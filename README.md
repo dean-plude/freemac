@@ -1,0 +1,132 @@
+# freemac
+
+freemac is an original, free operating system for ordinary x86-64 PCs whose
+desktop *feels* like a classic Mac-style desktop: a global menu bar along the
+top, a dock along the bottom, calm window chrome, a fast search launcher and
+trackpad gestures that just work.
+
+It is a small Linux distribution (Debian base) with its own Wayland desktop
+shell. It is **not** macOS, it does not run macOS apps, and it contains nothing
+from Apple.
+
+## Clean-room rules
+
+These rules apply to every commit, issue and pull request. A change that breaks
+one of them will be reverted.
+
+1. **No Apple material.** No Apple source code, binaries, firmware, kexts,
+   frameworks, fonts, icons, cursors, wallpapers, sounds, screenshots or other
+   artwork, in the repository or in built images.
+2. **No reverse engineering of Apple software.** Do not disassemble, decompile,
+   trace or dump macOS or any other Apple software, and do not use tools that do
+   so on your behalf. Do not copy code or data obtained that way by anyone else.
+3. **Design from public descriptions only.** Behaviour is designed from how the
+   user experience is publicly described (articles, reviews, user guides,
+   general knowledge of how such desktops work) and implemented from scratch.
+4. **Original names and look.** Components get original names. Window buttons,
+   icons and themes are our own designs. Do not imitate Apple's exact shapes,
+   colours or layouts pixel for pixel.
+5. **No Apple trademarks.** Do not use Apple, Mac, macOS, Finder, Dock,
+   Spotlight, Mission Control or similar marks as names of anything we ship.
+   (The repository name `freemac` is a working project name; a final product
+   name may be chosen before any public release.)
+6. **Only compatible open-source parts.** Third-party code must be under a
+   licence compatible with GPL-3.0-or-later and must be recorded in
+   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Target experience
+
+| Feature | Our component | Status |
+| --- | --- | --- |
+| Global top menu bar with app menus, clock, status icons | **Topline** | planned |
+| Bottom dock with magnification, running indicators | **Pier** | planned |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire plugins + theme) | planned |
+| File manager with column view | **Drawer** | planned |
+| Super+Space search launcher | **Seek** | planned |
+| Settings app with light and dark mode | **Dials** | planned |
+| Trackpad gestures (switch desktops, overview) | **Strata** gestures | planned |
+| Bootable live ISO | `build/build-iso.sh` | milestone 1 |
+
+## Roadmap
+
+- **Milestone 1: bootable base.** Reproducible script that builds a live ISO
+  (BIOS and UEFI) from a pinned Debian release and boots in QEMU to an
+  auto-logged-in console. *(this milestone)*
+- **Milestone 2: graphical session.** Wayfire compositor with our config,
+  greeter-less autologin into a Wayland session, Strata window theme with
+  left-side buttons, virtual desktops and overview enabled.
+- **Milestone 3: shell.** Topline menu bar and Pier dock as layer-shell
+  clients; Seek launcher on Super+Space.
+- **Milestone 4: apps.** Drawer file manager (icon, list and column views) and
+  Dials settings (appearance, light/dark, displays, network, trackpad).
+- **Milestone 5: polish.** Gestures, global menus for GTK and Qt apps, original
+  icon set and wallpapers, installer (Calamares).
+- **Milestone 6: Mac app compatibility (experimental).** Optional package
+  that runs some macOS command-line programs and, over time, simple apps
+  through the open-source Darling project, the way Wine runs Windows apps.
+  See [Mac app compatibility](docs/ARCHITECTURE.md#mac-app-compatibility-optional-layer).
+- **Milestone 7: release.** Signed images, package repository, docs.
+
+## Running Mac apps
+
+freemac is not macOS and does not include it. Mac app support is planned as an
+optional, experimental compatibility layer (milestone 6), and its limits are
+real:
+
+- **App Store apps are not supported.** They are encrypted and tied to Apple's
+  DRM and Apple ID, and freemac will not try to work around that.
+- Only apps built for Intel (x86-64), or universal apps, can run on a PC. Apps
+  built only for Apple silicon cannot.
+- Darling today runs many command-line tools; graphical apps are early and
+  experimental. Most everyday Mac apps will not work for a long time, if ever.
+
+For apps that matter, the dependable route is the Linux or web version of the
+app, or a free alternative; Seek and the app catalogue will point to those.
+
+## Building
+
+You need a Debian or Ubuntu build host, root (the build uses `chroot`) and
+about 10 GB free.
+
+```sh
+sudo apt-get install debootstrap squashfs-tools xorriso grub-pc-bin \
+  grub-efi-amd64-bin grub-common mtools dosfstools qemu-system-x86 ovmf
+sudo ./build/build-iso.sh            # writes out/freemac-<version>-amd64.iso
+```
+
+Options are environment variables, for example:
+
+```sh
+sudo BASE=debian SUITE=trixie MIRROR=http://deb.debian.org/debian ./build/build-iso.sh
+sudo SNAPSHOT=20261101T000000Z ./build/build-iso.sh   # pin to snapshot.debian.org
+sudo BASE=ubuntu ./build/build-iso.sh                 # fallback base (Ubuntu 24.04)
+```
+
+## Testing in QEMU
+
+```sh
+./scripts/run-qemu.sh out/freemac-*-amd64.iso          # BIOS, window
+./scripts/run-qemu.sh --uefi out/freemac-*-amd64.iso   # UEFI (needs OVMF)
+./scripts/run-qemu.sh --serial out/freemac-*-amd64.iso # no window, serial console
+```
+
+The raw command it runs is:
+
+```sh
+qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.1.0-amd64.iso \
+  -boot d -vga virtio -enable-kvm -cpu host
+```
+
+Tested so far (Nov 2026): the `BASE=ubuntu` image boots to the auto-login
+console in QEMU under both BIOS and UEFI (OVMF). The default `BASE=debian`
+build uses the same script and package list but has not been built yet,
+because the first build host could not reach Debian mirrors.
+
+The live session logs in automatically as user `freemac` (no password; `sudo`
+works without one on the live image).
+
+## Licence
+
+freemac's own code is licensed under the GNU General Public License v3.0 or
+later; see [LICENSE](LICENSE). Third-party components keep their own licences,
+listed in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

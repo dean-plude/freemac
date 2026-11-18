@@ -1,0 +1,19 @@
+# Packages installed on every freemac image (any base).
+# Boot and system
+systemd-sysv
+udev
+dbus
+kmod
+initramfs-tools
+live-boot
+live-boot-initramfs-tools
+# Basic tools for the live console
+sudo
+bash-completion
+less
+nano
+procps
+iproute2
+iputils-ping
+ca-certificates
+locales
