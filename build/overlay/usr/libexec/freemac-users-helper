@@ -121,6 +121,9 @@ def main(args):
             fail("You can't delete the account you're using.")
         if subprocess.run(["pgrep", "-u", entry.pw_name], capture_output=True).returncode == 0:
             fail(f"{entry.pw_gecos.split(',')[0] or entry.pw_name} is logged in. They need to log out first.")
+        members = grp.getgrnam(ADMIN_GROUP).gr_mem
+        if entry.pw_name in members and not [m for m in members if m != entry.pw_name]:
+            fail("This is the only administrator. Make someone else an administrator first.")
         run("userdel", *(["--remove"] if rest[1] == "remove" else []), entry.pw_name)
         if autologin_user() == entry.pw_name:
             set_autologin(None)

@@ -43,16 +43,20 @@ on the Ubuntu 24.04 base (`BASE=ubuntu`). The new packages in 0.6 (gtklock,
 swayidle, PackageKit, AppStream, mate-polkit) should all be in Debian trixie under the same names,
 but that build hasn't been run yet.
 
-## 0.7 "own look and people" (in progress)
+## 0.7 "own look and people" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | More original wallpapers, each in a day and a night version that follows light and dark mode | art, Dials | in progress |
-| 2 | Original icons for every freemac app | art/icons | in progress |
-| 3 | A freemac icon theme with our own folder and file-type icons (Adwaita for the rest) | art/icon-theme | in progress |
-| 4 | Users panel: add and delete users, change passwords, administrators, automatic login | Dials | in progress |
-| 5 | Bluetooth panel: on/off, pairing (with codes), connect, forget, battery level | Dials | in progress |
-| 6 | Printers panel: list, default, test page, remove; Add Printer through system-config-printer | Dials | in progress |
+| 1 | More original wallpapers, each in a day and a night version that follows light and dark mode | art, Dials | done |
+| 2 | Original icons for every freemac app | art/icons | done |
+| 3 | A freemac icon theme with our own folder and file-type icons (Adwaita for the rest) | art/icon-theme | done |
+| 4 | Users panel: add and delete users, change passwords, administrators, automatic login | Dials | done |
+| 5 | Bluetooth panel: on/off, pairing (with codes), connect, forget, battery level | Dials | done |
+| 6 | Printers panel: list, default, test page, remove; Add Printer through system-config-printer | Dials | done |
+
+Also in 0.7: the session now creates the standard folders (Desktop, Documents,
+Downloads and so on) at login, so they get their own icons, and the last
+administrator can no longer be deleted.
 
 ## 0.8 "Strata plugins" (planned)
 

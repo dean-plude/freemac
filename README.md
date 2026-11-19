@@ -56,7 +56,7 @@ one of them will be reverted.
 | Lock screen (Super+L, idle and before sleep) | **Latch** | 0.6 |
 | Calculator | **Tally** | 0.6 |
 | Clock with world clocks, alarms, timers and a stopwatch | **Chime** | 0.6 |
-| Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 15 folder and file icons, 4 wallpaper scenes |
+| Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 17 folder and file icons, 4 wallpaper scenes |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4 |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |

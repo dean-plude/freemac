@@ -329,6 +329,9 @@ class BluetoothPanel(Gtk.Box):
         self.nearby.get_style_context().add_class("dials-group")
         self.pack_start(page("Bluetooth", top, self.mine_title, self.mine, self.nearby_title, self.nearby),
                         True, True, 0)
+        # refresh() decides which of these show; keep show_all() off them.
+        for widget in (self.mine_title, self.mine, self.nearby_title, self.nearby):
+            widget.set_no_show_all(True)
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         except GLib.Error:
@@ -483,8 +486,8 @@ class BluetoothPanel(Gtk.Box):
         if on and not self.nearby.get_children():
             self.nearby.add(item_row("bluetooth-active-symbolic", "Looking for devices…",
                                      "Put the device in pairing mode to see it here."))
-        self.mine.show_all()
-        self.nearby.show_all()
+        for row in self.mine.get_children() + self.nearby.get_children():
+            row.show_all()      # the lists have no_show_all, so show their rows directly
         return False
 
     def device_row(self, path, dev):
