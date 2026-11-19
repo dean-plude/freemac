@@ -13,7 +13,10 @@ import subprocess
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+gi.require_version("GtkLayerShell", "0.1")
+from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
+
+from . import style  # noqa: E402
 
 try:
     gi.require_version("NM", "1.0")
@@ -89,9 +92,20 @@ class Sound(StatusButton):
 
     def __init__(self):
         super().__init__()
-        # The bar is at the top of the screen, so the popover opens downwards.
-        self.popover = Gtk.Popover(relative_to=self, position=Gtk.PositionType.BOTTOM)
-        box = Gtk.Box(spacing=8, margin=10)
+        # Topline's window is only as tall as the bar, and a GTK 3 popover
+        # can't draw outside its window, so the slider lives in a small
+        # layer-shell window of its own, placed under the icon.
+        self.popup = Gtk.Window(title="Volume")
+        style.make_transparent(self.popup)
+        GtkLayerShell.init_for_window(self.popup)
+        GtkLayerShell.set_layer(self.popup, GtkLayerShell.Layer.OVERLAY)
+        GtkLayerShell.set_namespace(self.popup, "freemac-volume")
+        GtkLayerShell.set_anchor(self.popup, GtkLayerShell.Edge.TOP, True)
+        GtkLayerShell.set_anchor(self.popup, GtkLayerShell.Edge.RIGHT, True)
+        GtkLayerShell.set_margin(self.popup, GtkLayerShell.Edge.TOP, 32)
+        GtkLayerShell.set_keyboard_mode(self.popup, GtkLayerShell.KeyboardMode.ON_DEMAND)
+        box = Gtk.Box(spacing=8)
+        box.get_style_context().add_class("topline-popup")
         self.mute = Gtk.ToggleButton()
         self.mute.set_image(Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic", Gtk.IconSize.MENU))
         self.mute.set_tooltip_text("Mute")
@@ -102,13 +116,51 @@ class Sound(StatusButton):
         self.scale_handler = self.scale.connect("value-changed", self._set_volume)
         box.pack_start(self.mute, False, False, 0)
         box.pack_start(self.scale, True, True, 0)
+        self.popup.add(box)
         box.show_all()
-        self.popover.add(box)
-        self.connect("clicked", lambda *_: self.update() or self.popover.popup())
+        self.popup.connect("key-press-event", self._popup_key)
+        self.popup.connect("leave-notify-event", self._popup_leave)
+        self.popup.connect("enter-notify-event", self._popup_enter)
+        self.close_timer = None
+        self.connect("clicked", self._toggle_popup)
         self.add_events(1 << 21)  # scroll
         self.connect("scroll-event", self._scroll)
         GLib.timeout_add_seconds(10, lambda: self.update() or True)
         self.update()
+
+    def _toggle_popup(self, *_args):
+        if self.popup.get_visible():
+            self.popup.hide()
+            return
+        self.update()
+        top = self.get_toplevel()
+        alloc = self.get_allocation()
+        x, _y = self.translate_coordinates(top, 0, 0)
+        right = top.get_allocated_width() - (x + alloc.width // 2) - 110
+        GtkLayerShell.set_margin(self.popup, GtkLayerShell.Edge.RIGHT, max(8, right))
+        self.popup.show()
+        self._popup_leave()   # closes by itself if the pointer never goes in
+
+    def _popup_key(self, _window, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.popup.hide()
+        return False
+
+    def _popup_enter(self, *_args):
+        if self.close_timer:
+            GLib.source_remove(self.close_timer)
+            self.close_timer = None
+
+    def _popup_leave(self, _window=None, event=None):
+        if event is not None and event.detail == Gdk.NotifyType.INFERIOR:
+            return   # moved onto the slider or the mute button
+        self._popup_enter()
+        self.close_timer = GLib.timeout_add(2500, self._auto_close)
+
+    def _auto_close(self):
+        self.close_timer = None
+        self.popup.hide()
+        return False
 
     def read(self):
         if not shutil.which("wpctl"):
@@ -147,8 +199,6 @@ class Sound(StatusButton):
         self.update()
 
     def _scroll(self, _widget, event):
-        from gi.repository import Gdk
-
         step = "5%+" if event.direction == Gdk.ScrollDirection.UP else "5%-"
         if event.direction in (Gdk.ScrollDirection.UP, Gdk.ScrollDirection.DOWN):
             subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", step], capture_output=True)

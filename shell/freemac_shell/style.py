@@ -31,6 +31,13 @@ TEMPLATE = """
 }
 .pier-item { background: none; border: none; box-shadow: none; padding: 0 3px; }
 .pier-dot { color: @ink; font-size: 7px; }
+.topline-popup {
+  background-color: @shelf;
+  border: 1px solid @edge;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.topline-popup label { color: @ink; }
 .pier-sep { background-color: @edge; min-width: 1px; margin: 8px 6px; }
 
 .seek {
