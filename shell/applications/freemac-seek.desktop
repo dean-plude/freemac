@@ -3,6 +3,6 @@ Type=Application
 Name=Seek
 Comment=Find apps and files, and do quick sums
 Exec=freemac-seek
-Icon=system-search
+Icon=freemac-seek
 Categories=Utility;
 Keywords=search;find;launcher;calculator;

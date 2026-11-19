@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Seek: a brass spyglass across a starry sky. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b3a7a"/><stop offset="1" stop-color="#141a3c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd890"/><stop offset="1" stop-color="#c98b33"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <g fill="#ffffff">
+    <circle cx="30" cy="30" r="2"/><circle cx="52" cy="22" r="1.5"/><circle cx="96" cy="28" r="2.5"/>
+    <circle cx="82" cy="46" r="1.5"/><circle cx="26" cy="64" r="1.5"/><circle cx="102" cy="84" r="1.5"/>
+  </g>
+  <g transform="rotate(-35 64 70)">
+    <rect x="18" y="62" width="30" height="18" rx="4" fill="#9a6526"/>
+    <rect x="44" y="59" width="30" height="24" rx="4" fill="url(#brass)"/>
+    <rect x="70" y="55" width="38" height="32" rx="5" fill="url(#brass)"/>
+    <rect x="104" y="53" width="8" height="36" rx="3" fill="#7a4d1b"/>
+    <rect x="52" y="59" width="4" height="24" fill="#a46c2a"/>
+    <rect x="80" y="55" width="4" height="32" fill="#a46c2a"/>
+  </g>
+</svg>

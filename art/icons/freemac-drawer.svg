@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Drawer: two drawers, the top one pulled open with papers inside. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fb3b0"/><stop offset="1" stop-color="#1f7f8f"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf6ea"/><stop offset="1" stop-color="#e6dcc6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="26" y="30" width="76" height="72" rx="8" fill="#15626e"/>
+  <rect x="34" y="24" width="20" height="26" rx="2" fill="#ffffff" transform="rotate(-8 44 37)"/>
+  <rect x="50" y="22" width="22" height="28" rx="2" fill="#dff3f6"/>
+  <rect x="68" y="26" width="20" height="24" rx="2" fill="#ffd9a8" transform="rotate(7 78 38)"/>
+  <rect x="20" y="46" width="88" height="26" rx="7" fill="url(#front)"/>
+  <rect x="50" y="56" width="28" height="7" rx="3.5" fill="#1f7f8f"/>
+  <rect x="26" y="78" width="76" height="24" rx="7" fill="url(#front)" opacity="0.92"/>
+  <rect x="50" y="87" width="28" height="7" rx="3.5" fill="#1f7f8f"/>
+</svg>
