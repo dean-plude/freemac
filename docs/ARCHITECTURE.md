@@ -78,7 +78,7 @@ only ship alongside, which is fine for any free licence).
 | Name | What it is | Language | Notes |
 | --- | --- | --- | --- |
 | **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. |
-| **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, app menus read over DBusMenu (KDE appmenu protocol on Wayland). Right: network, sound and battery icons (0.4), clock; app status icons (StatusNotifierItem) and quick settings later. Falls back to a minimal per-app menu when an app exports none. |
+| **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, the app's own menus (GTK apps since 0.8, through strata-shell; Qt apps planned). Right: network, sound and battery icons (0.4), Bluetooth and printing (0.8), clock; app status icons (StatusNotifierItem) and quick settings later. Falls back to a minimal per-app menu when an app exports none. |
 | **Backdrop** | Desktop wallpaper | Python + GTK 3 (layer-shell, background layer) | One window per screen under the menu bar and dock; fills the screen at any shape (or fits or stretches, set in Dials). Replaced wf-shell's background in 0.4. |
 | **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
@@ -124,19 +124,43 @@ without changing the user experience.
   log-out; installed systems show Gangway unless "Log in automatically" was
   chosen. seatd hands the compositor its devices; NetworkManager runs the
   network.
-- **Known gaps:** app menus from GTK and Qt apps in Topline (DBusMenu), our
-  own decoration plugin, our own icons (0.5 adds icons for Quill, Frame and
-  Lens only), and gestures, Wi-Fi and
+- **Known gaps (then):** app menus in Topline and our own decoration plugin
+  (both came in 0.8), our own icons (0.7), and gestures, Wi-Fi and
   batteries tested on real hardware. In QEMU's software rendering the menu
   bar sometimes shows a dark patch for a moment while it redraws; not yet
   checked on real hardware.
 
+## Strata's plugins (0.8)
+
+`strata/` holds Wayfire plugins in C++. `build/build-iso.sh` copies them into
+the image, installs the compilers and Wayfire's headers, runs
+`strata/build.sh`, installs the `.so` files and their option files
+(`/usr/share/wayfire/metadata`), swaps them into `wayfire.ini`'s plugin list,
+and removes the compilers again. They follow Wayfire's plugin API as of ABI
+2023-11-23; with another Wayfire the build skips them and Wayfire's stock
+plugins stay in use.
+
+- **strata-decor** (`strata/decor`) replaces `decoration`: the title bar for
+  apps that leave it to the desktop, with freemac's buttons on the left, a
+  centred title, and colours that follow Dials' light/dark setting live.
+- **strata-shell** (`strata/shell`) replaces `gtk-shell`: it keeps the menu
+  addresses GTK apps publish for each window and answers the IPC call
+  `strata/app-menus {"id": N}` with them. Topline reads the menus over D-Bus
+  (`org.gtk.Menus` and `org.gtk.Actions`, through GIO's `GDBusMenuModel` and
+  `GDBusActionGroup`) and shows them next to the app's name. It also tells
+  GTK apps that the desktop shows their menu bar, so they leave it out of the
+  window (`[strata-shell] global_menus`).
+
+Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
+
 ## Hard problems we know about
 
-- **Global menus on Wayland.** There is no single standard. Qt apps can export
-  menus through the KDE appmenu protocol; GTK 3 apps through
-  appmenu-gtk-module; GTK 4 and Electron apps mostly cannot. Topline must
-  handle "no menu exported" gracefully from day one.
+- **Global menus on Wayland.** There is no single standard. GTK 3 apps with
+  a GtkApplication menu bar publish it through the gtk-shell protocol, which
+  strata-shell passes to Topline (0.8). Qt apps can export menus through the
+  KDE appmenu protocol (planned); GTK 4 and Electron apps mostly cannot.
+  Topline falls back to its own small app menu (Hide, Quit) when an app
+  publishes none.
 - **Overview and gestures** need compositor support, which is why Strata is
   built inside Wayfire rather than as a separate client.
 - **Hardware support** follows Debian's kernel and firmware (we enable

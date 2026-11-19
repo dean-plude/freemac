@@ -40,10 +40,10 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; app menus exported by apps planned for 0.8 |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; 0.8: GTK apps' own menus, Bluetooth and printing icons |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned for 0.8 |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor) |
 | File manager with icon, list and column views | **Drawer** | 0.4 |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
 | Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers |
@@ -79,8 +79,9 @@ one of them will be reverted.
   Dials settings (appearance, light/dark, wallpaper, dock, displays, trackpad,
   keyboard, network). *(0.4.0)*
 - **Milestone 5: polish.** Keel installer and Gangway login screen *(0.4.0)*;
-  still to do: global menus for GTK and Qt apps, our own decoration plugin,
-  original icon set, more wallpapers, gestures tested on real trackpads.
+  original icons and more wallpapers came in 0.7, our own title bars and
+  GTK app menus in Topline in 0.8; still to do: menus from Qt apps, gestures
+  tested on real trackpads.
 - **Milestone 6: Mac app compatibility (experimental).** Ferry, our own
   optional layer that runs some programs built for Intel Macs, the way Wine
   runs Windows programs. Written from public documentation only. See
