@@ -153,6 +153,26 @@ plugins stay in use.
 
 Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 
+## Menus, tiling, quick settings and night light (0.9)
+
+- Every freemac app publishes its menu bar through `GtkApplication`
+  (`shell/freemac_shell/menus.py` builds them). The menus only show the keys;
+  each window still handles its own keys, so typing in a text field works as
+  usual.
+- Tiling at the screen edges is Wayfire's `grid` plugin together with
+  `move`'s snapping (`[move] enable_snap`), in freemac's colours. Dials >
+  Appearance switches it off.
+- Dials > Keyboard edits the shortcuts in `wayfire.ini`. It reads the key
+  pressed as a Linux input code through libevdev, so the name it writes
+  (`KEY_A` and so on) is right whatever the keyboard layout.
+- Brightness goes through logind's `SetBrightness`, so the person at the
+  seat can change it without a password. Night light is `wlsunset` (Wayland
+  gamma control), started at login by `freemac-nightlight` from
+  `~/.config/freemac/nightlight.json`. Virtual machines usually can't change
+  gamma, so night light only shows on real screens.
+- Quick settings (`quick.py`) is a layer-shell panel from Topline, like the
+  volume slider, so it can draw below the bar.
+
 ## Hard problems we know about
 
 - **Global menus on Wayland.** There is no single standard. GTK 3 apps with
