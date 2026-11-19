@@ -544,9 +544,9 @@ class UpdatesPage(Gtk.Box):
             sub.get_style_context().add_class("dim-label")
             row.pack_start(sub, True, True, 0)
             row.pack_start(Gtk.Label(label=version), False, False, 0)
+            row.show_all()   # the list has no_show_all set, so show_all on it does nothing
             self.list.add(row)
         self.list.show()
-        self.list.show_all()
         self.install.show()
         self.install.set_sensitive(True)
 
