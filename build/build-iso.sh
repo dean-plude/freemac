@@ -182,6 +182,27 @@ in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
+# Strata's own Wayfire plugins (C++), compiled against the image's Wayfire.
+# The compilers are removed again afterwards. If this Wayfire has a plugin API
+# they don't support yet, Wayfire's stock decoration plugin stays in use.
+log "Building Strata's plugins"
+STRATA_BUILD_DEPS="g++ pkg-config wayfire-dev"
+rm -rf "$ROOTFS/tmp/strata"
+cp -r "$REPO/strata" "$ROOTFS/tmp/strata"
+if in_chroot apt-get install -y --no-install-recommends $STRATA_BUILD_DEPS \
+   && in_chroot sh /tmp/strata/build.sh /tmp/strata/out; then
+  plugdir=$(in_chroot pkg-config --variable=plugindir wayfire 2>/dev/null || true)
+  [ -n "$plugdir" ] || plugdir=/usr/lib/$(in_chroot dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo x86_64-linux-gnu)/wayfire
+  install -m 0644 "$ROOTFS/tmp/strata/out/libstrata-decor.so" "$ROOTFS$plugdir/libstrata-decor.so"
+  install -D -m 0644 "$REPO/strata/decor/strata-decor.xml" "$ROOTFS/usr/share/wayfire/metadata/strata-decor.xml"
+  for ini in "$ROOTFS/etc/skel/.config/wayfire.ini" "$ROOTFS/home/freemac/.config/wayfire.ini"; do
+    if [ -f "$ini" ]; then sed -i 's/^\(plugins = .*\) decoration /\1 strata-decor /' "$ini"; fi
+  done
+else
+  log "Warning: Strata's plugins didn't build; using Wayfire's stock title bars"
+fi
+in_chroot apt-get purge -y --auto-remove $STRATA_BUILD_DEPS || true
+rm -rf "$ROOTFS/tmp/strata"
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 # Every scene in a day and a night version (Dials swaps them with the mode).
 python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"

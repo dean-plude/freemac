@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<wayfire>
+	<!-- Strata's title bars. It reads the [decoration] options. -->
+	<plugin name="strata-decor">
+		<_short>Strata title bars</_short>
+		<_long>freemac's window title bars for apps that don't draw their own.</_long>
+		<category>Window Management</category>
+	</plugin>
+</wayfire>
