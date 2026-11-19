@@ -1,0 +1,12 @@
+# freemac live image: log the freemac user straight into the desktop.
+[terminal]
+vt = 7
+
+# Fallback text login if the desktop session exits.
+[default_session]
+command = "agreety --cmd /usr/local/bin/freemac-session"
+user = "_greetd"
+
+[initial_session]
+command = "/usr/local/bin/freemac-session"
+user = "freemac"

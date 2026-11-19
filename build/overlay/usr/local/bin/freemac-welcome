@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""freemac Welcome: first window of the live session (milestone 2)."""
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import GLib, Gtk  # noqa: E402
+
+GLib.set_prgname("freemac-welcome")
+
+SHORTCUTS = [
+    ("Ctrl + Up  or  4-finger swipe up", "Show all windows"),
+    ("Ctrl + Down  or  4-finger swipe down", "Show all desktops"),
+    ("Ctrl + Left / Right  or  3-finger swipe", "Switch desktop"),
+    ("Super + Enter", "Open a terminal"),
+    ("Super + Q", "Close the window"),
+    ("Super + D", "Show the desktop"),
+]
+
+
+class Welcome(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Welcome to freemac")
+        self.set_default_size(560, 420)
+        bar = Gtk.HeaderBar(title="Welcome to freemac", show_close_button=True)
+        self.set_titlebar(bar)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=28)
+        self.add(box)
+
+        logo = Gtk.Image.new_from_file("/usr/share/freemac/freemac-mark.svg")
+        box.pack_start(logo, False, False, 0)
+
+        title = Gtk.Label()
+        title.set_markup("<span size='xx-large' weight='bold'>freemac</span>")
+        box.pack_start(title, False, False, 0)
+
+        intro = Gtk.Label(
+            label="A free desktop for your PC. This is an early preview:\n"
+            "the menu bar and dock here are stand-ins until our own arrive.",
+            justify=Gtk.Justification.CENTER,
+        )
+        box.pack_start(intro, False, False, 0)
+
+        grid = Gtk.Grid(column_spacing=24, row_spacing=8, halign=Gtk.Align.CENTER, margin_top=8)
+        for row, (keys, action) in enumerate(SHORTCUTS):
+            k = Gtk.Label(xalign=1)
+            k.set_markup(f"<b>{keys}</b>")
+            grid.attach(k, 0, row, 1, 1)
+            grid.attach(Gtk.Label(label=action, xalign=0), 1, row, 1, 1)
+        box.pack_start(grid, False, False, 0)
+
+
+win = Welcome()
+win.connect("destroy", Gtk.main_quit)
+win.show_all()
+Gtk.main()

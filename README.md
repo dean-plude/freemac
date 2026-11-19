@@ -38,23 +38,25 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menus, clock, status icons | **Topline** | planned |
-| Bottom dock with magnification, running indicators | **Pier** | planned |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire plugins + theme) | planned |
+| Global top menu bar with app menus, clock, status icons | **Topline** | planned (interim wf-panel bar in 0.2) |
+| Bottom dock with magnification, running indicators | **Pier** | planned (interim wf-dock in 0.2) |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire plugins + theme) | 0.2: overview, 4 desktops, left buttons on GTK apps; own decoration plugin planned |
 | File manager with column view | **Drawer** | planned |
 | Super+Space search launcher | **Seek** | planned |
 | Settings app with light and dark mode | **Dials** | planned |
-| Trackpad gestures (switch desktops, overview) | **Strata** gestures | planned |
-| Bootable live ISO | `build/build-iso.sh` | milestone 1 |
+| Trackpad gestures (switch desktops, overview) | **Strata** gestures | 0.2: configured, not yet tested on hardware |
+| Bootable live ISO | `build/build-iso.sh` | done (0.1) |
 
 ## Roadmap
 
 - **Milestone 1: bootable base.** Reproducible script that builds a live ISO
   (BIOS and UEFI) from a pinned Debian release and boots in QEMU to an
-  auto-logged-in console. *(this milestone)*
-- **Milestone 2: graphical session.** Wayfire compositor with our config,
-  greeter-less autologin into a Wayland session, Strata window theme with
-  left-side buttons, virtual desktops and overview enabled.
+  auto-logged-in console. *(done, 0.1.0)*
+- **Milestone 2: graphical session.** Wayfire configured as Strata, greetd
+  autologin straight into the Wayland desktop, original wallpaper, a Welcome
+  app, window overview, four desktops, gestures, and left-side window buttons
+  on GTK apps. wf-shell's bar and dock stand in for Topline and Pier.
+  *(0.2.0)*
 - **Milestone 3: shell.** Topline menu bar and Pier dock as layer-shell
   clients; Seek launcher on Super+Space.
 - **Milestone 4: apps.** Drawer file manager (icon, list and column views) and
@@ -113,16 +115,33 @@ sudo BASE=ubuntu ./build/build-iso.sh                 # fallback base (Ubuntu 24
 The raw command it runs is:
 
 ```sh
-qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.1.0-amd64.iso \
+qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.2.0-amd64.iso \
   -boot d -vga virtio -enable-kvm -cpu host
 ```
 
-Tested so far (Nov 2026): the `BASE=ubuntu` image boots to the auto-login
-console in QEMU under both BIOS and UEFI (OVMF). The default `BASE=debian`
-build uses the same script and package list but has not been built yet,
-because the first build host could not reach Debian mirrors.
+Tested so far (Nov 2026): the `BASE=ubuntu` image boots in QEMU under both
+BIOS and UEFI (OVMF). 0.1.0 reached the auto-login console; 0.2.0 starts the
+desktop session on its own:
 
-The live session logs in automatically as user `freemac` (no password; `sudo`
+![freemac 0.2 desktop](docs/screenshots/0.2-desktop.png)
+ The default `BASE=debian` build
+uses the same script and package lists but has not been built yet, because the
+first build host could not reach Debian mirrors.
+
+### Desktop shortcuts (0.2)
+
+| Keys or gesture | Action |
+| --- | --- |
+| Ctrl+Up, Super+Tab, 4-finger swipe up | Show all windows |
+| Ctrl+Down, 4-finger swipe down | Show all desktops |
+| Ctrl+Left / Ctrl+Right, 3-finger swipe | Switch desktop |
+| Ctrl+Shift+Left / Right | Move the window to the next desktop |
+| Alt+Tab | Switch windows |
+| Super+Enter | Terminal |
+| Super+Q | Close window |
+| Super+M / Super+D | Minimise / show desktop |
+
+The live session logs in automatically as user `freemac` (desktop on VT 7, text console on VT 1) (no password; `sudo`
 works without one on the live image).
 
 ## Licence

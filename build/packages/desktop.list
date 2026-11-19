@@ -1,0 +1,22 @@
+# Graphical session (milestone 2): Wayfire configured as Strata, interim
+# wf-shell bar and dock, greetd autologin, fonts, Mesa, GTK for our apps.
+wayfire
+wf-shell
+greetd
+seatd
+foot
+dbus-user-session
+libpam-systemd
+libgl1-mesa-dri
+libegl-mesa0
+libgles2
+libgbm1
+fonts-inter
+fonts-dejavu-core
+adwaita-icon-theme
+hicolor-icon-theme
+librsvg2-common
+gsettings-desktop-schemas
+libglib2.0-bin
+python3-gi
+gir1.2-gtk-3.0

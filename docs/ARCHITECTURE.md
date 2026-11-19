@@ -36,6 +36,9 @@ only ship alongside, which is fine for any free licence).
 | GRUB 2 | BIOS and UEFI boot loader on the ISO | GPL-3.0-or-later |
 | squashfs-tools, xorriso | Image creation (build time only) | GPL-2.0-or-later / GPL-3.0-or-later |
 | Wayfire | Wayland compositor we extend into Strata | MIT |
+| wf-shell | Interim top bar, dock and background (0.2 only) | MIT |
+| seatd | Seat and device access for the compositor | MIT |
+| foot | Terminal | MIT |
 | wlroots | Compositor library under Wayfire | MIT |
 | wf-touch / libinput | Gesture recognition, input | MIT |
 | GTK 4 | Toolkit for our shell and apps | LGPL-2.1-or-later |
@@ -69,6 +72,29 @@ Python is chosen for the first versions of the shell apps because it lets the
 look and behaviour iterate quickly; anything that turns out to be performance
 sensitive (the dock's magnification, for example) can move to C or Rust later
 without changing the user experience.
+
+## Status in 0.2 (milestone 2)
+
+- **Strata** is, for now, a Wayfire configuration (`/etc/skel/.config/wayfire.ini`
+  in `build/overlay`): overview (scale), all-desktops view (expo), four
+  desktops in a row (vswitch), 3-finger desktop swipe (vswipe), animations.
+- **Left-side window buttons** come from GTK's decoration layout
+  (`close,minimize,maximize:` set through a GSettings override and
+  `settings.ini`), so they appear on GTK apps that draw their own title bars.
+  Wayfire 0.8's built-in decoration only places buttons on the right, so apps
+  that ask the compositor for a title bar (foot, some Qt apps) still get
+  right-side buttons until our own Strata decoration plugin lands.
+- **Interim shell:** wf-panel (top bar), wf-dock (dock) and wf-background from
+  wf-shell (MIT) stand in for Topline and Pier.
+- **Session:** greetd starts `/usr/local/bin/freemac-session` for the live
+  user on VT 7; agreety is the fallback text login. seatd (MIT) hands the
+  compositor its display and input devices; logind alone refused to activate
+  the session in testing.
+- **Known rough edges:** the interim dock shows a blank tile for our Welcome
+  app and draws a full-width strip, and the bar's clock can render clipped
+  until it next updates. Both components are replaced in milestone 3.
+- **Artwork:** the "Dusk Tide" wallpaper is generated at build time by
+  `art/make-wallpaper.py`, and the freemac mark is an original SVG.
 
 ## Hard problems we know about
 
