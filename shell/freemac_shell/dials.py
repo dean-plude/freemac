@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_more, dials_people, menus, pier, style  # noqa: E402
+from . import dials_keys, dials_more, dials_people, menus, pier, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -530,14 +530,14 @@ class DialsWindow(Gtk.ApplicationWindow):
         layout.connect("activate", lambda e: ini_set(WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us"))
         layout.connect("focus-out-event", lambda e, _ev: ini_set(
             WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us") or False)
-        shortcuts = [
-            ("Super+Space", "Seek"), ("Ctrl+Up or Super+Tab", "All windows"), ("Ctrl+Down", "All desktops"),
-            ("Ctrl+Left / Right", "Switch desktop"), ("Alt+Tab", "Switch windows"), ("Super+Enter", "Terminal"),
-            ("Super+Q", "Close window"), ("Super+M", "Minimize"), ("Super+D", "Show desktop"),
-        ]
+        self.shortcuts = dials_keys.Shortcuts(
+            self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
+            lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
+        heading = Gtk.Label(label="Shortcuts", xalign=0)
+        heading.get_style_context().add_class("dials-section")
         return page("Keyboard", group(
             row("Layout", layout, "An XKB layout code such as us, gb, de or fr. Press Enter to apply."),
-        ), group(*[row(action, Gtk.Label(label=keys)) for keys, action in shortcuts]))
+        ), heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):
