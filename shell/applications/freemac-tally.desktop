@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tally
+Comment=Work out sums, with a running tape
+Exec=freemac-tally
+Icon=freemac-tally
+Categories=Utility;Calculator;
+Keywords=calculator;calculate;maths;math;sum;
+StartupWMClass=org.freemac.Tally
+StartupNotify=true

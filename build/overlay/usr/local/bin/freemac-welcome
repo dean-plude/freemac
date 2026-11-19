@@ -25,6 +25,7 @@ SHORTCUTS = [
     ("Super + Enter", "Open a terminal"),
     ("Super + Q", "Close the window"),
     ("Super + D", "Show the desktop"),
+    ("Super + L", "Lock the screen"),
 ]
 
 

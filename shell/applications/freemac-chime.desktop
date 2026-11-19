@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Chime
+Comment=World clocks, alarms, a timer and a stopwatch
+Exec=freemac-chime
+Icon=freemac-chime
+Categories=Utility;Clock;
+Keywords=clock;alarm;timer;stopwatch;world;time;zone;
+StartupWMClass=org.freemac.Chime
+StartupNotify=true

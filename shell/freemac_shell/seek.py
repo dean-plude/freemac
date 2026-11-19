@@ -118,6 +118,7 @@ class SeekWindow(Gtk.Window):
         box.pack_start(self.hint, False, False, 0)
         self.connect("key-press-event", self._key)
         self.results = []
+        self.query = ""
         self.apps = [a for a in Gio.AppInfo.get_all() if a.should_show()]
 
     def _key(self, _w, event):
@@ -134,13 +135,17 @@ class SeekWindow(Gtk.Window):
             self.listbox.select_row(self.listbox.get_row_at_index(index))
             return True
         if event.keyval == Gdk.KEY_Return:
+            if self.entry.get_text().strip() != self.query:
+                # Typed faster than the search updates: search now so Enter
+                # opens the best match for what's in the field.
+                self._changed(self.entry)
             row = self.listbox.get_selected_row()
             self._run(row.get_index() if row else 0)
             return True
         return False
 
     def _changed(self, _entry):
-        query = self.entry.get_text().strip()
+        query = self.query = self.entry.get_text().strip()
         results = []
         if query:
             answer = calculate(query)

@@ -44,5 +44,19 @@ gnome-themes-extra
 pipewire
 pipewire-pulse
 wireplumber
+# Alarm and timer sounds for Chime (freedesktop sound theme), and time zones
+sound-theme-freedesktop
+tzdata
 at-spi2-core
 power-profiles-daemon
+# Lock screen (Latch): session locking with PAM, and idle detection
+gtklock
+swayidle
+# App centre (Harbor): PackageKit installs, AppStream catalogue with icons,
+# and a password prompt (polkit agent) for installs and updates
+packagekit
+gir1.2-packagekitglib-1.0
+gir1.2-appstream-1.0
+appstream
+apt-config-icons
+mate-polkit

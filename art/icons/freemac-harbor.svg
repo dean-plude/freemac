@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Harbor: a lighthouse and a crate arriving on the quay. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f4fb8"/><stop offset="1" stop-color="#1f8a9a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#sky)"/>
+  <path d="M27 40 L13 33 M27 40 L13 47" stroke="#ffe2a8" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <path d="M27 32 h12 v-6 a6 6 0 0 0 -12 0 z" fill="#e9eefc"/>
+  <rect x="28" y="33" width="10" height="9" rx="2" fill="#ffd27a"/>
+  <path d="M26 44 h14 l4 50 h-22 z" fill="#e9eefc"/>
+  <path d="M27.2 58 h11.6 l1 13 h-13.6 z" fill="#e2675d"/>
+  <rect x="62" y="56" width="38" height="32" rx="5" fill="#f2a65a"/>
+  <path d="M62 67 h38 M62 77 h38" stroke="#c97c35" stroke-width="2.5"/>
+  <path d="M81 26 v18 M73 37 l8 8 8 -8" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="16" y="92" width="96" height="10" rx="3" fill="#20294f"/>
+  <path d="M16 110 q8 -5 16 0 t16 0 t16 0 t16 0 t16 0 t16 0" stroke="#bfe9ee" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

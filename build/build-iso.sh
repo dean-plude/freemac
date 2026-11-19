@@ -95,9 +95,25 @@ log "Bootstrapping minimal root filesystem"
 debootstrap --arch="$ARCH" --variant=minbase --components="$COMPONENTS" \
   "$SUITE" "$ROOTFS" "$MIRROR"
 
-# Sources for apt inside the image (also used for the install step below).
-printf 'deb %s %s %s\n' "$MIRROR" "$SUITE" "$(echo "$COMPONENTS" | tr ',' ' ')" \
-  > "$ROOTFS/etc/apt/sources.list"
+# Sources for apt inside the image (also used for the install step below):
+# the release, its updates and its security fixes, so Harbor's Updates page
+# and the daily check have something to offer.
+COMPS=$(echo "$COMPONENTS" | tr ',' ' ')
+case "$BASE" in
+  debian)
+    if [ -n "${SNAPSHOT:-}" ]; then
+      SECURITY=${SECURITY_MIRROR:-http://snapshot.debian.org/archive/debian-security/$SNAPSHOT}
+    else
+      SECURITY=${SECURITY_MIRROR:-http://security.debian.org/debian-security}
+    fi
+    ;;
+  ubuntu) SECURITY=${SECURITY_MIRROR:-http://security.ubuntu.com/ubuntu} ;;
+esac
+{
+  printf 'deb %s %s %s\n' "$MIRROR" "$SUITE" "$COMPS"
+  printf 'deb %s %s-updates %s\n' "$MIRROR" "$SUITE" "$COMPS"
+  printf 'deb %s %s-security %s\n' "$SECURITY" "$SUITE" "$COMPS"
+} > "$ROOTFS/etc/apt/sources.list"
 [ -n "${SNAPSHOT:-}" ] && printf 'Acquire::Check-Valid-Until "false";\n' \
   > "$ROOTFS/etc/apt/apt.conf.d/10freemac-snapshot"
 
@@ -116,6 +132,9 @@ chmod 755 "$ROOTFS/usr/sbin/policy-rc.d"
 in_chroot apt-get update
 # shellcheck disable=SC2086
 in_chroot apt-get install -y --no-install-recommends $KERNEL $PACKAGES
+# A second update, now that AppStream is installed, downloads the app
+# catalogue (DEP-11) for Harbor and builds its cache.
+in_chroot apt-get update || log "Warning: couldn't download the app catalogue; Harbor will fetch it later"
 
 log "Applying freemac overlay"
 cp -a "$REPO/build/overlay/." "$ROOTFS/"
@@ -166,7 +185,10 @@ python3 "$REPO/art/make-wallpaper.py" --night "$ROOTFS/usr/share/backgrounds/fre
 log "Cleaning the image"
 rm -f "$ROOTFS/usr/sbin/policy-rc.d"
 in_chroot apt-get clean
-rm -rf "$ROOTFS"/var/lib/apt/lists/* "$ROOTFS"/var/cache/apt/*.bin \
+# The package lists stay: Harbor's app catalogue (AppStream DEP-11 data) and
+# installs work straight away; Harbor refreshes them when they get old.
+rm -rf "$ROOTFS"/var/lib/apt/lists/partial/* "$ROOTFS"/var/lib/apt/lists/lock \
+  "$ROOTFS"/var/cache/apt/*.bin \
   "$ROOTFS"/var/log/*.log "$ROOTFS"/var/log/apt/* "$ROOTFS"/tmp/* \
   "$ROOTFS"/var/cache/debconf/*-old "$ROOTFS"/var/lib/dpkg/*-old
 : > "$ROOTFS/etc/machine-id"

@@ -63,7 +63,12 @@ only ship alongside, which is fine for any free licence).
 | libdbusmenu / appmenu-gtk-module | Exporting app menus for the global menu bar | LGPL-3.0 / LGPL-3.0-or-later |
 | plocate (later) | Fast file-name index for Seek | GPL-2.0-or-later (separate program) |
 | Inter font | UI typeface | SIL OFL 1.1 |
-| Darling (optional add-on, milestone 6) | Runs some macOS programs | GPL-3.0, plus APSL-2.0 Apple open-source parts (separate program) |
+| PackageKit, packagekit-glib | Installs, removes and updates packages for Harbor | GPL-2.0-or-later / LGPL-2.1-or-later (separate program) |
+| AppStream, apt-config-icons | The app catalogue (names, summaries, categories, icons) Harbor shows | LGPL-2.1-or-later |
+| mate-polkit | Password prompt when an app asks for administrator rights | LGPL-2.0-or-later (separate program) |
+| gtklock | Wayland session locking with PAM, styled by Latch | GPL-3.0-only (separate program) |
+| swayidle | Idle and before-sleep events for Latch | MIT (separate program) |
+| sound-theme-freedesktop | Alarm and timer sounds for Chime | GPL-2.0-or-later / CC-BY-SA (sounds) |
 
 ## Components we write
 
@@ -80,6 +85,10 @@ only ship alongside, which is fine for any free licence).
 | **Lens** | Screenshots | Python + GTK 3 | Whole screen, an area or the focused window, on Print, Shift+Print and Alt+Print; uses grim and slurp, copies to the clipboard with wl-copy and announces the file through Beacon. |
 | **Quill** | Text editor | Python + GTK 3 + GtkSourceView 4 | Syntax colours, line numbers, find and replace, go to line, wrapping, light and dark schemes, safe saving. |
 | **Frame** | Image viewer | Python + GTK 3 | Fit, zoom, rotate, next and previous in the folder, animated GIFs, Trash, full screen. |
+| **Harbor** | App centre and updates | Python + GTK 3 | Browses the AppStream catalogue of the archive (categories, search, picks), app pages with Install, Open and Remove, an Installed list and an Updates page, all through PackageKit, which asks for the password through polkit. A background check once a day notifies through Beacon when updates are ready. Refreshes old package lists before installing. |
+| **Latch** | Lock screen | Python (launcher) + gtklock | Locks with gtklock dressed in freemac's style (current wallpaper, large clock, password field); Super+L and Lock Screen in the system menu; swayidle locks after the idle time set in Dials > Power, and before sleep. |
+| **Tally** | Calculator | Python + GTK 3 | Its own expression parser (decimal arithmetic for the basic operations), a running tape, a scientific mode with degrees or radians, `Ans`, and keyboard entry. |
+| **Chime** | Clock | Python + GTK 3 | World clocks, alarms with repeat days, timers and a stopwatch. Keeps running in the background while an alarm or timer is set, rings with the freedesktop sound theme and notifies through Beacon. |
 | **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |

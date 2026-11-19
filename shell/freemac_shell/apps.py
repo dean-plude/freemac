@@ -29,7 +29,17 @@ def app_info(app_id):
     return info
 
 
+# Helper programs with no app entry of their own, named the way a person
+# would think of them.
+HELPER_NAMES = {
+    "polkit-mate-authentication-agent-1": "Password",
+    "gtklock": "Lock Screen",
+}
+
+
 def display_name(app_id, title=""):
+    if app_id in HELPER_NAMES:
+        return HELPER_NAMES[app_id]
     info = app_info(app_id)
     if info:
         return info.get_name()
