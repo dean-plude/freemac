@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Welcome to freemac
-Comment=Shortcuts and a first look at freemac
-Exec=freemac-welcome
+Comment=Set up the look, wallpaper and Wi-Fi, and see the shortcuts
+Exec=freemac-welcome --always
 Icon=freemac-welcome
 Categories=System;
