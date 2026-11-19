@@ -108,6 +108,10 @@ def battery_state():
     return None
 
 
+LOCK_CHOICES = (("0", "Never"), ("1", "1 minute"), ("2", "2 minutes"), ("5", "5 minutes"),
+                ("10", "10 minutes"), ("15", "15 minutes"), ("30", "30 minutes"))
+
+
 def power(window):
     group, row, page, _slider, _switch = window.helpers
     groups = []
@@ -124,6 +128,19 @@ def power(window):
     blank.connect("changed", lambda c: window.ini_set("idle", "dpms_timeout", c.get_active_id()))
     groups.append(group(row("Turn the screen off after", blank,
                             "When nothing has been touched for this long.")))
+    prefs = style.prefs()
+    lock_after = Gtk.ComboBoxText()
+    for value, label in LOCK_CHOICES:
+        lock_after.append(value, label)
+    lock_after.set_active_id(str(prefs.get("lock_after", 5)))
+    if not lock_after.get_active_id():
+        lock_after.set_active_id("5")
+    lock_after.connect("changed", lambda c: window.save_prefs(lock_after=int(c.get_active_id())))
+    on_sleep = _switch(bool(prefs.get("lock_on_sleep", True)),
+                       lambda active: window.save_prefs(lock_on_sleep=active))
+    groups.append(group(row("Lock the screen after", lock_after,
+                            "You'll need your password to get back in. Super+L locks at once."),
+                        row("Lock before sleeping", on_sleep)))
     if shutil.which("powerprofilesctl"):
         mode = Gtk.ComboBoxText()
         for value, label in (("power-saver", "Power Saver"), ("balanced", "Balanced"),

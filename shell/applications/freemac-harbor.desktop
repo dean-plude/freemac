@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Harbor
+Comment=Find, install and update apps
+Exec=freemac-harbor
+Icon=freemac-harbor
+Categories=System;PackageManager;
+Keywords=apps;install;software;store;updates;packages;
+StartupWMClass=org.freemac.Harbor
+StartupNotify=true
+Actions=updates;
+
+[Desktop Action updates]
+Name=Check for Updates
+Exec=freemac-harbor --updates

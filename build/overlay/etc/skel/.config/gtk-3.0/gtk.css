@@ -33,3 +33,5 @@ check:checked, radio:checked { background-image: none; background-color: @freema
 row:selected, iconview:selected, treeview.view:selected, *:selected,
 entry selection, label selection, textview text selection { background-color: @freemac_accent; color: white; }
 button.suggested-action { background-image: none; background-color: @freemac_accent; border-color: shade(@freemac_accent, 0.85); color: white; }
+button.suggested-action:disabled { background-color: alpha(@freemac_accent, 0.45); border-color: alpha(@freemac_accent, 0.3); color: alpha(white, 0.8); }
+button.suggested-action:disabled label { color: alpha(white, 0.8); }

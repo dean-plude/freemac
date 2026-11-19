@@ -110,6 +110,7 @@ class Topline(Gtk.Window):
         self._item(menu, "Search…", lambda: run("freemac-seek"))
         self._item(menu, "Terminal", lambda: run("foot"))
         menu.append(Gtk.SeparatorMenuItem())
+        self._item(menu, "Lock Screen", lambda: run("freemac-lock"))
         self._item(menu, "Restart…", lambda: run("systemctl", "reboot"))
         self._item(menu, "Shut Down…", lambda: run("systemctl", "poweroff"))
         self._item(menu, "Log Out", lambda: run("pkill", "-u", str(os.getuid()), "-x", "wayfire"))

@@ -40,7 +40,7 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; app menus exported by apps (DBusMenu) still to come |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; app menus exported by apps planned for 0.7 |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
 | Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
@@ -52,6 +52,10 @@ one of them will be reverted.
 | Text editor | **Quill** | 0.5 |
 | Image viewer | **Frame** | 0.5 |
 | Runs simple Intel Mac command-line programs (optional add-on) | **Ferry** | 0.5: first version |
+| App centre for open-source apps, with system updates | **Harbor** | 0.6 |
+| Lock screen (Super+L, idle and before sleep) | **Latch** | 0.6 |
+| Calculator | **Tally** | 0.6 |
+| Clock with world clocks, alarms, timers and a stopwatch | **Chime** | 0.6 |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4 |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
@@ -87,19 +91,20 @@ From 0.5 on, work is planned in batches of features; the current list is in
 
 ## Running Mac apps
 
-freemac is not macOS and does not include it. Mac app support is planned as an
-optional, experimental compatibility layer (milestone 6), and its limits are
-real:
+freemac is not macOS and does not include it. Mac program support comes from
+Ferry, our own optional, experimental compatibility layer (milestone 6), and
+its limits are real:
 
 - **App Store apps are not supported.** They are encrypted and tied to Apple's
   DRM and Apple ID, and freemac will not try to work around that.
 - Only apps built for Intel (x86-64), or universal apps, can run on a PC. Apps
   built only for Apple silicon cannot.
-- Darling today runs many command-line tools; graphical apps are early and
-  experimental. Most everyday Mac apps will not work for a long time, if ever.
+- Ferry today runs simple command-line programs only. Graphical apps need
+  Mac frameworks Ferry doesn't have; most everyday Mac apps will not work for
+  a long time, if ever. See [ferry/README.md](ferry/README.md).
 
 For apps that matter, the dependable route is the Linux or web version of the
-app, or a free alternative; Seek and the app catalogue will point to those.
+app, or a free alternative; Harbor, the app centre, lists those.
 
 ## Building
 
