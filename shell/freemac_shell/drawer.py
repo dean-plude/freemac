@@ -503,9 +503,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif self.view_mode == "list":
             self.list_view.grab_focus()
         else:
-            columns = self.columns_box.get_children()
-            if columns:
-                columns[-1].view.grab_focus()
+            # Focus the column holding the open folder, on its selected row;
+            # focusing a column with no cursor would select (and open) its
+            # first row.
+            for column in reversed(self.columns_box.get_children()):
+                model, it = column.view.get_selection().get_selected()
+                if it:
+                    column.view.set_cursor(model.get_path(it), None, False)
+                    column.view.grab_focus()
+                    break
         return False
 
     def _filter_changed(self, entry):

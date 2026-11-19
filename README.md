@@ -38,14 +38,16 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, clock | **Topline** | 0.4: own bar; app menus exported by apps (DBusMenu) still to come |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; app menus exported by apps (DBusMenu) still to come |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
+| Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
 | Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
 | File manager with icon, list and column views | **Drawer** | 0.4 |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
 | Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4 |
+| Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
 | Trackpad gestures (switch desktops, overview) | **Strata** gestures | configured, not yet tested on hardware |
 | Bootable live ISO | `build/build-iso.sh` | done |
 
@@ -123,14 +125,26 @@ qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.4.0-amd64.iso \
   -boot d -vga virtio -enable-kvm -cpu host
 ```
 
-Tested so far (Nov 2026): the `BASE=ubuntu` image boots in QEMU under both
-BIOS and UEFI (OVMF). 0.1.0 reached the auto-login console; 0.2.0 starts the
-desktop session on its own:
+Tested so far (Nov 2026), on the `BASE=ubuntu` image in QEMU:
 
-![freemac 0.2 desktop](docs/screenshots/0.2-desktop.png)
- The default `BASE=debian` build
-uses the same script and package lists but has not been built yet, because the
-first build host could not reach Debian mirrors.
+- 0.4.0 live session: the desktop starts on its own with Topline, Pier, the
+  wallpaper, network and sound icons; Seek, Drawer (all three views), Dials
+  and light/dark mode work, and wired networking comes up through
+  NetworkManager.
+- Keel installed 0.4.0 to an empty 20 GB virtual disk. The installed system
+  boots under both BIOS and UEFI (OVMF) to the Gangway login screen; a wrong
+  password is refused and the right one opens the desktop.
+
+![freemac 0.4 desktop with Drawer and Seek](docs/screenshots/0.4-desktop.png)
+
+![freemac 0.4 in dark mode](docs/screenshots/0.4-dark.png)
+
+![Gangway, the 0.4 login screen](docs/screenshots/0.4-login.png)
+
+Not tested yet: real PC hardware, Wi-Fi (the virtual machine has none),
+laptop batteries and trackpads, and the default `BASE=debian` build, which
+uses the same script and package lists but couldn't be built on the first
+build host because it couldn't reach Debian mirrors.
 
 ### Desktop shortcuts
 
