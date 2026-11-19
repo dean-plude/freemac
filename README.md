@@ -40,13 +40,13 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; app menus exported by apps planned for 0.7 |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; app menus exported by apps planned for 0.8 |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned for 0.8 |
 | File manager with icon, list and column views | **Drawer** | 0.4 |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
-| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers |
 | Notifications with banners, a history list and Do Not Disturb | **Beacon** | 0.5 |
 | Screenshots of the screen, an area or a window (Print key) | **Lens** | 0.5 |
 | Text editor | **Quill** | 0.5 |
@@ -56,6 +56,7 @@ one of them will be reverted.
 | Lock screen (Super+L, idle and before sleep) | **Latch** | 0.6 |
 | Calculator | **Tally** | 0.6 |
 | Clock with world clocks, alarms, timers and a stopwatch | **Chime** | 0.6 |
+| Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 15 folder and file icons, 4 wallpaper scenes |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4 |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |

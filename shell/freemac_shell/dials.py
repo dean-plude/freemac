@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_more, pier, style  # noqa: E402
+from . import dials_more, dials_people, pier, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -30,6 +30,24 @@ SHELL_INI = os.path.join(CONFIG, "wf-shell.ini")
 WALLPAPERS = "/usr/share/backgrounds/freemac"
 LIGHT_WALL = os.path.join(WALLPAPERS, "dusk-tide.png")
 DARK_WALL = os.path.join(WALLPAPERS, "night-tide.png")
+# freemac's own scenes, each with a day and a night version (art/make-wallpaper.py).
+SCENES = (
+    ("Tide", "dusk-tide.png", "night-tide.png"),
+    ("Lagoon", "lagoon-day.png", "lagoon-night.png"),
+    ("Prism", "prism-day.png", "prism-night.png"),
+    ("Harbor", "harbor-day.png", "harbor-night.png"),
+)
+
+
+def scene_version(path, dark):
+    """The day or night version of a built-in scene, or None for other pictures."""
+    name = os.path.basename(path or "")
+    if path and os.path.dirname(path) != WALLPAPERS:
+        return None
+    for _title, day, night in SCENES:
+        if name in (day, night) or not path:
+            return os.path.join(WALLPAPERS, night if dark else day)
+    return None
 CSS = b"""
 .dials-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 .dials-sidebar row { padding: 7px 12px; border-radius: 8px; margin: 1px 8px; }
@@ -40,6 +58,8 @@ CSS = b"""
 .dials-caption { opacity: 0.65; font-size: 12px; }
 .dials-choice { padding: 8px; border-radius: 12px; border: 2px solid transparent; background: none; box-shadow: none; }
 .dials-choice:checked { border-color: #4b5fc4; }
+.dials-chosen { border-color: #4b5fc4; }
+.dials-section { font-weight: bold; margin-top: 12px; }
 """
 
 
@@ -235,6 +255,10 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_more.notifications(self)),
             ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic",
              lambda: dials_more.accessibility(self)),
+            ("bluetooth", "Bluetooth", "bluetooth-active-symbolic",
+             lambda: dials_people.BluetoothPanel(self, page)),
+            ("printers", "Printers", "printer-symbolic", lambda: dials_people.PrintersPanel(self, page)),
+            ("users", "Users", "system-users-symbolic", lambda: dials_people.UsersPanel(self, page)),
             ("about", "About", "help-about-symbolic", self.about),
         ):
             item = Gtk.ListBoxRow()
@@ -307,7 +331,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             "text-scaling-factor", float(c.get_active_id())))
         return page("Appearance", choices, group(
             row("Switch wallpaper with the mode", self.follow_wallpaper,
-                "Uses Dusk Tide in light mode and Night Tide in dark mode."),
+                "freemac's own wallpapers have a day and a night version."),
             row("Text size", text_size),
         ))
 
@@ -325,27 +349,19 @@ class DialsWindow(Gtk.ApplicationWindow):
         ini_set(WAYFIRE_INI, "decoration", "active_color", "#2A2C48FF" if dark else "#E9E7EFFF")
         ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#22243AFF" if dark else "#F4F3F7FF")
         current = ini_get(SHELL_INI, "background", "image")
-        if self.follow_wallpaper.get_active() and current in (None, LIGHT_WALL, DARK_WALL):
-            self.set_wallpaper(DARK_WALL if dark else LIGHT_WALL)
+        other = scene_version(current, dark)
+        if self.follow_wallpaper.get_active() and other and other != current:
+            self.set_wallpaper(other)
+        self.refresh_wallpapers()
 
     # Wallpaper ----------------------------------------------------------------
     def wallpaper(self):
-        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
-                           column_spacing=12, row_spacing=12, homogeneous=True)
-        pictures = sorted(glob.glob(os.path.join(WALLPAPERS, "*.png")) + glob.glob(os.path.join(WALLPAPERS, "*.jpg")))
-        for path in pictures:
-            pixbuf = thumbnail(path)
-            if not pixbuf:
-                continue
-            button = Gtk.Button()
-            button.get_style_context().add_class("dials-choice")
-            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            inner.pack_start(Gtk.Image.new_from_pixbuf(pixbuf), False, False, 0)
-            name = os.path.splitext(os.path.basename(path))[0].replace("-", " ").title()
-            inner.pack_start(Gtk.Label(label=name), False, False, 0)
-            button.add(inner)
-            button.connect("clicked", lambda _b, p=path: self.set_wallpaper(p))
-            flow.add(button)
+        self.wall_flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
+                                     column_spacing=12, row_spacing=12, homogeneous=True)
+        self.refresh_wallpapers()
+        note = Gtk.Label(label="Each freemac wallpaper has a day and a night version, "
+                               "and follows light and dark mode.", xalign=0, wrap=True)
+        note.get_style_context().add_class("dials-caption")
         choose = Gtk.Button(label="Choose a Picture…", halign=Gtk.Align.START)
         choose.connect("clicked", self.choose_wallpaper)
         fit = Gtk.ComboBoxText()
@@ -354,10 +370,45 @@ class DialsWindow(Gtk.ApplicationWindow):
         fit.append("stretch", "Stretch")
         fit.set_active_id(ini_get(SHELL_INI, "background", "fit", "fill"))
         fit.connect("changed", lambda c: ini_set(SHELL_INI, "background", "fit", c.get_active_id()))
-        return page("Wallpaper", flow, choose, group(row("Picture fit", fit)))
+        return page("Wallpaper", self.wall_flow, note, choose, group(row("Picture fit", fit)))
+
+    def refresh_wallpapers(self):
+        """One tile per scene, showing the version for the current mode."""
+        if not hasattr(self, "wall_flow"):
+            return
+        for child in self.wall_flow.get_children():
+            self.wall_flow.remove(child)
+        dark = style.is_dark()
+        current = ini_get(SHELL_INI, "background", "image") or LIGHT_WALL
+        tiles = []
+        own = set()
+        for title, day, night in SCENES:
+            own.update((day, night))
+            tiles.append((title, os.path.join(WALLPAPERS, night if dark else day),
+                          current in (os.path.join(WALLPAPERS, day), os.path.join(WALLPAPERS, night))))
+        for path in sorted(glob.glob(os.path.join(WALLPAPERS, "*.png")) + glob.glob(os.path.join(WALLPAPERS, "*.jpg"))):
+            if os.path.basename(path) not in own:
+                title = os.path.splitext(os.path.basename(path))[0].replace("-", " ").title()
+                tiles.append((title, path, path == current))
+        for title, path, chosen in tiles:
+            pixbuf = thumbnail(path)
+            if not pixbuf:
+                continue
+            button = Gtk.Button()
+            button.get_style_context().add_class("dials-choice")
+            if chosen:
+                button.get_style_context().add_class("dials-chosen")
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            inner.pack_start(Gtk.Image.new_from_pixbuf(pixbuf), False, False, 0)
+            inner.pack_start(Gtk.Label(label=title), False, False, 0)
+            button.add(inner)
+            button.connect("clicked", lambda _b, p=path: self.set_wallpaper(p))
+            self.wall_flow.add(button)
+        self.wall_flow.show_all()
 
     def set_wallpaper(self, path):
         ini_set(SHELL_INI, "background", "image", path)
+        self.refresh_wallpapers()
 
     def choose_wallpaper(self, _button):
         dialog = Gtk.FileChooserNative(title="Choose a Picture", transient_for=self,

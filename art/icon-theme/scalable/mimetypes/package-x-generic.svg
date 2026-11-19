@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Archive: a crate with rope ties. Original freemac artwork, GPL-3.0-or-later. -->
+  <rect x="16" y="34" width="96" height="78" rx="8" fill="#c89156"/>
+  <rect x="12" y="24" width="104" height="22" rx="6" fill="#dca86b"/>
+  <g stroke="#9b6a35" stroke-width="3"><path d="M16 64 H112 M16 88 H112"/></g>
+  <rect x="58" y="24" width="12" height="88" fill="#f2e2c4"/>
+</svg>

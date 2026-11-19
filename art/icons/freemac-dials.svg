@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Dials: three round knobs on a panel, each turned to a different setting. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6d6f86"/><stop offset="1" stop-color="#3d3f55"/>
+    </linearGradient>
+    <radialGradient id="knob" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd2e2"/>
+    </radialGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <g stroke="#a7abc6" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M27 51 a19 19 0 1 1 26 0"/>
+    <path d="M75 51 a19 19 0 1 1 26 0"/>
+    <path d="M51 103 a19 19 0 1 1 26 0"/>
+  </g>
+  <circle cx="40" cy="38" r="14" fill="url(#knob)"/>
+  <circle cx="88" cy="38" r="14" fill="url(#knob)"/>
+  <circle cx="64" cy="90" r="14" fill="url(#knob)"/>
+  <g stroke-width="4" stroke-linecap="round">
+    <path d="M40 38 L32 30" stroke="#f0a35e"/>
+    <path d="M88 38 L97 33" stroke="#5fb7c4"/>
+    <path d="M64 90 L64 79" stroke="#8b7be0"/>
+  </g>
+</svg>

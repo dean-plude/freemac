@@ -1,0 +1,156 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""The account changes Dials' Users panel makes, run as root through pkexec.
+
+  freemac-users-helper add NAME "Full Name" 0|1     password on stdin; 1 = administrator
+  freemac-users-helper delete NAME keep|remove       keep or remove the home folder
+  freemac-users-helper password NAME                 new password on stdin
+  freemac-users-helper admin NAME 0|1
+  freemac-users-helper autologin NAME|-              - turns automatic login off
+
+Only people's accounts (uid 1000-59999) can be changed, and nobody can delete
+the account they're running Dials from.
+"""
+import grp
+import os
+import pwd
+import re
+import subprocess
+import sys
+
+NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
+GREETD = "/etc/greetd/config.toml"
+GROUPS = ("audio", "video", "render", "input", "plugdev", "netdev", "bluetooth", "lpadmin")
+ADMIN_GROUP = "sudo"
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def person(name):
+    if not NAME.match(name):
+        fail("That isn't a valid user name.")
+    try:
+        entry = pwd.getpwnam(name)
+    except KeyError:
+        fail(f"There's no user called {name}.")
+    if not 1000 <= entry.pw_uid < 60000:
+        fail(f"{name} is a system account and can't be changed here.")
+    return entry
+
+
+def caller():
+    try:
+        return pwd.getpwuid(int(os.environ.get("PKEXEC_UID", ""))).pw_name
+    except (ValueError, KeyError):
+        return None
+
+
+def read_password():
+    password = sys.stdin.readline().rstrip("\n")
+    if not password or "\n" in password or len(password) > 512:
+        fail("The password can't be empty.")
+    return password
+
+
+def run(*cmd, stdin=None):
+    result = subprocess.run(cmd, input=stdin, text=True, capture_output=True)
+    if result.returncode:
+        fail(result.stderr.strip() or f"{cmd[0]} failed")
+
+
+def existing_groups(names):
+    found = []
+    for name in names:
+        try:
+            grp.getgrnam(name)
+            found.append(name)
+        except KeyError:
+            pass
+    return found
+
+
+def set_autologin(name):
+    try:
+        with open(GREETD) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        fail("Automatic login needs greetd, which isn't set up.")
+    kept, skipping = [], False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("["):
+            skipping = stripped == "[initial_session]"
+        if not skipping:
+            kept.append(line)
+    while kept and not kept[-1].strip():
+        kept.pop()
+    if name:
+        kept += ["", "[initial_session]", 'command = "/usr/local/bin/freemac-session"', f'user = "{name}"']
+    tmp = GREETD + ".new"
+    with open(tmp, "w") as f:
+        f.write("\n".join(kept) + "\n")
+    os.replace(tmp, GREETD)
+
+
+def main(args):
+    if not args:
+        fail(__doc__)
+    command, rest = args[0], args[1:]
+    if command == "add" and len(rest) == 3:
+        name, full, admin = rest
+        if not NAME.match(name):
+            fail("A user name uses small letters, numbers, - and _, and starts with a letter.")
+        try:
+            pwd.getpwnam(name)
+            fail(f"There's already a user called {name}.")
+        except KeyError:
+            pass
+        if any(c in full for c in ":,\n") or len(full) > 100:
+            fail("The full name can't contain : or ,")
+        password = read_password()
+        groups = existing_groups(GROUPS + ((ADMIN_GROUP,) if admin == "1" else ()))
+        run("useradd", "--create-home", "--shell", "/bin/bash", "--user-group",
+            "--groups", ",".join(groups), "--comment", full or name, name)
+        run("chpasswd", stdin=f"{name}:{password}\n")
+    elif command == "delete" and len(rest) == 2:
+        entry = person(rest[0])
+        if entry.pw_name == caller():
+            fail("You can't delete the account you're using.")
+        if subprocess.run(["pgrep", "-u", entry.pw_name], capture_output=True).returncode == 0:
+            fail(f"{entry.pw_gecos.split(',')[0] or entry.pw_name} is logged in. They need to log out first.")
+        run("userdel", *(["--remove"] if rest[1] == "remove" else []), entry.pw_name)
+        if autologin_user() == entry.pw_name:
+            set_autologin(None)
+    elif command == "password" and len(rest) == 1:
+        entry = person(rest[0])
+        run("chpasswd", stdin=f"{entry.pw_name}:{read_password()}\n")
+    elif command == "admin" and len(rest) == 2:
+        entry = person(rest[0])
+        if rest[1] == "1":
+            run("gpasswd", "--add", entry.pw_name, ADMIN_GROUP)
+        else:
+            admins = [m for m in grp.getgrnam(ADMIN_GROUP).gr_mem if m != entry.pw_name]
+            if not admins:
+                fail("At least one administrator has to stay.")
+            run("gpasswd", "--delete", entry.pw_name, ADMIN_GROUP)
+    elif command == "autologin" and len(rest) == 1:
+        set_autologin(None if rest[0] == "-" else person(rest[0]).pw_name)
+    else:
+        fail(__doc__)
+
+
+def autologin_user():
+    try:
+        with open(GREETD) as f:
+            text = f.read()
+    except OSError:
+        return None
+    match = re.search(r'^\[initial_session\][^\[]*?^user\s*=\s*"([^"]+)"', text, re.M | re.S)
+    return match.group(1) if match else None
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- PDF document: a page with a red band. Original freemac artwork, GPL-3.0-or-later. -->
+  <path d="M28 10 h50 l26 26 v74 a8 8 0 0 1 -8 8 h-68 a8 8 0 0 1 -8 -8 v-92 a8 8 0 0 1 8 -8 z" fill="#fbfaf6" stroke="#c9c6d6" stroke-width="2"/>
+  <path d="M78 10 v18 a8 8 0 0 0 8 8 h18 z" fill="#e2dfec"/>
+  <rect x="20" y="86" width="88" height="24" rx="0" fill="#c9443c" opacity="0.15"/>
+  <g stroke="#9a97ad" stroke-width="4" stroke-linecap="round"><path d="M34 44 H70 M34 56 H90 M34 68 H90 M34 80 H78"/></g>
+  <rect x="20" y="92" width="88" height="18" fill="#c9443c"/><text x="64" y="106" font-family="Inter, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">PDF</text>
+</svg>

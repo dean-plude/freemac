@@ -159,7 +159,7 @@ for d in Desktop Documents Downloads Music Pictures Videos; do
   mkdir -p "$ROOTFS/etc/skel/$d"
 done
 USER_GROUPS=sudo
-for g in audio video render input plugdev; do
+for g in audio video render input plugdev bluetooth lpadmin; do
   in_chroot getent group "$g" >/dev/null && USER_GROUPS="$USER_GROUPS,$g"
 done
 in_chroot useradd --create-home --shell /bin/bash --groups "$USER_GROUPS" --user-group freemac
@@ -178,9 +178,13 @@ in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 install -d "$ROOTFS/usr/share/icons/hicolor/scalable/apps"
 install -m 0644 "$REPO"/art/icons/*.svg "$ROOTFS/usr/share/icons/hicolor/scalable/apps/"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+# freemac's icon theme: our own folder and file-type icons, Adwaita for the rest.
+rm -rf "$ROOTFS/usr/share/icons/freemac"
+cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"
+in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
-python3 "$REPO/art/make-wallpaper.py" "$ROOTFS/usr/share/backgrounds/freemac/dusk-tide.png"
-python3 "$REPO/art/make-wallpaper.py" --night "$ROOTFS/usr/share/backgrounds/freemac/night-tide.png"
+# Every scene in a day and a night version (Dials swaps them with the mode).
+python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"
 
 log "Cleaning the image"
 rm -f "$ROOTFS/usr/sbin/policy-rc.d"

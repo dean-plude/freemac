@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Desktop folder: a folder marked with a screen. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6c78d8"/><stop offset="1" stop-color="#4f5bbd"/></linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa6f2"/><stop offset="1" stop-color="#7884e2"/></linearGradient>
+  </defs>
+  <path d="M10 30 a8 8 0 0 1 8 -8 h30 l10 10 h52 a8 8 0 0 1 8 8 v62 a8 8 0 0 1 -8 8 h-92 a8 8 0 0 1 -8 -8 z" fill="url(#back)"/>
+  <rect x="16" y="36" width="96" height="16" rx="3" fill="#f6f4ee"/>
+  <path d="M10 50 a8 8 0 0 1 8 -8 h92 a8 8 0 0 1 8 8 v52 a8 8 0 0 1 -8 8 h-92 a8 8 0 0 1 -8 -8 z" fill="url(#front)"/>
+  <rect x="10" y="42" width="108" height="2" fill="#ffffff" opacity="0.5"/>
+  <g fill="none" stroke="#3d47a0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"><rect x="46" y="68" width="36" height="24" rx="3"/><path d="M56 98 H72"/></g>
+</svg>

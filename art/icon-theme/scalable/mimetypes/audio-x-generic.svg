@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Sound: a pair of notes. Original freemac artwork, GPL-3.0-or-later. -->
+  <path d="M28 10 h50 l26 26 v74 a8 8 0 0 1 -8 8 h-68 a8 8 0 0 1 -8 -8 v-92 a8 8 0 0 1 8 -8 z" fill="#fbfaf6" stroke="#c9c6d6" stroke-width="2"/>
+  <path d="M78 10 v18 a8 8 0 0 0 8 8 h18 z" fill="#e2dfec"/>
+  <rect x="20" y="86" width="88" height="24" rx="0" fill="#d0577f" opacity="0.15"/>
+  <g fill="#d0577f"><path d="M54 92 V54 L90 46 V84" fill="none" stroke="#d0577f" stroke-width="6"/><circle cx="48" cy="92" r="9"/><circle cx="84" cy="84" r="9"/></g>
+</svg>

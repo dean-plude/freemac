@@ -60,3 +60,9 @@ gir1.2-appstream-1.0
 appstream
 apt-config-icons
 mate-polkit
+# Bluetooth (Dials' Bluetooth panel talks to BlueZ) and printing: CUPS finds
+# network printers by itself; system-config-printer adds the rest.
+bluez
+cups
+cups-browsed
+system-config-printer

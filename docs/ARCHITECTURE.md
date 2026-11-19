@@ -69,6 +69,9 @@ only ship alongside, which is fine for any free licence).
 | gtklock | Wayland session locking with PAM, styled by Latch | GPL-3.0-only (separate program) |
 | swayidle | Idle and before-sleep events for Latch | MIT (separate program) |
 | sound-theme-freedesktop | Alarm and timer sounds for Chime | GPL-2.0-or-later / CC-BY-SA (sounds) |
+| BlueZ | Bluetooth service that Dials' Bluetooth panel talks to over D-Bus | GPL-2.0-or-later (separate program) |
+| CUPS, cups-browsed | Printing; finds driverless network printers by itself | Apache-2.0 with exceptions (separate programs) |
+| system-config-printer | Adding printers that need a driver, print queues | GPL-2.0-or-later (separate program) |
 
 ## Components we write
 
@@ -80,7 +83,7 @@ only ship alongside, which is fine for any free licence).
 | **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
 | **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
-| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, sound (WirePlumber's wpctl), power (screen blanking through Wayfire's idle plugin, power-profiles-daemon), notifications, accessibility, about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. |
+| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, sound (WirePlumber's wpctl), power (screen blanking through Wayfire's idle plugin, power-profiles-daemon), notifications, accessibility, Bluetooth (BlueZ over D-Bus, with its own pairing agent), printers (CUPS), users (through a small root helper run with pkexec: add, delete, change password, administrator, automatic login), about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. |
 | **Beacon** | Notifications | Python + GTK 3 (layer-shell) | Implements the freedesktop.org notification D-Bus interface, so `notify-send` and every app's notifications work. Banners in the top-right corner, a centre with a calendar and the last 50 notifications (opened from the clock), Do Not Disturb. |
 | **Lens** | Screenshots | Python + GTK 3 | Whole screen, an area or the focused window, on Print, Shift+Print and Alt+Print; uses grim and slurp, copies to the clipboard with wl-copy and announces the file through Beacon. |
 | **Quill** | Text editor | Python + GTK 3 + GtkSourceView 4 | Syntax colours, line numbers, find and replace, go to line, wrapping, light and dark schemes, safe saving. |
@@ -92,7 +95,7 @@ only ship alongside, which is fine for any free licence).
 | **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |
-| **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). Adwaita icons until our own set exists. |
+| **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). 0.7: original icons for every freemac app (`art/icons`), a `freemac` icon theme with our own folder and file-type icons that inherits Adwaita for everything else (`art/icon-theme`), and four wallpaper scenes (Tide, Lagoon, Prism, Harbor), each computed in a day and a night version that Dials swaps with light and dark mode (`art/make-wallpaper.py`). |
 | **build/** | ISO build tooling | POSIX shell | This repository's `build/build-iso.sh`. |
 
 Python with GTK 3 is chosen for the first versions of the shell apps because

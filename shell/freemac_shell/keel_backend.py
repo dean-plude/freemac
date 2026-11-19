@@ -211,7 +211,7 @@ def configure_system(request):
     # Replace the live user with the person's own account.
     if subprocess.run(["chroot", TARGET, "id", "freemac"], capture_output=True).returncode == 0:
         run("userdel", "-r", "freemac", chroot=True)
-    groups = [g for g in ("sudo", "audio", "video", "render", "input", "plugdev", "netdev")
+    groups = [g for g in ("sudo", "audio", "video", "render", "input", "plugdev", "netdev", "bluetooth", "lpadmin")
               if subprocess.run(["chroot", TARGET, "getent", "group", g], capture_output=True).returncode == 0]
     run("useradd", "--create-home", "--shell", "/bin/bash", "--user-group", "--groups", ",".join(groups),
         "--comment", request.get("fullname") or user, user, chroot=True)
