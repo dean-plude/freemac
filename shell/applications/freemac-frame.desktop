@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Frame
+Comment=Look at pictures and screenshots
+Exec=freemac-frame %F
+Icon=freemac-frame
+Categories=Graphics;Viewer;
+Keywords=image;picture;photo;viewer;screenshot;
+MimeType=image/png;image/jpeg;image/gif;image/webp;image/svg+xml;image/bmp;image/tiff;image/x-icon;
+StartupWMClass=org.freemac.Frame
+StartupNotify=true

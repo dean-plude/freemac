@@ -52,8 +52,12 @@ only ship alongside, which is fine for any free licence).
 | dconf | Stores GSettings such as light/dark mode for all apps | LGPL-2.1-or-later |
 | cage | Kiosk compositor that shows Gangway, the login screen | MIT |
 | gdisk, parted, dosfstools, e2fsprogs, squashfs-tools | Partitioning and copying the system in Keel | GPL-2.0-or-later (separate programs) |
-| Mousepad | Text editor shipped in the image | GPL-2.0-or-later (separate program) |
-| Ristretto | Image viewer shipped in the image | GPL-2.0-or-later (separate program) |
+| GtkSourceView 4 | Text view with syntax colours, used by Quill | LGPL-2.1-or-later |
+| grim, slurp | Screen capture and area picking for Lens | MIT (separate programs) |
+| wl-clipboard | Clipboard for Lens | GPL-3.0-or-later (separate program) |
+| power-profiles-daemon | Power modes in Dials | GPL-3.0-or-later (separate program) |
+| at-spi2-core | Accessibility bus for screen readers | LGPL-2.1-or-later |
+| clang, lld (build only) | Compiling Mac test programs for Ferry | Apache-2.0 with LLVM exception |
 | GNOME Web (Epiphany) | Web browser shipped in the image | GPL-3.0-or-later (separate program) |
 | xdg-desktop-portal(-gtk) | Color-scheme setting, file pickers | LGPL-2.1-or-later |
 | libdbusmenu / appmenu-gtk-module | Exporting app menus for the global menu bar | LGPL-3.0 / LGPL-3.0-or-later |
@@ -71,7 +75,12 @@ only ship alongside, which is fine for any free licence).
 | **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
 | **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
-| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. Sound later. |
+| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, sound (WirePlumber's wpctl), power (screen blanking through Wayfire's idle plugin, power-profiles-daemon), notifications, accessibility, about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. |
+| **Beacon** | Notifications | Python + GTK 3 (layer-shell) | Implements the freedesktop.org notification D-Bus interface, so `notify-send` and every app's notifications work. Banners in the top-right corner, a centre with a calendar and the last 50 notifications (opened from the clock), Do Not Disturb. |
+| **Lens** | Screenshots | Python + GTK 3 | Whole screen, an area or the focused window, on Print, Shift+Print and Alt+Print; uses grim and slurp, copies to the clipboard with wl-copy and announces the file through Beacon. |
+| **Quill** | Text editor | Python + GTK 3 + GtkSourceView 4 | Syntax colours, line numbers, find and replace, go to line, wrapping, light and dark schemes, safe saving. |
+| **Frame** | Image viewer | Python + GTK 3 | Fit, zoom, rotate, next and previous in the folder, animated GIFs, Trash, full screen. |
+| **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |
 | **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). Adwaita icons until our own set exists. |
@@ -104,8 +113,8 @@ without changing the user experience.
   chosen. seatd hands the compositor its devices; NetworkManager runs the
   network.
 - **Known gaps:** app menus from GTK and Qt apps in Topline (DBusMenu), our
-  own decoration plugin, a notification centre, a Sound panel in Dials (the
-  menu bar has a volume control), our own icons, and gestures, Wi-Fi and
+  own decoration plugin, our own icons (0.5 adds icons for Quill, Frame and
+  Lens only), and gestures, Wi-Fi and
   batteries tested on real hardware. In QEMU's software rendering the menu
   bar sometimes shows a dark patch for a moment while it redraws; not yet
   checked on real hardware.
@@ -123,41 +132,50 @@ without changing the user experience.
 
 ## Mac app compatibility (optional layer)
 
-Goal: let some macOS programs run on freemac the way Wine lets Windows programs
-run on Linux, without macOS itself and without anything taken from a Mac.
+Goal: let some programs built for Intel Macs run on freemac the way Wine lets
+Windows programs run on Linux, without macOS itself and without anything taken
+from a Mac.
 
-**Approach.** Package the open-source
-[Darling](https://github.com/darlinghq/darling) project as an optional
-`freemac-darling` add-on that is **not** part of the default ISO. Darling loads
-Mach-O programs and provides its own implementations of macOS system libraries
-and frameworks. We integrate it rather than write our own: a desktop file
-handler so `.app` bundles open from Drawer, and a Dials panel to install or
-remove it.
+**Approach: Ferry, written by us.** The project owner chose to build our own
+layer instead of packaging Darling, so no Apple-published source code (APSL)
+is involved. Ferry lives in [`ferry/`](../ferry/README.md) and ships as an
+optional `freemac-ferry` package that is **not** part of the default ISO.
 
-**Licence.** Darling's own code is GPL-3.0. It also builds Apple's published
-open-source Darwin components (libc, libdispatch and others), which are under
-the Apple Public Source License 2.0, a free licence that is not GPL-compatible.
-Because Darling is a separate program, shipping it as its own package beside
-freemac is fine licence-wise. It does put Apple-published open-source code on
-the system, so the clean-room rule 1 needs a deliberate, narrow exception for
-this one optional package before milestone 6 starts. That is a decision for the
-project owner; until it is made, Darling is out of scope.
+- `ferry` is a loader written in C. It reads a Mach-O executable (picking the
+  Intel slice of a universal file), maps its segments, applies rebases and
+  binds (classic opcode streams and chained fixups), and calls its `main`.
+- Imports from libSystem resolve to Ferry's own code: conversions for the
+  calls whose numbers or data layouts differ between macOS and Linux (errno,
+  `FILE`, `struct stat`, directory entries, open flags, signals, clocks,
+  `sysconf`, `uname`, locales, getopt), and this system's C library for calls
+  that are the same on both. Anything else stops the program with a message
+  naming the call; Ferry never guesses.
+- The Ferry SDK (`ferry-cc`) builds Mac programs on freemac with clang and
+  lld, against our own headers and our own description of libSystem, so tests
+  never need a Mac.
 
-**What it runs today (honestly).** Command-line programs and many developer
-tools work. Graphical apps need AppKit, Metal and many other frameworks that
-Darling only partly implements, so GUI support is experimental and most
-everyday apps do not run. Check the Darling project's current status before
-promising anything to users.
+**Sources.** Only public documentation and open specifications: the Mach-O
+file format as documented publicly and in LLVM's open-source tools (Apache-2.0
+with LLVM exception), the System V AMD64 calling convention, POSIX, and the
+numbers and structure layouts that are part of the published macOS C
+interface. No Apple binary is ever disassembled, decompiled, traced or dumped,
+and no Apple code, headers or assets are copied.
+
+**What it runs today (honestly).** Simple command-line programs that use the
+C library: text, files, directories, environment, time, maths, signals.
+Not yet: threads, sockets, C++ (libc++), Objective-C, frameworks such as
+Foundation or AppKit, and programs that need other dynamic libraries. GUI
+apps are a long way off and may never be practical.
 
 **Hard limits, by design:**
 
 - No App Store apps: they are FairPlay-encrypted and tied to Apple ID. freemac
-  will not decrypt them, bypass DRM or sign in to Apple services.
+  will not decrypt them, bypass DRM or code signing, or sign in to Apple
+  services.
 - No Apple binaries, frameworks or system files copied from a Mac, ever, even
-  from the user's own machine. Compatibility comes only from open-source
-  reimplementations.
-- Intel (x86-64) and universal binaries only; Apple-silicon-only apps cannot
-  run on a PC.
+  from the user's own machine.
+- Intel (x86-64) and universal binaries only; Apple-silicon-only programs
+  cannot run on a PC.
 
 ## Build pipeline (milestone 1)
 

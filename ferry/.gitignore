@@ -1,0 +1,5 @@
+/ferry
+/src/*.o
+/sdk/lib/
+/tests/build/
+/packaging/out/

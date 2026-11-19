@@ -1,0 +1,119 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Mach-O structures and constants that Ferry needs, written for freemac from
+ * the publicly documented file format (the format is described in open
+ * documentation and in permissively licensed open-source toolchains such as
+ * LLVM). Only x86-64, 64-bit images are covered.
+ */
+#ifndef FERRY_MACHO_H
+#define FERRY_MACHO_H
+#include <stdint.h>
+
+#define MACHO_MAGIC_64      0xfeedfacfu
+#define MACHO_FAT_MAGIC     0xcafebabeu   /* stored big-endian */
+#define MACHO_CPU_X86_64    0x01000007
+#define MACHO_EXECUTE       0x2
+#define MACHO_FLAG_PIE      0x00200000u
+
+#define LC_REQ_DYLD              0x80000000u
+#define LC_SEGMENT_64            0x19
+#define LC_SYMTAB                0x2
+#define LC_DYSYMTAB              0xb
+#define LC_UNIXTHREAD            0x5
+#define LC_LOAD_DYLIB            0xc
+#define LC_LOAD_WEAK_DYLIB       (0x18 | LC_REQ_DYLD)
+#define LC_REEXPORT_DYLIB        (0x1f | LC_REQ_DYLD)
+#define LC_DYLD_INFO             0x22
+#define LC_DYLD_INFO_ONLY        (0x22 | LC_REQ_DYLD)
+#define LC_MAIN                  (0x28 | LC_REQ_DYLD)
+#define LC_DYLD_CHAINED_FIXUPS   (0x34 | LC_REQ_DYLD)
+#define LC_DYLD_EXPORTS_TRIE     (0x33 | LC_REQ_DYLD)
+
+struct macho_header {
+    uint32_t magic, cputype, cpusubtype, filetype, ncmds, sizeofcmds, flags, reserved;
+};
+
+struct macho_fat_header { uint32_t magic, nfat_arch; };            /* big-endian */
+struct macho_fat_arch { uint32_t cputype, cpusubtype, offset, size, align; };
+
+struct macho_load_command { uint32_t cmd, cmdsize; };
+
+struct macho_segment {
+    uint32_t cmd, cmdsize;
+    char segname[16];
+    uint64_t vmaddr, vmsize, fileoff, filesize;
+    uint32_t maxprot, initprot, nsects, flags;
+};
+
+struct macho_section {
+    char sectname[16], segname[16];
+    uint64_t addr, size;
+    uint32_t offset, align, reloff, nreloc, flags, reserved1, reserved2, reserved3;
+};
+
+struct macho_dylib_command {
+    uint32_t cmd, cmdsize, name_offset, timestamp, current_version, compat_version;
+};
+
+struct macho_dyld_info {
+    uint32_t cmd, cmdsize;
+    uint32_t rebase_off, rebase_size, bind_off, bind_size;
+    uint32_t weak_bind_off, weak_bind_size, lazy_bind_off, lazy_bind_size;
+    uint32_t export_off, export_size;
+};
+
+struct macho_linkedit_data { uint32_t cmd, cmdsize, dataoff, datasize; };
+
+struct macho_entry_point { uint32_t cmd, cmdsize; uint64_t entryoff, stacksize; };
+
+/* Rebase and bind opcode streams (LC_DYLD_INFO). */
+#define OPCODE_MASK     0xf0
+#define IMMEDIATE_MASK  0x0f
+
+#define REBASE_DONE                          0x00
+#define REBASE_SET_TYPE_IMM                  0x10
+#define REBASE_SET_SEGMENT_AND_OFFSET_ULEB   0x20
+#define REBASE_ADD_ADDR_ULEB                 0x30
+#define REBASE_ADD_ADDR_IMM_SCALED           0x40
+#define REBASE_DO_REBASE_IMM_TIMES           0x50
+#define REBASE_DO_REBASE_ULEB_TIMES          0x60
+#define REBASE_DO_REBASE_ADD_ADDR_ULEB       0x70
+#define REBASE_DO_REBASE_ULEB_TIMES_SKIPPING 0x80
+
+#define BIND_DONE                            0x00
+#define BIND_SET_DYLIB_ORDINAL_IMM           0x10
+#define BIND_SET_DYLIB_ORDINAL_ULEB          0x20
+#define BIND_SET_DYLIB_SPECIAL_IMM           0x30
+#define BIND_SET_SYMBOL_FLAGS_IMM            0x40
+#define BIND_SET_TYPE_IMM                    0x50
+#define BIND_SET_ADDEND_SLEB                 0x60
+#define BIND_SET_SEGMENT_AND_OFFSET_ULEB     0x70
+#define BIND_ADD_ADDR_ULEB                   0x80
+#define BIND_DO_BIND                         0x90
+#define BIND_DO_BIND_ADD_ADDR_ULEB           0xa0
+#define BIND_DO_BIND_ADD_ADDR_IMM_SCALED     0xb0
+#define BIND_DO_BIND_ULEB_TIMES_SKIPPING     0xc0
+#define BIND_THREADED                        0xd0
+
+/* Chained fixups (LC_DYLD_CHAINED_FIXUPS). */
+struct chained_fixups_header {
+    uint32_t fixups_version, starts_offset, imports_offset, symbols_offset;
+    uint32_t imports_count, imports_format, symbols_format;
+};
+struct chained_starts_in_segment {
+    uint32_t size;
+    uint16_t page_size, pointer_format;
+    uint64_t segment_offset;
+    uint32_t max_valid_pointer;
+    uint16_t page_count;
+    uint16_t page_start[];
+};
+#define CHAINED_PTR_START_NONE   0xffff
+#define CHAINED_PTR_START_MULTI  0x8000
+#define CHAINED_PTR_64           2
+#define CHAINED_PTR_64_OFFSET    6
+#define CHAINED_IMPORT           1
+#define CHAINED_IMPORT_ADDEND    2
+#define CHAINED_IMPORT_ADDEND64  3
+
+#endif

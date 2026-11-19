@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Quill: a page with a pen nib. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a6fd6"/><stop offset="1" stop-color="#34409a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="30" y="24" width="56" height="76" rx="6" fill="#fbfaff"/>
+  <g stroke="#c9cbe6" stroke-width="4" stroke-linecap="round">
+    <line x1="40" y1="42" x2="76" y2="42"/><line x1="40" y1="54" x2="76" y2="54"/>
+    <line x1="40" y1="66" x2="64" y2="66"/><line x1="40" y1="78" x2="58" y2="78"/>
+  </g>
+  <g transform="rotate(38 82 78)">
+    <rect x="76" y="34" width="14" height="52" rx="3" fill="#e9967a"/>
+    <path d="M76 86 L90 86 L83 104 Z" fill="#f4c7a8"/>
+    <circle cx="83" cy="94" r="2.2" fill="#34409a"/>
+  </g>
+</svg>

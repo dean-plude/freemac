@@ -11,7 +11,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, status, style  # noqa: E402
+from . import apps, beacon, status, style  # noqa: E402
 from .wfipc import Wayfire  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -56,16 +56,26 @@ class Topline(Gtk.Window):
         self.window_button.set_popup(self.window_menu)
         bar.pack_start(self.window_button, False, False, 0)
 
+        # The clock opens Beacon's notification centre.
         self.clock = Gtk.Label()
-        self.clock.get_style_context().add_class("clock")
-        bar.pack_end(self.clock, False, False, 0)
+        clock_button = Gtk.Button()
+        clock_button.add(self.clock)
+        clock_button.get_style_context().add_class("clock")
+        clock_button.set_tooltip_text("Notifications and calendar")
+        clock_button.connect("clicked", lambda *_: beacon.call("ToggleCenter"))
+        bar.pack_end(clock_button, False, False, 0)
+        self.dnd = Gtk.Image.new_from_icon_name("notifications-disabled-symbolic", Gtk.IconSize.MENU)
+        self.dnd.set_tooltip_text("Do Not Disturb is on")
+        self.dnd.set_no_show_all(True)
+        bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
         # computer has nothing to show (no battery, no sound server).
         for indicator in (status.Battery(), status.Sound(), status.Network()):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
         self._tick()
-        self._prefs_monitor = style.watch_prefs(self._show_time)
+        self._prefs_monitor = style.watch_prefs(self._prefs_changed)
+        self._prefs_changed()
 
         self.focused = None
         try:
@@ -117,6 +127,10 @@ class Topline(Gtk.Window):
         dialog.set_logo_icon_name("freemac-welcome")
         dialog.run()
         dialog.destroy()
+
+    def _prefs_changed(self, *_args):
+        self._show_time()
+        self.dnd.set_visible(bool(style.prefs().get("dnd")))
 
     def _show_time(self, *_args):
         fmt = "%a %b %-d   %H:%M" if style.prefs().get("clock") == "24" else "%a %b %-d   %-I:%M %p"

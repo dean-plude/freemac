@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Frame: a framed landscape at dusk. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2b38f"/><stop offset="1" stop-color="#d97a5c"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c3577"/><stop offset="1" stop-color="#e7a07f"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="28" width="80" height="72" rx="6" fill="#fbfaff"/>
+  <rect x="31" y="35" width="66" height="58" rx="3" fill="url(#sky)"/>
+  <circle cx="78" cy="56" r="8" fill="#ffe2c7"/>
+  <path d="M31 93 L52 66 L66 82 L76 72 L97 93 Z" fill="#26306b"/>
+</svg>

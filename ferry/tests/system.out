@@ -1,0 +1,13 @@
+monotonic moved >=2ms 1
+mach time ok 1
+gettimeofday sane 1
+sysname=Darwin machine=x86_64
+pagesize=4096 cpus>0 1
+rlimit ok 1
+passwd ok 1
+locale set
+strftime 1971-01-01 00:00
+ctype 11077
+getopt a=1 b=val rest=file
+assert passed
+exit=0

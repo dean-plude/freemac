@@ -1,0 +1,27 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#   ferry-cc [clang options] source.c -o program
+#
+# Builds a program for an Intel Mac with Ferry's own SDK (our headers and our
+# description of libSystem), using clang and LLVM's lld. Used to make test
+# programs on freemac; no Mac or Apple SDK is needed.
+set -eu
+here=$(dirname "$(readlink -f "$0")")
+if [ -n "${FERRY_SDK:-}" ]; then sdk=$FERRY_SDK
+elif [ -d "$here/include" ]; then sdk=$here
+else sdk=/usr/share/ferry/sdk
+fi
+# clang only passes the Mach-O linker its platform and architecture when it
+# knows the linker is lld, so point it at a directory holding "ld64.lld".
+lddir=
+for candidate in "$(command -v ld64.lld 2>/dev/null || true)" /usr/lib/llvm-*/bin/ld64.lld; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then lddir=$(dirname "$candidate"); break; fi
+done
+if [ -z "$lddir" ]; then
+    echo "ferry-cc: LLVM's Mach-O linker (ld64.lld, package lld) isn't installed" >&2
+    exit 1
+fi
+exec clang -target x86_64-apple-macos11 -nostdlibinc -isystem "$sdk/include" \
+    -fno-stack-protector -Wno-unused-command-line-argument \
+    -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -lSystem "$@"
