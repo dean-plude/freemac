@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- freemac mark: an original rising-tide emblem. GPL-3.0-or-later. -->
+  <circle cx="32" cy="32" r="28" fill="#2C3A78"/>
+  <path d="M8 38 C18 30 26 44 36 36 S52 30 56 34 L56 40 A28 28 0 0 1 8 40 Z" fill="#E29678"/>
+  <path d="M10 30 C20 22 28 36 38 28 S52 22 56 26" fill="none" stroke="#F4F3F7" stroke-width="3" stroke-linecap="round"/>
+</svg>

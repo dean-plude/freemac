@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to freemac
+Comment=Shortcuts and a first look at freemac
+Exec=freemac-welcome
+Icon=freemac-welcome
+Categories=System;

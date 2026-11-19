@@ -1,0 +1,16 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Start the freemac desktop session (Wayfire configured as Strata).
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=freemac:wayfire
+export XDG_SESSION_DESKTOP=freemac
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM="wayland;xcb"
+# libseat finds seatd first (seatd.service); logind is the fallback.
+# Allow the software renderer (virtual machines, GPUs without drivers).
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+if systemd-detect-virt -q 2>/dev/null; then
+  export WLR_NO_HARDWARE_CURSORS=1
+fi
+mkdir -p "$HOME/.cache"
+exec wayfire >"$HOME/.cache/wayfire.log" 2>&1

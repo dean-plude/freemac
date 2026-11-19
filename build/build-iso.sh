@@ -73,10 +73,11 @@ need() {
 }
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (the build uses chroot)." >&2; exit 1; }
-need debootstrap mksquashfs xorriso grub-mkrescue mformat
+need debootstrap mksquashfs xorriso grub-mkrescue mformat python3
 
 # Package list: shared packages plus the base's own extras.
-PACKAGES=$(grep -hv '^\s*#' "$REPO/build/packages/common.list" "$REPO/build/packages/$BASE.list" | tr -s ' \n' ' ')
+PACKAGES=$(cat "$REPO/build/packages/common.list" "$REPO/build/packages/desktop.list" \
+  "$REPO/build/packages/$BASE.list" | grep -v '^[[:space:]]*#' | tr -s ' \n' ' ')
 
 umount_chroot() {
   for m in dev/pts dev proc sys run; do
@@ -128,11 +129,19 @@ ID=freemac
 ID_LIKE="$ID_LIKE"
 HOME_URL="https://github.com/dean-plude/freemac"
 EOF
-in_chroot useradd --create-home --shell /bin/bash --groups sudo,audio,video,plugdev --user-group freemac 2>/dev/null \
-  || in_chroot useradd --create-home --shell /bin/bash --groups sudo --user-group freemac
+USER_GROUPS=sudo
+for g in audio video render input plugdev; do
+  in_chroot getent group "$g" >/dev/null && USER_GROUPS="$USER_GROUPS,$g"
+done
+in_chroot useradd --create-home --shell /bin/bash --groups "$USER_GROUPS" --user-group freemac
 in_chroot passwd --delete freemac
 in_chroot passwd --lock root
 in_chroot systemctl enable systemd-networkd.service >/dev/null 2>&1 || true
+in_chroot systemctl enable seatd.service greetd.service
+in_chroot systemctl set-default graphical.target
+in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
+mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
+python3 "$REPO/art/make-wallpaper.py" "$ROOTFS/usr/share/backgrounds/freemac/dusk-tide.png"
 mkdir -p "$ROOTFS/etc/systemd/network"
 cat > "$ROOTFS/etc/systemd/network/20-wired.network" <<'EOF'
 [Match]

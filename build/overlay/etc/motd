@@ -1,6 +1,6 @@
 
-  Welcome to freemac (live, milestone 1: base system).
+  Welcome to freemac (live preview).
 
-  This is a console-only base image. The Strata desktop arrives in
-  milestone 2. Project: https://github.com/dean-plude/freemac
+  The desktop runs on VT 7 (Ctrl+Alt+F7). This is the text console.
+  Project: https://github.com/dean-plude/freemac
 
