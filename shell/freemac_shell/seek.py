@@ -1,20 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Seek: freemac's search launcher (Super+Space).
 
-Finds applications, files in your home folder, and answers simple sums.
+Finds applications, files in your home folder (by name, and by the text
+inside them through seek_index), and answers simple sums.
 """
 import ast
 import operator
 import os
 import re
+import threading
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gio, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import style  # noqa: E402
+from . import seek_index, style  # noqa: E402
 
 MAX_RESULTS = 8
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
@@ -86,6 +88,15 @@ def find_files(query, limit):
     return found
 
 
+def short(path):
+    home = os.path.expanduser("~")
+    return "~" + path[len(home):] if path == home or path.startswith(home + os.sep) else path
+
+
+def open_path(path):
+    Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
+
+
 class Result:
     def __init__(self, title, subtitle, icon, action):
         self.title, self.subtitle, self.icon, self.action = title, subtitle, icon, action
@@ -106,7 +117,7 @@ class SeekWindow(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.get_style_context().add_class("seek")
         self.add(box)
-        self.entry = Gtk.SearchEntry(placeholder_text="Search apps and files")
+        self.entry = Gtk.SearchEntry(placeholder_text="Search apps, files and what's in them")
         self.entry.connect("search-changed", self._changed)
         self.entry.connect("activate", lambda _e: self._run(0))
         box.pack_start(self.entry, False, False, 0)
@@ -120,6 +131,18 @@ class SeekWindow(Gtk.Window):
         self.results = []
         self.query = ""
         self.apps = [a for a in Gio.AppInfo.get_all() if a.should_show()]
+        # Bring the index of words in files up to date while the person types.
+        self.stop = threading.Event()
+        threading.Thread(target=self._index, daemon=True).start()
+        self.connect("destroy", lambda *_: self.stop.set())
+
+    def _index(self):
+        try:
+            changed = seek_index.update(stop=self.stop)
+        except Exception:   # a broken index must never break the launcher
+            return
+        if changed and not self.stop.is_set():
+            GLib.idle_add(lambda: self.query and self._changed(self.entry) and False)
 
     def _key(self, _w, event):
         from gi.repository import Gdk
@@ -158,10 +181,15 @@ class SeekWindow(Gtk.Window):
                 results.append(Result(info.get_name(), "Application", info.get_icon(),
                                       lambda i=info: i.launch([], None)))
             if len(query) >= 2:
-                for path in find_files(query, MAX_RESULTS - len(results)):
-                    results.append(Result(os.path.basename(path), path.replace(os.path.expanduser("~"), "~", 1),
+                named = find_files(query, MAX_RESULTS - len(results))
+                for path in named:
+                    results.append(Result(os.path.basename(path), short(path),
                                           Gio.ThemedIcon.new("folder" if os.path.isdir(path) else "text-x-generic"),
-                                          lambda p=path: Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(p).get_uri(), None)))
+                                          lambda p=path: open_path(p)))
+                room = MAX_RESULTS - len(results)
+                for path, words in seek_index.search(query, room, exclude=set(named)) if room > 0 else []:
+                    results.append(Result(os.path.basename(path), f"{short(os.path.dirname(path))}: {words}",
+                                          Gio.ThemedIcon.new("text-x-generic"), lambda p=path: open_path(p)))
         self._show(results[:MAX_RESULTS])
 
     def _show(self, results):
@@ -176,7 +204,7 @@ class SeekWindow(Gtk.Window):
             row.pack_start(image, False, False, 0)
             text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             title = Gtk.Label(label=res.title, xalign=0)
-            sub = Gtk.Label(label=res.subtitle, xalign=0)
+            sub = Gtk.Label(label=res.subtitle, xalign=0, ellipsize=3, max_width_chars=70)
             sub.get_style_context().add_class("hint")
             text.pack_start(title, False, False, 0)
             text.pack_start(sub, False, False, 0)
