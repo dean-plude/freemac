@@ -151,6 +151,13 @@ Tested so far (Nov 2026), on the `BASE=ubuntu` image in QEMU:
 - Keel installed 0.4.0 to an empty 20 GB virtual disk. The installed system
   boots under both BIOS and UEFI (OVMF) to the Gangway login screen; a wrong
   password is refused and the right one opens the desktop.
+- 0.9.0 live session: app menus show in Topline (Tally's View menu switches
+  its scientific keys), dragging a window to the screen's edge tiles it, the
+  quick settings panel opens from the gear and hides Wi-Fi, Bluetooth and
+  brightness on a machine without them, Dials > Keyboard lists the shortcuts,
+  and switching night light on starts wlsunset with the chosen hours. QEMU's
+  own screen capture can show stale patches of the menu bar without a GL
+  display; the compositor's picture (grim) is clean.
 
 ![freemac 0.4 desktop with Drawer and Seek](docs/screenshots/0.4-desktop.png)
 
