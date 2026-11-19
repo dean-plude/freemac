@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lens
+Comment=Take a screenshot of the screen, an area or a window
+Exec=freemac-lens
+Icon=freemac-lens
+Categories=Utility;Graphics;
+Keywords=screenshot;screen;capture;print;snip;
+StartupWMClass=org.freemac.Lens

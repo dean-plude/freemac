@@ -75,6 +75,9 @@ one of them will be reverted.
   See [Mac app compatibility](docs/ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - **Milestone 7: release.** Signed images, package repository, docs.
 
+From 0.5 on, work is planned in batches of features; the current list is in
+[docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## Running Mac apps
 
 freemac is not macOS and does not include it. Mac app support is planned as an

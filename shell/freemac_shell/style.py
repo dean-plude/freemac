@@ -20,6 +20,7 @@ TEMPLATE = """
 .topline label { color: @ink; }
 .topline .app-name { font-weight: 700; }
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
+.topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }
 
 .pier-shelf {

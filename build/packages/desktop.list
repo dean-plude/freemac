@@ -27,8 +27,13 @@ dconf-service
 network-manager
 polkitd
 # Everyday apps we ship but don't write: text editor, image viewer, web browser.
-mousepad
-ristretto
+gir1.2-gtksource-4
+grim
+slurp
+wl-clipboard
+libnotify-bin
+xdg-utils
+xdg-user-dirs
 epiphany-browser
 gir1.2-nm-1.0
 gtk-update-icon-cache
@@ -39,3 +44,4 @@ gnome-themes-extra
 pipewire
 pipewire-pulse
 wireplumber
+power-profiles-daemon

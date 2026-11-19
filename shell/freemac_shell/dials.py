@@ -2,7 +2,8 @@
 """Dials: freemac's settings app.
 
 Appearance (light and dark), wallpaper, dock, displays, trackpad and mouse,
-network and an About page. Settings are written to the same files the rest of
+keyboard, network, sound, power, accessibility, notifications and an About
+page. Settings are written to the same files the rest of
 the desktop reads (GSettings, ~/.config/wayfire.ini, ~/.config/wf-shell.ini and
 ~/.config/freemac/pier.json), and every running part follows the change.
 """
@@ -19,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import pier, style  # noqa: E402
+from . import dials_more, pier, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -201,6 +202,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         super().__init__(application=app, title="Dials")
         self.set_default_size(860, 580)
         self.settings = style.interface_settings()
+        self.helpers = (group, row, page, slider, switch)
         header = Gtk.HeaderBar(show_close_button=True, title="Dials")
         self.set_titlebar(header)
 
@@ -227,6 +229,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             ("pointing", "Trackpad and Mouse", "input-touchpad-symbolic", self.pointing),
             ("keyboard", "Keyboard", "input-keyboard-symbolic", self.keyboard),
             ("network", "Network", "network-wired-symbolic", self.network),
+            ("sound", "Sound", "audio-volume-high-symbolic", lambda: dials_more.sound(self)),
+            ("power", "Power", "battery-good-symbolic", lambda: dials_more.power(self)),
+            ("notifications", "Notifications", "preferences-system-notifications-symbolic",
+             lambda: dials_more.notifications(self)),
+            ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic",
+             lambda: dials_more.accessibility(self)),
             ("about", "About", "help-about-symbolic", self.about),
         ):
             item = Gtk.ListBoxRow()
@@ -240,6 +248,26 @@ class DialsWindow(Gtk.ApplicationWindow):
             self.stack.add_named(build(), name)
         self.sidebar = sidebar
         sidebar.select_row(self.rows["appearance"])
+
+    @staticmethod
+    def ini_get(section, key, default=None):
+        return ini_get(WAYFIRE_INI, section, key, default)
+
+    @staticmethod
+    def ini_set(section, key, value):
+        ini_set(WAYFIRE_INI, section, key, value)
+
+    def confirm_power(self, action):
+        if action != "suspend":
+            words = {"reboot": ("Restart now?", "Restart"), "poweroff": ("Shut down now?", "Shut Down")}[action]
+            dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                       text=words[0], secondary_text="Unsaved work in open apps will be lost.")
+            dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, words[1], Gtk.ResponseType.OK)
+            answer = dialog.run()
+            dialog.destroy()
+            if answer != Gtk.ResponseType.OK:
+                return
+        Gio.Subprocess.new(["systemctl", action], Gio.SubprocessFlags.NONE)
 
     def show_panel(self, name):
         if name in self.rows:
@@ -374,8 +402,10 @@ class DialsWindow(Gtk.ApplicationWindow):
         prefs = style.prefs()
         prefs.update(changes)
         os.makedirs(os.path.dirname(style.PREFS), exist_ok=True)
-        with open(style.PREFS, "w") as f:
+        tmp = style.PREFS + ".dials-tmp"
+        with open(tmp, "w") as f:
             json.dump(prefs, f, indent=2)
+        os.replace(tmp, style.PREFS)
 
     # Displays -----------------------------------------------------------------
     def displays(self):
