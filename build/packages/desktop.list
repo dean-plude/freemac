@@ -49,6 +49,8 @@ sound-theme-freedesktop
 tzdata
 at-spi2-core
 power-profiles-daemon
+# Night light (warmer colours in the evening) through Wayland's gamma control
+wlsunset
 # Lock screen (Latch): session locking with PAM, and idle detection
 gtklock
 swayidle

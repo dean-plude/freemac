@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_keys, dials_more, dials_people, menus, pier, style  # noqa: E402
+from . import dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -494,7 +494,45 @@ class DialsWindow(Gtk.ApplicationWindow):
             rows.append(row(f"{name} scale", scale, caption))
         if not rows:
             rows.append(row("No displays found", None, "Dials reads displays from the window manager."))
-        return page("Displays", group(*rows))
+        level = screen.brightness()
+        if level is not None:
+            rows.insert(0, row("Brightness", slider(0.05, 1, 0.01, level, screen.set_brightness)))
+        else:
+            rows.append(row("Brightness", None, "This display sets its own brightness, with its buttons."))
+        return page("Displays", group(*rows), self.night_light())
+
+    def night_light(self):
+        settings = screen.night_settings()
+
+        def changed(key, value):
+            if settings.get(key) != value:
+                settings[key] = value
+                screen.save_night_settings(settings)
+
+        times = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
+
+        def time_box(key):
+            combo = Gtk.ComboBoxText()
+            for t in times:
+                combo.append(t, t)
+            if settings[key] not in times:
+                combo.append(settings[key], settings[key])
+            combo.set_active_id(settings[key])
+            combo.connect("changed", lambda c: changed(key, c.get_active_id()))
+            return combo
+
+        warmth = slider(2700, 5500, 100, settings["warmth"], lambda v: changed("warmth", int(v)),
+                        marks=((2700, "Warmer"), (5500, "Less warm")))
+        hours = Gtk.Box(spacing=6)
+        hours.pack_start(time_box("from"), False, False, 0)
+        hours.pack_start(Gtk.Label(label="to"), False, False, 0)
+        hours.pack_start(time_box("to"), False, False, 0)
+        return group(
+            row("Night Light", switch(settings["on"], lambda on: changed("on", on)),
+                "Warmer colours in the evening, which are easier on the eyes at night."),
+            row("From", hours, "It fades in and out over half an hour."),
+            row("Colour", warmth),
+        )
 
     # Trackpad and mouse -------------------------------------------------------
     def pointing(self):
