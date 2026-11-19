@@ -9,7 +9,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import apps, beacon, status, style  # noqa: E402
 from .wfipc import Wayfire  # noqa: E402
@@ -47,12 +47,28 @@ class Topline(Gtk.Window):
         # Focused application's name and menu.
         self.app_button = Gtk.MenuButton(label="freemac")
         self.app_button.get_style_context().add_class("app-name")
-        self.app_menu = Gtk.Menu()
+        self.app_menu = self._watch_menu(Gtk.Menu())
         self.app_button.set_popup(self.app_menu)
         bar.pack_start(self.app_button, False, False, 0)
 
+        # The focused app's own menus (File, Edit, ...), when it publishes
+        # them; Strata tells us where to find them.
+        self.menus_box = Gtk.Box(spacing=0)
+        self.menus_box.set_no_show_all(True)
+        bar.pack_start(self.menus_box, False, False, 0)
+        self._menu_key = None
+        self._menubar = None
+        self._app_model = None
+        self._groups = {}
+        self._bus = None
+        self._own_actions = Gio.SimpleActionGroup()
+        for name in ("hide", "quit"):
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", lambda _a, _p, n=name: self._own_action(n))
+            self._own_actions.add_action(action)
+
         self.window_button = Gtk.MenuButton(label="Window")
-        self.window_menu = Gtk.Menu()
+        self.window_menu = self._watch_menu(Gtk.Menu())
         self.window_button.set_popup(self.window_menu)
         bar.pack_start(self.window_button, False, False, 0)
 
@@ -70,7 +86,8 @@ class Topline(Gtk.Window):
         bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
         # computer has nothing to show (no battery, no sound server).
-        for indicator in (status.Battery(), status.Sound(), status.Network()):
+        for indicator in (status.Battery(), status.Sound(), status.Network(), status.Bluetooth(),
+                          status.Printing()):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
         self._tick()
@@ -144,7 +161,12 @@ class Topline(Gtk.Window):
 
     def refresh(self):
         view = self.wf.focused() if self.wf else None
+        # Opening one of our menus takes the focus from the app; keep showing
+        # that app's menus until the menu closes.
+        if view is None and self.focused is not None and self._menu_open():
+            return
         self.focused = view
+        self._fill_app_menus(view)
         app_id = view.get("app-id") if view else None
         self.app_button.set_label(apps.display_name(app_id, view.get("title", "") if view else "") if view else "freemac")
         self._fill_app_menu(view)
@@ -154,7 +176,118 @@ class Topline(Gtk.Window):
         for child in menu.get_children():
             menu.remove(child)
 
+    def _menus(self):
+        yield self.app_button.get_popup()
+        yield self.window_menu
+        for button in self.menus_box.get_children():
+            yield button.get_popup()
+
+    def _menu_open(self):
+        return any(menu is not None and menu.get_visible() for menu in self._menus())
+
+    def _watch_menu(self, menu):
+        menu.connect("deactivate", lambda *_: GLib.idle_add(self._after_menu))
+        return menu
+
+    def _after_menu(self):
+        self.refresh()
+        return False
+
+    # --- the app's own menus -------------------------------------------
+    def _session_bus(self):
+        if self._bus is None:
+            self._bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        return self._bus
+
+    def _fill_app_menus(self, view):
+        info = self.wf.app_menus(view["id"]) if (self.wf and view) else None
+        key = None
+        if info:
+            key = tuple(info.get(k) or "" for k in
+                        ("bus-name", "menubar-path", "app-menu-path", "window-path", "application-path"))
+        if key == self._menu_key:
+            return
+        self._menu_key = key
+        self._menubar = None
+        self._app_model = None
+        for prefix in ("app", "win"):
+            self.menus_box.insert_action_group(prefix, None)
+        self._groups = {}
+        if key:
+            bus_name, menubar_path, app_menu_path, window_path, application_path = key
+            try:
+                conn = self._session_bus()
+                for prefix, path in (("app", application_path), ("win", window_path)):
+                    if path:
+                        self._groups[prefix] = Gio.DBusActionGroup.get(conn, bus_name, path)
+                        self.menus_box.insert_action_group(prefix, self._groups[prefix])
+                if menubar_path:
+                    self._menubar = Gio.DBusMenuModel.get(conn, bus_name, menubar_path)
+                    self._menubar.connect("items-changed", lambda *_: self._build_menubar())
+                if app_menu_path:
+                    self._app_model = Gio.DBusMenuModel.get(conn, bus_name, app_menu_path)
+                    self._app_model.connect("items-changed", lambda *_: self._fill_app_menu(self.focused))
+            except GLib.Error:
+                self._menubar = self._app_model = None
+        self._build_menubar()
+
+    def _top_level(self, model):
+        """(label, submenu) for each menu of a menu bar model; items inside
+        sections count as top-level too."""
+        string = GLib.VariantType.new("s")
+        for i in range(model.get_n_items()):
+            section = model.get_item_link(i, Gio.MENU_LINK_SECTION)
+            if section is not None:
+                yield from self._top_level(section)
+                continue
+            submenu = model.get_item_link(i, Gio.MENU_LINK_SUBMENU)
+            label = model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_LABEL, string)
+            if submenu is not None and label is not None:
+                yield label.get_string(), submenu
+
+    def _menu_from_model(self, model):
+        menu = Gtk.Menu.new_from_model(model)
+        for prefix, group in self._groups.items():
+            menu.insert_action_group(prefix, group)
+        menu.insert_action_group("topline", self._own_actions)
+        return self._watch_menu(menu)
+
+    def _build_menubar(self):
+        for child in self.menus_box.get_children():
+            self.menus_box.remove(child)
+        # Asking for the items is also what makes the model load them; it
+        # calls back (items-changed) once they've arrived.
+        menus = list(self._top_level(self._menubar)) if self._menubar is not None else []
+        for label, submenu in menus:
+            button = Gtk.MenuButton(label=label, use_underline=True)
+            button.set_popup(self._menu_from_model(submenu))
+            self.menus_box.pack_start(button, False, False, 0)
+            button.show_all()
+        self.menus_box.set_visible(bool(menus))
+
+    def _own_action(self, name):
+        view = self.focused
+        if not view or not self.wf:
+            return
+        if name == "hide":
+            self.wf.set_minimized(view["id"], True)
+        elif name == "quit" and view.get("pid"):
+            os.kill(view["pid"], signal.SIGTERM)
+
     def _fill_app_menu(self, view):
+        # An app with an old-style app menu: its items, then Hide and Quit.
+        if view and self._app_model is not None and self._app_model.get_n_items():
+            name = apps.display_name(view.get("app-id"))
+            combined = Gio.Menu()
+            combined.append_section(None, self._app_model)
+            ours = Gio.Menu()
+            ours.append(f"Hide {name}", "topline.hide")
+            ours.append(f"Quit {name}", "topline.quit")
+            combined.append_section(None, ours)
+            self.app_button.set_popup(self._menu_from_model(combined))
+            return
+        if self.app_button.get_popup() is not self.app_menu:
+            self.app_button.set_popup(self.app_menu)
         menu = self.app_menu
         self._clear(menu)
         if not view:

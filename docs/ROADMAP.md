@@ -58,18 +58,35 @@ Also in 0.7: the session now creates the standard folders (Desktop, Documents,
 Downloads and so on) at login, so they get their own icons, and the last
 administrator can no longer be deleted.
 
-## 0.8 "Strata plugins" (planned)
+## 0.8 "Strata plugins" (done)
 
-These need C++ plugins built against Wayfire's headers, so the ISO build gets a
-compile step.
+These need C++ plugins built against Wayfire's headers, so the ISO build now
+has a compile step (`strata/build.sh`, run in the image and removed again).
 
-- Debian (`BASE=debian`, trixie) build tested end to end, as the default. (Moved
-  from 0.6; waiting until the build machine can reach Debian's mirrors.)
-- App menus in Topline: a Strata plugin that hands Topline the menu address an
-  app publishes, then Topline shows that app's menus. (Moved from 0.6.)
-- Strata decoration plugin: our own window buttons on every app, not just GTK.
-  (Moved from 0.7.)
-- A Bluetooth icon in Topline and a printer-queue notification.
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Strata decoration plugin: our own title bar and left-side buttons on apps that leave the title bar to the desktop (terminals, Qt apps, browsers), following light and dark mode as it changes | **Strata** (strata-decor) | done |
+| 2 | App menus in Topline: a Strata plugin that hands Topline the menus a GTK app publishes; Topline shows them (File, Edit, View, ...) and runs them, and the app leaves them out of its window | **Strata** (strata-shell), Topline | done |
+| 3 | Quill gets a File / Edit / View menu bar | Quill | done |
+| 4 | A Bluetooth icon in Topline: off, on, or which devices are connected | Topline | done |
+| 5 | Printing in Topline: an icon while something prints, notifications when it has printed, didn't print, or the printer stopped | Topline | done |
+| 6 | Debian (`BASE=debian`, trixie) build tested end to end, as the default | build | moved to 0.9 |
+
+Also in 0.8: Dials writes Wayfire's settings file in place, so changes to
+animations, title bars and the like apply straight away rather than after
+logging in again.
+
+## 0.9 "menus everywhere" (planned)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Menu bars for the rest of freemac's apps (Drawer, Frame, Tally, Chime, Harbor, Dials) | apps | planned |
+| 2 | App menus from Qt apps in Topline (KDE's appmenu protocol and DBusMenu) | Strata, Topline | planned |
+| 3 | Quick settings from Topline: Wi-Fi, Bluetooth, Do Not Disturb, dark mode, volume and brightness in one panel | Topline | planned |
+| 4 | Screen brightness and a night light (warmer colours in the evening) in Dials > Displays | Dials | planned |
+| 5 | Drag a window to the left or right edge to fill that half of the screen, to the top to fill it | Strata | planned |
+| 6 | Keyboard panel: see and change shortcuts | Dials | planned |
+| 7 | Debian (`BASE=debian`, trixie) build tested end to end, as the default (moved from 0.6; waiting until the build machine can reach Debian's mirrors) | build | planned |
 
 ## Later
 

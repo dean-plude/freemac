@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<wayfire>
+	<!-- Strata's gtk-shell: replaces Wayfire's gtk-shell plugin. -->
+	<plugin name="strata-shell">
+		<_short>Strata GTK shell</_short>
+		<_long>GTK app extras, and hands each app's menus to Topline.</_long>
+		<category>Desktop</category>
+		<option name="global_menus" type="bool">
+			<_short>Show app menus in Topline</_short>
+			<_long>Tell GTK apps that the menu bar at the top of the screen shows their menus, so they leave them out of their windows.</_long>
+			<default>true</default>
+		</option>
+	</plugin>
+</wayfire>

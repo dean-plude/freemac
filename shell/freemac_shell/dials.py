@@ -120,10 +120,12 @@ def ini_set(path, section, key, value):
                 at -= 1
             lines.insert(at, f"{key} = {value}")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".dials-tmp"
-    with open(tmp, "w") as f:
+    # Write the file in place rather than replacing it: Wayfire watches the
+    # file itself for a finished write, and loses track of it when a new file
+    # is renamed over it, so later changes would only apply after logging in
+    # again.
+    with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
-    os.replace(tmp, path)
 
 
 def pier_config():

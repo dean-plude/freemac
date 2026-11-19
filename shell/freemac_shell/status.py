@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Status icons for Topline: network, sound and battery.
+"""Status icons for Topline: network, sound, battery, Bluetooth and printing.
 
 Each one hides itself when the computer doesn't have the thing it shows (no
-battery on a desktop PC, no sound server, no NetworkManager).
+battery on a desktop PC, no sound server, no NetworkManager, no Bluetooth
+adapter, nothing printing).
 """
 import glob
 import os
@@ -14,9 +15,14 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import style  # noqa: E402
+from . import beacon, style  # noqa: E402
+
+try:
+    import cups  # python3-cups, which system-config-printer brings along
+except ImportError:
+    cups = None
 
 try:
     gi.require_version("NM", "1.0")
@@ -234,3 +240,135 @@ class Battery(StatusButton):
                 return f.read().strip()
         except OSError:
             return None
+
+
+class Bluetooth(StatusButton):
+    """Shown when the computer has a Bluetooth adapter: on, off, or the
+    devices connected right now. Click for Dials' Bluetooth panel."""
+
+    def __init__(self):
+        super().__init__()
+        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "bluetooth"))
+        self.manager = None
+        try:
+            self.manager = Gio.DBusObjectManagerClient.new_for_bus_sync(
+                Gio.BusType.SYSTEM, Gio.DBusObjectManagerClientFlags.NONE, "org.bluez", "/",
+                None, None, None)
+        except GLib.Error:
+            self.manager = None
+        if self.manager:
+            for signal in ("object-added", "object-removed", "interface-added", "interface-removed",
+                           "interface-proxy-properties-changed", "notify::name-owner"):
+                self.manager.connect(signal, lambda *_: self.update())
+        self.update()
+
+    @staticmethod
+    def _prop(proxy, name):
+        value = proxy.get_cached_property(name)
+        return value.unpack() if value is not None else None
+
+    def update(self):
+        if not self.manager or not self.manager.get_name_owner():
+            self.hide()
+            return
+        adapters, connected = [], []
+        for obj in self.manager.get_objects():
+            adapter = obj.get_interface("org.bluez.Adapter1")
+            if adapter:
+                adapters.append(adapter)
+            device = obj.get_interface("org.bluez.Device1")
+            if device and self._prop(device, "Connected"):
+                connected.append(self._prop(device, "Alias") or self._prop(device, "Name") or "a device")
+        if not adapters:
+            self.hide()
+            return
+        if not any(self._prop(a, "Powered") for a in adapters):
+            self.show_icon("bluetooth-disabled-symbolic", "Bluetooth is off")
+        elif connected:
+            self.show_icon("bluetooth-active-symbolic", "Connected to " + ", ".join(sorted(connected)))
+        else:
+            self.show_icon("bluetooth-disconnected-symbolic", "Bluetooth is on")
+
+
+JOB_DONE, JOB_CANCELED, JOB_ABORTED = 9, 7, 8
+PRINTER_STOPPED = 5
+
+
+class Printing(StatusButton):
+    """Shown while something is printing or waiting to print. Says so (with a
+    notification) when a document has printed, didn't print, or its printer
+    stopped. Click for Dials' Printers panel."""
+
+    def __init__(self):
+        super().__init__()
+        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "printers"))
+        self.jobs = {}          # job id -> (document name, printer name)
+        self.stopped = set()    # printers we've already said have stopped
+        GLib.timeout_add_seconds(5, lambda: self.update() or True)
+        self.update()
+
+    def _connection(self):
+        if not cups:
+            return None
+        try:
+            return cups.Connection()
+        except (RuntimeError, cups.IPPError):
+            return None
+
+    @staticmethod
+    def _printer_of(attrs):
+        uri = attrs.get("job-printer-uri", "")
+        return uri.rsplit("/", 1)[-1] if uri else ""
+
+    def update(self):
+        conn = self._connection()
+        if conn is None:
+            self.hide()
+            return
+        try:
+            pending = conn.getJobs(which_jobs="not-completed", my_jobs=True,
+                                   requested_attributes=["job-id", "job-name", "job-printer-uri"])
+            printers = conn.getPrinters()
+        except cups.IPPError:
+            self.hide()
+            return
+        for job_id, attrs in pending.items():
+            self.jobs[job_id] = (attrs.get("job-name") or "Untitled", self._printer_of(attrs))
+        for job_id in [j for j in self.jobs if j not in pending]:
+            name, printer = self.jobs.pop(job_id)
+            self._finished(conn, job_id, name, printers.get(printer, {}).get("printer-info") or printer)
+        self._check_stopped(printers, {p for _n, p in self.jobs.values()})
+        if not self.jobs:
+            self.hide()
+            return
+        name, printer = next(iter(self.jobs.values()))
+        info = printers.get(printer, {})
+        label = info.get("printer-info") or printer
+        if printer in self.stopped:
+            self.show_icon("printer-error-symbolic", f"{label} has stopped")
+        else:
+            more = f" ({len(self.jobs)} waiting)" if len(self.jobs) > 1 else ""
+            self.show_icon("printer-printing-symbolic", f"Printing “{name}” on {label}{more}")
+
+    def _finished(self, conn, job_id, name, printer):
+        try:
+            attrs = conn.getJobAttributes(job_id, requested_attributes=["job-state", "job-state-message"])
+        except cups.IPPError:
+            return
+        state = attrs.get("job-state")
+        if state == JOB_DONE:
+            beacon.send(f"Printed “{name}”", f"On {printer}." if printer else "", "printer-symbolic", "Printers")
+        elif state == JOB_ABORTED:
+            detail = attrs.get("job-state-message") or "The printer reported a problem."
+            beacon.send(f"“{name}” didn’t print", detail, "printer-error-symbolic", "Printers")
+
+    def _check_stopped(self, printers, busy):
+        for printer, info in printers.items():
+            stopped = info.get("printer-state") == PRINTER_STOPPED
+            if stopped and printer in busy and printer not in self.stopped:
+                self.stopped.add(printer)
+                reason = info.get("printer-state-message") or "Documents will wait until it's working again."
+                beacon.send(f"{info.get('printer-info') or printer} has stopped", reason,
+                            "printer-error-symbolic", "Printers")
+            elif not stopped:
+                self.stopped.discard(printer)
