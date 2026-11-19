@@ -94,7 +94,7 @@ without changing the user experience.
   layer (`/etc/skel/.config/gtk-3.0/gtk.css`) that draws them as freemac's own
   rounded squares. Apps that ask the compositor for a title bar (foot, some Qt
   apps) still get Wayfire's right-side buttons until our decoration plugin.
-- **Shell:** Topline, Pier and Seek are layer-shell clients in the
+- **Shell:** Topline, Pier, Seek and Backdrop are layer-shell clients in the
   `freemac_shell` Python package (`shell/`), started from Wayfire's autostart.
   They talk to Wayfire over its IPC socket for windows and focus.
 - **Apps:** Drawer, Dials, Keel and Gangway live in the same package.
@@ -104,8 +104,11 @@ without changing the user experience.
   chosen. seatd hands the compositor its devices; NetworkManager runs the
   network.
 - **Known gaps:** app menus from GTK and Qt apps in Topline (DBusMenu), our
-  own decoration plugin, a notification centre, sound settings, our own icons,
-  and gestures tested on real hardware.
+  own decoration plugin, a notification centre, a Sound panel in Dials (the
+  menu bar has a volume control), our own icons, and gestures, Wi-Fi and
+  batteries tested on real hardware. In QEMU's software rendering the menu
+  bar sometimes shows a dark patch for a moment while it redraws; not yet
+  checked on real hardware.
 
 ## Hard problems we know about
 

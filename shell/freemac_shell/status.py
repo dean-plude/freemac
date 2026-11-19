@@ -33,8 +33,13 @@ class StatusButton(Gtk.Button):
         self.image = Gtk.Image()
         self.set_image(self.image)
         self.set_no_show_all(True)
+        self.shown = None
 
     def show_icon(self, icon, tooltip):
+        # Redraw only when something changed; the bar polls every few seconds.
+        if self.shown == (icon, tooltip) and self.get_visible():
+            return
+        self.shown = (icon, tooltip)
         self.image.set_from_icon_name(icon, Gtk.IconSize.MENU)
         self.set_tooltip_text(tooltip)
         self.show()
@@ -123,10 +128,12 @@ class Sound(StatusButton):
         volume, muted = state
         level = "muted" if muted or volume == 0 else "low" if volume < 34 else "medium" if volume < 67 else "high"
         self.show_icon(f"audio-volume-{level}-symbolic", "Muted" if muted else f"Volume {volume}%")
-        with self.scale.handler_block(self.scale_handler):
-            self.scale.set_value(volume)
-        with self.mute.handler_block(self.mute_handler):
-            self.mute.set_active(muted)
+        if round(self.scale.get_value()) != volume:
+            with self.scale.handler_block(self.scale_handler):
+                self.scale.set_value(volume)
+        if self.mute.get_active() != muted:
+            with self.mute.handler_block(self.mute_handler):
+                self.mute.set_active(muted)
 
     def _set_volume(self, scale):
         subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{int(scale.get_value())}%"],
@@ -166,7 +173,8 @@ class Battery(StatusButton):
         level = min(100, max(0, round(capacity / 10) * 10))
         icon = f"battery-level-{level}{'-charging' if charging else ''}-symbolic"
         self.show_icon(icon, f"Battery {capacity}%{' (charging)' if charging else ''}")
-        self.set_label(f"{capacity}%")
+        if self.get_label() != f"{capacity}%":
+            self.set_label(f"{capacity}%")
 
     @staticmethod
     def _read(path, name):
