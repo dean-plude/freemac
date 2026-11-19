@@ -380,7 +380,8 @@ class Calculator(Gtk.ApplicationWindow):
                     ctx.add_class("suggested-action")
                 button.connect("clicked", lambda _b, a=action: self.press(a))
                 grid.attach(button, c, r, 1, 1)
-        grid.show_all()
+                button.show()
+        # Only the keys: the scientific grid itself stays hidden until asked for.
         return grid
 
     # -- typing --------------------------------------------------------------
