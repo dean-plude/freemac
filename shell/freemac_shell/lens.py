@@ -87,8 +87,11 @@ def capture(mode):
     if subprocess.run(cmd, capture_output=True).returncode != 0 or not os.path.exists(path):
         return None, "The screenshot couldn't be taken."
     if shutil.which("wl-copy"):
+        # wl-copy keeps running in the background to serve the clipboard, so
+        # don't wait on its output pipes.
         with open(path, "rb") as f:
-            subprocess.run(["wl-copy", "--type", "image/png"], stdin=f, capture_output=True)
+            subprocess.run(["wl-copy", "--type", "image/png"], stdin=f,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
     return path, None
 
 

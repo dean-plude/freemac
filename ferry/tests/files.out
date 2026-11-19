@@ -1,0 +1,15 @@
+size=29 regular=1 dir=0
+lines=3 eof=1
+getline=11 'first line'
+fgetln=12 'second line'
+ftell=29
+read=6 'abcdef'
+fstat size=6 flags_ok=1
+append flag kept=1
+after append=8
+lstat link=1
+entries: link notes.txt raw.bin sub
+missing=NULL errno=2
+access=0
+cleanup=0
+exit=0

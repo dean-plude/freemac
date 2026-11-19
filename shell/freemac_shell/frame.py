@@ -82,6 +82,8 @@ class Viewer(Gtk.ApplicationWindow):
         self.stack.add_named(self.empty, "empty")
         self.stack.add_named(self.scroller, "image")
         self.add(self.stack)
+        # A stack only switches to children that are already shown.
+        self.stack.show_all()
         self._last_size = None
 
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)

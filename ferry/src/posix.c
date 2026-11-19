@@ -1,0 +1,792 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * POSIX calls whose numbers or structures differ between macOS and Linux:
+ * file flags, stat and directory entries, memory maps, clocks, signals,
+ * system limits and a few others. Each converts the Mac form to this
+ * system's, calls the real function, and converts the answer back.
+ */
+#define _GNU_SOURCE
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <limits.h>
+#include <locale.h>
+#include <pwd.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "ferry.h"
+
+/* ---- open flags ------------------------------------------------------------------ */
+
+static const struct { int mac, lnx; } open_bits[] = {
+    {0x0004, O_NONBLOCK}, {0x0008, O_APPEND}, {0x0080, O_SYNC}, {0x0100, O_NOFOLLOW},
+    {0x0200, O_CREAT}, {0x0400, O_TRUNC}, {0x0800, O_EXCL}, {0x20000, O_NOCTTY},
+    {0x100000, O_DIRECTORY}, {0x400000, O_DSYNC}, {0x1000000, O_CLOEXEC},
+};
+#define NBITS (sizeof open_bits / sizeof open_bits[0])
+
+static int open_to_linux(int mac)
+{
+    int out = mac & O_ACCMODE;
+    for (size_t i = 0; i < NBITS; i++)
+        if (mac & open_bits[i].mac)
+            out |= open_bits[i].lnx;
+    return out;
+}
+
+static int open_to_mac(int lnx)
+{
+    int out = lnx & O_ACCMODE;
+    for (size_t i = 0; i < NBITS; i++)
+        if ((lnx & open_bits[i].lnx) == open_bits[i].lnx)
+            out |= open_bits[i].mac;
+    return out;
+}
+
+#define MAC_AT_FDCWD -2
+#define MAC_AT_SYMLINK_NOFOLLOW 0x20
+#define MAC_AT_REMOVEDIR 0x80
+
+static int at_fd(int fd) { return fd == MAC_AT_FDCWD ? AT_FDCWD : fd; }
+
+static int mac_open(const char *path, int flags, ...)
+{
+    mode_t mode = 0;
+    if (flags & 0x200) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, int);
+        va_end(ap);
+    }
+    return open(path, open_to_linux(flags), mode);
+}
+
+static int mac_openat(int fd, const char *path, int flags, ...)
+{
+    mode_t mode = 0;
+    if (flags & 0x200) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, int);
+        va_end(ap);
+    }
+    return openat(at_fd(fd), path, open_to_linux(flags), mode);
+}
+
+static int mac_creat(const char *path, mode_t mode) { return creat(path, mode); }
+
+static int mac_unlinkat(int fd, const char *path, int flags)
+{
+    return unlinkat(at_fd(fd), path, (flags & MAC_AT_REMOVEDIR) ? AT_REMOVEDIR : 0);
+}
+
+static int mac_mkdirat(int fd, const char *path, mode_t mode) { return mkdirat(at_fd(fd), path, mode); }
+
+/* Record locks: different command numbers, lock types and field order. */
+struct mac_flock { int64_t start, len; int32_t pid; int16_t type, whence; };
+#define MAC_F_GETLK 7
+#define MAC_F_SETLK 8
+#define MAC_F_SETLKW 9
+#define MAC_F_FULLFSYNC 51
+#define MAC_F_DUPFD_CLOEXEC 67
+
+static int lock_type_to_linux(int t) { return t == 1 ? F_RDLCK : t == 3 ? F_WRLCK : F_UNLCK; }
+static int lock_type_to_mac(int t) { return t == F_RDLCK ? 1 : t == F_WRLCK ? 3 : 2; }
+
+static int mac_fcntl(int fd, int cmd, ...)
+{
+    va_list ap;
+    va_start(ap, cmd);
+    long arg = va_arg(ap, long);
+    va_end(ap);
+    switch (cmd) {
+    case 0: /* F_DUPFD */
+    case 1: /* F_GETFD */
+    case 2: /* F_SETFD: FD_CLOEXEC is 1 on both */
+        return fcntl(fd, cmd, arg);
+    case 3: { /* F_GETFL */
+        int rc = fcntl(fd, F_GETFL);
+        return rc < 0 ? rc : open_to_mac(rc);
+    }
+    case 4: /* F_SETFL */
+        return fcntl(fd, F_SETFL, open_to_linux((int)arg));
+    case MAC_F_DUPFD_CLOEXEC:
+        return fcntl(fd, F_DUPFD_CLOEXEC, arg);
+    case MAC_F_FULLFSYNC:
+        return fsync(fd);
+    case MAC_F_GETLK:
+    case MAC_F_SETLK:
+    case MAC_F_SETLKW: {
+        struct mac_flock *m = (void *)arg;
+        struct flock l = {.l_type = lock_type_to_linux(m->type), .l_whence = m->whence,
+                          .l_start = m->start, .l_len = m->len, .l_pid = m->pid};
+        int rc = fcntl(fd, cmd == MAC_F_GETLK ? F_GETLK : cmd == MAC_F_SETLK ? F_SETLK : F_SETLKW, &l);
+        if (rc == 0 && cmd == MAC_F_GETLK) {
+            m->type = lock_type_to_mac(l.l_type);
+            m->whence = l.l_whence;
+            m->start = l.l_start;
+            m->len = l.l_len;
+            m->pid = l.l_pid;
+        }
+        return rc;
+    }
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+}
+
+/* ---- stat --------------------------------------------------------------------------
+ * The 64-bit-inode struct stat that Mac programs for Intel use (the "$INODE64"
+ * variants of the calls). */
+
+struct mac_timespec { int64_t sec, nsec; };
+struct mac_stat {
+    int32_t dev;
+    uint16_t mode, nlink;
+    uint64_t ino;
+    uint32_t uid, gid;
+    int32_t rdev;
+    struct mac_timespec atime, mtime, ctime, birthtime;
+    int64_t size, blocks;
+    int32_t blksize;
+    uint32_t flags, gen;
+    int32_t lspare;
+    int64_t qspare[2];
+};
+_Static_assert(sizeof(struct mac_stat) == 144, "Mac struct stat is 144 bytes");
+_Static_assert(__builtin_offsetof(struct mac_stat, size) == 96, "st_size offset");
+
+static int32_t mac_dev(dev_t d) { return (int32_t)((major(d) << 24) | (minor(d) & 0xffffff)); }
+
+static void to_mac_stat(const struct stat *s, struct mac_stat *m)
+{
+    memset(m, 0, sizeof *m);
+    m->dev = mac_dev(s->st_dev);
+    m->mode = s->st_mode;
+    m->nlink = s->st_nlink > 0xffff ? 0xffff : s->st_nlink;
+    m->ino = s->st_ino;
+    m->uid = s->st_uid;
+    m->gid = s->st_gid;
+    m->rdev = mac_dev(s->st_rdev);
+    m->atime = (struct mac_timespec){s->st_atim.tv_sec, s->st_atim.tv_nsec};
+    m->mtime = (struct mac_timespec){s->st_mtim.tv_sec, s->st_mtim.tv_nsec};
+    m->ctime = (struct mac_timespec){s->st_ctim.tv_sec, s->st_ctim.tv_nsec};
+    m->birthtime = m->ctime; /* Linux's stat has no creation time */
+    m->size = s->st_size;
+    m->blocks = s->st_blocks;
+    m->blksize = s->st_blksize;
+}
+
+#define STAT_WRAPPER(name, call)                                   \
+    static int name                                                \
+    {                                                              \
+        struct stat s;                                             \
+        int rc = call;                                             \
+        if (rc == 0)                                               \
+            to_mac_stat(&s, out);                                  \
+        return rc;                                                 \
+    }
+
+STAT_WRAPPER(mac_stat64(const char *path, struct mac_stat *out), stat(path, &s))
+STAT_WRAPPER(mac_lstat64(const char *path, struct mac_stat *out), lstat(path, &s))
+STAT_WRAPPER(mac_fstat64(int fd, struct mac_stat *out), fstat(fd, &s))
+STAT_WRAPPER(mac_fstatat64(int fd, const char *path, struct mac_stat *out, int flags),
+             fstatat(at_fd(fd), path, &s, (flags & MAC_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0))
+
+/* ---- directories ------------------------------------------------------------------- */
+
+struct mac_dirent {
+    uint64_t ino, seekoff;
+    uint16_t reclen, namlen;
+    uint8_t type;
+    char name[1024];
+};
+
+struct mac_DIR {
+    int fd; /* Mac headers may read the descriptor from the start of DIR */
+    DIR *dir;
+    struct mac_dirent entry;
+};
+
+static struct mac_DIR *wrap_dir(DIR *d)
+{
+    if (!d)
+        return NULL;
+    struct mac_DIR *m = calloc(1, sizeof *m);
+    if (!m) {
+        closedir(d);
+        errno = ENOMEM;
+        return NULL;
+    }
+    m->dir = d;
+    m->fd = dirfd(d);
+    return m;
+}
+
+static struct mac_DIR *mac_opendir(const char *path) { return wrap_dir(opendir(path)); }
+static struct mac_DIR *mac_fdopendir(int fd) { return wrap_dir(fdopendir(fd)); }
+
+static struct mac_dirent *mac_readdir(struct mac_DIR *m)
+{
+    struct dirent *e = readdir(m->dir);
+    if (!e)
+        return NULL;
+    size_t len = strlen(e->d_name); /* at most 255 on Linux */
+    m->entry.ino = e->d_ino;
+    m->entry.seekoff = e->d_off;
+    m->entry.namlen = len;
+    m->entry.type = e->d_type;
+    m->entry.reclen = (uint16_t)((__builtin_offsetof(struct mac_dirent, name) + len + 1 + 3) & ~3u);
+    memcpy(m->entry.name, e->d_name, len);
+    m->entry.name[len] = 0;
+    return &m->entry;
+}
+
+static int mac_closedir(struct mac_DIR *m)
+{
+    int rc = closedir(m->dir);
+    free(m);
+    return rc;
+}
+
+static void mac_rewinddir(struct mac_DIR *m) { rewinddir(m->dir); }
+static int mac_dirfd(struct mac_DIR *m) { return m->fd; }
+static long mac_telldir(struct mac_DIR *m) { return telldir(m->dir); }
+static void mac_seekdir(struct mac_DIR *m, long pos) { seekdir(m->dir, pos); }
+
+/* ---- memory maps and clocks --------------------------------------------------------- */
+
+static void *mac_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off)
+{
+    int lf = flags & 0x3;                 /* MAP_SHARED / MAP_PRIVATE */
+    if (flags & 0x0010) lf |= MAP_FIXED;
+    if (flags & 0x0040) lf |= MAP_NORESERVE;
+    if (flags & 0x1000) lf |= MAP_ANONYMOUS;
+    return mmap(addr, len, prot, lf, (flags & 0x1000) ? -1 : fd, off);
+}
+
+static clockid_t clock_to_linux(int c)
+{
+    switch (c) {
+    case 0: return CLOCK_REALTIME;
+    case 4: case 5: return CLOCK_MONOTONIC_RAW;
+    case 6: case 8: case 9: return CLOCK_MONOTONIC;
+    case 12: return CLOCK_PROCESS_CPUTIME_ID;
+    case 16: return CLOCK_THREAD_CPUTIME_ID;
+    default: return (clockid_t)-1;
+    }
+}
+
+static int mac_clock_gettime(int c, struct timespec *ts)
+{
+    clockid_t id = clock_to_linux(c);
+    if (id == (clockid_t)-1) {
+        errno = EINVAL;
+        return -1;
+    }
+    return clock_gettime(id, ts);
+}
+
+static int mac_clock_getres(int c, struct timespec *ts)
+{
+    clockid_t id = clock_to_linux(c);
+    if (id == (clockid_t)-1) {
+        errno = EINVAL;
+        return -1;
+    }
+    return clock_getres(id, ts);
+}
+
+static uint64_t mac_clock_gettime_nsec_np(int c)
+{
+    struct timespec ts;
+    if (mac_clock_gettime(c, &ts) < 0)
+        return 0;
+    return (uint64_t)ts.tv_sec * 1000000000ull + ts.tv_nsec;
+}
+
+/* ---- signals ----------------------------------------------------------------------- */
+
+static const int mac_to_linux_sig[32] = {
+    0, SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, 0 /* EMT */, SIGFPE, SIGKILL,
+    SIGBUS, SIGSEGV, SIGSYS, SIGPIPE, SIGALRM, SIGTERM, SIGURG, SIGSTOP, SIGTSTP, SIGCONT,
+    SIGCHLD, SIGTTIN, SIGTTOU, SIGIO, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGWINCH,
+    0 /* INFO */, SIGUSR1, SIGUSR2,
+};
+
+int ferry_signal_to_linux(int s) { return s > 0 && s < 32 ? mac_to_linux_sig[s] : 0; }
+
+int ferry_signal_to_mac(int s)
+{
+    for (int i = 1; i < 32; i++)
+        if (mac_to_linux_sig[i] == s)
+            return i;
+    return 0;
+}
+
+static int sig_or_fail(int mac)
+{
+    if (mac == 0)
+        return 0;
+    int s = ferry_signal_to_linux(mac);
+    if (!s)
+        errno = EINVAL;
+    return s ? s : -1;
+}
+
+static uint32_t set_to_mac(const sigset_t *set)
+{
+    uint32_t out = 0;
+    for (int i = 1; i < 32; i++)
+        if (mac_to_linux_sig[i] && sigismember(set, mac_to_linux_sig[i]) == 1)
+            out |= 1u << (i - 1);
+    return out;
+}
+
+static void set_to_linux(uint32_t mac, sigset_t *set)
+{
+    sigemptyset(set);
+    for (int i = 1; i < 32; i++)
+        if ((mac & (1u << (i - 1))) && mac_to_linux_sig[i])
+            sigaddset(set, mac_to_linux_sig[i]);
+}
+
+static int mac_sigemptyset(uint32_t *set) { *set = 0; return 0; }
+static int mac_sigfillset(uint32_t *set) { *set = 0xffffffffu; return 0; }
+static int mac_sigaddset(uint32_t *set, int s)
+{
+    if (s <= 0 || s >= 32) { errno = EINVAL; return -1; }
+    *set |= 1u << (s - 1);
+    return 0;
+}
+static int mac_sigdelset(uint32_t *set, int s)
+{
+    if (s <= 0 || s >= 32) { errno = EINVAL; return -1; }
+    *set &= ~(1u << (s - 1));
+    return 0;
+}
+static int mac_sigismember(const uint32_t *set, int s)
+{
+    if (s <= 0 || s >= 32) { errno = EINVAL; return -1; }
+    return (*set >> (s - 1)) & 1;
+}
+
+static int mac_sigprocmask(int how, const uint32_t *set, uint32_t *old)
+{
+    sigset_t in, out;
+    int lhow = how == 1 ? SIG_BLOCK : how == 2 ? SIG_UNBLOCK : how == 3 ? SIG_SETMASK : -1;
+    if (lhow < 0 && set) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (set)
+        set_to_linux(*set, &in);
+    int rc = sigprocmask(lhow < 0 ? SIG_BLOCK : lhow, set ? &in : NULL, &out);
+    if (rc == 0 && old)
+        *old = set_to_mac(&out);
+    return rc;
+}
+
+/* The Mac program's handlers get Mac signal numbers, so they run behind a trampoline. */
+struct mac_siginfo {
+    int32_t signo, err, code, pid;
+    uint32_t uid;
+    int32_t status;
+    void *addr;
+    uint64_t value;
+    long band;
+    unsigned long pad[7];
+};
+
+struct mac_sigaction {
+    void *handler;
+    uint32_t mask;
+    int32_t flags;
+};
+
+#define MAC_SA_ONSTACK   0x0001
+#define MAC_SA_RESTART   0x0002
+#define MAC_SA_RESETHAND 0x0004
+#define MAC_SA_NOCLDSTOP 0x0008
+#define MAC_SA_NODEFER   0x0010
+#define MAC_SA_NOCLDWAIT 0x0020
+#define MAC_SA_SIGINFO   0x0040
+
+static void *mac_handler[65];
+
+static void trampoline(int s)
+{
+    ((void (*)(int))mac_handler[s])(ferry_signal_to_mac(s));
+}
+
+static void trampoline_info(int s, siginfo_t *info, void *ctx)
+{
+    (void)ctx;
+    struct mac_siginfo mi = {.signo = ferry_signal_to_mac(s)};
+    if (info) {
+        mi.code = info->si_code;
+        mi.pid = info->si_pid;
+        mi.uid = info->si_uid;
+        mi.addr = info->si_addr;
+        mi.err = ferry_errno_to_mac(info->si_errno);
+    }
+    /* The machine context is laid out differently, so the program gets none. */
+    ((void (*)(int, struct mac_siginfo *, void *))mac_handler[s])(mi.signo, &mi, NULL);
+}
+
+static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_sigaction *old)
+{
+    int s = sig_or_fail(mac);
+    if (s <= 0)
+        return s == 0 ? (errno = EINVAL, -1) : -1;
+    struct sigaction in = {0}, out;
+    if (act) {
+        int f = act->flags;
+        in.sa_flags = (f & MAC_SA_ONSTACK ? SA_ONSTACK : 0) | (f & MAC_SA_RESTART ? SA_RESTART : 0)
+            | (f & MAC_SA_RESETHAND ? SA_RESETHAND : 0) | (f & MAC_SA_NOCLDSTOP ? SA_NOCLDSTOP : 0)
+            | (f & MAC_SA_NODEFER ? SA_NODEFER : 0) | (f & MAC_SA_NOCLDWAIT ? SA_NOCLDWAIT : 0)
+            | (f & MAC_SA_SIGINFO ? SA_SIGINFO : 0);
+        set_to_linux(act->mask, &in.sa_mask);
+        if (act->handler == SIG_DFL || act->handler == SIG_IGN) {
+            in.sa_handler = act->handler;
+        } else {
+            mac_handler[s] = act->handler;
+            if (f & MAC_SA_SIGINFO)
+                in.sa_sigaction = trampoline_info;
+            else
+                in.sa_handler = trampoline;
+        }
+    }
+    void *previous = mac_handler[s];
+    int rc = sigaction(s, act ? &in : NULL, &out);
+    if (rc == 0 && old) {
+        int f = out.sa_flags;
+        old->handler = (out.sa_handler == trampoline || (void *)out.sa_sigaction == (void *)trampoline_info)
+            ? previous : (void *)out.sa_handler;
+        old->mask = set_to_mac(&out.sa_mask);
+        old->flags = (f & SA_ONSTACK ? MAC_SA_ONSTACK : 0) | (f & SA_RESTART ? MAC_SA_RESTART : 0)
+            | (f & SA_RESETHAND ? MAC_SA_RESETHAND : 0) | (f & SA_NOCLDSTOP ? MAC_SA_NOCLDSTOP : 0)
+            | (f & SA_NODEFER ? MAC_SA_NODEFER : 0) | (f & SA_NOCLDWAIT ? MAC_SA_NOCLDWAIT : 0)
+            | (f & SA_SIGINFO ? MAC_SA_SIGINFO : 0);
+    }
+    return rc;
+}
+
+static void *mac_signal(int mac, void *handler)
+{
+    struct mac_sigaction act = {.handler = handler, .flags = MAC_SA_RESTART}, old;
+    if (mac_sigaction(mac, &act, &old) < 0)
+        return SIG_ERR;
+    return old.handler;
+}
+
+static int mac_kill(pid_t pid, int mac)
+{
+    int s = sig_or_fail(mac);
+    return s < 0 ? -1 : kill(pid, s);
+}
+
+static int mac_killpg(pid_t pg, int mac)
+{
+    int s = sig_or_fail(mac);
+    return s < 0 ? -1 : killpg(pg, s);
+}
+
+static int mac_raise(int mac)
+{
+    int s = sig_or_fail(mac);
+    return s < 0 ? -1 : raise(s);
+}
+
+static char *mac_strsignal(int mac) { return strsignal(ferry_signal_to_linux(mac)); }
+
+/* A child killed by a signal reports that signal's number inside the status. */
+static int status_to_mac(int st)
+{
+    if (WIFSIGNALED(st))
+        return (st & ~0x7f) | ferry_signal_to_mac(WTERMSIG(st));
+    if (WIFSTOPPED(st))
+        return (ferry_signal_to_mac(WSTOPSIG(st)) << 8) | 0x7f;
+    return st;
+}
+
+static pid_t mac_waitpid(pid_t pid, int *status, int options)
+{
+    /* WNOHANG 1 and WUNTRACED 2 are the same on both systems. */
+    int st = 0;
+    pid_t rc = waitpid(pid, &st, options & 3);
+    if (rc > 0 && status)
+        *status = status_to_mac(st);
+    return rc;
+}
+
+static pid_t mac_wait(int *status) { return mac_waitpid(-1, status, 0); }
+
+/* ---- system information --------------------------------------------------------------- */
+
+static long mac_sysconf(int name)
+{
+    switch (name) {
+    case 1: return sysconf(_SC_ARG_MAX);
+    case 2: return sysconf(_SC_CHILD_MAX);
+    case 3: return sysconf(_SC_CLK_TCK);
+    case 4: return sysconf(_SC_NGROUPS_MAX);
+    case 5: return sysconf(_SC_OPEN_MAX);
+    case 29: return sysconf(_SC_PAGESIZE);
+    case 57: return sysconf(_SC_NPROCESSORS_CONF);
+    case 58: return sysconf(_SC_NPROCESSORS_ONLN);
+    case 71: return sysconf(_SC_GETPW_R_SIZE_MAX);
+    case 72: return sysconf(_SC_HOST_NAME_MAX);
+    case 200: return sysconf(_SC_PHYS_PAGES);
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+}
+
+struct mac_utsname { char sysname[256], nodename[256], release[256], version[256], machine[256]; };
+
+static int mac_uname(struct mac_utsname *u)
+{
+    struct utsname l;
+    if (uname(&l) < 0)
+        return -1;
+    memset(u, 0, sizeof *u);
+    /* Programs check these names to pick Mac behaviour. Report the macOS
+     * family Ferry imitates, and say in the version where it really runs. */
+    snprintf(u->sysname, sizeof u->sysname, "Darwin");
+    snprintf(u->nodename, sizeof u->nodename, "%s", l.nodename);
+    snprintf(u->release, sizeof u->release, "20.0.0");
+    snprintf(u->version, sizeof u->version, "Ferry on Linux %s", l.release);
+    snprintf(u->machine, sizeof u->machine, "x86_64");
+    return 0;
+}
+
+struct mac_passwd {
+    char *name, *passwd;
+    uint32_t uid, gid;
+    long change;
+    char *class_, *gecos, *dir, *shell;
+    long expire;
+};
+
+static struct mac_passwd *to_mac_passwd(struct passwd *p)
+{
+    static __thread struct mac_passwd m;
+    if (!p)
+        return NULL;
+    m = (struct mac_passwd){.name = p->pw_name, .passwd = p->pw_passwd, .uid = p->pw_uid,
+                            .gid = p->pw_gid, .class_ = "", .gecos = p->pw_gecos,
+                            .dir = p->pw_dir, .shell = p->pw_shell};
+    return &m;
+}
+
+static struct mac_passwd *mac_getpwuid(uid_t uid) { return to_mac_passwd(getpwuid(uid)); }
+static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(getpwnam(name)); }
+
+#define MAC_TIOCGWINSZ 0x40087468ul
+#define MAC_FIONREAD   0x4004667ful
+
+static int mac_ioctl(int fd, unsigned long req, ...)
+{
+    va_list ap;
+    va_start(ap, req);
+    void *arg = va_arg(ap, void *);
+    va_end(ap);
+    if (req == MAC_TIOCGWINSZ) /* struct winsize is the same on both */
+        return ioctl(fd, TIOCGWINSZ, arg);
+    if (req == MAC_FIONREAD)
+        return ioctl(fd, FIONREAD, arg);
+    errno = ENOTTY;
+    return -1;
+}
+
+/* Resource numbers differ, and so does the "no limit" value. */
+#define MAC_RLIM_INFINITY 0x7fffffffffffffffull
+
+static int rlimit_to_linux(int r)
+{
+    static const int map[] = {RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE,
+                              RLIMIT_AS, RLIMIT_MEMLOCK, RLIMIT_NPROC, RLIMIT_NOFILE};
+    return r >= 0 && r < 9 ? map[r] : -1;
+}
+
+static int mac_getrlimit(int r, uint64_t lim[2])
+{
+    int lr = rlimit_to_linux(r);
+    struct rlimit l;
+    if (lr < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (getrlimit(lr, &l) < 0)
+        return -1;
+    lim[0] = l.rlim_cur == RLIM_INFINITY ? MAC_RLIM_INFINITY : l.rlim_cur;
+    lim[1] = l.rlim_max == RLIM_INFINITY ? MAC_RLIM_INFINITY : l.rlim_max;
+    return 0;
+}
+
+static int mac_setrlimit(int r, const uint64_t lim[2])
+{
+    int lr = rlimit_to_linux(r);
+    if (lr < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    struct rlimit l = {lim[0] >= MAC_RLIM_INFINITY ? RLIM_INFINITY : lim[0],
+                       lim[1] >= MAC_RLIM_INFINITY ? RLIM_INFINITY : lim[1]};
+    return setrlimit(lr, &l);
+}
+
+/* Locale categories are numbered differently. */
+static int category_to_linux(int c)
+{
+    static const int map[] = {LC_ALL, LC_COLLATE, LC_CTYPE, LC_MONETARY, LC_NUMERIC, LC_TIME, LC_MESSAGES};
+    return c >= 0 && c < 7 ? map[c] : -1;
+}
+
+static char *mac_setlocale(int c, const char *name)
+{
+    int lc = category_to_linux(c);
+    if (lc < 0)
+        return NULL;
+    return setlocale(lc, name);
+}
+
+/* Mac paths are at most 1024 bytes, and callers size their buffers to that. */
+static char *mac_realpath(const char *path, char *out)
+{
+    char *full = realpath(path, NULL);
+    if (!full || !out)
+        return full;
+    if (strlen(full) >= 1024) {
+        free(full);
+        errno = ENAMETOOLONG;
+        return NULL;
+    }
+    strcpy(out, full);
+    free(full);
+    return out;
+}
+
+/* ---- getopt ---------------------------------------------------------------------------
+ * BSD getopt stops at the first non-option; this C library's moves options
+ * forward unless the option string starts with '+'. Mac programs also reset
+ * scanning through a variable called optreset. */
+
+static int mac_optreset;
+
+static const char *bsd_optstring(const char *opts)
+{
+    static const char *last_in;
+    static char *last_out;
+    if (opts == last_in && last_out)
+        return last_out;
+    char *s = malloc(strlen(opts) + 2);
+    if (!s)
+        return opts;
+    s[0] = '+';
+    strcpy(s + 1, opts[0] == '+' ? opts + 1 : opts);
+    free(last_out);
+    last_in = opts;
+    last_out = s;
+    return s;
+}
+
+static void check_reset(void)
+{
+    if (mac_optreset) {
+        mac_optreset = 0;
+        optind = 0;
+    }
+}
+
+static int mac_getopt(int argc, char *const argv[], const char *opts)
+{
+    check_reset();
+    return getopt(argc, argv, bsd_optstring(opts));
+}
+
+static int mac_getopt_long(int argc, char *const argv[], const char *opts, const struct option *lo, int *idx)
+{
+    check_reset();
+    return getopt_long(argc, argv, bsd_optstring(opts), lo, idx);
+}
+
+static int mac_getopt_long_only(int argc, char *const argv[], const char *opts, const struct option *lo, int *idx)
+{
+    check_reset();
+    return getopt_long_only(argc, argv, bsd_optstring(opts), lo, idx);
+}
+
+const struct ferry_symbol ferry_posix_symbols[] = {
+    {"open", mac_open},
+    {"openat", mac_openat},
+    {"creat", mac_creat},
+    {"unlinkat", mac_unlinkat},
+    {"mkdirat", mac_mkdirat},
+    {"fcntl", mac_fcntl},
+    {"stat$INODE64", mac_stat64},
+    {"lstat$INODE64", mac_lstat64},
+    {"fstat$INODE64", mac_fstat64},
+    {"fstatat$INODE64", mac_fstatat64},
+    {"stat64", mac_stat64},
+    {"lstat64", mac_lstat64},
+    {"fstat64", mac_fstat64},
+    {"opendir$INODE64", mac_opendir},
+    {"fdopendir$INODE64", mac_fdopendir},
+    {"readdir$INODE64", mac_readdir},
+    {"rewinddir$INODE64", mac_rewinddir},
+    {"telldir$INODE64", mac_telldir},
+    {"seekdir$INODE64", mac_seekdir},
+    {"closedir", mac_closedir},
+    {"dirfd", mac_dirfd},
+    {"mmap", mac_mmap},
+    {"clock_gettime", mac_clock_gettime},
+    {"clock_getres", mac_clock_getres},
+    {"clock_gettime_nsec_np", mac_clock_gettime_nsec_np},
+    {"sigemptyset", mac_sigemptyset},
+    {"sigfillset", mac_sigfillset},
+    {"sigaddset", mac_sigaddset},
+    {"sigdelset", mac_sigdelset},
+    {"sigismember", mac_sigismember},
+    {"sigprocmask", mac_sigprocmask},
+    {"sigaction", mac_sigaction},
+    {"signal", mac_signal},
+    {"kill", mac_kill},
+    {"killpg", mac_killpg},
+    {"raise", mac_raise},
+    {"strsignal", mac_strsignal},
+    {"waitpid", mac_waitpid},
+    {"wait", mac_wait},
+    {"sysconf", mac_sysconf},
+    {"uname", mac_uname},
+    {"getpwuid", mac_getpwuid},
+    {"getpwnam", mac_getpwnam},
+    {"ioctl", mac_ioctl},
+    {"getrlimit", mac_getrlimit},
+    {"setrlimit", mac_setrlimit},
+    {"setlocale", mac_setlocale},
+    {"realpath", mac_realpath},
+    {"getopt", mac_getopt},
+    {"getopt_long", mac_getopt_long},
+    {"getopt_long_only", mac_getopt_long_only},
+    {"optreset", &mac_optreset},
+    {NULL, NULL},
+};

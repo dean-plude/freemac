@@ -6,8 +6,10 @@ top, a dock along the bottom, calm window chrome, a fast search launcher and
 trackpad gestures that just work.
 
 It is a small Linux distribution (Debian base) with its own Wayland desktop
-shell. It is **not** macOS, it does not run macOS apps, and it contains nothing
-from Apple.
+shell. It is **not** macOS and it contains nothing from Apple. An optional
+add-on, [Ferry](ferry/README.md), runs some simple command-line programs built
+for Intel Macs; Mac apps in general, and App Store apps in particular, do not
+run.
 
 ## Clean-room rules
 
@@ -38,13 +40,18 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; app menus exported by apps (DBusMenu) still to come |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; app menus exported by apps (DBusMenu) still to come |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
 | Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
 | File manager with icon, list and column views | **Drawer** | 0.4 |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
-| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility |
+| Notifications with banners, a history list and Do Not Disturb | **Beacon** | 0.5 |
+| Screenshots of the screen, an area or a window (Print key) | **Lens** | 0.5 |
+| Text editor | **Quill** | 0.5 |
+| Image viewer | **Frame** | 0.5 |
+| Runs simple Intel Mac command-line programs (optional add-on) | **Ferry** | 0.5: first version |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4 |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
@@ -69,10 +76,10 @@ one of them will be reverted.
 - **Milestone 5: polish.** Keel installer and Gangway login screen *(0.4.0)*;
   still to do: global menus for GTK and Qt apps, our own decoration plugin,
   original icon set, more wallpapers, gestures tested on real trackpads.
-- **Milestone 6: Mac app compatibility (experimental).** Optional package
-  that runs some macOS command-line programs and, over time, simple apps
-  through the open-source Darling project, the way Wine runs Windows apps.
-  See [Mac app compatibility](docs/ARCHITECTURE.md#mac-app-compatibility-optional-layer).
+- **Milestone 6: Mac app compatibility (experimental).** Ferry, our own
+  optional layer that runs some programs built for Intel Macs, the way Wine
+  runs Windows programs. Written from public documentation only. See
+  [Mac app compatibility](docs/ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - **Milestone 7: release.** Signed images, package repository, docs.
 
 From 0.5 on, work is planned in batches of features; the current list is in

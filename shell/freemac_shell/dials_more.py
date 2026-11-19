@@ -76,10 +76,10 @@ def sound(window):
             if default:
                 combo.set_active_id(str(dev_id))
         combo.connect("changed", lambda c: c.get_active_id() and run("wpctl", "set-default", c.get_active_id()))
-        if devices[kind]:
-            rows.append(row(f"{title} device", combo))
-        else:
-            rows.append(row(f"No {title.lower()} devices", None))
+        if not devices[kind]:
+            groups.append(group(row(f"No {title.lower()} devices", None)))
+            continue
+        rows.append(row(f"{title} device", combo))
         level, muted = volume_of(target)
         if level is not None:
             rows.append(row(f"{title} volume", slider(

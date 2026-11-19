@@ -1,0 +1,6 @@
+hello from a Mac program
+puts works
+argc=2 first=boat
+env=tide
+done
+exit=3

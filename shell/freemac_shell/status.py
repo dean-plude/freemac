@@ -89,7 +89,8 @@ class Sound(StatusButton):
 
     def __init__(self):
         super().__init__()
-        self.popover = Gtk.Popover(relative_to=self)
+        # The bar is at the top of the screen, so the popover opens downwards.
+        self.popover = Gtk.Popover(relative_to=self, position=Gtk.PositionType.BOTTOM)
         box = Gtk.Box(spacing=8, margin=10)
         self.mute = Gtk.ToggleButton()
         self.mute.set_image(Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic", Gtk.IconSize.MENU))

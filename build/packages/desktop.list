@@ -44,4 +44,5 @@ gnome-themes-extra
 pipewire
 pipewire-pulse
 wireplumber
+at-spi2-core
 power-profiles-daemon

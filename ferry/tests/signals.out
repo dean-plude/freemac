@@ -1,0 +1,8 @@
+SIGUSR1 handler got 30 (expect 30)
+SIGUSR2 via siginfo 31/31
+old handler is ours 1
+blocked, got 0
+unblocked, got 30
+child exited=1 code=7
+child signaled=1 sig=15
+exit=0
