@@ -1,0 +1,13 @@
+# Keel, the installer, and Gangway, the login screen of installed systems:
+# partitioning, file systems, both boot loaders and the kiosk compositor.
+gdisk
+parted
+dosfstools
+squashfs-tools
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+efibootmgr
+cage
+tzdata
+e2fsprogs

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Topline
+Comment=freemac Menu bar
+Exec=freemac-topline
+Icon=freemac-welcome
+NoDisplay=true

@@ -38,14 +38,18 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menus, clock, status icons | **Topline** | planned (interim wf-panel bar in 0.2) |
-| Bottom dock with magnification, running indicators | **Pier** | planned (interim wf-dock in 0.2) |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire plugins + theme) | 0.2: overview, 4 desktops, left buttons on GTK apps; own decoration plugin planned |
-| File manager with column view | **Drawer** | planned |
-| Super+Space search launcher | **Seek** | planned |
-| Settings app with light and dark mode | **Dials** | planned |
-| Trackpad gestures (switch desktops, overview) | **Strata** gestures | 0.2: configured, not yet tested on hardware |
-| Bootable live ISO | `build/build-iso.sh` | done (0.1) |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; app menus exported by apps (DBusMenu) still to come |
+| Bottom dock with magnification, running indicators | **Pier** | 0.4 |
+| Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
+| File manager with icon, list and column views | **Drawer** | 0.4 |
+| Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about |
+| Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
+| Login screen | **Gangway** | 0.4 |
+| Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
+| Trackpad gestures (switch desktops, overview) | **Strata** gestures | configured, not yet tested on hardware |
+| Bootable live ISO | `build/build-iso.sh` | done |
 
 ## Roadmap
 
@@ -58,11 +62,13 @@ one of them will be reverted.
   on GTK apps. wf-shell's bar and dock stand in for Topline and Pier.
   *(0.2.0)*
 - **Milestone 3: shell.** Topline menu bar and Pier dock as layer-shell
-  clients; Seek launcher on Super+Space.
+  clients; Seek launcher on Super+Space. *(0.4.0)*
 - **Milestone 4: apps.** Drawer file manager (icon, list and column views) and
-  Dials settings (appearance, light/dark, displays, network, trackpad).
-- **Milestone 5: polish.** Gestures, global menus for GTK and Qt apps, original
-  icon set and wallpapers, installer (Calamares).
+  Dials settings (appearance, light/dark, wallpaper, dock, displays, trackpad,
+  keyboard, network). *(0.4.0)*
+- **Milestone 5: polish.** Keel installer and Gangway login screen *(0.4.0)*;
+  still to do: global menus for GTK and Qt apps, our own decoration plugin,
+  original icon set, more wallpapers, gestures tested on real trackpads.
 - **Milestone 6: Mac app compatibility (experimental).** Optional package
   that runs some macOS command-line programs and, over time, simple apps
   through the open-source Darling project, the way Wine runs Windows apps.
@@ -115,23 +121,36 @@ sudo BASE=ubuntu ./build/build-iso.sh                 # fallback base (Ubuntu 24
 The raw command it runs is:
 
 ```sh
-qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.2.0-amd64.iso \
+qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.4.0-amd64.iso \
   -boot d -vga virtio -enable-kvm -cpu host
 ```
 
-Tested so far (Nov 2026): the `BASE=ubuntu` image boots in QEMU under both
-BIOS and UEFI (OVMF). 0.1.0 reached the auto-login console; 0.2.0 starts the
-desktop session on its own:
+Tested so far (Nov 2026), on the `BASE=ubuntu` image in QEMU:
 
-![freemac 0.2 desktop](docs/screenshots/0.2-desktop.png)
- The default `BASE=debian` build
-uses the same script and package lists but has not been built yet, because the
-first build host could not reach Debian mirrors.
+- 0.4.0 live session: the desktop starts on its own with Topline, Pier, the
+  wallpaper, network and sound icons; Seek, Drawer (all three views), Dials
+  and light/dark mode work, and wired networking comes up through
+  NetworkManager.
+- Keel installed 0.4.0 to an empty 20 GB virtual disk. The installed system
+  boots under both BIOS and UEFI (OVMF) to the Gangway login screen; a wrong
+  password is refused and the right one opens the desktop.
 
-### Desktop shortcuts (0.2)
+![freemac 0.4 desktop with Drawer and Seek](docs/screenshots/0.4-desktop.png)
+
+![freemac 0.4 in dark mode](docs/screenshots/0.4-dark.png)
+
+![Gangway, the 0.4 login screen](docs/screenshots/0.4-login.png)
+
+Not tested yet: real PC hardware, Wi-Fi (the virtual machine has none),
+laptop batteries and trackpads, and the default `BASE=debian` build, which
+uses the same script and package lists but couldn't be built on the first
+build host because it couldn't reach Debian mirrors.
+
+### Desktop shortcuts
 
 | Keys or gesture | Action |
 | --- | --- |
+| Super+Space | Seek: search apps and files, or type a sum |
 | Ctrl+Up, Super+Tab, 4-finger swipe up | Show all windows |
 | Ctrl+Down, 4-finger swipe down | Show all desktops |
 | Ctrl+Left / Ctrl+Right, 3-finger swipe | Switch desktop |
@@ -140,6 +159,17 @@ first build host could not reach Debian mirrors.
 | Super+Enter | Terminal |
 | Super+Q | Close window |
 | Super+M / Super+D | Minimise / show desktop |
+
+In Drawer: Ctrl+1/2/3 switch between icon, list and column views, Ctrl+H
+shows hidden files, F2 renames, Delete moves to the Trash.
+
+## Installing
+
+Start the live ISO and choose **Install freemac…** in the Welcome window (or
+search for it with Super+Space). Keel asks for a disk and your account, erases
+that disk, and installs freemac so it starts on both BIOS and UEFI PCs. It
+uses the whole disk; dual-booting isn't supported yet. The boot loader is not
+signed, so turn Secure Boot off first.
 
 The live session logs in automatically as user `freemac` (desktop on VT 7, text console on VT 1) (no password; `sudo`
 works without one on the live image).

@@ -77,7 +77,7 @@ need debootstrap mksquashfs xorriso grub-mkrescue mformat python3
 
 # Package list: shared packages plus the base's own extras.
 PACKAGES=$(cat "$REPO/build/packages/common.list" "$REPO/build/packages/desktop.list" \
-  "$REPO/build/packages/$BASE.list" | grep -v '^[[:space:]]*#' | tr -s ' \n' ' ')
+  "$REPO/build/packages/installer.list" "$REPO/build/packages/$BASE.list" | grep -v '^[[:space:]]*#' | tr -s ' \n' ' ')
 
 umount_chroot() {
   for m in dev/pts dev proc sys run; do
@@ -120,6 +120,13 @@ in_chroot apt-get install -y --no-install-recommends $KERNEL $PACKAGES
 log "Applying freemac overlay"
 cp -a "$REPO/build/overlay/." "$ROOTFS/"
 chmod 0440 "$ROOTFS/etc/sudoers.d/freemac-live"
+# freemac's own shell (Topline, Pier, Seek, ...).
+mkdir -p "$ROOTFS/usr/lib/python3/dist-packages"
+rm -rf "$ROOTFS/usr/lib/python3/dist-packages/freemac_shell"
+cp -r "$REPO/shell/freemac_shell" "$ROOTFS/usr/lib/python3/dist-packages/"
+find "$ROOTFS/usr/lib/python3/dist-packages/freemac_shell" -name __pycache__ -prune -exec rm -rf {} +
+install -m 0755 "$REPO"/shell/bin/* "$ROOTFS/usr/bin/"
+install -m 0644 "$REPO"/shell/applications/*.desktop "$ROOTFS/usr/share/applications/"
 cat > "$ROOTFS/etc/os-release" <<EOF
 PRETTY_NAME="freemac $VERSION"
 NAME="freemac"
@@ -129,6 +136,9 @@ ID=freemac
 ID_LIKE="$ID_LIKE"
 HOME_URL="https://github.com/dean-plude/freemac"
 EOF
+for d in Desktop Documents Downloads Music Pictures Videos; do
+  mkdir -p "$ROOTFS/etc/skel/$d"
+done
 USER_GROUPS=sudo
 for g in audio video render input plugdev; do
   in_chroot getent group "$g" >/dev/null && USER_GROUPS="$USER_GROUPS,$g"
@@ -136,20 +146,19 @@ done
 in_chroot useradd --create-home --shell /bin/bash --groups "$USER_GROUPS" --user-group freemac
 in_chroot passwd --delete freemac
 in_chroot passwd --lock root
-in_chroot systemctl enable systemd-networkd.service >/dev/null 2>&1 || true
+if in_chroot getent group netdev >/dev/null; then
+  in_chroot usermod -aG netdev freemac
+fi
+# NetworkManager handles wired and Wi-Fi networks.
+in_chroot systemctl enable NetworkManager.service
 in_chroot systemctl enable seatd.service greetd.service
 in_chroot systemctl set-default graphical.target
 in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
+# The overlay adds icons; refresh the cache so apps and the dock find them.
+in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 python3 "$REPO/art/make-wallpaper.py" "$ROOTFS/usr/share/backgrounds/freemac/dusk-tide.png"
-mkdir -p "$ROOTFS/etc/systemd/network"
-cat > "$ROOTFS/etc/systemd/network/20-wired.network" <<'EOF'
-[Match]
-Name=en* eth*
-
-[Network]
-DHCP=yes
-EOF
+python3 "$REPO/art/make-wallpaper.py" --night "$ROOTFS/usr/share/backgrounds/freemac/night-tide.png"
 
 log "Cleaning the image"
 rm -f "$ROOTFS/usr/sbin/policy-rc.d"
@@ -173,9 +182,10 @@ find "$ROOTFS" -newermt "@$SOURCE_DATE_EPOCH" -print0 \
   | xargs -0r touch --no-dereference --date="@$SOURCE_DATE_EPOCH"
 
 log "Creating squashfs"
-# mksquashfs reads SOURCE_DATE_EPOCH itself for the image timestamps.
+# mksquashfs reads SOURCE_DATE_EPOCH itself for the image timestamps. /boot
+# stays in the image so the installer can copy a complete system.
 mksquashfs "$ROOTFS" "$ISOTREE/live/filesystem.squashfs" \
-  -noappend -comp xz -b 1M -no-progress -e boot
+  -noappend -comp xz -b 1M -no-progress
 
 log "Assembling ISO"
 mkdir -p "$ISOTREE/boot/grub" "$ISOTREE/.disk"

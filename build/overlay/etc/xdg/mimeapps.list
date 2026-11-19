@@ -1,0 +1,13 @@
+# freemac default apps.
+[Default Applications]
+inode/directory=freemac-drawer.desktop
+text/plain=org.xfce.mousepad.desktop
+text/markdown=org.xfce.mousepad.desktop
+image/png=org.xfce.ristretto.desktop
+image/jpeg=org.xfce.ristretto.desktop
+image/gif=org.xfce.ristretto.desktop
+image/webp=org.xfce.ristretto.desktop
+image/svg+xml=org.xfce.ristretto.desktop
+text/html=org.gnome.Epiphany.desktop
+x-scheme-handler/http=org.gnome.Epiphany.desktop
+x-scheme-handler/https=org.gnome.Epiphany.desktop

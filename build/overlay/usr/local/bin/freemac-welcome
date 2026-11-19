@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""freemac Welcome: first window of the live session (milestone 2)."""
+"""freemac Welcome: first window of the live session and of a new account."""
+import os
+import shutil
+import subprocess
+import sys
+
 import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
 GLib.set_prgname("freemac-welcome")
+LIVE = os.path.isdir("/run/live/medium")
+SEEN = os.path.expanduser("~/.config/freemac/welcome-seen")
+if not LIVE and os.path.exists(SEEN) and "--always" not in sys.argv:
+    sys.exit(0)  # Installed systems show Welcome once per account.
 
 SHORTCUTS = [
+    ("Super + Space", "Search apps and files (Seek)"),
     ("Ctrl + Up  or  4-finger swipe up", "Show all windows"),
     ("Ctrl + Down  or  4-finger swipe down", "Show all desktops"),
     ("Ctrl + Left / Right  or  3-finger swipe", "Switch desktop"),
@@ -21,7 +31,7 @@ SHORTCUTS = [
 class Welcome(Gtk.Window):
     def __init__(self):
         super().__init__(title="Welcome to freemac")
-        self.set_default_size(560, 420)
+        self.set_default_size(560, 460)
         bar = Gtk.HeaderBar(title="Welcome to freemac", show_close_button=True)
         self.set_titlebar(bar)
 
@@ -36,8 +46,9 @@ class Welcome(Gtk.Window):
         box.pack_start(title, False, False, 0)
 
         intro = Gtk.Label(
-            label="A free desktop for your PC. This is an early preview:\n"
-            "the menu bar and dock here are stand-ins until our own arrive.",
+            label=("A free desktop for your PC. You're trying it from the live system;\n"
+                   "nothing is saved until you install it." if LIVE else
+                   "A free desktop for your PC. Here are a few things to know."),
             justify=Gtk.Justification.CENTER,
         )
         box.pack_start(intro, False, False, 0)
@@ -50,8 +61,26 @@ class Welcome(Gtk.Window):
             grid.attach(Gtk.Label(label=action, xalign=0), 1, row, 1, 1)
         box.pack_start(grid, False, False, 0)
 
+        buttons = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER, margin_top=10)
+        settings = Gtk.Button(label="Open Dials")
+        settings.connect("clicked", lambda *_: subprocess.Popen(["freemac-dials"]))
+        buttons.pack_start(settings, False, False, 0)
+        if LIVE and shutil.which("freemac-keel"):
+            install = Gtk.Button(label="Install freemac\u2026")
+            install.get_style_context().add_class("suggested-action")
+            install.connect("clicked", lambda *_: subprocess.Popen(["freemac-keel"]))
+            buttons.pack_start(install, False, False, 0)
+        box.pack_start(buttons, False, False, 0)
+
+
+def closed(*_args):
+    if not LIVE:
+        os.makedirs(os.path.dirname(SEEN), exist_ok=True)
+        open(SEEN, "w").close()
+    Gtk.main_quit()
+
 
 win = Welcome()
-win.connect("destroy", Gtk.main_quit)
+win.connect("destroy", closed)
 win.show_all()
 Gtk.main()

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Dials
+Comment=Change how freemac looks and works
+Exec=freemac-dials
+Icon=preferences-system
+Categories=Settings;System;
+Keywords=settings;preferences;dark mode;light mode;wallpaper;dock;display;trackpad;mouse;keyboard;
+StartupWMClass=org.freemac.Dials
