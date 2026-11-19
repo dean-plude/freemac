@@ -447,7 +447,7 @@ class BluetoothPanel(Gtk.Box):
         if self.bus:
             try:
                 reply = self.bus.call_sync("org.bluez", "/", "org.freedesktop.DBus.ObjectManager",
-                                           "GetManagedObjects", None, None, Gio.DBusCallFlags.NONE, 2000, None)
+                                           "GetManagedObjects", None, None, Gio.DBusCallFlags.NO_AUTO_START, 2000, None)
                 self.objects = reply.unpack()[0]
             except GLib.Error:
                 pass

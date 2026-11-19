@@ -178,7 +178,7 @@ class QuickSettings(StatusButton):
             return None
         try:
             objects = self.system.call_sync("org.bluez", "/", "org.freedesktop.DBus.ObjectManager",
-                                            "GetManagedObjects", None, None, Gio.DBusCallFlags.NONE,
+                                            "GetManagedObjects", None, None, Gio.DBusCallFlags.NO_AUTO_START,
                                             1000, None).unpack()[0]
         except GLib.Error:
             return None
