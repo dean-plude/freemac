@@ -342,10 +342,17 @@ class DialsWindow(Gtk.ApplicationWindow):
         text_size.set_active_id(min(("1.0", "1.15", "1.3"), key=lambda v: abs(float(v) - current)))
         text_size.connect("changed", lambda c: self.settings and self.settings.set_double(
             "text-scaling-factor", float(c.get_active_id())))
+        snap = Gtk.Switch(active=ini_get(WAYFIRE_INI, "move", "enable_snap", "true") != "false")
+        snap.connect("notify::active", lambda sw, _p: ini_set(
+            WAYFIRE_INI, "move", "enable_snap", "true" if sw.get_active() else "false"))
         return page("Appearance", choices, group(
             row("Switch wallpaper with the mode", self.follow_wallpaper,
                 "freemac's own wallpapers have a day and a night version."),
             row("Text size", text_size),
+        ), group(
+            row("Tile windows at the screen edges", snap,
+                "Drag a window to the left or right edge to fill half the screen, to a corner for a "
+                "quarter, or to the top to fill it."),
         ))
 
     def _show_mode(self):
