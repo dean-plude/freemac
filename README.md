@@ -38,14 +38,16 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menus, clock, status icons | **Topline** | planned (interim wf-panel bar in 0.2) |
-| Bottom dock with magnification, running indicators | **Pier** | planned (interim wf-dock in 0.2) |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire plugins + theme) | 0.2: overview, 4 desktops, left buttons on GTK apps; own decoration plugin planned |
-| File manager with column view | **Drawer** | planned |
-| Super+Space search launcher | **Seek** | planned |
-| Settings app with light and dark mode | **Dials** | planned |
-| Trackpad gestures (switch desktops, overview) | **Strata** gestures | 0.2: configured, not yet tested on hardware |
-| Bootable live ISO | `build/build-iso.sh` | done (0.1) |
+| Global top menu bar with app menu, window menu, clock | **Topline** | 0.4: own bar; app menus exported by apps (DBusMenu) still to come |
+| Bottom dock with magnification, running indicators | **Pier** | 0.4 |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; own decoration plugin planned |
+| File manager with icon, list and column views | **Drawer** | 0.4 |
+| Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about |
+| Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
+| Login screen | **Gangway** | 0.4 |
+| Trackpad gestures (switch desktops, overview) | **Strata** gestures | configured, not yet tested on hardware |
+| Bootable live ISO | `build/build-iso.sh` | done |
 
 ## Roadmap
 
@@ -58,11 +60,13 @@ one of them will be reverted.
   on GTK apps. wf-shell's bar and dock stand in for Topline and Pier.
   *(0.2.0)*
 - **Milestone 3: shell.** Topline menu bar and Pier dock as layer-shell
-  clients; Seek launcher on Super+Space.
+  clients; Seek launcher on Super+Space. *(0.4.0)*
 - **Milestone 4: apps.** Drawer file manager (icon, list and column views) and
-  Dials settings (appearance, light/dark, displays, network, trackpad).
-- **Milestone 5: polish.** Gestures, global menus for GTK and Qt apps, original
-  icon set and wallpapers, installer (Calamares).
+  Dials settings (appearance, light/dark, wallpaper, dock, displays, trackpad,
+  keyboard, network). *(0.4.0)*
+- **Milestone 5: polish.** Keel installer and Gangway login screen *(0.4.0)*;
+  still to do: global menus for GTK and Qt apps, our own decoration plugin,
+  original icon set, more wallpapers, gestures tested on real trackpads.
 - **Milestone 6: Mac app compatibility (experimental).** Optional package
   that runs some macOS command-line programs and, over time, simple apps
   through the open-source Darling project, the way Wine runs Windows apps.
@@ -115,7 +119,7 @@ sudo BASE=ubuntu ./build/build-iso.sh                 # fallback base (Ubuntu 24
 The raw command it runs is:
 
 ```sh
-qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.2.0-amd64.iso \
+qemu-system-x86_64 -m 2048 -smp 2 -cdrom out/freemac-0.4.0-amd64.iso \
   -boot d -vga virtio -enable-kvm -cpu host
 ```
 
@@ -128,10 +132,11 @@ desktop session on its own:
 uses the same script and package lists but has not been built yet, because the
 first build host could not reach Debian mirrors.
 
-### Desktop shortcuts (0.2)
+### Desktop shortcuts
 
 | Keys or gesture | Action |
 | --- | --- |
+| Super+Space | Seek: search apps and files, or type a sum |
 | Ctrl+Up, Super+Tab, 4-finger swipe up | Show all windows |
 | Ctrl+Down, 4-finger swipe down | Show all desktops |
 | Ctrl+Left / Ctrl+Right, 3-finger swipe | Switch desktop |
@@ -140,6 +145,17 @@ first build host could not reach Debian mirrors.
 | Super+Enter | Terminal |
 | Super+Q | Close window |
 | Super+M / Super+D | Minimise / show desktop |
+
+In Drawer: Ctrl+1/2/3 switch between icon, list and column views, Ctrl+H
+shows hidden files, F2 renames, Delete moves to the Trash.
+
+## Installing
+
+Start the live ISO and choose **Install freemac…** in the Welcome window (or
+search for it with Super+Space). Keel asks for a disk and your account, erases
+that disk, and installs freemac so it starts on both BIOS and UEFI PCs. It
+uses the whole disk; dual-booting isn't supported yet. The boot loader is not
+signed, so turn Secure Boot off first.
 
 The live session logs in automatically as user `freemac` (desktop on VT 7, text console on VT 1) (no password; `sudo`
 works without one on the live image).

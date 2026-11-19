@@ -1,5 +1,5 @@
-# Graphical session (milestone 2): Wayfire configured as Strata, interim
-# wf-shell bar and dock, greetd autologin, fonts, Mesa, GTK for our apps.
+# Graphical session: Wayfire configured as Strata, wf-shell for the background,
+# greetd autologin, fonts, Mesa, GTK and layer-shell for our own shell and apps.
 wayfire
 wf-shell
 greetd
@@ -20,3 +20,19 @@ gsettings-desktop-schemas
 libglib2.0-bin
 python3-gi
 gir1.2-gtk-3.0
+gir1.2-gtklayershell-0.1
+# Settings storage shared by all apps (light/dark mode and so on).
+dconf-gsettings-backend
+dconf-service
+# Networking (wired and Wi-Fi) and the permission service it uses.
+network-manager
+polkitd
+# Everyday apps we ship but don't write: text editor, image viewer, web browser.
+mousepad
+ristretto
+epiphany-browser
+gir1.2-nm-1.0
+# Sound: PipeWire with WirePlumber; Topline's volume control uses wpctl
+pipewire
+pipewire-pulse
+wireplumber

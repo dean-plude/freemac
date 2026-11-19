@@ -2,9 +2,10 @@
 [terminal]
 vt = 7
 
-# Fallback text login if the desktop session exits.
+# After logging out: Gangway, freemac's login screen, in the cage kiosk
+# compositor. (The live user has no password; just press Log In.)
 [default_session]
-command = "agreety --cmd /usr/local/bin/freemac-session"
+command = "cage -s -- freemac-gangway"
 user = "_greetd"
 
 [initial_session]

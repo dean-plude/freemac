@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Drawer
+Comment=Browse and organise your files
+Exec=freemac-drawer %U
+Icon=system-file-manager
+Categories=System;FileManager;Utility;
+Keywords=files;folders;file manager;browse;
+MimeType=inode/directory;
+StartupWMClass=org.freemac.Drawer

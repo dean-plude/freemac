@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install freemac
+Comment=Install freemac on this computer's disk
+Exec=freemac-keel
+Icon=system-software-install
+Categories=System;
+Keywords=install;installer;disk;
+StartupWMClass=org.freemac.Keel

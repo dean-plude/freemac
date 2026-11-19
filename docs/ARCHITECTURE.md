@@ -12,9 +12,10 @@ only ship alongside, which is fine for any free licence).
 
 ```
 +-----------------------------------------------------------------+
-|  Apps:  Drawer (files)   Dials (settings)   Seek (launcher)      |  ours
+|  Apps:  Drawer (files)  Dials (settings)  Seek (launcher)        |  ours
+|         Keel (installer)  Gangway (login screen)                 |  ours
 +-----------------------------------------------------------------+
-|  Shell: Topline (menu bar)   Pier (dock)   notifications         |  ours
+|  Shell: Topline (menu bar)   Pier (dock)   notifications (later) |  ours
 +-----------------------------------------------------------------+
 |  Strata: Wayfire + our plugins, decorations, gestures, config    |  ours on top of reused
 +-----------------------------------------------------------------+
@@ -36,23 +37,29 @@ only ship alongside, which is fine for any free licence).
 | GRUB 2 | BIOS and UEFI boot loader on the ISO | GPL-3.0-or-later |
 | squashfs-tools, xorriso | Image creation (build time only) | GPL-2.0-or-later / GPL-3.0-or-later |
 | Wayfire | Wayland compositor we extend into Strata | MIT |
-| wf-shell | Interim top bar, dock and background (0.2 only) | MIT |
+| wf-shell | Desktop background (its bar and dock were stand-ins in 0.2 only) | MIT |
 | seatd | Seat and device access for the compositor | MIT |
 | foot | Terminal | MIT |
 | wlroots | Compositor library under Wayfire | MIT |
 | wf-touch / libinput | Gesture recognition, input | MIT |
-| GTK 4 | Toolkit for our shell and apps | LGPL-2.1-or-later |
-| gtk4-layer-shell | Panels and dock as Wayland layer surfaces | MIT |
-| libadwaita | Widgets and light/dark style handling | LGPL-2.1-or-later |
+| GTK 3 (GTK 4 later) | Toolkit for our shell and apps | LGPL-2.1-or-later |
+| gtk-layer-shell (gtk4-layer-shell later) | Menu bar, dock and Seek as Wayland layer surfaces | MIT |
+| libadwaita (later) | Widgets and light/dark style handling | LGPL-2.1-or-later |
 | PyGObject | Python bindings for prototyping shell apps | LGPL-2.1-or-later |
 | greetd | Login manager and autologin | GPL-3.0-or-later |
 | PipeWire, WirePlumber | Audio and screen capture | MIT |
-| NetworkManager | Networking | GPL-2.0-or-later (separate program) |
+| NetworkManager, libnm | Wired and Wi-Fi networking; Dials joins Wi-Fi through libnm | GPL-2.0-or-later (separate program) / LGPL-2.1-or-later |
+| polkit | Lets the desktop user manage networks | LGPL-2.0-or-later |
+| dconf | Stores GSettings such as light/dark mode for all apps | LGPL-2.1-or-later |
+| cage | Kiosk compositor that shows Gangway, the login screen | MIT |
+| gdisk, parted, dosfstools, e2fsprogs, squashfs-tools | Partitioning and copying the system in Keel | GPL-2.0-or-later (separate programs) |
+| Mousepad | Text editor shipped in the image | GPL-2.0-or-later (separate program) |
+| Ristretto | Image viewer shipped in the image | GPL-2.0-or-later (separate program) |
+| GNOME Web (Epiphany) | Web browser shipped in the image | GPL-3.0-or-later (separate program) |
 | xdg-desktop-portal(-gtk) | Color-scheme setting, file pickers | LGPL-2.1-or-later |
 | libdbusmenu / appmenu-gtk-module | Exporting app menus for the global menu bar | LGPL-3.0 / LGPL-3.0-or-later |
-| plocate | Fast file-name index for Seek | GPL-2.0-or-later (separate program) |
+| plocate (later) | Fast file-name index for Seek | GPL-2.0-or-later (separate program) |
 | Inter font | UI typeface | SIL OFL 1.1 |
-| Calamares (later) | Installer | GPL-3.0-or-later |
 | Darling (optional add-on, milestone 6) | Runs some macOS programs | GPL-3.0, plus APSL-2.0 Apple open-source parts (separate program) |
 
 ## Components we write
@@ -60,41 +67,45 @@ only ship alongside, which is fine for any free licence).
 | Name | What it is | Language | Notes |
 | --- | --- | --- | --- |
 | **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. |
-| **Topline** | Global menu bar | Python + GTK 4 (layer-shell), C later if needed | Left: system menu, focused app name, app menus read over DBusMenu (KDE appmenu protocol on Wayland). Right: status icons (StatusNotifierItem), clock, quick settings. Falls back to a minimal per-app menu when an app exports none. |
-| **Pier** | Dock | Python + GTK 4 (layer-shell) | Pinned and running apps from `wlr-foreign-toplevel-management`; cursor-proximity magnification; running indicators; trash at the end. |
-| **Seek** | Search launcher on Super+Space | Python + GTK 4 | Apps (`.desktop`), files (plocate), settings panels, calculator, unit conversion. |
-| **Drawer** | File manager | Python + GTK 4 / libadwaita | Icon, list and column (Miller) views; sidebar of places; GIO for file operations and trash. |
-| **Dials** | Settings app | Python + GTK 4 / libadwaita | Appearance (light/dark through `org.freedesktop.appearance` color-scheme), wallpaper, dock and menu bar options, displays, trackpad, network, sound. |
-| **freemac-theme** | GTK theme, cursor, icon set, wallpapers | CSS, SVG | All original artwork. Until our icon set exists we ship a free third-party icon theme and record its licence here first. |
+| **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, app menus read over DBusMenu (KDE appmenu protocol on Wayland). Right: status icons (StatusNotifierItem), clock, quick settings. Falls back to a minimal per-app menu when an app exports none. |
+| **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
+| **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
+| **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
+| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, about. Writes the same files Wayfire, wf-shell and Pier watch, so changes apply at once. Sound later. |
+| **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
+| **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |
+| **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). Adwaita icons until our own set exists. |
 | **build/** | ISO build tooling | POSIX shell | This repository's `build/build-iso.sh`. |
 
-Python is chosen for the first versions of the shell apps because it lets the
-look and behaviour iterate quickly; anything that turns out to be performance
+Python with GTK 3 is chosen for the first versions of the shell apps because
+it lets the look and behaviour iterate quickly and gtk-layer-shell for GTK 3 is
+packaged everywhere; a move to GTK 4 and libadwaita is planned once
+gtk4-layer-shell is widely packaged. Anything that turns out to be performance
 sensitive (the dock's magnification, for example) can move to C or Rust later
 without changing the user experience.
 
-## Status in 0.2 (milestone 2)
+## Status in 0.4 (milestones 3 to 5)
 
-- **Strata** is, for now, a Wayfire configuration (`/etc/skel/.config/wayfire.ini`
-  in `build/overlay`): overview (scale), all-desktops view (expo), four
-  desktops in a row (vswitch), 3-finger desktop swipe (vswipe), animations.
-- **Left-side window buttons** come from GTK's decoration layout
-  (`close,minimize,maximize:` set through a GSettings override and
-  `settings.ini`), so they appear on GTK apps that draw their own title bars.
-  Wayfire 0.8's built-in decoration only places buttons on the right, so apps
-  that ask the compositor for a title bar (foot, some Qt apps) still get
-  right-side buttons until our own Strata decoration plugin lands.
-- **Interim shell:** wf-panel (top bar), wf-dock (dock) and wf-background from
-  wf-shell (MIT) stand in for Topline and Pier.
-- **Session:** greetd starts `/usr/local/bin/freemac-session` for the live
-  user on VT 7; agreety is the fallback text login. seatd (MIT) hands the
-  compositor its display and input devices; logind alone refused to activate
-  the session in testing.
-- **Known rough edges:** the interim dock shows a blank tile for our Welcome
-  app and draws a full-width strip, and the bar's clock can render clipped
-  until it next updates. Both components are replaced in milestone 3.
-- **Artwork:** the "Dusk Tide" wallpaper is generated at build time by
-  `art/make-wallpaper.py`, and the freemac mark is an original SVG.
+- **Strata** is a Wayfire configuration (`/etc/skel/.config/wayfire.ini` in
+  `build/overlay`): overview (scale), all-desktops view (expo), four desktops
+  in a row (vswitch), 3-finger desktop swipe (vswipe), animations, and the
+  `ipc` plugins our shell uses.
+- **Left-side window buttons** come from GTK's decoration layout and a GTK CSS
+  layer (`/etc/skel/.config/gtk-3.0/gtk.css`) that draws them as freemac's own
+  rounded squares. Apps that ask the compositor for a title bar (foot, some Qt
+  apps) still get Wayfire's right-side buttons until our decoration plugin.
+- **Shell:** Topline, Pier and Seek are layer-shell clients in the
+  `freemac_shell` Python package (`shell/`), started from Wayfire's autostart.
+  They talk to Wayfire over its IPC socket for windows and focus.
+- **Apps:** Drawer, Dials, Keel and Gangway live in the same package.
+  `build/build-iso.sh` installs it into the image.
+- **Session:** greetd logs the live user in on VT 7 and shows Gangway after
+  log-out; installed systems show Gangway unless "Log in automatically" was
+  chosen. seatd hands the compositor its devices; NetworkManager runs the
+  network.
+- **Known gaps:** app menus from GTK and Qt apps in Topline (DBusMenu), our
+  own decoration plugin, a notification centre, sound settings, our own icons,
+  and gestures tested on real hardware.
 
 ## Hard problems we know about
 
