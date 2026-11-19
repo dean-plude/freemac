@@ -1,7 +1,6 @@
-# Graphical session: Wayfire configured as Strata, wf-shell for the background,
+# Graphical session: Wayfire configured as Strata,
 # greetd autologin, fonts, Mesa, GTK and layer-shell for our own shell and apps.
 wayfire
-wf-shell
 greetd
 seatd
 foot
@@ -32,6 +31,10 @@ mousepad
 ristretto
 epiphany-browser
 gir1.2-nm-1.0
+gtk-update-icon-cache
+python3-gi-cairo
+# Adwaita-dark for GTK 3 apps (dark mode)
+gnome-themes-extra
 # Sound: PipeWire with WirePlumber; Topline's volume control uses wpctl
 pipewire
 pipewire-pulse

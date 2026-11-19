@@ -154,6 +154,8 @@ in_chroot systemctl enable NetworkManager.service
 in_chroot systemctl enable seatd.service greetd.service
 in_chroot systemctl set-default graphical.target
 in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
+# The overlay adds icons; refresh the cache so apps and the dock find them.
+in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 python3 "$REPO/art/make-wallpaper.py" "$ROOTFS/usr/share/backgrounds/freemac/dusk-tide.png"
 python3 "$REPO/art/make-wallpaper.py" --night "$ROOTFS/usr/share/backgrounds/freemac/night-tide.png"

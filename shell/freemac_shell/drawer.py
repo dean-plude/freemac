@@ -494,6 +494,19 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.view_mode = mode
             if self.path:
                 self.refresh()
+            GLib.idle_add(self._focus_view)
+
+    def _focus_view(self):
+        """Keyboard focus follows the view, so arrow keys move through files."""
+        if self.view_mode == "icons":
+            self.icon_view.grab_focus()
+        elif self.view_mode == "list":
+            self.list_view.grab_focus()
+        else:
+            columns = self.columns_box.get_children()
+            if columns:
+                columns[-1].view.grab_focus()
+        return False
 
     def _filter_changed(self, entry):
         self.filter_text = entry.get_text().strip().lower()

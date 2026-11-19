@@ -64,7 +64,7 @@ def ini_get(path, section, key, default=None):
 def ini_set(path, section, key, value):
     """Set one value in a Wayfire-style ini file, keeping comments and order.
 
-    Wayfire and wf-shell watch their files and apply the change at once.
+    Wayfire and Backdrop watch their files and apply the change at once.
     """
     value = str(value).replace("#", "\\#")
     try:
@@ -250,6 +250,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         dark = style.is_dark()
         choices = Gtk.Box(spacing=16)
         light_button = None
+        self.mode_buttons = {}
         for label, is_dark, wall in (("Light", False, LIGHT_WALL), ("Dark", True, DARK_WALL)):
             button = Gtk.RadioButton.new_from_widget(light_button)
             light_button = light_button or button
@@ -262,8 +263,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             inner.pack_start(Gtk.Label(label=label), False, False, 0)
             button.add(inner)
             button.set_active(is_dark == dark)
-            button.connect("toggled", lambda b, d=is_dark: b.get_active() and self.set_dark(d))
+            button.handler = button.connect("toggled", lambda b, d=is_dark: b.get_active() and self.set_dark(d))
+            self.mode_buttons[is_dark] = button
             choices.pack_start(button, False, False, 0)
+        if self.settings:
+            # Show the change when the mode is switched from elsewhere.
+            self.settings.connect("changed::color-scheme", lambda *_: self._show_mode())
         self.follow_wallpaper = Gtk.Switch(active=True)
         text_size = Gtk.ComboBoxText()
         for value, name in (("1.0", "Default"), ("1.15", "Large"), ("1.3", "Larger")):
@@ -277,6 +282,11 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Uses Dusk Tide in light mode and Night Tide in dark mode."),
             row("Text size", text_size),
         ))
+
+    def _show_mode(self):
+        button = self.mode_buttons[style.is_dark()]
+        with button.handler_block(button.handler):
+            button.set_active(True)
 
     def set_dark(self, dark):
         if self.settings:
@@ -311,10 +321,11 @@ class DialsWindow(Gtk.ApplicationWindow):
         choose = Gtk.Button(label="Choose a Picture…", halign=Gtk.Align.START)
         choose.connect("clicked", self.choose_wallpaper)
         fit = Gtk.ComboBoxText()
-        fit.append("true", "Fit to screen")
-        fit.append("false", "Fill screen")
-        fit.set_active_id(ini_get(SHELL_INI, "background", "preserve_aspect", "true"))
-        fit.connect("changed", lambda c: ini_set(SHELL_INI, "background", "preserve_aspect", c.get_active_id()))
+        fit.append("fill", "Fill screen")
+        fit.append("fit", "Fit to screen")
+        fit.append("stretch", "Stretch")
+        fit.set_active_id(ini_get(SHELL_INI, "background", "fit", "fill"))
+        fit.connect("changed", lambda c: ini_set(SHELL_INI, "background", "fit", c.get_active_id()))
         return page("Wallpaper", flow, choose, group(row("Picture fit", fit)))
 
     def set_wallpaper(self, path):

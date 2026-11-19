@@ -37,7 +37,6 @@ only ship alongside, which is fine for any free licence).
 | GRUB 2 | BIOS and UEFI boot loader on the ISO | GPL-3.0-or-later |
 | squashfs-tools, xorriso | Image creation (build time only) | GPL-2.0-or-later / GPL-3.0-or-later |
 | Wayfire | Wayland compositor we extend into Strata | MIT |
-| wf-shell | Desktop background (its bar and dock were stand-ins in 0.2 only) | MIT |
 | seatd | Seat and device access for the compositor | MIT |
 | foot | Terminal | MIT |
 | wlroots | Compositor library under Wayfire | MIT |
@@ -67,11 +66,12 @@ only ship alongside, which is fine for any free licence).
 | Name | What it is | Language | Notes |
 | --- | --- | --- | --- |
 | **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. |
-| **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, app menus read over DBusMenu (KDE appmenu protocol on Wayland). Right: status icons (StatusNotifierItem), clock, quick settings. Falls back to a minimal per-app menu when an app exports none. |
+| **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, app menus read over DBusMenu (KDE appmenu protocol on Wayland). Right: network, sound and battery icons (0.4), clock; app status icons (StatusNotifierItem) and quick settings later. Falls back to a minimal per-app menu when an app exports none. |
+| **Backdrop** | Desktop wallpaper | Python + GTK 3 (layer-shell, background layer) | One window per screen under the menu bar and dock; fills the screen at any shape (or fits or stretches, set in Dials). Replaced wf-shell's background in 0.4. |
 | **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
 | **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
-| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, about. Writes the same files Wayfire, wf-shell and Pier watch, so changes apply at once. Sound later. |
+| **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. Sound later. |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |
 | **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). Adwaita icons until our own set exists. |

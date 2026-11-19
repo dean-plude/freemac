@@ -18,7 +18,7 @@ PEAK = 80          # icon size right under the pointer
 REACH = 150        # pixels over which magnification fades out
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
-DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "foot.desktop",
+DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-dials.desktop", "freemac-welcome.desktop"]
 
 
