@@ -173,6 +173,29 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 - Quick settings (`quick.py`) is a layer-shell panel from Topline, like the
   volume slider, so it can draw below the bar.
 
+## Finding, previewing and first run (1.0)
+
+- **Seek's text index** (`seek_index.py`): a SQLite FTS5 table with the
+  trigram tokenizer in `~/.cache/freemac/seek.db`, so any three or more
+  characters match inside words. Seek updates it in a background thread
+  each time it opens, rereading only files whose modification time
+  changed. It reads text files by extension (skipping anything with NUL
+  bytes), and the XML inside OpenDocument (`.odt`, `.ods`, `.odp`) and
+  Word (`.docx`) files; files over 2 MB and hidden folders are skipped.
+- **Drawer tabs** keep each tab's folder, history, view and filter and
+  swap them into the one set of views when switching, rather than
+  building a set of views per tab. **Favourites** live in
+  `~/.config/freemac/drawer.json`. **Glance** (`drawer_glance.py`) is a
+  plain window that follows the selection while open.
+- **Pier's places** sit after a separator at the dock's right end: folder
+  stacks open as a menu of the newest files, and the Trash watches
+  `~/.local/share/Trash/files` (the freedesktop.org trash that Drawer and
+  GLib use) and empties it by deleting `files/`, `info/` and `expunged/`.
+- **Welcome** (`welcome.py`) runs from the login autostart once per
+  account (`~/.config/freemac/welcome-seen`), and every time on the live
+  system. Its Wi-Fi step reuses Dials' network panel, and its look and
+  wallpaper steps call the same code as Dials.
+
 ## Hard problems we know about
 
 - **Global menus on Wayland.** There is no single standard. GTK 3 apps with
