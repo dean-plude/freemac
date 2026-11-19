@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_more, dials_people, pier, style  # noqa: E402
+from . import dials_more, dials_people, menus, pier, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -274,6 +274,17 @@ class DialsWindow(Gtk.ApplicationWindow):
             self.stack.add_named(build(), name)
         self.sidebar = sidebar
         sidebar.select_row(self.rows["appearance"])
+        actions = {"close": self.close}
+        for name in self.rows:
+            actions["show-" + name] = lambda n=name: self.show_panel(n)
+        menus.add_actions(self, actions)
+        self.connect("key-press-event", self._on_key)
+
+    def _on_key(self, _widget, event):
+        if event.state & Gdk.ModifierType.CONTROL_MASK and event.keyval in (Gdk.KEY_w, Gdk.KEY_W):
+            self.close()
+            return True
+        return False
 
     @staticmethod
     def ini_get(section, key, default=None):
@@ -569,6 +580,23 @@ class DialsWindow(Gtk.ApplicationWindow):
         ))
 
 
+# The View menu, grouped; the names match DialsWindow's panels.
+MENU_PANELS = (
+    (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("dock", "Dock and Menu Bar"),
+     ("notifications", "Notifications")),
+    (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
+     ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
+    (("network", "Network"), ("accessibility", "Accessibility"), ("users", "Users"), ("about", "About")),
+)
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [[("Close Window", "win.close", "<Ctrl>w")]]),
+        ("_View", [[(title, "win.show-" + name, None) for name, title in group] for group in MENU_PANELS]),
+    ])
+
+
 class Dials(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="org.freemac.Dials", flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
@@ -583,6 +611,9 @@ class Dials(Gtk.Application):
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        menus.add_actions(self, {"quit": self.quit})
+        self.set_accels_for_action("app.quit", ["<Control>q"])
+        self.set_menubar(menubar())
 
     def do_command_line(self, command_line):
         options = command_line.get_options_dict().end().unpack()

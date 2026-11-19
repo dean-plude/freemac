@@ -13,6 +13,8 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
+from . import menus  # noqa: E402
+
 ATTRS = ",".join([
     "standard::name", "standard::display-name", "standard::type", "standard::icon",
     "standard::size", "standard::is-hidden", "standard::content-type", "time::modified",
@@ -183,7 +185,33 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._build_list_view()
         self._build_column_view()
         self.connect("key-press-event", self._key)
+        self._add_actions()
         self.navigate(path, remember=False)
+
+    def _add_actions(self):
+        """The window's actions, for the menu bar."""
+        menus.add_actions(self, {
+            "new-folder": self.new_folder,
+            "open": lambda: [self.open_or_enter(p) for p in self.selected_paths()],
+            "rename": self.rename,
+            "trash": self.trash,
+            "close": self.close,
+            "select-all": self.select_all,
+            "filter": self.search.grab_focus,
+            "back": self.go_back,
+            "forward": self.go_forward,
+            "up": self.go_up,
+            "view-icons": lambda: self.view_buttons["icons"].set_active(True),
+            "view-list": lambda: self.view_buttons["list"].set_active(True),
+            "view-columns": lambda: self.view_buttons["columns"].set_active(True),
+        })
+        for name, path in (("go-home", GLib.get_home_dir()),
+                           ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
+                           ("go-downloads", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)),
+                           ("go-desktop", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)),
+                           ("go-computer", "/")):
+            menus.add_actions(self, {name: lambda p=path or GLib.get_home_dir(): self.navigate(p)})
+        self.hidden_action = menus.add_toggle(self, "show-hidden", False, self._set_hidden)
 
     # ---- building -------------------------------------------------------
     def _button(self, icon, tip, handler):
@@ -485,8 +513,22 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.notify(f"Moved {moved} item{'s' if moved != 1 else ''} to the Trash.")
 
     def toggle_hidden(self):
-        self.show_hidden = not self.show_hidden
+        self.hidden_action.change_state(GLib.Variant("b", not self.show_hidden))
+
+    def _set_hidden(self, shown):
+        self.show_hidden = shown
         self.refresh()
+
+    def select_all(self):
+        if self.view_mode == "icons":
+            self.icon_view.select_all()
+        elif self.view_mode == "list":
+            self.list_view.get_selection().select_all()
+
+    def go_up(self):
+        parent = os.path.dirname(self.path)
+        if parent != self.path:
+            self.navigate(parent)
 
     # ---- events ---------------------------------------------------------
     def _view_toggled(self, button, mode):
@@ -586,15 +628,49 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.search.grab_focus()
         elif (event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Left) or key == Gdk.KEY_BackSpace:
             self.go_back()
+        elif event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Right:
+            self.go_forward()
         elif ctrl and key == Gdk.KEY_Up:
-            parent = os.path.dirname(self.path)
-            if parent != self.path:
-                self.navigate(parent)
+            self.go_up()
+        elif ctrl and key in (Gdk.KEY_n, Gdk.KEY_N):
+            self.get_application().activate_action("new-window", None)
+        elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
+            self.close()
+        elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O, Gdk.KEY_Down):
+            for p in self.selected_paths():
+                self.open_or_enter(p)
         elif key == Gdk.KEY_Escape and self.search.get_text():
             self.search.set_text("")
         else:
             return False
         return True
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [
+            [("New Window", "app.new-window", "<Ctrl>n"), ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
+            [("Open", "win.open", "<Ctrl>o")],
+            [("Rename…", "win.rename", "F2"), ("Move to Trash", "win.trash", "Delete")],
+            [("Close Window", "win.close", "<Ctrl>w")],
+        ]),
+        ("_Edit", [
+            [("Select All", "win.select-all", "<Ctrl>a")],
+            [("Filter…", "win.filter", "<Ctrl>f")],
+        ]),
+        ("_View", [
+            [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
+             ("as Columns", "win.view-columns", "<Ctrl>3")],
+            [("Show Hidden Files", "win.show-hidden", "<Ctrl>h")],
+        ]),
+        ("_Go", [
+            [("Back", "win.back", "<Alt>Left"), ("Forward", "win.forward", "<Alt>Right"),
+             ("Enclosing Folder", "win.up", "<Ctrl>Up")],
+            [("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
+             ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
+             ("Computer", "win.go-computer", None)],
+        ]),
+    ])
 
 
 class Drawer(Gtk.Application):
@@ -604,6 +680,8 @@ class Drawer(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        menus.add_actions(self, {"new-window": lambda: DrawerWindow(self, GLib.get_home_dir()).show_all()})
+        self.set_menubar(menubar())
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
