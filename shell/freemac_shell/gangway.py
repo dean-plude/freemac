@@ -33,6 +33,7 @@ window { background-color: #1c1e4a; }
 .gangway-power { color: white; background: rgba(0, 0, 0, 0.25); border: none; border-radius: 10px; }
 entry { min-height: 38px; font-size: 15px; }
 button.suggested-action { background-image: none; background-color: #4b5fc4; color: white; border: none; }
+.gangway-card button.suggested-action label { color: white; font-weight: 600; }
 """
 
 
@@ -69,6 +70,8 @@ def people():
 class Gangway(Gtk.Window):
     def __init__(self):
         super().__init__(title="Log In")
+        # cage shows one window at full size; no title bar on the login screen.
+        self.set_decorated(False)
         self.greetd = None
         self.users = people()
         overlay = Gtk.Overlay()
