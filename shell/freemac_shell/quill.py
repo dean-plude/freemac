@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "4")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkSource  # noqa: E402
 
-from . import style  # noqa: E402
+from . import menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Quill"
 LIGHT_SCHEME, DARK_SCHEME = "classic", "oblivion"
@@ -417,43 +417,27 @@ class Editor(Gtk.ApplicationWindow):
 
 
 def menubar():
-    """File, Edit and View. The keys are shown in the menus; the editor window
-    handles them itself, so typing in the find fields still works as usual."""
-    def section(*entries):
-        menu = Gio.Menu()
-        for label, action, accel in entries:
-            item = Gio.MenuItem.new(label, action)
-            if accel:
-                item.set_attribute_value("accel", GLib.Variant("s", accel))
-            menu.append_item(item)
-        return menu
-
-    def submenu(*sections):
-        menu = Gio.Menu()
-        for part in sections:
-            menu.append_section(None, part)
-        return menu
-
-    bar = Gio.Menu()
-    bar.append_submenu("_File", submenu(
-        section(("New Window", "app.new", "<Ctrl>n"), ("Open…", "win.open", "<Ctrl>o")),
-        section(("Save", "win.save", "<Ctrl>s"), ("Save As…", "win.save-as", "<Ctrl><Shift>s")),
-        section(("Close Window", "win.close", "<Ctrl>w")),
-    ))
-    bar.append_submenu("_Edit", submenu(
-        section(("Undo", "win.undo", "<Ctrl>z"), ("Redo", "win.redo", "<Ctrl><Shift>z")),
-        section(("Cut", "win.cut", "<Ctrl>x"), ("Copy", "win.copy", "<Ctrl>c"),
-                ("Paste", "win.paste", "<Ctrl>v"), ("Select All", "win.select-all", "<Ctrl>a")),
-        section(("Find…", "win.find", "<Ctrl>f"), ("Find and Replace…", "win.replace", "<Ctrl>h"),
-                ("Find Next", "win.find-next", "<Ctrl>g"), ("Find Previous", "win.find-previous", "<Ctrl><Shift>g")),
-        section(("Go to Line…", "win.goto", "<Ctrl>l")),
-    ))
-    bar.append_submenu("_View", submenu(
-        section(("Wrap Long Lines", "win.wrap", None)),
-        section(("Bigger Text", "win.bigger", "<Ctrl>equal"), ("Smaller Text", "win.smaller", "<Ctrl>minus"),
-                ("Actual Size", "win.actual-size", "<Ctrl>0")),
-    ))
-    return bar
+    """File, Edit and View. The editor window handles the keys itself."""
+    return menus.menubar([
+        ("_File", [
+            [("New Window", "app.new", "<Ctrl>n"), ("Open…", "win.open", "<Ctrl>o")],
+            [("Save", "win.save", "<Ctrl>s"), ("Save As…", "win.save-as", "<Ctrl><Shift>s")],
+            [("Close Window", "win.close", "<Ctrl>w")],
+        ]),
+        ("_Edit", [
+            [("Undo", "win.undo", "<Ctrl>z"), ("Redo", "win.redo", "<Ctrl><Shift>z")],
+            [("Cut", "win.cut", "<Ctrl>x"), ("Copy", "win.copy", "<Ctrl>c"),
+             ("Paste", "win.paste", "<Ctrl>v"), ("Select All", "win.select-all", "<Ctrl>a")],
+            [("Find…", "win.find", "<Ctrl>f"), ("Find and Replace…", "win.replace", "<Ctrl>h"),
+             ("Find Next", "win.find-next", "<Ctrl>g"), ("Find Previous", "win.find-previous", "<Ctrl><Shift>g")],
+            [("Go to Line…", "win.goto", "<Ctrl>l")],
+        ]),
+        ("_View", [
+            [("Wrap Long Lines", "win.wrap", None)],
+            [("Bigger Text", "win.bigger", "<Ctrl>equal"), ("Smaller Text", "win.smaller", "<Ctrl>minus"),
+             ("Actual Size", "win.actual-size", "<Ctrl>0")],
+        ]),
+    ])
 
 
 class Quill(Gtk.Application):

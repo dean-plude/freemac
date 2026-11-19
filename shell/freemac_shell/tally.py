@@ -17,9 +17,9 @@ import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Tally"
 D = decimal.Decimal
@@ -334,6 +334,7 @@ class Calculator(Gtk.ApplicationWindow):
         box.pack_start(self.keypad(BASIC_KEYS), False, False, 0)
 
         self.connect("key-press-event", self.on_key)
+        self._add_actions()
         css = Gtk.CssProvider()
         css.load_from_data(b"""
             .tally-entry { font-size: 26px; padding: 6px 8px; }
@@ -345,6 +346,26 @@ class Calculator(Gtk.ApplicationWindow):
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.show_all()
         self.entry.grab_focus()
+
+    def _add_actions(self):
+        menus.add_actions(self, {
+            "close": self.close,
+            "copy-answer": self.copy_answer,
+            "paste": lambda: self.entry.paste_clipboard(),
+            "clear": self.clear,
+            "clear-tape": self.clear_tape,
+        })
+        self.science_action = menus.add_toggle(self, "scientific", False, self.science.set_active)
+        self.radians_action = menus.add_toggle(self, "radians", False,
+                                               lambda on: on == self.degrees and self.on_angle(self.angle))
+
+    def copy_answer(self):
+        if self.answer is not None:
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(show(self.answer).replace(",", ""), -1)
+
+    def clear_tape(self):
+        for row in self.tape.get_children():
+            self.tape.remove(row)
 
     def keypad(self, rows):
         grid = Gtk.Grid(row_spacing=6, column_spacing=6, column_homogeneous=True, row_homogeneous=True)
@@ -359,7 +380,8 @@ class Calculator(Gtk.ApplicationWindow):
                     ctx.add_class("suggested-action")
                 button.connect("clicked", lambda _b, a=action: self.press(a))
                 grid.attach(button, c, r, 1, 1)
-        grid.show_all()
+                button.show()
+        # Only the keys: the scientific grid itself stays hidden until asked for.
         return grid
 
     # -- typing --------------------------------------------------------------
@@ -396,8 +418,7 @@ class Calculator(Gtk.ApplicationWindow):
 
     def clear(self):
         if not self.entry.get_text():
-            for row in self.tape.get_children():
-                self.tape.remove(row)
+            self.clear_tape()
         self.entry.set_text("")
         self.just_answered = False
 
@@ -456,8 +477,13 @@ class Calculator(Gtk.ApplicationWindow):
             self.clear()
             return True
         if ctrl and key in ("c", "C") and not self.entry.get_selection_bounds():
-            if self.answer is not None:
-                Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(show(self.answer).replace(",", ""), -1)
+            self.copy_answer()
+            return True
+        if ctrl and key in ("w", "W"):
+            self.close()
+            return True
+        if ctrl and key in ("n", "N"):
+            self.get_application().activate_action("new-window", None)
             return True
         if key == "equal" and not ctrl:
             self.equals()
@@ -476,11 +502,25 @@ class Calculator(Gtk.ApplicationWindow):
     def on_science(self, button):
         self.science_grid.set_visible(button.get_active())
         self.angle.set_visible(True)
+        if self.science_action.get_state().get_boolean() != button.get_active():
+            self.science_action.set_state(GLib.Variant("b", button.get_active()))
 
     def on_angle(self, button):
         self.degrees = not self.degrees
         button.set_label("Degrees" if self.degrees else "Radians")
+        self.radians_action.set_state(GLib.Variant("b", not self.degrees))
         self.on_changed(self.entry)
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [[("New Window", "app.new-window", "<Ctrl>n")], [("Close Window", "win.close", "<Ctrl>w")]]),
+        ("_Edit", [
+            [("Copy Answer", "win.copy-answer", "<Ctrl>c"), ("Paste", "win.paste", "<Ctrl>v")],
+            [("Clear", "win.clear", "Escape"), ("Clear Tape", "win.clear-tape", None)],
+        ]),
+        ("_View", [[("Scientific", "win.scientific", None), ("Radians", "win.radians", None)]]),
+    ])
 
 
 class Tally(Gtk.Application):
@@ -494,6 +534,8 @@ class Tally(Gtk.Application):
         quit_action = Gio.SimpleAction.new("quit", None)
         quit_action.connect("activate", lambda *_: self.quit())
         self.add_action(quit_action)
+        menus.add_actions(self, {"new-window": lambda: Calculator(self).present()})
+        self.set_menubar(menubar())
 
     def do_activate(self):
         window = self.get_active_window() or Calculator(self)

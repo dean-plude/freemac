@@ -252,7 +252,7 @@ class Bluetooth(StatusButton):
         self.manager = None
         try:
             self.manager = Gio.DBusObjectManagerClient.new_for_bus_sync(
-                Gio.BusType.SYSTEM, Gio.DBusObjectManagerClientFlags.NONE, "org.bluez", "/",
+                Gio.BusType.SYSTEM, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, "org.bluez", "/",
                 None, None, None)
         except GLib.Error:
             self.manager = None

@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_more, dials_people, pier, style  # noqa: E402
+from . import dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -274,6 +274,17 @@ class DialsWindow(Gtk.ApplicationWindow):
             self.stack.add_named(build(), name)
         self.sidebar = sidebar
         sidebar.select_row(self.rows["appearance"])
+        actions = {"close": self.close}
+        for name in self.rows:
+            actions["show-" + name] = lambda n=name: self.show_panel(n)
+        menus.add_actions(self, actions)
+        self.connect("key-press-event", self._on_key)
+
+    def _on_key(self, _widget, event):
+        if event.state & Gdk.ModifierType.CONTROL_MASK and event.keyval in (Gdk.KEY_w, Gdk.KEY_W):
+            self.close()
+            return True
+        return False
 
     @staticmethod
     def ini_get(section, key, default=None):
@@ -331,10 +342,17 @@ class DialsWindow(Gtk.ApplicationWindow):
         text_size.set_active_id(min(("1.0", "1.15", "1.3"), key=lambda v: abs(float(v) - current)))
         text_size.connect("changed", lambda c: self.settings and self.settings.set_double(
             "text-scaling-factor", float(c.get_active_id())))
+        snap = Gtk.Switch(active=ini_get(WAYFIRE_INI, "move", "enable_snap", "true") != "false")
+        snap.connect("notify::active", lambda sw, _p: ini_set(
+            WAYFIRE_INI, "move", "enable_snap", "true" if sw.get_active() else "false"))
         return page("Appearance", choices, group(
             row("Switch wallpaper with the mode", self.follow_wallpaper,
                 "freemac's own wallpapers have a day and a night version."),
             row("Text size", text_size),
+        ), group(
+            row("Tile windows at the screen edges", snap,
+                "Drag a window to the left or right edge to fill half the screen, to a corner for a "
+                "quarter, or to the top to fill it."),
         ))
 
     def _show_mode(self):
@@ -476,7 +494,45 @@ class DialsWindow(Gtk.ApplicationWindow):
             rows.append(row(f"{name} scale", scale, caption))
         if not rows:
             rows.append(row("No displays found", None, "Dials reads displays from the window manager."))
-        return page("Displays", group(*rows))
+        level = screen.brightness()
+        if level is not None:
+            rows.insert(0, row("Brightness", slider(0.05, 1, 0.01, level, screen.set_brightness)))
+        else:
+            rows.append(row("Brightness", None, "This display sets its own brightness, with its buttons."))
+        return page("Displays", group(*rows), self.night_light())
+
+    def night_light(self):
+        settings = screen.night_settings()
+
+        def changed(key, value):
+            if settings.get(key) != value:
+                settings[key] = value
+                screen.save_night_settings(settings)
+
+        times = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
+
+        def time_box(key):
+            combo = Gtk.ComboBoxText()
+            for t in times:
+                combo.append(t, t)
+            if settings[key] not in times:
+                combo.append(settings[key], settings[key])
+            combo.set_active_id(settings[key])
+            combo.connect("changed", lambda c: changed(key, c.get_active_id()))
+            return combo
+
+        warmth = slider(2700, 5500, 100, settings["warmth"], lambda v: changed("warmth", int(v)),
+                        marks=((2700, "Warmer"), (5500, "Less warm")))
+        hours = Gtk.Box(spacing=6)
+        hours.pack_start(time_box("from"), False, False, 0)
+        hours.pack_start(Gtk.Label(label="to"), False, False, 0)
+        hours.pack_start(time_box("to"), False, False, 0)
+        return group(
+            row("Night Light", switch(settings["on"], lambda on: changed("on", on)),
+                "Warmer colours in the evening, which are easier on the eyes at night."),
+            row("From", hours, "It fades in and out over half an hour."),
+            row("Colour", warmth),
+        )
 
     # Trackpad and mouse -------------------------------------------------------
     def pointing(self):
@@ -512,14 +568,14 @@ class DialsWindow(Gtk.ApplicationWindow):
         layout.connect("activate", lambda e: ini_set(WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us"))
         layout.connect("focus-out-event", lambda e, _ev: ini_set(
             WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us") or False)
-        shortcuts = [
-            ("Super+Space", "Seek"), ("Ctrl+Up or Super+Tab", "All windows"), ("Ctrl+Down", "All desktops"),
-            ("Ctrl+Left / Right", "Switch desktop"), ("Alt+Tab", "Switch windows"), ("Super+Enter", "Terminal"),
-            ("Super+Q", "Close window"), ("Super+M", "Minimize"), ("Super+D", "Show desktop"),
-        ]
+        self.shortcuts = dials_keys.Shortcuts(
+            self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
+            lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
+        heading = Gtk.Label(label="Shortcuts", xalign=0)
+        heading.get_style_context().add_class("dials-section")
         return page("Keyboard", group(
             row("Layout", layout, "An XKB layout code such as us, gb, de or fr. Press Enter to apply."),
-        ), group(*[row(action, Gtk.Label(label=keys)) for keys, action in shortcuts]))
+        ), heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):
@@ -569,6 +625,23 @@ class DialsWindow(Gtk.ApplicationWindow):
         ))
 
 
+# The View menu, grouped; the names match DialsWindow's panels.
+MENU_PANELS = (
+    (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("dock", "Dock and Menu Bar"),
+     ("notifications", "Notifications")),
+    (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
+     ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
+    (("network", "Network"), ("accessibility", "Accessibility"), ("users", "Users"), ("about", "About")),
+)
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [[("Close Window", "win.close", "<Ctrl>w")]]),
+        ("_View", [[(title, "win.show-" + name, None) for name, title in group] for group in MENU_PANELS]),
+    ])
+
+
 class Dials(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="org.freemac.Dials", flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
@@ -583,6 +656,9 @@ class Dials(Gtk.Application):
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        menus.add_actions(self, {"quit": self.quit})
+        self.set_accels_for_action("app.quit", ["<Control>q"])
+        self.set_menubar(menubar())
 
     def do_command_line(self, command_line):
         options = command_line.get_options_dict().end().unpack()

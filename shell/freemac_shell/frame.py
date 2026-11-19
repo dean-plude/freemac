@@ -14,7 +14,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Frame"
 
@@ -92,8 +92,29 @@ class Viewer(Gtk.ApplicationWindow):
         self.connect("key-press-event", self._on_key)
         self.connect("scroll-event", self._on_scroll)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
+        self._add_actions()
         if path:
             self.open_path(path)
+
+    def _add_actions(self):
+        menus.add_actions(self, {
+            "open": self.open_dialog,
+            "close": self.close,
+            "trash": self.trash,
+            "next": lambda: self.step(1),
+            "previous": lambda: self.step(-1),
+            "zoom-in": lambda: self.zoom_by(1.25),
+            "zoom-out": lambda: self.zoom_by(0.8),
+            "fit": lambda: self.set_zoom(None),
+            "actual-size": lambda: self.set_zoom(1.0),
+            "rotate-right": lambda: self.rotate(-90),
+            "rotate-left": lambda: self.rotate(90),
+            "full-screen": self.toggle_fullscreen,
+        })
+
+    def toggle_fullscreen(self):
+        self.fullscreen_on = not self.fullscreen_on
+        (self.fullscreen if self.fullscreen_on else self.unfullscreen)()
 
     # --- files -----------------------------------------------------------
     def open_path(self, path):
@@ -240,8 +261,7 @@ class Viewer(Gtk.ApplicationWindow):
         elif key == Gdk.KEY_Delete:
             self.trash()
         elif key == Gdk.KEY_F11 or (key == Gdk.KEY_Escape and self.fullscreen_on):
-            self.fullscreen_on = not self.fullscreen_on
-            (self.fullscreen if self.fullscreen_on else self.unfullscreen)()
+            self.toggle_fullscreen()
         else:
             return False
         return True
@@ -255,6 +275,25 @@ class Viewer(Gtk.ApplicationWindow):
         return False
 
 
+def menubar():
+    return menus.menubar([
+        ("_File", [
+            [("New Window", "app.new-window", None), ("Open…", "win.open", "<Ctrl>o")],
+            [("Move to Trash", "win.trash", "Delete")],
+            [("Close Window", "win.close", "<Ctrl>w")],
+        ]),
+        ("_View", [
+            [("Zoom In", "win.zoom-in", "plus"), ("Zoom Out", "win.zoom-out", "minus"),
+             ("Fit to Window", "win.fit", "0"), ("Actual Size", "win.actual-size", "1")],
+            [("Rotate Right", "win.rotate-right", "r"), ("Rotate Left", "win.rotate-left", "<Shift>r")],
+            [("Full Screen", "win.full-screen", "F11")],
+        ]),
+        ("_Go", [
+            [("Previous Picture", "win.previous", "Left"), ("Next Picture", "win.next", "Right")],
+        ]),
+    ])
+
+
 class Frame(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
@@ -262,6 +301,8 @@ class Frame(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
         style.apply()
+        menus.add_actions(self, {"new-window": lambda: Viewer(self).show_all()})
+        self.set_menubar(menubar())
 
     def do_activate(self):
         Viewer(self).show_all()

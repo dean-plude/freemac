@@ -11,7 +11,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, status, style  # noqa: E402
+from . import apps, beacon, quick, status, style  # noqa: E402
 from .wfipc import Wayfire  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -80,6 +80,9 @@ class Topline(Gtk.Window):
         clock_button.set_tooltip_text("Notifications and calendar")
         clock_button.connect("clicked", lambda *_: beacon.call("ToggleCenter"))
         bar.pack_end(clock_button, False, False, 0)
+        quick_settings = quick.QuickSettings()
+        quick_settings.get_style_context().add_class("status")
+        bar.pack_end(quick_settings, False, False, 0)
         self.dnd = Gtk.Image.new_from_icon_name("notifications-disabled-symbolic", Gtk.IconSize.MENU)
         self.dnd.set_tooltip_text("Do Not Disturb is on")
         self.dnd.set_no_show_all(True)

@@ -40,13 +40,13 @@ one of them will be reverted.
 
 | Feature | Our component | Status |
 | --- | --- | --- |
-| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; 0.8: GTK apps' own menus, Bluetooth and printing icons |
+| Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; 0.8: GTK apps' own menus, Bluetooth and printing icons; 0.9: quick settings panel |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4 |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor) |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor); 0.9: drag a window to an edge to tile it |
 | File manager with icon, list and column views | **Drawer** | 0.4 |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4 |
-| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers; 0.9: brightness, night light, changeable shortcuts |
 | Notifications with banners, a history list and Do Not Disturb | **Beacon** | 0.5 |
 | Screenshots of the screen, an area or a window (Print key) | **Lens** | 0.5 |
 | Text editor | **Quill** | 0.5 |
@@ -80,7 +80,7 @@ one of them will be reverted.
   keyboard, network). *(0.4.0)*
 - **Milestone 5: polish.** Keel installer and Gangway login screen *(0.4.0)*;
   original icons and more wallpapers came in 0.7, our own title bars and
-  GTK app menus in Topline in 0.8; still to do: menus from Qt apps, gestures
+  GTK app menus in Topline in 0.8, menu bars in every freemac app in 0.9; still to do: menus from Qt apps, gestures
   tested on real trackpads.
 - **Milestone 6: Mac app compatibility (experimental).** Ferry, our own
   optional layer that runs some programs built for Intel Macs, the way Wine
@@ -151,6 +151,13 @@ Tested so far (Nov 2026), on the `BASE=ubuntu` image in QEMU:
 - Keel installed 0.4.0 to an empty 20 GB virtual disk. The installed system
   boots under both BIOS and UEFI (OVMF) to the Gangway login screen; a wrong
   password is refused and the right one opens the desktop.
+- 0.9.0 live session: app menus show in Topline (Tally's View menu switches
+  its scientific keys), dragging a window to the screen's edge tiles it, the
+  quick settings panel opens from the gear and hides Wi-Fi, Bluetooth and
+  brightness on a machine without them, Dials > Keyboard lists the shortcuts,
+  and switching night light on starts wlsunset with the chosen hours. QEMU's
+  own screen capture can show stale patches of the menu bar without a GL
+  display; the compositor's picture (grim) is clean.
 
 ![freemac 0.4 desktop with Drawer and Seek](docs/screenshots/0.4-desktop.png)
 

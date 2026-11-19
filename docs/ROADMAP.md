@@ -76,17 +76,33 @@ Also in 0.8: Dials writes Wayfire's settings file in place, so changes to
 animations, title bars and the like apply straight away rather than after
 logging in again.
 
-## 0.9 "menus everywhere" (planned)
+## 0.9 "menus everywhere" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Menu bars for the rest of freemac's apps (Drawer, Frame, Tally, Chime, Harbor, Dials) | apps | planned |
-| 2 | App menus from Qt apps in Topline (KDE's appmenu protocol and DBusMenu) | Strata, Topline | planned |
-| 3 | Quick settings from Topline: Wi-Fi, Bluetooth, Do Not Disturb, dark mode, volume and brightness in one panel | Topline | planned |
-| 4 | Screen brightness and a night light (warmer colours in the evening) in Dials > Displays | Dials | planned |
-| 5 | Drag a window to the left or right edge to fill that half of the screen, to the top to fill it | Strata | planned |
-| 6 | Keyboard panel: see and change shortcuts | Dials | planned |
-| 7 | Debian (`BASE=debian`, trixie) build tested end to end, as the default (moved from 0.6; waiting until the build machine can reach Debian's mirrors) | build | planned |
+| 1 | Menu bars for the rest of freemac's apps (Drawer, Frame, Tally, Chime, Harbor, Dials) | apps | done |
+| 2 | App menus from Qt apps in Topline (KDE's appmenu protocol and DBusMenu) | Strata, Topline | moved to 1.0 |
+| 3 | Quick settings from Topline: Wi-Fi, Bluetooth, Do Not Disturb, dark mode, night light, brightness and volume in one panel | Topline | done |
+| 4 | Screen brightness and a night light (warmer colours in the evening) in Dials > Displays | Dials | done |
+| 5 | Drag a window to the left or right edge to fill that half of the screen, to a corner for a quarter, to the top to fill it; Super+arrows too | Strata | done |
+| 6 | Keyboard panel: see and change shortcuts | Dials | done |
+| 7 | Debian (`BASE=debian`, trixie) build tested end to end, as the default | build | moved to 1.0 |
+
+Qt app menus moved because freemac ships no Qt apps yet and Qt only hands its
+menus over through KDE's own platform plugin; it needs more work in Strata to
+do properly. The Debian build is still waiting on the build machine reaching
+Debian's mirrors.
+
+## 1.0 "release candidate" (planned)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | App menus from Qt apps in Topline | Strata, Topline | planned |
+| 2 | Debian (`BASE=debian`, trixie) build tested end to end, as the default | build | planned |
+| 3 | Seek finds files by the text inside them, not only by name | Seek | planned |
+| 4 | Drawer: tabs, a sidebar you can edit, and a preview of the selected file with Space | Drawer | planned |
+| 5 | Pier: folders on the dock (Downloads stack) and a Trash you can empty | Pier | planned |
+| 6 | First-run welcome: pick light or dark, wallpaper, Wi-Fi and a user account before the desktop opens | Welcome | planned |
 
 ## Later
 

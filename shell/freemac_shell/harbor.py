@@ -39,7 +39,7 @@ try:
 except (ImportError, ValueError):
     PK = None
 
-from . import beacon, style  # noqa: E402
+from . import beacon, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Harbor"
 ICON_SIZE = 48
@@ -616,6 +616,15 @@ class HarborWindow(Gtk.ApplicationWindow):
         self.tabs_stack.connect("notify::visible-child-name", self.on_tab)
         self.add(self.stack)
         self.connect("key-press-event", self.on_key)
+        menus.add_actions(self, {
+            "close": self.close,
+            "find": self.search.grab_focus,
+            "back": lambda: self.back.get_visible() and self.go_back(),
+            "show-explore": lambda: self.show_page("explore"),
+            "show-installed": lambda: self.show_page("installed"),
+            "show-updates": lambda: self.show_page("updates"),
+            "check-updates": self.check_updates,
+        })
 
         css = Gtk.CssProvider()
         css.load_from_data(b"""
@@ -639,6 +648,15 @@ class HarborWindow(Gtk.ApplicationWindow):
         alt = event.state & Gdk.ModifierType.MOD1_MASK
         if ctrl and event.keyval in (Gdk.KEY_f, Gdk.KEY_F):
             self.search.grab_focus()
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_1, Gdk.KEY_2, Gdk.KEY_3):
+            self.show_page(("explore", "installed", "updates")[event.keyval - Gdk.KEY_1])
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_w, Gdk.KEY_W):
+            self.close()
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_r, Gdk.KEY_R):
+            self.check_updates()
             return True
         if (alt and event.keyval == Gdk.KEY_Left) or (
                 event.keyval == Gdk.KEY_Escape and not self.search.get_text()):
@@ -797,9 +815,24 @@ class HarborWindow(Gtk.ApplicationWindow):
         if tabs.get_visible_child_name() == "updates" and not self.updates.loaded:
             self.updates.load(refresh=False)
 
+    def check_updates(self):
+        self.show_page("updates")
+        self.updates.load(refresh=True)
+
     def reload_installed(self):
         self.installed = installed_packages()
         self.build_installed()
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [[("Close Window", "win.close", "<Ctrl>w")]]),
+        ("_Edit", [[("Find…", "win.find", "<Ctrl>f")]]),
+        ("_View", [[("Explore", "win.show-explore", "<Ctrl>1"), ("Installed", "win.show-installed", "<Ctrl>2"),
+                    ("Updates", "win.show-updates", "<Ctrl>3")],
+                   [("Back", "win.back", "<Alt>Left")]]),
+        ("_Apps", [[("Check for Updates", "win.check-updates", "<Ctrl>r")]]),
+    ])
 
 
 class Harbor(Gtk.Application):
@@ -816,6 +849,7 @@ class Harbor(Gtk.Application):
         action.connect("activate", lambda *_: self.quit())
         self.add_action(action)
         self.set_accels_for_action("app.quit", ["<Control>q"])
+        self.set_menubar(menubar())
 
     def do_command_line(self, command_line):
         args = command_line.get_arguments()[1:]

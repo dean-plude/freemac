@@ -24,7 +24,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import beacon, style  # noqa: E402
+from . import beacon, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Chime"
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "chime.json")
@@ -509,15 +509,21 @@ class StopwatchPage(Gtk.Box):
         self.go.get_style_context().remove_class("suggested-action" if self.started is not None else "destructive-action")
         self.go.get_style_context().add_class("destructive-action" if self.started is not None else "suggested-action")
 
+    def reset(self):
+        if self.started is not None:
+            self.on_go(None)
+        self.banked = 0.0
+        self.lap_marks = []
+        for row in self.laps.get_children():
+            self.laps.remove(row)
+        self.lap.set_sensitive(False)
+        self.lap.set_label("Lap")
+        self.tick()
+
     def on_lap(self, _button):
         if self.started is None:      # Reset
-            self.banked = 0.0
-            self.lap_marks = []
-            for row in self.laps.get_children():
-                self.laps.remove(row)
-            self.lap.set_sensitive(False)
-            self.lap.set_label("Lap")
-            self.tick()
+            if self.banked:
+                self.reset()
             return
         total = self.elapsed()
         split = total - (self.lap_marks[-1] if self.lap_marks else 0)
@@ -557,6 +563,42 @@ class ClockWindow(Gtk.ApplicationWindow):
         # Start with nothing focused so the city field shows its hint.
         GLib.idle_add(self.set_focus, None)
         self.connect("delete-event", self.on_close)
+        self.connect("key-press-event", self.on_key)
+        actions = {
+            "close": self.on_close,
+            "new-alarm": self.new_alarm,
+            "timer-go": lambda: self.show_page("timer") or self.timer.on_go(None),
+            "timer-cancel": self.timer.cancel,
+            "stopwatch-go": lambda: self.show_page("stopwatch") or self.stopwatch.on_go(None),
+            "stopwatch-lap": lambda: self.stopwatch.started is not None and self.stopwatch.on_lap(None),
+            "stopwatch-reset": self.stopwatch.reset,
+        }
+        for name in self.PAGES:
+            actions["show-" + name] = lambda n=name: self.show_page(n)
+        menus.add_actions(self, actions)
+
+    PAGES = ("world", "alarms", "timer", "stopwatch")
+
+    def show_page(self, name):
+        self.stack.set_visible_child_name(name)
+
+    def new_alarm(self):
+        self.show_page("alarms")
+        self.alarms.edit(None)
+
+    def on_key(self, _widget, event):
+        if not event.state & Gdk.ModifierType.CONTROL_MASK:
+            return False
+        key = Gdk.keyval_name(event.keyval).lower()
+        if key in ("1", "2", "3", "4"):
+            self.show_page(self.PAGES[int(key) - 1])
+        elif key == "n":
+            self.new_alarm()
+        elif key == "w":
+            self.on_close()
+        else:
+            return False
+        return True
 
     def on_close(self, *_args):
         # Keep the timer and stopwatch state; the app decides whether to stay.
@@ -569,6 +611,19 @@ class ClockWindow(Gtk.ApplicationWindow):
         if page is self.world:
             self.world.tick()
         self.stopwatch.tick()
+
+
+def menubar():
+    return menus.menubar([
+        ("_File", [[("New Alarm…", "win.new-alarm", "<Ctrl>n")], [("Close Window", "win.close", "<Ctrl>w")]]),
+        ("_View", [[("World", "win.show-world", "<Ctrl>1"), ("Alarms", "win.show-alarms", "<Ctrl>2"),
+                    ("Timer", "win.show-timer", "<Ctrl>3"), ("Stopwatch", "win.show-stopwatch", "<Ctrl>4")]]),
+        ("_Controls", [
+            [("Start or Pause Timer", "win.timer-go", None), ("Cancel Timer", "win.timer-cancel", None)],
+            [("Start or Stop Stopwatch", "win.stopwatch-go", None), ("Lap", "win.stopwatch-lap", None),
+             ("Reset Stopwatch", "win.stopwatch-reset", None)],
+        ]),
+    ])
 
 
 class Chime(Gtk.Application):
@@ -596,6 +651,7 @@ class Chime(Gtk.Application):
             action.connect("activate", callback)
             self.add_action(action)
             self.set_accels_for_action(f"app.{name}", [accel])
+        self.set_menubar(menubar())
         GLib.timeout_add(50, self.tick)
         self.hold_for("alarms", self.alarms_on())
 
