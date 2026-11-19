@@ -93,7 +93,7 @@ menus over through KDE's own platform plugin; it needs more work in Strata to
 do properly. The Debian build is still waiting on the build machine reaching
 Debian's mirrors.
 
-## 1.0 "release candidate" (planned)
+## 1.0 "release candidate" (in progress)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |

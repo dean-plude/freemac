@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Trash with something in it: the bin with its lid tipped back and papers showing. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8c94b8"/><stop offset="0.5" stop-color="#b4bad6"/><stop offset="1" stop-color="#7e86ab"/></linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6c78d8"/><stop offset="1" stop-color="#4f5bbd"/></linearGradient>
+  </defs>
+  <path d="M38 46 l14 -18 l18 8 l-4 12 z" fill="#f6f4ee" stroke="#c9c4b6" stroke-width="2"/>
+  <path d="M62 44 l20 -16 l12 14 l-10 8 z" fill="#e8e4d8" stroke="#c9c4b6" stroke-width="2"/>
+  <path d="M28 40 h72 l-7 70 a8 8 0 0 1 -8 7 h-42 a8 8 0 0 1 -8 -7 z" fill="url(#bin)"/>
+  <g stroke="#5b6390" stroke-width="4" stroke-linecap="round" opacity="0.55"><path d="M48 52 l2 52 M64 52 v52 M80 52 l-2 52"/></g>
+  <g transform="rotate(-14 24 34)">
+    <rect x="20" y="22" width="88" height="14" rx="7" fill="url(#lid)"/>
+    <rect x="52" y="14" width="24" height="10" rx="4" fill="#4f5bbd"/>
+  </g>
+</svg>

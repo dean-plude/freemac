@@ -457,6 +457,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             save_pier(magnify=on)
             peak.set_sensitive(on)
 
+        downloads = pier.default_stacks()[0]
+
+        def show_downloads(on):
+            stacks = [f for f in pier_config()["stacks"] if f != downloads]
+            save_pier(stacks=([downloads] if on else []) + stacks)
+
         clock = Gtk.ComboBoxText()
         for fmt, name in (("12", "12-hour (2:30 PM)"), ("24", "24-hour (14:30)")):
             clock.append(fmt, name)
@@ -466,6 +472,11 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Icon size", size),
             row("Magnification", switch(config["magnify"], magnify), "Icons grow as the pointer passes over them."),
             row("Magnified size", peak),
+        ), group(
+            row("Downloads", switch(downloads in config["stacks"], show_downloads),
+                "A folder on the dock that shows your newest downloads."),
+            row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
+                "Drop files on it to throw them away; right-click it to empty it."),
         ), group(row("Clock", clock)))
 
     @staticmethod
