@@ -86,6 +86,19 @@ class Wayfire:
     def focus(self, view_id):
         return self.req.call("window-rules/focus-view", id=view_id)
 
+    def app_menus(self, view_id):
+        """Where the window's app publishes its menus on the session bus, as
+        Strata's strata-shell plugin heard it from the app: a dict with
+        bus-name, menubar-path, app-menu-path, window-path and
+        application-path, or None (no menus, or no strata-shell)."""
+        try:
+            result = self.req.call("strata/app-menus", id=view_id)
+        except (ConnectionError, OSError, ValueError):
+            return None
+        if not isinstance(result, dict) or result.get("result") != "ok" or not result.get("bus-name"):
+            return None
+        return result
+
     def set_minimized(self, view_id, state=True):
         return self.req.call("wm-actions/set-minimized", view_id=view_id, state=state)
 

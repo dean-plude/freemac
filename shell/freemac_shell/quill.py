@@ -6,6 +6,10 @@ GtkSourceView; the colour scheme follows freemac's light/dark setting.
 Keys: Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S save as, Ctrl+F find,
 Ctrl+H replace, Ctrl+G next match, Ctrl+L go to line, Ctrl+= / Ctrl+- text
 size, Ctrl+W close.
+
+Quill also publishes a File / Edit / View menu bar. On freemac Topline shows it
+at the top of the screen (Strata passes on where to find it); elsewhere GTK
+shows it in the window.
 """
 import os
 import sys
@@ -107,16 +111,49 @@ class Editor(Gtk.ApplicationWindow):
         button = Gtk.MenuButton()
         button.set_image(Gtk.Image.new_from_icon_name("open-menu-symbolic", Gtk.IconSize.BUTTON))
         button.set_menu_model(menu)
-        for name, callback in (("save-as", lambda *_: self.save_as()),
-                               ("replace", lambda *_: self.show_find(replace=True)),
-                               ("goto", lambda *_: self.goto_line())):
+        self._add_actions()
+        return button
+
+    def _add_actions(self):
+        """The window's actions, used by the header menu and the menu bar."""
+        for name, callback in (("open", self.open_dialog),
+                               ("save", self.save),
+                               ("save-as", self.save_as),
+                               ("close", self.close),
+                               ("undo", lambda: self.buffer.can_undo() and self.buffer.undo()),
+                               ("redo", lambda: self.buffer.can_redo() and self.buffer.redo()),
+                               ("cut", lambda: self._clipboard("cut")),
+                               ("copy", lambda: self._clipboard("copy")),
+                               ("paste", lambda: self._clipboard("paste")),
+                               ("select-all", lambda: self._clipboard("select-all")),
+                               ("find", lambda: self.show_find(False)),
+                               ("replace", lambda: self.show_find(replace=True)),
+                               ("find-next", self.find_next),
+                               ("find-previous", self.find_previous),
+                               ("goto", self.goto_line),
+                               ("bigger", lambda: self.zoom(1)),
+                               ("smaller", lambda: self.zoom(-1)),
+                               ("actual-size", lambda: self.zoom(0))):
             action = Gio.SimpleAction.new(name, None)
-            action.connect("activate", callback)
+            action.connect("activate", lambda _a, _p, c=callback: c())
             self.add_action(action)
         wrap = Gio.SimpleAction.new_stateful("wrap", None, GLib.Variant("b", True))
         wrap.connect("change-state", self._toggle_wrap)
         self.add_action(wrap)
-        return button
+
+    def _clipboard(self, what):
+        """Cut, copy, paste or select all in whatever has the keyboard: the
+        find fields or the document."""
+        focus = self.get_focus()
+        if isinstance(focus, Gtk.Editable):
+            if what == "select-all":
+                focus.select_region(0, -1)
+            else:
+                getattr(focus, f"{what}_clipboard")()
+        elif what == "select-all":
+            self.view.emit("select-all", True)
+        else:
+            self.view.emit(f"{what}-clipboard")
 
     def _find_bar(self):
         self.revealer = Gtk.Revealer()
@@ -379,6 +416,46 @@ class Editor(Gtk.ApplicationWindow):
         dialog.destroy()
 
 
+def menubar():
+    """File, Edit and View. The keys are shown in the menus; the editor window
+    handles them itself, so typing in the find fields still works as usual."""
+    def section(*entries):
+        menu = Gio.Menu()
+        for label, action, accel in entries:
+            item = Gio.MenuItem.new(label, action)
+            if accel:
+                item.set_attribute_value("accel", GLib.Variant("s", accel))
+            menu.append_item(item)
+        return menu
+
+    def submenu(*sections):
+        menu = Gio.Menu()
+        for part in sections:
+            menu.append_section(None, part)
+        return menu
+
+    bar = Gio.Menu()
+    bar.append_submenu("_File", submenu(
+        section(("New Window", "app.new", "<Ctrl>n"), ("Open…", "win.open", "<Ctrl>o")),
+        section(("Save", "win.save", "<Ctrl>s"), ("Save As…", "win.save-as", "<Ctrl><Shift>s")),
+        section(("Close Window", "win.close", "<Ctrl>w")),
+    ))
+    bar.append_submenu("_Edit", submenu(
+        section(("Undo", "win.undo", "<Ctrl>z"), ("Redo", "win.redo", "<Ctrl><Shift>z")),
+        section(("Cut", "win.cut", "<Ctrl>x"), ("Copy", "win.copy", "<Ctrl>c"),
+                ("Paste", "win.paste", "<Ctrl>v"), ("Select All", "win.select-all", "<Ctrl>a")),
+        section(("Find…", "win.find", "<Ctrl>f"), ("Find and Replace…", "win.replace", "<Ctrl>h"),
+                ("Find Next", "win.find-next", "<Ctrl>g"), ("Find Previous", "win.find-previous", "<Ctrl><Shift>g")),
+        section(("Go to Line…", "win.goto", "<Ctrl>l")),
+    ))
+    bar.append_submenu("_View", submenu(
+        section(("Wrap Long Lines", "win.wrap", None)),
+        section(("Bigger Text", "win.bigger", "<Ctrl>equal"), ("Smaller Text", "win.smaller", "<Ctrl>minus"),
+                ("Actual Size", "win.actual-size", "<Ctrl>0")),
+    ))
+    return bar
+
+
 class Quill(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
@@ -388,6 +465,7 @@ class Quill(Gtk.Application):
         new = Gio.SimpleAction.new("new", None)
         new.connect("activate", lambda *_: Editor(self).show_all())
         self.add_action(new)
+        self.set_menubar(menubar())
         settings = style.interface_settings()
         if settings:
             settings.connect("changed::color-scheme", lambda *_: self._retheme())
