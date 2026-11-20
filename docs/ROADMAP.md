@@ -348,7 +348,7 @@ The small things a Mac user notices in their first minute.
 | 12 | New screenshots of 1.23 in the README | docs | done |
 | 13 | App windows: one rounded corner from the title bar down, with no notch under the title bar | freemac-theme | done |
 
-## 1.24 "look and mail" (next)
+## 1.24 "look and mail" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
