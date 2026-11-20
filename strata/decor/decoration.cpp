@@ -8,6 +8,7 @@
 #include <wayfire/txn/transaction-manager.hpp>
 
 #include "deco-subsurface.hpp"
+#include "corners.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/plugin.hpp"
 #include "wayfire/signal-provider.hpp"
@@ -65,9 +66,16 @@ class strata_decoration : public wf::plugin_interface_t
         update_view_decoration(ev->view);
     };
 
+    wf::signal::connection_t<wf::view_mapped_signal> on_view_mapped =
+        [=] (wf::view_mapped_signal *ev)
+    {
+        strata_corners::attach(ev->view);
+    };
+
   public:
     void init() override
     {
+        wf::get_core().connect(&on_view_mapped);
         wf::get_core().connect(&on_decoration_state_changed);
         wf::get_core().tx_manager->connect(&on_new_tx);
         wf::get_core().connect(&on_view_tiled);
@@ -75,6 +83,10 @@ class strata_decoration : public wf::plugin_interface_t
         for (auto& view : wf::get_core().get_all_views())
         {
             update_view_decoration(view);
+            if (view->is_mapped())
+            {
+                strata_corners::attach(view);
+            }
         }
     }
 
@@ -82,12 +94,15 @@ class strata_decoration : public wf::plugin_interface_t
     {
         for (auto view : wf::get_core().get_all_views())
         {
+            strata_corners::detach(view);
             if (auto toplevel = wf::toplevel_cast(view))
             {
                 remove_decoration(toplevel);
                 wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
             }
         }
+
+        strata_corners::release();
     }
 
     /**
