@@ -72,6 +72,12 @@ bluez
 cups
 cups-browsed
 system-config-printer
-# Qt 5 and Qt 6 apps get freemac's colours and font (QT_QPA_PLATFORMTHEME=qt5ct)
+# Qt 5 and Qt 6 apps get freemac's colours and font (QT_QPA_PLATFORMTHEME=qt5ct),
+# and Qt 5 apps freemac's own buttons, fields and tabs (a Kvantum theme drawn
+# by art/kvantum/make-kvantum.py). Qt apps need Qt's Wayland support, since
+# freemac has no X server.
 qt5ct
 qt6ct
+qt5-style-kvantum
+qtwayland5
+qt6-wayland

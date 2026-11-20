@@ -77,10 +77,10 @@ only ship alongside, which is fine for any free licence).
 
 | Name | What it is | Language | Notes |
 | --- | --- | --- | --- |
-| **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. |
+| **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. Remembers each app's window size and place and reopens its next window there (`$XDG_STATE_HOME/freemac/window-places`); `strata/close` closes a window for Quit. |
 | **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, the app's own menus (GTK apps since 0.8, through strata-shell; Qt apps planned). Right: network, sound and battery icons (0.4), Bluetooth and printing (0.8), clock; app status icons (StatusNotifierItem) and quick settings later. Falls back to a minimal per-app menu when an app exports none. |
 | **Backdrop** | Desktop wallpaper | Python + GTK 3 (layer-shell, background layer) | One window per screen under the menu bar and dock; fills the screen at any shape (or fits or stretches, set in Dials). Replaced wf-shell's background in 0.4. Since 1.4 the first screen also shows the Desktop folder's files as icons down the right side (`desktop_icons.py`): click to select, double-click to open, drag to place (kept in `~/.config/freemac/desktop.json`) or drop files in, right-click for Rename, Move to Trash, New Folder and Change Wallpaper. |
-| **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. Tells Strata where each window's icon sits (`strata/minimize-hint`), so a minimized window shrinks into its icon and grows back out of it. |
+| **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. Tells Strata where each window's icon sits (`strata/minimize-hint`), so a minimized window shrinks into its icon and grows back out of it. Right-click or hold an app for its menu: its windows, Keep in Dock, Hide and Quit. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
 | **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
 | **Tack** | App switcher | Python + GTK 3 (layer-shell, overlay layer) | Alt+Tab shows the open apps, last used first, as large icons on a translucent panel; Tab and Shift+Tab move, letting go of Alt brings that app's windows forward (restoring one if all are minimized). Runs with the session and hears the key presses on a socket, so it answers at once. Replaced Wayfire's fast-switcher in 1.4. |
@@ -119,6 +119,14 @@ without changing the user experience.
   `freemac-dark`), which draws them as small round buttons. Apps that ask the
   compositor for a title bar (foot, some Qt apps) get strata-decor's, which
   matches.
+- **Qt apps** take freemac's colours and font through qt5ct and qt6ct, and
+  Qt 5 apps also freemac's own buttons, fields, tabs, check boxes, pop-up
+  menus and scroll bars: a Kvantum theme (`art/kvantum/make-kvantum.py`,
+  installed as `freemac` and `freemac-dark` in `/usr/share/Kvantum`) drawn
+  from the same colours as the GTK theme. Dials switches it with light and
+  dark. Qt 6 apps still use Qt's Fusion style in freemac's colours, since
+  Ubuntu 24.04 has no Kvantum for Qt 6. Qt apps run on Wayland
+  (qtwayland5, qt6-wayland); there is no X server.
 - **Shell:** Topline, Pier, Seek and Backdrop are layer-shell clients in the
   `freemac_shell` Python package (`shell/`), started from Wayfire's autostart.
   They talk to Wayfire over its IPC socket for windows and focus.

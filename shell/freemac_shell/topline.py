@@ -274,7 +274,15 @@ class Topline(Gtk.Window):
             return
         if name == "hide":
             self.wf.set_minimized(view["id"], True)
-        elif name == "quit" and view.get("pid"):
+        elif name == "quit":
+            self._quit(view)
+
+    def _quit(self, view):
+        """Close the app's windows (it may ask to save first); with no Strata,
+        end its process."""
+        if self.wf and self.wf.quit(view.get("app-id") or ""):
+            return
+        if view.get("pid"):
             os.kill(view["pid"], signal.SIGTERM)
 
     def _fill_app_menu(self, view):
@@ -298,8 +306,7 @@ class Topline(Gtk.Window):
         else:
             name = apps.display_name(view.get("app-id"))
             self._item(menu, f"Hide {name}", lambda: self.wf.set_minimized(view["id"], True))
-            pid = view.get("pid")
-            self._item(menu, f"Quit {name}", (lambda: os.kill(pid, signal.SIGTERM)) if pid else None)
+            self._item(menu, f"Quit {name}", lambda: self._quit(view))
         menu.show_all()
 
     def _fill_window_menu(self, view):

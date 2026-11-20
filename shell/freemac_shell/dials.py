@@ -42,6 +42,7 @@ SCENES = (
 TOOLKITS = "/usr/share/freemac"  # GTK 4 and Qt colours (art/gtk-theme/make-theme.py)
 GTK4_CSS = os.path.join(GLib.get_user_config_dir(), "gtk-4.0", "gtk.css")
 QT_CONFS = [os.path.join(GLib.get_user_config_dir(), name, name + ".conf") for name in ("qt5ct", "qt6ct")]
+KVANTUM_CONF = os.path.join(GLib.get_user_config_dir(), "Kvantum", "kvantum.kvconfig")
 
 
 def apply_toolkits(dark):
@@ -59,6 +60,31 @@ def apply_toolkits(dark):
     for conf in QT_CONFS:
         if os.path.exists(conf):
             ini_set(conf, "Appearance", "color_scheme_path", scheme)
+    set_kvantum_theme("freemac-dark" if dark else "freemac")
+
+
+def set_kvantum_theme(name):
+    """Qt 5 apps' buttons and fields (freemac's Kvantum themes, light or dark).
+    A Kvantum theme the person chose themselves is left alone."""
+    try:
+        with open(KVANTUM_CONF) as f:
+            current = f.read()
+    except OSError:
+        current = ""
+    chosen = [line.split("=", 1)[1].strip() for line in current.splitlines()
+              if line.replace(" ", "").startswith("theme=")]
+    if chosen and chosen[0] not in ("freemac", "freemac-dark"):
+        return
+    if chosen and chosen[0] == name:
+        return
+    os.makedirs(os.path.dirname(KVANTUM_CONF), exist_ok=True)
+    if chosen:
+        ini_set(KVANTUM_CONF, "General", "theme", name)
+    else:
+        tmp = KVANTUM_CONF + ".new"
+        with open(tmp, "w") as f:
+            f.write(f"[General]\ntheme={name}\n")
+        os.replace(tmp, KVANTUM_CONF)
 
 
 def apply_appearance(dark, settings=None, follow_wallpaper=True):

@@ -3,7 +3,8 @@
 // hands them to Topline over IPC (strata/app-menus), and tells GTK apps that
 // the desktop shows their menu bar, so they leave it out of the window. It
 // also lets Pier say where each window's dock icon is (strata/minimize-hint),
-// so minimizing a window shrinks it into that icon and restoring grows it back.
+// so minimizing a window shrinks it into that icon and restoring grows it back,
+// and closes windows on request (strata/close) for Quit in the menu bar and dock.
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -22,6 +23,7 @@
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
 
 #include "gtk-shell.hpp"
+#include "window-places.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -381,6 +383,7 @@ void bind_gtk_shell1(wl_client *client, void *data, uint32_t version, uint32_t i
 class strata_shell_impl : public wf::plugin_interface_t
 {
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> method_repository;
+    strata_window_places window_places;
 
     /* strata/app-menus {id}: where the app behind a window publishes its
      * menus on the session bus (org.gtk.Menus / org.gtk.Actions). */
@@ -444,6 +447,21 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/close {id}: ask a window to close, as its close button does (the
+     * app may still ask to save first). Topline's and Pier's Quit use it. */
+    wf::ipc::method_callback close_view = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        auto view = wf::ipc::find_view_by_id(data["id"]);
+        if (!view || (view->role != wf::VIEW_ROLE_TOPLEVEL))
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        view->close();
+        return wf::ipc::json_ok();
+    };
+
   public:
     void init() override
     {
@@ -452,6 +470,8 @@ class strata_shell_impl : public wf::plugin_interface_t
         wf::get_core().connect(&on_app_id_query);
         method_repository->register_method("strata/app-menus", get_app_menus);
         method_repository->register_method("strata/minimize-hint", set_minimize_hint);
+        method_repository->register_method("strata/close", close_view);
+        window_places.init();
     }
 
     bool is_unloadable() override

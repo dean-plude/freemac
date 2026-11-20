@@ -19,7 +19,7 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import apps, style  # noqa: E402
-from .wfipc import Wayfire  # noqa: E402
+from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 BASE = 48          # icon size at rest
 PEAK = 80          # icon size right under the pointer
@@ -27,6 +27,7 @@ REACH = 150        # pixels over which magnification fades out
 BOUNCE_PERIOD = 0.62   # seconds per hop while an app starts
 BOUNCE_HEIGHT = 0.42   # share of the icon size
 BOUNCE_LIMIT = 6.0     # stop hopping after this long even if no window shows
+HOLD_MS = 550        # hold an app in the dock this long to open its menu
 # Parts of the desktop that open without a window of their own don't hop.
 SHADOW_ROOM = 22   # px each side of the shelf for its shadow
 NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
@@ -288,7 +289,11 @@ class Item(Gtk.Button):
         box.pack_start(self.dot, False, False, 0)
         self.add(box)
         self.set_tooltip_text(info.get_name() if info else apps.display_name(app_id))
+        self.menu = None
+        self.hold = 0
         self.connect("clicked", self._clicked)
+        self.connect("button-press-event", self._press)
+        self.connect("button-release-event", self._release)
 
     @property
     def ok(self):
@@ -311,14 +316,80 @@ class Item(Gtk.Button):
             self.stop_bounce()
 
     def _clicked(self, _button):
+        if self.menu and self.menu.get_visible():
+            return
         if self.views:
             latest = max(self.views, key=lambda v: v.get("last-focus-timestamp", 0))
-            if latest.get("minimized"):
-                self.pier.wf.set_minimized(latest["id"], False)
-            self.pier.wf.focus(latest["id"])
+            self.show_window(latest)
         elif self.info:
             self.info.launch([], None)
             self.bounce()
+
+    def show_window(self, view):
+        if is_minimized(view):
+            self.pier.wf.set_minimized(view["id"], False)
+        self.pier.wf.focus(view["id"])
+
+    # ---- the app's menu: right-click, or hold the button down ---------------
+    def _press(self, _widget, event):
+        if event.type != Gdk.EventType.BUTTON_PRESS:
+            return False
+        if event.button == 3:
+            self.show_menu()
+            return True
+        if event.button == 1:
+            self.hold = GLib.timeout_add(HOLD_MS, self._held)
+        return False
+
+    def _release(self, _widget, _event):
+        if self.hold:
+            GLib.source_remove(self.hold)
+            self.hold = 0
+        elif self.menu and self.menu.get_visible():
+            return True   # the hold opened the menu; don't also click
+        return False
+
+    def _held(self):
+        self.hold = 0
+        self.show_menu()
+        return False
+
+    def show_menu(self):
+        name = self.info.get_name() if self.info else apps.display_name(self.app_id)
+        self.menu = Gtk.Menu()
+
+        def add(label, action=None):
+            item = Gtk.MenuItem(label=label)
+            if action:
+                item.connect("activate", lambda *_: action())
+            else:
+                item.set_sensitive(False)
+            self.menu.append(item)
+            return item
+
+        views = sorted(self.views, key=lambda v: (v.get("title") or "").lower())
+        for view in views:
+            title = view.get("title") or name
+            add(title[:60], lambda view=view: self.show_window(view))
+        if views:
+            self.menu.append(Gtk.SeparatorMenuItem())
+        desktop_id = self.desktop_id or (self.info.get_id() if self.info else None)
+        keep = Gtk.CheckMenuItem(label="Keep in Dock")
+        keep.set_active(self in self.pier.pinned)
+        keep.set_sensitive(desktop_id is not None)
+        keep.connect("toggled", lambda item: self.pier.set_pinned(desktop_id, item.get_active()))
+        self.menu.append(keep)
+        if views:
+            self.menu.append(Gtk.SeparatorMenuItem())
+            add("Hide", lambda: [self.pier.wf.set_minimized(v["id"], True) for v in self.views])
+            add("Quit", lambda: self.pier.wf.quit(self.views[0].get("app-id") or ""))
+        elif self.info:
+            add("Open", lambda: self._clicked(None))
+        self.popup(self.menu)
+
+    def popup(self, menu):
+        menu.show_all()
+        menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
 
     # ---- the launch bounce -------------------------------------------------
     # While an app starts, its icon hops up and down until its first window
@@ -494,6 +565,26 @@ class Pier(Gtk.Window):
         if not self._hint_pending:
             self._hint_pending = GLib.timeout_add(200, self._send_hints)
         return False
+
+    def set_pinned(self, desktop_id, keep):
+        """Keep in Dock: add the app to (or take it off) the pinned list in
+        pier.json; the file watch then rebuilds the dock."""
+        try:
+            with open(CONFIG) as f:
+                saved = json.load(f)
+        except (OSError, ValueError):
+            saved = {}
+        pinned = list(saved.get("pinned", self.config["pinned"] if self.config else DEFAULT_PINNED))
+        if keep and desktop_id not in pinned:
+            pinned.append(desktop_id)
+        elif not keep and desktop_id in pinned:
+            pinned.remove(desktop_id)
+        saved["pinned"] = pinned
+        os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+        tmp = CONFIG + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(saved, f, indent=1)
+        os.replace(tmp, CONFIG)
 
     def _send_hints(self):
         """Tell Strata where each window's icon sits, so minimizing a window

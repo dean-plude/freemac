@@ -122,8 +122,28 @@ class Wayfire:
                 return view.get("id")
         return None
 
+    def close(self, view_id):
+        """Ask a window to close, as its close button does (Strata)."""
+        try:
+            result = self.req.call("strata/close", id=view_id)
+        except (ConnectionError, OSError, ValueError):
+            return False
+        return isinstance(result, dict) and result.get("result") == "ok"
+
+    def quit(self, app_id):
+        """Close every window of an app: Quit in the menu bar and the dock."""
+        closed = False
+        for view in self.views():
+            if (view.get("app-id") or "") == app_id:
+                closed = self.close(view["id"]) or closed
+        return closed
+
     def set_minimized(self, view_id, state=True):
         return self.req.call("wm-actions/set-minimized", view_id=view_id, state=state)
+
+
+def is_minimized(view):
+    return bool((view.get("state") or {}).get("minimized", view.get("minimized", False)))
 
 
 def is_app_window(view):

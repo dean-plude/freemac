@@ -157,16 +157,27 @@ What a Mac user reaches for next.
 | 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata, Pier | done |
 | 4 | Screenshots land on the Desktop, named with the date and time | Lens | done |
 
-## 1.5 "the little things" (in progress)
+## 1.5 "the little things" (done)
 
 The details a Mac user notices in the first ten minutes.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Show in Drawer, Quit | Pier | |
-| 2 | Drawer's sidebar shows the folder you're in | Drawer | |
-| 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | |
-| 4 | Windows reopen at the size and place they had last time | Strata | |
+| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Hide, Quit | Pier, Strata | done |
+| 2 | Drawer's sidebar shows the folder you're in | Drawer | done |
+| 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | done |
+| 4 | Windows reopen at the size and place they had last time | Strata | done |
+
+## 1.6 "the Command key" (next)
+
+A Mac user's hands reach for Command, not Control.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Windows key works as Command: Super+C, X, V, Z, A, S, F, N, O, P, T, W and the rest do in every app what Ctrl does, and freemac's own Super shortcuts keep working | Strata | |
+| 2 | Super+Q quits the app (every window), Super+W closes one window, Super+H hides the app, Super+` goes through the app's windows | Strata, Tack | |
+| 3 | Get Info in Drawer (Super+I): kind, size, where it is, when it was made and changed, and who can open it | Drawer | |
+| 4 | A start-up sound of our own when freemac starts, which can be turned off in Sound | Keel, Dials | |
 
 ## Later
 
