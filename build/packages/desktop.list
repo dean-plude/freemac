@@ -3,6 +3,7 @@
 wayfire
 # Start-up screen (freemac theme in /usr/share/plymouth/themes/freemac)
 plymouth
+plymouth-label
 greetd
 seatd
 foot
