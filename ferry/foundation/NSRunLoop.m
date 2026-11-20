@@ -93,7 +93,15 @@ static NSRunLoop *main_loop;
     }
 }
 - (void)stop { _stopped = YES; }
-- (BOOL)hasWork { return [_timers count] || [_blocks count] || _nsources; }
+/* Another event loop waited on together with this one (AppKit's GLib main
+ * context): before each wait it adds its descriptors and may shorten the
+ * wait; after it, it handles what is ready. */
+static int (*hook_prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max);
+static BOOL (*hook_dispatch)(void *ctx, struct pollfd *fds, int count);
+static void *hook_ctx;
+#define HOOK_FDS 64
+
+- (BOOL)hasWork { return [_timers count] || [_blocks count] || _nsources || hook_prepare; }
 
 /* One pass: run queued blocks, fire due timers, then wait for a descriptor
  * or the next timer, but not past limit. Returns NO when there is nothing that
@@ -145,15 +153,20 @@ static NSRunLoop *main_loop;
     }
     double wait = next - t;
     int ms = wait <= 0 ? 0 : wait > 2e6 ? 2000000000 : (int)ceil(wait * 1000);
-    struct pollfd *fds = calloc(_nsources ? _nsources : 1, sizeof *fds);
+    struct pollfd *fds = calloc(_nsources + HOOK_FDS + 1, sizeof *fds);
     for (int i = 0; i < _nsources; i++) {
         fds[i].fd = _sources[i].fd;
         fds[i].events = POLLIN;
     }
-    int count = _nsources;
+    int count = _nsources, extra = 0;
+    if (hook_prepare)
+        extra = hook_prepare(hook_ctx, &ms, fds + count, HOOK_FDS);
     struct fsource *snapshot = malloc((count ? count : 1) * sizeof *snapshot);
     memcpy(snapshot, _sources, count * sizeof *snapshot);
-    if (poll(fds, count, ms) > 0) {
+    int ready = poll(fds, count + extra, ms);
+    if (hook_dispatch && hook_dispatch(hook_ctx, fds + count, extra))
+        *handled = YES;
+    if (ready > 0) {
         for (int i = 0; i < count; i++) {
             if (fds[i].revents) {
                 @autoreleasepool {
@@ -215,6 +228,14 @@ F_EXPORT void FerryRunLoopAddDescriptor(int fd, void (*callback)(int, void *), v
 }
 
 F_EXPORT void FerryRunLoopRemoveDescriptor(int fd) { [[NSRunLoop mainRunLoop] removeDescriptor:fd]; }
+
+F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollfd *, int),
+                                      BOOL (*dispatch)(void *, struct pollfd *, int), void *ctx)
+{
+    hook_prepare = prepare;
+    hook_dispatch = dispatch;
+    hook_ctx = ctx;
+}
 
 /* ---- NSTimer ------------------------------------------------------------------------- */
 

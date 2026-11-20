@@ -16,6 +16,7 @@
 #include <objc/NSObject.h>
 #include <objc/NSObjCRuntime.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CGGeometry.h>
 
 #ifndef NS_FORMAT_FUNCTION
 #define NS_FORMAT_FUNCTION(F, A) __attribute__((format(__NSString__, F, A)))
@@ -43,6 +44,60 @@ static inline NSRange NSMakeRange(NSUInteger loc, NSUInteger len) { NSRange r = 
 static inline NSUInteger NSMaxRange(NSRange r) { return r.location + r.length; }
 static inline BOOL NSLocationInRange(NSUInteger loc, NSRange r) { return loc - r.location < r.length; }
 static inline BOOL NSEqualRanges(NSRange a, NSRange b) { return a.location == b.location && a.length == b.length; }
+
+/* ---- geometry (NSGeometry): the Core Graphics types, as on a 64-bit Mac ---- */
+
+typedef CGPoint NSPoint;
+typedef CGSize NSSize;
+typedef CGRect NSRect;
+typedef NSPoint *NSPointPointer;
+typedef NSSize *NSSizePointer;
+typedef NSRect *NSRectPointer;
+typedef struct NSEdgeInsets { CGFloat top, left, bottom, right; } NSEdgeInsets;
+typedef NS_ENUM(NSUInteger, NSRectEdge) {
+    NSRectEdgeMinX = 0, NSRectEdgeMinY = 1, NSRectEdgeMaxX = 2, NSRectEdgeMaxY = 3,
+    NSMinXEdge = 0, NSMinYEdge = 1, NSMaxXEdge = 2, NSMaxYEdge = 3,
+};
+extern const NSPoint NSZeroPoint;
+extern const NSSize NSZeroSize;
+extern const NSRect NSZeroRect;
+extern const NSEdgeInsets NSEdgeInsetsZero;
+static inline NSPoint NSMakePoint(CGFloat x, CGFloat y) { NSPoint p = {x, y}; return p; }
+static inline NSSize NSMakeSize(CGFloat w, CGFloat h) { NSSize s = {w, h}; return s; }
+static inline NSRect NSMakeRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { NSRect r = {{x, y}, {w, h}}; return r; }
+static inline NSEdgeInsets NSEdgeInsetsMake(CGFloat t, CGFloat l, CGFloat b, CGFloat r)
+{
+    NSEdgeInsets e = {t, l, b, r};
+    return e;
+}
+static inline CGFloat NSMinX(NSRect r) { return r.origin.x; }
+static inline CGFloat NSMinY(NSRect r) { return r.origin.y; }
+static inline CGFloat NSMaxX(NSRect r) { return r.origin.x + r.size.width; }
+static inline CGFloat NSMaxY(NSRect r) { return r.origin.y + r.size.height; }
+static inline CGFloat NSMidX(NSRect r) { return r.origin.x + r.size.width / 2; }
+static inline CGFloat NSMidY(NSRect r) { return r.origin.y + r.size.height / 2; }
+static inline CGFloat NSWidth(NSRect r) { return r.size.width; }
+static inline CGFloat NSHeight(NSRect r) { return r.size.height; }
+static inline NSRect NSRectFromCGRect(CGRect r) { return r; }
+static inline CGRect NSRectToCGRect(NSRect r) { return r; }
+static inline NSPoint NSPointFromCGPoint(CGPoint p) { return p; }
+static inline CGPoint NSPointToCGPoint(NSPoint p) { return p; }
+static inline NSSize NSSizeFromCGSize(CGSize s) { return s; }
+static inline CGSize NSSizeToCGSize(NSSize s) { return s; }
+BOOL NSEqualPoints(NSPoint a, NSPoint b);
+BOOL NSEqualSizes(NSSize a, NSSize b);
+BOOL NSEqualRects(NSRect a, NSRect b);
+BOOL NSIsEmptyRect(NSRect r);
+NSRect NSInsetRect(NSRect r, CGFloat dx, CGFloat dy);
+NSRect NSIntegralRect(NSRect r);
+NSRect NSUnionRect(NSRect a, NSRect b);
+NSRect NSIntersectionRect(NSRect a, NSRect b);
+NSRect NSOffsetRect(NSRect r, CGFloat dx, CGFloat dy);
+void NSDivideRect(NSRect r, NSRect *slice, NSRect *remainder, CGFloat amount, NSRectEdge edge);
+BOOL NSPointInRect(NSPoint p, NSRect r);
+BOOL NSMouseInRect(NSPoint p, NSRect r, BOOL flipped);
+BOOL NSContainsRect(NSRect a, NSRect b);
+BOOL NSIntersectsRect(NSRect a, NSRect b);
 
 typedef NS_ENUM(NSInteger, NSComparisonResult) {
     NSOrderedAscending = -1, NSOrderedSame = 0, NSOrderedDescending = 1
@@ -237,7 +292,15 @@ typedef struct {
 @interface NSValue : NSObject <NSCopying>
 + (NSValue *)valueWithRange:(NSRange)range;
 + (NSValue *)valueWithPointer:(const void *)pointer;
++ (NSValue *)valueWithPoint:(NSPoint)point;
++ (NSValue *)valueWithSize:(NSSize)size;
++ (NSValue *)valueWithRect:(NSRect)rect;
++ (NSValue *)valueWithEdgeInsets:(NSEdgeInsets)insets;
 @property (readonly) NSRange rangeValue;
+@property (readonly) NSPoint pointValue;
+@property (readonly) NSSize sizeValue;
+@property (readonly) NSRect rectValue;
+@property (readonly) NSEdgeInsets edgeInsetsValue;
 @property (readonly) void *pointerValue;
 @end
 
@@ -888,6 +951,12 @@ NSString *NSStringFromProtocol(Protocol *proto);
 Protocol *NSProtocolFromString(NSString *name);
 NSString *NSStringFromRange(NSRange range);
 NSRange NSRangeFromString(NSString *s);
+NSString *NSStringFromPoint(NSPoint p);
+NSString *NSStringFromSize(NSSize s);
+NSString *NSStringFromRect(NSRect r);
+NSPoint NSPointFromString(NSString *s);
+NSSize NSSizeFromString(NSString *s);
+NSRect NSRectFromString(NSString *s);
 NSString *NSHomeDirectory(void);
 NSString *NSTemporaryDirectory(void);
 NSString *NSUserName(void);

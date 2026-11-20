@@ -160,6 +160,32 @@ void GContextSetSource(GContext *c, const double rgba[4]);
  * when path is YES it must only add to the current path. */
 void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path));
 
+/* ---- Core Text ---------------------------------------------------------------- */
+
+/* A font. AppKit's NSFont and NSParagraphStyle are subclasses of these two
+ * that add no instance variables, so Core Text calls work on them. */
+@interface GFont : NSObject <NSCopying> {
+@public
+    PangoFontDescription *desc;
+    PangoFont *font;
+    hb_font_t *hb;
+    unsigned upem;
+    CGFloat size;
+    CGAffineTransform matrix;
+    NSString *family;   /* as installed */
+    int weight, style;
+    BOOL monospace;
+}
+@end
+
+@interface GParagraphStyle : NSObject <NSCopying> {
+@public
+    uint8_t alignment, lineBreakMode, writingDirection;
+    CGFloat values[17];
+}
+@end
+
+
 /* ---- conversions ---------------------------------------------------------------- */
 
 static inline cairo_matrix_t GMatrix(CGAffineTransform t)
