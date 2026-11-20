@@ -1,0 +1,58 @@
+literal: Hello, world
+length 12, char 4 'o'
+class is NSString: 1, mutable: 0
+format: 42|   42|42   |00042|ff|FF|10|7
+format: 3.14|   2.500|1.234568e+04|0.0001|100
+format: cstr|obj|42|x|%|-5|1234567890123|9
+format:    7|ab |
+positional: hello world
+format: (null) and (
+    x
+)
+equal 1, compare -1, caseless 0
+prefix 1 suffix 1 contains 1
+range 4,1 back 8 missing 1
+numeric compare 1
+substring: world
+from: world
+to: Hello
+upper: HELLO, WORLD
+lower: hello, world
+capitalized: The Quick Fox
+replace: Hell0, w0rld
+components: (
+    a,
+    b,
+    "",
+    c
+)
+joined: x-y-z
+trimmed: padded
+padded: ab...
+int 42, double 3.75, bool 1, longlong -9000000000
+unicode length 7, utf8 bytes 10, text café 😀
+from UTF-8 length 5 equal 1
+hash equal for equal strings 1
+last: libfoo.dylib
+ext: dylib
+dir: /usr/local/lib
+noext: /usr/local/lib/libfoo
+append: /tmp/x.txt
+appendext: photo.png
+components: (
+    /,
+    usr,
+    local,
+    lib,
+    libfoo.dylib
+)
+standard: /a/c/d
+absolute 1 0
+mutable: ZERO one two
+replaced 2 -> ZERO 0ne tw0
+copy kept ZERO 0ne tw0, mutable now changed, copy is mutable 0
+line <first>
+line <second>
+line <third>
+data 7 bytes, back equal 1
+exit=0

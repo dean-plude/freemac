@@ -1,0 +1,13 @@
+bundle Hello.app
+identifier org.freemac.ferry.hello, version 1.2
+executable ends with Contents/MacOS/Hello: 1
+resources ends with Contents/Resources: 1
+data.txt: resource text
+missing resource nil: 1
+strings file in fr.lproj
+greeting: Bonjour depuis le paquet
+farewell: farewell
+untranslated: Untranslated key
+CFBundle identifier org.freemac.ferry.hello
+preferences named after the bundle: 1
+exit=0

@@ -1,0 +1,6 @@
+string "plain C" length 7, equal to literal 1
+array count 2, retain count of the array 1
+second item second
+number 3.25, true is 1
+run loop with nothing to do finishes: 1
+exit=0

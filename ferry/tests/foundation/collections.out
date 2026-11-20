@@ -1,0 +1,111 @@
+numbers 42 0.1 1 18446744073709551615
+types i d c f
+equal 1 0 1, compare -1 1
+same hash for 1 and 1.0: 1, shared YES 1
+conversions 10 7.0 -1 0
+range value NSRange: {3, 4} 4
+array: (
+    pear,
+    apple,
+    fig,
+    banana
+)
+count 4 first pear last banana index of fig 2 missing 1
+sorted: (
+    apple,
+    banana,
+    fig,
+    pear
+)
+by length: (
+    fig,
+    pear,
+    apple,
+    banana
+)
+filtered: (
+    pear,
+    apple,
+    banana
+)
+sub: (
+    apple,
+    fig
+)
+plus: (
+    pear,
+    apple,
+    fig,
+    banana,
+    kiwi
+)
+reverse banana
+reverse fig
+reverse apple
+reverse pear
+block 0 pear
+block 1 apple
+literal class immutable 1, equal arrays 1
+empty: (
+)
+mutable: (
+    apple,
+    banana,
+    cherry,
+    DATE,
+    elder
+)
+snapshot 5, mutable 0, snapshot mutable 0
+dict: {
+    name = Ferry;
+    nested = {
+        a = 1;
+    };
+    tags = (
+        mac,
+        linux
+    );
+    version = 2;
+}
+lookup Ferry 2 missing 1
+keys: (
+    name,
+    nested,
+    tags,
+    version
+)
+mutable dict 50, k7 49, k8 gone 1, k99 replaced
+enumerated 50, fast 50
+keys are copied: value 1
+sorted by value: (
+    c,
+    b,
+    a
+)
+set 3 contains y 1, mutable 2 contains 1 0, subset 1
+set sorted: (
+    x,
+    y,
+    z
+)
+data: <46657272 7900ff>
+base64 RmVycnkA/w==
+base64 round trip 1
+mutable data: <00006162 6364>
+subdata: <616263>
+null: <null>
+kvc renamed 9
+array kvc: (
+    1,
+    2
+)
+dealloc two
+dealloc one
+dealloc renamed
+pool drained
+still alive: held
+dealloc held
+array released
+dealloc in dict
+done
+exit=0

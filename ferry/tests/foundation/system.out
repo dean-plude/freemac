@@ -1,0 +1,97 @@
+home is HOME: 1
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>blob</key>
+	<data>
+	aGk=
+	</data>
+	<key>count</key>
+	<integer>3</integer>
+	<key>list</key>
+	<array>
+		<string>a</string>
+		<integer>1</integer>
+		<dict/>
+	</array>
+	<key>name</key>
+	<string>Ferry &amp; &lt;friends&gt;</string>
+	<key>on</key>
+	<true/>
+	<key>ratio</key>
+	<real>0.5</real>
+	<key>unicode</key>
+	<string>été</string>
+	<key>when</key>
+	<date>2023-11-14T22:13:20Z</date>
+</dict>
+</plist>
+xml round trip 1 format 100
+binary starts bplist00
+binary round trip 1 format 200 mutable 1
+openstep: {
+    items = (
+        one,
+        "two words",
+        <0a0b>
+    );
+    n = 12;
+    title = "Old style";
+}
+strings: {
+    Hello = Bonjour;
+    Quote = "\"q\"\n";
+}
+bad plist 1, error NSCocoaErrorDomain 3840
+mkdir 1
+write 1
+exists 1 dir 0
+size 18 type NSFileTypeRegular
+read back: line one
+line two
+listing: (
+    moved.txt,
+    note.txt
+)
+subpaths: (
+    deep,
+    deep/er,
+    deep/er/moved.txt,
+    deep/er/note.txt
+)
+copy onto existing 0: The file “moved.txt” couldn’t be saved because a file with the same name already exists.
+missing file 0: The file “x” couldn’t be opened because there is no such file. (code 260)
+remove 1, gone 1
+dict file 1
+dict read: {
+    k = v;
+}
+documents ~/Documents
+app support ~/.local/share
+caches ~/.cache
+registered 7 light
+set 11 1 recent2 1.5
+stored: {
+    enabled = 1;
+    recent = (
+        recent1,
+        recent2
+    );
+    volume = 11;
+    zoom = 1.5;
+}
+reloaded 11, missing key 0
+from arguments fast
+url https | example.com | 8443 | /a/b/c.html | x=1&y=2 | top | c.html | html
+relative: https://user@example.com:8443/a/d/e.png
+file url file:///tmp/some%20file.txt path /tmp/some file.txt isFile 1
+appended: file:///tmp/x.txt
+bad url nil 1
+epoch: 1970-01-01 00:00:00 +0000
+later: 2000-01-01 12:00:00 +0000
+reference -978307200, since 946728000, compare -1, now is recent 1
+error: Error Domain=MyDomain Code=7 "Broke" UserInfo={NSLocalizedDescription=Broke}
+process foundation_system args 3 last fast pid ok 1 cpus ok 1
+unique strings differ 1
+exit=0

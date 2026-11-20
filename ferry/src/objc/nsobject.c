@@ -79,13 +79,10 @@ void *objc_destructInstance(id obj)
         if (m)
             FN(dtor_fn, m->imp)(obj, SEL_cxx_destruct);
     }
-    if (!(class_rt(obj->isa)->flags & RT_STATIC_INSTANCES)) {
-        uint32_t f = __atomic_load_n(&OBJ_HEADER(obj)->flags, __ATOMIC_ACQUIRE);
-        if (f & OBJ_HAS_ASSOC)
-            ferry_objc_assoc_clear(obj);
-        if (f & OBJ_WEAKLY_REFERENCED)
-            ferry_objc_weak_clear(obj);
-    }
+    /* Only objects with NSObject's own retain/release are known to have a
+     * header, so the side tables are always checked. */
+    ferry_objc_assoc_clear(obj);
+    ferry_objc_weak_clear(obj);
     return obj;
 }
 
@@ -301,9 +298,16 @@ void objc_storeStrong(id *location, id obj)
 struct weak_entry { id **locs; size_t n, cap; };
 static struct ftable weak_table;
 
+static SEL SEL_isDeallocating;
+
 static int is_deallocating(id obj)
 {
-    return has_header(obj) && (__atomic_load_n(&OBJ_HEADER(obj)->flags, __ATOMIC_ACQUIRE) & OBJ_DEALLOCATING);
+    if (!has_header(obj))
+        return 0;
+    if (ferry_objc_has_default_rr(obj->isa))
+        return !!(__atomic_load_n(&OBJ_HEADER(obj)->flags, __ATOMIC_ACQUIRE) & OBJ_DEALLOCATING);
+    /* a class with its own retain/release (perhaps static objects) */
+    return SEND0(BOOL, obj, SEL_isDeallocating);
 }
 
 static void weak_unregister(id obj, id *loc)
@@ -330,8 +334,6 @@ static void weak_register(id obj, id *loc)
         e->locs = realloc(e->locs, e->cap * sizeof *e->locs);
     }
     e->locs[e->n++] = loc;
-    if (has_header(obj))
-        __atomic_fetch_or(&OBJ_HEADER(obj)->flags, OBJ_WEAKLY_REFERENCED, __ATOMIC_RELEASE);
 }
 
 id objc_storeWeak(id *location, id obj)
@@ -444,8 +446,6 @@ void objc_setAssociatedObject(id obj, const void *key, id value, uintptr_t polic
     if (!e && value) {
         e = calloc(1, sizeof *e);
         ferry_table_put(&assoc_table, obj, e);
-        if (has_header(obj))
-            __atomic_fetch_or(&OBJ_HEADER(obj)->flags, OBJ_HAS_ASSOC, __ATOMIC_RELEASE);
     }
     if (e) {
         size_t i;
@@ -727,6 +727,11 @@ static Class i_superclass(id self, SEL _cmd) { (void)_cmd; return object_getClas
 static BOOL i_isEqual(id self, SEL _cmd, id other) { (void)_cmd; return self == other; }
 static uintptr_t i_hash(id self, SEL _cmd) { (void)_cmd; return (uintptr_t)self; }
 static BOOL i_no(id self, SEL _cmd) { (void)self; (void)_cmd; return NO; }
+static BOOL i_isDeallocating(id self, SEL _cmd)
+{
+    (void)_cmd;
+    return !!(__atomic_load_n(&OBJ_HEADER(self)->flags, __ATOMIC_ACQUIRE) & OBJ_DEALLOCATING);
+}
 static BOOL i_yes(id self, SEL _cmd) { (void)self; (void)_cmd; return YES; }
 static NSZone i_zone(id self, SEL _cmd) { (void)self; (void)_cmd; return NULL; }
 static id i_nil1(id self, SEL _cmd, id a) { (void)self; (void)_cmd; (void)a; return nil; }
@@ -843,7 +848,7 @@ static const struct fmethod nsobject_instance[] = {
     M("autorelease", "@16@0:8", i_autorelease),
     M("retainCount", "Q16@0:8", i_retainCount),
     M("_tryRetain", "c16@0:8", i_yes),
-    M("_isDeallocating", "c16@0:8", i_no),
+    M("_isDeallocating", "c16@0:8", i_isDeallocating),
     M("allowsWeakReference", "c16@0:8", i_yes),
     M("retainWeakReference", "c16@0:8", i_yes),
     M("self", "@16@0:8", i_self),
@@ -916,6 +921,7 @@ static BOOL p_isEqual(struct c_protocol *self, SEL _cmd, struct c_protocol *o) {
 
 void ferry_objc_nsobject_init(void)
 {
+    SEL_isDeallocating = sel_registerName("_isDeallocating");
     ferry_objc_make_class(&ferry_class_NSObject, &ferry_meta_NSObject, NULL, "NSObject", sizeof(Class),
                           nsobject_instance, COUNT(nsobject_instance), nsobject_class, COUNT(nsobject_class), 0);
     struct fmethod proto[COUNT(ferry_static_rr_methods) + 3];

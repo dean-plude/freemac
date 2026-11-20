@@ -161,8 +161,6 @@ struct fobj_header {
     uint32_t reserved;
 };
 #define OBJ_DEALLOCATING 1u
-#define OBJ_WEAKLY_REFERENCED 2u
-#define OBJ_HAS_ASSOC 4u
 #define OBJ_HEADER(o) ((struct fobj_header *)(o) - 1)
 
 /* ---- small hash tables (runtime.c) ------------------------------------------ */

@@ -1,0 +1,10 @@
+peer of item0 is item1
+labels item0,item1,item2, dictionary has 3
+total label length 15
+dealloc item1
+item1 removed; weak peer now nil
+dictionary dropped
+dealloc item0
+dealloc item2
+done
+exit=0
