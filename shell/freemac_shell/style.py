@@ -29,7 +29,7 @@ TEMPLATE = """
   background-color: @shelf;
   border: 1px solid @edge;
   border-radius: 18px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
 }
 .pier-item { background: none; border: none; box-shadow: none; padding: 0 3px; }
 .pier-dot { color: @ink; font-size: 7px; }

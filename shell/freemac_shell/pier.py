@@ -28,6 +28,7 @@ BOUNCE_PERIOD = 0.62   # seconds per hop while an app starts
 BOUNCE_HEIGHT = 0.42   # share of the icon size
 BOUNCE_LIMIT = 6.0     # stop hopping after this long even if no window shows
 # Parts of the desktop that open without a window of their own don't hop.
+SHADOW_ROOM = 22   # px each side of the shelf for its shadow
 NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
@@ -375,6 +376,10 @@ class Pier(Gtk.Window):
         outer.connect("draw", self._draw_backing)
         holder = Gtk.Box()
         holder.set_valign(Gtk.Align.END)
+        # Room at the sides for the shelf's soft shadow, so the window's own
+        # edge never cuts it off in a straight line.
+        holder.set_margin_start(SHADOW_ROOM)
+        holder.set_margin_end(SHADOW_ROOM)
         holder.pack_start(self.shelf, True, False, 0)
         outer.add(holder)
         outer.add_events(1 << 2 | 1 << 13)  # pointer motion, leave
