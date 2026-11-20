@@ -63,6 +63,12 @@ class button_t
      */
     void set_pressed(bool is_pressed);
 
+    /** Strata: show the symbols on all buttons while the pointer is over any of them. */
+    void set_show_symbol(bool show);
+
+    /** Strata: whether the window is the active one; inactive buttons are paler. */
+    void set_active(bool active);
+
     /**
      * Render the button on the given framebuffer at the given coordinates.
      * Precondition: set_button_type() has been called, otherwise result is no-op
@@ -85,6 +91,9 @@ class button_t
     bool is_hovered = false;
     /* Whether the button is currently being held */
     bool is_pressed = false;
+    /* Strata: symbols shown, window active */
+    bool show_symbol = false;
+    bool active = true;
     /* The shade of button background to use. */
     wf::animation::simple_animation_t hover{wf::create_option(100)};
 

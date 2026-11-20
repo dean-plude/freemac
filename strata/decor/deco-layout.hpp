@@ -137,6 +137,9 @@ class decoration_layout_t
      */
     void handle_focus_lost();
 
+    /** Strata: tell the buttons whether their window is the active one. */
+    void set_active(bool active);
+
   private:
     const int titlebar_size;
     const int border_size;
@@ -171,6 +174,9 @@ class decoration_layout_t
      * @return The layout area or null on failure
      */
     nonstd::observer_ptr<decoration_area_t> find_area_at(wf::point_t point);
+
+    /** Strata: show or hide the symbols on all the buttons */
+    void show_symbols(bool show);
 
     /** Unset hover state of hovered button at @position, if any */
     void unset_hover(wf::point_t position);

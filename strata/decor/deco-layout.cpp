@@ -6,7 +6,9 @@
 #include <wayfire/nonstd/wlroots-full.hpp>
 #include <wayfire/util.hpp>
 
-#define BUTTON_HEIGHT_PC 0.62
+/* Strata: round buttons about 12 px across on a 28 px title bar, 8 px apart. */
+#define BUTTON_HEIGHT_PC 0.43
+#define BUTTON_GAP_PC 0.29
 
 namespace wf
 {
@@ -59,14 +61,9 @@ decoration_layout_t::decoration_layout_t(const decoration_theme_t& th,
 
     titlebar_size(th.get_title_height()),
     border_size(th.get_border_size()),
-    /**
-     * This is necessary. Otherwise, we will draw an
-     * overly huge button. 70% of the titlebar height
-     * is a decent size. (Equals 21 px by default)
-     */
-    button_width(titlebar_size * BUTTON_HEIGHT_PC),
-    button_height(titlebar_size * BUTTON_HEIGHT_PC),
-    button_padding((titlebar_size - button_height) / 2),
+    button_width(std::max(10, (int)(titlebar_size * BUTTON_HEIGHT_PC + 0.5))),
+    button_height(button_width),
+    button_padding(std::max(6, (int)(titlebar_size * BUTTON_GAP_PC + 0.5))),
     theme(th),
     damage_callback(callback)
 {}
@@ -94,11 +91,12 @@ wf::geometry_t decoration_layout_t::create_buttons(int width, int)
         }
     }
 
-    /* Strata puts the buttons at the left edge, in button_order. */
+    /* Strata puts the buttons at the left edge, in button_order, centred
+     * on the title bar's height with button_padding between them. */
     int per_button = button_padding + button_width;
     wf::geometry_t button_geometry = {
-        border_size + button_padding,
-        button_padding + border_size,
+        border_size + button_padding + 1,
+        border_size + (titlebar_size - button_height) / 2,
         button_width,
         button_height,
     };
@@ -111,7 +109,7 @@ wf::geometry_t decoration_layout_t::create_buttons(int width, int)
         button_geometry.x += per_button;
     }
 
-    int total_width = button_padding + buttons.size() * per_button;
+    int total_width = button_padding + 1 + buttons.size() * per_button;
     (void)width;
 
     return {
@@ -231,10 +229,13 @@ decoration_layout_t::action_response_t decoration_layout_t::handle_motion(
     } else
     {
         unset_hover(current_input);
-        if (current_area && (current_area->get_type() == DECORATION_AREA_BUTTON))
+        bool on_button = current_area && (current_area->get_type() == DECORATION_AREA_BUTTON);
+        if (on_button)
         {
             current_area->as_button().set_hover(true);
         }
+
+        show_symbols(on_button);
     }
 
     this->current_input = {x, y};
@@ -375,6 +376,29 @@ void decoration_layout_t::handle_focus_lost()
     }
 
     this->unset_hover(current_input);
+    show_symbols(false);
+}
+
+void decoration_layout_t::show_symbols(bool show)
+{
+    for (auto& area : layout_areas)
+    {
+        if (area->get_type() == DECORATION_AREA_BUTTON)
+        {
+            area->as_button().set_show_symbol(show);
+        }
+    }
+}
+
+void decoration_layout_t::set_active(bool active)
+{
+    for (auto& area : layout_areas)
+    {
+        if (area->get_type() == DECORATION_AREA_BUTTON)
+        {
+            area->as_button().set_active(active);
+        }
+    }
 }
 }
 }
