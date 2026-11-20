@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Builds the live ISO, boots it in QEMU to check the desktop starts, and
+# publishes it as a GitHub release with its SHA-256 checksum, so anyone can
+# download freemac and try it in a virtual machine without building it.
+#
+# Runs when a tag like v1.22.0 is pushed, or by hand from the Actions tab
+# (Run workflow), which releases the version in the VERSION file.
+name: Release ISO
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to build (default: Main)"
+        required: false
+        default: "Main"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-iso
+  cancel-in-progress: false
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Make room on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force || true
+          df -h / /mnt
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin \
+            grub-efi-amd64-bin grub-common mtools dosfstools qemu-system-x86 ovmf file
+
+      - name: Let QEMU use KVM
+        run: |
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+              | sudo tee /etc/udev/rules.d/99-kvm.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+          fi
+
+      - name: Build the ISO
+        run: |
+          # Ferry, the optional Mac layer, isn't part of the desktop image.
+          rm -rf ferry
+          sudo env BASE=ubuntu WORKDIR=/mnt/fm-work OUTDIR="$PWD/out" ./build/build-iso.sh
+          sudo rm -rf /mnt/fm-work
+          sudo chown -R "$USER" out
+          ls -la out
+
+      - name: Boot it in QEMU (BIOS)
+        run: python3 scripts/smoke-test.py out/freemac-*-amd64.iso --timeout 1200
+
+      - name: Boot it in QEMU (UEFI)
+        run: python3 scripts/smoke-test.py out/freemac-*-amd64.iso --uefi --timeout 1200
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="v$VERSION"
+          ISO=$(ls out/freemac-*-amd64.iso)
+          SIZE=$(du -m "$ISO" | cut -f1)
+          sed -e "s/@VERSION@/$VERSION/g" -e "s/@SIZE@/$SIZE/g" \
+            -e "s/@SHA256@/$(cut -d' ' -f1 "$ISO.sha256")/g" \
+            build/release-notes.md > notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ISO" "$ISO.sha256" --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" "$ISO" "$ISO.sha256" --target "$(git rev-parse HEAD)" \
+              --title "freemac $VERSION" --notes-file notes.md --prerelease
+          fi
