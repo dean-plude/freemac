@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Nudge
+GenericName=Reminders
+Comment=Keep lists of things to do, and get a nudge when one is due
+Exec=freemac-nudge %U
+Icon=freemac-nudge
+Categories=Office;ProjectManagement;
+Keywords=reminders;to-do;todo;tasks;lists;checklist;
+StartupWMClass=org.freemac.Nudge
+StartupNotify=true

@@ -1,5 +1,7 @@
-#!/usr/bin/python3
+#!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-from freemac_shell.seek import main
-
-main()
+# Seek stays running once started; ask the running copy to open (fast), and
+# start it only when it isn't there yet.
+gdbus call --session --dest org.freemac.Seek --object-path /org/freemac/Seek \
+    --method org.freedesktop.Application.Activate "{}" >/dev/null 2>&1 && exit 0
+exec python3 -c 'from freemac_shell.seek import main; main()' "$@"

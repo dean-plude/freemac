@@ -582,7 +582,13 @@ class Crew(Gtk.Application):
                     people += store.parse(handle.read())
             except OSError:
                 pass
-        window.add_people(people)
+        added = window.add_people(people)
+        known = {c.uid for c in window.contacts}
+        if people and not added and people[0].uid in known:
+            # Already here (Seek opens a card's own file): show that card.
+            window.chosen = people[0].uid
+            window.fill_list()
+            window.show_card()
         window.present()
 
     def do_startup(self):

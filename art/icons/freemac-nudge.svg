@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Nudge: a white sheet with three coloured rings and lines, one ticked. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9eaee"/>
+    </linearGradient>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="23.5" fill="none" stroke="#000" stroke-opacity="0.08"/>
+  <g stroke-width="5" fill="none">
+    <circle cx="34" cy="38" r="9" stroke="#f59a23"/>
+    <circle cx="34" cy="64" r="9" stroke="#2f7bf5"/>
+    <circle cx="34" cy="90" r="9" stroke="#f04d3e"/>
+  </g>
+  <circle cx="34" cy="64" r="5" fill="#2f7bf5"/>
+  <g fill="#c7c9d0">
+    <rect x="52" y="35" width="48" height="6" rx="3"/>
+    <rect x="52" y="61" width="38" height="6" rx="3"/>
+    <rect x="52" y="87" width="44" height="6" rx="3"/>
+  </g>
+</svg>

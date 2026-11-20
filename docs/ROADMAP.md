@@ -330,14 +330,26 @@ The small things a Mac user notices in their first minute.
 | 4 | Frame marks up pictures and PDFs: draw, boxes, text, and a signature drawn once on a pad; Save a Copy keeps the original as it was, and closing asks about marks not yet saved | Frame | done |
 | 5 | Every milestone is published as a downloadable live ISO, built and booted (BIOS and UEFI) in QEMU by a GitHub workflow before it goes up | build | done |
 
-## 1.23 "reminders and mail" (next)
+## 1.23 "reminders" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Tide's events can give a notice a set time before they start | Tide, Beacon | |
-| 2 | A reminders app: lists of to-dos with due dates and notices | New app | |
-| 3 | Seek finds events and contacts | Seek | |
-| 4 | Crew's birthdays show in Tide | Tide, Crew | |
+| 1 | Tide's events can give a notice a set time before they start; clicking it opens that day, and Snooze shows it again in 5 minutes | Tide, Beacon | done |
+| 2 | A reminders app: lists in colours, Today, Scheduled, All and Flagged, due dates typed as words ("Friday 5pm"), priorities, flags and notes; a notice when one is due, with Mark as Completed and Snooze | Nudge (new) | done |
+| 3 | Seek finds contacts, coming events and reminders | Seek | done |
+| 4 | Crew's birthdays show in Tide, in purple, every year | Tide, Crew | done |
+| 5 | The menu bar shows a newly opened app's name at once | Topline | done |
+| 6 | Seek stays running, so ⌘Space opens it without starting a program each time | Seek | done |
+| 7 | Pop-up panels and tooltips no longer sit in a grey box | theme | done |
+
+## 1.24 "look and mail" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Space in Drawer shows a large preview of the chosen file (pictures, PDFs, text), and Space again closes it | Drawer | |
+| 2 | A mail app for IMAP and SMTP accounts: inbox, read, reply, write, attachments | New app | |
+| 3 | Tide, Crew and Nudge can sync with online calendars and contacts (CalDAV, CardDAV) set up once in Dials | Dials, Tide, Crew, Nudge | |
+| 4 | Seek's window is kept ready so it takes typing the moment ⌘Space is pressed | Seek | |
 
 ## Later
 

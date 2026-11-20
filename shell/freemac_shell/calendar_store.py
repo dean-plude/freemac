@@ -5,7 +5,7 @@ The file is ~/.local/share/freemac/calendar.ics, a standard .ics that other
 calendar apps can import. Times are kept as local time with no time zone
 (iCalendar's "floating" times); times written in UTC by other apps are moved
 into local time when read. An event can repeat every day, week, month or
-year. No GTK here, so the menu bar and Seek can read events cheaply.
+year, and can have one alert, a set time before it starts (shown by Beacon). No GTK here, so the menu bar and Seek can read events cheaply.
 Original freemac code.
 """
 import calendar
@@ -15,6 +15,12 @@ import uuid
 
 REPEATS = {"": "Never", "DAILY": "Every Day", "WEEKLY": "Every Week",
            "MONTHLY": "Every Month", "YEARLY": "Every Year"}
+# Minutes before the start; None is no alert. An all-day event's alert
+# counts back from 9 AM on its first day.
+ALERTS = {None: "None", 0: "At time of event", 5: "5 minutes before", 10: "10 minutes before",
+          15: "15 minutes before", 30: "30 minutes before", 60: "1 hour before",
+          120: "2 hours before", 1440: "1 day before", 2880: "2 days before"}
+ALL_DAY_ALERT_HOUR = 9
 
 
 def store_path():
@@ -27,17 +33,17 @@ class Event:
     midnight on its first day to midnight after its last (end is excluded)."""
 
     def __init__(self, title="New Event", start=None, end=None, all_day=False,
-                 location="", notes="", repeat="", uid=None):
+                 location="", notes="", repeat="", uid=None, alert=None):
         self.uid = uid or f"{uuid.uuid4()}@freemac"
         self.title, self.location, self.notes = title, location, notes
         self.start = start or dt.datetime.now().replace(minute=0, second=0, microsecond=0)
         self.end = end or self.start + dt.timedelta(hours=1)
-        self.all_day, self.repeat = all_day, repeat
+        self.all_day, self.repeat, self.alert = all_day, repeat, alert
         self.extra = []   # lines we don't use, kept as they were
 
     def copy(self):
         twin = Event(self.title, self.start, self.end, self.all_day, self.location,
-                     self.notes, self.repeat, self.uid)
+                     self.notes, self.repeat, self.uid, self.alert)
         twin.extra = list(self.extra)
         return twin
 
@@ -104,14 +110,43 @@ def _lines(text):
     return lines
 
 
+def _alarm_minutes(lines):
+    """Minutes before the start from a VALARM's lines, or None when it isn't
+    a plain "some time before the start" alarm."""
+    for line in lines:
+        name_part, _sep, value = line.partition(":")
+        name, *param_list = name_part.split(";")
+        params = {k.upper(): v.upper() for k, v in (p.split("=", 1) for p in param_list if "=" in p)}
+        if name.upper() != "TRIGGER":
+            continue
+        if params.get("VALUE") == "DATE-TIME" or params.get("RELATED") == "END":
+            return None
+        before = -_duration(value)
+        if before < dt.timedelta(0):
+            return None
+        return int(before.total_seconds() // 60)
+    return None
+
+
 def parse(text):
-    events, current = [], None
+    events, current, alarm = [], None, None
     for line in _lines(text):
         name_part, _sep, value = line.partition(":")
         name, *param_list = name_part.split(";")
         name = name.upper()
         params = dict(p.split("=", 1) for p in param_list if "=" in p)
-        if name == "BEGIN" and value.upper() == "VEVENT":
+        if alarm is not None:
+            alarm.append(line)
+            if name == "END" and value.upper() == "VALARM":
+                minutes = _alarm_minutes(alarm)
+                if minutes is not None and current.get("alert") is None:
+                    current["alert"] = minutes
+                else:
+                    current["extra"] += alarm   # another alarm, kept as it was
+                alarm = None
+        elif name == "BEGIN" and value.upper() == "VALARM" and current is not None:
+            alarm = [line]
+        elif name == "BEGIN" and value.upper() == "VEVENT":
             current = {"extra": []}
         elif name == "END" and value.upper() == "VEVENT" and current is not None:
             if "start" in current:
@@ -179,7 +214,7 @@ def _event_from(data):
         end = start
     event = Event(data.get("SUMMARY", "") or "Untitled", start, end, all_day,
                   data.get("LOCATION", ""), data.get("DESCRIPTION", ""),
-                  data.get("repeat", ""), data.get("UID"))
+                  data.get("repeat", ""), data.get("UID"), data.get("alert"))
     event.extra = data["extra"]
     return event
 
@@ -215,6 +250,9 @@ def dump(events):
         if e.repeat:
             lines.append(f"RRULE:FREQ={e.repeat}")
         lines += e.extra
+        if e.alert is not None:
+            lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_escape(e.title)}",
+                      f"TRIGGER:-PT{e.alert}M" if e.alert else "TRIGGER:PT0M", "END:VALARM"]
         lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")
     folded = []
@@ -301,6 +339,31 @@ def occurrences(events, first, last):
 
 def on_day(events, day):
     return [o for o in occurrences(events, day, day) if day in set(o.days())]
+
+
+def alert_time(occurrence):
+    """When an occurrence's alert goes off, or None if it has none."""
+    minutes = occurrence.event.alert
+    if minutes is None:
+        return None
+    base = occurrence.start
+    if occurrence.all_day:
+        base += dt.timedelta(hours=ALL_DAY_ALERT_HOUR)
+    return base - dt.timedelta(minutes=minutes)
+
+
+def due_alerts(events, since, until):
+    """Occurrences whose alert goes off after since and up to until
+    (datetimes), soonest first."""
+    reach = max((m for m in ALERTS if m), default=0)
+    last = (until + dt.timedelta(minutes=reach, days=1)).date()
+    found = []
+    for occ in occurrences([e for e in events if e.alert is not None], since.date(), last):
+        when = alert_time(occ)
+        if when is not None and since < when <= until:
+            found.append((when, occ))
+    found.sort(key=lambda pair: pair[0])
+    return [occ for _when, occ in found]
 
 
 def time_text(when):

@@ -152,6 +152,7 @@ class Topline(Gtk.Window):
         # The app last in front, and a held app whose last window closed:
         # it stays in the bar with its menus until another app comes forward.
         self._last_app, self._windowless, self._told_strata = None, None, None
+        self._refresh_queued = False
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         try:
             self.wf = Wayfire(on_event=self._on_event)
@@ -171,6 +172,10 @@ class Topline(Gtk.Window):
         if kind == "view-focused" and view:
             if is_app_window(view) and app_id.lower() not in DESKTOP_OWNED:
                 self._last_app, self._windowless = app_id, None
+                # Show the app's name at once, from the event itself: while
+                # a new window opens Wayfire can take a while to answer, and
+                # the full refresh below asks it several things.
+                self.app_button.set_label(apps.display_name(app_id, view.get("title", "")))
                 # This may be Wayfire handing the focus on as another app
                 # closed its last window; Strata then takes it back so that
                 # app stays in front. Look again once it has.
@@ -184,8 +189,34 @@ class Topline(Gtk.Window):
             # very nearly, so look again in a moment too.
             self._check_windowless()
             GLib.timeout_add(250, self._check_windowless)
+        if kind in ("view-focused", "view-mapped", "view-app-id-changed"):
+            # A window that opens as another app is launched can be focused
+            # before Wayfire knows its app: look again once it has settled.
+            GLib.timeout_add(300, self._look_again)
         self._tell_strata()
+        self._refresh_soon()
+
+    def _refresh_soon(self):
+        """Refresh once the bar has been drawn, and only once for a burst of
+        events (a window opening sends several)."""
+        if not self._refresh_queued:
+            self._refresh_queued = True
+            GLib.idle_add(self._queued_refresh)
+
+    def _queued_refresh(self):
+        self._refresh_queued = False
         self.refresh()
+        return False
+
+    def _look_again(self):
+        front = self.wf.focused() if self.wf else None
+        app_id = (front or {}).get("app-id") or ""
+        if (front and is_app_window(front) and app_id.lower() not in DESKTOP_OWNED
+                and app_id != self._last_app):
+            self._last_app, self._windowless = app_id, None
+            self._tell_strata()
+        self.refresh()
+        return False
 
     def _check_windowless(self):
         app_id = self._last_app
