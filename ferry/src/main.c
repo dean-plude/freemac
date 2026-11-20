@@ -10,7 +10,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.1.0"
+#define FERRY_VERSION "0.2.0"
 
 static void usage(FILE *out)
 {
@@ -18,7 +18,9 @@ static void usage(FILE *out)
           "Runs a command-line program built for an Intel Mac.\n\n"
           "  -v, --verbose   say what Ferry loads and connects\n"
           "  -h, --help      show this help\n"
-          "      --version   show Ferry's version\n", out);
+          "      --version   show Ferry's version\n"
+          "      --list-symbols[=libSystem|libobjc]\n"
+          "                  list the calls Ferry provides (used to build its SDK)\n", out);
 }
 
 int main(int argc, char **argv, char **envp)
@@ -30,15 +32,20 @@ int main(int argc, char **argv, char **envp)
         } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
             usage(stdout);
             return 0;
-        } else if (!strcmp(argv[i], "--list-symbols")) {
+        } else if (!strcmp(argv[i], "--list-symbols") || !strcmp(argv[i], "--list-symbols=libSystem")) {
             /* Everything Ferry provides, spelled as in Mach-O; the SDK's
              * description of libSystem is generated from this. */
-            const struct ferry_symbol *tables[] = {ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols};
-            for (size_t t = 0; t < 3; t++)
+            const struct ferry_symbol *tables[] = {ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols,
+                                                   ferry_blocks_symbols};
+            for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);
             for (const char *const *p = ferry_passthrough; *p; p++)
                 printf("_%s\n", *p);
+            return 0;
+        } else if (!strcmp(argv[i], "--list-symbols=libobjc")) {
+            for (const struct ferry_symbol *s = ferry_objc_symbols; s->name; s++)
+                printf("_%s\n", s->name);
             return 0;
         } else if (!strcmp(argv[i], "--version")) {
             puts("ferry " FERRY_VERSION);

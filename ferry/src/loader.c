@@ -23,12 +23,19 @@
 
 #include "ferry.h"
 #include "macho.h"
+#include "objc/objc-private.h"
 
 #define PAGE 4096ul
 #define ALIGN_DOWN(x) ((x) & ~(PAGE - 1))
 #define ALIGN_UP(x) (((x) + PAGE - 1) & ~(PAGE - 1))
 #define MAX_SEGMENTS 32
 #define MAX_DYLIBS 64
+#define MAX_SECTIONS 128
+
+struct section {
+    char segname[17], name[17];
+    uint64_t addr, size;
+};
 
 struct segment {
     char name[17];
@@ -50,6 +57,8 @@ struct image {
     struct macho_linkedit_data *chained;
     uint64_t entryoff;
     int has_main;
+    struct section sect[MAX_SECTIONS];
+    int nsect;
 };
 
 int ferry_verbose;
@@ -185,6 +194,17 @@ static void parse_commands(struct image *im)
             seg->prot = s->initprot;
             if (s->fileoff + s->filesize > im->size)
                 die("%s: segment %s runs past the end of the file", im->path, seg->name);
+            const struct macho_section *sec = (const void *)(s + 1);
+            if ((const uint8_t *)(sec + s->nsects) > (const uint8_t *)lc + lc->cmdsize)
+                die("%s: damaged section list in %s", im->path, seg->name);
+            for (uint32_t k = 0; k < s->nsects && im->nsect < MAX_SECTIONS; k++) {
+                struct section *d = &im->sect[im->nsect++];
+                memcpy(d->segname, sec[k].segname, 16);
+                memcpy(d->name, sec[k].sectname, 16);
+                d->segname[16] = d->name[16] = 0;
+                d->addr = sec[k].addr;
+                d->size = sec[k].size;
+            }
             break;
         }
         case LC_LOAD_DYLIB:
@@ -536,6 +556,38 @@ static void do_chained(struct image *im)
     note("applied %d chained fixups", count);
 }
 
+/* ---- Objective-C ----------------------------------------------------------------
+ * The __objc_* sections go to the runtime (src/objc) once fixups are done. */
+
+static void *objc_section(struct image *im, const char *name, size_t *count)
+{
+    for (int i = 0; i < im->nsect; i++)
+        if (!strcmp(im->sect[i].name, name) && !strncmp(im->sect[i].segname, "__DATA", 6)) {
+            *count = im->sect[i].size / sizeof(void *);
+            return (void *)(im->sect[i].addr + im->slide);
+        }
+    *count = 0;
+    return NULL;
+}
+
+static int objc_find(struct image *im, struct ferry_objc_image *oi)
+{
+    size_t n;
+    memset(oi, 0, sizeof *oi);
+    oi->path = im->path;
+    oi->selrefs = objc_section(im, "__objc_selrefs", &oi->nselrefs);
+    oi->classlist = objc_section(im, "__objc_classlist", &oi->nclasses);
+    oi->nlclslist = objc_section(im, "__objc_nlclslist", &oi->nnlcls);
+    oi->catlist = objc_section(im, "__objc_catlist", &oi->ncats);
+    oi->nlcatlist = objc_section(im, "__objc_nlcatlist", &oi->nnlcats);
+    oi->protolist = objc_section(im, "__objc_protolist", &oi->nprotos);
+    oi->protorefs = objc_section(im, "__objc_protorefs", &oi->nprotorefs);
+    uint32_t *info = objc_section(im, "__objc_imageinfo", &n);
+    if (info)
+        oi->imageinfo_flags = info[1];
+    return info || oi->nselrefs || oi->nclasses || oi->ncats;
+}
+
 /* ---- running ------------------------------------------------------------------- */
 
 typedef int (*mac_main)(int, char **, char **, char **);
@@ -555,6 +607,13 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
         do_binds(&im, im.dyld_info->weak_bind_off, im.dyld_info->weak_bind_size, 0, 1);
     }
     ferry_seal_stubs();
+    struct ferry_objc_image objc;
+    int has_objc = objc_find(&im, &objc);
+    if (has_objc) {
+        note("setting up Objective-C: %zu classes, %zu categories, %zu selectors",
+             objc.nclasses, objc.ncats, objc.nselrefs);
+        ferry_objc_map_image(&objc);
+    }
     protect_segments(&im);
     /* __TEXT starts at the Mach-O header (file offset 0). */
     uint64_t text = 0;
@@ -564,6 +623,8 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
     mac_main entry = (mac_main)(text + im.slide + im.entryoff);
     char *apple[] = {NULL};
     ferry_program_started(path, argc, argv);
+    if (has_objc)
+        ferry_objc_load_image(&objc);
     note("calling main at %p", (void *)entry);
     return entry(argc, argv, envp, apple);
 }

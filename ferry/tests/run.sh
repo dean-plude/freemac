@@ -40,6 +40,21 @@ run_one unsupported "$here/unsupported.c" "$here/unsupported.out" -Wl,-undefined
 for t in hello files; do
     run_one "${t}_chained" "$here/$t.c" "$here/$t.out" -Wl,-fixup_chains
 done
+# Blocks from plain C, and the Objective-C runtime (M1).
+run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
+run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
+run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
+run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
+run_one objc_basic_chained "$here/objc_basic.m" "$here/objc_basic.out" -lobjc -Wl,-fixup_chains
+run_one objc_arc_chained "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc -Wl,-fixup_chains
+# Unoptimized code sends messages differently (no tail calls, more stack).
+run_one objc_basic_O0 "$here/objc_basic.m" "$here/objc_basic.out" -O0 -lobjc
+# An unknown selector must be reported as a Mac reports it.
+if grep -q "unrecognized selector sent to instance" "$build/objc_unknown.err" 2>/dev/null; then
+    echo "ok   objc_unknown message"; pass=$((pass + 1))
+else
+    echo "FAIL objc_unknown message"; fail=$((fail + 1))
+fi
 # The unsupported program must also say what was missing.
 if grep -q "pthread_yield_np" "$build/unsupported.err" 2>/dev/null; then
     echo "ok   unsupported message"; pass=$((pass + 1))

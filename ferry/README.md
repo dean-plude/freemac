@@ -19,16 +19,27 @@ numbers, memory, sorting, clocks, signals, child processes, `getopt`,
 user lookups and the like. Universal ("fat") files work when they contain an
 Intel slice.
 
+It also has its own Objective-C runtime (Ferry's `libobjc.A.dylib`) and
+blocks, so Objective-C command-line programs that only need the runtime and
+`NSObject` run: classes, categories, protocols, properties, `+load` and
+`+initialize`, manual and automatic reference counting (ARC), weak
+references, autorelease pools, `@synchronized`, blocks, and the
+`<objc/runtime.h>` calls apps use for introspection and swizzling. Foundation
+(`NSString` and friends, including `@"..."` literals) is not there yet; see
+[docs/ferry-gui.md](../docs/ferry-gui.md) for the plan towards graphical apps.
+
 ## What doesn't run, and won't
 
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
-- **Graphical Mac apps.** Ferry has no AppKit, SwiftUI or other Mac
-  frameworks.
+- **Graphical Mac apps, for now.** Ferry has no Foundation or AppKit yet;
+  they are being added step by step (see
+  [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
+  frameworks are further off.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
   so when given an arm64 one.
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,
-  C++ (libc++) or extra libraries. When a program reaches a call Ferry lacks,
+  C++ (libc++), Objective-C exceptions (`@throw`) or extra libraries. When a program reaches a call Ferry lacks,
   it stops with a message naming that call (`this program uses X, which Ferry
   doesn't support yet`) and exit status 127, rather than guessing.
 
@@ -45,6 +56,12 @@ Intel slice.
    macOS and Linux differ (the layout of `FILE`, `struct stat` and directory
    entries, flag values, error and signal numbers), Ferry converts between
    them.
+4. **Objective-C runtime** (`src/objc/`). The loader hands the program's
+   `__objc_*` sections to the runtime, which registers selectors, classes,
+   categories and protocols before `main` runs. `objc_msgSend` and friends
+   (`msgsend.S`) look methods up in a per-class cache; `nsobject.c` has
+   `NSObject`, reference counting, ARC, weak references and autorelease
+   pools; `blocks.c` has blocks.
 
 ## Sources
 
@@ -52,7 +69,11 @@ Ferry is written only from public material: the Mach-O file format as
 described in Apple's published headers in the open-source XNU and cctools/ld64
 releases and in LLVM's documentation, the System V AMD64 calling convention,
 the POSIX standard, and the open-source C library headers that document
-structure layouts and constant values. Nothing in Ferry comes from
+structure layouts and constant values. The Objective-C runtime follows
+Apple's public API documentation, clang's published ARC and block ABI
+specifications, and the metadata clang emits for our own test programs (read
+with LLVM's `llvm-objdump --objc-meta-data`); it uses no code from Apple's,
+GNUstep's or Darling's runtimes. Nothing in Ferry comes from
 disassembling or decompiling Apple software, and it contains no Apple code,
 binaries or assets.
 
@@ -66,6 +87,7 @@ which runs clang and LLVM's lld with them:
 ```
 ferry-cc -O1 -o hello hello.c
 ferry ./hello
+ferry-cc -O1 -fobjc-arc -o hello hello.m -lobjc    # Objective-C
 ```
 
 `make check` builds every program in `tests/` this way, in both relocation

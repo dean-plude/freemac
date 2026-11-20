@@ -30,7 +30,8 @@ int ferry_library_supported(const char *name)
 {
     /* libSystem is macOS's C library; its pieces live under /usr/lib/system. */
     return !strcmp(name, "/usr/lib/libSystem.B.dylib")
-        || !strncmp(name, "/usr/lib/system/", 16);
+        || !strncmp(name, "/usr/lib/system/", 16)
+        || !strcmp(name, "/usr/lib/libobjc.A.dylib");
 }
 
 /* ---- the program's own details ------------------------------------------------- */
@@ -195,6 +196,8 @@ static int32_t mac_toupper(int32_t c) { return c >= 0 && c < 256 ? default_rune.
 
 /* ---- tables ------------------------------------------------------------------- */
 
+void ferry_unwind_resume(void *exception); /* objc/nsobject.c */
+
 int *mac_error(void);
 char *mac_strerror(int);
 int mac_strerror_r(int, char *, size_t);
@@ -223,11 +226,12 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"__maskrune", mac_maskrune},
     {"__tolower", mac_tolower},
     {"__toupper", mac_toupper},
+    {"_Unwind_Resume", ferry_unwind_resume},
     {NULL, NULL},
 };
 
 static const struct ferry_symbol *const tables[] = {
-    ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols,
+    ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_blocks_symbols, ferry_objc_symbols,
 };
 
 static void *find_own(const char *name)
