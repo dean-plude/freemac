@@ -1,0 +1,6 @@
+[Desktop Entry]
+# Hidden from the app grid; Terminal above is the one to open.
+Type=Application
+Name=Terminal
+Exec=footclient
+NoDisplay=true
