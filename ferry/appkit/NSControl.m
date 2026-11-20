@@ -33,23 +33,82 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     NSTextAlignment _alignment;
     NSLineBreakMode _lineBreak;
     NSControlSize _controlSize;
+    NSCell *_cell;
+}
+
+/* Defaults for a new control; subclasses add theirs. Used both by
+ * initWithFrame: and when a control is loaded from a nib. */
+- (void)_setDefaults
+{
+    _enabled = YES;
+    _value = @"";
+    _alignment = NSTextAlignmentNatural;
+    _lineBreak = NSLineBreakByClipping;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
 {
-    if ((self = [super initWithFrame:frame])) {
-        _enabled = YES;
-        _value = @"";
-        _alignment = NSTextAlignmentNatural;
-        _lineBreak = NSLineBreakByClipping;
-    }
+    if ((self = [super initWithFrame:frame]))
+        [self _setDefaults];
     return self;
+}
+
+/* From a nib: the view's keys, then the settings kept in the cell. */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [super initWithCoder:coder]))
+        return nil;
+    [self _setDefaults];
+    NSCell *cell = [coder decodeObjectForKey:@"NSCell"];
+    if ([cell isKindOfClass:[NSCell class]]) {
+        _cell = [cell retain];
+        [cell setControlView:self];
+        [self _takeFromCell:cell];
+    }
+    if ([coder containsValueForKey:@"NSEnabled"])
+        _enabled = [coder decodeBoolForKey:@"NSEnabled"];
+    if ([coder containsValueForKey:@"NSTag"])
+        _tag = [coder decodeIntegerForKey:@"NSTag"];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [super encodeWithCoder:coder];
+    [coder encodeBool:_enabled forKey:@"NSEnabled"];
+    if (_cell)
+        [coder encodeObject:_cell forKey:@"NSCell"];
+}
+- (void)_takeFromCell:(NSCell *)cell
+{
+    _enabled = [cell isEnabled];
+    _tag = [cell tag];
+    _continuous = [cell isContinuous];
+    _controlSize = [cell controlSize];
+    if ([cell font])
+        [self setFont:[cell font]];
+    _alignment = [cell alignment];
+    if ([cell target])
+        _target = [cell target];
+    if ([cell action])
+        _action = [cell action];
+}
+
++ (Class)cellClass { return [NSActionCell class]; }
++ (void)setCellClass:(Class)cls {}
+- (NSCell *)cell { return _cell; }
+- (void)setCell:(NSCell *)cell
+{
+    [cell retain];
+    [_cell release];
+    _cell = cell;
+    [cell setControlView:self];
 }
 
 - (void)dealloc
 {
     [_value release];
     [_font release];
+    [_cell release];
     [super dealloc];
 }
 
@@ -205,18 +264,37 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     return b;
 }
 
-- (instancetype)initWithFrame:(NSRect)frame
+- (void)_setDefaults
 {
-    if ((self = [super initWithFrame:frame])) {
-        _title = @"Button";
-        _alternateTitle = @"";
-        _key = @"";
-        _type = NSButtonTypeMomentaryPushIn;
-        _bezel = NSBezelStyleRounded;
-        _bordered = YES;
-        _alignment = NSTextAlignmentCenter;
+    [super _setDefaults];
+    _title = @"Button";
+    _alternateTitle = @"";
+    _key = @"";
+    _type = NSButtonTypeMomentaryPushIn;
+    _bezel = NSBezelStyleRounded;
+    _bordered = YES;
+    _alignment = NSTextAlignmentCenter;
+}
+
++ (Class)cellClass { return [NSButtonCell class]; }
+
+- (void)_takeFromCell:(NSCell *)cell
+{
+    [super _takeFromCell:cell];
+    [self setTitle:[cell title]];
+    if ([cell isKindOfClass:[NSButtonCell class]]) {
+        NSButtonCell *b = (NSButtonCell *)cell;
+        [self setAlternateTitle:[b alternateTitle]];
+        [self setKeyEquivalent:[b keyEquivalent]];
+        _keyMask = [b keyEquivalentModifierMask];
+        _bezel = [b bezelStyle];
+        _bordered = [b isBordered];
+        _transparent = [b isTransparent];
+        _mixed = [b allowsMixedState];
+        if ([b _hasButtonType])
+            [self setButtonType:[b _buttonType]];
     }
-    return self;
+    _state = [cell state];
 }
 
 - (void)dealloc
@@ -592,13 +670,38 @@ static BOOL keeps_state(NSButtonType t)
     return f;
 }
 
-- (instancetype)initWithFrame:(NSRect)frame
+- (void)_setDefaults
 {
-    if ((self = [super initWithFrame:frame])) {
-        _editable = _selectable = _bezeled = _drawsBackground = YES;
-        _maxLines = 1;
+    [super _setDefaults];
+    _editable = _selectable = _bezeled = _drawsBackground = YES;
+    _maxLines = 1;
+}
+
++ (Class)cellClass { return [NSTextFieldCell class]; }
+
+- (void)_takeFromCell:(NSCell *)cell
+{
+    [super _takeFromCell:cell];
+    [self setObjectValue:[cell objectValue] ?: @""];
+    _editable = [cell isEditable];
+    _selectable = [cell isSelectable];
+    _bezeled = [cell isBezeled];
+    _bordered = [cell isBordered];
+    _lineBreak = [cell lineBreakMode];
+    if ([cell wraps] && !_editable && _lineBreak == NSLineBreakByWordWrapping)
+        _maxLines = 0;
+    if ([cell isKindOfClass:[NSTextFieldCell class]]) {
+        NSTextFieldCell *t = (NSTextFieldCell *)cell;
+        if ([t placeholderAttributedString])
+            [self setPlaceholderAttributedString:[t placeholderAttributedString]];
+        else
+            [self setPlaceholderString:[t placeholderString]];
+        _drawsBackground = [t drawsBackground];
+        if ([t backgroundColor])
+            [self setBackgroundColor:[t backgroundColor]];
+        if ([t textColor])
+            [self setTextColor:[t textColor]];
     }
-    return self;
 }
 
 - (void)dealloc

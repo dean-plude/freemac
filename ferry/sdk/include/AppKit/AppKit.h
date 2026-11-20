@@ -448,6 +448,7 @@ typedef NS_ENUM(NSUInteger, NSFocusRingType) { NSFocusRingTypeDefault = 0, NSFoc
 
 @interface NSView : NSResponder
 - (instancetype)initWithFrame:(NSRect)frame NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
 @property NSRect frame, bounds;
 @property NSPoint frameOrigin;
 @property NSSize frameSize;
@@ -527,7 +528,10 @@ typedef NS_ENUM(NSInteger, NSControlStateValue) {
 #define NSOffState NSControlStateValueOff
 #define NSOnState NSControlStateValueOn
 
+@class NSCell;
 @interface NSControl : NSView
+@property (retain) __kindof NSCell *cell;
+@property (class) Class cellClass;
 @property (assign) id target;
 @property SEL action;
 @property NSInteger tag;
@@ -579,6 +583,59 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 #define NSTexturedRoundedBezelStyle NSBezelStyleTexturedRounded
 #define NSRecessedBezelStyle NSBezelStyleRecessed
 #define NSRoundRectBezelStyle NSBezelStyleRoundRect
+
+/* Cells. Ferry's controls draw and keep their state themselves; a cell is
+ * the record of a control's settings that nib files store. */
+@interface NSCell : NSObject <NSCopying, NSCoding>
+- (instancetype)initTextCell:(NSString *)string;
+- (instancetype)initImageCell:(NSImage *)image;
+@property (copy) id objectValue;
+@property (copy) NSString *stringValue, *title;
+@property (copy) NSAttributedString *attributedStringValue;
+@property (readonly) int intValue;
+@property (readonly) NSInteger integerValue;
+@property (readonly) double doubleValue;
+@property (retain) NSFont *font;
+@property NSTextAlignment alignment;
+@property NSLineBreakMode lineBreakMode;
+@property BOOL wraps;
+@property (getter=isEnabled) BOOL enabled;
+@property (getter=isEditable) BOOL editable;
+@property (getter=isSelectable) BOOL selectable;
+@property (getter=isBordered) BOOL bordered;
+@property (getter=isBezeled) BOOL bezeled;
+@property (getter=isScrollable) BOOL scrollable;
+@property (getter=isHighlighted) BOOL highlighted;
+@property (getter=isContinuous) BOOL continuous;
+@property NSControlStateValue state;
+@property NSInteger tag;
+@property NSControlSize controlSize;
+@property (assign) id target;
+@property SEL action;
+@property (assign) NSView *controlView;
+@end
+
+@interface NSActionCell : NSCell
+@end
+
+@interface NSButtonCell : NSActionCell
+@property (copy) NSString *alternateTitle, *keyEquivalent;
+@property NSEventModifierFlags keyEquivalentModifierMask;
+@property NSBezelStyle bezelStyle;
+@property (getter=isTransparent) BOOL transparent;
+@property BOOL allowsMixedState;
+- (void)setButtonType:(NSButtonType)type;
+@end
+
+@interface NSTextFieldCell : NSActionCell
+@property (copy) NSString *placeholderString;
+@property (copy) NSAttributedString *placeholderAttributedString;
+@property BOOL drawsBackground;
+@property (retain) NSColor *backgroundColor, *textColor;
+@end
+
+@interface NSSecureTextFieldCell : NSTextFieldCell
+@end
 
 @interface NSButton : NSControl
 + (instancetype)buttonWithTitle:(NSString *)title target:(id)target action:(SEL)action;
@@ -932,5 +989,40 @@ APPKIT_EXTERN NSNotificationName const NSApplicationDidFinishLaunchingNotificati
 APPKIT_EXTERN NSNotificationName const NSApplicationWillTerminateNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidBecomeActiveNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidResignActiveNotification;
+
+/* ---- nibs ---------------------------------------------------------------------------- */
+
+#ifndef IBOutlet
+#define IBOutlet
+#endif
+#ifndef IBAction
+#define IBAction void
+#endif
+#ifndef IBInspectable
+#define IBInspectable
+#endif
+#ifndef IB_DESIGNABLE
+#define IB_DESIGNABLE
+#endif
+
+typedef NSString *NSNibName;
+
+@interface NSNib : NSObject
+- (instancetype)initWithNibNamed:(NSNibName)name bundle:(NSBundle *)bundle;
+- (instancetype)initWithNibData:(NSData *)data bundle:(NSBundle *)bundle;
+- (instancetype)initWithContentsOfURL:(NSURL *)url;
+- (BOOL)instantiateWithOwner:(id)owner topLevelObjects:(NSArray **)topLevelObjects;
+@end
+
+@interface NSBundle (NSNibLoading)
+- (BOOL)loadNibNamed:(NSNibName)name owner:(id)owner topLevelObjects:(NSArray **)topLevelObjects;
++ (BOOL)loadNibNamed:(NSString *)name owner:(id)owner;
++ (BOOL)loadNibFile:(NSString *)path externalNameTable:(NSDictionary *)context withZone:(NSZone *)zone;
+@end
+
+@interface NSObject (NSNibAwaking)
+- (void)awakeFromNib;
+- (void)prepareForInterfaceBuilder;
+@end
 
 #endif

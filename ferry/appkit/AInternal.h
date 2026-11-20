@@ -7,6 +7,9 @@
 #ifndef FERRY_APPKIT_INTERNAL_H
 #define FERRY_APPKIT_INTERNAL_H
 #include "../graphics/GInternal.h"
+/* Some NSCoding methods live in NSNib.m, as categories. */
+#pragma clang diagnostic ignored "-Wprotocol"
+#pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
 #define FERRY_APPKIT_BUILD 1      /* NSFont and NSParagraphStyle are Core Text's */
 #import <AppKit/AppKit.h>
 #include <poll.h>
@@ -70,6 +73,30 @@ void AWindowDidClose(NSWindow *window);
 - (BOOL)_wantsMouseMoved;
 - (NSSize)_contentSize;
 @end
+
+@interface NSControl (FerryPrivate)
+- (void)_setDefaults;
+- (void)_takeFromCell:(NSCell *)cell;
+@end
+
+@interface NSButtonCell (FerryPrivate)
+- (BOOL)_hasButtonType;
+- (NSButtonType)_buttonType;
+@end
+
+/* ---- nibs (NSNib.m) ---------------------------------------------------------------------- */
+
+@interface NSKeyedUnarchiver (FerryPrivate)
+- (NSArray *)_decodeArrayKeepingNullsForKey:(NSString *)key;
+@end
+NSRect AViewFrameFromCoder(NSCoder *coder);
+void AViewDecode(NSView *view, NSCoder *coder);
+/* Image references in nibs, kept by name until Ferry has NSImage. */
+@interface NSObject (FerryNibImage)
+- (NSString *)_imageName;
+@end
+/* Records a menu named in a nib ("_NSMainMenu", "_NSWindowsMenu"...). */
+void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
 
 @interface NSGraphicsContext (FerryPrivate)
 - (void)_setDrawingToScreen:(BOOL)screen;

@@ -29,10 +29,10 @@ Description: Ferry, runs simple Intel Mac programs
  C library through its own small libSystem layer, Objective-C runtime,
  Foundation, Core Graphics, Core Text and AppKit, written from public
  documentation. It runs command-line programs and simple windowed AppKit
- programs written in code (windows, views, buttons, text fields, menus'
- keyboard shortcuts), drawn with this system's Cairo and Pango and shown
- through GTK 3 on Wayland or X11. Apps built with nib files and App Store
- apps do not run yet.
+ programs (windows, views, buttons, text fields, menus' keyboard
+ shortcuts), built in code or from nib files, drawn with this system's
+ Cairo and Pango and shown through GTK 3 on Wayland or X11. Larger Mac
+ apps and App Store apps do not run yet.
 CONTROL
 cat > "$root/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh

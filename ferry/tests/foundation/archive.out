@@ -1,0 +1,41 @@
+fixture 1470 bytes
+root is a mutable dictionary with 15 entries
+count=42 pi=3.25 yes=1
+list is a mutable array
+list: one, 2, Point3(1, 2, 3.5 hello)
+set: 2 items, has a 1, has b 1
+when: 86400 seconds after 2001
+bytes: 3: 00 01 fe
+mutable: mutable string, grow me more
+rect: {{1, 2}, {30, 40}}
+styled "Hi there": [0,2] weight=bold [2,6] 0 attributes
+url: https://example.com/a?b=c host example.com
+same object twice: yes
+same object in the list: yes
+loop: Point3(7, 8, 0), next is itself: yes
+missing class: Point3 = Point3(-4, 5, 6.25)
+error: no
+as an array: nil, error code 4864
+with its classes: decoded
+junk: nil, error code 4864
+archive starts bplist00
+points: mutable array of 7
+  item: Point3 = Point3(10, -20, 0.5 pé)
+  item: Point3 = Point3(10, -20, 0.5 pé)
+  item: Point3 = Point3(99, 0, 0)
+  item: NSString = text
+  item: NSNumber = 12
+  item: NSNumber = 0
+  item: NSNull = <null>
+shared kept: yes, loop kept: yes
+name: mutable string "changeable"
+date: 1000.5
+size: {3, 4} range: {5, 6}
+set: 3, data: mutable 4, url: http://h/a/b/c
+equal dictionaries apart from points: yes
+$archiver=NSKeyedArchiver $version=100000 $top has root: yes
+classes: NSDate NSDictionary NSMutableArray NSMutableData NSMutableString NSNull NSSet NSURL NSValue Point3
+xml has CF$UID: yes, RenamedPoint: yes
+renamed: Point3 = Point3(10, -20, 0.5 pé)
+seven=7 flag=1 has r=1 r={{1, 2}, {3, 4}} has nothing=0
+exit=0

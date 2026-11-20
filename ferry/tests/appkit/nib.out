@@ -1,0 +1,42 @@
+AppDelegate awakeFromNib: window yes, field yes, button yes
+launched; NSApp's delegate is this object: yes
+main menu "AMainMenu":
+  - NibApp -> submenuAction: on the first responder
+    - Say Hello [cmd-h] -> sayHello: on AppDelegate
+    - (separator)
+    - Quit NibApp [cmd-q] -> terminate: on the first responder
+  - Window -> submenuAction: on the first responder
+    - Minimize [cmd-m] -> performMiniaturize: on the first responder
+windows menu: Window
+window: NSWindow "Nib Window", content {480, 270}, visible yes, style 15, min size {300, 200}
+  NSTextField {{20, 228}, {440, 22}} mask 10
+  NSSecureTextField {{20, 196}, {200, 22}} mask 8
+  NSButton {{370, 13}, {96, 32}} mask 1
+  NSButton {{18, 60}, {100, 18}} mask 32
+  ColorSwatch {{20, 90}, {40, 40}} mask 4
+  LoudButton {{140, 13}, {120, 32}} mask 0
+  NSTextField {{80, 90}, {140, 50}} mask 0
+  NSView {{300, 90}, {40, 40}} mask 0
+name field: "Ada" placeholder "Your name" editable yes bezeled yes draws background yes font set 13
+secure field: NSSecureTextField, placeholder "Password"
+label: "A label long enough to wrap onto more lines" editable no draws background no lines 0
+greet button: "Greet" key equivalent is Return yes, bezel 1, target is the delegate yes, action greet:, cell NSButtonCell
+loud box: "Loud" state 0
+swatch: ColorSwatch, made with initWithFrame: yes, awoke yes, name teal, corner 4
+swapped: LoudButton "Swapped" enabled no awoke yes
+unknown view class falls back to NSView
+key views: field -> NSSecureTextField -> NSButton
+swatch pixel: 0.00 0.50 0.50
+greet: from Greet, "Hello, Ada."
+toggleLoud: state 1
+greet: from Greet, "Hello, Ada!"
+sayHello: from the menu item "Say Hello"
+cmd-h handled: yes
+Helper awakeFromNib, owner outlet set: yes
+PanelController awakeFromNib
+Panel loaded: yes, 2 top-level objects: Helper NSPanel
+panel: NSPanel "A Panel" visible no; note "From the panel nib"; helper yes
+missing nib: no
+cmd-q:
+applicationWillTerminate
+exit=0
