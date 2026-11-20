@@ -323,7 +323,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         sidebar = Gtk.ListBox()
         sidebar.get_style_context().add_class("dials-sidebar")
         sidebar.set_size_request(200, -1)
-        sidebar.connect("row-selected", lambda _l, r: r and self.stack.set_visible_child_name(r.name))
+        sidebar.connect("row-selected", lambda _l, r: r and self._show_page(r.name))
         side_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         side_box.get_style_context().add_class("dials-sidebar")
         # Search at the top, as on a Mac: typing narrows the list to the
@@ -340,6 +340,10 @@ class DialsWindow(Gtk.ApplicationWindow):
         paned.set_position(200)
 
         self.rows = {}
+        # Each page is built the first time it's shown, so the window opens
+        # at once instead of after every page (sound, power, printers...)
+        # has asked the system how it is.
+        self.builders = {}
         # Grouped the way a Mac's settings sidebar is: connections, then
         # alerts and sound, then how things look, power, people, and the
         # devices you hold. Each icon sits white in a small coloured tile.
@@ -379,7 +383,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             item.add(line)
             sidebar.add(item)
             self.rows[name] = item
-            self.stack.add_named(build(), name)
+            self.builders[name] = build
+            self.stack.add_named(Gtk.Box(), name)
 
         def gap(row, before):
             if before is not None and before.group_no != row.group_no:
@@ -405,8 +410,23 @@ class DialsWindow(Gtk.ApplicationWindow):
     def _show_selected(self):
         row = self.sidebar.get_selected_row()
         if row is not None:
-            self.stack.set_visible_child_name(row.name)
+            self._show_page(row.name)
         return False
+
+    def _built(self, name):
+        """The page called name, built now if it hasn't been yet."""
+        build = self.builders.pop(name, None)
+        if build is not None:
+            stand_in = self.stack.get_child_by_name(name)
+            widget = build()
+            self.stack.remove(stand_in)
+            self.stack.add_named(widget, name)
+            widget.show_all()
+        return self.stack.get_child_by_name(name)
+
+    def _show_page(self, name):
+        self._built(name)
+        self.stack.set_visible_child_name(name)
 
     def _on_key(self, _widget, event):
         if event.state & Gdk.ModifierType.CONTROL_MASK and event.keyval in (Gdk.KEY_w, Gdk.KEY_W):
@@ -509,6 +529,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             button.set_active(True)
 
     def set_dark(self, dark):
+        self._built("appearance")
         apply_appearance(dark, self.settings, self.follow_wallpaper.get_active())
         self.refresh_wallpapers()
 

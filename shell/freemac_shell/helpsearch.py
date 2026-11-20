@@ -97,13 +97,22 @@ class HelpPanel(Gtk.Window):
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_namespace(self, "freemac-help")
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, True)
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, True)
+        # The panel covers the whole screen, see-through but for the menu
+        # itself, so a click anywhere else closes it, as a click outside an
+        # open menu does on a Mac. (It has the keyboard to itself, so it
+        # never hears that another window was clicked.)
+        for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
+                     GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
+            GtkLayerShell.set_anchor(self, edge, True)
+        GtkLayerShell.set_exclusive_zone(self, -1)
         GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box = self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                                 halign=Gtk.Align.START, valign=Gtk.Align.START)
         box.get_style_context().add_class("menu")
         box.get_style_context().add_class("help-panel")
         self.add(box)
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.connect("button-press-event", self._pressed)
         row = Gtk.Box(spacing=8)
         row.pack_start(Gtk.Label(label="Search"), False, False, 4)
         self.entry = Gtk.SearchEntry(placeholder_text="Type to find a menu item", width_chars=26)
@@ -118,8 +127,8 @@ class HelpPanel(Gtk.Window):
         self.connect("focus-out-event", lambda *_: self.close_panel())
 
     def open_at(self, x):
-        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.LEFT, max(0, x))
-        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, BAR + 2)
+        self.box.set_margin_start(max(0, x))
+        self.box.set_margin_top(BAR + 2)
         self.entry.set_text("")
         self._fill()
         self.show_all()
@@ -159,8 +168,12 @@ class HelpPanel(Gtk.Window):
         first = self.list.get_row_at_index(0)
         if first is not None and self.found:
             self.list.select_row(first)
-        # Shrink back to the field when the results go.
-        self.resize(1, 1)
+
+    def _pressed(self, _widget, event):
+        inside = self.box.get_allocation()
+        if not (inside.x <= event.x < inside.x + inside.width and inside.y <= event.y < inside.y + inside.height):
+            self.close_panel()
+        return False
 
     def _key(self, _widget, event):
         if event.keyval == Gdk.KEY_Escape:

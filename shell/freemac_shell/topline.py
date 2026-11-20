@@ -157,6 +157,11 @@ class Topline(Gtk.Window):
             self.wf = Wayfire(on_event=self._on_event)
         except OSError:
             self.wf = None
+        # An app that came forward before the bar started (Welcome at login)
+        # sent its focus event too early for us: start from what's in front.
+        front = self.wf.focused() if self.wf else None
+        if front is not None and (front.get("app-id") or "").lower() not in DESKTOP_OWNED:
+            self._last_app = front.get("app-id")
         self.refresh()
 
     def _on_event(self, event):

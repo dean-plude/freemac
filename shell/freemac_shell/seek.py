@@ -14,7 +14,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import dials_pages, seek_index, style  # noqa: E402
 
@@ -145,14 +145,22 @@ class SeekWindow(Gtk.Window):
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_namespace(self, "freemac-seek")
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, True)
-        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, 160)
+        # Seek covers the screen, see-through but for its own panel, so a
+        # click anywhere else closes it. (It has the keyboard to itself, so it
+        # never hears that another window was clicked.)
+        for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
+                     GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
+            GtkLayerShell.set_anchor(self, edge, True)
+        GtkLayerShell.set_exclusive_zone(self, -1)
         GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
-        self.set_size_request(640, -1)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box = self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, halign=Gtk.Align.CENTER,
+                                 valign=Gtk.Align.START, margin_top=160)
+        box.set_size_request(640, -1)
         box.get_style_context().add_class("seek")
         self.add(box)
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.connect("button-press-event", self._pressed)
         self.entry = Gtk.SearchEntry(placeholder_text="Search apps, files and what's in them")
         self.entry.connect("search-changed", self._changed)
         self.entry.connect("activate", lambda _e: self._run(0))
@@ -180,8 +188,13 @@ class SeekWindow(Gtk.Window):
         if changed and not self.stop.is_set():
             GLib.idle_add(lambda: self.query and self._changed(self.entry) and False)
 
+    def _pressed(self, _w, event):
+        inside = self.box.get_allocation()
+        if not (inside.x <= event.x < inside.x + inside.width and inside.y <= event.y < inside.y + inside.height):
+            self.close()
+        return False
+
     def _key(self, _w, event):
-        from gi.repository import Gdk
 
         if event.keyval == Gdk.KEY_Escape:
             self.close()
@@ -222,8 +235,8 @@ class SeekWindow(Gtk.Window):
             # Settings by name or by what's on the page ("wallpaper", "night
             # light"), opened in Dials at that page.
             for name in dials_pages.matching(query)[:2]:
-                title, icon = dials_pages.PAGES[name]
-                results.append(Result(title, "Settings", Gio.ThemedIcon.new(icon),
+                title, _symbol = dials_pages.PAGES[name]
+                results.append(Result(title, "Settings", Gio.ThemedIcon.new("freemac-dials"),
                                       lambda n=name: launch("freemac-dials", "--panel", n)))
             # The app in front's own menu items, as its Help menu finds them.
             if len(query) >= 2:
@@ -266,7 +279,6 @@ class SeekWindow(Gtk.Window):
         self.listbox.show_all()
         if results:
             self.listbox.select_row(self.listbox.get_row_at_index(0))
-        self.resize(640, 1)
 
     def _run(self, index):
         if 0 <= index < len(self.results):

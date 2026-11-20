@@ -291,14 +291,22 @@ The small things a Mac user notices in their first minute.
 | 1 | Seek finds the menu items of the app in front (Topline shares them over D-Bus), with the app's own icon, and Return runs the item | Seek, Topline | done |
 | 2 | Seek finds settings by name or by what's on the page ("wallpaper", "night", "mouse") and opens Dials at that page; a settings page comes before an app found only by its description | Seek, Dials | done |
 
-## 1.19 "first impressions" (next)
+## 1.19 "first impressions" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | The first window after login gets the keyboard (Welcome showed in the bar while typing went to the desktop) | Strata | |
-| 2 | Dials shows its window at once and builds pages as they're opened (it takes several seconds to appear on a slow PC) | Dials | |
-| 3 | Help also lists short freemac Guide topics that match, opened in a small Guide window | Topline | |
-| 4 | Seek shows a preview of the selected file or app beside the results | Seek | |
+| 1 | The menu bar keeps the app in front right after login (opening Help before clicking anything switched the bar to Drawer: Welcome came forward before the bar was listening) | Topline | done |
+| 2 | Dials builds each page the first time it's shown, so its window opens in about half the time (10 s to under 5 s in a test PC) | Dials | done |
+| 3 | Help and Seek close when you click anywhere outside them, as an open menu or Spotlight does | Topline, Seek | done |
+| 4 | Settings results in Seek show Dials' own icon | Seek | done |
+
+## 1.20 "guides and previews" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Help also lists short freemac Guide topics that match, opened in a small Guide window | Topline | |
+| 2 | Seek shows a preview of the selected file or app beside the results | Seek | |
+| 3 | Dials starts faster still (it spends about 2.5 s loading before it builds its window) | Dials | |
 
 ## Later
 
