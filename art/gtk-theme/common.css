@@ -16,8 +16,13 @@ window, .background { background-color: @fm_bg; color: @fm_fg; }
 }
 label.dim-label, .dim-label { color: @fm_dim; opacity: 1; }
 
-/* Windows: round corners all the way round and a deep, soft shadow. */
-window.csd, window.csd > .background, window.csd decoration { border-radius: 10px; }
+/* Windows: round corners all the way round and a deep, soft shadow.
+   GTK paints a window's own background only below its title bar, so the
+   window and its content round just their bottom corners; the frame
+   (decoration) and the title bar round the top. Rounding the window's top
+   too left a notch under the title bar at each top corner. */
+window.csd decoration { border-radius: 10px; }
+window.csd, window.csd > .background { border-radius: 0 0 10px 10px; }
 decoration {
   border-radius: 10px;
   box-shadow: 0 12px 38px 2px @fm_shadow, 0 0 0 1px @fm_edge;
