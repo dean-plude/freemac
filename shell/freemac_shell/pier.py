@@ -28,7 +28,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import alert, apps, held, login_items, style  # noqa: E402
+from . import alert, apps, held, login_items, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -309,7 +309,12 @@ class TrashCan(Place):
             self.update()
 
     def _dropped(self, _widget, _context, _x, _y, data, _info, _time):
+        drives = {volumes.key_of(m).rstrip("/"): m for m in volumes.drives()}
         for uri in data.get_uris() or []:
+            drive = drives.get(uri.rstrip("/"))
+            if drive is not None:   # a drive dropped on the Trash is ejected, as on a Mac
+                volumes.eject(drive)
+                continue
             target = Gio.File.new_for_uri(uri)
             if target.get_path():
                 try:

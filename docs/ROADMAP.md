@@ -362,7 +362,7 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | USB drives, memory cards and phones open by themselves when plugged in, show under Locations in Drawer's sidebar and on the Desktop, and have Eject | Drawer, Backdrop | |
+| 1 | USB drives, memory cards and phones open by themselves when plugged in, show under Locations in Drawer's sidebar and on the Desktop, and have Eject | Drawer, Backdrop | done |
 | 2 | A colour for each calendar, local and online, with a list to show or hide each one | Tide | |
 | 3 | The menu bar always shows the app in front, also just after an app opens or quits | Topline | |
 | 4 | Albums in Cove: make one, add photos to it, and play any album or month as a slideshow | Cove | |

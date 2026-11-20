@@ -11,6 +11,10 @@ Click selects, double-click opens, Return renames, Delete moves the selection
 to the Trash. The right button gives Open, Rename, Show in Drawer and Move to
 Trash for a file, and New Folder and Change Wallpaper on the empty desktop.
 Screenshots (Lens) land here too.
+
+Plugged-in drives, memory cards and phones show here as well, first in the
+top right corner: double-click opens one in Drawer, and Eject (the right
+button, Command-E, or a drag onto the dock's Trash) takes it away.
 """
 import json
 import os
@@ -22,6 +26,8 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
+
+from . import volumes  # noqa: E402
 
 LAYOUT = os.path.join(GLib.get_user_config_dir(), "freemac", "desktop.json")
 CELL_W, CELL_H = 100, 104   # one place on the grid
@@ -65,7 +71,7 @@ def save_places(places):
     os.replace(tmp, LAYOUT)
 
 
-def picture_for(path, info):
+def picture_for(path, info, icon=None):
     """A small picture of the file: a thumbnail for pictures, else its icon."""
     kind = info.get_content_type() if info else ""
     if kind and kind.startswith("image/") and info.get_size() < 40_000_000:
@@ -73,7 +79,8 @@ def picture_for(path, info):
             return GdkPixbuf.Pixbuf.new_from_file_at_scale(path, ICON, ICON, True)
         except GLib.Error:
             pass
-    icon = info.get_icon() if info else None
+    if icon is None:
+        icon = info.get_icon() if info else None
     theme = Gtk.IconTheme.get_default()
     if icon is not None:
         found = theme.lookup_by_gicon(icon, ICON, Gtk.IconLookupFlags.FORCE_SIZE)
@@ -89,7 +96,9 @@ def picture_for(path, info):
 
 
 class DesktopIcon(Gtk.EventBox):
-    def __init__(self, owner, path, info):
+    mount = None   # a drive, for DriveIcon
+
+    def __init__(self, owner, path, info, title=None, icon=None):
         super().__init__()
         self.owner, self.path = owner, path
         self.set_visible_window(False)
@@ -97,12 +106,12 @@ class DesktopIcon(Gtk.EventBox):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, halign=Gtk.Align.CENTER)
         self.frame = Gtk.Box(halign=Gtk.Align.CENTER)
         self.frame.get_style_context().add_class("desk-icon")
-        self.pixbuf = picture_for(path, info)
+        self.pixbuf = picture_for(path, info, icon)
         image = Gtk.Image.new_from_pixbuf(self.pixbuf) if self.pixbuf else Gtk.Image()
         image.set_size_request(ICON, ICON)
         self.frame.add(image)
         box.pack_start(self.frame, False, False, 0)
-        name = info.get_display_name() if info else os.path.basename(path)
+        name = title or (info.get_display_name() if info else os.path.basename(path))
         self.label = Gtk.Label(label=name, justify=Gtk.Justification.CENTER, max_width_chars=13,
                                ellipsize=Pango.EllipsizeMode.MIDDLE, lines=2, halign=Gtk.Align.CENTER)
         self.label.set_line_wrap(True)
@@ -149,7 +158,27 @@ class DesktopIcon(Gtk.EventBox):
                                      self.pixbuf.get_height() // 2)
 
     def _drag_data_get(self, _widget, _context, data, _info, _time):
-        data.set_uris([Gio.File.new_for_path(icon.path).get_uri() for icon in self.owner.selected])
+        data.set_uris([icon.uri for icon in self.owner.selected])
+
+    @property
+    def uri(self):
+        return Gio.File.new_for_path(self.path).get_uri()
+
+
+class DriveIcon(DesktopIcon):
+    """A plugged-in drive, memory card or phone."""
+
+    def __init__(self, owner, mount):
+        self.mount = mount
+        super().__init__(owner, volumes.path_of(mount) or "", None, mount.get_name(), mount.get_icon())
+
+    @property
+    def name(self):
+        return "drive:" + volumes.key_of(self.mount)
+
+    @property
+    def uri(self):
+        return volumes.key_of(self.mount)
 
 
 class DesktopIcons(Gtk.Layout):
@@ -181,7 +210,9 @@ class DesktopIcons(Gtk.Layout):
         os.makedirs(self.folder, exist_ok=True)
         self.monitor = Gio.File.new_for_path(self.folder).monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, None)
         self.monitor.connect("changed", lambda *_: self._soon())
+        volumes.watch(self.refresh_drives)
         self.refresh()
+        self.refresh_drives()
 
     # ---- the grid -----------------------------------------------------------------
     def size(self):
@@ -230,7 +261,7 @@ class DesktopIcons(Gtk.Layout):
             return  # not laid out on the screen yet
         taken, changed = set(), False
         rows = self.rows()
-        for name in sorted(self.icons, key=lambda n: (n not in self.places, n.lower())):
+        for name in sorted(self.icons, key=lambda n: (n not in self.places, not n.startswith("drive:"), n.lower())):
             cell = self.places.get(name)
             if cell is None or cell in taken or cell[1] >= rows:
                 cell = self.free_cell(taken, cell if cell and cell[1] < rows else None)
@@ -263,7 +294,7 @@ class DesktopIcons(Gtk.Layout):
         except OSError:
             names = []
         for name in list(self.icons):
-            if name not in names:
+            if name not in names and not name.startswith("drive:"):
                 icon = self.icons.pop(name)
                 if icon in self.selected:
                     self.selected.remove(icon)
@@ -288,6 +319,25 @@ class DesktopIcons(Gtk.Layout):
             icon.show_all()
         self._arrange()
         return False
+
+    def refresh_drives(self):
+        """Put an icon up for each drive, and take down the ones ejected."""
+        mounts = {"drive:" + volumes.key_of(m): m for m in volumes.drives()}
+        for name in [n for n in self.icons if n.startswith("drive:")]:
+            if name not in mounts or self.icons[name].mount.get_name() != mounts[name].get_name():
+                icon = self.icons.pop(name)
+                if icon in self.selected:
+                    self.selected.remove(icon)
+                icon.destroy()
+        for name, mount in mounts.items():
+            if name not in self.icons:
+                icon = DriveIcon(self, mount)
+                self.icons[name] = icon
+                self.put(icon, 0, 0)
+                icon.show_all()
+                # A drive takes the first free place; it doesn't keep one from last time.
+                self.places.pop(name, None)
+        self._arrange()
 
     @staticmethod
     def _key_of(path):
@@ -321,8 +371,11 @@ class DesktopIcons(Gtk.Layout):
 
     def open(self, icons):
         for icon in icons:
+            if icon.mount is not None and icon.path:
+                subprocess.Popen(["freemac-drawer", icon.path], start_new_session=True)
+                continue
             try:
-                Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(icon.path).get_uri(), None)
+                Gio.AppInfo.launch_default_for_uri(icon.uri, None)
             except GLib.Error:
                 subprocess.Popen(["xdg-open", icon.path], start_new_session=True)
 
@@ -339,10 +392,13 @@ class DesktopIcons(Gtk.Layout):
 
     def _key(self, _widget, event):
         key = event.keyval
-        if key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and len(self.selected) == 1:
+        files = [icon for icon in self.selected if icon.mount is None]
+        if key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and len(self.selected) == 1 and files:
             self.rename(self.selected[0])
         elif key == Gdk.KEY_Delete or (key == Gdk.KEY_BackSpace and event.state & Gdk.ModifierType.CONTROL_MASK):
-            self.trash(list(self.selected))
+            self.trash(files)
+        elif key == Gdk.KEY_e and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.eject([icon for icon in self.selected if icon.mount is not None])
         elif key == Gdk.KEY_o and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.open(list(self.selected))
         elif key == Gdk.KEY_a and event.state & Gdk.ModifierType.CONTROL_MASK:
@@ -372,6 +428,12 @@ class DesktopIcons(Gtk.Layout):
         return menu
 
     def file_menu(self, event):
+        drives = [icon for icon in self.selected if icon.mount is not None]
+        if drives:
+            what = f"“{drives[0].mount.get_name()}”" if len(drives) == 1 else f"{len(drives)} Disks"
+            self.menu = self._menu([("Open", lambda: self.open(drives)), (None, None),
+                                    (f"Eject {what}", lambda: self.eject(drives))], event)
+            return
         icons = list(self.selected)
         items = [("Open", lambda: self.open(icons))]
         if len(icons) == 1:
@@ -405,6 +467,10 @@ class DesktopIcons(Gtk.Layout):
         if icon:
             self.click(icon, False)
             GLib.idle_add(lambda: self.rename(icon) and False)
+
+    def eject(self, icons):
+        for icon in icons:
+            volumes.eject(icon.mount, self.get_toplevel())
 
     def trash(self, icons):
         for icon in icons:
@@ -452,11 +518,13 @@ class DesktopIcons(Gtk.Layout):
         anchor = self.places.get(dragged) if dragged else None
         target = self.nearest_cell(x - CELL_W // 2, y - ICON // 2)
         for uri in uris:
+            drive = next((n for n, icon in self.icons.items() if icon.mount is not None and icon.uri.rstrip("/")
+                          == uri.rstrip("/")), None)
             path = path_of(uri)
-            if not path:
+            if not path and drive is None:
                 continue
-            name = os.path.basename(path)
-            if os.path.dirname(os.path.abspath(path)) == os.path.abspath(self.folder):
+            name = drive or os.path.basename(path)
+            if drive is not None or os.path.dirname(os.path.abspath(path)) == os.path.abspath(self.folder):
                 # One of ours, moved on the desktop: the others keep their
                 # place next to it.
                 cell = self.places.get(name)
@@ -473,7 +541,8 @@ class DesktopIcons(Gtk.Layout):
                 continue
             try:
                 source = Gio.File.new_for_path(path)
-                if context.get_selected_action() == Gdk.DragAction.COPY:
+                # From another disk, a file is copied, not moved, as on a Mac.
+                if context.get_selected_action() == Gdk.DragAction.COPY or not self._same_disk(path):
                     source.copy(Gio.File.new_for_path(destination), Gio.FileCopyFlags.NONE, None, None, None)
                 else:
                     source.move(Gio.File.new_for_path(destination), Gio.FileCopyFlags.NONE, None, None, None)
@@ -485,3 +554,9 @@ class DesktopIcons(Gtk.Layout):
         if moved:
             self._save()
             self.refresh()
+
+    def _same_disk(self, path):
+        try:
+            return os.stat(path).st_dev == os.stat(self.folder).st_dev
+        except OSError:
+            return False

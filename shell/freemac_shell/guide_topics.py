@@ -112,6 +112,15 @@ TOPICS = {
         "The photos go into your Pictures folder, in a folder for each day, and show in Cove under "
         "Recently Added.",
     ]),
+    "drives": ("Use a USB drive or memory card", "usb drive stick flash memory card sd disk external eject unmount", [
+        "Plug the drive in. Its icon shows on the Desktop, at the top right, and under Locations in "
+        "Drawer's sidebar.",
+        "Double-click the icon, or click it in Drawer, to see what's on it. Drag files onto it to copy them there.",
+        "Before you pull it out, eject it: click the Eject button next to it in Drawer, press ⌘E, or drag its "
+        "icon onto the Trash in the Dock. Its icon goes away when it's safe to unplug.",
+        "If it says the disk wasn't ejected, an app still has a file open on it. Close that file or quit the app, "
+        "and eject it again.",
+    ]),
 }
 
 

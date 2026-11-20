@@ -17,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -40,6 +40,8 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-sidebar row:hover { background-color: rgba(120, 120, 150, 0.10); }
 .drawer-sidebar row:selected { background-color: rgba(120, 120, 150, 0.24); color: inherit; }
 .drawer-sidebar row:selected label { color: inherit; }
+.drawer-eject { padding: 0 2px; min-height: 0; min-width: 0; }
+.drawer-sidebar row .drawer-eject image { color: rgba(120, 120, 150, 0.9); }
 .drawer-heading { font-size: 11px; font-weight: bold; opacity: 0.5; margin: 14px 16px 3px; }
 .drawer-column { border-right: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
@@ -376,6 +378,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "add-to-sidebar": self.add_to_sidebar,
             "compress": self.compress,
             "get-info": self.get_info,
+            "eject": self.eject,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -398,24 +401,6 @@ class DrawerWindow(Gtk.ApplicationWindow):
         box.set_size_request(170, -1)
         self.place_rows = []
 
-        def section(title, entries):
-            label = Gtk.Label(label=title, xalign=0)
-            label.get_style_context().add_class("drawer-heading")
-            box.pack_start(label, False, False, 0)
-            listbox = Gtk.ListBox(can_focus=False)
-            listbox.get_style_context().add_class("drawer-sidebar")
-            listbox.connect("row-activated", lambda _l, row: self.navigate(row.path))
-            for name, path, icon in entries:
-                row = Gtk.ListBoxRow(can_focus=False)
-                row.path = path
-                line = Gtk.Box(spacing=8)
-                line.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
-                line.pack_start(Gtk.Label(label=name, xalign=0), True, True, 0)
-                row.add(line)
-                listbox.add(row)
-                self.place_rows.append((listbox, row))
-            box.pack_start(listbox, False, False, 0)
-
         heading = Gtk.Label(label="Favorites", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
@@ -428,9 +413,89 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.fav_list.connect("drag-data-received", self._sidebar_drop)
         box.pack_start(self.fav_list, False, False, 0)
         self._fill_favourites()
-        trash = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
-        section("Locations", [("Computer", "/", "drive-harddisk-symbolic"), ("Trash", trash, "user-trash-symbolic")])
+        heading = Gtk.Label(label="Locations", xalign=0)
+        heading.get_style_context().add_class("drawer-heading")
+        box.pack_start(heading, False, False, 0)
+        self.loc_list = Gtk.ListBox(can_focus=False)
+        self.loc_list.get_style_context().add_class("drawer-sidebar")
+        self.loc_list.connect("row-activated", lambda _l, row: self._open_location(row))
+        self.loc_list.connect("button-press-event", self._location_button)
+        box.pack_start(self.loc_list, False, False, 0)
+        self._fill_locations()
+        # Drives come and go: the list follows, and a window on a drive that
+        # went away goes back to the home folder.
+        handlers = volumes.watch(self._drives_changed)
+        self.connect("destroy", lambda *_: [volumes.monitor().disconnect(h) for h in handlers])
         return box
+
+    def _fill_locations(self):
+        """Computer, each drive with its Eject button, then the Trash."""
+        self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.loc_list]
+        for child in self.loc_list.get_children():
+            self.loc_list.remove(child)
+        trash = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
+        entries = [("Computer", "/", Gio.ThemedIcon.new("drive-harddisk-symbolic"), None)]
+        for mount in volumes.drives():
+            entries.append((mount.get_name(), volumes.path_of(mount), mount.get_symbolic_icon(), mount))
+        entries.append(("Trash", trash, Gio.ThemedIcon.new("user-trash-symbolic"), None))
+        for name, path, icon, mount in entries:
+            row = Gtk.ListBoxRow(can_focus=False)
+            row.path, row.mount = path or "", mount
+            line = Gtk.Box(spacing=8)
+            line.pack_start(Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU), False, False, 0)
+            line.pack_start(Gtk.Label(label=name, xalign=0, ellipsize=Pango.EllipsizeMode.END), True, True, 0)
+            if mount is not None and (mount.can_eject() or mount.can_unmount()):
+                eject = Gtk.Button(relief=Gtk.ReliefStyle.NONE, can_focus=False, tooltip_text=f"Eject “{name}”")
+                eject.add(Gtk.Image.new_from_icon_name("media-eject-symbolic", Gtk.IconSize.MENU))
+                eject.get_style_context().add_class("drawer-eject")
+                eject.connect("clicked", lambda _b, m=mount: self.eject(m))
+                line.pack_end(eject, False, False, 0)
+            row.add(line)
+            self.loc_list.add(row)
+            if path:
+                self.place_rows.append((self.loc_list, row))
+        self.loc_list.show_all()
+
+    def _open_location(self, row):
+        if row.path:
+            self.navigate(row.path)
+        else:   # a phone with no folder of its own: let the system open it
+            Gio.AppInfo.launch_default_for_uri_async(row.mount.get_root().get_uri(), None, None, None, None)
+
+    def _drives_changed(self):
+        self._fill_locations()
+        if self.path and self.path != "/" and not os.path.isdir(self.path):
+            self.history.clear()
+            self.future.clear()
+            self.navigate(GLib.get_home_dir(), remember=False)
+        else:
+            self._show_place()
+
+    def eject(self, mount=None):
+        """Eject a drive: the one given, else the one the window is showing."""
+        mount = mount or volumes.mount_of(self.path)
+        if mount is not None:
+            volumes.eject(mount, self)
+
+    def _location_button(self, listbox, event):
+        if event.button != 3:
+            return False
+        row = listbox.get_row_at_y(int(event.y))
+        if row is None or row.mount is None:
+            return True
+        menu = Gtk.Menu()
+        menu.attach_to_widget(listbox, None)
+        for label, action in (("Open", lambda: self._open_location(row)),
+                              (None, None),
+                              (f"Eject “{row.mount.get_name()}”", lambda: self.eject(row.mount))):
+            item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
+            if label is not None:
+                item.connect("activate", lambda _i, a=action: a())
+            menu.append(item)
+        menu.show_all()
+        menu.popup_at_pointer(event)
+        self._location_menu = menu
+        return True
 
     def _show_place(self):
         """Light up the sidebar row for the folder on show, and no other.
@@ -1027,6 +1092,7 @@ def menubar():
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace")],
             [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
+            [("Eject", "win.eject", "<Ctrl>e")],
             [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
         ]),
         ("_Edit", [
