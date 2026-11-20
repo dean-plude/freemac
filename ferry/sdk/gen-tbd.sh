@@ -5,12 +5,14 @@
 #
 #   gen-tbd.sh ./ferry libSystem    > libSystem.tbd
 #   gen-tbd.sh ./ferry libobjc      > libobjc.tbd
+#   gen-tbd.sh ./ferry libFerryHost > libFerryHost.tbd   (Ferry's own frameworks only)
 set -eu
 ferry=${1:-./ferry}
 lib=${2:-libSystem}
 case $lib in
     libSystem) install=/usr/lib/libSystem.B.dylib; extra="dyld_stub_binder," ;;
     libobjc) install=/usr/lib/libobjc.A.dylib; extra= ;;
+    libFerryHost) install=/usr/lib/ferry/libFerryHost.dylib; extra= ;;
     *) echo "gen-tbd.sh: unknown library $lib" >&2; exit 2 ;;
 esac
 {

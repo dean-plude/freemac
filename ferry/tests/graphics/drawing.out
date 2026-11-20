@@ -1,0 +1,53 @@
+rect, bottom left: 255 0 0 255
+rect is not at the top: 255 255 255 255
+ellipse centre: 0 0 255 255
+outside ellipse corner: 255 255 255 255
+stroked line: 0 128 0 255
+background: 255 255 255 255
+half black over white: ok
+quarter alpha: ok
+ctm: 2 0 0 2 20 0
+scaled square: 0 255 0 255
+fill colour restored: 255 0 0 255
+ctm restored: 1 0 0 1 0 0
+rotated rect: 255 255 0 255
+clip box: 10 10 10 10
+inside clip: 0 0 0 255
+outside clip: 255 255 255 255
+ring: 255 0 255 255
+ring hole: 255 255 255 255
+path empty after fill: 1
+cleared: 0 0 0 0
+linear gradient rises: yes, middle about half: ok
+not drawn past the end without the option: yes
+drawn before the start with the option: yes
+radial centre dark: yes, outside untouched: yes
+image: 4 x 4, 32 bits per pixel, alpha info 2
+image top half: 255 0 0 255
+image bottom half: 0 0 255 255
+beside image: 255 255 255 255
+cropped image is the red part: 255 0 0 255
+png: 3 x 2
+png top left: 255 0 0 255
+png top right: 0 0 255 255
+png bottom left: 255 255 255 255
+png clear: 0 0 0 0
+png half alpha: 0 0 0 128
+BGRA memory: 0 128 255 255
+xRGB memory: 255 255 128 0
+grey memory: ok
+alpha only: 255 0
+unsupported layout gives NULL: yes
+rect path is a rect: 1
+elements: move(0,0) line(10,0) line(10,10) line(0,10) close move(20,0) quad(30,0) line(55,0) curve(50,5) curve(45,0) close
+control-point box: 0 0 55 10
+path box: 0 0 55 10
+contains: 1 0 1
+moved current point: 120 0, equal to original: 0, copy equal: 1
+rounded rect: centre 1, corner 0
+arc to point ends at: 20 5
+copied path box: 0 0 20 5
+colour: 4 components 0.25 0.5 0.75 1
+alpha 0.5, equal 0 1
+black: 2 components, model 0
+exit=0

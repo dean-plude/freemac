@@ -1,0 +1,26 @@
+Helvetica is the system font: yes
+Menlo and SF Mono are the same monospace font: yes
+system font size: 13, default size: 12
+traits: bold yes, regular yes, mono yes
+bold copy is bold: yes, same size: yes
+PostScript name ends in -Bold: yes
+ascent and descent positive: yes, ascent above cap height above x-height: yes
+double size, double ascent: yes, units per em: yes
+glyphs found: yes, distinct: yes, W wider than i: yes, total is the sum: yes
+advance doubles with size: yes
+A's box sits on the baseline: yes
+A's outline matches its box: yes
+line: 12 glyphs, 12 characters, width between 80 and 250: yes, ascent matches font: yes
+offsets increase: yes, end is the width: yes, position maps back: yes
+ink drawn: yes, all of it inside the image bounds: yes
+image bounds start near the text position: yes, rise above the baseline: yes
+nothing below the descent: yes
+red text is red: yes
+truncated line fits: yes, keeps more than the ellipsis: yes
+suggested size fits the width: yes, several lines tall: yes, whole text fits: yes
+frame: several lines: yes, going down: yes, covering the text in order: yes
+first line starts at the top: yes
+frame ink inside its rectangle: yes, none outside: yes
+short frame shows one line: yes
+centred line starts mid-way: yes, style reads back: yes
+exit=0

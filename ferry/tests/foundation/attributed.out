@@ -1,0 +1,17 @@
+"Hello world": [0,11 a=1]
+"Hello world": [0,6 a=1] [6,5 a=1 b=x]
+"Hello world": [0,2 a=1] [2,6 c=3] [8,3 a=1 b=x]
+"Hello world": [0,2 a=1] [2,6] [8,3 a=1 b=x]
+"Goodbye world": [0,7 a=1] [7,3] [10,3 a=1 b=x]
+"Goodbye world!": [0,7 a=1] [7,3] [10,3 a=1 b=x] [13,1 d=4]
+"Goodbyeworld!": [0,7 a=1] [7,2] [9,3 a=1 b=x] [12,1 d=4]
+a at 3 = 1 over {0, 7}
+attributes at 12: 1 keys over {12, 1}
+"yeworld": [0,2 a=1] [2,2] [4,3 a=1 b=x]
+copy equal: yes, mutable copy is mutable: yes
+a (none) over {12, 1}
+a 1 over {9, 3}
+a (none) over {7, 2}
+a 1 over {0, 7}
+CF: 7 chars, k=v over {6, 1}
+exit=0

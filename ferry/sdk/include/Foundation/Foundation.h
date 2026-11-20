@@ -822,6 +822,57 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 @property NSTimeInterval tolerance;
 @end
 
+/* ---- NSAttributedString ------------------------------------------------------------ */
+
+typedef NSString *NSAttributedStringKey;
+typedef NS_OPTIONS(NSUInteger, NSAttributedStringEnumerationOptions) {
+    NSAttributedStringEnumerationReverse = (1UL << 1),
+    NSAttributedStringEnumerationLongestEffectiveRangeNotRequired = (1UL << 20),
+};
+
+@interface NSAttributedString : NSObject <NSCopying, NSMutableCopying>
+@property (readonly, copy) NSString *string;
+@property (readonly) NSUInteger length;
+- (instancetype)initWithString:(NSString *)str;
+- (instancetype)initWithString:(NSString *)str attributes:(NSDictionary<NSAttributedStringKey, id> *)attrs;
+- (instancetype)initWithAttributedString:(NSAttributedString *)attrStr;
+- (NSDictionary<NSAttributedStringKey, id> *)attributesAtIndex:(NSUInteger)location
+                                                 effectiveRange:(NSRangePointer)range;
+- (NSDictionary<NSAttributedStringKey, id> *)attributesAtIndex:(NSUInteger)location
+                                          longestEffectiveRange:(NSRangePointer)range
+                                                        inRange:(NSRange)rangeLimit;
+- (id)attribute:(NSAttributedStringKey)name atIndex:(NSUInteger)location effectiveRange:(NSRangePointer)range;
+- (id)attribute:(NSAttributedStringKey)name
+                  atIndex:(NSUInteger)location
+    longestEffectiveRange:(NSRangePointer)range
+                  inRange:(NSRange)rangeLimit;
+- (NSAttributedString *)attributedSubstringFromRange:(NSRange)range;
+- (BOOL)isEqualToAttributedString:(NSAttributedString *)other;
+- (void)enumerateAttributesInRange:(NSRange)range
+                           options:(NSAttributedStringEnumerationOptions)opts
+                        usingBlock:(void (^)(NSDictionary<NSAttributedStringKey, id> *attrs, NSRange range,
+                                             BOOL *stop))block;
+- (void)enumerateAttribute:(NSAttributedStringKey)name
+                   inRange:(NSRange)range
+                   options:(NSAttributedStringEnumerationOptions)opts
+                usingBlock:(void (^)(id value, NSRange range, BOOL *stop))block;
+@end
+
+@interface NSMutableAttributedString : NSAttributedString
+- (void)replaceCharactersInRange:(NSRange)range withString:(NSString *)str;
+- (void)replaceCharactersInRange:(NSRange)range withAttributedString:(NSAttributedString *)attrString;
+- (void)setAttributes:(NSDictionary<NSAttributedStringKey, id> *)attrs range:(NSRange)range;
+- (void)addAttribute:(NSAttributedStringKey)name value:(id)value range:(NSRange)range;
+- (void)addAttributes:(NSDictionary<NSAttributedStringKey, id> *)attrs range:(NSRange)range;
+- (void)removeAttribute:(NSAttributedStringKey)name range:(NSRange)range;
+- (void)appendAttributedString:(NSAttributedString *)attrString;
+- (void)insertAttributedString:(NSAttributedString *)attrString atIndex:(NSUInteger)loc;
+- (void)deleteCharactersInRange:(NSRange)range;
+- (void)setAttributedString:(NSAttributedString *)attrString;
+- (void)beginEditing;
+- (void)endEditing;
+@end
+
 /* ---- functions ------------------------------------------------------------------- */
 
 #ifdef __cplusplus
