@@ -309,13 +309,25 @@ The small things a Mac user notices in their first minute.
 | 3 | Every freemac app starts faster: the image now ships their Python code compiled (Dials' own code went from about 1.3 s to 0.3 s to load in a test PC) | build | done |
 | 4 | Seek finds Guide topics too | Seek | done |
 
-## 1.21 "glass and polish" (next)
+## 1.21 "glass and polish" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | The menu bar, Seek, Help and the Dock blur what's behind them, so text under them doesn't show through | Strata | |
-| 2 | Guide opens from the freemac menu and from Welcome's last page | Topline, Welcome | |
-| 3 | Seek's preview shows the first page of a PDF | Seek | |
+| 1 | Seek, Help and notices are nearly solid, so text under them doesn't show through (the compositor's blur doesn't reach these surfaces yet) | Shell | done |
+| 2 | Guide opens from the freemac menu and from Welcome's last page | Topline, Welcome | done |
+| 3 | Frame opens PDFs and pages through them; PDFs open in Frame by default | Frame | done |
+| 4 | Seek's preview and Drawer's Glance show the first page of a PDF | Seek, Drawer | done |
+| 5 | Files opened by other apps, and a screenshot's preview, open in their own app instead of the web browser | Image, Lens | done |
+| 6 | Seek lists the front app's commands, not the names of its open windows | Topline, Seek | done |
+
+## 1.22 "everyday apps" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A calendar app with month, week and day views, kept on the computer | New app | |
+| 2 | A contacts app for names, phone numbers and addresses | New app | |
+| 3 | The menu bar's clock opens a small calendar for the month | Topline | |
+| 4 | Frame marks up pictures and PDFs: draw, write text, sign | Frame | |
 
 ## Later
 

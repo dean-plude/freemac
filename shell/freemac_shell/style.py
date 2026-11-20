@@ -72,10 +72,10 @@ TEMPLATE = """
 
 LIGHT = {"bar": "rgba(246, 246, 248, 0.66)", "ink": "#1d1d1f", "hover": "rgba(0, 0, 0, 0.09)",
          "shelf": "rgba(255, 255, 255, 0.36)", "edge": "rgba(255, 255, 255, 0.50)",
-         "panel": "rgba(246, 246, 248, 0.96)", "dim": "rgba(29, 29, 31, 0.55)"}
+         "panel": "rgba(246, 246, 248, 0.985)", "dim": "rgba(29, 29, 31, 0.55)"}
 DARK = {"bar": "rgba(30, 30, 33, 0.60)", "ink": "#ececef", "hover": "rgba(255, 255, 255, 0.13)",
         "shelf": "rgba(40, 40, 44, 0.50)", "edge": "rgba(255, 255, 255, 0.16)",
-        "panel": "rgba(38, 38, 42, 0.96)", "dim": "rgba(236, 236, 239, 0.55)"}
+        "panel": "rgba(38, 38, 42, 0.985)", "dim": "rgba(236, 236, 239, 0.55)"}
 
 PREFS = os.path.expanduser("~/.config/freemac/shell.json")
 

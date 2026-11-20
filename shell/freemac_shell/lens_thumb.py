@@ -14,7 +14,7 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 SHOW_SECONDS = 5
 WIDTH = 220
@@ -86,8 +86,11 @@ class Thumb(Gtk.Window):
     def open(self, _widget, event):
         if self.left or event.button != 1:
             return False
-        subprocess.Popen(["xdg-open", self.path], start_new_session=True,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(self.path, None), None)
+        except GLib.Error:
+            subprocess.Popen(["xdg-open", self.path], start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.finish()
         return True
 

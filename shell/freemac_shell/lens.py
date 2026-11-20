@@ -29,7 +29,7 @@ import time
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 # Both land on the Desktop, where they show as icons, ready to drag somewhere.
 FOLDER = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) or os.path.expanduser("~/Desktop")
@@ -275,7 +275,10 @@ class Picker(Gtk.ApplicationWindow):
 
     def open_folder(self, *_args):
         os.makedirs(FOLDER, exist_ok=True)
-        subprocess.Popen(["xdg-open", FOLDER], start_new_session=True)
+        try:
+            Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(FOLDER, None), None)
+        except GLib.Error:
+            subprocess.Popen(["xdg-open", FOLDER], start_new_session=True)
 
 
 def main():

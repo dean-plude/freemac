@@ -108,6 +108,19 @@ class Glance(Gtk.Window):
                         description += f", {width}×{height}"
                 except GLib.Error:
                     shown = False
+            elif Gio.content_type_is_a(kind or "", "application/pdf"):
+                from . import pdf   # Poppler loads only when a PDF is shown
+                document = pdf.open_document(path)
+                pixbuf = pdf.page_pixbuf(document, 0, HEIGHT - 90)
+                if pixbuf is not None:
+                    if pixbuf.get_width() > WIDTH - 40:
+                        ratio = (WIDTH - 40) / pixbuf.get_width()
+                        pixbuf = pixbuf.scale_simple(WIDTH - 40, max(1, round(pixbuf.get_height() * ratio)),
+                                                     GdkPixbuf.InterpType.BILINEAR)
+                    self.body.pack_start(Gtk.Image.new_from_pixbuf(pixbuf), True, True, 0)
+                    shown = True
+                    pages = document.get_n_pages()
+                    description += f", {pages} page{'s' if pages != 1 else ''}"
             elif is_text(kind, path):
                 try:
                     with open(path, "rb") as f:

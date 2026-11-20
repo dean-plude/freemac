@@ -37,11 +37,15 @@ wl-clipboard
 wf-recorder
 libnotify-bin
 xdg-utils
+# xdg-open asks file what kind a file is; without it every file opens in the browser.
+file
 xdg-user-dirs
 epiphany-browser
 gir1.2-nm-1.0
 gtk-update-icon-cache
 python3-gi-cairo
+# PDF pages for Frame, Seek's preview and Glance.
+gir1.2-poppler-0.18
 # Adwaita-dark for GTK 3 apps (dark mode)
 gnome-themes-extra
 # Sound: PipeWire with WirePlumber; Topline's volume control uses wpctl
