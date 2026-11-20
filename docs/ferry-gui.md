@@ -592,7 +592,7 @@ before M4), all passing. The new ones:
 It was also checked by eye under Weston at scale 1 and 2: a decorated
 window with a text field (selection and focus ring), a blue default button,
 a check box, radio buttons, a wrapping label and a flipped view, all drawn
-where they should be (screenshot attached to the M4 pull request).
+where they should be.
 
 **What isn't done yet (and why).**
 
