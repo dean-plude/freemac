@@ -24,6 +24,7 @@
 
 #include "gtk-shell.hpp"
 #include "window-places.hpp"
+#include "command-key.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -384,6 +385,7 @@ class strata_shell_impl : public wf::plugin_interface_t
 {
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> method_repository;
     strata_window_places window_places;
+    strata_command_key command_key;
 
     /* strata/app-menus {id}: where the app behind a window publishes its
      * menus on the session bus (org.gtk.Menus / org.gtk.Actions). */
@@ -462,6 +464,26 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/command-key {app-id, raw}: while raw, the app's windows get the
+     * keys as they are, with no Command key (Dials, as it records a new
+     * shortcut). */
+    wf::ipc::method_callback set_command_key_raw = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "app-id", string);
+        WFJSON_EXPECT_FIELD(data, "raw", boolean);
+        command_key.set_raw(data["app-id"], data["raw"]);
+        return wf::ipc::json_ok();
+    };
+
+    /* strata/held-modifiers: which of Command, Alt, Control and Shift are
+     * held down right now. */
+    wf::ipc::method_callback get_held_modifiers = [=] (nlohmann::json)
+    {
+        auto out = wf::ipc::json_ok();
+        out["held"] = command_key.held_modifiers();
+        return out;
+    };
+
   public:
     void init() override
     {
@@ -471,7 +493,10 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/app-menus", get_app_menus);
         method_repository->register_method("strata/minimize-hint", set_minimize_hint);
         method_repository->register_method("strata/close", close_view);
+        method_repository->register_method("strata/command-key", set_command_key_raw);
+        method_repository->register_method("strata/held-modifiers", get_held_modifiers);
         window_places.init();
+        command_key.init();
     }
 
     bool is_unloadable() override

@@ -27,13 +27,16 @@ from . import style  # noqa: E402
 LIVE = os.path.isdir("/run/live/medium")
 SEEN = os.path.join(GLib.get_user_config_dir(), "freemac", "welcome-seen")
 MARK = "/usr/share/freemac/freemac-mark.svg"
+# \u2318 Command is the key next to the space bar (Dials > Keyboard can make
+# it the Windows key instead).
 SHORTCUTS = [
-    ("Super+Space", "Search apps, files and what's in them"),
-    ("Ctrl+Up or 4-finger swipe up", "Show all windows"),
-    ("Ctrl+Left / Right or 3-finger swipe", "Switch desktop"),
-    ("Super+Left / Right", "Fill half the screen"),
-    ("Super+Enter", "Open a terminal"),
-    ("Super+L", "Lock the screen"),
+    ("\u2318 Command", "The key next to the space bar: \u2318C copies, \u2318V pastes"),
+    ("\u2318Space", "Search apps, files and what's in them"),
+    ("\u2318Tab", "Switch apps"),
+    ("\u2318Q / \u2318H", "Quit or hide the app"),
+    ("\u2303\u2191 or 4-finger swipe up", "Show all windows"),
+    ("\u21e7\u23183 / \u21e7\u23184", "Screenshot of the screen / an area"),
+    ("\u2303\u2318Q", "Lock the screen"),
 ]
 CSS = b"""
 .welcome-title { font-size: 26px; font-weight: 800; }

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Latch: freemac's lock screen.
 
-    freemac-lock            lock the screen now (Super+L, Topline > Lock Screen)
+    freemac-lock            lock the screen now (Ctrl+Command+Q, Topline > Lock Screen)
     freemac-lock --watch    started at login: locks after the idle time set in
                             Dials > Power, and before the computer sleeps
 

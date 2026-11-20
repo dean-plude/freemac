@@ -17,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, macapps, menus  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -374,6 +374,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "glance": self.toggle_glance,
             "add-to-sidebar": self.add_to_sidebar,
             "compress": self.compress,
+            "get-info": self.get_info,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -842,6 +843,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if moved:
             self.notify(f"Moved {moved} item{'s' if moved != 1 else ''} to the Trash.")
 
+    def get_info(self):
+        paths = self.selected_paths() or [self.path]
+        drawer_info.show(paths, self)
+
     def toggle_hidden(self):
         self.hidden_action.change_state(GLib.Variant("b", not self.show_hidden))
 
@@ -909,6 +914,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             )
         for label, handler, enabled in app_items + (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
+            ("Get Info", lambda *_: self.get_info(), True),
             ("Rename…", lambda *_: self.rename(), has_selection),
             ("Move to Trash", lambda *_: self.trash(), has_selection),
             (None, None, True),
@@ -970,23 +976,29 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif ctrl and key in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab, Gdk.KEY_Page_Down, Gdk.KEY_Page_Up):
             back = shift or key == Gdk.KEY_Page_Up
             self.switch_tab((self.current + (-1 if back else 1)) % len(self.tabs))
-        elif key == Gdk.KEY_Delete:
-            self.trash()
+        elif key == Gdk.KEY_Delete or (ctrl and key == Gdk.KEY_BackSpace):
+            self.trash()  # Command+Backspace, as on a Mac
+        elif ctrl and key in (Gdk.KEY_i, Gdk.KEY_I):
+            self.get_info()
         elif key == Gdk.KEY_F2:
             self.rename()
         elif ctrl and shift and key in (Gdk.KEY_N, Gdk.KEY_n):
             self.new_folder()
-        elif ctrl and key in (Gdk.KEY_h, Gdk.KEY_H):
+        elif (ctrl and key in (Gdk.KEY_h, Gdk.KEY_H)) or (ctrl and shift and key in (Gdk.KEY_period,
+                                                                                    Gdk.KEY_greater)):
             self.toggle_hidden()
         elif ctrl and key in (Gdk.KEY_1, Gdk.KEY_2, Gdk.KEY_3):
             self.view_buttons[VIEWS[key - Gdk.KEY_1][0]].set_active(True)
         elif ctrl and key in (Gdk.KEY_f, Gdk.KEY_F):
             self.search.grab_focus()
-        elif (event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Left) or key == Gdk.KEY_BackSpace:
+        elif (ctrl and key == Gdk.KEY_bracketleft) or key == Gdk.KEY_BackSpace or (
+                event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Left):
             self.go_back()
-        elif event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Right:
+        elif (ctrl and key == Gdk.KEY_bracketright) or (event.state & Gdk.ModifierType.MOD1_MASK and
+                                                        key == Gdk.KEY_Right):
             self.go_forward()
-        elif ctrl and key == Gdk.KEY_Up:
+        elif ctrl and key in (Gdk.KEY_Up, Gdk.KEY_Home):
+            # Command+Up: the folder it's in (Strata sends Command+Up as Ctrl+Home).
             self.go_up()
         elif ctrl and key in (Gdk.KEY_n, Gdk.KEY_N):
             self.get_application().activate_action("new-window", None)
@@ -994,7 +1006,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.add_to_sidebar()
         elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
             self.close_tab()
-        elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O, Gdk.KEY_Down):
+        elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O, Gdk.KEY_Down, Gdk.KEY_End):
             for p in self.selected_paths():
                 self.open_or_enter(p)
         elif key == Gdk.KEY_Escape and self.search.get_text():
@@ -1010,8 +1022,9 @@ def menubar():
             [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
              ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
+            [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
-             ("Move to Trash", "win.trash", "Delete")],
+             ("Move to Trash", "win.trash", "<Ctrl>BackSpace")],
             [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
             [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
         ]),
@@ -1022,11 +1035,11 @@ def menubar():
         ("_View", [
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
              ("as Columns", "win.view-columns", "<Ctrl>3")],
-            [("Show Hidden Files", "win.show-hidden", "<Ctrl>h")],
+            [("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
             [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),
         ("_Go", [
-            [("Back", "win.back", "<Alt>Left"), ("Forward", "win.forward", "<Alt>Right"),
+            [("Back", "win.back", "<Ctrl>bracketleft"), ("Forward", "win.forward", "<Ctrl>bracketright"),
              ("Enclosing Folder", "win.up", "<Ctrl>Up")],
             [("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),

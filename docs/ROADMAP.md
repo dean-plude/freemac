@@ -168,16 +168,27 @@ The details a Mac user notices in the first ten minutes.
 | 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | done |
 | 4 | Windows reopen at the size and place they had last time | Strata | done |
 
-## 1.6 "the Command key" (next)
+## 1.6 "the Command key" (done)
 
 A Mac user's hands reach for Command, not Control.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | The Windows key works as Command: Super+C, X, V, Z, A, S, F, N, O, P, T, W and the rest do in every app what Ctrl does, and freemac's own Super shortcuts keep working | Strata | |
-| 2 | Super+Q quits the app (every window), Super+W closes one window, Super+H hides the app, Super+` goes through the app's windows | Strata, Tack | |
-| 3 | Get Info in Drawer (Super+I): kind, size, where it is, when it was made and changed, and who can open it | Drawer | |
-| 4 | A start-up sound of our own when freemac starts, which can be turned off in Sound | Keel, Dials | |
+| 1 | The key beside the space bar is Command (as on a Mac keyboard; the Windows key can be Command instead): ⌘C, X, V, Z, A, S, F, N, O, P, T, W and the rest do in every app what Ctrl does, terminals get Ctrl+Shift, ⌘←/→ go to the start and end of a line and ⌥← → move by word, and freemac's own ⌘ shortcuts keep working | Strata, Dials | done |
+| 2 | ⌘Q quits the app (every window), ⌘W closes one window, ⌘H hides the app, ⌥⌘H hides the others, ⌘` goes through the app's windows, ⌘Tab switches apps | Strata, Tack | done |
+| 3 | Get Info in Drawer (⌘I): kind, size, where it is, when it was made and changed, and who can open it | Drawer | done |
+| 4 | A start-up sound of our own when freemac starts, which can be turned off in Sound | art, Dials | done |
+
+## 1.7 "menus and finishing touches" (next)
+
+The small things a Mac user notices in their first minute.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Menus in Topline show each item's shortcut in Mac symbols (⌘C, ⇧⌘S) on the right, not "Ctrl+C" | Topline | |
+| 2 | Every app's bold name menu in Topline has About, Hide, Hide Others and Quit with their shortcuts, the same in every app | Topline | |
+| 3 | After ⇧⌘3 or ⇧⌘4, a small picture of the screenshot sits in the screen's corner for a few seconds; click it to open it | Lens | |
+| 4 | Volume and brightness keys show a rounded panel low in the middle of the screen with the level | Beacon | |
 
 ## Later
 

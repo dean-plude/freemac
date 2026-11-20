@@ -76,6 +76,16 @@ class Wayfire:
         views = result if isinstance(result, list) else result.get("views", [])
         return [v for v in views if is_app_window(v)]
 
+    def held_modifiers(self):
+        """{command, alt, control, shift}: the modifier keys held down now
+        (Strata's answer), or None when Strata can't say."""
+        try:
+            reply = self.req.call("strata/held-modifiers")
+        except (ConnectionError, OSError, ValueError):
+            return None
+        held = reply.get("held") if isinstance(reply, dict) else None
+        return held if isinstance(held, dict) else None
+
     def focused(self):
         try:
             info = self.req.call("window-rules/get-focused-view").get("info")

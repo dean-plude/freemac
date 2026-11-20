@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -59,11 +59,21 @@ def volume_of(target):
     return (float(match.group(1)) * 100 if match else None), "MUTED" in result.stdout
 
 
+def start_up_group(group, row, switch):
+    def changed(on):
+        startup_sound.set_enabled(on)
+        if on:
+            startup_sound.play()
+    return group(row("Play a sound at start-up", switch(startup_sound.enabled(), changed),
+                     "freemac's own chime as the desktop first appears after the computer starts."))
+
+
 def sound(window):
     group, row, page, slider, switch = window.helpers
     if not shutil.which("wpctl"):
         return page("Sound", group(row("Sound isn't running", None,
-                                       "freemac uses PipeWire for sound; its control tool wasn't found.")))
+                                       "freemac uses PipeWire for sound; its control tool wasn't found.")),
+                    start_up_group(group, row, switch))
     status = run("wpctl", "status")
     devices = parse_wpctl_status(status.stdout if status else "")
     groups = []
@@ -87,6 +97,7 @@ def sound(window):
             rows.append(row("Mute", switch(muted, lambda on, t=target: run(
                 "wpctl", "set-mute", t, "1" if on else "0"))))
         groups.append(group(*rows))
+    groups.append(start_up_group(group, row, switch))
     return page("Sound", *groups)
 
 
@@ -139,7 +150,7 @@ def power(window):
     on_sleep = _switch(bool(prefs.get("lock_on_sleep", True)),
                        lambda active: window.save_prefs(lock_on_sleep=active))
     groups.append(group(row("Lock the screen after", lock_after,
-                            "You'll need your password to get back in. Super+L locks at once."),
+                            "You'll need your password to get back in. \u2303\u2318Q locks at once."),
                         row("Lock before sleeping", on_sleep)))
     if shutil.which("powerprofilesctl"):
         mode = Gtk.ComboBoxText()

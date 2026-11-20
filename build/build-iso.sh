@@ -236,6 +236,8 @@ rm -rf "$ROOTFS/tmp/strata"
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 # Every scene in a day and a night version (Dials swaps them with the mode).
 python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"
+# freemac's own start-up sound, made from scratch
+python3 "$REPO/art/sounds/make-sounds.py" "$ROOTFS/usr/share/sounds/freemac"
 # Start-up screen: freemac's own Plymouth theme (overlay), built into the initramfs.
 # Debian has plymouth-set-default-theme; Ubuntu picks the theme with an
 # alternative instead.

@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Tack, the app switcher: hold Alt and press Tab to see every open app as a
-row of large icons on a translucent panel in the middle of the screen. Each Tab
-moves to the next app (Shift+Tab goes back); letting go of Alt brings the
-chosen app's windows to the front. A quick Alt+Tab, let go at once, swaps
-straight to the app used before without the panel showing.
+"""Tack, the app switcher: hold Command (or Alt) and press Tab to see every
+open app as a row of large icons on a translucent panel in the middle of the
+screen. Each Tab moves to the next app (Shift+Tab goes back); letting go
+brings the chosen app's windows to the front. A quick Command+Tab, let go at
+once, swaps straight to the app used before without the panel showing.
 
     freemac-tack            run the switcher (started with the session)
-    freemac-tack --next     what Alt+Tab runs: show it, or move right
-    freemac-tack --prev     what Alt+Shift+Tab runs: show it, or move left
+    freemac-tack --next     what Command+Tab runs: show it, or move right
+    freemac-tack --prev     what Command+Shift+Tab runs: show it, or move left
 
-The key presses reach the running switcher through a small socket, so Alt+Tab
-answers at once instead of waiting for a new program to start.
+The key presses reach the running switcher through a small socket, so
+Command+Tab answers at once instead of waiting for a new program to start.
 Original freemac code.
 """
 import os
@@ -20,7 +20,7 @@ import sys
 SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "freemac-tack.sock")
 
 ICON = 96          # pixels
-SHOW_AFTER = 140   # ms: a quick Alt+Tab switches without the panel flashing up
+SHOW_AFTER = 140   # ms: a quick Command+Tab switches without the panel flashing up
 HIDE_IDS = {"gtklock", "polkit-mate-authentication-agent-1"}
 
 CSS = b"""
@@ -128,6 +128,18 @@ def run():
     from . import style
     from .wfipc import Wayfire
 
+    # Command reaches apps (Tack too) as Ctrl, so letting go of Command, Ctrl
+    # or Alt ends the switch.
+    hold = (Gdk.ModifierType.MOD1_MASK | Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SUPER_MASK
+            | Gdk.ModifierType.MOD4_MASK)
+    alt_keys = (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R)
+    let_go = alt_keys + (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Control_L, Gdk.KEY_Control_R)
+
+    def mask_of(keyval):
+        if keyval in alt_keys:
+            return Gdk.ModifierType.MOD1_MASK | Gdk.ModifierType.META_MASK
+        return Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.MOD4_MASK
+
     class Switcher(Gtk.Window):
         def __init__(self):
             super().__init__(title="Switcher")
@@ -211,18 +223,26 @@ def run():
 
         # -- letting go
         def _check_alt(self):
-            """Alt let go (perhaps before we had the keyboard): switch."""
+            """Command or Alt let go (perhaps before we had the keyboard): switch.
+            Apps see Command as Ctrl (Strata's Command key), so Tack does too."""
             if not self.showing:
                 self.check_timer = 0
                 return False
-            state = Gdk.Keymap.get_for_display(self.get_display()).get_modifier_state()
-            if not state & Gdk.ModifierType.MOD1_MASK and self.is_active():
+            # Strata always sees the keyboard, so its answer comes first; what
+            # GTK knows is only as fresh as the last key Tack itself was sent.
+            held = self.wayfire.held_modifiers()
+            if held is not None:
+                let_go_now = not (held.get("command") or held.get("alt") or held.get("control"))
+            else:
+                state = Gdk.Keymap.get_for_display(self.get_display()).get_modifier_state()
+                let_go_now = self.is_active() and not state & hold
+            if let_go_now:
                 self.finish(self.chosen)
                 return False
             return True
 
         def _key_release(self, _widget, event):
-            if event.keyval in (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R):
+            if event.keyval in let_go and not (event.state & hold & ~mask_of(event.keyval)):
                 self.finish(self.chosen)
             return True
 
