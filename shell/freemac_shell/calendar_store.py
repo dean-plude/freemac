@@ -12,6 +12,7 @@ import calendar
 import datetime as dt
 import os
 import uuid
+import zoneinfo
 
 REPEATS = {"": "Never", "DAILY": "Every Day", "WEEKLY": "Every Week",
            "MONTHLY": "Every Month", "YEARLY": "Every Year"}
@@ -96,6 +97,14 @@ def _when(value, params):
     stamp = dt.datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
     if utc:
         stamp = stamp.replace(tzinfo=dt.timezone.utc).astimezone().replace(tzinfo=None)
+    elif params.get("TZID"):
+        # A time in a named zone (as online calendars write them): moved
+        # into this computer's local time.
+        try:
+            zone = zoneinfo.ZoneInfo(params["TZID"].strip('"'))
+            stamp = stamp.replace(tzinfo=zone).astimezone().replace(tzinfo=None)
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+            pass
     return stamp, False
 
 

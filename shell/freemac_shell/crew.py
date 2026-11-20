@@ -9,6 +9,7 @@ person, Delete removes the chosen one after asking. Opening .vcf files adds
 the people in them. Each person is one vCard file (contacts_store.py) that
 other address books can import. Original freemac code.
 """
+import os
 import sys
 
 import gi
@@ -362,6 +363,32 @@ class Window(Gtk.ApplicationWindow):
         self.fill_list()
         self.show_card()
         self.show_all()
+        # Cards can change underneath (an online account's sync, another app):
+        # read them again a moment after the folder settles.
+        os.makedirs(store.store_dir(), exist_ok=True)
+        self.monitor = Gio.File.new_for_path(store.store_dir()).monitor_directory(Gio.FileMonitorFlags.NONE, None)
+        self.monitor.connect("changed", self._files_changed)
+        self.reload_pending = None
+
+    def _files_changed(self, *_):
+        if self.reload_pending is None:
+            self.reload_pending = GLib.timeout_add(700, self.reload)
+
+    def reload(self):
+        """Read the cards again, unless one is being edited (then later)."""
+        if self.card is not None and self.card.editing:
+            self.reload_pending = GLib.timeout_add_seconds(2, self.reload)
+            return False
+        self.reload_pending = None
+        fresh = store.load()
+        if sorted(map(store.dump, fresh)) == sorted(map(store.dump, self.contacts)):
+            return False
+        self.contacts = fresh
+        if self.chosen not in {c.uid for c in fresh}:
+            self.chosen = fresh[0].uid if fresh else None
+        self.fill_list()
+        self.show_card()
+        return False
 
     # -- the list --------------------------------------------------------
     def fill_list(self):
