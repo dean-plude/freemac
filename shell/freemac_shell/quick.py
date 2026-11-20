@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Quick settings: one panel from Topline for the switches people reach for
 most. Wi-Fi, Bluetooth, Do Not Disturb, dark mode and night light as tiles,
-with brightness and volume sliders under them. A tile is left out when the
+what's playing (with back, play/pause and forward) when a player is open,
+and brightness and volume sliders under them. A tile is left out when the
 computer doesn't have the thing (no Wi-Fi card, no Bluetooth adapter), and so
 is a slider (no backlight, no sound server).
 """
@@ -13,9 +14,9 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
 
-from . import beacon, screen, style  # noqa: E402
+from . import beacon, media, screen, style  # noqa: E402
 from .status import NM, StatusButton, launch  # noqa: E402
 
 CSS = b"""
@@ -24,6 +25,7 @@ CSS = b"""
 .quick-tile:checked { background-image: none; background-color: #4b5fc4; color: white; }
 .quick-tile:checked .dim-label { color: rgba(255, 255, 255, 0.8); }
 .quick-tile-title { font-weight: bold; }
+.now-playing { padding: 6px 4px; border-top: 1px solid alpha(currentColor, 0.12); }
 """
 
 
@@ -55,6 +57,60 @@ class Tile(Gtk.ToggleButton):
         with self.handler_block(self.handler):
             self.set_active(on)
         self.detail.set_text(detail or ("On" if on else "Off"))
+
+
+class NowPlaying(Gtk.Box):
+    """A row with the track, the app it plays in, and back / play / forward."""
+
+    def __init__(self):
+        super().__init__(spacing=8)
+        self.get_style_context().add_class("now-playing")
+        self.bus = media.session()
+        self.player = None
+        self.icon = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        self.pack_start(self.icon, False, False, 0)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.title = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END, max_width_chars=22)
+        self.title.get_style_context().add_class("quick-tile-title")
+        self.subtitle = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END, max_width_chars=22)
+        self.subtitle.get_style_context().add_class("dim-label")
+        text.pack_start(self.title, False, False, 0)
+        text.pack_start(self.subtitle, False, False, 0)
+        self.pack_start(text, True, True, 0)
+        self.previous = self._button("media-skip-backward-symbolic", "Previous", "previous")
+        self.play = self._button("media-playback-start-symbolic", "Play", "play-pause")
+        self.next = self._button("media-skip-forward-symbolic", "Next", "next")
+        for button in (self.previous, self.play, self.next):
+            self.pack_start(button, False, False, 0)
+        self.set_no_show_all(True)
+        for child in self.get_children():
+            child.show_all()
+
+    def _button(self, icon, tip, action):
+        button = Gtk.Button.new_from_icon_name(icon, Gtk.IconSize.BUTTON)
+        button.set_relief(Gtk.ReliefStyle.NONE)
+        button.set_tooltip_text(tip)
+        button.connect("clicked", lambda *_: self._send(action))
+        return button
+
+    def _send(self, action):
+        if self.player and media.send(action, self.bus, self.player["name"]):
+            GLib.timeout_add(300, lambda: self.refresh() or False)
+
+    def refresh(self):
+        self.player = media.current(self.bus) if self.bus else None
+        self.set_visible(self.player is not None)
+        if not self.player:
+            return
+        p = self.player
+        self.title.set_text(p["title"] or p["app"])
+        self.subtitle.set_text(" · ".join(x for x in (p["artist"], p["app"]) if x and x != self.title.get_text()))
+        playing = p["status"] == "Playing"
+        self.play.set_image(Gtk.Image.new_from_icon_name(
+            "media-playback-pause-symbolic" if playing else "media-playback-start-symbolic", Gtk.IconSize.BUTTON))
+        self.play.set_tooltip_text("Pause" if playing else "Play")
+        self.previous.set_sensitive(p["can_previous"])
+        self.next.set_sensitive(p["can_next"])
 
 
 class QuickSettings(StatusButton):
@@ -102,6 +158,8 @@ class QuickSettings(StatusButton):
         for tile in (self.wifi, self.bluetooth, self.dnd, self.dark, self.night):
             self.tiles.add(tile)
         panel.pack_start(self.tiles, False, False, 0)
+        self.now_playing = NowPlaying()
+        panel.pack_start(self.now_playing, False, False, 0)
 
         self.brightness_row, self.brightness = self._slider("display-brightness-symbolic", 5, 100,
                                                             lambda v: screen.set_brightness(v / 100))
@@ -154,6 +212,7 @@ class QuickSettings(StatusButton):
         if adapter:
             self.bluetooth.show_state(adapter[1])
 
+        self.now_playing.refresh()
         self.dnd.show_state(bool(style.prefs().get("dnd")))
         self.dark.show_state(style.is_dark())
         night = screen.night_settings()
