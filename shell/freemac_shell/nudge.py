@@ -914,6 +914,18 @@ class Window(Gtk.ApplicationWindow):
         if key == Gdk.KEY_Escape and self.get_focus() is self.search:
             self.search.set_text("")
             return True
+        if key == Gdk.KEY_Escape and isinstance(self.get_focus(), Gtk.Entry):
+            # Esc while typing a title: put the old title back (a new
+            # reminder still empty goes away) and stop editing.
+            row = self.get_focus().get_ancestor(Row)
+            if row is not None:
+                if row.reminder.title.strip():
+                    row.entry.set_text(row.reminder.title)
+                else:
+                    row.entry.set_text("")
+                self.set_focus(None)
+                self.commit(row)
+                return True
         typing = isinstance(self.get_focus(), Gtk.Entry)
         if not typing and key in (Gdk.KEY_BackSpace, Gdk.KEY_Delete):
             self.delete_current()

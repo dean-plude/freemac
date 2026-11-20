@@ -341,6 +341,11 @@ The small things a Mac user notices in their first minute.
 | 5 | The menu bar shows a newly opened app's name at once | Topline | done |
 | 6 | Seek stays running, so ⌘Space opens it without starting a program each time | Seek | done |
 | 7 | Pop-up panels and tooltips no longer sit in a grey box | theme | done |
+| 8 | ⌘Q quits Tide, Crew and Nudge as a whole (it only closed their windows, leaving them running) | Strata | done |
+| 9 | Qt, Kvantum and printer helper apps stay out of the app grid and Seek; Dials still opens the printer one | build | done |
+| 10 | Quick settings and the volume pop-up are nearly solid, so windows no longer show through their text | Topline | done |
+| 11 | Esc while typing a reminder puts its title back, and a new empty one goes away | Nudge | done |
+| 12 | New screenshots of 1.23 in the README | docs | done |
 
 ## 1.24 "look and mail" (next)
 
