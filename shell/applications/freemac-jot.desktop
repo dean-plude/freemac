@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Jot
+Comment=Quick notes, saved as you type
+Exec=freemac-jot
+Icon=freemac-jot
+Categories=Utility;TextEditor;
+Keywords=notes;note;memo;jot;list;
+StartupWMClass=org.freemac.Jot
+StartupNotify=true
