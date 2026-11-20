@@ -5,6 +5,10 @@ Pinned apps come first, then apps that are open but not pinned. At the right
 end are folder stacks (Downloads by default: click to see the newest files)
 and the Trash, which shows when it has something in it, takes files dropped
 on it, and can be emptied from its right-click menu.
+
+Apps can be dragged along the Dock to move them, dragged up and out of it to
+take them off, and a running app dragged in among the pinned ones stays.
+A file dropped on an app opens in that app.
 """
 import json
 import math
@@ -35,11 +39,16 @@ NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
-SHELL_APP_IDS = {"freemac-pier", "freemac-topline"}
+SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-jot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]
 
+
+# Dragging an app along the Dock (only within this program).
+DOCK_TYPE = "application/x-freemac-dock-item"
+DOCK_TARGET = Gtk.TargetEntry.new(DOCK_TYPE, Gtk.TargetFlags.SAME_APP, 1)
+URI_TARGET = Gtk.TargetEntry.new("text/uri-list", 0, 0)
 
 STACK_LIMIT = 15   # newest files shown when a folder stack is opened
 TRASH = os.path.join(GLib.get_user_data_dir(), "Trash")
@@ -292,9 +301,18 @@ class Item(Gtk.Button):
         self.set_tooltip_text(info.get_name() if info else apps.display_name(app_id))
         self.menu = None
         self.hold = 0
+        self.icon = icon
         self.connect("clicked", self._clicked)
         self.connect("button-press-event", self._press)
         self.connect("button-release-event", self._release)
+        # Drag along the Dock to move it; drag it up and out to take it off.
+        self.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [DOCK_TARGET], Gdk.DragAction.MOVE)
+        # Darkened while a file it can open is held over it, as on a Mac.
+        self.drop_glow = False
+        self.connect_after("draw", self._draw_drop_glow)
+        self.connect("drag-begin", self._drag_begin)
+        self.connect("drag-failed", self._drag_failed)
+        self.connect("drag-end", self._drag_end)
 
     @property
     def ok(self):
@@ -354,6 +372,70 @@ class Item(Gtk.Button):
         self.hold = 0
         self.show_menu()
         return False
+
+    def set_drop_glow(self, on):
+        if on != self.drop_glow:
+            self.drop_glow = on
+            self.queue_draw()
+
+    def _draw_drop_glow(self, _widget, cr):
+        if not self.drop_glow:
+            return False
+        alloc = self.image.get_allocation()
+        origin = self.image.translate_coordinates(self, 0, 0)
+        if not origin:
+            return False
+        size = min(alloc.width, alloc.height)
+        x = origin[0] + (alloc.width - size) / 2
+        y = origin[1] + (alloc.height - size) / 2
+        radius = size * 0.22
+        cr.new_sub_path()
+        cr.arc(x + size - radius, y + radius, radius, -math.pi / 2, 0)
+        cr.arc(x + size - radius, y + size - radius, radius, 0, math.pi / 2)
+        cr.arc(x + radius, y + size - radius, radius, math.pi / 2, math.pi)
+        cr.arc(x + radius, y + radius, radius, math.pi, 3 * math.pi / 2)
+        cr.close_path()
+        cr.set_source_rgba(0, 0, 0, 0.32)
+        cr.fill()
+        return False
+
+    @property
+    def pin_id(self):
+        """The desktop file this app is kept in the Dock by, if it has one."""
+        return self.desktop_id or (self.info.get_id() if self.info else None)
+
+    # ---- dragging it along or off the Dock ----------------------------------
+    def _drag_begin(self, _widget, context):
+        if self.hold:
+            GLib.source_remove(self.hold)
+            self.hold = 0
+        self.pier.start_drag(self)
+        # The icon itself follows the pointer, at its size in the Dock.
+        size = self.pier.base
+        found = Gtk.IconTheme.get_default().lookup_by_gicon(self.icon, size, Gtk.IconLookupFlags.FORCE_SIZE)
+        if found is not None:
+            try:
+                Gtk.drag_set_icon_pixbuf(context, found.load_icon(), size // 2, size // 2)
+            except GLib.Error:
+                pass
+        # A gap stays where it was, and moves with it along the Dock.
+        self.set_opacity(0.0)
+
+    def _drag_failed(self, _widget, _context, result):
+        # Let go away from the Dock: a kept app comes off it, as on a Mac.
+        # (An app that's open stays, as a running app, until it quits.)
+        # On Wayland a drop nobody takes comes back as an error, not "no target".
+        away = result in (Gtk.DragResult.NO_TARGET, Gtk.DragResult.ERROR) and self.pier.drag_outside
+        if away and self in self.pier.pinned and self.pin_id:
+            self.pier.removed = True
+            self.pier.set_pinned(self.pin_id, False)
+            return True   # no fly-back to where it was
+        return False
+
+    def _drag_end(self, _widget, _context):
+        self.set_opacity(1.0)
+        self.show()
+        self.pier.end_drag()
 
     def show_menu(self):
         name = self.info.get_name() if self.info else apps.display_name(self.app_id)
@@ -488,6 +570,19 @@ class Pier(Gtk.Window):
         outer.add_events(1 << 2 | 1 << 13)  # pointer motion, leave
         outer.connect("motion-notify-event", self._motion)
         outer.connect("leave-notify-event", lambda *_: self._magnify(None))
+        # Apps dragged along the Dock, and files dropped on an app to open them.
+        outer.drag_dest_set(0, [DOCK_TARGET, URI_TARGET], Gdk.DragAction.MOVE | Gdk.DragAction.COPY)
+        outer.connect("drag-motion", self._drag_motion)
+        outer.connect("drag-leave", self._drag_leave)
+        outer.connect("drag-drop", self._drag_drop)
+        outer.connect("drag-data-received", self._drag_data)
+        self.dragging, self.drag_at, self.dropped, self.removed = None, None, False, False
+        self.drop_on, self.glowing, self.drag_outside = None, None, False
+        self.drop_candidate = None
+        # What kind of files a drag carries, read as it first comes over the
+        # Dock, so only apps that can open them light up.
+        self.peek_context, self.peek_types, self.peek_at = None, None, None
+        self.peeked = (None, [])   # (drag, its files), kept for the drop
         self.add(outer)
 
         self.pinned = []
@@ -601,22 +696,223 @@ class Pier(Gtk.Window):
     def set_pinned(self, desktop_id, keep):
         """Keep in Dock: add the app to (or take it off) the pinned list in
         pier.json; the file watch then rebuilds the dock."""
+        pinned = self._saved_pinned()
+        if keep and desktop_id not in pinned:
+            pinned.append(desktop_id)
+        elif not keep and desktop_id in pinned:
+            pinned.remove(desktop_id)
+        self._save_pinned(pinned)
+
+    def _saved_pinned(self):
         try:
             with open(CONFIG) as f:
                 saved = json.load(f)
         except (OSError, ValueError):
             saved = {}
-        pinned = list(saved.get("pinned", self.config["pinned"] if self.config else DEFAULT_PINNED))
-        if keep and desktop_id not in pinned:
-            pinned.append(desktop_id)
-        elif not keep and desktop_id in pinned:
-            pinned.remove(desktop_id)
+        return list(saved.get("pinned", self.config["pinned"] if self.config else DEFAULT_PINNED))
+
+    def _save_pinned(self, pinned):
+        try:
+            with open(CONFIG) as f:
+                saved = json.load(f)
+        except (OSError, ValueError):
+            saved = {}
         saved["pinned"] = pinned
         os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
         tmp = CONFIG + ".tmp"
         with open(tmp, "w") as f:
             json.dump(saved, f, indent=1)
         os.replace(tmp, CONFIG)
+
+    # ---- dragging apps along the Dock, and files onto apps -------------------
+    def _center(self, widget, relative_to):
+        alloc = widget.get_allocation()
+        coords = widget.translate_coordinates(relative_to, alloc.width // 2, 0)
+        return coords[0] if coords else None
+
+    def _item_at(self, x, relative_to):
+        for item in self.items():
+            alloc = item.get_allocation()
+            coords = item.translate_coordinates(relative_to, 0, 0)
+            if coords and coords[0] <= x < coords[0] + alloc.width:
+                return item
+        return None
+
+    def start_drag(self, item):
+        self.dragging, self.drag_at, self.dropped, self.removed = item, None, False, False
+        self.drag_outside = False
+
+    def end_drag(self):
+        item, self.dragging = self.dragging, None
+        if not self.dropped and not self.removed and item is not None:
+            self._restore_order()
+        self.dropped = self.removed = False
+
+    def _restore_order(self):
+        for index, item in enumerate(self.pinned):
+            self.shelf.reorder_child(item, index)
+        line = self.shelf.get_children().index(self.running_sep)
+        for item in self.extra.values():
+            if self.shelf.get_children().index(item) < line:
+                self.shelf.reorder_child(item, -1)
+
+    def _move_dragged(self, x, widget):
+        """Slide the dragged app's gap to where the pointer is, among the
+        kept apps. A running app moves in among them only if it can be kept."""
+        item = self.dragging
+        item.show()
+        others = [p for p in self.pinned if p is not item]
+        line = self._center(self.running_sep, widget) if self.running_sep.get_visible() else None
+        if item not in self.pinned and (not item.pin_id or (line is not None and x > line)):
+            if self.drag_at is not None:
+                self.drag_at = None
+                self.shelf.reorder_child(item, -1)
+            return
+        index = 0
+        for other in others:
+            center = self._center(other, widget)
+            if center is not None and center < x:
+                index += 1
+        if index != self.drag_at:
+            self.drag_at = index
+            self.shelf.reorder_child(item, index)
+
+    def _mark_drop(self, item):
+        if self.glowing is not None and self.glowing is not item:
+            self.glowing.set_drop_glow(False)
+        self.glowing = item
+        if item is not None:
+            item.set_drop_glow(True)
+
+    @staticmethod
+    def _opens_files(item, types=None):
+        """Whether this app can open files of these types. An app that names
+        the kinds of file it opens takes only those, as on a Mac."""
+        if not isinstance(item, Item) or item.info is None:
+            return False
+        if not (item.info.supports_files() or item.info.supports_uris()):
+            return False
+        accepts = item.info.get_supported_types() or []
+        if not accepts or not types:
+            return True
+        return all(any(Gio.content_type_is_a(kind, ok) for ok in accepts) for kind in types)
+
+    @staticmethod
+    def _types_of(uris):
+        kinds = []
+        for uri in uris:
+            path = Gio.File.new_for_uri(uri).get_path()
+            if path and os.path.isdir(path):
+                kinds.append("inode/directory")
+            else:
+                kind, _uncertain = Gio.content_type_guess(path or uri, None)
+                kinds.append(kind)
+        return kinds
+
+    def _show_drop_target(self, context, x, widget, time):
+        item = self._item_at(x, widget)
+        # Kept for the drop: by then the icons have shrunk back, so the
+        # pointer's spot may be over a different one.
+        self.drop_candidate = item
+        if self._opens_files(item, self.peek_types):
+            self._mark_drop(item)
+            Gdk.drag_status(context, Gdk.DragAction.COPY, time)
+        else:
+            self._mark_drop(None)
+            Gdk.drag_status(context, 0, time)
+
+    def _drag_motion(self, widget, context, x, _y, time):
+        target = widget.drag_dest_find_target(context, None)
+        if target is None:
+            Gdk.drag_status(context, 0, time)
+            return False
+        if target.name() == DOCK_TYPE and self.dragging is not None:
+            self.drag_outside = False
+            self._move_dragged(x, widget)
+            self._magnify(x, widget)
+            Gdk.drag_status(context, Gdk.DragAction.MOVE, time)
+            return True
+        self._magnify(x, widget)
+        self.peek_at = x
+        if self.peek_context is not context:
+            # First look: ask for the file list, and answer once it comes.
+            self.peek_context, self.peek_types, self.peeked = context, None, (None, [])
+            self.drop_candidate = None
+            widget.drag_get_data(context, target, time)
+            return True
+        if self.peek_types is not None:
+            self._show_drop_target(context, x, widget, time)
+        return True
+
+    def _drag_leave(self, _widget, _context, _time):
+        self._mark_drop(None)
+        self.peek_context, self.peek_types = None, None
+        self._magnify(None)
+        # Dragged up and out: its gap closes, as it will if it's let go there.
+        if self.dragging is not None:
+            self.drag_outside = True
+            self.dragging.hide()
+
+    def _drag_drop(self, widget, context, x, _y, time):
+        target = widget.drag_dest_find_target(context, None)
+        if target is None:
+            return False
+        if target.name() == DOCK_TYPE and self.dragging is not None:
+            item = self.dragging
+            self.drag_outside = False
+            # Where its gap was last is where it goes.
+            item.show()
+            children = self.shelf.get_children()
+            line = children.index(self.running_sep)
+            kept = [c.pin_id for c in children[:line] if isinstance(c, Item) and c.pin_id]
+            # Apps kept in the list but not shown (not installed now) stay kept.
+            kept += [d for d in self._saved_pinned() if d not in kept and d not in [
+                p.pin_id for p in self.pinned]]
+            self.dropped = True
+            if kept != self._saved_pinned():
+                self._save_pinned(kept)
+            Gtk.drag_finish(context, True, False, time)
+            return True
+        item = self.drop_candidate or self._item_at(x, widget)
+        self.drop_candidate = None
+        if not self._opens_files(item):
+            self._mark_drop(None)
+            Gtk.drag_finish(context, False, False, time)
+            return True
+        if self.peeked[1]:
+            # The files were already read on the way over.
+            self._open_dropped(item, context, self.peeked[1], time)
+            return True
+        self.drop_on = item
+        widget.drag_get_data(context, target, time)
+        return True
+
+    def _drag_data(self, widget, context, _x, _y, data, _info, time):
+        uris = data.get_uris() or []
+        if self.drop_on is None:
+            # The first look while dragging over: note the kinds of file.
+            if context is self.peek_context:
+                self.peeked = (context, uris)
+                self.peek_types = self._types_of(uris)
+                if self.peek_at is not None:
+                    self._show_drop_target(context, self.peek_at, widget, time)
+            return
+        item, self.drop_on = self.drop_on, None
+        self._open_dropped(item, context, uris, time)
+
+    def _open_dropped(self, item, context, uris, time):
+        self.peeked = (None, [])
+        self._mark_drop(None)
+        if not self._opens_files(item, self._types_of(uris)) or not uris:
+            Gtk.drag_finish(context, False, False, time)
+            return
+        try:
+            item.info.launch_uris(uris, None)
+            if not item.views:
+                item.bounce()
+            Gtk.drag_finish(context, True, False, time)
+        except GLib.Error:
+            Gtk.drag_finish(context, False, False, time)
 
     def _send_hints(self):
         """Tell Strata where each window's icon sits, so minimizing a window

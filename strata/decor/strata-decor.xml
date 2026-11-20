@@ -5,5 +5,10 @@
 		<_short>Strata title bars</_short>
 		<_long>freemac's window title bars for apps that don't draw their own.</_long>
 		<category>Window Management</category>
+		<option name="double_click" type="string">
+			<_short>Double-click a title bar to</_short>
+			<_long>zoom, minimize or none.</_long>
+			<default>zoom</default>
+		</option>
 	</plugin>
 </wayfire>

@@ -9,6 +9,9 @@
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
 #include <map>
+#include <csignal>
+#include <sys/types.h>
+#include <unistd.h>
 #include <string>
 #include <wayfire/util.hpp>
 #include <wayfire/view.hpp>
@@ -464,6 +467,38 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/force-quit {id}: end the program behind a window at once, for an
+     * app that has stopped answering (the Force Quit window). Only the
+     * user's own programs, and never the compositor itself. */
+    wf::ipc::method_callback force_quit_view = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        auto view = wf::ipc::find_view_by_id(data["id"]);
+        wl_client *client = view ? view->get_client() : nullptr;
+        if (!view || (view->role != wf::VIEW_ROLE_TOPLEVEL) || !client)
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        pid_t pid = 0;
+        uid_t uid = 0;
+        gid_t gid = 0;
+        wl_client_get_credentials(client, &pid, &uid, &gid);
+        if ((pid <= 1) || (pid == getpid()) || (uid != getuid()))
+        {
+            return wf::ipc::json_error("not a program of yours");
+        }
+
+        if (kill(pid, SIGKILL) != 0)
+        {
+            return wf::ipc::json_error("couldn't end it");
+        }
+
+        auto out = wf::ipc::json_ok();
+        out["pid"] = pid;
+        return out;
+    };
+
     /* strata/zoom {id}: fill the free part of the screen, or go back; what
      * the zoom button and the Window menu's Zoom do. */
     wf::ipc::method_callback zoom_view = [=] (nlohmann::json data)
@@ -512,6 +547,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/command-key", set_command_key_raw);
         method_repository->register_method("strata/held-modifiers", get_held_modifiers);
         method_repository->register_method("strata/zoom", zoom_view);
+        method_repository->register_method("strata/force-quit", force_quit_view);
         window_places.init();
         command_key.init();
     }

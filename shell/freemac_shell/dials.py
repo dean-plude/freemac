@@ -539,7 +539,33 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "A folder on the dock that shows your newest downloads."),
             row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
                 "Drop files on it to throw them away; right-click it to empty it."),
-        ), group(row("Clock", clock)), self.hot_corners())
+        ), group(row("Double-click a window's title bar to", self.title_double_click())),
+            group(row("Clock", clock)), self.hot_corners())
+
+    # What a double-click on a title bar does: freemac's own title bars read
+    # it from wayfire.ini, apps that draw their own read GNOME's setting.
+    TITLE_CLICK = (("zoom", "Zoom", "toggle-maximize"), ("minimize", "Minimize", "minimize"),
+                   ("none", "Do Nothing", "none"))
+
+    def title_double_click(self):
+        choice = Gtk.ComboBoxText()
+        for value, label, _gnome in self.TITLE_CLICK:
+            choice.append(value, label)
+        choice.set_active_id(ini_get(WAYFIRE_INI, "strata-decor", "double_click", "zoom") or "zoom")
+        if not choice.get_active_id():
+            choice.set_active_id("zoom")
+
+        def changed(combo):
+            value = combo.get_active_id()
+            ini_set(WAYFIRE_INI, "strata-decor", "double_click", value)
+            gnome = dict((v, g) for v, _l, g in self.TITLE_CLICK)[value]
+            source = Gio.SettingsSchemaSource.get_default()
+            if source and source.lookup("org.gnome.desktop.wm.preferences", True):
+                Gio.Settings.new("org.gnome.desktop.wm.preferences").set_string(
+                    "action-double-click-titlebar", gnome)
+
+        choice.connect("changed", changed)
+        return choice
 
     def hot_corners(self):
         from . import corners

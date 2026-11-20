@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Force Quit
+Comment=End an app that has stopped responding
+Exec=freemac-force-quit
+Icon=freemac-force-quit
+Categories=System;
+NoDisplay=true
+StartupWMClass=freemac-force-quit

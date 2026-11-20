@@ -199,14 +199,23 @@ The small things a Mac user notices in their first minute.
 | 3 | ⌘, opens an app's settings where it has them, and every app menu offers Settings… (and the app's own About) when it does | Topline, Strata | done |
 | 4 | Pier's right-click menu: a tick by the front window, and Options with Keep in Dock and Open at Login | Pier | done |
 
-## 1.9 "the Dock and stuck apps" (next)
+## 1.9 "the Dock and stuck apps" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | ⌥⌘⎋ opens a Force Quit window listing running apps, with a Force Quit button that ends one that has stopped answering | Strata, new shell window | |
-| 2 | Drag apps along the Dock to reorder them, and drag one up and out to take it off the Dock | Pier | |
-| 3 | Drop a file on an app in the Dock to open it with that app | Pier | |
-| 4 | Dials choice for what a double-click on a title bar does: Zoom (now) or Minimize | Dials, Strata | |
+| 1 | ⌥⌘⎋ (and Force Quit… in the logo menu) opens a Force Quit window listing running apps; Force Quit asks once, then ends the app | Strata, Force Quit | done |
+| 2 | Drag apps along the Dock to reorder them, drag one up and out to take it off, or drag a running app in among the kept ones to keep it | Pier | done |
+| 3 | Drop a file on an app in the Dock to open it there; only apps that can open that kind of file light up | Pier | done |
+| 4 | Dials > Dock and Menu Bar: double-click a window's title bar to Zoom, Minimize or Do Nothing | Dials, Strata | done |
+
+## 1.10 "alerts and the desktop" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Alerts look like a Mac's: the app's icon, a bold question, and small buttons on the right with the default one in blue, not full-width bars | theme, shell dialogs | |
+| 2 | Dials' sidebar looks like a Mac's settings sidebar: plain rows, each icon in a small coloured tile | Dials | |
+| 3 | Clicking the desktop makes the file manager the app in the menu bar, with its menus, as on a Mac | Topline, Drawer | |
+| 4 | Drop files on a folder in the Dock (like Downloads) to move them there | Pier | |
 
 ## Later
 

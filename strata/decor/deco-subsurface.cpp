@@ -299,8 +299,25 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         handle_action(layout.handle_press_event(ev.state == WLR_BUTTON_PRESSED));
     }
 
+    /* Strata: what a double-click on the title bar does, set in Dials
+     * ("zoom", "minimize" or "none"), as on a Mac. */
+    wf::option_wrapper_t<std::string> double_click{"strata-decor/double_click"};
+
     void handle_action(wf::strata_decor::decoration_layout_t::action_response_t action)
     {
+        if (action.action == wf::strata_decor::DECORATION_ACTION_TITLE_DOUBLE_CLICK)
+        {
+            std::string choice = double_click;
+            if (choice == "none")
+            {
+                return;
+            }
+
+            action.action = (choice == "minimize") ?
+                wf::strata_decor::DECORATION_ACTION_MINIMIZE :
+                wf::strata_decor::DECORATION_ACTION_TOGGLE_MAXIMIZE;
+        }
+
         if (auto view = _view.lock())
         {
             switch (action.action)
