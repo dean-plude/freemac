@@ -679,11 +679,27 @@ class DialsWindow(Gtk.ApplicationWindow):
 
         clear = Gtk.Button(label="Clear History")
         clear.connect("clicked", lambda _b: clips.clear())
+        options = (ini_get(WAYFIRE_INI, "input", "xkb_options", "") or "").split(",")
+
+        def command_beside_space(on):
+            kept = [o for o in (ini_get(WAYFIRE_INI, "input", "xkb_options", "") or "").split(",")
+                    if o.strip() and o.strip() != "altwin:swap_alt_win"]
+            ini_set(WAYFIRE_INI, "input", "xkb_options", ",".join(kept + (["altwin:swap_alt_win"] if on else [])))
+
         return page("Keyboard", group(
             row("Layout", layout, "An XKB layout code such as us, gb, de or fr. Press Enter to apply."),
+            row("\u2318 Command next to the space bar",
+                switch("altwin:swap_alt_win" in [o.strip() for o in options], command_beside_space),
+                "On: the key beside the space bar (Alt on most PC keyboards) is \u2318 Command and the one "
+                "beyond it is \u2325 Option, as on a Mac. Off: the Windows key is \u2318 Command. "
+                "Turn this off for a Mac keyboard."),
+            row("Command key", switch(ini_get(WAYFIRE_INI, "strata-shell", "command_key", "true") != "false",
+                                      lambda on: ini_set(WAYFIRE_INI, "strata-shell", "command_key",
+                                                         "true" if on else "false")),
+                "\u2318C, \u2318V, \u2318Z, \u2318S and the rest work in every app. Off: apps use Ctrl."),
         ), group(
             row("Clipboard history", switch(style.prefs().get("clipboard_history", True), history),
-                "Keep the last 50 things you copy, on this computer only. Super+Shift+V shows them. "
+                "Keep the last 50 things you copy, on this computer only. \u21e7\u2318V shows them. "
                 "Passwords marked as secret by a password manager are never kept."),
             row("Forget what was copied", clear),
         ), heading, self.shortcuts.widget)

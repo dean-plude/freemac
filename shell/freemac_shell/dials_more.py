@@ -139,7 +139,7 @@ def power(window):
     on_sleep = _switch(bool(prefs.get("lock_on_sleep", True)),
                        lambda active: window.save_prefs(lock_on_sleep=active))
     groups.append(group(row("Lock the screen after", lock_after,
-                            "You'll need your password to get back in. Super+L locks at once."),
+                            "You'll need your password to get back in. \u2303\u2318Q locks at once."),
                         row("Lock before sleeping", on_sleep)))
     if shutil.which("powerprofilesctl"):
         mode = Gtk.ComboBoxText()

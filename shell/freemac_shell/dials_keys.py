@@ -19,31 +19,38 @@ SHORTCUTS = (
     ("command", "binding_seek", "Seek", "<super> KEY_SPACE"),
     ("command", "binding_marina", "All apps (Marina)", "KEY_F4"),
     ("command", "binding_clips", "Clipboard history", "<super> <shift> KEY_V"),
-    ("command", "repeatable_binding_switcher", "Switch apps", "<alt> KEY_TAB"),
+    ("command", "repeatable_binding_switcher", "Switch apps", "<super> KEY_TAB | <alt> KEY_TAB"),
+    ("strata-shell", "next_app_window", "Next window of the app", "<super> KEY_GRAVE"),
+    ("strata-shell", "quit_app", "Quit the app", "<super> KEY_Q"),
+    ("strata-shell", "hide_app", "Hide the app", "<super> KEY_H"),
+    ("strata-shell", "hide_others", "Hide the other apps", "<super> <alt> KEY_H"),
+    ("wm-actions", "minimize", "Minimize window", "<super> KEY_M"),
+    ("wm-actions", "toggle_fullscreen", "Full screen", "<super> <ctrl> KEY_F"),
     ("scale", "toggle", "All windows", "<ctrl> KEY_UP | swipe up 4"),
-    ("scale", "toggle_all", "All windows on every desktop", "<super> KEY_TAB"),
+    ("scale", "toggle_all", "All windows on every desktop", "KEY_SCALE"),
     ("expo", "toggle", "All desktops", "<ctrl> KEY_DOWN | swipe down 4"),
     ("vswitch", "binding_left", "Desktop to the left", "<ctrl> KEY_LEFT"),
     ("vswitch", "binding_right", "Desktop to the right", "<ctrl> KEY_RIGHT"),
-    ("wm-actions", "toggle_showdesktop", "Show the desktop", "<super> KEY_D"),
-    ("core", "close_top_view", "Close window", "<super> KEY_Q | <alt> KEY_F4"),
-    ("wm-actions", "minimize", "Minimize window", "<super> KEY_M"),
-    ("wm-actions", "toggle_fullscreen", "Full screen", "<super> <ctrl> KEY_F"),
-    ("grid", "slot_l", "Fill the left half", "<super> KEY_LEFT | <super> KEY_KP4"),
-    ("grid", "slot_r", "Fill the right half", "<super> KEY_RIGHT | <super> KEY_KP6"),
-    ("grid", "slot_c", "Fill the screen", "<super> KEY_UP | <super> KEY_KP5"),
-    ("grid", "restore", "Back to its own size", "<super> KEY_DOWN | <super> KEY_KP0"),
-    ("command", "binding_terminal", "Open a terminal", "<super> KEY_ENTER"),
-    ("command", "binding_lock", "Lock the screen", "<super> KEY_L"),
-    ("command", "binding_lens_screen", "Screenshot", "KEY_SYSRQ"),
-    ("command", "binding_lens_area", "Screenshot of an area", "<shift> KEY_SYSRQ"),
+    ("wm-actions", "toggle_showdesktop", "Show the desktop", "<super> KEY_F3"),
+    ("grid", "slot_l", "Fill the left half", "<ctrl> <super> KEY_LEFT | <ctrl> <super> KEY_KP4"),
+    ("grid", "slot_r", "Fill the right half", "<ctrl> <super> KEY_RIGHT | <ctrl> <super> KEY_KP6"),
+    ("grid", "slot_c", "Fill the screen", "<ctrl> <super> KEY_UP | <ctrl> <super> KEY_KP5"),
+    ("grid", "restore", "Back to its own size", "<ctrl> <super> KEY_DOWN | <ctrl> <super> KEY_KP0"),
+    ("command", "binding_lock", "Lock the screen", "<super> <ctrl> KEY_Q"),
+    ("command", "binding_terminal", "Open a terminal", "<ctrl> <alt> KEY_T"),
+    ("command", "binding_lens_screen", "Screenshot", "<super> <shift> KEY_3 | KEY_SYSRQ"),
+    ("command", "binding_lens_area", "Screenshot of an area", "<super> <shift> KEY_4 | <shift> KEY_SYSRQ"),
     ("command", "binding_lens_window", "Screenshot of a window", "<alt> KEY_SYSRQ"),
     ("command", "binding_lens_record", "Start or stop recording the screen", "<ctrl> KEY_SYSRQ"),
-    ("command", "binding_lens_record_area", "Start or stop recording an area", "<ctrl> <shift> KEY_SYSRQ"),
+    ("command", "binding_lens_record_area", "Start or stop recording an area",
+     "<super> <shift> KEY_5 | <ctrl> <shift> KEY_SYSRQ"),
 )
 
-MODIFIERS = (("<super>", "Super"), ("<ctrl>", "Ctrl"), ("<alt>", "Alt"), ("<shift>", "Shift"))
-NAMES = {"SYSRQ": "Print Screen", "ENTER": "Enter", "ESC": "Escape", "PAGEUP": "Page Up",
+# Shown as on a Mac keyboard, in its order: Control, Option, Shift, Command.
+# Command is Super (Strata's Command key); Option is Alt.
+MODIFIERS = (("<ctrl>", "\u2303"), ("<alt>", "\u2325"), ("<shift>", "\u21e7"), ("<super>", "\u2318"))
+NAMES = {"SYSRQ": "Print Screen", "UP": "\u2191", "DOWN": "\u2193", "LEFT": "\u2190", "RIGHT": "\u2192",
+         "SCALE": "the overview key", "ENTER": "Enter", "ESC": "Escape", "PAGEUP": "Page Up",
          "PAGEDOWN": "Page Down", "BACKSPACE": "Backspace", "LEFTBRACE": "[", "RIGHTBRACE": "]",
          "SEMICOLON": ";", "APOSTROPHE": "'", "GRAVE": "`", "BACKSLASH": "\\", "COMMA": ",",
          "DOT": ".", "SLASH": "/", "MINUS": "-", "EQUAL": "=", "CAPSLOCK": "Caps Lock"}
@@ -66,7 +73,7 @@ def alternatives(value):
 
 
 def describe(binding):
-    """"<super> KEY_SPACE" -> "Super+Space"."""
+    """"<super> KEY_SPACE" -> "\u2318Space", "<ctrl> <super> KEY_F" -> "\u2303\u2318F"."""
     words = binding.split()
     if not words or not words[-1].startswith("KEY_"):
         return None
@@ -77,7 +84,7 @@ def describe(binding):
     else:
         plain = len(key) == 1 or (key[0] == "F" and key[1:].isdigit())
         name = NAMES.get(key) or (key if plain else key.replace("_", " ").title())
-    return "+".join(parts + [name])
+    return "".join(parts) + name
 
 
 def describe_all(value):
@@ -122,6 +129,15 @@ def binding_from(event):
     if state & Gdk.ModifierType.SHIFT_MASK:
         tags.append("<shift>")
     return " ".join(tags + [key])
+
+
+def raw_keys(on):
+    """Ask Strata to give Dials the keys as they are (no Command key)."""
+    try:
+        from .wfipc import Connection
+        Connection().call("strata/command-key", **{"app-id": "org.freemac.Dials", "raw": bool(on)})
+    except (OSError, ValueError, ConnectionError):
+        pass
 
 
 def same(a, b):
@@ -170,7 +186,8 @@ class Shortcuts:
         box.set_spacing(10)
         box.set_border_width(18)
         prompt = Gtk.Label(label=f"Press the keys for “{title}”.", xalign=0)
-        hint = Gtk.Label(label="Hold Super, Ctrl, Alt or Shift and press a key. Escape cancels.", xalign=0)
+        hint = Gtk.Label(label="Hold \u2318 Command, \u2303 Control, \u2325 Option or \u21e7 Shift and press a key. "
+                               "Escape cancels.", xalign=0)
         hint.get_style_context().add_class("dim-label")
         box.pack_start(prompt, False, False, 0)
         box.pack_start(hint, False, False, 0)
@@ -184,7 +201,7 @@ class Shortcuts:
             if binding is None:
                 return True
             if "<" not in binding and not binding.split()[-1].startswith(("KEY_F", "KEY_SYSRQ")):
-                hint.set_text(f"{describe(binding)} on its own is for typing; hold Super, Ctrl or Alt with it.")
+                hint.set_text(f"{describe(binding)} on its own is for typing; hold \u2318, \u2303 or \u2325 with it.")
                 return True
             taken = self.owner(binding, (section, option))
             if taken:
@@ -196,7 +213,11 @@ class Shortcuts:
 
         dialog.connect("key-press-event", pressed)
         dialog.show_all()
-        answer = dialog.run()
+        raw_keys(True)  # see Command as Command, not as Ctrl, while recording
+        try:
+            answer = dialog.run()
+        finally:
+            raw_keys(False)
         dialog.destroy()
         current = alternatives(self.value(section, option, default))
         keys = [b for b in current if "KEY_" in b]

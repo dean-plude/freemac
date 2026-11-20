@@ -59,7 +59,7 @@ one of them will be reverted.
 | Image viewer | **Frame** | 0.5 |
 | Runs simple Intel Mac command-line programs (optional add-on) | **Ferry** | 0.5: first version |
 | App centre for open-source apps, with system updates | **Harbor** | 0.6 |
-| Lock screen (Super+L, idle and before sleep) | **Latch** | 0.6; 1.3: laid out like the login screen |
+| Lock screen (Ctrl+Command+Q, idle and before sleep) | **Latch** | 0.6; 1.3: laid out like the login screen |
 | Calculator | **Tally** | 0.6 |
 | Clock with world clocks, alarms, timers and a stopwatch | **Chime** | 0.6 |
 | Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 17 folder and file icons, 4 wallpaper scenes; 1.2: every app's icon on the same rounded tile, a full GTK theme of our own, Inter as the system font |
@@ -186,20 +186,34 @@ build host because it couldn't reach Debian mirrors.
 
 ### Desktop shortcuts
 
+Command (⌘) is the key next to the space bar: Alt on most PC keyboards, with
+Option (⌥) beside it, as on a Mac keyboard. Dials > Keyboard can make the
+Windows key Command instead (for a Mac keyboard). Command with a key does in
+every app what Ctrl does on other PCs: Command+C copies, Command+V pastes,
+Command+Z undoes, Command+S saves, Command+T opens a tab, and so on (in a
+terminal, Command+C copies). Command+Left/Right go to the start or end of the
+line and Option+Left/Right move a word.
+
 | Keys or gesture | Action |
 | --- | --- |
-| Super+Space | Seek: search apps and files, or type a sum |
-| Ctrl+Up, Super+Tab, 4-finger swipe up | Show all windows |
+| Command+Space | Seek: search apps and files, or type a sum |
+| Command+Tab | Switch apps (hold Command, press Tab, let go); Alt+Tab works too |
+| Command+` | The app's next window |
+| Command+Q / Command+H / Option+Command+H | Quit the app / hide it / hide the others |
+| Command+M | Minimise the window |
+| Control+Command+F | Full screen |
+| Command+F3 | Show the desktop |
+| Ctrl+Up, 4-finger swipe up | Show all windows |
 | Ctrl+Down, 4-finger swipe down | Show all desktops |
 | Ctrl+Left / Ctrl+Right, 3-finger swipe | Switch desktop |
 | Ctrl+Shift+Left / Right | Move the window to the next desktop |
-| Alt+Tab | Switch apps (hold Alt, press Tab, let go) |
-| Super+Enter | Terminal |
-| Super+Q | Close window |
-| Super+M / Super+D | Minimise / show desktop |
-| Super+Shift+V | Clipboard history |
-| Print / Shift+Print / Alt+Print | Screenshot of the screen / an area / the window |
-| Ctrl+Print / Ctrl+Shift+Print | Record the screen / an area (press again to stop) |
+| Control+Command+Left / Right / Up / Down | Fill the left / right half, the screen, or back |
+| Control+Command+Q | Lock the screen |
+| Ctrl+Alt+T | Terminal |
+| Shift+Command+V | Clipboard history |
+| Shift+Command+3 / 4 (or Print / Shift+Print) | Screenshot of the screen / an area |
+| Alt+Print | Screenshot of the window |
+| Shift+Command+5, Ctrl+Print / Ctrl+Shift+Print | Record an area / the screen / an area (press again to stop) |
 | Volume, brightness and media keys | Change the level, shown near the bottom of the screen; play/pause, next, previous |
 
 In Drawer: Ctrl+1/2/3 switch between icon, list and column views, Ctrl+H

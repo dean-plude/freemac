@@ -10,5 +10,40 @@
 			<_long>Tell GTK apps that the menu bar at the top of the screen shows their menus, so they leave them out of their windows.</_long>
 			<default>true</default>
 		</option>
+		<option name="command_key" type="bool">
+			<_short>Super is the Command key</_short>
+			<_long>Super with a key does in apps what Ctrl with it does (Ctrl+Shift in a terminal); Super+Left/Right/Up/Down and Alt+Left/Right/Backspace move through text as on a Mac.</_long>
+			<default>true</default>
+		</option>
+		<option name="command_key_terminals" type="string">
+			<_short>Terminal apps</_short>
+			<_long>App ids, separated by spaces, that are told Ctrl+Shift for Super, so Super+C copies.</_long>
+			<default>foot footclient org.codeberg.dnkl.foot kitty Alacritty org.gnome.Terminal org.gnome.Console org.gnome.Ptyxis com.mitchellh.ghostty org.wezfurlong.wezterm xterm</default>
+		</option>
+		<option name="quit_app" type="activator">
+			<_short>Quit the app</_short>
+			<_long>Close every window of the focused app.</_long>
+			<default>&lt;super&gt; KEY_Q</default>
+		</option>
+		<option name="hide_app" type="activator">
+			<_short>Hide the app</_short>
+			<_long>Minimize every window of the focused app.</_long>
+			<default>&lt;super&gt; KEY_H</default>
+		</option>
+		<option name="hide_others" type="activator">
+			<_short>Hide the other apps</_short>
+			<_long>Minimize the windows of every other app.</_long>
+			<default>&lt;super&gt; &lt;alt&gt; KEY_H</default>
+		</option>
+		<option name="next_app_window" type="activator">
+			<_short>Next window of the app</_short>
+			<_long>Bring the focused app's next window to the front.</_long>
+			<default>&lt;super&gt; KEY_GRAVE</default>
+		</option>
+		<option name="prev_app_window" type="activator">
+			<_short>Previous window of the app</_short>
+			<_long>Bring the focused app's previous window to the front.</_long>
+			<default>&lt;super&gt; &lt;shift&gt; KEY_GRAVE</default>
+		</option>
 	</plugin>
 </wayfire>
