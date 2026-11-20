@@ -104,6 +104,18 @@ Debian's mirrors.
 | 5 | Pier: folders on the dock (Downloads stack) and a Trash you can empty | Pier | done |
 | 6 | First-run welcome: pick light or dark, wallpaper, Wi-Fi and a user account before the desktop opens | Welcome | done: light or dark, wallpaper, Wi-Fi and the account page; accounts themselves are made by Keel at install and in Dials > Users |
 
+## 1.1 "everyday extras" (in progress)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Volume, mute, microphone, brightness and media keys work, with the new level shown in a small panel near the bottom of the screen | freemac-keys, Beacon | done |
+| 2 | What's playing in quick settings (from any player that publishes it), with back, play/pause and forward | Topline | done |
+| 3 | A notes app: notes are plain text files in Documents › Notes, saved as you type, searchable, and found by Seek | **Jot** | done |
+| 4 | Screen recording: Ctrl+Print for the screen, Ctrl+Shift+Print for an area, a red stop button in Topline, videos saved to Videos › Screen Recordings | Lens | done |
+| 5 | Clipboard history: Super+Shift+V lists the last 50 things you copied; secrets marked by password managers are never kept; on/off and clear in Dials > Keyboard | freemac-clips, Dials | done |
+| 6 | Drawer compresses files to .zip and expands .zip and tar archives (safely: nothing is written outside the new folder) | Drawer | done |
+| 7 | Hot corners: pick what each screen corner does (all windows, all desktops, show the desktop, notifications, a new note, lock) | Dials, Strata | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
