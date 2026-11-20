@@ -20,7 +20,8 @@ from gi.repository import Gio, GLib  # noqa: E402
 # freemac's apps that keep running windowless: the name each owns on the bus,
 # and the app ID its windows carry. Drawer runs as many copies as it has
 # windows, and Tally quits with its window, as a Mac's Calculator does.
-HELD_APPS = {"org.freemac.Quill": "freemac-quill", "org.freemac.Jot": "freemac-jot"}
+HELD_APPS = {"org.freemac.Quill": "freemac-quill", "org.freemac.Jot": "freemac-jot",
+             "org.freemac.Tide": "freemac-tide", "org.freemac.Crew": "freemac-crew"}
 
 DBUS = "org.freedesktop.DBus"
 

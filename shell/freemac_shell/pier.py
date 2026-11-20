@@ -46,7 +46,7 @@ CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
 SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
-                  "freemac-jot.desktop",
+                  "freemac-tide.desktop", "freemac-crew.desktop", "freemac-jot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]
 
 

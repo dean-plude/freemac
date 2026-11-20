@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Crew: a name card with a person on it, over a rope knot. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34b39b"/><stop offset="1" stop-color="#1d8a78"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="22" y="30" width="84" height="66" rx="10" fill="#fbfdfc"/>
+  <circle cx="46" cy="56" r="13" fill="#f4b25c"/>
+  <circle cx="46" cy="52" r="5.5" fill="#fff6e8"/>
+  <path d="M36.5 65 a10 8 0 0 1 19 0" fill="#fff6e8"/>
+  <g stroke="#c7d6d2" stroke-width="5" stroke-linecap="round">
+    <line x1="68" y1="50" x2="92" y2="50"/>
+    <line x1="68" y1="62" x2="86" y2="62"/>
+  </g>
+  <path d="M30 84 h68" stroke="#34b39b" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 9"/>
+</svg>

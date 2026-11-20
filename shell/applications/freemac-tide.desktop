@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Tide
+GenericName=Calendar
+Comment=Keep track of your days and events
+Exec=freemac-tide %f
+Icon=freemac-tide
+Categories=Office;Calendar;
+Keywords=calendar;events;dates;schedule;appointments;month;week;
+MimeType=text/calendar;
+StartupWMClass=org.freemac.Tide
+StartupNotify=true
