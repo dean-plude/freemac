@@ -11,7 +11,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, fallback_menus, held, mac_accel, quick, status, style  # noqa: E402
+from . import apps, beacon, fallback_menus, held, helpsearch, mac_accel, quick, status, style  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -109,6 +109,15 @@ class Topline(Gtk.Window):
         self.window_button.set_popup(self.window_menu)
         bar.pack_start(self.window_button, False, False, 0)
         self._slide(self.window_button)
+
+        # Help ends every app's menus: a search field that finds menu items.
+        # Its button opens a panel of its own, which takes the keyboard.
+        self.help_button = helpsearch.HelpButton()
+        self.help = helpsearch.HelpPanel(self._searchable_menus,
+                                         lambda: self.help_button.set_active(False))
+        self.help_button.connect("toggled", self._help_toggled)
+        bar.pack_start(self.help_button, False, False, 0)
+        self._slide(self.help_button)
 
         # The clock opens Beacon's notification centre.
         self.clock = Gtk.Label()
@@ -389,6 +398,25 @@ class Topline(Gtk.Window):
         for button in self.menus_box.get_children():
             yield button.get_popup()
 
+    def _help_toggled(self, button):
+        if not button.get_active():
+            self.help.close_panel()
+            return
+        # Clicking Help while it's open closes it: the click first takes the
+        # focus from the panel (closing it), then would open it again.
+        if time.monotonic() - self.help.closed_at < 0.4:
+            button.set_active(False)
+            return
+        spot = button.translate_coordinates(self, 0, 0)
+        self.help.open_at(spot[0] if spot else 0)
+
+    def _searchable_menus(self):
+        """(title, menu) for each menu Help searches, in the bar's order."""
+        yield self.app_button.get_label() or "", self.app_button.get_popup()
+        for button in self.menus_box.get_children():
+            yield (button.get_label() or "").replace("_", ""), button.get_popup()
+        yield "Window", self.window_menu
+
     def _menu_open(self):
         return any(menu is not None and menu.get_visible() for menu in self._menus())
 
@@ -397,6 +425,7 @@ class Topline(Gtk.Window):
         yield self.app_button
         yield from self.menus_box.get_children()
         yield self.window_button
+        yield self.help_button
 
     def _slide(self, button):
         """As on a Mac, once one menu is open, moving the pointer onto

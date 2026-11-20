@@ -16,7 +16,7 @@ from gi.repository import Gio  # noqa: E402
 TEMPLATE = """
 .topline { background-color: @bar; color: @ink; }
 .topline button { background: none; border: none; box-shadow: none; padding: 0 9px; min-height: 24px; color: @ink; }
-.topline button:hover { background-color: @hover; border-radius: 6px; }
+.topline button:hover, .topline button:checked { background-color: @hover; border-radius: 6px; }
 .topline label { color: @ink; }
 .topline .app-name { font-weight: 700; }
 .topline .app-name menu, .topline .app-name menu label { font-weight: 400; }
@@ -60,6 +60,10 @@ TEMPLATE = """
 .seek row:selected { background-color: #2f7bf5; color: white; }
 .seek row:selected .hint { color: rgba(255, 255, 255, 0.75); }
 .seek .hint { color: @dim; font-size: 12px; }
+.help-panel list, .help-panel row { background-color: transparent; }
+.help-panel row { padding: 2px 4px; border-radius: 5px; }
+.help-panel row:selected { background-color: #2f7bf5; }
+.help-panel row:selected label { color: white; }
 """
 
 LIGHT = {"bar": "rgba(246, 246, 248, 0.66)", "ink": "#1d1d1f", "hover": "rgba(0, 0, 0, 0.09)",

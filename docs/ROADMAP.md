@@ -276,13 +276,21 @@ The small things a Mac user notices in their first minute.
 | 3 | Web and Firefox get their usual menus (New Tab, New Window, Reopen Closed Tab, History, Bookmarks, zoom), and VLC gets Playback, from a short list freemac keeps | Topline | done |
 | 4 | Help in every app's bar, with a search that finds menu items | Topline | moved to 1.17 |
 
-## 1.17 "help and search" (next)
+## 1.17 "help and search" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Help in every app's bar, with a search box that finds and highlights menu items as you type | Topline | |
-| 2 | Choosing a found item runs it, keyboard only (arrows and Return) | Topline | |
-| 3 | Seek finds menu items of the app in front too | Seek | |
+| 1 | Help in every app's bar, with a search box that finds menu items as you type, showing the menu each is in and its shortcut | Topline | done |
+| 2 | Choosing a found item runs it, keyboard only (arrows and Return) | Topline | done |
+| 3 | Seek finds menu items of the app in front too | Seek | moved to 1.18 |
+
+## 1.18 "search everywhere" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Seek finds the menu items of the app in front (Topline shares them over D-Bus) | Seek, Topline | |
+| 2 | Seek finds settings by name ("wallpaper", "night light") and opens Dials at the right page | Seek, Dials | |
+| 3 | Help also lists short freemac Guide topics that match, opened in a small Guide window | Topline | |
 
 ## Later
 
