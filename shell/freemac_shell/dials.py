@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
+from . import alert, dials_accounts, dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -145,6 +145,7 @@ CSS = b"""
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
+.dials-error { color: #f04d3e; font-size: 12px; }
 .dials-choice { padding: 8px; border-radius: 12px; border: 2px solid transparent; background: none; box-shadow: none; }
 .dials-choice:checked { border-color: #2f7bf5; }
 .dials-chosen { border-color: #2f7bf5; }
@@ -364,6 +365,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             (2, "wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", "teal", self.wallpaper),
             (3, "power", "Power", "battery-good-symbolic", "green", lambda: dials_more.power(self)),
             (4, "users", "Users", "system-users-symbolic", "indigo", lambda: dials_people.UsersPanel(self, page)),
+            (4, "accounts", "Internet Accounts", "emblem-synchronizing-symbolic", "blue",
+             lambda: dials_accounts.AccountsPanel(self, page)),
             (5, "keyboard", "Keyboard", "input-keyboard-symbolic", "gray", self.keyboard),
             (5, "pointing", "Trackpad and Mouse", "input-touchpad-symbolic", "gray", self.pointing),
             (5, "printers", "Printers", "printer-symbolic", "gray", lambda: dials_people.PrintersPanel(self, page)),
