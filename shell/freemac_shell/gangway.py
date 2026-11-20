@@ -20,6 +20,8 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
+from . import style  # noqa: E402
+
 SESSION = ["/usr/local/bin/freemac-session"]
 WALLPAPER = "/usr/share/backgrounds/freemac/dusk-tide.png"
 AVATAR = 96
@@ -48,19 +50,6 @@ label { color: white; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
 .gangway-power:hover .gangway-power-circle { background-color: rgba(255, 255, 255, 0.34); }
 .gangway-power label { font-size: 12px; }
 """
-
-
-def blurred(pixbuf, width, height):
-    """The wallpaper filling width x height, softly blurred (shrink, then grow
-    back with smooth scaling, twice), and a touch darker so text stands out."""
-    scale = max(width / pixbuf.get_width(), height / pixbuf.get_height())
-    full = pixbuf.scale_simple(max(1, int(pixbuf.get_width() * scale)), max(1, int(pixbuf.get_height() * scale)),
-                               GdkPixbuf.InterpType.BILINEAR)
-    small = full.scale_simple(max(1, full.get_width() // 24), max(1, full.get_height() // 24),
-                              GdkPixbuf.InterpType.HYPER)
-    small = small.scale_simple(max(1, full.get_width() // 8), max(1, full.get_height() // 8),
-                               GdkPixbuf.InterpType.BILINEAR)
-    return small.scale_simple(full.get_width(), full.get_height(), GdkPixbuf.InterpType.BILINEAR)
 
 
 def initials(name):
@@ -270,7 +259,7 @@ class Gangway(Gtk.Window):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
         if self.wallpaper:
             if self.soft is None or (self.soft.get_width(), self.soft.get_height()) < (width, height):
-                self.soft = blurred(self.wallpaper, width, height)
+                self.soft = style.blurred(self.wallpaper, width, height)
             Gdk.cairo_set_source_pixbuf(cr, self.soft, (width - self.soft.get_width()) / 2,
                                         (height - self.soft.get_height()) / 2)
             cr.paint()

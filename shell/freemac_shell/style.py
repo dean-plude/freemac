@@ -24,12 +24,12 @@ TEMPLATE = """
 .topline button.status { padding: 0 6px; min-width: 0; }
 .topline button.recording image { color: #e5484d; }
 
-.pier-shelf {
+.pier-shelf { padding: 6px 10px; }
+.pier-shelf-bg {
   background-color: @shelf;
   border: 1px solid @edge;
   border-radius: 18px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-  padding: 6px 10px;
 }
 .pier-item { background: none; border: none; box-shadow: none; padding: 0 3px; }
 .pier-dot { color: @ink; font-size: 7px; }
@@ -121,6 +121,21 @@ def apply(on_change=None):
                     on_change(is_dark())
             _settings.connect("changed::color-scheme", changed)
     _provider.load_from_data(css(is_dark()))
+
+
+def blurred(pixbuf, width, height):
+    """A picture filling width x height, softly blurred (shrunk a lot, then
+    grown back with smooth scaling): for the login screen and Marina."""
+    from gi.repository import GdkPixbuf
+
+    scale = max(width / pixbuf.get_width(), height / pixbuf.get_height())
+    full = pixbuf.scale_simple(max(1, int(pixbuf.get_width() * scale)), max(1, int(pixbuf.get_height() * scale)),
+                               GdkPixbuf.InterpType.BILINEAR)
+    small = full.scale_simple(max(1, full.get_width() // 24), max(1, full.get_height() // 24),
+                              GdkPixbuf.InterpType.HYPER)
+    small = small.scale_simple(max(1, full.get_width() // 8), max(1, full.get_height() // 8),
+                               GdkPixbuf.InterpType.BILINEAR)
+    return small.scale_simple(full.get_width(), full.get_height(), GdkPixbuf.InterpType.BILINEAR)
 
 
 def make_transparent(window):

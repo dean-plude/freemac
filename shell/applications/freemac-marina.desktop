@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Marina
+GenericName=All Apps
+Comment=See every app on one full-screen grid
+Exec=freemac-marina
+Icon=freemac-marina
+Categories=Utility;
+Keywords=apps;applications;all apps;grid;launcher;
