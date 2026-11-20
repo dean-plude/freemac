@@ -59,8 +59,7 @@ def item_row(icon, title, subtitle, *widgets):
 
 
 def message(window, text, secondary=None, kind=Gtk.MessageType.ERROR):
-    alert.tell(window, text, secondary or "",
-               icon="dialog-warning" if kind == Gtk.MessageType.ERROR else None)
+    alert.tell(window, text, secondary or "")
 
 
 # ---- Users ----------------------------------------------------------------------
@@ -260,7 +259,7 @@ class UsersPanel(Gtk.Box):
         answer = alert.ask(self.window, f"Delete {full}?",
                            "They won't be able to log in any more. You can keep their files or delete them too.",
                            [("Keep Files", 1), ("Delete Files", 2), ("Cancel", Gtk.ResponseType.CANCEL)],
-                           default=1, destructive=2, icon="avatar-default")
+                           default=1, destructive=2)
         if answer in (1, 2):
             self.helper("delete", name, "keep" if answer == 1 else "remove")
 
@@ -413,7 +412,7 @@ class BluetoothPanel(Gtk.Box):
     def ask(self, text, secondary):
         answer = alert.ask(self.window, text, secondary,
                            [("Cancel", Gtk.ResponseType.CANCEL), ("Pair", Gtk.ResponseType.OK)],
-                           default=Gtk.ResponseType.OK, icon="bluetooth")
+                           default=Gtk.ResponseType.OK)
         return answer == Gtk.ResponseType.OK
 
     def ask_code(self, name):
@@ -651,7 +650,7 @@ class PrintersPanel(Gtk.Box):
     def remove(self, name, description):
         answer = alert.ask(self.window, f"Remove {description}?", "You can add it again later.",
                            [("Cancel", Gtk.ResponseType.CANCEL), ("Remove", Gtk.ResponseType.OK)],
-                           default=Gtk.ResponseType.OK, icon="printer")
+                           default=Gtk.ResponseType.OK)
         if answer == Gtk.ResponseType.OK:
             self.lp("lpadmin", "-x", name)
 

@@ -120,7 +120,27 @@ def scene_version(path, dark):
         if name in (day, night) or not path:
             return os.path.join(WALLPAPERS, night if dark else day)
     return None
+# Other words people use for what's on each page, for the sidebar's search.
+SEARCH_WORDS = {
+    "network": "wifi wi-fi internet wireless ethernet vpn proxy",
+    "bluetooth": "pair headphones speaker mouse keyboard",
+    "notifications": "alerts banners do not disturb focus",
+    "sound": "volume speaker microphone output input audio alert chime",
+    "about": "version computer name storage memory system update",
+    "appearance": "dark light mode theme accent text size tiling",
+    "accessibility": "zoom contrast larger text reduce motion screen reader",
+    "dock": "menu bar magnification trash downloads title bar double-click hide",
+    "displays": "screen resolution brightness night light scale monitor",
+    "wallpaper": "background desktop picture",
+    "power": "battery sleep suspend energy shut down restart",
+    "users": "accounts password login automatic log in people",
+    "keyboard": "shortcuts command key layout input language typing",
+    "pointing": "trackpad mouse click scroll tap pointer speed",
+    "printers": "print scanner",
+}
+
 CSS = b"""
+.dials-search { margin: 10px 10px 4px 10px; }
 .dials-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 .dials-sidebar list, .dials-sidebar list row { background: none; border: none; box-shadow: none; }
 .dials-sidebar list row { padding: 4px 8px; border-radius: 6px; margin: 0 10px; min-height: 0; }
@@ -323,7 +343,15 @@ class DialsWindow(Gtk.ApplicationWindow):
         sidebar.connect("row-selected", lambda _l, r: r and self.stack.set_visible_child_name(r.name))
         side_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         side_box.get_style_context().add_class("dials-sidebar")
+        # Search at the top, as on a Mac: typing narrows the list to the
+        # settings whose name or usual words match, and Return opens the first.
+        self.search = Gtk.SearchEntry(placeholder_text="Search")
+        self.search.get_style_context().add_class("dials-search")
+        self.search.connect("search-changed", self._search_changed)
+        self.search.connect("activate", self._search_open)
+        side_box.pack_start(self.search, False, False, 0)
         side_box.pack_start(sidebar, True, True, 6)
+        sidebar.set_filter_func(self._search_match)
         paned.pack1(side_box, False, False)
         paned.pack2(self.stack, True, False)
         paned.set_position(200)
@@ -355,6 +383,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         ):
             item = Gtk.ListBoxRow()
             item.name, item.group_no = name, group_no
+            item.words = (title + " " + SEARCH_WORDS.get(name, "")).lower()
             line = Gtk.Box(spacing=8)
             tile = Gtk.Box(halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
             tile.get_style_context().add_class("dials-tile")
@@ -406,10 +435,32 @@ class DialsWindow(Gtk.ApplicationWindow):
             words = {"reboot": ("Restart now?", "Restart"), "poweroff": ("Shut down now?", "Shut Down")}[action]
             answer = alert.ask(self, words[0], "Unsaved work in open apps will be lost.",
                                [("Cancel", Gtk.ResponseType.CANCEL), (words[1], Gtk.ResponseType.OK)],
-                               default=Gtk.ResponseType.OK, icon="system-shutdown")
+                               default=Gtk.ResponseType.OK)
             if answer != Gtk.ResponseType.OK:
                 return
         Gio.Subprocess.new(["systemctl", action], Gio.SubprocessFlags.NONE)
+
+    def _search_match(self, row):
+        text = self.search.get_text().strip().lower()
+        return not text or all(part in row.words for part in text.split())
+
+    def _search_changed(self, _entry):
+        self.sidebar.invalidate_filter()
+        self.sidebar.invalidate_headers()
+        first = self._first_found()
+        if first is not None and self.search.get_text().strip():
+            self.sidebar.select_row(first)
+
+    def _first_found(self):
+        return next((row for row in self.sidebar.get_children()
+                     if row.get_child_visible() and self._search_match(row)), None)
+
+    def _search_open(self, _entry):
+        if not self.search.get_text().strip():
+            return
+        first = self._first_found()
+        if first is not None:
+            self.sidebar.select_row(first)
 
     def show_panel(self, name):
         if name in self.rows:

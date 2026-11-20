@@ -189,7 +189,7 @@ flowboxchild { border-radius: 8px; }
 placessidebar row:selected label, placessidebar row:selected image,
 stacksidebar row:selected label { color: @fm_fg; }
 .sidebar row:selected image, placessidebar row:selected image { color: @fm_accent; }
-paned > separator { background-color: @fm_line; min-width: 1px; min-height: 1px; background-image: none; }
+paned > separator { background-color: @fm_line; min-width: 1px; min-height: 1px; background-image: none; background-clip: content-box; }
 
 /* Scrollbars: thin, rounded, only solid while used. */
 scrollbar { background: none; border: none; }

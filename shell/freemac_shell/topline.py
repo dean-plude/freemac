@@ -16,6 +16,7 @@ from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
 DESKTOP_APP = "Drawer"   # the file manager, in the bar when the desktop is in front
+DESKTOP_OWNED = {"freemac-pier", "org.freemac.pier"}   # windows of the Dock count as the desktop's
 DESKTOP_GO = (("Home", "", "⇧⌘H"), ("Desktop", "Desktop", "⇧⌘D"),
               ("Documents", "Documents", "⇧⌘O"), ("Downloads", "Downloads", "⌥⌘L"),
               ("Pictures", "Pictures", ""), ("Music", "Music", ""))
@@ -214,6 +215,10 @@ class Topline(Gtk.Window):
         # that app's menus until the menu closes.
         if view is None and self._menu_open():
             return
+        if view is not None and (view.get("app-id") or "").lower() in DESKTOP_OWNED:
+            # The Dock's own windows (the Empty Trash alert) belong to the
+            # file manager, as the Trash does on a Mac.
+            view = None
         self.focused = view
         self._fill_app_menus(view)
         app_id = view.get("app-id") if view else None
