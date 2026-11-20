@@ -5,9 +5,9 @@
     freemac-lock --watch    started at login: locks after the idle time set in
                             Dials > Power, and before the computer sleeps
 
-The lock itself is gtklock (Wayland session locking with PAM), dressed with
-freemac's own style: the current wallpaper, a large clock and a password
-field. Idle detection is swayidle. Settings live in ~/.config/freemac/shell.json
+The lock itself is gtklock (Wayland session locking with PAM), dressed to
+look like the login screen: the blurred wallpaper, the date and a large
+clock, the person's picture and name, and a round password field. Idle detection is swayidle. Settings live in ~/.config/freemac/shell.json
 as "lock_after" (minutes, 0 for never) and "lock_on_sleep".
 """
 import os
@@ -23,50 +23,56 @@ from . import backdrop, style
 DEFAULT_LOCK_AFTER = 5   # minutes
 
 
+# The lock screen looks like Gangway, the login screen: the wallpaper softly
+# blurred, the date and a large clock at the top, the person's picture and
+# name in the lower middle over a round password field. freemac-latch.so (a
+# gtklock module, strata/latch) moves gtklock's widgets into that layout;
+# without it the same colours still apply to gtklock's own layout.
 CSS = """
 window {
-    background-color: %(bg)s;
+    background-color: #1c1e4a;
     background-size: cover;
     background-position: center;
 }
-#window-box {
-    background-color: %(veil)s;
-    border-radius: 22px;
-    padding: 28px 36px;
-    margin: 40px;
-}
-#clock-label {
-    color: %(fg)s;
-    font-family: "Inter", sans-serif;
-    font-weight: 300;
-    font-size: 72pt;
-    font-feature-settings: "tnum";
-}
-window.focused:not(.hidden) #clock-label { font-size: 44pt; }
-#input-label { color: %(dim)s; }
+#window-box { background: none; padding: 0; }
+label { color: #ffffff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
+#clock-label { font-size: 84px; font-weight: 600; font-feature-settings: "tnum"; }
+#date-label { font-size: 21px; font-weight: 500; color: rgba(255, 255, 255, 0.92); }
+#name-label { font-size: 17px; font-weight: 600; }
+#placeholder-label { color: rgba(255, 255, 255, 0.62); text-shadow: none; font-size: 14px; }
+#input-label { color: rgba(255, 255, 255, 0.80); }
+#latch-field { background-color: rgba(255, 255, 255, 0.22); border-radius: 18px; padding: 0 4px 0 14px; }
+#latch-field #input-field { background: none; border: none; box-shadow: none; min-width: 0;
+                            border-radius: 0; padding: 0; }
 #input-field {
-    min-width: 260px;
-    min-height: 36px;
+    min-height: 34px;
     border-radius: 18px;
     padding: 0 14px;
-    background-color: %(field)s;
-    color: %(fg)s;
-    border: 1px solid %(edge)s;
-    box-shadow: none;
-}
-#unlock-button {
-    border-radius: 18px;
-    min-height: 36px;
-    padding: 0 16px;
-    background-image: none;
-    background-color: %(accent)s;
+    background-color: rgba(255, 255, 255, 0.22);
     color: #ffffff;
+    caret-color: #ffffff;
+    font-size: 14px;
     border: none;
     box-shadow: none;
 }
-#error-label { color: %(error)s; font-weight: bold; }
-#warning-label { color: %(warning)s; }
+#unlock-button {
+    min-width: 26px;
+    min-height: 26px;
+    padding: 0;
+    border-radius: 13px;
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+}
+#unlock-button:hover { background-color: rgba(255, 255, 255, 0.40); }
+#unlock-button:disabled { background-color: rgba(255, 255, 255, 0.12); }
+#error-label { color: #ffd8d4; font-size: 13px; }
+#warning-label { color: rgba(255, 255, 255, 0.80); font-size: 13px; }
 """
+
+MODULE = "/usr/lib/gtklock/freemac-latch.so"
 
 
 def settings():
@@ -86,21 +92,9 @@ def runtime_dir():
 
 
 def write_style():
-    dark = style.is_dark()
-    colours = {
-        "bg": "#1c1e34",
-        "veil": "rgba(18, 20, 38, 0.55)" if dark else "rgba(250, 249, 255, 0.62)",
-        "fg": "#f4f3fb" if dark else "#1d1f33",
-        "dim": "rgba(244, 243, 251, 0.7)" if dark else "rgba(29, 31, 51, 0.65)",
-        "field": "rgba(255, 255, 255, 0.12)" if dark else "rgba(255, 255, 255, 0.85)",
-        "edge": "rgba(255, 255, 255, 0.18)" if dark else "rgba(29, 31, 51, 0.15)",
-        "accent": "#5b6cf0",
-        "error": "#ffb4a8" if dark else "#a8231a",
-        "warning": "#ffd58a" if dark else "#8a5a00",
-    }
     path = os.path.join(runtime_dir(), "style.css")
     with open(path, "w") as f:
-        f.write(CSS % colours)
+        f.write(CSS)
     return path
 
 
@@ -108,6 +102,52 @@ def wallpaper():
     image = backdrop.read_settings().get("image") or backdrop.DEFAULT_IMAGE
     image = os.path.expanduser(image)
     return image if os.path.isfile(image) else None
+
+
+def soft_wallpaper():
+    """The wallpaper blurred and dimmed a little, as behind the login screen.
+    Kept in the runtime folder and made again when the wallpaper changes."""
+    image = wallpaper()
+    if not image:
+        return None
+    try:
+        import gi
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf
+        stamp = "%s:%d" % (image, int(os.path.getmtime(image)))
+        out = os.path.join(runtime_dir(), "background.png")
+        mark = out + ".source"
+        try:
+            with open(mark) as f:
+                if f.read() == stamp and os.path.isfile(out):
+                    return out
+        except OSError:
+            pass
+        picture = GdkPixbuf.Pixbuf.new_from_file(image)
+        soft = style.blurred(picture, 1600, 1000)
+        # The login screen lays 12% black over it.
+        dim = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, soft.get_width(), soft.get_height())
+        dim.fill(0x000000ff)
+        dim.composite(soft, 0, 0, soft.get_width(), soft.get_height(), 0, 0, 1, 1,
+                      GdkPixbuf.InterpType.NEAREST, 31)
+        soft.savev(out, "png", [], [])
+        with open(mark, "w") as f:
+            f.write(stamp)
+        return out
+    except Exception:  # noqa: BLE001 - a plain wallpaper is fine too
+        return image
+
+
+def module_fits():
+    """freemac-latch.so is built for gtklock 2.1's layout."""
+    if not os.path.isfile(MODULE):
+        return False
+    try:
+        out = subprocess.run(["gtklock", "--version"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    words = (out.stdout + out.stderr).split()   # "gtklock v2.1.0"
+    return bool(words) and words[-1].lstrip("v").startswith("2.1.")
 
 
 def locked():
@@ -121,9 +161,11 @@ def lock_command():
                "--idle-hide", "--idle-timeout", "20"]
     if style.is_dark():
         command += ["--gtk-theme", "freemac-dark"]
-    image = wallpaper()
+    image = soft_wallpaper()
     if image:
         command += ["--background", image]
+    if module_fits():
+        command += ["--modules", MODULE]
     return command
 
 

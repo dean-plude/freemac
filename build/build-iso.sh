@@ -183,16 +183,21 @@ python3 "$REPO/art/gtk-theme/make-theme.py" "$ROOTFS/usr/share/themes"
 # freemac's icon theme: our own folder and file-type icons, Adwaita for the rest.
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"
+# freemac's own pointer (art/cursors), drawn into the same theme.
+cp "$REPO/art/cursors/make-cursors.py" "$ROOTFS/tmp/make-cursors.py"
+in_chroot python3 /tmp/make-cursors.py /usr/share/icons/freemac || log "Warning: couldn't draw freemac's pointer"
+rm -f "$ROOTFS/tmp/make-cursors.py"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
 # Every installed app's own icon on freemac's rounded-square tile. The apt hook
 # in the overlay does the same for apps installed later.
 in_chroot freemac-icon-tiles --system --quiet || log "Warning: couldn't make app icon tiles"
 # Strata's own Wayfire plugins (C++), compiled against the image's Wayfire:
-# strata-decor (title bars) and strata-shell (gtk-shell that hands app menus
-# to Topline). The build tools are removed again afterwards. If this Wayfire
+# strata-decor (title bars and rounded window corners) and strata-shell
+# (gtk-shell that hands app menus to Topline), plus Latch's lock screen
+# module for gtklock. The build tools are removed again afterwards. If this Wayfire
 # has a plugin API they don't support yet, Wayfire's stock plugins stay in use.
 log "Building Strata's plugins"
-STRATA_BUILD_DEPS="g++ pkg-config wayfire-dev wayland-protocols libwayland-bin nlohmann-json3-dev"
+STRATA_BUILD_DEPS="g++ pkg-config wayfire-dev wayland-protocols libwayland-bin nlohmann-json3-dev libgtk-3-dev"
 # Only remove afterwards what this step added.
 STRATA_NEW_DEPS=""
 for pkg in $STRATA_BUILD_DEPS; do
@@ -209,6 +214,9 @@ if in_chroot apt-get install -y --no-install-recommends $STRATA_BUILD_DEPS \
     install -m 0644 "$ROOTFS/tmp/strata/out/libstrata-$plugin.so" "$ROOTFS$plugdir/libstrata-$plugin.so"
     install -D -m 0644 "$REPO/strata/$plugin/strata-$plugin.xml" "$ROOTFS/usr/share/wayfire/metadata/strata-$plugin.xml"
   done
+  if [ -f "$ROOTFS/tmp/strata/out/freemac-latch.so" ]; then
+    install -D -m 0644 "$ROOTFS/tmp/strata/out/freemac-latch.so" "$ROOTFS/usr/lib/gtklock/freemac-latch.so"
+  fi
   for ini in "$ROOTFS/etc/skel/.config/wayfire.ini" "$ROOTFS/home/freemac/.config/wayfire.ini"; do
     if [ -f "$ini" ]; then
       sed -i -e 's/^\(plugins = .*\) decoration /\1 strata-decor /' \
