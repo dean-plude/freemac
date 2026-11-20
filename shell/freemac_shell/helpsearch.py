@@ -5,7 +5,8 @@ As on a Mac, every app has Help at the end of its menu bar. Open it and just
 type: the words go into the search field and the menu items that match show
 under it, with the menu they're in and their shortcut. The arrow keys move
 through them and Return chooses one, which does exactly what the item does
-in its own menu. Escape, or a click elsewhere, closes it. Original freemac code.
+in its own menu. Guide topics that match are listed under the menu items and
+open in Guide. Escape, or a click elsewhere, closes it. Original freemac code.
 """
 import time
 
@@ -15,9 +16,10 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import style  # noqa: E402
+from . import guide_topics, style  # noqa: E402
 
 MOST = 12
+TOPICS = 4
 BAR = 28
 ARROW = " ▸ "
 
@@ -93,6 +95,7 @@ class HelpPanel(Gtk.Window):
     def __init__(self, sources, closed):
         super().__init__(title="Help")
         self.sources, self.closed, self.found, self.closed_at = sources, closed, [], 0.0
+        self.picks = []   # what each row of the list does: a menu item, a Guide topic, or None
         style.make_transparent(self)
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
@@ -115,7 +118,7 @@ class HelpPanel(Gtk.Window):
         self.connect("button-press-event", self._pressed)
         row = Gtk.Box(spacing=8)
         row.pack_start(Gtk.Label(label="Search"), False, False, 4)
-        self.entry = Gtk.SearchEntry(placeholder_text="Type to find a menu item", width_chars=26)
+        self.entry = Gtk.SearchEntry(placeholder_text="Type to find a menu item or topic", width_chars=28)
         self.entry.connect("search-changed", lambda *_: self._fill())
         self.entry.connect("activate", lambda *_: self._run(self.list.get_selected_row()))
         row.pack_start(self.entry, True, True, 0)
@@ -147,7 +150,11 @@ class HelpPanel(Gtk.Window):
             self.list.remove(child)
         query = self.entry.get_text()
         self.found = find(self.sources, query)
-        for _original, path, name, shortcut in self.found:
+        topics = guide_topics.matching(query)[:TOPICS]
+        self.picks = []
+        if self.found and topics:
+            self._heading("Menu Items")
+        for original, path, name, shortcut in self.found:
             line = Gtk.Box(spacing=24)
             where = Gtk.Label(label=ARROW.join(path) + ARROW, xalign=0)
             where.get_style_context().add_class("dim-label")
@@ -158,16 +165,34 @@ class HelpPanel(Gtk.Window):
             keys = Gtk.Label(label=shortcut, xalign=1)
             keys.get_style_context().add_class("dim-label")
             line.pack_end(keys, False, False, 0)
-            self.list.add(line)
-        if query and not self.found:
-            none = Gtk.Label(label="No menu items match", xalign=0)
+            self._add(line, ("item", original))
+        if topics:
+            self._heading("Help Topics")
+        for name in topics:
+            line = Gtk.Box(spacing=8)
+            line.pack_start(Gtk.Image.new_from_icon_name("freemac-guide", Gtk.IconSize.MENU), False, False, 0)
+            line.pack_start(Gtk.Label(label=guide_topics.TOPICS[name][0], xalign=0), True, True, 0)
+            self._add(line, ("topic", name))
+        if query and not self.found and not topics:
+            none = Gtk.Label(label="No menu items or topics match", xalign=0)
             none.get_style_context().add_class("dim-label")
-            self.list.add(none)
+            self._add(none, None)
         self.list.show_all()
         self.list.set_visible(bool(query))
-        first = self.list.get_row_at_index(0)
-        if first is not None and self.found:
-            self.list.select_row(first)
+        first = next((i for i, pick in enumerate(self.picks) if pick), None)
+        if first is not None:
+            self.list.select_row(self.list.get_row_at_index(first))
+
+    def _heading(self, text):
+        label = Gtk.Label(label=text, xalign=0)
+        label.get_style_context().add_class("dim-label")
+        self._add(label, None)
+
+    def _add(self, widget, pick):
+        row = Gtk.ListBoxRow(selectable=pick is not None, activatable=pick is not None)
+        row.add(widget)
+        self.list.add(row)
+        self.picks.append(pick)
 
     def _pressed(self, _widget, event):
         inside = self.box.get_allocation()
@@ -178,18 +203,28 @@ class HelpPanel(Gtk.Window):
     def _key(self, _widget, event):
         if event.keyval == Gdk.KEY_Escape:
             return self.close_panel() or True
-        if event.keyval in (Gdk.KEY_Down, Gdk.KEY_Up) and self.found:
+        if event.keyval in (Gdk.KEY_Down, Gdk.KEY_Up) and any(self.picks):
             row = self.list.get_selected_row()
-            index = (row.get_index() if row else -1) + (1 if event.keyval == Gdk.KEY_Down else -1)
-            index = max(0, min(index, len(self.found) - 1))
-            self.list.select_row(self.list.get_row_at_index(index))
+            step = 1 if event.keyval == Gdk.KEY_Down else -1
+            index = row.get_index() if row else -1
+            while 0 <= index + step < len(self.picks):
+                index += step
+                if self.picks[index]:
+                    self.list.select_row(self.list.get_row_at_index(index))
+                    break
             return True
         return False
 
     def _run(self, row):
-        if row is None or not self.found or row.get_index() >= len(self.found):
+        if row is None or row.get_index() >= len(self.picks) or not self.picks[row.get_index()]:
             return
-        original = self.found[row.get_index()][0]
+        kind, what = self.picks[row.get_index()]
         self.close_panel()
+        if kind == "topic":
+            try:
+                GLib.spawn_async(["freemac-guide", "--topic", what], flags=GLib.SpawnFlags.SEARCH_PATH)
+            except GLib.Error:
+                pass
+            return
         # Once the app has the keyboard back, as if chosen in its own menu.
-        GLib.timeout_add(120, lambda: original.activate() and False)
+        GLib.timeout_add(120, lambda: what.activate() and False)

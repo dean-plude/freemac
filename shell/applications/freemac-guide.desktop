@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Guide
+Comment=How to do everyday things on freemac
+Exec=freemac-guide
+Icon=freemac-guide
+Categories=Utility;Documentation;
+Keywords=help;guide;how;tips;manual;shortcuts;
+StartupWMClass=org.freemac.Guide
+StartupNotify=true

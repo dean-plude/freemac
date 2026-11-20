@@ -300,13 +300,22 @@ The small things a Mac user notices in their first minute.
 | 3 | Help and Seek close when you click anywhere outside them, as an open menu or Spotlight does | Topline, Seek | done |
 | 4 | Settings results in Seek show Dials' own icon | Seek | done |
 
-## 1.20 "guides and previews" (next)
+## 1.20 "guides and previews" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Help also lists short freemac Guide topics that match, opened in a small Guide window | Topline | |
-| 2 | Seek shows a preview of the selected file or app beside the results | Seek | |
-| 3 | Dials starts faster still (it spends about 2.5 s loading before it builds its window) | Dials | |
+| 1 | Help also lists short freemac Guide topics that match, opened in a small Guide app (15 topics: the Command key, apps, windows, desktops, Seek, Help, files, screenshots, Wi-Fi, the look, sound, installing apps, locking, a stuck app, clipboard history) | Guide, Topline | done |
+| 2 | Seek shows a preview of the chosen result beside the list: a picture, the start of a text file, a file's kind, size and date, or an app's description | Seek | done |
+| 3 | Every freemac app starts faster: the image now ships their Python code compiled (Dials' own code went from about 1.3 s to 0.3 s to load in a test PC) | build | done |
+| 4 | Seek finds Guide topics too | Seek | done |
+
+## 1.21 "glass and polish" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The menu bar, Seek, Help and the Dock blur what's behind them, so text under them doesn't show through | Strata | |
+| 2 | Guide opens from the freemac menu and from Welcome's last page | Topline, Welcome | |
+| 3 | Seek's preview shows the first page of a PDF | Seek | |
 
 ## Later
 

@@ -1,24 +1,29 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Seek: freemac's search launcher (Super+Space).
 
-Finds applications, files in your home folder (by name, and by the text
-inside them through seek_index), and answers simple sums.
+Finds applications, settings, Guide topics, the front app's menu items,
+files in your home folder (by name, and by the text inside them through
+seek_index), and answers simple sums.
 """
 import ast
 import operator
 import os
 import re
 import threading
+import time
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import dials_pages, seek_index, style  # noqa: E402
+from . import dials_pages, guide_topics, seek_index, style  # noqa: E402
 
 MAX_RESULTS = 8
+PREVIEW = 280      # width of the preview beside the results
+PICTURE = 240      # most a picture's preview may measure
+TEXT_LINES = 12    # lines of a text file shown in its preview
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
        ast.Div: operator.truediv, ast.Pow: operator.pow, ast.Mod: operator.mod,
        ast.USub: operator.neg, ast.UAdd: operator.pos}
@@ -134,8 +139,61 @@ def run_menu_item(index):
 
 
 class Result:
-    def __init__(self, title, subtitle, icon, action):
+    """One line of results. about is a sentence for the preview; path, a
+    file whose preview shows what's in it."""
+
+    def __init__(self, title, subtitle, icon, action, about="", path=None):
         self.title, self.subtitle, self.icon, self.action = title, subtitle, icon, action
+        self.about, self.path = about, path
+
+
+def size_text(size):
+    for unit in ("bytes", "KB", "MB", "GB"):
+        if size < 1000 or unit == "GB":
+            return f"{size:,} {unit}" if unit == "bytes" else f"{size:,.1f} {unit}"
+        size /= 1000
+    return ""
+
+
+def file_facts(path):
+    """Kind, size and when changed, for a file's preview."""
+    try:
+        info = Gio.File.new_for_path(path).query_info("standard::content-type,standard::size,time::modified",
+                                                      Gio.FileQueryInfoFlags.NONE, None)
+    except GLib.Error:
+        return []
+    kind = Gio.content_type_get_description(info.get_content_type() or "") or "Document"
+    facts = ["Folder" if os.path.isdir(path) else kind]
+    if not os.path.isdir(path):
+        facts.append(size_text(info.get_size()))
+    changed = info.get_attribute_uint64("time::modified")
+    if changed:
+        facts.append("Modified " + time.strftime("%-d %b %Y, %-I:%M %p", time.localtime(changed)))
+    return facts
+
+
+def first_lines(path):
+    """The start of a text file, or "" for anything else."""
+    kind, _uncertain = Gio.content_type_guess(path, None)
+    if not Gio.content_type_is_a(kind or "", "text/plain") or os.path.isdir(path):
+        return ""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = [f.readline().rstrip("\n")[:60] for _ in range(TEXT_LINES)]
+    except OSError:
+        return ""
+    return "\n".join(lines).rstrip()
+
+
+def picture(path):
+    """A small version of a picture file, or None."""
+    kind, _uncertain = Gio.content_type_guess(path, None)
+    if not (kind or "").startswith("image/"):
+        return None
+    try:
+        return GdkPixbuf.Pixbuf.new_from_file_at_size(path, PICTURE, PICTURE)
+    except GLib.Error:
+        return None
 
 
 class SeekWindow(Gtk.Window):
@@ -156,7 +214,7 @@ class SeekWindow(Gtk.Window):
 
         box = self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, halign=Gtk.Align.CENTER,
                                  valign=Gtk.Align.START, margin_top=160)
-        box.set_size_request(640, -1)
+        box.set_size_request(600 + PREVIEW, -1)
         box.get_style_context().add_class("seek")
         self.add(box)
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
@@ -165,9 +223,17 @@ class SeekWindow(Gtk.Window):
         self.entry.connect("search-changed", self._changed)
         self.entry.connect("activate", lambda _e: self._run(0))
         box.pack_start(self.entry, False, False, 0)
-        self.listbox = Gtk.ListBox()
+        # The results, and beside them a preview of the one chosen, as on a Mac.
+        middle = Gtk.Box(spacing=0)
+        self.listbox = Gtk.ListBox(valign=Gtk.Align.START)
         self.listbox.connect("row-activated", lambda _l, row: self._run(row.get_index()))
-        box.pack_start(self.listbox, False, False, 0)
+        self.listbox.connect("row-selected", lambda _l, row: self._preview(row))
+        middle.pack_start(self.listbox, True, True, 0)
+        self.preview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.preview.set_size_request(PREVIEW, -1)
+        self.preview.get_style_context().add_class("seek-preview")
+        middle.pack_start(self.preview, False, False, 0)
+        box.pack_start(middle, False, False, 0)
         self.hint = Gtk.Label(label="Enter to open · Esc to close", xalign=0)
         self.hint.get_style_context().add_class("hint")
         box.pack_start(self.hint, False, False, 0)
@@ -223,11 +289,13 @@ class SeekWindow(Gtk.Window):
             answer = calculate(query)
             if answer is not None:
                 results.append(Result(answer, f"{query} =", Gio.ThemedIcon.new("accessories-calculator"),
-                                      lambda a=answer: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1)))
+                                      lambda a=answer: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1),
+                                      about="Press Return to copy the answer."))
             scored = sorted(((score_app(a, query), a.get_name(), a) for a in self.apps
                              if score_app(a, query) is not None), key=lambda t: (t[0], t[1].lower()))
             apps = [Result(info.get_name(), "Application", info.get_icon(),
-                           lambda i=info: i.launch([], None)) for _score, _name, info in scored[:MAX_RESULTS]]
+                           lambda i=info: i.launch([], None), about=info.get_description() or "")
+                    for _score, _name, info in scored[:MAX_RESULTS]]
             # Apps whose name matches come first; one found only by what it's
             # for (Dials for "wallpaper") comes after the settings page itself.
             named_apps = sum(1 for score, _name, _info in scored[:MAX_RESULTS] if score < 3)
@@ -237,25 +305,35 @@ class SeekWindow(Gtk.Window):
             for name in dials_pages.matching(query)[:2]:
                 title, _symbol = dials_pages.PAGES[name]
                 results.append(Result(title, "Settings", Gio.ThemedIcon.new("freemac-dials"),
-                                      lambda n=name: launch("freemac-dials", "--panel", n)))
+                                      lambda n=name: launch("freemac-dials", "--panel", n),
+                                      about=f"Opens Dials at {title}."))
+            # How-to topics in Guide ("screenshot", "wifi").
+            if len(query) >= 3:
+                for name in guide_topics.matching(query)[:1]:
+                    title, _usual, body = guide_topics.TOPICS[name]
+                    results.append(Result(title, "Guide", Gio.ThemedIcon.new("freemac-guide"),
+                                          lambda n=name: launch("freemac-guide", "--topic", n),
+                                          about=body[0].lstrip("- ")))
             # The app in front's own menu items, as its Help menu finds them.
             if len(query) >= 2:
                 found, app_icon = menu_items(query)
                 for index, (name, where, keys) in enumerate(found[:2]):
                     results.append(Result(name, f"Menu item: {where}" + (f"  {keys}" if keys else ""),
                                           app_icon or Gio.ThemedIcon.new("application-x-executable"),
-                                          lambda i=index: run_menu_item(i)))
+                                          lambda i=index: run_menu_item(i),
+                                          about=f"Does {name} in {where}, as choosing it in the menu does."))
             results += apps[named_apps:]
             if len(query) >= 2:
                 named = find_files(query, MAX_RESULTS - len(results))
                 for path in named:
                     results.append(Result(os.path.basename(path), short(path),
                                           Gio.ThemedIcon.new("folder" if os.path.isdir(path) else "text-x-generic"),
-                                          lambda p=path: open_path(p)))
+                                          lambda p=path: open_path(p), path=path))
                 room = MAX_RESULTS - len(results)
                 for path, words in seek_index.search(query, room, exclude=set(named)) if room > 0 else []:
                     results.append(Result(os.path.basename(path), f"{short(os.path.dirname(path))}: {words}",
-                                          Gio.ThemedIcon.new("text-x-generic"), lambda p=path: open_path(p)))
+                                          Gio.ThemedIcon.new("text-x-generic"), lambda p=path: open_path(p),
+                                          path=path))
         self._show(results[:MAX_RESULTS])
 
     def _show(self, results):
@@ -277,8 +355,47 @@ class SeekWindow(Gtk.Window):
             row.pack_start(text, True, True, 0)
             self.listbox.add(row)
         self.listbox.show_all()
+        if not results:
+            self._preview(None)
         if results:
             self.listbox.select_row(self.listbox.get_row_at_index(0))
+
+    def _preview(self, row):
+        for child in self.preview.get_children():
+            self.preview.remove(child)
+        res = self.results[row.get_index()] if row is not None and row.get_index() < len(self.results) else None
+        if res is None:
+            self.preview.hide()
+            return
+        shown = picture(res.path) if res.path else None
+        if shown is not None:
+            image = Gtk.Image.new_from_pixbuf(shown)
+        else:
+            icon = res.icon or Gio.ThemedIcon.new("application-x-executable")
+            if res.path:
+                try:
+                    icon = Gio.File.new_for_path(res.path).query_info(
+                        "standard::icon", Gio.FileQueryInfoFlags.NONE, None).get_icon() or icon
+                except GLib.Error:
+                    pass
+            image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
+            image.set_pixel_size(96)
+        image.set_margin_top(12)
+        self.preview.pack_start(image, False, False, 0)
+        title = Gtk.Label(label=res.title, wrap=True, max_width_chars=28, justify=Gtk.Justification.CENTER)
+        title.get_style_context().add_class("seek-preview-title")
+        self.preview.pack_start(title, False, False, 0)
+        lines = file_facts(res.path) if res.path else ([res.about] if res.about else [])
+        for line in lines:
+            label = Gtk.Label(label=line, wrap=True, max_width_chars=34, justify=Gtk.Justification.CENTER)
+            label.get_style_context().add_class("hint")
+            self.preview.pack_start(label, False, False, 0)
+        text = first_lines(res.path) if res.path and shown is None else ""
+        if text:
+            start = Gtk.Label(label=text, xalign=0, yalign=0, ellipsize=3, max_width_chars=40)
+            start.get_style_context().add_class("seek-preview-text")
+            self.preview.pack_start(start, False, False, 6)
+        self.preview.show_all()
 
     def _run(self, index):
         if 0 <= index < len(self.results):
@@ -298,6 +415,7 @@ class Seek(Gtk.Application):
         style.apply()
         win = SeekWindow(self)
         win.show_all()
+        win.preview.hide()
         win.entry.grab_focus()
 
 

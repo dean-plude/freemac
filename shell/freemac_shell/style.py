@@ -60,6 +60,10 @@ TEMPLATE = """
 .seek row:selected { background-color: #2f7bf5; color: white; }
 .seek row:selected .hint { color: rgba(255, 255, 255, 0.75); }
 .seek .hint { color: @dim; font-size: 12px; }
+.seek list { background: transparent; }
+.seek .seek-preview { border-left: 1px solid rgba(128, 128, 128, 0.22); padding: 8px 4px 8px 18px; }
+.seek .seek-preview-title { font-size: 17px; font-weight: bold; color: @ink; }
+.seek .seek-preview-text { font-family: monospace; font-size: 11px; color: @dim; }
 .help-panel list, .help-panel row { background-color: transparent; }
 .help-panel row { padding: 2px 4px; border-radius: 5px; }
 .help-panel row:selected { background-color: #2f7bf5; }
