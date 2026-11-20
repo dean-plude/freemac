@@ -11,8 +11,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, quick, status, style  # noqa: E402
-from .wfipc import Wayfire  # noqa: E402
+from . import apps, beacon, mac_accel, quick, status, style  # noqa: E402
+from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
 HEIGHT = 28
@@ -62,7 +62,7 @@ class Topline(Gtk.Window):
         self._groups = {}
         self._bus = None
         self._own_actions = Gio.SimpleActionGroup()
-        for name in ("hide", "quit"):
+        for name in ("hide", "hide-others", "show-all", "quit"):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", lambda _a, _p, n=name: self._own_action(n))
             self._own_actions.add_action(action)
@@ -114,8 +114,24 @@ class Topline(Gtk.Window):
             image.set_from_icon_name("start-here", Gtk.IconSize.MENU)
         return image
 
-    def _item(self, menu, label, callback=None, sensitive=True):
-        item = Gtk.MenuItem(label=label)
+    def _item(self, menu, label, callback=None, sensitive=True, shortcut="", check=None):
+        """A menu item; shortcut is shown on the right in Mac symbols (it's
+        only a reminder: the keys themselves are Strata's). check True or
+        False puts a plain tick, or the room for one, before the name."""
+        item = Gtk.MenuItem()
+        if shortcut or check is not None:
+            box = Gtk.Box(spacing=24 if shortcut else 0)
+            if check is not None:
+                tick = Gtk.Label(label="\u2713" if check else "", xalign=0)
+                tick.set_size_request(18, -1)
+                box.pack_start(tick, False, False, 0)
+            box.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            keys = Gtk.Label(label=shortcut, xalign=1)
+            keys.get_style_context().add_class("dim-label")
+            box.pack_end(keys, False, False, 0)
+            item.add(box)
+        else:
+            item.set_label(label)
         item.set_sensitive(sensitive and callback is not None)
         if callback:
             item.connect("activate", lambda _i: callback())
@@ -249,7 +265,7 @@ class Topline(Gtk.Window):
                 yield label.get_string(), submenu
 
     def _menu_from_model(self, model):
-        menu = Gtk.Menu.new_from_model(model)
+        menu = mac_accel.macify(Gtk.Menu.new_from_model(model))
         for prefix, group in self._groups.items():
             menu.insert_action_group(prefix, group)
         menu.insert_action_group("topline", self._own_actions)
@@ -273,9 +289,46 @@ class Topline(Gtk.Window):
         if not view or not self.wf:
             return
         if name == "hide":
-            self.wf.set_minimized(view["id"], True)
+            self._hide_app(view)
+        elif name == "hide-others":
+            self._hide_others(view)
+        elif name == "show-all":
+            self._show_all()
         elif name == "quit":
             self._quit(view)
+
+    def _views_of(self, app_id, same=True):
+        return [v for v in (self.wf.views() if self.wf else [])
+                if ((v.get("app-id") or "") == app_id) == same]
+
+    def _hide_app(self, view):
+        for other in self._views_of(view.get("app-id") or ""):
+            self.wf.set_minimized(other["id"], True)
+
+    def _hide_others(self, view):
+        for other in self._views_of(view.get("app-id") or "", same=False):
+            if not is_minimized(other):
+                self.wf.set_minimized(other["id"], True)
+
+    def _show_all(self):
+        for other in (self.wf.views() if self.wf else []):
+            if is_minimized(other):
+                self.wf.set_minimized(other["id"], False)
+
+    def _app_about(self, view):
+        app_id = view.get("app-id") or ""
+        name = apps.display_name(app_id)
+        dialog = Gtk.AboutDialog(program_name=name, comments="")
+        icon = apps.icon_for(app_id)
+        theme = Gtk.IconTheme.get_default()
+        info = theme.lookup_by_gicon(icon, 128, 0) if icon is not None else None
+        if info is not None:
+            try:
+                dialog.set_logo(info.load_icon())
+            except GLib.Error:
+                pass
+        dialog.run()
+        dialog.destroy()
 
     def _quit(self, view):
         """Close the app's windows (it may ask to save first); with no Strata,
@@ -291,10 +344,20 @@ class Topline(Gtk.Window):
             name = apps.display_name(view.get("app-id"))
             combined = Gio.Menu()
             combined.append_section(None, self._app_model)
-            ours = Gio.Menu()
-            ours.append(f"Hide {name}", "topline.hide")
-            ours.append(f"Quit {name}", "topline.quit")
-            combined.append_section(None, ours)
+            hiding = Gio.Menu()
+            for label, action, accel in ((f"Hide {name}", "topline.hide", "<Super>h"),
+                                         ("Hide Others", "topline.hide-others", "<Super><Alt>h"),
+                                         ("Show All", "topline.show-all", None)):
+                item = Gio.MenuItem.new(label, action)
+                if accel:
+                    item.set_attribute_value("accel", GLib.Variant.new_string(accel))
+                hiding.append_item(item)
+            combined.append_section(None, hiding)
+            quitting = Gio.Menu()
+            item = Gio.MenuItem.new(f"Quit {name}", "topline.quit")
+            item.set_attribute_value("accel", GLib.Variant.new_string("<Super>q"))
+            quitting.append_item(item)
+            combined.append_section(None, quitting)
             self.app_button.set_popup(self._menu_from_model(combined))
             return
         if self.app_button.get_popup() is not self.app_menu:
@@ -304,22 +367,59 @@ class Topline(Gtk.Window):
         if not view:
             self._item(menu, "About freemac", self._about)
         else:
+            # The same menu in every app, as on a Mac.
             name = apps.display_name(view.get("app-id"))
-            self._item(menu, f"Hide {name}", lambda: self.wf.set_minimized(view["id"], True))
-            self._item(menu, f"Quit {name}", lambda: self._quit(view))
+            self._item(menu, f"About {name}", lambda: self._app_about(view))
+            menu.append(Gtk.SeparatorMenuItem())
+            self._item(menu, f"Hide {name}", lambda: self._hide_app(view), shortcut="\u2318H")
+            self._item(menu, "Hide Others", lambda: self._hide_others(view), shortcut="\u2325\u2318H")
+            self._item(menu, "Show All", self._show_all)
+            menu.append(Gtk.SeparatorMenuItem())
+            self._item(menu, f"Quit {name}", lambda: self._quit(view), shortcut="\u2318Q")
         menu.show_all()
 
     def _fill_window_menu(self, view):
+        """Minimize, Zoom and Bring All to Front, then the app's windows with
+        a tick by the front one (other apps' windows are in the dock and
+        ⌘Tab, as on a Mac)."""
         menu = self.window_menu
         self._clear(menu)
-        self._item(menu, "Minimize", (lambda: self.wf.set_minimized(view["id"], True)) if view else None)
+        vid = view["id"] if view else None
+        self._item(menu, "Minimize", (lambda: self.wf.set_minimized(vid, True)) if view else None,
+                   shortcut="\u2318M")
+        self._item(menu, "Zoom", (lambda: self._zoom(vid)) if view else None)
         menu.append(Gtk.SeparatorMenuItem())
-        if self.wf:
-            for other in self.wf.views():
-                vid = other["id"]
+        self._item(menu, "Bring All to Front", (lambda: self._bring_all(view)) if view else None)
+        if view and self.wf:
+            windows = self._views_of(view.get("app-id") or "")
+            if windows:
+                menu.append(Gtk.SeparatorMenuItem())
+            for other in windows:
+                oid = other["id"]
                 title = other.get("title") or apps.display_name(other.get("app-id"))
-                self._item(menu, title[:60], lambda vid=vid: self.wf.focus(vid))
+                self._item(menu, title[:60], lambda oid=oid: self._front(oid), check=(oid == vid))
         menu.show_all()
+
+    def _front(self, view_id):
+        self.wf.set_minimized(view_id, False)
+        self.wf.focus(view_id)
+
+    def _zoom(self, view_id):
+        """Fill the screen's free area, or go back (the green button's job)."""
+        # Wait for the menu to close first: an app asked to change size while
+        # the menu still holds the pointer can keep its old size.
+        def zoom():
+            self.wf.focus(view_id)
+            self.wf.zoom(view_id)
+            return False
+        GLib.timeout_add(250, zoom)
+
+    def _bring_all(self, view):
+        others = [v for v in self._views_of(view.get("app-id") or "") if v["id"] != view["id"]]
+        for other in others:
+            self.wf.set_minimized(other["id"], False)
+            self.wf.focus(other["id"])
+        self.wf.focus(view["id"])
 
 
 def _os_version():

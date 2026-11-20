@@ -179,16 +179,25 @@ A Mac user's hands reach for Command, not Control.
 | 3 | Get Info in Drawer (⌘I): kind, size, where it is, when it was made and changed, and who can open it | Drawer | done |
 | 4 | A start-up sound of our own when freemac starts, which can be turned off in Sound | art, Dials | done |
 
-## 1.7 "menus and finishing touches" (next)
+## 1.7 "menus and finishing touches" (done)
 
 The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Menus in Topline show each item's shortcut in Mac symbols (⌘C, ⇧⌘S) on the right, not "Ctrl+C" | Topline | |
-| 2 | Every app's bold name menu in Topline has About, Hide, Hide Others and Quit with their shortcuts, the same in every app | Topline | |
-| 3 | After ⇧⌘3 or ⇧⌘4, a small picture of the screenshot sits in the screen's corner for a few seconds; click it to open it | Lens | |
-| 4 | Volume and brightness keys show a rounded panel low in the middle of the screen with the level | Beacon | |
+| 1 | Menus in Topline show each item's shortcut in Mac symbols (⌘C, ⇧⌘S) on the right, not "Ctrl+C" | Topline | done |
+| 2 | Every app's bold name menu in Topline has About, Hide, Hide Others and Quit with their shortcuts, the same in every app | Topline | done |
+| 3 | After ⇧⌘3 or ⇧⌘4, a small picture of the screenshot sits in the screen's corner for a few seconds; click it to open it | Lens | done |
+| 4 | The Window menu has Minimize (⌘M), Zoom and Bring All to Front, then the app's windows with a tick by the front one | Topline, Strata | done |
+
+## 1.8 "the details" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Moving the pointer along the menu bar while a menu is open opens the next menu, with no extra click | Topline | |
+| 2 | Qt apps (VLC and others) follow freemac's light or dark look and its fonts | Theme | |
+| 3 | ⌘, opens an app's settings where it has them, and every app menu offers Settings… when it does | Topline, Strata | |
+| 4 | A tick by the front window in Pier's right-click menu, and Pier's menu shows the same Hide and Quit shortcuts | Pier | |
 
 ## Later
 

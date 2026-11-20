@@ -10,7 +10,8 @@
 
 Pictures are saved as PNG on the Desktop, copied to the clipboard
 when wl-copy is installed, and announced through Beacon; clicking the
-notification opens the picture. Capturing uses grim, picking an area uses
+notification opens the picture. A small picture of each new screenshot first
+sits in the corner for a few seconds (lens_thumb); a click opens it. Capturing uses grim, picking an area uses
 slurp.
 
 Recordings are MP4 videos, also on the Desktop, made by wf-recorder.
@@ -190,10 +191,15 @@ def announce(path, error):
 
 
 def shoot(mode, delay=0):
+    """Take it; a small picture of it then sits in the corner for a moment, as
+    the sign that it worked (a notification says so if that can't show)."""
+    from . import lens_thumb
+
     if delay:
         time.sleep(delay)
     path, error = capture(mode)
-    announce(path, error)
+    if not (path and lens_thumb.show(path)):
+        announce(path, error)
     return path
 
 
@@ -236,8 +242,8 @@ class Picker(Gtk.ApplicationWindow):
         folder.connect("clicked", self.open_folder)
         delay_row.pack_end(folder, False, False, 0)
         box.pack_start(delay_row, False, False, 0)
-        hint = Gtk.Label(label="Print takes the whole screen, Shift+Print an area, Alt+Print the window. "
-                               "Ctrl+Print starts and stops a recording.",
+        hint = Gtk.Label(label="\u21e7\u23183 takes the whole screen, \u21e7\u23184 an area, "
+                               "\u21e7\u23185 records an area. The Print key works too.",
                          wrap=True, xalign=0)
         hint.get_style_context().add_class("dim-label")
         box.pack_start(hint, False, False, 0)
@@ -259,8 +265,11 @@ class Picker(Gtk.ApplicationWindow):
         return False
 
     def _run(self, mode):
+        from . import lens_thumb
+
         path, error = capture(mode)
-        announce(path, error)
+        if not (path and lens_thumb.show(path)):
+            announce(path, error)
         self.get_application().quit()
         return False
 
