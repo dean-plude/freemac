@@ -172,7 +172,6 @@ class Marina(Gtk.Window):
                          ellipsize=Pango.EllipsizeMode.END, width_chars=NAME_CHARS - 4)
         box.pack_start(name, False, False, 0)
         button.add(box)
-        button.set_tooltip_text(info.get_description() or None)
         button.connect("clicked", lambda *_: self.open(info))
         return button
 
