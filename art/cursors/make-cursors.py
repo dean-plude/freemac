@@ -107,7 +107,8 @@ def shapes():
         shape = rotated(DOUBLE, degrees)
         resize[name] = ([svg(edged(shape, width=2.2), shape)], (16, 16), aliases)
     out = {
-        "default": ([arrow], HOTSPOT_ARROW, ["left_ptr", "arrow", "top_left_arrow", "context-menu"]),
+        "default": ([arrow], HOTSPOT_ARROW, ["left_ptr", "arrow", "top_left_arrow", "context-menu",
+                                             "dnd-move", "dnd-none", "dnd-link", "dnd-ask"]),
         "pointer": ([hand], HOTSPOT_HAND, ["hand", "hand1", "hand2", "pointing_hand",
                                            "9d800788f1b08800ae810202380a0822", "e29285e634086352946a0e7090d73106"]),
         "text": ([svg(edged(IBEAM, width=2.0), IBEAM)], (16, 16), ["xterm", "ibeam"]),
