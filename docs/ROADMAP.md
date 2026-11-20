@@ -146,7 +146,7 @@ What still looked like Linux after 1.2.
 | 5 | Qt and GTK 4 apps use the same colours and font as the rest | build | done |
 | 6 | New windows never start under the menu bar; one too big is made to fit | strata-decor | done |
 
-## 1.4 "the desktop is yours" (in progress)
+## 1.4 "the desktop is yours" (done)
 
 What a Mac user reaches for next.
 
