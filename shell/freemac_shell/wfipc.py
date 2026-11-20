@@ -74,7 +74,7 @@ class Wayfire:
         except (ConnectionError, OSError, ValueError):
             return []
         views = result if isinstance(result, list) else result.get("views", [])
-        return [v for v in views if is_app_window(v)]
+        return [v for v in _owned(views, views) if is_app_window(v)]
 
     def held_modifiers(self):
         """{command, alt, control, shift}: the modifier keys held down now
@@ -91,6 +91,16 @@ class Wayfire:
             info = self.req.call("window-rules/get-focused-view").get("info")
         except (ConnectionError, OSError, ValueError, AttributeError):
             return None
+        if info:
+            # The focused-view answer has no parent; the full list does.
+            try:
+                every = self.req.call("window-rules/list-views")
+            except (ConnectionError, OSError, ValueError):
+                every = []
+            every = every if isinstance(every, list) else []
+            mine = next((v for v in every if v.get("id") == info.get("id")), None)
+            if mine and "parent" in mine:
+                info = _owned([dict(info, parent=mine["parent"])], every)[0]
         return info if info and is_app_window(info) else None
 
     def focus(self, view_id):
@@ -165,3 +175,21 @@ def is_minimized(view):
 def is_app_window(view):
     kind = view.get("type") or view.get("role")
     return kind == "toplevel" and view.get("mapped", True)
+
+
+def _owned(views, every):
+    """A dialog belongs to the app whose window opened it, as on a Mac: the
+    browser's Preferences window (app id "epiphany") counts as the browser
+    ("org.gnome.Epiphany"), so the menu bar and the Dock say the same app.
+    Its own id is kept as "own-app-id"."""
+    by_id = {v.get("id"): v for v in every}
+    out = []
+    for view in views:
+        top, seen = view, set()
+        while (top.get("parent") or -1) in by_id and top["id"] not in seen:
+            seen.add(top["id"])
+            top = by_id[top["parent"]]
+        if top is not view and top.get("app-id") and top.get("app-id") != view.get("app-id"):
+            view = dict(view, **{"own-app-id": view.get("app-id"), "app-id": top.get("app-id")})
+        out.append(view)
+    return out

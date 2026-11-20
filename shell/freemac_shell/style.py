@@ -21,6 +21,7 @@ TEMPLATE = """
 .topline .app-name { font-weight: 700; }
 .topline .app-name menu, .topline .app-name menu label { font-weight: 400; }
 .topline menu label.dim-label { opacity: 0.55; }
+.topline menuitem:hover > label, .topline menuitem:hover > box label { color: white; }
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }

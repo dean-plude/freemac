@@ -322,6 +322,10 @@ class Topline(Gtk.Window):
                     if path:
                         self._groups[prefix] = Gio.DBusActionGroup.get(conn, bus_name, path)
                         self.menus_box.insert_action_group(prefix, self._groups[prefix])
+                        # The app's About and Settings join the app menu once
+                        # its actions have arrived.
+                        self._groups[prefix].connect(
+                            "action-added", lambda *_: GLib.idle_add(self._refill_app_menu))
                 if menubar_path:
                     self._menubar = Gio.DBusMenuModel.get(conn, bus_name, menubar_path)
                     self._menubar.connect("items-changed", lambda *_: self._build_menubar())
@@ -422,6 +426,25 @@ class Topline(Gtk.Window):
         if view.get("pid"):
             os.kill(view["pid"], signal.SIGTERM)
 
+    SETTINGS_ACTIONS = ("preferences", "settings", "prefs", "show-preferences", "show-settings")
+    ABOUT_ACTIONS = ("about", "show-about")
+
+    def _app_action(self, names):
+        """(group, name) of the first of these actions the app offers."""
+        for prefix in ("app", "win"):
+            group = self._groups.get(prefix)
+            if group is None:
+                continue
+            for name in names:
+                if group.has_action(name) and group.get_action_enabled(name):
+                    return group, name
+        return None
+
+    def _refill_app_menu(self):
+        if not self._menu_open():
+            self._fill_app_menu(self.focused)
+        return False
+
     def _fill_app_menu(self, view):
         # An app with an old-style app menu: its items, then Hide and Quit.
         if view and self._app_model is not None and self._app_model.get_n_items():
@@ -453,7 +476,16 @@ class Topline(Gtk.Window):
         else:
             # The same menu in every app, as on a Mac.
             name = apps.display_name(view.get("app-id"))
-            self._item(menu, f"About {name}", lambda: self._app_about(view))
+            about = self._app_action(self.ABOUT_ACTIONS)
+            self._item(menu, f"About {name}", (lambda: about[0].activate_action(about[1], None))
+                       if about else (lambda: self._app_about(view)))
+            settings = self._app_action(self.SETTINGS_ACTIONS)
+            if settings:
+                # Command+comma reaches the app as Ctrl+comma, the shortcut
+                # most apps use for their settings.
+                menu.append(Gtk.SeparatorMenuItem())
+                self._item(menu, "Settings\u2026", lambda: settings[0].activate_action(settings[1], None),
+                           shortcut="\u2318,")
             menu.append(Gtk.SeparatorMenuItem())
             self._item(menu, f"Hide {name}", lambda: self._hide_app(view), shortcut="\u2318H")
             self._item(menu, "Hide Others", lambda: self._hide_others(view), shortcut="\u2325\u2318H")

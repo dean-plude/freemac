@@ -190,20 +190,22 @@ The small things a Mac user notices in their first minute.
 | 3 | After ⇧⌘3 or ⇧⌘4, a small picture of the screenshot sits in the screen's corner for a few seconds; click it to open it | Lens | done |
 | 4 | The Window menu has Minimize (⌘M), Zoom and Bring All to Front, then the app's windows with a tick by the front one | Topline, Strata | done |
 
-## 1.8 "the details" (next)
+## 1.8 "the details" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Moving the pointer along the menu bar while a menu is open opens the next menu, with no extra click | Topline | |
-| 2 | Qt apps (VLC and others) follow freemac's light or dark look and its fonts | Theme | |
-| 3 | ⌘, opens an app's settings where it has them, and every app menu offers Settings… when it does | Topline, Strata | |
-| 4 | A tick by the front window in Pier's right-click menu, and Pier's menu shows the same Hide and Quit shortcuts | Pier | |
+| 1 | Moving the pointer along the menu bar while a menu is open opens the next menu, with no extra click | Topline | done |
+| 2 | An app's dialogs (its Settings or About window) count as that app: the menu bar and the Dock name the app, not a second unknown one | Topline, Pier | done |
+| 3 | ⌘, opens an app's settings where it has them, and every app menu offers Settings… (and the app's own About) when it does | Topline, Strata | done |
+| 4 | Pier's right-click menu: a tick by the front window, and Options with Keep in Dock and Open at Login | Pier | done |
 
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
   Strata and a Qt platform plugin that uses it).
 - The Debian build, as soon as a build host can reach Debian's servers.
+- Qt 6 apps in freemac's own look: Ubuntu 24.04 has no Qt 6 build of
+  Kvantum, so Qt 6 apps use Fusion with freemac's colours until it does.
 
 - Ferry, step by step: threads, sockets, C++ programs (libc++), other dynamic
   libraries. Frameworks such as Foundation

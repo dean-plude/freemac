@@ -217,7 +217,10 @@ menu menuitem, .menu menuitem, popover modelbutton {
 menu menuitem:hover, .menu menuitem:hover, popover modelbutton:hover {
   background-color: @fm_accent; color: white;
 }
-menu menuitem:hover label, menu menuitem:hover accelerator, popover modelbutton:hover label { color: white; }
+/* Only the hovered item's own text turns white, not the items of the
+   submenu it opens (which sit inside it in the style tree). */
+menu menuitem:hover > label, menu menuitem:hover > label > accelerator,
+menu menuitem:hover > box label, popover modelbutton:hover label { color: white; }
 menu menuitem accelerator { color: @fm_dim; }
 menu menuitem:disabled { color: @fm_dim; }
 menu separator, popover separator { background-color: @fm_line; margin: 4px 8px; min-height: 1px; }
