@@ -138,6 +138,15 @@ TOPICS = {
         "To play a slideshow, open an album (or the Library) and click the play button at the top right. "
         "Space pauses, the arrow keys go back and forward, and Esc ends it.",
     ]),
+    "share": ("Send files by mail or copy them to a drive", "share send mail email attach copy usb drive stick", [
+        "In Drawer, Cove or Frame, select what you want to send and click the Share button at the top "
+        "(a tray with an arrow), or right-click and choose Share. File > Share… does the same.",
+        "Mail opens a new message in Post with the files attached. Type who it's to and click Send.",
+        "Copy to puts a copy on a USB drive or memory card that's plugged in. If the drive already has a file "
+        "with that name, the copy is called “name 2”, so nothing is replaced.",
+        "When the copy is done, Drawer's status line or a notification says so. "
+        "Eject the drive before you unplug it.",
+    ]),
 }
 
 

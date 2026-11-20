@@ -736,9 +736,25 @@ def mailto_fields(uri):
     import urllib.parse
     rest = uri.split(":", 1)[1] if ":" in uri else uri
     path, _, query = rest.partition("?")
+    path = path.lstrip("/")   # GIO hands "mailto:?…" on as "mailto:///?…"
     fields = {k.lower(): v for k, v in urllib.parse.parse_qsl(query, keep_blank_values=True)}
     to = ", ".join(filter(None, [urllib.parse.unquote(path), fields.get("to", "")]))
     return to, fields.get("cc", ""), fields.get("subject", ""), fields.get("body", "")
+
+
+def mailto_files(uri):
+    """The files a mailto: link asks to attach (attach= paths or file: links,
+    as Share sends them), those that are files on this computer."""
+    import urllib.parse
+    query = uri.partition("?")[2]
+    found = []
+    for key, value in urllib.parse.parse_qsl(query, keep_blank_values=True):
+        if key.lower() not in ("attach", "attachment"):
+            continue
+        path = urllib.parse.unquote(urllib.parse.urlparse(value).path) if value.startswith("file:") else value
+        if os.path.isabs(path) and os.path.isfile(path) and path not in found:
+            found.append(path)
+    return found
 
 
 # --- reading messages -----------------------------------------------------------

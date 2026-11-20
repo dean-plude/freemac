@@ -36,7 +36,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, menus, style  # noqa: E402
+from . import alert, menus, share, style  # noqa: E402
 from . import photos_store as store  # noqa: E402
 from .cove_slideshow import Slideshow  # noqa: E402
 
@@ -350,6 +350,9 @@ class Window(Gtk.ApplicationWindow):
         header.pack_start(self.zoom)
         self.play_button = self._header_button("media-playback-start-symbolic", "Play Slideshow", self.slideshow)
         header.pack_end(self.play_button)
+        self.share_button = share.button(self, self.chosen_paths)
+        self.share_button.set_no_show_all(True)
+        header.pack_end(self.share_button)
         self.delete_button = self._header_button("user-trash-symbolic", "Move to Trash (⌘⌫)", self.delete_photo)
         self.info_button = Gtk.MenuButton()
         self.info_button.add(Gtk.Image(icon_name="help-about-symbolic", icon_size=Gtk.IconSize.BUTTON, visible=True))
@@ -439,6 +442,7 @@ class Window(Gtk.ApplicationWindow):
             "recent": lambda: self.choose_view("recent"),
             "new-album": lambda: self.new_album(self.chosen_paths()),
             "remove-from-album": self.remove_from_album, "slideshow": self.slideshow,
+            "share": lambda: share.popup(self, self.chosen_paths(), self.share_button),
         })
         self.connect("key-press-event", self._key)
         self.connect("notify::is-active", self._activated)
@@ -887,6 +891,7 @@ class Window(Gtk.ApplicationWindow):
         add("Unfavourite" if favourite else "Favourite", lambda: self.mark_favourites(paths, not favourite))
         add("Show in Drawer", self.show_in_folder, len(paths) == 1)
         add("Open With Frame", self.open_in_frame, len(paths) == 1)
+        menu.append(share.menu_item(self, paths))
         menu.append(Gtk.SeparatorMenuItem())
         add(f"Move {len(paths)} Photos to Trash" if len(paths) > 1 else "Move to Trash", self.delete_photo)
         menu.show_all()
@@ -1005,6 +1010,7 @@ class Window(Gtk.ApplicationWindow):
         self.import_all.set_visible(device and not self.importing)
         self.import_some.set_visible(False)
         self.play_button.set_visible(not viewing and not device and self.device is None and bool(self.shown))
+        self.share_button.set_visible(self.device is None and bool(self.shown))
         if not viewing:
             if device:
                 self.header.set_title(self.device.name)
@@ -1298,6 +1304,7 @@ def menubar():
                    [("Play Slideshow", "win.slideshow", None)],
                    [("Import…", "win.import", None)],
                    [("Show in Drawer", "win.show-folder", "<Ctrl>r"), ("Open With Frame", "win.open-frame", None)],
+                   [("Share…", "win.share", None)],
                    [("Close Window", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("Move to Trash", "win.delete", "<Ctrl>BackSpace")]]),
         ("_Image", [[("Favourite", "win.favourite", "period"), ("Get Info", "win.info", "<Ctrl>i")],

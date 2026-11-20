@@ -848,6 +848,8 @@ class Compose(Gtk.ApplicationWindow):
         else:
             self.to.grab_focus()
         self.saved_state = self._state()
+        # In front of Post's own window, which may open in the same moment.
+        GLib.timeout_add(200, lambda: self.present() and False)
 
     def _field(self, label, widget):
         line = Gtk.Box(spacing=6)
@@ -1023,6 +1025,8 @@ def menubar():
 class Post(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        self.waiting = None   # a mailto: link that came before any account
+        self.telling = None   # the problem an alert is showing now
         self.accounts = []
         self.mailboxes = {}       # account id -> [Mailbox]
         self.workers = {}
@@ -1045,6 +1049,9 @@ class Post(Gtk.Application):
         store.save_accounts(self.accounts)
         self.window.fill_sidebar()
         self.refresh_account(account)
+        if self.waiting:
+            waiting, self.waiting = self.waiting, None
+            self.compose(mailto=waiting)
 
     def remove_account(self, account):
         worker = self.workers.pop(account.id, None)
@@ -1058,7 +1065,10 @@ class Post(Gtk.Application):
     def problem(self, text):
         if self.window:
             self.window.busy(False)
-            alert.tell(self.window, "There's a problem with your mail.", text)
+            if text != self.telling:   # once, while the same alert is up
+                self.telling = text
+                alert.tell(self.window, "There's a problem with your mail.", text)
+                self.telling = None
         return False
 
     # -- keeping up to date -------------------------------------------------
@@ -1081,17 +1091,22 @@ class Post(Gtk.Application):
         return True
 
     def refresh(self, account, name):
-        self.window.busy(True)
+        # The window may not be there: Post stays open without one, and the
+        # first refresh comes while its window is still being made.
+        if self.window:
+            self.window.busy(True)
 
         def got(index):
-            self.window.busy(False)
+            if self.window:
+                self.window.busy(False)
             unread = sum(1 for m in index["messages"] if "\\Seen" not in m.get("flags", []))
             for box in self.mailboxes.get(account.id, []):
                 if box.name == name and box.unread != unread:
                     box.unread = unread
                     store.save_mailboxes(account, self.mailboxes[account.id])
-                    self.window.fill_sidebar()
-            if self.window.current and self.window.current[0].id == account.id and self.window.current[1] == name:
+                    if self.window:
+                        self.window.fill_sidebar()
+            if self.window and self.window.current and self.window.current[0].id == account.id and self.window.current[1] == name:
                 self.window.fill_list()
             if name.upper() == "INBOX":
                 self._tell_new(account, index)
@@ -1101,7 +1116,7 @@ class Post(Gtk.Application):
         newest = max((m["uid"] for m in index["messages"]), default=0)
         before = self.newest.get(account.id)
         self.newest[account.id] = newest
-        if before is None or self.window.is_active():
+        if before is None or (self.window is not None and self.window.is_active()):
             return
         fresh = [m for m in index["messages"] if m["uid"] > before and "\\Seen" not in m.get("flags", [])]
         if not fresh:
@@ -1154,7 +1169,9 @@ class Post(Gtk.Application):
 
     def compose(self, reply=None, forward=None, mailto=None):
         if not self.accounts:
-            self.window.present()
+            # Shared files wait while the first account is added, then open.
+            self.waiting = mailto or self.waiting
+            self._main_window().present()
             return
         account = self.window.current[0] if self.window and self.window.current else self.accounts[0]
         if reply:
@@ -1167,7 +1184,7 @@ class Post(Gtk.Application):
             Compose(self, account, subject=subject, body=body, files=files)
         elif mailto:
             to, cc, subject, body = store.mailto_fields(mailto)
-            Compose(self, account, to, cc, subject, body)
+            Compose(self, account, to, cc, subject, body, store.mailto_files(mailto))
         else:
             Compose(self, account)
 
@@ -1232,6 +1249,7 @@ class Post(Gtk.Application):
 
     def do_open(self, files, _count, _hint):
         window = self._main_window()
+        window.present()   # first, so a new message opens in front of it
         for f in files:
             uri = f.get_uri()
             if uri.startswith("mailto:"):
@@ -1243,7 +1261,7 @@ class Post(Gtk.Application):
                 except OSError:
                     continue
                 window.show_message(message)
-        window.present()
+                window.present()
 
     def do_shutdown(self):
         for worker in self.workers.values():

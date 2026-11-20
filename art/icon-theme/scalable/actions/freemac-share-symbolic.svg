@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- freemac's share icon: an open tray with an arrow rising out of it. Original artwork. -->
+  <path fill="#2e3436" d="M3 7.4v6.7c0 .5.4.9.9.9h8.2c.5 0 .9-.4.9-.9V7.4c0-.5-.4-.9-.9-.9h-1.7v1.3h1.3v5.9H4.3V7.8h1.3V6.5H3.9c-.5 0-.9.4-.9.9z"/>
+  <path fill="#2e3436" d="M7.35 2.9h1.3v7.6h-1.3z"/>
+  <path fill="#2e3436" d="M8 .8l3.2 3.2-.9.9L8 2.6 5.7 4.9l-.9-.9z"/>
+</svg>
