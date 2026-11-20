@@ -129,6 +129,15 @@ TOPICS = {
         "To move an event to another calendar, double-click it and pick one next to calendar:. "
         "It moves online too, the next time the account syncs.",
     ]),
+    "albums": ("Make a photo album and play a slideshow", "album albums photos pictures slideshow cove collection", [
+        "In Cove, click + next to My Albums (or press ⌘N), type a name and press Return.",
+        "To add photos, drag them onto the album in the sidebar, or select them, right-click and choose Add to Album. "
+        "Hold ⌘ or Shift while you click to select more than one.",
+        "To take a photo out of an album, open the album, select the photo and press Delete. "
+        "It stays in your library.",
+        "To play a slideshow, open an album (or the Library) and click the play button at the top right. "
+        "Space pauses, the arrow keys go back and forward, and Esc ends it.",
+    ]),
 }
 
 

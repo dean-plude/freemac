@@ -7,14 +7,17 @@ A photo's date is when it was taken, read from the picture's own EXIF data
 (JPEG and TIFF), or else the file's date. What was learned about each file
 is kept in ~/.cache/freemac/photos.json so the next start is quick. Small
 copies follow the freedesktop.org thumbnail rules (~/.cache/thumbnails), so
-other apps can use them too. Favourites and what was imported from which
-device are in ~/.local/share/freemac/photos.json. Original freemac code.
+other apps can use them too. Favourites, albums and what was imported from
+which device are in ~/.local/share/freemac/photos.json; an album is a name
+and a list of photos, so a photo can be in many albums and is never copied.
+Original freemac code.
 """
 import hashlib
 import json
 import os
 import struct
 import time
+import uuid
 
 import gi
 
@@ -182,6 +185,7 @@ def _data():
     found = _read_json(_data_path(), {})
     found.setdefault("favourites", [])
     found.setdefault("imported", {})
+    found.setdefault("albums", [])
     return found
 
 
@@ -198,11 +202,104 @@ def set_favourite(path, on):
 
 
 def forget(path):
-    """A photo went to the Trash: drop its favourite mark."""
+    """A photo went to the Trash: drop its favourite mark and take it out
+    of every album."""
     data = _data()
+    changed = False
     if path in data["favourites"]:
         data["favourites"].remove(path)
+        changed = True
+    for album in data["albums"]:
+        if path in album.get("paths", []):
+            album["paths"].remove(path)
+            changed = True
+    if changed:
         _write_json(_data_path(), data)
+
+
+# -- albums -------------------------------------------------------------------
+
+class Album:
+    def __init__(self, ident, name, paths):
+        self.id, self.name, self.paths = ident, name, list(paths)
+
+    def __repr__(self):
+        return f"Album({self.name!r}, {len(self.paths)} photos)"
+
+
+def albums():
+    """Every album, in the order they were made."""
+    return [Album(a.get("id", ""), a.get("name", "Album"), a.get("paths", []))
+            for a in _data()["albums"] if isinstance(a, dict) and a.get("id")]
+
+
+def album(ident):
+    return next((a for a in albums() if a.id == ident), None)
+
+
+def free_album_name(name="Untitled Album"):
+    taken = {a.name.lower() for a in albums()}
+    if name.lower() not in taken:
+        return name
+    n = 2
+    while f"{name} {n}".lower() in taken:
+        n += 1
+    return f"{name} {n}"
+
+
+def _change_album(ident, change):
+    data = _data()
+    for entry in data["albums"]:
+        if entry.get("id") == ident:
+            change(entry)
+            _write_json(_data_path(), data)
+            return True
+    return False
+
+
+def new_album(name=None, paths=()):
+    """Make an album (with these photos in it); returns its id."""
+    data = _data()
+    ident = uuid.uuid4().hex[:12]
+    name = (name or "").strip() or free_album_name()
+    seen = []
+    for path in paths:
+        if path not in seen:
+            seen.append(path)
+    data["albums"].append({"id": ident, "name": name, "paths": seen})
+    _write_json(_data_path(), data)
+    return ident
+
+
+def rename_album(ident, name):
+    name = name.strip()
+    return bool(name) and _change_album(ident, lambda e: e.__setitem__("name", name))
+
+
+def delete_album(ident):
+    """The album goes; its photos stay in the library."""
+    data = _data()
+    data["albums"] = [a for a in data["albums"] if a.get("id") != ident]
+    _write_json(_data_path(), data)
+
+
+def add_to_album(ident, paths):
+    """Add photos at the end of an album; returns how many were new to it."""
+    added = []
+
+    def change(entry):
+        have = entry.setdefault("paths", [])
+        for path in paths:
+            if path not in have and path not in added:
+                added.append(path)
+        have.extend(added)
+    _change_album(ident, change)
+    return len(added)
+
+
+def remove_from_album(ident, paths):
+    gone = set(paths)
+    return _change_album(ident, lambda e: e.__setitem__("paths", [p for p in e.get("paths", []) if p not in gone]))
 
 
 # -- small copies ------------------------------------------------------------
