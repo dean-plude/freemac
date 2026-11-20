@@ -35,11 +35,12 @@ VIEWS = (("icons", "view-grid-symbolic", "Icons"),
 CSS = b"""
 box.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 list.drawer-sidebar { background-color: transparent; }
-.drawer-sidebar row { padding: 5px 10px; border-radius: 7px; margin: 1px 6px; background-color: transparent; }
+.drawer-sidebar row { padding: 4px 8px; border-radius: 6px; margin: 0 8px; background-color: transparent; }
+.drawer-sidebar row image { color: #2f7bf5; }
 .drawer-sidebar row:hover { background-color: rgba(120, 120, 150, 0.10); }
 .drawer-sidebar row:selected { background-color: rgba(120, 120, 150, 0.24); color: inherit; }
 .drawer-sidebar row:selected label { color: inherit; }
-.drawer-heading { font-size: 11px; font-weight: bold; opacity: 0.55; margin: 12px 16px 4px; }
+.drawer-heading { font-size: 11px; font-weight: bold; opacity: 0.5; margin: 14px 16px 3px; }
 .drawer-column { border-right: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
 .drawer-status { font-size: 11px; opacity: 0.7; padding: 3px 10px; }
@@ -415,7 +416,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 self.place_rows.append((listbox, row))
             box.pack_start(listbox, False, False, 0)
 
-        heading = Gtk.Label(label="Favourites", xalign=0)
+        heading = Gtk.Label(label="Favorites", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
         self.fav_list = Gtk.ListBox(can_focus=False)
@@ -428,7 +429,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         box.pack_start(self.fav_list, False, False, 0)
         self._fill_favourites()
         trash = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
-        section("Device", [("Computer", "/", "drive-harddisk-symbolic"), ("Trash", trash, "user-trash-symbolic")])
+        section("Locations", [("Computer", "/", "drive-harddisk-symbolic"), ("Trash", trash, "user-trash-symbolic")])
         return box
 
     def _show_place(self):
