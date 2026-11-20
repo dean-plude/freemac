@@ -226,7 +226,12 @@ mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 # Every scene in a day and a night version (Dials swaps them with the mode).
 python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"
 # Start-up screen: freemac's own Plymouth theme (overlay), built into the initramfs.
-if in_chroot plymouth-set-default-theme freemac; then
+# Debian has plymouth-set-default-theme; Ubuntu picks the theme with an
+# alternative instead.
+THEME=/usr/share/plymouth/themes/freemac/freemac.plymouth
+if in_chroot sh -c "command -v plymouth-set-default-theme >/dev/null && plymouth-set-default-theme freemac \
+     || { update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth $THEME 300 \
+          && update-alternatives --set default.plymouth $THEME; }"; then
   in_chroot update-initramfs -u || log "Warning: couldn't rebuild the initramfs with the start-up screen"
 else
   log "Warning: couldn't set the start-up screen; the boot shows text instead"
