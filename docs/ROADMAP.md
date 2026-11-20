@@ -157,6 +157,17 @@ What a Mac user reaches for next.
 | 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata, Pier | done |
 | 4 | Screenshots land on the Desktop, named with the date and time | Lens | done |
 
+## 1.5 "the little things" (in progress)
+
+The details a Mac user notices in the first ten minutes.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Show in Drawer, Quit | Pier | |
+| 2 | Drawer's sidebar shows the folder you're in | Drawer | |
+| 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | |
+| 4 | Windows reopen at the size and place they had last time | Strata | |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
