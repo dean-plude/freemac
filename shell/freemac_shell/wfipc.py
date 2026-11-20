@@ -148,6 +148,12 @@ class Wayfire:
                 closed = self.close(view["id"]) or closed
         return closed
 
+    def zoom(self, view_id):
+        try:
+            return self.req.call("strata/zoom", id=view_id)
+        except (ConnectionError, OSError, ValueError):
+            return None
+
     def set_minimized(self, view_id, state=True):
         return self.req.call("wm-actions/set-minimized", view_id=view_id, state=state)
 

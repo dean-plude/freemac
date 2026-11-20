@@ -464,6 +464,22 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/zoom {id}: fill the free part of the screen, or go back; what
+     * the zoom button and the Window menu's Zoom do. */
+    wf::ipc::method_callback zoom_view = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        auto toplevel = wf::toplevel_cast(wf::ipc::find_view_by_id(data["id"]));
+        if (!toplevel)
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        wf::get_core().default_wm->tile_request(toplevel,
+            toplevel->pending_tiled_edges() ? 0 : wf::TILED_EDGES_ALL);
+        return wf::ipc::json_ok();
+    };
+
     /* strata/command-key {app-id, raw}: while raw, the app's windows get the
      * keys as they are, with no Command key (Dials, as it records a new
      * shortcut). */
@@ -495,6 +511,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/close", close_view);
         method_repository->register_method("strata/command-key", set_command_key_raw);
         method_repository->register_method("strata/held-modifiers", get_held_modifiers);
+        method_repository->register_method("strata/zoom", zoom_view);
         window_places.init();
         command_key.init();
     }
