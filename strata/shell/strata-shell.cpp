@@ -475,6 +475,15 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/held-modifiers: which of Command, Alt, Control and Shift are
+     * held down right now. */
+    wf::ipc::method_callback get_held_modifiers = [=] (nlohmann::json)
+    {
+        auto out = wf::ipc::json_ok();
+        out["held"] = command_key.held_modifiers();
+        return out;
+    };
+
   public:
     void init() override
     {
@@ -485,6 +494,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/minimize-hint", set_minimize_hint);
         method_repository->register_method("strata/close", close_view);
         method_repository->register_method("strata/command-key", set_command_key_raw);
+        method_repository->register_method("strata/held-modifiers", get_held_modifiers);
         window_places.init();
         command_key.init();
     }

@@ -135,7 +135,7 @@ def raw_keys(on):
     """Ask Strata to give Dials the keys as they are (no Command key)."""
     try:
         from .wfipc import Connection
-        Connection().call("strata/command-key", **{"app-id": "org.freemac.Dials", "raw": bool(on)})
+        Connection().call("strata/command-key", **{"app-id": "freemac-dials", "raw": bool(on)})
     except (OSError, ValueError, ConnectionError):
         pass
 

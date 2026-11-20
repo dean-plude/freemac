@@ -105,7 +105,7 @@ class InfoWindow(Gtk.Window):
             image.set_pixel_size(64)
         top.pack_start(image, False, False, 0)
         titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, valign=Gtk.Align.CENTER)
-        title = Gtk.Label(label=name, xalign=0, wrap=True, max_width_chars=24, selectable=True)
+        title = Gtk.Label(label=name, xalign=0, wrap=True, max_width_chars=24)
         title.get_style_context().add_class("drawer-preview-name")
         titles.pack_start(title, False, False, 0)
         self.size_line = Gtk.Label(xalign=0)
@@ -169,7 +169,8 @@ class InfoWindow(Gtk.Window):
                 text = nice_size(total) if total >= 1000 else f"{total:,} bytes"
             else:
                 count = f"{items:,} item" + ("" if items == 1 else "s")
-                text = f"{nice_size(total)} for {count}" if total >= 1000 else f"{total:,} bytes for {count}"
+                text = ("Empty" if not items else f"{nice_size(total)} for {count}" if total >= 1000
+                        else f"{total:,} bytes for {count}")
             self.size_value.set_text(text)
             self.size_line.set_text(text)
             return False

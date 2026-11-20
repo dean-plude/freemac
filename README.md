@@ -45,10 +45,10 @@ one of them will be reverted.
 | Desktop wallpaper that fills any screen shape; files on the Desktop as icons | **Backdrop** | 0.4; 1.4: desktop icons |
 | Alt+Tab app switcher with large icons | **Tack** | 1.4 |
 | Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor); 0.9: drag a window to an edge to tile it; 1.2: rounded title bars with round buttons that show their symbols on hover; 1.3: all four corners round, our own pointer, new windows clear of the menu bar |
-| File manager with icon, list and column views | **Drawer** | 0.4; 1.0: tabs, a sidebar you can change, Glance preview on Space; 1.1: compress to .zip, open .zip and tar archives; 1.2: Mac apps (.app) shown with their own icon |
+| File manager with icon, list and column views | **Drawer** | 0.4; 1.0: tabs, a sidebar you can change, Glance preview on Space; 1.1: compress to .zip, open .zip and tar archives; 1.2: Mac apps (.app) shown with their own icon; 1.6: Get Info (⌘I) |
 | Full-screen grid of all apps (F4) | **Marina** | 1.2; 1.3: folders, and apps can be dragged into any order |
-| Super+Space search launcher (apps, files, sums) | **Seek** | 0.4; 1.0: finds files by the words inside them |
-| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers; 0.9: brightness, night light, changeable shortcuts |
+| ⌘Space search launcher (apps, files, sums) | **Seek** | 0.4; 1.0: finds files by the words inside them |
+| Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers; 0.9: brightness, night light, changeable shortcuts; 1.6: Command key choices, start-up sound switch |
 | Notifications with banners, a history list and Do Not Disturb | **Beacon** | 0.5 |
 | Screenshots of the screen, an area or a window (Print key) | **Lens** | 0.5; 1.1: screen recording (Ctrl+Print) |
 | Notes, saved as plain text files as you type | **Jot** | 1.1 |
@@ -68,6 +68,7 @@ one of them will be reverted.
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
 | Login screen | **Gangway** | 0.4; 1.2: blurred wallpaper, round picture, password field with an arrow |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
+| A start-up sound of its own (four soft bell notes, made by our own code), which can be turned off in Dials > Sound | art, Dials | 1.6 |
 | Trackpad gestures (switch desktops, overview) | **Strata** gestures | configured, not yet tested on hardware |
 | Bootable live ISO | `build/build-iso.sh` | done |
 

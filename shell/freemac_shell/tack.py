@@ -228,8 +228,15 @@ def run():
             if not self.showing:
                 self.check_timer = 0
                 return False
-            state = Gdk.Keymap.get_for_display(self.get_display()).get_modifier_state()
-            if not state & hold and self.is_active():
+            # Strata always sees the keyboard, so its answer comes first; what
+            # GTK knows is only as fresh as the last key Tack itself was sent.
+            held = self.wayfire.held_modifiers()
+            if held is not None:
+                let_go_now = not (held.get("command") or held.get("alt") or held.get("control"))
+            else:
+                state = Gdk.Keymap.get_for_display(self.get_display()).get_modifier_state()
+                let_go_now = self.is_active() and not state & hold
+            if let_go_now:
                 self.finish(self.chosen)
                 return False
             return True

@@ -35,6 +35,7 @@
 #include <wayfire/input-device.hpp>
 #include <wayfire/option-wrapper.hpp>
 #include <wayfire/seat.hpp>
+#include <nlohmann/json.hpp>
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
@@ -74,6 +75,23 @@ class strata_command_key
         return (index == XKB_MOD_INVALID) ? 0 : (1u << index);
     }
 
+    /* The modifier keys held down right now, as the keyboard has them (the
+     * Command key is Logo). Tack asks while its panel is up, because it may
+     * not have the keyboard itself and so can't see Command let go. */
+  public:
+    nlohmann::json held_modifiers()
+    {
+        nlohmann::json out = nlohmann::json::object();
+        auto kbd = wlr_seat_get_keyboard(wf::get_core().get_current_seat());
+        uint32_t down = kbd ? kbd->modifiers.depressed : 0;
+        out["command"] = kbd && (down & mask(kbd, XKB_MOD_NAME_LOGO));
+        out["alt"]     = kbd && (down & mask(kbd, XKB_MOD_NAME_ALT));
+        out["control"] = kbd && (down & mask(kbd, XKB_MOD_NAME_CTRL));
+        out["shift"]   = kbd && (down & mask(kbd, XKB_MOD_NAME_SHIFT));
+        return out;
+    }
+
+  private:
     /* Dials, while it waits for a new shortcut, sees the keys as they are. */
     std::string raw_app;
 
