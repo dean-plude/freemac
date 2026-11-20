@@ -487,7 +487,31 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "A folder on the dock that shows your newest downloads."),
             row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
                 "Drop files on it to throw them away; right-click it to empty it."),
-        ), group(row("Clock", clock)))
+        ), group(row("Clock", clock)), self.hot_corners())
+
+    def hot_corners(self):
+        from . import corners
+
+        get = lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default)  # noqa: E731
+        put = lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value)  # noqa: E731
+        now = corners.current(get)
+        rows = []
+        for corner, label in corners.CORNERS:
+            choice = Gtk.ComboBoxText()
+            for action in corners.ORDER:
+                choice.append(action, corners.ACTIONS[action][0])
+            choice.set_active_id(now[corner])
+            choice.connect("changed", lambda c, k=corner: corners.assign(get, put, k, c.get_active_id()))
+            rows.append(row(label, choice))
+        heading = Gtk.Label(label="Hot Corners", xalign=0)
+        heading.get_style_context().add_class("dials-section")
+        note = Gtk.Label(label="Rest the pointer in a corner of the screen to do one of these.", xalign=0, wrap=True)
+        note.get_style_context().add_class("dim-label")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(heading, False, False, 0)
+        box.pack_start(note, False, False, 0)
+        box.pack_start(group(*rows), False, False, 0)
+        return box
 
     @staticmethod
     def save_prefs(**changes):
@@ -594,8 +618,22 @@ class DialsWindow(Gtk.ApplicationWindow):
             lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
         heading = Gtk.Label(label="Shortcuts", xalign=0)
         heading.get_style_context().add_class("dials-section")
+        from . import clips
+
+        def history(on):
+            self.save_prefs(clipboard_history=on)
+            if not on:
+                clips.clear()
+
+        clear = Gtk.Button(label="Clear History")
+        clear.connect("clicked", lambda _b: clips.clear())
         return page("Keyboard", group(
             row("Layout", layout, "An XKB layout code such as us, gb, de or fr. Press Enter to apply."),
+        ), group(
+            row("Clipboard history", switch(style.prefs().get("clipboard_history", True), history),
+                "Keep the last 50 things you copy, on this computer only. Super+Shift+V shows them. "
+                "Passwords marked as secret by a password manager are never kept."),
+            row("Forget what was copied", clear),
         ), heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
