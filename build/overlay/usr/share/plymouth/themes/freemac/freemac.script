@@ -1,0 +1,56 @@
+# freemac start-up screen (Plymouth script plugin). GPL-3.0-or-later.
+# Black, the white mark in the middle, a thin bar under it that fills as the
+# computer starts, and nothing else: no text, no scrolling messages.
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+
+mark.image = Image("mark.png");
+scale = 1;
+if (screen_h < 700) scale = 0.75;
+mark.image = mark.image.Scale(mark.image.GetWidth() * scale, mark.image.GetHeight() * scale);
+mark.sprite = Sprite(mark.image);
+mark.sprite.SetX(Window.GetX() + screen_w / 2 - mark.image.GetWidth() / 2);
+mark.sprite.SetY(Window.GetY() + screen_h / 2 - mark.image.GetHeight() / 2 - 30);
+
+track.image = Image("track.png");
+track.sprite = Sprite(track.image);
+track.x = Window.GetX() + screen_w / 2 - track.image.GetWidth() / 2;
+track.y = mark.sprite.GetY() + mark.image.GetHeight() + 64;
+track.sprite.SetPosition(track.x, track.y, 1);
+
+fill.image = Image("fill.png");
+fill.sprite = Sprite();
+fill.sprite.SetPosition(track.x, track.y, 2);
+fill.shown = 0;
+
+fun progress_callback(duration, progress) {
+    # Plymouth's estimate goes 0..1; never let the bar slide backwards.
+    if (progress > fill.shown) fill.shown = progress;
+    width = Math.Int(fill.image.GetWidth() * fill.shown);
+    if (width < fill.image.GetHeight()) width = fill.image.GetHeight();
+    fill.sprite.SetImage(fill.image.Scale(width, fill.image.GetHeight()));
+}
+Plymouth.SetBootProgressFunction(progress_callback);
+
+# Password prompts (an encrypted disk): a plain field under the mark.
+fun display_password_callback(prompt, bullets) {
+    question.image = Image.Text(prompt, 1, 1, 1);
+    question.sprite = Sprite(question.image);
+    question.sprite.SetPosition(Window.GetX() + screen_w / 2 - question.image.GetWidth() / 2, track.y + 24, 3);
+    text = "";
+    for (i = 0; i < bullets; i++) text += "●";
+    dots.image = Image.Text(text, 1, 1, 1);
+    dots.sprite = Sprite(dots.image);
+    dots.sprite.SetPosition(Window.GetX() + screen_w / 2 - dots.image.GetWidth() / 2, track.y + 52, 3);
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+fun display_normal_callback() {
+    question.sprite = NULL;
+    dots.sprite = NULL;
+}
+Plymouth.SetDisplayNormalFunction(display_normal_callback);

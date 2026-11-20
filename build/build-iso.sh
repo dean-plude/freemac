@@ -178,10 +178,15 @@ in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 install -d "$ROOTFS/usr/share/icons/hicolor/scalable/apps"
 install -m 0644 "$REPO"/art/icons/*.svg "$ROOTFS/usr/share/icons/hicolor/scalable/apps/"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+# freemac's own GTK theme, light and dark (art/gtk-theme), on top of GTK's Adwaita.
+python3 "$REPO/art/gtk-theme/make-theme.py" "$ROOTFS/usr/share/themes"
 # freemac's icon theme: our own folder and file-type icons, Adwaita for the rest.
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
+# Every installed app's own icon on freemac's rounded-square tile. The apt hook
+# in the overlay does the same for apps installed later.
+in_chroot freemac-icon-tiles --system --quiet || log "Warning: couldn't make app icon tiles"
 # Strata's own Wayfire plugins (C++), compiled against the image's Wayfire:
 # strata-decor (title bars) and strata-shell (gtk-shell that hands app menus
 # to Topline). The build tools are removed again afterwards. If this Wayfire
@@ -220,6 +225,12 @@ rm -rf "$ROOTFS/tmp/strata"
 mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 # Every scene in a day and a night version (Dials swaps them with the mode).
 python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"
+# Start-up screen: freemac's own Plymouth theme (overlay), built into the initramfs.
+if in_chroot plymouth-set-default-theme freemac; then
+  in_chroot update-initramfs -u || log "Warning: couldn't rebuild the initramfs with the start-up screen"
+else
+  log "Warning: couldn't set the start-up screen; the boot shows text instead"
+fi
 
 log "Cleaning the image"
 rm -f "$ROOTFS/usr/sbin/policy-rc.d"
