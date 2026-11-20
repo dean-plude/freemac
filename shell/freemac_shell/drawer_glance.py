@@ -12,7 +12,7 @@ import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
 TEXT_BYTES = 64 * 1024
 WIDTH, HEIGHT = 560, 420
@@ -57,7 +57,7 @@ class Glance(Gtk.Window):
         self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.pack_start(self.body, True, True, 0)
         footer = Gtk.Box(spacing=8)
-        self.details = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END)
+        self.details = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
         self.details.get_style_context().add_class("dim-label")
         footer.pack_start(self.details, True, True, 0)
         self.open_button = Gtk.Button(label="Open")
