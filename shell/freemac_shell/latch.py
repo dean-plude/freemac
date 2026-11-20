@@ -120,7 +120,7 @@ def lock_command():
     command = ["gtklock", "--daemonize", "--style", write_style(), "--time-format", clock,
                "--idle-hide", "--idle-timeout", "20"]
     if style.is_dark():
-        command += ["--gtk-theme", "Adwaita-dark"]
+        command += ["--gtk-theme", "freemac-dark"]
     image = wallpaper()
     if image:
         command += ["--background", image]

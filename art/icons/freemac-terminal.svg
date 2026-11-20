@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Terminal: a slate panel with a dollar prompt and a green block cursor.
+       Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#55606e"/><stop offset="1" stop-color="#2b323c"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2129"/><stop offset="1" stop-color="#12161c"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="18" y="24" width="92" height="76" rx="10" fill="url(#screen)"/>
+  <rect x="18" y="24" width="92" height="12" rx="6" fill="#ffffff" fill-opacity="0.06"/>
+  <text x="28" y="74" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="bold" fill="#e8ecf2">$</text>
+  <rect x="52" y="52" width="14" height="24" rx="2" fill="#5fd38d"/>
+  <rect x="28" y="84" width="40" height="4" rx="2" fill="#8a95a5" fill-opacity="0.6"/>
+</svg>

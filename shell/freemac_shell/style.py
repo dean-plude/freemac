@@ -11,8 +11,8 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 
 from gi.repository import Gio  # noqa: E402
 
-# Colours are freemac's own: a soft lavender-grey glass in light mode and a deep
-# navy glass in dark mode, with an indigo accent.
+# Colours are freemac's own: a pale frosted glass in light mode and a smoky
+# glass in dark mode (Strata blurs what's behind the menu bar), with a blue accent.
 TEMPLATE = """
 .topline { background-color: @bar; color: @ink; }
 .topline button { background: none; border: none; box-shadow: none; padding: 0 9px; min-height: 24px; color: @ink; }
@@ -24,11 +24,12 @@ TEMPLATE = """
 .topline button.status { padding: 0 6px; min-width: 0; }
 .topline button.recording image { color: #e5484d; }
 
-.pier-shelf {
+.pier-shelf { padding: 6px 10px; }
+.pier-shelf-bg {
   background-color: @shelf;
   border: 1px solid @edge;
-  border-radius: 20px;
-  padding: 6px 10px;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
 }
 .pier-item { background: none; border: none; box-shadow: none; padding: 0 3px; }
 .pier-dot { color: @ink; font-size: 7px; }
@@ -50,17 +51,17 @@ TEMPLATE = """
 }
 .seek entry { font-size: 22px; min-height: 44px; border: none; box-shadow: none; background: none; color: @ink; }
 .seek row { padding: 6px 10px; border-radius: 9px; color: @ink; }
-.seek row:selected { background-color: #4b5fc4; color: white; }
+.seek row:selected { background-color: #2f7bf5; color: white; }
 .seek row:selected .hint { color: rgba(255, 255, 255, 0.75); }
 .seek .hint { color: @dim; font-size: 12px; }
 """
 
-LIGHT = {"bar": "rgba(246, 245, 250, 0.82)", "ink": "#1d1d27", "hover": "rgba(30, 30, 60, 0.10)",
-         "shelf": "rgba(250, 249, 253, 0.42)", "edge": "rgba(255, 255, 255, 0.55)",
-         "panel": "rgba(248, 247, 252, 0.94)", "dim": "rgba(30, 30, 50, 0.55)"}
-DARK = {"bar": "rgba(22, 24, 44, 0.80)", "ink": "#ecebf5", "hover": "rgba(255, 255, 255, 0.12)",
-        "shelf": "rgba(30, 32, 58, 0.55)", "edge": "rgba(255, 255, 255, 0.14)",
-        "panel": "rgba(28, 30, 52, 0.95)", "dim": "rgba(236, 235, 245, 0.55)"}
+LIGHT = {"bar": "rgba(246, 246, 248, 0.66)", "ink": "#1d1d1f", "hover": "rgba(0, 0, 0, 0.09)",
+         "shelf": "rgba(255, 255, 255, 0.36)", "edge": "rgba(255, 255, 255, 0.50)",
+         "panel": "rgba(246, 246, 248, 0.96)", "dim": "rgba(29, 29, 31, 0.55)"}
+DARK = {"bar": "rgba(30, 30, 33, 0.60)", "ink": "#ececef", "hover": "rgba(255, 255, 255, 0.13)",
+        "shelf": "rgba(40, 40, 44, 0.50)", "edge": "rgba(255, 255, 255, 0.16)",
+        "panel": "rgba(38, 38, 42, 0.96)", "dim": "rgba(236, 236, 239, 0.55)"}
 
 PREFS = os.path.expanduser("~/.config/freemac/shell.json")
 
@@ -120,6 +121,21 @@ def apply(on_change=None):
                     on_change(is_dark())
             _settings.connect("changed::color-scheme", changed)
     _provider.load_from_data(css(is_dark()))
+
+
+def blurred(pixbuf, width, height):
+    """A picture filling width x height, softly blurred (shrunk a lot, then
+    grown back with smooth scaling): for the login screen and Marina."""
+    from gi.repository import GdkPixbuf
+
+    scale = max(width / pixbuf.get_width(), height / pixbuf.get_height())
+    full = pixbuf.scale_simple(max(1, int(pixbuf.get_width() * scale)), max(1, int(pixbuf.get_height() * scale)),
+                               GdkPixbuf.InterpType.BILINEAR)
+    small = full.scale_simple(max(1, full.get_width() // 24), max(1, full.get_height() // 24),
+                              GdkPixbuf.InterpType.HYPER)
+    small = small.scale_simple(max(1, full.get_width() // 8), max(1, full.get_height() // 8),
+                               GdkPixbuf.InterpType.BILINEAR)
+    return small.scale_simple(full.get_width(), full.get_height(), GdkPixbuf.InterpType.BILINEAR)
 
 
 def make_transparent(window):

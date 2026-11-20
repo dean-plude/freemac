@@ -1,0 +1,263 @@
+/* freemac GTK 3 theme: shared rules for the light and dark variants.
+ *
+ * Original design. It sits on top of GTK's own Adwaita and restyles the parts
+ * people see most: windows with round corners and a soft shadow, one flat
+ * toolbar area, small round window buttons on the left, compact controls in
+ * Inter, a quiet grey sidebar, accent-coloured selection, thin overlay
+ * scrollbars and rounded menus. Colours come from the @fm_* names defined by
+ * make-theme.py for each variant.
+ */
+
+* { -gtk-outline-radius: 6px; outline-color: alpha(@fm_accent, 0.5); }
+
+window, .background { background-color: @fm_bg; color: @fm_fg; }
+.view, textview text, iconview, treeview.view, list, row.activatable, flowbox, viewport.view {
+  background-color: @fm_view; color: @fm_fg;
+}
+label.dim-label, .dim-label { color: @fm_dim; opacity: 1; }
+
+/* Windows: round corners all the way round and a deep, soft shadow. */
+window.csd, window.csd > .background, window.csd decoration { border-radius: 10px; }
+decoration {
+  border-radius: 10px;
+  box-shadow: 0 12px 38px 2px @fm_shadow, 0 0 0 1px @fm_edge;
+  margin: 10px;
+}
+decoration:backdrop { box-shadow: 0 6px 22px 0 alpha(@fm_shadow, 0.6), 0 0 0 1px @fm_edge; }
+window.maximized decoration, window.fullscreen decoration, window.tiled decoration { border-radius: 0; box-shadow: none; }
+window.solid-csd decoration { box-shadow: 0 0 0 1px @fm_edge; }
+window.csd > .background, window.csd > box > .background { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+window.popup decoration, menu decoration { box-shadow: none; margin: 0; }
+
+/* One flat toolbar area that blends into the window. */
+headerbar, .titlebar:not(headerbar) {
+  background-image: none;
+  background-color: @fm_head;
+  border: none;
+  border-bottom: 1px solid @fm_line;
+  box-shadow: none;
+  min-height: 46px;
+  padding: 0 10px;
+  border-radius: 10px 10px 0 0;
+  color: @fm_fg;
+}
+headerbar:backdrop { background-color: @fm_head; }
+headerbar:backdrop label, headerbar:backdrop image { color: @fm_dim; }
+.maximized headerbar, .tiled headerbar { border-radius: 0; }
+headerbar .title { font-weight: 600; font-size: 10pt; }
+headerbar .subtitle { font-size: 8.5pt; color: @fm_dim; }
+headerbar entry, headerbar spinbutton, headerbar button, headerbar separator { margin-top: 8px; margin-bottom: 8px; }
+headerbar separator { background: none; min-width: 6px; }
+
+/* Window buttons: small round buttons on the left, plain until hovered. */
+headerbar button.titlebutton, .titlebar button.titlebutton {
+  min-width: 14px; min-height: 14px;
+  padding: 0; margin: 0 3px;
+  border-radius: 99px;
+  border: 1px solid @fm_tbtn_edge;
+  background-image: none;
+  background-color: @fm_tbtn;
+  box-shadow: none;
+  color: transparent;
+  -gtk-icon-shadow: none;
+  -gtk-icon-transform: scale(0.62);
+}
+headerbar button.titlebutton image, .titlebar button.titlebutton image { color: transparent; }
+headerbar:hover button.titlebutton image, .titlebar:hover button.titlebutton image { color: @fm_tbtn_glyph; }
+headerbar button.titlebutton:hover { background-color: @fm_tbtn_hover; }
+headerbar button.titlebutton:active { background-color: @fm_tbtn_active; }
+headerbar button.titlebutton:backdrop { background-color: @fm_tbtn_back; border-color: @fm_tbtn_edge; }
+
+/* Buttons */
+button {
+  min-height: 20px;
+  padding: 2px 12px;
+  border-radius: 6px;
+  border: 1px solid @fm_button_edge;
+  background-image: none;
+  background-color: @fm_button;
+  box-shadow: 0 1px 1.5px alpha(black, 0.12);
+  color: @fm_fg;
+  text-shadow: none;
+  -gtk-icon-shadow: none;
+}
+button:hover { background-color: @fm_button_hover; }
+button:active, button:checked { background-color: @fm_button_active; box-shadow: none; }
+button:disabled { background-color: @fm_button; color: @fm_dim; opacity: 0.6; box-shadow: none; }
+button:backdrop { background-color: @fm_button; box-shadow: none; }
+button.flat, headerbar button:not(.titlebutton):not(.suggested-action):not(.destructive-action), .toolbar button {
+  background-color: transparent; border-color: transparent; box-shadow: none;
+}
+button.flat:hover, headerbar button:not(.titlebutton):not(.suggested-action):not(.destructive-action):hover, .toolbar button:hover {
+  background-color: @fm_hover;
+}
+headerbar button:not(.titlebutton):checked, headerbar button:not(.titlebutton):active { background-color: @fm_pressed; }
+button.suggested-action, button.default {
+  background-color: @fm_accent; border-color: shade(@fm_accent, 0.88); color: white;
+  box-shadow: 0 1px 1.5px alpha(@fm_accent, 0.35);
+}
+button.suggested-action:hover { background-color: shade(@fm_accent, 1.08); }
+button.suggested-action:active { background-color: shade(@fm_accent, 0.9); }
+button.suggested-action label, button.default label { color: white; }
+button.suggested-action:disabled { background-color: alpha(@fm_accent, 0.45); color: alpha(white, 0.8); }
+button.destructive-action { background-color: @fm_red; border-color: shade(@fm_red, 0.88); color: white; }
+button.destructive-action label { color: white; }
+.linked > button { border-radius: 0; }
+.linked > button:first-child { border-radius: 6px 0 0 6px; }
+.linked > button:last-child { border-radius: 0 6px 6px 0; }
+.linked > button:only-child { border-radius: 6px; }
+button.circular { border-radius: 99px; }
+
+/* Text fields */
+entry, spinbutton:not(.vertical), textview.entry {
+  min-height: 24px;
+  border-radius: 6px;
+  border: 1px solid @fm_button_edge;
+  background-image: none;
+  background-color: @fm_field;
+  box-shadow: inset 0 1px alpha(black, 0.04);
+  color: @fm_fg;
+  caret-color: @fm_accent;
+}
+entry:focus, spinbutton:focus:not(.vertical) {
+  border-color: @fm_accent;
+  box-shadow: 0 0 0 3px alpha(@fm_accent, 0.35);
+}
+entry.search { border-radius: 7px; background-color: @fm_hover; border-color: transparent; box-shadow: none; }
+entry.search:focus { background-color: @fm_field; border-color: @fm_accent; }
+entry selection, label selection, textview text selection, spinbutton selection { background-color: alpha(@fm_accent, 0.35); color: @fm_fg; }
+
+/* Switches, checks, radios, sliders, progress */
+switch {
+  min-width: 34px; min-height: 18px;
+  border-radius: 99px; padding: 0;
+  border: 1px solid @fm_button_edge;
+  background-image: none; background-color: @fm_track;
+  font-size: 0;
+}
+switch:checked { background-color: @fm_accent; border-color: shade(@fm_accent, 0.9); }
+switch slider {
+  min-width: 18px; min-height: 18px; margin: -1px;
+  border-radius: 99px; border: 1px solid alpha(black, 0.12);
+  background-image: none; background-color: white;
+  box-shadow: 0 1px 2px alpha(black, 0.25);
+}
+switch image { color: transparent; }
+check, radio {
+  min-width: 14px; min-height: 14px; margin: 0 6px 0 0;
+  border: 1px solid @fm_button_edge;
+  background-image: none; background-color: @fm_field;
+  box-shadow: 0 1px 1px alpha(black, 0.08);
+  color: white;
+}
+check { border-radius: 4px; }
+radio { border-radius: 99px; }
+check:checked, radio:checked, check:indeterminate { background-color: @fm_accent; border-color: shade(@fm_accent, 0.88); color: white; }
+scale trough { min-height: 4px; min-width: 4px; border-radius: 99px; background-color: @fm_track; border: none; }
+scale highlight { border-radius: 99px; background-image: none; background-color: @fm_accent; border: none; }
+scale slider {
+  min-width: 18px; min-height: 18px; margin: -8px;
+  border-radius: 99px; border: 1px solid alpha(black, 0.14);
+  background-image: none; background-color: white;
+  box-shadow: 0 1px 3px alpha(black, 0.25);
+}
+progressbar trough { min-height: 5px; border-radius: 99px; background-color: @fm_track; border: none; }
+progressbar progress { min-height: 5px; border-radius: 99px; background-image: none; background-color: @fm_accent; border: none; }
+levelbar block.filled { background-color: @fm_accent; }
+
+/* Selection */
+row:selected, treeview.view:selected, iconview:selected, flowboxchild:selected, *:selected:not(entry):not(label) {
+  background-color: @fm_accent; color: white;
+}
+row:selected label, row:selected image { color: white; }
+list row, listbox row { border-radius: 0; }
+flowboxchild { border-radius: 8px; }
+
+/* Sidebars: a quiet grey column with rounded selection. */
+.sidebar, placessidebar, stacksidebar, .navigation-sidebar, placessidebar list, stacksidebar list,
+.sidebar list, .sidebar row, placessidebar row, stacksidebar row {
+  background-color: @fm_side; border: none;
+}
+.sidebar row, placessidebar row, stacksidebar row, .navigation-sidebar row {
+  margin: 1px 8px; padding: 4px 8px; border-radius: 6px; min-height: 22px;
+}
+.sidebar row:hover, placessidebar row:hover, stacksidebar row:hover { background-color: @fm_hover; }
+.sidebar row:selected, placessidebar row:selected, stacksidebar row:selected, .navigation-sidebar row:selected {
+  background-color: @fm_side_sel; color: @fm_fg;
+}
+.sidebar row:selected label, .sidebar row:selected image,
+placessidebar row:selected label, placessidebar row:selected image,
+stacksidebar row:selected label { color: @fm_fg; }
+.sidebar row:selected image, placessidebar row:selected image { color: @fm_accent; }
+paned > separator { background-color: @fm_line; min-width: 1px; min-height: 1px; background-image: none; }
+
+/* Scrollbars: thin, rounded, only solid while used. */
+scrollbar { background: none; border: none; }
+scrollbar slider {
+  min-width: 6px; min-height: 6px; margin: 3px;
+  border-radius: 99px; border: none;
+  background-color: alpha(@fm_fg, 0.32);
+}
+scrollbar slider:hover { background-color: alpha(@fm_fg, 0.48); }
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider { min-width: 4px; min-height: 4px; margin: 3px; }
+
+/* Menus and popovers */
+menu, .menu, .context-menu, popover, popover.background {
+  padding: 5px;
+  border-radius: 9px;
+  border: 1px solid @fm_edge;
+  background-image: none;
+  background-color: @fm_popover;
+  box-shadow: 0 10px 28px alpha(black, 0.22);
+  color: @fm_fg;
+}
+menu menuitem, .menu menuitem, popover modelbutton {
+  min-height: 20px; padding: 3px 10px; border-radius: 5px; color: @fm_fg; text-shadow: none;
+}
+menu menuitem:hover, .menu menuitem:hover, popover modelbutton:hover {
+  background-color: @fm_accent; color: white;
+}
+menu menuitem:hover label, menu menuitem:hover accelerator, popover modelbutton:hover label { color: white; }
+menu menuitem accelerator { color: @fm_dim; }
+menu menuitem:disabled { color: @fm_dim; }
+menu separator, popover separator { background-color: @fm_line; margin: 4px 8px; min-height: 1px; }
+menubar { background: none; box-shadow: none; padding: 0; }
+menubar > menuitem { padding: 3px 9px; border-radius: 5px; }
+menubar > menuitem:hover { background-color: @fm_hover; color: @fm_fg; box-shadow: none; }
+
+/* Tooltips */
+tooltip, tooltip.background {
+  border-radius: 6px; padding: 4px 8px;
+  background-color: @fm_popover; color: @fm_fg;
+  border: 1px solid @fm_edge;
+  box-shadow: 0 3px 10px alpha(black, 0.18);
+}
+tooltip label { color: @fm_fg; }
+
+/* Tabs and segmented controls */
+notebook > header { background-color: @fm_head; border-color: @fm_line; }
+notebook > header tab { border-radius: 6px; margin: 4px 2px; padding: 3px 12px; box-shadow: none; }
+notebook > header tab:checked { background-color: @fm_button; box-shadow: 0 1px 2px alpha(black, 0.12); }
+stackswitcher > button { padding: 2px 14px; }
+
+/* Lists in settings-style boxes */
+frame > border, .frame { border-color: @fm_line; border-radius: 10px; }
+list.boxed-list, .content list { border-radius: 10px; }
+
+/* Combo boxes and dropdown arrows */
+combobox button.combo { padding: 2px 8px 2px 12px; }
+
+/* Dialogs */
+messagedialog .titlebar, messagedialog headerbar { border-bottom: none; background-color: @fm_bg; }
+messagedialog .dialog-action-area button { border-radius: 6px; margin: 6px; }
+messagedialog .dialog-action-area { padding: 6px; }
+messagedialog .message-area { padding: 18px 22px 10px 22px; }
+messagedialog label.title { font-weight: 700; }
+
+/* File chooser */
+filechooser placessidebar { background-color: @fm_side; }
+filechooser .path-bar button { border-radius: 6px; }
+filechooser actionbar { background-color: @fm_head; border-top: 1px solid @fm_line; }
+
+/* Info bars */
+infobar { border-radius: 8px; margin: 6px; }

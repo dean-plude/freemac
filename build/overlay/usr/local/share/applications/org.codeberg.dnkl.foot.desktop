@@ -1,0 +1,12 @@
+[Desktop Entry]
+# freemac's Terminal: the foot terminal under a plain name and freemac's icon.
+# (Files here override the package's own copy in /usr/share/applications.)
+Type=Application
+Exec=foot
+Icon=freemac-terminal
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=shell;prompt;command;commandline;foot;
+Name=Terminal
+Comment=Type commands to run on this computer
+StartupWMClass=foot

@@ -92,6 +92,7 @@ only ship alongside, which is fine for any free licence).
 | **Latch** | Lock screen | Python (launcher) + gtklock | Locks with gtklock dressed in freemac's style (current wallpaper, large clock, password field); Super+L and Lock Screen in the system menu; swayidle locks after the idle time set in Dials > Power, and before sleep. |
 | **Tally** | Calculator | Python + GTK 3 | Its own expression parser (decimal arithmetic for the basic operations), a running tape, a scientific mode with degrees or radians, `Ans`, and keyboard entry. |
 | **Chime** | Clock | Python + GTK 3 | World clocks, alarms with repeat days, timers and a stopwatch. Keeps running in the background while an alarm or timer is set, rings with the freedesktop sound theme and notifies through Beacon. |
+| **Marina** | Full-screen app grid | Python + GTK 3 (layer-shell) | Every app that shows in menus, freemac's first, then A to Z, in pages over a blurred copy of the wallpaper; filters as you type. Opened with F4, from Pier or a hot corner. |
 | **Jot** | Notes | Python + GTK 3 | Each note is a plain text file in `~/Documents/Notes`; the first line is the title. Saves a moment after typing stops, searches as you type, and notes show up in Seek and Drawer like any file. |
 | **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
@@ -112,10 +113,11 @@ without changing the user experience.
   `build/overlay`): overview (scale), all-desktops view (expo), four desktops
   in a row (vswitch), 3-finger desktop swipe (vswipe), animations, and the
   `ipc` plugins our shell uses.
-- **Left-side window buttons** come from GTK's decoration layout and a GTK CSS
-  layer (`/etc/skel/.config/gtk-3.0/gtk.css`) that draws them as freemac's own
-  rounded squares. Apps that ask the compositor for a title bar (foot, some Qt
-  apps) still get Wayfire's right-side buttons until our decoration plugin.
+- **Left-side window buttons** come from GTK's decoration layout and
+  freemac's own GTK theme (`art/gtk-theme`, installed as `freemac` and
+  `freemac-dark`), which draws them as small round buttons. Apps that ask the
+  compositor for a title bar (foot, some Qt apps) get strata-decor's, which
+  matches.
 - **Shell:** Topline, Pier, Seek and Backdrop are layer-shell clients in the
   `freemac_shell` Python package (`shell/`), started from Wayfire's autostart.
   They talk to Wayfire over its IPC socket for windows and focus.
@@ -236,6 +238,27 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   built inside Wayfire rather than as a separate client.
 - **Hardware support** follows Debian's kernel and firmware (we enable
   `non-free-firmware` so Wi-Fi works on common laptops).
+
+## App icons (1.2)
+
+- **freemac-icon-tiles** (`shell/freemac_shell/icontiles.py`) gives every
+  installed app's icon freemac's rounded-square shape, so the dock, app grid
+  and search look like one family. It reads each `.desktop` file's icon,
+  then writes a tile into the `freemac` icon theme (`scalable/apps`): an icon
+  that already fills a square is just rounded; any other shape sits at 70%
+  on a soft paper tile. It runs while the image is built, after each package
+  install (an apt hook), and at login for apps in the home folder.
+  freemac's own icons are left alone.
+- **Mac apps** (`shell/freemac_shell/macapps.py`, `freemac-mac-app`): a
+  `.app` folder is read for its name (`CFBundleDisplayName`/`CFBundleName`)
+  and icon (`CFBundleIconFile` in `Contents/Resources`). The `.icns` file is
+  read following its public format: PNG entries are used as they are, and
+  the older run-length-encoded RGB entries are combined with their 8-bit
+  masks. The icon goes into `hicolor` and a `.desktop` file into the app
+  grid, both named `ferry-<bundle id>`. Apps found in `~/Applications` are
+  added at login; Drawer shows `.app` folders as single apps with their own
+  icon. Apps whose icon only exists in a compiled asset catalogue get
+  freemac's generic Mac app icon.
 
 ## Mac app compatibility (optional layer)
 

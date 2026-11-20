@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Marina: nine small app tiles moored in rows on a night-blue tile.
+       Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4a8c"/><stop offset="1" stop-color="#1d2552"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <g>
+    <rect x="26" y="26" width="20" height="20" rx="6" fill="#f0a35e"/>
+    <rect x="54" y="26" width="20" height="20" rx="6" fill="#5fd38d"/>
+    <rect x="82" y="26" width="20" height="20" rx="6" fill="#5b8def"/>
+    <rect x="26" y="54" width="20" height="20" rx="6" fill="#e86a8a"/>
+    <rect x="54" y="54" width="20" height="20" rx="6" fill="#f4d35e"/>
+    <rect x="82" y="54" width="20" height="20" rx="6" fill="#a98bf0"/>
+    <rect x="26" y="82" width="20" height="20" rx="6" fill="#4fc3c9"/>
+    <rect x="54" y="82" width="20" height="20" rx="6" fill="#f2f2f7"/>
+    <rect x="82" y="82" width="20" height="20" rx="6" fill="#8fa3c4"/>
+  </g>
+</svg>

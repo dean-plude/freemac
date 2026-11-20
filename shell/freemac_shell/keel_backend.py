@@ -264,8 +264,11 @@ def install_bootloader(disk, _version):
     grub_default = os.path.join(TARGET, "etc/default/grub")
     os.makedirs(os.path.dirname(grub_default), exist_ok=True)
     with open(grub_default, "w") as f:
-        f.write('GRUB_DEFAULT=0\nGRUB_TIMEOUT=2\nGRUB_DISTRIBUTOR="freemac"\n'
-                'GRUB_CMDLINE_LINUX_DEFAULT="quiet"\nGRUB_CMDLINE_LINUX=""\n'
+        # Straight to the start-up screen, like a Mac: the menu shows only
+        # while Esc or Shift is held, and the kernel and systemd keep quiet.
+        f.write('GRUB_DEFAULT=0\nGRUB_TIMEOUT_STYLE=hidden\nGRUB_TIMEOUT=2\nGRUB_DISTRIBUTOR="freemac"\n'
+                'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 rd.udev.log_level=3 '
+                'systemd.show_status=false vt.global_cursor_default=0"\nGRUB_CMDLINE_LINUX=""\n'
                 'GRUB_DISABLE_OS_PROBER=true\n')
     # Both firmware types: BIOS boot code in the protective MBR and an EFI
     # loader at the removable-media path every UEFI firmware looks for.

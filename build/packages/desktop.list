@@ -1,6 +1,9 @@
 # Graphical session: Wayfire configured as Strata,
 # greetd autologin, fonts, Mesa, GTK and layer-shell for our own shell and apps.
 wayfire
+# Start-up screen (freemac theme in /usr/share/plymouth/themes/freemac)
+plymouth
+plymouth-label
 greetd
 seatd
 foot

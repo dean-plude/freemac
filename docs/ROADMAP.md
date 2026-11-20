@@ -104,7 +104,7 @@ Debian's mirrors.
 | 5 | Pier: folders on the dock (Downloads stack) and a Trash you can empty | Pier | done |
 | 6 | First-run welcome: pick light or dark, wallpaper, Wi-Fi and a user account before the desktop opens | Welcome | done: light or dark, wallpaper, Wi-Fi and the account page; accounts themselves are made by Keel at install and in Dials > Users |
 
-## 1.1 "everyday extras" (in progress)
+## 1.1 "everyday extras" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
@@ -116,6 +116,23 @@ Debian's mirrors.
 | 6 | Drawer compresses files to .zip and expands .zip and tar archives (safely: nothing is written outside the new folder) | Drawer | done |
 | 7 | Hot corners: pick what each screen corner does (all windows, all desktops, show the desktop, notifications, a new note, lock) | Dials, Strata | done |
 
+## 1.2 "feels like a Mac" (in progress)
+
+The goal: someone who knows a Mac sits down at freemac and it feels like one,
+without any Apple artwork, code or names.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Title bars: rounded top corners, a soft edge, centred titles, round grey buttons on the left whose symbols show on hover | strata-decor | done |
+| 2 | Every installed app's icon on the same rounded-square tile, including apps installed later | freemac-icon-tiles | done |
+| 3 | Mac apps (.app) show their own icon, read from the app's Info.plist and .icns file; drop one into Applications and it's in the app grid and dock | freemac-mac-app, Drawer | done; graphical Mac apps still can't run, and opening one says so |
+| 4 | A full GTK theme of our own, light and dark, with Mac-like blue and Inter as the system font | freemac-theme | done |
+| 5 | Start-up: no boot menu or text, just the freemac mark on black with a progress bar | build, Keel | done |
+| 6 | Login screen like a Mac's: blurred wallpaper, round picture, password field with an arrow | Gangway | done |
+| 7 | Terminal under its plain name, with its own icon and a light look; windows no longer wobble | build, Strata | done |
+| 8 | Every app on one full-screen grid over a blurred wallpaper, with search and pages (F4, the dock or a hot corner) | **Marina** | done |
+| 9 | Dock icons bounce while an app starts, and magnified icons rise out of the dock instead of stretching it | Pier | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
@@ -123,8 +140,11 @@ Debian's mirrors.
 - The Debian build, as soon as a build host can reach Debian's servers.
 
 - Ferry, step by step: threads, sockets, C++ programs (libc++), other dynamic
-  libraries, opening Mac programs from Drawer. Frameworks such as Foundation
+  libraries. Frameworks such as Foundation
   only after that, and only from public documentation. See
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images, a package repository and release docs.
+- Still not quite a Mac: round corners at the bottom of windows, our own
+  pointer, Marina folders and rearranging, a lock screen that looks like the
+  login screen, and apps built with Qt or GTK 4 matching the GTK 3 theme.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.

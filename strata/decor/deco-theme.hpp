@@ -22,15 +22,24 @@ class decoration_theme_t
     int get_border_size() const;
 
     /**
-     * Fill the given rectangle with the background color(s).
+     * Strata: draw the sides and bottom of the frame: a soft edge that fades
+     * out from the window, like a small shadow, in place of a solid border.
      *
-     * @param fb The target framebuffer, must have been bound already.
-     * @param rectangle The rectangle to redraw.
+     * @param fb The target framebuffer.
+     * @param rectangle The whole frame, in logical coordinates.
+     * @param top Height of the title bar part (drawn by render_titlebar).
      * @param scissor The GL scissor rectangle to use.
-     * @param active Whether to use active or inactive colors
+     * @param active Whether the window is the active one.
      */
-    void render_background(const wf::render_target_t& fb, wf::geometry_t rectangle,
+    void render_edges(const wf::render_target_t& fb, wf::geometry_t rectangle, int top,
         const wf::geometry_t& scissor, bool active) const;
+
+    /**
+     * Strata: the title bar, with rounded top corners, the same soft edge and
+     * a hairline under it, as a cairo surface of the given pixel size.
+     * The caller frees it.
+     */
+    cairo_surface_t *render_titlebar(int width, int height, double scale, bool active) const;
 
     /**
      * Render the given text on a cairo_surface_t with the given size.
@@ -49,6 +58,10 @@ class decoration_theme_t
         /** Progress of button hover, in range [-1, 1].
          * Negative numbers are usually used for pressed state. */
         double hover_progress;
+        /** Strata: draw the symbol (the pointer is over the buttons) */
+        bool show_symbol;
+        /** Strata: the window is the active one */
+        bool active;
     };
 
     /**

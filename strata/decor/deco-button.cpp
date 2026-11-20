@@ -63,6 +63,24 @@ void button_t::set_pressed(bool is_pressed)
     add_idle_damage();
 }
 
+void button_t::set_show_symbol(bool show)
+{
+    if (show != this->show_symbol)
+    {
+        this->show_symbol = show;
+        add_idle_damage();
+    }
+}
+
+void button_t::set_active(bool active)
+{
+    if (active != this->active)
+    {
+        this->active = active;
+        add_idle_damage();
+    }
+}
+
 void button_t::render(const wf::render_target_t& fb, wf::geometry_t geometry,
     wf::geometry_t scissor)
 {
@@ -80,17 +98,15 @@ void button_t::render(const wf::render_target_t& fb, wf::geometry_t geometry,
 
 void button_t::update_texture()
 {
-    /**
-     * We render at 100% resolution
-     * When uploading the texture, this gets scaled
-     * to 70% of the titlebar height. Thus we will have
-     * a very crisp image
-     */
+    /* Drawn at the title bar's full height and scaled down to the button's
+     * size, so it stays crisp on high-density screens too. */
     decoration_theme_t::button_state_t state = {
         .width  = 1.0 * theme.get_title_height(),
         .height = 1.0 * theme.get_title_height(),
         .border = 1.0,
         .hover_progress = hover,
+        .show_symbol    = show_symbol,
+        .active = active,
     };
 
     auto surface = theme.get_button_surface(type, state);

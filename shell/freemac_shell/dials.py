@@ -48,11 +48,11 @@ def apply_appearance(dark, settings=None, follow_wallpaper=True):
     settings = settings if settings is not None else style.interface_settings()
     if settings:
         settings.set_string("color-scheme", "prefer-dark" if dark else "prefer-light")
-        settings.set_string("gtk-theme", "Adwaita-dark" if dark else "Adwaita")
+        settings.set_string("gtk-theme", "freemac-dark" if dark else "freemac")
     Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", dark)
     # Title bars the window manager draws follow the mode too.
-    ini_set(WAYFIRE_INI, "decoration", "active_color", "#2A2C48FF" if dark else "#E9E7EFFF")
-    ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#22243AFF" if dark else "#F4F3F7FF")
+    ini_set(WAYFIRE_INI, "decoration", "active_color", "#36363AFF" if dark else "#E9E9ECFF")
+    ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#2A2A2EFF" if dark else "#F5F5F7FF")
     current = ini_get(SHELL_INI, "background", "image")
     other = scene_version(current, dark)
     if follow_wallpaper and other and other != current:
@@ -77,8 +77,8 @@ CSS = b"""
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
 .dials-choice { padding: 8px; border-radius: 12px; border: 2px solid transparent; background: none; box-shadow: none; }
-.dials-choice:checked { border-color: #4b5fc4; }
-.dials-chosen { border-color: #4b5fc4; }
+.dials-choice:checked { border-color: #2f7bf5; }
+.dials-chosen { border-color: #2f7bf5; }
 .dials-section { font-weight: bold; margin-top: 12px; }
 """
 

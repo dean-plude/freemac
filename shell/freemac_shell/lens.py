@@ -70,7 +70,7 @@ def start_recording(area=False):
     if area:
         if not shutil.which("slurp"):
             return None, "The area picker (slurp) isn't installed."
-        picked = subprocess.run(["slurp", "-d", "-b", "1b1e4a40", "-c", "e5484dff", "-w", "2"],
+        picked = subprocess.run(["slurp", "-d", "-b", "00000040", "-c", "e5484dff", "-w", "2"],
                                 capture_output=True, text=True)
         if picked.returncode != 0 or not picked.stdout.strip():
             return None, None
@@ -158,7 +158,7 @@ def capture(mode):
     if mode == "area":
         if not shutil.which("slurp"):
             return None, "The area picker (slurp) isn't installed."
-        picked = subprocess.run(["slurp", "-d", "-b", "1b1e4a40", "-c", "4b5fc4ff", "-w", "2"],
+        picked = subprocess.run(["slurp", "-d", "-b", "00000040", "-c", "2f7bf5ff", "-w", "2"],
                                 capture_output=True, text=True)
         if picked.returncode != 0 or not picked.stdout.strip():
             return None, None  # cancelled with Escape

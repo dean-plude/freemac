@@ -65,6 +65,35 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         bool stale = false;
     } title_texture;
 
+    /* Strata: the title bar's background, redrawn when its size, scale,
+     * colours or the window's activation change. */
+    struct
+    {
+        wf::simple_texture_t tex;
+        int width = -1, height = -1;
+        bool active = false;
+        bool stale = true;
+    } bar_texture;
+
+    void render_bar(const wf::render_target_t& fb, wf::geometry_t geometry, bool active)
+    {
+        int w = geometry.width * fb.scale, h = geometry.height * fb.scale;
+        if (bar_texture.stale || (bar_texture.width != w) || (bar_texture.height != h) ||
+            (bar_texture.active != active))
+        {
+            auto surface = theme.render_titlebar(w, h, fb.scale, active);
+            cairo_surface_upload_to_texture(surface, bar_texture.tex);
+            cairo_surface_destroy(surface);
+            bar_texture.width  = w;
+            bar_texture.height = h;
+            bar_texture.active = active;
+            bar_texture.stale  = false;
+        }
+
+        OpenGL::render_texture(bar_texture.tex.tex, fb, geometry,
+            glm::vec4(1.0f), OpenGL::TEXTURE_TRANSFORM_INVERT_Y);
+    }
+
     /* Strata: when Dials switches light/dark mode it changes the title bar
      * colours; redraw the title and buttons in the new colours straight away. */
     wf::option_wrapper_t<wf::color_t> active_color{"decoration/active_color"};
@@ -72,6 +101,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     void restyle()
     {
         title_texture.stale = true;
+        bar_texture.stale = true;
         layout.resize(size.width, size.height);
         if (auto view = _view.lock())
         {
@@ -109,11 +139,13 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     }
 
     void render_title(const wf::render_target_t& fb,
-        wf::geometry_t geometry)
+        wf::geometry_t geometry, bool active)
     {
         update_title(geometry.width, geometry.height, fb.scale);
+        /* Strata: an inactive window's title is paler. */
+        float a = active ? 1.0f : 0.55f;
         OpenGL::render_texture(title_texture.tex.tex, fb, geometry,
-            glm::vec4(1.0f), OpenGL::TEXTURE_TRANSFORM_INVERT_Y);
+            glm::vec4(a), OpenGL::TEXTURE_TRANSFORM_INVERT_Y);
     }
 
     void render_scissor_box(const wf::render_target_t& fb, wf::point_t origin,
@@ -128,7 +160,19 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             activated = view->activated;
         }
 
-        theme.render_background(fb, geometry, scissor, activated);
+        /* Strata: the title bar with its rounded top, then the soft edge
+         * around the rest of the window. */
+        int top = current_titlebar;
+        if (top > 0)
+        {
+            OpenGL::render_begin(fb);
+            fb.logic_scissor(scissor);
+            render_bar(fb, {origin.x, origin.y, size.width, top}, activated);
+            OpenGL::render_end();
+        }
+
+        theme.render_edges(fb, geometry, top, scissor, activated);
+        layout.set_active(activated);
 
         /* Draw title & buttons */
         auto renderables = layout.get_renderable_areas();
@@ -138,7 +182,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             {
                 OpenGL::render_begin(fb);
                 fb.logic_scissor(scissor);
-                render_title(fb, item->get_geometry() + origin);
+                render_title(fb, item->get_geometry() + origin, activated);
                 OpenGL::render_end();
             } else // button
             {
