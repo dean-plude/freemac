@@ -7,9 +7,11 @@
 
 @interface FValue : NSValue {
 @public
-    char _kind; /* 'r' range, 'p' pointer */
+    char _kind; /* 'r' range, 'p' pointer, 'P' point, 'S' size, 'R' rect, 'E' edge insets */
     NSRange _range;
     void *_ptr;
+    NSRect _rect;           /* a point or size is kept in its first half */
+    NSEdgeInsets _insets;
 }
 @end
 
@@ -51,14 +53,39 @@ CFBooleanRef ferry_true, ferry_false;
     v->_ptr = (void *)pointer;
     return [v autorelease];
 }
+static NSValue *geometry_value(char kind, NSRect rect)
+{
+    FValue *v = [[FValue alloc] init];
+    v->_kind = kind;
+    v->_rect = rect;
+    return [v autorelease];
+}
++ (NSValue *)valueWithPoint:(NSPoint)p { return geometry_value('P', NSMakeRect(p.x, p.y, 0, 0)); }
++ (NSValue *)valueWithSize:(NSSize)s { return geometry_value('S', NSMakeRect(s.width, s.height, 0, 0)); }
++ (NSValue *)valueWithRect:(NSRect)r { return geometry_value('R', r); }
++ (NSValue *)valueWithEdgeInsets:(NSEdgeInsets)e
+{
+    FValue *v = [[FValue alloc] init];
+    v->_kind = 'E';
+    v->_insets = e;
+    return [v autorelease];
+}
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (NSRange)rangeValue { return NSMakeRange(0, 0); }
 - (void *)pointerValue { return NULL; }
+- (NSPoint)pointValue { return NSZeroPoint; }
+- (NSSize)sizeValue { return NSZeroSize; }
+- (NSRect)rectValue { return NSZeroRect; }
+- (NSEdgeInsets)edgeInsetsValue { return NSEdgeInsetsZero; }
 @end
 
 @implementation FValue
 - (NSRange)rangeValue { return _range; }
 - (void *)pointerValue { return _ptr; }
+- (NSPoint)pointValue { return _rect.origin; }
+- (NSSize)sizeValue { return NSMakeSize(_rect.origin.x, _rect.origin.y); }
+- (NSRect)rectValue { return _rect; }
+- (NSEdgeInsets)edgeInsetsValue { return _insets; }
 - (BOOL)isEqual:(id)other
 {
     if (other == self)
@@ -66,14 +93,37 @@ CFBooleanRef ferry_true, ferry_false;
     if (![other isKindOfClass:[FValue class]])
         return NO;
     FValue *o = other;
-    return o->_kind == _kind && (_kind == 'r' ? NSEqualRanges(o->_range, _range) : o->_ptr == _ptr);
+    if (o->_kind != _kind)
+        return NO;
+    switch (_kind) {
+    case 'r': return NSEqualRanges(o->_range, _range);
+    case 'p': return o->_ptr == _ptr;
+    case 'E': return !memcmp(&o->_insets, &_insets, sizeof _insets);
+    default: return NSEqualRects(o->_rect, _rect);
+    }
 }
-- (NSUInteger)hash { return _kind == 'r' ? _range.location * 31 + _range.length : (NSUInteger)_ptr; }
+- (NSUInteger)hash
+{
+    switch (_kind) {
+    case 'r': return _range.location * 31 + _range.length;
+    case 'p': return (NSUInteger)_ptr;
+    case 'E': return (NSUInteger)(_insets.top * 31 + _insets.left);
+    default: return (NSUInteger)(_rect.origin.x * 31 + _rect.origin.y * 17 + _rect.size.width);
+    }
+}
 - (NSString *)description
 {
     if (_kind == 'r')
         return [NSString stringWithFormat:@"NSRange: {%lu, %lu}", (unsigned long)_range.location,
                                           (unsigned long)_range.length];
+    switch (_kind) {
+    case 'P': return [@"NSPoint: " stringByAppendingString:NSStringFromPoint(_rect.origin)];
+    case 'S': return [@"NSSize: " stringByAppendingString:NSStringFromSize([self sizeValue])];
+    case 'R': return [@"NSRect: " stringByAppendingString:NSStringFromRect(_rect)];
+    case 'E':
+        return [NSString stringWithFormat:@"NSEdgeInsets: {%g, %g, %g, %g}", _insets.top, _insets.left,
+                                          _insets.bottom, _insets.right];
+    }
     return [NSString stringWithFormat:@"<%p>", _ptr];
 }
 @end

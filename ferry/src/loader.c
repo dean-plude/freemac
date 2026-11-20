@@ -734,6 +734,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreFoundation", "Foundation"},
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},
+    {"Cocoa", "AppKit"},
     {NULL, NULL},
 };
 

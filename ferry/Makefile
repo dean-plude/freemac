@@ -30,7 +30,14 @@ GRAPHICS_HEADERS = graphics/GInternal.h graphics/host.h sdk/include/CoreGraphics
                    sdk/include/CoreText/CoreText.h $(FOUNDATION_HEADERS)
 HOST_TBD = graphics/build/libFerryHost.tbd
 
-all: ferry $(TBD) $(FOUNDATION) $(GRAPHICS)
+# AppKit (M4): windows through this system's GTK, drawn with the library
+# above. Cocoa is served from it.
+APPKIT_SRC = $(wildcard appkit/*.m)
+APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
+APPKIT = frameworks/AppKit.framework/AppKit
+APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(GRAPHICS_HEADERS)
+
+all: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -38,10 +45,10 @@ ferry: $(OBJ)
 src/%.o: src/%.c src/ferry.h src/macho.h src/objc/objc-private.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# The Cairo, Pango and HarfBuzz calls Ferry's drawing frameworks may make:
-# exactly the ones graphics/host.h declares.
-src/host_names.h: graphics/host.h
-	grep -oE '\b(cairo|pango|g|hb)_[a-z0-9_]+\(' $< | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
+# The Cairo, Pango, HarfBuzz and GTK calls Ferry's frameworks may make:
+# exactly the ones graphics/host.h and appkit/gtk.h declare.
+src/host_names.h: graphics/host.h appkit/gtk.h
+	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
 src/host.o: src/host_names.h
 
@@ -80,13 +87,23 @@ $(GRAPHICS): $(GRAPHICS_OBJ) $(FOUNDATION) $(HOST_TBD)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics \
 	    -o $@ $(GRAPHICS_OBJ) -framework Foundation $(HOST_TBD)
 	@mkdir -p frameworks/CoreText.framework frameworks/ApplicationServices.framework
-	sdk/gen-alias-tbd.sh $@ CoreText > frameworks/CoreText.framework/CoreText.tbd
-	sdk/gen-alias-tbd.sh $@ ApplicationServices > frameworks/ApplicationServices.framework/ApplicationServices.tbd
+	sdk/gen-alias-tbd.sh CoreText $@ > frameworks/CoreText.framework/CoreText.tbd
+	sdk/gen-alias-tbd.sh ApplicationServices $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
+
+appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
+	@mkdir -p appkit/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(HOST_TBD)
+	@mkdir -p frameworks/AppKit.framework frameworks/Cocoa.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
+	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics $(HOST_TBD)
+	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS)
+install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
@@ -95,13 +112,14 @@ install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS)
 	install -Dm644 frameworks/CoreFoundation.framework/CoreFoundation.tbd \
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
 	install -Dm755 $(GRAPHICS) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreGraphics.framework/CoreGraphics
-	for f in CoreText ApplicationServices; do \
+	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
+	for f in CoreText ApplicationServices Cocoa; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h
-	rm -rf tests/build foundation/build graphics/build frameworks
+	rm -rf tests/build foundation/build graphics/build appkit/build frameworks
 
 .PHONY: all check install clean

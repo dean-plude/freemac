@@ -42,21 +42,9 @@ static PangoContext *pango_context(void)
 
 /* ---- fonts ------------------------------------------------------------------------ */
 
-@interface GFont : NSObject {
-@public
-    PangoFontDescription *desc;
-    PangoFont *font;
-    hb_font_t *hb;
-    unsigned upem;
-    CGFloat size;
-    CGAffineTransform matrix;
-    NSString *family;   /* as installed */
-    int weight, style;
-    BOOL monospace;
-}
-@end
-
 @implementation GFont
+
+- (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 
 - (void)dealloc
 {
@@ -156,7 +144,12 @@ static GFont *load_font(NSString *family, int weight, int style, CGFloat size, c
 {
     if (size <= 0)
         size = 12;
-    GFont *f = [[GFont alloc] init];
+    /* AppKit's NSFont is a Core Text font, as on a Mac (where the two are
+     * toll-free bridged): when AppKit is loaded, fonts are made as NSFonts. */
+    static Class cls;
+    if (!cls)
+        cls = objc_getClass("NSFont") ?: [GFont class];
+    GFont *f = [[cls alloc] init];
     f->size = size;
     f->matrix = matrix ? *matrix : CGAffineTransformIdentity;
     f->desc = pango_font_description_new();
@@ -444,13 +437,6 @@ void CTFontDrawGlyphs(CTFontRef font, const CGGlyph glyphs[], const CGPoint posi
 CFTypeID CTFontGetTypeID(void) { return (CFTypeID)[GFont class]; }
 
 /* ---- paragraph styles ---------------------------------------------------------------- */
-
-@interface GParagraphStyle : NSObject <NSCopying> {
-@public
-    uint8_t alignment, lineBreakMode, writingDirection;
-    CGFloat values[17];
-}
-@end
 
 @implementation GParagraphStyle
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }

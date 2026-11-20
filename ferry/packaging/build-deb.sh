@@ -20,17 +20,18 @@ Architecture: amd64
 Maintainer: freemac project <noreply@freemac.invalid>
 Installed-Size: $size
 Depends: libc6
-Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b
+Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0
 Suggests: clang, lld
 Section: otherosfs
 Priority: optional
-Description: Ferry, runs simple Intel Mac command-line programs
+Description: Ferry, runs simple Intel Mac programs
  Ferry loads 64-bit Intel Mach-O programs and connects them to this system's
- C library through its own small libSystem layer, Objective-C runtime and
- Foundation, written from public documentation. It runs command-line
- programs that use the C and POSIX basics, blocks, the Objective-C runtime
- and Foundation, and can draw into images with its Core Graphics and Core
- Text (on this system's Cairo and Pango). Graphical Mac apps and App Store
+ C library through its own small libSystem layer, Objective-C runtime,
+ Foundation, Core Graphics, Core Text and AppKit, written from public
+ documentation. It runs command-line programs and simple windowed AppKit
+ programs written in code (windows, views, buttons, text fields, menus'
+ keyboard shortcuts), drawn with this system's Cairo and Pango and shown
+ through GTK 3 on Wayland or X11. Apps built with nib files and App Store
  apps do not run yet.
 CONTROL
 cat > "$root/DEBIAN/postinst" <<'POSTINST'

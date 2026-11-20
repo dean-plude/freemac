@@ -1,0 +1,57 @@
+NSApp is an App: 1
+content frame: {{0, 0}, {200, 100}}
+window set: 1, next responder is content: 1
+plain (0,0) in window: {10, 20}
+flipped (0,0) in window: {100, 60}
+flipped (5,5) from plain: {-85, 35}
+rect to window: {{100, 50}, {10, 10}}
+hit (15,25): plain
+hit (105,55): flipped
+hit (80,80): content
+bitmap 200x100
+plain corner (12,78): 1.00 0.00 0.00 1.00
+plain top (12,42): 0.00 0.00 0.00 0.00
+flipped corner (102,42): 0.00 0.00 1.00 1.00
+flipped bottom (102,78): 0.00 0.00 0.00 0.00
+drawn once each: 1 1
+oval centre (10,10): 0.00 0.50 0.00 1.00
+oval corner (0,0): 0.00 0.00 0.00 0.00
+line (30,10): 0.00 0.00 0.00 1.00
+path bounds {{20, 10}, {20, 0}}, elements 2, contains centre 1
+colour 1.00 0.50 0.25, hue 0.056 sat 0.75 bri 1.00, white 0.30
+blend 0.25, with alpha 0.50, CGColor alpha 1.00
+font 20 pt, ascender > 0: 1, descender < 0: 1, bold differs: 1, mono fixed: 1
+an NSFont is a CTFont: 20; a CTFont is an NSFont: 1
+text grows with length: 1, height ~ line height: 1
+paragraph style alignment 2 break 4
+window frame: {{100, 100}, {300, 150}}
+stretchy: {{10, 10}, {280, 130}}
+pinned: {{250, 110}, {40, 30}}
+removed: superview nil 1, window nil 1
+button size {60, 32}, check box height 18, label editable 0, label takes focus 0
+key window: 1, visible: 1
+check box 0, radios 0 1
+clicks: clicked OK, clicked Check, clicked Check, clicked One, clicked Two
+highlighted while pressed: 1
+not highlighted outside: 1
+dragged away: 
+first responder is the field: 1
+typed: Aad!
+while typing: changed, changed, changed, changed, changed, changed
+return: entered Aad!, clicked OK
+tab moved to the next field: 1
+first field kept its text: Aad!
+shift-tab moved back: 1
+everything selected on the way in: Aad!
+select a word back and type: Aad! Z
+edits: changed, changed, changed, changed
+text drawn in the field: 1
+unhandled key equivalent: 0
+nil-targeted action found the delegate: 1
+first responder target: 1
+menus: menu Do It, menu Shifted, menu App
+application event 42
+run: launched, tick
+will close
+after close: visible 0, key 0, windows 0
+exit=0
