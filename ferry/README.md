@@ -35,7 +35,8 @@ and the old text form), `NSBundle` (a program inside an `.app` folder finds
 its `Info.plist`, resources and localized strings), `NSUserDefaults` (kept
 in `~/.config/ferry/preferences/<app id>.plist`), `NSFileManager`,
 `NSProcessInfo`, `NSRunLoop`, `NSTimer`, `NSNotificationCenter`, and the
-`CF...` calls on the same objects, and `NSAttributedString`.
+`CF...` calls on the same objects, `NSAttributedString`, and keyed
+archives (`NSKeyedArchiver`, `NSKeyedUnarchiver`).
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
@@ -50,8 +51,9 @@ Linux places: Documents to `~/Documents`, Application Support to
 `~/.local/share`, Caches to `~/.cache`.
 
 Ferry also has the start of its own AppKit (`AppKit.framework`, also
-reached as `Cocoa`), so a program that builds its windows in code can open
-them on the desktop: `NSApplication`, `NSWindow`, `NSView` with
+reached as `Cocoa`), so a program can open windows on the desktop, built
+in code or loaded from nib files (an app's `MainMenu.nib` is loaded by
+`NSApplicationMain`, with outlets, actions and `awakeFromNib`): `NSApplication`, `NSWindow`, `NSView` with
 `drawRect:`, mouse and keyboard events, `NSColor`, `NSFont`,
 `NSBezierPath`, buttons, check boxes, radio buttons, text fields and
 labels, and menus' keyboard shortcuts. Windows are shown through this
@@ -63,9 +65,10 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
 
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
-- **Most graphical Mac apps, for now.** Ferry's AppKit is young: apps built
-  with nib files or storyboards (most of them) don't start yet, and many
-  views (tables, scroll views, text views, images) are missing. These are
+- **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
+  views (tables, scroll views, text views, images) are missing, storyboards
+  aren't read, and nib loading hasn't yet been tried with nibs made by
+  Xcode. These are
   being added step by step (see
   [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
   frameworks are further off.
@@ -114,7 +117,9 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
    draw into with Core Graphics; GTK's events become `NSEvent`s, and GTK's
    main loop runs inside Foundation's run loop. GTK is opened only when a
    program uses AppKit, and only for the calls in `appkit/gtk.h`. Without a
-   display, windows still work off screen, which the tests use.
+   display, windows still work off screen, which the tests use. Nib files
+   are keyed archives; `appkit/NSNib.m` turns Interface Builder's stand-in
+   objects into the real ones and makes the connections.
 
 ## Sources
 

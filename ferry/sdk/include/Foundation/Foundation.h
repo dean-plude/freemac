@@ -137,10 +137,14 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 - (id)mutableCopyWithZone:(NSZone *)zone;
 @end
 
+@class NSCoder;
 @protocol NSCoding
+- (void)encodeWithCoder:(NSCoder *)coder;
+- (instancetype)initWithCoder:(NSCoder *)coder;
 @end
 
 @protocol NSSecureCoding <NSCoding>
+@property (class, readonly) BOOL supportsSecureCoding;
 @end
 
 typedef struct {
@@ -174,7 +178,7 @@ typedef struct {
 - (void)performSelectorOnMainThread:(SEL)aSelector withObject:(id)arg waitUntilDone:(BOOL)wait;
 @end
 
-@interface NSNull : NSObject <NSCopying>
+@interface NSNull : NSObject <NSCopying, NSSecureCoding>
 + (NSNull *)null;
 @end
 
@@ -289,7 +293,7 @@ typedef struct {
 
 /* ---- NSValue and NSNumber --------------------------------------------------------- */
 
-@interface NSValue : NSObject <NSCopying>
+@interface NSValue : NSObject <NSCopying, NSSecureCoding>
 + (NSValue *)valueWithRange:(NSRange)range;
 + (NSValue *)valueWithPointer:(const void *)pointer;
 + (NSValue *)valueWithPoint:(NSPoint)point;
@@ -302,6 +306,7 @@ typedef struct {
 @property (readonly) NSRect rectValue;
 @property (readonly) NSEdgeInsets edgeInsetsValue;
 @property (readonly) void *pointerValue;
+@property (readonly) const char *objCType NS_RETURNS_INNER_POINTER;
 @end
 
 @interface NSNumber : NSValue
@@ -352,7 +357,7 @@ typedef struct {
 @property (readonly, copy) NSArray<ObjectType> *allObjects;
 @end
 
-@interface NSArray<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration>
+@interface NSArray<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
 @property (readonly) NSUInteger count;
 - (ObjectType)objectAtIndex:(NSUInteger)index;
 + (instancetype)array;
@@ -413,7 +418,7 @@ typedef struct {
 - (void)sortUsingComparator:(NSComparator)cmptr;
 @end
 
-@interface NSDictionary<__covariant KeyType, __covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration>
+@interface NSDictionary<__covariant KeyType, __covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
 @property (readonly) NSUInteger count;
 - (ObjectType)objectForKey:(KeyType)key;
 - (NSEnumerator<KeyType> *)keyEnumerator;
@@ -455,7 +460,7 @@ typedef struct {
 - (void)setDictionary:(NSDictionary<KeyType, ObjectType> *)other;
 @end
 
-@interface NSSet<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration>
+@interface NSSet<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
 @property (readonly) NSUInteger count;
 + (instancetype)set;
 + (instancetype)setWithObject:(ObjectType)obj;
@@ -486,7 +491,7 @@ typedef struct {
 
 typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 };
 
-@interface NSData : NSObject <NSCopying, NSMutableCopying>
+@interface NSData : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 @property (readonly) NSUInteger length;
 @property (readonly) const void *bytes NS_RETURNS_INNER_POINTER;
 + (instancetype)data;
@@ -530,7 +535,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 }
 
 #define NSTimeIntervalSince1970 978307200.0
 
-@interface NSDate : NSObject <NSCopying>
+@interface NSDate : NSObject <NSCopying, NSSecureCoding>
 @property (readonly) NSTimeInterval timeIntervalSinceReferenceDate;
 + (instancetype)date;
 + (instancetype)dateWithTimeIntervalSinceNow:(NSTimeInterval)secs;
@@ -555,7 +560,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 }
 
 /* ---- NSURL ------------------------------------------------------------------------- */
 
-@interface NSURL : NSObject <NSCopying>
+@interface NSURL : NSObject <NSCopying, NSSecureCoding>
 + (instancetype)URLWithString:(NSString *)s;
 + (instancetype)URLWithString:(NSString *)s relativeToURL:(NSURL *)base;
 + (NSURL *)fileURLWithPath:(NSString *)path;
@@ -821,6 +826,95 @@ typedef NSUInteger NSPropertyListWriteOptions;
                     format:(NSPropertyListFormat *)format errorDescription:(NSString **)errorString;
 @end
 
+/* ---- archiving (NSCoder, NSKeyedArchiver, NSKeyedUnarchiver) --------------------- */
+
+@interface NSCoder : NSObject
+@property (readonly) BOOL allowsKeyedCoding;
+@property (readonly) BOOL requiresSecureCoding;
+- (void)encodeObject:(id)object forKey:(NSString *)key;
+- (void)encodeConditionalObject:(id)object forKey:(NSString *)key;
+- (void)encodeBool:(BOOL)value forKey:(NSString *)key;
+- (void)encodeInt:(int)value forKey:(NSString *)key;
+- (void)encodeInt32:(int32_t)value forKey:(NSString *)key;
+- (void)encodeInt64:(int64_t)value forKey:(NSString *)key;
+- (void)encodeInteger:(NSInteger)value forKey:(NSString *)key;
+- (void)encodeFloat:(float)value forKey:(NSString *)key;
+- (void)encodeDouble:(double)value forKey:(NSString *)key;
+- (void)encodeBytes:(const uint8_t *)bytes length:(NSUInteger)length forKey:(NSString *)key;
+- (void)encodePoint:(NSPoint)point forKey:(NSString *)key;
+- (void)encodeSize:(NSSize)size forKey:(NSString *)key;
+- (void)encodeRect:(NSRect)rect forKey:(NSString *)key;
+- (BOOL)containsValueForKey:(NSString *)key;
+- (id)decodeObjectForKey:(NSString *)key;
+- (id)decodeObjectOfClass:(Class)cls forKey:(NSString *)key;
+- (id)decodeObjectOfClasses:(NSSet *)classes forKey:(NSString *)key;
+- (id)decodeTopLevelObjectForKey:(NSString *)key error:(NSError **)error;
+- (NSArray *)decodeArrayOfObjectsOfClass:(Class)cls forKey:(NSString *)key;
+- (BOOL)decodeBoolForKey:(NSString *)key;
+- (int)decodeIntForKey:(NSString *)key;
+- (int32_t)decodeInt32ForKey:(NSString *)key;
+- (int64_t)decodeInt64ForKey:(NSString *)key;
+- (NSInteger)decodeIntegerForKey:(NSString *)key;
+- (float)decodeFloatForKey:(NSString *)key;
+- (double)decodeDoubleForKey:(NSString *)key;
+- (const uint8_t *)decodeBytesForKey:(NSString *)key returnedLength:(NSUInteger *)length;
+- (NSPoint)decodePointForKey:(NSString *)key;
+- (NSSize)decodeSizeForKey:(NSString *)key;
+- (NSRect)decodeRectForKey:(NSString *)key;
+- (void)failWithError:(NSError *)error;
+@property (readonly, copy) NSError *error;
+@end
+
+FOUNDATION_EXPORT NSString *const NSKeyedArchiveRootObjectKey;
+FOUNDATION_EXPORT NSString *const NSInvalidArchiveOperationException;
+FOUNDATION_EXPORT NSString *const NSInvalidUnarchiveOperationException;
+
+@interface NSKeyedArchiver : NSCoder
++ (NSData *)archivedDataWithRootObject:(id)root requiringSecureCoding:(BOOL)secure error:(NSError **)error;
++ (NSData *)archivedDataWithRootObject:(id)root;
++ (BOOL)archiveRootObject:(id)root toFile:(NSString *)path;
+- (instancetype)initRequiringSecureCoding:(BOOL)secure;
+- (instancetype)initForWritingWithMutableData:(NSMutableData *)data;
+@property NSPropertyListFormat outputFormat;
+@property (readonly, strong) NSData *encodedData;
+- (void)finishEncoding;
++ (void)setClassName:(NSString *)name forClass:(Class)cls;
++ (NSString *)classNameForClass:(Class)cls;
+- (void)setClassName:(NSString *)name forClass:(Class)cls;
+- (NSString *)classNameForClass:(Class)cls;
+@end
+
+typedef NS_ENUM(NSInteger, NSDecodingFailurePolicy) {
+    NSDecodingFailurePolicyRaiseException = 0,
+    NSDecodingFailurePolicySetErrorAndReturn = 1,
+};
+
+@interface NSKeyedUnarchiver : NSCoder
++ (id)unarchiveObjectWithData:(NSData *)data;
++ (id)unarchiveObjectWithFile:(NSString *)path;
++ (id)unarchivedObjectOfClass:(Class)cls fromData:(NSData *)data error:(NSError **)error;
++ (id)unarchivedObjectOfClasses:(NSSet *)classes fromData:(NSData *)data error:(NSError **)error;
++ (id)unarchiveTopLevelObjectWithData:(NSData *)data error:(NSError **)error;
+- (instancetype)initForReadingFromData:(NSData *)data error:(NSError **)error;
+- (instancetype)initForReadingWithData:(NSData *)data;
+@property (readwrite) BOOL requiresSecureCoding;
+@property NSDecodingFailurePolicy decodingFailurePolicy;
+- (void)finishDecoding;
++ (void)setClass:(Class)cls forClassName:(NSString *)name;
++ (Class)classForClassName:(NSString *)name;
+- (void)setClass:(Class)cls forClassName:(NSString *)name;
+- (Class)classForClassName:(NSString *)name;
+@end
+
+@interface NSObject (NSArchiving)
+@property (readonly) Class classForCoder;
+@property (readonly) Class classForKeyedArchiver;
+- (id)replacementObjectForCoder:(NSCoder *)coder;
+- (id)replacementObjectForKeyedArchiver:(NSKeyedArchiver *)archiver;
+- (id)awakeAfterUsingCoder:(NSCoder *)coder;
++ (NSArray<NSString *> *)classFallbacksForKeyedArchiver;
+@end
+
 /* ---- notifications, run loops, timers ----------------------------------------------- */
 
 typedef NSString *NSNotificationName;
@@ -893,7 +987,7 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringEnumerationOptions) {
     NSAttributedStringEnumerationLongestEffectiveRangeNotRequired = (1UL << 20),
 };
 
-@interface NSAttributedString : NSObject <NSCopying, NSMutableCopying>
+@interface NSAttributedString : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 @property (readonly, copy) NSString *string;
 @property (readonly) NSUInteger length;
 - (instancetype)initWithString:(NSString *)str;

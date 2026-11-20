@@ -13,6 +13,11 @@
 
 void objc_exception_throw(id exception);
 
+/* The NSCoding methods of Foundation's classes are in NSCoder.m, as categories. */
+#pragma clang diagnostic ignored "-Wprotocol"
+#pragma clang diagnostic ignored "-Wobjc-property-implementation"
+#pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
+
 #define F_EXPORT __attribute__((visibility("default")))
 
 /* Strings */

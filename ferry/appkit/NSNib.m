@@ -1,0 +1,693 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Ferry's AppKit: loading nib files. A compiled nib for the Mac is a keyed
+ * archive (see Foundation's NSCoder.m) whose top object, under the key
+ * "IB.objectdata", is an NSIBObjectData: the nib's root (File's Owner),
+ * every object with its parent, the outlet and action connections, the
+ * windows to show at launch, and names for special objects. A nib can be
+ * a single file or a folder holding keyedobjects.nib.
+ *
+ * Interface Builder writes stand-ins for some objects: NSCustomObject for
+ * File's Owner, First Responder, the Application and custom objects;
+ * NSCustomView and NSClassSwapper for views of the app's own classes; and
+ * NSWindowTemplate for each window. Loading turns those into the real
+ * objects, makes the connections, sends awakeFromNib, and shows the
+ * windows marked visible at launch.
+ *
+ * The class and key names follow Apple's public documentation of nib
+ * loading (NSNib, awakeFromNib, File's Owner, outlets and actions) and
+ * descriptions of the archive's contents published by developers and by the
+ * GNUstep project. No Apple code or nib was copied. */
+#import "AInternal.h"
+
+/* Stand-ins replace themselves with other objects in initWithCoder:. */
+#pragma clang diagnostic ignored "-Wobjc-designated-initializers"
+
+/* ---- the load in progress --------------------------------------------------------------- */
+
+typedef struct {
+    NSMutableDictionary *namedMenus;   /* "_NSMainMenu" -> menu */
+} ANibLoad;
+
+static ANibLoad *current_load;
+
+void ANibNoteNamedMenu(NSMenu *menu, NSString *name)
+{
+    if (current_load && menu && name)
+        [current_load->namedMenus setObject:menu forKey:name];
+}
+
+static void warn_class(NSString *what, NSString *name)
+{
+    static NSMutableSet *warned;
+    if (!warned)
+        warned = [[NSMutableSet alloc] init];
+    if ([warned containsObject:name])
+        return;
+    [warned addObject:name];
+    fprintf(stderr, "ferry: a nib uses %s %s, which this program doesn't have\n", [what UTF8String],
+            [name UTF8String]);
+}
+
+/* ---- colours and fonts ---------------------------------------------------------------------- */
+
+/* "NSColorSpace": 1 and 2 are RGB in "NSRGB" (text, "r g b a"), 3 and 4
+ * grey in "NSWhite" ("w a"), 5 CMYK in "NSCMYK", 6 a named colour
+ * ("NSCatalogName", "NSColorName", with "NSColor" as a fallback). */
+static int parse_components(NSData *d, CGFloat *out, int max)
+{
+    if (![d isKindOfClass:[NSData class]])
+        return 0;
+    char buf[256];
+    NSUInteger n = [d length] < sizeof buf - 1 ? [d length] : sizeof buf - 1;
+    memcpy(buf, [d bytes], n);
+    buf[n] = 0;
+    int count = 0;
+    char *p = buf, *end;
+    while (count < max) {
+        double v = strtod(p, &end);
+        if (end == p)
+            break;
+        out[count++] = v;
+        p = end;
+    }
+    return count;
+}
+
+@implementation NSColor (NSNibCoding)
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    [self release];
+    NSColor *color = nil;
+    CGFloat v[5] = {0, 0, 0, 1, 1};
+    int space = [c decodeIntForKey:@"NSColorSpace"];
+    switch (space) {
+    case 1:
+    case 2: {
+        NSData *d = [c decodeObjectForKey:@"NSRGB"] ?: [c decodeObjectForKey:@"NSComponents"];
+        int n = parse_components(d, v, 4);
+        if (n < 4)
+            v[3] = 1;
+        color = [NSColor colorWithSRGBRed:v[0] green:v[1] blue:v[2] alpha:v[3]];
+        break;
+    }
+    case 3:
+    case 4: {
+        int n = parse_components([c decodeObjectForKey:@"NSWhite"], v, 2);
+        if (n < 2)
+            v[1] = 1;
+        color = [NSColor colorWithCalibratedWhite:v[0] alpha:v[1]];
+        break;
+    }
+    case 5: {
+        int n = parse_components([c decodeObjectForKey:@"NSCMYK"], v, 5);
+        if (n < 5)
+            v[4] = 1;
+        color = [NSColor colorWithSRGBRed:(1 - v[0]) * (1 - v[3]) green:(1 - v[1]) * (1 - v[3])
+                                     blue:(1 - v[2]) * (1 - v[3]) alpha:v[4]];
+        break;
+    }
+    case 6: {
+        NSString *name = [c decodeObjectForKey:@"NSColorName"];
+        SEL sel = [name isKindOfClass:[NSString class]] ? NSSelectorFromString(name) : NULL;
+        if (sel && [NSColor respondsToSelector:sel])
+            color = ((id (*)(id, SEL))objc_msgSend)([NSColor class], sel);
+        if (![color isKindOfClass:[NSColor class]]) {
+            color = [c decodeObjectForKey:@"NSColor"];
+            if (![color isKindOfClass:[NSColor class]])
+                color = nil;
+        }
+        break;
+    }
+    }
+    return [color ?: [NSColor blackColor] retain];
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    CGFloat rgba[4];
+    AColorRGBA(self, rgba);
+    [c encodeInt:1 forKey:@"NSColorSpace"];
+    NSString *s = [NSString stringWithFormat:@"%g %g %g %g", rgba[0], rgba[1], rgba[2], rgba[3]];
+    [c encodeObject:[s dataUsingEncoding:NSASCIIStringEncoding] forKey:@"NSRGB"];
+}
+@end
+
+@implementation NSFont (NSNibCoding)
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    [self release];
+    NSString *name = [c decodeObjectForKey:@"NSName"];
+    CGFloat points = [c decodeDoubleForKey:@"NSSize"];
+    NSFont *f = [name isKindOfClass:[NSString class]] ? [NSFont fontWithName:name size:points] : nil;
+    return [f ?: [NSFont systemFontOfSize:points] retain];
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    [c encodeObject:[self fontName] forKey:@"NSName"];
+    [c encodeDouble:[self pointSize] forKey:@"NSSize"];
+}
+@end
+
+@implementation NSObject (FerryNibImage)
+- (NSString *)_imageName { return nil; }
+@end
+
+/* Image references: "NSButtonImageSource" names a system image (NSSwitch,
+ * NSRadioButton) and "NSCustomResource" an image in the app's resources.
+ * Ferry has no NSImage yet, so only the name is kept. */
+@interface NSButtonImageSource : NSObject <NSCoding> {
+    NSString *_name;
+}
+@end
+@implementation NSButtonImageSource
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init]))
+        _name = [[c decodeObjectForKey:@"NSImageName"] copy];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c { [c encodeObject:_name forKey:@"NSImageName"]; }
+- (void)dealloc
+{
+    [_name release];
+    [super dealloc];
+}
+- (NSString *)_imageName { return _name; }
+@end
+
+@interface NSCustomResource : NSObject <NSCoding> {
+    NSString *_class, *_name;
+}
+@end
+@implementation NSCustomResource
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init])) {
+        _class = [[c decodeObjectForKey:@"NSClassName"] copy];
+        _name = [[c decodeObjectForKey:@"NSResourceName"] copy];
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    [c encodeObject:_class forKey:@"NSClassName"];
+    [c encodeObject:_name forKey:@"NSResourceName"];
+}
+- (void)dealloc
+{
+    [_class release];
+    [_name release];
+    [super dealloc];
+}
+- (NSString *)_imageName { return _name; }
+@end
+
+/* ---- stand-ins ------------------------------------------------------------------------- */
+
+/* File's Owner, First Responder, the Application, or an object of the
+ * app's own class. Replaced by the real object when the nib is loaded. */
+@interface NSCustomObject : NSObject <NSCoding> {
+@public
+    NSString *_className;
+}
+@end
+@implementation NSCustomObject
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init]))
+        _className = [[c decodeObjectForKey:@"NSClassName"] copy];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c { [c encodeObject:_className forKey:@"NSClassName"]; }
+- (void)dealloc
+{
+    [_className release];
+    [super dealloc];
+}
+@end
+
+/* A view of the app's own class, made with initWithFrame: as on a Mac. */
+@interface NSCustomView : NSView
+@end
+@implementation NSCustomView
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    NSString *name = [c decodeObjectForKey:@"NSClassName"];
+    Class cls = [name isKindOfClass:[NSString class]] ? NSClassFromString(name) : Nil;
+    if (!cls || ![cls isSubclassOfClass:[NSView class]]) {
+        if (name)
+            warn_class(@"the view class", name);
+        cls = [NSView class];
+    }
+    [self release];
+    NSView *v = [[cls alloc] initWithFrame:AViewFrameFromCoder(c)];
+    AViewDecode(v, c);
+    return (id)v;
+}
+@end
+
+/* An object of the app's own class that Interface Builder knows by one of
+ * AppKit's classes: it is decoded as the app's class from the same keys. */
+@interface NSClassSwapper : NSObject <NSCoding>
+@end
+@implementation NSClassSwapper
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    NSString *name = [c decodeObjectForKey:@"NSClassName"];
+    NSString *original = [c decodeObjectForKey:@"NSOriginalClassName"];
+    Class cls = [name isKindOfClass:[NSString class]] ? NSClassFromString(name) : Nil;
+    if (!cls) {
+        if (name)
+            warn_class(@"the class", name);
+        cls = [original isKindOfClass:[NSString class]] ? NSClassFromString(original) : Nil;
+    }
+    [self release];
+    return cls ? [[cls alloc] initWithCoder:c] : nil;
+}
+- (void)encodeWithCoder:(NSCoder *)c {}
+@end
+
+/* A window as Interface Builder describes it. Decoding makes the window
+ * itself, so outlets to it get the window. */
+@interface NSWindowTemplate : NSObject <NSCoding>
+@end
+@implementation NSWindowTemplate
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    [self release];
+    NSString *name = [c decodeObjectForKey:@"NSWindowClass"];
+    Class cls = [name isKindOfClass:[NSString class]] ? NSClassFromString(name) : Nil;
+    if (!cls || ![cls isSubclassOfClass:[NSWindow class]]) {
+        if (name)
+            warn_class(@"the window class", name);
+        cls = [NSWindow class];
+    }
+    NSRect rect = [c decodeRectForKey:@"NSWindowRect"];
+    NSWindowStyleMask style = (NSWindowStyleMask)[c decodeInt64ForKey:@"NSWindowStyleMask"];
+    NSWindow *w = [[cls alloc] initWithContentRect:rect styleMask:style backing:NSBackingStoreBuffered defer:YES];
+    NSString *title = [c decodeObjectForKey:@"NSWindowTitle"];
+    if ([title isKindOfClass:[NSString class]])
+        [w setTitle:title];
+    NSView *content = [c decodeObjectForKey:@"NSWindowView"];
+    if ([content isKindOfClass:[NSView class]])
+        [w setContentView:content];
+    if ([c containsValueForKey:@"NSMinSize"])
+        [w setMinSize:[c decodeSizeForKey:@"NSMinSize"]];
+    if ([c containsValueForKey:@"NSMaxSize"]) {
+        NSSize max = [c decodeSizeForKey:@"NSMaxSize"];
+        if (max.width > 0 && max.height > 0)
+            [w setMaxSize:max];
+    }
+    if ([c containsValueForKey:@"NSWindowContentMinSize"])
+        [w setContentMinSize:[c decodeSizeForKey:@"NSWindowContentMinSize"]];
+    if ([c containsValueForKey:@"NSWindowIsRestorable"])
+        (void)[c decodeBoolForKey:@"NSWindowIsRestorable"];
+    NSString *autosave = [c decodeObjectForKey:@"NSFrameAutosaveName"];
+    if ([autosave isKindOfClass:[NSString class]] && [autosave length])
+        [w setFrameAutosaveName:autosave];
+    return (id)w;
+}
+- (void)encodeWithCoder:(NSCoder *)c {}
+@end
+
+/* Connections. Outlets are set with the setter or instance variable of
+ * that name (key-value coding); actions set a control's or menu item's
+ * target and action. */
+@interface NSNibConnector : NSObject <NSCoding> {
+@public
+    id _source, _destination;
+    NSString *_label;
+}
+- (void)_connectWith:(NSDictionary *)map;
+@end
+
+static id resolve(id obj, NSDictionary *map)
+{
+    if (!obj)
+        return nil;
+    id real = [map objectForKey:[NSValue valueWithPointer:obj]];
+    if (real)
+        return real == [NSNull null] ? nil : real;
+    return obj;
+}
+
+@implementation NSNibConnector
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init])) {
+        _source = [c decodeObjectForKey:@"NSSource"];
+        _destination = [c decodeObjectForKey:@"NSDestination"];
+        _label = [[c decodeObjectForKey:@"NSLabel"] copy];
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c {}
+- (void)dealloc
+{
+    [_label release];
+    [super dealloc];
+}
+- (void)_connectWith:(NSDictionary *)map {}
+@end
+
+@interface NSNibOutletConnector : NSNibConnector
+@end
+@implementation NSNibOutletConnector
+- (void)_connectWith:(NSDictionary *)map
+{
+    id src = resolve(_source, map), dst = resolve(_destination, map);
+    if (!src || ![_label length])
+        return;
+    const char *k = [_label UTF8String];
+    char setter[256], ivar[256];
+    snprintf(setter, sizeof setter, "set%c%s:", toupper((unsigned char)k[0]), k + 1);
+    snprintf(ivar, sizeof ivar, "_%s", k);
+    Class cls = object_getClass(src);
+    if ([src respondsToSelector:sel_registerName(setter)] || class_getInstanceVariable(cls, ivar) ||
+        class_getInstanceVariable(cls, k))
+        [src setValue:dst forKey:_label];
+    else
+        fprintf(stderr, "ferry: a nib connects the outlet \"%s\" of a %s, which has no such outlet\n", k,
+                object_getClassName(src));
+}
+@end
+
+@interface NSNibControlConnector : NSNibConnector
+@end
+@implementation NSNibControlConnector
+- (void)_connectWith:(NSDictionary *)map
+{
+    id src = resolve(_source, map), dst = resolve(_destination, map);
+    if (![src respondsToSelector:@selector(setAction:)])
+        return;
+    [src setTarget:dst];
+    [src setAction:NSSelectorFromString(_label)];
+}
+@end
+
+@interface NSNibAXRelationshipConnector : NSNibConnector
+@end
+@implementation NSNibAXRelationshipConnector
+@end
+
+@interface NSNibBindingConnector : NSNibConnector
+@end
+@implementation NSNibBindingConnector
+- (void)_connectWith:(NSDictionary *)map { AWarnOnce("Cocoa bindings in nibs (they are skipped)"); }
+@end
+
+/* "User Defined Runtime Attributes": key paths set on an object. */
+@interface NSIBUserDefinedRuntimeAttributesConnector : NSNibConnector {
+    id _object;
+    NSArray *_keyPaths, *_values;
+}
+@end
+@implementation NSIBUserDefinedRuntimeAttributesConnector
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super initWithCoder:c])) {
+        _object = [c decodeObjectForKey:@"NSObject"];
+        _keyPaths = [[c decodeObjectForKey:@"NSKeyPaths"] retain];
+        _values = [[c decodeObjectForKey:@"NSValues"] retain];
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_keyPaths release];
+    [_values release];
+    [super dealloc];
+}
+- (void)_connectWith:(NSDictionary *)map
+{
+    id obj = resolve(_object, map);
+    NSUInteger n = MIN([_keyPaths count], [_values count]);
+    for (NSUInteger i = 0; i < n; i++) {
+        id target = obj;
+        NSArray *parts = [[_keyPaths objectAtIndex:i] componentsSeparatedByString:@"."];
+        for (NSUInteger j = 0; j + 1 < [parts count] && target; j++)
+            target = [target valueForKey:[parts objectAtIndex:j]];
+        [target setValue:[_values objectAtIndex:i] forKey:[parts lastObject]];
+    }
+}
+@end
+
+/* The nib's table of contents. */
+@interface NSIBObjectData : NSObject <NSCoding> {
+@public
+    id _root;
+    NSArray *_objects, *_parents, *_connections, *_visibleWindows;
+}
+@end
+@implementation NSIBObjectData
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init])) {
+        _root = [[c decodeObjectForKey:@"NSRoot"] retain];
+        _objects = [[(NSKeyedUnarchiver *)c _decodeArrayKeepingNullsForKey:@"NSObjectsKeys"] retain];
+        _parents = [[(NSKeyedUnarchiver *)c _decodeArrayKeepingNullsForKey:@"NSObjectsValues"] retain];
+        _connections = [[c decodeObjectForKey:@"NSConnections"] retain];
+        id visible = [c decodeObjectForKey:@"NSVisibleWindows"];
+        _visibleWindows = [([visible isKindOfClass:[NSSet class]] ? [visible allObjects] : visible) retain];
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c {}
+- (void)dealloc
+{
+    [_root release];
+    [_objects release];
+    [_parents release];
+    [_connections release];
+    [_visibleWindows release];
+    [super dealloc];
+}
+@end
+
+/* ---- NSNib ----------------------------------------------------------------------------- */
+
+@implementation NSNib {
+    NSData *_data;
+    NSBundle *_bundle;
+}
+
+/* A nib is a file, or a folder with keyedobjects.nib (or a variant for a
+ * newer system, keyedobjects-NNNNNN.nib) inside. */
+static NSData *read_nib(NSString *path)
+{
+    BOOL dir = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&dir])
+        return nil;
+    if (!dir)
+        return [NSData dataWithContentsOfFile:path];
+    NSData *d = [NSData dataWithContentsOfFile:[path stringByAppendingPathComponent:@"keyedobjects.nib"]];
+    if (d)
+        return d;
+    NSArray *names = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:path error:NULL]
+        sortedArrayUsingSelector:@selector(compare:)];
+    for (NSString *n in [names reverseObjectEnumerator])
+        if ([n hasPrefix:@"keyedobjects"] && [n hasSuffix:@".nib"])
+            return [NSData dataWithContentsOfFile:[path stringByAppendingPathComponent:n]];
+    return nil;
+}
+
+- (instancetype)initWithNibData:(NSData *)data bundle:(NSBundle *)bundle
+{
+    if (!data) {
+        [self release];
+        return nil;
+    }
+    if ((self = [super init])) {
+        _data = [data retain];
+        _bundle = [bundle ?: [NSBundle mainBundle] retain];
+    }
+    return self;
+}
+- (instancetype)initWithNibNamed:(NSString *)name bundle:(NSBundle *)bundle
+{
+    bundle = bundle ?: [NSBundle mainBundle];
+    NSString *path = [name isAbsolutePath] ? name : [bundle pathForResource:name ofType:@"nib"];
+    if (!path && [[name pathExtension] isEqualToString:@"nib"])
+        path = [bundle pathForResource:[name stringByDeletingPathExtension] ofType:@"nib"];
+    return [self initWithNibData:path ? read_nib(path) : nil bundle:bundle];
+}
+- (instancetype)initWithContentsOfURL:(NSURL *)url
+{
+    return [self initWithNibData:read_nib([url path]) bundle:nil];
+}
+- (void)dealloc
+{
+    [_data release];
+    [_bundle release];
+    [super dealloc];
+}
+
+/* Makes the real object for a stand-in: File's Owner is the owner, First
+ * Responder is nil (an action with no target), the Application is NSApp,
+ * and anything else is a new object of its class. */
+static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
+{
+    if (isRoot)
+        return owner;
+    NSString *name = placeholder->_className;
+    if ([name isEqualToString:@"FirstResponder"])
+        return nil;
+    Class cls = name ? NSClassFromString(name) : Nil;
+    if (!cls) {
+        warn_class(@"the class", name ?: @"(unnamed)");
+        return nil;
+    }
+    if ([cls isSubclassOfClass:[NSApplication class]])
+        return [cls sharedApplication];
+    return [[[cls alloc] init] autorelease];
+}
+
+- (BOOL)instantiateWithOwner:(id)owner topLevelObjects:(NSArray **)topLevelObjects
+{
+    if (topLevelObjects)
+        *topLevelObjects = nil;
+    if ([_data length] >= 10 && !memcmp([_data bytes], "NIBArchive", 10)) {
+        AWarnOnce("nibs in the NIBArchive format (Ferry reads keyed-archive nibs only)");
+        return NO;
+    }
+    ANibLoad load = {[NSMutableDictionary dictionary]};
+    ANibLoad *outer = current_load;
+    current_load = &load;
+    NSKeyedUnarchiver *u = [[NSKeyedUnarchiver alloc] initForReadingFromData:_data error:NULL];
+    [u setRequiresSecureCoding:NO];
+    NSIBObjectData *nib = [u decodeObjectForKey:@"IB.objectdata"];
+    current_load = outer;
+    if (![nib isKindOfClass:[NSIBObjectData class]]) {
+        fprintf(stderr, "ferry: this nib couldn't be read%s\n", [u error] ? " (it isn't a keyed archive)" : "");
+        [u release];
+        return NO;
+    }
+    [nib retain];
+    [u release];
+
+    /* Stand-ins to real objects. */
+    NSMutableDictionary *map = [NSMutableDictionary dictionary];
+    NSMutableArray *made = [NSMutableArray array]; /* keeps the new objects alive */
+    NSMutableArray *all = [NSMutableArray arrayWithArray:nib->_objects ?: [NSArray array]];
+    if (nib->_root && ![all containsObject:nib->_root])
+        [all addObject:nib->_root];
+    [all removeObject:[NSNull null]];
+    for (id o in all) {
+        if (![o isKindOfClass:[NSCustomObject class]])
+            continue;
+        id real = instantiate(o, o == nib->_root, owner);
+        [map setObject:real ?: (id)[NSNull null] forKey:[NSValue valueWithPointer:o]];
+        if (real)
+            [made addObject:real];
+    }
+
+    /* Menu items and cells whose target is a stand-in. */
+    for (id o in all) {
+        if ([o isKindOfClass:[NSMenuItem class]] || [o isKindOfClass:[NSCell class]]) {
+            id t = [o target];
+            if (t && [map objectForKey:[NSValue valueWithPointer:t]])
+                [o setTarget:resolve(t, map)];
+        }
+        if ([o isKindOfClass:[NSControl class]] && [o target] &&
+            [map objectForKey:[NSValue valueWithPointer:[o target]]])
+            [o setTarget:resolve([o target], map)];
+    }
+
+    for (NSNibConnector *conn in nib->_connections)
+        if ([conn isKindOfClass:[NSNibConnector class]])
+            [conn _connectWith:map];
+
+    /* Top-level objects: those whose parent is File's Owner, apart from the
+     * stand-ins for the owner, First Responder and the Application. */
+    NSMutableArray *top = [NSMutableArray array];
+    NSUInteger n = MIN([nib->_objects count], [nib->_parents count]);
+    for (NSUInteger i = 0; i < n; i++) {
+        id o = [nib->_objects objectAtIndex:i];
+        if ([nib->_parents objectAtIndex:i] != nib->_root || o == nib->_root)
+            continue;
+        if ([o isKindOfClass:[NSCustomObject class]]) {
+            NSString *cn = ((NSCustomObject *)o)->_className;
+            if ([cn isEqualToString:@"FirstResponder"] || NSClassFromString(cn) == [NSApplication class] ||
+                [NSClassFromString(cn) isSubclassOfClass:[NSApplication class]])
+                continue;
+        }
+        id real = resolve(o, map);
+        if (real && ![top containsObject:real])
+            [top addObject:real];
+    }
+
+    /* The main menu, when loading for the application. */
+    NSMenu *main = [load.namedMenus objectForKey:@"_NSMainMenu"];
+    if (main && (owner == NSApp || ![NSApp mainMenu]))
+        [NSApp setMainMenu:main];
+    NSMenu *windows = [load.namedMenus objectForKey:@"_NSWindowsMenu"];
+    if (windows && owner == NSApp)
+        [NSApp setWindowsMenu:windows];
+
+    /* awakeFromNib, to every object the nib made and to the owner. */
+    NSMutableArray *awake = [NSMutableArray array];
+    for (id o in all) {
+        id real = resolve(o, map);
+        if (real && real != owner && real != NSApp && ![awake containsObject:real])
+            [awake addObject:real];
+    }
+    for (id o in awake)
+        if ([o respondsToSelector:@selector(awakeFromNib)])
+            [o awakeFromNib];
+    if ([owner respondsToSelector:@selector(awakeFromNib)])
+        [owner awakeFromNib];
+
+    for (NSWindow *w in nib->_visibleWindows) {
+        if (![w isKindOfClass:[NSWindow class]])
+            continue;
+        [w retain]; /* a shown window stays until it is closed */
+        [w makeKeyAndOrderFront:nil];
+    }
+
+    if (topLevelObjects)
+        *topLevelObjects = top;
+    [nib release];
+    return YES;
+}
+- (BOOL)instantiateNibWithOwner:(id)owner topLevelObjects:(NSArray **)objects
+{
+    return [self instantiateWithOwner:owner topLevelObjects:objects];
+}
+@end
+
+@implementation NSObject (NSNibAwaking)
+- (void)awakeFromNib {}
+- (void)prepareForInterfaceBuilder {}
+@end
+
+@implementation NSBundle (NSNibLoading)
+- (BOOL)loadNibNamed:(NSString *)name owner:(id)owner topLevelObjects:(NSArray **)objects
+{
+    NSNib *nib = [[NSNib alloc] initWithNibNamed:name bundle:self];
+    if (!nib) {
+        fprintf(stderr, "ferry: couldn't find the nib %s\n", [name UTF8String]);
+        return NO;
+    }
+    BOOL ok = [nib instantiateWithOwner:owner topLevelObjects:objects];
+    [nib release];
+    return ok;
+}
+/* The old way: the top-level objects are kept (the caller releases them). */
++ (BOOL)loadNibNamed:(NSString *)name owner:(id)owner
+{
+    NSArray *top = nil;
+    BOOL ok = [[NSBundle mainBundle] loadNibNamed:name owner:owner topLevelObjects:&top];
+    for (id o in top)
+        [o retain];
+    return ok;
+}
++ (BOOL)loadNibFile:(NSString *)path externalNameTable:(NSDictionary *)context withZone:(NSZone *)zone
+{
+    NSNib *nib = [[NSNib alloc] initWithNibData:read_nib(path) bundle:nil];
+    NSArray *top = nil;
+    BOOL ok = [nib instantiateWithOwner:[context objectForKey:@"NSOwner"] topLevelObjects:&top];
+    for (id o in top)
+        [o retain];
+    [nib release];
+    return ok;
+}
+@end

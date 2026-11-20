@@ -15,8 +15,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M1 | Objective-C runtime (libobjc) and blocks | **done**, merged (#25) |
 | M2 | Foundation core + CoreFoundation basics | **done**, merged (#28) |
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
-| M4 | AppKit minimum on Wayland (through GTK 3) | **done**, pull request open (see the M4 report below) |
-| M5 | Nibs (compiled .nib) | planned |
+| M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
+| M5 | Nibs (compiled .nib) | **done**, pull request open (see the M5 report below) |
 | M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | planned |
 | M7 | Polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | planned |
 
@@ -608,7 +608,7 @@ where they should be.
   drop, cursors, tracking areas, input methods (text fields take what
   the keyboard layout types, not composed text from an IME), and
   accessibility. A few stand-ins (`lockFocus`, `scrollPoint:`, the About
-  panel, nib loading) print a one-time "not supported yet" warning.
+  panel) print a one-time "not supported yet" warning.
 - Simplifications: a window redraws in full whenever any part needs it;
   `lockFocus` does nothing and `NSBezierPath setClip` adds to the clip
   rather than replacing it; window positions are
@@ -622,6 +622,126 @@ where they should be.
 `.nib` bundles in an app's Resources), so that `NSApplicationMain` can
 build `MainMenu.nib` and an app's windows from Interface Builder, with
 outlets, actions and bindings of the simple kind.
+
+## M5: nib files
+
+### What a nib is
+
+A compiled Mac nib (what Xcode makes from a `.xib`, in an app's
+`Resources`, often inside `Base.lproj` or a language's `.lproj`) is a
+keyed archive: a property list written by `NSKeyedArchiver`, with
+`$archiver`, `$version`, `$top` and `$objects`, where objects refer to each
+other by UID and each names its class. A nib is either one such file or a
+folder holding `keyedobjects.nib`. Its top object, `IB.objectdata`, is an
+`NSIBObjectData` listing the nib's root (File's Owner), every object with
+its parent, the connections (outlets and actions) and the windows to show
+at launch. Interface Builder stores stand-ins for some objects:
+`NSCustomObject` (File's Owner, First Responder, the Application, the app's
+own objects such as its delegate), `NSCustomView` and `NSClassSwapper`
+(views and controls of the app's own classes) and `NSWindowTemplate`
+(each window).
+
+### Design
+
+- **Foundation** gained `NSCoder`, `NSKeyedArchiver` and
+  `NSKeyedUnarchiver` (`foundation/NSCoder.m`), with `NSCoding` for
+  strings, arrays, dictionaries, sets, data, dates, numbers, `NSNull`,
+  `NSURL`, `NSValue` (points, sizes, rectangles, ranges) and
+  `NSAttributedString`. Secure decoding checks the allowed classes. An
+  object of a class the program doesn't have is decoded as the nearest
+  superclass the archive names, with a warning. The binary property-list
+  writer learned UIDs. Archives are written in binary by default, or XML.
+- **AppKit**: `appkit/NSNib.m` has the stand-ins, the connectors and
+  `NSNib`; `appkit/NSCell.m` has `NSCell`, `NSActionCell`, `NSButtonCell`,
+  `NSTextFieldCell` and `NSSecureTextFieldCell`. `NSView`, `NSControl`,
+  `NSButton`, `NSTextField`, `NSMenu`, `NSMenuItem`, `NSColor` and `NSFont`
+  can be decoded from a nib.
+- **Cells.** Ferry's controls still draw and keep their state themselves
+  (M4). A nib stores a control's settings in its cell, so a control loaded
+  from a nib copies them from the cell, and keeps the cell for `-cell`.
+- **Loading** (`-[NSNib instantiateWithOwner:topLevelObjects:]`):
+  1. Decode the archive.
+  2. Replace the stand-ins: File's Owner becomes the owner, First Responder
+     becomes nil (an action with no target, which goes up the responder
+     chain), the Application becomes `NSApp`, and anything else becomes a
+     new object of its class made with `-init`. Custom views are made with
+     `-initWithFrame:` and swapped classes with `-initWithCoder:`, as on a
+     Mac. Each window template becomes its window as it is decoded.
+  3. Make the connections. Outlets use the setter, or an instance variable
+     of that name, as key-value coding does. An outlet the object doesn't
+     have is reported rather than crashing. Actions set the target and
+     action. "User Defined Runtime Attributes" are set too.
+  4. Set the main menu and the Windows menu from the menus named
+     `_NSMainMenu` and `_NSWindowsMenu`.
+  5. Send `awakeFromNib` to every object the nib made, then to the owner.
+  6. Show the windows marked visible at launch.
+- `NSApplicationMain` loads the main nib named by `NSMainNibFile` in
+  `Info.plist`, with `NSApp` as its owner, before running. `NSBundle`'s
+  `loadNibNamed:owner:topLevelObjects:` (and the older
+  `+loadNibNamed:owner:`) find a nib through the bundle's resources,
+  including `Base.lproj` and the user's language.
+- **Sources.** Keyed archives follow Apple's public documentation of
+  `NSKeyedArchiver`/`NSKeyedUnarchiver` and of property lists. Nib loading
+  follows Apple's documentation of `NSNib`, File's Owner, outlets, actions
+  and `awakeFromNib`. The names of the stand-in classes and their keys
+  (`NSWindowRect`, `NSvFlags`, `NSCellFlags`...) and the meaning of their
+  flag bits follow descriptions of the format published by developers and
+  by the GNUstep project. No code was copied from GNUstep, Darling or
+  Apple, and no Apple nib is in the repository: the test nibs are written
+  by our own script (`tests/appkit/make_nibs.py`) with Python's plistlib.
+
+### M5 report (2026-11-20)
+
+**What works now.** An app bundle whose `Info.plist` names a main nib
+starts with `NSApplicationMain`. It gets its menu bar's menus (with their
+keyboard shortcuts), its application delegate, its windows with their
+views, buttons, check boxes, text fields, secure fields and labels, its own
+custom view and control classes, and its outlets and actions connected,
+then `awakeFromNib` and `applicationDidFinishLaunching:`. A program can
+load more nibs with `NSNib` or `NSBundle`. Keyed archives also work on
+their own (for apps that save documents or settings with
+`NSKeyedArchiver`). `make check` runs 43 tests (41 before M5), all
+passing. The new ones:
+
+| Test | Proves |
+| --- | --- |
+| `foundation_archive` | Reading an archive made by another program (`archive.bplist`, written with Python's plistlib by `make_archive.py`): strings, numbers, booleans, arrays, sets, dates, data, mutable strings, rectangles, attributed strings with two runs, URLs, an object shared in two places, an object that refers to itself, a class the program doesn't have. Secure decoding refusing the wrong class. Junk data giving an error, not a crash. Writing and reading back a graph of objects (sharing and loops kept, mutable stays mutable, `classForKeyedArchiver`), the archive's layout, XML output and class renaming both ways |
+| `appkit_nib` | `NibApp.app`, started by `NSApplicationMain` from `Base.lproj/MainMenu.nib`, with no display: the main menu, its submenus and shortcuts; the delegate connected to `NSApp`; ten outlets; the window's title, size, minimum size and style; each view's class, frame and autoresizing; the text field's text, placeholder, font and switches; the default button (Return), its target and action; a check box; a custom view made with `initWithFrame:` and given runtime attributes; a swapped button class; a wrapping label; the key-view loop; the custom view's colour drawn in the window; button actions, the check box, Command-H and Command-Q through the menu, which quits. Then `Panel.nib` (the folder form) loaded with its own owner: top-level objects, a panel not shown, `awakeFromNib` order, and warnings (not crashes) for a missing class, a missing outlet and a missing nib |
+
+It was also checked by eye on a headless Weston display: the window from
+the nib draws as it should (screenshot attached to the M5 report).
+
+**What isn't done yet (and why).**
+
+- **Not yet tried with nibs made by Xcode.** The test nibs are written by
+  our own script, following the published descriptions of the format.
+  Ferry can't use Apple's tools to make nibs here, and the rules say no
+  Apple files in the repository. Real nibs carry many more keys and
+  classes than the tests, and some flag bits (in `NSCellFlags`,
+  `NSButtonFlags`) may be read wrong. A key or class Ferry doesn't know is
+  skipped or warned about, so a real nib should load with some settings
+  missing rather than crash, but that is unproven. Trying a few real
+  apps' nibs is the first job of M6.
+- **Not read:** storyboards (`NSMainStoryboardFile` warns), the newer
+  `NIBArchive` container (says so), Cocoa bindings (skipped, with a
+  warning), images in nibs (Ferry has no `NSImage` yet; image names are
+  kept), toolbars, and classes Ferry doesn't have (`NSScrollView`,
+  `NSTableView`, `NSTextView`, `NSPopUpButton`, `NSBox`, `NSImageView`,
+  `NSStackView`, `NSTabView`, `NSSplitView`, `NSWindowController` and
+  `NSViewController` and so on). Such objects are left out with a
+  warning, which is what most real nibs will hit first.
+- **Writing AppKit objects** to archives is partial: views, menus, colours,
+  fonts and cells have `encodeWithCoder:`, but controls made in code have
+  no cell, so their titles aren't written. Apps rarely archive views.
+- The window position in a nib is ignored on Wayland, as in M4.
+- Auto Layout constraints in nibs are ignored; views keep their frames and
+  autoresizing masks.
+
+**What's next.** M6: real apps, with a compatibility table in
+`docs/ferry-compat.md`. The first step is trying real nibs; the next is
+the AppKit classes they need most (likely `NSWindowController`,
+`NSViewController`, `NSImage`, `NSBox`, `NSPopUpButton`, `NSScrollView`
+and `NSTextView`).
 
 ## Known limits (for every milestone)
 
@@ -650,3 +770,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M1 merged (#25). M2 done: dylib loading, Foundation and CoreFoundation basics, `make check` 31/31.
 - 2026-11-20: M2 merged (#28). M3 done: Core Graphics and Core Text on Cairo, Pango and HarfBuzz, NSAttributedString, `make check` 38/38.
 - 2026-11-20: M3 merged (#33). M4 done: AppKit on GTK 3 (Wayland or X11), windows, views, events, controls, `make check` 41/41.
+- 2026-11-20: M4 merged (#35). M5 done: keyed archives, nib loading, `NSApplicationMain` with a main nib, `make check` 43/43.
