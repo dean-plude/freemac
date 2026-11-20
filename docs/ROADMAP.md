@@ -116,7 +116,7 @@ Debian's mirrors.
 | 6 | Drawer compresses files to .zip and expands .zip and tar archives (safely: nothing is written outside the new folder) | Drawer | done |
 | 7 | Hot corners: pick what each screen corner does (all windows, all desktops, show the desktop, notifications, a new note, lock) | Dials, Strata | done |
 
-## 1.2 "feels like a Mac" (in progress)
+## 1.2 "feels like a Mac" (done)
 
 The goal: someone who knows a Mac sits down at freemac and it feels like one,
 without any Apple artwork, code or names.
@@ -133,6 +133,30 @@ without any Apple artwork, code or names.
 | 8 | Every app on one full-screen grid over a blurred wallpaper, with search and pages (F4, the dock or a hot corner) | **Marina** | done |
 | 9 | Dock icons bounce while an app starts, and magnified icons rise out of the dock instead of stretching it | Pier | done |
 
+## 1.3 "nothing gives it away" (done)
+
+What still looked like Linux after 1.2.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Windows round at all four corners, not only at the top | Strata | done |
+| 2 | Our own pointer: a black arrow with a white edge, and matching busy, text and hand pointers | freemac-cursors | done |
+| 3 | The lock screen looks like the login screen: blurred wallpaper, clock, round picture, password field | Latch | done |
+| 4 | Marina: drag apps to rearrange them, and drop one on another to make a folder | Marina | done |
+| 5 | Qt and GTK 4 apps use the same colours and font as the rest | build | done |
+| 6 | New windows never start under the menu bar; one too big is made to fit | strata-decor | done |
+
+## 1.4 "the desktop is yours" (in progress)
+
+What a Mac user reaches for next.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Files in the Desktop folder show on the wallpaper as icons: open, move, rename and drop files onto them | Backdrop | |
+| 2 | Alt+Tab shows the open apps as a row of icons on a frosted panel; let go to switch | Strata, Topline | |
+| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata | |
+| 4 | Screenshots land on the Desktop, named with the date and time | Lens | |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
@@ -144,7 +168,4 @@ without any Apple artwork, code or names.
   only after that, and only from public documentation. See
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images, a package repository and release docs.
-- Still not quite a Mac: round corners at the bottom of windows, our own
-  pointer, Marina folders and rearranging, a lock screen that looks like the
-  login screen, and apps built with Qt or GTK 4 matching the GTK 3 theme.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.

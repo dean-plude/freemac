@@ -9,6 +9,11 @@ draw their own (most non-GTK apps). It matches the look of freemac's own apps:
 - a centred, semibold title whose colour follows the title bar colour, so it
   reads in light and dark mode (Dials sets `decoration/active_color`)
 
+It also rounds the bottom corners of every window, its own and those of apps
+that draw their own title bar (`corners.cpp`, original freemac code): a small
+shader clips the two corners and bends the window's edge or shadow round the
+curve, so windows are round at all four corners as on a Mac.
+
 It reads the standard `[decoration]` options in `wayfire.ini`, so nothing else
 changes when it replaces Wayfire's `decoration` plugin.
 
