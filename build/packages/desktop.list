@@ -72,3 +72,6 @@ bluez
 cups
 cups-browsed
 system-config-printer
+# Qt 5 and Qt 6 apps get freemac's colours and font (QT_QPA_PLATFORMTHEME=qt5ct)
+qt5ct
+qt6ct

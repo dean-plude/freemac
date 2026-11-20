@@ -178,8 +178,9 @@ in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 install -d "$ROOTFS/usr/share/icons/hicolor/scalable/apps"
 install -m 0644 "$REPO"/art/icons/*.svg "$ROOTFS/usr/share/icons/hicolor/scalable/apps/"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
-# freemac's own GTK theme, light and dark (art/gtk-theme), on top of GTK's Adwaita.
-python3 "$REPO/art/gtk-theme/make-theme.py" "$ROOTFS/usr/share/themes"
+# freemac's own GTK theme, light and dark (art/gtk-theme), on top of GTK's Adwaita,
+# and the same colours for GTK 4 and Qt apps in /usr/share/freemac.
+python3 "$REPO/art/gtk-theme/make-theme.py" "$ROOTFS/usr/share/themes" "$ROOTFS/usr/share/freemac"
 # freemac's icon theme: our own folder and file-type icons, Adwaita for the rest.
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"

@@ -39,6 +39,28 @@ SCENES = (
 )
 
 
+TOOLKITS = "/usr/share/freemac"  # GTK 4 and Qt colours (art/gtk-theme/make-theme.py)
+GTK4_CSS = os.path.join(GLib.get_user_config_dir(), "gtk-4.0", "gtk.css")
+QT_CONFS = [os.path.join(GLib.get_user_config_dir(), name, name + ".conf") for name in ("qt5ct", "qt6ct")]
+
+
+def apply_toolkits(dark):
+    """GTK 4 (libadwaita) and Qt apps take light or dark from their own files.
+    A gtk.css of the person's own (not our link) is left alone."""
+    css = os.path.join(TOOLKITS, "gtk4", "dark.css" if dark else "light.css")
+    if os.path.exists(css) and (os.path.islink(GTK4_CSS) or not os.path.exists(GTK4_CSS)):
+        os.makedirs(os.path.dirname(GTK4_CSS), exist_ok=True)
+        tmp = GTK4_CSS + ".new"
+        if os.path.lexists(tmp):
+            os.remove(tmp)
+        os.symlink(css, tmp)
+        os.replace(tmp, GTK4_CSS)
+    scheme = os.path.join(TOOLKITS, "qt", "freemac-dark.conf" if dark else "freemac.conf")
+    for conf in QT_CONFS:
+        if os.path.exists(conf):
+            ini_set(conf, "Appearance", "color_scheme_path", scheme)
+
+
 def apply_appearance(dark, settings=None, follow_wallpaper=True):
     """Switch light/dark everywhere: GTK, title bars and (optionally) the wallpaper.
 
@@ -50,6 +72,10 @@ def apply_appearance(dark, settings=None, follow_wallpaper=True):
         settings.set_string("color-scheme", "prefer-dark" if dark else "prefer-light")
         settings.set_string("gtk-theme", "freemac-dark" if dark else "freemac")
     Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", dark)
+    try:
+        apply_toolkits(dark)
+    except OSError:
+        pass
     # Title bars the window manager draws follow the mode too.
     ini_set(WAYFIRE_INI, "decoration", "active_color", "#36363AFF" if dark else "#E9E9ECFF")
     ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#2A2A2EFF" if dark else "#F5F5F7FF")

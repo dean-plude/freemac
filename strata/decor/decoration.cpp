@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <wayfire/per-output-plugin.hpp>
 #include <wayfire/view.hpp>
 #include <wayfire/workarea.hpp>
@@ -70,7 +72,40 @@ class strata_decoration : public wf::plugin_interface_t
         [=] (wf::view_mapped_signal *ev)
     {
         strata_corners::attach(ev->view);
+        fit_in_workarea(ev->view);
     };
+
+    /* A new window never starts under the menu bar or the dock: one taller or
+     * wider than the free space is made to fit it, and one placed above it is
+     * moved down. (This runs after the placement plugin has placed it.) */
+    static void fit_in_workarea(wayfire_view view)
+    {
+        auto toplevel = wf::toplevel_cast(view);
+        if (!toplevel || (view->role != wf::VIEW_ROLE_TOPLEVEL) || !view->get_output() ||
+            toplevel->parent || toplevel->pending_fullscreen() || toplevel->pending_tiled_edges())
+        {
+            return;
+        }
+
+        auto area = view->get_output()->workarea->get_workarea();
+        auto g    = toplevel->get_pending_geometry();
+        auto fit  = g;
+        fit.width  = std::min(g.width, area.width);
+        fit.height = std::min(g.height, area.height);
+        fit.x = std::clamp(g.x, area.x, area.x + area.width - fit.width);
+        fit.y = std::clamp(g.y, area.y, area.y + area.height - fit.height);
+        if ((fit.width != g.width) || (fit.height != g.height))
+        {
+            // Keep it centred where the placement plugin centred it.
+            fit.x = std::clamp(g.x + (g.width - fit.width) / 2, area.x, area.x + area.width - fit.width);
+            fit.y = std::clamp(g.y + (g.height - fit.height) / 2, area.y, area.y + area.height - fit.height);
+        }
+
+        if (fit != g)
+        {
+            toplevel->set_geometry(fit);
+        }
+    }
 
   public:
     void init() override
