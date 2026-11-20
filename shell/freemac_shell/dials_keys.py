@@ -19,7 +19,7 @@ SHORTCUTS = (
     ("command", "binding_seek", "Seek", "<super> KEY_SPACE"),
     ("command", "binding_marina", "All apps (Marina)", "KEY_F4"),
     ("command", "binding_clips", "Clipboard history", "<super> <shift> KEY_V"),
-    ("fast-switcher", "activate", "Switch windows", "<alt> KEY_TAB"),
+    ("command", "repeatable_binding_switcher", "Switch apps", "<alt> KEY_TAB"),
     ("scale", "toggle", "All windows", "<ctrl> KEY_UP | swipe up 4"),
     ("scale", "toggle_all", "All windows on every desktop", "<super> KEY_TAB"),
     ("expo", "toggle", "All desktops", "<ctrl> KEY_DOWN | swipe down 4"),
