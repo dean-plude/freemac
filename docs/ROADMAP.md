@@ -133,17 +133,29 @@ without any Apple artwork, code or names.
 | 8 | Every app on one full-screen grid over a blurred wallpaper, with search and pages (F4, the dock or a hot corner) | **Marina** | done |
 | 9 | Dock icons bounce while an app starts, and magnified icons rise out of the dock instead of stretching it | Pier | done |
 
-## 1.3 "nothing gives it away" (in progress)
+## 1.3 "nothing gives it away" (done)
 
 What still looked like Linux after 1.2.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Windows round at all four corners, not only at the top | Strata | |
-| 2 | Our own pointer: a black arrow with a white edge, and matching busy, text and hand pointers | freemac-cursors | |
-| 3 | The lock screen looks like the login screen: blurred wallpaper, clock, round picture, password field | Latch | |
-| 4 | Marina: drag apps to rearrange them, and drop one on another to make a folder | Marina | |
-| 5 | Qt and GTK 4 apps use the same colours and font as the rest | build | |
+| 1 | Windows round at all four corners, not only at the top | Strata | done |
+| 2 | Our own pointer: a black arrow with a white edge, and matching busy, text and hand pointers | freemac-cursors | done |
+| 3 | The lock screen looks like the login screen: blurred wallpaper, clock, round picture, password field | Latch | done |
+| 4 | Marina: drag apps to rearrange them, and drop one on another to make a folder | Marina | done |
+| 5 | Qt and GTK 4 apps use the same colours and font as the rest | build | done |
+| 6 | New windows never start under the menu bar; one too big is made to fit | strata-decor | done |
+
+## 1.4 "the desktop is yours" (in progress)
+
+What a Mac user reaches for next.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Files in the Desktop folder show on the wallpaper as icons: open, move, rename and drop files onto them | Backdrop | |
+| 2 | Alt+Tab shows the open apps as a row of icons on a frosted panel; let go to switch | Strata, Topline | |
+| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata | |
+| 4 | Screenshots land on the Desktop, named with the date and time | Lens | |
 
 ## Later
 
