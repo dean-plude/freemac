@@ -8,7 +8,10 @@ view to move it, and press Delete to remove the one chosen. Events are kept
 in one .ics file (calendar_store.py) that other calendar apps can import.
 Birthdays from Crew show on their days in purple; they are read from the
 cards, never saved into the calendar, and double-clicking one opens the card.
-Original freemac code.
+The Calendars list beside the views (calendars.py) shows Home, each calendar
+from an online account and Birthdays, each in its own colour: tick one to
+show or hide it, right-click it for another colour, and pick an event's
+calendar in its details. Original freemac code.
 """
 import calendar
 import datetime as dt
@@ -20,12 +23,13 @@ import urllib.parse
 import gi
 
 gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 from . import calendar_store as store  # noqa: E402
-from . import contacts_store, menus, style  # noqa: E402
+from . import calendars, contacts_store, menus, style  # noqa: E402
 from .minimonth import MiniMonth, month_weeks  # noqa: E402
 
 APP_ID = "org.freemac.Tide"
@@ -44,6 +48,13 @@ CSS = b"""
 .tide-editor .tide-label { color: alpha(currentColor, 0.6); }
 .minimonth-title { font-size: 13px; }
 .tide-delete { color: #e5463d; padding-left: 0; }
+box.tide-sidebar { background-color: rgba(120, 120, 150, 0.08); }
+list.tide-calendars { background-color: transparent; }
+.tide-calendars row { padding: 3px 10px; background-color: transparent; }
+.tide-calendars row:hover { background-color: rgba(120, 120, 150, 0.10); }
+.tide-calendars row:selected { background-color: transparent; color: inherit; }
+.tide-calendars row:selected label { color: inherit; }
+.tide-calendars .tide-group { font-size: 11px; font-weight: bold; color: alpha(currentColor, 0.5); }
 """
 
 
@@ -93,15 +104,49 @@ def dark(widget):
     return sum(ink_of(widget)) > 1.5
 
 
-def all_day_colors(occ, chosen, darkened):
-    """(fill rgba, words rgba) for an all-day chip: blue, or purple for a
-    birthday."""
-    if getattr(occ.event, "person", None):
-        hue, words = PURPLE, ((0.88, 0.78, 1, 1) if darkened else (0.40, 0.16, 0.62, 1))
-    else:
-        hue, words = BLUE, ((0.75, 0.85, 1, 1) if darkened else (0.08, 0.27, 0.62, 1))
+def mix(hue, other, amount):
+    return tuple(a + (b - a) * amount for a, b in zip(hue, other))
+
+
+def words_on(hue, darkened):
+    """Words in a calendar's colour that read on its own pale tint: lighter
+    in Dark mode, deeper in Light."""
+    return mix(hue, (1, 1, 1), 0.68) if darkened else mix(hue, (0, 0, 0), 0.5)
+
+
+def all_day_colors(occ, chosen, darkened, hue=BLUE):
+    """(fill rgba, words rgba) for an all-day chip in its calendar's colour."""
     fill = (*hue, 0.95 if chosen else (0.32 if darkened else 0.2))
-    return fill, ((1, 1, 1, 1) if chosen else words)
+    return fill, ((1, 1, 1, 1) if chosen else (*words_on(hue, darkened), 1))
+
+
+def swatch(cr, x, y, size, hue, ticked):
+    """A calendar's box in the list: filled with its colour and ticked when
+    shown, an empty ring of the colour when hidden."""
+    rounded(cr, x + 0.5, y + 0.5, size - 1, size - 1, 3.5)
+    if ticked:
+        cr.set_source_rgb(*hue)
+        cr.fill()
+        cr.set_source_rgb(1, 1, 1)
+        cr.set_line_width(1.8)
+        cr.move_to(x + size * 0.25, y + size * 0.52)
+        cr.line_to(x + size * 0.43, y + size * 0.7)
+        cr.line_to(x + size * 0.76, y + size * 0.3)
+        cr.stroke()
+    else:
+        cr.set_source_rgb(*hue)
+        cr.set_line_width(1.5)
+        cr.stroke()
+
+
+def dot_pixbuf(hue, size=12):
+    import cairo
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+    cr = cairo.Context(surface)
+    cr.arc(size / 2, size / 2, size / 2 - 1, 0, 2 * math.pi)
+    cr.set_source_rgb(*hue)
+    cr.fill()
+    return Gdk.pixbuf_get_from_surface(surface, 0, 0, size, size)
 
 
 def birthday_events(year_from=None):
@@ -218,17 +263,18 @@ class MonthView(Gtk.DrawingArea):
         chosen = self.win.selected == occ.event.uid
         h = CHIP - 2
         if occ.all_day:
-            fill, colour = all_day_colors(occ, chosen, dark(area))
+            fill, colour = all_day_colors(occ, chosen, dark(area), self.win.hue(occ.event))
             cr.set_source_rgba(*fill)
             rounded(cr, x, y, w, h, 4)
             cr.fill()
             text(cr, area, occ.event.title, x + 6, y + 1, w - 10, 12, rgba=colour)
         else:
+            hue = self.win.hue(occ.event)
             if chosen:
-                cr.set_source_rgba(*BLUE, 0.95)
+                cr.set_source_rgba(*hue, 0.95)
                 rounded(cr, x, y, w, h, 4)
                 cr.fill()
-            cr.set_source_rgba(*((1, 1, 1) if chosen else BLUE), 1)
+            cr.set_source_rgba(*((1, 1, 1) if chosen else hue), 1)
             cr.arc(x + 7, y + h / 2, 3.5, 0, 2 * math.pi)
             cr.fill()
             fore = (1, 1, 1, 1) if chosen else (*ink, 0.9)
@@ -305,7 +351,7 @@ class DayHeader(Gtk.DrawingArea):
                     continue
                 y = DAY_HEAD + row * CHIP
                 chosen = win.selected == occ.event.uid
-                fill, colour = all_day_colors(occ, chosen, dark(area))
+                fill, colour = all_day_colors(occ, chosen, dark(area), win.hue(occ.event))
                 cr.set_source_rgba(*fill)
                 rounded(cr, x + 2, y, cw - 4, CHIP - 2, 4)
                 cr.fill()
@@ -433,18 +479,18 @@ class TimeGrid(Gtk.DrawingArea):
 
     def _block(self, cr, area, occ, start, x, y, w, h, ink):
         chosen = self.win.selected == occ.event.uid
-        cr.set_source_rgba(*BLUE, 0.92 if chosen else (0.34 if dark(area) else 0.18))
+        hue = self.win.hue(occ.event)
+        cr.set_source_rgba(*hue, 0.92 if chosen else (0.34 if dark(area) else 0.18))
         rounded(cr, x, y, w, h, 5)
         cr.fill()
-        cr.set_source_rgba(*BLUE, 1)
+        cr.set_source_rgba(*hue, 1)
         rounded(cr, x, y, 3.5, h, 1.5)
         cr.fill()
         if chosen:
             fore, soft = (1, 1, 1, 1), (1, 1, 1, 0.85)
-        elif dark(area):
-            fore, soft = (0.82, 0.89, 1, 1), (0.82, 0.89, 1, 0.75)
         else:
-            fore, soft = (0.06, 0.22, 0.52, 1), (0.06, 0.22, 0.52, 0.75)
+            deep = words_on(hue, dark(area))
+            fore, soft = (*deep, 1), (*deep, 0.75)
         used = text(cr, area, occ.event.title, x + 8, y + 3, w - 12, 12, bold=True, rgba=fore)
         if h > 34:
             when = store.time_text(start)
@@ -602,6 +648,23 @@ class Editor(Gtk.Popover):
         self.alert.set_active_id("" if event.alert is None else str(event.alert))
         grid.attach(self._label("alert:"), 0, 4, 1, 1)
         grid.attach(self.alert, 1, 4, 2, 1)
+        self.calendar = None
+        choices = [c for c in win.calendars if c.editable]
+        if len(choices) > 1:
+            model = Gtk.ListStore(str, str, GdkPixbuf.Pixbuf)
+            for cal in choices:
+                model.append([cal.key, cal.name if cal.group == "On My Computer" else f"{cal.name} ({cal.group})",
+                              dot_pixbuf(cal.rgb)])
+            self.calendar = Gtk.ComboBox(model=model, id_column=0)
+            dot = Gtk.CellRendererPixbuf()
+            self.calendar.pack_start(dot, False)
+            self.calendar.add_attribute(dot, "pixbuf", 2)
+            words = Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END, max_width_chars=26)
+            self.calendar.pack_start(words, True)
+            self.calendar.add_attribute(words, "text", 1)
+            self.calendar.set_active_id(calendars.key_of(event))
+            grid.attach(self._label("calendar:"), 0, 5, 1, 1)
+            grid.attach(self.calendar, 1, 5, 2, 1)
         box.pack_start(grid, False, False, 0)
         box.pack_start(Gtk.Separator(), False, False, 2)
 
@@ -668,6 +731,10 @@ class Editor(Gtk.Popover):
         alert = self.alert.get_active_id()
         e.alert = int(alert) if alert else None
         e.all_day = self.all_day.get_active()
+        if self.calendar is not None:
+            key = self.calendar.get_active_id()
+            if key is not None and key != calendars.key_of(e):
+                calendars.move(e, key)
         first, last = self.start_day.day, max(self.end_day.day, self.start_day.day)
         if e.all_day:
             e.start = dt.datetime.combine(first, dt.time())
@@ -701,6 +768,7 @@ class Window(Gtk.ApplicationWindow):
         self.selected = None
         self.editor = None
         self.written = 0
+        self.load_calendars()
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -717,6 +785,9 @@ class Window(Gtk.ApplicationWindow):
                 today.set_tooltip_text("Go to Today (⌘T)")
                 today.connect("clicked", lambda *_: self.today())
                 nav.pack_start(today, False, False, 0)
+        self.list_button = Gtk.ToggleButton(label="Calendars")
+        self.list_button.set_tooltip_text("Show or hide the calendar list (⌥⌘S)")
+        header.pack_start(self.list_button)
         header.pack_start(nav)
         self.heading = Gtk.Label()
         self.heading.get_style_context().add_class("tide-title")
@@ -750,7 +821,18 @@ class Window(Gtk.ApplicationWindow):
             page.pack_start(scroll, True, True, 0)
             self.stack.add_named(page, name)
             self.grids[name], self.headers[name], self.scrolls[name] = grid, head, scroll
-        self.add(self.stack)
+        body = Gtk.Box()
+        self.side = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_RIGHT,
+                                 transition_duration=150)
+        self.side.add(self._sidebar())
+        body.pack_start(self.side, False, False, 0)
+        body.pack_start(self.stack, True, True, 0)
+        self.add(body)
+        showing = self.settings.get("sidebar", True)
+        self.side.set_reveal_child(showing)
+        self.list_button.set_active(showing)
+        self.list_button.connect("toggled", lambda b: self.show_list(b.get_active()))
+        self.list_action = menus.add_toggle(self, "calendar-list", showing, self.show_list)
 
         menus.add_actions(self, {
             "new-event": self.new_event, "delete-event": self.delete_chosen,
@@ -768,9 +850,135 @@ class Window(Gtk.ApplicationWindow):
             Gio.FileMonitorFlags.NONE, None)
         self.cards_monitor.connect("changed", self._cards_changed)
         GLib.timeout_add_seconds(60, self._tick)
+        self.connect("focus-in-event", lambda *_: self._calendars_changed())
         header.show_all()
-        self.stack.show_all()
+        body.show_all()
         self.show_view("month")
+
+    # -- calendars ---------------------------------------------------------------
+    def load_calendars(self):
+        self.settings = calendars.load_settings()
+        self.calendars = calendars.calendars(self.settings)
+        self.hidden = calendars.hidden(self.settings)
+        self.colors = {c.key: c.rgb for c in self.calendars}
+
+    def hue(self, event):
+        return self.colors.get(calendars.key_of(event), BLUE)
+
+    def _sidebar(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.get_style_context().add_class("tide-sidebar")
+        box.set_size_request(200, -1)
+        self.cal_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, activate_on_single_click=True)
+        self.cal_list.get_style_context().add_class("tide-calendars")
+        self.cal_list.connect("row-activated", lambda _l, row: self._toggle(row))
+        self.cal_list.connect("button-press-event", self._list_button)
+        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        scroll.add(self.cal_list)
+        box.pack_start(scroll, True, True, 6)
+        self.mini = MiniMonth(self.day, picked=lambda d: self.go_to(d), marked=self._marked)
+        self.mini.set_margin_start(10)
+        self.mini.set_margin_end(10)
+        self.mini.set_margin_bottom(12)
+        box.pack_end(self.mini, False, False, 0)
+        self._fill_list()
+        return box
+
+    def _marked(self, first, last):
+        return {d for o in store.occurrences(self.shown(), first, last) for d in o.days()}
+
+    def _fill_list(self):
+        for row in self.cal_list.get_children():
+            self.cal_list.remove(row)
+        group = None
+        for cal in self.calendars:
+            if cal.group != group:
+                group = cal.group
+                head = Gtk.ListBoxRow(activatable=False, selectable=False)
+                head.calendar = None
+                label = Gtk.Label(label=group, xalign=0)
+                label.get_style_context().add_class("tide-group")
+                label.set_margin_top(6 if head is not None and self.cal_list.get_children() else 0)
+                head.add(label)
+                self.cal_list.add(head)
+            row = Gtk.ListBoxRow()
+            row.calendar = cal
+            line = Gtk.Box(spacing=8)
+            mark = Gtk.DrawingArea()
+            mark.set_size_request(14, 14)
+            mark.set_valign(Gtk.Align.CENTER)
+            mark.connect("draw", lambda _a, cr, c=cal: swatch(cr, 0, 0, 14, c.rgb, c.key not in self.hidden))
+            line.pack_start(mark, False, False, 0)
+            line.pack_start(Gtk.Label(label=cal.name, xalign=0, ellipsize=Pango.EllipsizeMode.END), True, True, 0)
+            row.add(line)
+            self.cal_list.add(row)
+        self.cal_list.show_all()
+
+    def _toggle(self, row):
+        cal = getattr(row, "calendar", None)
+        if cal is not None:
+            self.set_shown(cal.key, cal.key in self.hidden)
+
+    def set_shown(self, key, shown):
+        calendars.set_shown(key, shown)
+        self.load_calendars()
+        if not shown and self.selected and any(
+                e.uid == self.selected and calendars.key_of(e) == key for e in self.shown_all()):
+            self.selected = None
+        self.cal_list.queue_draw()
+        self.refresh()
+
+    def _list_button(self, _list, event):
+        if event.button != 3:
+            return False
+        row = self.cal_list.get_row_at_y(int(event.y))
+        cal = getattr(row, "calendar", None) if row else None
+        if cal is None:
+            return False
+        menu = Gtk.Menu()
+        item = Gtk.MenuItem(label=f"Hide “{cal.name}”" if cal.key not in self.hidden else f"Show “{cal.name}”")
+        item.connect("activate", lambda *_: self._toggle(row))
+        menu.append(item)
+        menu.append(Gtk.SeparatorMenuItem())
+        for name, hexcode in calendars.COLORS.items():
+            item = Gtk.CheckMenuItem(draw_as_radio=True, active=cal.color.lower() == hexcode)
+            line = Gtk.Box(spacing=8)
+            line.pack_start(Gtk.Image.new_from_pixbuf(dot_pixbuf(calendars.rgb(hexcode))), False, False, 0)
+            line.pack_start(Gtk.Label(label=name.capitalize(), xalign=0), True, True, 0)
+            item.add(line)
+            item.connect("activate", lambda i, h=hexcode: i.get_active() and self.set_color(cal.key, h))
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(self.cal_list, None)
+        menu.popup_at_pointer(event)
+        return True
+
+    def set_color(self, key, hexcode):
+        calendars.set_color(key, hexcode)
+        self.load_calendars()
+        self._fill_list()
+        self.refresh()
+
+    def show_list(self, showing):
+        self.side.set_reveal_child(showing)
+        if self.list_button.get_active() != showing:
+            self.list_button.set_active(showing)
+        if self.list_action.get_state().get_boolean() != showing:
+            self.list_action.set_state(GLib.Variant("b", showing))
+        if self.settings.get("sidebar", True) != showing:
+            settings = calendars.load_settings()
+            settings["sidebar"] = showing
+            calendars.save_settings(settings)
+            self.settings = settings
+
+    def _calendars_changed(self):
+        """An account came or went, or synced a new calendar: list it."""
+        before = [(c.key, c.name, c.color, c.group) for c in self.calendars]
+        self.load_calendars()
+        if [(c.key, c.name, c.color, c.group) for c in self.calendars] != before:
+            self._fill_list()
+            self.refresh()
+        return False
 
     # -- moving around ----------------------------------------------------------
     def show_view(self, name):
@@ -835,15 +1043,21 @@ class Window(Gtk.ApplicationWindow):
             words = f"{calendar.month_name[day.month]} {day.year}"
         self.heading.set_text(words)
         self.set_title(words)
+        if hasattr(self, "mini"):
+            self.mini.show_day(day)
         for head in self.headers.values():
             head.update()
         for grid in self.grids.values():
             grid.queue_draw()
         self.month.queue_draw()
 
-    def shown(self):
-        """The calendar's own events and the birthdays from Crew."""
+    def shown_all(self):
         return self.events + self.birthdays
+
+    def shown(self):
+        """The events of the calendars that are ticked, birthdays from Crew
+        among them."""
+        return [e for e in self.shown_all() if calendars.key_of(e) not in self.hidden]
 
     def _cards_changed(self, *_args):
         self.birthdays = birthday_events()
@@ -883,6 +1097,7 @@ class Window(Gtk.ApplicationWindow):
             self.events = store.load()
             self.saved = [e.copy() for e in self.events]
             self.undos, self.redos = [], []
+            self._calendars_changed()
             self.refresh()
 
     def undo(self, redo=False):
@@ -898,6 +1113,12 @@ class Window(Gtk.ApplicationWindow):
 
     def add_event(self, start, end, all_day=False):
         event = store.Event("New Event", start, end, all_day)
+        key = calendars.default_key(self.settings)
+        if key in self.hidden:
+            # A new event goes where it can be seen.
+            key = next((c.key for c in self.calendars if c.editable and c.key not in self.hidden), key)
+        if key:
+            calendars.move(event, key)
         self.events.append(event)
         self._save()
         self.selected = event.uid
@@ -1028,6 +1249,7 @@ def menubar():
                    [("Delete Event", "win.delete-event", "Delete")]]),
         ("_View", [[("Day", "win.view-day", "<Ctrl>1"), ("Week", "win.view-week", "<Ctrl>2"),
                     ("Month", "win.view-month", "<Ctrl>3")],
+                   [("Show Calendar List", "win.calendar-list", "<Alt><Ctrl>s")],
                    [("Go to Today", "win.today", "<Ctrl>t"), ("Previous", "win.previous", "<Ctrl>Left"),
                     ("Next", "win.next", "<Ctrl>Right")]]),
     ])

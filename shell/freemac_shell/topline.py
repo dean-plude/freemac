@@ -171,6 +171,11 @@ class Topline(Gtk.Window):
         app_id = view.get("app-id") or ""
         if kind == "view-focused" and view:
             if is_app_window(view) and app_id.lower() not in DESKTOP_OWNED:
+                if app_id != (self.focused or {}).get("app-id"):
+                    # Another app came forward: take the last one's menus
+                    # down now, so its name never sits over the old menus
+                    # while the new app's arrive.
+                    self._use_menus(None)
                 self._last_app, self._windowless = app_id, None
                 # Show the app's name at once, from the event itself: while
                 # a new window opens Wayfire can take a while to answer, and

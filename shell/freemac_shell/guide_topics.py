@@ -121,6 +121,14 @@ TOPICS = {
         "If it says the disk wasn't ejected, an app still has a file open on it. Close that file or quit the app, "
         "and eject it again.",
     ]),
+    "calendars": ("Show, hide and colour your calendars", "calendar calendars colour color hide show tide work family", [
+        "In Tide, click Calendars at the top left (or press ⌥⌘S) to see the list of your calendars: "
+        "Home on this computer, each calendar from an online account, and Birthdays.",
+        "Click a calendar's box to show or hide its events. Hidden calendars still sync and still give alerts.",
+        "Right-click a calendar to give it another colour.",
+        "To move an event to another calendar, double-click it and pick one next to calendar:. "
+        "It moves online too, the next time the account syncs.",
+    ]),
 }
 
 
