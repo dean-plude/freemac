@@ -286,6 +286,7 @@ class Topline(Gtk.Window):
         menu = Gtk.Menu()
         self._item(menu, "About freemac", self._about)
         self._item(menu, "Settings…", lambda: run("freemac-dials"))
+        self._item(menu, "Guide", lambda: run("freemac-guide"))
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Search…", lambda: run("freemac-seek"))
         self._item(menu, "Terminal", lambda: run("foot"))
@@ -436,7 +437,10 @@ class Topline(Gtk.Window):
         list, a moment later (Seek is closing and handing back the keyboard)."""
         if method == "SearchMenus":
             (query,) = params.unpack()
-            self._found = helpsearch.find(self._searchable_menus, query)[:4]
+            # Seek finds commands, not the names of open windows in the
+            # Window menu (the file itself is already among its results).
+            self._found = [f for f in helpsearch.find(self._searchable_menus, query)
+                           if not getattr(f[0], "fm_window", False)][:4]
             rows = [(name, helpsearch.ARROW.join(path), shortcut) for _i, path, name, shortcut in self._found]
             app_id = (self.focused or {}).get("app-id")
             icon = apps.icon_for(app_id).to_string() if app_id else "system-file-manager"
@@ -843,7 +847,8 @@ class Topline(Gtk.Window):
             for other in windows:
                 oid = other["id"]
                 title = other.get("title") or apps.display_name(other.get("app-id"))
-                self._item(menu, title[:60], lambda oid=oid: self._front(oid), check=(oid == vid))
+                item = self._item(menu, title[:60], lambda oid=oid: self._front(oid), check=(oid == vid))
+                item.fm_window = True   # a window's name: Help finds it, Seek doesn't
         menu.show_all()
 
     def _front(self, view_id):

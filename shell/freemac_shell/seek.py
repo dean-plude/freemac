@@ -186,8 +186,11 @@ def first_lines(path):
 
 
 def picture(path):
-    """A small version of a picture file, or None."""
+    """A small version of a picture file, or of a PDF's first page, or None."""
     kind, _uncertain = Gio.content_type_guess(path, None)
+    if Gio.content_type_is_a(kind or "", "application/pdf"):
+        from . import pdf   # Poppler loads only when a PDF is chosen
+        return pdf.first_page(path, PICTURE)
     if not (kind or "").startswith("image/"):
         return None
     try:

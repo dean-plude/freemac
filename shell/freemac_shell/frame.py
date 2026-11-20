@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Frame: freemac's image viewer.
+"""Frame: freemac's image and PDF viewer.
 
-Opens a picture and lets you step through the others in the same folder.
+Opens a picture and lets you step through the others in the same folder, or
+a PDF and lets you step through its pages (pdf.py draws them).
 Keys: Left/Right previous/next, + / - zoom, 0 or F fit, 1 actual size,
 R rotate right, Shift+R rotate left, Delete move to Trash, F11 full screen.
 """
@@ -14,7 +15,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import menus, style  # noqa: E402
+from . import menus, pdf, style  # noqa: E402
 
 APP_ID = "org.freemac.Frame"
 
@@ -48,6 +49,7 @@ class Viewer(Gtk.ApplicationWindow):
         self.animation = None
         self.zoom = None        # None means "fit to window"
         self.fullscreen_on = False
+        self.document, self.page = None, 0   # the PDF open, and its page shown
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -76,7 +78,7 @@ class Viewer(Gtk.ApplicationWindow):
         self.scroller.connect("size-allocate", lambda *_: self._refit())
         self.image = Gtk.Image()
         self.scroller.add(self.image)
-        self.empty = Gtk.Label(label="Open a picture, or drop one here.")
+        self.empty = Gtk.Label(label="Open a picture or a PDF, or drop one here.")
         self.empty.get_style_context().add_class("dim-label")
         self.stack = Gtk.Stack()
         self.stack.add_named(self.empty, "empty")
@@ -119,6 +121,13 @@ class Viewer(Gtk.ApplicationWindow):
     # --- files -----------------------------------------------------------
     def open_path(self, path):
         path = os.path.abspath(path)
+        self.document, self.page = None, 0
+        if pdf.is_pdf(path):
+            # A PDF steps through its own pages, not the folder.
+            self.files, self.index = [path], 0
+            self.document = pdf.open_document(path)
+            self.show_current()
+            return
         self.files = siblings(path)
         self.index = self.files.index(path) if path in self.files else 0
         if path not in self.files:
@@ -133,6 +142,9 @@ class Viewer(Gtk.ApplicationWindow):
             return
         path = self.files[self.index]
         self.animation = None
+        if pdf.is_pdf(path):
+            self._show_page(path)
+            return
         try:
             if path.lower().endswith(".gif"):
                 anim = GdkPixbuf.PixbufAnimation.new_from_file(path)
@@ -158,16 +170,40 @@ class Viewer(Gtk.ApplicationWindow):
         self._last_size = None
         self._render()
 
+    def _show_page(self, path):
+        pixbuf = pdf.page_pixbuf(self.document, self.page, 2000)
+        self.header.set_title(os.path.basename(path))
+        if pixbuf is None:
+            self.original = None
+            self.image.clear()
+            self.empty.set_text(f"“{os.path.basename(path)}” can’t be shown.")
+            self.stack.set_visible_child_name("empty")
+            self.header.set_subtitle(None)
+            return
+        self.original = pixbuf
+        self.zoom = None
+        self.stack.set_visible_child_name("image")
+        self.header.set_subtitle(f"Page {self.page + 1} of {self.document.get_n_pages()}")
+        self._last_size = None
+        self._render()
+
     def step(self, delta):
+        if self.document is not None:
+            page = max(0, min(self.document.get_n_pages() - 1, self.page + delta))
+            if page != self.page:
+                self.page = page
+                self.show_current()
+            return
         if len(self.files) > 1:
             self.index = (self.index + delta) % len(self.files)
             self.show_current()
 
     def open_dialog(self):
-        dialog = Gtk.FileChooserNative.new("Open Picture", self, Gtk.FileChooserAction.OPEN, "Open", "Cancel")
+        dialog = Gtk.FileChooserNative.new("Open", self, Gtk.FileChooserAction.OPEN, "Open", "Cancel")
         pictures = Gtk.FileFilter()
-        pictures.set_name("Pictures")
+        pictures.set_name("Pictures and PDFs")
         pictures.add_pixbuf_formats()
+        pictures.add_mime_type("application/pdf")
         dialog.add_filter(pictures)
         if dialog.run() == Gtk.ResponseType.ACCEPT:
             self.open_path(dialog.get_filename())
@@ -181,6 +217,7 @@ class Viewer(Gtk.ApplicationWindow):
         except GLib.Error:
             return
         del self.files[self.index]
+        self.document, self.page = None, 0
         self.index = min(self.index, len(self.files) - 1)
         self.show_current()
 
@@ -289,7 +326,7 @@ def menubar():
             [("Full Screen", "win.full-screen", "F11")],
         ]),
         ("_Go", [
-            [("Previous Picture", "win.previous", "Left"), ("Next Picture", "win.next", "Right")],
+            [("Previous", "win.previous", "Left"), ("Next", "win.next", "Right")],
         ]),
     ])
 

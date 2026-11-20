@@ -245,6 +245,10 @@ class Welcome(Gtk.Window):
         people.connect("clicked", lambda *_: subprocess.Popen(
             ["freemac-dials"] + ([] if LIVE else ["--panel", "users"]), start_new_session=True))
         buttons.pack_start(people, False, False, 0)
+        guide = Gtk.Button(label="Open the Guide")
+        guide.set_tooltip_text("Short how-tos: windows, files, screenshots, Wi-Fi and more")
+        guide.connect("clicked", lambda *_: subprocess.Popen(["freemac-guide"], start_new_session=True))
+        buttons.pack_start(guide, False, False, 0)
         if LIVE and shutil.which("freemac-keel"):
             install = Gtk.Button(label="Install freemac…")
             install.get_style_context().add_class("suggested-action")
