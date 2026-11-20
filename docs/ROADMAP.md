@@ -368,6 +368,23 @@ The small things a Mac user notices in their first minute.
 | 4 | Albums in Cove: make one, add photos to it, and play any album or month as a slideshow | Cove | done |
 | 5 | Share from Drawer, Cove and Frame: send a file by mail in Post, or copy it to a drive | Drawer, Cove, Frame, Post | done |
 
+## 1.26 "files that move" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Copy and paste files: ⌘C, then ⌘V for a copy or ⌥⌘V to move them, between Drawer windows, tabs and the Desktop; Duplicate (⌘D) | Drawer, Backdrop | done |
+| 2 | Drag files onto a folder, a sidebar place or another window to move them (copy when it's another disk, or with ⌥) | Drawer | done |
+| 3 | A small window shows a long copy's progress with a Stop button, and a name that's taken asks Keep Both, Stop or Replace | Drawer, Backdrop | done |
+| 4 | Undo (⌘Z) the last move, rename, copy or Move to Trash | Drawer | done |
+
+## 1.27 "music and backups"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A music app for your Music folder, by album, artist and song, with play, shuffle and repeat, shown in the menu bar's what's playing and played with the media keys | new app | planned |
+| 2 | Backups to a drive: pick one in Dials, and while it's plugged in your home folder is copied every hour, keeping earlier copies with unchanged files shared | new app, Dials | planned |
+| 3 | Bring back a file or folder from any backup, browsed by date | new app | planned |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

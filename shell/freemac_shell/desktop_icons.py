@@ -8,7 +8,8 @@ the dock's Trash, a Drawer window or a folder works like any file. Files
 dropped on the desktop from elsewhere are moved into the Desktop folder.
 
 Click selects, double-click opens, Return renames, Delete moves the selection
-to the Trash. The right button gives Open, Rename, Show in Drawer and Move to
+to the Trash; ⌘C, ⌘V, ⌥⌘V, ⌘D and ⌘Z copy, paste, move, duplicate and undo
+as in Drawer (transfer.py), and files dropped on a folder go into it. The right button gives Open, Rename, Show in Drawer and Move to
 Trash for a file, and New Folder and Change Wallpaper on the empty desktop.
 Screenshots (Lens) land here too.
 
@@ -27,7 +28,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import volumes  # noqa: E402
+from . import transfer, volumes  # noqa: E402
 
 LAYOUT = os.path.join(GLib.get_user_config_dir(), "freemac", "desktop.json")
 CELL_W, CELL_H = 100, 104   # one place on the grid
@@ -397,6 +398,14 @@ class DesktopIcons(Gtk.Layout):
             self.rename(self.selected[0])
         elif key == Gdk.KEY_Delete or (key == Gdk.KEY_BackSpace and event.state & Gdk.ModifierType.CONTROL_MASK):
             self.trash(files)
+        elif key in (Gdk.KEY_c, Gdk.KEY_C) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            transfer.copy_files([icon.path for icon in files])
+        elif key in (Gdk.KEY_v, Gdk.KEY_V) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.paste(move=bool(event.state & Gdk.ModifierType.MOD1_MASK))
+        elif key in (Gdk.KEY_d, Gdk.KEY_D) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.run_job([icon.path for icon in files], self.folder, duplicate=True)
+        elif key in (Gdk.KEY_z, Gdk.KEY_Z) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            transfer.undo_last(self.get_toplevel(), lambda _t: self.refresh())
         elif key == Gdk.KEY_e and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.eject([icon for icon in self.selected if icon.mount is not None])
         elif key == Gdk.KEY_o and event.state & Gdk.ModifierType.CONTROL_MASK:
@@ -439,12 +448,33 @@ class DesktopIcons(Gtk.Layout):
         if len(icons) == 1:
             items.append(("Rename…", lambda: self.rename(icons[0])))
         items += [("Show in Drawer", self.show_folder), (None, None),
+                  ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
+                  ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
         self.menu = self._menu(items, event)
 
     def desktop_menu(self, event):
-        self.menu = self._menu([("New Folder", self.new_folder), (None, None),
+        self.menu = self._menu([("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
                                 ("Change Wallpaper…", self.change_wallpaper)], event)
+
+    # ---- copy and paste -------------------------------------------------------------------
+    def run_job(self, paths, folder, move=False, duplicate=False, near=None):
+        """Copy or move onto the desktop (or into a folder on it); new icons
+        go in free places near the drop."""
+        if not paths:
+            return
+
+        def done(job):
+            if os.path.abspath(folder) == os.path.abspath(self.folder):
+                for path in job.made:
+                    taken = {v for k, v in self.places.items() if k in self.icons}
+                    self.places[os.path.basename(path)] = self.free_cell(taken, near)
+                self._save()
+            self.refresh()
+        transfer.Job(paths, folder, move=move, parent=self.get_toplevel(), done=done, duplicate=duplicate).start()
+
+    def paste(self, move=False):
+        self.run_job(transfer.pasted_files(), self.folder, move=move)
 
     def show_folder(self):
         subprocess.Popen(["freemac-drawer", self.folder], start_new_session=True)
@@ -462,6 +492,7 @@ class DesktopIcons(Gtk.Layout):
             os.mkdir(os.path.join(self.folder, name))
         except OSError:
             return
+        transfer.note_done({"kind": "new-folder", "path": os.path.join(self.folder, name)})
         self.refresh()
         icon = self.icons.get(name)
         if icon:
@@ -473,11 +504,9 @@ class DesktopIcons(Gtk.Layout):
             volumes.eject(icon.mount, self.get_toplevel())
 
     def trash(self, icons):
-        for icon in icons:
-            try:
-                Gio.File.new_for_path(icon.path).trash(None)
-            except GLib.Error:
-                pass
+        went, _error = transfer.to_trash([icon.path for icon in icons])
+        if went:
+            transfer.note_done({"kind": "trash", "paths": went})
         self.refresh()
 
     def rename(self, icon):
@@ -500,6 +529,7 @@ class DesktopIcons(Gtk.Layout):
             Gio.File.new_for_path(icon.path).set_display_name(new, None)
         except GLib.Error:
             return
+        transfer.note_done({"kind": "rename", "old": icon.path, "new": os.path.join(self.folder, new)})
         if old in self.places:
             self.places[new] = self.places.pop(old)
         self.refresh()
@@ -511,9 +541,36 @@ class DesktopIcons(Gtk.Layout):
     def drag_ended(self):
         self.dragging = None
 
+    def _folder_at(self, x, y):
+        """The folder icon under a drop, if one is there and not being dragged."""
+        for icon in self.icons.values():
+            if icon.mount is not None or icon is self.dragging or icon in (self.selected if self.dragging else []):
+                continue
+            if not os.path.isdir(icon.path):
+                continue
+            ix, iy = icon.translate_coordinates(self, 0, 0) or (None, None)
+            if ix is None:
+                continue
+            if ix <= x < ix + icon.get_allocated_width() and iy <= y < iy + icon.get_allocated_height():
+                return icon.path
+        return None
+
+    def _alt_held(self):
+        window, seat = self.get_window(), Gdk.Display.get_default().get_default_seat()
+        if window is None or seat is None:
+            return False
+        return bool(window.get_device_position(seat.get_pointer())[3] & Gdk.ModifierType.MOD1_MASK)
+
     def _dropped(self, _widget, context, x, y, data, _info, time):
         uris = data.get_uris() or []
+        into = self._folder_at(x, y)
+        if into is not None:
+            paths = [p for p in (path_of(u) for u in uris) if p and os.path.abspath(p) != into]
+            move = not self._alt_held() and all(transfer.same_disk(p, into) for p in paths)
+            self.run_job(paths, into, move=move)
+            return
         moved = False
+        incoming = []
         dragged = self.dragging.name if self.dragging else None
         anchor = self.places.get(dragged) if dragged else None
         target = self.nearest_cell(x - CELL_W // 2, y - ICON // 2)
@@ -536,24 +593,14 @@ class DesktopIcons(Gtk.Layout):
                 self.places[name] = cell if cell not in taken else self.free_cell(taken, cell)
                 moved = True
                 continue
-            destination = os.path.join(self.folder, name)
-            if os.path.exists(destination):
-                continue
-            try:
-                source = Gio.File.new_for_path(path)
-                # From another disk, a file is copied, not moved, as on a Mac.
-                if context.get_selected_action() == Gdk.DragAction.COPY or not self._same_disk(path):
-                    source.copy(Gio.File.new_for_path(destination), Gio.FileCopyFlags.NONE, None, None, None)
-                else:
-                    source.move(Gio.File.new_for_path(destination), Gio.FileCopyFlags.NONE, None, None, None)
-            except GLib.Error:
-                continue
-            taken = {v for k, v in self.places.items() if k in self.icons}
-            self.places[name] = self.free_cell(taken, target)
-            moved = True
+            incoming.append(path)
         if moved:
             self._save()
             self.refresh()
+        if incoming:
+            # From another disk, files are copied, not moved, as on a Mac; ⌥ copies too.
+            move = not self._alt_held() and all(self._same_disk(p) for p in incoming)
+            self.run_job(incoming, self.folder, move=move, near=target)
 
     def _same_disk(self, path):
         try:

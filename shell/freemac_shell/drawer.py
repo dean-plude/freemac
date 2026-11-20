@@ -3,8 +3,9 @@
 
 Icon, list and column views over local folders, tabs, a sidebar of
 favourite folders you can change, a preview of the selected file on Space
-(Glance), and the everyday file operations (open, new folder, rename, move
-to trash).
+(Glance), and the everyday file operations: open, new folder, rename, move
+to trash, copy and paste (⌘C, ⌘V, ⌥⌘V to move), Duplicate, drag onto a
+folder, and Undo (see transfer.py).
 """
 import json
 import os
@@ -17,10 +18,12 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, share, volumes  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, share, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
+TRASH = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
+TO_TRASH, TO_SIDEBAR = "\0trash", "\0sidebar"   # drop places that aren't folders
 URI_TARGETS = [Gtk.TargetEntry.new("text/uri-list", 0, 0)]
 
 ATTRS = ",".join([
@@ -196,6 +199,8 @@ def name_column(title="Name"):
 
 
 class DrawerWindow(Gtk.ApplicationWindow):
+    dragging = None       # the files being dragged out of a Drawer window, while they are
+
     def __init__(self, app, path):
         super().__init__(application=app, title="Drawer")
         self.set_default_size(980, 600)
@@ -207,6 +212,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.tabs = []        # one dict per tab; the open tab's state lives on self
         self.current = 0
         self.glance = None
+        self.monitor, self.watched, self.soon, self.told_at = None, None, 0, 0
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -356,6 +362,218 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _drag_get(self, _widget, _context, data, _info, _time):
         data.set_uris([Gio.File.new_for_path(p).get_uri() for p in self.selected_paths()])
 
+    def _drag_source(self, widget):
+        widget.connect("drag-data-get", self._drag_get)
+        widget.connect("drag-begin", lambda *_: setattr(DrawerWindow, "dragging", self.selected_paths()))
+        widget.connect("drag-end", lambda *_: setattr(DrawerWindow, "dragging", None))
+
+    # ---- dropping files in ----------------------------------------------
+    def _accept_drops(self, widget, find):
+        """widget takes dropped files. find(x, y) says where they would go:
+        (folder, light) with light(on) showing the place, or None."""
+        widget.drag_dest_set(0, URI_TARGETS, Gdk.DragAction.COPY | Gdk.DragAction.MOVE | Gdk.DragAction.LINK)
+        lit = {"light": None}
+
+        def light(show):
+            if lit["light"] is not None and lit["light"] is not show:
+                lit["light"](False)
+            lit["light"] = show
+            if show is not None:
+                show(True)
+
+        def motion(_w, context, x, y, time):
+            found = find(x, y)
+            action = self._drop_action(found[0]) if found else 0
+            light(found[1] if found and action else None)
+            Gdk.drag_status(context, action, time)
+            return True
+
+        def drop(_w, context, _x, _y, time):
+            widget.drag_get_data(context, Gdk.Atom.intern("text/uri-list", False), time)
+            return True
+
+        def received(_w, context, x, y, data, _info, time):
+            light(None)
+            found = find(x, y)
+            paths = [Gio.File.new_for_uri(u).get_path() for u in data.get_uris() or []]
+            paths = [p for p in paths if p]
+            # Never let the source delete anything: a move is done here.
+            Gtk.drag_finish(context, bool(found and paths), False, time)
+            if found and paths:
+                GLib.idle_add(lambda: self._dropped(paths, found[0]) and False)
+
+        widget.connect("drag-motion", motion)
+        widget.connect("drag-leave", lambda *_: light(None))
+        widget.connect("drag-drop", drop)
+        widget.connect("drag-data-received", received)
+
+    def _alt_held(self):
+        window, seat = self.get_window(), Gdk.Display.get_default().get_default_seat()
+        if window is None or seat is None:
+            return False
+        mask = window.get_device_position(seat.get_pointer())[3]
+        return bool(mask & Gdk.ModifierType.MOD1_MASK)
+
+    def _drop_action(self, folder):
+        paths = DrawerWindow.dragging or []
+        if folder == TO_SIDEBAR:
+            return Gdk.DragAction.LINK
+        if folder == TO_TRASH:
+            return Gdk.DragAction.MOVE
+        if paths and (folder in paths or all(os.path.dirname(p) == folder for p in paths)):
+            return 0     # where they are already
+        if self._alt_held():
+            return Gdk.DragAction.COPY
+        if paths and not all(transfer.same_disk(p, folder) for p in paths):
+            return Gdk.DragAction.COPY
+        return Gdk.DragAction.MOVE
+
+    def _dropped(self, paths, folder):
+        if folder == TO_SIDEBAR:
+            self.add_to_sidebar(paths)
+        elif folder == TO_TRASH:
+            self.trash(paths)
+        elif not all(os.path.dirname(p) == folder for p in paths):
+            # A move on the same disk, a copy onto another one; ⌥ copies.
+            move = not self._alt_held() and all(transfer.same_disk(p, folder) for p in paths)
+            self.run_job(paths, folder, move)
+
+    def _item_target(self, path, is_dir):
+        """A folder under the pointer takes the drop, unless it's being dragged."""
+        dragged = DrawerWindow.dragging or []
+        return is_dir and path not in dragged
+
+    def _find_in_icons(self, x, y):
+        found = self.icon_view.get_dest_item_at_pos(x, y)
+        model = self.icon_view.get_model()
+        if found:
+            item = found[0]
+            row = model[item]
+            if self._item_target(row[C_PATH], row[C_IS_DIR]):
+                return row[C_PATH], lambda on: self.icon_view.set_drag_dest_item(
+                    item if on else None, Gtk.IconViewDropPosition.DROP_INTO)
+        return self.path, lambda on: None
+
+    def _find_in_tree(self, view, folder_of):
+        def find(x, y):
+            found = view.get_dest_row_at_pos(x, y)
+            model = view.get_model()
+            if found:
+                tree_path = found[0]
+                row = model[tree_path]
+                if self._item_target(row[C_PATH], row[C_IS_DIR]):
+                    return row[C_PATH], lambda on: view.set_drag_dest_row(
+                        tree_path if on else None, Gtk.TreeViewDropPosition.INTO_OR_AFTER)
+            return folder_of(), lambda on: None
+        return find
+
+    def _find_in_sidebar(self, listbox, places_only=False):
+        def find(_x, y):
+            row = listbox.get_row_at_y(int(y))
+            if row is not None and getattr(row, "path", ""):
+                if row.path == TRASH:
+                    target = TO_TRASH
+                elif places_only and getattr(row, "mount", None) is None:
+                    return None     # Computer: not a place to drop files
+                else:
+                    target = row.path
+                return target, lambda on: listbox.drag_highlight_row(row) if on else listbox.drag_unhighlight_row()
+            if places_only:
+                return None
+            # Below the rows: add folders to the sidebar.
+            return TO_SIDEBAR, lambda on: listbox.drag_highlight() if on else listbox.drag_unhighlight()
+        return find
+
+    # ---- copy, paste, duplicate, undo -------------------------------------
+    def run_job(self, paths, folder, move=False, duplicate=False):
+        def done(job):
+            self.refresh()
+            self.select_paths([p for p in job.made if os.path.dirname(p) == self.path])
+        transfer.Job(paths, folder, move=move, parent=self, done=done, duplicate=duplicate).start()
+
+    def copy(self):
+        paths = self.selected_paths()
+        if transfer.copy_files(paths):
+            one = len(paths) == 1
+            self.notify(f"Copied {len(paths)} item{'' if one else 's'}. ⌘V pastes {'it' if one else 'them'} "
+                        f"somewhere else, ⌥⌘V moves {'it' if one else 'them'}.")
+
+    def paste(self, move=False):
+        paths = transfer.pasted_files()
+        if not paths:
+            self.notify("There are no files to paste. Copy some first with ⌘C.")
+            return
+        self.run_job(paths, self.path, move=move)
+
+    def duplicate(self):
+        paths = self.selected_paths()
+        if paths:
+            self.run_job(paths, os.path.dirname(paths[0]) if len(set(map(os.path.dirname, paths))) == 1
+                         else self.path, duplicate=True)
+
+    def undo(self):
+        def told(text):
+            self.refresh()
+            self.notify(text)
+        if not transfer.undo_last(self, told):
+            self.notify("There’s nothing to undo.")
+
+    def select_paths(self, paths):
+        """Select these files in the view, the first one scrolled into view."""
+        wanted = set(paths)
+        if not wanted:
+            return
+        if self.view_mode == "icons":
+            model = self.icon_view.get_model()
+            self.icon_view.unselect_all()
+            first = None
+            for row in model:
+                if row[C_PATH] in wanted:
+                    self.icon_view.select_path(row.path)
+                    first = first or row.path
+            if first is not None:
+                self.icon_view.scroll_to_path(first, False, 0, 0)
+        elif self.view_mode == "list":
+            selection = self.list_view.get_selection()
+            selection.unselect_all()
+            first = None
+            for row in self.list_view.get_model():
+                if row[C_PATH] in wanted:
+                    selection.select_path(row.path)
+                    first = first or row.path
+            if first is not None:
+                self.list_view.scroll_to_cell(first, None, False, 0, 0)
+
+    # ---- keeping up with changes made elsewhere ---------------------------
+    def _watch(self):
+        if self.watched == self.path:
+            return
+        if self.monitor is not None:
+            self.monitor.cancel()
+            self.monitor = None
+        self.watched = self.path
+        try:
+            self.monitor = Gio.File.new_for_path(self.path).monitor_directory(
+                Gio.FileMonitorFlags.WATCH_MOVES, None)
+        except GLib.Error:
+            return
+        self.monitor.connect("changed", lambda *_: self._changed_soon())
+
+    def _changed_soon(self):
+        if not self.soon:
+            self.soon = GLib.timeout_add(300, self._changed)
+
+    def _changed(self):
+        self.soon = 0
+        if self.view_mode == "columns" or not self.get_visible():
+            return False
+        keep, told = self.selected_paths(), self.status.get_text()
+        self.refresh()
+        self.select_paths(keep)
+        if time.monotonic() - self.told_at < 4:
+            self.status.set_text(told)
+        return False
+
     def _add_actions(self):
         """The window's actions, for the menu bar."""
         menus.add_actions(self, {
@@ -382,6 +600,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "compress": self.compress,
             "get-info": self.get_info,
             "eject": self.eject,
+            "copy": self.copy,
+            "paste": self.paste,
+            "move-here": lambda: self.paste(move=True),
+            "duplicate": self.duplicate,
+            "undo": self.undo,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -411,9 +634,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.fav_list.get_style_context().add_class("drawer-sidebar")
         self.fav_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
         self.fav_list.connect("button-press-event", self._sidebar_button)
-        # Drop folders here to add them.
-        self.fav_list.drag_dest_set(Gtk.DestDefaults.ALL, URI_TARGETS, Gdk.DragAction.COPY | Gdk.DragAction.LINK)
-        self.fav_list.connect("drag-data-received", self._sidebar_drop)
+        # Drop files on a place to move them there, or folders below the
+        # places to add them.
+        self._accept_drops(self.fav_list, self._find_in_sidebar(self.fav_list))
         box.pack_start(self.fav_list, False, False, 0)
         self._fill_favourites()
         heading = Gtk.Label(label="Locations", xalign=0)
@@ -423,6 +646,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.loc_list.get_style_context().add_class("drawer-sidebar")
         self.loc_list.connect("row-activated", lambda _l, row: self._open_location(row))
         self.loc_list.connect("button-press-event", self._location_button)
+        self._accept_drops(self.loc_list, self._find_in_sidebar(self.loc_list, places_only=True))
         box.pack_start(self.loc_list, False, False, 0)
         self._fill_locations()
         # Drives come and go: the list follows, and a window on a drive that
@@ -436,7 +660,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.loc_list]
         for child in self.loc_list.get_children():
             self.loc_list.remove(child)
-        trash = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
+        trash = TRASH
         entries = [("Computer", "/", Gio.ThemedIcon.new("drive-harddisk-symbolic"), None)]
         for mount in volumes.drives():
             entries.append((mount.get_name(), volumes.path_of(mount), mount.get_symbolic_icon(), mount))
@@ -546,10 +770,6 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if folders:
             self._change_favourites(change)
 
-    def _sidebar_drop(self, _widget, _context, _x, _y, data, _info, _time):
-        paths = [Gio.File.new_for_uri(u).get_path() for u in data.get_uris() or []]
-        self.add_to_sidebar([p for p in paths if p])
-
     def _sidebar_button(self, listbox, event):
         if event.button != 3:
             return False
@@ -597,7 +817,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.icon_view.connect("selection-changed", self._selection_changed)
         self.icon_view.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS,
                                                 Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
-        self.icon_view.connect("drag-data-get", self._drag_get)
+        self._drag_source(self.icon_view)
+        self._accept_drops(self.icon_view, self._find_in_icons)
         scroll = Gtk.ScrolledWindow()
         scroll.add(self.icon_view)
         self.content.add_named(scroll, "icons")
@@ -617,7 +838,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.list_view.get_selection().connect("changed", self._selection_changed)
         self.list_view.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS,
                                                 Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
-        self.list_view.connect("drag-data-get", self._drag_get)
+        self._drag_source(self.list_view)
+        self._accept_drops(self.list_view, self._find_in_tree(self.list_view, lambda: self.path))
         scroll = Gtk.ScrolledWindow()
         scroll.add(self.list_view)
         self.content.add_named(scroll, "list")
@@ -669,6 +891,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         count = len(model)
         self.status.set_text(folder.error or f"{count} item{'s' if count != 1 else ''}")
         self.content.set_visible_child_name(self.view_mode)
+        self._watch()
 
     # ---- column (Miller) view ------------------------------------------
     def _reset_columns(self):
@@ -700,6 +923,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         view.get_selection().connect("changed", self._column_changed, index)
         view.connect("row-activated", lambda v, p, _c: self._activate(v.get_model(), p))
         view.connect("button-press-event", self._tree_button)
+        view.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS,
+                                      Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
+        self._drag_source(view)
+        self._accept_drops(view, self._find_in_tree(view, lambda: path))
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroll.set_size_request(220, -1)
         scroll.get_style_context().add_class("drawer-column")
@@ -844,6 +1071,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def notify(self, text):
         self.status.set_text(text)
+        self.told_at = time.monotonic()
 
     def selected_paths(self):
         if self.view_mode == "icons":
@@ -869,6 +1097,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         except OSError as err:
             self.notify(f"Couldn’t make a folder here: {err.strerror}.")
             return
+        transfer.note_done({"kind": "new-folder", "path": os.path.join(base, name)})
         self.refresh()
         self.rename(os.path.join(base, name))
 
@@ -894,23 +1123,23 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 else:
                     try:
                         os.rename(path, target)
+                        transfer.note_done({"kind": "rename", "old": path, "new": target})
                     except OSError as err:
                         self.notify(f"Couldn’t rename: {err.strerror}.")
         dialog.destroy()
         self.refresh()
 
-    def trash(self):
-        paths = self.selected_paths()
-        moved = 0
-        for path in paths:
-            try:
-                Gio.File.new_for_path(path).trash(None)
-                moved += 1
-            except GLib.Error as err:
-                self.notify(f"Couldn’t move “{os.path.basename(path)}” to the Trash: {err.message}")
+    def trash(self, paths=None):
+        paths = paths if paths is not None else self.selected_paths()
+        went, error = transfer.to_trash(paths)
+        if went:
+            transfer.note_done({"kind": "trash", "paths": went})
         self.refresh()
-        if moved:
-            self.notify(f"Moved {moved} item{'s' if moved != 1 else ''} to the Trash.")
+        if error is not None:
+            self.notify(f"Couldn’t move everything to the Trash: {error.message}")
+        elif went:
+            self.notify(f"Moved {len(went)} item{'s' if len(went) != 1 else ''} to the Trash. ⌘Z puts "
+                        f"{'it' if len(went) == 1 else 'them'} back.")
 
     def get_info(self):
         paths = self.selected_paths() or [self.path]
@@ -987,6 +1216,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Rename…", lambda *_: self.rename(), has_selection),
             ("Move to Trash", lambda *_: self.trash(), has_selection),
             (None, None, True),
+            ("Duplicate", lambda *_: self.duplicate(), has_selection),
+            ("Copy", lambda *_: self.copy(), has_selection),
+            ("Paste Item", lambda *_: self.paste(), True),
+            (None, None, True),
             ("Expand" if one_archive else "Compress",
              (lambda *_: self.expand(selected[0])) if one_archive else (lambda *_: self.compress()), has_selection),
             ("Share", None, has_selection),
@@ -1053,6 +1286,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.trash()  # Command+Backspace, as on a Mac
         elif ctrl and key in (Gdk.KEY_i, Gdk.KEY_I):
             self.get_info()
+        elif ctrl and not shift and key in (Gdk.KEY_c, Gdk.KEY_C):
+            self.copy()
+        elif ctrl and not shift and key in (Gdk.KEY_v, Gdk.KEY_V):
+            self.paste(move=bool(event.state & Gdk.ModifierType.MOD1_MASK))
+        elif ctrl and not shift and key in (Gdk.KEY_d, Gdk.KEY_D):
+            self.duplicate()
+        elif ctrl and not shift and key in (Gdk.KEY_z, Gdk.KEY_Z):
+            self.undo()
         elif key == Gdk.KEY_F2:
             self.rename()
         elif ctrl and shift and key in (Gdk.KEY_N, Gdk.KEY_n):
@@ -1095,6 +1336,7 @@ def menubar():
             [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
              ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
+            [("Duplicate", "win.duplicate", "<Ctrl>d")],
             [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace")],
@@ -1104,6 +1346,9 @@ def menubar():
             [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
         ]),
         ("_Edit", [
+            [("Undo", "win.undo", "<Ctrl>z")],
+            [("Copy", "win.copy", "<Ctrl>c"), ("Paste Item", "win.paste", "<Ctrl>v"),
+             ("Move Item Here", "win.move-here", "<Ctrl><Alt>v")],
             [("Select All", "win.select-all", "<Ctrl>a")],
             [("Filter…", "win.filter", "<Ctrl>f")],
         ]),
