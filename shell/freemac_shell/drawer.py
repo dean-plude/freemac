@@ -17,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, menus  # noqa: E402
+from . import drawer_archive, macapps, menus  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -65,6 +65,9 @@ def when(stamp):
 def places():
     home = GLib.get_home_dir()
     found = [("Home", home, "user-home-symbolic")]
+    apps = os.path.join(home, "Applications")
+    if os.path.isdir(apps):
+        found.append(("Applications", apps, "folder-symbolic"))
     special = [
         (GLib.UserDirectory.DIRECTORY_DESKTOP, "Desktop", "user-desktop-symbolic"),
         (GLib.UserDirectory.DIRECTORY_DOCUMENTS, "Documents", "folder-documents-symbolic"),
@@ -112,6 +115,9 @@ def place_icon(path):
     return "folder-symbolic"
 
 
+MAC_APP = "Mac App"
+
+
 class Folder:
     """Reads one folder into a Gtk.ListStore."""
 
@@ -135,12 +141,24 @@ class Folder:
             stamp = modified.to_unix() if modified else 0
             kind = "Folder" if is_dir else Gio.content_type_get_description(info.get_content_type() or "")
             name = info.get_display_name()
+            full = os.path.join(path, info.get_name())
+            big, small = self.icon(info.get_icon(), 48), self.icon(info.get_icon(), 20)
+            if is_dir and macapps.is_bundle(full):
+                # A Mac app is a folder, but it shows and opens as one app, with its own icon.
+                is_dir, kind = False, MAC_APP
+                name = macapps.display_name(full)
+                big, small = self.app_icon(full, 48), self.app_icon(full, 20)
             self.store.append([
-                self.icon(info.get_icon(), 48), name, os.path.join(path, info.get_name()), is_dir,
-                "" if is_dir else human_size(info.get_size()), when(stamp), kind,
-                ("0" if is_dir else "1") + name.lower(), self.icon(info.get_icon(), 20),
+                big, name, full, is_dir,
+                "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
+                ("0" if is_dir else "1") + name.lower(), small,
             ])
         enum.close(None)
+
+    @classmethod
+    def app_icon(cls, path, size):
+        pixbuf = macapps.cached_icon(path, size)
+        return pixbuf or cls.icon(Gio.ThemedIcon.new(macapps.GENERIC_ICON), size)
 
     @classmethod
     def icon(cls, gicon, size):
@@ -645,7 +663,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         box.set_size_request(260, -1)
         pixbuf = None
         try:
-            if (row[C_KIND] or "").lower().find("image") >= 0:
+            if row[C_KIND] == MAC_APP:
+                pixbuf = Folder.app_icon(path, 128)
+            elif (row[C_KIND] or "").lower().find("image") >= 0:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 220, 220, True)
         except GLib.Error:
             pixbuf = None
@@ -674,6 +694,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.open_file(path)
 
     def open_file(self, path):
+        if macapps.is_bundle(path):
+            GLib.spawn_async(["freemac-mac-app", "open", path], flags=GLib.SpawnFlags.SEARCH_PATH)
+            return
         if drawer_archive.is_archive(path):
             self.expand(path)
             return
@@ -697,6 +720,18 @@ class DrawerWindow(Gtk.ApplicationWindow):
             GLib.idle_add(lambda: done(result, error) or False)
 
         threading.Thread(target=run, daemon=True).start()
+
+    def add_to_applications(self, path):
+        name = macapps.display_name(path)
+
+        def done(_target, error):
+            if error:
+                self.notify(f"Couldn't add “{name}” to Applications: {error}")
+            else:
+                self.refresh()
+                self.notify(f"“{name}” is in Applications and the app grid now.")
+
+        self._in_background(lambda: macapps.install(path), done, f"Adding “{name}” to Applications…")
 
     def compress(self):
         paths = self.selected_paths()
@@ -850,7 +885,16 @@ class DrawerWindow(Gtk.ApplicationWindow):
         has_folder = any(os.path.isdir(p) for p in self.selected_paths()[:1])
         selected = self.selected_paths()
         one_archive = len(selected) == 1 and drawer_archive.is_archive(selected[0])
-        for label, handler, enabled in (
+        one_app = len(selected) == 1 and macapps.is_bundle(selected[0])
+        app_items = ()
+        if one_app:
+            app_items = (
+                ("Show Package Contents", lambda *_: self.navigate(selected[0]), True),
+                ("Add to Applications", lambda *_: self.add_to_applications(selected[0]),
+                 not macapps.in_applications(selected[0])),
+                (None, None, True),
+            )
+        for label, handler, enabled in app_items + (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Rename…", lambda *_: self.rename(), has_selection),
             ("Move to Trash", lambda *_: self.trash(), has_selection),
@@ -875,7 +919,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         menu.popup_at_pointer(event)
 
     def open_or_enter(self, path):
-        if os.path.isdir(path):
+        if os.path.isdir(path) and not macapps.is_bundle(path):
             self.navigate(path)
         else:
             self.open_file(path)
