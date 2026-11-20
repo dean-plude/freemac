@@ -605,14 +605,29 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
-    /* strata/front-app {app-id}: the app Topline shows in front with no
-     * window open, or "" for none; ⌘Q quits it. */
+    /* strata/front-app {app-id, keys}: the app Topline shows in front with
+     * no window open, or "" for none; ⌘Q quits it, and its keys work. */
     wf::ipc::method_callback set_front_app = [=] (nlohmann::json data)
     {
         if (data.contains("app-id"))
         {
             WFJSON_EXPECT_FIELD(data, "app-id", string);
             command_key.front_windowless = data["app-id"];
+        }
+
+        /* keys {chord: action}: the app's own shortcuts, for while it has
+         * no window open. */
+        if (data.contains("keys") && data["keys"].is_object() && data.contains("app-id"))
+        {
+            command_key.windowless_keys.clear();
+            command_key.windowless_keys_app = data["app-id"];
+            for (auto& [chord, action] : data["keys"].items())
+            {
+                if (action.is_string() && (command_key.windowless_keys.size() < 200))
+                {
+                    command_key.windowless_keys[chord] = action;
+                }
+            }
         }
 
         /* Without an app-id it only answers: Strata itself keeps an app in

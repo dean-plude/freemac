@@ -89,6 +89,8 @@ class Topline(Gtk.Window):
         self._app_model = None
         self._groups = {}
         self._bus = None
+        # The app menus' shortcuts, watched for while a held app has no window.
+        self._key_models, self._keys_sent, self._keys_queued = [], None, False
         self._own_actions = Gio.SimpleActionGroup()
         for name in ("hide", "hide-others", "show-all", "quit"):
             action = Gio.SimpleAction.new(name, None)
@@ -177,7 +179,49 @@ class Topline(Gtk.Window):
     def _tell_strata(self):
         if self._windowless != self._told_strata and self.wf:
             self._told_strata = self._windowless
+            self._keys_sent = None
             self.wf.front_app(self._windowless)
+            self._queue_keys()
+
+    def _queue_keys(self):
+        if self._windowless and not self._keys_queued:
+            self._keys_queued = True
+            GLib.timeout_add(120, self._send_keys)
+
+    def _send_keys(self):
+        """The held app's shortcuts go on working with no window open, as on
+        a Mac (⌘N for a new note): Strata carries them out, from the list of
+        those its menus show. Quit is Strata's own."""
+        self._keys_queued = False
+        if not (self._windowless and self.wf and self._menu_key and
+                held.bus_name(self._windowless) == self._menu_key[0]):
+            return False
+        keys = {}
+        self._walk_keys(self._menubar, keys)
+        if keys != self._keys_sent:
+            self._keys_sent = keys
+            self.wf.front_app(self._windowless, keys=keys)
+        return False
+
+    def _walk_keys(self, model, keys):
+        if model is None:
+            return
+        if not any(model is seen for seen in self._key_models):
+            self._key_models.append(model)
+            model.connect("items-changed", lambda *_: self._queue_keys())
+        string = GLib.VariantType.new("s")
+        for i in range(model.get_n_items()):
+            for link in (Gio.MENU_LINK_SECTION, Gio.MENU_LINK_SUBMENU):
+                self._walk_keys(model.get_item_link(i, link), keys)
+            accel = model.get_item_attribute_value(i, "accel", string)
+            action = model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_ACTION, string)
+            if (accel is None or action is None or
+                    model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_TARGET, None) is not None):
+                continue
+            name = action.get_string()
+            chord = mac_accel.chord(accel.get_string())
+            if chord and name.startswith("app.") and name != "app.quit":
+                keys.setdefault(chord, name[4:])
 
     def _mark_image(self):
         image = Gtk.Image()
@@ -480,6 +524,7 @@ class Topline(Gtk.Window):
         self._menu_key = key
         self._menubar = None
         self._app_model = None
+        self._key_models = []
         for prefix in ("app", "win"):
             self.menus_box.insert_action_group(prefix, None)
         self._groups = {}
@@ -540,6 +585,7 @@ class Topline(Gtk.Window):
             self.menus_box.pack_start(button, False, False, 0)
             button.show_all()
         self.menus_box.set_visible(bool(menus))
+        self._queue_keys()
 
     def _own_action(self, name):
         view = self.focused

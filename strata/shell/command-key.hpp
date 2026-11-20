@@ -17,6 +17,11 @@
  * And the app shortcuts that belong to the system:
  *   Super+Q quit the app (every window), Super+H hide it, Super+Alt+H hide
  *   the others, Super+` (Shift: back) step through the app's own windows.
+ *   Super+. cancels a dialog, as Escape does.
+ *
+ * An app that stays open with no window keeps its shortcuts: Topline tells
+ * Strata which ones its menus offer (Super+N for New...), and Strata asks the
+ * app to carry them out when one is pressed while no window has the keyboard.
  *
  * Original freemac code.
  */
@@ -25,6 +30,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -41,6 +47,7 @@
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
+#include <wayfire/util/log.hpp>
 #include <wayfire/view-helpers.hpp>
 #include <wayfire/window-manager.hpp>
 #include <wayfire/nonstd/wlroots-full.hpp>
@@ -215,6 +222,12 @@ class strata_command_key
         tell_app(wlr_seat_get_keyboard(wf::get_core().get_current_seat()));
     };
 
+    static bool dialog_focused()
+    {
+        auto view = wf::toplevel_cast(wf::get_core().seat->get_active_view());
+        return view && view->parent;
+    }
+
     bool stand_in_for(wlr_keyboard *kbd, uint32_t key, stand_in& out)
     {
         uint32_t mods  = kbd->modifiers.depressed;
@@ -245,6 +258,17 @@ class strata_command_key
               case KEY_DOWN:
                 out = {KEY_END, logo, ctrl};
                 return true;
+
+              case KEY_DOT:
+                /* Command-period cancels, in a dialog. Elsewhere it stays
+                 * Ctrl+period for the app. */
+                if (dialog_focused())
+                {
+                    out = {KEY_ESC, logo, 0};
+                    return true;
+                }
+
+                break;
             }
         } else if ((mods & alt) && !(mods & logo))
         {
@@ -288,6 +312,13 @@ class strata_command_key
             return;
         }
 
+        /* No window has the keyboard (the desktop may hold it, as nothing). */
+        if (enabled && !wf::get_core().seat->get_active_view() && windowless_shortcut(kbd, key))
+        {
+            ev->mode = wf::input_event_processing_mode_t::IGNORE;
+            return;
+        }
+
         stand_in in;
         if (!enabled || held.count(key) || !seat->keyboard_state.focused_surface || focused_is(raw_app) ||
             !stand_in_for(kbd, key, in))
@@ -300,6 +331,67 @@ class strata_command_key
         tell_app(kbd);
         wlr_seat_keyboard_notify_key(seat, ev->event->time_msec, in.key, WL_KEYBOARD_KEY_STATE_PRESSED);
     };
+
+    /* -- the shortcuts of an app with no window open */
+
+    /* The key's name as on its key cap, unshifted ("n", "comma"). */
+    static std::string key_name(wlr_keyboard *kbd, uint32_t key)
+    {
+        if (!kbd->keymap || !kbd->xkb_state)
+        {
+            return "";
+        }
+
+        xkb_keycode_t code = key + 8;
+        auto layout = xkb_state_key_get_layout(kbd->xkb_state, code);
+        const xkb_keysym_t *syms = nullptr;
+        int count = xkb_keymap_key_get_syms_by_level(kbd->keymap, code,
+            (layout == XKB_LAYOUT_INVALID) ? 0 : layout, 0, &syms);
+        char name[64];
+        if ((count < 1) || (xkb_keysym_get_name(xkb_keysym_to_lower(syms[0]), name, sizeof(name)) <= 0))
+        {
+            return "";
+        }
+
+        return name;
+    }
+
+    /* Command (with Shift, Option) and a key, as Topline names them:
+     * "alt+command+shift+n". */
+    std::string chord(wlr_keyboard *kbd, uint32_t key)
+    {
+        uint32_t mods = kbd->modifiers.depressed;
+        if (!(mods & mask(kbd, XKB_MOD_NAME_LOGO)) || (mods & mask(kbd, XKB_MOD_NAME_CTRL)))
+        {
+            return "";
+        }
+
+        auto name = key_name(kbd, key);
+        if (name.empty())
+        {
+            return "";
+        }
+
+        std::string out = (mods & mask(kbd, XKB_MOD_NAME_ALT)) ? "alt+command+" : "command+";
+        if (mods & mask(kbd, XKB_MOD_NAME_SHIFT))
+        {
+            out += "shift+";
+        }
+
+        return out + name;
+    }
+
+    bool windowless_shortcut(wlr_keyboard *kbd, uint32_t key)
+    {
+        if (front_windowless.empty() || (front_windowless != windowless_keys_app))
+        {
+            return false;
+        }
+
+        auto it = windowless_keys.find(chord(kbd, key));
+        return (it != windowless_keys.end()) &&
+               activate_app_action(whole_app_bus_name(front_windowless), it->second);
+    }
 
     /* -- the system's app shortcuts */
     static wayfire_toplevel_view focused_app_window()
@@ -348,16 +440,21 @@ class strata_command_key
         return "";
     }
 
-    /* Activate the app's own quit action over D-Bus (it asks about unsaved
-     * changes itself). The app ID becomes part of a command, so only plain
-     * D-Bus names are accepted. */
-    static bool ask_app_to_quit(const std::string& bus_name)
+    /* Activate one of the app's own actions over D-Bus (its quit asks about
+     * unsaved changes itself). The names become part of a command, so only
+     * plain D-Bus and action names are accepted. */
+    static bool plain(const std::string& text, const char *also)
     {
-        if (bus_name.empty() || (bus_name.size() > 200) ||
-            !std::all_of(bus_name.begin(), bus_name.end(), [] (char c)
+        return !text.empty() && (text.size() <= 200) &&
+               std::all_of(text.begin(), text.end(), [=] (char c)
         {
-            return std::isalnum((unsigned char)c) || (c == '.') || (c == '_');
-        }))
+            return std::isalnum((unsigned char)c) || ((c != 0) && strchr(also, c));
+        });
+    }
+
+    static bool activate_app_action(const std::string& bus_name, const std::string& action)
+    {
+        if (!plain(bus_name, "._") || !plain(action, "-_."))
         {
             return false;
         }
@@ -365,8 +462,13 @@ class strata_command_key
         std::string path = "/" + bus_name;
         std::replace(path.begin(), path.end(), '.', '/');
         wf::get_core().run("gdbus call --session --dest " + bus_name + " --object-path " + path +
-            " --method org.gtk.Actions.Activate quit '[]' '{}' >/dev/null 2>&1");
+            " --method org.gtk.Actions.Activate " + action + " '[]' '{}' >/dev/null 2>&1");
         return true;
+    }
+
+    static bool ask_app_to_quit(const std::string& bus_name)
+    {
+        return activate_app_action(bus_name, "quit");
     }
 
     wf::activator_callback on_quit = [=] (const wf::activator_data_t&)
@@ -515,6 +617,10 @@ class strata_command_key
   public:
     /* The app in front with no window open (Topline says which), for ⌘Q. */
     std::string front_windowless;
+
+    /* Its shortcuts, as Topline found them in its menus: chord -> action. */
+    std::string windowless_keys_app;
+    std::map<std::string, std::string> windowless_keys;
 
     void set_raw(const std::string& app_id, bool raw)
     {
