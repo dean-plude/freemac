@@ -358,7 +358,7 @@ The small things a Mac user notices in their first minute.
 | 4 | Seek's window is kept ready so it takes typing the moment ⌘Space is pressed | Seek, Glyph (`ready_panel.py`) | done |
 | 5 | A photos app: the Pictures folder by month, a large viewer, and import from a camera or phone | Cove (new) | done |
 
-## 1.25 "drives and albums" (next)
+## 1.25 "drives and albums" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
