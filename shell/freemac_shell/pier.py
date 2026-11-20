@@ -14,11 +14,12 @@ import subprocess
 
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, style  # noqa: E402
+from . import apps, login_items, style  # noqa: E402
 from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -358,8 +359,19 @@ class Item(Gtk.Button):
         name = self.info.get_name() if self.info else apps.display_name(self.app_id)
         self.menu = Gtk.Menu()
 
+        def labelled(label, tick=""):
+            # Every item lines up after the tick column the window list uses.
+            item = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            mark = Gtk.Label(label=tick, xalign=0)
+            mark.set_size_request(18 if self.views else 0, -1)
+            box.pack_start(mark, False, False, 0)
+            box.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            item.add(box)
+            return item
+
         def add(label, action=None):
-            item = Gtk.MenuItem(label=label)
+            item = labelled(label)
             if action:
                 item.connect("activate", lambda *_: action())
             else:
@@ -368,17 +380,37 @@ class Item(Gtk.Button):
             return item
 
         views = sorted(self.views, key=lambda v: (v.get("title") or "").lower())
+        # The app's front window is the one it last had in focus.
+        front = max(views, key=lambda v: v.get("last-focus-timestamp", 0)).get("id") if views else None
         for view in views:
-            title = view.get("title") or name
-            add(title[:60], lambda view=view: self.show_window(view))
+            title = (view.get("title") or name)[:60]
+            # The front window gets a tick, as on a Mac.
+            item = labelled(title, "\u2713" if view.get("id") == front else "")
+            item.connect("activate", lambda *_, view=view: self.show_window(view))
+            self.menu.append(item)
         if views:
             self.menu.append(Gtk.SeparatorMenuItem())
         desktop_id = self.desktop_id or (self.info.get_id() if self.info else None)
-        keep = Gtk.CheckMenuItem(label="Keep in Dock")
-        keep.set_active(self in self.pier.pinned)
-        keep.set_sensitive(desktop_id is not None)
-        keep.connect("toggled", lambda item: self.pier.set_pinned(desktop_id, item.get_active()))
-        self.menu.append(keep)
+        options = labelled("Options")
+        options.set_sensitive(desktop_id is not None)
+        sub = Gtk.Menu()
+        # Ticks, not boxes, as a Mac's Dock shows them.
+        for label, on, turn in (
+                ("Keep in Dock", self in self.pier.pinned,
+                 lambda now: self.pier.set_pinned(desktop_id, now)),
+                ("Open at Login", login_items.is_on(desktop_id),
+                 lambda now: login_items.set_on(desktop_id, now))):
+            choice = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            mark = Gtk.Label(label="\u2713" if on else "", xalign=0)
+            mark.set_size_request(18, -1)
+            box.pack_start(mark, False, False, 0)
+            box.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            choice.add(box)
+            choice.connect("activate", lambda *_, on=on, turn=turn: turn(not on))
+            sub.append(choice)
+        options.set_submenu(sub)
+        self.menu.append(options)
         if views:
             self.menu.append(Gtk.SeparatorMenuItem())
             add("Hide", lambda: [self.pier.wf.set_minimized(v["id"], True) for v in self.views])
