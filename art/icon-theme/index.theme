@@ -2,7 +2,7 @@
 Name=freemac
 Comment=freemac's own folder and file icons, and each app's icon on a rounded tile; the rest comes from Adwaita
 Inherits=Adwaita,hicolor
-Directories=scalable/apps,scalable/places,scalable/mimetypes
+Directories=scalable/apps,scalable/places,scalable/mimetypes,scalable/actions
 
 [scalable/places]
 Size=128
@@ -23,4 +23,11 @@ Size=128
 MinSize=8
 MaxSize=512
 Context=Applications
+Type=Scalable
+
+[scalable/actions]
+Size=16
+MinSize=8
+MaxSize=512
+Context=Actions
 Type=Scalable

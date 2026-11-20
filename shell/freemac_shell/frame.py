@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, markup, menus, pdf, style  # noqa: E402
+from . import alert, markup, menus, pdf, share, style  # noqa: E402
 
 TOOLS = (("select", "edit-select-symbolic", "Choose and move marks"),
          ("ink", "document-edit-symbolic", "Draw"),
@@ -99,6 +99,8 @@ class Viewer(Gtk.ApplicationWindow):
         self.markup_button.set_tooltip_text("Markup (⇧⌘A)")
         self.markup_button.connect("toggled", lambda b: self.show_markup(b.get_active()))
         header.pack_end(self.markup_button)
+        self.share_button = share.button(self, self.shown_paths)
+        header.pack_end(self.share_button)
 
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.connect("size-allocate", lambda *_: self._refit())
@@ -158,7 +160,12 @@ class Viewer(Gtk.ApplicationWindow):
             "markup": lambda: self.markup_button.set_active(not self.markup_button.get_active()),
             "save-copy": self.save_copy,
             "undo": self.undo,
+            "share": lambda: share.popup(self, self.shown_paths(), self.share_button),
         })
+
+    def shown_paths(self):
+        """The file on show, for Share."""
+        return [self.files[self.index]] if self.files else []
 
     def toggle_fullscreen(self):
         self.fullscreen_on = not self.fullscreen_on
@@ -731,6 +738,7 @@ def menubar():
         ("_File", [
             [("New Window", "app.new-window", None), ("Open…", "win.open", "<Ctrl>o")],
             [("Save a Copy", "win.save-copy", "<Ctrl>s")],
+            [("Share…", "win.share", None)],
             [("Move to Trash", "win.trash", "Delete")],
             [("Close Window", "win.close", "<Ctrl>w")],
         ]),

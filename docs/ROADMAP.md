@@ -366,7 +366,7 @@ The small things a Mac user notices in their first minute.
 | 2 | A colour for each calendar, local and online, with a list to show or hide each one | Tide | done |
 | 3 | The menu bar always shows the app in front, also just after an app opens or quits | Topline | done |
 | 4 | Albums in Cove: make one, add photos to it, and play any album or month as a slideshow | Cove | done |
-| 5 | Share from Drawer, Cove and Frame: send a file by mail in Post, or copy it to a drive | Drawer, Cove, Frame, Post | |
+| 5 | Share from Drawer, Cove and Frame: send a file by mail in Post, or copy it to a drive | Drawer, Cove, Frame, Post | done |
 
 ## Later
 

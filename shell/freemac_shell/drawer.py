@@ -17,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, volumes  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, share, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -238,6 +238,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.search.connect("search-changed", self._filter_changed)
         header.pack_end(self.search)
         header.pack_end(views)
+        self.share_button = share.button(self, self.selected_paths, self.notify)
+        header.pack_end(self.share_button)
         header.pack_end(self._button("folder-new-symbolic", "New Folder", lambda *_: self.new_folder()))
 
         paned = Gtk.Paned()
@@ -357,6 +359,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _add_actions(self):
         """The window's actions, for the menu bar."""
         menus.add_actions(self, {
+            "share": lambda: share.popup(self, self.selected_paths(), self.share_button, self.notify),
             "new-folder": self.new_folder,
             "open": lambda: [self.open_or_enter(p) for p in self.selected_paths()],
             "rename": self.rename,
@@ -986,6 +989,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             (None, None, True),
             ("Expand" if one_archive else "Compress",
              (lambda *_: self.expand(selected[0])) if one_archive else (lambda *_: self.compress()), has_selection),
+            ("Share", None, has_selection),
             (None, None, True),
             ("Open in New Tab", lambda *_: self.new_tab(self.selected_paths()[0]), has_folder),
             ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
@@ -994,6 +998,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("New Folder", lambda *_: self.new_folder(), True),
             ("Hide Hidden Files" if self.show_hidden else "Show Hidden Files", lambda *_: self.toggle_hidden(), True),
         ):
+            if label == "Share":
+                menu.append(share.menu_item(self, selected, self.notify))
+                continue
             item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
             if handler:
                 item.connect("activate", handler)
@@ -1091,6 +1098,7 @@ def menubar():
             [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace")],
+            [("Share…", "win.share", None)],
             [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
             [("Eject", "win.eject", "<Ctrl>e")],
             [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
