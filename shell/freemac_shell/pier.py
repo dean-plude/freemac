@@ -24,11 +24,16 @@ from .wfipc import Wayfire  # noqa: E402
 BASE = 48          # icon size at rest
 PEAK = 80          # icon size right under the pointer
 REACH = 150        # pixels over which magnification fades out
+BOUNCE_PERIOD = 0.62   # seconds per hop while an app starts
+BOUNCE_HEIGHT = 0.42   # share of the icon size
+BOUNCE_LIMIT = 6.0     # stop hopping after this long even if no window shows
+# Parts of the desktop that open without a window of their own don't hop.
+NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
 SHELL_APP_IDS = {"freemac-pier", "freemac-topline"}
-DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
+DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-jot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]
 
@@ -301,6 +306,8 @@ class Item(Gtk.Button):
     def set_views(self, views):
         self.views = views
         self.dot.set_opacity(1.0 if views else 0.0)
+        if views:
+            self.stop_bounce()
 
     def _clicked(self, _button):
         if self.views:
@@ -310,6 +317,39 @@ class Item(Gtk.Button):
             self.pier.wf.focus(latest["id"])
         elif self.info:
             self.info.launch([], None)
+            self.bounce()
+
+    # ---- the launch bounce -------------------------------------------------
+    # While an app starts, its icon hops up and down until its first window
+    # shows (or for BOUNCE_LIMIT seconds), so a click always gets an answer.
+    bouncing = None
+
+    def bounce(self):
+        settings = Gtk.Settings.get_default()
+        if self.bouncing or self.desktop_id in NO_BOUNCE or (settings and not settings.props.gtk_enable_animations):
+            return
+        self.dot.set_opacity(1.0)
+        self.bouncing = (GLib.get_monotonic_time(), GLib.timeout_add(16, self._bounce_step))
+
+    def _bounce_step(self):
+        started, _source = self.bouncing
+        elapsed = (GLib.get_monotonic_time() - started) / 1e6
+        if elapsed > BOUNCE_LIMIT:
+            self.bouncing = None
+            self.image.set_margin_bottom(0)
+            self.dot.set_opacity(1.0 if self.views else 0.0)
+            return False
+        phase = (elapsed % BOUNCE_PERIOD) / BOUNCE_PERIOD
+        # Up fast, ease at the top, down with a little weight: one sine arch per hop.
+        height = int(round(self.pier.base * BOUNCE_HEIGHT * math.sin(math.pi * phase)))
+        self.image.set_margin_bottom(height)
+        return True
+
+    def stop_bounce(self):
+        if self.bouncing:
+            GLib.source_remove(self.bouncing[1])
+            self.bouncing = None
+            self.image.set_margin_bottom(0)
 
 
 class Pier(Gtk.Window):
@@ -329,6 +369,10 @@ class Pier(Gtk.Window):
         outer = Gtk.EventBox()
         self.outer = outer
         outer.set_visible_window(False)
+        # The dock's background is painted here at a fixed height, beneath
+        # the icons, so magnified and bouncing icons rise out of it, as on a
+        # Mac, instead of stretching it.
+        outer.connect("draw", self._draw_backing)
         holder = Gtk.Box()
         holder.set_valign(Gtk.Align.END)
         holder.pack_start(self.shelf, True, False, 0)
@@ -367,6 +411,8 @@ class Pier(Gtk.Window):
         # Windows avoid the resting dock; magnified icons may overlap them.
         GtkLayerShell.set_exclusive_zone(self, self.base + 28)
         self.outer.set_size_request(-1, self.peak + 30)
+        # Icon, the running dot under it and the shelf's top and bottom padding.
+        self.rest_height = self.base + 22
         if self.config is None or config["pinned"] != self.config["pinned"]:
             for item in self.pinned:
                 self.shelf.remove(item)
@@ -392,6 +438,20 @@ class Pier(Gtk.Window):
         self.config = config
         for item in self.items():
             item.image.set_pixel_size(self.base)
+
+    def _draw_backing(self, widget, cr):
+        alloc = self.shelf.get_allocation()
+        origin = self.shelf.translate_coordinates(widget, 0, 0)
+        if not origin or alloc.width <= 1:
+            return False
+        x, bottom = origin[0], origin[1] + alloc.height
+        context = self.shelf.get_style_context()
+        context.save()
+        context.add_class("pier-shelf-bg")
+        Gtk.render_background(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
+        Gtk.render_frame(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
+        context.restore()
+        return False
 
     def _reload(self):
         self.load()
