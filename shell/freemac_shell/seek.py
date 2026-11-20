@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import seek_index, style  # noqa: E402
+from . import dials_pages, seek_index, style  # noqa: E402
 
 MAX_RESULTS = 8
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
@@ -95,6 +95,42 @@ def short(path):
 
 def open_path(path):
     Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
+
+
+TOPLINE = ("org.freemac.Topline", "/org/freemac/Topline", "org.freemac.Topline")
+
+
+def launch(*argv):
+    try:
+        GLib.spawn_async(list(argv), flags=GLib.SpawnFlags.SEARCH_PATH)
+    except GLib.Error:
+        pass
+
+
+def _topline(method, args, reply):
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        return bus.call_sync(*TOPLINE, method, args, GLib.VariantType.new(reply) if reply else None,
+                             Gio.DBusCallFlags.NO_AUTO_START, 300, None)
+    except GLib.Error:
+        return None
+
+
+def menu_items(query):
+    """(name, where, shortcut) of the front app's menu items that match, from
+    the menu bar, and the app's icon; nothing if the bar isn't there to ask."""
+    answer = _topline("SearchMenus", GLib.Variant("(s)", (query,)), "(a(sss)s)")
+    if answer is None:
+        return [], None
+    found, icon = answer.unpack()
+    try:
+        return found, Gio.Icon.new_for_string(icon)
+    except GLib.Error:
+        return found, None
+
+
+def run_menu_item(index):
+    _topline("RunMenuItem", GLib.Variant("(u)", (index,)), None)
 
 
 class Result:
@@ -177,9 +213,26 @@ class SeekWindow(Gtk.Window):
                                       lambda a=answer: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1)))
             scored = sorted(((score_app(a, query), a.get_name(), a) for a in self.apps
                              if score_app(a, query) is not None), key=lambda t: (t[0], t[1].lower()))
-            for _score, _name, info in scored[:MAX_RESULTS]:
-                results.append(Result(info.get_name(), "Application", info.get_icon(),
-                                      lambda i=info: i.launch([], None)))
+            apps = [Result(info.get_name(), "Application", info.get_icon(),
+                           lambda i=info: i.launch([], None)) for _score, _name, info in scored[:MAX_RESULTS]]
+            # Apps whose name matches come first; one found only by what it's
+            # for (Dials for "wallpaper") comes after the settings page itself.
+            named_apps = sum(1 for score, _name, _info in scored[:MAX_RESULTS] if score < 3)
+            results += apps[:named_apps]
+            # Settings by name or by what's on the page ("wallpaper", "night
+            # light"), opened in Dials at that page.
+            for name in dials_pages.matching(query)[:2]:
+                title, icon = dials_pages.PAGES[name]
+                results.append(Result(title, "Settings", Gio.ThemedIcon.new(icon),
+                                      lambda n=name: launch("freemac-dials", "--panel", n)))
+            # The app in front's own menu items, as its Help menu finds them.
+            if len(query) >= 2:
+                found, app_icon = menu_items(query)
+                for index, (name, where, keys) in enumerate(found[:2]):
+                    results.append(Result(name, f"Menu item: {where}" + (f"  {keys}" if keys else ""),
+                                          app_icon or Gio.ThemedIcon.new("application-x-executable"),
+                                          lambda i=index: run_menu_item(i)))
+            results += apps[named_apps:]
             if len(query) >= 2:
                 named = find_files(query, MAX_RESULTS - len(results))
                 for path in named:

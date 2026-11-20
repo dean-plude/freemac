@@ -120,24 +120,7 @@ def scene_version(path, dark):
         if name in (day, night) or not path:
             return os.path.join(WALLPAPERS, night if dark else day)
     return None
-# Other words people use for what's on each page, for the sidebar's search.
-SEARCH_WORDS = {
-    "network": "wifi wi-fi internet wireless ethernet vpn proxy",
-    "bluetooth": "pair headphones speaker mouse keyboard",
-    "notifications": "alerts banners do not disturb focus",
-    "sound": "volume speaker microphone output input audio alert chime",
-    "about": "version computer name storage memory system update",
-    "appearance": "dark light mode theme accent text size tiling",
-    "accessibility": "zoom contrast larger text reduce motion screen reader",
-    "dock": "menu bar magnification trash downloads title bar double-click hide minimize windows application icon",
-    "displays": "screen resolution brightness night light scale monitor",
-    "wallpaper": "background desktop picture",
-    "power": "battery sleep suspend energy shut down restart",
-    "users": "accounts password login automatic log in people",
-    "keyboard": "shortcuts command key layout input language typing",
-    "pointing": "trackpad mouse click scroll tap pointer speed",
-    "printers": "print scanner",
-}
+from .dials_pages import SEARCH_WORDS  # noqa: E402  (also used by Seek)
 
 CSS = b"""
 .dials-search { margin: 10px 10px 4px 10px; }
