@@ -470,6 +470,45 @@ class strata_command_key
         return true;
     }
 
+    /* An app that stays open with no window keeps the front when its last
+     * window closes, as on a Mac: no other app's window takes the keyboard.
+     * Wayfire hands focus to the next window as the last one goes; Strata
+     * takes it back straight after, and the app stays in the menu bar. */
+    wf::wl_idle_call keep_front_idle;
+    wf::signal::connection_t<wf::view_unmapped_signal> on_unmapped = [=] (wf::view_unmapped_signal *ev)
+    {
+        auto view = wf::toplevel_cast(ev->view);
+        if (!view || view->parent || (wf::get_core().seat->get_active_view() != ev->view))
+        {
+            return;
+        }
+
+        std::string app_id = view->get_app_id();
+        if (whole_app_bus_name(app_id).empty())
+        {
+            return;
+        }
+
+        for (auto& other : wf::get_core().get_all_views())
+        {
+            auto toplevel = wf::toplevel_cast(other);
+            if (toplevel && (toplevel != view) && toplevel->is_mapped() &&
+                (toplevel->get_app_id() == app_id) && !toplevel->minimized)
+            {
+                return; // the app has another window to go to
+            }
+        }
+
+        front_windowless = app_id;
+        keep_front_idle.run_once([=] ()
+        {
+            if (front_windowless == app_id)
+            {
+                wf::get_core().seat->focus_view(nullptr);
+            }
+        });
+    };
+
     wf::activator_callback on_next = [=] (const wf::activator_data_t&) { return step_window(1); };
     wf::activator_callback on_prev = [=] (const wf::activator_data_t&) { return step_window(-1); };
 
@@ -490,6 +529,7 @@ class strata_command_key
         wf::get_core().connect(&on_device_removed);
         wf::get_core().connect(&on_focus);
         wf::get_core().connect(&on_key);
+        wf::get_core().connect(&on_unmapped);
         auto& bindings = wf::get_core().bindings;
         bindings->add_activator(quit_app, &on_quit);
         bindings->add_activator(hide_app, &on_hide);

@@ -246,14 +246,26 @@ The small things a Mac user notices in their first minute.
 | 5 | ⌘Q, the menu bar and the Dock quit such an app as a whole; Quill asks about unsaved changes first | Strata, Topline, Pier, Quill | done |
 | 6 | The menu bar keeps the front app while ⌘Tab or Seek is up, or while its windows are minimized, instead of showing Drawer | Topline | done |
 
-## 1.14 "the menu bar, finished" (next)
+## 1.14 "the menu bar, finished" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | The menu bar names apps by their short names (Welcome, not "Welcome to freemac") | Topline, apps | |
-| 2 | A dialog (Save, an alert) keeps its app's full menus in the bar | Topline | |
-| 3 | The Dock dot shows for apps open at login straight away, not only after a window event | Pier | |
-| 4 | Menu items that need a window are greyed out while the app has none | Topline | |
+| 1 | The menu bar, the Dock and ⌘Tab name apps by their short names (Welcome, not "Welcome to freemac"; Firefox, not "Firefox Web Browser") | apps, Topline, Pier | done |
+| 2 | A dialog (Save, an alert) keeps its app's full menus in the bar | Topline | done |
+| 3 | The Dock dot shows for apps open at login straight away, not only after a window event | Pier | done |
+| 4 | Menu items that need a window are greyed out while the app has none | Topline | done |
+| 5 | Closing an app's last window keeps that app in front, rather than another app's window taking over | Strata, Topline | done |
+| 6 | Hints and labels show Mac shortcuts (⌘N), not "Ctrl+N" | Jot | done |
+| 7 | Save dialogs and unsaved-changes alerts come down from their window's title bar as sheets and move with the window | Strata | done |
+
+## 1.15 "the keyboard, finished" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An app's own shortcuts work while it is in front with no window (⌘N in Jot opens a note) | Strata, Topline | |
+| 2 | The Save sheet starts small (name and where) and opens out to the full file browser | Quill, Jot | |
+| 3 | Full keyboard access: Tab moves through buttons in dialogs and sheets, Space presses the focused one | Strata, apps | |
+| 4 | ⌘. and Escape cancel a sheet, Return picks its default button | Strata, apps | |
 
 ## Later
 
