@@ -211,6 +211,9 @@ menu, .menu, .context-menu, popover, popover.background {
   box-shadow: 0 10px 28px alpha(black, 0.22);
   color: @fm_fg;
 }
+/* A GTK 3 popover or tooltip is drawn inside its window on Wayland, so a shadow round it
+   shows as a grey box over the window instead of a soft edge. */
+popover, popover.background, tooltip, tooltip.background { box-shadow: none; }
 menu menuitem, .menu menuitem, popover modelbutton {
   min-height: 20px; padding: 3px 10px; border-radius: 5px; color: @fm_fg; text-shadow: none;
 }
@@ -233,7 +236,6 @@ tooltip, tooltip.background {
   border-radius: 6px; padding: 4px 8px;
   background-color: @fm_popover; color: @fm_fg;
   border: 1px solid @fm_edge;
-  box-shadow: 0 3px 10px alpha(black, 0.18);
 }
 tooltip label { color: @fm_fg; }
 

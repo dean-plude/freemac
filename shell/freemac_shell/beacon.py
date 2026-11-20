@@ -28,12 +28,13 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, minimonth, style  # noqa: E402
+from . import calendar_store, minimonth, reminders_store, style  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
 OWN_IFACE = "org.freemac.Beacon"
 SNOOZE, SNOOZE_MINUTES = "x-freemac-snooze", 5
+DONE = "x-freemac-done"   # Nudge: mark the reminder completed
 HISTORY = os.path.join(GLib.get_user_state_dir(), "freemac", "notifications.json")
 KEEP = 50
 MAX_BANNERS = 3
@@ -260,6 +261,7 @@ class Beacon:
         self.history = self._load()
         self.events = []
         self.alert_events, self.alert_stamp = [], None
+        self.reminder_lists, self.reminder_stamp = [], None
         self.alerts_until = dt.datetime.now() - dt.timedelta(minutes=1)
         GLib.timeout_add_seconds(15, self._check_alerts)
         self.connection = None
@@ -422,11 +424,16 @@ class Beacon:
 
     def invoke(self, note, key):
         if key == SNOOZE:
-            # Tide's alerts: show it again in a few minutes.
+            # Tide's alerts and Nudge's reminders: show it again in a few minutes.
             self.close(note.id, DISMISSED)
+            actions = [part for pair in note.actions for part in pair]
             GLib.timeout_add_seconds(SNOOZE_MINUTES * 60, lambda: self.notify(
-                note.app, 0, note.icon, note.summary, note.body, [SNOOZE, "Snooze"],
+                note.app, 0, note.icon, note.summary, note.body, actions,
                 {"x-freemac-uri": note.open_uri}, 0) and False)
+            return
+        if key == DONE and note.open_uri.startswith("nudge-reminder:"):
+            self._complete_reminder(urllib.parse.unquote(note.open_uri.split(":", 1)[1]))
+            self.close(note.id, DISMISSED)
             return
         self._emit("ActionInvoked", "(us)", (note.id, key))
         self.close(note.id, DISMISSED)
@@ -436,9 +443,10 @@ class Beacon:
         if any(key == "default" for key, _label in note.actions):
             self.invoke(note, "default")
             return
-        if note.open_uri.startswith("tide-event:"):
+        if note.open_uri.startswith(("tide-event:", "nudge-reminder:")):
+            program = "freemac-tide" if note.open_uri.startswith("tide-event:") else "freemac-nudge"
             try:
-                GLib.spawn_async(["freemac-tide", note.open_uri], flags=GLib.SpawnFlags.SEARCH_PATH)
+                GLib.spawn_async([program, note.open_uri], flags=GLib.SpawnFlags.SEARCH_PATH)
             except GLib.Error:
                 pass
         elif note.open_path and os.path.exists(note.open_path):
@@ -576,7 +584,41 @@ class Beacon:
                         [SNOOZE, "Snooze"],
                         {"x-freemac-uri": "tide-event:" + urllib.parse.quote(occ.event.uid, safe="")
                          + "@@" + occ.start.date().isoformat()}, 0)
+        self._check_reminders(since, now)
         return True
+
+    # --- Nudge's reminders ------------------------------------------------
+    def _reminder_files(self):
+        folder = reminders_store.store_dir()
+        try:
+            return tuple(sorted((n, os.stat(os.path.join(folder, n)).st_mtime)
+                                for n in os.listdir(folder) if n.endswith(".ics")))
+        except OSError:
+            return ()
+
+    def _check_reminders(self, since, now):
+        stamp = self._reminder_files()
+        if stamp != self.reminder_stamp:
+            self.reminder_stamp = stamp
+            self.reminder_lists = reminders_store.load() if stamp else []
+        for reminder in reminders_store.due_nudges(self.reminder_lists, since, now):
+            owner = next((l for l in self.reminder_lists if l.id == reminder.list_id), None)
+            body = owner.name if owner else ""
+            if reminder.notes:
+                body = f"{body}\n{reminder.notes.splitlines()[0]}" if body else reminder.notes.splitlines()[0]
+            self.notify("Nudge", 0, "freemac-nudge", reminder.title or "New Reminder", body,
+                        [DONE, "Mark as Completed", SNOOZE, "Snooze"],
+                        {"x-freemac-uri": "nudge-reminder:" + urllib.parse.quote(reminder.uid, safe="")}, 0)
+
+    @staticmethod
+    def _complete_reminder(uid):
+        for rlist in reminders_store.load():
+            for reminder in rlist.reminders:
+                if reminder.uid == uid and not reminder.done:
+                    reminder.done = True
+                    reminder.completed = dt.datetime.now().replace(microsecond=0)
+                    reminders_store.save(rlist)
+                    return
 
     @staticmethod
     def _alert_body(occ, now):

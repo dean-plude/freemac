@@ -12,6 +12,7 @@ import os
 import re
 import threading
 import time
+import sys
 import urllib.parse
 
 import gi
@@ -20,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, contacts_store, dials_pages, guide_topics, seek_index, style  # noqa: E402
+from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, style  # noqa: E402
 
 MAX_RESULTS = 8
 PREVIEW = 280      # width of the preview beside the results
@@ -245,19 +246,29 @@ class SeekWindow(Gtk.Window):
         self.connect("key-press-event", self._key)
         self.results = []
         self.query = ""
-        self.apps = [a for a in Gio.AppInfo.get_all() if a.should_show()]
-        # Bring the index of words in files up to date while the person types.
-        self.stop = threading.Event()
-        threading.Thread(target=self._index, daemon=True).start()
-        self.connect("destroy", lambda *_: self.stop.set())
+        self.apps = []
+        self.connect("delete-event", lambda *_: (self.close(), True)[1])
 
-    def _index(self):
-        try:
-            changed = seek_index.update(stop=self.stop)
-        except Exception:   # a broken index must never break the launcher
-            return
-        if changed and not self.stop.is_set():
-            GLib.idle_add(lambda: self.query and self._changed(self.entry) and False)
+    def opened(self):
+        """Seek is built once and shown on each ⌘Space, so it's there at once."""
+        app = self.get_application()
+        self.apps = app.apps()
+        # The index of words in files is brought up to date while Seek is
+        # closed (see Seek), so typing here never waits on it.
+        app.stop_indexing()
+        self.show_all()
+        self.preview.hide()
+        self.entry.grab_focus()
+
+    def close(self):
+        """Hide, ready for next time, with the search field empty."""
+        self.hide()
+        self.entry.set_text("")
+        self.query = ""
+        self.results = []
+        for row in self.listbox.get_children():
+            row.destroy()
+        self.get_application().index_soon()
 
     def _pressed(self, _w, event):
         inside = self.box.get_allocation()
@@ -331,6 +342,7 @@ class SeekWindow(Gtk.Window):
             if len(query) >= 2:
                 results += self._people(query)[:2]
                 results += self._events(query)[:2]
+                results += self._reminders(query)[:2]
             results += apps[named_apps:]
             if len(query) >= 2:
                 named = find_files(query, MAX_RESULTS - len(results))
@@ -356,6 +368,21 @@ class SeekWindow(Gtk.Window):
                                     Gio.ThemedIcon.new("freemac-crew"),
                                     lambda p=person.path: launch("freemac-crew", p),
                                     about=f"Opens {person.name}'s card in Crew."))
+        return found
+
+    @staticmethod
+    def _reminders(query):
+        """Open reminders in Nudge with every word typed in their title or notes."""
+        found = []
+        for rlist in reminders_store.load():
+            for reminder in rlist.open_items():
+                if reminder.title.strip() and reminder.matches(query):
+                    due = reminders_store.due_text(reminder)
+                    found.append(Result(reminder.title, f"Reminder: {rlist.name}" + (f", {due}" if due else ""),
+                                        Gio.ThemedIcon.new("freemac-nudge"),
+                                        lambda u=reminder.uid: launch(
+                                            "freemac-nudge", "nudge-reminder:" + urllib.parse.quote(u, safe="")),
+                                        about="Shows this reminder in Nudge."))
         return found
 
     @staticmethod
@@ -448,20 +475,71 @@ class SeekWindow(Gtk.Window):
 
 
 class Seek(Gtk.Application):
-    def __init__(self):
+    """Stays running after its window closes, so ⌘Space opens it at once
+    (the freemac-seek command asks the running copy over the session bus)."""
+
+    INDEX_EVERY = 15 * 60   # seconds between updates of the files' index
+
+    def __init__(self, background=False):
         super().__init__(application_id="org.freemac.Seek")
+        self.background = background
+        self._apps = None
+        self.stop = threading.Event()
+        self.indexing = None
+        self.index_timer = 0
+        self.window = None
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        style.apply()
+        self.hold()
+        # Apps are listed once and again only when one is installed or removed.
+        self.app_monitor = Gio.AppInfoMonitor.get()
+        self.app_monitor.connect("changed", lambda *_: setattr(self, "_apps", None))
+        self.index_soon(20 if self.background else 2)
+
+    def apps(self):
+        if self._apps is None:
+            self._apps = [a for a in Gio.AppInfo.get_all() if a.should_show()]
+        return self._apps
+
+    def index_soon(self, seconds=2):
+        if self.index_timer:
+            GLib.source_remove(self.index_timer)
+        self.index_timer = GLib.timeout_add_seconds(seconds, self._start_index)
+
+    def _start_index(self):
+        self.index_timer = 0
+        if not (self.window and self.window.get_visible()) and (self.indexing is None or not self.indexing.is_alive()):
+            self.stop = threading.Event()
+            self.indexing = threading.Thread(target=self._index, args=(self.stop,), daemon=True)
+            self.indexing.start()
+        self.index_timer = GLib.timeout_add_seconds(self.INDEX_EVERY, self._start_index)
+        return False
+
+    @staticmethod
+    def _index(stop):
+        try:
+            seek_index.update(stop=stop)
+        except Exception:   # a broken index must never break the launcher
+            pass
+
+    def stop_indexing(self):
+        """Opening Seek pauses the index so the window answers at once; it
+        carries on where it left off once Seek closes."""
+        self.stop.set()
 
     def do_activate(self):
-        windows = self.get_windows()
-        if windows:  # Super+Space again closes it.
-            windows[0].close()
+        if self.window is None:
+            self.window = SeekWindow(self)
+        if self.background:   # started with the session: wait for ⌘Space
+            self.background = False
             return
-        style.apply()
-        win = SeekWindow(self)
-        win.show_all()
-        win.preview.hide()
-        win.entry.grab_focus()
+        if self.window.get_visible():  # Super+Space again closes it.
+            self.window.close()
+            return
+        self.window.opened()
 
 
 def main():
-    Seek().run(None)
+    Seek(background="--background" in sys.argv).run(None)
