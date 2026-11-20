@@ -129,7 +129,7 @@ SEARCH_WORDS = {
     "about": "version computer name storage memory system update",
     "appearance": "dark light mode theme accent text size tiling",
     "accessibility": "zoom contrast larger text reduce motion screen reader",
-    "dock": "menu bar magnification trash downloads title bar double-click hide",
+    "dock": "menu bar magnification trash downloads title bar double-click hide minimize windows application icon",
     "displays": "screen resolution brightness night light scale monitor",
     "wallpaper": "background desktop picture",
     "power": "battery sleep suspend energy shut down restart",
@@ -410,11 +410,20 @@ class DialsWindow(Gtk.ApplicationWindow):
         sidebar.set_header_func(gap)
         self.sidebar = sidebar
         sidebar.select_row(self.rows["appearance"])
+        # The stack can't show a page before the window is shown, so it
+        # opened on the first one; show the selected page once it can.
+        self.connect("map", lambda *_: GLib.idle_add(self._show_selected))
         actions = {"close": self.close}
         for name in self.rows:
             actions["show-" + name] = lambda n=name: self.show_panel(n)
         menus.add_actions(self, actions)
         self.connect("key-press-event", self._on_key)
+
+    def _show_selected(self):
+        row = self.sidebar.get_selected_row()
+        if row is not None:
+            self.stack.set_visible_child_name(row.name)
+        return False
 
     def _on_key(self, _widget, event):
         if event.state & Gdk.ModifierType.CONTROL_MASK and event.keyval in (Gdk.KEY_w, Gdk.KEY_W):
@@ -623,7 +632,10 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "A folder on the dock that shows your newest downloads."),
             row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
                 "Drop files on it to throw them away; right-click it to empty it."),
-        ), group(row("Double-click a window's title bar to", self.title_double_click())),
+        ), group(row("Double-click a window's title bar to", self.title_double_click()),
+                 row("Minimize windows into application icon",
+                     switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),
+                     "Off: a minimized window gets its own picture at the right end of the dock.")),
             group(row("Clock", clock)), self.hot_corners())
 
     # What a double-click on a title bar does: freemac's own title bars read

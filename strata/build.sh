@@ -35,7 +35,7 @@ wayland-scanner server-header "$WLPROTO/stable/xdg-shell/xdg-shell.xml" "$GEN/xd
 gcc -O2 -fPIC -c "$GEN/gtk-shell-protocol.c" -o "$GEN/gtk-shell-protocol.o" $(pkg-config --cflags wayland-server)
 # shellcheck disable=SC2086
 g++ $FLAGS $CFLAGS -I"$GEN" "$HERE/shell/strata-shell.cpp" "$GEN/gtk-shell-protocol.o" \
-  -o "$OUT/libstrata-shell.so"
+  -o "$OUT/libstrata-shell.so" $(pkg-config --libs cairo)
 echo "strata: built $OUT/libstrata-shell.so"
 
 # Latch: the gtklock module that lays the lock screen out like the login

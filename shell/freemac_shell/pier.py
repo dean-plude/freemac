@@ -9,6 +9,11 @@ on it, and can be emptied from its right-click menu.
 Apps can be dragged along the Dock to move them, dragged up and out of it to
 take them off, and a running app dragged in among the pinned ones stays.
 A file dropped on an app opens in that app.
+
+A minimized window shrinks into its own small picture of itself, just left
+of the Trash, with its app's icon in the corner; clicking the picture brings
+the window back. (Dials can have windows go into their app's icon instead.)
+Hidden apps (Hide) get no picture.
 """
 import json
 import math
@@ -21,10 +26,10 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import alert, apps, login_items, style  # noqa: E402
-from .wfipc import Wayfire, is_minimized  # noqa: E402
+from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
 PEAK = 80          # icon size right under the pointer
@@ -63,7 +68,7 @@ def load_config():
     """Pier settings, written by Dials: pinned apps, icon size, magnification,
     folder stacks and whether the Trash is shown."""
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
-              "stacks": default_stacks(), "trash": True}
+              "stacks": default_stacks(), "trash": True, "minimize_into_app": False}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -383,7 +388,15 @@ class Item(Gtk.Button):
         if self.menu and self.menu.get_visible():
             return
         if self.views:
-            latest = max(self.views, key=lambda v: v.get("last-focus-timestamp", 0))
+            hidden = self.pier.wf.hidden() if self.pier.wf else set()
+            shown = [v for v in self.views if not is_minimized(v)]
+            if not shown and any(v["id"] in hidden for v in self.views):
+                # A hidden app comes back whole; minimized windows stay put.
+                back = [v for v in self.views if v["id"] in hidden]
+                for view in sorted(back, key=lambda v: v.get("last-focus-timestamp", 0)):
+                    self.show_window(view)
+                return
+            latest = max(shown or self.views, key=lambda v: v.get("last-focus-timestamp", 0))
             self.show_window(latest)
         elif self.info:
             self.info.launch([], None)
@@ -540,7 +553,7 @@ class Item(Gtk.Button):
         self.menu.append(options)
         if views:
             self.menu.append(Gtk.SeparatorMenuItem())
-            add("Hide", lambda: [self.pier.wf.set_minimized(v["id"], True) for v in self.views])
+            add("Hide", lambda: [self.pier.wf.hide(v["id"]) for v in self.views if not is_minimized(v)])
             add("Quit", lambda: self.pier.wf.quit(self.views[0].get("app-id") or ""))
         elif self.info:
             add("Open", lambda: self._clicked(None))
@@ -581,6 +594,102 @@ class Item(Gtk.Button):
             GLib.source_remove(self.bouncing[1])
             self.bouncing = None
             self.image.set_margin_bottom(0)
+
+
+class WindowPicture(Gtk.DrawingArea):
+    """A minimized window's picture, fitted into a square the size of an
+    icon, with its app's icon over the lower right corner. It answers to
+    set_pixel_size like the icons, so it grows with them under the pointer."""
+
+    def __init__(self, picture, icon, size):
+        super().__init__()
+        self.picture, self.icon, self.size = picture, icon, size
+        self.set_size_request(size, size)
+        self.connect("draw", self._draw)
+
+    def set_pixel_size(self, size):
+        if size != self.size:
+            self.size = size
+            self.set_size_request(size, size)
+            self.queue_draw()
+
+    def _draw(self, widget, cr):
+        size = self.size
+        alloc = widget.get_allocation()
+        left = (alloc.width - size) / 2
+        top = alloc.height - size
+        if self.picture is not None:
+            width, height = self.picture.get_width(), self.picture.get_height()
+            fit = min(size / width, size / height) * 0.94
+            shown = self.picture.scale_simple(max(1, int(width * fit)), max(1, int(height * fit)),
+                                              GdkPixbuf.InterpType.BILINEAR)
+            x = left + (size - shown.get_width()) / 2
+            y = top + (size - shown.get_height()) / 2
+            # The picture carries the window's own shadow, so none is added.
+            Gdk.cairo_set_source_pixbuf(cr, shown, x, y)
+            cr.paint()
+        if self.icon is not None:
+            badge = max(12, int(size * 0.42))
+            theme = Gtk.IconTheme.get_default()
+            info = theme.lookup_by_gicon_for_scale(self.icon, badge, widget.get_scale_factor(),
+                                                   Gtk.IconLookupFlags.FORCE_SIZE)
+            if info is not None:
+                try:
+                    pixbuf = info.load_icon()
+                except GLib.Error:
+                    pixbuf = None
+                if pixbuf is not None:
+                    cr.save()
+                    cr.translate(left + size - badge, top + size - badge)
+                    scale = badge / max(pixbuf.get_width(), 1)
+                    cr.scale(scale, scale)
+                    Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0)
+                    cr.paint()
+                    cr.restore()
+        return False
+
+
+class MinimizedWindow(Gtk.Button):
+    """A minimized window in the Dock: click to bring it back."""
+
+    def __init__(self, pier, view, picture_path):
+        super().__init__()
+        self.pier = pier
+        self.view = view
+        self.path = picture_path
+        self.get_style_context().add_class("pier-item")
+        self.get_style_context().add_class("pier-window")
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        picture = None
+        if picture_path:
+            try:
+                picture = GdkPixbuf.Pixbuf.new_from_file(picture_path)
+            except GLib.Error:
+                picture = None
+        icon = apps.icon_for(view.get("app-id"))
+        self.image = WindowPicture(picture, icon, pier.base)
+        spacer = Gtk.Label(label="●")   # level with the app icons
+        spacer.get_style_context().add_class("pier-dot")
+        spacer.set_opacity(0.0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_valign(Gtk.Align.END)
+        box.pack_start(self.image, False, False, 0)
+        box.pack_start(spacer, False, False, 0)
+        self.add(box)
+        self.set_tooltip_text(view.get("title") or apps.display_name(view.get("app-id")))
+        self.connect("clicked", self._clicked)
+
+    def _clicked(self, _button):
+        if self.pier.wf:
+            self.pier.wf.set_minimized(self.view["id"], False)
+            self.pier.wf.focus(self.view["id"])
+
+    def forget(self):
+        if self.path:
+            try:
+                os.remove(self.path)
+            except OSError:
+                pass
 
 
 class Pier(Gtk.Window):
@@ -640,6 +749,9 @@ class Pier(Gtk.Window):
         self.places_sep.get_style_context().add_class("pier-sep")
         self.shelf.pack_end(self.places_sep, False, False, 0)
         self.places = []
+        # Minimized windows sit between the folders and the Trash.
+        self.min_box = Gtk.Box(spacing=0)
+        self.windows = {}
         self.config = None
         self.load()
         self.monitor = Gio.File.new_for_path(CONFIG).monitor_file(Gio.FileMonitorFlags.NONE, None)
@@ -676,16 +788,24 @@ class Pier(Gtk.Window):
         if self.config is None or (config["stacks"], config["trash"]) != (self.config["stacks"], self.config["trash"]):
             for place in self.places:
                 self.shelf.remove(place)
+            if self.min_box.get_parent() is not None:
+                self.shelf.remove(self.min_box)
             self.places = [Stack(self, folder) for folder in config["stacks"]]
             if config["trash"]:
                 self.places.append(TrashCan(self))
-            # pack_end fills from the right, so add them in reverse.
+            # pack_end fills from the right, so add them in reverse; the
+            # minimized windows go just left of the Trash.
+            if not config["trash"]:
+                self.shelf.pack_end(self.min_box, False, False, 0)
             for place in reversed(self.places):
                 self.shelf.pack_end(place, False, False, 0)
                 place.show_all()
+                if isinstance(place, TrashCan):
+                    self.shelf.pack_end(self.min_box, False, False, 0)
+            self.min_box.show()
             self.shelf.reorder_child(self.places_sep, -1)
         self.config = config
-        for item in self.items():
+        for item in self.items() + list(self.windows.values()):
             item.image.set_pixel_size(self.base)
 
     def _draw_backing(self, widget, cr):
@@ -732,11 +852,43 @@ class Pier(Gtk.Window):
                 self.shelf.pack_start(item, False, False, 0)
                 item.show_all()
             self.extra[app_id].set_views(its_views)
+        self._refresh_windows(views)
         self.running_sep.set_visible(bool(self.extra))
-        self.places_sep.set_visible(bool(self.places))
+        self.places_sep.set_visible(bool(self.places) or bool(self.windows))
         if not self._hint_pending:
             self._hint_pending = GLib.timeout_add(200, self._send_hints)
         return False
+
+    def _refresh_windows(self, views):
+        """A picture in the Dock for each window minimized into it; hidden
+        apps' windows get none."""
+        hidden = self.wf.hidden() if self.wf else set()
+        wanted = [v for v in views if is_minimized(v) and v["id"] not in hidden
+                  and (v.get("app-id") or "").lower() not in SHELL_APP_IDS]
+        if self.config and self.config.get("minimize_into_app"):
+            wanted = []
+        wanted_ids = {v["id"] for v in wanted}
+        for view_id in list(self.windows):
+            if view_id not in wanted_ids:
+                tile = self.windows.pop(view_id)
+                self.min_box.remove(tile)
+                tile.forget()
+        for view in wanted:
+            if view["id"] in self.windows:
+                continue
+            path = None
+            if self.wf:
+                try:
+                    path = os.path.join(snapshot_dir(), f"window-{view['id']}.png")
+                except OSError:
+                    path = None
+                if path and not self.wf.snapshot(view["id"], path, size=2 * self.peak):
+                    path = None
+            tile = MinimizedWindow(self, view, path)
+            self.windows[view["id"]] = tile
+            # Newest at the right, next to the Trash.
+            self.min_box.pack_start(tile, False, False, 0)
+            tile.show_all()
 
     def set_pinned(self, desktop_id, keep):
         """Keep in Dock: add the app to (or take it off) the pinned list in
@@ -959,9 +1111,38 @@ class Pier(Gtk.Window):
         except GLib.Error:
             Gtk.drag_finish(context, False, False, time)
 
+    def _icon_rect(self, item):
+        """Where an item's icon sits at rest, in Pier's own coordinates."""
+        alloc = item.image.get_allocation()
+        origin = item.image.translate_coordinates(self, 0, 0)
+        if not origin or alloc.width <= 1:
+            return None
+        size = self.base
+        return (origin[0] + (alloc.width - size) // 2, origin[1] + alloc.height - size, size, size)
+
+    def _next_window_slot(self):
+        """Where a window minimized now will get its picture: just left of
+        the Trash (the Dock widens by one picture, centred, so the new one
+        lands where the Trash's left edge is now)."""
+        trash = next((p for p in self.places if isinstance(p, TrashCan)), None)
+        anchor = trash or (self.places[-1] if self.places else None)
+        size = self.base
+        if anchor is not None:
+            rect = self._icon_rect(anchor)
+            if rect is not None:
+                if trash is None:
+                    return (rect[0] + rect[2], rect[1], size, size)
+                return (rect[0] - size // 2, rect[1], size, size)
+        alloc = self.shelf.get_allocation()
+        origin = self.shelf.translate_coordinates(self, 0, 0)
+        if not origin:
+            return None
+        return (origin[0] + alloc.width - size, origin[1] + alloc.height - size - 16, size, size)
+
     def _send_hints(self):
-        """Tell Strata where each window's icon sits, so minimizing a window
-        shrinks it into its icon here and restoring grows it back out."""
+        """Tell Strata where each window shrinks to when minimized: its own
+        picture's place at the right end of the Dock (or its app's icon, if
+        Dials says so), so it shrinks into it and grows back out of it."""
         self._hint_pending = 0
         if not self.wf:
             return False
@@ -969,17 +1150,24 @@ class Pier(Gtk.Window):
             self.own_id = self.wf.own_view("freemac-pier")
             if self.own_id is None:
                 return False
+        into_app = bool(self.config and self.config.get("minimize_into_app"))
+        hidden = self.wf.hidden()
+        slot = None if into_app else self._next_window_slot()
         sent = {}
         for item in self.pinned + list(self.extra.values()):
-            alloc = item.image.get_allocation()
-            origin = item.image.translate_coordinates(self, 0, 0)
-            if not origin or alloc.width <= 1:
-                continue
-            size = self.base
-            x = origin[0] + (alloc.width - size) // 2
-            y = origin[1] + alloc.height - size
+            icon = self._icon_rect(item)
             for view in item.views:
-                rect = (x, y, size, size)
+                tile = self.windows.get(view["id"])
+                if view["id"] in hidden:
+                    rect = (0, 0, 0, 0)   # hidden apps just go, without shrinking
+                elif tile is not None:
+                    rect = self._icon_rect(tile)
+                elif into_app or is_minimized(view):
+                    rect = icon
+                else:
+                    rect = slot or icon
+                if rect is None:
+                    continue
                 sent[view["id"]] = rect
                 if self.hints.get(view["id"]) != rect:
                     if not self.wf.minimize_hint(view["id"], *rect, relative_to=self.own_id):
@@ -994,7 +1182,7 @@ class Pier(Gtk.Window):
 
     def _magnify(self, pointer_x, widget=None):
         """Grow icons near the pointer along a cosine curve."""
-        for item in self.items():
+        for item in self.items() + list(self.windows.values()):
             size = self.base
             if pointer_x is not None and widget is not None:
                 alloc = item.get_allocation()

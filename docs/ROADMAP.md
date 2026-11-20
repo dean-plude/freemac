@@ -226,14 +226,23 @@ The small things a Mac user notices in their first minute.
 | 3 | A thin line, not a thick bar, between a sidebar and its page (the theme's divider no longer paints its grab area) | theme | done |
 | 4 | Alerts from the Dock (Empty Trash) show Drawer as the app in the menu bar; Dials' alerts show Dials' own icon | Topline, Dials | done |
 
-## 1.12 "windows that behave like a Mac's" (next)
+## 1.12 "windows that behave like a Mac's" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Minimizing (⌘M or the yellow button) shrinks the window down into its place in the Dock, and it grows back out from there | Strata, Pier | |
-| 2 | A minimized window shows as its own small picture at the right end of the Dock, and clicking it brings the window back | Pier | |
-| 3 | Closing an app's last window leaves the app in the menu bar (and its Dock dot), as on a Mac, for apps that keep running | Topline, Pier | |
-| 4 | ⌥-click on the green button (or Window > Fill) fills the screen without going full screen | Strata, Topline | |
+| 1 | Minimizing (⌘M or the yellow button) shrinks the window down into its place in the Dock, and it grows back out from there | Strata, Pier | done |
+| 2 | A minimized window shows as its own small picture at the right end of the Dock, beside the Trash, with its app's icon on it; clicking it brings the window back. Hidden apps' windows get none. Dials > Dock can put minimized windows into their app's icon instead | Strata, Pier, Dials | done |
+| 3 | Closing an app's last window leaves the app in the menu bar (and its Dock dot), as on a Mac, for apps that keep running | Topline, Pier | moved to 1.13 |
+| 4 | Window > Fill fills the screen without going full screen, and Window > Center puts the window in the middle | Strata, Topline | done |
+
+## 1.13 "apps that stay open" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Closing an app's last window leaves the app in the menu bar (and its Dock dot), as on a Mac, for freemac's own apps that keep running (Drawer, Quill, Jot, Tally) | Topline, Pier, apps | |
+| 2 | Clicking a running app in the Dock that has no windows opens a new one | Pier | |
+| 3 | ⌘` moves between the front app's windows | Strata | |
+| 4 | The window picker shown by ⌘Tab-and-hold, or a Dock right-click, lists each window by title | Pier | |
 
 ## Later
 

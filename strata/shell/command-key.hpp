@@ -21,6 +21,7 @@
  * Original freemac code.
  */
 #pragma once
+#include "hidden-windows.hpp"
 
 #include <algorithm>
 #include <map>
@@ -357,7 +358,7 @@ class strata_command_key
         {
             if (!window->parent && !window->minimized)
             {
-                wf::get_core().default_wm->minimize_request(window, true);
+                strata_hidden::hide(window);
             }
         }
 
@@ -376,7 +377,7 @@ class strata_command_key
         {
             if (!window->parent && !window->minimized && !window->get_app_id().empty())
             {
-                wf::get_core().default_wm->minimize_request(window, true);
+                strata_hidden::hide(window);
             }
         }
 

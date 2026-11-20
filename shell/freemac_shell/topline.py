@@ -472,16 +472,19 @@ class Topline(Gtk.Window):
 
     def _hide_app(self, view):
         for other in self._views_of(view.get("app-id") or ""):
-            self.wf.set_minimized(other["id"], True)
+            if not is_minimized(other):
+                self.wf.hide(other["id"])
 
     def _hide_others(self, view):
         for other in self._views_of(view.get("app-id") or "", same=False):
             if not is_minimized(other):
-                self.wf.set_minimized(other["id"], True)
+                self.wf.hide(other["id"])
 
     def _show_all(self):
+        """Bring hidden apps back; minimized windows stay in the Dock."""
+        hidden = self.wf.hidden() if self.wf else set()
         for other in (self.wf.views() if self.wf else []):
-            if is_minimized(other):
+            if is_minimized(other) and other["id"] in hidden:
                 self.wf.set_minimized(other["id"], False)
 
     def _app_about(self, view):
@@ -592,6 +595,11 @@ class Topline(Gtk.Window):
                    shortcut="\u2318M")
         self._item(menu, "Zoom", (lambda: self._zoom(vid)) if view else None)
         menu.append(Gtk.SeparatorMenuItem())
+        # Fill: the whole screen but the menu bar and the Dock, without going
+        # full screen. Center: the same size, in the middle.
+        self._item(menu, "Fill", (lambda: self._fill(view)) if view else None)
+        self._item(menu, "Center", (lambda: self._center(view)) if view else None)
+        menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Bring All to Front", (lambda: self._bring_all(view)) if view else None)
         if view and self.wf:
             windows = self._views_of(view.get("app-id") or "")
@@ -617,10 +625,60 @@ class Topline(Gtk.Window):
             return False
         GLib.timeout_add(250, zoom)
 
+    @staticmethod
+    def _tiled(view):
+        return int((view.get("state") or {}).get("tiled") or 0)
+
+    def _fresh(self, view):
+        """The window as it is now; the menu may have been built earlier."""
+        return next((v for v in self.wf.views() if v["id"] == view["id"]), view)
+
+    def _fill(self, view):
+        tiled = self._tiled(self._fresh(view))
+        if tiled == 15:     # already fills the screen
+            return
+        def fill():
+            self.wf.focus(view["id"])
+            if tiled:
+                self.wf.zoom(view["id"])   # first back to its own size
+            self.wf.zoom(view["id"])
+            return False
+        GLib.timeout_add(250, fill)
+
+    def _center(self, view):
+        now = self._fresh(view)
+        outputs = self.wf.outputs()
+        area = next((o.get("workarea") for o in outputs
+                     if o.get("id") == now.get("output-id") or o.get("name") == now.get("output")), None)
+        if not area and outputs:
+            area = outputs[0].get("workarea")
+        if not area:
+            return
+        def center():
+            self.wf.focus(view["id"])
+            if self._tiled(self._fresh(view)):
+                self.wf.zoom(view["id"])   # back to its own size first
+                GLib.timeout_add(250, center_now)
+            else:
+                center_now()
+            return False
+        def center_now():
+            box = self._fresh(view).get("geometry") or {}
+            width = min(box.get("width", 800), area["width"])
+            height = min(box.get("height", 600), area["height"])
+            self.wf.move_to(view["id"], area["x"] + (area["width"] - width) // 2,
+                            area["y"] + (area["height"] - height) // 2, width, height)
+            return False
+        GLib.timeout_add(250, center)
+
     def _bring_all(self, view):
-        others = [v for v in self._views_of(view.get("app-id") or "") if v["id"] != view["id"]]
+        # Minimized windows stay in the Dock, as on a Mac; hidden ones come back.
+        hidden = self.wf.hidden() if self.wf else set()
+        others = [v for v in self._views_of(view.get("app-id") or "") if v["id"] != view["id"]
+                  and (not is_minimized(v) or v["id"] in hidden)]
         for other in others:
-            self.wf.set_minimized(other["id"], False)
+            if is_minimized(other):
+                self.wf.set_minimized(other["id"], False)
             self.wf.focus(other["id"])
         self.wf.focus(view["id"])
 
