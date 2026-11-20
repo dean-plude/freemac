@@ -8,7 +8,9 @@ menu bar and the dock. The picture fills the screen at any shape by default
 
 Keys: image = path, fit = fill | fit | stretch.
 
-The first screen also shows the Desktop folder's files (desktop_icons.py).
+The first screen also shows the Desktop folder's files and the plugged-in
+drives (desktop_icons.py). Backdrop runs for the whole session, so it is
+also what mounts a USB drive, memory card or phone as it is plugged in.
 """
 import os
 
@@ -112,6 +114,9 @@ class Backdrop:
             Gio.FileMonitorFlags.WATCH_MOVES, None)
         self.monitor.connect("changed", self._changed)
         self._pending = None
+        from . import volumes
+        volumes.monitor().connect("volume-added", lambda _m, volume: volumes.mount_volume(volume))
+        volumes.mount_new()
 
     def _changed(self, _monitor, file, other, _event):
         names = {f.get_basename() for f in (file, other) if f}
