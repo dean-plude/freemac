@@ -75,6 +75,13 @@ gir1.2-appstream-1.0
 appstream
 apt-config-icons
 mate-polkit
+# Phones, cameras, memory cards and USB drives: udisks2 mounts drives and
+# cards, GVfs reaches phones (MTP, and iPhones through usbmuxd) and cameras
+# (PTP), for Cove's import and for Drawer.
+udisks2
+gvfs
+gvfs-backends
+usbmuxd
 # Bluetooth (Dials' Bluetooth panel talks to BlueZ) and printing: CUPS finds
 # network printers by itself; system-config-printer adds the rest.
 bluez

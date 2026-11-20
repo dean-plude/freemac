@@ -103,6 +103,15 @@ TOPICS = {
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),
+    "photos": ("Bring in photos from a phone or camera", "photos pictures import camera phone iphone android sd card cove", [
+        "Connect the phone or camera with its cable, or put its memory card in. On a phone, allow access "
+        "to photos when it asks.",
+        "Open Cove. The phone or camera shows in the sidebar under Devices: click it.",
+        "Click Import All New Items. Photos already brought in are dimmed with a tick and aren't copied again.",
+        "To bring in only some, click one, then ⌘-click the others, and click Import Selected.",
+        "The photos go into your Pictures folder, in a folder for each day, and show in Cove under "
+        "Recently Added.",
+    ]),
 }
 
 

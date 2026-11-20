@@ -24,7 +24,8 @@ from gi.repository import Gio, GLib  # noqa: E402
 # step, so the Command-Q key quits these as a whole too.
 HELD_APPS = {"org.freemac.Quill": "freemac-quill", "org.freemac.Jot": "freemac-jot",
              "org.freemac.Tide": "freemac-tide", "org.freemac.Crew": "freemac-crew",
-             "org.freemac.Nudge": "freemac-nudge", "org.freemac.Post": "freemac-post"}
+             "org.freemac.Nudge": "freemac-nudge", "org.freemac.Post": "freemac-post",
+             "org.freemac.Cove": "freemac-cove"}
 
 DBUS = "org.freedesktop.DBus"
 

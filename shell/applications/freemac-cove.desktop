@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cove
+GenericName=Photos
+Comment=See your photos by month and import them from a camera or phone
+Exec=freemac-cove
+Icon=freemac-cove
+Categories=Graphics;Photography;Viewer;
+Keywords=photos;pictures;images;camera;phone;import;gallery;album;
+StartupWMClass=org.freemac.Cove
+StartupNotify=true

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Cove: a fan of three snapshots, the front one a sunny cove. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9edf3"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb25c"/><stop offset="1" stop-color="#ffe2a8"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22a6b8"/><stop offset="1" stop-color="#0d6f96"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="pic"><rect x="38" y="40" width="52" height="42" rx="4"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="23.5" fill="none" stroke="#000" stroke-opacity="0.08"/>
+  <g filter="url(#sh)">
+    <g transform="rotate(-16 64 70)">
+      <rect x="32" y="34" width="64" height="66" rx="7" fill="#ffffff"/>
+      <rect x="38" y="40" width="52" height="42" rx="4" fill="#f5c542"/>
+    </g>
+    <g transform="rotate(12 64 70)">
+      <rect x="32" y="34" width="64" height="66" rx="7" fill="#ffffff"/>
+      <rect x="38" y="40" width="52" height="42" rx="4" fill="#ef6f5e"/>
+    </g>
+    <g>
+      <rect x="32" y="34" width="64" height="66" rx="7" fill="#ffffff"/>
+      <g clip-path="url(#pic)">
+        <rect x="38" y="40" width="52" height="42" fill="url(#sky)"/>
+        <circle cx="74" cy="56" r="7" fill="#fff6d8"/>
+        <path d="M38 66 C52 60 66 62 90 58 L90 82 L38 82 Z" fill="url(#sea)"/>
+        <path d="M38 76 C50 70 62 74 74 82 L38 82 Z" fill="#f2d7a6"/>
+        <path d="M60 68 C66 66 72 67 78 65" fill="none" stroke="#bfeaf0" stroke-width="1.6" stroke-linecap="round"/>
+      </g>
+    </g>
+  </g>
+</svg>
