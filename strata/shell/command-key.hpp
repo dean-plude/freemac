@@ -24,6 +24,7 @@
 #include "hidden-windows.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -49,6 +50,7 @@ class strata_command_key
     wf::option_wrapper_t<bool> enabled{"strata-shell/command_key"};
     wf::option_wrapper_t<std::string> terminals{"strata-shell/command_key_terminals"};
     wf::option_wrapper_t<wf::activatorbinding_t> quit_app{"strata-shell/quit_app"};
+    wf::option_wrapper_t<std::string> whole_apps{"strata-shell/quit_whole_apps"};
     wf::option_wrapper_t<wf::activatorbinding_t> hide_app{"strata-shell/hide_app"};
     wf::option_wrapper_t<wf::activatorbinding_t> hide_others{"strata-shell/hide_others"};
     wf::option_wrapper_t<wf::activatorbinding_t> next_window{"strata-shell/next_app_window"};
@@ -327,9 +329,56 @@ class strata_command_key
         return found;
     }
 
+    /* For an app that stays open with no window, the D-Bus name it owns, so
+     * Quit asks the app itself to quit rather than closing its windows; ""
+     * for other apps. The option lists app-id=bus.name pairs. */
+    std::string whole_app_bus_name(const std::string& app_id)
+    {
+        std::istringstream pairs{std::string(whole_apps)};
+        std::string pair;
+        while (pairs >> pair)
+        {
+            auto eq = pair.find('=');
+            if ((eq != std::string::npos) && (pair.substr(0, eq) == app_id))
+            {
+                return pair.substr(eq + 1);
+            }
+        }
+
+        return "";
+    }
+
+    /* Activate the app's own quit action over D-Bus (it asks about unsaved
+     * changes itself). The app ID becomes part of a command, so only plain
+     * D-Bus names are accepted. */
+    static bool ask_app_to_quit(const std::string& bus_name)
+    {
+        if (bus_name.empty() || (bus_name.size() > 200) ||
+            !std::all_of(bus_name.begin(), bus_name.end(), [] (char c)
+        {
+            return std::isalnum((unsigned char)c) || (c == '.') || (c == '_');
+        }))
+        {
+            return false;
+        }
+
+        std::string path = "/" + bus_name;
+        std::replace(path.begin(), path.end(), '.', '/');
+        wf::get_core().run("gdbus call --session --dest " + bus_name + " --object-path " + path +
+            " --method org.gtk.Actions.Activate quit '[]' '{}' >/dev/null 2>&1");
+        return true;
+    }
+
     wf::activator_callback on_quit = [=] (const wf::activator_data_t&)
     {
         auto view = focused_app_window();
+        std::string app_id = view ? view->get_app_id() : front_windowless;
+        if (ask_app_to_quit(whole_app_bus_name(app_id)))
+        {
+            front_windowless.clear();
+            return true;
+        }
+
         if (!view)
         {
             return false;
@@ -425,6 +474,9 @@ class strata_command_key
     wf::activator_callback on_prev = [=] (const wf::activator_data_t&) { return step_window(-1); };
 
   public:
+    /* The app in front with no window open (Topline says which), for ⌘Q. */
+    std::string front_windowless;
+
     void set_raw(const std::string& app_id, bool raw)
     {
         raw_app = raw ? app_id : "";

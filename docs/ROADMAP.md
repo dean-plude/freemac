@@ -235,14 +235,25 @@ The small things a Mac user notices in their first minute.
 | 3 | Closing an app's last window leaves the app in the menu bar (and its Dock dot), as on a Mac, for apps that keep running | Topline, Pier | moved to 1.13 |
 | 4 | Window > Fill fills the screen without going full screen, and Window > Center puts the window in the middle | Strata, Topline | done |
 
-## 1.13 "apps that stay open" (next)
+## 1.13 "apps that stay open" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Closing an app's last window leaves the app in the menu bar (and its Dock dot), as on a Mac, for freemac's own apps that keep running (Drawer, Quill, Jot, Tally) | Topline, Pier, apps | |
-| 2 | Clicking a running app in the Dock that has no windows opens a new one | Pier | |
-| 3 | ⌘` moves between the front app's windows | Strata | |
-| 4 | The window picker shown by ⌘Tab-and-hold, or a Dock right-click, lists each window by title | Pier | |
+| 1 | Closing an app's last window leaves the app in the menu bar, with its own menus, and keeps its Dock dot, as on a Mac. Quill and Jot keep running; Drawer and Tally don't (a Mac's Calculator quits with its window) | Topline, Pier, Quill, Jot | done |
+| 2 | Clicking a running app in the Dock that has no windows opens a new one; Jot's File > New Note works with no window open | Pier, Jot | done |
+| 3 | ⌘` moves between the front app's windows | Strata | done (from an earlier release) |
+| 4 | ⌘Tab lists apps that are open with no window, and picking one opens a window | Tack | done |
+| 5 | ⌘Q, the menu bar and the Dock quit such an app as a whole; Quill asks about unsaved changes first | Strata, Topline, Pier, Quill | done |
+| 6 | The menu bar keeps the front app while ⌘Tab or Seek is up, or while its windows are minimized, instead of showing Drawer | Topline | done |
+
+## 1.14 "the menu bar, finished" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The menu bar names apps by their short names (Welcome, not "Welcome to freemac") | Topline, apps | |
+| 2 | A dialog (Save, an alert) keeps its app's full menus in the bar | Topline | |
+| 3 | The Dock dot shows for apps open at login straight away, not only after a window event | Pier | |
+| 4 | Menu items that need a window are greyed out while the app has none | Topline | |
 
 ## Later
 

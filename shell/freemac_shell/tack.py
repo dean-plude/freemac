@@ -73,8 +73,9 @@ def send(word):
 
 
 # ---- the apps and their windows ---------------------------------------------------
-def open_apps(views):
-    """Apps with windows, the one used last first: [(app id, [views newest first])]."""
+def open_apps(views, windowless=()):
+    """Apps with windows, the one used last first, then apps still open with
+    no window (as on a Mac): [(app id, [views newest first])]."""
     apps = {}
     for view in views:
         app_id = view.get("app-id") or f"view-{view.get('id')}"
@@ -83,7 +84,9 @@ def open_apps(views):
         apps.setdefault(app_id, []).append(view)
     for its in apps.values():
         its.sort(key=lambda v: v.get("last-focus-timestamp", 0), reverse=True)
-    return sorted(apps.items(), key=lambda item: item[1][0].get("last-focus-timestamp", 0), reverse=True)
+    ordered = sorted(apps.items(), key=lambda item: item[1][0].get("last-focus-timestamp", 0), reverse=True)
+    with_windows = {app_id.lower() for app_id in apps}
+    return ordered + [(app_id, []) for app_id in sorted(windowless) if app_id.lower() not in with_windows]
 
 
 def minimized(view):
@@ -125,7 +128,7 @@ def run():
     from gi.repository import Gdk, GLib, Gtk, GtkLayerShell, Pango
 
     from . import apps as app_names
-    from . import style
+    from . import held as held_apps, style
     from .wfipc import Wayfire
 
     # Command reaches apps (Tack too) as Ctrl, so letting go of Command, Ctrl
@@ -151,6 +154,7 @@ def run():
             GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
             GtkLayerShell.set_exclusive_zone(self, -1)
             self.wayfire = Wayfire()
+            self.held = held_apps.Watcher()
             self.apps, self.tiles, self.chosen = [], [], 0
             self.showing = False
             self.reveal_timer = self.check_timer = 0
@@ -176,7 +180,7 @@ def run():
                 self.choose((self.chosen + by) % len(self.apps))
 
         def start(self, by):
-            self.apps = open_apps(self.wayfire.views())
+            self.apps = open_apps(self.wayfire.views(), self.held.running_ids())
             if not self.apps:
                 return
             for child in self.row.get_children():
@@ -212,7 +216,7 @@ def run():
                 (context.add_class if i == index else context.remove_class)("chosen")
             self.chosen = index
             app_id, views = self.apps[index]
-            self.name.set_text(app_names.display_name(app_id, views[0].get("title", "")))
+            self.name.set_text(app_names.display_name(app_id, views[0].get("title", "") if views else ""))
             return False
 
         def _reveal(self):
@@ -261,10 +265,15 @@ def run():
         def finish(self, index):
             if not self.showing:
                 return False
-            views = self.apps[index][1] if 0 <= index < len(self.apps) else []
+            app_id, views = self.apps[index] if 0 <= index < len(self.apps) else (None, [])
             self.stop()
             if views:
                 bring_forward(self.wayfire, views)
+            elif app_id:
+                # Open with no window: it opens a new one.
+                info = app_names.app_info(app_id)
+                if info:
+                    info.launch([], None)
             return True
 
         def stop(self):

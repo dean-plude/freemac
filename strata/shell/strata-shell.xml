@@ -22,8 +22,13 @@
 		</option>
 		<option name="quit_app" type="activator">
 			<_short>Quit the app</_short>
-			<_long>Close every window of the focused app.</_long>
+			<_long>Quit the focused app: close every window of it, or ask an app that stays open to quit.</_long>
 			<default>&lt;super&gt; KEY_Q</default>
+		</option>
+		<option name="quit_whole_apps" type="string">
+			<_short>Apps that stay open</_short>
+			<_long>Apps that keep running with no window, as app-id=bus.name pairs separated by spaces; Quit asks them to quit over D-Bus instead of closing their windows.</_long>
+			<default>freemac-quill=org.freemac.Quill freemac-jot=org.freemac.Jot</default>
 		</option>
 		<option name="hide_app" type="activator">
 			<_short>Hide the app</_short>

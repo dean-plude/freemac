@@ -28,7 +28,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import alert, apps, login_items, style  # noqa: E402
+from . import alert, apps, held, login_items, style  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -326,6 +326,8 @@ class Item(Gtk.Button):
         self.desktop_id = desktop_id
         self.app_id = app_id
         self.views = []
+        # Open with no window (a held app): its dot stays, as on a Mac.
+        self.alive = False
         self.get_style_context().add_class("pier-item")
         self.set_relief(Gtk.ReliefStyle.NONE)
 
@@ -378,11 +380,18 @@ class Item(Gtk.Button):
             return stem == app_id or (info is not None and info.get_id() == self.desktop_id)
         return False
 
-    def set_views(self, views):
+    def set_views(self, views, alive=False):
         self.views = views
-        self.dot.set_opacity(1.0 if views else 0.0)
+        self.alive = alive
+        self.dot.set_opacity(1.0 if views or alive else 0.0)
         if views:
             self.stop_bounce()
+
+    def running_app_id(self):
+        """The app's ID if it's running, with or without windows."""
+        if self.views:
+            return self.views[0].get("app-id") or ""
+        return self.alive or ""
 
     def _clicked(self, _button):
         if self.menu and self.menu.get_visible():
@@ -399,8 +408,10 @@ class Item(Gtk.Button):
             latest = max(shown or self.views, key=lambda v: v.get("last-focus-timestamp", 0))
             self.show_window(latest)
         elif self.info:
+            # A running app with no window opens a new one.
             self.info.launch([], None)
-            self.bounce()
+            if not self.alive:
+                self.bounce()
 
     def show_window(self, view):
         if is_minimized(view):
@@ -554,7 +565,9 @@ class Item(Gtk.Button):
         if views:
             self.menu.append(Gtk.SeparatorMenuItem())
             add("Hide", lambda: [self.pier.wf.hide(v["id"]) for v in self.views if not is_minimized(v)])
-            add("Quit", lambda: self.pier.wf.quit(self.views[0].get("app-id") or ""))
+            add("Quit", lambda: self.pier.quit_app(self.running_app_id()))
+        elif self.alive:
+            add("Quit", lambda: self.pier.quit_app(self.running_app_id()))
         elif self.info:
             add("Open", lambda: self._clicked(None))
         self.popup(self.menu)
@@ -581,7 +594,7 @@ class Item(Gtk.Button):
         if elapsed > BOUNCE_LIMIT:
             self.bouncing = None
             self.image.set_margin_bottom(0)
-            self.dot.set_opacity(1.0 if self.views else 0.0)
+            self.dot.set_opacity(1.0 if self.views or self.alive else 0.0)
             return False
         phase = (elapsed % BOUNCE_PERIOD) / BOUNCE_PERIOD
         # Up fast, ease at the top, down with a little weight: one sine arch per hop.
@@ -758,6 +771,8 @@ class Pier(Gtk.Window):
         self.monitor.connect("changed", lambda *_: GLib.timeout_add(200, self._reload))
 
         self._hint_pending, self.own_id, self.hints = 0, None, {}
+        # Apps still open with no window keep their dot.
+        self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         try:
             self.wf = Wayfire(on_event=lambda _e: self.refresh())
         except OSError:
@@ -832,12 +847,20 @@ class Pier(Gtk.Window):
 
     def refresh(self):
         views = self.wf.views() if self.wf else []
-        claimed = set()
+        # Held apps running with no window: (app ID, a stand-in view to match).
+        with_windows = {(v.get("app-id") or "").lower() for v in views}
+        held_apps = getattr(self, "held", None)
+        windowless = [a for a in (held_apps.running_ids() if held_apps else ())
+                      if a.lower() not in with_windows]
+        claimed, claimed_apps = set(), set()
         for item in self.pinned:
             mine = [v for v in views if item.matches(v)]
             claimed.update(v["id"] for v in mine)
-            item.set_views(mine)
-        unpinned = {}
+            alive = next((a for a in windowless if item.matches({"app-id": a})), False)
+            if alive:
+                claimed_apps.add(alive)
+            item.set_views(mine, alive)
+        unpinned = {app_id: [] for app_id in windowless if app_id not in claimed_apps}
         for view in views:
             if view["id"] in claimed or (view.get("app-id") or "").lower() in SHELL_APP_IDS:
                 continue
@@ -851,7 +874,7 @@ class Pier(Gtk.Window):
                 self.extra[app_id] = item
                 self.shelf.pack_start(item, False, False, 0)
                 item.show_all()
-            self.extra[app_id].set_views(its_views)
+            self.extra[app_id].set_views(its_views, False if its_views else app_id)
         self._refresh_windows(views)
         self.running_sep.set_visible(bool(self.extra))
         self.places_sep.set_visible(bool(self.places) or bool(self.windows))
@@ -889,6 +912,13 @@ class Pier(Gtk.Window):
             # Newest at the right, next to the Trash.
             self.min_box.pack_start(tile, False, False, 0)
             tile.show_all()
+
+    def quit_app(self, app_id):
+        """Quit: a held app quits as a whole; others close their windows."""
+        if self.held and self.held.is_running(app_id):
+            self.held.quit(app_id)
+        elif self.wf:
+            self.wf.quit(app_id)
 
     def set_pinned(self, desktop_id, keep):
         """Keep in Dock: add the app to (or take it off) the pinned list in
