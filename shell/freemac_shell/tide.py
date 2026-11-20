@@ -6,6 +6,8 @@ bar, and ⌘N for a new event. Double-click an empty spot to add an event
 there, double-click an event to change it, drag an event in the week or day
 view to move it, and press Delete to remove the one chosen. Events are kept
 in one .ics file (calendar_store.py) that other calendar apps can import.
+Birthdays from Crew show on their days in purple; they are read from the
+cards, never saved into the calendar, and double-clicking one opens the card.
 Original freemac code.
 """
 import calendar
@@ -13,6 +15,7 @@ import datetime as dt
 import math
 import os
 import sys
+import urllib.parse
 
 import gi
 
@@ -22,7 +25,7 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 from . import calendar_store as store  # noqa: E402
-from . import menus, style  # noqa: E402
+from . import contacts_store, menus, style  # noqa: E402
 from .minimonth import MiniMonth, month_weeks  # noqa: E402
 
 APP_ID = "org.freemac.Tide"
@@ -32,6 +35,7 @@ DAY_HEAD = 46      # day names above the week and day views
 CHIP = 19          # one line of an event in the month view and the all-day band
 BLUE = (0.18, 0.48, 0.96)
 RED = (0.94, 0.26, 0.24)
+PURPLE = (0.62, 0.36, 0.86)
 WEEKDAYS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
 CSS = b"""
@@ -89,6 +93,33 @@ def dark(widget):
     return sum(ink_of(widget)) > 1.5
 
 
+def all_day_colors(occ, chosen, darkened):
+    """(fill rgba, words rgba) for an all-day chip: blue, or purple for a
+    birthday."""
+    if getattr(occ.event, "person", None):
+        hue, words = PURPLE, ((0.88, 0.78, 1, 1) if darkened else (0.40, 0.16, 0.62, 1))
+    else:
+        hue, words = BLUE, ((0.75, 0.85, 1, 1) if darkened else (0.08, 0.27, 0.62, 1))
+    fill = (*hue, 0.95 if chosen else (0.32 if darkened else 0.2))
+    return fill, ((1, 1, 1, 1) if chosen else words)
+
+
+def birthday_events(year_from=None):
+    """One all-day event a year for each card in Crew with a birthday."""
+    found = []
+    first = (year_from or dt.date.today().year) - 1
+    for month, day, card in contacts_store.birthdays(contacts_store.load()):
+        try:
+            start = dt.datetime(first if (month, day) != (2, 29) else 2024, month, day)
+        except ValueError:
+            continue
+        event = store.Event(f"{card.name}’s Birthday", start, start + dt.timedelta(days=1), True,
+                            repeat="YEARLY", uid=f"birthday-{card.uid}")
+        event.person = card.path
+        found.append(event)
+    return found
+
+
 def lanes(items):
     """Side-by-side places for overlapping (start, end, item): a list of
     (item, lane, lanes in its group)."""
@@ -130,7 +161,7 @@ class MonthView(Gtk.DrawingArea):
         width, height = area.get_allocated_width(), area.get_allocated_height()
         ink = ink_of(area)
         weeks = month_weeks(win.day.year, win.day.month)
-        found = store.occurrences(win.events, weeks[0][0], weeks[-1][-1])
+        found = store.occurrences(win.shown(), weeks[0][0], weeks[-1][-1])
         by_day = {}
         for occ in found:
             for day in occ.days():
@@ -187,10 +218,10 @@ class MonthView(Gtk.DrawingArea):
         chosen = self.win.selected == occ.event.uid
         h = CHIP - 2
         if occ.all_day:
-            cr.set_source_rgba(*BLUE, 0.95 if chosen else (0.32 if dark(area) else 0.2))
+            fill, colour = all_day_colors(occ, chosen, dark(area))
+            cr.set_source_rgba(*fill)
             rounded(cr, x, y, w, h, 4)
             cr.fill()
-            colour = (1, 1, 1, 1) if chosen else ((0.75, 0.85, 1, 1) if dark(area) else (0.08, 0.27, 0.62, 1))
             text(cr, area, occ.event.title, x + 6, y + 1, w - 10, 12, rgba=colour)
         else:
             if chosen:
@@ -241,7 +272,7 @@ class DayHeader(Gtk.DrawingArea):
 
     def update(self):
         days = self.grid.days()
-        found = [o for o in store.occurrences(self.win.events, days[0], days[-1]) if o.all_day]
+        found = [o for o in store.occurrences(self.win.shown(), days[0], days[-1]) if o.all_day]
         most = max((sum(1 for o in found if d in set(o.days())) for d in days), default=0)
         self.set_size_request(-1, DAY_HEAD + max(1, most) * CHIP + 6)
         self.queue_draw()
@@ -253,7 +284,7 @@ class DayHeader(Gtk.DrawingArea):
         cw = (width - GUTTER) / len(days)
         today = dt.date.today()
         self.hits = []
-        found = [o for o in store.occurrences(win.events, days[0], days[-1]) if o.all_day]
+        found = [o for o in store.occurrences(win.shown(), days[0], days[-1]) if o.all_day]
         text(cr, area, "all-day", 0, DAY_HEAD + 2, GUTTER - 8, 10, rgba=(*ink, 0.5), align=2)
         for col, day in enumerate(days):
             x = GUTTER + col * cw
@@ -274,10 +305,10 @@ class DayHeader(Gtk.DrawingArea):
                     continue
                 y = DAY_HEAD + row * CHIP
                 chosen = win.selected == occ.event.uid
-                cr.set_source_rgba(*BLUE, 0.95 if chosen else (0.32 if dark(area) else 0.2))
+                fill, colour = all_day_colors(occ, chosen, dark(area))
+                cr.set_source_rgba(*fill)
                 rounded(cr, x + 2, y, cw - 4, CHIP - 2, 4)
                 cr.fill()
-                colour = (1, 1, 1, 1) if chosen else ((0.75, 0.85, 1, 1) if dark(area) else (0.08, 0.27, 0.62, 1))
                 text(cr, area, occ.event.title, x + 8, y + 1, cw - 14, 12, rgba=colour)
                 self.hits.append((x + 2, y, cw - 4, CHIP - 2, occ))
                 row += 1
@@ -365,7 +396,7 @@ class TimeGrid(Gtk.DrawingArea):
             cr.rectangle(GUTTER + col * cw, 6, cw, 24 * HOUR)
             cr.fill()
         self.hits = []
-        found = [o for o in store.occurrences(win.events, days[0], days[-1]) if not o.all_day]
+        found = [o for o in store.occurrences(win.shown(), days[0], days[-1]) if not o.all_day]
         moving = self.drag["occ"] if self.drag and self.drag.get("moved") else None
         for col, day in enumerate(days):
             start_of_day = dt.datetime.combine(day, dt.time())
@@ -563,6 +594,14 @@ class Editor(Gtk.Popover):
         self.repeat.set_active_id(event.repeat or "")
         grid.attach(self._label("repeat:"), 0, 3, 1, 1)
         grid.attach(self.repeat, 1, 3, 2, 1)
+        self.alert = Gtk.ComboBoxText()
+        for minutes, label in store.ALERTS.items():
+            self.alert.append("" if minutes is None else str(minutes), label)
+        if event.alert is not None and event.alert not in store.ALERTS:
+            self.alert.append(str(event.alert), f"{event.alert} minutes before")
+        self.alert.set_active_id("" if event.alert is None else str(event.alert))
+        grid.attach(self._label("alert:"), 0, 4, 1, 1)
+        grid.attach(self.alert, 1, 4, 2, 1)
         box.pack_start(grid, False, False, 0)
         box.pack_start(Gtk.Separator(), False, False, 2)
 
@@ -626,6 +665,8 @@ class Editor(Gtk.Popover):
         buffer = self.notes.get_buffer()
         e.notes = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False).strip()
         e.repeat = self.repeat.get_active_id() or ""
+        alert = self.alert.get_active_id()
+        e.alert = int(alert) if alert else None
         e.all_day = self.all_day.get_active()
         first, last = self.start_day.day, max(self.end_day.day, self.start_day.day)
         if e.all_day:
@@ -652,6 +693,7 @@ class Window(Gtk.ApplicationWindow):
         self.set_default_size(980, 660)
         self.set_icon_name("freemac-tide")
         self.events = store.load()
+        self.birthdays = birthday_events()
         self.saved = [e.copy() for e in self.events]   # as last written, for Undo
         self.undos, self.redos = [], []
         self.day = dt.date.today()
@@ -721,6 +763,10 @@ class Window(Gtk.ApplicationWindow):
         os.makedirs(os.path.dirname(store.store_path()), exist_ok=True)
         self.monitor = Gio.File.new_for_path(store.store_path()).monitor_file(Gio.FileMonitorFlags.NONE, None)
         self.monitor.connect("changed", self._file_changed)
+        os.makedirs(contacts_store.store_dir(), exist_ok=True)
+        self.cards_monitor = Gio.File.new_for_path(contacts_store.store_dir()).monitor_directory(
+            Gio.FileMonitorFlags.NONE, None)
+        self.cards_monitor.connect("changed", self._cards_changed)
         GLib.timeout_add_seconds(60, self._tick)
         header.show_all()
         self.stack.show_all()
@@ -794,6 +840,14 @@ class Window(Gtk.ApplicationWindow):
         for grid in self.grids.values():
             grid.queue_draw()
         self.month.queue_draw()
+
+    def shown(self):
+        """The calendar's own events and the birthdays from Crew."""
+        return self.events + self.birthdays
+
+    def _cards_changed(self, *_args):
+        self.birthdays = birthday_events()
+        self.refresh()
 
     def _tick(self):
         self.refresh()
@@ -881,6 +935,10 @@ class Window(Gtk.ApplicationWindow):
         self.add_event(start, start + dt.timedelta(hours=1))
 
     def edit(self, event, widget, rect):
+        if getattr(event, "person", None):
+            # A birthday belongs to its card: change it there.
+            Gio.Subprocess.new(["freemac-crew", event.person], Gio.SubprocessFlags.NONE)
+            return
         if self.editor is not None:
             self.editor.popdown()
         self.editor = Editor(self, event, widget, rect)
@@ -986,6 +1044,16 @@ class Tide(Gtk.Application):
         known = {e.uid for e in window.events}
         added = []
         for f in files:
+            if f.get_uri_scheme() == "tide-event":
+                # An alert's notice was clicked: show that event on its day.
+                uid, _sep, day = f.get_uri()[len("tide-event:"):].partition("@@")
+                window.selected = urllib.parse.unquote(uid)
+                try:
+                    window.day = dt.date.fromisoformat(day)
+                except ValueError:
+                    pass
+                window.show_view("day")
+                continue
             path = f.get_path()
             for event in store.load(path) if path else []:
                 if event.uid not in known:

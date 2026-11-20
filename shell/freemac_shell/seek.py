@@ -6,11 +6,13 @@ files in your home folder (by name, and by the text inside them through
 seek_index), and answers simple sums.
 """
 import ast
+import datetime as dt
 import operator
 import os
 import re
 import threading
 import time
+import urllib.parse
 
 import gi
 
@@ -18,7 +20,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import dials_pages, guide_topics, seek_index, style  # noqa: E402
+from . import calendar_store, contacts_store, dials_pages, guide_topics, seek_index, style  # noqa: E402
 
 MAX_RESULTS = 8
 PREVIEW = 280      # width of the preview beside the results
@@ -325,6 +327,10 @@ class SeekWindow(Gtk.Window):
                                           app_icon or Gio.ThemedIcon.new("application-x-executable"),
                                           lambda i=index: run_menu_item(i),
                                           about=f"Does {name} in {where}, as choosing it in the menu does."))
+            # People from Crew and coming events from Tide.
+            if len(query) >= 2:
+                results += self._people(query)[:2]
+                results += self._events(query)[:2]
             results += apps[named_apps:]
             if len(query) >= 2:
                 named = find_files(query, MAX_RESULTS - len(results))
@@ -338,6 +344,41 @@ class SeekWindow(Gtk.Window):
                                           Gio.ThemedIcon.new("text-x-generic"), lambda p=path: open_path(p),
                                           path=path))
         self._show(results[:MAX_RESULTS])
+
+    @staticmethod
+    def _people(query):
+        found = []
+        for person in contacts_store.load():
+            if person.matches(query):
+                reach = (person.phones[0][1] if person.phones else
+                         person.emails[0][1] if person.emails else person.company)
+                found.append(Result(person.name, "Contact" + (f": {reach}" if reach else ""),
+                                    Gio.ThemedIcon.new("freemac-crew"),
+                                    lambda p=person.path: launch("freemac-crew", p),
+                                    about=f"Opens {person.name}'s card in Crew."))
+        return found
+
+    @staticmethod
+    def _events(query):
+        """Events from today on, over the next year, whose title or place
+        has every word typed."""
+        words = query.lower().split()
+        today = dt.date.today()
+        found, seen = [], set()
+        for occ in calendar_store.occurrences(calendar_store.load(), today, today + dt.timedelta(days=366)):
+            event = occ.event
+            hay = f"{event.title} {event.location}".lower()
+            if event.uid in seen or not all(w in hay for w in words):
+                continue
+            seen.add(event.uid)
+            day = occ.start.date()
+            when = f"{day:%a %b} {day.day}" + ("" if occ.all_day else f", {calendar_store.time_text(occ.start)}")
+            uri = "tide-event:" + urllib.parse.quote(event.uid, safe="") + "@@" + day.isoformat()
+            found.append(Result(event.title, f"Event: {when}", Gio.ThemedIcon.new("freemac-tide"),
+                                lambda u=uri: launch("freemac-tide", u),
+                                about=f"{when}" + (f", {event.location}" if event.location else "")
+                                + ". Opens that day in Tide."))
+        return found
 
     def _show(self, results):
         for child in self.listbox.get_children():

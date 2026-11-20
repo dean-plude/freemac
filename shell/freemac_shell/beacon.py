@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 
 import gi
 
@@ -32,6 +33,7 @@ from . import calendar_store, minimonth, style  # noqa: E402
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
 OWN_IFACE = "org.freemac.Beacon"
+SNOOZE, SNOOZE_MINUTES = "x-freemac-snooze", 5
 HISTORY = os.path.join(GLib.get_user_state_dir(), "freemac", "notifications.json")
 KEEP = 50
 MAX_BANNERS = 3
@@ -129,6 +131,7 @@ class Note:
         except (TypeError, ValueError):
             self.urgency = 1
         self.open_path = hints.get("x-freemac-open") or ""
+        self.open_uri = hints.get("x-freemac-uri") or ""   # passed to app_command
         self.image_path = hints.get("image-path") or ""
         self.transient = bool(hints.get("transient", False))
         self.timeout = timeout
@@ -136,12 +139,13 @@ class Note:
 
     def to_json(self):
         return {"id": self.id, "app": self.app, "icon": self.icon, "summary": self.summary,
-                "body": self.body, "open": self.open_path, "when": self.when}
+                "body": self.body, "open": self.open_path, "uri": self.open_uri, "when": self.when}
 
     @classmethod
     def from_json(cls, data):
         note = cls(data.get("id", 0), data.get("app"), data.get("icon"), data.get("summary"),
-                   data.get("body"), [], {"x-freemac-open": data.get("open", "")}, -1)
+                   data.get("body"), [], {"x-freemac-open": data.get("open", ""),
+                                          "x-freemac-uri": data.get("uri", "")}, -1)
         note.when = data.get("when", time.time())
         return note
 
@@ -255,6 +259,9 @@ class Beacon:
         self.live = {}       # id -> (note, card, timer)
         self.history = self._load()
         self.events = []
+        self.alert_events, self.alert_stamp = [], None
+        self.alerts_until = dt.datetime.now() - dt.timedelta(minutes=1)
+        GLib.timeout_add_seconds(15, self._check_alerts)
         self.connection = None
         self.banners = Overlay("freemac-beacon")
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -414,6 +421,13 @@ class Beacon:
             self._emit("NotificationClosed", "(uu)", (nid, reason))
 
     def invoke(self, note, key):
+        if key == SNOOZE:
+            # Tide's alerts: show it again in a few minutes.
+            self.close(note.id, DISMISSED)
+            GLib.timeout_add_seconds(SNOOZE_MINUTES * 60, lambda: self.notify(
+                note.app, 0, note.icon, note.summary, note.body, [SNOOZE, "Snooze"],
+                {"x-freemac-uri": note.open_uri}, 0) and False)
+            return
         self._emit("ActionInvoked", "(us)", (note.id, key))
         self.close(note.id, DISMISSED)
 
@@ -422,7 +436,12 @@ class Beacon:
         if any(key == "default" for key, _label in note.actions):
             self.invoke(note, "default")
             return
-        if note.open_path and os.path.exists(note.open_path):
+        if note.open_uri.startswith("tide-event:"):
+            try:
+                GLib.spawn_async(["freemac-tide", note.open_uri], flags=GLib.SpawnFlags.SEARCH_PATH)
+            except GLib.Error:
+                pass
+        elif note.open_path and os.path.exists(note.open_path):
             try:
                 Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(note.open_path).get_uri(), None)
             except GLib.Error:
@@ -535,6 +554,42 @@ class Beacon:
             more.get_style_context().add_class("beacon-empty")
             self.events_box.pack_start(more, False, False, 0)
         self.events_box.show_all()
+
+    # --- Tide's alerts ----------------------------------------------------
+    def _check_alerts(self):
+        """Show a notice for each event whose alert time has come since the
+        last look. Alerts missed while the computer was off or asleep for
+        more than an hour are skipped rather than shown all at once."""
+        try:
+            stamp = os.stat(calendar_store.store_path()).st_mtime
+        except OSError:
+            stamp = None
+        if stamp != self.alert_stamp:
+            self.alert_stamp = stamp
+            self.alert_events = calendar_store.load() if stamp else []
+        now = dt.datetime.now()
+        since = max(self.alerts_until, now - dt.timedelta(hours=1))
+        self.alerts_until = now
+        for occ in calendar_store.due_alerts(self.alert_events, since, now):
+            # Stays up until it's closed, clicked or snoozed, as a calendar alert should.
+            self.notify("Tide", 0, "freemac-tide", occ.event.title, self._alert_body(occ, now),
+                        [SNOOZE, "Snooze"],
+                        {"x-freemac-uri": "tide-event:" + urllib.parse.quote(occ.event.uid, safe="")
+                         + "@@" + occ.start.date().isoformat()}, 0)
+        return True
+
+    @staticmethod
+    def _alert_body(occ, now):
+        day = occ.start.date()
+        today = now.date()
+        name = "Today" if day == today else "Tomorrow" if day == today + dt.timedelta(days=1) \
+            else f"{day:%A, %B} {day.day}"
+        if occ.all_day:
+            when = f"{name}, all day"
+        else:
+            when = f"{name}, {calendar_store.time_text(occ.start)} to {calendar_store.time_text(occ.end)}"
+        place = occ.event.location.strip()
+        return f"{when}\n{place}" if place else when
 
     def _open_calendar(self):
         self.center.hide()
