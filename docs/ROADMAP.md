@@ -346,6 +346,7 @@ The small things a Mac user notices in their first minute.
 | 10 | Quick settings and the volume pop-up are nearly solid, so windows no longer show through their text | Topline | done |
 | 11 | Esc while typing a reminder puts its title back, and a new empty one goes away | Nudge | done |
 | 12 | New screenshots of 1.23 in the README | docs | done |
+| 13 | App windows: one rounded corner from the title bar down, with no notch under the title bar | freemac-theme | done |
 
 ## 1.24 "look and mail" (next)
 
