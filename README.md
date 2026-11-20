@@ -43,8 +43,8 @@ one of them will be reverted.
 | Global top menu bar with app menu, window menu, status icons, clock | **Topline** | 0.4: own bar with network, sound and battery icons; 0.5: clock opens the notification centre; 0.6: Lock Screen item; 0.8: GTK apps' own menus, Bluetooth and printing icons; 0.9: quick settings panel; 1.1: what's playing, with play/pause |
 | Bottom dock with magnification, running indicators | **Pier** | 0.4; 1.0: Downloads folder and a Trash you can empty |
 | Desktop wallpaper that fills any screen shape | **Backdrop** | 0.4 |
-| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor); 0.9: drag a window to an edge to tile it |
-| File manager with icon, list and column views | **Drawer** | 0.4; 1.0: tabs, a sidebar you can change, Glance preview on Space; 1.1: compress to .zip, open .zip and tar archives |
+| Window manager: left-side window buttons in our own style, window overview, virtual desktops | **Strata** (Wayfire config + theme) | 0.4: overview, 4 desktops, left buttons in freemac style on GTK apps; 0.8: own title bars for every app (strata-decor); 0.9: drag a window to an edge to tile it; 1.2: rounded title bars with round buttons that show their symbols on hover |
+| File manager with icon, list and column views | **Drawer** | 0.4; 1.0: tabs, a sidebar you can change, Glance preview on Space; 1.1: compress to .zip, open .zip and tar archives; 1.2: Mac apps (.app) shown with their own icon |
 | Super+Space search launcher (apps, files, sums) | **Seek** | 0.4; 1.0: finds files by the words inside them |
 | Settings app with light and dark mode | **Dials** | 0.4: appearance, wallpaper, dock, displays, trackpad and mouse, keyboard, network and Wi-Fi, about; 0.5: sound, power, notifications, accessibility; 0.7: users, Bluetooth, printers; 0.9: brightness, night light, changeable shortcuts |
 | Notifications with banners, a history list and Do Not Disturb | **Beacon** | 0.5 |
@@ -60,10 +60,11 @@ one of them will be reverted.
 | Lock screen (Super+L, idle and before sleep) | **Latch** | 0.6 |
 | Calculator | **Tally** | 0.6 |
 | Clock with world clocks, alarms, timers and a stopwatch | **Chime** | 0.6 |
-| Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 17 folder and file icons, 4 wallpaper scenes |
+| Original app icons, folder and file icons, and day/night wallpapers | freemac theme | 0.7: 10 app icons, 17 folder and file icons, 4 wallpaper scenes; 1.2: every app's icon on the same rounded tile, a full GTK theme of our own, Inter as the system font |
+| Start-up screen instead of a boot menu and text | build | 1.2 |
 | First-run setup: light or dark, wallpaper, Wi-Fi, shortcuts | **Welcome** | 1.0 |
 | Installer | **Keel** | 0.4: whole-disk install, BIOS and UEFI |
-| Login screen | **Gangway** | 0.4 |
+| Login screen | **Gangway** | 0.4; 1.2: blurred wallpaper, round picture, password field with an arrow |
 | Sound (PipeWire) with a volume control in the menu bar | Topline | 0.4 |
 | Trackpad gestures (switch desktops, overview) | **Strata** gestures | configured, not yet tested on hardware |
 | Bootable live ISO | `build/build-iso.sh` | done |
@@ -109,6 +110,12 @@ its limits are real:
 - Ferry today runs simple command-line programs only. Graphical apps need
   Mac frameworks Ferry doesn't have; most everyday Mac apps will not work for
   a long time, if ever. See [ferry/README.md](ferry/README.md).
+
+Mac apps still look like themselves on freemac: put a `.app` in the
+Applications folder (or use Add to Applications in Drawer) and it appears in
+the app grid, dock and search with its own icon, read from the app itself.
+Opening one runs it through Ferry when Ferry is installed and the program is
+simple enough; otherwise freemac says plainly that it can't run yet.
 
 For apps that matter, the dependable route is the Linux or web version of the
 app, or a free alternative; Harbor, the app centre, lists those.
