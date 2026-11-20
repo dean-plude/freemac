@@ -284,13 +284,21 @@ The small things a Mac user notices in their first minute.
 | 2 | Choosing a found item runs it, keyboard only (arrows and Return) | Topline | done |
 | 3 | Seek finds menu items of the app in front too | Seek | moved to 1.18 |
 
-## 1.18 "search everywhere" (next)
+## 1.18 "search everywhere" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Seek finds the menu items of the app in front (Topline shares them over D-Bus) | Seek, Topline | |
-| 2 | Seek finds settings by name ("wallpaper", "night light") and opens Dials at the right page | Seek, Dials | |
+| 1 | Seek finds the menu items of the app in front (Topline shares them over D-Bus), with the app's own icon, and Return runs the item | Seek, Topline | done |
+| 2 | Seek finds settings by name or by what's on the page ("wallpaper", "night", "mouse") and opens Dials at that page; a settings page comes before an app found only by its description | Seek, Dials | done |
+
+## 1.19 "first impressions" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The first window after login gets the keyboard (Welcome showed in the bar while typing went to the desktop) | Strata | |
+| 2 | Dials shows its window at once and builds pages as they're opened (it takes several seconds to appear on a slow PC) | Dials | |
 | 3 | Help also lists short freemac Guide topics that match, opened in a small Guide window | Topline | |
+| 4 | Seek shows a preview of the selected file or app beside the results | Seek | |
 
 ## Later
 

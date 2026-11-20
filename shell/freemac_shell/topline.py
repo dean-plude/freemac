@@ -118,6 +118,10 @@ class Topline(Gtk.Window):
         self.help_button.connect("toggled", self._help_toggled)
         bar.pack_start(self.help_button, False, False, 0)
         self._slide(self.help_button)
+        # Seek asks the bar for the front app's menu items, too.
+        self._found = []
+        Gio.bus_own_name(Gio.BusType.SESSION, "org.freemac.Topline", Gio.BusNameOwnerFlags.REPLACE,
+                         self._bus_acquired, None, None)
 
         # The clock opens Beacon's notification centre.
         self.clock = Gtk.Label()
@@ -409,6 +413,35 @@ class Topline(Gtk.Window):
             return
         spot = button.translate_coordinates(self, 0, 0)
         self.help.open_at(spot[0] if spot else 0)
+
+    BUS_XML = """<node><interface name="org.freemac.Topline">
+      <method name="SearchMenus"><arg type="s" name="query" direction="in"/>
+        <arg type="a(sss)" name="found" direction="out"/>
+        <arg type="s" name="app_icon" direction="out"/></method>
+      <method name="RunMenuItem"><arg type="u" name="index" direction="in"/></method>
+    </interface></node>"""
+
+    def _bus_acquired(self, connection, _name):
+        iface = Gio.DBusNodeInfo.new_for_xml(self.BUS_XML).interfaces[0]
+        connection.register_object("/org/freemac/Topline", iface, self._bus_call, None, None)
+
+    def _bus_call(self, _conn, _sender, _path, _iface, method, params, invocation):
+        """SearchMenus gives (name, where, shortcut) of the front app's menu
+        items that match, and the app's icon; RunMenuItem runs one of them by its place in that
+        list, a moment later (Seek is closing and handing back the keyboard)."""
+        if method == "SearchMenus":
+            (query,) = params.unpack()
+            self._found = helpsearch.find(self._searchable_menus, query)[:4]
+            rows = [(name, helpsearch.ARROW.join(path), shortcut) for _i, path, name, shortcut in self._found]
+            app_id = (self.focused or {}).get("app-id")
+            icon = apps.icon_for(app_id).to_string() if app_id else "system-file-manager"
+            invocation.return_value(GLib.Variant("(a(sss)s)", (rows, icon)))
+        elif method == "RunMenuItem":
+            (index,) = params.unpack()
+            if index < len(self._found):
+                item = self._found[index][0]
+                GLib.timeout_add(250, lambda: item.activate() and False)
+            invocation.return_value(None)
 
     def _searchable_menus(self):
         """(title, menu) for each menu Help searches, in the bar's order."""
