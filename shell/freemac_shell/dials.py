@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
+from . import alert, dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -122,7 +122,21 @@ def scene_version(path, dark):
     return None
 CSS = b"""
 .dials-sidebar { background-color: rgba(120, 120, 150, 0.08); }
-.dials-sidebar row { padding: 7px 12px; border-radius: 8px; margin: 1px 8px; }
+.dials-sidebar list, .dials-sidebar list row { background: none; border: none; box-shadow: none; }
+.dials-sidebar list row { padding: 4px 8px; border-radius: 6px; margin: 0 10px; min-height: 0; }
+.dials-sidebar list row:hover { background-color: rgba(120, 120, 150, 0.12); }
+.dials-sidebar list row:selected { background-color: #2f7bf5; color: #ffffff; }
+.dials-gap { min-height: 10px; }
+.dials-tile { border-radius: 6px; min-width: 22px; min-height: 22px; color: #ffffff; }
+.dials-tile image { color: #ffffff; -gtk-icon-shadow: none; }
+.dials-tile-blue { background-image: linear-gradient(#3d8bff, #1f6fe8); }
+.dials-tile-teal { background-image: linear-gradient(#4cc4dc, #2aa0bd); }
+.dials-tile-indigo { background-image: linear-gradient(#6e6cf0, #4f4dc9); }
+.dials-tile-green { background-image: linear-gradient(#48cf6b, #2fae4f); }
+.dials-tile-red { background-image: linear-gradient(#ff5a50, #e5372e); }
+.dials-tile-pink { background-image: linear-gradient(#ff4f78, #e2325a); }
+.dials-tile-gray { background-image: linear-gradient(#9a9aa1, #77777e); }
+.dials-tile-dark { background-image: linear-gradient(#5a5a60, #3a3a3f); }
 .dials-page { padding: 24px 32px; }
 .dials-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
@@ -315,35 +329,56 @@ class DialsWindow(Gtk.ApplicationWindow):
         paned.set_position(200)
 
         self.rows = {}
-        for name, title, icon, build in (
-            ("appearance", "Appearance", "preferences-desktop-appearance-symbolic", self.appearance),
-            ("wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", self.wallpaper),
-            ("dock", "Dock and Menu Bar", "view-app-grid-symbolic", self.dock),
-            ("displays", "Displays", "video-display-symbolic", self.displays),
-            ("pointing", "Trackpad and Mouse", "input-touchpad-symbolic", self.pointing),
-            ("keyboard", "Keyboard", "input-keyboard-symbolic", self.keyboard),
-            ("network", "Network", "network-wired-symbolic", self.network),
-            ("sound", "Sound", "audio-volume-high-symbolic", lambda: dials_more.sound(self)),
-            ("power", "Power", "battery-good-symbolic", lambda: dials_more.power(self)),
-            ("notifications", "Notifications", "preferences-system-notifications-symbolic",
-             lambda: dials_more.notifications(self)),
-            ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic",
-             lambda: dials_more.accessibility(self)),
-            ("bluetooth", "Bluetooth", "bluetooth-active-symbolic",
+        # Grouped the way a Mac's settings sidebar is: connections, then
+        # alerts and sound, then how things look, power, people, and the
+        # devices you hold. Each icon sits white in a small coloured tile.
+        # The group number puts a little space between groups.
+        for group_no, name, title, icon, colour, build in (
+            (0, "network", "Network", "network-wired-symbolic", "blue", self.network),
+            (0, "bluetooth", "Bluetooth", "bluetooth-active-symbolic", "blue",
              lambda: dials_people.BluetoothPanel(self, page)),
-            ("printers", "Printers", "printer-symbolic", lambda: dials_people.PrintersPanel(self, page)),
-            ("users", "Users", "system-users-symbolic", lambda: dials_people.UsersPanel(self, page)),
-            ("about", "About", "help-about-symbolic", self.about),
+            (1, "notifications", "Notifications", "preferences-system-notifications-symbolic", "red",
+             lambda: dials_more.notifications(self)),
+            (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
+            (2, "about", "About", "help-about-symbolic", "gray", self.about),
+            (2, "appearance", "Appearance", "preferences-desktop-appearance-symbolic", "dark", self.appearance),
+            (2, "accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic", "blue",
+             lambda: dials_more.accessibility(self)),
+            (2, "dock", "Dock and Menu Bar", "view-app-grid-symbolic", "dark", self.dock),
+            (2, "displays", "Displays", "video-display-symbolic", "blue", self.displays),
+            (2, "wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", "teal", self.wallpaper),
+            (3, "power", "Power", "battery-good-symbolic", "green", lambda: dials_more.power(self)),
+            (4, "users", "Users", "system-users-symbolic", "indigo", lambda: dials_people.UsersPanel(self, page)),
+            (5, "keyboard", "Keyboard", "input-keyboard-symbolic", "gray", self.keyboard),
+            (5, "pointing", "Trackpad and Mouse", "input-touchpad-symbolic", "gray", self.pointing),
+            (5, "printers", "Printers", "printer-symbolic", "gray", lambda: dials_people.PrintersPanel(self, page)),
         ):
             item = Gtk.ListBoxRow()
-            item.name = name
-            line = Gtk.Box(spacing=10)
-            line.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
+            item.name, item.group_no = name, group_no
+            line = Gtk.Box(spacing=8)
+            tile = Gtk.Box(halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+            tile.get_style_context().add_class("dials-tile")
+            tile.get_style_context().add_class("dials-tile-" + colour)
+            image = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU)
+            image.set_pixel_size(14)
+            tile.set_center_widget(image)
+            line.pack_start(tile, False, False, 0)
             line.pack_start(Gtk.Label(label=title, xalign=0), True, True, 0)
             item.add(line)
             sidebar.add(item)
             self.rows[name] = item
             self.stack.add_named(build(), name)
+
+        def gap(row, before):
+            if before is not None and before.group_no != row.group_no:
+                if row.get_header() is None:
+                    space = Gtk.Box()
+                    space.get_style_context().add_class("dials-gap")
+                    row.set_header(space)
+            else:
+                row.set_header(None)
+
+        sidebar.set_header_func(gap)
         self.sidebar = sidebar
         sidebar.select_row(self.rows["appearance"])
         actions = {"close": self.close}
@@ -369,11 +404,9 @@ class DialsWindow(Gtk.ApplicationWindow):
     def confirm_power(self, action):
         if action != "suspend":
             words = {"reboot": ("Restart now?", "Restart"), "poweroff": ("Shut down now?", "Shut Down")}[action]
-            dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                       text=words[0], secondary_text="Unsaved work in open apps will be lost.")
-            dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, words[1], Gtk.ResponseType.OK)
-            answer = dialog.run()
-            dialog.destroy()
+            answer = alert.ask(self, words[0], "Unsaved work in open apps will be lost.",
+                               [("Cancel", Gtk.ResponseType.CANCEL), (words[1], Gtk.ResponseType.OK)],
+                               default=Gtk.ResponseType.OK, icon="system-shutdown")
             if answer != Gtk.ResponseType.OK:
                 return
         Gio.Subprocess.new(["systemctl", action], Gio.SubprocessFlags.NONE)

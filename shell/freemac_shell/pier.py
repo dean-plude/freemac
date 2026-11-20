@@ -23,7 +23,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, login_items, style  # noqa: E402
+from . import alert, apps, login_items, style  # noqa: E402
 from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -77,6 +77,17 @@ def load_config():
 
 def open_in_drawer(path):
     subprocess.Popen(["freemac-drawer", path], start_new_session=True)
+
+
+def unique_path(folder, name, is_dir=False):
+    """folder/name, or "name 2", "name 3"... when that's taken."""
+    stem, ext = os.path.splitext(name)
+    if name.startswith(".") or is_dir:
+        stem, ext = name, ""
+    candidate, n = os.path.join(folder, name), 2
+    while os.path.lexists(candidate):
+        candidate, n = os.path.join(folder, f"{stem} {n}{ext}"), n + 1
+    return candidate
 
 
 def newest_files(folder, limit=STACK_LIMIT):
@@ -170,6 +181,44 @@ class Stack(Place):
         self.folder = folder
         self.menu = None
         self.connect("clicked", lambda *_: self.show_files())
+        # Files dropped on the folder move into it, as on a Mac; the icon
+        # darkens while they're over it.
+        self.drop_glow = False
+        self.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry.new("text/uri-list", 0, 0)],
+                           Gdk.DragAction.MOVE | Gdk.DragAction.COPY)
+        self.connect("drag-motion", lambda *_: self._glow(True) or False)
+        self.connect("drag-leave", lambda *_: self._glow(False))
+        self.connect("drag-data-received", self._dropped)
+        self.connect_after("draw", lambda w, cr: Item._draw_drop_glow(self, w, cr))
+
+    def _glow(self, on):
+        if self.drop_glow != on:
+            self.drop_glow = on
+            self.queue_draw()
+
+    def _dropped(self, _widget, context, _x, _y, data, _info, time):
+        self._glow(False)
+        moved = 0
+        for uri in data.get_uris() or []:
+            source = Gio.File.new_for_uri(uri)
+            path = source.get_path()
+            if not path or os.path.dirname(path.rstrip("/")) == self.folder.rstrip("/"):
+                continue
+            if os.path.realpath(self.folder).startswith(os.path.realpath(path) + os.sep):
+                continue   # a folder can't go inside itself
+            target = Gio.File.new_for_path(unique_path(self.folder, os.path.basename(path.rstrip("/")),
+                                                         os.path.isdir(path)))
+            try:
+                source.move(target, Gio.FileCopyFlags.NOFOLLOW_SYMLINKS, None, None, None)
+                moved += 1
+            except GLib.Error:
+                continue
+        if moved:
+            self.bounce_once()
+
+    def bounce_once(self):
+        self.image.set_opacity(0.55)
+        GLib.timeout_add(160, lambda: self.image.set_opacity(1.0) or False)
 
     def show_files(self):
         self.menu = Gtk.Menu()
@@ -244,16 +293,12 @@ class TrashCan(Place):
 
     def ask_to_empty(self):
         count = len(trash_items())
-        dialog = Gtk.MessageDialog(message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.NONE,
-                                   text="Empty the Trash?")
-        what = "the item" if count == 1 else f"all {count} items"
-        dialog.format_secondary_text(f"This deletes {what} in the Trash for good. It can't be undone.")
-        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        button = dialog.add_button("Empty Trash", Gtk.ResponseType.ACCEPT)
-        button.get_style_context().add_class("destructive-action")
-        dialog.set_default_response(Gtk.ResponseType.CANCEL)
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(None, "Are you sure you want to permanently erase the items in the Trash?"
+                           if count != 1 else "Are you sure you want to permanently erase the item in the Trash?",
+                           "You can't undo this action.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Empty Trash", Gtk.ResponseType.ACCEPT)],
+                           default=Gtk.ResponseType.ACCEPT, destructive=Gtk.ResponseType.ACCEPT,
+                           icon="user-trash-full")
         if answer == Gtk.ResponseType.ACCEPT:
             empty_trash()
             self.update()

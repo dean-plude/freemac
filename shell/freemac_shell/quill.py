@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "4")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkSource  # noqa: E402
 
-from . import menus, style  # noqa: E402
+from . import alert, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Quill"
 LIGHT_SCHEME, DARK_SCHEME = "classic", "oblivion"
@@ -397,23 +397,17 @@ class Editor(Gtk.ApplicationWindow):
         if not self.buffer.get_modified():
             return False
         name = os.path.basename(self.path) if self.path else "Untitled"
-        dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
-                                   text=f"Save changes to “{name}” before closing?",
-                                   secondary_text="If you don’t save, your changes will be lost.")
-        dialog.add_buttons("Don’t Save", Gtk.ResponseType.REJECT, "Cancel", Gtk.ResponseType.CANCEL,
-                           "Save", Gtk.ResponseType.ACCEPT)
-        dialog.set_default_response(Gtk.ResponseType.ACCEPT)
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self, f"Do you want to keep the changes you made to “{name}”?",
+                           "Your changes will be lost if you don’t save them.",
+                           [("Save", Gtk.ResponseType.ACCEPT), ("Cancel", Gtk.ResponseType.CANCEL),
+                            ("Don’t Save", Gtk.ResponseType.REJECT)],
+                           default=Gtk.ResponseType.ACCEPT)
         if answer == Gtk.ResponseType.ACCEPT:
             return not self.save()
         return answer != Gtk.ResponseType.REJECT
 
     def alert(self, text, detail=""):
-        dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.ERROR,
-                                   buttons=Gtk.ButtonsType.CLOSE, text=text, secondary_text=detail)
-        dialog.run()
-        dialog.destroy()
+        alert.tell(self, text, detail)
 
 
 def menubar():
