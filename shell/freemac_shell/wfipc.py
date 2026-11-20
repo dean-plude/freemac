@@ -150,11 +150,15 @@ class Wayfire:
             return False
         return isinstance(result, dict) and result.get("result") == "ok"
 
-    def front_app(self, app_id):
+    def front_app(self, app_id, keys=None):
         """Tell Strata which app is in front with no window open ("" for
-        none), so ⌘Q quits it."""
+        none), so ⌘Q quits it; with keys ({"command+n": "new-note"}), the
+        shortcuts that still work while it has no window."""
+        data = {"app-id": app_id or ""}
+        if keys is not None:
+            data["keys"] = keys
         try:
-            self.req.call("strata/front-app", **{"app-id": app_id or ""})
+            self.req.call("strata/front-app", **data)
         except (ConnectionError, OSError, ValueError):
             pass
 

@@ -258,14 +258,23 @@ The small things a Mac user notices in their first minute.
 | 6 | Hints and labels show Mac shortcuts (⌘N), not "Ctrl+N" | Jot | done |
 | 7 | Save dialogs and unsaved-changes alerts come down from their window's title bar as sheets and move with the window | Strata | done |
 
-## 1.15 "the keyboard, finished" (next)
+## 1.15 "the keyboard, finished" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | An app's own shortcuts work while it is in front with no window (⌘N in Jot opens a note) | Strata, Topline | |
-| 2 | The Save sheet starts small (name and where) and opens out to the full file browser | Quill, Jot | |
-| 3 | Full keyboard access: Tab moves through buttons in dialogs and sheets, Space presses the focused one | Strata, apps | |
-| 4 | ⌘. and Escape cancel a sheet, Return picks its default button | Strata, apps | |
+| 1 | An app's own shortcuts work while it is in front with no window (⌘N in Jot opens a note) | Strata, Topline | done |
+| 2 | The Save sheet starts small (name and where) and opens out to the full file browser | Quill | done |
+| 3 | Full keyboard access: Tab moves through the fields and buttons of alerts and sheets, Space presses the focused one | apps | done |
+| 4 | ⌘. and Escape cancel a sheet or dialog, Return picks its default button; saving over a file asks first | Strata, apps | done |
+
+## 1.16 "every app has a menu bar" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Apps that publish no menus (Firefox, VLC, Qt and older apps) still get File, Edit, View and Window menus in the bar, whose items press the app's own shortcuts | Topline, Strata | |
+| 2 | Edit has Undo, Redo, Cut, Copy, Paste and Select All for every app, as on a Mac | Topline | |
+| 3 | Firefox gets its usual menus (New Tab, New Window, Reopen Closed Tab, History, Bookmarks, zoom) from a short list freemac keeps | Topline | |
+| 4 | Help in every app's bar, with a search that finds menu items | Topline | |
 
 ## Later
 

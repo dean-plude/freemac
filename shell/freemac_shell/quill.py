@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "4")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkSource  # noqa: E402
 
-from . import alert, menus, style  # noqa: E402
+from . import alert, menus, savesheet, style  # noqa: E402
 
 APP_ID = "org.freemac.Quill"
 LIGHT_SCHEME, DARK_SCHEME = "classic", "oblivion"
@@ -239,15 +239,11 @@ class Editor(Gtk.ApplicationWindow):
         return self.write(self.path) if self.path else self.save_as()
 
     def save_as(self):
-        dialog = Gtk.FileChooserNative.new("Save As", self, Gtk.FileChooserAction.SAVE, "Save", "Cancel")
-        dialog.set_do_overwrite_confirmation(True)
         if self.path:
-            dialog.set_filename(self.path)
+            path = savesheet.ask(self, os.path.basename(self.path), os.path.dirname(self.path))
         else:
-            dialog.set_current_name("Untitled.txt")
-        if dialog.run() == Gtk.ResponseType.ACCEPT:
-            return self.write(dialog.get_filename())
-        return False
+            path = savesheet.ask(self, "Untitled.txt")
+        return self.write(path) if path else False
 
     def open_dialog(self):
         dialog = Gtk.FileChooserNative.new("Open", self, Gtk.FileChooserAction.OPEN, "Open", "Cancel")

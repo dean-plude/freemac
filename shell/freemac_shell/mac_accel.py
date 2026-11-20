@@ -51,6 +51,25 @@ def key_text(keyval):
     return name.replace("_", " ")
 
 
+def chord(accel):
+    """A GTK shortcut ("<Primary><Shift>n") as Strata names the keys pressed
+    for it: "command+shift+n". Apps' Ctrl shortcuts are pressed with ⌘.
+    "" for shortcuts that don't use Ctrl."""
+    keyval, mods = Gtk.accelerator_parse(accel or "")
+    other = Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.MOD4_MASK | Gdk.ModifierType.META_MASK
+    if not keyval or not (mods & Gdk.ModifierType.CONTROL_MASK) or (mods & other):
+        return ""
+    name = Gdk.keyval_name(Gdk.keyval_to_lower(keyval))
+    if not name:
+        return ""
+    parts = ["command"]
+    if mods & Gdk.ModifierType.SHIFT_MASK:
+        parts.append("shift")
+    if mods & Gdk.ModifierType.MOD1_MASK:
+        parts.append("alt")
+    return "+".join(sorted(parts) + [name])
+
+
 def text(keyval, mods, command_is_ctrl=True):
     """Mac order: ⌃ ⌥ ⇧ ⌘ then the key."""
     if not keyval:
