@@ -31,6 +31,7 @@
 #include "command-key.hpp"
 #include "window-snapshot.hpp"
 #include "minimize-glide.hpp"
+#include "sheets.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -99,6 +100,9 @@ static void handle_gtk_surface_set_dbus_properties(wl_client *client,
 static void handle_gtk_surface_set_modal(wl_client *client, wl_resource *resource)
 {
     auto surface = static_cast<wf_gtk_surface*>(wl_resource_get_user_data(resource));
+    /* GTK says a dialog is modal before it shows, often before Wayfire has
+     * a view for it; Strata's sheets look it up by surface. */
+    strata_sheets::modal_surfaces().insert(surface->wl_surface);
     wayfire_view view = wf::wl_surface_to_wayfire_view(surface->wl_surface);
     if (view)
     {
@@ -115,6 +119,7 @@ static void handle_gtk_surface_set_modal(wl_client *client, wl_resource *resourc
 static void handle_gtk_surface_unset_modal(wl_client *client, wl_resource *resource)
 {
     auto surface = static_cast<wf_gtk_surface*>(wl_resource_get_user_data(resource));
+    strata_sheets::modal_surfaces().erase(surface->wl_surface);
     wayfire_view view = wf::wl_surface_to_wayfire_view(surface->wl_surface);
     if (view)
     {
@@ -258,6 +263,7 @@ static void handle_xdg_surface_on_configure(wf_gtk_surface *surface)
  */
 static void handle_xdg_surface_on_destroy(wf_gtk_surface *surface)
 {
+    strata_sheets::modal_surfaces().erase(surface->wl_surface);
     surface->on_configure.disconnect();
     surface->on_destroy.disconnect();
 }
@@ -393,6 +399,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_window_places window_places;
     strata_command_key command_key;
     strata_glide::glides_t glides;
+    strata_sheets::sheets_t sheets;
 
     /* strata/app-menus {id}: where the app behind a window publishes its
      * menus on the session bus (org.gtk.Menus / org.gtk.Actions). */
@@ -602,9 +609,17 @@ class strata_shell_impl : public wf::plugin_interface_t
      * window open, or "" for none; ⌘Q quits it. */
     wf::ipc::method_callback set_front_app = [=] (nlohmann::json data)
     {
-        WFJSON_EXPECT_FIELD(data, "app-id", string);
-        command_key.front_windowless = data["app-id"];
-        return wf::ipc::json_ok();
+        if (data.contains("app-id"))
+        {
+            WFJSON_EXPECT_FIELD(data, "app-id", string);
+            command_key.front_windowless = data["app-id"];
+        }
+
+        /* Without an app-id it only answers: Strata itself keeps an app in
+         * front when its last window closes, and Topline asks which. */
+        auto out = wf::ipc::json_ok();
+        out["app-id"] = command_key.front_windowless;
+        return out;
     };
 
     /* strata/held-modifiers: which of Command, Alt, Control and Shift are
@@ -636,6 +651,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         window_places.init();
         command_key.init();
         glides.init();
+        sheets.init();
     }
 
     bool is_unloadable() override

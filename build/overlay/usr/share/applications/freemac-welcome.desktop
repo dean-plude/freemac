@@ -5,3 +5,4 @@ Comment=Set up the look, wallpaper and Wi-Fi, and see the shortcuts
 Exec=freemac-welcome --always
 Icon=freemac-welcome
 Categories=System;
+X-Freemac-ShortName=Welcome

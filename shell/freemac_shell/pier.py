@@ -350,7 +350,7 @@ class Item(Gtk.Button):
         box.pack_start(self.image, False, False, 0)
         box.pack_start(self.dot, False, False, 0)
         self.add(box)
-        self.set_tooltip_text(info.get_name() if info else apps.display_name(app_id))
+        self.set_tooltip_text(apps.short_name(info) if info else apps.display_name(app_id))
         self.menu = None
         self.hold = 0
         self.icon = icon
@@ -507,7 +507,7 @@ class Item(Gtk.Button):
         self.pier.end_drag()
 
     def show_menu(self):
-        name = self.info.get_name() if self.info else apps.display_name(self.app_id)
+        name = apps.short_name(self.info) if self.info else apps.display_name(self.app_id)
         self.menu = Gtk.Menu()
 
         def labelled(label, tick=""):
@@ -1230,5 +1230,9 @@ def main():
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     win.refresh()
+    # Apps that opened at login, before the Dock was listening, get their
+    # dots as soon as it is up rather than at the next five-second check.
+    for delay in (300, 1000, 2500):
+        GLib.timeout_add(delay, lambda: win.refresh() and False)
     GLib.timeout_add_seconds(5, lambda: win.refresh() or True)
     Gtk.main()

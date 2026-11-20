@@ -22,6 +22,9 @@ TEMPLATE = """
 .topline .app-name menu, .topline .app-name menu label { font-weight: 400; }
 .topline menu label.dim-label { opacity: 0.55; }
 .topline menuitem:hover > label, .topline menuitem:hover > box label { color: white; }
+/* Items that can't be chosen now (a window's commands while its app has no
+ * window open) are greyed out, as on a Mac. */
+.topline menuitem:disabled label, .topline menuitem:disabled box label { color: alpha(@ink, 0.4); }
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }

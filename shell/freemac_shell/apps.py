@@ -37,12 +37,50 @@ HELPER_NAMES = {
 }
 
 
+# Long names some apps give themselves, and what the menu bar calls them.
+KNOWN_SHORT = {
+    "gnu image manipulation program": "GIMP",
+    "vlc media player": "VLC",
+    "welcome to freemac": "Welcome",
+}
+
+# Words that describe an app rather than name it, as in "Firefox Web Browser".
+# A Mac's menu bar shows only the name.
+DESCRIPTIVE_ENDINGS = (
+    " web browser", " internet browser", " media player", " video player",
+    " music player", " text editor", " code editor", " image viewer", " document viewer",
+    " email client", " mail client", " file manager", " office suite",
+)
+
+
+def short_name(info):
+    """The name an app goes by in the menu bar, the Dock and the app switcher:
+    its own short name if it gives one, else its name without the words that
+    only describe it."""
+    if not info:
+        return ""
+    get = getattr(info, "get_string", None)
+    for key in ("X-Freemac-ShortName",):
+        value = get(key) if get else None
+        if value:
+            return value
+    name = info.get_name() or ""
+    known = KNOWN_SHORT.get(name.lower())
+    if known:
+        return known
+    lower = name.lower()
+    for ending in DESCRIPTIVE_ENDINGS:
+        if lower.endswith(ending) and len(name) > len(ending):
+            return name[:-len(ending)].strip()
+    return name
+
+
 def display_name(app_id, title=""):
     if app_id in HELPER_NAMES:
         return HELPER_NAMES[app_id]
     info = app_info(app_id)
     if info:
-        return info.get_name()
+        return short_name(info)
     if app_id:
         return app_id.split(".")[-1].replace("-", " ").title()
     return title or "Desktop"

@@ -144,6 +144,10 @@ class Topline(Gtk.Window):
         if kind == "view-focused" and view:
             if is_app_window(view) and app_id.lower() not in DESKTOP_OWNED:
                 self._last_app, self._windowless = app_id, None
+                # This may be Wayfire handing the focus on as another app
+                # closed its last window; Strata then takes it back so that
+                # app stays in front. Look again once it has.
+                GLib.timeout_add(150, self._check_windowless)
             elif app_id.lower() in DESKTOP_OWNED | {"freemac-backdrop"}:
                 # The desktop came forward: the file manager is in front.
                 self._last_app, self._windowless = None, None
@@ -158,6 +162,11 @@ class Topline(Gtk.Window):
 
     def _check_windowless(self):
         app_id = self._last_app
+        # Strata keeps a held app in front when its last window closes, even
+        # though another app's window had the focus for a moment.
+        kept = self.wf.front_app_now() if (self.wf and not self._windowless) else ""
+        if kept and self.held.is_running(kept):
+            app_id = kept
         if (app_id and not self._windowless and self.held.is_running(app_id) and self.wf
                 and self.wf.focused() is None and not self._views_of(app_id)):
             self._windowless = held.window_id(app_id)
@@ -440,12 +449,30 @@ class Topline(Gtk.Window):
     def _fill_app_menus(self, view):
         if view is None and self._menu_key == ("desktop",):
             return   # the desktop's own menus are up already
-        info = self.wf.app_menus(view["id"]) if (self.wf and view) else None
-        key = None
-        if info:
-            key = tuple(info.get(k) or "" for k in
-                        ("bus-name", "menubar-path", "app-menu-path", "window-path", "application-path"))
+        key = self._menus_of(view)
+        if view and not (key and key[1]):
+            # A dialog (Save, Open, an alert) publishes no menus of its own:
+            # the app's menus stay up while it's in front, as on a Mac.
+            others = [v for v in self._views_of(view.get("app-id") or "")
+                      if v.get("id") != view.get("id")]
+            for other in sorted(others, key=lambda v: v.get("last-focus-timestamp", 0), reverse=True):
+                found = self._menus_of(other)
+                if found and found[1]:
+                    key = found
+                    break
+            else:
+                name = held.bus_name(view.get("app-id"))
+                if name and self.held.is_running(name):
+                    path = held.object_path(name)
+                    key = (name, path + "/menus/menubar", "", "", path)
         self._use_menus(key)
+
+    def _menus_of(self, view):
+        info = self.wf.app_menus(view["id"]) if (self.wf and view and view.get("id")) else None
+        if not info:
+            return None
+        return tuple(info.get(k) or "" for k in
+                     ("bus-name", "menubar-path", "app-menu-path", "window-path", "application-path"))
 
     def _use_menus(self, key):
         if key == self._menu_key:
