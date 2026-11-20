@@ -12,6 +12,7 @@ Preferences live in ~/.config/freemac/shell.json, written by Dials:
   "dnd": true/false          Do Not Disturb (banners hidden, history kept)
   "banner_seconds": 5        how long a normal banner stays
 """
+import datetime as dt
 import html
 import json
 import os
@@ -26,7 +27,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import style  # noqa: E402
+from . import calendar_store, minimonth, style  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
@@ -91,7 +92,10 @@ CSS = """
 .beacon-center label { color: @ink; }
 .beacon-center .beacon-heading { font-weight: 700; font-size: 15px; }
 .beacon-center .beacon-empty { color: @dim; }
-.beacon-center calendar { background: none; border: none; color: @ink; }
+.beacon-center .beacon-day { color: @dim; font-size: 12px; font-weight: 700; }
+.beacon-center button.beacon-event { padding: 3px 6px; border-radius: 8px; }
+.beacon-center .beacon-event-time { color: @dim; font-size: 12px; }
+.beacon-center .beacon-dot { color: #2f7bf5; }
 .beacon-level {
   background-color: @panel;
   border: 1px solid @edge;
@@ -250,6 +254,7 @@ class Beacon:
         self.next_id = 1
         self.live = {}       # id -> (note, card, timer)
         self.history = self._load()
+        self.events = []
         self.connection = None
         self.banners = Overlay("freemac-beacon")
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -464,7 +469,13 @@ class Beacon:
         date.get_style_context().add_class("beacon-heading")
         self.date_label = date
         outer.pack_start(date, False, False, 0)
-        outer.pack_start(Gtk.Calendar(), False, False, 0)
+        # The month, with a dot under days that have events in Tide, and
+        # the chosen day's events under it; a click on one opens Tide.
+        self.month = minimonth.MiniMonth(picked=self._show_events, marked=self._event_days)
+        self.month.set_halign(Gtk.Align.CENTER)
+        outer.pack_start(self.month, False, False, 0)
+        self.events_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        outer.pack_start(self.events_box, False, False, 0)
         row = Gtk.Box(spacing=8)
         heading = Gtk.Label(label="Notifications", xalign=0)
         heading.get_style_context().add_class("beacon-heading")
@@ -484,10 +495,60 @@ class Beacon:
         clear.connect("clicked", lambda *_: self.clear_all())
         outer.pack_start(clear, False, False, 0)
 
+    def _event_days(self, first, last):
+        days = set()
+        for occ in calendar_store.occurrences(self.events, first, last):
+            days.update(occ.days())
+        return days
+
+    def _show_events(self, day):
+        for child in self.events_box.get_children():
+            child.destroy()
+        today = dt.date.today()
+        name = "Today" if day == today else "Tomorrow" if day == today + dt.timedelta(days=1) \
+            else f"{day:%A, %B} {day.day}"
+        heading = Gtk.Label(label=name, xalign=0)
+        heading.get_style_context().add_class("beacon-day")
+        self.events_box.pack_start(heading, False, False, 2)
+        found = calendar_store.on_day(self.events, day)
+        if not found:
+            empty = Gtk.Label(label="No events", xalign=0)
+            empty.get_style_context().add_class("beacon-empty")
+            self.events_box.pack_start(empty, False, False, 0)
+        for occ in found[:5]:
+            button = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+            button.get_style_context().add_class("beacon-event")
+            row = Gtk.Box(spacing=8)
+            dot = Gtk.Label(label="●")
+            dot.get_style_context().add_class("beacon-dot")
+            row.pack_start(dot, False, False, 0)
+            title = Gtk.Label(label=occ.event.title, xalign=0, ellipsize=3)
+            row.pack_start(title, True, True, 0)
+            when = Gtk.Label(label="all-day" if occ.all_day else calendar_store.time_text(occ.start))
+            when.get_style_context().add_class("beacon-event-time")
+            row.pack_start(when, False, False, 0)
+            button.add(row)
+            button.connect("clicked", lambda *_: self._open_calendar())
+            self.events_box.pack_start(button, False, False, 0)
+        if len(found) > 5:
+            more = Gtk.Label(label=f"{len(found) - 5} more", xalign=0)
+            more.get_style_context().add_class("beacon-empty")
+            self.events_box.pack_start(more, False, False, 0)
+        self.events_box.show_all()
+
+    def _open_calendar(self):
+        self.center.hide()
+        info = Gio.DesktopAppInfo.new("freemac-tide.desktop")
+        if info:
+            info.launch([], None)
+
     def _fill_center(self):
         if not self.center:
             return
         self.date_label.set_text(time.strftime("%A, %B %-d"))
+        self.events = calendar_store.load()
+        self.month.show_day(dt.date.today())
+        self._show_events(dt.date.today())
         with self.dnd.handler_block(self.dnd_handler):
             self.dnd.set_active(bool(style.prefs().get("dnd")))
         for child in self.list_box.get_children():

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Crew
+GenericName=Contacts
+Comment=Keep the names, numbers and addresses of the people you know
+Exec=freemac-crew %F
+Icon=freemac-crew
+Categories=Office;ContactManagement;
+Keywords=contacts;address book;people;phone;email;vcard;
+MimeType=text/vcard;text/x-vcard;text/directory;
+StartupWMClass=org.freemac.Crew
+StartupNotify=true

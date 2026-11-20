@@ -320,14 +320,24 @@ The small things a Mac user notices in their first minute.
 | 5 | Files opened by other apps, and a screenshot's preview, open in their own app instead of the web browser | Image, Lens | done |
 | 6 | Seek lists the front app's commands, not the names of its open windows | Topline, Seek | done |
 
-## 1.22 "everyday apps" (next)
+## 1.22 "everyday apps" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | A calendar app with month, week and day views, kept on the computer | New app | |
-| 2 | A contacts app for names, phone numbers and addresses | New app | |
-| 3 | The menu bar's clock opens a small calendar for the month | Topline | |
-| 4 | Frame marks up pictures and PDFs: draw, write text, sign | Frame | |
+| 1 | A calendar app with day, week and month views: drag events to move them, events that repeat, undo, all kept in one standard .ics file | Tide (new) | done |
+| 2 | A contacts app for names, companies, phone numbers, email and postal addresses, birthdays and notes, one standard .vcf card per person; opening a .vcf adds it | Crew (new) | done |
+| 3 | The menu bar's clock opens a small calendar for the month, with dots on days that have events and the chosen day's events under it | Topline, Beacon | done |
+| 4 | Frame marks up pictures and PDFs: draw, boxes, text, and a signature drawn once on a pad; Save a Copy keeps the original as it was, and closing asks about marks not yet saved | Frame | done |
+| 5 | Every milestone is published as a downloadable live ISO, built and booted (BIOS and UEFI) in QEMU by a GitHub workflow before it goes up | build | done |
+
+## 1.23 "reminders and mail" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Tide's events can give a notice a set time before they start | Tide, Beacon | |
+| 2 | A reminders app: lists of to-dos with due dates and notices | New app | |
+| 3 | Seek finds events and contacts | Seek | |
+| 4 | Crew's birthdays show in Tide | Tide, Crew | |
 
 ## Later
 
@@ -341,5 +351,5 @@ The small things a Mac user notices in their first minute.
   libraries. Frameworks such as Foundation
   only after that, and only from public documentation. See
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
-- Signed images, a package repository and release docs.
+- Signed images and a package repository.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.
