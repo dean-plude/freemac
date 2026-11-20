@@ -26,10 +26,10 @@ Section: otherosfs
 Priority: optional
 Description: Ferry, runs simple Intel Mac command-line programs
  Ferry loads 64-bit Intel Mach-O programs and connects them to this system's
- C library through its own small libSystem layer and Objective-C runtime,
- written from public documentation. It runs command-line programs that use
- the C and POSIX basics, blocks and the Objective-C runtime. Graphical Mac
- apps and App Store apps do not run yet.
+ C library through its own small libSystem layer, Objective-C runtime and
+ Foundation, written from public documentation. It runs command-line
+ programs that use the C and POSIX basics, blocks, the Objective-C runtime
+ and Foundation. Graphical Mac apps and App Store apps do not run yet.
 CONTROL
 cat > "$root/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh

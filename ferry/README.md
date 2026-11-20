@@ -24,15 +24,28 @@ blocks, so Objective-C command-line programs that only need the runtime and
 `NSObject` run: classes, categories, protocols, properties, `+load` and
 `+initialize`, manual and automatic reference counting (ARC), weak
 references, autorelease pools, `@synchronized`, blocks, and the
-`<objc/runtime.h>` calls apps use for introspection and swizzling. Foundation
-(`NSString` and friends, including `@"..."` literals) is not there yet; see
-[docs/ferry-gui.md](../docs/ferry-gui.md) for the plan towards graphical apps.
+`<objc/runtime.h>` calls apps use for introspection and swizzling.
+
+Ferry also has its own Foundation and the basics of CoreFoundation, loaded as
+Mac frameworks (`Foundation.framework`, `CoreFoundation.framework`), so
+programs written against Foundation run too: `NSString` (including `@"..."`
+literals and `%@` formatting), `NSNumber`, `NSArray`, `NSDictionary`,
+`NSSet`, `NSData`, `NSDate`, `NSURL`, `NSError`, property lists (XML, binary
+and the old text form), `NSBundle` (a program inside an `.app` folder finds
+its `Info.plist`, resources and localized strings), `NSUserDefaults` (kept
+in `~/.config/ferry/preferences/<app id>.plist`), `NSFileManager`,
+`NSProcessInfo`, `NSRunLoop`, `NSTimer`, `NSNotificationCenter`, and the
+`CF...` calls on the same objects. See
+[docs/ferry-gui.md](../docs/ferry-gui.md) for what is missing and the plan
+towards graphical apps. A Mac app's standard folders map to their usual
+Linux places: Documents to `~/Documents`, Application Support to
+`~/.local/share`, Caches to `~/.cache`.
 
 ## What doesn't run, and won't
 
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
-- **Graphical Mac apps, for now.** Ferry has no Foundation or AppKit yet;
+- **Graphical Mac apps, for now.** Ferry has no AppKit yet;
   they are being added step by step (see
   [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
   frameworks are further off.
@@ -62,6 +75,12 @@ references, autorelease pools, `@synchronized`, blocks, and the
    (`msgsend.S`) look methods up in a per-class cache; `nsobject.c` has
    `NSObject`, reference counting, ARC, weak references and autorelease
    pools; `blocks.c` has blocks.
+5. **Foundation** (`foundation/`). Written in Objective-C and built with
+   `ferry-cc` into a Mac library, `frameworks/Foundation.framework/Foundation`,
+   which the loader finds when a program asks for Foundation or
+   CoreFoundation (installed in `/usr/lib/ferry/frameworks`; `FERRY_FRAMEWORKS`
+   points elsewhere). Every CoreFoundation object is the matching Foundation
+   object, so the two can be mixed freely, as on a Mac.
 
 ## Sources
 
@@ -73,7 +92,9 @@ structure layouts and constant values. The Objective-C runtime follows
 Apple's public API documentation, clang's published ARC and block ABI
 specifications, and the metadata clang emits for our own test programs (read
 with LLVM's `llvm-objdump --objc-meta-data`); it uses no code from Apple's,
-GNUstep's or Darling's runtimes. Nothing in Ferry comes from
+GNUstep's or Darling's runtimes. Foundation is written from Apple's public
+API documentation and the published descriptions of the property list
+formats; it uses no code from Apple's, GNUstep's or Darling's Foundation. Nothing in Ferry comes from
 disassembling or decompiling Apple software, and it contains no Apple code,
 binaries or assets.
 
@@ -88,16 +109,18 @@ which runs clang and LLVM's lld with them:
 ferry-cc -O1 -o hello hello.c
 ferry ./hello
 ferry-cc -O1 -fobjc-arc -o hello hello.m -lobjc    # Objective-C
+ferry-cc -O1 -fobjc-arc -o hello hello.m -framework Foundation
 ```
 
 `make check` builds every program in `tests/` this way, in both relocation
-formats, runs it through Ferry and compares the output. It needs `clang` and
-`lld`.
+formats, runs it through Ferry and compares the output. It needs `clang`,
+`lld` and `llvm` (for `llvm-nm`).
 
 ## Building and packaging
 
 ```
-make                       # builds ./ferry and the SDK's libSystem description
+make                       # builds ./ferry, the SDK's library descriptions and Foundation
+                           # (Foundation needs clang, lld and llvm, as the tests do)
 make check                 # runs the tests
 ./packaging/build-deb.sh   # builds freemac-ferry_VERSION_amd64.deb
 ```

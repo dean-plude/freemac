@@ -12,8 +12,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 
 | Milestone | Layer | Status |
 | --- | --- | --- |
-| M1 | Objective-C runtime (libobjc) and blocks | **done**, pull request open (see the M1 report below) |
-| M2 | Foundation core + CoreFoundation basics | planned |
+| M1 | Objective-C runtime (libobjc) and blocks | **done**, merged (#25) |
+| M2 | Foundation core + CoreFoundation basics | **done**, pull request open (see the M2 report below) |
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | planned |
 | M4 | AppKit minimum on Wayland | planned |
 | M5 | Nibs (compiled .nib) | planned |
@@ -207,6 +207,129 @@ dylibs, then Foundation is written in Objective-C as Ferry's own
 - **String literals `@"..."`** need Foundation's constant string class (M2).
 - **Threads**: Ferry itself has no pthreads yet.
 
+## M2: Foundation and CoreFoundation basics
+
+### Design
+
+- **Ferry loads Mac libraries now.** The loader reads `MH_DYLIB` files,
+  their export tries (including re-exports), `LC_LOAD_DYLIB` dependencies
+  with two-level namespace ordinals, `LC_RPATH` and `@rpath`,
+  `@executable_path` and `@loader_path`, and runs each library's
+  initializers (its Objective-C `+load` methods, then its C constructors)
+  after the libraries it depends on. `libSystem` and `libobjc` stay built
+  into the `ferry` binary.
+- **Frameworks.** A program asking for
+  `/System/Library/Frameworks/X.framework/...` gets Ferry's own
+  `X.framework/X`, searched in `$FERRY_FRAMEWORKS`, then `frameworks/` next
+  to the `ferry` binary, then `/usr/lib/ferry/frameworks`. CoreFoundation is
+  an alias for Foundation's file (one library serves both, so every CF
+  object is the Foundation object and toll-free bridging is automatic).
+- **Foundation is Objective-C**, in `ferry/foundation/`, built by `make` with
+  `ferry-cc -dynamiclib` into `ferry/frameworks/Foundation.framework/Foundation`
+  (install name `/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation`).
+  It uses manual reference counting, like Apple's frameworks, and runs on
+  the M1 runtime. For linking, `CoreFoundation.framework` holds a
+  generated `CoreFoundation.tbd` (`sdk/gen-cf-tbd.sh`), so C programs record
+  CoreFoundation's real Mac name, which exercises the loader's alias.
+- **Class clusters as on a Mac.** `NSString`, `NSArray`, `NSDictionary`,
+  `NSSet`, `NSNumber`, `NSData`, `NSDate`, `NSValue` are abstract; allocating
+  one gives a private concrete class (`NSConcreteString`, `FArray`,
+  `FMutableArray`, `FDictionary`, ...). Subclasses of the public classes work
+  through the primitive methods.
+- **Strings** hold UTF-16 code units, so lengths and indexes match a Mac's.
+  `@"..."` literals are clang's constant strings (`{isa, flags, chars,
+  length}`), whose class `___CFConstantStringClassReference` is an alias of
+  Ferry's `__NSCFConstantString`. Formatting (`%@`, the C conversions,
+  widths, `*`, positional `%1$@`) is Ferry's own (`FFormat`).
+- **Empty literals.** clang refers to `__NSArray0__` and `__NSDictionary0__`
+  for `@[]` and `@{}`; Foundation exports them.
+- **Exceptions.** `-[NSException raise]` prints the Mac's message (`***
+  Terminating app due to uncaught exception 'NSRangeException', reason:
+  '...'`) and ends the program (still no unwinder; see below).
+- **Run loop.** One run loop on the main thread, waiting in `poll()`, with
+  timers, a queue of blocks (`performBlock:`, `CFRunLoopPerformBlock`) and
+  file-descriptor sources. `FerryRunLoopAddDescriptor(fd, callback, ctx)` is
+  the hook AppKit (M4) will use for its Wayland connection.
+- **Where things go on freemac.** `NSUserDefaults` writes through to
+  `~/.config/ferry/preferences/<bundle id or program name>.plist` (XML,
+  honouring `XDG_CONFIG_HOME`); `-Key value` on the command line overrides a
+  default, as on a Mac. Documents is `~/Documents`, Application Support and
+  Library are `~/.local/share` (`XDG_DATA_HOME`), Caches is `~/.cache`
+  (`XDG_CACHE_HOME`), Applications is `~/Applications`, Movies is
+  `~/Videos`. Only the user domain has folders.
+- **Bundles.** A program at `X.app/Contents/MacOS/X` gets `X.app` as its main
+  bundle, reads `Contents/Info.plist` and finds resources in
+  `Contents/Resources`, then in `<language>.lproj` folders, picking the
+  language from `LC_ALL`/`LC_MESSAGES`/`LANG`, then English, then `Base`.
+  `.strings` files (UTF-8 or UTF-16) are read with the OpenStep parser.
+
+### M2 report (2026-11-20)
+
+**What works now.** A Mac program written against Foundation (manual
+reference counting or ARC) runs on Ferry with Ferry's own Foundation,
+including programs that live in an `.app` bundle. `make check` runs 31
+tests (20 before M2's Foundation part, 18 before M2), all passing. The new
+ones:
+
+| Test | Proves |
+| --- | --- |
+| `dylib_classic`, `dylib_chained` | a program using its own Mac library, found through `@rpath`, in both relocation formats (classes, categories and C calls across the library boundary, `+load` and constructors in order) |
+| `foundation_strings` | `@"..."` literals, `stringWithFormat:` (flags, widths, `*`, `%@`, positional arguments), comparing and searching, numeric compare, substrings, case, trimming, padding, splitting and joining, number parsing, UTF-16 lengths for accented letters and emoji, paths, `NSMutableString` editing, copies, line enumeration, `NSData` round trip |
+| `foundation_collections` (also with chained fixups) | `NSNumber` (types, equality across int/float, shortest float text, shared booleans), `NSValue`, `NSArray` (literals, stable sorting by selector and block, filtering, enumerators, fast enumeration, blocks), `NSMutableArray`, `NSDictionary` (literal, description with sorted keys and nesting, 100-key growth and removal, copied keys, sorting by value), `NSSet`, `NSData` and base64, `NSNull`, key-value coding, and objects freed when collections and pools release them |
+| `foundation_system` | property lists: XML out and back, binary out and back (mutable containers), OpenStep text and `.strings`, a bad plist giving error 3840; `NSFileManager` (nested folders, attributes, copy, move, listing, subpaths, removal, the Mac's error messages); search paths; `NSUserDefaults` (registered defaults, typed setters, the file on disk, reloading, a command-line override); `NSURL` (parts, relative resolution, file URLs with escaping); `NSDate`; `NSError`; `NSProcessInfo` |
+| `foundation_runloop` | `NSRunLoop` (returns at once with nothing to do, runs until its timers are done), repeating and one-shot timers with targets and blocks, `performSelector:withObject:afterDelay:`, queued blocks, a pipe as an input source, `CFRunLoopRunInMode`, `CFRunLoopStop`, notifications (selector and block observers, object filtering, removal), and CF calls on Foundation objects and back |
+| `foundation_corefoundation` | CoreFoundation from plain C, linked under CoreFoundation's own Mac name |
+| `foundation_arc` | Foundation from ARC code: collections owning objects, weak references clearing when the last owner goes |
+| `foundation_bundle` (C and French) | a program inside `Hello.app`: bundle path, identifier, Info.plist values, resources, `NSLocalizedString` from `en.lproj` and `fr.lproj`, `CFBundle`, preferences named after the bundle identifier |
+| `foundation_exception` (+ message check) | reading past the end of an array stops the program with the Mac's "Terminating app due to uncaught exception 'NSRangeException'" message |
+
+The expected outputs were written from Apple's documented behaviour and
+checked by hand; they were not captured on a Mac (we have none), so small
+differences in wording from real macOS output are possible.
+
+**Design notes for the next session.**
+
+- Sources: `foundation/NSString.m` (strings, character sets, formatting),
+  `NSValue.m` (numbers), `NSArray.m`, `NSDictionary.m` (dictionaries and
+  sets on one hash table), `NSData.m`, `NSDate.m` (dates and URLs),
+  `NSObject.m` (NSObject additions, errors, exceptions, `NSLog`, functions,
+  descriptions), `NSPropertyList.m`, `NSSystem.m` (process info, bundles,
+  defaults, files), `NSRunLoop.m` (run loop, timers, notifications),
+  `CoreFoundation.m`. Shared helpers are in `FInternal.h`.
+- Headers: `sdk/include/Foundation/Foundation.h` declares everything (the
+  per-class headers just include it) and `sdk/include/CoreFoundation/`.
+  Everything declared there is implemented; keep it that way.
+- `ferry-cc` passes `-F` for Ferry's frameworks and adds `-lobjc` when a
+  program links a framework (on a Mac, Foundation re-exports libobjc; lld
+  can't follow that re-export to a library outside a Mac SDK).
+- Foundation's own singletons and the run loop have no locks: Ferry still
+  has no threads.
+
+**What isn't done yet (and why).**
+
+- Exceptions still can't be caught (`@try`/`@catch`): that needs a Mach-O
+  unwinder. An uncaught exception prints the Mac's message and stops.
+- Not written yet: `NSInvocation`/`NSMethodSignature` (so no
+  `forwardInvocation:`), `NSThread`, `NSOperationQueue`, `NSTask`,
+  `NSDateFormatter`, `NSCalendar`, `NSLocale`, `NSNumberFormatter`,
+  `NSRegularExpression`, `NSScanner`, `NSPredicate`, `NSSortDescriptor`,
+  `NSIndexSet`, `NSUUID`, `NSCache`, `NSJSONSerialization`, keyed archiving
+  (`NSCoding`, needed for nibs in M5), key-value observing, and
+  `NSAttributedString`. M4 to M6 will add what real apps turn out to need.
+- Simplifications: upper/lower case mapping covers ASCII and Latin-1 only;
+  `localizedCompare:` is plain `compare:`; dates print in UTC;
+  `bundleForClass:` returns the main bundle; only the user domain has
+  search paths; there's no global defaults domain; notification queues are
+  ignored (observers run at once); there's one run loop.
+- The private class names differ from Apple's (`FArray` instead of
+  `__NSArrayI`), so exception messages name Ferry's classes.
+- A pre-existing difference in Ferry's C library layer: `printf("%p", NULL)`
+  prints `(nil)` (Linux) instead of `0x0`. Foundation's own formatting
+  prints `0x0`.
+
+**What's next.** M3, drawing: a Core Graphics subset and Core Text basics on
+Cairo, Pango/HarfBuzz and FreeType, using freemac's system font.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -231,3 +354,4 @@ bridge in the `ferry` binary.
 
 - 2026-11-20: read Ferry, `make check` 10/10 green, wrote this plan, started M1.
 - 2026-11-20: M1 done: Objective-C runtime and blocks, `make check` 18/18.
+- 2026-11-20: M1 merged (#25). M2 done: dylib loading, Foundation and CoreFoundation basics, `make check` 31/31.
