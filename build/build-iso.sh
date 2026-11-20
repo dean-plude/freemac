@@ -198,6 +198,14 @@ in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
 # Every installed app's own icon on freemac's rounded-square tile. The apt hook
 # in the overlay does the same for apps installed later.
 in_chroot freemac-icon-tiles --system --quiet || log "Warning: couldn't make app icon tiles"
+# Helpers that freemac sets up itself stay out of the app grid and Seek (Dials
+# opens the printer one; the Qt and Kvantum ones only carry freemac's look).
+for app in kvantummanager qt5ct qt6ct system-config-printer; do
+  file="$ROOTFS/usr/share/applications/$app.desktop"
+  if [ -f "$file" ] && ! grep -q '^NoDisplay=true' "$file"; then
+    sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$file"
+  fi
+done
 # Strata's own Wayfire plugins (C++), compiled against the image's Wayfire:
 # strata-decor (title bars and rounded window corners) and strata-shell
 # (gtk-shell that hands app menus to Topline), plus Latch's lock screen

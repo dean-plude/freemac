@@ -21,6 +21,7 @@ from .status import NM, StatusButton, launch  # noqa: E402
 
 CSS = b"""
 .quick-panel { padding: 12px; }
+.quick-panel flowbox, .quick-panel flowboxchild { background: none; }
 .quick-tile { padding: 8px 10px; border-radius: 12px; min-width: 150px; }
 .quick-tile:checked { background-image: none; background-color: #2f7bf5; color: white; }
 .quick-tile:checked .dim-label { color: rgba(255, 255, 255, 0.8); }

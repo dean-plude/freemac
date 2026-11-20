@@ -39,8 +39,10 @@ TEMPLATE = """
 }
 .pier-item { background: none; border: none; box-shadow: none; padding: 0 3px; }
 .pier-dot { color: @ink; font-size: 7px; }
+/* Pop-ups from the menu bar (quick settings, volume) are nearly solid: with
+ * no blur behind them, see-through glass let windows show through the text. */
 .topline-popup {
-  background-color: @shelf;
+  background-color: @panel;
   border: 1px solid @edge;
   border-radius: 14px;
   padding: 10px 12px;

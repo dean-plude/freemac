@@ -11,6 +11,22 @@ add-on, [Ferry](ferry/README.md), runs some simple command-line programs built
 for Intel Macs; Mac apps in general, and App Store apps in particular, do not
 run.
 
+## Screenshots
+
+Taken from the 1.23 live ISO in a virtual machine (QEMU, 1280×800). The
+names, contacts and events in them are made-up examples.
+
+![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
+
+<table>
+<tr><td width="50%"><img src="docs/screenshots/drawer.png" alt="Drawer, the file browser, with the menu bar and Dock"><br><sub>Drawer, the file browser, with the menu bar and Dock</sub></td><td width="50%"><img src="docs/screenshots/seek.png" alt="Seek (⌘Space) finds files, apps, contacts, events and reminders"><br><sub>Seek (⌘Space) finds files, apps, contacts, events and reminders</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/apps.png" alt="All apps (F4 or the Dock's grid icon)"><br><sub>All apps (F4 or the Dock's grid icon)</sub></td><td width="50%"><img src="docs/screenshots/freemac-menu.png" alt="The freemac menu at the left of the menu bar"><br><sub>The freemac menu at the left of the menu bar</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/quick-settings.png" alt="Quick settings from the menu bar"><br><sub>Quick settings from the menu bar</sub></td><td width="50%"><img src="docs/screenshots/nudge.png" alt="Nudge, for reminders"><br><sub>Nudge, for reminders</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tide.png" alt="Tide, the calendar"><br><sub>Tide, the calendar</sub></td><td width="50%"><img src="docs/screenshots/crew.png" alt="Crew, for contacts"><br><sub>Crew, for contacts</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/dark-mode.png" alt="Dark mode, with the night wallpaper"><br><sub>Dark mode, with the night wallpaper</sub></td><td width="50%"><img src="docs/screenshots/dials-dark.png" alt="Dials, the settings app, in dark mode"><br><sub>Dials, the settings app, in dark mode</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td></tr>
+</table>
+
 ## Download
 
 Each finished milestone is published as a ready-made live ISO on the
@@ -188,12 +204,6 @@ Tested so far (Nov 2026), on the `BASE=ubuntu` image in QEMU:
   and switching night light on starts wlsunset with the chosen hours. QEMU's
   own screen capture can show stale patches of the menu bar without a GL
   display; the compositor's picture (grim) is clean.
-
-![freemac 0.4 desktop with Drawer and Seek](docs/screenshots/0.4-desktop.png)
-
-![freemac 0.4 in dark mode](docs/screenshots/0.4-dark.png)
-
-![Gangway, the 0.4 login screen](docs/screenshots/0.4-login.png)
 
 Not tested yet: real PC hardware, Wi-Fi (the virtual machine has none),
 laptop batteries and trackpads, and the default `BASE=debian` build, which
