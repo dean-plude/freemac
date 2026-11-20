@@ -22,6 +22,7 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, style  # noqa: E402
+from .ready_panel import ReadyPanel  # noqa: E402
 
 MAX_RESULTS = 8
 PREVIEW = 280      # width of the preview beside the results
@@ -202,7 +203,7 @@ def picture(path):
         return None
 
 
-class SeekWindow(Gtk.Window):
+class SeekWindow(ReadyPanel, Gtk.Window):
     def __init__(self, app):
         super().__init__(application=app, title="Seek")
         style.make_transparent(self)
@@ -256,13 +257,13 @@ class SeekWindow(Gtk.Window):
         # The index of words in files is brought up to date while Seek is
         # closed (see Seek), so typing here never waits on it.
         app.stop_indexing()
-        self.show_all()
+        self.show_ready()
         self.preview.hide()
         self.entry.grab_focus()
 
     def close(self):
         """Hide, ready for next time, with the search field empty."""
-        self.hide()
+        self.hide_ready()
         self.entry.set_text("")
         self.query = ""
         self.results = []
@@ -510,7 +511,7 @@ class Seek(Gtk.Application):
 
     def _start_index(self):
         self.index_timer = 0
-        if not (self.window and self.window.get_visible()) and (self.indexing is None or not self.indexing.is_alive()):
+        if not (self.window and self.window.is_open) and (self.indexing is None or not self.indexing.is_alive()):
             self.stop = threading.Event()
             self.indexing = threading.Thread(target=self._index, args=(self.stop,), daemon=True)
             self.indexing.start()
@@ -532,10 +533,11 @@ class Seek(Gtk.Application):
     def do_activate(self):
         if self.window is None:
             self.window = SeekWindow(self)
+            self.window.map_ready(self.window.box)
         if self.background:   # started with the session: wait for ⌘Space
             self.background = False
             return
-        if self.window.get_visible():  # Super+Space again closes it.
+        if self.window.is_open:  # Super+Space again closes it.
             self.window.close()
             return
         self.window.opened()

@@ -29,6 +29,7 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import style  # noqa: E402
+from .ready_panel import ReadyPanel  # noqa: E402
 
 APP_ID = "org.freemac.Glyph"
 RECENT_FILE = os.path.join(GLib.get_user_state_dir(), "freemac", "emoji-recent.json")
@@ -167,7 +168,7 @@ def type_text(text):
     return False
 
 
-class GlyphWindow(Gtk.Window):
+class GlyphWindow(ReadyPanel, Gtk.Window):
     def __init__(self, app):
         super().__init__(application=app, title="Emoji & Symbols")
         style.make_transparent(self)
@@ -260,11 +261,11 @@ class GlyphWindow(Gtk.Window):
                 self.refresh()
 
     def open_panel(self):
-        self.show_all()
+        self.show_ready()
         self.entry.grab_focus()
 
     def close_panel(self):
-        self.hide()
+        self.hide_ready()
         self.reset()
 
     # --- what's shown ----------------------------------------------------
@@ -399,10 +400,11 @@ class Glyph(Gtk.Application):
     def do_activate(self):
         if self.window is None:
             self.window = GlyphWindow(self)
+            self.window.map_ready(self.window.box)
         if self.background:   # started with the session: wait for the shortcut
             self.background = False
             return
-        if self.window.get_visible():   # Control-⌘-Space again closes it.
+        if self.window.is_open:   # Control-⌘-Space again closes it.
             self.window.close_panel()
             return
         self.window.open_panel()
