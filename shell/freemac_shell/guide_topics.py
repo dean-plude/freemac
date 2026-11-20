@@ -147,6 +147,20 @@ TOPICS = {
         "When the copy is done, Drawer's status line or a notification says so. "
         "Eject the drive before you unplug it.",
     ]),
+    "copy-files": ("Copy, move and duplicate files", "copy paste move cut duplicate drag folder undo files "
+                   "replace keep both", [
+        "Drag files onto a folder, a place in Drawer's sidebar, the Desktop or another Drawer window to move "
+        "them there. Onto another disk, such as a USB drive, they're copied instead. Hold ⌥ while you drop "
+        "to copy them anyway.",
+        "Or select them and press ⌘C, open the folder where they should go, and press ⌘V for a copy, or ⌥⌘V "
+        "to move them. Edit > Paste Item and Move Item Here do the same.",
+        "⌘D makes a copy beside the original, called “name copy”.",
+        "If the folder already has something with that name, you're asked: Keep Both (the new one is called "
+        "“name 2”), Stop, or Replace (the old one goes to the Trash).",
+        "A long copy shows a small window with how much is left. Click its stop button to stop it; the half-made "
+        "copy is removed.",
+        "Changed your mind? ⌘Z (Edit > Undo) takes back the last move, copy, rename, new folder or Move to Trash.",
+    ]),
 }
 
 
