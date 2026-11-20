@@ -144,6 +144,10 @@ mkdir -p "$ROOTFS/usr/lib/python3/dist-packages"
 rm -rf "$ROOTFS/usr/lib/python3/dist-packages/freemac_shell"
 cp -r "$REPO/shell/freemac_shell" "$ROOTFS/usr/lib/python3/dist-packages/"
 find "$ROOTFS/usr/lib/python3/dist-packages/freemac_shell" -name __pycache__ -prune -exec rm -rf {} +
+# Compile it ahead, as Debian's own Python packages are: the folder isn't
+# writable by the person using it, so otherwise every app recompiles its code
+# each time it starts.
+in_chroot python3 -m compileall -q /usr/lib/python3/dist-packages/freemac_shell
 install -m 0755 "$REPO"/shell/bin/* "$ROOTFS/usr/bin/"
 install -m 0644 "$REPO"/shell/applications/*.desktop "$ROOTFS/usr/share/applications/"
 cat > "$ROOTFS/etc/os-release" <<EOF

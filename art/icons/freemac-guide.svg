@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Guide: an open book with a bookmark. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fc3a1"/><stop offset="1" stop-color="#22977a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <path d="M64 40 C52 32 36 30 22 32 L22 94 C36 92 52 94 64 102 Z" fill="#fdfaf2"/>
+  <path d="M64 40 C76 32 92 30 106 32 L106 94 C92 92 76 94 64 102 Z" fill="#f2ecdc"/>
+  <path d="M64 40 L64 102" stroke="#c9bfa2" stroke-width="2"/>
+  <g fill="#b9c7c2">
+    <rect x="30" y="46" width="26" height="4" rx="2"/>
+    <rect x="30" y="58" width="26" height="4" rx="2"/>
+    <rect x="30" y="70" width="20" height="4" rx="2"/>
+    <rect x="72" y="58" width="26" height="4" rx="2"/>
+    <rect x="72" y="70" width="26" height="4" rx="2"/>
+    <rect x="72" y="82" width="18" height="4" rx="2"/>
+  </g>
+  <path d="M82 30 L94 30 L94 52 L88 47 L82 52 Z" fill="#f08a5d"/>
+</svg>
