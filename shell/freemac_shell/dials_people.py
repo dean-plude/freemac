@@ -18,6 +18,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
+from . import alert  # noqa: E402
+
 HELPER = "/usr/libexec/freemac-users-helper"
 GREETD = "/etc/greetd/config.toml"
 ADMIN_GROUP = "sudo"
@@ -57,10 +59,8 @@ def item_row(icon, title, subtitle, *widgets):
 
 
 def message(window, text, secondary=None, kind=Gtk.MessageType.ERROR):
-    dialog = Gtk.MessageDialog(transient_for=window, modal=True, message_type=kind,
-                               buttons=Gtk.ButtonsType.OK, text=text, secondary_text=secondary)
-    dialog.run()
-    dialog.destroy()
+    alert.tell(window, text, secondary or "",
+               icon="dialog-warning" if kind == Gtk.MessageType.ERROR else None)
 
 
 # ---- Users ----------------------------------------------------------------------
@@ -257,14 +257,10 @@ class UsersPanel(Gtk.Box):
         dialog.destroy()
 
     def on_delete(self, name, full):
-        dialog = Gtk.MessageDialog(transient_for=self.window, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                   text=f"Delete {full}?",
-                                   secondary_text="They won't be able to log in any more. You can keep their "
-                                                  "files in /home or delete them too.")
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Keep Files", 1, "Delete Files", 2)
-        dialog.get_widget_for_response(2).get_style_context().add_class("destructive-action")
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self.window, f"Delete {full}?",
+                           "They won't be able to log in any more. You can keep their files or delete them too.",
+                           [("Keep Files", 1), ("Delete Files", 2), ("Cancel", Gtk.ResponseType.CANCEL)],
+                           default=1, destructive=2, icon="avatar-default")
         if answer in (1, 2):
             self.helper("delete", name, "keep" if answer == 1 else "remove")
 
@@ -415,11 +411,9 @@ class BluetoothPanel(Gtk.Box):
             invocation.return_value(None)
 
     def ask(self, text, secondary):
-        dialog = Gtk.MessageDialog(transient_for=self.window, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                   text=text, secondary_text=secondary)
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Pair", Gtk.ResponseType.OK)
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self.window, text, secondary,
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Pair", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, icon="bluetooth")
         return answer == Gtk.ResponseType.OK
 
     def ask_code(self, name):
@@ -655,12 +649,9 @@ class PrintersPanel(Gtk.Box):
         self.lp("lp", "-d", name, "-t", "freemac test page", page)
 
     def remove(self, name, description):
-        dialog = Gtk.MessageDialog(transient_for=self.window, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                   text=f"Remove {description}?",
-                                   secondary_text="You can add it again later.")
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Remove", Gtk.ResponseType.OK)
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self.window, f"Remove {description}?", "You can add it again later.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Remove", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, icon="printer")
         if answer == Gtk.ResponseType.OK:
             self.lp("lpadmin", "-x", name)
 

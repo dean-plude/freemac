@@ -15,11 +15,36 @@ from . import apps, beacon, mac_accel, quick, status, style  # noqa: E402
 from .wfipc import Wayfire, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
+DESKTOP_APP = "Drawer"   # the file manager, in the bar when the desktop is in front
+DESKTOP_GO = (("Home", "", "⇧⌘H"), ("Desktop", "Desktop", "⇧⌘D"),
+              ("Documents", "Documents", "⇧⌘O"), ("Downloads", "Downloads", "⌥⌘L"),
+              ("Pictures", "Pictures", ""), ("Music", "Music", ""))
 HEIGHT = 28
 
 
 def run(*cmd):
     subprocess.Popen(cmd, start_new_session=True)
+
+
+def _trash_dir():
+    return os.path.join(GLib.get_user_data_dir(), "Trash", "files")
+
+
+def _trash_has_items():
+    try:
+        return bool(os.listdir(_trash_dir()))
+    except OSError:
+        return False
+
+
+def _untitled_folder(parent):
+    name, n = "untitled folder", 2
+    while os.path.exists(os.path.join(parent, name)):
+        name, n = f"untitled folder {n}", n + 1
+    try:
+        os.makedirs(os.path.join(parent, name))
+    except OSError:
+        pass
 
 
 class Topline(Gtk.Window):
@@ -187,14 +212,61 @@ class Topline(Gtk.Window):
         view = self.wf.focused() if self.wf else None
         # Opening one of our menus takes the focus from the app; keep showing
         # that app's menus until the menu closes.
-        if view is None and self.focused is not None and self._menu_open():
+        if view is None and self._menu_open():
             return
         self.focused = view
         self._fill_app_menus(view)
         app_id = view.get("app-id") if view else None
-        self.app_button.set_label(apps.display_name(app_id, view.get("title", "") if view else "") if view else "freemac")
+        # With no window in front (the desktop was clicked), the file manager
+        # is the app in the bar, with its own menus, as on a Mac.
+        self.app_button.set_label(apps.display_name(app_id, view.get("title", "") if view else "") if view
+                                  else DESKTOP_APP)
+        if view is None:
+            self._desktop_menus()
         self._fill_app_menu(view)
         self._fill_window_menu(view)
+
+    def _desktop_menus(self):
+        """File and Go for the desktop, which belongs to Drawer."""
+        if self._menu_key == ("desktop",):
+            return
+        self._menu_key = ("desktop",)
+        for child in self.menus_box.get_children():
+            self.menus_box.remove(child)
+        home = GLib.get_home_dir()
+        desktop = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) or os.path.join(home, "Desktop")
+        file_menu = self._watch_menu(Gtk.Menu())
+        self._item(file_menu, f"New {DESKTOP_APP} Window", lambda: run("freemac-drawer", home), shortcut="⌘N")
+        self._item(file_menu, "New Folder", lambda: _untitled_folder(desktop), shortcut="⇧⌘N")
+        file_menu.append(Gtk.SeparatorMenuItem())
+        self._item(file_menu, "Find…", lambda: run("freemac-seek"), shortcut="⌘Space")
+        go_menu = self._watch_menu(Gtk.Menu())
+        for label, sub, shortcut in DESKTOP_GO:
+            path = os.path.join(home, sub) if sub else home
+            if os.path.isdir(path):
+                self._item(go_menu, label, lambda p=path: run("freemac-drawer", p), shortcut=shortcut)
+        go_menu.append(Gtk.SeparatorMenuItem())
+        self._item(go_menu, "Trash", lambda: run("freemac-drawer", _trash_dir()))
+        for label, menu in (("File", file_menu), ("Go", go_menu)):
+            menu.show_all()
+            button = Gtk.MenuButton(label=label)
+            button.set_popup(menu)
+            menu.connect("motion-notify-event", self._menu_motion)
+            self._slide(button)
+            self.menus_box.pack_start(button, False, False, 0)
+            button.show_all()
+        self.menus_box.set_visible(True)
+
+    def _empty_trash(self):
+        from . import alert
+        answer = alert.ask(None, "Are you sure you want to permanently erase the items in the Trash?",
+                           "You can't undo this action.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Empty Trash", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK, icon="user-trash-full")
+        if answer == Gtk.ResponseType.OK:
+            # The same as the dock's Trash does.
+            from . import pier
+            pier.empty_trash()
 
     def _clear(self, menu):
         for child in menu.get_children():
@@ -303,6 +375,8 @@ class Topline(Gtk.Window):
         return self._bus
 
     def _fill_app_menus(self, view):
+        if view is None and self._menu_key == ("desktop",):
+            return   # the desktop's own menus are up already
         info = self.wf.app_menus(view["id"]) if (self.wf and view) else None
         key = None
         if info:
@@ -474,7 +548,13 @@ class Topline(Gtk.Window):
         menu = self.app_menu
         self._clear(menu)
         if not view:
-            self._item(menu, "About freemac", self._about)
+            self._item(menu, f"About {DESKTOP_APP}", self._about)
+            menu.append(Gtk.SeparatorMenuItem())
+            self._item(menu, "Empty Trash…", self._empty_trash, sensitive=_trash_has_items(),
+                       shortcut="⇧⌘⌫")
+            menu.append(Gtk.SeparatorMenuItem())
+            self._item(menu, "Hide Others", lambda: self._hide_others({}), shortcut="⌥⌘H")
+            self._item(menu, "Show All", self._show_all)
         else:
             # The same menu in every app, as on a Mac.
             name = apps.display_name(view.get("app-id"))

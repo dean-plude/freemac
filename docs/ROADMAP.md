@@ -208,14 +208,23 @@ The small things a Mac user notices in their first minute.
 | 3 | Drop a file on an app in the Dock to open it there; only apps that can open that kind of file light up | Pier | done |
 | 4 | Dials > Dock and Menu Bar: double-click a window's title bar to Zoom, Minimize or Do Nothing | Dials, Strata | done |
 
-## 1.10 "alerts and the desktop" (next)
+## 1.10 "alerts and the desktop" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Alerts look like a Mac's: the app's icon, a bold question, and small buttons on the right with the default one in blue, not full-width bars | theme, shell dialogs | |
-| 2 | Dials' sidebar looks like a Mac's settings sidebar: plain rows, each icon in a small coloured tile | Dials | |
-| 3 | Clicking the desktop makes the file manager the app in the menu bar, with its menus, as on a Mac | Topline, Drawer | |
-| 4 | Drop files on a folder in the Dock (like Downloads) to move them there | Pier | |
+| 1 | Alerts look like a Mac's: a small panel with no title bar, the app's icon on top, the question in bold, a short line under it, and equal buttons side by side (stacked when there are three), the default in blue; Return and Esc work | alert.py, theme | done |
+| 2 | Dials' sidebar looks like a Mac's settings sidebar: grouped plain rows, each icon white in a small coloured tile | Dials | done |
+| 3 | Clicking the desktop makes Drawer the app in the menu bar, with File (New Drawer Window, New Folder, Find) and Go menus and Empty Trash in its app menu | Topline | done |
+| 4 | Drop files on a folder in the Dock (like Downloads) to move them there; the folder darkens while they're over it | Pier | done |
+
+## 1.11 "the file manager and settings, finished" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A search field at the top of Dials' sidebar that finds a setting by name and opens its page | Dials | |
+| 2 | Drawer's sidebar like a Mac file manager's: a Favorites heading, plain rows with small blue icons, no boxes | Drawer | |
+| 3 | A thin line, not a thick bar, between the sidebar and the page in Dials and Drawer | Dials, Drawer, theme | |
+| 4 | Alerts from the Dock (Empty Trash) show Drawer as the app in the menu bar, as the Trash belongs to the file manager | Pier, Topline | |
 
 ## Later
 

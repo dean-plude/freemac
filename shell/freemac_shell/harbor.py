@@ -39,7 +39,7 @@ try:
 except (ImportError, ValueError):
     PK = None
 
-from . import beacon, menus, style  # noqa: E402
+from . import alert, beacon, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Harbor"
 ICON_SIZE = 48
@@ -462,14 +462,10 @@ class Details(Gtk.Box):
 
     def on_remove(self, _button):
         name = self.comp.get_name()
-        dialog = Gtk.MessageDialog(transient_for=self.get_toplevel(), modal=True,
-                                   message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.NONE,
-                                   text=f"Remove {name}?")
-        dialog.format_secondary_text("Your own files made with it are kept.")
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Remove", Gtk.ResponseType.OK)
-        dialog.get_widget_for_response(Gtk.ResponseType.OK).get_style_context().add_class("destructive-action")
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self.get_toplevel(), f"Remove {name}?", "Your own files made with it are kept.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Remove", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK,
+                           icon=self.image.get_pixbuf())
         if answer != Gtk.ResponseType.OK:
             return
         self.window.packages.remove([self.comp.get_pkgname()],

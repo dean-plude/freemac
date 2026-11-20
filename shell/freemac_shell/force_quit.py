@@ -12,7 +12,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import apps, style  # noqa: E402
+from . import alert, apps, style  # noqa: E402
 from .wfipc import Wayfire  # noqa: E402
 
 APP_ID = "org.freemac.ForceQuit"
@@ -104,21 +104,12 @@ class Window(Gtk.ApplicationWindow):
         if not chosen:
             return
         app_id, name, ids = chosen
-        dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
-                                   text=f"Do you want to force {name} to quit?")
-        dialog.format_secondary_text("You'll lose any changes you haven't saved.")
         # The app's own icon, not a warning sign, as on a Mac.
-        icon = apps.icon_for(app_id)
-        if icon is not None:
-            image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
-            image.set_pixel_size(64)
-            dialog.set_image(image)
-            image.show()
-        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        dialog.add_button("Force Quit", Gtk.ResponseType.OK).get_style_context().add_class("destructive-action")
-        dialog.set_default_response(Gtk.ResponseType.CANCEL)
-        answer = dialog.run()
-        dialog.destroy()
+        answer = alert.ask(self, f"Do you want to force {name} to quit?",
+                           "You'll lose any changes you haven't saved.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Force Quit", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK,
+                           icon=apps.icon_for(app_id))
         if answer == Gtk.ResponseType.OK:
             ended = set()
             for view_id in ids:
