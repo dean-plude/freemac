@@ -199,6 +199,15 @@ The small things a Mac user notices in their first minute.
 | 3 | ⌘, opens an app's settings where it has them, and every app menu offers Settings… (and the app's own About) when it does | Topline, Strata | done |
 | 4 | Pier's right-click menu: a tick by the front window, and Options with Keep in Dock and Open at Login | Pier | done |
 
+## 1.9 "the Dock and stuck apps" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | ⌥⌘⎋ opens a Force Quit window listing running apps, with a Force Quit button that ends one that has stopped answering | Strata, new shell window | |
+| 2 | Drag apps along the Dock to reorder them, and drag one up and out to take it off the Dock | Pier | |
+| 3 | Drop a file on an app in the Dock to open it with that app | Pier | |
+| 4 | Dials choice for what a double-click on a title bar does: Zoom (now) or Minimize | Dials, Strata | |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
