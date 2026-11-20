@@ -1,5 +1,6 @@
 /ferry
 /src/*.o
+/src/objc/*.o
 /sdk/lib/
 /tests/build/
 /packaging/out/

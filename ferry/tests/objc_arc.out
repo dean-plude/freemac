@@ -1,0 +1,43 @@
+-- scope
+made a, alive 1
+dealloc a
+after scope, alive 0
+-- strong and weak
+child alive through parent: child, its parent parent
+dealloc child
+weak child now nil
+dealloc parent
+weak parent now nil, alive 0
+-- autorelease pool
+in pool: pooled
+dealloc pooled
+after pool, alive 0
+-- copy and atomic properties
+copied: copy of orig, shared same: 1
+dealloc holder
+dealloc orig
+dealloc copy of orig
+alive 0
+-- blocks
+counter 1 (captured)
+counter 2 (captured)
+counter 3 (captured)
+same heap block: 1
+dealloc captured
+alive 0
+global block 42
+dealloc first
+swap is second
+dealloc second
+block sees temp
+dealloc temp
+block sees nil
+-- imp_implementationWithBlock
+bumper got 4
+returned 5
+dealloc bumper
+-- @synchronized
+inside twice
+dealloc lock
+end, alive 0
+exit=0

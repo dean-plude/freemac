@@ -1,0 +1,68 @@
++load Animal
++load Dog
++load Animal(Pet)
+-- classes
++initialize Animal
+animal with 4 legs says ...
++initialize Dog
+[dog with 4 legs says WOOF] and knows 3 tricks, age 5
+isKindOfClass Animal: 1, isMemberOfClass Animal: 0
+superclass of Dog: Animal
+Dog subclass of Animal: 1, of Square: 0
+respondsToSelector sound: 1, fly: 0
+instancesRespondToSelector petName: 1
+category: Rex
+-- protocols
+conforms Shape: 1, NSObject: 1, Named: 0
+Animal conforms Named: 1, Dog: 1
+protocol name: Shape, optional nickname: 0
+Shape requires area (d16@0:8)
+-- return values
+area 9.0
+bounds 0 0 3 3
+bigArea 9000
+half 2.50
+sum 7.0
+nil: 0.0 0 0
+-- introspection
+ivar legs i at 8
+ivar _age i at 12
+property side Td,V_side
+property hash TQ,R
+property superclass T#,R
+side type d
+half: 3 args, returns f, takes f
+instance size Animal 16 Dog 24
+objc_getClass Dog: 1, metaclass: 1
+via IMP 4.5
+-- objc_msgSend by hand
+WOOF
+super: ...
+-- dynamic classes
++initialize Cat
+animal with 0 legs says meow, lives 9
+Cat is an Animal: 1
+-- swizzling
+sound dog, name WOOF
+sound meow
+sound WOOF
+-- associated objects
+associated: tag
+dealloc tag
+-- resolution and forwarding
+resolved magic
+magic 42
+magic again 42
+forwarding sound
+forwarded: WOOF
+-- manual reference counting
+retainCount 1
+retainCount 2
+copy label one, same object 0
+dealloc one
+dealloc one
+deallocs 3
+before pop
+dealloc pooled
+after pop, deallocs 4
+exit=0

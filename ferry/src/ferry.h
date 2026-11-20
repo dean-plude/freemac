@@ -28,6 +28,8 @@ extern const struct ferry_symbol ferry_core_symbols[];
 extern const struct ferry_symbol ferry_stdio_symbols[];
 extern const struct ferry_symbol ferry_posix_symbols[];
 extern const char *const ferry_passthrough[];
+extern const struct ferry_symbol ferry_blocks_symbols[];   /* libSystem's blocks */
+extern const struct ferry_symbol ferry_objc_symbols[];     /* libobjc.A.dylib */
 
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);
