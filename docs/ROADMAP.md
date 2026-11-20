@@ -358,12 +358,17 @@ The small things a Mac user notices in their first minute.
 | 4 | Seek's window is kept ready so it takes typing the moment ⌘Space is pressed | Seek, Glyph (`ready_panel.py`) | done |
 | 5 | A photos app: the Pictures folder by month, a large viewer, and import from a camera or phone | Cove (new) | done |
 
-## Later
+## 1.25 "drives and albums" (next)
 
-- Drawer: USB drives, memory cards and phones in the sidebar (and on the
-  Desktop) with Eject, as Locations.
-- Tide: a colour for each calendar, so an online account's events stand
-  apart from the ones made here.
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | USB drives, memory cards and phones open by themselves when plugged in, show under Locations in Drawer's sidebar and on the Desktop, and have Eject | Drawer, Backdrop | |
+| 2 | A colour for each calendar, local and online, with a list to show or hide each one | Tide | |
+| 3 | The menu bar always shows the app in front, also just after an app opens or quits | Topline | |
+| 4 | Albums in Cove: make one, add photos to it, and play any album or month as a slideshow | Cove | |
+| 5 | Share from Drawer, Cove and Frame: send a file by mail in Post, or copy it to a drive | Drawer, Cove, Frame, Post | |
+
+## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
   Strata and a Qt platform plugin that uses it).
