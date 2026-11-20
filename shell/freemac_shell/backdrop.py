@@ -7,6 +7,8 @@ menu bar and the dock. The picture fills the screen at any shape by default
 [background] section of ~/.config/wf-shell.ini; Backdrop watches that file.
 
 Keys: image = path, fit = fill | fit | stretch.
+
+The first screen also shows the Desktop folder's files (desktop_icons.py).
 """
 import os
 
@@ -50,7 +52,7 @@ def placement(img_w, img_h, area_w, area_h, fit):
 
 
 class BackdropWindow(Gtk.Window):
-    def __init__(self, owner, monitor):
+    def __init__(self, owner, monitor, with_icons=False):
         super().__init__(title="Backdrop")
         self.owner = owner
         GtkLayerShell.init_for_window(self)
@@ -64,7 +66,18 @@ class BackdropWindow(Gtk.Window):
         self.cache = None
         self.area = Gtk.DrawingArea()
         self.area.connect("draw", self.draw)
-        self.add(self.area)
+        self.icons = None
+        if with_icons:
+            # The Desktop folder's files, over the picture (first screen only).
+            from .desktop_icons import DesktopIcons
+            GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.ON_DEMAND)
+            overlay = Gtk.Overlay()
+            overlay.add(self.area)
+            self.icons = DesktopIcons(monitor)
+            overlay.add_overlay(self.icons)
+            self.add(overlay)
+        else:
+            self.add(self.area)
         self.show_all()
 
     def draw(self, widget, cr):
@@ -133,7 +146,8 @@ class Backdrop:
         for window in self.windows:
             window.destroy()
         display = Gdk.Display.get_default()
-        self.windows = [BackdropWindow(self, display.get_monitor(i)) for i in range(display.get_n_monitors())]
+        self.windows = [BackdropWindow(self, display.get_monitor(i), with_icons=(i == 0))
+                        for i in range(display.get_n_monitors())]
 
 
 def main():

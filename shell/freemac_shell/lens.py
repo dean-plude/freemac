@@ -8,12 +8,12 @@
   freemac-lens --record-area  start or stop recording an area     (Ctrl+Shift+Print)
   freemac-lens            a small window to choose, with an optional delay
 
-Pictures are saved as PNG in ~/Pictures/Screenshots, copied to the clipboard
+Pictures are saved as PNG on the Desktop, copied to the clipboard
 when wl-copy is installed, and announced through Beacon; clicking the
 notification opens the picture. Capturing uses grim, picking an area uses
 slurp.
 
-Recordings are MP4 videos in ~/Videos/Screen Recordings, made by wf-recorder.
+Recordings are MP4 videos, also on the Desktop, made by wf-recorder.
 While one runs, Topline shows a red stop button (status.Recording), which
 runs `freemac-lens --stop`. The running recorder's process id is kept in
 $XDG_RUNTIME_DIR/freemac-recording.
@@ -30,12 +30,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
-FOLDER = os.path.join(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
-                      or os.path.expanduser("~/Pictures"), "Screenshots")
-
-
-VIDEOS = os.path.join(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_VIDEOS)
-                      or os.path.expanduser("~/Videos"), "Screen Recordings")
+# Both land on the Desktop, where they show as icons, ready to drag somewhere.
+FOLDER = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) or os.path.expanduser("~/Desktop")
+VIDEOS = FOLDER
 RECORDING = os.path.join(GLib.get_user_runtime_dir(), "freemac-recording")
 
 
@@ -114,7 +111,7 @@ def toggle_recording(area=False):
     if recording():
         path = stop_recording()
         if path:
-            beacon.send("Screen recording saved", f"{os.path.basename(path)} is in Videos › Screen Recordings.",
+            beacon.send("Screen recording saved", f"{os.path.basename(path)} is on the Desktop.",
                         icon="video-x-generic", app="Lens", open_path=path)
         return bool(path)
     path, error = start_recording(area)
@@ -185,7 +182,7 @@ def announce(path, error):
     from . import beacon
 
     if path:
-        beacon.send("Screenshot saved", f"{os.path.basename(path)} is in Pictures › Screenshots"
+        beacon.send("Screenshot saved", f"{os.path.basename(path)} is on the Desktop"
                     + (" and on the clipboard." if shutil.which("wl-copy") else "."),
                     icon=path, app="Lens", open_path=path)
     elif error:
