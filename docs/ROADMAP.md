@@ -351,10 +351,11 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Space in Drawer shows a large preview of the chosen file (pictures, PDFs, text), and Space again closes it | Drawer | |
+| 1 | An emoji and symbols picker (Control-⌘-Space, and Edit > Emoji & Symbols) that types the chosen one into the app in front | New, Topline | |
 | 2 | A mail app for IMAP and SMTP accounts: inbox, read, reply, write, attachments | New app | |
 | 3 | Tide, Crew and Nudge can sync with online calendars and contacts (CalDAV, CardDAV) set up once in Dials | Dials, Tide, Crew, Nudge | |
 | 4 | Seek's window is kept ready so it takes typing the moment ⌘Space is pressed | Seek | |
+| 5 | A photos app: the Pictures folder by month, a large viewer, and import from a camera or phone | New app | |
 
 ## Later
 
