@@ -372,3 +372,22 @@ class Printing(StatusButton):
                             "printer-error-symbolic", "Printers")
             elif not stopped:
                 self.stopped.discard(printer)
+
+
+class Recording(StatusButton):
+    """A red stop button while Lens is recording the screen; click to stop."""
+
+    def __init__(self):
+        super().__init__()
+        self.get_style_context().add_class("recording")
+        self.connect("clicked", lambda *_: launch("freemac-lens", "--stop"))
+        GLib.timeout_add(1000, lambda: self.update() or True)
+        self.update()
+
+    def update(self):
+        from . import lens
+
+        if lens.recording():
+            self.show_icon("media-record-symbolic", "Recording the screen. Click to stop.")
+        else:
+            self.hide()

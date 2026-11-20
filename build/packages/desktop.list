@@ -31,6 +31,7 @@ gir1.2-gtksource-4
 grim
 slurp
 wl-clipboard
+wf-recorder
 libnotify-bin
 xdg-utils
 xdg-user-dirs
