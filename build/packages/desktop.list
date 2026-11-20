@@ -15,6 +15,8 @@ libgles2
 libgbm1
 fonts-inter
 fonts-dejavu-core
+# Colour emoji, for the emoji panel (Glyph) and every app
+fonts-noto-color-emoji
 adwaita-icon-theme
 hicolor-icon-theme
 librsvg2-common
@@ -34,6 +36,8 @@ gir1.2-gtksource-4
 grim
 slurp
 wl-clipboard
+# Glyph types the emoji you pick into the app in front
+wtype
 wf-recorder
 libnotify-bin
 xdg-utils

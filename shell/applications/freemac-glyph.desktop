@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Emoji & Symbols
+Comment=Find an emoji or symbol and type it into the app in front
+Exec=freemac-glyph
+Icon=face-smile
+Categories=Utility;
+Keywords=emoji;symbol;character;smiley;
+NoDisplay=true
+StartupWMClass=freemac-glyph

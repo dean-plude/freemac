@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Opens the Emoji & Symbols panel. When the session's copy is already
+# running, gdbus asks it to open, which takes a moment rather than the second
+# or two that starting Python and GTK takes.
+if [ "$1" != "--background" ] && command -v gdbus >/dev/null 2>&1 &&
+    gdbus call --session --dest org.freemac.Glyph --object-path /org/freemac/Glyph \
+        --method org.freedesktop.Application.Activate '{}' >/dev/null 2>&1; then
+    exit 0
+fi
+exec /usr/bin/python3 -c 'import sys; from freemac_shell.glyph import main; sys.exit(main(["freemac-glyph"] + sys.argv[1:]))' "$@"

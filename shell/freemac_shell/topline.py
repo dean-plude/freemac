@@ -695,12 +695,35 @@ class Topline(Gtk.Window):
         menus = list(self._top_level(self._menubar)) if self._menubar is not None else []
         for label, submenu in menus:
             button = Gtk.MenuButton(label=label, use_underline=True)
-            button.set_popup(self._menu_from_model(submenu))
+            menu = self._menu_from_model(submenu)
+            if label.replace("_", "") == "Edit":
+                self._add_emoji_item(menu)
+            button.set_popup(menu)
             self._slide(button)
             self.menus_box.pack_start(button, False, False, 0)
             button.show_all()
         self.menus_box.set_visible(bool(menus))
         self._queue_keys()
+
+    def _add_emoji_item(self, menu):
+        """Every app's Edit menu ends with Emoji & Symbols, as on a Mac. It
+        opens Glyph once the menu has closed, so the app keeps the keyboard
+        and the emoji is typed into it."""
+        separator = Gtk.SeparatorMenuItem()
+        menu.append(separator)
+        separator.show()
+        item = Gtk.MenuItem()
+        box = Gtk.Box(spacing=24)
+        box.pack_start(Gtk.Label(label="Emoji & Symbols", xalign=0), True, True, 0)
+        keys = Gtk.Label(label="⌃⌘Space", xalign=1)
+        keys.get_style_context().add_class("dim-label")
+        keys.get_style_context().add_class("accelerator")
+        box.pack_end(keys, False, False, 0)
+        item.add(box)
+        item.connect("activate", lambda *_: GLib.timeout_add(
+            150, lambda: GLib.spawn_async(["freemac-glyph"], flags=GLib.SpawnFlags.SEARCH_PATH) and False))
+        menu.append(item)
+        item.show_all()
 
     def _own_action(self, name):
         view = self.focused
