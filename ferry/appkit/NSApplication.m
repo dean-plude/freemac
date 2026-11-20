@@ -183,6 +183,52 @@ void AWindowDidClose(NSWindow *window)
     return [item autorelease];
 }
 - (instancetype)init { return [self initWithTitle:@"" action:NULL keyEquivalent:@""]; }
+
+/* From a nib: the title, key equivalent and its modifiers, action, target,
+ * tag, state, submenu and the separator, disabled and hidden switches. */
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if (!(self = [self initWithTitle:@"" action:NULL keyEquivalent:@""]))
+        return nil;
+    NSString *title = [c decodeObjectForKey:@"NSTitle"];
+    if ([title isKindOfClass:[NSString class]])
+        [self setTitle:title];
+    NSString *key = [c decodeObjectForKey:@"NSKeyEquiv"];
+    if ([key isKindOfClass:[NSString class]])
+        [self setKeyEquivalent:key];
+    if ([c containsValueForKey:@"NSKeyEquivModMask"])
+        _mask = (NSEventModifierFlags)[c decodeInt64ForKey:@"NSKeyEquivModMask"];
+    NSString *action = [c decodeObjectForKey:@"NSAction"];
+    if ([action isKindOfClass:[NSString class]])
+        _action = NSSelectorFromString(action);
+    _target = [c decodeObjectForKey:@"NSTarget"];
+    _tag = [c decodeIntegerForKey:@"NSTag"];
+    _state = [c decodeIntegerForKey:@"NSState"];
+    _separator = [c decodeBoolForKey:@"NSIsSeparator"];
+    _enabled = !_separator && ![c decodeBoolForKey:@"NSIsDisabled"];
+    _hidden = [c decodeBoolForKey:@"NSIsHidden"];
+    NSMenu *sub = [c decodeObjectForKey:@"NSSubmenu"];
+    if ([sub isKindOfClass:[NSMenu class]])
+        [self setSubmenu:sub];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    [c encodeObject:_title forKey:@"NSTitle"];
+    [c encodeObject:_key forKey:@"NSKeyEquiv"];
+    [c encodeInt64:(int64_t)_mask forKey:@"NSKeyEquivModMask"];
+    if (_action)
+        [c encodeObject:NSStringFromSelector(_action) forKey:@"NSAction"];
+    if (_target)
+        [c encodeConditionalObject:_target forKey:@"NSTarget"];
+    [c encodeInteger:_tag forKey:@"NSTag"];
+    [c encodeInteger:_state forKey:@"NSState"];
+    [c encodeBool:_separator forKey:@"NSIsSeparator"];
+    [c encodeBool:!_enabled forKey:@"NSIsDisabled"];
+    [c encodeBool:_hidden forKey:@"NSIsHidden"];
+    if (_submenu)
+        [c encodeObject:_submenu forKey:@"NSSubmenu"];
+}
 - (instancetype)initWithTitle:(NSString *)title action:(SEL)action keyEquivalent:(NSString *)key
 {
     if ((self = [super init])) {
@@ -291,6 +337,30 @@ void AWindowDidClose(NSWindow *window)
     id _delegate;
 }
 - (instancetype)init { return [self initWithTitle:@""]; }
+
+/* From a nib: the title, the items, and a name for the special menus
+ * ("_NSMainMenu", "_NSWindowsMenu"...). */
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    NSString *title = [c decodeObjectForKey:@"NSTitle"];
+    if (!(self = [self initWithTitle:[title isKindOfClass:[NSString class]] ? title : @""]))
+        return nil;
+    for (NSMenuItem *item in [c decodeObjectForKey:@"NSMenuItems"])
+        if ([item isKindOfClass:[NSMenuItem class]])
+            [self addItem:item];
+    if ([c containsValueForKey:@"NSNoAutoenable"])
+        _autoenables = ![c decodeBoolForKey:@"NSNoAutoenable"];
+    NSString *name = [c decodeObjectForKey:@"NSName"];
+    if ([name isKindOfClass:[NSString class]])
+        ANibNoteNamedMenu(self, name);
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    [c encodeObject:_title forKey:@"NSTitle"];
+    [c encodeObject:_items forKey:@"NSMenuItems"];
+    [c encodeBool:!_autoenables forKey:@"NSNoAutoenable"];
+}
 - (instancetype)initWithTitle:(NSString *)title
 {
     if ((self = [super init])) {
@@ -803,9 +873,13 @@ int NSApplicationMain(int argc, const char *argv[])
         NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
         Class cls = NSClassFromString(info[@"NSPrincipalClass"]) ?: [NSApplication class];
         [cls sharedApplication];
-        NSString *nib = info[@"NSMainNibFile"] ?: info[@"NSMainStoryboardFile"];
-        if (nib)
-            AWarnOnce("loading the main nib or storyboard");
+        NSString *nib = info[@"NSMainNibFile"];
+        if ([nib isKindOfClass:[NSString class]] && [nib length]) {
+            if (![NSBundle loadNibNamed:nib owner:NSApp])
+                fprintf(stderr, "ferry: the app's main nib, %s, couldn't be loaded\n", [nib UTF8String]);
+        } else if (info[@"NSMainStoryboardFile"]) {
+            AWarnOnce("storyboards (the app's main storyboard isn't loaded)");
+        }
     }
     [NSApp run];
     return 0;

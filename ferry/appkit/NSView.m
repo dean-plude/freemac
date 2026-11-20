@@ -26,19 +26,75 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
 
 - (instancetype)init { return [self initWithFrame:NSZeroRect]; }
 
+static void view_setup(NSView *v, NSRect frame)
+{
+    v->_frame = frame;
+    v->_bounds = NSMakeRect(0, 0, frame.size.width, frame.size.height);
+    v->_subviews = [[NSMutableArray alloc] init];
+    v->_autoresizes = YES;
+    v->_postsFrame = v->_postsBounds = YES;
+    v->_translates = YES;
+    v->_alpha = 1;
+    v->_needsDisplay = YES;
+}
+
 - (instancetype)initWithFrame:(NSRect)frame
 {
+    if ((self = [super init]))
+        view_setup(self, frame);
+    return self;
+}
+
+/* From a nib: the frame, then the flags word "NSvFlags" (the autoresizing
+ * mask in its low six bits, 0x100 for autoresizing subviews, the top bit
+ * for hidden), the subviews back to front and the next key view. */
+NSRect AViewFrameFromCoder(NSCoder *c)
+{
+    if ([c containsValueForKey:@"NSFrame"])
+        return [c decodeRectForKey:@"NSFrame"];
+    NSRect r = NSZeroRect;
+    r.size = [c decodeSizeForKey:@"NSFrameSize"];
+    return r;
+}
+
+void AViewDecode(NSView *v, NSCoder *c)
+{
+    if ([c containsValueForKey:@"NSvFlags"]) {
+        unsigned flags = (unsigned)[c decodeInt64ForKey:@"NSvFlags"];
+        v->_mask = flags & 0x3f;
+        v->_autoresizes = (flags & 0x100) != 0;
+        v->_hidden = (flags & 0x80000000u) != 0;
+    }
+    if ([c containsValueForKey:@"NSHidden"])
+        v->_hidden = [c decodeBoolForKey:@"NSHidden"];
+    for (NSView *sub in [c decodeObjectForKey:@"NSSubviews"])
+        if ([sub isKindOfClass:[NSView class]] && [sub superview] != v)
+            [v addSubview:sub];
+    NSView *next = [c decodeObjectForKey:@"NSNextKeyView"];
+    if ([next isKindOfClass:[NSView class]])
+        [v setNextKeyView:next];
+    NSString *tip = [c decodeObjectForKey:@"NSToolTip"];
+    if ([tip isKindOfClass:[NSString class]])
+        [v setToolTip:tip];
+}
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
     if ((self = [super init])) {
-        _frame = frame;
-        _bounds = NSMakeRect(0, 0, frame.size.width, frame.size.height);
-        _subviews = [[NSMutableArray alloc] init];
-        _autoresizes = YES;
-        _postsFrame = _postsBounds = YES;
-        _translates = YES;
-        _alpha = 1;
-        _needsDisplay = YES;
+        view_setup(self, AViewFrameFromCoder(coder));
+        AViewDecode(self, coder);
     }
     return self;
+}
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeRect:_frame forKey:@"NSFrame"];
+    [coder encodeInt64:(int64_t)((_mask & 0x3f) | (_autoresizes ? 0x100 : 0) | (_hidden ? 0x80000000u : 0))
+                forKey:@"NSvFlags"];
+    if ([_subviews count])
+        [coder encodeObject:_subviews forKey:@"NSSubviews"];
+    if (_nextKeyView)
+        [coder encodeConditionalObject:_nextKeyView forKey:@"NSNextKeyView"];
 }
 
 - (void)dealloc

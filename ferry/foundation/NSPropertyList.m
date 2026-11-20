@@ -822,6 +822,19 @@ struct bpw {
     int refsize;
 };
 
+/* Keyed archives' UIDs are one-entry dictionaries {"CF$UID": n}. */
+static BOOL is_uid(id obj, uint64_t *n)
+{
+    if (![obj isKindOfClass:[NSDictionary class]] || [obj count] != 1)
+        return NO;
+    id v = [obj objectForKey:@"CF$UID"];
+    if (![v isKindOfClass:[NSNumber class]] || [v longLongValue] < 0)
+        return NO;
+    if (n)
+        *n = [v unsignedLongLongValue];
+    return YES;
+}
+
 static NSUInteger bpw_flatten(struct bpw *w, id obj)
 {
     NSUInteger ref = [w->objects count];
@@ -829,7 +842,7 @@ static NSUInteger bpw_flatten(struct bpw *w, id obj)
     if ([obj isKindOfClass:[NSArray class]]) {
         for (id o in obj)
             bpw_flatten(w, o);
-    } else if ([obj isKindOfClass:[NSDictionary class]]) {
+    } else if ([obj isKindOfClass:[NSDictionary class]] && !is_uid(obj, NULL)) {
         NSArray *keys = [[obj allKeys] sortedArrayUsingSelector:@selector(compare:)];
         for (id k in keys)
             bpw_flatten(w, k);
@@ -869,7 +882,7 @@ static NSUInteger bpw_count_tree(id obj)
     if ([obj isKindOfClass:[NSArray class]])
         for (id o in obj)
             n += bpw_count_tree(o);
-    else if ([obj isKindOfClass:[NSDictionary class]])
+    else if ([obj isKindOfClass:[NSDictionary class]] && !is_uid(obj, NULL))
         for (id k in obj)
             n += 1 + bpw_count_tree([obj objectForKey:k]);
     return n;
@@ -879,6 +892,7 @@ static NSUInteger bpw_write(struct bpw *w, NSUInteger ref, uint64_t *offsets)
 {
     id obj = [w->objects objectAtIndex:ref];
     NSMutableData *d = w->out;
+    uint64_t uid;
     offsets[ref] = [d length];
     if ([obj isKindOfClass:[NSString class]]) {
         NSUInteger n = [obj length];
@@ -933,6 +947,11 @@ static NSUInteger bpw_write(struct bpw *w, NSUInteger ref, uint64_t *offsets)
         for (i = 0; i < [obj count]; i++)
             bpw_write(w, refs[i], offsets);
         free(refs);
+    } else if (is_uid(obj, &uid)) {
+        int n = uid < 256 ? 1 : uid < 65536 ? 2 : uid < 4294967296ull ? 4 : 8;
+        unsigned char m = 0x80 | (n - 1);
+        [d appendBytes:&m length:1];
+        put_be(d, uid, n);
     } else if ([obj isKindOfClass:[NSDictionary class]]) {
         NSArray *keys = [[obj allKeys] sortedArrayUsingSelector:@selector(compare:)];
         NSUInteger n = [keys count], child = ref + 1;

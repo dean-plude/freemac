@@ -80,6 +80,17 @@ static NSValue *geometry_value(char kind, NSRect rect)
 @end
 
 @implementation FValue
+- (const char *)objCType
+{
+    switch (_kind) {
+    case 'r': return @encode(NSRange);
+    case 'P': return @encode(NSPoint);
+    case 'S': return @encode(NSSize);
+    case 'R': return @encode(NSRect);
+    case 'E': return @encode(NSEdgeInsets);
+    }
+    return @encode(void *);
+}
 - (NSRange)rangeValue { return _range; }
 - (void *)pointerValue { return _ptr; }
 - (NSPoint)pointValue { return _rect.origin; }

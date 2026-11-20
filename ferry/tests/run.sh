@@ -24,6 +24,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
+        foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -82,6 +83,8 @@ run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobj
 run_one foundation_collections_chained "$here/foundation/collections.m" "$here/foundation/collections.out" \
     -framework Foundation -Wl,-fixup_chains
 run_one foundation_attributed "$here/foundation/attributed.m" "$here/foundation/attributed.out" -framework Foundation
+# Keyed archives (M5), the format of nib files.
+run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archive.out" -framework Foundation
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
 run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
     -framework CoreGraphics -framework CoreFoundation
@@ -141,6 +144,29 @@ if "$top/sdk/ferry-cc" -O1 -o "$app/Contents/MacOS/Hello" "$here/foundation/bund
     done
 else
     echo "FAIL foundation_bundle (did not compile)"; sed 's/^/    /' "$build/foundation_bundle.cc.log"
+    fail=$((fail + 1))
+fi
+# An app started from its main nib (M5), with no display. The nibs come
+# from make_nibs.py; what Ferry says about the parts it can't use goes to
+# stderr and is checked too.
+app="$build/NibApp.app"
+rm -rf "$app"; cp -r "$here/appkit/NibApp.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/NibApp" "$here/appkit/nib.m" -framework Cocoa \
+        2> "$build/appkit_nib.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY LANG=C LC_ALL= LC_MESSAGES= "$top/ferry" "$app/Contents/MacOS/NibApp" \
+        > "$build/appkit_nib.got" 2> "$build/appkit_nib.err"
+    echo "exit=$?" >> "$build/appkit_nib.got"
+    if ! diff -u "$here/appkit/nib.out" "$build/appkit_nib.got" > "$build/appkit_nib.diff"; then
+        echo "FAIL appkit_nib"; sed 's/^/    /' "$build/appkit_nib.diff"; sed 's/^/    stderr: /' "$build/appkit_nib.err"
+        fail=$((fail + 1))
+    elif ! grep -q "view class NoSuchView" "$build/appkit_nib.err" || ! grep -q '"noSuchOutlet"' "$build/appkit_nib.err"; then
+        echo "FAIL appkit_nib (no warning for the missing class or outlet)"; sed 's/^/    stderr: /' "$build/appkit_nib.err"
+        fail=$((fail + 1))
+    else
+        echo "ok   appkit_nib"; pass=$((pass + 1))
+    fi
+else
+    echo "FAIL appkit_nib (did not compile)"; sed 's/^/    /' "$build/appkit_nib.cc.log"
     fail=$((fail + 1))
 fi
 # An exception nobody catches ends the program with the Mac's message.
