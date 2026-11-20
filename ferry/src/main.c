@@ -10,7 +10,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.3.0"
+#define FERRY_VERSION "0.4.0"
 
 static void usage(FILE *out)
 {
@@ -19,7 +19,7 @@ static void usage(FILE *out)
           "  -v, --verbose   say what Ferry loads and connects\n"
           "  -h, --help      show this help\n"
           "      --version   show Ferry's version\n"
-          "      --list-symbols[=libSystem|libobjc]\n"
+          "      --list-symbols[=libSystem|libobjc|libFerryHost]\n"
           "                  list the calls Ferry provides (used to build its SDK)\n", out);
 }
 
@@ -46,6 +46,10 @@ int main(int argc, char **argv, char **envp)
         } else if (!strcmp(argv[i], "--list-symbols=libobjc")) {
             for (const struct ferry_symbol *s = ferry_objc_symbols; s->name; s++)
                 printf("_%s\n", s->name);
+            return 0;
+        } else if (!strcmp(argv[i], "--list-symbols=libFerryHost")) {
+            for (const char *const *p = ferry_host_names; *p; p++)
+                printf("_%s\n", *p);
             return 0;
         } else if (!strcmp(argv[i], "--version")) {
             puts("ferry " FERRY_VERSION);

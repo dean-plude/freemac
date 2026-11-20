@@ -6,3 +6,5 @@
 /packaging/out/
 /foundation/build/
 /frameworks/
+/graphics/build/
+/src/host_names.h

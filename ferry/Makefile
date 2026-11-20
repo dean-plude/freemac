@@ -6,7 +6,7 @@ LDLIBS = -Wl,--no-as-needed -lm -ldl -lpthread
 PREFIX ?= /usr
 DESTDIR ?=
 
-SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/passthrough.c \
+SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/passthrough.c src/host.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/symbols.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
@@ -20,13 +20,30 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      sdk/include/CoreFoundation/CoreFoundation.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
-all: ferry $(TBD) $(FOUNDATION)
+# Core Graphics and Core Text (M3), one Mac library that draws with this
+# system's Cairo and Pango. CoreText and ApplicationServices are served from
+# it, as CoreFoundation is from Foundation.
+GRAPHICS_SRC = $(wildcard graphics/*.m)
+GRAPHICS_OBJ = $(GRAPHICS_SRC:graphics/%.m=graphics/build/%.o)
+GRAPHICS = frameworks/CoreGraphics.framework/CoreGraphics
+GRAPHICS_HEADERS = graphics/GInternal.h graphics/host.h sdk/include/CoreGraphics/CoreGraphics.h \
+                   sdk/include/CoreText/CoreText.h $(FOUNDATION_HEADERS)
+HOST_TBD = graphics/build/libFerryHost.tbd
+
+all: ferry $(TBD) $(FOUNDATION) $(GRAPHICS)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
 
 src/%.o: src/%.c src/ferry.h src/macho.h src/objc/objc-private.h
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+# The Cairo, Pango and HarfBuzz calls Ferry's drawing frameworks may make:
+# exactly the ones graphics/host.h declares.
+src/host_names.h: graphics/host.h
+	grep -oE '\b(cairo|pango|g|hb)_[a-z0-9_]+\(' $< | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
+
+src/host.o: src/host_names.h
 
 src/objc/msgsend.o: src/objc/msgsend.S
 	$(CC) -c -o $@ $<
@@ -50,10 +67,26 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	@mkdir -p frameworks/CoreFoundation.framework
 	sdk/gen-cf-tbd.sh $@ > frameworks/CoreFoundation.framework/CoreFoundation.tbd
 
+$(HOST_TBD): ferry sdk/gen-tbd.sh
+	@mkdir -p graphics/build
+	sdk/gen-tbd.sh ./ferry libFerryHost > $@
+
+graphics/build/%.o: graphics/%.m $(GRAPHICS_HEADERS) sdk/ferry-cc
+	@mkdir -p graphics/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(GRAPHICS): $(GRAPHICS_OBJ) $(FOUNDATION) $(HOST_TBD)
+	@mkdir -p frameworks/CoreGraphics.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics \
+	    -o $@ $(GRAPHICS_OBJ) -framework Foundation $(HOST_TBD)
+	@mkdir -p frameworks/CoreText.framework frameworks/ApplicationServices.framework
+	sdk/gen-alias-tbd.sh $@ CoreText > frameworks/CoreText.framework/CoreText.tbd
+	sdk/gen-alias-tbd.sh $@ ApplicationServices > frameworks/ApplicationServices.framework/ApplicationServices.tbd
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(FOUNDATION)
+install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS)
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
@@ -61,10 +94,14 @@ install: ferry $(TBD) $(FOUNDATION)
 	install -Dm755 $(FOUNDATION) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Foundation.framework/Foundation
 	install -Dm644 frameworks/CoreFoundation.framework/CoreFoundation.tbd \
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
+	install -Dm755 $(GRAPHICS) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreGraphics.framework/CoreGraphics
+	for f in CoreText ApplicationServices; do \
+	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
+	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 
 clean:
-	rm -f ferry $(OBJ) $(TBD)
-	rm -rf tests/build foundation/build frameworks
+	rm -f ferry $(OBJ) $(TBD) src/host_names.h
+	rm -rf tests/build foundation/build graphics/build frameworks
 
 .PHONY: all check install clean

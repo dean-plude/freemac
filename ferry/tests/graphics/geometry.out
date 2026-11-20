@@ -1,0 +1,23 @@
+standardize: 5 -10 5 20
+min/mid/max x: 10 60 110, height 7
+union: 10 20 150 120
+intersection: 60 40 50 30
+no intersection: null
+inset: 15 30 90 30
+inset too far: null
+offset: 0 25 100 50
+integral: 0 1 11 4
+divide slice: 10 20 30 50
+divide rest: 40 20 70 50
+contains point: 1 0, contains rect: 1, intersects: 1, empty: 1 0
+null union: 1, infinite: 1
+translate then scale: [2 0 0 3 10 20]
+point: 12 23
+inverse: [0.5 0 0 0.333 -5 -6.667]
+rotate 90: [0 1 -1 0 0 0]
+rotated point: 0 1
+concat: [2 0 0 2 5 0]
+identity: 1 0
+rect through rotation: -20 0 20 10
+dictionary round trip: 1
+exit=0

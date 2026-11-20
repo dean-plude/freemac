@@ -6,13 +6,16 @@
  *      for calls whose numbers or data layouts differ between macOS and Linux.
  *   2. A list of C library calls that behave the same on both systems; those
  *      come straight from this system's C library.
- *   3. Anything else becomes a stub that stops the program with a clear
+ *   3. For Ferry's own drawing frameworks only, the Cairo, Pango and HarfBuzz
+ *      calls listed in graphics/host.h (see host.c).
+ *   4. Anything else becomes a stub that stops the program with a clear
  *      message if it is ever called. Ferry never guesses.
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
 #include <malloc.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +35,8 @@ int ferry_library_supported(const char *name)
     /* libSystem is macOS's C library; its pieces live under /usr/lib/system. */
     return !strcmp(name, "/usr/lib/libSystem.B.dylib")
         || !strncmp(name, "/usr/lib/system/", 16)
-        || !strcmp(name, "/usr/lib/libobjc.A.dylib");
+        || !strcmp(name, "/usr/lib/libobjc.A.dylib")
+        || !strcmp(name, FERRY_HOST_LIBRARY);
 }
 
 /* ---- the program's own details ------------------------------------------------- */
@@ -116,6 +120,13 @@ static int mac_timebase_info(struct mac_timebase *info)
     info->denom = 1; /* mach_absolute_time counts nanoseconds here */
     return 0;
 }
+
+/* clang turns sin(x) and cos(x) of the same x into one call on a Mac; both
+ * systems return the pair of results in xmm0 and xmm1. */
+struct mac_sincos { double s, c; };
+struct mac_sincosf { float s, c; };
+static struct mac_sincos mac_sincos_stret(double x) { return (struct mac_sincos){sin(x), cos(x)}; }
+static struct mac_sincosf mac_sincosf_stret(float x) { return (struct mac_sincosf){sinf(x), cosf(x)}; }
 
 static size_t mac_malloc_size(const void *p) { return p ? malloc_usable_size((void *)p) : 0; }
 
@@ -230,6 +241,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"_Unwind_Resume", ferry_unwind_resume},
     /* clang lowers memset(p, 0, n) to this name on a Mac */
     {"__bzero", bzero},
+    {"__sincos_stret", mac_sincos_stret},
+    {"__sincosf_stret", mac_sincosf_stret},
     {NULL, NULL},
 };
 
@@ -270,7 +283,9 @@ void *ferry_lookup(const char *name)
         if ((addr = find_own(base)))
             return addr;
     }
-    return find_passthrough(base);
+    if ((addr = find_passthrough(base)))
+        return addr;
+    return ferry_host_lookup(base);
 }
 
 /* ---- stubs for what Ferry doesn't have ---------------------------------------- */

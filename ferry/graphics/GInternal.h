@@ -1,0 +1,176 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Ferry's Core Graphics and Core Text: shared internals. Our own code,
+ * written from Apple's public API documentation; it is built as a Mach-O
+ * library with ferry-cc and draws with this system's Cairo and Pango (see
+ * host.h). Every CG and CT object is an Objective-C object, so CFRetain and
+ * CFRelease work on them. Built without ARC. */
+#ifndef FERRY_GRAPHICS_INTERNAL_H
+#define FERRY_GRAPHICS_INTERNAL_H
+#import <Foundation/Foundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
+#include <ctype.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "host.h"
+
+#define OBJ(x) ((id)(x))
+
+/* Says once, on stderr, that something isn't supported yet. */
+void GWarnOnce(const char *what);
+
+/* ---- colour ------------------------------------------------------------------- */
+
+@interface GColorSpace : NSObject {
+@public
+    CGColorSpaceModel model;
+    size_t ncomp;
+    NSString *name;
+}
+@end
+
+@interface GColor : NSObject {
+@public
+    GColorSpace *space;
+    size_t ncomp;           /* including alpha */
+    CGFloat comp[5];
+    double rgba[4];         /* the colour as sRGB, not premultiplied */
+}
+@end
+
+GColorSpace *GSpaceRGB(void);   /* shared, not retained */
+GColorSpace *GSpaceGray(void);
+GColorSpace *GSpaceCMYK(void);
+GColor *GColorNew(GColorSpace *space, const CGFloat *components);   /* retained */
+
+/* ---- paths ------------------------------------------------------------------- */
+
+struct gelem {
+    CGPathElementType type;
+    CGPoint pts[3];
+};
+
+@interface GPath : NSObject <NSCopying, NSMutableCopying> {
+@public
+    struct gelem *elems;
+    size_t count, cap;
+    CGPoint start, current;
+    BOOL hasCurrent;
+}
+@end
+
+/* Somewhere to send path pieces: a CGPath or a Cairo context. */
+struct gsink {
+    void (*move)(void *info, CGPoint p);
+    void (*line)(void *info, CGPoint p);
+    void (*curve)(void *info, CGPoint c1, CGPoint c2, CGPoint p);
+    void (*close)(void *info);
+    BOOL (*current)(void *info, CGPoint *p);
+    void *info;
+};
+void GSinkArc(const struct gsink *s, CGFloat x, CGFloat y, CGFloat r, CGFloat start, CGFloat end, BOOL clockwise);
+void GSinkArcToPoint(const struct gsink *s, CGFloat x1, CGFloat y1, CGFloat x2, CGFloat y2, CGFloat r);
+void GSinkEllipse(const struct gsink *s, CGRect rect);
+void GSinkRoundedRect(const struct gsink *s, CGRect rect, CGFloat cw, CGFloat ch);
+void GSinkRect(const struct gsink *s, CGRect rect);
+void GSinkQuad(const struct gsink *s, CGPoint c, CGPoint p);
+
+void GPathToCairo(GPath *path, cairo_t *cr);       /* appends, in cr's user space */
+GPath *GPathFromCairo(cairo_t *cr);                  /* retained */
+
+/* ---- images --------------------------------------------------------------------- */
+
+/* How one pixel of 8-bit-per-component data is laid out. */
+struct gfmt {
+    int bytes;          /* per pixel */
+    int r, g, b, a;     /* byte offsets; -1 if absent (a grey image uses g only) */
+    BOOL gray, premultiplied, alphaOnly;
+};
+BOOL GFormatFor(size_t bpc, size_t bpp, CGColorSpaceModel model, uint32_t info, struct gfmt *out);
+void GToCairo(const struct gfmt *f, const uint8_t *src, uint32_t *dst, size_t width);
+void GFromCairo(const struct gfmt *f, const uint32_t *src, uint8_t *dst, size_t width, BOOL opaque);
+
+@interface GDataProvider : NSObject {
+@public
+    NSData *data;
+}
+@end
+
+@interface GImage : NSObject {
+@public
+    size_t width, height, bpc, bpp, bpr;
+    uint32_t info;
+    GColorSpace *space;
+    GDataProvider *provider;
+    BOOL interpolate, mask;
+    cairo_surface_t *surface;   /* made the first time the image is drawn */
+}
+@end
+cairo_surface_t *GImageSurface(GImage *image);
+
+@interface GGradient : NSObject {
+@public
+    size_t count;
+    double *locations;
+    double (*rgba)[4];
+}
+@end
+
+/* ---- contexts ------------------------------------------------------------------- */
+
+struct gstate {
+    double fill[4], stroke[4];
+    GColorSpace *fillSpace, *strokeSpace;
+    double alpha;
+    BOOL antialias;
+    CGInterpolationQuality interpolation;
+    CGTextDrawingMode textMode;
+    CGFloat characterSpacing, fontSize;
+};
+
+@interface GContext : NSObject {
+@public
+    cairo_t *cr;
+    cairo_surface_t *surface;
+    cairo_matrix_t base;          /* device space as CG sees it, to Cairo's */
+    struct gstate *states;
+    int depth, cap;
+    BOOL allowsAntialias;
+    CGAffineTransform textMatrix;   /* its tx and ty are the text position */
+    /* bitmap contexts */
+    void *data;
+    BOOL ownsData, shadow;
+    size_t width, height, bpc, bpp, bpr;
+    uint32_t info;
+    GColorSpace *space;
+    struct gfmt fmt;
+}
+@end
+
+#define GSTATE(c) (&(c)->states[(c)->depth])
+void GContextWillDraw(GContext *c);    /* brings outside changes to the pixels in */
+void GContextDidDraw(GContext *c);     /* writes the drawing out to the caller's pixels */
+void GContextSetSource(GContext *c, const double rgba[4]);
+
+/* Draws glyphs or a laid-out line in the context's text space, at (x, y)
+ * there, following the text drawing mode. The body draws with Cairo's y
+ * going down from the baseline, as Pango and Cairo's glyph calls expect;
+ * when path is YES it must only add to the current path. */
+void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path));
+
+/* ---- conversions ---------------------------------------------------------------- */
+
+static inline cairo_matrix_t GMatrix(CGAffineTransform t)
+{
+    cairo_matrix_t m = {t.a, t.b, t.c, t.d, t.tx, t.ty};
+    return m;
+}
+static inline CGAffineTransform GTransform(cairo_matrix_t m)
+{
+    CGAffineTransform t = {m.xx, m.yx, m.xy, m.yy, m.x0, m.y0};
+    return t;
+}
+
+#endif

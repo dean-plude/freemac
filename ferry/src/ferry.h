@@ -31,6 +31,11 @@ extern const char *const ferry_passthrough[];
 extern const struct ferry_symbol ferry_blocks_symbols[];   /* libSystem's blocks */
 extern const struct ferry_symbol ferry_objc_symbols[];     /* libobjc.A.dylib */
 
+/* host.c: this system's drawing libraries, for Ferry's own frameworks */
+#define FERRY_HOST_LIBRARY "/usr/lib/ferry/libFerryHost.dylib"
+extern const char *const ferry_host_names[];
+void *ferry_host_lookup(const char *name);
+
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);
 int ferry_errno_to_linux(int mac_errno);

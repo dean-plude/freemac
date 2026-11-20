@@ -141,6 +141,28 @@ void CFRunLoopWakeUp(CFRunLoopRef rl);
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void));
 enum { kCFRunLoopRunFinished = 1, kCFRunLoopRunStopped = 2, kCFRunLoopRunTimedOut = 3, kCFRunLoopRunHandledSource = 4 };
 
+typedef const struct __CFAttributedString *CFAttributedStringRef;
+typedef struct __CFAttributedString *CFMutableAttributedStringRef;
+
+CFAttributedStringRef CFAttributedStringCreate(CFAllocatorRef alloc, CFStringRef str, CFDictionaryRef attributes);
+CFAttributedStringRef CFAttributedStringCreateCopy(CFAllocatorRef alloc, CFAttributedStringRef str);
+CFMutableAttributedStringRef CFAttributedStringCreateMutable(CFAllocatorRef alloc, CFIndex maxLength);
+CFMutableAttributedStringRef CFAttributedStringCreateMutableCopy(CFAllocatorRef alloc, CFIndex maxLength,
+                                                                 CFAttributedStringRef str);
+CFStringRef CFAttributedStringGetString(CFAttributedStringRef str);
+CFIndex CFAttributedStringGetLength(CFAttributedStringRef str);
+CFDictionaryRef CFAttributedStringGetAttributes(CFAttributedStringRef str, CFIndex loc, CFRange *effectiveRange);
+CFTypeRef CFAttributedStringGetAttribute(CFAttributedStringRef str, CFIndex loc, CFStringRef name,
+                                         CFRange *effectiveRange);
+void CFAttributedStringReplaceString(CFMutableAttributedStringRef str, CFRange range, CFStringRef replacement);
+void CFAttributedStringSetAttributes(CFMutableAttributedStringRef str, CFRange range, CFDictionaryRef attributes,
+                                     Boolean clearOtherAttributes);
+void CFAttributedStringSetAttribute(CFMutableAttributedStringRef str, CFRange range, CFStringRef name,
+                                    CFTypeRef value);
+void CFAttributedStringRemoveAttribute(CFMutableAttributedStringRef str, CFRange range, CFStringRef name);
+void CFAttributedStringBeginEditing(CFMutableAttributedStringRef str);
+void CFAttributedStringEndEditing(CFMutableAttributedStringRef str);
+
 CFBundleRef CFBundleGetMainBundle(void);
 CFTypeRef CFBundleGetValueForInfoDictionaryKey(CFBundleRef bundle, CFStringRef key);
 CFStringRef CFBundleGetIdentifier(CFBundleRef bundle);

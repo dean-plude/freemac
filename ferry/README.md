@@ -35,7 +35,15 @@ and the old text form), `NSBundle` (a program inside an `.app` folder finds
 its `Info.plist`, resources and localized strings), `NSUserDefaults` (kept
 in `~/.config/ferry/preferences/<app id>.plist`), `NSFileManager`,
 `NSProcessInfo`, `NSRunLoop`, `NSTimer`, `NSNotificationCenter`, and the
-`CF...` calls on the same objects. See
+`CF...` calls on the same objects, and `NSAttributedString`.
+
+For drawing there are Ferry's own Core Graphics and Core Text
+(`CoreGraphics.framework`, which also serves `CoreText` and
+`ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
+bitmap contexts, paths, colours, transforms, clipping, gradients, images
+(PNG files), and text in the system's fonts, in lines and wrapped frames.
+Mac font names map to the nearest installed font (on freemac, Helvetica and
+the system font are Inter). See
 [docs/ferry-gui.md](../docs/ferry-gui.md) for what is missing and the plan
 towards graphical apps. A Mac app's standard folders map to their usual
 Linux places: Documents to `~/Documents`, Application Support to
@@ -81,6 +89,13 @@ Linux places: Documents to `~/Documents`, Application Support to
    CoreFoundation (installed in `/usr/lib/ferry/frameworks`; `FERRY_FRAMEWORKS`
    points elsewhere). Every CoreFoundation object is the matching Foundation
    object, so the two can be mixed freely, as on a Mac.
+6. **Core Graphics and Core Text** (`graphics/`). Also Objective-C built
+   into a Mac library, `frameworks/CoreGraphics.framework/CoreGraphics`,
+   which serves CoreText and ApplicationServices too. It draws by calling
+   this system's Cairo, Pango and HarfBuzz directly (both systems use the
+   same calling convention); Ferry opens those libraries only when a program
+   first draws, and only for the calls listed in `graphics/host.h`
+   (`src/host.c`).
 
 ## Sources
 
@@ -110,17 +125,20 @@ ferry-cc -O1 -o hello hello.c
 ferry ./hello
 ferry-cc -O1 -fobjc-arc -o hello hello.m -lobjc    # Objective-C
 ferry-cc -O1 -fobjc-arc -o hello hello.m -framework Foundation
+ferry-cc -O1 -o draw draw.m -framework CoreText -framework CoreGraphics -framework Foundation
 ```
 
 `make check` builds every program in `tests/` this way, in both relocation
 formats, runs it through Ferry and compares the output. It needs `clang`,
-`lld` and `llvm` (for `llvm-nm`).
+`lld` and `llvm` (for `llvm-nm`); the drawing tests also need Cairo, Pango
+and HarfBuzz (the runtime libraries, not their `-dev` packages) and some
+fonts.
 
 ## Building and packaging
 
 ```
-make                       # builds ./ferry, the SDK's library descriptions and Foundation
-                           # (Foundation needs clang, lld and llvm, as the tests do)
+make                       # builds ./ferry, the SDK's library descriptions, Foundation
+                           # and CoreGraphics (these need clang, lld and llvm, as the tests do)
 make check                 # runs the tests
 ./packaging/build-deb.sh   # builds freemac-ferry_VERSION_amd64.deb
 ```
