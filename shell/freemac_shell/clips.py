@@ -157,7 +157,7 @@ def picker():
             hint.set_text("Nothing copied yet.")
         else:
             hint.set_text("Enter copies it again, ready to paste.")
-        first = listbox.get_row_at_y(0)
+        first = listbox.get_row_at_index(0)
         if first:
             listbox.select_row(first)
 

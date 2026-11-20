@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Clipboard History
+Comment=The last things you copied, ready to paste again
+Exec=freemac-clips
+Icon=edit-paste
+Categories=Utility;
+Keywords=clipboard;copy;paste;history;
+NoDisplay=true
+StartupWMClass=freemac-clips
