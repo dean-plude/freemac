@@ -41,8 +41,9 @@ class Topline(Gtk.Window):
         # System menu behind the freemac mark.
         self.mark = Gtk.MenuButton()
         self.mark.set_image(self._mark_image())
-        self.mark.set_popup(self._system_menu())
+        self.mark.set_popup(self._watch_menu(self._system_menu()))
         bar.pack_start(self.mark, False, False, 4)
+        self._slide(self.mark)
 
         # Focused application's name and menu.
         self.app_button = Gtk.MenuButton(label="freemac")
@@ -50,6 +51,7 @@ class Topline(Gtk.Window):
         self.app_menu = self._watch_menu(Gtk.Menu())
         self.app_button.set_popup(self.app_menu)
         bar.pack_start(self.app_button, False, False, 0)
+        self._slide(self.app_button)
 
         # The focused app's own menus (File, Edit, ...), when it publishes
         # them; Strata tells us where to find them.
@@ -71,6 +73,7 @@ class Topline(Gtk.Window):
         self.window_menu = self._watch_menu(Gtk.Menu())
         self.window_button.set_popup(self.window_menu)
         bar.pack_start(self.window_button, False, False, 0)
+        self._slide(self.window_button)
 
         # The clock opens Beacon's notification centre.
         self.clock = Gtk.Label()
@@ -204,9 +207,88 @@ class Topline(Gtk.Window):
     def _menu_open(self):
         return any(menu is not None and menu.get_visible() for menu in self._menus())
 
+    def _menu_buttons(self):
+        yield self.mark
+        yield self.app_button
+        yield from self.menus_box.get_children()
+        yield self.window_button
+
+    def _slide(self, button):
+        """As on a Mac, once one menu is open, moving the pointer onto
+        another title in the bar opens that menu instead, with no click."""
+        button.connect("enter-notify-event", self._slide_to)
+        button.connect("toggled", self._menu_toggled)
+        return button
+
+    def _menu_toggled(self, button):
+        """The first click on a title right after Esc closed a menu opens the
+        new menu and has it shut again at once (the compositor turns down
+        its grab). A menu that closes that fast, untouched, opens again."""
+        now = time.monotonic()
+        if button.get_active():
+            if now - getattr(button, "_fm_opened", 0) > 1:
+                button._fm_retried = False
+            button._fm_opened = now
+            return
+        if (now - getattr(button, "_fm_opened", 0) < 0.3 and not getattr(button, "_fm_retried", True)
+                and not any(other.get_active() for other in self._menu_buttons())):
+            button._fm_retried = True
+            GLib.timeout_add(60, self._open_untouched, button)
+
+    def _slide_to(self, button, _event):
+        if any(other is not button and other.get_active() for other in self._menu_buttons()):
+            self._switch_menu(button)
+        return False
+
     def _watch_menu(self, menu):
         menu.connect("deactivate", lambda *_: GLib.idle_add(self._after_menu))
+        menu.connect("motion-notify-event", self._menu_motion)
         return menu
+
+    def _menu_motion(self, _menu, event):
+        """While a menu is open it gets the pointer's moves, also those over
+        the bar; over another menu title, open that menu instead."""
+        # The bar sits at the screen's top left, so the pointer's place on the
+        # screen is its place in the bar.
+        x, y = event.x_root, event.y_root
+        if y >= HEIGHT:
+            return False
+        for button in self._menu_buttons():
+            menu = button.get_popup()
+            if not button.get_visible() or (menu is not None and menu.get_visible()):
+                continue
+            spot = button.translate_coordinates(self, 0, 0)
+            if spot is None:
+                continue
+            bx, by = spot
+            size = button.get_allocation()
+            if bx <= x < bx + size.width and by <= y < by + size.height:
+                GLib.idle_add(self._switch_menu, button)
+                break
+        return False
+
+    def _switch_menu(self, button):
+        for other in self._menu_buttons():
+            if other is button:
+                continue
+            menu = other.get_popup()
+            if menu is not None and menu.get_visible():
+                menu.popdown()
+            if other.get_active():
+                other.set_active(False)
+            # The pointer left it during the menu's grab, so GTK never saw it
+            # go: drop the hover look by hand, or every title stays lit.
+            other.unset_state_flags(Gtk.StateFlags.PRELIGHT)
+        return self._open_untouched(button)
+
+    def _open_untouched(self, button):
+        """Open a title's menu with nothing in it chosen yet (opened from
+        code, GTK picks the first item, as if the keyboard had opened it)."""
+        button.set_active(True)
+        menu = button.get_popup()
+        if menu is not None:
+            GLib.idle_add(lambda: menu.deselect() and False)
+        return False
 
     def _after_menu(self):
         self.refresh()
@@ -266,6 +348,7 @@ class Topline(Gtk.Window):
 
     def _menu_from_model(self, model):
         menu = mac_accel.macify(Gtk.Menu.new_from_model(model))
+        menu.connect("motion-notify-event", self._menu_motion)
         for prefix, group in self._groups.items():
             menu.insert_action_group(prefix, group)
         menu.insert_action_group("topline", self._own_actions)
@@ -280,6 +363,7 @@ class Topline(Gtk.Window):
         for label, submenu in menus:
             button = Gtk.MenuButton(label=label, use_underline=True)
             button.set_popup(self._menu_from_model(submenu))
+            self._slide(button)
             self.menus_box.pack_start(button, False, False, 0)
             button.show_all()
         self.menus_box.set_visible(bool(menus))
