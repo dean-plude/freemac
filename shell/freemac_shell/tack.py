@@ -1,0 +1,299 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Tack, the app switcher: hold Alt and press Tab to see every open app as a
+row of large icons on a translucent panel in the middle of the screen. Each Tab
+moves to the next app (Shift+Tab goes back); letting go of Alt brings the
+chosen app's windows to the front. A quick Alt+Tab, let go at once, swaps
+straight to the app used before without the panel showing.
+
+    freemac-tack            run the switcher (started with the session)
+    freemac-tack --next     what Alt+Tab runs: show it, or move right
+    freemac-tack --prev     what Alt+Shift+Tab runs: show it, or move left
+
+The key presses reach the running switcher through a small socket, so Alt+Tab
+answers at once instead of waiting for a new program to start.
+Original freemac code.
+"""
+import os
+import socket
+import sys
+
+SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "freemac-tack.sock")
+
+ICON = 96          # pixels
+SHOW_AFTER = 140   # ms: a quick Alt+Tab switches without the panel flashing up
+HIDE_IDS = {"gtklock", "polkit-mate-authentication-agent-1"}
+
+CSS = b"""
+window.switcher, window.switcher > * {
+    background: transparent;
+}
+.switcher-panel {
+    margin: 48px;
+    background-color: rgba(246, 246, 248, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 24px;
+    padding: 14px 14px 10px 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+.switcher-panel.dark {
+    background-color: rgba(40, 40, 44, 0.70);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+.switcher-app {
+    border-radius: 16px;
+    padding: 8px;
+}
+.switcher-app.chosen {
+    background-color: rgba(0, 0, 0, 0.16);
+}
+.switcher-panel.dark .switcher-app.chosen {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+.switcher-name {
+    font-size: 13px;
+    color: #1d1d1f;
+    margin-top: 4px;
+}
+.switcher-panel.dark .switcher-name {
+    color: #f2f2f4;
+}
+"""
+
+
+def send(word):
+    """Tell the running switcher to move; False when none is running."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            s.connect(SOCKET)
+            s.sendall(word.encode() + b"\n")
+        return True
+    except OSError:
+        return False
+
+
+# ---- the apps and their windows ---------------------------------------------------
+def open_apps(views):
+    """Apps with windows, the one used last first: [(app id, [views newest first])]."""
+    apps = {}
+    for view in views:
+        app_id = view.get("app-id") or f"view-{view.get('id')}"
+        if app_id.lower() in HIDE_IDS:
+            continue
+        apps.setdefault(app_id, []).append(view)
+    for its in apps.values():
+        its.sort(key=lambda v: v.get("last-focus-timestamp", 0), reverse=True)
+    return sorted(apps.items(), key=lambda item: item[1][0].get("last-focus-timestamp", 0), reverse=True)
+
+
+def minimized(view):
+    return (view.get("state") or {}).get("minimized", view.get("minimized", False))
+
+
+def bring_forward(wayfire, views):
+    """Bring all of an app's windows to the front, the one used last on top.
+    If every one of them is minimized, the last used comes back."""
+    shown = [v for v in views if not minimized(v)]
+    if not shown and views:
+        try:
+            wayfire.set_minimized(views[0]["id"], False)
+        except (ConnectionError, OSError, ValueError):
+            return
+        shown = [views[0]]
+    for view in reversed(shown):
+        try:
+            wayfire.focus(view["id"])
+        except (ConnectionError, OSError, ValueError):
+            pass
+
+
+def switch_without_panel(step):
+    """No switcher running: just swap to the next app, as a fallback."""
+    from .wfipc import Wayfire
+    wayfire = Wayfire()
+    apps = open_apps(wayfire.views())
+    if len(apps) > 1:
+        bring_forward(wayfire, apps[step % len(apps)][1])
+
+
+# ---- the panel ----------------------------------------------------------------------
+def run():
+    import gi
+    gi.require_version("Gdk", "3.0")
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("GtkLayerShell", "0.1")
+    from gi.repository import Gdk, GLib, Gtk, GtkLayerShell, Pango
+
+    from . import apps as app_names
+    from . import style
+    from .wfipc import Wayfire
+
+    class Switcher(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Switcher")
+            style.make_transparent(self)
+            self.get_style_context().add_class("switcher")
+            GtkLayerShell.init_for_window(self)
+            GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_namespace(self, "freemac-tack")
+            GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+            GtkLayerShell.set_exclusive_zone(self, -1)
+            self.wayfire = Wayfire()
+            self.apps, self.tiles, self.chosen = [], [], 0
+            self.showing = False
+            self.reveal_timer = self.check_timer = 0
+            self.panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.panel.get_style_context().add_class("switcher-panel")
+            self.row = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER)
+            self.name = Gtk.Label(ellipsize=Pango.EllipsizeMode.END, max_width_chars=40)
+            self.name.get_style_context().add_class("switcher-name")
+            self.panel.pack_start(self.row, False, False, 0)
+            self.panel.pack_start(self.name, False, False, 0)
+            self.add(self.panel)
+            self.add_events(Gdk.EventMask.KEY_PRESS_MASK | Gdk.EventMask.KEY_RELEASE_MASK)
+            self.connect("key-press-event", self._key_press)
+            self.connect("key-release-event", self._key_release)
+            self.connect("focus-in-event", lambda *_: self._check_alt())
+
+        # -- moving through the apps
+        def step(self, by):
+            if not self.showing:
+                self.start(by)
+                return
+            if self.apps:
+                self.choose((self.chosen + by) % len(self.apps))
+
+        def start(self, by):
+            self.apps = open_apps(self.wayfire.views())
+            if not self.apps:
+                return
+            for child in self.row.get_children():
+                self.row.remove(child)
+            self.tiles = []
+            dark = style.is_dark()
+            (self.panel.get_style_context().add_class if dark else
+             self.panel.get_style_context().remove_class)("dark")
+            for index, (app_id, _views) in enumerate(self.apps):
+                image = Gtk.Image.new_from_gicon(app_names.icon_for(app_id), Gtk.IconSize.DIALOG)
+                image.set_pixel_size(ICON)
+                tile = Gtk.EventBox()
+                tile.set_visible_window(False)
+                box = Gtk.Box()   # draws the highlight; an EventBox without a window doesn't
+                box.get_style_context().add_class("switcher-app")
+                box.add(image)
+                tile.add(box)
+                tile.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK)
+                tile.connect("enter-notify-event", lambda _w, _e, i=index: self.choose(i))
+                tile.connect("button-release-event", lambda _w, _e, i=index: self.finish(i))
+                self.row.pack_start(tile, False, False, 0)
+                self.tiles.append(tile)
+            self.showing = True
+            self.choose((by if len(self.apps) > 1 else 0) % len(self.apps))
+            self.panel.set_opacity(0)
+            self.show_all()
+            self.reveal_timer = GLib.timeout_add(SHOW_AFTER, self._reveal)
+            self.check_timer = GLib.timeout_add(100, self._check_alt)
+
+        def choose(self, index):
+            for i, tile in enumerate(self.tiles):
+                context = tile.get_child().get_style_context()
+                (context.add_class if i == index else context.remove_class)("chosen")
+            self.chosen = index
+            app_id, views = self.apps[index]
+            self.name.set_text(app_names.display_name(app_id, views[0].get("title", "")))
+            return False
+
+        def _reveal(self):
+            self.reveal_timer = 0
+            if self.showing:
+                self.panel.set_opacity(1)
+            return False
+
+        # -- letting go
+        def _check_alt(self):
+            """Alt let go (perhaps before we had the keyboard): switch."""
+            if not self.showing:
+                self.check_timer = 0
+                return False
+            state = Gdk.Keymap.get_for_display(self.get_display()).get_modifier_state()
+            if not state & Gdk.ModifierType.MOD1_MASK and self.is_active():
+                self.finish(self.chosen)
+                return False
+            return True
+
+        def _key_release(self, _widget, event):
+            if event.keyval in (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R):
+                self.finish(self.chosen)
+            return True
+
+        def _key_press(self, _widget, event):
+            key = event.keyval
+            if key == Gdk.KEY_Escape:
+                self.stop()
+            elif key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
+                self.finish(self.chosen)
+            elif key in (Gdk.KEY_Right, Gdk.KEY_Tab):
+                self.step(1)
+            elif key in (Gdk.KEY_Left, Gdk.KEY_ISO_Left_Tab):
+                self.step(-1)
+            return True
+
+        def finish(self, index):
+            if not self.showing:
+                return False
+            views = self.apps[index][1] if 0 <= index < len(self.apps) else []
+            self.stop()
+            if views:
+                bring_forward(self.wayfire, views)
+            return True
+
+        def stop(self):
+            self.showing = False
+            for timer in ("reveal_timer", "check_timer"):
+                if getattr(self, timer):
+                    GLib.source_remove(getattr(self, timer))
+                    setattr(self, timer, 0)
+            self.hide()
+
+    style.apply()
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS)
+    Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+    switcher = Switcher()
+
+    try:
+        os.unlink(SOCKET)
+    except FileNotFoundError:
+        pass
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(SOCKET)
+    os.chmod(SOCKET, 0o600)
+    server.listen(8)
+
+    def on_connect(_fd, _condition):
+        conn, _ = server.accept()
+        with conn:
+            conn.settimeout(0.5)
+            try:
+                word = conn.recv(16).decode().strip()
+            except (OSError, UnicodeDecodeError):
+                return True
+        if word == "next":
+            switcher.step(1)
+        elif word == "prev":
+            switcher.step(-1)
+        return True
+
+    GLib.io_add_watch(server.fileno(), GLib.IO_IN, on_connect)
+    Gtk.main()
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if args and args[0] in ("--next", "--prev"):
+        word = args[0][2:]
+        if not send(word):
+            switch_without_panel(1 if word == "next" else -1)
+        return
+    run()

@@ -146,16 +146,27 @@ What still looked like Linux after 1.2.
 | 5 | Qt and GTK 4 apps use the same colours and font as the rest | build | done |
 | 6 | New windows never start under the menu bar; one too big is made to fit | strata-decor | done |
 
-## 1.4 "the desktop is yours" (in progress)
+## 1.4 "the desktop is yours" (done)
 
 What a Mac user reaches for next.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Files in the Desktop folder show on the wallpaper as icons: open, move, rename and drop files onto them | Backdrop | |
-| 2 | Alt+Tab shows the open apps as a row of icons on a frosted panel; let go to switch | Strata, Topline | |
-| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata | |
-| 4 | Screenshots land on the Desktop, named with the date and time | Lens | |
+| 1 | Files in the Desktop folder show on the wallpaper as icons: open, move, rename and drop files onto them | Backdrop | done |
+| 2 | Alt+Tab shows the open apps as a row of icons on a frosted panel; let go to switch | Tack | done |
+| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata, Pier | done |
+| 4 | Screenshots land on the Desktop, named with the date and time | Lens | done |
+
+## 1.5 "the little things" (in progress)
+
+The details a Mac user notices in the first ten minutes.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Show in Drawer, Quit | Pier | |
+| 2 | Drawer's sidebar shows the folder you're in | Drawer | |
+| 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | |
+| 4 | Windows reopen at the size and place they had last time | Strata | |
 
 ## Later
 

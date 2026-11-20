@@ -79,13 +79,14 @@ only ship alongside, which is fine for any free licence).
 | --- | --- | --- | --- |
 | **Strata** | Window-management layer: Wayfire config, our own plugins and decoration theme | C++ (Wayfire plugin API) | Left-side window buttons in an original shape and colour scheme; overview of all windows (built on Wayfire's scale and expo ideas, our own look); virtual desktops in a row; 3- and 4-finger gestures. |
 | **Topline** | Global menu bar | Python + GTK 3 (layer-shell), C later if needed | Left: system menu, focused app name, the app's own menus (GTK apps since 0.8, through strata-shell; Qt apps planned). Right: network, sound and battery icons (0.4), Bluetooth and printing (0.8), clock; app status icons (StatusNotifierItem) and quick settings later. Falls back to a minimal per-app menu when an app exports none. |
-| **Backdrop** | Desktop wallpaper | Python + GTK 3 (layer-shell, background layer) | One window per screen under the menu bar and dock; fills the screen at any shape (or fits or stretches, set in Dials). Replaced wf-shell's background in 0.4. |
-| **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. |
+| **Backdrop** | Desktop wallpaper | Python + GTK 3 (layer-shell, background layer) | One window per screen under the menu bar and dock; fills the screen at any shape (or fits or stretches, set in Dials). Replaced wf-shell's background in 0.4. Since 1.4 the first screen also shows the Desktop folder's files as icons down the right side (`desktop_icons.py`): click to select, double-click to open, drag to place (kept in `~/.config/freemac/desktop.json`) or drop files in, right-click for Rename, Move to Trash, New Folder and Change Wallpaper. |
+| **Pier** | Dock | Python + GTK 3 (layer-shell) | Pinned and running apps from Wayfire's IPC; cursor-proximity magnification; running indicators; size and magnification set in Dials. Tells Strata where each window's icon sits (`strata/minimize-hint`), so a minimized window shrinks into its icon and grows back out of it. |
 | **Seek** | Search launcher on Super+Space | Python + GTK 3 (layer-shell) | Apps (`.desktop`), files in the home folder, calculator; later plocate, settings panels, unit conversion. |
 | **Drawer** | File manager | Python + GTK 3 | Icon, list and column (Miller) views with a preview pane; sidebar of places; GIO for opening files and the Trash. |
+| **Tack** | App switcher | Python + GTK 3 (layer-shell, overlay layer) | Alt+Tab shows the open apps, last used first, as large icons on a translucent panel; Tab and Shift+Tab move, letting go of Alt brings that app's windows forward (restoring one if all are minimized). Runs with the session and hears the key presses on a socket, so it answers at once. Replaced Wayfire's fast-switcher in 1.4. |
 | **Dials** | Settings app | Python + GTK 3 | Appearance (light/dark through the GSettings `color-scheme` and GTK theme), wallpaper, dock and menu bar, displays (scale), trackpad and mouse, keyboard layout, network and Wi-Fi, sound (WirePlumber's wpctl), power (screen blanking through Wayfire's idle plugin, power-profiles-daemon), notifications, accessibility, Bluetooth (BlueZ over D-Bus, with its own pairing agent), printers (CUPS), users (through a small root helper run with pkexec: add, delete, change password, administrator, automatic login), about. Writes the same files Wayfire, Backdrop and Pier watch, so changes apply at once. |
 | **Beacon** | Notifications | Python + GTK 3 (layer-shell) | Implements the freedesktop.org notification D-Bus interface, so `notify-send` and every app's notifications work. Banners in the top-right corner, a centre with a calendar and the last 50 notifications (opened from the clock), Do Not Disturb. |
-| **Lens** | Screenshots | Python + GTK 3 | Whole screen, an area or the focused window, on Print, Shift+Print and Alt+Print; uses grim and slurp, copies to the clipboard with wl-copy and announces the file through Beacon. |
+| **Lens** | Screenshots | Python + GTK 3 | Whole screen, an area or the focused window, on Print, Shift+Print and Alt+Print; uses grim and slurp, saves to the Desktop, copies to the clipboard with wl-copy and announces the file through Beacon. |
 | **Quill** | Text editor | Python + GTK 3 + GtkSourceView 4 | Syntax colours, line numbers, find and replace, go to line, wrapping, light and dark schemes, safe saving. |
 | **Frame** | Image viewer | Python + GTK 3 | Fit, zoom, rotate, next and previous in the folder, animated GIFs, Trash, full screen. |
 | **Harbor** | App centre and updates | Python + GTK 3 | Browses the AppStream catalogue of the archive (categories, search, picks), app pages with Install, Open and Remove, an Installed list and an Updates page, all through PackageKit, which asks for the password through polkit. A background check once a day notifies through Beacon when updates are ready. Refreshes old package lists before installing. |
@@ -210,8 +211,8 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   with Gio only, so a key press doesn't load GTK. It prefers a playing
   player, then a paused one. Quick settings shows it with back,
   play/pause and forward.
-- **Screen recording** (Lens): wf-recorder to
-  `~/Videos/Screen Recordings`, the whole screen or an area picked with
+- **Screen recording** (Lens): wf-recorder to the Desktop (where
+  screenshots land too, as on a Mac), the whole screen or an area picked with
   slurp; Topline shows a red stop button while it runs.
 - **Clipboard history** (`clips.py`): `wl-paste --watch` hands each new
   text copy to `freemac-clips --store`, which keeps the last 50 in
