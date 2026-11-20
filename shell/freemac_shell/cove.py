@@ -7,7 +7,14 @@ smaller. Double-click (or Return) opens a photo large in the window; the
 arrow keys go to the next and previous, Escape goes back. A photo can be
 marked a favourite (the heart, or the full stop key), shown with its details
 (⌘I), opened in Frame for markup, or moved to the Trash (⌘⌫). Tiles can be
-dragged into mail, folders and other apps.
+dragged into mail, folders and other apps. ⌘-click and Shift-click choose
+more than one.
+
+Albums are listed under My Albums: File > New Album (⌘N) makes one from the
+photos chosen, and photos are added by dragging them onto an album or with
+Add to Album when right-clicking them. In an album, Delete takes a photo out
+of it (the photo stays in the library). Play Slideshow (the play button)
+shows the photos in view on the whole screen (cove_slideshow.py).
 
 The sidebar has Library, Favourites and Recently Added, and, while one is
 plugged in, each camera, phone or memory card with photos on it: choosing
@@ -31,6 +38,7 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
 from . import alert, menus, style  # noqa: E402
 from . import photos_store as store  # noqa: E402
+from .cove_slideshow import Slideshow  # noqa: E402
 
 APP_ID = "org.freemac.Cove"
 SIZES = (90, 120, 160, 210, 260)   # tile sizes, smallest to largest
@@ -60,6 +68,8 @@ list.cove-side { background: transparent; }
 .cove-info-key { color: alpha(currentColor, 0.55); font-size: 12px; }
 .cove-info-value { font-size: 13px; }
 .cove-fav:checked image, .cove-fav:checked { color: #f04d3e; }
+.cove-side-head button { padding: 0 4px; min-height: 0; min-width: 0; margin-right: 8px; }
+.cove-side row.cove-drop { background: alpha(#2f7bf5, 0.25); }
 """
 
 
@@ -166,8 +176,8 @@ class Tile(Gtk.FlowBoxChild):
         self.add(self.area)
         self.resize(size)
         if not device:
-            self.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
-            self.drag_source_add_uri_targets()
+            # The drag itself starts in Window._drag_moved: a FlowBox that
+            # lets you select more than one takes every drag for its rubber band.
             self.connect("drag-data-get", self._drag_data)
             self.connect("drag-begin", self._drag_begin)
 
@@ -189,7 +199,9 @@ class Tile(Gtk.FlowBoxChild):
         self.area.queue_draw()
 
     def _drag_data(self, _w, _ctx, data, _info, _time):
-        data.set_uris([Gio.File.new_for_path(self.item.path).get_uri()])
+        # A selected photo takes the rest of the selection with it, as on a Mac.
+        paths = self.window.chosen_paths() if self.is_selected() else [self.item.path]
+        data.set_uris([Gio.File.new_for_path(p).get_uri() for p in paths or [self.item.path]])
 
     def _drag_begin(self, _w, ctx):
         if self.picture is not None:
@@ -336,6 +348,8 @@ class Window(Gtk.ApplicationWindow):
         self.zoom.set_tooltip_text("Tile size (⌘+ and ⌘−)")
         self.zoom.connect("value-changed", lambda s: self.set_size(int(round(s.get_value()))))
         header.pack_start(self.zoom)
+        self.play_button = self._header_button("media-playback-start-symbolic", "Play Slideshow", self.slideshow)
+        header.pack_end(self.play_button)
         self.delete_button = self._header_button("user-trash-symbolic", "Move to Trash (⌘⌫)", self.delete_photo)
         self.info_button = Gtk.MenuButton()
         self.info_button.add(Gtk.Image(icon_name="help-about-symbolic", icon_size=Gtk.IconSize.BUTTON, visible=True))
@@ -369,6 +383,7 @@ class Window(Gtk.ApplicationWindow):
         self.sidebar.get_style_context().add_class("cove-side")
         self.sidebar.set_header_func(self._side_header)
         self.sidebar.connect("row-selected", self._side_selected)
+        self.sidebar.connect("button-press-event", self._side_button)
         side_scroll.add(self.sidebar)
         paned.pack1(side_scroll, False, False)
 
@@ -378,6 +393,12 @@ class Window(Gtk.ApplicationWindow):
         self.grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.grid_box.get_style_context().add_class("cove-grid")
         self.grid_scroll.add(self.grid_box)
+        self.pressed = None   # the photo under the button while it is down
+        self.dragger = Gtk.GestureDrag.new(self.grid_scroll)
+        self.dragger.set_button(1)
+        self.dragger.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        self.dragger.connect("drag-begin", self._drag_pressed)
+        self.dragger.connect("drag-update", self._drag_moved)
         self.stack.add_named(self.grid_scroll, "grid")
         self.viewer = Viewer()
         self.stack.add_named(self.viewer, "viewer")
@@ -416,6 +437,8 @@ class Window(Gtk.ApplicationWindow):
             "library": lambda: self.choose_view("library"),
             "favourites": lambda: self.choose_view("favourites"),
             "recent": lambda: self.choose_view("recent"),
+            "new-album": lambda: self.new_album(self.chosen_paths()),
+            "remove-from-album": self.remove_from_album, "slideshow": self.slideshow,
         })
         self.connect("key-press-event", self._key)
         self.connect("notify::is-active", self._activated)
@@ -460,15 +483,38 @@ class Window(Gtk.ApplicationWindow):
         rows = [("library", "Library", "camera-photo-symbolic", "Photos"),
                 ("favourites", "Favourites", "emblem-favorite-symbolic", "Photos"),
                 ("recent", "Recently Added", "document-open-recent-symbolic", "Photos")]
+        self.albums = store.albums()
+        known = {p.path for p in self.photos}
+        for album in self.albums:
+            count = sum(1 for path in album.paths if path in known) if self.photos else len(album.paths)
+            rows.append((f"album:{album.id}", album.name, "folder-pictures-symbolic", "My Albums", count))
         for n, device in enumerate(self.devices):
             rows.append((f"device:{n}", device.name, "camera-photo-symbolic", "Devices"))
-        for key, title, icon, group in rows:
+        if not self.albums:
+            rows.insert(3, (None, "", "", "My Albums"))   # the heading still shows, with its + button
+        for key, title, icon, group, *count in rows:
             row = Gtk.ListBoxRow()
             row.key, row.group = key, group
+            if key is None:
+                row.set_activatable(False)
+                row.set_selectable(False)
+                row.set_size_request(-1, 0)
+                self.sidebar.add(row)
+                continue
             box = Gtk.Box(spacing=8)
             box.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
             box.pack_start(Gtk.Label(label=title, xalign=0, ellipsize=3), True, True, 0)
+            if count:
+                number = Gtk.Label(label=str(count[0]))
+                number.get_style_context().add_class("cove-count")
+                box.pack_end(number, False, False, 0)
             row.add(box)
+            if key.startswith("album:"):
+                row.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+                row.drag_dest_add_uri_targets()
+                row.connect("drag-data-received", self._dropped_on_album)
+                row.connect("drag-motion", lambda r, *_: r.get_style_context().add_class("cove-drop") or False)
+                row.connect("drag-leave", lambda r, *_: r.get_style_context().remove_class("cove-drop"))
             self.sidebar.add(row)
             if key == self.view:
                 self.sidebar.select_row(row)
@@ -476,12 +522,153 @@ class Window(Gtk.ApplicationWindow):
         self.choosing = False
 
     def _side_header(self, row, before):
-        if row.group == "Devices" and (before is None or before.group != "Devices"):
-            label = Gtk.Label(label="Devices", xalign=0)
-            label.get_style_context().add_class("cove-side-head")
-            row.set_header(label)
+        if row.group in ("My Albums", "Devices") and (before is None or before.group != row.group):
+            head = Gtk.Box()
+            head.get_style_context().add_class("cove-side-head")
+            label = Gtk.Label(label=row.group, xalign=0)
+            head.pack_start(label, True, True, 0)
+            if row.group == "My Albums":
+                add = Gtk.Button.new_from_icon_name("list-add-symbolic", Gtk.IconSize.MENU)
+                add.set_relief(Gtk.ReliefStyle.NONE)
+                add.set_tooltip_text("New Album (⌘N)")
+                add.connect("clicked", lambda *_: self.new_album(self.chosen_paths()))
+                head.pack_end(add, False, False, 0)
+            head.show_all()
+            row.set_header(head)
         else:
             row.set_header(None)
+
+    def _side_button(self, _box, event):
+        if event.button != 3:
+            return False
+        row = self.sidebar.get_row_at_y(int(event.y))
+        key = getattr(row, "key", None) or ""
+        if not key.startswith("album:"):
+            return False
+        ident = key.split(":", 1)[1]
+        album = store.album(ident)
+        if album is None:
+            return False
+        menu = Gtk.Menu()
+        for label, callback in (("Play Slideshow", lambda: (self.choose_view(key), self.slideshow())),
+                                (f"Rename “{album.name}”…", lambda: self.rename_album(ident)),
+                                (None, None),
+                                ("Delete Album", lambda: self.delete_album(ident))):
+            if label is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda _i, c=callback: c())
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(self.sidebar, None)
+        menu.popup_at_pointer(event)
+        return True
+
+    def _dropped_on_album(self, row, _ctx, _x, _y, data, _info, _time):
+        row.get_style_context().remove_class("cove-drop")
+        paths = [Gio.File.new_for_uri(u).get_path() for u in data.get_uris() or []]
+        known = {p.path for p in self.photos}
+        paths = [p for p in paths if p and p in known]
+        if paths:
+            store.add_to_album(row.key.split(":", 1)[1], paths)
+            self.fill_sidebar()
+            if self.view == row.key:
+                self.show_grid()
+
+    # -- albums -------------------------------------------------------------------
+
+    def album_id(self):
+        return self.view.split(":", 1)[1] if self.view.startswith("album:") else None
+
+    def new_album(self, paths=()):
+        ident = store.new_album(store.free_album_name(), paths)
+        self.choose_view(f"album:{ident}")
+        self.fill_sidebar()
+        GLib.idle_add(self.rename_album, ident)
+        return ident
+
+    def _album_row(self, ident):
+        for row in self.sidebar.get_children():
+            if getattr(row, "key", None) == f"album:{ident}":
+                return row
+        return None
+
+    def rename_album(self, ident):
+        """Name an album in a small box beside it, like a Mac sidebar."""
+        row = self._album_row(ident)
+        album = store.album(ident)
+        if row is None or album is None:
+            return False
+        pop = Gtk.Popover(relative_to=row, position=Gtk.PositionType.RIGHT)
+        entry = Gtk.Entry(text=album.name, width_chars=22, margin=8)
+        pop.add(entry)
+
+        def renamed(name):
+            pop.destroy()
+            if store.rename_album(ident, name):
+                self.fill_sidebar()
+                if self.view == f"album:{ident}" and self.current is None:
+                    self.show_grid()
+            return False
+        entry.connect("activate", lambda *_: pop.popdown())
+        pop.connect("closed", lambda *_: GLib.idle_add(renamed, entry.get_text()))
+        pop.show_all()
+        pop.popup()
+        entry.grab_focus()
+        return False
+
+    def delete_album(self, ident):
+        album = store.album(ident)
+        if album is None:
+            return
+        answer = alert.ask(self, f"Delete the album “{album.name}”?",
+                           "The photos in it stay in your library.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Delete", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, icon="freemac-cove")
+        if answer != Gtk.ResponseType.OK:
+            return
+        store.delete_album(ident)
+        if self.view == f"album:{ident}":
+            self.view = "library"
+            self.show_grid()
+        self.fill_sidebar()
+
+    def add_to_album(self, ident, paths):
+        if paths:
+            store.add_to_album(ident, paths)
+            self.fill_sidebar()
+
+    def remove_from_album(self):
+        ident = self.album_id()
+        chosen = self.chosen_paths()
+        if ident is None or not chosen:
+            return
+        at = min(i for i, p in enumerate(self.shown) if p.path in chosen)
+        viewing = self.current is not None
+        store.remove_from_album(ident, chosen)
+        self.current = None
+        self.fill_sidebar()
+        self.show_grid()
+        if viewing and self.shown:
+            self.open_photo(min(at, len(self.shown) - 1))
+        elif self.shown:
+            self._select_tile(self.shown[min(at, len(self.shown) - 1)])
+
+    def chosen_paths(self):
+        """The photos chosen: the one open, or the tiles selected."""
+        if self.current is not None:
+            return [self.shown[self.current].path]
+        return [t.item.path for t in self.tiles if not t.device and t.is_selected()]
+
+    def slideshow(self):
+        if not self.shown or self.device is not None:
+            return
+        start = self.current
+        if start is None:
+            tile = self._selected_tile()
+            start = self.shown.index(tile.item) if tile is not None and not tile.device else 0
+        Slideshow(self, self.shown, start)
 
     def _side_selected(self, _box, row):
         if row is None or self.choosing:
@@ -543,6 +730,8 @@ class Window(Gtk.ApplicationWindow):
         before = [(p.path, p.mtime) for p in self.photos]
         self.photos = photos
         if first or before != [(p.path, p.mtime) for p in photos]:
+            if self.device is None:
+                self.fill_sidebar()   # album counts, now the photos are known
             if self.device is None and (self.current is None or first):
                 self.show_grid(keep=self._photo_in_hand())
         return False
@@ -557,6 +746,10 @@ class Window(Gtk.ApplicationWindow):
             return [p for p in self.photos if p.path in self.favourite_paths]
         if self.view == "recent":
             return store.recently_added(self.photos)
+        if self.view.startswith("album:"):
+            album = store.album(self.album_id())
+            by_path = {p.path: p for p in self.photos}
+            return [by_path[path] for path in (album.paths if album else []) if path in by_path]
         return self.photos
 
     def show_grid(self, keep=None):
@@ -570,6 +763,9 @@ class Window(Gtk.ApplicationWindow):
         if not self.shown:
             texts = {"favourites": ("No Favourites", "Open a photo and click the heart to keep it here."),
                      "recent": ("Nothing Added Lately", "Photos added in the last 30 days show here.")}
+            if self.album_id():
+                texts[self.view] = ("No Photos in This Album", "Drag photos onto the album in the sidebar, "
+                                    "or right-click photos and choose Add to Album.")
             title, text = texts.get(self.view, (
                 "No Photos", "Put pictures in your Pictures folder, or connect a camera or phone and "
                 "import from it."))
@@ -579,6 +775,9 @@ class Window(Gtk.ApplicationWindow):
             return
         if self.view == "recent":
             groups = [("Recently Added", "", self.shown)]
+        elif self.album_id():
+            album = store.album(self.album_id())
+            groups = [(album.name if album else "Album", "", self.shown)]
         else:
             groups = []
             for photo in self.shown:
@@ -615,21 +814,26 @@ class Window(Gtk.ApplicationWindow):
         flow = Gtk.FlowBox(homogeneous=True, column_spacing=3, row_spacing=3, margin_start=20,
                            margin_end=20, valign=Gtk.Align.START, halign=Gtk.Align.START,
                            max_children_per_line=60, activate_on_single_click=False)
-        flow.set_selection_mode(Gtk.SelectionMode.MULTIPLE if device else Gtk.SelectionMode.SINGLE)
+        flow.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
         size = SIZES[self.size_at]
         for item in items:
             tile = Tile(self, item, size, device=device, dimmed=device and item.key() in done)
             flow.add(tile)
             self.tiles.append(tile)
         flow.connect("child-activated", self._tile_activated)
+        if not device:
+            flow.connect("button-press-event", self._tile_button)
         flow.connect("selected-children-changed", self._selection_changed)
         return flow
 
     def _selection_changed(self, flow):
         if self.choosing:
             return
-        if flow.get_selection_mode() == Gtk.SelectionMode.SINGLE and flow.get_selected_children():
-            self.choosing = True   # one photo chosen across all the months
+        held = Gtk.get_current_event_state()
+        adding = held[0] and held[1] & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.MOD1_MASK |
+                                        Gdk.ModifierType.SHIFT_MASK)
+        if not adding and self.device is None and flow.get_selected_children():
+            self.choosing = True   # a plain click chooses afresh, across all the months
             for other in self.grid_box.get_children():
                 if isinstance(other, Gtk.FlowBox) and other is not flow:
                     other.unselect_all()
@@ -639,10 +843,106 @@ class Window(Gtk.ApplicationWindow):
         if self.device is not None:
             self._update_import_buttons()
 
+    def _tile_button(self, flow, event):
+        if event.button != 3:
+            return False
+        tile = flow.get_child_at_pos(int(event.x), int(event.y))
+        if tile is None:
+            return False
+        if not tile.is_selected():
+            self.choosing = True
+            for other in self.grid_box.get_children():
+                if isinstance(other, Gtk.FlowBox):
+                    other.unselect_all()
+            self.choosing = False
+            flow.select_child(tile)
+        tile.grab_focus()
+        paths = self.chosen_paths()
+        menu = Gtk.Menu()
+
+        def add(label, callback, sensitive=True):
+            item = Gtk.MenuItem(label=label, sensitive=sensitive)
+            item.connect("activate", lambda *_: callback())
+            menu.append(item)
+            return item
+        add("Play Slideshow", self.slideshow)
+        menu.append(Gtk.SeparatorMenuItem())
+        into = Gtk.Menu()
+        for album in store.albums():
+            item = Gtk.MenuItem(label=album.name, sensitive=album.id != self.album_id())
+            item.connect("activate", lambda _i, a=album.id: self.add_to_album(a, paths))
+            into.append(item)
+        if store.albums():
+            into.append(Gtk.SeparatorMenuItem())
+        item = Gtk.MenuItem(label="New Album With Selection")
+        item.connect("activate", lambda *_: self.new_album(paths))
+        into.append(item)
+        parent = Gtk.MenuItem(label="Add to Album")
+        parent.set_submenu(into)
+        menu.append(parent)
+        if self.album_id():
+            add("Remove from Album", self.remove_from_album)
+        menu.append(Gtk.SeparatorMenuItem())
+        favourite = all(p in self.favourite_paths for p in paths)
+        add("Unfavourite" if favourite else "Favourite", lambda: self.mark_favourites(paths, not favourite))
+        add("Show in Drawer", self.show_in_folder, len(paths) == 1)
+        add("Open With Frame", self.open_in_frame, len(paths) == 1)
+        menu.append(Gtk.SeparatorMenuItem())
+        add(f"Move {len(paths)} Photos to Trash" if len(paths) > 1 else "Move to Trash", self.delete_photo)
+        menu.show_all()
+        menu.attach_to_widget(flow, None)
+        menu.popup_at_pointer(event)
+        return True
+
+    def mark_favourites(self, paths, on):
+        for path in paths:
+            (self.favourite_paths.add if on else self.favourite_paths.discard)(path)
+            store.set_favourite(path, on)
+        for tile in self.tiles:
+            tile.area.queue_draw()
+        if self.view == "favourites" and not on:
+            self.show_grid()
+
     def _tile_activated(self, _flow, tile):
         if tile.device:
             return
         self.open_photo(self.shown.index(tile.item))
+
+    def _drag_pressed(self, gesture, x, y):
+        """Drag photos out (to an album, Drawer, Post): a press on a photo
+        that moves becomes a drag; a press between photos still draws the
+        rubber band that selects several. This gesture sees the press
+        before the FlowBox does, which would otherwise take every drag."""
+        self.pressed = None
+        if self.current is None:
+            for flow in self.grid_box.get_children():
+                if not isinstance(flow, Gtk.FlowBox):
+                    continue
+                at = self.grid_scroll.translate_coordinates(flow, int(x), int(y))
+                tile = flow.get_child_at_pos(*at) if at else None
+                if isinstance(tile, Tile) and not tile.device:
+                    self.pressed = tile
+                    break
+        if self.pressed is None:
+            gesture.set_state(Gtk.EventSequenceState.DENIED)
+
+    def _drag_moved(self, gesture, dx, dy):
+        tile = self.pressed
+        if tile is None or not self.grid_scroll.drag_check_threshold(0, 0, int(dx), int(dy)):
+            return
+        self.pressed = None
+        event = gesture.get_last_event(gesture.get_current_sequence())
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        if not tile.is_selected():
+            self.choosing = True
+            for other in self.grid_box.get_children():
+                if isinstance(other, Gtk.FlowBox):
+                    other.unselect_all()
+            self.choosing = False
+            tile.get_parent().select_child(tile)
+        targets = Gtk.TargetList.new([])
+        targets.add_uri_targets(0)
+        tile.drag_begin_with_coordinates(targets, Gdk.DragAction.COPY, 1, event, -1, -1)
 
     def _selected_tile(self):
         for tile in self.tiles:
@@ -704,9 +1004,13 @@ class Window(Gtk.ApplicationWindow):
             widget.set_visible(viewing)
         self.import_all.set_visible(device and not self.importing)
         self.import_some.set_visible(False)
+        self.play_button.set_visible(not viewing and not device and self.device is None and bool(self.shown))
         if not viewing:
             if device:
                 self.header.set_title(self.device.name)
+            elif self.album_id():
+                album = store.album(self.album_id())
+                self.header.set_title(album.name if album else "Album")
             else:
                 self.header.set_title({"favourites": "Favourites", "recent": "Recently Added"}.get(self.view, "Library"))
             shown = self.shown if not device else []
@@ -758,12 +1062,9 @@ class Window(Gtk.ApplicationWindow):
         if self.current is not None:
             self.fav_button.set_active(not self.fav_button.get_active())
         else:
-            tile = self._selected_tile()
-            if tile is not None and not tile.device:
-                on = tile.item.path not in self.favourite_paths
-                (self.favourite_paths.add if on else self.favourite_paths.discard)(tile.item.path)
-                store.set_favourite(tile.item.path, on)
-                tile.area.queue_draw()
+            paths = self.chosen_paths()
+            if paths:
+                self.mark_favourites(paths, not all(p in self.favourite_paths for p in paths))
 
     def _photo_in_hand(self):
         if self.current is not None:
@@ -772,23 +1073,40 @@ class Window(Gtk.ApplicationWindow):
         return tile.item if tile is not None and not tile.device else None
 
     def delete_photo(self):
-        photo = self._photo_in_hand()
-        if photo is None:
+        paths = self.chosen_paths()
+        photos = [p for p in self.shown if p.path in paths]
+        if not photos:
             return
-        answer = alert.ask(self, "Move this photo to the Trash?", photo.name,
+        if len(photos) == 1:
+            title, text = "Move this photo to the Trash?", photos[0].name
+        else:
+            title, text = f"Move {len(photos)} photos to the Trash?", ""
+        if self.album_id():
+            them = "They" if len(photos) > 1 else "It"
+            note = (f"{them} also leave{'' if len(photos) > 1 else 's'} every album. To take "
+                    f"{them.lower()} out of this album only, press Delete.")
+            text = f"{text}\n\n{note}" if text else note
+        answer = alert.ask(self, title, text,
                            [("Cancel", Gtk.ResponseType.CANCEL), ("Move to Trash", Gtk.ResponseType.OK)],
                            default=Gtk.ResponseType.OK, icon="freemac-cove")
         if answer != Gtk.ResponseType.OK:
             return
-        try:
-            Gio.File.new_for_path(photo.path).trash(None)
-        except GLib.Error as error:
-            alert.tell(self, "The photo couldn't be moved to the Trash.", error.message, icon="freemac-cove")
+        gone = set()
+        for photo in photos:
+            try:
+                Gio.File.new_for_path(photo.path).trash(None)
+            except GLib.Error as error:
+                alert.tell(self, f"“{photo.name}” couldn't be moved to the Trash.", error.message,
+                           icon="freemac-cove")
+                break
+            store.forget(photo.path)
+            self.favourite_paths.discard(photo.path)
+            gone.add(photo.path)
+        if not gone:
             return
-        store.forget(photo.path)
-        self.favourite_paths.discard(photo.path)
-        at = self.shown.index(photo)
-        self.photos = [p for p in self.photos if p.path != photo.path]
+        at = min(self.shown.index(p) for p in photos if p.path in gone)
+        self.photos = [p for p in self.photos if p.path not in gone]
+        self.fill_sidebar()
         viewing = self.current is not None
         self.current = None
         self.show_grid()
@@ -955,6 +1273,8 @@ class Window(Gtk.ApplicationWindow):
                 self.close_photo()
             elif key == Gdk.KEY_period:
                 self.toggle_favourite()
+            elif key in (Gdk.KEY_Delete, Gdk.KEY_BackSpace) and self.album_id():
+                self.remove_from_album()
             else:
                 return False
             return True
@@ -966,16 +1286,22 @@ class Window(Gtk.ApplicationWindow):
         if key == Gdk.KEY_period:
             self.toggle_favourite()
             return True
+        if key in (Gdk.KEY_Delete, Gdk.KEY_BackSpace) and self.album_id():
+            self.remove_from_album()
+            return True
         return False
 
 
 def menubar():
     return menus.menubar([
-        ("_File", [[("Import…", "win.import", None)],
+        ("_File", [[("New Album", "win.new-album", "<Ctrl>n")],
+                   [("Play Slideshow", "win.slideshow", None)],
+                   [("Import…", "win.import", None)],
                    [("Show in Drawer", "win.show-folder", "<Ctrl>r"), ("Open With Frame", "win.open-frame", None)],
                    [("Close Window", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("Move to Trash", "win.delete", "<Ctrl>BackSpace")]]),
-        ("_Image", [[("Favourite", "win.favourite", "period"), ("Get Info", "win.info", "<Ctrl>i")]]),
+        ("_Image", [[("Favourite", "win.favourite", "period"), ("Get Info", "win.info", "<Ctrl>i")],
+                    [("Remove from Album", "win.remove-from-album", None)]]),
         ("_View", [[("Library", "win.library", "<Ctrl>1"), ("Favourites", "win.favourites", "<Ctrl>2"),
                     ("Recently Added", "win.recent", "<Ctrl>3")],
                    [("Bigger Tiles", "win.bigger", "<Ctrl>plus"), ("Smaller Tiles", "win.smaller", "<Ctrl>minus")]]),
