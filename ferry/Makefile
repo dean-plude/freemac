@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 CC ?= cc
 CFLAGS ?= -O2 -g
-CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fno-strict-aliasing
+CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation -fno-strict-aliasing
 LDLIBS = -Wl,--no-as-needed -lm -ldl -lpthread
 PREFIX ?= /usr
 DESTDIR ?=

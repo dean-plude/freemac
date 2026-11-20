@@ -49,6 +49,20 @@ run_one objc_basic_chained "$here/objc_basic.m" "$here/objc_basic.out" -lobjc -W
 run_one objc_arc_chained "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc -Wl,-fixup_chains
 # Unoptimized code sends messages differently (no tail calls, more stack).
 run_one objc_basic_O0 "$here/objc_basic.m" "$here/objc_basic.out" -O0 -lobjc
+# A program using a Mac library (dylib) of its own, found through @rpath,
+# with both relocation formats.
+for fmt in classic chained; do
+    flags=; [ $fmt = chained ] && flags=-Wl,-fixup_chains
+    mkdir -p "$build/lib_$fmt"
+    if "$top/sdk/ferry-cc" -O1 -dynamiclib -install_name @rpath/libgreet.dylib $flags \
+            -o "$build/lib_$fmt/libgreet.dylib" "$here/dylib/greet.m" -lobjc 2> "$build/greet_$fmt.cc.log"; then
+        run_one "dylib_$fmt" "$here/dylib_main.m" "$here/dylib_main.out" -lobjc $flags \
+            -L"$build/lib_$fmt" -lgreet -Wl,-rpath,@executable_path/lib_$fmt
+    else
+        echo "FAIL dylib_$fmt (library did not compile)"; sed 's/^/    /' "$build/greet_$fmt.cc.log"
+        fail=$((fail + 1))
+    fi
+done
 # An unknown selector must be reported as a Mac reports it.
 if grep -q "unrecognized selector sent to instance" "$build/objc_unknown.err" 2>/dev/null; then
     echo "ok   objc_unknown message"; pass=$((pass + 1))
