@@ -77,6 +77,26 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_collections_chained "$here/foundation/collections.m" "$here/foundation/collections.out" \
     -framework Foundation -Wl,-fixup_chains
+run_one foundation_attributed "$here/foundation/attributed.m" "$here/foundation/attributed.out" -framework Foundation
+# Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
+run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
+    -framework CoreGraphics -framework CoreFoundation
+run_one graphics_drawing "$here/graphics/drawing.c" "$here/graphics/drawing.out" -framework CoreGraphics
+run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
+    -framework CoreText -framework CoreGraphics -framework Foundation
+# The same, linked under ApplicationServices' Mac name, which CoreGraphics' file also serves.
+run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
+    -framework ApplicationServices -framework CoreFoundation
+run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/drawing.out" \
+    -framework CoreGraphics -Wl,-fixup_chains
+# Cairo is loaded only by programs that draw (glibc's LD_DEBUG lists each library loaded).
+if LD_DEBUG=libs "$top/ferry" "$build/foundation_strings" 2>&1 >/dev/null | grep -q "libcairo"; then
+    echo "FAIL foundation_strings loads Cairo"; fail=$((fail + 1))
+elif ! LD_DEBUG=libs "$top/ferry" "$build/graphics_drawing" 2>&1 >/dev/null | grep -q "libcairo"; then
+    echo "FAIL graphics_drawing doesn't load Cairo"; fail=$((fail + 1))
+else
+    echo "ok   Cairo loaded only when drawing"; pass=$((pass + 1))
+fi
 # A program inside a Mac app bundle: Info.plist, resources, localized strings.
 app="$build/Hello.app"
 rm -rf "$app"; cp -r "$here/foundation/Hello.app" "$app"; mkdir -p "$app/Contents/MacOS"

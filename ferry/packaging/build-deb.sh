@@ -20,7 +20,7 @@ Architecture: amd64
 Maintainer: freemac project <noreply@freemac.invalid>
 Installed-Size: $size
 Depends: libc6
-Recommends: systemd
+Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b
 Suggests: clang, lld
 Section: otherosfs
 Priority: optional
@@ -29,7 +29,9 @@ Description: Ferry, runs simple Intel Mac command-line programs
  C library through its own small libSystem layer, Objective-C runtime and
  Foundation, written from public documentation. It runs command-line
  programs that use the C and POSIX basics, blocks, the Objective-C runtime
- and Foundation. Graphical Mac apps and App Store apps do not run yet.
+ and Foundation, and can draw into images with its Core Graphics and Core
+ Text (on this system's Cairo and Pango). Graphical Mac apps and App Store
+ apps do not run yet.
 CONTROL
 cat > "$root/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh

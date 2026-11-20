@@ -13,8 +13,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | Milestone | Layer | Status |
 | --- | --- | --- |
 | M1 | Objective-C runtime (libobjc) and blocks | **done**, merged (#25) |
-| M2 | Foundation core + CoreFoundation basics | **done**, pull request open (see the M2 report below) |
-| M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | planned |
+| M2 | Foundation core + CoreFoundation basics | **done**, merged (#28) |
+| M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, pull request open (see the M3 report below) |
 | M4 | AppKit minimum on Wayland | planned |
 | M5 | Nibs (compiled .nib) | planned |
 | M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | planned |
@@ -314,8 +314,8 @@ differences in wording from real macOS output are possible.
   `NSDateFormatter`, `NSCalendar`, `NSLocale`, `NSNumberFormatter`,
   `NSRegularExpression`, `NSScanner`, `NSPredicate`, `NSSortDescriptor`,
   `NSIndexSet`, `NSUUID`, `NSCache`, `NSJSONSerialization`, keyed archiving
-  (`NSCoding`, needed for nibs in M5), key-value observing, and
-  `NSAttributedString`. M4 to M6 will add what real apps turn out to need.
+  (`NSCoding`, needed for nibs in M5) and key-value observing
+  (`NSAttributedString` came with M3). M4 to M6 will add what real apps turn out to need.
 - Simplifications: upper/lower case mapping covers ASCII and Latin-1 only;
   `localizedCompare:` is plain `compare:`; dates print in UTC;
   `bundleForClass:` returns the main bundle; only the user domain has
@@ -329,6 +329,156 @@ differences in wording from real macOS output are possible.
 
 **What's next.** M3, drawing: a Core Graphics subset and Core Text basics on
 Cairo, Pango/HarfBuzz and FreeType, using freemac's system font.
+
+## M3: drawing (Core Graphics and Core Text)
+
+### Design
+
+- **The bridge to this system's libraries.** Ferry's frameworks are Mac code,
+  but the System V calling convention is the same on both systems, so a Mac
+  library can call a Linux one directly. Ferry's own drawing framework
+  imports Cairo, Pango and HarfBuzz calls from a library name that exists
+  only inside Ferry, `/usr/lib/ferry/libFerryHost.dylib`. The loader treats
+  it as built in (like libSystem) and resolves those names with `dlopen` and
+  `dlsym` on `libcairo.so.2`, `libpangocairo-1.0.so.0`, `libpango-1.0.so.0`,
+  `libgobject-2.0.so.0`, `libglib-2.0.so.0` and `libharfbuzz.so.0`
+  (`src/host.c`). Only the calls declared in `graphics/host.h` are allowed;
+  the list is generated from that header at build time, and so is the link
+  stub `graphics/build/libFerryHost.tbd`. The libraries are opened the first
+  time a program needs one, so programs that don't draw never load them,
+  and the `ferry` binary doesn't link against them (a test checks both).
+  The declarations in `host.h` are written from each library's published API
+  documentation, because a Mac build can't include Linux headers. Building
+  needs no `-dev` packages; running a drawing program needs the libraries.
+- **One file, three frameworks.** `ferry/graphics/` builds
+  `frameworks/CoreGraphics.framework/CoreGraphics` (install name
+  `/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics`).
+  CoreText and ApplicationServices are aliases for that file in the loader,
+  like CoreFoundation for Foundation, with generated `.tbd` link stubs
+  (`sdk/gen-alias-tbd.sh`) so programs record the real Mac names.
+- **CG objects are Objective-C objects** (`GColor`, `GPath`, `GContext`,
+  `GFont`, `GLine`, ...), so `CFRetain`, `CFRelease` and `CFEqual` work on
+  them and they can sit in `NSArray`s.
+- **Coordinates.** A CG context's origin is the bottom left with y going up;
+  Cairo's is the top left with y going down. Each context keeps a base
+  transform (`[1 0 0 -1 0 height]`) under the user's CTM, and
+  `CGContextGetCTM` reports the CTM without it, as on a Mac (identity for a
+  new bitmap context). A bitmap's first row in memory is its top, as on a
+  Mac. Arcs, ellipses and rounded rectangles become Bézier curves when they
+  are added, so `CGPathApply` reports curves as it does on a Mac.
+- **Bitmap layouts.** Cairo's own layout (32-bit premultiplied ARGB in host
+  order, which is `kCGImageAlphaPremultipliedFirst |
+  kCGBitmapByteOrder32Little` on Intel, the same with the alpha byte
+  skipped, and 8-bit alpha only) is drawn into the caller's memory directly.
+  Every other supported layout (RGBA, i.e. `kCGImageAlphaPremultipliedLast`,
+  the most common in Mac code; big-endian ARGB; 8-bit grey) is drawn in a
+  Cairo copy and converted in and out around each drawing call. Supported:
+  8 bits per component, RGB with alpha or a skipped byte, grey, alpha only.
+  16-bit, float and CMYK bitmaps give `NULL` with the Mac's "unsupported
+  parameter combination" message.
+- **Colour.** Everything is drawn as sRGB with no colour management: a
+  colour's components are used as sRGB values whatever space they are in
+  (grey and CMYK are converted simply).
+- **Text.** A `CTFont` is a Pango font loaded at an absolute size in points
+  in a Pango context at 72 dpi with metric hinting off, so one point is one
+  unit of user space and widths scale exactly with size. Metrics, glyphs,
+  advances and glyph boxes come from HarfBuzz in font units. Mac font names
+  are matched to the system's fonts: Helvetica, Helvetica Neue, Arial, SF
+  (`.SFNS...`, `.AppleSystemUIFont`), Lucida Grande, Geneva and others ask
+  for `sans-serif`, which freemac's fontconfig maps to Inter; Menlo, Monaco,
+  Courier and SF Mono ask for `monospace`; Times, Georgia and Palatino for
+  `serif`. Weights and italics are read from the name (`Helvetica-Bold`,
+  `HelveticaNeue-LightItalic`). The font then reports its real name
+  (`Inter`, `Inter-Bold`), never the Mac name it was asked for.
+  `CTFontCreateUIFontForLanguage` gives the Mac's documented default sizes
+  (13 pt for the system font).
+- **Lines and frames** are Pango layouts built from the attributed string
+  (font, colour, colour from the context, kerning, underline), with a map
+  between the string's UTF-16 indexes and Pango's UTF-8 byte offsets.
+  `CTLineDraw` and `CTFrameDraw` draw at the text position (the text
+  matrix's translation, as on a Mac), flipping y locally so glyphs stand
+  upright. Pango shapes with HarfBuzz and falls back to other installed
+  fonts for missing characters (emoji, for example), which Core Text also
+  does. Frames lay lines out from the top of the rectangle down and stop at
+  the last line that fits.
+- **NSAttributedString** joined Foundation (`foundation/NSAttributedString.m`):
+  a string plus a list of runs (length and attribute dictionary), merged when
+  neighbours are equal, with the Mac's rules for what new text inherits.
+  `CFAttributedString` calls work on the same objects.
+
+### M3 report (2026-11-20)
+
+**What works now.** A Mac program can draw with Core Graphics and Core
+Text into bitmaps: shapes, paths, colours, transforms, clipping, gradients,
+images (including PNG files), and text in the system's fonts, laid out in
+lines and wrapped in rectangles. `make check` runs 38 tests (31 before M3),
+all passing. The new ones:
+
+| Test | Proves |
+| --- | --- |
+| `foundation_attributed` | `NSAttributedString` and `NSMutableAttributedString`: adding, setting and removing attributes, replacing text (what the new text inherits), appending, deleting, effective ranges, substrings, copies, enumeration forwards and in reverse, and `CFAttributedString` from C |
+| `graphics_geometry` (also as `graphics_appservices`, linked under ApplicationServices' name) | `CGRect` functions (standardizing, union, intersection, inset, integral, divide, containment, null and infinite rectangles), affine transforms (make, translate, scale, rotate, invert, concatenate, apply to points and rectangles), dictionary forms |
+| `graphics_drawing` (also with chained fixups) | RGBA bitmap contexts checked pixel by pixel: filled rectangles and ellipses where y-up puts them, stroked lines, colours with alpha and a global alpha, save and restore, translate, scale and rotate, `CGContextGetCTM`, clipping and its bounding box, even-odd fill, clearing, linear gradients (rising, half-way grey in the middle, the before/after options) and radial ones, an image from one context drawn into another the right way up and cropped, a PNG decoded with its colours and transparency, the BGRA, xRGB, grey and alpha-only memory layouts, `NULL` for an unsupported layout, path elements (lines, quadratic curves, arcs as curves), bounding boxes, containment, `CGPathIsRect`, transformed copies, rounded rectangles, `CGContextAddArcToPoint`, copying the context's path, and colours |
+| `graphics_text` | Helvetica and the system font are the same family, Menlo and SF Mono the same monospace one; default sizes; bold and monospace traits; a bold copy; metrics that double with the size; glyphs and advances; glyph boxes and outlines on the baseline; a line's width, ascent, offsets and hit testing; drawn text landing inside its image bounds above the baseline and nothing below the descent; red text drawn red; truncation; a framesetter's suggested size; a frame's lines going down the rectangle in order, starting at the top, with all ink inside it; a short frame showing one line; centred paragraphs |
+| `Cairo loaded only when drawing` | a Foundation-only program doesn't load Cairo; a drawing program does |
+
+Text tests check properties that hold for any font (sizes scale, ink lands
+where it should, Mac names map to the right kind of font) rather than exact
+pixel widths, so they pass with whatever fonts a machine has. They were
+also checked by eye: text stands upright on its baseline, wraps inside its
+frame and starts at the top; arcs go the documented way round.
+
+**Design notes for the next session.**
+
+- Sources: `graphics/GInternal.h` (shared types), `host.h` (the Linux calls),
+  `CGGeometry.m`, `CGColor.m`, `CGPath.m` (paths and the shape builders
+  shared with contexts), `CGImage.m` (pixel layouts, data providers, images,
+  gradients), `CGContext.m`, `CoreText.m`. Public headers are in
+  `sdk/include/CoreGraphics/`, `CoreText/` and `ApplicationServices/`.
+- For M4: `GContextCreateWithSurface(cairo_surface_t *, height)` (exported
+  from CoreGraphics) makes a context on any Cairo surface; AppKit will use
+  it for window contents. AppKit's `NSFont` and `NSColor` can sit on
+  `GFont` and `GColor`: Core Text already accepts the `NSFont` key (it is the
+  same string as `kCTFontAttributeName`) and any colour object that answers
+  `-CGColor`, under `NSColor` or `CTForegroundColor`.
+- Adding a Linux call means declaring it in `graphics/host.h`; the allow
+  list and link stub follow from that.
+- Programs link Core Text, Core Graphics and CoreFoundation separately, as
+  on a Mac (none of them re-exports the others).
+- `__sincos_stret` and `__sincosf_stret` (clang on a Mac turns `sin(x)` and
+  `cos(x)` of the same x into one call) were added to Ferry's libSystem.
+
+**What isn't done yet (and why).**
+
+- Not written: shadows (`CGContextSetShadow` warns once and draws without
+  one), transparency layers, patterns, masks (`CGImageMaskCreate`,
+  `CGContextClipToMask`), `CGContextReplacePathWithStrokedPath`, PDF
+  contexts and documents, `CGFont` and the old CG text calls
+  (`CGContextShowText`...), `CTRun` and `CTLineGetGlyphRuns`, font
+  descriptors and collections, font name lists, vertical text, and
+  ImageIO (so only PNG images can be read, through
+  `CGImageCreateWithPNGDataProvider`; no JPEG, and nothing can be written).
+- Simplifications: no colour management (see above); a radial gradient
+  drawn with only one of the before/after options extends both ends;
+  `kCGBlendModePlusDarker` draws as normal; justified text is left-aligned;
+  a text frame that isn't a rectangle uses its bounding box; truncation
+  always uses "…" (a custom token is ignored); `CTFontGetBoundingBox` is an
+  estimate (HarfBuzz doesn't expose the font's own box); clip text drawing
+  modes draw without clipping; line spacing in frames is Pango's (ascent
+  plus descent), which can be a little tighter than a Mac's.
+- Bitmaps in a layout Cairo doesn't have are converted around every
+  drawing call, which is slow for big bitmaps; drawing in
+  `kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little` avoids it.
+- Fonts: the font a Mac name maps to depends on what the machine has; on
+  freemac that is Inter, DejaVu Sans Mono and DejaVu Serif (or Noto, if
+  installed). The real Mac fonts are never used or shipped.
+- Still no threads, so the shared Pango context and caches have no locks.
+
+**What's next.** M4, the AppKit minimum on Wayland: `NSApplication`,
+`NSWindow`, `NSView` with `drawRect:` on the M3 contexts, events, `NSFont`
+and `NSColor`, a few controls. The first M4 task is to choose how windows
+reach Wayland (directly with libwayland and xdg-shell, or through GTK) and
+record the choice and the reason here.
 
 ## Known limits (for every milestone)
 
@@ -355,3 +505,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: read Ferry, `make check` 10/10 green, wrote this plan, started M1.
 - 2026-11-20: M1 done: Objective-C runtime and blocks, `make check` 18/18.
 - 2026-11-20: M1 merged (#25). M2 done: dylib loading, Foundation and CoreFoundation basics, `make check` 31/31.
+- 2026-11-20: M2 merged (#28). M3 done: Core Graphics and Core Text on Cairo, Pango and HarfBuzz, NSAttributedString, `make check` 38/38.
