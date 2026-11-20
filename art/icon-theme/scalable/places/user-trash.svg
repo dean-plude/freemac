@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Trash: a rounded bin with a lid. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8c94b8"/><stop offset="0.5" stop-color="#b4bad6"/><stop offset="1" stop-color="#7e86ab"/></linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6c78d8"/><stop offset="1" stop-color="#4f5bbd"/></linearGradient>
+  </defs>
+  <path d="M28 40 h72 l-7 70 a8 8 0 0 1 -8 7 h-42 a8 8 0 0 1 -8 -7 z" fill="url(#bin)"/>
+  <g stroke="#5b6390" stroke-width="4" stroke-linecap="round" opacity="0.55"><path d="M48 52 l2 52 M64 52 v52 M80 52 l-2 52"/></g>
+  <rect x="20" y="28" width="88" height="14" rx="7" fill="url(#lid)"/>
+  <rect x="52" y="20" width="24" height="10" rx="4" fill="#4f5bbd"/>
+  <rect x="22" y="29" width="84" height="3" rx="1.5" fill="#ffffff" opacity="0.35"/>
+</svg>

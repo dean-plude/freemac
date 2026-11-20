@@ -93,18 +93,22 @@ menus over through KDE's own platform plugin; it needs more work in Strata to
 do properly. The Debian build is still waiting on the build machine reaching
 Debian's mirrors.
 
-## 1.0 "release candidate" (planned)
+## 1.0 "release candidate" (1.0.0-rc1)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | App menus from Qt apps in Topline | Strata, Topline | planned |
-| 2 | Debian (`BASE=debian`, trixie) build tested end to end, as the default | build | planned |
-| 3 | Seek finds files by the text inside them, not only by name | Seek | planned |
-| 4 | Drawer: tabs, a sidebar you can edit, and a preview of the selected file with Space | Drawer | planned |
-| 5 | Pier: folders on the dock (Downloads stack) and a Trash you can empty | Pier | planned |
-| 6 | First-run welcome: pick light or dark, wallpaper, Wi-Fi and a user account before the desktop opens | Welcome | planned |
+| 1 | App menus from Qt apps in Topline | Strata, Topline | moved to Later: Qt apps only publish menus on Wayland through KDE's own protocol and platform plugin, and freemac ships no Qt apps yet |
+| 2 | Debian (`BASE=debian`, trixie) build tested end to end, as the default | build | still blocked: the build host can't reach Debian's servers |
+| 3 | Seek finds files by the text inside them, not only by name | Seek | done: a full-text index of text, OpenDocument and Word files in the home folder |
+| 4 | Drawer: tabs, a sidebar you can edit, and a preview of the selected file with Space | Drawer | done: tabs, Favourites you add, reorder and remove, and Glance on Space |
+| 5 | Pier: folders on the dock (Downloads stack) and a Trash you can empty | Pier | done |
+| 6 | First-run welcome: pick light or dark, wallpaper, Wi-Fi and a user account before the desktop opens | Welcome | done: light or dark, wallpaper, Wi-Fi and the account page; accounts themselves are made by Keel at install and in Dials > Users |
 
 ## Later
+
+- App menus from Qt apps in Topline (needs KDE's app-menu protocol in
+  Strata and a Qt platform plugin that uses it).
+- The Debian build, as soon as a build host can reach Debian's servers.
 
 - Ferry, step by step: threads, sockets, C++ programs (libc++), other dynamic
   libraries, opening Mac programs from Drawer. Frameworks such as Foundation

@@ -39,6 +39,26 @@ SCENES = (
 )
 
 
+def apply_appearance(dark, settings=None, follow_wallpaper=True):
+    """Switch light/dark everywhere: GTK, title bars and (optionally) the wallpaper.
+
+    Needs no window, so `freemac-dials --appearance` (used by Welcome) never
+    opens Dials.
+    """
+    settings = settings if settings is not None else style.interface_settings()
+    if settings:
+        settings.set_string("color-scheme", "prefer-dark" if dark else "prefer-light")
+        settings.set_string("gtk-theme", "Adwaita-dark" if dark else "Adwaita")
+    Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", dark)
+    # Title bars the window manager draws follow the mode too.
+    ini_set(WAYFIRE_INI, "decoration", "active_color", "#2A2C48FF" if dark else "#E9E7EFFF")
+    ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#22243AFF" if dark else "#F4F3F7FF")
+    current = ini_get(SHELL_INI, "background", "image")
+    other = scene_version(current, dark)
+    if follow_wallpaper and other and other != current:
+        ini_set(SHELL_INI, "background", "image", other)
+
+
 def scene_version(path, dark):
     """The day or night version of a built-in scene, or None for other pictures."""
     name = os.path.basename(path or "")
@@ -361,17 +381,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             button.set_active(True)
 
     def set_dark(self, dark):
-        if self.settings:
-            self.settings.set_string("color-scheme", "prefer-dark" if dark else "prefer-light")
-            self.settings.set_string("gtk-theme", "Adwaita-dark" if dark else "Adwaita")
-        Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", dark)
-        # Title bars the window manager draws follow the mode too.
-        ini_set(WAYFIRE_INI, "decoration", "active_color", "#2A2C48FF" if dark else "#E9E7EFFF")
-        ini_set(WAYFIRE_INI, "decoration", "inactive_color", "#22243AFF" if dark else "#F4F3F7FF")
-        current = ini_get(SHELL_INI, "background", "image")
-        other = scene_version(current, dark)
-        if self.follow_wallpaper.get_active() and other and other != current:
-            self.set_wallpaper(other)
+        apply_appearance(dark, self.settings, self.follow_wallpaper.get_active())
         self.refresh_wallpapers()
 
     # Wallpaper ----------------------------------------------------------------
@@ -457,6 +467,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             save_pier(magnify=on)
             peak.set_sensitive(on)
 
+        downloads = pier.default_stacks()[0]
+
+        def show_downloads(on):
+            stacks = [f for f in pier_config()["stacks"] if f != downloads]
+            save_pier(stacks=([downloads] if on else []) + stacks)
+
         clock = Gtk.ComboBoxText()
         for fmt, name in (("12", "12-hour (2:30 PM)"), ("24", "24-hour (14:30)")):
             clock.append(fmt, name)
@@ -466,6 +482,11 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Icon size", size),
             row("Magnification", switch(config["magnify"], magnify), "Icons grow as the pointer passes over them."),
             row("Magnified size", peak),
+        ), group(
+            row("Downloads", switch(downloads in config["stacks"], show_downloads),
+                "A folder on the dock that shows your newest downloads."),
+            row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
+                "Drop files on it to throw them away; right-click it to empty it."),
         ), group(row("Clock", clock)))
 
     @staticmethod
@@ -663,11 +684,12 @@ class Dials(Gtk.Application):
     def do_command_line(self, command_line):
         options = command_line.get_options_dict().end().unpack()
         if options.get("appearance") in ("light", "dark"):
-            window = self.get_active_window() or DialsWindow(self)
-            window.set_dark(options["appearance"] == "dark")
+            window = self.get_active_window()
+            if window is not None:
+                window.set_dark(options["appearance"] == "dark")
+            else:
+                apply_appearance(options["appearance"] == "dark")
             Gio.Settings.sync()
-            if not window.get_visible():
-                window.destroy()
             return 0
         window = self.get_active_window() or DialsWindow(self)
         window.show_all()

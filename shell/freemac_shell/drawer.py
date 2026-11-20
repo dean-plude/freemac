@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Drawer: freemac's file manager.
 
-Icon, list and column views over local folders, a sidebar of places, and the
-everyday file operations (open, new folder, rename, move to trash).
+Icon, list and column views over local folders, tabs, a sidebar of
+favourite folders you can change, a preview of the selected file on Space
+(Glance), and the everyday file operations (open, new folder, rename, move
+to trash).
 """
+import json
 import os
 import time
 
@@ -14,6 +17,10 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import menus  # noqa: E402
+from .drawer_glance import Glance  # noqa: E402
+
+CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
+URI_TARGETS = [Gtk.TargetEntry.new("text/uri-list", 0, 0)]
 
 ATTRS = ",".join([
     "standard::name", "standard::display-name", "standard::type", "standard::icon",
@@ -31,6 +38,9 @@ CSS = b"""
 .drawer-column { border-right: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
 .drawer-status { font-size: 11px; opacity: 0.7; padding: 3px 10px; }
+.drawer-tabs { padding: 4px 6px 0; }
+.drawer-tabs button { padding: 2px 8px; }
+.drawer-tab-close { padding: 0 2px; min-width: 0; min-height: 0; }
 """
 
 
@@ -67,6 +77,38 @@ def places():
         if path and path != home and os.path.isdir(path):
             found.append((os.path.basename(path), path, icon))
     return found
+
+
+def load_favourites():
+    """The sidebar's folders: [(name, path)]. The list Drawer starts with is
+    the home folder and its usual folders; people add, remove and reorder."""
+    try:
+        with open(CONFIG) as f:
+            saved = json.load(f).get("favourites")
+        if isinstance(saved, list):
+            return [(str(e[0]), str(e[1])) for e in saved if isinstance(e, list) and len(e) == 2]
+    except (OSError, ValueError, AttributeError):
+        pass
+    return [(name, path) for name, path, _icon in places()]
+
+
+def save_favourites(entries):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    try:
+        with open(CONFIG) as f:
+            config = json.load(f)
+    except (OSError, ValueError):
+        config = {}
+    config["favourites"] = [[name, path] for name, path in entries]
+    with open(CONFIG, "w") as f:
+        json.dump(config, f, indent=2)
+
+
+def place_icon(path):
+    for _name, known, icon in places():
+        if known == path:
+            return icon
+    return "folder-symbolic"
 
 
 class Folder:
@@ -136,6 +178,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.view_mode = "icons"
         self.show_hidden = False
         self.filter_text = ""
+        self.tabs = []        # one dict per tab; the open tab's state lives on self
+        self.current = 0
+        self.glance = None
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -173,6 +218,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.add(paned)
         paned.pack1(self._sidebar(), False, False)
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.tab_bar = Gtk.Box(spacing=4, homogeneous=True)
+        self.tab_bar.get_style_context().add_class("drawer-tabs")
+        self.tab_bar.set_no_show_all(True)
+        right.pack_start(self.tab_bar, False, False, 0)
         self.content = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
         right.pack_start(self.content, True, True, 0)
         self.status = Gtk.Label(xalign=0)
@@ -186,7 +235,96 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._build_column_view()
         self.connect("key-press-event", self._key)
         self._add_actions()
+        self.tabs.append({})
         self.navigate(path, remember=False)
+
+    # ---- tabs -----------------------------------------------------------
+    def _save_tab(self):
+        self.tabs[self.current] = {"path": self.path, "history": self.history, "future": self.future,
+                                   "view": self.view_mode, "filter": self.search.get_text()}
+
+    def _load_tab(self, index):
+        self.current = index
+        tab = self.tabs[index]
+        self.path, self.history, self.future = tab["path"], tab["history"], tab["future"]
+        self.search.set_text(tab["filter"])
+        if self.view_mode != tab["view"]:
+            self.view_buttons[tab["view"]].set_active(True)   # refreshes
+        else:
+            self.refresh()
+
+    def new_tab(self, path=None):
+        self._save_tab()
+        self.tabs.append({"path": os.path.abspath(path or self.path), "history": [], "future": [],
+                          "view": self.view_mode, "filter": ""})
+        self._load_tab(len(self.tabs) - 1)
+
+    def switch_tab(self, index):
+        if 0 <= index < len(self.tabs) and index != self.current:
+            self._save_tab()
+            self._load_tab(index)
+
+    def close_tab(self, index=None):
+        index = self.current if index is None else index
+        if len(self.tabs) <= 1:
+            self.close()
+            return
+        self._save_tab()
+        del self.tabs[index]
+        self._load_tab(min(self.current if index > self.current else max(0, self.current - 1),
+                           len(self.tabs) - 1))
+
+    def _draw_tabs(self):
+        for child in self.tab_bar.get_children():
+            self.tab_bar.remove(child)
+        if len(self.tabs) < 2:
+            self.tab_bar.hide()
+            return
+        for index, tab in enumerate(self.tabs):
+            path = self.path if index == self.current else tab["path"]
+            box = Gtk.Box()
+            box.get_style_context().add_class("linked")
+            button = Gtk.ToggleButton(label=self._label(path), active=index == self.current)
+            button.get_child().set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            button.connect("clicked", lambda b, i=index: (self.switch_tab(i), b.set_active(i == self.current)))
+            close = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
+            close.get_style_context().add_class("drawer-tab-close")
+            close.set_tooltip_text("Close Tab")
+            close.connect("clicked", lambda _b, i=index: self.close_tab(i))
+            box.pack_start(button, True, True, 0)
+            box.pack_start(close, False, False, 0)
+            self.tab_bar.pack_start(box, True, True, 0)
+            box.show_all()
+        self.tab_bar.show()
+
+    @staticmethod
+    def _label(path):
+        if path == GLib.get_home_dir():
+            return "Home"
+        return os.path.basename(path) or "Computer"
+
+    # ---- Glance (Space) -------------------------------------------------
+    def toggle_glance(self):
+        if self.glance and self.glance.get_visible():
+            self.glance.hide()
+            return
+        paths = self.selected_paths()
+        if not paths:
+            return
+        if self.glance is None:
+            self.glance = Glance(self, lambda p: (self.glance.hide(), self.open_or_enter(p)))
+        self.glance.show_path(paths[0])
+
+    def _selection_changed(self, *_args):
+        if self.glance and self.glance.get_visible():
+            paths = self.selected_paths()
+            if paths and paths[0] != self.glance.path:
+                self.glance.show_path(paths[0])
+                self.present()   # keep the keys going to the file list
+
+    # ---- dragging files out ---------------------------------------------
+    def _drag_get(self, _widget, _context, data, _info, _time):
+        data.set_uris([Gio.File.new_for_path(p).get_uri() for p in self.selected_paths()])
 
     def _add_actions(self):
         """The window's actions, for the menu bar."""
@@ -204,6 +342,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "view-icons": lambda: self.view_buttons["icons"].set_active(True),
             "view-list": lambda: self.view_buttons["list"].set_active(True),
             "view-columns": lambda: self.view_buttons["columns"].set_active(True),
+            "new-tab": self.new_tab,
+            "close-tab": self.close_tab,
+            "next-tab": lambda: self.switch_tab((self.current + 1) % len(self.tabs)),
+            "previous-tab": lambda: self.switch_tab((self.current - 1) % len(self.tabs)),
+            "glance": self.toggle_glance,
+            "add-to-sidebar": self.add_to_sidebar,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -244,10 +388,92 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 self.place_rows.append((listbox, row))
             box.pack_start(listbox, False, False, 0)
 
-        section("Places", places())
+        heading = Gtk.Label(label="Favourites", xalign=0)
+        heading.get_style_context().add_class("drawer-heading")
+        box.pack_start(heading, False, False, 0)
+        self.fav_list = Gtk.ListBox()
+        self.fav_list.get_style_context().add_class("drawer-sidebar")
+        self.fav_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
+        self.fav_list.connect("button-press-event", self._sidebar_button)
+        # Drop folders here to add them.
+        self.fav_list.drag_dest_set(Gtk.DestDefaults.ALL, URI_TARGETS, Gdk.DragAction.COPY | Gdk.DragAction.LINK)
+        self.fav_list.connect("drag-data-received", self._sidebar_drop)
+        box.pack_start(self.fav_list, False, False, 0)
+        self._fill_favourites()
         trash = os.path.join(GLib.get_user_data_dir(), "Trash", "files")
         section("Device", [("Computer", "/", "drive-harddisk-symbolic"), ("Trash", trash, "user-trash-symbolic")])
         return box
+
+    def _fill_favourites(self):
+        self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.fav_list]
+        for child in self.fav_list.get_children():
+            self.fav_list.remove(child)
+        for name, path in load_favourites():
+            row = Gtk.ListBoxRow()
+            row.path = path
+            line = Gtk.Box(spacing=8)
+            line.pack_start(Gtk.Image.new_from_icon_name(place_icon(path), Gtk.IconSize.MENU), False, False, 0)
+            line.pack_start(Gtk.Label(label=name, xalign=0, ellipsize=Pango.EllipsizeMode.END), True, True, 0)
+            row.add(line)
+            self.fav_list.add(row)
+            self.place_rows.insert(0, (self.fav_list, row))
+        self.fav_list.show_all()
+
+    def _change_favourites(self, change):
+        entries = load_favourites()
+        change(entries)
+        save_favourites(entries)
+        # Every Drawer window shows the same sidebar.
+        for window in self.get_application().get_windows() if self.get_application() else [self]:
+            if isinstance(window, DrawerWindow):
+                window._fill_favourites()
+                if window.path:
+                    window.refresh()
+
+    def add_to_sidebar(self, paths=None):
+        folders = [p for p in (paths or self.selected_paths() or [self.path]) if os.path.isdir(p)]
+
+        def change(entries):
+            known = {path for _name, path in entries}
+            entries.extend((self._label(p), p) for p in folders if p not in known)
+        if folders:
+            self._change_favourites(change)
+
+    def _sidebar_drop(self, _widget, _context, _x, _y, data, _info, _time):
+        paths = [Gio.File.new_for_uri(u).get_path() for u in data.get_uris() or []]
+        self.add_to_sidebar([p for p in paths if p])
+
+    def _sidebar_button(self, listbox, event):
+        if event.button != 3:
+            return False
+        row = listbox.get_row_at_y(int(event.y))
+        if row is None:
+            return False
+        index = row.get_index()
+        count = len(listbox.get_children())
+
+        def move(by):
+            def change(entries):
+                entries.insert(index + by, entries.pop(index))
+            self._change_favourites(change)
+
+        menu = Gtk.Menu()
+        for label, handler, enabled in (
+            ("Open in New Tab", lambda *_: self.new_tab(row.path), True),
+            (None, None, True),
+            ("Move Up", lambda *_: move(-1), index > 0),
+            ("Move Down", lambda *_: move(1), index < count - 1),
+            ("Remove from Sidebar", lambda *_: self._change_favourites(lambda e: e.pop(index)), True),
+        ):
+            item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
+            if handler:
+                item.connect("activate", handler)
+            item.set_sensitive(enabled)
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(listbox, None)
+        menu.popup_at_pointer(event)
+        return True
 
     def _model(self, folder):
         model = folder.store.filter_new()
@@ -261,6 +487,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.icon_view.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
         self.icon_view.connect("item-activated", lambda v, p: self._activate(v.get_model(), p))
         self.icon_view.connect("button-press-event", self._icon_button)
+        self.icon_view.connect("selection-changed", self._selection_changed)
+        self.icon_view.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS,
+                                                Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
+        self.icon_view.connect("drag-data-get", self._drag_get)
         scroll = Gtk.ScrolledWindow()
         scroll.add(self.icon_view)
         self.content.add_named(scroll, "icons")
@@ -277,6 +507,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.list_view.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         self.list_view.connect("row-activated", lambda v, p, _c: self._activate(v.get_model(), p))
         self.list_view.connect("button-press-event", self._tree_button)
+        self.list_view.get_selection().connect("changed", self._selection_changed)
+        self.list_view.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS,
+                                                Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
+        self.list_view.connect("drag-data-get", self._drag_get)
         scroll = Gtk.ScrolledWindow()
         scroll.add(self.list_view)
         self.content.add_named(scroll, "list")
@@ -314,6 +548,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.forward.set_sensitive(bool(self.future))
         home = GLib.get_home_dir()
         label = "Home" if self.path == home else (os.path.basename(self.path) or "Computer")
+        self._draw_tabs()
         self.title.set_text(label)
         self.set_title(f"{label} — Drawer")
         for listbox, row in self.place_rows:
@@ -565,10 +800,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _menu(self, event):
         menu = Gtk.Menu()
         has_selection = bool(self.selected_paths())
+        has_folder = any(os.path.isdir(p) for p in self.selected_paths()[:1])
         for label, handler, enabled in (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Rename…", lambda *_: self.rename(), has_selection),
             ("Move to Trash", lambda *_: self.trash(), has_selection),
+            (None, None, True),
+            ("Open in New Tab", lambda *_: self.new_tab(self.selected_paths()[0]), has_folder),
+            ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
+            ("Glance", lambda *_: self.toggle_glance(), has_selection),
             (None, None, True),
             ("New Folder", lambda *_: self.new_folder(), True),
             ("Hide Hidden Files" if self.show_hidden else "Show Hidden Files", lambda *_: self.toggle_hidden(), True),
@@ -614,7 +854,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
         key = event.keyval
         if self.search.has_focus() and key not in (Gdk.KEY_Escape,):
             return False
-        if key == Gdk.KEY_Delete:
+        if key == Gdk.KEY_space and not ctrl:
+            self.toggle_glance()
+        elif ctrl and key in (Gdk.KEY_t, Gdk.KEY_T):
+            self.new_tab()
+        elif ctrl and key in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab, Gdk.KEY_Page_Down, Gdk.KEY_Page_Up):
+            back = shift or key == Gdk.KEY_Page_Up
+            self.switch_tab((self.current + (-1 if back else 1)) % len(self.tabs))
+        elif key == Gdk.KEY_Delete:
             self.trash()
         elif key == Gdk.KEY_F2:
             self.rename()
@@ -634,8 +881,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.go_up()
         elif ctrl and key in (Gdk.KEY_n, Gdk.KEY_N):
             self.get_application().activate_action("new-window", None)
+        elif ctrl and shift and key in (Gdk.KEY_d, Gdk.KEY_D):
+            self.add_to_sidebar()
         elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
-            self.close()
+            self.close_tab()
         elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O, Gdk.KEY_Down):
             for p in self.selected_paths():
                 self.open_or_enter(p)
@@ -649,10 +898,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
 def menubar():
     return menus.menubar([
         ("_File", [
-            [("New Window", "app.new-window", "<Ctrl>n"), ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
-            [("Open", "win.open", "<Ctrl>o")],
+            [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
+             ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
+            [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
             [("Rename…", "win.rename", "F2"), ("Move to Trash", "win.trash", "Delete")],
-            [("Close Window", "win.close", "<Ctrl>w")],
+            [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
+            [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
         ]),
         ("_Edit", [
             [("Select All", "win.select-all", "<Ctrl>a")],
@@ -662,6 +913,7 @@ def menubar():
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
              ("as Columns", "win.view-columns", "<Ctrl>3")],
             [("Show Hidden Files", "win.show-hidden", "<Ctrl>h")],
+            [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),
         ("_Go", [
             [("Back", "win.back", "<Alt>Left"), ("Forward", "win.forward", "<Alt>Right"),
