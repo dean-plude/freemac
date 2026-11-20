@@ -4,7 +4,8 @@
 // the desktop shows their menu bar, so they leave it out of the window. It
 // also lets Pier say where each window's dock icon is (strata/minimize-hint),
 // so minimizing a window shrinks it into that icon and restoring grows it back,
-// and closes windows on request (strata/close) for Quit in the menu bar and dock.
+// closes windows on request (strata/close) for Quit in the menu bar and dock,
+// and draws small pictures of minimized windows for the dock (strata/snapshot).
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -28,6 +29,8 @@
 #include "gtk-shell.hpp"
 #include "window-places.hpp"
 #include "command-key.hpp"
+#include "window-snapshot.hpp"
+#include "minimize-glide.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -389,6 +392,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> method_repository;
     strata_window_places window_places;
     strata_command_key command_key;
+    strata_glide::glides_t glides;
 
     /* strata/app-menus {id}: where the app behind a window publishes its
      * menus on the session bus (org.gtk.Menus / org.gtk.Actions). */
@@ -515,6 +519,74 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/snapshot {id, path, size}: a small picture of a window, for its
+     * place in the Dock while it is minimized. Only under the user's runtime
+     * directory, so no other file can be overwritten. */
+    wf::ipc::method_callback snapshot_view = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        WFJSON_EXPECT_FIELD(data, "path", string);
+        auto view = wf::ipc::find_view_by_id(data["id"]);
+        if (!view || (view->role != wf::VIEW_ROLE_TOPLEVEL) || !view->get_output())
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        std::string path = data["path"];
+        const char *runtime = getenv("XDG_RUNTIME_DIR");
+        std::string dir     = std::string(runtime ? runtime : "/nonexistent") + "/freemac-pier/";
+        if ((path.rfind(dir, 0) != 0) || (path.find("..") != std::string::npos) ||
+            (path.find('/', dir.size()) != std::string::npos))
+        {
+            return wf::ipc::json_error("pictures go in the dock's own folder");
+        }
+
+        int size = 256;
+        if (data.contains("size") && data["size"].is_number_integer())
+        {
+            size = std::clamp((int)data["size"], 16, 1024);
+        }
+
+        int width = 0, height = 0;
+        std::string failed = strata_snapshot::save(view, path, size, width, height);
+        if (!failed.empty())
+        {
+            return wf::ipc::json_error(failed);
+        }
+
+        auto out = wf::ipc::json_ok();
+        out["width"]  = width;
+        out["height"] = height;
+        return out;
+    };
+
+    /* strata/hide {id}: hide a window (Hide in the menu bar and the Dock). */
+    wf::ipc::method_callback hide_view = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        auto toplevel = wf::toplevel_cast(wf::ipc::find_view_by_id(data["id"]));
+        if (!toplevel)
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        strata_hidden::hide(toplevel);
+        return wf::ipc::json_ok();
+    };
+
+    /* strata/hidden: the ids of the windows hidden now. */
+    wf::ipc::method_callback list_hidden = [=] (nlohmann::json)
+    {
+        auto out = wf::ipc::json_ok();
+        out["ids"] = nlohmann::json::array();
+        for (auto id : strata_hidden::current())
+        {
+            out["ids"].push_back(id);
+        }
+
+        return out;
+    };
+
     /* strata/command-key {app-id, raw}: while raw, the app's windows get the
      * keys as they are, with no Command key (Dials, as it records a new
      * shortcut). */
@@ -548,8 +620,12 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/held-modifiers", get_held_modifiers);
         method_repository->register_method("strata/zoom", zoom_view);
         method_repository->register_method("strata/force-quit", force_quit_view);
+        method_repository->register_method("strata/snapshot", snapshot_view);
+        method_repository->register_method("strata/hide", hide_view);
+        method_repository->register_method("strata/hidden", list_hidden);
         window_places.init();
         command_key.init();
+        glides.init();
     }
 
     bool is_unloadable() override

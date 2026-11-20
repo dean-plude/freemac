@@ -165,6 +165,21 @@ class Wayfire:
         except (ConnectionError, OSError, ValueError):
             return None
 
+    def outputs(self):
+        try:
+            result = self.req.call("window-rules/list-outputs")
+        except (ConnectionError, OSError, ValueError):
+            return []
+        return result if isinstance(result, list) else []
+
+    def move_to(self, view_id, x, y, width, height):
+        """Put a window at this place and size (Window > Center)."""
+        try:
+            return self.req.call("window-rules/configure-view", id=view_id,
+                                 geometry={"x": int(x), "y": int(y), "width": int(width), "height": int(height)})
+        except (ConnectionError, OSError, ValueError):
+            return None
+
     def zoom(self, view_id):
         try:
             return self.req.call("strata/zoom", id=view_id)
@@ -173,6 +188,46 @@ class Wayfire:
 
     def set_minimized(self, view_id, state=True):
         return self.req.call("wm-actions/set-minimized", view_id=view_id, state=state)
+
+    def hide(self, view_id):
+        """Hide a window, as Hide in the app menu does (Strata): it goes away
+        without shrinking into the Dock or getting a picture there, which is
+        for minimized windows. Falls back to minimizing without Strata."""
+        try:
+            result = self.req.call("strata/hide", id=view_id)
+        except (ConnectionError, OSError, ValueError):
+            result = None
+        if not isinstance(result, dict) or result.get("result") != "ok":
+            return self.set_minimized(view_id, True)
+        return result
+
+    def hidden(self):
+        """The ids of the windows hidden now (Strata), as a set."""
+        try:
+            result = self.req.call("strata/hidden")
+        except (ConnectionError, OSError, ValueError):
+            return set()
+        if not isinstance(result, dict) or result.get("result") != "ok":
+            return set()
+        return {i for i in result.get("ids") or [] if isinstance(i, int)}
+
+    def snapshot(self, view_id, path, size=256):
+        """Draw a small picture of a window into path, a file in the Dock's own
+        folder (snapshot_dir()); (width, height) or None."""
+        try:
+            result = self.req.call("strata/snapshot", id=view_id, path=path, size=int(size))
+        except (ConnectionError, OSError, ValueError):
+            return None
+        if not isinstance(result, dict) or result.get("result") != "ok":
+            return None
+        return result.get("width"), result.get("height")
+
+
+def snapshot_dir():
+    """Where Strata may draw pictures of minimized windows for the Dock."""
+    path = os.path.join(GLib.get_user_runtime_dir(), "freemac-pier")
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    return path
 
 
 def is_minimized(view):
