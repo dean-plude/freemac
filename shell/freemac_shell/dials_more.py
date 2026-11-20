@@ -180,17 +180,17 @@ def accessibility(window):
         window.ini_set("animate", "open_animation", "fade" if on else "zoom")
         window.ini_set("animate", "close_animation", "fade" if on else "zoom")
         window.ini_set("animate", "duration", "120" if on else "220")
+        # Windows no longer wobble at all (that's not how a Mac behaves); this
+        # only cleans it up on systems set up before 1.2.
         plugins = (window.ini_get("core", "plugins", "") or "").split()
-        if on and "wobbly" in plugins:
+        if "wobbly" in plugins:
             plugins.remove("wobbly")
-        elif not on and "wobbly" not in plugins:
-            plugins.append("wobbly")
-        window.ini_set("core", "plugins", " ".join(plugins))
+            window.ini_set("core", "plugins", " ".join(plugins))
 
     def high_contrast(on):
         if settings:
             dark = style.is_dark()
-            settings.set_string("gtk-theme", "HighContrast" if on else ("Adwaita-dark" if dark else "Adwaita"))
+            settings.set_string("gtk-theme", "HighContrast" if on else ("freemac-dark" if dark else "freemac"))
 
     def big_pointer(size):
         if settings:
@@ -207,7 +207,7 @@ def accessibility(window):
     zoom_on = "zoom" in (window.ini_get("core", "plugins", "") or "").split()
     return page("Accessibility", group(
         row("Larger text", switch(get("text-scaling-factor", 1.0) > 1.05, larger_text)),
-        row("High contrast", switch(get("gtk-theme", "Adwaita") == "HighContrast", high_contrast),
+        row("High contrast", switch(get("gtk-theme", "freemac") == "HighContrast", high_contrast),
             "Stronger borders and colours in apps."),
         row("Reduce motion", switch(not get("enable-animations", True), reduce_motion),
             "Windows fade instead of zooming and don't wobble."),
