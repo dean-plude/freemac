@@ -1,0 +1,27 @@
+same loop 1
+empty loop returns at once: 0
+timer valid 1 interval 0.01
+queued block ran first, step 1
+tick 1 (info)
+tick 2 (info)
+performed later with an argument
+tick 3 (info)
+block timer fired, step 2
+run returned after the work; ticks 3, took between 0.4 and 3 seconds: 1
+timer valid after invalidate 0
+descriptor pipe said "ping"
+CFRunLoopPerformBlock ran
+CFRunLoopRunInMode handled 1
+stopping the loop
+CFRunLoopRun returned after stop
+observer got Changed from sender, info v
+block observer got Changed
+observer got Changed from other, info (null)
+after removal: nothing above
+CFStringGetLength 7, prefix 1
+NSDictionary sees 99, count 1
+CFStringGetCString n=5
+kCFBooleanTrue is @YES 1, value 1
+CFStringCreateWithFormat cf-7, equal 1
+absolute time positive 1
+exit=0

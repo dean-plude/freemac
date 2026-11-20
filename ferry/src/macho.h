@@ -13,6 +13,7 @@
 #define MACHO_FAT_MAGIC     0xcafebabeu   /* stored big-endian */
 #define MACHO_CPU_X86_64    0x01000007
 #define MACHO_EXECUTE       0x2
+#define MACHO_DYLIB         0x6
 #define MACHO_FLAG_PIE      0x00200000u
 
 #define LC_REQ_DYLD              0x80000000u
@@ -28,6 +29,20 @@
 #define LC_MAIN                  (0x28 | LC_REQ_DYLD)
 #define LC_DYLD_CHAINED_FIXUPS   (0x34 | LC_REQ_DYLD)
 #define LC_DYLD_EXPORTS_TRIE     (0x33 | LC_REQ_DYLD)
+#define LC_ID_DYLIB              0xd
+#define LC_RPATH                 (0x1c | LC_REQ_DYLD)
+
+/* section types (low byte of a section's flags) */
+#define S_MOD_INIT_FUNC_POINTERS 0x9
+#define S_INIT_FUNC_OFFSETS      0x16
+
+/* export trie */
+#define EXPORT_KIND_MASK         0x3
+#define EXPORT_KIND_ABSOLUTE     0x2
+#define EXPORT_REEXPORT          0x8
+#define EXPORT_STUB_AND_RESOLVER 0x10
+
+struct macho_rpath { uint32_t cmd, cmdsize, path_offset; };
 
 struct macho_header {
     uint32_t magic, cputype, cpusubtype, filetype, ncmds, sizeofcmds, flags, reserved;

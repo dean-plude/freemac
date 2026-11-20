@@ -20,6 +20,10 @@ run_one() {
     case $name in
         hello*) FERRY_TEST_VALUE=tide "$top/ferry" "$exe" boat > "$build/$name.got" 2> "$build/$name.err" ;;
         system) "$top/ferry" "$exe" -a -b val file > "$build/$name.got" 2> "$build/$name.err" ;;
+        foundation_system)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
+                "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -49,6 +53,58 @@ run_one objc_basic_chained "$here/objc_basic.m" "$here/objc_basic.out" -lobjc -W
 run_one objc_arc_chained "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc -Wl,-fixup_chains
 # Unoptimized code sends messages differently (no tail calls, more stack).
 run_one objc_basic_O0 "$here/objc_basic.m" "$here/objc_basic.out" -O0 -lobjc
+# A program using a Mac library (dylib) of its own, found through @rpath,
+# with both relocation formats.
+for fmt in classic chained; do
+    flags=; [ $fmt = chained ] && flags=-Wl,-fixup_chains
+    mkdir -p "$build/lib_$fmt"
+    if "$top/sdk/ferry-cc" -O1 -dynamiclib -install_name @rpath/libgreet.dylib $flags \
+            -o "$build/lib_$fmt/libgreet.dylib" "$here/dylib/greet.m" -lobjc 2> "$build/greet_$fmt.cc.log"; then
+        run_one "dylib_$fmt" "$here/dylib_main.m" "$here/dylib_main.out" -lobjc $flags \
+            -L"$build/lib_$fmt" -lgreet -Wl,-rpath,@executable_path/lib_$fmt
+    else
+        echo "FAIL dylib_$fmt (library did not compile)"; sed 's/^/    /' "$build/greet_$fmt.cc.log"
+        fail=$((fail + 1))
+    fi
+done
+# Foundation (M2), Ferry's own, loaded as a Mac framework.
+for t in strings collections system runloop exception; do
+    run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -framework Foundation
+done
+# CoreFoundation from plain C, linked under CoreFoundation's own Mac name.
+run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/foundation/corefoundation.out" \
+    -framework CoreFoundation
+run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
+run_one foundation_collections_chained "$here/foundation/collections.m" "$here/foundation/collections.out" \
+    -framework Foundation -Wl,-fixup_chains
+# A program inside a Mac app bundle: Info.plist, resources, localized strings.
+app="$build/Hello.app"
+rm -rf "$app"; cp -r "$here/foundation/Hello.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if "$top/sdk/ferry-cc" -O1 -o "$app/Contents/MacOS/Hello" "$here/foundation/bundle.m" -framework Foundation \
+        2> "$build/foundation_bundle.cc.log"; then
+    rm -rf "$build/home_bundle"; mkdir -p "$build/home_bundle"
+    for lang in C fr_FR.UTF-8; do
+        HOME="$build/home_bundle" XDG_CONFIG_HOME= LANG=$lang LC_ALL= LC_MESSAGES= "$top/ferry" "$app/Contents/MacOS/Hello" \
+            > "$build/foundation_bundle_$lang.got" 2> "$build/foundation_bundle.err"
+        echo "exit=$?" >> "$build/foundation_bundle_$lang.got"
+        expected="$here/foundation/bundle.out"; [ $lang = C ] || expected="$here/foundation/bundle_fr.out"
+        if diff -u "$expected" "$build/foundation_bundle_$lang.got" > "$build/foundation_bundle.diff"; then
+            echo "ok   foundation_bundle ($lang)"; pass=$((pass + 1))
+        else
+            echo "FAIL foundation_bundle ($lang)"; sed 's/^/    /' "$build/foundation_bundle.diff"
+            sed 's/^/    stderr: /' "$build/foundation_bundle.err"; fail=$((fail + 1))
+        fi
+    done
+else
+    echo "FAIL foundation_bundle (did not compile)"; sed 's/^/    /' "$build/foundation_bundle.cc.log"
+    fail=$((fail + 1))
+fi
+# An exception nobody catches ends the program with the Mac's message.
+if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$build/foundation_exception.err" 2>/dev/null; then
+    echo "ok   foundation_exception message"; pass=$((pass + 1))
+else
+    echo "FAIL foundation_exception message"; fail=$((fail + 1))
+fi
 # An unknown selector must be reported as a Mac reports it.
 if grep -q "unrecognized selector sent to instance" "$build/objc_unknown.err" 2>/dev/null; then
     echo "ok   objc_unknown message"; pass=$((pass + 1))

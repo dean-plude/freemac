@@ -1,0 +1,11 @@
++load Greeter (library)
+library initializer ran
++load Loud (program)
+main starts, count 100
+add 103
+hello from the library, 42
+count now 101
+category from the program
+HELLO FROM THE PROGRAM, category from the program
+Loud is a Greeter: 1
+exit=0

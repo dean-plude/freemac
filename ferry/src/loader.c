@@ -35,6 +35,7 @@
 struct section {
     char segname[17], name[17];
     uint64_t addr, size;
+    uint32_t flags;
 };
 
 struct segment {
@@ -59,7 +60,23 @@ struct image {
     int has_main;
     struct section sect[MAX_SECTIONS];
     int nsect;
+    /* libraries */
+    int is_dylib;
+    struct image *deps[MAX_DYLIBS];     /* NULL: one of Ferry's built-in libraries */
+    int dep_weak[MAX_DYLIBS];
+    const uint8_t *exports;
+    uint32_t exports_size;
+    const char *rpaths[16];
+    int nrpaths;
+    struct ferry_objc_image objc;
+    int has_objc;
+    int initialized;
+    char *real;                         /* real path, to load each file once */
 };
+
+static struct image *images[64];
+static int nimages;
+static struct image *main_image;
 
 int ferry_verbose;
 
@@ -163,8 +180,10 @@ static void read_file(struct image *im, const char *path)
         die("%s is not a 64-bit Mac program", path);
     if (im->header->cputype != MACHO_CPU_X86_64)
         die("%s is built for Apple silicon (arm64), not for a PC's Intel/AMD processor", path);
-    if (im->header->filetype != MACHO_EXECUTE)
-        die("%s is a library or other Mach-O file, not a program", path);
+    if (im->header->filetype == MACHO_DYLIB)
+        im->is_dylib = 1;
+    else if (im->header->filetype != MACHO_EXECUTE)
+        die("%s is not a program or a library", path);
 }
 
 static void parse_commands(struct image *im)
@@ -204,6 +223,7 @@ static void parse_commands(struct image *im)
                 d->segname[16] = d->name[16] = 0;
                 d->addr = sec[k].addr;
                 d->size = sec[k].size;
+                d->flags = sec[k].flags;
             }
             break;
         }
@@ -211,16 +231,27 @@ static void parse_commands(struct image *im)
         case LC_LOAD_WEAK_DYLIB:
         case LC_REEXPORT_DYLIB: {
             struct macho_dylib_command *d = (void *)lc;
-            if (im->ndylibs < MAX_DYLIBS)
-                im->dylibs[im->ndylibs++] = (const char *)lc + d->name_offset;
-            if (lc->cmd != LC_LOAD_WEAK_DYLIB && !ferry_library_supported((const char *)lc + d->name_offset))
-                die("%s needs %s, which Ferry doesn't provide yet", im->path,
-                    (const char *)lc + d->name_offset);
+            if (im->ndylibs == MAX_DYLIBS)
+                die("%s uses too many libraries", im->path);
+            im->dep_weak[im->ndylibs] = lc->cmd == LC_LOAD_WEAK_DYLIB;
+            im->dylibs[im->ndylibs++] = (const char *)lc + d->name_offset;
             break;
         }
+        case LC_RPATH:
+            if (im->nrpaths < 16)
+                im->rpaths[im->nrpaths++] = (const char *)lc + ((struct macho_rpath *)lc)->path_offset;
+            break;
+        case LC_DYLD_EXPORTS_TRIE:
+            im->exports = im->file + ((struct macho_linkedit_data *)lc)->dataoff;
+            im->exports_size = ((struct macho_linkedit_data *)lc)->datasize;
+            break;
         case LC_DYLD_INFO:
         case LC_DYLD_INFO_ONLY:
             im->dyld_info = (void *)lc;
+            if (im->dyld_info->export_size && !im->exports) {
+                im->exports = im->file + im->dyld_info->export_off;
+                im->exports_size = im->dyld_info->export_size;
+            }
             break;
         case LC_DYLD_CHAINED_FIXUPS:
             im->chained = (void *)lc;
@@ -238,7 +269,7 @@ static void parse_commands(struct image *im)
     }
     if (!im->nseg)
         die("%s has nothing to load", im->path);
-    if (!im->has_main)
+    if (!im->has_main && !im->is_dylib)
         die("%s has no main entry point", im->path);
 }
 
@@ -260,7 +291,7 @@ static void map_segments(struct image *im)
     }
     low = ALIGN_DOWN(low);
     high = ALIGN_UP(high);
-    void *want = (im->header->flags & MACHO_FLAG_PIE) ? NULL : (void *)low;
+    void *want = (im->is_dylib || (im->header->flags & MACHO_FLAG_PIE)) ? NULL : (void *)low;
     int flags = MAP_PRIVATE | MAP_ANONYMOUS | (want ? MAP_FIXED_NOREPLACE : 0);
     uint8_t *base = mmap(want, high - low, PROT_NONE, flags, -1, 0);
     if (base == MAP_FAILED)
@@ -324,18 +355,43 @@ static const char *strip_symbol(const char *name, char *buf, size_t size)
     return buf;
 }
 
-static void *resolve(struct image *im, const char *raw, int weak)
+static void *trie_lookup(struct image *im, const char *raw, int depth);
+
+/* Two-level namespace: a bind names the library (by its position in the
+ * image's load commands) as well as the symbol. Ordinal 0 is the image
+ * itself, -1 the main program, -2 "search everywhere". If the named library
+ * doesn't have it (Ferry's libraries are organised differently from
+ * Apple's), every loaded library is searched, then Ferry's own tables. */
+static void *lookup_symbol(struct image *im, const char *raw, int ordinal)
 {
+    void *addr = NULL;
+    if (ordinal == 0)
+        addr = trie_lookup(im, raw, 0);
+    else if (ordinal == -1 && main_image)
+        addr = trie_lookup(main_image, raw, 0);
+    else if (ordinal > 0 && ordinal <= im->ndylibs && im->deps[ordinal - 1])
+        addr = trie_lookup(im->deps[ordinal - 1], raw, 0);
+    if (addr)
+        return addr;
     char name[256];
     strip_symbol(raw, name, sizeof name);
-    void *addr = ferry_lookup(name);
+    if ((addr = ferry_lookup(name)))
+        return addr;
+    for (int i = 0; i < nimages && !addr; i++)
+        if (images[i] != im || ordinal != 0)
+            addr = trie_lookup(images[i], raw, 0);
+    return addr;
+}
+
+static void *resolve(struct image *im, const char *raw, int weak, int ordinal)
+{
+    void *addr = lookup_symbol(im, raw, ordinal);
     if (!addr) {
         if (weak)
             return NULL;
         addr = ferry_missing_stub(raw);
         note("  missing %s", raw);
     }
-    (void)im;
     return addr;
 }
 
@@ -410,7 +466,7 @@ static void do_binds(struct image *im, uint32_t offset, uint32_t size, int lazy,
     uint64_t off = 0, times, skip;
     int64_t addend = 0;
     const char *symbol = NULL;
-    int weak = 0, count = 0;
+    int weak = 0, count = 0, ordinal = 0;
     while (p < end) {
         uint8_t byte = *p++;
         uint8_t op = byte & OPCODE_MASK, imm = byte & IMMEDIATE_MASK;
@@ -420,10 +476,13 @@ static void do_binds(struct image *im, uint32_t offset, uint32_t size, int lazy,
                 p = end;
             break;
         case BIND_SET_DYLIB_ORDINAL_IMM:
+            ordinal = imm;
+            break;
         case BIND_SET_DYLIB_SPECIAL_IMM:
+            ordinal = imm ? (int)(int8_t)(OPCODE_MASK | imm) : 0;
             break;
         case BIND_SET_DYLIB_ORDINAL_ULEB:
-            uleb(&p, end);
+            ordinal = (int)uleb(&p, end);
             break;
         case BIND_SET_SYMBOL_FLAGS_IMM:
             symbol = (const char *)p;
@@ -456,7 +515,7 @@ static void do_binds(struct image *im, uint32_t offset, uint32_t size, int lazy,
             while (times--) {
                 if (!symbol)
                     die("%s: bind without a symbol", im->path);
-                void *target = resolve(im, symbol, weak || weak_stream);
+                void *target = resolve(im, symbol, weak || weak_stream, weak_stream ? -2 : ordinal);
                 if (target || !weak_stream)
                     *(uint64_t *)seg_addr(im, seg, off) = (uint64_t)target + addend;
                 off += 8 + skip;
@@ -491,25 +550,28 @@ static void do_chained(struct image *im)
     int64_t *addends = calloc(h->imports_count ? h->imports_count : 1, sizeof *addends);
     for (uint32_t i = 0; i < h->imports_count; i++) {
         uint32_t name_off;
-        int weak;
+        int weak, ordinal;
         if (h->imports_format == CHAINED_IMPORT) {
             uint32_t v = ((const uint32_t *)(data + h->imports_offset))[i];
+            ordinal = (int8_t)(v & 0xff);
             weak = (v >> 8) & 1;
             name_off = v >> 9;
         } else if (h->imports_format == CHAINED_IMPORT_ADDEND) {
             const uint32_t *v = (const uint32_t *)(data + h->imports_offset) + i * 2;
+            ordinal = (int8_t)(v[0] & 0xff);
             weak = (v[0] >> 8) & 1;
             name_off = v[0] >> 9;
             addends[i] = (int32_t)v[1];
         } else if (h->imports_format == CHAINED_IMPORT_ADDEND64) {
             const uint64_t *v = (const uint64_t *)(data + h->imports_offset) + i * 2;
+            ordinal = (int16_t)(v[0] & 0xffff);
             weak = (v[0] >> 16) & 1;
             name_off = (uint32_t)(v[0] >> 32);
             addends[i] = (int64_t)v[1];
         } else {
             die("%s: unknown import format %u", im->path, h->imports_format);
         }
-        targets[i] = resolve(im, symbols + name_off, weak);
+        targets[i] = resolve(im, symbols + name_off, weak, ordinal);
     }
     const uint32_t *starts = (const uint32_t *)(data + h->starts_offset);
     uint32_t seg_count = starts[0];
@@ -588,43 +650,279 @@ static int objc_find(struct image *im, struct ferry_objc_image *oi)
     return info || oi->nselrefs || oi->nclasses || oi->ncats;
 }
 
+/* ---- exported symbols ------------------------------------------------------
+ * A library lists what it exports in a prefix tree ("export trie"): each
+ * node has the data for the name spelled so far (if one ends there) and
+ * edges labelled with the next characters. */
+
+static uint64_t image_base(struct image *im)
+{
+    for (int i = 0; i < im->nseg; i++)
+        if (im->seg[i].fileoff == 0 && im->seg[i].filesize)
+            return im->seg[i].vmaddr + im->slide;
+    return im->seg[0].vmaddr + im->slide;
+}
+
+static void *trie_lookup(struct image *im, const char *raw, int depth)
+{
+    if (!im || !im->exports || depth > 8)
+        return NULL;
+    const uint8_t *start = im->exports, *end = start + im->exports_size, *p = start;
+    const char *s = raw;
+    for (;;) {
+        if (p >= end)
+            return NULL;
+        const uint8_t *node = p;
+        uint64_t terminal = uleb(&p, end);
+        const uint8_t *children = p + terminal;
+        if (!*s) {
+            if (!terminal)
+                return NULL;
+            uint64_t flags = uleb(&p, end);
+            if (flags & EXPORT_REEXPORT) {
+                uint64_t ordinal = uleb(&p, end);
+                const char *other = (const char *)p;
+                if (!*other)
+                    other = raw;
+                if (ordinal >= 1 && ordinal <= (uint64_t)im->ndylibs) {
+                    if (im->deps[ordinal - 1])
+                        return trie_lookup(im->deps[ordinal - 1], other, depth + 1);
+                    char name[256];
+                    strip_symbol(other, name, sizeof name);
+                    return ferry_lookup(name);
+                }
+                return NULL;
+            }
+            uint64_t value = uleb(&p, end);
+            if (flags & EXPORT_STUB_AND_RESOLVER)
+                uleb(&p, end);  /* the resolver; the stub address is fine */
+            if ((flags & EXPORT_KIND_MASK) == EXPORT_KIND_ABSOLUTE)
+                return (void *)value;
+            return (void *)(image_base(im) + value);
+        }
+        (void)node;
+        p = children;
+        if (p >= end)
+            return NULL;
+        uint8_t count = *p++;
+        const uint8_t *next = NULL;
+        for (uint8_t c = 0; c < count && p < end; c++) {
+            const char *edge = (const char *)p;
+            size_t len = strnlen(edge, end - p);
+            p += len + 1;
+            uint64_t off = uleb(&p, end);
+            if (!next && !strncmp(s, edge, len)) {
+                next = start + off;
+                s += len;
+            }
+        }
+        if (!next)
+            return NULL;
+        p = next;
+    }
+}
+
+/* ---- finding libraries -------------------------------------------------------
+ * Apple's frameworks are replaced by Ferry's own (written from public
+ * documentation), installed as <dir>/<Name>.framework/<Name> in the
+ * directory named by $FERRY_FRAMEWORKS, next to the ferry program
+ * (frameworks/), or in /usr/lib/ferry/frameworks. A few Apple libraries are
+ * served by one of Ferry's: CoreFoundation lives inside Foundation. */
+
+static const struct { const char *name, *served_by; } framework_aliases[] = {
+    {"CoreFoundation", "Foundation"},
+    {NULL, NULL},
+};
+
+static int file_exists(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static int find_framework(const char *name, char *out, size_t size)
+{
+    for (int i = 0; framework_aliases[i].name; i++)
+        if (!strcmp(name, framework_aliases[i].name))
+            name = framework_aliases[i].served_by;
+    char self[4096];
+    const char *dirs[3] = {getenv("FERRY_FRAMEWORKS"), NULL, "/usr/lib/ferry/frameworks"};
+    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 16);
+    if (n > 0) {
+        self[n] = 0;
+        char *slash = strrchr(self, '/');
+        if (slash) {
+            strcpy(slash + 1, "frameworks");
+            dirs[1] = self;
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        if (!dirs[i] || !*dirs[i])
+            continue;
+        snprintf(out, size, "%s/%s.framework/%s", dirs[i], name, name);
+        if (file_exists(out))
+            return 1;
+    }
+    return 0;
+}
+
+static void dir_of(const char *path, char *out, size_t size)
+{
+    snprintf(out, size, "%s", path);
+    char *slash = strrchr(out, '/');
+    if (slash)
+        *slash = 0;
+    else
+        snprintf(out, size, ".");
+}
+
+/* @executable_path, @loader_path and @rpath, as in a Mac app bundle.
+ * Returns 0 if the name can't be expanded. */
+static int expand_path(struct image *loader, const char *name, char *out, size_t size)
+{
+    char dir[4096];
+    if (!strncmp(name, "@executable_path/", 17)) {
+        dir_of(main_image ? main_image->path : loader->path, dir, sizeof dir);
+        snprintf(out, size, "%s/%s", dir, name + 17);
+        return 1;
+    }
+    if (!strncmp(name, "@loader_path/", 13)) {
+        dir_of(loader->path, dir, sizeof dir);
+        snprintf(out, size, "%s/%s", dir, name + 13);
+        return 1;
+    }
+    if (!strncmp(name, "@rpath/", 7)) {
+        struct image *search[2] = {loader, main_image};
+        for (int k = 0; k < 2; k++) {
+            if (!search[k])
+                continue;
+            for (int i = 0; i < search[k]->nrpaths; i++) {
+                char base[4096];
+                if (!expand_path(search[k], search[k]->rpaths[i], base, sizeof base))
+                    continue;
+                snprintf(out, size, "%s/%s", base, name + 7);
+                if (file_exists(out))
+                    return 1;
+            }
+        }
+        return 0;
+    }
+    snprintf(out, size, "%s", name);
+    return name[0] != '@';
+}
+
+static struct image *load_image(const char *path);
+
+static struct image *load_library(struct image *loader, const char *install_name, int weak)
+{
+    if (ferry_library_supported(install_name))
+        return NULL;    /* libSystem, libobjc: built into Ferry */
+    char path[4096];
+    const char *fw = strstr(install_name, ".framework/");
+    int found = 0;
+    if (!strncmp(install_name, "/System/Library/", 16) || !strncmp(install_name, "/usr/lib/", 9)) {
+        const char *base = strrchr(install_name, '/');
+        if (fw && base)
+            found = find_framework(base + 1, path, sizeof path);
+    } else {
+        found = expand_path(loader, install_name, path, sizeof path) && file_exists(path);
+    }
+    if (!found) {
+        if (weak)
+            return NULL;
+        die("%s needs %s, which Ferry doesn't provide yet", loader->path, install_name);
+    }
+    return load_image(path);
+}
+
+/* ---- loading ----------------------------------------------------------------- */
+
+static void apply_fixups(struct image *im)
+{
+    if (im->chained) {
+        do_chained(im);
+    } else if (im->dyld_info) {
+        do_rebases(im);
+        do_binds(im, im->dyld_info->bind_off, im->dyld_info->bind_size, 0, 0);
+        do_binds(im, im->dyld_info->lazy_bind_off, im->dyld_info->lazy_bind_size, 1, 0);
+        do_binds(im, im->dyld_info->weak_bind_off, im->dyld_info->weak_bind_size, 0, 1);
+    }
+}
+
+static struct image *load_image(const char *path)
+{
+    char real[4096];
+    if (!realpath(path, real))
+        snprintf(real, sizeof real, "%s", path);
+    for (int i = 0; i < nimages; i++)
+        if (!strcmp(images[i]->real, real))
+            return images[i];
+    if (nimages == (int)(sizeof images / sizeof images[0]))
+        die("the program uses too many libraries");
+    struct image *im = calloc(1, sizeof *im);
+    im->real = strdup(real);
+    read_file(im, strdup(path));
+    if (!main_image && im->is_dylib)
+        die("%s is a library, not a program", path);
+    images[nimages++] = im;
+    if (!main_image)
+        main_image = im;
+    parse_commands(im);
+    map_segments(im);
+    for (int i = 0; i < im->ndylibs; i++)
+        im->deps[i] = load_library(im, im->dylibs[i], im->dep_weak[i]);
+    apply_fixups(im);
+    im->has_objc = objc_find(im, &im->objc);
+    if (im->has_objc) {
+        note("setting up Objective-C in %s: %zu classes, %zu categories, %zu selectors", im->path,
+             im->objc.nclasses, im->objc.ncats, im->objc.nselrefs);
+        ferry_objc_map_image(&im->objc);
+    }
+    protect_segments(im);
+    return im;
+}
+
+typedef void (*initializer)(int, char **, char **, char **);
+
+/* Libraries are set up before whatever uses them: +load methods, then C
+ * and C++ initializers (__mod_init_func, __init_offsets). */
+static void initialize_image(struct image *im, int argc, char **argv, char **envp, char **apple)
+{
+    if (im->initialized)
+        return;
+    im->initialized = 1;
+    for (int i = 0; i < im->ndylibs; i++)
+        if (im->deps[i])
+            initialize_image(im->deps[i], argc, argv, envp, apple);
+    if (im->has_objc)
+        ferry_objc_load_image(&im->objc);
+    for (int i = 0; i < im->nsect; i++) {
+        struct section *sec = &im->sect[i];
+        uint8_t type = sec->flags & 0xff;
+        if (type == S_MOD_INIT_FUNC_POINTERS) {
+            initializer *f = (initializer *)(sec->addr + im->slide);
+            for (uint64_t k = 0; k < sec->size / sizeof *f; k++)
+                f[k](argc, argv, envp, apple);
+        } else if (type == S_INIT_FUNC_OFFSETS) {
+            const uint32_t *off = (const uint32_t *)(sec->addr + im->slide);
+            for (uint64_t k = 0; k < sec->size / sizeof *off; k++)
+                ((initializer)(image_base(im) + off[k]))(argc, argv, envp, apple);
+        }
+    }
+}
+
 /* ---- running ------------------------------------------------------------------- */
 
 typedef int (*mac_main)(int, char **, char **, char **);
 
 int ferry_run(const char *path, int argc, char **argv, char **envp)
 {
-    struct image im = {0};
-    read_file(&im, path);
-    parse_commands(&im);
-    map_segments(&im);
-    if (im.chained) {
-        do_chained(&im);
-    } else if (im.dyld_info) {
-        do_rebases(&im);
-        do_binds(&im, im.dyld_info->bind_off, im.dyld_info->bind_size, 0, 0);
-        do_binds(&im, im.dyld_info->lazy_bind_off, im.dyld_info->lazy_bind_size, 1, 0);
-        do_binds(&im, im.dyld_info->weak_bind_off, im.dyld_info->weak_bind_size, 0, 1);
-    }
+    struct image *im = load_image(path);
     ferry_seal_stubs();
-    struct ferry_objc_image objc;
-    int has_objc = objc_find(&im, &objc);
-    if (has_objc) {
-        note("setting up Objective-C: %zu classes, %zu categories, %zu selectors",
-             objc.nclasses, objc.ncats, objc.nselrefs);
-        ferry_objc_map_image(&objc);
-    }
-    protect_segments(&im);
-    /* __TEXT starts at the Mach-O header (file offset 0). */
-    uint64_t text = 0;
-    for (int i = 0; i < im.nseg; i++)
-        if (im.seg[i].fileoff == 0 && im.seg[i].filesize)
-            text = im.seg[i].vmaddr;
-    mac_main entry = (mac_main)(text + im.slide + im.entryoff);
+    mac_main entry = (mac_main)(image_base(im) + im->entryoff);
     char *apple[] = {NULL};
     ferry_program_started(path, argc, argv);
-    if (has_objc)
-        ferry_objc_load_image(&objc);
+    initialize_image(im, argc, argv, envp, apple);
     note("calling main at %p", (void *)entry);
     return entry(argc, argv, envp, apple);
 }

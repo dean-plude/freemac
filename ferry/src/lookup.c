@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/mman.h>
 #include <sys/random.h>
 #include <time.h>
@@ -227,6 +228,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"__tolower", mac_tolower},
     {"__toupper", mac_toupper},
     {"_Unwind_Resume", ferry_unwind_resume},
+    /* clang lowers memset(p, 0, n) to this name on a Mac */
+    {"__bzero", bzero},
     {NULL, NULL},
 };
 

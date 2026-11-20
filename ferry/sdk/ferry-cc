@@ -12,6 +12,11 @@ if [ -n "${FERRY_SDK:-}" ]; then sdk=$FERRY_SDK
 elif [ -d "$here/include" ]; then sdk=$here
 else sdk=/usr/share/ferry/sdk
 fi
+# Ferry's own Mac frameworks (Foundation and the ones after it), for -framework.
+if [ -n "${FERRY_FRAMEWORKS:-}" ]; then fw=$FERRY_FRAMEWORKS
+elif [ -d "$sdk/../frameworks" ]; then fw=$(cd "$sdk/../frameworks" && pwd)
+else fw=/usr/lib/ferry/frameworks
+fi
 # clang only passes the Mach-O linker its platform and architecture when it
 # knows the linker is lld, so point it at a directory holding "ld64.lld".
 lddir=
@@ -22,6 +27,12 @@ if [ -z "$lddir" ]; then
     echo "ferry-cc: LLVM's Mach-O linker (ld64.lld, package lld) isn't installed" >&2
     exit 1
 fi
+# On a Mac, Foundation re-exports the Objective-C runtime; here programs that
+# use a framework get libobjc directly instead.
+objc=
+for arg in "$@"; do
+    if [ "$arg" = -framework ]; then objc=-lobjc; fi
+done
 exec clang -target x86_64-apple-macos11 -nostdlibinc -isystem "$sdk/include" \
     -fno-stack-protector -Wno-unused-command-line-argument \
-    -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -lSystem "$@"
+    -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -F"$fw" -lSystem "$@" $objc
