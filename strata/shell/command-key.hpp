@@ -622,6 +622,32 @@ class strata_command_key
     std::string windowless_keys_app;
     std::map<std::string, std::string> windowless_keys;
 
+    /* Press a key, with the modifiers given, in the window that has the
+     * keyboard: Topline's menus for apps that publish none press the app's
+     * own shortcuts this way. The real modifiers are told again after. */
+    bool press(uint32_t key, bool ctrl, bool shift, bool alt)
+    {
+        auto seat = wf::get_core().get_current_seat();
+        auto kbd  = wlr_seat_get_keyboard(seat);
+        if (!kbd || !seat->keyboard_state.focused_surface || !focused_app_window() || (key > 0x2ff))
+        {
+            return false;
+        }
+
+        wlr_keyboard_modifiers mods = kbd->modifiers;
+        mods.depressed = (ctrl ? mask(kbd, XKB_MOD_NAME_CTRL) : 0) |
+            (shift ? mask(kbd, XKB_MOD_NAME_SHIFT) : 0) | (alt ? mask(kbd, XKB_MOD_NAME_ALT) : 0);
+        mods.latched = 0;
+        uint32_t now = wf::get_current_time();
+        wlr_seat_keyboard_send_modifiers(seat, &mods);
+        wlr_seat_keyboard_send_key(seat, now, key, WL_KEYBOARD_KEY_STATE_PRESSED);
+        wlr_seat_keyboard_send_key(seat, now + 1, key, WL_KEYBOARD_KEY_STATE_RELEASED);
+        mods = kbd->modifiers;
+        wlr_seat_keyboard_send_modifiers(seat, &mods);
+        tell_app(kbd);
+        return true;
+    }
+
     void set_raw(const std::string& app_id, bool raw)
     {
         raw_app = raw ? app_id : "";

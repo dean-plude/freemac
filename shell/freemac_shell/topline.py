@@ -9,9 +9,9 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, held, mac_accel, quick, status, style  # noqa: E402
+from . import apps, beacon, fallback_menus, held, mac_accel, quick, status, style  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -96,6 +96,13 @@ class Topline(Gtk.Window):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", lambda _a, _p, n=name: self._own_action(n))
             self._own_actions.add_action(action)
+        close = Gio.SimpleAction.new("close-window", None)
+        close.connect("activate", lambda *_: self._own_action("close-window"))
+        self._own_actions.add_action(close)
+        # Menus for apps that publish none press the app's own shortcuts.
+        press = Gio.SimpleAction.new("press", GLib.VariantType.new("s"))
+        press.connect("activate", lambda _a, keys: GLib.timeout_add(150, self._press, keys.get_string()))
+        self._own_actions.add_action(press)
 
         self.window_button = Gtk.MenuButton(label="Window")
         self.window_menu = self._watch_menu(Gtk.Menu())
@@ -509,6 +516,10 @@ class Topline(Gtk.Window):
                 if name and self.held.is_running(name):
                     path = held.object_path(name)
                     key = (name, path + "/menus/menubar", "", "", path)
+                elif view.get("app-id"):
+                    # An app that publishes no menus still gets a menu bar,
+                    # as every app on a Mac has one.
+                    key = ("fallback", view.get("app-id"))
         self._use_menus(key)
 
     def _menus_of(self, view):
@@ -528,7 +539,9 @@ class Topline(Gtk.Window):
         for prefix in ("app", "win"):
             self.menus_box.insert_action_group(prefix, None)
         self._groups = {}
-        if key:
+        if key and key[0] == "fallback":
+            self._menubar = fallback_menus.menubar_for(key[1])
+        elif key:
             bus_name, menubar_path, app_menu_path, window_path, application_path = key
             try:
                 conn = self._session_bus()
@@ -599,6 +612,23 @@ class Topline(Gtk.Window):
             self._show_all()
         elif name == "quit":
             self._quit(view)
+        elif name == "close-window" and view.get("id"):
+            self.wf.close(view["id"])
+
+    def _press(self, keys):
+        """Press a shortcut in the app in front, for the menus of apps that
+        publish none. Waits until the menu has closed and the app has the
+        keyboard again."""
+        keyval, mods = Gtk.accelerator_parse(keys)
+        keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
+        found, entries = keymap.get_entries_for_keyval(keyval) if keyval else (False, [])
+        if not found or not entries or not self.wf:
+            return False
+        entry = min(entries, key=lambda e: (e.group, e.level))
+        shift = bool(mods & Gdk.ModifierType.SHIFT_MASK) or entry.level == 1
+        self.wf.press(entry.keycode - 8, ctrl=bool(mods & Gdk.ModifierType.CONTROL_MASK), shift=shift,
+                      alt=bool(mods & Gdk.ModifierType.MOD1_MASK))
+        return False
 
     def _views_of(self, app_id, same=True):
         return [v for v in (self.wf.views() if self.wf else [])

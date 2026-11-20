@@ -267,14 +267,22 @@ The small things a Mac user notices in their first minute.
 | 3 | Full keyboard access: Tab moves through the fields and buttons of alerts and sheets, Space presses the focused one | apps | done |
 | 4 | ⌘. and Escape cancel a sheet or dialog, Return picks its default button; saving over a file asks first | Strata, apps | done |
 
-## 1.16 "every app has a menu bar" (next)
+## 1.16 "every app has a menu bar" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Apps that publish no menus (Firefox, VLC, Qt and older apps) still get File, Edit, View and Window menus in the bar, whose items press the app's own shortcuts | Topline, Strata | |
-| 2 | Edit has Undo, Redo, Cut, Copy, Paste and Select All for every app, as on a Mac | Topline | |
-| 3 | Firefox gets its usual menus (New Tab, New Window, Reopen Closed Tab, History, Bookmarks, zoom) from a short list freemac keeps | Topline | |
-| 4 | Help in every app's bar, with a search that finds menu items | Topline | |
+| 1 | Apps that publish no menus (Firefox, VLC, Qt and older apps) still get File, Edit and Window menus in the bar, whose items press the app's own shortcuts | Topline, Strata | done |
+| 2 | Edit has Undo, Redo, Cut, Copy, Paste, Select All and Find for every app, as on a Mac | Topline | done |
+| 3 | Web and Firefox get their usual menus (New Tab, New Window, Reopen Closed Tab, History, Bookmarks, zoom), and VLC gets Playback, from a short list freemac keeps | Topline | done |
+| 4 | Help in every app's bar, with a search that finds menu items | Topline | moved to 1.17 |
+
+## 1.17 "help and search" (next)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Help in every app's bar, with a search box that finds and highlights menu items as you type | Topline | |
+| 2 | Choosing a found item runs it, keyboard only (arrows and Return) | Topline | |
+| 3 | Seek finds menu items of the app in front too | Seek | |
 
 ## Later
 
