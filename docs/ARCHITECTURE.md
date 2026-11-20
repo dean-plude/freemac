@@ -119,6 +119,14 @@ without changing the user experience.
   `freemac-dark`), which draws them as small round buttons. Apps that ask the
   compositor for a title bar (foot, some Qt apps) get strata-decor's, which
   matches.
+- **Qt apps** take freemac's colours and font through qt5ct and qt6ct, and
+  Qt 5 apps also freemac's own buttons, fields, tabs, check boxes, pop-up
+  menus and scroll bars: a Kvantum theme (`art/kvantum/make-kvantum.py`,
+  installed as `freemac` and `freemac-dark` in `/usr/share/Kvantum`) drawn
+  from the same colours as the GTK theme. Dials switches it with light and
+  dark. Qt 6 apps still use Qt's Fusion style in freemac's colours, since
+  Ubuntu 24.04 has no Kvantum for Qt 6. Qt apps run on Wayland
+  (qtwayland5, qt6-wayland); there is no X server.
 - **Shell:** Topline, Pier, Seek and Backdrop are layer-shell clients in the
   `freemac_shell` Python package (`shell/`), started from Wayfire's autostart.
   They talk to Wayfire over its IPC socket for windows and focus.

@@ -181,6 +181,8 @@ in_chroot gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 # freemac's own GTK theme, light and dark (art/gtk-theme), on top of GTK's Adwaita,
 # and the same colours for GTK 4 and Qt apps in /usr/share/freemac.
 python3 "$REPO/art/gtk-theme/make-theme.py" "$ROOTFS/usr/share/themes" "$ROOTFS/usr/share/freemac"
+# The same look for Qt 5 apps: freemac's own Kvantum themes (art/kvantum).
+python3 "$REPO/art/kvantum/make-kvantum.py" "$ROOTFS/usr/share/Kvantum"
 # freemac's icon theme: our own folder and file-type icons, Adwaita for the rest.
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"

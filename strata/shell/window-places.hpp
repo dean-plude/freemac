@@ -30,6 +30,7 @@
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/view.hpp>
 #include <wayfire/workarea.hpp>
+#include <wayfire/nonstd/wlroots-full.hpp>
 
 class strata_window_places
 {
@@ -37,15 +38,20 @@ class strata_window_places
     bool loaded = false;
 
     /* Windows just put back, and the content each should have. Some apps
-     * answer the first size they're given late or not at all, so it's
-     * checked a few more times in the first half second. */
+     * answer the first size they're given late, or change it again as the
+     * title bar arrives, so it's checked every 100 ms for two seconds and
+     * asked for again. An app that keeps refusing it (one that needs more
+     * room) keeps its own size, with the whole window kept on the screen. */
     struct settling
     {
         uint32_t id;
         wf::geometry_t content;
         int checks;
+        int asked;
     };
     std::vector<settling> settle;
+    static constexpr int CHECKS = 20;
+    static constexpr int ASK_AGAIN = 4;
     wf::wl_timer<true> settle_timer;
 
     bool check_settling()
@@ -60,10 +66,28 @@ class strata_window_places
             }
 
             auto& now = view->toplevel()->current();
+            at_least_min_size(view, it->content);
             auto want = wf::expand_geometry_by_margins(it->content, now.margins);
-            if ((now.geometry != want) && (view->get_pending_geometry() == now.geometry))
+            if ((view->get_pending_geometry() != now.geometry) || (now.geometry == want))
             {
+                ++it; // the app hasn't answered yet, or has the noted size
+                continue;
+            }
+
+            if (it->asked < ASK_AGAIN)
+            {
+                ++it->asked;
                 view->set_geometry(want);
+            } else
+            {
+                auto area = view->get_output()->workarea->get_workarea();
+                auto g    = now.geometry;
+                g.x = std::clamp(g.x, area.x, std::max(area.x, area.x + area.width - g.width));
+                g.y = std::clamp(g.y, area.y, std::max(area.y, area.y + area.height - g.height));
+                if (g != now.geometry)
+                {
+                    view->set_geometry(g);
+                }
             }
 
             ++it;
@@ -149,6 +173,18 @@ class strata_window_places
         return toplevel;
     }
 
+    /* No smaller than the app says its window can be. */
+    static void at_least_min_size(wayfire_toplevel_view view, wf::geometry_t& g)
+    {
+        auto surface = view->get_wlr_surface();
+        auto xdg     = surface ? wlr_xdg_surface_try_from_wlr_surface(surface) : nullptr;
+        if (xdg && (xdg->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) && xdg->toplevel)
+        {
+            g.width  = std::max(g.width, xdg->toplevel->current.min_width);
+            g.height = std::max(g.height, xdg->toplevel->current.min_height);
+        }
+    }
+
     static bool others_open(wayfire_toplevel_view view)
     {
         for (auto& other : wf::get_core().get_all_views())
@@ -184,6 +220,7 @@ class strata_window_places
 
         auto area = view->get_output()->workarea->get_workarea();
         wf::geometry_t g = it->second;
+        at_least_min_size(view, g);
         g.width  = std::min(g.width, area.width);
         g.height = std::min(g.height, area.height);
         g.x = area.x + std::clamp(g.x, 0, area.width - g.width);
@@ -192,7 +229,7 @@ class strata_window_places
          * window maps grows the frame around it, back to where it was. */
         view->set_geometry(wf::expand_geometry_by_margins(g, view->toplevel()->pending().margins));
         ev->is_positioned = true;
-        settle.push_back({view->get_id(), g, 5});
+        settle.push_back({view->get_id(), g, CHECKS, 0});
         if (!settle_timer.is_connected())
         {
             settle_timer.set_timeout(100, [=] () { return check_settling(); });
