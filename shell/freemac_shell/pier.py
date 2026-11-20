@@ -26,6 +26,8 @@ PEAK = 80          # icon size right under the pointer
 REACH = 150        # pixels over which magnification fades out
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
+# The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
+SHELL_APP_IDS = {"freemac-pier", "freemac-topline"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]
 
@@ -407,7 +409,7 @@ class Pier(Gtk.Window):
             item.set_views(mine)
         unpinned = {}
         for view in views:
-            if view["id"] in claimed:
+            if view["id"] in claimed or (view.get("app-id") or "").lower() in SHELL_APP_IDS:
                 continue
             unpinned.setdefault(view.get("app-id") or f"view-{view['id']}", []).append(view)
         for app_id in list(self.extra):
