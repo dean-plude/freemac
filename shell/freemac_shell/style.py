@@ -70,6 +70,24 @@ TEMPLATE = """
 .help-panel row { padding: 2px 4px; border-radius: 5px; }
 .help-panel row:selected { background-color: #2f7bf5; }
 .help-panel row:selected label { color: white; }
+/* Glyph, the emoji and symbols panel (Control-⌘-Space). */
+.glyph {
+  background-color: @panel;
+  border: 1px solid @edge;
+  border-radius: 14px;
+  padding: 10px;
+  color: @ink;
+}
+.glyph entry { min-height: 30px; }
+.glyph scrolledwindow, .glyph viewport, .glyph flowbox { background: none; }
+.glyph flowboxchild { padding: 0; border-radius: 7px; background: none; }
+.glyph flowboxchild:hover { background-color: rgba(128, 128, 128, 0.18); }
+.glyph flowboxchild:selected { background-color: #2f7bf5; }
+.glyph .glyph-emoji { font-size: 24px; min-width: 36px; min-height: 36px; }
+.glyph .glyph-tabs button { padding: 2px 0; min-width: 0; border-radius: 7px; font-size: 16px; background: none; border: none; box-shadow: none; }
+.glyph .glyph-tabs button:checked { background-color: rgba(128, 128, 128, 0.22); }
+.glyph .glyph-heading { font-weight: 600; font-size: 11px; color: @dim; }
+.glyph .glyph-name { font-size: 12px; color: @dim; }
 """
 
 LIGHT = {"bar": "rgba(246, 246, 248, 0.66)", "ink": "#1d1d1f", "hover": "rgba(0, 0, 0, 0.09)",

@@ -19,6 +19,7 @@ SHORTCUTS = (
     ("command", "binding_seek", "Seek", "<super> KEY_SPACE"),
     ("command", "binding_marina", "All apps (Marina)", "KEY_F4"),
     ("command", "binding_clips", "Clipboard history", "<super> <shift> KEY_V"),
+    ("command", "binding_glyph", "Emoji & Symbols", "<ctrl> <super> KEY_SPACE"),
     ("command", "repeatable_binding_switcher", "Switch apps", "<super> KEY_TAB | <alt> KEY_TAB"),
     ("strata-shell", "next_app_window", "Next window of the app", "<super> KEY_GRAVE"),
     ("strata-shell", "quit_app", "Quit the app", "<super> KEY_Q"),
