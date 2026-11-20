@@ -145,6 +145,6 @@ without any Apple artwork, code or names.
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images, a package repository and release docs.
 - Still not quite a Mac: round corners at the bottom of windows, our own
-  pointer, Marina folders and rearranging, and apps built with Qt or GTK 4
-  matching the GTK 3 theme.
+  pointer, Marina folders and rearranging, a lock screen that looks like the
+  login screen, and apps built with Qt or GTK 4 matching the GTK 3 theme.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.
