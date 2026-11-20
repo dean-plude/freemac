@@ -50,6 +50,7 @@ gtk-update-icon-cache
 python3-gi-cairo
 # PDF pages for Frame, Seek's preview and Glance.
 gir1.2-poppler-0.18
+gir1.2-webkit2-4.1
 # Adwaita-dark for GTK 3 apps (dark mode)
 gnome-themes-extra
 # Sound: PipeWire with WirePlumber; Topline's volume control uses wpctl

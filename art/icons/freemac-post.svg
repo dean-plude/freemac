@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Post: a white envelope on a blue tile, with a red-and-blue airmail edge. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1f62e0"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e8ecf3"/>
+    </linearGradient>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="env"><rect x="22" y="38" width="84" height="56" rx="7"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="23.5" fill="none" stroke="#000" stroke-opacity="0.08"/>
+  <g filter="url(#sh)">
+    <rect x="22" y="38" width="84" height="56" rx="7" fill="url(#paper)"/>
+  </g>
+  <g clip-path="url(#env)">
+    <g stroke-width="5">
+      <path d="M22 41 L106 41" stroke="#f04d3e" stroke-dasharray="8 8"/>
+      <path d="M22 41 L106 41" stroke="#2f7bf5" stroke-dasharray="8 8" stroke-dashoffset="8"/>
+    </g>
+    <path d="M22 44 L64 72 L106 44" fill="none" stroke="#b9c2d2" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M22 94 L52 66 M106 94 L76 66" stroke="#d3d9e4" stroke-width="2.5"/>
+  </g>
+</svg>
