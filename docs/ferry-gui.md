@@ -14,8 +14,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | --- | --- | --- |
 | M1 | Objective-C runtime (libobjc) and blocks | **done**, merged (#25) |
 | M2 | Foundation core + CoreFoundation basics | **done**, merged (#28) |
-| M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, pull request open (see the M3 report below) |
-| M4 | AppKit minimum on Wayland | planned |
+| M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
+| M4 | AppKit minimum on Wayland (through GTK 3) | **done**, pull request open (see the M4 report below) |
 | M5 | Nibs (compiled .nib) | planned |
 | M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | planned |
 | M7 | Polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | planned |
@@ -480,6 +480,149 @@ and `NSColor`, a few controls. The first M4 task is to choose how windows
 reach Wayland (directly with libwayland and xdg-shell, or through GTK) and
 record the choice and the reason here.
 
+## M4: the AppKit minimum
+
+### Decision: windows go through GTK 3, not raw libwayland
+
+Ferry's AppKit opens its windows with this system's GTK 3 (`libgtk-3.so.0`,
+`libgdk-3.so.0`), called directly like Cairo and Pango, and draws every
+window's contents itself with the M3 Core Graphics. GTK is used only as a
+window and input layer: no GTK widgets appear inside a Mac window. Reasons:
+
+- freemac already ships GTK 3 and runs Wayfire, which prefers server-side
+  decorations, so a GTK window gets the same title bar, borders and
+  resizing as every other freemac app with no work from Ferry.
+- Raw libwayland plus xdg-shell would mean writing, and keeping working,
+  things GTK already does well: shared-memory buffers, frame callbacks,
+  output scale (HiDPI), cursors, keyboard maps (xkbcommon), input methods,
+  clipboard, drag and drop and file choosers. The last few are M7 work,
+  and GTK has them ready.
+- GTK draws with Cairo, which is what M3 already uses, so a window's
+  backing image goes to the screen with no conversion.
+- It also works on X11 (with `DISPLAY`) for free, which helps testing.
+
+The cost is one more library (about 6 MB, already on freemac) and GTK's
+own main loop, which Ferry drives from its run loop (below) rather than
+handing control to `gtk_main`.
+
+### Design
+
+- Sources are in `ferry/appkit/` (Objective-C, built into
+  `frameworks/AppKit.framework/AppKit`). `Cocoa` is an alias for AppKit in
+  the loader, and `Cocoa.tbd` lists AppKit, Foundation and Core Graphics, so
+  `-framework Cocoa` links like on a Mac. Headers:
+  `sdk/include/AppKit/AppKit.h` and `sdk/include/Cocoa/Cocoa.h`.
+- **Host calls.** `src/host.c` now opens two groups of Linux libraries on
+  first use: "drawing" (Cairo, Pango, HarfBuzz, GLib) and "windows" (GTK and
+  GDK, for `gtk_`/`gdk_` names, declared in `appkit/gtk.h`). A drawing-only
+  program never loads GTK (a test checks this). If a library is missing,
+  Ferry says which one.
+- **Windows.** Each `NSWindow` keeps a backing image (a Cairo image surface
+  at the screen's scale) and a Core Graphics context on it
+  (`GContextCreateWithSurface`). Views draw into it with `drawRect:`; a
+  `GtkDrawingArea` copies it to the screen. The window frame equals its
+  content rectangle, because the compositor draws the title bar. Wayland
+  doesn't let apps place windows, so `setFrameOrigin:` is remembered but
+  has no effect on screen.
+- **No display.** If neither `WAYLAND_DISPLAY` nor `DISPLAY` is set (or GTK
+  can't connect), AppKit still works off screen: windows draw into their
+  backing images, events can be posted, `NSScreen` reports 1440x900. The
+  off-screen tests rely on this.
+- **Run loop.** M2's `NSRunLoop` gained a poll hook
+  (`FerryRunLoopSetPollHook`), and AppKit installs one that runs GLib's main
+  context (prepare, query, poll, check, dispatch) inside the run loop's own
+  `poll`. So timers, `performSelector:afterDelay:`, run-loop sources and GTK
+  events all wake the same loop, and `[NSApp run]` is the Mac's loop, not
+  `gtk_main`.
+- **Events.** GTK signals become `NSEvent`s in the application's queue;
+  `nextEventMatchingMask:` redraws windows that need it before waiting.
+  `NSWindow` routes mouse events to the view under the pointer (and keeps
+  the view a drag started in), key events to the first responder, and walks
+  the responder chain. Clicks are counted by Ferry. Linux key codes map to
+  the Mac's virtual key codes; arrows and function keys use the Mac's
+  `NSUpArrowFunctionKey` range.
+- **Modifier keys.** Alt is Option. Super is Command. Ctrl is also Command,
+  because on freemac the Strata command key sends Ctrl to apps while the
+  Command (Super) key is held, and Linux users expect Ctrl+C. Setting
+  `FERRY_CONTROL_KEY=control` makes Ctrl the Mac's Control key instead.
+- **Fonts and colours.** `NSFont` is a subclass of Core Text's font class,
+  and Core Text creates `NSFont` objects when AppKit is loaded, so `CTFontRef`
+  and `NSFont *` are the same object, as on a Mac. `NSParagraphStyle` is
+  Core Text's paragraph style the same way. `NSColor` holds sRGB components
+  and hands out a `CGColor`. Named system colours (`controlTextColor`,
+  `controlAccentColor`...) are Ferry's own palette, not Apple's values.
+- **Controls** are Ferry's own drawing (rounded rectangles, a blue default
+  button, check boxes and radio buttons, a focus ring), not imitations of
+  Apple artwork. There is no `NSCell`: `NSButton` and `NSTextField` draw and
+  track themselves, without nested event loops.
+- **Text fields** edit in place: typing, Backspace and Delete, arrows,
+  Option-arrows by word, Command-arrows to the ends, Shift to select,
+  Command-A, placeholder text, secure fields (bullets), and wrapping labels.
+  Keys go through `interpretKeyEvents:` and the Mac's standard key bindings
+  (`moveLeft:`, `deleteBackward:`, `insertNewline:`...), so a subclass can
+  override the same methods it would on a Mac.
+- **Keyboard navigation.** Tab and Shift-Tab move between key views (in
+  reading order if the app set none); Return presses the default button
+  and Escape the Cancel one. Menus aren't shown yet, but `NSMenu` and
+  `NSMenuItem` exist, are validated, and their key equivalents work, so
+  Command-Q, Command-W and an app's own shortcuts do what the app set up.
+- **Geometry** (`NSRect`, `NSPoint`, `NSMakeRect`, `NSStringFromRect`...)
+  moved into Foundation, where it is on a Mac, as typedefs of the CG
+  structures; `NSValue` holds points, sizes, rectangles and edge insets.
+
+### M4 report (2026-11-20)
+
+**What works now.** A Mac program written in code (no nib) can open
+windows on freemac's desktop, draw in them with `drawRect:`, and respond to
+the mouse and keyboard: buttons (push, check box, radio groups, default
+and Cancel buttons), editable and secure text fields, labels, custom views,
+flipped views, autoresizing, key equivalents through `NSMenu`, the
+responder chain, the window delegate (`windowShouldClose:`,
+`windowWillClose:`, resize and focus notifications) and
+`applicationShouldTerminateAfterLastWindowClosed:`. Windows follow the
+screen's scale, so they are sharp on HiDPI. `make check` runs 41 tests (38
+before M4), all passing. The new ones:
+
+| Test | Proves |
+| --- | --- |
+| `appkit_views` (built with `-framework Cocoa`) and `appkit_views_appkit` (with AppKit, Foundation, Core Graphics and Core Text linked separately) | Off screen: `NSRect` functions and strings, `NSValue` geometry; view trees, frames and bounds, flipped and unflipped coordinate conversion, hit testing, autoresizing; `drawRect:` checked pixel by pixel through `cacheDisplayInRect:`; `NSBezierPath`, `NSColor`, `NSFont` (and that it is a `CTFont`), string drawing; buttons, check boxes and radio groups by posted mouse events; typing, selection, word movement and deletion in a text field; Tab and Shift-Tab; menu key equivalents with validation; the responder chain and `sendAction:to:from:`; `[NSApp run]` with a timer and an application event, `stop:`; closing a window |
+| `appkit_window` | On a real Wayland display (a headless Weston started by the test): a window shows, is drawn, is resized and redrawn at the new size, closes through its delegate, and the app terminates after the last window closes. Skipped, with a message, if `weston` isn't installed |
+| `Cairo loaded only when drawing` | now also checks that a drawing program doesn't load GTK |
+
+It was also checked by eye under Weston at scale 1 and 2: a decorated
+window with a text field (selection and focus ring), a blue default button,
+a check box, radio buttons, a wrapping label and a flipped view, all drawn
+where they should be (screenshot attached to the M4 pull request).
+
+**What isn't done yet (and why).**
+
+- **Nibs.** `NSApplicationMain` starts the app but can't load
+  `MainMenu.nib` yet; it says so. That is M5, so most real apps don't start
+  yet.
+- **Menus aren't shown.** There is no menu bar on screen (freemac's global
+  menu is the desktop's business; M7 can export menus to it). Key
+  equivalents work.
+- Not written: `NSCell` and its subclasses, `NSImage` and `NSImageView`,
+  `NSScrollView`, `NSTextView`, `NSTableView`, `NSStackView` and Auto
+  Layout, alerts and sheets, Open/Save panels, the pasteboard and drag and
+  drop, cursors, tracking areas, input methods (text fields take what
+  the keyboard layout types, not composed text from an IME), and
+  accessibility. A few stand-ins (`lockFocus`, `scrollPoint:`, the About
+  panel, nib loading) print a one-time "not supported yet" warning.
+- Simplifications: a window redraws in full whenever any part needs it;
+  `lockFocus` does nothing and `NSBezierPath setClip` adds to the clip
+  rather than replacing it; window positions are
+  ignored on Wayland; `runModalForWindow:` ignores events for other windows
+  but the compositor doesn't know the window is modal; colours aren't managed (all
+  sRGB).
+- Under headless Weston GTK prints a harmless warning about the seat on
+  stderr; the test ignores stderr.
+
+**What's next.** M5: load compiled nib files (`NSKeyedArchiver` archives,
+`.nib` bundles in an app's Resources), so that `NSApplicationMain` can
+build `MainMenu.nib` and an app's windows from Interface Builder, with
+outlets, actions and bindings of the simple kind.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -506,3 +649,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M1 done: Objective-C runtime and blocks, `make check` 18/18.
 - 2026-11-20: M1 merged (#25). M2 done: dylib loading, Foundation and CoreFoundation basics, `make check` 31/31.
 - 2026-11-20: M2 merged (#28). M3 done: Core Graphics and Core Text on Cairo, Pango and HarfBuzz, NSAttributedString, `make check` 38/38.
+- 2026-11-20: M3 merged (#33). M4 done: AppKit on GTK 3 (Wayland or X11), windows, views, events, controls, `make check` 41/41.

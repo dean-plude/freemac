@@ -7,4 +7,5 @@
 /foundation/build/
 /frameworks/
 /graphics/build/
+/appkit/build/
 /src/host_names.h

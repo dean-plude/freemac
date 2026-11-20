@@ -1,0 +1,9 @@
+screen has a size: 1, scale 1
+visible 1
+drawn at {320, 200}, to the screen: 1
+resized to {400, 260}
+drawn at {400, 260}, to the screen: 1
+should close
+will close; timers fired meanwhile: 1
+terminating
+exit=0

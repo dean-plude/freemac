@@ -24,6 +24,10 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_window*)
+            XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -89,13 +93,33 @@ run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometr
     -framework ApplicationServices -framework CoreFoundation
 run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/drawing.out" \
     -framework CoreGraphics -Wl,-fixup_chains
-# Cairo is loaded only by programs that draw (glibc's LD_DEBUG lists each library loaded).
+# AppKit (M4). First with no display, where windows are drawn off screen,
+# linked through Cocoa and through AppKit itself.
+run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
+run_one appkit_views_appkit "$here/appkit/views.m" "$here/appkit/views.out" -fblocks \
+    -framework AppKit -framework Foundation -framework CoreGraphics -framework CoreText
+# Then on a real Wayland display: a headless Weston compositor, when installed.
+if command -v weston > /dev/null 2>&1; then
+    xdg="$build/xdg"
+    rm -rf "$xdg"; mkdir -p "$xdg"; chmod 700 "$xdg"
+    XDG_RUNTIME_DIR="$xdg" weston --backend=headless --socket=ferry-test > "$build/weston.log" 2>&1 &
+    weston_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-test" ] && break; sleep 0.5; done
+    run_one appkit_window "$here/appkit/window.m" "$here/appkit/window.out" -framework Cocoa
+    kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
+else
+    echo "skip appkit_window (needs weston, for a test display)"
+fi
+# Cairo is loaded only by programs that draw, and GTK only by AppKit's
+# (glibc's LD_DEBUG lists each library loaded).
 if LD_DEBUG=libs "$top/ferry" "$build/foundation_strings" 2>&1 >/dev/null | grep -q "libcairo"; then
     echo "FAIL foundation_strings loads Cairo"; fail=$((fail + 1))
 elif ! LD_DEBUG=libs "$top/ferry" "$build/graphics_drawing" 2>&1 >/dev/null | grep -q "libcairo"; then
     echo "FAIL graphics_drawing doesn't load Cairo"; fail=$((fail + 1))
+elif LD_DEBUG=libs "$top/ferry" "$build/graphics_drawing" 2>&1 >/dev/null | grep -q "libgtk"; then
+    echo "FAIL graphics_drawing loads GTK"; fail=$((fail + 1))
 else
-    echo "ok   Cairo loaded only when drawing"; pass=$((pass + 1))
+    echo "ok   Cairo loaded only when drawing, GTK only for AppKit"; pass=$((pass + 1))
 fi
 # A program inside a Mac app bundle: Info.plist, resources, localized strings.
 app="$build/Hello.app"

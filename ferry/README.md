@@ -1,6 +1,6 @@
 # Ferry
 
-Ferry runs simple command-line programs built for Intel Macs on freemac (and
+Ferry runs simple command-line programs and simple windowed programs built for Intel Macs on freemac (and
 other x86-64 Linux systems). It is our own code, written from public
 documentation, and an optional add-on: it isn't on the freemac ISO.
 
@@ -49,12 +49,24 @@ towards graphical apps. A Mac app's standard folders map to their usual
 Linux places: Documents to `~/Documents`, Application Support to
 `~/.local/share`, Caches to `~/.cache`.
 
+Ferry also has the start of its own AppKit (`AppKit.framework`, also
+reached as `Cocoa`), so a program that builds its windows in code can open
+them on the desktop: `NSApplication`, `NSWindow`, `NSView` with
+`drawRect:`, mouse and keyboard events, `NSColor`, `NSFont`,
+`NSBezierPath`, buttons, check boxes, radio buttons, text fields and
+labels, and menus' keyboard shortcuts. Windows are shown through this
+system's GTK 3 (on Wayland, or X11), get the desktop's own title bars, and
+are sharp on HiDPI screens. Ctrl works as Command (and Super too);
+`FERRY_CONTROL_KEY=control` makes it the Mac's Control key instead.
+
 ## What doesn't run, and won't
 
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
-- **Graphical Mac apps, for now.** Ferry has no AppKit yet;
-  they are being added step by step (see
+- **Most graphical Mac apps, for now.** Ferry's AppKit is young: apps built
+  with nib files or storyboards (most of them) don't start yet, and many
+  views (tables, scroll views, text views, images) are missing. These are
+  being added step by step (see
   [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
   frameworks are further off.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
@@ -96,6 +108,13 @@ Linux places: Documents to `~/Documents`, Application Support to
    same calling convention); Ferry opens those libraries only when a program
    first draws, and only for the calls listed in `graphics/host.h`
    (`src/host.c`).
+7. **AppKit** (`appkit/`). Objective-C again, built into
+   `frameworks/AppKit.framework/AppKit` (`Cocoa` is an alias). Each window
+   is a GTK 3 window whose contents are an image that the program's views
+   draw into with Core Graphics; GTK's events become `NSEvent`s, and GTK's
+   main loop runs inside Foundation's run loop. GTK is opened only when a
+   program uses AppKit, and only for the calls in `appkit/gtk.h`. Without a
+   display, windows still work off screen, which the tests use.
 
 ## Sources
 
@@ -107,9 +126,11 @@ structure layouts and constant values. The Objective-C runtime follows
 Apple's public API documentation, clang's published ARC and block ABI
 specifications, and the metadata clang emits for our own test programs (read
 with LLVM's `llvm-objdump --objc-meta-data`); it uses no code from Apple's,
-GNUstep's or Darling's runtimes. Foundation is written from Apple's public
-API documentation and the published descriptions of the property list
-formats; it uses no code from Apple's, GNUstep's or Darling's Foundation. Nothing in Ferry comes from
+GNUstep's or Darling's runtimes. Foundation, Core Graphics, Core Text and AppKit are written from Apple's
+public API documentation and the published descriptions of the property
+list formats; they use no code from Apple's, GNUstep's or Darling's
+frameworks, and AppKit's controls are Ferry's own drawing, not Apple's
+artwork. Nothing in Ferry comes from
 disassembling or decompiling Apple software, and it contains no Apple code,
 binaries or assets.
 
@@ -126,19 +147,21 @@ ferry ./hello
 ferry-cc -O1 -fobjc-arc -o hello hello.m -lobjc    # Objective-C
 ferry-cc -O1 -fobjc-arc -o hello hello.m -framework Foundation
 ferry-cc -O1 -o draw draw.m -framework CoreText -framework CoreGraphics -framework Foundation
+ferry-cc -O1 -fobjc-arc -o app app.m -framework Cocoa
 ```
 
 `make check` builds every program in `tests/` this way, in both relocation
 formats, runs it through Ferry and compares the output. It needs `clang`,
 `lld` and `llvm` (for `llvm-nm`); the drawing tests also need Cairo, Pango
 and HarfBuzz (the runtime libraries, not their `-dev` packages) and some
-fonts.
+fonts, and the AppKit tests need GTK 3. The on-screen window test also
+needs `weston`, which it starts headless; without it that test is skipped.
 
 ## Building and packaging
 
 ```
-make                       # builds ./ferry, the SDK's library descriptions, Foundation
-                           # and CoreGraphics (these need clang, lld and llvm, as the tests do)
+make                       # builds ./ferry, the SDK's library descriptions, Foundation,
+                           # CoreGraphics and AppKit (these need clang, lld and llvm, as the tests do)
 make check                 # runs the tests
 ./packaging/build-deb.sh   # builds freemac-ferry_VERSION_amd64.deb
 ```
