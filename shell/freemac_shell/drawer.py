@@ -33,8 +33,12 @@ VIEWS = (("icons", "view-grid-symbolic", "Icons"),
          ("list", "view-list-symbolic", "List"),
          ("columns", "view-dual-symbolic", "Columns"))
 CSS = b"""
-.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
-.drawer-sidebar row { padding: 5px 10px; border-radius: 7px; margin: 1px 6px; }
+box.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
+list.drawer-sidebar { background-color: transparent; }
+.drawer-sidebar row { padding: 5px 10px; border-radius: 7px; margin: 1px 6px; background-color: transparent; }
+.drawer-sidebar row:hover { background-color: rgba(120, 120, 150, 0.10); }
+.drawer-sidebar row:selected { background-color: rgba(120, 120, 150, 0.24); color: inherit; }
+.drawer-sidebar row:selected label { color: inherit; }
 .drawer-heading { font-size: 11px; font-weight: bold; opacity: 0.55; margin: 12px 16px 4px; }
 .drawer-column { border-right: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
@@ -256,6 +260,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._add_actions()
         self.tabs.append({})
         self.navigate(path, remember=False)
+        # GTK lights the first sidebar row as the window shows; put it right.
+        self.connect("map", lambda *_: GLib.idle_add(lambda: self._show_place() and False))
 
     # ---- tabs -----------------------------------------------------------
     def _save_tab(self):
@@ -394,11 +400,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
             label = Gtk.Label(label=title, xalign=0)
             label.get_style_context().add_class("drawer-heading")
             box.pack_start(label, False, False, 0)
-            listbox = Gtk.ListBox()
+            listbox = Gtk.ListBox(can_focus=False)
             listbox.get_style_context().add_class("drawer-sidebar")
             listbox.connect("row-activated", lambda _l, row: self.navigate(row.path))
             for name, path, icon in entries:
-                row = Gtk.ListBoxRow()
+                row = Gtk.ListBoxRow(can_focus=False)
                 row.path = path
                 line = Gtk.Box(spacing=8)
                 line.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
@@ -411,7 +417,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         heading = Gtk.Label(label="Favourites", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
-        self.fav_list = Gtk.ListBox()
+        self.fav_list = Gtk.ListBox(can_focus=False)
         self.fav_list.get_style_context().add_class("drawer-sidebar")
         self.fav_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
         self.fav_list.connect("button-press-event", self._sidebar_button)
@@ -424,12 +430,23 @@ class DrawerWindow(Gtk.ApplicationWindow):
         section("Device", [("Computer", "/", "drive-harddisk-symbolic"), ("Trash", trash, "user-trash-symbolic")])
         return box
 
+    def _show_place(self):
+        """Light up the sidebar row for the folder on show, and no other.
+        Inside a folder the sidebar doesn't list, no row is lit."""
+        lists = {listbox for listbox, _row in self.place_rows}
+        for listbox in lists:
+            listbox.unselect_all()
+        for listbox, row in self.place_rows:
+            if os.path.normpath(row.path) == self.path:
+                listbox.select_row(row)
+                break
+
     def _fill_favourites(self):
         self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.fav_list]
         for child in self.fav_list.get_children():
             self.fav_list.remove(child)
         for name, path in load_favourites():
-            row = Gtk.ListBoxRow()
+            row = Gtk.ListBoxRow(can_focus=False)
             row.path = path
             line = Gtk.Box(spacing=8)
             line.pack_start(Gtk.Image.new_from_icon_name(place_icon(path), Gtk.IconSize.MENU), False, False, 0)
@@ -571,11 +588,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._draw_tabs()
         self.title.set_text(label)
         self.set_title(f"{label} — Drawer")
-        for listbox, row in self.place_rows:
-            if row.path == self.path:
-                listbox.select_row(row)
-            elif listbox.get_selected_row() is row:
-                listbox.unselect_row(row)
+        self._show_place()
         folder = Folder(self.path, self.show_hidden)
         self.folder = folder
         model = self._model(folder)

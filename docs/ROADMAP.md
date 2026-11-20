@@ -163,10 +163,10 @@ The details a Mac user notices in the first ten minutes.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Show in Drawer, Quit | Pier | |
-| 2 | Drawer's sidebar shows the folder you're in | Drawer | |
+| 1 | Right-click (or hold) an app in the dock: its windows, Keep in Dock, Hide, Quit | Pier, Strata | done |
+| 2 | Drawer's sidebar shows the folder you're in | Drawer | done |
 | 3 | Qt apps get freemac's own buttons, scroll bars and tabs (a Kvantum theme drawn from scratch) | art | |
-| 4 | Windows reopen at the size and place they had last time | Strata | |
+| 4 | Windows reopen at the size and place they had last time | Strata | done |
 
 ## Later
 
