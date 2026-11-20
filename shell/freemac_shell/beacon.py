@@ -57,6 +57,9 @@ XML = f"""
     <method name="ToggleCenter"/>
     <method name="ClearAll"/>
     <method name="Count"><arg type="u" direction="out"/></method>
+    <method name="ShowLevel">
+      <arg type="s" direction="in"/><arg type="d" direction="in"/><arg type="s" direction="in"/>
+    </method>
   </interface>
 </node>
 """
@@ -89,6 +92,16 @@ CSS = """
 .beacon-center .beacon-heading { font-weight: 700; font-size: 15px; }
 .beacon-center .beacon-empty { color: @dim; }
 .beacon-center calendar { background: none; border: none; color: @ink; }
+.beacon-level {
+  background-color: @panel;
+  border: 1px solid @edge;
+  border-radius: 18px;
+  padding: 14px 18px;
+  color: @ink;
+}
+.beacon-level label { color: @ink; }
+.beacon-level levelbar block.filled { background-color: @ink; border-radius: 3px; }
+.beacon-level levelbar block.empty { background-color: alpha(@ink, 0.2); border-radius: 3px; }
 """
 
 
@@ -242,6 +255,8 @@ class Beacon:
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.banners.add(self.banner_box)
         self.center = None
+        self.level = None
+        self.level_timer = None
         provider = Gtk.CssProvider()
         self._provider = provider
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
@@ -284,12 +299,54 @@ class Beacon:
             invocation.return_value(None)
         elif iface == OWN_IFACE and method == "Count":
             invocation.return_value(GLib.Variant("(u)", (len(self.history),)))
+        elif iface == OWN_IFACE and method == "ShowLevel":
+            self.show_level(*args)
+            invocation.return_value(None)
         else:
             invocation.return_dbus_error("org.freedesktop.DBus.Error.UnknownMethod", method)
 
     def _emit(self, name, signature, values):
         if self.connection:
             self.connection.emit_signal(None, PATH, BUS_NAME, name, GLib.Variant(signature, values))
+
+    # --- volume and brightness keys --------------------------------------
+    def show_level(self, icon, fraction, label):
+        """The panel near the bottom that shows a level after a key press."""
+        if self.level is None:
+            self.level = Gtk.Window(title="Level")
+            style.make_transparent(self.level)
+            GtkLayerShell.init_for_window(self.level)
+            GtkLayerShell.set_layer(self.level, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_namespace(self.level, "freemac-level")
+            GtkLayerShell.set_anchor(self.level, GtkLayerShell.Edge.BOTTOM, True)
+            GtkLayerShell.set_margin(self.level, GtkLayerShell.Edge.BOTTOM, 120)
+            box = Gtk.Box(spacing=12)
+            box.get_style_context().add_class("beacon-level")
+            self.level_icon = Gtk.Image()
+            self.level_icon.set_pixel_size(24)
+            self.level_bar = Gtk.LevelBar(min_value=0, max_value=1, valign=Gtk.Align.CENTER)
+            self.level_bar.set_size_request(200, 6)
+            self.level_label = Gtk.Label()
+            box.pack_start(self.level_icon, False, False, 0)
+            box.pack_start(self.level_bar, True, True, 0)
+            box.pack_start(self.level_label, False, False, 0)
+            self.level.add(box)
+            box.show_all()
+        self.level_icon.set_from_icon_name(icon or "dialog-information-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        self.level_bar.set_visible(fraction >= 0)
+        self.level_bar.set_value(min(1.0, max(0.0, fraction)))
+        self.level_label.set_text(label)
+        self.level_label.set_visible(bool(label))
+        self.level.resize(1, 1)
+        self.level.show()
+        if self.level_timer:
+            GLib.source_remove(self.level_timer)
+        self.level_timer = GLib.timeout_add(1500, self._hide_level)
+
+    def _hide_level(self):
+        self.level_timer = None
+        self.level.hide()
+        return False
 
     # --- notifications ---------------------------------------------------
     def notify(self, app, replaces, icon, summary, body, actions, hints, timeout):

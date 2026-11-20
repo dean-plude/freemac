@@ -4,15 +4,23 @@
   freemac-lens --screen   the whole screen          (Print)
   freemac-lens --area     drag to pick an area      (Shift+Print)
   freemac-lens --window   the focused window        (Alt+Print)
+  freemac-lens --record       start or stop recording the screen  (Ctrl+Print)
+  freemac-lens --record-area  start or stop recording an area     (Ctrl+Shift+Print)
   freemac-lens            a small window to choose, with an optional delay
 
 Pictures are saved as PNG in ~/Pictures/Screenshots, copied to the clipboard
 when wl-copy is installed, and announced through Beacon; clicking the
 notification opens the picture. Capturing uses grim, picking an area uses
 slurp.
+
+Recordings are MP4 videos in ~/Videos/Screen Recordings, made by wf-recorder.
+While one runs, Topline shows a red stop button (status.Recording), which
+runs `freemac-lens --stop`. The running recorder's process id is kept in
+$XDG_RUNTIME_DIR/freemac-recording.
 """
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -26,15 +34,93 @@ FOLDER = os.path.join(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PIC
                       or os.path.expanduser("~/Pictures"), "Screenshots")
 
 
-def target_path(folder=FOLDER, now=None):
+VIDEOS = os.path.join(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_VIDEOS)
+                      or os.path.expanduser("~/Videos"), "Screen Recordings")
+RECORDING = os.path.join(GLib.get_user_runtime_dir(), "freemac-recording")
+
+
+def target_path(folder=FOLDER, now=None, kind="Screenshot", ext="png"):
     """A new, unused file name like 'Screenshot 2026-11-19 at 14.05.09.png'."""
     stamp = time.strftime("%Y-%m-%d at %H.%M.%S", time.localtime(now or time.time()))
-    path = os.path.join(folder, f"Screenshot {stamp}.png")
+    path = os.path.join(folder, f"{kind} {stamp}.{ext}")
     n = 2
     while os.path.exists(path):
-        path = os.path.join(folder, f"Screenshot {stamp} ({n}).png")
+        path = os.path.join(folder, f"{kind} {stamp} ({n}).{ext}")
         n += 1
     return path
+
+
+# -- screen recording ------------------------------------------------------------
+def recording():
+    """(pid, path) of the recording in progress, or None."""
+    try:
+        with open(RECORDING) as f:
+            pid_text, path = f.read().split("\n", 1)
+        pid = int(pid_text)
+        os.kill(pid, 0)
+        return pid, path.strip()
+    except (OSError, ValueError):
+        return None
+
+
+def start_recording(area=False):
+    if not shutil.which("wf-recorder"):
+        return None, "The screen recorder (wf-recorder) isn't installed."
+    cmd = ["wf-recorder", "-y"]
+    if area:
+        if not shutil.which("slurp"):
+            return None, "The area picker (slurp) isn't installed."
+        picked = subprocess.run(["slurp", "-d", "-b", "1b1e4a40", "-c", "e5484dff", "-w", "2"],
+                                capture_output=True, text=True)
+        if picked.returncode != 0 or not picked.stdout.strip():
+            return None, None
+        cmd += ["-g", picked.stdout.strip()]
+    os.makedirs(VIDEOS, exist_ok=True)
+    path = target_path(VIDEOS, kind="Screen Recording", ext="mp4")
+    log = open(os.path.join(GLib.get_user_runtime_dir(), "freemac-recording.log"), "w")
+    proc = subprocess.Popen(cmd + ["-f", path], stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                            start_new_session=True)
+    time.sleep(0.6)
+    if proc.poll() is not None:
+        return None, "The recording couldn't start."
+    with open(RECORDING, "w") as f:
+        f.write(f"{proc.pid}\n{path}")
+    return path, None
+
+
+def stop_recording():
+    """Stop the recording in progress; returns its path, or None."""
+    running = recording()
+    try:
+        os.remove(RECORDING)
+    except OSError:
+        pass
+    if not running:
+        return None
+    pid, path = running
+    os.kill(pid, signal.SIGINT)    # wf-recorder finishes the file on SIGINT
+    for _ in range(100):
+        time.sleep(0.1)
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            break
+    return path if os.path.exists(path) else None
+
+
+def toggle_recording(area=False):
+    from . import beacon
+
+    if recording():
+        path = stop_recording()
+        if path:
+            beacon.send("Screen recording saved", f"{os.path.basename(path)} is in Videos › Screen Recordings.",
+                        icon="video-x-generic", app="Lens", open_path=path)
+        return bool(path)
+    path, error = start_recording(area)
+    if error:
+        beacon.send("No recording", error, icon="dialog-warning-symbolic", app="Lens")
+    return bool(path)
 
 
 def window_geometry():
@@ -135,6 +221,13 @@ class Picker(Gtk.ApplicationWindow):
             button.connect("clicked", lambda _b, m=mode: self.take(m))
             row.pack_start(button, True, True, 0)
         box.pack_start(row, False, False, 0)
+        record_row = Gtk.Box(spacing=10, homogeneous=True)
+        for label, area in (("Record Screen", False), ("Record Area", True)):
+            button = Gtk.Button(label=label, image=Gtk.Image.new_from_icon_name(
+                "media-record-symbolic", Gtk.IconSize.BUTTON), always_show_image=True)
+            button.connect("clicked", lambda _b, a=area: self.record(a))
+            record_row.pack_start(button, True, True, 0)
+        box.pack_start(record_row, False, False, 0)
         delay_row = Gtk.Box(spacing=8)
         delay_row.pack_start(Gtk.Label(label="Delay"), False, False, 0)
         self.delay = Gtk.ComboBoxText()
@@ -146,7 +239,8 @@ class Picker(Gtk.ApplicationWindow):
         folder.connect("clicked", self.open_folder)
         delay_row.pack_end(folder, False, False, 0)
         box.pack_start(delay_row, False, False, 0)
-        hint = Gtk.Label(label="Print takes the whole screen, Shift+Print an area, Alt+Print the window.",
+        hint = Gtk.Label(label="Print takes the whole screen, Shift+Print an area, Alt+Print the window. "
+                               "Ctrl+Print starts and stops a recording.",
                          wrap=True, xalign=0)
         hint.get_style_context().add_class("dim-label")
         box.pack_start(hint, False, False, 0)
@@ -156,6 +250,16 @@ class Picker(Gtk.ApplicationWindow):
         self.hide()
         # Give the compositor a moment to remove this window from the screen.
         GLib.timeout_add(400 + delay * 1000, self._run, mode)
+
+    def record(self, area):
+        delay = int(self.delay.get_active_id() or 0)
+        self.hide()
+        GLib.timeout_add(400 + delay * 1000, self._record, area)
+
+    def _record(self, area):
+        toggle_recording(area)
+        self.get_application().quit()
+        return False
 
     def _run(self, mode):
         path, error = capture(mode)
@@ -170,6 +274,10 @@ class Picker(Gtk.ApplicationWindow):
 
 def main():
     args = sys.argv[1:]
+    if "--stop" in args:
+        sys.exit(0 if recording() and toggle_recording() else 1)
+    if "--record" in args or "--record-area" in args:
+        sys.exit(0 if toggle_recording("--record-area" in args) else 1)
     for flag in ("screen", "area", "window"):
         if f"--{flag}" in args:
             sys.exit(0 if shoot(flag) else 1)

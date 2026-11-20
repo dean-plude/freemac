@@ -8,6 +8,7 @@ to trash).
 """
 import json
 import os
+import threading
 import time
 
 import gi
@@ -16,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import menus  # noqa: E402
+from . import drawer_archive, menus  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -348,6 +349,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "previous-tab": lambda: self.switch_tab((self.current - 1) % len(self.tabs)),
             "glance": self.toggle_glance,
             "add-to-sidebar": self.add_to_sidebar,
+            "compress": self.compress,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -672,10 +674,55 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.open_file(path)
 
     def open_file(self, path):
+        if drawer_archive.is_archive(path):
+            self.expand(path)
+            return
         try:
             Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
         except GLib.Error as err:
             self.notify(f"No app can open “{os.path.basename(path)}” ({err.message}).")
+
+    # ---- archives -------------------------------------------------------
+    def _in_background(self, work, done, busy_text):
+        """Run work() in a thread; done(result, error) back on the main loop."""
+        self.notify(busy_text)
+
+        def run():
+            try:
+                result, error = work(), None
+            except (OSError, EOFError, ValueError, RuntimeError) as err:
+                result, error = None, err
+            except Exception as err:   # zipfile/tarfile raise their own kinds
+                result, error = None, err
+            GLib.idle_add(lambda: done(result, error) or False)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def compress(self):
+        paths = self.selected_paths()
+        if not paths:
+            return
+
+        def done(target, error):
+            if error:
+                self.notify(f"Couldn't compress: {error}")
+            else:
+                self.refresh()
+                self.notify(f"Made “{os.path.basename(target)}”.")
+
+        self._in_background(lambda: drawer_archive.compress(paths), done,
+                            f"Compressing {len(paths)} item{'s' if len(paths) != 1 else ''}…")
+
+    def expand(self, path):
+        def done(folder, error):
+            if error:
+                self.notify(f"Couldn't expand “{os.path.basename(path)}”: {error}")
+            else:
+                self.refresh()
+                self.notify(f"Expanded into “{os.path.basename(folder)}”.")
+
+        self._in_background(lambda: drawer_archive.extract(path), done,
+                            f"Expanding “{os.path.basename(path)}”…")
 
     def notify(self, text):
         self.status.set_text(text)
@@ -801,10 +848,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
         menu = Gtk.Menu()
         has_selection = bool(self.selected_paths())
         has_folder = any(os.path.isdir(p) for p in self.selected_paths()[:1])
+        selected = self.selected_paths()
+        one_archive = len(selected) == 1 and drawer_archive.is_archive(selected[0])
         for label, handler, enabled in (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Rename…", lambda *_: self.rename(), has_selection),
             ("Move to Trash", lambda *_: self.trash(), has_selection),
+            (None, None, True),
+            ("Expand" if one_archive else "Compress",
+             (lambda *_: self.expand(selected[0])) if one_archive else (lambda *_: self.compress()), has_selection),
             (None, None, True),
             ("Open in New Tab", lambda *_: self.new_tab(self.selected_paths()[0]), has_folder),
             ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
@@ -901,7 +953,8 @@ def menubar():
             [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
              ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
-            [("Rename…", "win.rename", "F2"), ("Move to Trash", "win.trash", "Delete")],
+            [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
+             ("Move to Trash", "win.trash", "Delete")],
             [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
             [("Close Tab", "win.close-tab", "<Ctrl>w"), ("Close Window", "win.close", "<Ctrl><Shift>w")],
         ]),

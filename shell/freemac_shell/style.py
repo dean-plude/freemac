@@ -22,6 +22,7 @@ TEMPLATE = """
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }
+.topline button.recording image { color: #e5484d; }
 
 .pier-shelf {
   background-color: @shelf;

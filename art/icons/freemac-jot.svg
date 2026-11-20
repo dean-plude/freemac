@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Jot: a sticky pad with a pencil. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7d774"/><stop offset="1" stop-color="#e9b949"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="22" width="72" height="84" rx="8" fill="#fffbea"/>
+  <rect x="24" y="22" width="72" height="14" rx="7" fill="#5b6bd6"/>
+  <rect x="24" y="29" width="72" height="7" fill="#5b6bd6"/>
+  <g fill="#c9bfa2">
+    <rect x="34" y="48" width="44" height="4" rx="2"/>
+    <rect x="34" y="60" width="52" height="4" rx="2"/>
+    <rect x="34" y="72" width="36" height="4" rx="2"/>
+    <rect x="34" y="84" width="28" height="4" rx="2"/>
+  </g>
+  <g transform="rotate(40 92 82)">
+    <rect x="86" y="44" width="12" height="52" rx="2" fill="#3c4a63"/>
+    <rect x="86" y="44" width="12" height="8" rx="2" fill="#f08a8a"/>
+    <path d="M86 96 L92 108 L98 96 Z" fill="#f2d6a8"/>
+    <path d="M90 104 L92 108 L94 104 Z" fill="#3c4a63"/>
+  </g>
+</svg>

@@ -17,6 +17,7 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 # (section, option, what it does, Wayfire value as freemac ships it)
 SHORTCUTS = (
     ("command", "binding_seek", "Seek", "<super> KEY_SPACE"),
+    ("command", "binding_clips", "Clipboard history", "<super> <shift> KEY_V"),
     ("fast-switcher", "activate", "Switch windows", "<alt> KEY_TAB"),
     ("scale", "toggle", "All windows", "<ctrl> KEY_UP | swipe up 4"),
     ("scale", "toggle_all", "All windows on every desktop", "<super> KEY_TAB"),
@@ -36,6 +37,8 @@ SHORTCUTS = (
     ("command", "binding_lens_screen", "Screenshot", "KEY_SYSRQ"),
     ("command", "binding_lens_area", "Screenshot of an area", "<shift> KEY_SYSRQ"),
     ("command", "binding_lens_window", "Screenshot of a window", "<alt> KEY_SYSRQ"),
+    ("command", "binding_lens_record", "Start or stop recording the screen", "<ctrl> KEY_SYSRQ"),
+    ("command", "binding_lens_record_area", "Start or stop recording an area", "<ctrl> <shift> KEY_SYSRQ"),
 )
 
 MODIFIERS = (("<super>", "Super"), ("<ctrl>", "Ctrl"), ("<alt>", "Alt"), ("<shift>", "Shift"))

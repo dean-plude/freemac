@@ -92,6 +92,7 @@ only ship alongside, which is fine for any free licence).
 | **Latch** | Lock screen | Python (launcher) + gtklock | Locks with gtklock dressed in freemac's style (current wallpaper, large clock, password field); Super+L and Lock Screen in the system menu; swayidle locks after the idle time set in Dials > Power, and before sleep. |
 | **Tally** | Calculator | Python + GTK 3 | Its own expression parser (decimal arithmetic for the basic operations), a running tape, a scientific mode with degrees or radians, `Ans`, and keyboard entry. |
 | **Chime** | Clock | Python + GTK 3 | World clocks, alarms with repeat days, timers and a stopwatch. Keeps running in the background while an alarm or timer is set, rings with the freedesktop sound theme and notifies through Beacon. |
+| **Jot** | Notes | Python + GTK 3 | Each note is a plain text file in `~/Documents/Notes`; the first line is the title. Saves a moment after typing stops, searches as you type, and notes show up in Seek and Drawer like any file. |
 | **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
 | **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session. |
@@ -195,6 +196,33 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   account (`~/.config/freemac/welcome-seen`), and every time on the live
   system. Its Wi-Fi step reuses Dials' network panel, and its look and
   wallpaper steps call the same code as Dials.
+
+## Everyday extras (1.1)
+
+- **Keys** (`keys.py`, `freemac-keys`): Wayfire's command plugin runs it
+  for volume, mute, microphone, brightness and media keys (repeating
+  bindings for the levels). It changes the level with wpctl or logind's
+  backlight call and asks Beacon, over a new `ShowLevel` D-Bus method, to
+  show the level in a small panel near the bottom of the screen.
+- **Now playing** (`media.py`): reads MPRIS players on the session bus
+  with Gio only, so a key press doesn't load GTK. It prefers a playing
+  player, then a paused one. Quick settings shows it with back,
+  play/pause and forward.
+- **Screen recording** (Lens): wf-recorder to
+  `~/Videos/Screen Recordings`, the whole screen or an area picked with
+  slurp; Topline shows a red stop button while it runs.
+- **Clipboard history** (`clips.py`): `wl-paste --watch` hands each new
+  text copy to `freemac-clips --store`, which keeps the last 50 in
+  `~/.local/state/freemac/clips.json` (mode 600). Copies a password
+  manager marks with `x-kde-passwordManagerHint` are skipped, and nothing
+  is kept while history is off in Dials > Keyboard.
+- **Archives** (`drawer_archive.py`): zip with Python's zipfile; zip and
+  tar extraction skip absolute paths, `..` and links that would point
+  outside the new folder, and use tarfile's `data` filter where Python
+  has it.
+- **Hot corners** (`corners.py`): Wayfire activators accept
+  `hotspot <corner> 10x10 250`, so Dials adds that to the binding of the
+  chosen action and removes it from every other one.
 
 ## Hard problems we know about
 
