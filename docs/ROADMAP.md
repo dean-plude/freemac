@@ -154,7 +154,7 @@ What a Mac user reaches for next.
 | --- | --- | --- | --- |
 | 1 | Files in the Desktop folder show on the wallpaper as icons: open, move, rename and drop files onto them | Backdrop | done |
 | 2 | Alt+Tab shows the open apps as a row of icons on a frosted panel; let go to switch | Tack | done |
-| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata | |
+| 3 | Minimising a window shrinks it into the dock, and it grows back out | Strata, Pier | done |
 | 4 | Screenshots land on the Desktop, named with the date and time | Lens | done |
 
 ## Later

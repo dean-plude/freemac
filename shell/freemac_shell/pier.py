@@ -402,6 +402,7 @@ class Pier(Gtk.Window):
         self.monitor = Gio.File.new_for_path(CONFIG).monitor_file(Gio.FileMonitorFlags.NONE, None)
         self.monitor.connect("changed", lambda *_: GLib.timeout_add(200, self._reload))
 
+        self._hint_pending, self.own_id, self.hints = 0, None, {}
         try:
             self.wf = Wayfire(on_event=lambda _e: self.refresh())
         except OSError:
@@ -490,6 +491,38 @@ class Pier(Gtk.Window):
             self.extra[app_id].set_views(its_views)
         self.running_sep.set_visible(bool(self.extra))
         self.places_sep.set_visible(bool(self.places))
+        if not self._hint_pending:
+            self._hint_pending = GLib.timeout_add(200, self._send_hints)
+        return False
+
+    def _send_hints(self):
+        """Tell Strata where each window's icon sits, so minimizing a window
+        shrinks it into its icon here and restoring grows it back out."""
+        self._hint_pending = 0
+        if not self.wf:
+            return False
+        if self.own_id is None:
+            self.own_id = self.wf.own_view("freemac-pier")
+            if self.own_id is None:
+                return False
+        sent = {}
+        for item in self.pinned + list(self.extra.values()):
+            alloc = item.image.get_allocation()
+            origin = item.image.translate_coordinates(self, 0, 0)
+            if not origin or alloc.width <= 1:
+                continue
+            size = self.base
+            x = origin[0] + (alloc.width - size) // 2
+            y = origin[1] + alloc.height - size
+            for view in item.views:
+                rect = (x, y, size, size)
+                sent[view["id"]] = rect
+                if self.hints.get(view["id"]) != rect:
+                    if not self.wf.minimize_hint(view["id"], *rect, relative_to=self.own_id):
+                        self.own_id = None   # Pier's surface may be new; look again next time
+                        rect = None
+                    sent[view["id"]] = rect
+        self.hints = sent
         return False
 
     def _motion(self, widget, event):

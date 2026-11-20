@@ -1,7 +1,9 @@
 // Strata's copy of Wayfire's gtk-shell plugin. Besides what gtk-shell does, it
 // keeps the menu addresses GTK apps publish (Wayfire's plugin drops them),
 // hands them to Topline over IPC (strata/app-menus), and tells GTK apps that
-// the desktop shows their menu bar, so they leave it out of the window.
+// the desktop shows their menu bar, so they leave it out of the window. It
+// also lets Pier say where each window's dock icon is (strata/minimize-hint),
+// so minimizing a window shrinks it into that icon and restoring grows it back.
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -408,6 +410,40 @@ class strata_shell_impl : public wf::plugin_interface_t
         return response;
     };
 
+    /* strata/minimize-hint {id, x, y, width, height, relative-to}: the
+     * rectangle a window shrinks into when minimized, in the coordinates of
+     * the view relative-to (Pier's dock) or of the output if none is given. */
+    wf::ipc::method_callback set_minimize_hint = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "id", number_integer);
+        WFJSON_EXPECT_FIELD(data, "x", number_integer);
+        WFJSON_EXPECT_FIELD(data, "y", number_integer);
+        WFJSON_EXPECT_FIELD(data, "width", number_integer);
+        WFJSON_EXPECT_FIELD(data, "height", number_integer);
+        auto toplevel = wf::toplevel_cast(wf::ipc::find_view_by_id(data["id"]));
+        if (!toplevel)
+        {
+            return wf::ipc::json_error("no such window");
+        }
+
+        wlr_box hint{data["x"], data["y"], data["width"], data["height"]};
+        if (data.contains("relative-to") && data["relative-to"].is_number_integer())
+        {
+            auto base = wf::ipc::find_view_by_id(data["relative-to"]);
+            if (!base)
+            {
+                return wf::ipc::json_error("no such view to measure from");
+            }
+
+            wf::pointf_t origin = base->get_surface_root_node()->to_global({0, 0});
+            hint.x += origin.x;
+            hint.y += origin.y;
+        }
+
+        toplevel->set_minimize_hint(hint);
+        return wf::ipc::json_ok();
+    };
+
   public:
     void init() override
     {
@@ -415,6 +451,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         wl_global_create(display, &gtk_shell1_interface, GTK_SHELL_VERSION, NULL, bind_gtk_shell1);
         wf::get_core().connect(&on_app_id_query);
         method_repository->register_method("strata/app-menus", get_app_menus);
+        method_repository->register_method("strata/minimize-hint", set_minimize_hint);
     }
 
     bool is_unloadable() override
