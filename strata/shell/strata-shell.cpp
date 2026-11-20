@@ -598,6 +598,15 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/front-app {app-id}: the app Topline shows in front with no
+     * window open, or "" for none; ⌘Q quits it. */
+    wf::ipc::method_callback set_front_app = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "app-id", string);
+        command_key.front_windowless = data["app-id"];
+        return wf::ipc::json_ok();
+    };
+
     /* strata/held-modifiers: which of Command, Alt, Control and Shift are
      * held down right now. */
     wf::ipc::method_callback get_held_modifiers = [=] (nlohmann::json)
@@ -618,6 +627,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/close", close_view);
         method_repository->register_method("strata/command-key", set_command_key_raw);
         method_repository->register_method("strata/held-modifiers", get_held_modifiers);
+        method_repository->register_method("strata/front-app", set_front_app);
         method_repository->register_method("strata/zoom", zoom_view);
         method_repository->register_method("strata/force-quit", force_quit_view);
         method_repository->register_method("strata/snapshot", snapshot_view);

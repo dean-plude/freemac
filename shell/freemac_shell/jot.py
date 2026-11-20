@@ -337,7 +337,7 @@ class Window(Gtk.ApplicationWindow):
 
 def menubar():
     return menus.menubar([
-        ("_File", [[("New Note", "win.new-note", "<Ctrl>n")],
+        ("_File", [[("New Note", "app.new-note", "<Ctrl>n")],
                    [("Show Notes Folder", "win.show-folder", None)],
                    [("Move Note to Trash", "win.delete-note", "<Ctrl>Delete")],
                    [("Close Window", "win.close", "<Ctrl>w")]]),
@@ -357,9 +357,20 @@ class Jot(Gtk.Application):
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         quit_action = Gio.SimpleAction.new("quit", None)
-        quit_action.connect("activate", lambda *_: self.quit())
+        quit_action.connect("activate", lambda *_: GLib.idle_add(self.quit))
         self.add_action(quit_action)
+        # Jot stays open with no window, as a Mac app does; Quit ends it.
+        # New Note works from the menu bar even with no window open.
+        new_note = Gio.SimpleAction.new("new-note", None)
+        new_note.connect("activate", lambda *_: self._new_note())
+        self.add_action(new_note)
+        self.hold()
         self.set_menubar(menubar())
+
+    def _new_note(self):
+        window = self.get_active_window() or Window(self)
+        window.present()
+        window.activate_action("new-note", None)
 
     def do_activate(self):
         (self.get_active_window() or Window(self)).present()

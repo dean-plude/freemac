@@ -11,8 +11,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, mac_accel, quick, status, style  # noqa: E402
-from .wfipc import Wayfire, is_minimized  # noqa: E402
+from . import apps, beacon, held, mac_accel, quick, status, style  # noqa: E402
+from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
 DESKTOP_APP = "Drawer"   # the file manager, in the bar when the desktop is in front
@@ -127,11 +127,48 @@ class Topline(Gtk.Window):
         self._prefs_changed()
 
         self.focused = None
+        # The app last in front, and a held app whose last window closed:
+        # it stays in the bar with its menus until another app comes forward.
+        self._last_app, self._windowless, self._told_strata = None, None, None
+        self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         try:
-            self.wf = Wayfire(on_event=lambda _e: self.refresh())
+            self.wf = Wayfire(on_event=self._on_event)
         except OSError:
             self.wf = None
         self.refresh()
+
+    def _on_event(self, event):
+        kind = event.get("event")
+        view = event.get("view") or {}
+        app_id = view.get("app-id") or ""
+        if kind == "view-focused" and view:
+            if is_app_window(view) and app_id.lower() not in DESKTOP_OWNED:
+                self._last_app, self._windowless = app_id, None
+            elif app_id.lower() in DESKTOP_OWNED | {"freemac-backdrop"}:
+                # The desktop came forward: the file manager is in front.
+                self._last_app, self._windowless = None, None
+        elif kind == "view-focused" and self._last_app:
+            # Nothing has the focus: the front app may have closed its last
+            # window. Wayfire has dropped the window from its list by now, or
+            # very nearly, so look again in a moment too.
+            self._check_windowless()
+            GLib.timeout_add(250, self._check_windowless)
+        self._tell_strata()
+        self.refresh()
+
+    def _check_windowless(self):
+        app_id = self._last_app
+        if (app_id and not self._windowless and self.held.is_running(app_id) and self.wf
+                and self.wf.focused() is None and not self._views_of(app_id)):
+            self._windowless = held.window_id(app_id)
+            self._tell_strata()
+        self.refresh()
+        return False
+
+    def _tell_strata(self):
+        if self._windowless != self._told_strata and self.wf:
+            self._told_strata = self._windowless
+            self.wf.front_app(self._windowless)
 
     def _mark_image(self):
         image = Gtk.Image()
@@ -219,6 +256,15 @@ class Topline(Gtk.Window):
             # The Dock's own windows (the Empty Trash alert) belong to the
             # file manager, as the Trash does on a Mac.
             view = None
+        elif view is None and self._windowless and self.held.is_running(self._windowless):
+            self._show_windowless(self._windowless)
+            return
+        elif view is None and self._last_app and self.wf:
+            # The switcher, Seek or a panel has the keyboard, or the app's
+            # windows are minimized: the app stays in the bar, as on a Mac.
+            its = self._views_of(self._last_app)
+            if its:
+                view = max(its, key=lambda v: v.get("last-focus-timestamp", 0))
         self.focused = view
         self._fill_app_menus(view)
         app_id = view.get("app-id") if view else None
@@ -379,6 +425,18 @@ class Topline(Gtk.Window):
             self._bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         return self._bus
 
+    def _show_windowless(self, app_id):
+        """A held app with no window open: its name and menus stay in the bar,
+        with only what works without a window (New, About, Quit)."""
+        stand_in = {"id": None, "app-id": app_id, "title": "", "windowless": True}
+        self.focused = stand_in
+        name = held.bus_name(app_id)
+        path = held.object_path(name)
+        self._use_menus((name, path + "/menus/menubar", "", "", path))
+        self.app_button.set_label(apps.display_name(app_id))
+        self._fill_app_menu(stand_in)
+        self._fill_window_menu(None)
+
     def _fill_app_menus(self, view):
         if view is None and self._menu_key == ("desktop",):
             return   # the desktop's own menus are up already
@@ -387,6 +445,9 @@ class Topline(Gtk.Window):
         if info:
             key = tuple(info.get(k) or "" for k in
                         ("bus-name", "menubar-path", "app-menu-path", "window-path", "application-path"))
+        self._use_menus(key)
+
+    def _use_menus(self, key):
         if key == self._menu_key:
             return
         self._menu_key = key
@@ -504,7 +565,10 @@ class Topline(Gtk.Window):
 
     def _quit(self, view):
         """Close the app's windows (it may ask to save first); with no Strata,
-        end its process."""
+        end its process. An app that stays open with no window quits whole."""
+        if self.held.quit(view.get("app-id") or ""):
+            self._windowless = None
+            return
         if self.wf and self.wf.quit(view.get("app-id") or ""):
             return
         if view.get("pid"):
@@ -577,7 +641,8 @@ class Topline(Gtk.Window):
                 self._item(menu, "Settings\u2026", lambda: settings[0].activate_action(settings[1], None),
                            shortcut="\u2318,")
             menu.append(Gtk.SeparatorMenuItem())
-            self._item(menu, f"Hide {name}", lambda: self._hide_app(view), shortcut="\u2318H")
+            self._item(menu, f"Hide {name}", (lambda: self._hide_app(view)) if view.get("id") else None,
+                       shortcut="\u2318H")
             self._item(menu, "Hide Others", lambda: self._hide_others(view), shortcut="\u2325\u2318H")
             self._item(menu, "Show All", self._show_all)
             menu.append(Gtk.SeparatorMenuItem())

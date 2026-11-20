@@ -443,12 +443,29 @@ class Quill(Gtk.Application):
         new = Gio.SimpleAction.new("new", None)
         new.connect("activate", lambda *_: Editor(self).show_all())
         self.add_action(new)
+        # Quill stays open with no window, as a Mac app does; Quit ends it.
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: GLib.idle_add(self._quit))
+        self.add_action(quit_action)
+        self.hold()
         self.set_menubar(menubar())
         settings = style.interface_settings()
         if settings:
             settings.connect("changed::color-scheme", lambda *_: self._retheme())
             self._settings = settings
         GtkSource.init()
+
+    def _quit(self):
+        """Close every window, asking about unsaved changes; Cancel in any of
+        them keeps Quill open."""
+        for window in list(self.get_windows()):
+            if isinstance(window, Editor):
+                window.present()
+                if window._on_delete():
+                    return False
+                window.destroy()
+        self.quit()
+        return False
 
     def _retheme(self):
         for window in self.get_windows():

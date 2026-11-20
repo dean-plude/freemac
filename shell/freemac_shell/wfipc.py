@@ -150,6 +150,14 @@ class Wayfire:
             return False
         return isinstance(result, dict) and result.get("result") == "ok"
 
+    def front_app(self, app_id):
+        """Tell Strata which app is in front with no window open ("" for
+        none), so ⌘Q quits it."""
+        try:
+            self.req.call("strata/front-app", **{"app-id": app_id or ""})
+        except (ConnectionError, OSError, ValueError):
+            pass
+
     def quit(self, app_id):
         """Close every window of an app: Quit in the menu bar and the dock."""
         closed = False
