@@ -150,6 +150,14 @@ class Wayfire:
             return False
         return isinstance(result, dict) and result.get("result") == "ok"
 
+    def press(self, key, ctrl=False, shift=False, alt=False):
+        """Press a key (an evdev code) in the window that has the keyboard."""
+        try:
+            result = self.req.call("strata/press", key=key, ctrl=ctrl, shift=shift, alt=alt)
+        except (ConnectionError, OSError, ValueError):
+            return False
+        return isinstance(result, dict) and result.get("result") == "ok"
+
     def front_app(self, app_id, keys=None):
         """Tell Strata which app is in front with no window open ("" for
         none), so ⌘Q quits it; with keys ({"command+n": "new-note"}), the
