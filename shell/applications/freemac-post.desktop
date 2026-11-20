@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Post
+GenericName=Mail
+Comment=Read and send email
+Exec=freemac-post %U
+Icon=freemac-post
+Categories=Network;Email;
+Keywords=mail;email;inbox;imap;smtp;message;
+MimeType=x-scheme-handler/mailto;message/rfc822;
+StartupWMClass=org.freemac.Post
+StartupNotify=true
