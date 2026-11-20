@@ -285,7 +285,7 @@ decoration_layout_t::action_response_t decoration_layout_t::handle_press_event(
     if (!pressed && double_click_at_release)
     {
         double_click_at_release = false;
-        return {DECORATION_ACTION_TOGGLE_MAXIMIZE, 0};
+        return {DECORATION_ACTION_TITLE_DOUBLE_CLICK, 0};
     } else if (!pressed && is_grabbed)
     {
         is_grabbed = false;

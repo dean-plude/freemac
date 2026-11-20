@@ -158,6 +158,13 @@ class Wayfire:
                 closed = self.close(view["id"]) or closed
         return closed
 
+    def force_quit(self, view_id):
+        """End the program behind a window at once (Strata's strata/force-quit)."""
+        try:
+            return self.req.call("strata/force-quit", id=view_id)
+        except (ConnectionError, OSError, ValueError):
+            return None
+
     def zoom(self, view_id):
         try:
             return self.req.call("strata/zoom", id=view_id)

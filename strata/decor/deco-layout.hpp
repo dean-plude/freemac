@@ -79,6 +79,8 @@ enum decoration_layout_action_t
     DECORATION_ACTION_CLOSE           = 3,
     DECORATION_ACTION_TOGGLE_MAXIMIZE = 4,
     DECORATION_ACTION_MINIMIZE        = 5,
+    /* Strata: a double-click on the title bar; what it does is a setting */
+    DECORATION_ACTION_TITLE_DOUBLE_CLICK = 6,
 };
 
 class decoration_theme_t;

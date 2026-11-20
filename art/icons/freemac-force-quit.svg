@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Force Quit: a stuck window with a stop mark. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3f6e"/><stop offset="1" stop-color="#1c1e3d"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="30" width="64" height="50" rx="7" fill="#fbfaff" opacity="0.9"/>
+  <rect x="24" y="30" width="64" height="11" rx="5" fill="#c9cbe0"/>
+  <circle cx="86" cy="82" r="22" fill="#e9967a"/>
+  <rect x="74" y="78" width="24" height="8" rx="4" fill="#fbfaff"/>
+</svg>
