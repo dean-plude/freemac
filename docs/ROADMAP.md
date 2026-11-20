@@ -130,6 +130,8 @@ without any Apple artwork, code or names.
 | 5 | Start-up: no boot menu or text, just the freemac mark on black with a progress bar | build, Keel | done |
 | 6 | Login screen like a Mac's: blurred wallpaper, round picture, password field with an arrow | Gangway | done |
 | 7 | Terminal under its plain name, with its own icon and a light look; windows no longer wobble | build, Strata | done |
+| 8 | Every app on one full-screen grid over a blurred wallpaper, with search and pages (F4, the dock or a hot corner) | **Marina** | done |
+| 9 | Dock icons bounce while an app starts, and magnified icons rise out of the dock instead of stretching it | Pier | done |
 
 ## Later
 
@@ -142,7 +144,7 @@ without any Apple artwork, code or names.
   only after that, and only from public documentation. See
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images, a package repository and release docs.
-- Still not quite a Mac: round corners at the bottom of windows, a launch
-  bounce in Pier, a full-screen app grid, our own pointer, and apps built
-  with Qt or GTK 4 matching the GTK 3 theme.
+- Still not quite a Mac: round corners at the bottom of windows, our own
+  pointer, Marina folders and rearranging, and apps built with Qt or GTK 4
+  matching the GTK 3 theme.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.
