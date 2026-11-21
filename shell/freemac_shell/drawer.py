@@ -55,6 +55,8 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
 .drawer-status { font-size: 11px; opacity: 0.7; padding: 3px 10px; }
 .drawer-gallery-name { font-weight: bold; padding-top: 4px; }
+.drawer-preview { padding: 12px 14px; border-left: 1px solid rgba(120, 120, 140, 0.18); }
+.drawer-preview-heading { font-weight: bold; font-size: 12px; }
 .drawer-tabs { padding: 4px 6px 0; }
 .drawer-tabs button { padding: 2px 8px; }
 .drawer-tab-close { padding: 0 2px; min-width: 0; min-height: 0; }
@@ -427,6 +429,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.path_bar_shown = bool(config.get("path_bar", False))
         self.status_shown = bool(config.get("status_bar", True))
         self.sidebar_shown = bool(config.get("sidebar", True))
+        self.preview_shown = bool(config.get("preview", False))
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -474,7 +477,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
         right.pack_start(self.tab_bar, False, False, 0)
         right.pack_start(self._trash_bar(), False, False, 0)
         self.content = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
-        right.pack_start(self.content, True, True, 0)
+        middle = Gtk.Box()
+        middle.pack_start(self.content, True, True, 0)
+        self.preview = self._build_preview()
+        middle.pack_end(self.preview, False, False, 0)
+        right.pack_start(middle, True, True, 0)
         self.path_bar = Gtk.Box(spacing=0)
         self.path_bar.get_style_context().add_class("drawer-pathbar")
         self.path_bar.set_no_show_all(True)
@@ -636,6 +643,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _selection_changed(self, *_args):
         self._show_status()
         self._show_gallery()
+        self._show_preview()
         if self.glance and self.glance.get_visible():
             paths = self.selected_paths()
             if paths and paths != self.glance.paths:
@@ -943,6 +951,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.path_bar_action = menus.add_toggle(self, "path-bar", self.path_bar_shown, self._set_path_bar)
         self.status_bar_action = menus.add_toggle(self, "status-bar", self.status_shown, self._set_status_bar)
         self.sidebar_action = menus.add_toggle(self, "sidebar", self.sidebar_shown, self._set_sidebar)
+        self.preview_action = menus.add_toggle(self, "preview", self.preview_shown, self._set_preview)
         # View › Sort By: one choice of four, kept for every window.
         self.sort_action = Gio.SimpleAction.new_stateful("sort-by", GLib.VariantType.new("s"),
                                                          GLib.Variant("s", self.sort))
@@ -1243,6 +1252,87 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.column_paths = []
         self.content.add_named(self.column_scroll, "columns")
 
+    # ---- the preview pane ----------------------------------------------------
+    def _build_preview(self):
+        """View > Show Preview (⇧⌘P): the chosen file large at the window's
+        right, with its name, kind and size, and what is known about it, as
+        Finder's preview pane shows. Gallery has its own, below the file."""
+        pane = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        pane.get_style_context().add_class("drawer-preview")
+        pane.set_size_request(250, -1)
+        self.preview_picture = GalleryPicture()
+        self.preview_picture.set_size_request(-1, 220)
+        self.preview_picture.set_vexpand(False)
+        pane.pack_start(self.preview_picture, False, False, 0)
+        self.preview_name = Gtk.Label(xalign=0, wrap=True, max_width_chars=26)
+        self.preview_name.get_style_context().add_class("drawer-gallery-name")
+        pane.pack_start(self.preview_name, False, False, 0)
+        self.preview_kind = Gtk.Label(xalign=0, wrap=True, max_width_chars=30)
+        self.preview_kind.get_style_context().add_class("dim-label")
+        pane.pack_start(self.preview_kind, False, False, 0)
+        heading = Gtk.Label(label="Information", xalign=0)
+        heading.get_style_context().add_class("drawer-preview-heading")
+        pane.pack_start(heading, False, False, 6)
+        self.preview_facts = Gtk.Grid(column_spacing=10, row_spacing=4)
+        pane.pack_start(self.preview_facts, False, False, 0)
+        pane.set_no_show_all(True)
+        for child in pane.get_children():
+            child.show()
+        return pane
+
+    def _set_preview(self, shown):
+        self.preview_shown = shown
+        save_setting("preview", shown)
+        self._show_preview()
+
+    def _show_preview(self):
+        shown = self.preview_shown and self.view_mode != "gallery"
+        self.preview.set_visible(shown)
+        if not shown:
+            return
+        chosen = self.selected_paths()
+        path = chosen[0] if len(chosen) == 1 else (None if chosen else self.path)
+        for child in self.preview_facts.get_children():
+            self.preview_facts.remove(child)
+        if not path or self.in_virtual() and path == self.path:
+            self.preview_picture.show_pixbuf(None)
+            self.preview_name.set_text(f"{len(chosen)} items" if chosen else self._label(self.path or ""))
+            self.preview_kind.set_text("")
+            return
+        name = macapps.display_name(path) if macapps.is_bundle(path) else os.path.basename(path) or path
+        self.preview_name.set_text(name)
+        self.preview_picture.show_pixbuf(gallery_pixbuf(path))
+        try:
+            info = os.stat(path)
+        except OSError:
+            self.preview_kind.set_text("")
+            return
+        kind, _uncertain = Gio.content_type_guess(path, None)
+        is_dir = os.path.isdir(path) and not macapps.is_bundle(path)
+        described = "Folder" if is_dir else Gio.content_type_get_description(kind or "")
+        self.preview_kind.set_text(described if is_dir else f"{described} \u2014 {human_size(info.st_size)}")
+        facts = [("Created", when(getattr(info, "st_birthtime", 0) or info.st_ctime)),
+                 ("Modified", when(info.st_mtime))]
+        if is_dir:
+            try:
+                count = sum(1 for n in os.listdir(path) if not n.startswith("."))
+                facts.append(("Items", str(count)))
+            except OSError:
+                pass
+        elif kind and kind.startswith("image/"):
+            found = GdkPixbuf.Pixbuf.get_file_info(path)
+            if found and found[0] is not None and found[1] > 0:
+                facts.append(("Dimensions", f"{found[1]} \u00d7 {found[2]}"))
+        names = tags.get(path)
+        if names:
+            facts.append(("Tags", ", ".join(names)))
+        for row, (label, value) in enumerate(facts):
+            title = Gtk.Label(label=label, xalign=1)
+            title.get_style_context().add_class("dim-label")
+            self.preview_facts.attach(title, 0, row, 1, 1)
+            self.preview_facts.attach(Gtk.Label(label=value, xalign=0, selectable=True), 1, row, 1, 1)
+        self.preview_facts.show_all()
+
     # ---- gallery view -----------------------------------------------------
     def _build_gallery_view(self):
         """Finder's Gallery: the chosen file large, with its name and kind,
@@ -1351,6 +1441,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.content.set_visible_child_name("list" if self.in_virtual() and self.view_mode == "columns"
                                             else self.view_mode)
         self._show_gallery()
+        self._show_preview()
         in_trash = self.in_trash()
         self.trash_bar.set_visible(in_trash)
         self.empty_button.set_sensitive(in_trash and count > 0)
@@ -2135,7 +2226,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif (ctrl and key in (Gdk.KEY_h, Gdk.KEY_H)) or (ctrl and shift and key in (Gdk.KEY_period,
                                                                                     Gdk.KEY_greater)):
             self.toggle_hidden()
-        elif ctrl and key in (Gdk.KEY_1, Gdk.KEY_2, Gdk.KEY_3):
+        elif ctrl and key in (Gdk.KEY_1, Gdk.KEY_2, Gdk.KEY_3, Gdk.KEY_4):
             self.view_buttons[VIEWS[key - Gdk.KEY_1][0]].set_active(True)
         elif ctrl and shift and key in (Gdk.KEY_f, Gdk.KEY_F):
             self.navigate(recents.PLACE)
@@ -2156,6 +2247,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.add_to_sidebar()
         elif ctrl and shift and key in (Gdk.KEY_g, Gdk.KEY_G):
             self.go_to_folder()
+        elif ctrl and shift and key in (Gdk.KEY_p, Gdk.KEY_P) and not event.state & Gdk.ModifierType.MOD1_MASK:
+            self.preview_action.change_state(GLib.Variant("b", not self.preview_shown))
         elif ctrl and key in (Gdk.KEY_slash, Gdk.KEY_question):
             self.status_bar_action.change_state(GLib.Variant("b", not self.status_shown))
         elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_p, Gdk.KEY_P):
@@ -2201,7 +2294,7 @@ def menubar():
              ("as Columns", "win.view-columns", "<Ctrl>3"), ("as Gallery", "win.view-gallery", "<Ctrl>4")],
             [("Sort by " + title, f"win.sort-by::{key}", None) for key, title in SORTS],
             [("Show Sidebar", "win.sidebar", None), ("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
-             ("Show Status Bar", "win.status-bar", "<Ctrl>slash"),
+             ("Show Status Bar", "win.status-bar", "<Ctrl>slash"), ("Show Preview", "win.preview", "<Ctrl><Shift>p"),
              ("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
             [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),
