@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -666,6 +666,11 @@ class DialsWindow(Gtk.ApplicationWindow):
                 switch(bool(style.prefs().get("click_reveal")), lambda on: self.save_prefs(click_reveal=on)),
                 "Click the desktop picture and your windows step aside, so you can use the files on the "
                 "desktop. Click it again to bring them back."),
+        ), group(
+            row("Default web browser", default_apps.chooser(default_apps.BROWSER),
+                "Opens the links you click in other apps."),
+            row("Default email app", default_apps.chooser(default_apps.MAIL),
+                "Opens when you click an email address."),
         ), group(row("Double-click a window's title bar to", self.title_double_click()),
                  row("Minimize windows into application icon",
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),

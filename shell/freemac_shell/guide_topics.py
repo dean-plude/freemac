@@ -533,6 +533,13 @@ TOPICS = {
         "Browsing, mail and printing carry on as usual.",
         "Both switches ask for an administrator's password.",
     ]),
+    "default-apps": ("Choose which app opens a file or link", "default app browser web browser email mail open with change all always open double-click chrome firefox", [
+        "To change the browser that opens links, choose Dials > Dock and Menu Bar and pick one under Default "
+        "web browser. Default email app is just below it.",
+        "To change the app that opens a kind of document, select one in Drawer and press \u2318I. Under Open "
+        "with, pick the app, then click Change All\u2026.",
+        "To open one file in another app just this once, right-click it and choose Open With.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

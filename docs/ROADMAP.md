@@ -769,6 +769,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | freemac's own Software Update icon | Art | done |
 | 5 | Guide: Keep the computer up to date and safe | Guide | done |
 
+## 1.72 "which app opens what" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Dock and Menu Bar: Default web browser and Default email app, each a pop-up of the apps installed that can do it, with their icons | Dials | done |
+| 2 | Drawer > Get Info: Open with shows the app that opens the document; pick another (or Other… for any app) and Change All… makes it open every document of that kind, after asking | Drawer | done |
+| 3 | Get Info no longer opens with its Kind line highlighted | Drawer | done |
+| 4 | Guide: Choose which app opens a file or link | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

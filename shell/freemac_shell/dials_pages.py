@@ -39,7 +39,7 @@ SEARCH_WORDS = {
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode theme accent text size tiling",
     "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors",
-    "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon",
+    "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution brightness night light scale monitor",
     "wallpaper": "background desktop picture",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
