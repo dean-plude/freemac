@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Lantern
+GenericName=Presentations
+Comment=Make slides with titles, points and pictures, and show them full screen
+Exec=freemac-lantern %F
+Icon=freemac-lantern
+Categories=Office;Presentation;
+Keywords=presentation;slides;slideshow;deck;talk;project;school;pdf;
+StartupWMClass=org.freemac.Lantern
+StartupNotify=true
