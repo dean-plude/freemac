@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""More Dials panels: Sound, Power, Accessibility and Notifications.
+"""More Dials panels: Sound, Power, Accessibility, Notifications and Screen Saver.
 
 Each builder takes the Dials window (for its helpers and settings) and returns
 the panel widget.
@@ -306,4 +306,74 @@ def notifications(window):
         row("Show banners for", seconds),
     ), group(
         row("Notification history", clear, "Click the clock in the menu bar to see recent notifications."),
+    ))
+
+
+# ---- Screen Saver -----------------------------------------------------------------
+SAVER_AFTER_CHOICES = (("0", "Never"), ("1", "1 minute"), ("2", "2 minutes"), ("3", "3 minutes"),
+                       ("5", "5 minutes"), ("10", "10 minutes"), ("20", "20 minutes"), ("30", "30 minutes"))
+SAVER_ABOUT = {
+    "drift": "Soft lights drift over a dark sky.",
+    "clock": "The time and date, large and quiet.",
+    "album": "Your photos from Pictures, one after another.",
+}
+
+
+def screen_saver(window):
+    from . import saver
+    group, row, page, _slider, _switch = window.helpers
+    name, after = saver.settings()
+    flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3,
+                       column_spacing=12, row_spacing=12, homogeneous=True)
+    buttons = {}
+    about = Gtk.Label(label=SAVER_ABOUT[name], xalign=0)
+    about.get_style_context().add_class("dials-caption")
+
+    def choose(chosen):
+        window.save_prefs(saver=chosen)
+        for key, button in buttons.items():
+            context = button.get_style_context()
+            (context.add_class if key == chosen else context.remove_class)("dials-chosen")
+        about.set_text(SAVER_ABOUT[chosen])
+
+    for key, title in saver.SAVERS:
+        button = Gtk.Button()
+        button.get_style_context().add_class("dials-choice")
+        if key == name:
+            button.get_style_context().add_class("dials-chosen")
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        try:
+            picture = Gtk.Image.new_from_surface(saver.still(key, 176, 110))
+        except Exception:  # noqa: BLE001 - the name alone will do
+            picture = Gtk.Image.new_from_icon_name("video-display-symbolic", Gtk.IconSize.DIALOG)
+        inner.pack_start(picture, False, False, 0)
+        inner.pack_start(Gtk.Label(label=title), False, False, 0)
+        button.add(inner)
+        button.connect("clicked", lambda _b, k=key: choose(k))
+        flow.add(button)
+        buttons[key] = button
+
+    start = Gtk.ComboBoxText()
+    for value, label in SAVER_AFTER_CHOICES:
+        start.append(value, label)
+    start.set_active_id(str(after))
+    if not start.get_active_id():
+        start.set_active_id("0")
+    start.connect("changed", lambda c: window.save_prefs(saver_after=int(c.get_active_id())))
+
+    preview = Gtk.Button(label="Preview", halign=Gtk.Align.START)
+
+    def show_preview(_button):
+        program = shutil.which("freemac-screensaver")
+        command = [program] if program else ["python3", "-m", "freemac_shell.saver"]
+        try:
+            subprocess.Popen(command + [saver.settings()[0]])
+        except OSError:
+            pass
+    preview.connect("clicked", show_preview)
+
+    return page("Screen Saver", flow, about, preview, group(
+        row("Start the screen saver after", start,
+            "When nothing has been touched for this long. Move the pointer or press a key to end it. "
+            "If the screen should lock (Dials > Power), it locks when the screen saver ends."),
     ))

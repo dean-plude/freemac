@@ -506,6 +506,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | The Dock stays up while one of its menus is open or something is dragged over it | Pier | done |
 | 4 | Guide topic: Hide the Dock until you need it | Guide | done |
 
+## 1.43 "screen saver" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Screen savers: Drift (soft lights), Clock and Album (your photos, or the wallpapers) | Screen Saver | done |
+| 2 | Dials > Screen Saver: pick one from its picture, Preview, and when it starts (3 minutes unless changed) | Dials | done |
+| 3 | The lock waits for the screen saver: waking it asks for the password, with no desktop in between | Latch | done |
+| 4 | A hot corner can start the screen saver | Dials, corners | done |
+| 5 | Guide topic: Use a screen saver | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

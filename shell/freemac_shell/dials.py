@@ -365,6 +365,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             (2, "dock", "Dock and Menu Bar", "view-app-grid-symbolic", "dark", self.dock),
             (2, "displays", "Displays", "video-display-symbolic", "blue", self.displays),
             (2, "wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", "teal", self.wallpaper),
+            (2, "screensaver", "Screen Saver", "weather-clear-night-symbolic", "indigo",
+             lambda: dials_more.screen_saver(self)),
             (3, "power", "Power", "battery-good-symbolic", "green", lambda: dials_more.power(self)),
             (3, "lifeboat", "Lifeboat", "document-open-recent-symbolic", "teal",
              lambda: dials_backup.BackupPanel(self, page)),
@@ -886,7 +888,8 @@ class DialsWindow(Gtk.ApplicationWindow):
 
 # The View menu, grouped; the names match DialsWindow's panels.
 MENU_PANELS = (
-    (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("dock", "Dock and Menu Bar"),
+    (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("screensaver", "Screen Saver"),
+     ("dock", "Dock and Menu Bar"),
      ("notifications", "Notifications")),
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),

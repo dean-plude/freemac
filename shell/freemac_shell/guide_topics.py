@@ -472,6 +472,14 @@ TOPICS = {
         "It stays up while the pointer is on it or one of its menus is open, and hides again when you move away.",
         "Press ⌥⌘D again to keep it on screen all the time.",
     ]),
+    "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
+        "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
+        "photos in your Pictures folder.",
+        "It starts when nothing has been touched for the time under Start the screen saver after. "
+        "Click Preview to see it now.",
+        "Move the pointer or press a key to end it. If the screen was due to lock, it asks for your password.",
+        "To start it from a corner of the screen, choose it under Hot Corners in Dials > Dock and Menu Bar.",
+    ]),
     "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl", [
         "freemac Recovery fixes a computer that won't start properly. To open it, hold Ctrl while the "
         "computer starts, or choose Dials > Power > Restart in Recovery….",

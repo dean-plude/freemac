@@ -3,7 +3,10 @@
 
     freemac-lock            lock the screen now (Ctrl+Command+Q, Topline > Lock Screen)
     freemac-lock --watch    started at login: locks after the idle time set in
-                            Dials > Power, and before the computer sleeps
+                            Dials > Power, and before the computer sleeps;
+                            starts the screen saver (Dials > Screen Saver)
+    freemac-lock --idle     what the idle timer runs: while a screen saver
+                            shows, it marks the lock for when it ends instead
 
 The lock itself is gtklock (Wayland session locking with PAM), dressed to
 look like the login screen: the blurred wallpaper, the date and a large
@@ -15,10 +18,11 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 
 from gi.repository import GLib
 
-from . import backdrop, style
+from . import backdrop, saver, style
 
 DEFAULT_LOCK_AFTER = 5   # minutes
 
@@ -177,7 +181,29 @@ def lock():
         return 0
     # --daemonize returns once the screen is locked, so a caller that waits
     # (swayidle before sleep) knows the lock is up before the system sleeps.
-    return subprocess.run(lock_command()).returncode
+    code = subprocess.run(lock_command()).returncode
+    # A screen saver under the lock would still be there after unlocking.
+    saver.stop()
+    return code
+
+
+def idle_lock():
+    """The idle time to lock has come. While a screen saver shows, leave it
+    showing and lock when it ends, as a Mac asks for the password when you
+    wake it, so the desktop doesn't show in between."""
+    _name, saver_after = saver.settings()
+    lock_after, _on_sleep = settings()
+    if 0 < saver_after <= lock_after:
+        # Both times may come together; give the screen saver a moment to start.
+        for _ in range(30):
+            if saver.running_pid():
+                break
+            time.sleep(0.1)
+    if saver.running_pid():
+        with open(saver.LOCK_MARK, "w"):
+            pass
+        return 0
+    return lock()
 
 
 def idle_command():
@@ -185,8 +211,17 @@ def idle_command():
     me = [shutil.which("freemac-lock") or sys.executable, *([] if shutil.which("freemac-lock") else ["-m", "freemac_shell.latch"])]
     lock_now = " ".join(GLib.shell_quote(part) for part in me)
     command = ["swayidle", "-w"]
+    _name, saver_after = saver.settings()
+    if saver_after > 0:
+        start = shutil.which("freemac-screensaver")
+        start = GLib.shell_quote(start) if start else GLib.shell_quote(sys.executable) + " -m freemac_shell.saver"
+        # swayidle -w waits for each command, so the screen saver, which runs
+        # until it's woken, goes in the background. It ends itself when
+        # touched; a resume command would end it as it appears, since the
+        # compositor counts a new surface taking the keyboard as activity.
+        command += ["timeout", str(saver_after * 60), start + " >/dev/null 2>&1 &"]
     if after > 0:
-        command += ["timeout", str(after * 60), lock_now]
+        command += ["timeout", str(after * 60), lock_now + " --idle"]
     if on_sleep:
         command += ["before-sleep", lock_now, "lock", lock_now]
     return command if len(command) > 2 else None
@@ -248,6 +283,8 @@ def main():
         return 0
     if "--watch" in args:
         return watch()
+    if "--idle" in args:
+        return idle_lock()
     return lock()
 
 
