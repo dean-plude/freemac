@@ -461,9 +461,9 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Four in a row: drop counters into a stand of seven columns, against the computer at three levels or a friend on the same computer | Fourway | planned |
-| 2 | Draughts (checkers): the 8×8 game with forced captures and kings, against the computer or a friend, with undo and the legal moves shown | Kings | planned |
-| 3 | Tile-matching solitaire: clear a stacked layout of original picture tiles by matching free pairs, with several layouts, hints, shuffle and undo | Cairn | planned |
+| 1 | Four in a row: drop counters into a stand of seven columns, against the computer at three levels or a friend on the same computer | Fourway | done |
+| 2 | Draughts (checkers): the 8×8 game with forced captures and kings, against the computer or a friend, with undo and the legal moves shown | Kings | done |
+| 3 | Tile-matching solitaire: clear a stacked layout of original picture tiles by matching free pairs, with several layouts, hints, shuffle and undo | Cairn | done |
 
 ## Later
 

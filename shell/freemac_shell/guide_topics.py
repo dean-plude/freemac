@@ -307,6 +307,27 @@ TOPICS = {
         "slants and backwards.",
         "Click Hint to see the first letter of a word you haven't found.",
     ]),
+    "four-in-a-row": ("Play four in a row", "four in a row connect counters fourway board game kids", [
+        "Fourway is four in a row. Press ⌘Space, type Fourway and press Return.",
+        "Click a column to drop a counter. Line up four of yours across, down or on a slant to win.",
+        "Choose Computer or Friend at the top. Against the computer, pick Easy, Medium or Hard.",
+        "Press ⌘Z to take back a move.",
+    ]),
+    "draughts": ("Play draughts (checkers)", "draughts checkers kings board game crown jump", [
+        "Kings is draughts, also called checkers. Press ⌘Space, type Kings and press Return.",
+        "Click one of your pieces, then one of the marked squares to move it there.",
+        "Taking is compulsory: when one of your pieces can jump, it's ringed and has to. A piece that "
+        "reaches the far side becomes a king and can move backwards too.",
+        "Choose Computer or Friend at the top, and press ⌘Z to take back a move.",
+    ]),
+    "tile-matching": ("Play tile matching", "tile matching solitaire cairn pairs stack pictures", [
+        "Cairn is a tile-matching game. Press ⌘Space, type Cairn and press Return.",
+        "Click two free tiles with the same picture to take them away. A tile is free when nothing is "
+        "on top of it and its left or right side is open. Blocked tiles are shaded.",
+        "Pick a layout from the menu at the top. Pyramid is the easiest.",
+        "Click Hint to see a pair you can take, Shuffle to mix the tiles that are left, or ⌘Z to put a "
+        "pair back. Every game can be cleared.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),
