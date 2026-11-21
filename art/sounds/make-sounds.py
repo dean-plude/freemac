@@ -2,13 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Make freemac's own sounds from scratch: no recordings, no samples.
 
-    make-sounds.py OUTDIR      writes OUTDIR/startup.wav
+    make-sounds.py OUTDIR      writes OUTDIR/startup.wav, tick.wav and shutter.wav
 
 startup.wav is freemac's start-up sound: four soft bell notes rising one after
 another (D, A, E, then a high B, a little apart), so it reads as a quick
 upward sweep rather than one struck chord. Each bell is a few slightly
 out-of-tune partials dying away at different speeds, with a short room echo
-made by mixing in quieter, later copies. Original freemac work.
+made by mixing in quieter, later copies.
+
+tick.wav is one soft, short wooden tap, for each second of Pose's countdown.
+shutter.wav is Pose's picture sound: two quick clacks of filtered noise, the
+first louder, like a shutter opening and closing. Original freemac work.
 """
 import math
 import os
@@ -73,10 +77,43 @@ def write(path, samples):
         out.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s)) * 32767)) for s in samples))
 
 
+def tap(freq, length, loud, noise=0.0, seed=1):
+    """A short struck sound: a falling tone with a little filtered noise."""
+    import random
+    rng = random.Random(seed)
+    total = int(RATE * length)
+    out = []
+    smooth = 0.0
+    for i in range(total):
+        t = i / RATE
+        env = min(1.0, t / 0.002) * math.exp(-t * 38)
+        smooth += (rng.uniform(-1, 1) - smooth) * 0.35
+        out.append(loud * env * (math.sin(2 * math.pi * freq * t * (1 - 0.25 * t / length)) + noise * smooth))
+    return out
+
+
+def tick():
+    samples = tap(1180, 0.09, 1.0, noise=0.4)
+    return [s * 0.32 for s in samples]
+
+
+def shutter():
+    first = tap(2300, 0.06, 1.0, noise=2.2, seed=3)
+    second = tap(1700, 0.07, 0.6, noise=2.0, seed=5)
+    gap = int(0.085 * RATE)
+    out = first + [0.0] * (gap + len(second) - len(first))
+    for i, s in enumerate(second):
+        out[gap + i] += s
+    top = max(abs(s) for s in out) or 1.0
+    return [s / top * 0.5 for s in out] + [0.0] * int(0.05 * RATE)
+
+
 def main():
     outdir = sys.argv[1] if len(sys.argv) > 1 else "."
     os.makedirs(outdir, exist_ok=True)
     write(os.path.join(outdir, "startup.wav"), finish(room(bells())))
+    write(os.path.join(outdir, "tick.wav"), tick())
+    write(os.path.join(outdir, "shutter.wav"), shutter())
 
 
 if __name__ == "__main__":

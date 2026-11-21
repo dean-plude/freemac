@@ -110,7 +110,7 @@ TOPICS = {
         "- To quit one, select it and click ✕ at the top left, or press Delete. Quit asks it to close; "
         "Force Quit ends it at once and loses what it hasn't saved.",
     ]),
-    "drives": ("Rename, erase or eject a drive", "disk utility hull drive usb stick format erase rename eject space full exfat fat", [
+    "disk-utility": ("Rename, erase or eject a drive", "disk utility hull drive usb stick format erase rename eject space full exfat fat", [
         "Hull shows every drive, how full it is and what kind it is. Press ⌘Space, type Hull and press Return.",
         "Choose a drive or a volume on the left, then use the buttons at the top.",
         "- Rename: type a new name. Double-clicking a volume does the same.",
@@ -118,6 +118,16 @@ TOPICS = {
         "Windows computer.",
         "- Eject: do this before you unplug a drive, so nothing being saved is lost.",
         "Hull won't change the disk freemac is running from.",
+    ]),
+    "camera": ("Take a picture of yourself", "camera webcam selfie photo picture pose effects booth countdown", [
+        "Pose takes pictures with the computer's camera. Press ⌘Space, type Pose and press Return.",
+        "Click the red button (or press Space). Pose counts down 3, 2, 1 so you can get ready, then "
+        "takes the picture. Click 3 seconds to take pictures straight away instead.",
+        "Click Effects for fun ones: bend your face, make it a comic or an old movie, and more. "
+        "The picture is taken with the effect you choose.",
+        "Your pictures are saved in the Pose folder in Pictures, and show along the bottom of the window. "
+        "Double-click one to open it, or right-click it to move it to the Trash.",
+        "If Pose says no camera is connected, plug one in. If another app is using the camera, quit it first.",
     ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
