@@ -2,7 +2,7 @@
 """Drawer: freemac's file manager.
 
 Icon, list and column views over local folders, tabs, a sidebar of
-favourite folders you can change, a preview of the selected file on Space
+favourite folders you can change, a preview of the selected files on Space
 (Glance), and the everyday file operations: open, new folder, rename, move
 to trash, copy and paste (⌘C, ⌘V, ⌥⌘V to move), Duplicate, drag onto a
 folder, and Undo (see transfer.py).
@@ -126,12 +126,14 @@ def place_icon(path):
 
 
 MAC_APP = "Mac App"
+THUMB_LARGEST = 60_000_000   # bytes; bigger pictures keep their kind's icon
 
 
 class Folder:
     """Reads one folder into a Gtk.ListStore."""
 
     icon_cache = {}
+    thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
     def __init__(self, path, show_hidden=False):
         self.path = path
@@ -143,6 +145,7 @@ class Folder:
         except GLib.Error as err:
             self.error = err.message
             return
+        waiting = []
         for info in enum:
             if info.get_is_hidden() and not show_hidden:
                 continue
@@ -158,12 +161,64 @@ class Folder:
                 is_dir, kind = False, MAC_APP
                 name = macapps.display_name(full)
                 big, small = self.app_icon(full, 48), self.app_icon(full, 20)
-            self.store.append([
+            it = self.store.append([
                 big, name, full, is_dir,
                 "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
                 ("0" if is_dir else "1") + name.lower(), small,
             ])
+            content = info.get_content_type() or ""
+            if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
+                    and info.get_size() < THUMB_LARGEST:
+                waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
         enum.close(None)
+        if waiting:
+            GLib.idle_add(self._thumbnails, waiting)
+
+    def _thumbnails(self, waiting):
+        """Pictures and PDFs show a small picture of themselves instead of
+        their kind's icon, as in Finder, a few at a time so the folder
+        shows at once."""
+        for _ in range(4):
+            if not waiting:
+                return False
+            ref, path, stamp = waiting.pop(0)
+            if not ref.valid():
+                continue
+            big = self.thumbnail(path, stamp, 48)
+            if big is not None:
+                it = self.store.get_iter(ref.get_path())
+                self.store.set(it, {C_ICON: big, C_SMALL: self.thumbnail(path, stamp, 20)})
+        return bool(waiting)
+
+    @classmethod
+    def thumbnail(cls, path, stamp, size):
+        key = (path, stamp, size)
+        if key not in cls.thumb_cache:
+            pixbuf = None
+            try:
+                if path.lower().endswith(".pdf"):
+                    from . import pdf
+                    pixbuf = pdf.first_page(path, size * 4)
+                    if pixbuf is not None:
+                        ratio = size / max(pixbuf.get_width(), pixbuf.get_height())
+                        pixbuf = pixbuf.scale_simple(max(1, round(pixbuf.get_width() * ratio)),
+                                                     max(1, round(pixbuf.get_height() * ratio)),
+                                                     GdkPixbuf.InterpType.BILINEAR)
+                        # A thin grey edge, so a white page shows on a white window.
+                        framed = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8,
+                                                      pixbuf.get_width() + 2, pixbuf.get_height() + 2)
+                        framed.fill(0xb4b4b8ff)
+                        pixbuf.copy_area(0, 0, pixbuf.get_width(), pixbuf.get_height(), framed, 1, 1)
+                        pixbuf = framed
+                else:
+                    pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, size, size, True)
+                    pixbuf = pixbuf.apply_embedded_orientation() or pixbuf
+            except GLib.Error:
+                pixbuf = None
+            if len(cls.thumb_cache) > 2000:
+                cls.thumb_cache.clear()
+            cls.thumb_cache[key] = pixbuf
+        return cls.thumb_cache[key]
 
     @classmethod
     def app_icon(cls, path, size):
@@ -348,14 +403,25 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if not paths:
             return
         if self.glance is None:
-            self.glance = Glance(self, lambda p: (self.glance.hide(), self.open_or_enter(p)))
-        self.glance.show_path(paths[0])
+            self.glance = Glance(self, lambda p: (self.glance.hide(), self.open_or_enter(p)),
+                                 on_arrow=self._glance_arrow)
+        self.glance.show_paths(paths)
+
+    def _glance_arrow(self, key):
+        """An arrow pressed in Glance moves the selection here, as in Finder."""
+        across = key in (Gdk.KEY_Left, Gdk.KEY_Right)
+        step = Gtk.MovementStep.VISUAL_POSITIONS if across else Gtk.MovementStep.DISPLAY_LINES
+        count = -1 if key in (Gdk.KEY_Left, Gdk.KEY_Up) else 1
+        if self.view_mode == "icons":
+            self.icon_view.emit("move-cursor", step, count)
+        elif self.view_mode == "list" and not across:
+            self.list_view.emit("move-cursor", step, count)
 
     def _selection_changed(self, *_args):
         if self.glance and self.glance.get_visible():
             paths = self.selected_paths()
-            if paths and paths[0] != self.glance.path:
-                self.glance.show_path(paths[0])
+            if paths and paths != self.glance.paths:
+                self.glance.show_paths(paths)
                 self.present()   # keep the keys going to the file list
 
     # ---- dragging files out ---------------------------------------------

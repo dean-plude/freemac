@@ -536,6 +536,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Edit Widgets… on the desktop's menu opens a gallery to add and remove them | Backdrop | done |
 | 5 | Guide topic: Put widgets on your desktop | Guide | done |
 
+## 1.46 "glance" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Glance on the desktop: Space looks at the selected files, and the arrow keys move from icon to icon | Backdrop | done |
+| 2 | Movies and music play in Glance, with a play button and a time bar | Drawer | done |
+| 3 | Every page of a PDF in Glance, to scroll through | Drawer | done |
+| 4 | Several files in Glance, with arrows and "2 of 5"; arrows with one file move the selection; full screen (⌃⌘F) | Drawer, Backdrop | done |
+| 5 | Pictures and PDFs show small pictures of themselves in Drawer's icon and list views | Drawer | done |
+| 6 | Guide topic: Take a quick look at a file | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

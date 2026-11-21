@@ -487,6 +487,14 @@ TOPICS = {
         "Click a widget to open its app, such as Sky for the weather. Right-click it and choose "
         "Remove Widget to take it away.",
     ]),
+    "glance": ("Take a quick look at a file", "glance quick look preview space peek video movie music pdf photo full screen", [
+        "Click a file in Drawer or on the desktop and press Space. Glance shows it without opening an app.",
+        "Pictures fit the window, PDFs show every page, and movies and music start playing.",
+        "Press the arrow keys to look at the next file. With several files chosen, the arrows at the top "
+        "step through them.",
+        "Press Control+Command+F or click the arrows at the top right to fill the screen. Press Space again "
+        "to close Glance, or click Open to open the file.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",
