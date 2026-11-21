@@ -481,6 +481,14 @@ The small things a Mac user notices in their first minute.
 | 1 | Spreadsheets: a grid of cells with sums and formulas (SUM, AVERAGE, MIN, MAX, COUNT, IF, ROUND), number formats, sorting, a chart of the selected cells, and CSV files in and out | Ledger | done |
 | 2 | Presentations: slides with a title, points and a picture, a few original themes, a full-screen show moved on with the arrow keys, and PDF out | Lantern | done |
 
+## 1.40 "recovery" (done)
+
+From 1.40 on, the work is on the desktop and the system itself.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A recovery mode: hold Ctrl as the computer starts (or choose Restart in Recovery in Dials) to bring back files from a Lifeboat backup, reset a forgotten password, check a disk, reinstall, get help online or use a terminal, with Wi-Fi and an administrator's password asked first | Recovery | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

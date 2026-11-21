@@ -1,0 +1,12 @@
+# freemac Recovery: started instead of the desktop when the computer starts
+# with systemd.unit=freemac-recovery.target (the freemac Recovery entry in the
+# start-up menu, chosen by holding Ctrl or by Restart in Recovery in Dials).
+# Everything a normal start has apart from the login screen and the desktop.
+[Unit]
+Description=freemac Recovery
+Documentation=https://github.com/dean-plude/freemac/blob/Main/docs/ARCHITECTURE.md#recovery
+Requires=multi-user.target
+After=multi-user.target
+Wants=freemac-recovery.service
+Conflicts=greetd.service rescue.service rescue.target
+AllowIsolate=yes

@@ -1,0 +1,5 @@
+#%PAM-1.0
+# freemac Recovery's session (freemac-recovery.service). No password: getting
+# to Recovery means being at the computer as it starts, as on a Mac.
+session    required    pam_env.so readenv=0 user_readenv=0 conffile=/etc/security/freemac-session-type.conf
+@include common-session
