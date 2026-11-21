@@ -110,7 +110,7 @@ TOPICS = {
         "- To quit one, select it and click ✕ at the top left, or press Delete. Quit asks it to close; "
         "Force Quit ends it at once and loses what it hasn't saved.",
     ]),
-    "drives": ("Rename, erase or eject a drive", "disk utility hull drive usb stick format erase rename eject space full exfat fat", [
+    "disk-utility": ("Rename, erase or eject a drive", "disk utility hull drive usb stick format erase rename eject space full exfat fat", [
         "Hull shows every drive, how full it is and what kind it is. Press ⌘Space, type Hull and press Return.",
         "Choose a drive or a volume on the left, then use the buttons at the top.",
         "- Rename: type a new name. Double-clicking a volume does the same.",
@@ -118,6 +118,34 @@ TOPICS = {
         "Windows computer.",
         "- Eject: do this before you unplug a drive, so nothing being saved is lost.",
         "Hull won't change the disk freemac is running from.",
+    ]),
+    "camera": ("Take a picture of yourself", "camera webcam selfie photo picture pose effects booth countdown", [
+        "Pose takes pictures with the computer's camera. Press ⌘Space, type Pose and press Return.",
+        "Click the red button (or press Space). Pose counts down 3, 2, 1 so you can get ready, then "
+        "takes the picture. Click 3 seconds to take pictures straight away instead.",
+        "Click Effects for fun ones: bend your face, make it a comic or an old movie, and more. "
+        "The picture is taken with the effect you choose.",
+        "Your pictures are saved in the Pose folder in Pictures, and show along the bottom of the window. "
+        "Double-click one to open it, or right-click it to move it to the Trash.",
+        "If Pose says no camera is connected, plug one in. If another app is using the camera, quit it first.",
+    ]),
+    "weather": ("See the weather", "weather forecast sky temperature rain snow sun hourly week celsius fahrenheit", [
+        "Sky shows the weather. Press ⌘Space, type Sky and press Return.",
+        "The first time, Sky shows the weather for the city of your time zone. Click + and type a city "
+        "or town to add more places, then click a place on the left to see its weather.",
+        "You'll see the temperature now, the next 24 hours, the next 10 days, and how it feels, the wind "
+        "and when the sun rises or sets.",
+        "To switch between °F and °C, choose View > Fahrenheit or View > Celsius. To remove a place, "
+        "right-click it and choose Remove.",
+        "Sky needs the internet. If it can't connect, it shows the last weather it got.",
+    ]),
+    "stickies": ("Leave yourself a sticky note", "sticky note notes stickies memo reminder desktop post-it", [
+        "Stickies puts little coloured notes on your desktop. Press ⌘Space, type Stickies and press Return, "
+        "or click Stickies in the Dock, and a new note appears. Just start typing.",
+        "Drag a note by its top strip to move it, and drag its bottom-right corner to make it bigger. "
+        "Click the dots on the strip to change its colour, or + for another note.",
+        "Notes stay under your windows. To keep one in front, right-click its strip and choose Float on Top.",
+        "Your notes are kept as you type and come back when you log in. To throw one away, click the × on its strip.",
     ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",

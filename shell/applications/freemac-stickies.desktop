@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Stickies
+GenericName=Sticky Notes
+Comment=Little coloured notes that stay on your desktop
+Exec=freemac-stickies
+Icon=freemac-stickies
+Categories=Utility;
+Keywords=notes;sticky;post-it;reminder;memo;
+StartupWMClass=org.freemac.Stickies
+StartupNotify=false

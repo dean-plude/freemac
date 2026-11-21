@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Stickies: two overlapping notes, one with lines of writing. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffb84d"/><stop offset="1" stop-color="#ff8a3d"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <filter id="note" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#6b3300" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g transform="rotate(-8 64 64)" filter="url(#note)">
+    <rect x="26" y="28" width="58" height="58" rx="3" fill="#a6d3fb"/>
+    <rect x="26" y="28" width="58" height="10" rx="3" fill="#7fbaf0"/>
+  </g>
+  <g transform="rotate(5 64 64)" filter="url(#note)">
+    <rect x="42" y="40" width="62" height="62" rx="3" fill="#fff7a8"/>
+    <rect x="42" y="40" width="62" height="11" rx="3" fill="#f5e46e"/>
+    <g stroke="#8a7a3a" stroke-width="3.5" stroke-linecap="round" opacity="0.75">
+      <path d="M51 63 H94"/><path d="M51 74 H90"/><path d="M51 85 H78"/>
+    </g>
+  </g>
+</svg>

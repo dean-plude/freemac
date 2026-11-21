@@ -178,3 +178,29 @@ def make_transparent(window):
     if visual:
         window.set_visual(visual)
     window.set_app_paintable(True)
+
+
+def sideways_wheel(scroller):
+    """Let a mouse wheel's up and down move a row that only scrolls sideways,
+    until the row reaches its end."""
+    def scrolled(_w, event):
+        adjustment = scroller.get_hadjustment()
+        if event.direction == Gdk.ScrollDirection.SMOOTH:
+            ok, dx, dy = event.get_scroll_deltas()
+            if not ok or abs(dx) >= abs(dy):
+                return False
+            step = dy * 40
+        elif event.direction in (Gdk.ScrollDirection.UP, Gdk.ScrollDirection.DOWN):
+            step = 60 if event.direction == Gdk.ScrollDirection.DOWN else -60
+        else:
+            return False
+        top = adjustment.get_upper() - adjustment.get_page_size()
+        value = adjustment.get_value()
+        if (step < 0 and value <= 0) or (step > 0 and value >= top):
+            return False      # at the end: let the page around it scroll
+        adjustment.set_value(max(0, min(top, adjustment.get_value() + step)))
+        return True
+
+    scroller.add_events(Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.SMOOTH_SCROLL_MASK)
+    scroller.connect("scroll-event", scrolled)
+    return scroller

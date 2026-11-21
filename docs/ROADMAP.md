@@ -393,6 +393,14 @@ The small things a Mac user notices in their first minute.
 | 2 | See what's using the processor and memory, app by app, with a small history graph, and quit one that's stuck | Gauge | done |
 | 3 | See every drive with its space used, and eject, rename or erase one | Hull | done |
 
+## 1.29 "the camera, the weather, and notes"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Take pictures of yourself with the camera: a 3, 2, 1 countdown, a flash, and fun effects that bend and colour the picture, saved to Pictures | Pose | done |
+| 2 | The weather where you are and in places you add: now, by the hour and for the week, with no account needed | Sky | done |
+| 3 | Sticky notes on the desktop in a few colours, kept between restarts | Stickies | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

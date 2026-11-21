@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pose
+GenericName=Camera
+Comment=Take pictures of yourself with the camera, with fun effects
+Exec=freemac-pose
+Icon=freemac-pose
+Categories=AudioVideo;Video;Graphics;Photography;
+Keywords=camera;webcam;selfie;photo;picture;effects;booth;
+StartupWMClass=org.freemac.Pose
+StartupNotify=true
