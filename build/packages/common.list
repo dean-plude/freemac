@@ -3,6 +3,8 @@
 systemd-sysv
 udev
 dbus
+# Keeps the clock right from a time server (Dials > Date & Time)
+systemd-timesyncd
 kmod
 initramfs-tools
 live-boot

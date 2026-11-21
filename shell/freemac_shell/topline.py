@@ -12,7 +12,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, fallback_menus, held, helpsearch, mac_accel, quick, status, style  # noqa: E402
+from . import apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, quick, status, style  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -145,8 +145,11 @@ class Topline(Gtk.Window):
                           status.Printing(), status.Recording()):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
+        self._seconds, self._tick_source = None, None
         self._tick()
         self._prefs_monitor = style.watch_prefs(self._prefs_changed)
+        self._zone_monitor = Gio.File.new_for_path("/etc/localtime").monitor_file(Gio.FileMonitorFlags.NONE, None)
+        self._zone_monitor.connect("changed", self._zone_changed)
         self._prefs_changed()
 
         self.focused = None
@@ -357,13 +360,30 @@ class Topline(Gtk.Window):
         self.dnd.set_visible(bool(style.prefs().get("dnd")))
 
     def _show_time(self, *_args):
-        fmt = "%a %b %-d   %H:%M" if style.prefs().get("clock") == "24" else "%a %b %-d   %-I:%M %p"
-        self.clock.set_text(time.strftime(fmt, time.localtime()))
+        prefs = style.prefs()
+        self.clock.set_text(time.strftime(dials_time.clock_format(prefs), time.localtime()))
+        if prefs.get("clock_seconds") != self._seconds:
+            # Seconds on: tick every second; off: on each minute.
+            self._seconds = prefs.get("clock_seconds")
+            self._tick()
 
     def _tick(self):
+        if self._tick_source:
+            GLib.source_remove(self._tick_source)
         self._show_time()
-        GLib.timeout_add_seconds(60 - time.localtime().tm_sec, self._tick)
+        wait = 1 if self._seconds else 60 - time.localtime().tm_sec
+        self._tick_source = GLib.timeout_add_seconds(wait, self._tick_again)
         return False
+
+    def _tick_again(self):
+        self._tick_source = None
+        return self._tick()
+
+    def _zone_changed(self, *_args):
+        # Dials > Date & Time changed the time zone: /etc/localtime now points
+        # at another zone, which the C library reads again on tzset().
+        time.tzset()
+        self._show_time()
 
     def refresh(self):
         view = self.wf.focused() if self.wf else None

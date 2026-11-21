@@ -90,10 +90,10 @@ button:hover { background-color: @fm_button_hover; }
 button:active, button:checked { background-color: @fm_button_active; box-shadow: none; }
 button:disabled { background-color: @fm_button; color: @fm_dim; opacity: 0.6; box-shadow: none; }
 button:backdrop { background-color: @fm_button; box-shadow: none; }
-button.flat, headerbar button:not(.titlebutton):not(.suggested-action):not(.destructive-action), .toolbar button {
+button.flat, headerbar button:not(.titlebutton):not(.suggested-action):not(.default):not(.destructive-action), .toolbar button {
   background-color: transparent; border-color: transparent; box-shadow: none;
 }
-button.flat:hover, headerbar button:not(.titlebutton):not(.suggested-action):not(.destructive-action):hover, .toolbar button:hover {
+button.flat:hover, headerbar button:not(.titlebutton):not(.suggested-action):not(.default):not(.destructive-action):hover, .toolbar button:hover {
   background-color: @fm_hover;
 }
 headerbar button:not(.titlebutton):checked, headerbar button:not(.titlebutton):active { background-color: @fm_pressed; }
@@ -101,8 +101,10 @@ button.suggested-action, button.default {
   background-color: @fm_accent; border-color: shade(@fm_accent, 0.88); color: white;
   box-shadow: 0 1px 1.5px alpha(@fm_accent, 0.35);
 }
-button.suggested-action:hover { background-color: shade(@fm_accent, 1.08); }
-button.suggested-action:active { background-color: shade(@fm_accent, 0.9); }
+/* A dialog's default button (Save, Open) is blue like a suggested one, even
+   when the app only made it the default: GTK's file dialogs do. */
+button.suggested-action:hover, button.default:hover { background-color: shade(@fm_accent, 1.08); }
+button.suggested-action:active, button.default:active { background-color: shade(@fm_accent, 0.9); }
 button.suggested-action label, button.default label { color: white; }
 button.suggested-action:disabled, button.default:disabled {
   background-color: alpha(@fm_accent, 0.45); background-image: none; color: alpha(white, 0.85); box-shadow: none;
