@@ -81,12 +81,16 @@ TOPICS = {
         "- ⌘I shows a file's information, and ⌘T opens a tab.",
         "Click the Trash in the Dock to see it and empty it. In the Trash, Put Back returns a file to its folder.",
     ]),
-    "screenshot": ("Take a screenshot", "screenshot screen picture capture record print lens", [
+    "screenshot": ("Take a screenshot", "screenshot screen picture capture record print lens toolbar timer delay options clipboard save to", [
         "- ⇧⌘3 takes a picture of the whole screen.",
         "- ⇧⌘4 lets you drag around part of it.",
-        "- ⇧⌘5 records part of the screen; press it again to stop.",
+        "- ⇧⌘5 opens the Screenshot toolbar: pick the whole screen, a window or part of it, or "
+        "record the screen or part of it, then click Capture or Record (or press Return). Esc closes it.",
+        "While a recording runs, press ⇧⌘5 again, or click the stop button in the menu bar, to stop it.",
         "The pictures go on the desktop and are copied, ready to paste. A small preview shows in the "
         "corner for a moment.",
+        "In the toolbar, Options chooses where pictures go (Desktop, Documents, Pictures or just the "
+        "clipboard), a 5 or 10 second timer, and whether the corner preview shows.",
     ]),
     "wifi": ("Join a Wi-Fi network", "wifi wi-fi wireless internet network password connect", [
         "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",

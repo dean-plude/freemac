@@ -45,8 +45,8 @@ SHORTCUTS = (
     ("command", "binding_lens_area", "Screenshot of an area", "<super> <shift> KEY_4 | <shift> KEY_SYSRQ"),
     ("command", "binding_lens_window", "Screenshot of a window", "<alt> KEY_SYSRQ"),
     ("command", "binding_lens_record", "Start or stop recording the screen", "<ctrl> KEY_SYSRQ"),
-    ("command", "binding_lens_record_area", "Start or stop recording an area",
-     "<super> <shift> KEY_5 | <ctrl> <shift> KEY_SYSRQ"),
+    ("command", "binding_lens_record_area", "Start or stop recording an area", "<ctrl> <shift> KEY_SYSRQ"),
+    ("command", "binding_lens_toolbar", "Screenshot toolbar", "<super> <shift> KEY_5"),
 )
 
 # Shown as on a Mac keyboard, in its order: Control, Option, Shift, Command.

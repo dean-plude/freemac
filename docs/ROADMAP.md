@@ -831,6 +831,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Started at log in; the firewall lets it through from the local network only | Build | done |
 | 5 | Guide: Send files to a computer or phone nearby | Guide | done |
 
+## 1.78 "say cheese" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | ⇧⌘5 opens the Screenshot toolbar at the bottom of the screen: Entire Screen, Selected Window, Selected Portion, Record Entire Screen, Record Selected Portion, then Capture or Record; Return captures, Esc closes | Lens | done |
+| 2 | Options: save to Desktop, Documents, Pictures or only the clipboard; a 5 or 10 second timer with a countdown; show the floating thumbnail or not. ⇧⌘3 and ⇧⌘4 follow the same choices | Lens | done |
+| 3 | ⇧⌘5 during a recording stops it; recording a part of the screen keeps Ctrl+Shift+Print | Lens, Build | done |
+| 4 | Guide and Dials > Keyboard list the new shortcut | Guide, Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

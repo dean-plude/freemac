@@ -6,9 +6,10 @@
   freemac-lens --window   the focused window        (Alt+Print)
   freemac-lens --record       start or stop recording the screen  (Ctrl+Print)
   freemac-lens --record-area  start or stop recording an area     (Ctrl+Shift+Print)
-  freemac-lens            a small window to choose, with an optional delay
+  freemac-lens            the Screenshot toolbar (⇧⌘5), or stop a recording
 
-Pictures are saved as PNG on the Desktop, copied to the clipboard
+Pictures are saved as PNG on the Desktop (or where the toolbar's Options
+say: Documents, Pictures or only the clipboard), copied to the clipboard
 when wl-copy is installed, and announced through Beacon; clicking the
 notification opens the picture. A small picture of each new screenshot first
 sits in the corner for a few seconds (lens_thumb); a click opens it. Capturing uses grim, picking an area uses
@@ -19,6 +20,7 @@ While one runs, Topline shows a red stop button (status.Recording), which
 runs `freemac-lens --stop`. The running recorder's process id is kept in
 $XDG_RUNTIME_DIR/freemac-recording.
 """
+import json
 import os
 import shutil
 import signal
@@ -29,12 +31,53 @@ import time
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GLib, Gtk  # noqa: E402
+gi.require_version("Gdk", "3.0")
+gi.require_version("GtkLayerShell", "0.1")
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+
+from . import style  # noqa: E402
 
 # Both land on the Desktop, where they show as icons, ready to drag somewhere.
 FOLDER = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) or os.path.expanduser("~/Desktop")
 VIDEOS = FOLDER
 RECORDING = os.path.join(GLib.get_user_runtime_dir(), "freemac-recording")
+
+# Where the toolbar's Options can save to: (pref, label, special folder).
+SAVE_TO = (("desktop", "Desktop", GLib.UserDirectory.DIRECTORY_DESKTOP),
+           ("documents", "Documents", GLib.UserDirectory.DIRECTORY_DOCUMENTS),
+           ("pictures", "Pictures", GLib.UserDirectory.DIRECTORY_PICTURES),
+           ("clipboard", "Clipboard", None))
+TIMERS = ((0, "None"), (5, "5 Seconds"), (10, "10 Seconds"))
+
+
+def save_to():
+    """The pref name of where pictures go ("desktop" unless changed)."""
+    chosen = style.prefs().get("lens_save", "desktop")
+    return chosen if chosen in {k for k, _l, _d in SAVE_TO} else "desktop"
+
+
+def save_folder(for_video=False):
+    """(folder, its name) for new pictures; videos can't go on the clipboard,
+    so they go on the Desktop then."""
+    chosen = save_to()
+    for key, label, special in SAVE_TO:
+        if key == chosen and special is not None:
+            folder = GLib.get_user_special_dir(special) or os.path.expanduser(f"~/{label}")
+            return folder, label
+    return FOLDER, "Desktop"
+
+
+def thumbnail_on():
+    return bool(style.prefs().get("lens_thumbnail", True))
+
+
+def save_pref(**changes):
+    prefs = style.prefs()
+    prefs.update(changes)
+    os.makedirs(os.path.dirname(style.PREFS), exist_ok=True)
+    with open(style.PREFS + ".lens-tmp", "w") as f:
+        json.dump(prefs, f, indent=2)
+    os.replace(style.PREFS + ".lens-tmp", style.PREFS)
 
 
 def target_path(folder=FOLDER, now=None, kind="Screenshot", ext="png"):
@@ -73,8 +116,9 @@ def start_recording(area=False):
         if picked.returncode != 0 or not picked.stdout.strip():
             return None, None
         cmd += ["-g", picked.stdout.strip()]
-    os.makedirs(VIDEOS, exist_ok=True)
-    path = target_path(VIDEOS, kind="Screen Recording", ext="mp4")
+    folder, _name = save_folder(for_video=True)
+    os.makedirs(folder, exist_ok=True)
+    path = target_path(folder, kind="Screen Recording", ext="mp4")
     log = open(os.path.join(GLib.get_user_runtime_dir(), "freemac-recording.log"), "w")
     proc = subprocess.Popen(cmd + ["-f", path], stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                             start_new_session=True)
@@ -112,7 +156,9 @@ def toggle_recording(area=False):
     if recording():
         path = stop_recording()
         if path:
-            beacon.send("Screen recording saved", f"{os.path.basename(path)} is on the Desktop.",
+            where = os.path.basename(os.path.dirname(path)) or "Desktop"
+            beacon.send("Screen recording saved", f"{os.path.basename(path)} is in {where}."
+                        if where != os.path.basename(FOLDER) else f"{os.path.basename(path)} is on the Desktop.",
                         icon="video-x-generic", app="Lens", open_path=path)
         return bool(path)
     path, error = start_recording(area)
@@ -165,8 +211,10 @@ def capture(mode):
         region = window_geometry()
         if not region:
             return None, "There's no window to capture."
-    os.makedirs(FOLDER, exist_ok=True)
-    path = target_path()
+    only_clipboard = save_to() == "clipboard" and shutil.which("wl-copy")
+    folder = GLib.get_user_runtime_dir() if only_clipboard else save_folder()[0]
+    os.makedirs(folder, exist_ok=True)
+    path = target_path(folder)
     cmd = ["grim"] + (["-g", region] if region else []) + [path]
     if subprocess.run(cmd, capture_output=True).returncode != 0 or not os.path.exists(path):
         return None, "The screenshot couldn't be taken."
@@ -176,14 +224,25 @@ def capture(mode):
         with open(path, "rb") as f:
             subprocess.run(["wl-copy", "--type", "image/png"], stdin=f,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+    if only_clipboard:
+        os.remove(path)
+        return CLIPBOARD, None
     return path, None
+
+
+CLIPBOARD = "clipboard"   # capture()'s answer when the picture went only to the clipboard
 
 
 def announce(path, error):
     from . import beacon
 
-    if path:
-        beacon.send("Screenshot saved", f"{os.path.basename(path)} is on the Desktop"
+    if path == CLIPBOARD:
+        beacon.send("Screenshot copied", "Paste it into a message or a document.",
+                    icon="edit-paste-symbolic", app="Lens")
+    elif path:
+        where = os.path.dirname(path)
+        place = "on the Desktop" if where == FOLDER else f"in {os.path.basename(where)}"
+        beacon.send("Screenshot saved", f"{os.path.basename(path)} is {place}"
                     + (" and on the clipboard." if shutil.which("wl-copy") else "."),
                     icon=path, app="Lens", open_path=path)
     elif error:
@@ -198,87 +257,197 @@ def shoot(mode, delay=0):
     if delay:
         time.sleep(delay)
     path, error = capture(mode)
-    if not (path and lens_thumb.show(path)):
+    if not (path and path != CLIPBOARD and thumbnail_on() and lens_thumb.show(path)):
         announce(path, error)
     return path
 
 
-class Picker(Gtk.ApplicationWindow):
+MODES = (  # (mode, icon, tooltip, records)
+    ("screen", "video-display-symbolic", "Capture Entire Screen", False),
+    ("window", "window-new-symbolic", "Capture Selected Window", False),
+    ("area", "edit-select-all-symbolic", "Capture Selected Portion", False),
+    ("record", "camera-video-symbolic", "Record Entire Screen", True),
+    ("record-area", "media-record-symbolic", "Record Selected Portion", True),
+)
+
+TOOLBAR_CSS = b"""
+.lens-toolbar { background: alpha(@theme_bg_color, 0.92); border-radius: 12px;
+                border: 1px solid alpha(@theme_fg_color, 0.15); padding: 6px 8px; }
+.lens-toolbar button.lens-mode { min-width: 34px; min-height: 30px; padding: 4px 8px; border-radius: 7px; }
+.lens-toolbar button.lens-mode:checked { background: alpha(@theme_fg_color, 0.16); }
+.lens-toolbar .lens-split { background: alpha(@theme_fg_color, 0.2); min-width: 1px; margin: 4px 6px; }
+.lens-count { font-size: 64px; font-weight: bold; color: white; background: rgba(0,0,0,0.55);
+              border-radius: 22px; padding: 6px 34px; }
+"""
+
+
+class Toolbar(Gtk.ApplicationWindow):
+    """The Screenshot toolbar, as on a Mac (⇧⌘5): pick what to capture or
+    record, set Options (where to save, a timer, the thumbnail), then
+    Capture. Escape closes it; Return captures."""
+
     def __init__(self, app):
-        super().__init__(application=app, title="Lens")
-        self.set_resizable(False)
-        self.set_border_width(16)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        self.add(box)
-        row = Gtk.Box(spacing=10, homogeneous=True)
-        for label, icon, mode in (("Whole Screen", "video-display-symbolic", "screen"),
-                                  ("Area", "edit-select-all-symbolic", "area"),
-                                  ("Window", "window-new-symbolic", "window")):
-            button = Gtk.Button()
-            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=8)
-            image = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DND)
-            image.set_pixel_size(32)
-            inner.pack_start(image, False, False, 0)
-            inner.pack_start(Gtk.Label(label=label), False, False, 0)
-            button.add(inner)
-            button.connect("clicked", lambda _b, m=mode: self.take(m))
-            row.pack_start(button, True, True, 0)
-        box.pack_start(row, False, False, 0)
-        record_row = Gtk.Box(spacing=10, homogeneous=True)
-        for label, area in (("Record Screen", False), ("Record Area", True)):
-            button = Gtk.Button(label=label, image=Gtk.Image.new_from_icon_name(
-                "media-record-symbolic", Gtk.IconSize.BUTTON), always_show_image=True)
-            button.connect("clicked", lambda _b, a=area: self.record(a))
-            record_row.pack_start(button, True, True, 0)
-        box.pack_start(record_row, False, False, 0)
-        delay_row = Gtk.Box(spacing=8)
-        delay_row.pack_start(Gtk.Label(label="Delay"), False, False, 0)
-        self.delay = Gtk.ComboBoxText()
-        for seconds in ("0", "3", "5", "10"):
-            self.delay.append(seconds, "None" if seconds == "0" else f"{seconds} seconds")
-        self.delay.set_active_id("0")
-        delay_row.pack_start(self.delay, False, False, 0)
-        folder = Gtk.Button(label="Open Folder")
-        folder.connect("clicked", self.open_folder)
-        delay_row.pack_end(folder, False, False, 0)
-        box.pack_start(delay_row, False, False, 0)
-        hint = Gtk.Label(label="\u21e7\u23183 takes the whole screen, \u21e7\u23184 an area, "
-                               "\u21e7\u23185 records an area. The Print key works too.",
-                         wrap=True, xalign=0)
-        hint.get_style_context().add_class("dim-label")
-        box.pack_start(hint, False, False, 0)
+        super().__init__(application=app, title="Screenshot")
+        provider = Gtk.CssProvider()
+        provider.load_from_data(TOOLBAR_CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        style.apply()
+        if GtkLayerShell.is_supported():
+            GtkLayerShell.init_for_window(self)
+            GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_namespace(self, "freemac-lens-toolbar")
+            GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, True)
+            GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, 120)
+            GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+        visual = self.get_screen().get_rgba_visual()
+        if visual is not None:
+            self.set_visual(visual)
+        self.set_app_paintable(True)
+        self.mode = style.prefs().get("lens_mode", "area")
+        if self.mode not in {m for m, *_ in MODES}:
+            self.mode = "area"
+        bar = Gtk.Box(spacing=2)
+        bar.get_style_context().add_class("lens-toolbar")
+        close = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+        close.set_relief(Gtk.ReliefStyle.NONE)
+        close.set_tooltip_text("Close (Esc)")
+        close.connect("clicked", lambda *_: self.close())
+        bar.pack_start(close, False, False, 0)
+        self.buttons = {}
+        group = None
+        for n, (mode, icon, tip, _records) in enumerate(MODES):
+            if n in (0, 3):
+                split = Gtk.Box()
+                split.get_style_context().add_class("lens-split")
+                bar.pack_start(split, False, False, 0)
+            button = Gtk.RadioButton.new_from_widget(group)
+            group = group or button
+            button.set_mode(False)       # drawn as a button, not a dot
+            button.set_relief(Gtk.ReliefStyle.NONE)
+            button.get_style_context().add_class("lens-mode")
+            button.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR))
+            button.set_tooltip_text(tip)
+            button.set_active(mode == self.mode)
+            button.connect("toggled", self._picked, mode)
+            self.buttons[mode] = button
+            bar.pack_start(button, False, False, 0)
+        split = Gtk.Box()
+        split.get_style_context().add_class("lens-split")
+        bar.pack_start(split, False, False, 0)
+        options = Gtk.MenuButton(label="Options")
+        options.set_relief(Gtk.ReliefStyle.NONE)
+        options.set_popup(self._options_menu())
+        bar.pack_start(options, False, False, 0)
+        self.go = Gtk.Button()
+        self.go.get_style_context().add_class("suggested-action")
+        self.go.connect("clicked", lambda *_: self.capture())
+        bar.pack_start(self.go, False, False, 6)
+        self.add(bar)
+        self._label_go()
+        self.connect("key-press-event", self._key)
 
-    def take(self, mode):
-        delay = int(self.delay.get_active_id() or 0)
-        self.hide()
-        # Give the compositor a moment to remove this window from the screen.
-        GLib.timeout_add(400 + delay * 1000, self._run, mode)
+    def _options_menu(self):
+        menu = Gtk.Menu()
 
-    def record(self, area):
-        delay = int(self.delay.get_active_id() or 0)
-        self.hide()
-        GLib.timeout_add(400 + delay * 1000, self._record, area)
+        def heading(text):
+            item = Gtk.MenuItem(label=text, sensitive=False)
+            menu.append(item)
 
-    def _record(self, area):
-        toggle_recording(area)
-        self.get_application().quit()
+        def choices(items, current, on_pick):
+            group = []
+            for value, label in items:
+                item = Gtk.RadioMenuItem.new_with_label(group, label)
+                group = item.get_group()
+                item.set_active(value == current)
+                item.connect("toggled", lambda i, v=value: i.get_active() and on_pick(v))
+                menu.append(item)
+
+        heading("Save to")
+        choices([(k, label) for k, label, _d in SAVE_TO], save_to(), lambda v: save_pref(lens_save=v))
+        menu.append(Gtk.SeparatorMenuItem())
+        heading("Timer")
+        choices(TIMERS, int(style.prefs().get("lens_timer", 0) or 0), lambda v: save_pref(lens_timer=v))
+        menu.append(Gtk.SeparatorMenuItem())
+        heading("Options")
+        thumb = Gtk.CheckMenuItem(label="Show Floating Thumbnail")
+        thumb.set_active(thumbnail_on())
+        thumb.connect("toggled", lambda i: save_pref(lens_thumbnail=i.get_active()))
+        menu.append(thumb)
+        menu.show_all()
+        return menu
+
+    def _picked(self, button, mode):
+        if button.get_active():
+            self.mode = mode
+            save_pref(lens_mode=mode)
+            self._label_go()
+
+    def _label_go(self):
+        records = dict((m, r) for m, _i, _t, r in MODES)[self.mode]
+        self.go.set_label("Record" if records else "Capture")
+
+    def _key(self, _window, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.capture()
+            return True
         return False
+
+    def capture(self):
+        delay = int(style.prefs().get("lens_timer", 0) or 0)
+        self.hide()
+        mode = self.mode
+        # Give the compositor a moment to take the toolbar off the screen.
+        if delay:
+            Countdown(self.get_application(), delay, lambda: self._run(mode))
+        else:
+            GLib.timeout_add(400, self._run, mode)
 
     def _run(self, mode):
         from . import lens_thumb
 
-        path, error = capture(mode)
-        if not (path and lens_thumb.show(path)):
-            announce(path, error)
-        self.get_application().quit()
+        app = self.get_application()
+        if mode in ("record", "record-area"):
+            toggle_recording(mode == "record-area")
+        else:
+            path, error = capture(mode)
+            if not (path and path != CLIPBOARD and thumbnail_on() and lens_thumb.show(path)):
+                announce(path, error)
+        app.quit()
         return False
 
-    def open_folder(self, *_args):
-        os.makedirs(FOLDER, exist_ok=True)
-        try:
-            Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(FOLDER, None), None)
-        except GLib.Error:
-            subprocess.Popen(["xdg-open", FOLDER], start_new_session=True)
+
+class Countdown(Gtk.Window):
+    """The timer's big number in the middle of the screen."""
+
+    def __init__(self, app, seconds, then):
+        super().__init__(application=app)
+        self.left, self.then = seconds, then
+        if GtkLayerShell.is_supported():
+            GtkLayerShell.init_for_window(self)
+            GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_namespace(self, "freemac-lens-countdown")
+        visual = self.get_screen().get_rgba_visual()
+        if visual is not None:
+            self.set_visual(visual)
+        self.set_app_paintable(True)
+        self.label = Gtk.Label(label=str(seconds))
+        self.label.get_style_context().add_class("lens-count")
+        self.add(self.label)
+        self.show_all()
+        GLib.timeout_add(1000, self._tick)
+
+    def _tick(self):
+        self.left -= 1
+        if self.left > 0:
+            self.label.set_text(str(self.left))
+            return True
+        self.hide()
+        GLib.timeout_add(400, lambda: self.then() and False)
+        return False
 
 
 def main():
@@ -290,8 +459,11 @@ def main():
     for flag in ("screen", "area", "window"):
         if f"--{flag}" in args:
             sys.exit(0 if shoot(flag) else 1)
+    if recording():
+        # ⇧⌘5 while recording stops it, as the menu bar's stop button does.
+        sys.exit(0 if toggle_recording() else 1)
     app = Gtk.Application(application_id="org.freemac.Lens")
-    app.connect("activate", lambda a: (a.get_windows() or [Picker(a)])[0].show_all())
+    app.connect("activate", lambda a: (a.get_windows() or [Toolbar(a)])[0].show_all())
     app.run([sys.argv[0]])
 
 
