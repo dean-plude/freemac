@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -176,6 +176,8 @@ CSS = b"""
 .dials-accent:checked { box-shadow: 0 0 0 2px @theme_bg_color, 0 0 0 4px alpha(@theme_fg_color, 0.35); }
 .dials-chosen { border-color: @theme_selected_bg_color; }
 .dials-section { font-weight: bold; margin-top: 12px; }
+.input-badge { min-width: 30px; padding: 1px 4px; border-radius: 4px; font-size: 11px; font-weight: bold;
+  border: 1px solid alpha(@theme_fg_color, 0.5); }
 """
 
 
@@ -881,10 +883,12 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     # Keyboard -----------------------------------------------------------------
     def keyboard(self):
-        layout = Gtk.Entry(text=ini_get(WAYFIRE_INI, "input", "xkb_layout", "us") or "us", width_chars=10)
-        layout.connect("activate", lambda e: ini_set(WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us"))
-        layout.connect("focus-out-event", lambda e, _ev: ini_set(
-            WAYFIRE_INI, "input", "xkb_layout", e.get_text().strip() or "us") or False)
+        wf_get = lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default)  # noqa: E731
+        wf_set = lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value)  # noqa: E731
+        sources, input_menu = dials_input.input_sources_group(self, group, row, switch, wf_get, wf_set)
+        repeat = dials_input.key_repeat_group(group, row, slider, wf_get, wf_set)
+        sources_heading = Gtk.Label(label="Input Sources", xalign=0)
+        sources_heading.get_style_context().add_class("dials-section")
         self.shortcuts = dials_keys.Shortcuts(
             self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
             lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
@@ -906,8 +910,7 @@ class DialsWindow(Gtk.ApplicationWindow):
                     if o.strip() and o.strip() != "altwin:swap_alt_win"]
             ini_set(WAYFIRE_INI, "input", "xkb_options", ",".join(kept + (["altwin:swap_alt_win"] if on else [])))
 
-        return page("Keyboard", group(
-            row("Layout", layout, "An XKB layout code such as us, gb, de or fr. Press Enter to apply."),
+        return page("Keyboard", repeat, group(
             row("\u2318 Command next to the space bar",
                 switch("altwin:swap_alt_win" in [o.strip() for o in options], command_beside_space),
                 "On: the key beside the space bar (Alt on most PC keyboards) is \u2318 Command and the one "
@@ -922,7 +925,7 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Keep the last 50 things you copy, on this computer only. \u21e7\u2318V shows them. "
                 "Passwords marked as secret by a password manager are never kept."),
             row("Forget what was copied", clear),
-        ), heading, self.shortcuts.widget)
+        ), sources_heading, sources, input_menu, heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):

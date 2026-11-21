@@ -6,6 +6,8 @@
 // so minimizing a window shrinks it into that icon and restoring grows it back,
 // closes windows on request (strata/close) for Quit in the menu bar and dock,
 // and draws small pictures of minimized windows for the dock (strata/snapshot).
+// strata/input-source reads and switches the keyboard's input source (the XKB
+// layout group), for Topline's input menu.
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -25,6 +27,7 @@
 #include <wayfire/plugins/common/shared-core-data.hpp>
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
+#include <wayfire/input-device.hpp>
 
 #include "gtk-shell.hpp"
 #include "window-places.hpp"
@@ -696,6 +699,77 @@ class strata_shell_impl : public wf::plugin_interface_t
         return out;
     };
 
+    /* The keyboards plugged in now (a laptop's own and any USB ones). */
+    static std::vector<wlr_keyboard*> keyboards()
+    {
+        std::vector<wlr_keyboard*> found;
+        for (auto& device : wf::get_core().get_input_devices())
+        {
+            auto handle = device->get_wlr_handle();
+            if (handle && (handle->type == WLR_INPUT_DEVICE_KEYBOARD))
+            {
+                found.push_back(wlr_keyboard_from_input_device(handle));
+            }
+        }
+
+        return found;
+    }
+
+    /* strata/input-source {index?}: the input sources (XKB layouts) with
+     * their names and which one is in use; with index, switch every keyboard
+     * to that one first. */
+    wf::ipc::method_callback input_source = [=] (nlohmann::json data)
+    {
+        auto all = keyboards();
+        wlr_keyboard *kbd = nullptr;
+        if (auto seat = wf::get_core().get_current_seat())
+        {
+            kbd = wlr_seat_get_keyboard(seat);
+        }
+
+        if (!kbd && !all.empty())
+        {
+            kbd = all.front();
+        }
+
+        if (!kbd || !kbd->keymap)
+        {
+            return wf::ipc::json_error("no keyboard");
+        }
+
+        xkb_layout_index_t count = xkb_keymap_num_layouts(kbd->keymap);
+        if (data.contains("index"))
+        {
+            WFJSON_EXPECT_FIELD(data, "index", number_unsigned);
+            auto index = data["index"].get<uint32_t>();
+            if (index >= count)
+            {
+                return wf::ipc::json_error("no such input source");
+            }
+
+            for (auto keyboard : all)
+            {
+                if (keyboard->keymap && (index < xkb_keymap_num_layouts(keyboard->keymap)))
+                {
+                    wlr_keyboard_notify_modifiers(keyboard, keyboard->modifiers.depressed,
+                        keyboard->modifiers.latched, keyboard->modifiers.locked, index);
+                }
+            }
+        }
+
+        auto out = wf::ipc::json_ok();
+        out["names"] = nlohmann::json::array();
+        for (xkb_layout_index_t i = 0; i < count; i++)
+        {
+            const char *name = xkb_keymap_layout_get_name(kbd->keymap, i);
+            out["names"].push_back(name ? name : "");
+        }
+
+        out["index"] = kbd->xkb_state ?
+            xkb_state_serialize_layout(kbd->xkb_state, XKB_STATE_LAYOUT_EFFECTIVE) : 0;
+        return out;
+    };
+
   public:
     void init() override
     {
@@ -715,6 +789,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/snapshot", snapshot_view);
         method_repository->register_method("strata/hide", hide_view);
         method_repository->register_method("strata/hidden", list_hidden);
+        method_repository->register_method("strata/input-source", input_source);
         window_places.init();
         command_key.init();
         glides.init();

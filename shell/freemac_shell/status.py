@@ -544,3 +544,70 @@ class InUse(Gtk.MenuButton):
         item.connect("activate", lambda *_: launch("freemac-dials", "--panel", "sound"))
         self.menu.append(item)
         self.menu.show_all()
+
+
+class InputMenu(Gtk.MenuButton):
+    """The input menu, as on a Mac: with more than one input source (keyboard
+    layout), the menu bar shows which one you're typing with ("US", "GB"),
+    and its menu switches to another. Control-Space does the same."""
+
+    def __init__(self):
+        super().__init__()
+        from . import input_sources, wfipc
+
+        self.sources = input_sources
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        self.get_style_context().add_class("input-menu")
+        self.label = Gtk.Label()
+        self.add(self.label)
+        self.set_no_show_all(True)
+        self.menu = Gtk.Menu()
+        self.menu.set_halign(Gtk.Align.END)
+        self.set_popup(self.menu)
+        try:
+            self.wf = wfipc.Wayfire()
+        except OSError:
+            self.wf = None
+        self.shown = None
+        self._prefs_monitor = style.watch_prefs(self.update)
+        # The source changes with Control-Space, which no event reports.
+        GLib.timeout_add(1000, lambda: self.update() or True)
+        self.update()
+
+    def update(self):
+        configured = self.sources.sources()
+        state = self.sources.current(self.wf) if self.wf else None
+        if (len(configured) < 2 or not state or len(state[0]) < 2
+                or not style.prefs().get("input_menu", True)):
+            self.shown = None
+            self.menu.popdown()
+            self.hide()
+            return
+        names, index = state
+        index = min(max(index, 0), len(names) - 1)
+        if self.shown == (tuple(names), index):
+            return
+        self.shown = (tuple(names), index)
+        layout, variant = configured[index] if index < len(configured) else ("", "")
+        self.label.set_text(self.sources.short_label(layout, variant))
+        self.set_tooltip_text(f"{names[index]}\nControl-Space switches to the next one.")
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+        group = []
+        for n, name in enumerate(names):
+            item = Gtk.RadioMenuItem.new_with_label(group, name)
+            group = item.get_group()
+            item.set_active(n == index)
+            item.connect("toggled", lambda i, n=n: i.get_active() and self._choose(n))
+            self.menu.append(item)
+        self.menu.append(Gtk.SeparatorMenuItem())
+        settings = Gtk.MenuItem(label="Open Keyboard Settings…")
+        settings.connect("activate", lambda *_: launch("freemac-dials", "--panel", "keyboard"))
+        self.menu.append(settings)
+        self.menu.show_all()
+        self.show()
+        self.label.show()
+
+    def _choose(self, index):
+        self.sources.choose(self.wf, index)
+        GLib.timeout_add(150, lambda: self.update() and False)

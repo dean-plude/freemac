@@ -849,6 +849,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Remote Login (SSH), off unless turned on: each computer makes its own keys, the firewall lets it through from the local network only, and the page says what to type on the other computer | Dials, Build | done |
 | 4 | Guide: Rename this computer, or log in to it from another | Guide | done |
 
+## 1.80 "parlez-vous" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Keyboard > Input Sources: the layouts you type with, by name, added from a searchable list of every language and layout, up to four, and taken off with − | Dials | done |
+| 2 | The input menu in the menu bar (US, GB, DE…) shows the layout in use and switches to another; Control-Space goes to the next, without catching Control-Command-Space | Topline, Strata | done |
+| 3 | Key repeat rate and Delay until repeat sliders | Dials | done |
+| 4 | Guide: Type in another language or keyboard layout | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

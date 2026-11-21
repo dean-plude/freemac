@@ -438,6 +438,13 @@ TOPICS = {
         "When the copy is done, Drawer's status line or a notification says so. "
         "Eject the drive before you unplug it.",
     ]),
+    "input-sources": ("Type in another language or keyboard layout", "input sources keyboard layout language type british french german spanish dvorak colemak control space input menu key repeat", [
+        "Choose Dials > Keyboard and click Add Input Source\u2026 under Input Sources. Type a language or "
+        "layout, such as British or German, pick it and click Add. You can have up to four.",
+        "With more than one, the menu bar shows the one you're typing with (US, GB, DE). Click it to "
+        "choose another, or press Control-Space to go to the next. Click \u2212 beside one to take it off.",
+        "Key repeat rate and Delay until repeat, on the same page, set how fast a held key repeats.",
+    ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
         "administrator's password. Nearby devices and printers see the new name, and other computers "
