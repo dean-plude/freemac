@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Topline: freemac's menu bar along the top of the screen."""
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -337,6 +338,9 @@ class Topline(Gtk.Window):
         return menu
 
     def _about(self):
+        if shutil.which("freemac-manifest"):
+            run("freemac-manifest")
+            return
         dialog = Gtk.AboutDialog(
             program_name="freemac",
             version=_os_version(),

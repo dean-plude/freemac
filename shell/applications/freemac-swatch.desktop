@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch
+GenericName=Colour Picker
+Comment=Pick a colour from anywhere on the screen, copy it as hex, RGB or HSL, and keep the ones you like
+Exec=freemac-swatch
+Icon=freemac-swatch
+Categories=Graphics;Utility;
+Keywords=colour;color;picker;eyedropper;hex;rgb;hsl;palette;swatch;
+StartupWMClass=org.freemac.Swatch
+StartupNotify=true

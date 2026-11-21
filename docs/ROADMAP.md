@@ -441,6 +441,14 @@ The small things a Mac user notices in their first minute.
 | 2 | A graphing calculator: draw y = … equations in colour, zoom and drag, and read off any point on a curve | Plot | done |
 | 3 | A whiteboard: a big board for sticky notes, text, shapes, arrows and pictures, with as many boards as you like | Corkboard | done |
 
+## 1.35 "puzzles, parts and colours" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A jigsaw puzzle: real-shaped pieces cut from a built-in picture or one of your own photos, 12 to 100 pieces, that click together when they fit | Jigsaw | done |
+| 2 | About this computer: processor, memory, graphics, storage and version at a glance, with a full report of the hardware, USB devices, displays, network and sound; About freemac in the menu bar opens it | Manifest | done |
+| 3 | A colour picker: pick a colour from anywhere on the screen, see it as hex, RGB and HSL, copy it, and keep the colours you like | Swatch | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

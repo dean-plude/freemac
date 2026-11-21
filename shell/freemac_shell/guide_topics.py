@@ -267,6 +267,26 @@ TOPICS = {
         "Drag empty space to move around the board, and hold ⌘ while you scroll to zoom. Click New Board "
         "for another board.",
     ]),
+    "jigsaw": ("Do a jigsaw puzzle", "jigsaw puzzle pieces picture photo kids game", [
+        "Jigsaw cuts a picture into puzzle pieces. Press ⌘Space, type Jigsaw and press Return.",
+        "Click New Puzzle… to pick a picture, or Choose a Photo… to use one of yours, and pick how many pieces.",
+        "Drag pieces onto the board. Pieces that fit click together, and pieces in the right place lock into "
+        "the frame.",
+        "Click Peek to see the whole picture faintly behind the board, and Spread Out to tidy loose pieces.",
+    ]),
+    "about-computer": ("See what's inside this computer", "about this computer system information specs hardware "
+                       "processor memory storage graphics usb version report", [
+        "Click the freemac menu at the left of the menu bar and choose About freemac.",
+        "You'll see the processor, graphics, memory, free space and the version of freemac.",
+        "Click More Info… for the full report: disks, displays, USB devices, network, sound and battery. "
+        "Click Copy to copy it, for example to send to someone helping you.",
+    ]),
+    "pick-colour": ("Pick a colour from the screen", "colour color picker eyedropper hex rgb hsl swatch palette", [
+        "Swatch picks colours. Press ⌘Space, type Swatch and press Return.",
+        "Click Pick from Screen, then click anywhere. The loupe shows the pixels under the pointer.",
+        "Click the copy button next to Hex, RGB or HSL to copy that value. Click Add to Palette to keep the "
+        "colour for later.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),
