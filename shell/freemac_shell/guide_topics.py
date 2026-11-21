@@ -167,6 +167,13 @@ TOPICS = {
         "Your drawings are kept as you go and listed on the left. Click Export to save one as a picture "
         "you can share.",
     ]),
+    "chess": ("Play chess", "chess game play board checkmate rook computer friend", [
+        "Rook plays chess. Press ⌘Space, type Rook and press Return.",
+        "Click a piece to see where it can go, then click where you want it, or drag it there.",
+        "Click New Game to play the computer on Easy, Medium or Hard, or a friend on the same screen.",
+        "Stuck? Click Hint for a good move. The undo arrow takes your last move back.",
+        "Your game is kept, so you can stop and carry on later.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Rook
+GenericName=Chess
+Comment=Play chess against the computer or a friend
+Exec=freemac-rook
+Icon=freemac-rook
+Categories=Game;BoardGame;
+Keywords=chess;board;game;checkmate;play;
+StartupWMClass=org.freemac.Rook
+StartupNotify=true
