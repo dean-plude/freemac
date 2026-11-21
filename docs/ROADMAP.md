@@ -397,9 +397,9 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Take pictures of yourself with the camera: a 3, 2, 1 countdown, a flash, and fun effects that bend and colour the picture, saved to Pictures | Pose | in progress |
+| 1 | Take pictures of yourself with the camera: a 3, 2, 1 countdown, a flash, and fun effects that bend and colour the picture, saved to Pictures | Pose | done |
 | 2 | The weather where you are and in places you add: now, by the hour and for the week, with no account needed | Sky | done |
-| 3 | Sticky notes on the desktop in a few colours, kept between restarts | Stickies | planned |
+| 3 | Sticky notes on the desktop in a few colours, kept between restarts | Stickies | done |
 
 ## Later
 

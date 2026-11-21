@@ -599,6 +599,7 @@ class Window(Gtk.ApplicationWindow):
         panel = self._panel("Next 24 hours", "document-open-recent-symbolic")
         scroller = Gtk.ScrolledWindow(vscrollbar_policy=Gtk.PolicyType.NEVER)
         scroller.set_propagate_natural_height(True)
+        style.sideways_wheel(scroller)
         row = Gtk.Box(spacing=4)
         items = [(h["time"], "hour", h) for h in forecast.next_hours()]
         items += [(when, "sun", words) for when, words in forecast.sun_events()]

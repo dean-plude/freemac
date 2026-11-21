@@ -139,6 +139,14 @@ TOPICS = {
         "right-click it and choose Remove.",
         "Sky needs the internet. If it can't connect, it shows the last weather it got.",
     ]),
+    "stickies": ("Leave yourself a sticky note", "sticky note notes stickies memo reminder desktop post-it", [
+        "Stickies puts little coloured notes on your desktop. Press ⌘Space, type Stickies and press Return, "
+        "or click Stickies in the Dock, and a new note appears. Just start typing.",
+        "Drag a note by its top strip to move it, and drag its bottom-right corner to make it bigger. "
+        "Click the dots on the strip to change its colour, or + for another note.",
+        "Notes stay under your windows. To keep one in front, right-click its strip and choose Float on Top.",
+        "Your notes are kept as you type and come back when you log in. To throw one away, click the × on its strip.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

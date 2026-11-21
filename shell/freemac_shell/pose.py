@@ -316,6 +316,7 @@ class Window(Gtk.ApplicationWindow):
         scroller = Gtk.ScrolledWindow(vscrollbar_policy=Gtk.PolicyType.NEVER,
                                       hscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
         scroller.get_style_context().add_class("pose-effects")
+        style.sideways_wheel(scroller)
         row = Gtk.Box()
         self.effect_buttons = {}
         for name, _desc in effects():
@@ -642,6 +643,7 @@ class Window(Gtk.ApplicationWindow):
         scroller = Gtk.ScrolledWindow(vscrollbar_policy=Gtk.PolicyType.NEVER,
                                       hscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
         scroller.add(self.strip)
+        style.sideways_wheel(scroller)
         self.strip_stack.add_named(scroller, "pictures")
         self.strip_stack.add_named(self.strip_note, "empty")
         self.strip_stack.set_size_request(-1, THUMB + 18)
