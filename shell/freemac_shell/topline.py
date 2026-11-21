@@ -107,6 +107,7 @@ class Topline(Gtk.Window):
 
         self.window_button = Gtk.MenuButton(label="Window")
         self.window_menu = self._watch_menu(Gtk.Menu())
+        self.before_place = {}   # window id -> where it was before Move & Resize
         self.window_button.set_popup(self.window_menu)
         bar.pack_start(self.window_button, False, False, 0)
         self._slide(self.window_button)
@@ -389,7 +390,9 @@ class Topline(Gtk.Window):
         view = self.wf.focused() if self.wf else None
         # Opening one of our menus takes the focus from the app; keep showing
         # that app's menus until the menu closes.
-        if view is None and self._menu_open():
+        if self._menu_open():
+            # Refilling a menu while it is open would take its rows (and an
+            # open submenu) away under the pointer; it is done once it closes.
             return
         if view is not None and (view.get("app-id") or "").lower() in DESKTOP_OWNED:
             # The Dock's own windows (the Empty Trash alert) belong to the
@@ -921,6 +924,7 @@ class Topline(Gtk.Window):
         # full screen. Center: the same size, in the middle.
         self._item(menu, "Fill", (lambda: self._fill(view)) if view else None)
         self._item(menu, "Center", (lambda: self._center(view)) if view else None)
+        menu.append(self._move_resize_item(view))
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Bring All to Front", (lambda: self._bring_all(view)) if view else None)
         if view and self.wf:
@@ -993,6 +997,85 @@ class Topline(Gtk.Window):
                             area["y"] + (area["height"] - height) // 2, width, height)
             return False
         GLib.timeout_add(250, center)
+
+    # Window > Move & Resize: halves and quarters of the free part of the
+    # screen, as on a Mac, and back to the size it had before.
+    PLACES = (("Left", "left", "\u2303\u2318\u2190"), ("Right", "right", "\u2303\u2318\u2192"),
+              ("Top", "top", ""), ("Bottom", "bottom", ""), None,
+              ("Top Left", "tl", ""), ("Top Right", "tr", ""),
+              ("Bottom Left", "bl", ""), ("Bottom Right", "br", ""))
+
+    def _move_resize_item(self, view):
+        item = Gtk.MenuItem(label="Move & Resize")
+        menu = Gtk.Menu()
+        for place in self.PLACES:
+            if place is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            label, how, keys = place
+            self._item(menu, label, (lambda how=how: self._place(view, how)) if view else None, shortcut=keys)
+        menu.append(Gtk.SeparatorMenuItem())
+        before = view is not None and view["id"] in self.before_place
+        self._item(menu, "Return to Previous Size", (lambda: self._unplace(view)) if before else None)
+        item.set_submenu(menu)
+        item.set_sensitive(view is not None)
+        return item
+
+    def _workarea(self, view):
+        outputs = self.wf.outputs()
+        area = next((o.get("workarea") for o in outputs
+                     if o.get("id") == view.get("output-id") or o.get("name") == view.get("output")), None)
+        if not area and outputs:
+            area = outputs[0].get("workarea")
+        return area
+
+    @staticmethod
+    def place_rect(area, how):
+        """The part of the free area (x, y, width, height) a place names."""
+        x, y, w, h = area["x"], area["y"], area["width"], area["height"]
+        half_w, half_h = w // 2, h // 2
+        return {"left": (x, y, half_w, h), "right": (x + half_w, y, w - half_w, h),
+                "top": (x, y, w, half_h), "bottom": (x, y + half_h, w, h - half_h),
+                "tl": (x, y, half_w, half_h), "tr": (x + half_w, y, w - half_w, half_h),
+                "bl": (x, y + half_h, half_w, h - half_h),
+                "br": (x + half_w, y + half_h, w - half_w, h - half_h)}[how]
+
+    def _place(self, view, how):
+        now = self._fresh(view)
+        area = self._workarea(now)
+        if not area:
+            return
+        vid = view["id"]
+        if vid not in self.before_place and not self._tiled(now):
+            box = now.get("geometry") or {}
+            if box:
+                self.before_place[vid] = (box.get("x", 0), box.get("y", 0), box.get("width", 800),
+                                          box.get("height", 600))
+
+        def place():
+            self.wf.focus(vid)
+            if self._tiled(self._fresh(view)):
+                self.wf.zoom(vid)   # back to its own size first
+                GLib.timeout_add(250, place_now)
+            else:
+                place_now()
+            return False
+
+        def place_now():
+            self.wf.move_to(vid, *self.place_rect(area, how))
+            return False
+        GLib.timeout_add(250, place)
+
+    def _unplace(self, view):
+        rect = self.before_place.pop(view["id"], None)
+        if rect is None:
+            return
+
+        def back():
+            self.wf.focus(view["id"])
+            self.wf.move_to(view["id"], *rect)
+            return False
+        GLib.timeout_add(250, back)
 
     def _bring_all(self, view):
         # Minimized windows stay in the Dock, as on a Mac; hidden ones come back.

@@ -586,6 +586,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Quick Actions on pictures: Rotate Left, Rotate Right, Create PDF | Drawer, Backdrop | done |
 | 3 | Guide topic: Turn pictures and make PDFs | Guide | done |
 
+## 1.51 "move & resize" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Window > Move & Resize: Left, Right, Top, Bottom, the four quarters, and Return to Previous Size | Topline | done |
+| 2 | Submenus in the bar's menus open when the pointer rests on them (the bar no longer refills a menu while it is open) | Topline | done |
+| 3 | Screen zoom on or off, and the key to hold while scrolling (⌘, ⌥ or Control) | Dials | done |
+| 4 | Guide: Move & Resize in Arrange windows, and a new topic: Zoom in on the screen | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
