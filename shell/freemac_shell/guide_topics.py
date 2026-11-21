@@ -505,6 +505,14 @@ TOPICS = {
         "In the Trash, right-click a file and choose Put Back (or press Command+Delete) to return it to its folder. "
         "Click Empty to erase everything in the Trash.",
     ]),
+    "tags": ("Tag files with colours", "tags tag colour color label red orange yellow green blue purple gray finder", [
+        "Right-click a file in Drawer or on the desktop and click a colour under Tags. A dot in that colour "
+        "shows after the file's name.",
+        "Click the same colour again to take the tag off. You can give a file more than one colour.",
+        "Click a colour under Tags in Drawer's sidebar to see every file with that tag, wherever it is.",
+        "You can also drag files onto a colour in the sidebar to tag them.",
+        "Memory cards and some USB drives can't keep tags.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",

@@ -558,6 +558,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Go to Folder… (⇧⌘G) with Tab to finish names and ~ for home; a file opens its folder with it chosen | Drawer | done |
 | 6 | Guide topic: Sort, find and put back files | Guide | done |
 
+## 1.48 "tags" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Seven tag colours on a file's menu; a click adds the tag or takes it off, with a tick when every chosen file has it | Drawer, Backdrop | done |
+| 2 | A coloured dot after a tagged file's name in every Drawer view and on the desktop | Drawer, Backdrop | done |
+| 3 | Tags in Drawer's sidebar: click a colour for every file with that tag, drop files on it to tag them | Drawer | done |
+| 4 | Tags kept with the file (user.xdg.tags), and a note when a disk can't keep them | Shell | done |
+| 5 | Guide topic: Tag files with colours | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

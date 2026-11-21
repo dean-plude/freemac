@@ -252,6 +252,14 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   `Trash/info` for where it came from, moves it there (a taken name gets
   "name 2", a missing folder is made again) and removes the note;
   emptying the Trash is `transfer.empty_trash`, shared with the Dock.
+  **Tags** (`tags.py`, 1.48) live on the file itself in the
+  `user.xdg.tags` extended attribute (comma-separated names, as other
+  Linux file managers keep them), so they follow a rename or move on the
+  same disk. An index in `~/.local/share/freemac/tags.json` notes where
+  tagged files were last seen: tagging notes a file, every folder Drawer
+  reads brings the index up to date for that folder, and listing a tag
+  (Drawer's `tag:Red` place) rereads each file's attribute and drops any
+  that lost it. Names are drawn as Pango markup with a dot per tag.
   **Glance** (`drawer_glance.py`) is a
   plain window that follows the selection while open. Since 1.46 it also
   opens from the desktop, plays movies and music with its own GStreamer

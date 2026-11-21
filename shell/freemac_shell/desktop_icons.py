@@ -40,7 +40,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, drawer_info, transfer, volumes  # noqa: E402
+from . import desktop_widgets, drawer_info, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 try:
@@ -217,6 +217,8 @@ class DesktopIcon(Gtk.EventBox):
         self.label.set_line_wrap(True)
         self.label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self.label.get_style_context().add_class("desk-label")
+        self.title = name
+        self.show_tags()
         box.pack_start(self.label, False, False, 0)
         self.add(box)
         self.connect("button-press-event", self._press)
@@ -228,6 +230,14 @@ class DesktopIcon(Gtk.EventBox):
     @property
     def name(self):
         return os.path.basename(self.path)
+
+    def show_tags(self):
+        """The name, with a coloured dot for each of the file's tags."""
+        names = tags.get(self.path) if self.path else []
+        if names:
+            self.label.set_markup(tags.markup(self.title, names))
+        else:
+            self.label.set_text(self.title)
 
     def set_selected(self, selected):
         for widget in (self.frame, self.label):
@@ -615,7 +625,7 @@ class DesktopIcons(Gtk.Layout):
     def _key_of(path):
         try:
             st = os.stat(path)
-            return st.st_mtime_ns, st.st_size
+            return st.st_mtime_ns, st.st_ctime_ns, st.st_size   # (a new tag changes the ctime)
         except OSError:
             return None
 
@@ -790,6 +800,9 @@ class DesktopIcons(Gtk.Layout):
             if label is None:
                 menu.append(Gtk.SeparatorMenuItem())
                 continue
+            if label == "\0tags":   # the row of tag colours
+                menu.append(tags.menu_item(action, self._tags_changed))
+                continue
             if isinstance(action, tuple):
                 item = Gtk.CheckMenuItem(label=label, active=action[0])
                 item.connect("activate", lambda _i, a=action[1]: a())
@@ -812,10 +825,20 @@ class DesktopIcons(Gtk.Layout):
             items.append(("Rename…", lambda: self.rename(icons[0])))
         items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder),
                   ("Glance" if len(icons) == 1 else f"Glance at {len(icons)} Items", self.toggle_glance), (None, None),
+                  ("\0tags", [i.path for i in icons]), (None, None),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
                   ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
         self.menu = self._menu(items, event)
+
+    def _tags_changed(self, error):
+        if error is not None:
+            from . import alert
+            alert.ask(None, "The tags couldn’t be changed.",
+                      "This disk can’t keep tags." if error.errno in (1, 95) else error.strerror or "")
+        for icon in self.icons.values():
+            if type(icon) is DesktopIcon:
+                icon.show_tags()
 
     def desktop_menu(self, event):
         # Spelled out rather than a submenu: a submenu of the desktop's menu
