@@ -23,7 +23,7 @@ CSS = b"""
 .quick-panel { padding: 12px; }
 .quick-panel flowbox, .quick-panel flowboxchild { background: none; }
 .quick-tile { padding: 8px 10px; border-radius: 12px; min-width: 150px; }
-.quick-tile:checked { background-image: none; background-color: #2f7bf5; color: white; }
+.quick-tile:checked { background-image: none; background-color: @theme_selected_bg_color; color: white; }
 .quick-tile:checked .dim-label { color: rgba(255, 255, 255, 0.8); }
 .quick-tile-title { font-weight: bold; }
 .now-playing { padding: 6px 4px; border-top: 1px solid alpha(currentColor, 0.12); }

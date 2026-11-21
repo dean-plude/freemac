@@ -34,7 +34,7 @@ CSS = b"""
 .crew-sub { color: alpha(currentColor, 0.6); }
 .crew-kind { color: alpha(currentColor, 0.55); font-size: 12px; }
 .crew-value { font-size: 14px; }
-.crew-value-link { color: #2f7bf5; }
+.crew-value-link { color: @theme_selected_bg_color; }
 .crew-search { margin: 8px; }
 .crew-card entry { min-height: 26px; }
 .crew-empty { color: alpha(currentColor, 0.45); font-size: 15px; }

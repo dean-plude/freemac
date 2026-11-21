@@ -50,7 +50,7 @@ CSS = b"""
 .sky-side { background: #ececee; }
 .sky-side list { background: transparent; }
 .sky-side row { border-radius: 9px; margin: 2px 8px; padding: 8px 10px; }
-.sky-side row:selected { background: #2f7bf5; }
+.sky-side row:selected { background: @theme_selected_bg_color; }
 .sky-side row:selected label { color: white; }
 .sky-place { font-weight: 600; }
 .sky-place-temp { font-size: 1.6em; font-weight: 300; }

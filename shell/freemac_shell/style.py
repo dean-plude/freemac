@@ -65,7 +65,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 }
 .seek entry { font-size: 22px; min-height: 44px; border: none; box-shadow: none; background: none; color: @ink; }
 .seek row { padding: 6px 10px; border-radius: 9px; color: @ink; }
-.seek row:selected { background-color: #2f7bf5; color: white; }
+.seek row:selected { background-color: @theme_selected_bg_color; color: white; }
 .seek row:selected .hint { color: rgba(255, 255, 255, 0.75); }
 .seek .hint { color: @dim; font-size: 12px; }
 .seek list { background: transparent; }
@@ -74,7 +74,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .seek .seek-preview-text { font-family: monospace; font-size: 11px; color: @dim; }
 .help-panel list, .help-panel row { background-color: transparent; }
 .help-panel row { padding: 2px 4px; border-radius: 5px; }
-.help-panel row:selected { background-color: #2f7bf5; }
+.help-panel row:selected { background-color: @theme_selected_bg_color; }
 .help-panel row:selected label { color: white; }
 /* Glyph, the emoji and symbols panel (Control-⌘-Space). */
 .glyph {
@@ -88,7 +88,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .glyph scrolledwindow, .glyph viewport, .glyph flowbox { background: none; }
 .glyph flowboxchild { padding: 0; border-radius: 7px; background: none; }
 .glyph flowboxchild:hover { background-color: rgba(128, 128, 128, 0.18); }
-.glyph flowboxchild:selected { background-color: #2f7bf5; }
+.glyph flowboxchild:selected { background-color: @theme_selected_bg_color; }
 .glyph .glyph-emoji { font-size: 24px; min-width: 36px; min-height: 36px; }
 .glyph .glyph-tabs button { padding: 2px 0; min-width: 0; border-radius: 7px; font-size: 16px; background: none; border: none; box-shadow: none; }
 .glyph .glyph-tabs button:checked { background-color: rgba(128, 128, 128, 0.22); }
@@ -142,6 +142,26 @@ def interface_settings():
     if source and source.lookup("org.gnome.desktop.interface", True):
         return Gio.Settings.new("org.gnome.desktop.interface")
     return None
+
+
+# Dials > Appearance > Accent colour (shell.json "accent"): the colour of
+# selections, switches and default buttons in every app. Each has its own pair
+# of GTK themes (art/gtk-theme/make-theme.py); this is the swatch Dials shows.
+ACCENTS = (("blue", "Blue", "#2f7bf5"), ("purple", "Purple", "#8f52d9"), ("pink", "Pink", "#de4a80"),
+           ("red", "Red", "#dc3d42"), ("orange", "Orange", "#ea7a17"), ("yellow", "Yellow", "#d39a07"),
+           ("green", "Green", "#2c9f4c"), ("graphite", "Graphite", "#7d7d84"))
+
+
+def accent():
+    chosen = prefs().get("accent", "blue")
+    return chosen if chosen in {name for name, _label, _colour in ACCENTS} else "blue"
+
+
+def theme_name(dark, chosen=None):
+    """The GTK theme for light or dark mode in the accent colour chosen:
+    freemac, freemac-dark, freemac-purple, freemac-dark-purple…"""
+    chosen = chosen or accent()
+    return "freemac" + ("-dark" if dark else "") + ("" if chosen == "blue" else "-" + chosen)
 
 
 def is_dark():

@@ -92,8 +92,10 @@ TOPICS = {
         "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",
         "Type its password when asked. freemac remembers it next time.",
     ]),
-    "appearance": ("Change the look", "dark light mode wallpaper theme accent background appearance", [
+    "appearance": ("Change the look", "dark light mode wallpaper theme accent colour color highlight purple pink green favourite background appearance", [
         "Choose Dials > Appearance for light or dark, and Dials > Wallpaper for the picture on the desktop.",
+        "Pick an Accent colour on the same page: blue, purple, pink, red, orange, yellow, green or graphite. "
+        "Selections, switches and buttons in every app change to it at once.",
         "Each wallpaper has a day and a night version, and follows light and dark.",
     ]),
     "sound": ("Change the volume", "sound volume mute speaker headphones audio output", [

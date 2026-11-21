@@ -35,7 +35,7 @@ CSS = b"""
 .nudge-side { background: alpha(currentColor, 0.04); }
 .nudge-tile { border-radius: 10px; padding: 8px 10px; background: alpha(currentColor, 0.07);
               border: none; box-shadow: none; }
-.nudge-tile:checked { background: #2f7bf5; color: white; }
+.nudge-tile:checked { background: @theme_selected_bg_color; color: white; }
 .nudge-tile-count { font-size: 22px; font-weight: 700; }
 .nudge-tile-name { font-weight: 600; color: alpha(currentColor, 0.7); }
 .nudge-tile:checked .nudge-tile-name { color: white; }
@@ -51,7 +51,7 @@ CSS = b"""
 .nudge-items row { padding: 2px 6px; }
 .nudge-items row .nudge-info-button { opacity: 0; padding: 2px; min-height: 0; min-width: 0; }
 .nudge-items row:hover .nudge-info-button, .nudge-items row:selected .nudge-info-button { opacity: 1; }
-.nudge-items row:selected { background: alpha(#2f7bf5, 0.12); }
+.nudge-items row:selected { background: alpha(@theme_selected_bg_color, 0.12); }
 .nudge-items row:selected label, .nudge-items row:selected entry { color: @theme_fg_color; }
 .nudge-items row:selected label.nudge-meta { color: alpha(@theme_fg_color, 0.55); }
 .nudge-items entry.nudge-name { border: none; box-shadow: none; background: none; padding: 2px 0;

@@ -44,7 +44,7 @@ CSS = b"""
 box.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 list.drawer-sidebar { background-color: transparent; }
 .drawer-sidebar row { padding: 4px 8px; border-radius: 6px; margin: 0 8px; background-color: transparent; }
-.drawer-sidebar row image { color: #2f7bf5; }
+.drawer-sidebar row image { color: @theme_selected_bg_color; }
 .drawer-sidebar row:hover { background-color: rgba(120, 120, 150, 0.10); }
 .drawer-sidebar row:selected { background-color: rgba(120, 120, 150, 0.24); color: inherit; }
 .drawer-sidebar row:selected label { color: inherit; }
@@ -62,7 +62,7 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-tab-close { padding: 0 2px; min-width: 0; min-height: 0; }
 .drawer-pathbar { padding: 1px 6px; border-top: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-pathbar button { padding: 0 4px; min-height: 0; font-size: 11px; }
-.drawer-pathbar button image { color: #2f7bf5; }
+.drawer-pathbar button image { color: @theme_selected_bg_color; }
 .drawer-crumb-gap { font-size: 11px; opacity: 0.45; }
 .drawer-trashbar { padding: 6px 12px; border-bottom: 1px solid rgba(120, 120, 150, 0.18);
                    background-color: rgba(120, 120, 150, 0.06); }

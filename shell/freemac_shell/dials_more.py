@@ -252,9 +252,11 @@ def accessibility(window):
             window.ini_set("core", "plugins", " ".join(plugins))
 
     def high_contrast(on):
+        from .dials import theme_for   # dials imports this module
+
         if settings:
             dark = style.is_dark()
-            settings.set_string("gtk-theme", "HighContrast" if on else ("freemac-dark" if dark else "freemac"))
+            settings.set_string("gtk-theme", "HighContrast" if on else theme_for(dark))
 
     def big_pointer(size):
         if settings:

@@ -802,6 +802,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Fixed: the volume, settings, clock and other icons on the right of the menu bar could ignore clicks when the bar started before it had its full width | Topline | done |
 | 3 | Guide: See when an app is using the microphone or camera | Guide | done |
 
+## 1.75 "your colour" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Appearance > Accent colour: a row of eight coloured circles; the choice colours selections, switches, sliders and default buttons in every app at once, in light and dark | Dials, Theme | done |
+| 2 | A light and a dark GTK 3 theme, GTK 4 style sheet and Qt colour scheme for each accent | Theme, Build | done |
+| 3 | The Dock, menu bar, Drawer, Seek and freemac's other apps take their highlight from the accent instead of a fixed blue | Shell | done |
+| 4 | Guide: Change the look mentions the accent colour | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

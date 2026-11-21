@@ -45,10 +45,23 @@ QT_CONFS = [os.path.join(GLib.get_user_config_dir(), name, name + ".conf") for n
 KVANTUM_CONF = os.path.join(GLib.get_user_config_dir(), "Kvantum", "kvantum.kvconfig")
 
 
+def _toolkit_file(folder, blue, accent):
+    """The accent's own colours file, or the blue one if this computer's
+    themes predate accent colours."""
+    if accent != "blue":
+        stem, ext = os.path.splitext(blue)
+        coloured = os.path.join(TOOLKITS, folder, f"{stem}-{accent}{ext}")
+        if os.path.exists(coloured):
+            return coloured
+    return os.path.join(TOOLKITS, folder, blue)
+
+
 def apply_toolkits(dark):
-    """GTK 4 (libadwaita) and Qt apps take light or dark from their own files.
-    A gtk.css of the person's own (not our link) is left alone."""
-    css = os.path.join(TOOLKITS, "gtk4", "dark.css" if dark else "light.css")
+    """GTK 4 (libadwaita) and Qt apps take light or dark, and the accent
+    colour, from their own files. A gtk.css of the person's own (not our link)
+    is left alone."""
+    accent = style.accent()
+    css = _toolkit_file("gtk4", "dark.css" if dark else "light.css", accent)
     if os.path.exists(css) and (os.path.islink(GTK4_CSS) or not os.path.exists(GTK4_CSS)):
         os.makedirs(os.path.dirname(GTK4_CSS), exist_ok=True)
         tmp = GTK4_CSS + ".new"
@@ -56,7 +69,7 @@ def apply_toolkits(dark):
             os.remove(tmp)
         os.symlink(css, tmp)
         os.replace(tmp, GTK4_CSS)
-    scheme = os.path.join(TOOLKITS, "qt", "freemac-dark.conf" if dark else "freemac.conf")
+    scheme = _toolkit_file("qt", "freemac-dark.conf" if dark else "freemac.conf", accent)
     for conf in QT_CONFS:
         if os.path.exists(conf):
             ini_set(conf, "Appearance", "color_scheme_path", scheme)
@@ -87,6 +100,16 @@ def set_kvantum_theme(name):
         os.replace(tmp, KVANTUM_CONF)
 
 
+def theme_for(dark):
+    """The accent colour's GTK theme, or plain freemac if this computer's
+    themes predate accent colours."""
+    name = style.theme_name(dark)
+    for root in (os.path.join(GLib.get_user_data_dir(), "themes"), "/usr/share/themes"):
+        if os.path.isdir(os.path.join(root, name)):
+            return name
+    return style.theme_name(dark, "blue")
+
+
 def apply_appearance(dark, settings=None, follow_wallpaper=True):
     """Switch light/dark everywhere: GTK, title bars and (optionally) the wallpaper.
 
@@ -96,7 +119,7 @@ def apply_appearance(dark, settings=None, follow_wallpaper=True):
     settings = settings if settings is not None else style.interface_settings()
     if settings:
         settings.set_string("color-scheme", "prefer-dark" if dark else "prefer-light")
-        settings.set_string("gtk-theme", "freemac-dark" if dark else "freemac")
+        settings.set_string("gtk-theme", theme_for(dark))
     Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", dark)
     try:
         apply_toolkits(dark)
@@ -128,7 +151,7 @@ CSS = b"""
 .dials-sidebar list, .dials-sidebar list row { background: none; border: none; box-shadow: none; }
 .dials-sidebar list row { padding: 4px 8px; border-radius: 6px; margin: 0 10px; min-height: 0; }
 .dials-sidebar list row:hover { background-color: rgba(120, 120, 150, 0.12); }
-.dials-sidebar list row:selected { background-color: #2f7bf5; color: #ffffff; }
+.dials-sidebar list row:selected { background-color: @theme_selected_bg_color; color: #ffffff; }
 .dials-gap { min-height: 10px; }
 .dials-tile { border-radius: 6px; min-width: 22px; min-height: 22px; color: #ffffff; }
 .dials-tile image { color: #ffffff; -gtk-icon-shadow: none; }
@@ -147,8 +170,11 @@ CSS = b"""
 .dials-caption { opacity: 0.65; font-size: 12px; }
 .dials-error { color: #f04d3e; font-size: 12px; }
 .dials-choice { padding: 8px; border-radius: 12px; border: 2px solid transparent; background: none; box-shadow: none; }
-.dials-choice:checked { border-color: #2f7bf5; }
-.dials-chosen { border-color: #2f7bf5; }
+.dials-choice:checked { border-color: @theme_selected_bg_color; }
+.dials-accent { min-width: 18px; min-height: 18px; padding: 0; border-radius: 99px; border: none;
+  background-image: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.dials-accent:checked { box-shadow: 0 0 0 2px @theme_bg_color, 0 0 0 4px alpha(@theme_fg_color, 0.35); }
+.dials-chosen { border-color: @theme_selected_bg_color; }
 .dials-section { font-weight: bold; margin-top: 12px; }
 """
 
@@ -523,6 +549,8 @@ class DialsWindow(Gtk.ApplicationWindow):
         snap.connect("notify::active", lambda sw, _p: ini_set(
             WAYFIRE_INI, "move", "enable_snap", "true" if sw.get_active() else "false"))
         return page("Appearance", choices, group(
+            row("Accent colour", self.accent_choices(),
+                "Used for selections, switches and buttons in every app."),
             row("Switch wallpaper with the mode", self.follow_wallpaper,
                 "freemac's own wallpapers have a day and a night version."),
             row("Text size", text_size),
@@ -531,6 +559,35 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Drag a window to the left or right edge to fill half the screen, to a corner for a "
                 "quarter, or to the top to fill it."),
         ))
+
+    def accent_choices(self):
+        """A row of coloured circles, one per accent colour, as on a Mac."""
+        box = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+        first = None
+        current = style.accent()
+        for name, label, colour in style.ACCENTS:
+            button = Gtk.RadioButton.new_from_widget(first)
+            first = first or button
+            button.set_mode(False)
+            button.set_tooltip_text(label)
+            button.get_accessible().set_name(label)
+            button.get_style_context().add_class("dials-accent")
+            provider = Gtk.CssProvider()
+            provider.load_from_data(f".dials-accent {{ background-color: {colour}; }}".encode())
+            button.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+            button.set_active(name == current)
+            button.connect("toggled", lambda b, n=name: b.get_active() and self.set_accent(n))
+            box.pack_start(button, False, False, 0)
+        return box
+
+    def set_accent(self, name):
+        self.save_prefs(accent=name)
+        if self.settings and self.settings.get_string("gtk-theme") != "HighContrast":
+            self.settings.set_string("gtk-theme", theme_for(style.is_dark()))
+        try:
+            apply_toolkits(style.is_dark())
+        except OSError:
+            pass
 
     def _show_mode(self):
         button = self.mode_buttons[style.is_dark()]

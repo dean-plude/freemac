@@ -52,7 +52,7 @@ list.cove-side { background: transparent; }
 .cove-side row { padding: 5px 10px; border-radius: 7px; margin: 0 6px; background: transparent; }
 .cove-side row:selected { background: alpha(@theme_fg_color, 0.12); }
 .cove-side row:selected label { color: @theme_fg_color; }
-.cove-side image { color: #2f7bf5; }
+.cove-side image { color: @theme_selected_bg_color; }
 .cove-side-head { font-size: 12px; font-weight: 700; color: alpha(currentColor, 0.5); padding: 12px 14px 2px 14px; }
 .cove-count { color: alpha(currentColor, 0.5); font-size: 12px; }
 .cove-grid { background: @theme_base_color; }
@@ -69,7 +69,7 @@ list.cove-side { background: transparent; }
 .cove-info-value { font-size: 13px; }
 .cove-fav:checked image, .cove-fav:checked { color: #f04d3e; }
 .cove-side-head button { padding: 0 4px; min-height: 0; min-width: 0; margin-right: 8px; }
-.cove-side row.cove-drop { background: alpha(#2f7bf5, 0.25); }
+.cove-side row.cove-drop { background: alpha(@theme_selected_bg_color, 0.25); }
 """
 
 

@@ -29,7 +29,7 @@ CSS = b"""
 .hull-side { background: alpha(currentColor, 0.04); border-right: 1px solid alpha(currentColor, 0.1); }
 .hull-side list { background: transparent; }
 .hull-side row { border-radius: 6px; margin: 0 6px; padding: 4px 6px; background: transparent; }
-.hull-side row:selected { background: #2f7bf5; color: white; }
+.hull-side row:selected { background: @theme_selected_bg_color; color: white; }
 .hull-side row:selected image { opacity: 1; }
 .hull-section { font-weight: bold; font-size: 0.85em; opacity: 0.55; margin: 12px 14px 4px 14px; }
 .hull-drive-name { font-weight: 600; }
