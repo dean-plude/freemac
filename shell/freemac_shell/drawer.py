@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_info, macapps, menus, quick_actions, recents, share, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_info, macapps, menus, quick_actions, recents, servers, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -242,7 +242,9 @@ class Folder:
                 return
             found = {}
             for info in enum:
-                if info.get_is_hidden() and not show_hidden:
+                # Read softly: some network folders leave is-hidden out.
+                hidden = info.get_attribute_boolean("standard::is-hidden") or info.get_name().startswith(".")
+                if hidden and not show_hidden:
                     continue
                 full = os.path.join(path, info.get_name())
                 names = self._add(info, full)
@@ -957,6 +959,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "browse-backups": self.browse_backups,
             "put-back": self.put_back,
             "go-to-folder": self.go_to_folder,
+            "connect-to-server": self.connect_to_server,
             "go-recents": lambda: self.navigate(recents.PLACE),
             "new-folder-with": self.new_folder_with,
             "show-enclosing": self.show_enclosing,
@@ -1045,7 +1048,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return box
 
     def _fill_locations(self):
-        """Computer, each drive with its Eject button, then the Trash."""
+        """Computer, each drive and connected server with its Eject button,
+        then the Trash."""
         self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.loc_list]
         for child in self.loc_list.get_children():
             self.loc_list.remove(child)
@@ -1053,6 +1057,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         entries = [("Computer", "/", Gio.ThemedIcon.new("drive-harddisk-symbolic"), None)]
         for mount in volumes.drives():
             entries.append((mount.get_name(), volumes.path_of(mount), mount.get_symbolic_icon(), mount))
+        for mount in servers.servers():
+            entries.append((mount.get_name(), volumes.path_of(mount),
+                            Gio.ThemedIcon.new("network-server-symbolic"), mount))
         entries.append(("Trash", trash, Gio.ThemedIcon.new("user-trash-symbolic"), None))
         for name, path, icon, mount in entries:
             row = Gtk.ListBoxRow(can_focus=False)
@@ -1121,7 +1128,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def eject(self, mount=None):
         """Eject a drive: the one given, else the one the window is showing."""
-        mount = mount or volumes.mount_of(self.path)
+        mount = mount or volumes.mount_of(self.path) or servers.mount_of(self.path)
         if mount is not None:
             volumes.eject(mount, self)
 
@@ -2003,6 +2010,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
             child.show_all()   # (show_all skips a box that is set not to show with its window)
         self.path_bar.show()
 
+    # ---- Connect to Server -----------------------------------------------
+    def connect_to_server(self):
+        """⌘K: open a shared folder on another computer, like a drive."""
+        servers.connect_dialog(self, self.navigate)
+
     # ---- Go to Folder ----------------------------------------------------
     last_typed = "~/"
 
@@ -2440,7 +2452,8 @@ def menubar():
             [("Recents", "win.go-recents", "<Ctrl><Shift>f"), ("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
              ("Computer", "win.go-computer", None)],
-            [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g")],
+            [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g"),
+             ("Connect to Server…", "win.connect-to-server", "<Ctrl>k")],
             [("Browse Backups", "win.browse-backups", None)],
         ]),
     ])
