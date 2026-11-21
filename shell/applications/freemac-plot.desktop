@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Plot
+GenericName=Graphing Calculator
+Comment=Draw equations and read values off the curves
+Exec=freemac-plot
+Icon=freemac-plot
+Categories=Education;Math;Science;
+Keywords=graph;graphing;calculator;plot;equation;function;math;maths;algebra;
+StartupWMClass=org.freemac.Plot
+StartupNotify=true

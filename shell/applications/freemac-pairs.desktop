@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pairs
+GenericName=Memory Game
+Comment=Turn over the cards and find the matching pairs
+Exec=freemac-pairs
+Icon=freemac-pairs
+Categories=Game;KidsGame;CardGame;
+Keywords=memory;pairs;match;concentration;cards;kids;game;
+StartupWMClass=org.freemac.Pairs
+StartupNotify=true
