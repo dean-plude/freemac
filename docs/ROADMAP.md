@@ -377,13 +377,21 @@ The small things a Mac user notices in their first minute.
 | 3 | A small window shows a long copy's progress with a Stop button, and a name that's taken asks Keep Both, Stop or Replace | Drawer, Backdrop | done |
 | 4 | Undo (⌘Z) the last move, rename, copy or Move to Trash | Drawer | done |
 
-## 1.27 "music and backups"
+## 1.27 "music and backups" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
 | 1 | A music app for your Music folder, by album, artist and song, with play, shuffle and repeat, shown in the menu bar's what's playing and played with the media keys | Shanty | done |
 | 2 | Backups to a drive: pick one in Dials, and while it's plugged in your home folder is copied every hour, keeping earlier copies with unchanged files shared | Lifeboat, Dials | done |
 | 3 | Bring back a file or folder from any backup, browsed by date | Lifeboat, Drawer | done |
+
+## 1.28 "videos, the machine, and drives"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A video player: open a video from Drawer or the Videos folder, play, pause and scrub with controls that fade away, full screen, and pick up where you left off | Reel | done |
+| 2 | See what's using the processor and memory, app by app, with a small history graph, and quit one that's stuck | Gauge | |
+| 3 | See every drive with its space used, and eject, rename or erase one | Hull | |
 
 ## Later
 
