@@ -889,6 +889,8 @@ class DialsWindow(Gtk.ApplicationWindow):
         repeat = dials_input.key_repeat_group(group, row, slider, wf_get, wf_set)
         sources_heading = Gtk.Label(label="Input Sources", xalign=0)
         sources_heading.get_style_context().add_class("dials-section")
+        text_heading = Gtk.Label(label="Text Input", xalign=0)
+        text_heading.get_style_context().add_class("dials-section")
         self.shortcuts = dials_keys.Shortcuts(
             self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
             lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
@@ -925,7 +927,8 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Keep the last 50 things you copy, on this computer only. \u21e7\u2318V shows them. "
                 "Passwords marked as secret by a password manager are never kept."),
             row("Forget what was copied", clear),
-        ), sources_heading, sources, input_menu, heading, self.shortcuts.widget)
+        ), sources_heading, sources, input_menu, text_heading,
+            dials_input.spelling_group(self, group, row, switch), heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):

@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import alert, menus, style  # noqa: E402
+from . import alert, menus, spelling, style  # noqa: E402
 from . import reminders_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Nudge"
@@ -200,6 +200,7 @@ class Info(Gtk.Popover):
         title.set_max_width_chars(30)
         grid.attach(title, 0, 0, 2, 1)
         self.notes = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        spelling.attach(self.notes)
         self.notes.get_buffer().set_text(reminder.notes)
         frame = Gtk.ScrolledWindow(min_content_height=60, min_content_width=240)
         frame.set_shadow_type(Gtk.ShadowType.IN)

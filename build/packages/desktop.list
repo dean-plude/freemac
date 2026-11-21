@@ -41,6 +41,13 @@ ufw
 unattended-upgrades
 # Everyday apps we ship but don't write: text editor, image viewer, web browser.
 gir1.2-gtksource-4
+# Check spelling while typing (spelling.py): gspell, with Hunspell's English
+# dictionaries (U.S., British, Canadian, Australian) for Enchant.
+gir1.2-gspell-1
+hunspell-en-us
+hunspell-en-gb
+hunspell-en-ca
+hunspell-en-au
 grim
 slurp
 wl-clipboard

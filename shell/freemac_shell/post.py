@@ -25,7 +25,7 @@ try:
 except (ValueError, ImportError):   # no WebKit: messages show as text
     WebKit2 = None
 
-from . import alert, menus, style  # noqa: E402
+from . import alert, menus, spelling, style  # noqa: E402
 from . import mail_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Post"
@@ -826,6 +826,7 @@ class Compose(Gtk.ApplicationWindow):
         box.pack_start(self.chips, False, False, 0)
         self.body = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=16, right_margin=16,
                                  top_margin=12, bottom_margin=12)
+        spelling.attach(self.body)
         self.body.get_style_context().add_class("post-compose-body")
         self.body.get_buffer().set_text(body)
         scroll = Gtk.ScrolledWindow()

@@ -18,7 +18,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import menus, style  # noqa: E402
+from . import menus, spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Jot"
 SAVE_DELAY = 800   # ms after the last key press
@@ -159,6 +159,7 @@ class Window(Gtk.ApplicationWindow):
         self.stack = Gtk.Stack()
         self.view = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=24, right_margin=24,
                                  top_margin=20, bottom_margin=20, pixels_below_lines=2)
+        spelling.attach(self.view)
         self.view.get_style_context().add_class("jot-page")
         self.buffer = self.view.get_buffer()
         self.title_tag = self.buffer.create_tag("title", weight=Pango.Weight.BOLD, scale=1.35,
