@@ -500,6 +500,12 @@ TOPICS = {
         "top edge of the screen and it slides back down.",
         "It stays while the pointer is on it or one of its menus is open, and hides again when you move away.",
     ]),
+    "reveal-desktop": ("Click the wallpaper to see the desktop", "reveal desktop show desktop click wallpaper windows aside hide all windows", [
+        "Choose Dials > Dock and Menu Bar and turn on Click wallpaper to reveal desktop.",
+        "Now a click on the desktop picture puts the windows on the screen out of the way, so you can get to "
+        "the files on the desktop. Click the desktop picture again to bring them back.",
+        "Clicking an app in the Dock brings that app's windows back too.",
+    ]),
     "login-items": ("Open apps when you log in", "login items open at login startup start up launch automatically autostart", [
         "Choose Dials > Login Items. The apps listed there open by themselves each time you log in.",
         "Click + to choose an app to add, and \u2212 beside an app to stop it opening.",

@@ -664,6 +664,10 @@ class DialsWindow(Gtk.ApplicationWindow):
                 switch(bool(style.prefs().get("menubar_autohide")),
                        lambda on: self.save_prefs(menubar_autohide=on)),
                 "The menu bar slides away until you move the pointer to the top of the screen."),
+            row("Click wallpaper to reveal desktop",
+                switch(bool(style.prefs().get("click_reveal")), lambda on: self.save_prefs(click_reveal=on)),
+                "Click the desktop picture and your windows step aside, so you can use the files on the "
+                "desktop. Click it again to bring them back."),
         ), group(row("Double-click a window's title bar to", self.title_double_click()),
                  row("Minimize windows into application icon",
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),

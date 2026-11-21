@@ -724,6 +724,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Chime's alarm watcher keeps its own entry, apart from Chime as a login item | Chime | done |
 | 4 | Guide: opening apps when you log in | Guide | done |
 
+## 1.67 "reveal desktop" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Click the wallpaper and the windows on screen step aside; click it again to bring them back | Backdrop, Strata | done |
+| 2 | Dials > Dock and Menu Bar: Click wallpaper to reveal desktop (off unless you turn it on) | Dials | done |
+| 3 | Guide: revealing the desktop | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
