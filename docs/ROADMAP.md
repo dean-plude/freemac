@@ -732,6 +732,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Dials > Dock and Menu Bar: Click wallpaper to reveal desktop (off unless you turn it on) | Dials | done |
 | 3 | Guide: revealing the desktop | Guide | done |
 
+## 1.68 "conversions" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Seek converts units as you type: length, weight, volume and cooking measures, temperature, speed, time, data and area | Seek | done |
+| 2 | An amount alone converts between metric and US units; "in" or "to" picks the unit | Seek | done |
+| 3 | Guide: conversions in Search with Seek | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
