@@ -16,6 +16,12 @@ Screenshots (Lens) land here too.
 Plugged-in drives, memory cards and phones show here as well, first in the
 top right corner: double-click opens one in Drawer, and Eject (the right
 button, Command-E, or a drag onto the dock's Trash) takes it away.
+
+Use Stacks (the right button on the desktop, or Control-Command-0) gathers
+files of one kind into a pile: Images, Screenshots, Documents, PDF
+Documents, Movies, Music and so on. A click on a stack fans its files out in
+place, and another click gathers them up again; new files go straight into
+their stack. Clean Up By and Get Info (Command-I) work as on a Mac.
 """
 import json
 import os
@@ -28,7 +34,12 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import transfer, volumes  # noqa: E402
+from . import drawer_info, transfer, volumes  # noqa: E402
+
+try:
+    import cairo
+except ImportError:   # only the pictures of the stacks need it
+    cairo = None
 
 LAYOUT = os.path.join(GLib.get_user_config_dir(), "freemac", "desktop.json")
 CELL_W, CELL_H = 100, 104   # one place on the grid
@@ -43,7 +54,16 @@ CSS = b"""
 .desk-label { color: white; font-size: 12px; padding: 1px 5px; border-radius: 5px;
               text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
 .desk-label.selected { background-color: #2f7bf5; text-shadow: none; }
+.desk-icon.fanned { background-color: rgba(255, 255, 255, 0.16); }
+.desk-icon.stack-open { background-color: rgba(255, 255, 255, 0.28); }
 """
+
+# The kinds files are stacked by, in the order a Mac lists them. Folders
+# and drives are never stacked.
+STACK_KINDS = ("Documents", "Images", "Movies", "Music", "PDF Documents", "Presentations",
+               "Screenshots", "Spreadsheets", "Disk Images", "Developer", "Other")
+CODE_ENDINGS = (".py", ".sh", ".c", ".h", ".cpp", ".js", ".ts", ".rs", ".go", ".java", ".rb", ".swift",
+                ".m", ".json", ".yaml", ".yml", ".toml", ".html", ".css")
 
 
 def desktop_dir():
@@ -55,21 +75,92 @@ def path_of(uri):
     return unquote(parsed.path) if parsed.scheme == "file" else None
 
 
-def load_places():
+def load_layout():
+    """The saved places of the icons, and whether stacks are on."""
     try:
         with open(LAYOUT) as f:
-            places = json.load(f).get("places", {})
-        return {k: (int(v[0]), int(v[1])) for k, v in places.items()}
-    except (OSError, ValueError, AttributeError, TypeError, IndexError):
-        return {}
+            data = json.load(f)
+        stacks = bool(data.get("stacks", False))
+    except (OSError, ValueError, AttributeError):
+        return {}, False
+    try:
+        places = {k: (int(v[0]), int(v[1])) for k, v in data.get("places", {}).items()}
+    except (ValueError, AttributeError, TypeError, IndexError):
+        places = {}
+    return places, stacks
 
 
-def save_places(places):
+def load_places():
+    return load_layout()[0]
+
+
+def save_places(places, stacks=False):
     os.makedirs(os.path.dirname(LAYOUT), exist_ok=True)
     tmp = LAYOUT + ".tmp"
     with open(tmp, "w") as f:
-        json.dump({"places": {k: list(v) for k, v in places.items()}}, f, indent=1)
+        json.dump({"places": {k: list(v) for k, v in places.items()}, "stacks": bool(stacks)}, f, indent=1)
     os.replace(tmp, LAYOUT)
+
+
+def kind_of(name, path, content_type):
+    """The stack a file goes in, or None for a folder."""
+    if os.path.isdir(path):
+        return None
+    kind = (content_type or "").lower()
+    low = name.lower()
+    if name.startswith(("Screenshot ", "Screen Recording ", "Screen Shot ")):
+        return "Screenshots"
+    if kind == "application/pdf" or low.endswith(".pdf"):
+        return "PDF Documents"
+    if kind.startswith("image/"):
+        return "Images"
+    if kind.startswith("video/"):
+        return "Movies"
+    if kind.startswith("audio/"):
+        return "Music"
+    if any(w in kind for w in ("spreadsheet", "excel", "csv")) or low.endswith((".csv", ".xlsx", ".xls", ".ods")):
+        return "Spreadsheets"
+    if any(w in kind for w in ("presentation", "powerpoint")) or low.endswith((".pptx", ".ppt", ".odp", ".key")):
+        return "Presentations"
+    if any(w in kind for w in ("cd-image", "disk-image", "apple-diskimage")) or low.endswith((".iso", ".dmg", ".img")):
+        return "Disk Images"
+    if low.endswith(CODE_ENDINGS):
+        return "Developer"
+    if (kind.startswith("text/") or any(w in kind for w in ("document", "msword", "rtf", "opendocument.text"))
+            or low.endswith((".txt", ".md", ".rtf", ".doc", ".docx", ".odt", ".pages"))):
+        return "Documents"
+    return "Other"
+
+
+def stack_picture(cards):
+    """Up to three of the files' pictures, piled a little askew. Each card
+    is (pixbuf, framed): photos get a white edge, icons stand as they are."""
+    cards = [c for c in cards if c[0] is not None][:3]
+    if cairo is None or not cards:
+        return cards[0][0] if cards else None
+    size = ICON
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+    cr = cairo.Context(surface)
+    tilts = (-0.17, 0.13, 0.0)[-len(cards):]
+    for (pixbuf, framed), tilt in zip(reversed(cards), tilts):
+        scale = 0.8 * size / max(pixbuf.get_width(), pixbuf.get_height(), 1)
+        w, h = pixbuf.get_width() * scale, pixbuf.get_height() * scale
+        cr.save()
+        cr.translate(size / 2, size / 2)
+        cr.rotate(tilt)
+        if framed:
+            cr.set_source_rgba(0, 0, 0, 0.3)
+            cr.rectangle(-w / 2 - 1.5, -h / 2 - 0.5, w + 3, h + 3)
+            cr.fill()
+            cr.set_source_rgb(1, 1, 1)
+            cr.rectangle(-w / 2 - 1.5, -h / 2 - 1.5, w + 3, h + 3)
+            cr.fill()
+        cr.scale(scale, scale)
+        Gdk.cairo_set_source_pixbuf(cr, pixbuf, -pixbuf.get_width() / 2, -pixbuf.get_height() / 2)
+        cr.paint()
+        cr.restore()
+    surface.flush()
+    return Gdk.pixbuf_get_from_surface(surface, 0, 0, size, size)
 
 
 def picture_for(path, info, icon=None):
@@ -107,6 +198,7 @@ class DesktopIcon(Gtk.EventBox):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, halign=Gtk.Align.CENTER)
         self.frame = Gtk.Box(halign=Gtk.Align.CENTER)
         self.frame.get_style_context().add_class("desk-icon")
+        self.content_type = info.get_content_type() if info else ""
         self.pixbuf = picture_for(path, info, icon)
         image = Gtk.Image.new_from_pixbuf(self.pixbuf) if self.pixbuf else Gtk.Image()
         image.set_size_request(ICON, ICON)
@@ -182,6 +274,59 @@ class DriveIcon(DesktopIcon):
         return volumes.key_of(self.mount)
 
 
+class StackIcon(DesktopIcon):
+    """A pile of files of one kind. A click fans them out on the desktop and
+    another gathers them up; dragging it drags all of them."""
+
+    def __init__(self, owner, kind, members):
+        self.kind, self.members = kind, list(members)
+        super().__init__(owner, "", None, kind, Gio.ThemedIcon.new("folder"))
+        self.update(members)
+
+    @property
+    def name(self):
+        return "stack:" + self.kind
+
+    def update(self, members):
+        self.members = list(members)
+        cards = [(m.pixbuf, (m.content_type or "").startswith("image/")) for m in self.members[:3]]
+        picture = stack_picture(cards)
+        if picture is not None:
+            self.pixbuf = picture
+            image = self.frame.get_children()[0]
+            image.set_from_pixbuf(picture)
+        count = len(self.members)
+        self.set_tooltip_text(f"{self.kind}: {count} item{'s' if count != 1 else ''}")
+
+    def set_open(self, opened):
+        (self.frame.get_style_context().add_class if opened else
+         self.frame.get_style_context().remove_class)("stack-open")
+
+    def _press(self, _widget, event):
+        if event.type == Gdk.EventType._2BUTTON_PRESS:
+            return True   # the first press already opened or closed it
+        if event.button == 1:
+            self.owner.toggle_stack(self.kind)
+            return False  # let a drag start
+        if event.button == 3:
+            self.owner.stack_menu(self, event)
+            return True
+        return False
+
+    def _drag_begin(self, _widget, context):
+        self.owner.drag_started(self)
+        if self.pixbuf:
+            Gtk.drag_set_icon_pixbuf(context, self.pixbuf, self.pixbuf.get_width() // 2,
+                                     self.pixbuf.get_height() // 2)
+
+    def _drag_data_get(self, _widget, _context, data, _info, _time):
+        data.set_uris([m.uri for m in self.members])
+
+    @property
+    def uri(self):
+        return ""
+
+
 class DesktopIcons(Gtk.Layout):
     def __init__(self, monitor=None):
         super().__init__()
@@ -190,8 +335,10 @@ class DesktopIcons(Gtk.Layout):
             area = monitor.get_geometry()
             self.screen_size = (area.width, area.height)
         self.folder = desktop_dir()
-        self.places = load_places()
+        self.places, self.stacks_on = load_layout()
         self.icons = {}           # file name -> DesktopIcon
+        self.stack_icons = {}     # kind -> StackIcon, while stacks are on
+        self.open_stacks = set()  # the kinds fanned out
         self.selected = []
         self.dragging = None
         self._pending = None
@@ -260,6 +407,9 @@ class DesktopIcons(Gtk.Layout):
         width, height = self.size()
         if width < CELL_W * 3 or height < TOP + BOTTOM + CELL_H * 2:
             return  # not laid out on the screen yet
+        if self.stacks_on:
+            self._arrange_stacks()
+            return
         taken, changed = set(), False
         rows = self.rows()
         for name in sorted(self.icons, key=lambda n: (n not in self.places, not n.startswith("drive:"), n.lower())):
@@ -274,12 +424,123 @@ class DesktopIcons(Gtk.Layout):
             icon = self.icons[name]
             if self.child_get(icon, "x", "y") != (x + 4, y):
                 self.move(icon, x + 4, y)
+        # Moving a child doesn't always redraw a layer-shell surface by itself.
+        self.queue_resize()
         if changed:
             self._save()
 
+    def _arrange_stacks(self):
+        """With stacks on, the desktop keeps itself tidy as a Mac's does:
+        drives, then folders, then each stack (its files after it when it is
+        fanned out), then the files that have no others of their kind."""
+        order = sorted((i for n, i in self.icons.items() if n.startswith("drive:")), key=lambda i: i.name)
+        stacked = self._stacked()
+        loose = [i for i in self.icons.values() if i.mount is None and i not in stacked]
+        order += sorted((i for i in loose if os.path.isdir(i.path)), key=lambda i: i.name.lower())
+        for kind in STACK_KINDS:
+            stack = self.stack_icons.get(kind)
+            if stack is None:
+                continue
+            order.append(stack)
+            if kind in self.open_stacks:
+                order += stack.members
+        order += sorted((i for i in loose if not os.path.isdir(i.path)), key=lambda i: i.name.lower())
+        rows = self.rows()
+        for n, icon in enumerate(order):
+            x, y = self.cell_xy((n // rows, n % rows))
+            if self.child_get(icon, "x", "y") != (x + 4, y):
+                self.move(icon, x + 4, y)
+        self.queue_resize()
+
+    def _stacked(self):
+        return {m for stack in self.stack_icons.values() for m in stack.members}
+
+    def _restack(self):
+        """Gather the files into stacks by kind (two or more make a stack),
+        or put every file back on its own when stacks are off."""
+        groups = {}
+        if self.stacks_on:
+            for name, icon in self.icons.items():
+                if icon.mount is None:
+                    kind = kind_of(name, icon.path, icon.content_type)
+                    if kind:
+                        groups.setdefault(kind, []).append(icon)
+        groups = {k: sorted(v, key=lambda i: i.name.lower()) for k, v in groups.items() if len(v) >= 2}
+        for kind in list(self.stack_icons):
+            if kind not in groups:
+                stack = self.stack_icons.pop(kind)
+                if stack in self.selected:
+                    self.selected.remove(stack)
+                stack.destroy()
+                self.open_stacks.discard(kind)
+        for kind, members in groups.items():
+            stack = self.stack_icons.get(kind)
+            if stack is None:
+                stack = StackIcon(self, kind, members)
+                self.stack_icons[kind] = stack
+                self.put(stack, 0, 0)
+                stack.show_all()
+            elif stack.members != members:
+                stack.update(members)
+            stack.set_open(kind in self.open_stacks)
+        stacked = {m: k for k, s in self.stack_icons.items() for m in s.members}
+        for icon in self.icons.values():
+            kind = stacked.get(icon)
+            fanned = kind is not None and kind in self.open_stacks
+            icon.set_visible(kind is None or fanned)
+            (icon.frame.get_style_context().add_class if fanned else
+             icon.frame.get_style_context().remove_class)("fanned")
+            if kind is not None and not fanned and icon in self.selected:
+                self.selected.remove(icon)
+                icon.set_selected(False)
+
+    def toggle_stack(self, kind):
+        self.grab_focus()
+        self.clear_selection()
+        if kind in self.open_stacks:
+            self.open_stacks.discard(kind)
+        else:
+            self.open_stacks.add(kind)
+        self._restack()
+        self._arrange()
+
+    def set_stacks(self, on):
+        self.stacks_on = bool(on)
+        self.open_stacks.clear()
+        self.clear_selection()
+        self._restack()
+        self._arrange()
+        self._save()
+
+    def clean_up_by(self, how):
+        """Put every icon back on the grid in order, from the top right down."""
+        def modified(icon):
+            try:
+                return -os.stat(icon.path).st_mtime
+            except OSError:
+                return 0
+        keys = {
+            "name": lambda i: i.name.lower(),
+            "kind": lambda i: ((kind_of(i.name, i.path, i.content_type) or " ").lower(), i.name.lower()),
+            "modified": modified,
+        }
+        files = sorted((i for i in self.icons.values() if i.mount is None), key=keys[how])
+        drives = sorted((i for i in self.icons.values() if i.mount is not None), key=lambda i: i.name)
+        rows = self.rows()
+        self.places = {icon.name: (n // rows, n % rows) for n, icon in enumerate(drives + files)}
+        if self.stacks_on:
+            self.set_stacks(False)
+        self._arrange()
+        self._save()
+
+    def get_info(self, icons):
+        paths = [icon.path for icon in icons if icon.path]
+        if paths:
+            drawer_info.show(paths)
+
     def _save(self):
         try:
-            save_places({k: v for k, v in self.places.items() if k in self.icons})
+            save_places({k: v for k, v in self.places.items() if k in self.icons}, self.stacks_on)
         except OSError:
             pass
 
@@ -318,6 +579,7 @@ class DesktopIcons(Gtk.Layout):
             self.icons[name] = icon
             self.put(icon, 0, 0)
             icon.show_all()
+        self._restack()
         self._arrange()
         return False
 
@@ -408,13 +670,18 @@ class DesktopIcons(Gtk.Layout):
             transfer.undo_last(self.get_toplevel(), lambda _t: self.refresh())
         elif key == Gdk.KEY_e and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.eject([icon for icon in self.selected if icon.mount is not None])
+        elif key in (Gdk.KEY_i, Gdk.KEY_I) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.get_info(files)
+        elif key in (Gdk.KEY_0, Gdk.KEY_KP_0) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.set_stacks(not self.stacks_on)
         elif key == Gdk.KEY_o and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.open(list(self.selected))
         elif key == Gdk.KEY_a and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.clear_selection()
             for icon in self.icons.values():
-                self.selected.append(icon)
-                icon.set_selected(True)
+                if icon.get_visible():
+                    self.selected.append(icon)
+                    icon.set_selected(True)
         elif key == Gdk.KEY_Escape:
             self.clear_selection()
         else:
@@ -423,17 +690,26 @@ class DesktopIcons(Gtk.Layout):
 
     # ---- menus ----------------------------------------------------------------------------
     def _menu(self, items, event):
-        menu = Gtk.Menu()
+        menu = self._fill(Gtk.Menu(), items)
         menu.attach_to_widget(self, None)
+        menu.show_all()
+        menu.popup_at_pointer(event)
+        return menu
+
+    def _fill(self, menu, items):
+        """Items are (label, action); an action that is (True/False, action)
+        is a tick."""
         for label, action in items:
             if label is None:
                 menu.append(Gtk.SeparatorMenuItem())
                 continue
-            item = Gtk.MenuItem(label=label)
-            item.connect("activate", lambda _i, a=action: a())
+            if isinstance(action, tuple):
+                item = Gtk.CheckMenuItem(label=label, active=action[0])
+                item.connect("activate", lambda _i, a=action[1]: a())
+            else:
+                item = Gtk.MenuItem(label=label)
+                item.connect("activate", lambda _i, a=action: a())
             menu.append(item)
-        menu.show_all()
-        menu.popup_at_pointer(event)
         return menu
 
     def file_menu(self, event):
@@ -447,15 +723,32 @@ class DesktopIcons(Gtk.Layout):
         items = [("Open", lambda: self.open(icons))]
         if len(icons) == 1:
             items.append(("Rename…", lambda: self.rename(icons[0])))
-        items += [("Show in Drawer", self.show_folder), (None, None),
+        items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder), (None, None),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
                   ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
         self.menu = self._menu(items, event)
 
     def desktop_menu(self, event):
-        self.menu = self._menu([("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
-                                ("Change Wallpaper…", self.change_wallpaper)], event)
+        # Spelled out rather than a submenu: a submenu of the desktop's menu
+        # does not take the pointer under Wayland.
+        clean_up = [("Clean Up By Name", lambda: self.clean_up_by("name")),
+                    ("Clean Up By Kind", lambda: self.clean_up_by("kind")),
+                    ("Clean Up By Date Modified", lambda: self.clean_up_by("modified"))]
+        items = [("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
+                 ("Change Wallpaper…", self.change_wallpaper), (None, None),
+                 ("Use Stacks", (self.stacks_on, lambda: self.set_stacks(not self.stacks_on)))]
+        if not self.stacks_on:
+            items += [(None, None)] + clean_up
+        self.menu = self._menu(items, event)
+
+    def stack_menu(self, stack, event):
+        opened = stack.kind in self.open_stacks
+        self.menu = self._menu([
+            ("Collapse Stack" if opened else "Expand Stack", lambda: self.toggle_stack(stack.kind)),
+            ("Get Info", lambda: self.get_info(stack.members)), (None, None),
+            ("Move to Trash", lambda: self.trash(list(stack.members))), (None, None),
+            ("Use Stacks", (True, lambda: self.set_stacks(False)))], event)
 
     # ---- copy and paste -------------------------------------------------------------------
     def run_job(self, paths, folder, move=False, duplicate=False, near=None):
@@ -583,7 +876,9 @@ class DesktopIcons(Gtk.Layout):
             name = drive or os.path.basename(path)
             if drive is not None or os.path.dirname(os.path.abspath(path)) == os.path.abspath(self.folder):
                 # One of ours, moved on the desktop: the others keep their
-                # place next to it.
+                # place next to it. (With stacks on, the desktop keeps its own order.)
+                if self.stacks_on:
+                    continue
                 cell = self.places.get(name)
                 if anchor is not None and cell is not None:
                     cell = (max(0, target[0] + cell[0] - anchor[0]), max(0, target[1] + cell[1] - anchor[1]))

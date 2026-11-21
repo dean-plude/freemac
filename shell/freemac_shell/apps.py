@@ -34,6 +34,7 @@ def app_info(app_id):
 HELPER_NAMES = {
     "polkit-mate-authentication-agent-1": "Password",
     "gtklock": "Lock Screen",
+    "freemac-backdrop": "Drawer",   # the desktop's own windows, such as Get Info
 }
 
 
