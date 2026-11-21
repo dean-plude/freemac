@@ -112,7 +112,7 @@ CSS = """
 .beacon-center .beacon-day { color: @dim; font-size: 12px; font-weight: 700; }
 .beacon-center button.beacon-event { padding: 3px 6px; border-radius: 8px; }
 .beacon-center .beacon-event-time { color: @dim; font-size: 12px; }
-.beacon-center .beacon-dot { color: #2f7bf5; }
+.beacon-center .beacon-dot { color: @theme_selected_bg_color; }
 .beacon-level {
   background-color: @panel;
   border: 1px solid @edge;

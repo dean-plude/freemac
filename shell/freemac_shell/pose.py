@@ -86,7 +86,7 @@ CSS = b"""
 .pose-bar button.pose-tool { background: alpha(white, 0.08); color: #e8e8ea; border: none;
   box-shadow: none; border-radius: 7px; padding: 4px 12px; }
 .pose-bar button.pose-tool:hover { background: alpha(white, 0.16); }
-.pose-bar button.pose-tool:checked { background: #2f7bf5; color: white; }
+.pose-bar button.pose-tool:checked { background: @theme_selected_bg_color; color: white; }
 .pose-shutter { background: #e5342f; border-radius: 999px; min-width: 52px; min-height: 52px;
   padding: 0; border: 3px solid alpha(white, 0.85); box-shadow: 0 1px 3px alpha(black, 0.5);
   color: white; }
@@ -97,10 +97,10 @@ CSS = b"""
 .pose-effects button { background: alpha(white, 0.07); color: #e8e8ea; border: none; box-shadow: none;
   border-radius: 14px; padding: 4px 12px; margin: 0 3px; }
 .pose-effects button:hover { background: alpha(white, 0.15); }
-.pose-effects button:checked { background: #2f7bf5; color: white; }
+.pose-effects button:checked { background: @theme_selected_bg_color; color: white; }
 .pose-strip { background: #1e1e20; }
 .pose-strip flowboxchild { padding: 3px; border-radius: 5px; }
-.pose-strip flowboxchild:selected { background: #2f7bf5; }
+.pose-strip flowboxchild:selected { background: @theme_selected_bg_color; }
 .pose-strip-note { color: alpha(white, 0.5); }
 """
 

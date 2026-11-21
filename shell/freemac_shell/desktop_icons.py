@@ -98,7 +98,7 @@ CSS = b"""
 .desk-icon.selected { background-color: rgba(0, 0, 0, 0.22); }
 .desk-label { color: white; font-size: 12px; padding: 1px 5px; border-radius: 5px;
               text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
-.desk-label.selected { background-color: #2f7bf5; text-shadow: none; }
+.desk-label.selected { background-color: @theme_selected_bg_color; text-shadow: none; }
 .desk-info { color: #a8d4ff; font-size: 10px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
 .desk-icon.fanned { background-color: rgba(255, 255, 255, 0.16); }
 .desk-icon.stack-open { background-color: rgba(255, 255, 255, 0.28); }

@@ -42,9 +42,9 @@ CSS = b"""
 .welcome-title { font-size: 26px; font-weight: 800; }
 .welcome-text { font-size: 14px; opacity: 0.8; }
 .welcome-choice { padding: 8px; border-radius: 14px; border: 3px solid transparent; background: none; box-shadow: none; }
-.welcome-choice:checked { border-color: #2f7bf5; }
+.welcome-choice:checked { border-color: @theme_selected_bg_color; }
 .welcome-dot { font-size: 10px; opacity: 0.3; }
-.welcome-dot.current { opacity: 1; color: #2f7bf5; }
+.welcome-dot.current { opacity: 1; color: @theme_selected_bg_color; }
 """
 
 

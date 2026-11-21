@@ -42,20 +42,20 @@ list.post-side { background: transparent; }
 .post-side row { padding: 4px 10px; border-radius: 7px; margin: 0 6px; background: transparent; }
 .post-side row:selected { background: alpha(@theme_fg_color, 0.12); }
 .post-side row:selected label { color: @theme_fg_color; }
-.post-side row:selected image { color: #2f7bf5; }
-.post-side image { color: #2f7bf5; }
+.post-side row:selected image { color: @theme_selected_bg_color; }
+.post-side image { color: @theme_selected_bg_color; }
 .post-account { font-size: 12px; font-weight: 700; color: alpha(currentColor, 0.5); padding: 12px 14px 2px 14px; }
 .post-count { color: alpha(currentColor, 0.5); font-size: 12px; }
 .post-list { background: @theme_base_color; }
 .post-list row { padding: 7px 12px 7px 6px; border-bottom: 1px solid alpha(currentColor, 0.07); }
-.post-list row:selected { background: #2f7bf5; }
+.post-list row:selected { background: @theme_selected_bg_color; }
 .post-list row:selected label { color: white; }
 .post-list row:selected .post-dot { color: white; }
 .post-from { font-weight: 700; font-size: 14px; }
 .post-from.post-read { font-weight: 500; }
 .post-date { font-size: 12px; color: alpha(currentColor, 0.55); }
 .post-subject { font-size: 13px; }
-.post-dot { color: #2f7bf5; font-size: 10px; }
+.post-dot { color: @theme_selected_bg_color; font-size: 10px; }
 .post-flag { color: #f59a23; font-size: 11px; }
 .post-head { padding: 14px 20px 10px 20px; border-bottom: 1px solid alpha(currentColor, 0.1); background: @theme_base_color; }
 .post-head-from { font-size: 16px; font-weight: 700; }

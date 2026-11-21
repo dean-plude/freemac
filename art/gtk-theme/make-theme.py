@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Write the freemac and freemac-dark GTK 3 themes into a themes folder, and
-the same colours for GTK 4 and Qt apps into a second folder.
+the same colours for GTK 4 and Qt apps into a second folder. Each comes in
+every accent colour Dials > Appearance offers: freemac and freemac-dark are
+blue, freemac-purple and freemac-dark-purple are purple, and so on.
 
     make-theme.py /usr/share/themes [/usr/share/freemac]
 
@@ -46,7 +48,37 @@ DARK = {
 }
 
 
+# Accent colours (light mode, dark mode), in the order Dials shows them.
+# freemac's own values; blue is the one the themes always had.
+ACCENTS = {
+    "blue": ("#2f7bf5", "#3a86ff"),
+    "purple": ("#8f52d9", "#a66cec"),
+    "pink": ("#de4a80", "#ec6396"),
+    "red": ("#dc3d42", "#ec5257"),
+    "orange": ("#ea7a17", "#fb8c2c"),
+    "yellow": ("#d39a07", "#e9b21f"),
+    "green": ("#2c9f4c", "#3cb75d"),
+    "graphite": ("#7d7d84", "#93939b"),
+}
+
+
+def name(accent, dark):
+    """freemac, freemac-dark, freemac-purple, freemac-dark-purple…"""
+    return "freemac" + ("-dark" if dark else "") + ("" if accent == "blue" else "-" + accent)
+
+
+def variants():
+    """(theme name, colours, dark, accent) for every accent, light and dark."""
+    for accent, (light, dark_value) in ACCENTS.items():
+        for base, dark in ((LIGHT, False), (DARK, True)):
+            colors = dict(base, fm_accent=dark_value if dark else light)
+            yield name(accent, dark), colors, dark, accent
+
+
 def theme(colors, dark):
+    # Apps' own style sheets use GTK's standard name for the selection colour,
+    # which every theme has, so they follow the accent too.
+    colors = dict(colors, theme_selected_bg_color=colors["fm_accent"])
     defines = "".join(f"@define-color {k} {v};\n" for k, v in colors.items())
     with open(os.path.join(HERE, "common.css")) as f:
         common = f.read()
@@ -128,23 +160,24 @@ def qt(colors):
 
 
 def extras(target):
-    for name, colors, dark in (("freemac", LIGHT, False), ("freemac-dark", DARK, True)):
-        for folder, file, text in (("gtk4", "dark.css" if dark else "light.css", gtk4(colors, dark)),
-                                   ("qt", name + ".conf", qt(colors))):
+    for theme_name, colors, dark, accent in variants():
+        css = ("dark" if dark else "light") + ("" if accent == "blue" else "-" + accent) + ".css"
+        for folder, file, text in (("gtk4", css, gtk4(colors, dark)),
+                                   ("qt", theme_name + ".conf", qt(colors))):
             os.makedirs(os.path.join(target, folder), exist_ok=True)
             with open(os.path.join(target, folder, file), "w") as f:
                 f.write(text)
 
 
 def main(target, extra=None):
-    for name, colors, dark in (("freemac", LIGHT, False), ("freemac-dark", DARK, True)):
-        folder = os.path.join(target, name, "gtk-3.0")
+    for theme_name, colors, dark, _accent in variants():
+        folder = os.path.join(target, theme_name, "gtk-3.0")
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "gtk.css"), "w") as f:
             f.write(theme(colors, dark))
-        with open(os.path.join(target, name, "index.theme"), "w") as f:
-            f.write(f"[Desktop Entry]\nType=X-GNOME-Metatheme\nName={name}\n"
-                    f"Comment=freemac's own GTK theme\n\n[X-GNOME-Metatheme]\nGtkTheme={name}\n"
+        with open(os.path.join(target, theme_name, "index.theme"), "w") as f:
+            f.write(f"[Desktop Entry]\nType=X-GNOME-Metatheme\nName={theme_name}\n"
+                    f"Comment=freemac's own GTK theme\n\n[X-GNOME-Metatheme]\nGtkTheme={theme_name}\n"
                     f"IconTheme=freemac\n")
     if extra:
         extras(extra)
