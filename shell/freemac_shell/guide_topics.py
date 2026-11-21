@@ -29,7 +29,7 @@ TOPICS = {
         "An app stays open after its last window closes, with a dot under it in the Dock. "
         "⌘Q quits it.",
     ]),
-    "windows": ("Arrange windows", "window close tile half fill minimize zoom full screen resize move desktop", [
+    "windows": ("Arrange windows", "window close tile half quarter fill center minimize zoom full screen resize move desktop previous size", [
         "The three round buttons at the top left of a window close it, minimize it into the Dock, "
         "and zoom it.",
         "Drag a window to the left or right edge to fill that half of the screen, "
@@ -39,6 +39,13 @@ TOPICS = {
         "- ⌘H hides the app and ⌥⌘H hides the others.",
         "- Control+Up shows every window; click one to bring it forward.",
         "Window > Fill and Window > Center in the menu bar work on the window in front.",
+        "Window > Move & Resize puts the window in a half or a quarter of the screen. "
+        "Return to Previous Size there puts it back as it was.",
+    ]),
+    "screen-zoom": ("Zoom in on the screen", "zoom magnify enlarge screen bigger accessibility scroll see", [
+        "Hold ⌘ and scroll up to zoom in on the part of the screen under the pointer. "
+        "Scroll down to zoom out again.",
+        "To zoom with ⌥ Option or Control instead, or to turn zooming off, open Dials > Accessibility.",
     ]),
     "desktops": ("Use more than one desktop", "desktop space workspace virtual swipe overview", [
         "freemac has four desktops. Control+Left and Control+Right move between them, "

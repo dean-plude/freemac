@@ -265,7 +265,27 @@ def accessibility(window):
     if not pointer.get_active_id():
         pointer.set_active_id("24")
     pointer.connect("changed", lambda c: big_pointer(int(c.get_active_id())))
-    zoom_on = "zoom" in (window.ini_get("core", "plugins", "") or "").split()
+    def plugins():
+        return (window.ini_get("core", "plugins", "") or "").split()
+
+    def zoom_switch(on):
+        names = [n for n in plugins() if n != "zoom"]
+        if on:
+            names.append("zoom")
+        window.ini_set("core", "plugins", " ".join(names))
+        zoom_keys.set_sensitive(on)
+
+    # Hold a key and scroll to zoom in on the part of the screen under the
+    # pointer, as a Mac's Zoom does with its scroll gesture.
+    zoom_keys = Gtk.ComboBoxText()
+    for value, label in (("<super>", "⌘ Command"), ("<alt>", "⌥ Option"), ("<ctrl>", "⌃ Control")):
+        zoom_keys.append(value, label)
+    zoom_keys.set_active_id((window.ini_get("zoom", "modifier", "<super>") or "<super>").strip())
+    if not zoom_keys.get_active_id():
+        zoom_keys.set_active_id("<super>")
+    zoom_keys.connect("changed", lambda c: window.ini_set("zoom", "modifier", c.get_active_id()))
+    zoom_on = "zoom" in plugins()
+    zoom_keys.set_sensitive(zoom_on)
     return page("Accessibility", group(
         row("Larger text", switch(get("text-scaling-factor", 1.0) > 1.05, larger_text)),
         row("High contrast", switch(get("gtk-theme", "freemac") == "HighContrast", high_contrast),
@@ -274,8 +294,9 @@ def accessibility(window):
             "Windows fade instead of zooming and don't wobble."),
         row("Pointer size", pointer),
     ), group(
-        row("Zoom", None, "Hold Super and scroll to zoom in on part of the screen."
-            if zoom_on else "Screen zoom isn't turned on in this session."),
+        row("Zoom", switch(zoom_on, zoom_switch),
+            "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
+        row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
     ))
 
 
