@@ -497,6 +497,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | The clock keeps itself right: systemd-timesyncd is installed, so automatic time works | system | done |
 | 3 | Open and Save windows: the default button (Save, Open) is blue and readable; it was white on white | theme | done |
 
+## 1.42 "dock that hides" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Automatically hide and show the Dock: it slides away, windows get the whole screen, and it slides back when the pointer reaches the bottom edge | Pier | done |
+| 2 | A switch for it in Dials > Dock and Menu Bar, and ⌥⌘D to turn it on and off anywhere | Dials, keys | done |
+| 3 | The Dock stays up while one of its menus is open or something is dragged over it | Pier | done |
+| 4 | Guide topic: Hide the Dock until you need it | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

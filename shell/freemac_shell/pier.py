@@ -46,6 +46,8 @@ SHADOW_ROOM = 22   # px each side of the shelf for its shadow
 LABEL_ROOM = 36    # px above the magnified icons for the hovered app's name
 NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
 MARGIN = 8
+SLIDE_MS = 220     # how long the Dock takes to slide away or back
+HIDE_DELAY = 350   # ms after the pointer leaves before a hidden Dock slides away
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
 SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit"}
@@ -83,7 +85,8 @@ def load_config():
     """Pier settings, written by Dials: pinned apps, icon size, magnification,
     folder stacks and whether the Trash is shown."""
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
-              "stacks": default_stacks(), "trash": True, "minimize_into_app": False}
+              "stacks": default_stacks(), "trash": True, "minimize_into_app": False,
+              "autohide": False}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -190,6 +193,7 @@ class Place(Gtk.Button):
 
     def popup(self, menu):
         menu.show_all()
+        self.pier.hold_up(menu)
         menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
 
 
@@ -598,6 +602,7 @@ class Item(Gtk.Button):
 
     def popup(self, menu):
         menu.show_all()
+        self.pier.hold_up(menu)
         menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
 
     # ---- the launch bounce -------------------------------------------------
@@ -758,12 +763,21 @@ class Pier(Gtk.Window):
         # Mac, instead of stretching it.
         outer.connect("draw", self._draw_backing)
         holder = Gtk.Box()
+        self.holder = holder
         holder.set_valign(Gtk.Align.END)
         # Room at the sides for the shelf's soft shadow, so the window's own
         # edge never cuts it off in a straight line.
         holder.set_margin_start(SHADOW_ROOM)
         holder.set_margin_end(SHADOW_ROOM)
-        holder.pack_start(self.shelf, True, False, 0)
+        # The shelf sits in a revealer so a Dock that hides itself can slide
+        # down out of sight inside its own surface, which never moves: moving
+        # the surface under a still pointer confuses where the pointer is.
+        self.revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
+                                     transition_duration=SLIDE_MS, reveal_child=True)
+        self.revealer.set_valign(Gtk.Align.END)
+        self.revealer.add(self.shelf)
+        self.revealer.connect("notify::child-revealed", lambda *_: self._slid())
+        holder.pack_start(self.revealer, True, False, 0)
         outer.add(holder)
         outer.add_events(1 << 2)  # pointer motion
         outer.connect("motion-notify-event", self._motion)
@@ -776,6 +790,10 @@ class Pier(Gtk.Window):
         # bottom of a window behind it must still be clickable.
         self.input_full = False
         self.hover_x = None
+        # Automatically hide and show, and what keeps the Dock up for now.
+        self.autohide, self._hide_source, self.menus_up = False, None, 0
+        self.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK)
+        self.connect("enter-notify-event", self._entered)
         outer.connect_after("size-allocate", lambda *_: GLib.idle_add(self._settle))
         self.connect("map-event", lambda *_: self._set_input(False))
         # Apps dragged along the Dock, and files dropped on an app to open them.
@@ -825,9 +843,22 @@ class Pier(Gtk.Window):
         config = load_config()
         self.base = config["size"]
         self.peak = config["peak"] if config["magnify"] else config["size"]
-        # Windows avoid the resting dock; magnified icons may overlap them.
-        GtkLayerShell.set_exclusive_zone(self, self.base + 28)
-        self.outer.set_size_request(-1, self.peak + 30 + LABEL_ROOM)
+        # Windows avoid the resting dock; magnified icons may overlap them. A
+        # Dock that hides itself leaves the whole screen to windows, and sits
+        # on the screen's edge whatever space others keep (-1): with 0 the
+        # compositor can still count the space this Dock itself just gave up.
+        was_hiding, self.autohide = self.autohide, bool(config.get("autohide"))
+        GtkLayerShell.set_exclusive_zone(self, -1 if self.autohide else self.base + 28)
+        # A Dock that hides reaches down to the screen's edge, with its gap
+        # below inside it, so it slides out of sight past the edge and the
+        # pointer resting on the edge is on it.
+        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, 0 if self.autohide else MARGIN)
+        self.shelf.set_margin_bottom(MARGIN if self.autohide else 0)
+        if self.autohide and not was_hiding:
+            self._hide_later()
+        elif was_hiding and not self.autohide:
+            self.show_now()
+        self.outer.set_size_request(-1, self.peak + 30 + LABEL_ROOM + (MARGIN if self.autohide else 0))
         # Icon, the running dot under it and the shelf's top and bottom padding.
         self.rest_height = self.base + 22
         if self.config is None or config["pinned"] != self.config["pinned"]:
@@ -1094,6 +1125,7 @@ class Pier(Gtk.Window):
         if not self.dropped and not self.removed and item is not None:
             self._restore_order()
         self.dropped = self.removed = False
+        self._hide_later()
 
     def _restore_order(self):
         for index, item in enumerate(self.pinned):
@@ -1169,6 +1201,7 @@ class Pier(Gtk.Window):
             Gdk.drag_status(context, 0, time)
 
     def _drag_motion(self, widget, context, x, _y, time):
+        self.show_now()
         target = widget.drag_dest_find_target(context, None)
         if target is None:
             Gdk.drag_status(context, 0, time)
@@ -1195,6 +1228,7 @@ class Pier(Gtk.Window):
         self._mark_drop(None)
         self.peek_context, self.peek_types = None, None
         self._magnify(None)
+        self._hide_later()
         # Dragged up and out: its gap closes, as it will if it's let go there.
         if self.dragging is not None:
             self.drag_outside = True
@@ -1337,7 +1371,57 @@ class Pier(Gtk.Window):
     def _left(self, _widget, event):
         if event.window == self.get_window() and event.detail != Gdk.NotifyType.INFERIOR:
             self._magnify(None)
+            self._hide_later()
         return False
+
+    # ---- automatically hide and show ---------------------------------------
+    # The Dock slides down out of sight, leaving only the bottom row of its
+    # surface to catch the pointer; touching the screen's bottom edge there
+    # brings it back, and leaving it slides it away again.
+    def _entered(self, _widget, event):
+        if event.window == self.get_window():
+            self.show_now()
+        return False
+
+    def hidden(self):
+        return not self.revealer.get_reveal_child()
+
+    def show_now(self):
+        if self._hide_source:
+            GLib.source_remove(self._hide_source)
+            self._hide_source = None
+        if self.hidden():
+            self.revealer.set_reveal_child(True)
+            self._set_input(self.input_full)
+
+    def _hide_later(self):
+        if not self.autohide or self.menus_up or self.dragging or self.input_full:
+            return
+        if self._hide_source:
+            GLib.source_remove(self._hide_source)
+        self._hide_source = GLib.timeout_add(HIDE_DELAY, self._hide_now)
+
+    def _hide_now(self):
+        self._hide_source = None
+        if self.autohide and not self.menus_up and not self.dragging and not self.input_full:
+            self.revealer.set_reveal_child(False)
+            self._set_input(self.input_full)
+        return False
+
+    def _slid(self):
+        """The slide has ended: take input over where the Dock now is."""
+        self._set_input(self.input_full)
+
+    def hold_up(self, menu):
+        """Keep the Dock up while one of its menus is open."""
+        self.menus_up += 1
+
+        def closed(_menu):
+            self.menus_up = max(0, self.menus_up - 1)
+            # The pointer may be on the menu, far from the Dock; if it is back
+            # over the icons, they keep the Dock up.
+            GLib.timeout_add(150, lambda: self._hide_later() and False)
+        menu.connect("hide", closed)
 
     def _settle(self):
         self._set_input(self.input_full)
@@ -1354,7 +1438,11 @@ class Pier(Gtk.Window):
         width, height = window.get_width(), window.get_height()
         alloc = self.shelf.get_allocation()
         origin = self.shelf.translate_coordinates(self, 0, 0)
-        if not origin or alloc.width <= 1:
+        left, wide = (origin[0], alloc.width) if origin and alloc.width > 1 else (0, width)
+        if self.autohide and self.hidden():
+            # Hidden: only the bottom row, along the screen's edge under the Dock.
+            area = cairo.RectangleInt(left, height - 1, wide, 1)
+        elif not origin or alloc.width <= 1:
             area = cairo.RectangleInt(0, 0, width, height)
         elif full:
             # The magnified icons, but not the room for the name above them.
@@ -1367,6 +1455,8 @@ class Pier(Gtk.Window):
 
     def _magnify(self, pointer_x, widget=None):
         """Grow icons near the pointer along a cosine curve."""
+        if pointer_x is not None:
+            self.show_now()
         if (pointer_x is not None) != self.input_full:
             self._set_input(pointer_x is not None)
         # Where the pointer is along the Dock, for the name drawn above it.

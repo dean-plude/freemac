@@ -93,6 +93,9 @@ def do(action):
         level = min(1.0, max(0.05, round(level + step, 2)))
         screen.set_brightness(level)
         return "display-brightness-symbolic", level, ""
+    if action == "dock-autohide":
+        toggle_dock_autohide()
+        return None
     if action in ("play-pause", "next", "previous", "stop"):
         from . import media   # imports GTK, so only for these keys
         media.send(action)
@@ -101,7 +104,25 @@ def do(action):
 
 
 ACTIONS = ("volume-up", "volume-down", "mute", "mic-mute", "brightness-up", "brightness-down",
-           "play-pause", "next", "previous", "stop")
+           "play-pause", "next", "previous", "stop", "dock-autohide")
+
+
+def toggle_dock_autohide():
+    """Option-Command-D: turn the Dock's hiding on or off. The Dock and Dials
+    both watch pier.json, so they follow at once."""
+    import json
+    import os
+    path = os.path.expanduser("~/.config/freemac/pier.json")
+    try:
+        with open(path) as f:
+            config = json.load(f)
+    except (OSError, ValueError):
+        config = {}
+    config["autohide"] = not config.get("autohide", False)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".new", "w") as f:
+        json.dump(config, f, indent=2)
+    os.replace(path + ".new", path)
 
 
 def main(argv=None):

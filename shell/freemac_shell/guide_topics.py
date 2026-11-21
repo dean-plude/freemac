@@ -465,6 +465,13 @@ TOPICS = {
         "Choose 12-hour or 24-hour time, and whether the menu bar shows the day, the date and seconds.",
         "Changing the time or time zone asks for an administrator's password.",
     ]),
+    "dock-hide": ("Hide the Dock until you need it", "dock hide hides automatically autohide auto-hide show more room bottom screen", [
+        "Choose Dials > Dock and Menu Bar and turn on Automatically hide and show the Dock, or press ⌥⌘D.",
+        "The Dock slides away and windows can use the whole screen. Move the pointer to the bottom "
+        "edge of the screen and it slides back up.",
+        "It stays up while the pointer is on it or one of its menus is open, and hides again when you move away.",
+        "Press ⌥⌘D again to keep it on screen all the time.",
+    ]),
     "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl", [
         "freemac Recovery fixes a computer that won't start properly. To open it, hold Ctrl while the "
         "computer starts, or choose Dials > Power > Restart in Recovery….",

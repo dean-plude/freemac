@@ -633,6 +633,10 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Icon size", size),
             row("Magnification", switch(config["magnify"], magnify), "Icons grow as the pointer passes over them."),
             row("Magnified size", peak),
+            row("Automatically hide and show the Dock", switch(config.get("autohide", False),
+                                                                 lambda on: save_pier(autohide=on)),
+                "The Dock slides away until you move the pointer to the bottom of the screen. "
+                "\u2325\u2318D turns this on and off."),
         ), group(
             row("Downloads", switch(downloads in config["stacks"], show_downloads),
                 "A folder on the dock that shows your newest downloads."),
