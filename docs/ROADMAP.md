@@ -568,6 +568,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Tags kept with the file (user.xdg.tags), and a note when a disk can't keep them | Shell | done |
 | 5 | Guide topic: Tag files with colours | Guide | done |
 
+## 1.49 "recents" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Recents at the top of Drawer's sidebar and in the Go menu (⇧⌘F): files opened lately, newest first | Drawer | done |
+| 2 | Show in Enclosing Folder for a file in Recents or a tag, and Remove from Recents | Drawer | done |
+| 3 | New Folder with Selection in Drawer and on the desktop, named ready to type, with Undo | Drawer, Backdrop | done |
+| 4 | Tags in Get Info: click a colour to tag or untag | Drawer, Backdrop | done |
+| 5 | Guide topic: Find files you opened lately | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

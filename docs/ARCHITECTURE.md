@@ -260,6 +260,14 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   reads brings the index up to date for that folder, and listing a tag
   (Drawer's `tag:Red` place) rereads each file's attribute and drops any
   that lost it. Names are drawn as Pango markup with a dot per tag.
+  **Recents** (`recents.py`, 1.49) is the desktop's shared list of
+  recently used files (`recently-used.xbel` through Gtk.RecentManager),
+  which freemac's apps and most Linux apps already add to; Drawer and the
+  desktop add a file when they open it. Drawer's `recents:` place lists
+  the ones still there, newest first, in insertion order (the store is
+  left unsorted). **New Folder with Selection** (`transfer.folder_with`)
+  renames the items into a new folder beside them and notes a "group"
+  record, which Undo moves back and removes the folder if it is empty.
   **Glance** (`drawer_glance.py`) is a
   plain window that follows the selection while open. Since 1.46 it also
   opens from the desktop, plays movies and music with its own GStreamer

@@ -505,12 +505,21 @@ TOPICS = {
         "In the Trash, right-click a file and choose Put Back (or press Command+Delete) to return it to its folder. "
         "Click Empty to erase everything in the Trash.",
     ]),
+    "recents": ("Find files you opened lately", "recents recent files lately opened last new folder with selection group enclosing", [
+        "Click Recents at the top of Drawer's sidebar, or press Shift+Command+F, to see the files you opened "
+        "lately, newest first.",
+        "Right-click a file there and choose Show in Enclosing Folder to open the folder it's in, or "
+        "Remove from Recents to take it off the list.",
+        "To put several files into a new folder at once, select them, right-click one and choose "
+        "New Folder with Selection. Type a name for the folder. Command+Z puts them back.",
+    ]),
     "tags": ("Tag files with colours", "tags tag colour color label red orange yellow green blue purple gray finder", [
         "Right-click a file in Drawer or on the desktop and click a colour under Tags. A dot in that colour "
         "shows after the file's name.",
         "Click the same colour again to take the tag off. You can give a file more than one colour.",
         "Click a colour under Tags in Drawer's sidebar to see every file with that tag, wherever it is.",
-        "You can also drag files onto a colour in the sidebar to tag them.",
+        "You can also drag files onto a colour in the sidebar to tag them, or click a colour next to Tags "
+        "in Get Info (Command+I).",
         "Memory cards and some USB drives can't keep tags.",
     ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [

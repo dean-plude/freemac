@@ -40,7 +40,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, drawer_info, tags, transfer, volumes  # noqa: E402
+from . import desktop_widgets, drawer_info, recents, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 try:
@@ -731,6 +731,8 @@ class DesktopIcons(Gtk.Layout):
                 continue
             try:
                 Gio.AppInfo.launch_default_for_uri(icon.uri, None)
+                if icon.path and not os.path.isdir(icon.path):
+                    recents.note(icon.path)
             except GLib.Error:
                 subprocess.Popen(["xdg-open", icon.path], start_new_session=True)
 
@@ -826,6 +828,8 @@ class DesktopIcons(Gtk.Layout):
         items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder),
                   ("Glance" if len(icons) == 1 else f"Glance at {len(icons)} Items", self.toggle_glance), (None, None),
                   ("\0tags", [i.path for i in icons]), (None, None),
+                  (f"New Folder with Selection ({len(icons)} Item{'s' if len(icons) != 1 else ''})",
+                   lambda: self.new_folder_with(icons)),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
                   ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
@@ -900,6 +904,15 @@ class DesktopIcons(Gtk.Layout):
         transfer.note_done({"kind": "new-folder", "path": os.path.join(self.folder, name)})
         self.refresh()
         icon = self.icons.get(name)
+        if icon:
+            self.click(icon, False)
+            GLib.idle_add(lambda: self.rename(icon) and False)
+
+    def new_folder_with(self, icons):
+        """New Folder with Selection: the chosen icons go into a new folder."""
+        folder, _error = transfer.folder_with([i.path for i in icons])
+        self.refresh()
+        icon = self.icons.get(os.path.basename(folder)) if folder else None
         if icon:
             self.click(icon, False)
             GLib.idle_add(lambda: self.rename(icon) and False)
