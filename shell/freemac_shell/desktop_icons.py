@@ -41,7 +41,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, quick_actions, recents, tags, transfer, volumes  # noqa: E402
+from . import desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 from . import desktop_view  # noqa: E402
 from .drawer_info import item_info  # noqa: E402
@@ -444,6 +444,7 @@ class DesktopIcons(Gtk.Layout):
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.KEY_PRESS_MASK)
         self.set_can_focus(True)
         self.connect("button-press-event", self._press_empty)
+        self.reveal = reveal.Reveal()
         self.connect("key-press-event", self._key)
         self.connect("size-allocate", lambda *_: self._arrange())
         self.drag_dest_set(Gtk.DestDefaults.ALL, URI_TARGETS, Gdk.DragAction.MOVE | Gdk.DragAction.COPY)
@@ -907,6 +908,12 @@ class DesktopIcons(Gtk.Layout):
         if event.button == 1:
             self.clear_selection()
             self.grab_focus()
+            # A plain click on the wallpaper reveals the desktop (Dials > Dock
+            # and Menu Bar), and the next one brings the windows back.
+            plain = not event.state & (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK
+                                       | Gdk.ModifierType.MOD1_MASK)
+            if event.type == Gdk.EventType.BUTTON_PRESS and plain and reveal.enabled():
+                self.reveal.toggle()
         elif event.button == 3:
             self.clear_selection()
             self.desktop_menu(event)
