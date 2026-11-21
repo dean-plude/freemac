@@ -175,6 +175,10 @@ fi
 # NetworkManager handles wired and Wi-Fi networks.
 in_chroot systemctl enable NetworkManager.service
 in_chroot systemctl enable seatd.service greetd.service
+# Remote Login (Dials > Sharing) starts off, and every computer makes its own
+# SSH keys when it's turned on, rather than all sharing the image's.
+in_chroot systemctl disable ssh.service ssh.socket >/dev/null 2>&1 || true
+rm -f "$ROOTFS"/etc/ssh/ssh_host_*
 in_chroot systemctl set-default graphical.target
 in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 # freemac's own app icons (art/icons), then refresh the cache so apps and the

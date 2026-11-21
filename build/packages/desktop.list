@@ -85,6 +85,11 @@ at-spi2-core
 espeak-ng
 # Nearby sharing (Hail) makes its own certificate once with OpenSSL.
 openssl
+# Dials > Sharing: the computer answers to its-name.local (Avahi), and Remote
+# Login (SSH) is there for anyone who turns it on; it starts off.
+avahi-daemon
+libnss-mdns
+openssh-server
 power-profiles-daemon
 # Night light (warmer colours in the evening) through Wayland's gamma control
 wlsunset

@@ -77,6 +77,10 @@ def device_name():
     chosen = style.prefs().get("hail_name")
     if chosen:
         return chosen
+    from .dials_sharing import pretty_name   # Dials > Sharing > Computer name
+    named = pretty_name()
+    if named:
+        return named
     try:
         full = pwd.getpwuid(os.getuid()).pw_gecos.split(",")[0].strip()
     except KeyError:

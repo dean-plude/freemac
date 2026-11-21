@@ -4,7 +4,48 @@
 # after an administrator's password:
 #   freemac-system-helper firewall on|off       Network > Firewall
 #   freemac-system-helper auto-updates on|off   Software Update > Automatic updates
+#   freemac-system-helper remote-login on|off   Sharing > Remote Login (SSH)
+#   freemac-system-helper computer-name NAME    Sharing > Computer name
 set -e
+LANS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+
+ssh_on() {
+  [ -e /etc/systemd/system/multi-user.target.wants/ssh.service ] ||
+    [ -e /etc/systemd/system/sockets.target.wants/ssh.socket ]
+}
+
+# Remote Login through the firewall, from this network only.
+ssh_firewall() {
+  command -v ufw >/dev/null || return 0
+  for net in $LANS; do
+    if [ "$1" = allow ]; then
+      ufw allow in proto tcp from "$net" to any port 22 comment 'freemac: remote login' >/dev/null
+    else
+      ufw delete allow in proto tcp from "$net" to any port 22 >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+if [ "$1" = computer-name ]; then
+  # The name people see ("Dean's freemac") and the one computers use on the
+  # network ("Deans-freemac", and Deans-freemac.local through Avahi).
+  pretty=$(printf '%s' "$2" | tr -d '\000-\037')
+  [ -n "$pretty" ] || { echo "The name can't be empty." >&2; exit 2; }
+  [ "$(printf '%s' "$pretty" | wc -c)" -le 255 ] || { echo "The name is too long." >&2; exit 2; }
+  host=$(printf '%s' "$pretty" | tr -d "'’" | LC_ALL=C sed 's/[^A-Za-z0-9]\{1,\}/-/g; s/^-*//; s/-*$//' | cut -c1-63 | sed 's/-*$//')
+  [ -n "$host" ] || host=freemac
+  hostnamectl set-hostname --pretty "$pretty"
+  hostnamectl set-hostname --static "$host"
+  hostnamectl set-hostname --transient "$host" 2>/dev/null || hostname "$host"
+  if grep -q '^127\.0\.1\.1' /etc/hosts; then
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$host/" /etc/hosts
+  else
+    printf '127.0.1.1\t%s\n' "$host" >> /etc/hosts
+  fi
+  systemctl try-restart avahi-daemon.service >/dev/null 2>&1 || true
+  exit 0
+fi
+
 case "$1 $2" in
   "firewall on")
     # Turn away connections that other computers start; the computer's own
@@ -18,9 +59,10 @@ case "$1 $2" in
     # And nearby sharing (Hail), from this network only; it still asks
     # before taking any file, and listens only while it's turned on.
     ufw allow in proto udp to 224.0.0.167 port 53317 comment 'freemac: nearby sharing' >/dev/null
-    for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    for net in $LANS; do
       ufw allow in proto tcp from "$net" to any port 53317 comment 'freemac: nearby sharing' >/dev/null
     done
+    if ssh_on; then ssh_firewall allow; fi
     ufw --force enable >/dev/null
     ;;
   "firewall off")
@@ -35,8 +77,19 @@ APT::Periodic::Update-Package-Lists "$value";
 APT::Periodic::Unattended-Upgrade "$value";
 CONF
     ;;
+  "remote-login on")
+    # Each computer makes its own keys the first time (the image ships none).
+    ssh-keygen -A >/dev/null
+    systemctl disable --now ssh.socket >/dev/null 2>&1 || true
+    systemctl enable --now ssh.service >/dev/null
+    ssh_firewall allow
+    ;;
+  "remote-login off")
+    systemctl disable --now ssh.socket ssh.service >/dev/null 2>&1 || true
+    ssh_firewall delete
+    ;;
   *)
-    echo "usage: freemac-system-helper firewall|auto-updates on|off" >&2
+    echo "usage: freemac-system-helper firewall|auto-updates|remote-login on|off, or computer-name NAME" >&2
     exit 2
     ;;
 esac

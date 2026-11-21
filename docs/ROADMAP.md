@@ -840,6 +840,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | ⇧⌘5 during a recording stops it; recording a part of the screen keeps Ctrl+Shift+Print | Lens, Build | done |
 | 4 | Guide and Dials > Keyboard list the new shortcut | Guide, Dials | done |
 
+## 1.79 "what's my name" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Sharing: Computer name, changed after an administrator's password; nearby devices see it, and other computers reach this one at its-name.local | Dials, Build | done |
+| 2 | Nearby sharing's switch on the same page, and Hail calls the computer by its name | Dials, Hail | done |
+| 3 | Remote Login (SSH), off unless turned on: each computer makes its own keys, the firewall lets it through from the local network only, and the page says what to type on the other computer | Dials, Build | done |
+| 4 | Guide: Rename this computer, or log in to it from another | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
