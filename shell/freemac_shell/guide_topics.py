@@ -476,7 +476,7 @@ TOPICS = {
         "Choose 12-hour or 24-hour time, and whether the menu bar shows the day, the date and seconds.",
         "Changing the time or time zone asks for an administrator's password.",
     ]),
-    "dock-hide": ("Hide the Dock until you need it", "dock hide hides automatically autohide auto-hide show more room bottom screen magnification recent files recent apps right-click menu", [
+    "dock-hide": ("Hide the Dock until you need it", "dock hide hides automatically autohide auto-hide show more room bottom screen magnification recent files recent apps right-click menu position left right side move edge", [
         "Choose Dials > Dock and Menu Bar and turn on Automatically hide and show the Dock, or press ⌥⌘D.",
         "The Dock slides away and windows can use the whole screen. Move the pointer to the bottom "
         "edge of the screen and it slides back up.",
@@ -490,6 +490,9 @@ TOPICS = {
         "Options > Keep in Dock. Turn this off in Dials > Dock and Menu Bar with Show recent apps in Dock.",
         "The same page turns off the dots under open apps (Show indicators for open apps) and the bounce "
         "while an app opens (Animate opening apps).",
+        "To put the Dock on the left or right of the screen, choose Position on screen in Dials > Dock and "
+        "Menu Bar, or right-click the Dock between its icons and choose Position on Screen. A Dock that hides "
+        "itself comes back when the pointer reaches that edge.",
     ]),
     "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "

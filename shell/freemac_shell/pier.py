@@ -19,6 +19,7 @@ import json
 import math
 import os
 import subprocess
+import sys
 
 import cairo
 import gi
@@ -71,6 +72,32 @@ TRASH = os.path.join(GLib.get_user_data_dir(), "Trash")
 def default_stacks():
     downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
     return [downloads or os.path.expanduser("~/Downloads")]
+
+
+SIDES = ("left", "bottom", "right")
+SIDE_LABEL_ROOM = 220   # px beside a side Dock's magnified icons for the hovered app's name
+
+
+def icon_box(pier, image, dot):
+    """An icon with its dot under it, or beside it on the screen's side for a
+    Dock on the left or right, as on a Mac."""
+    if not pier.vertical:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_valign(Gtk.Align.END)
+        box.pack_start(image, False, False, 0)
+        box.pack_start(dot, False, False, 0)
+        return box
+    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=1)
+    box.set_valign(Gtk.Align.CENTER)
+    if pier.side == "left":
+        box.set_halign(Gtk.Align.START)
+        box.pack_start(dot, False, False, 0)
+        box.pack_start(image, False, False, 0)
+    else:
+        box.set_halign(Gtk.Align.END)
+        box.pack_start(image, False, False, 0)
+        box.pack_start(dot, False, False, 0)
+    return box
 
 
 def name_tag(widget, name):
@@ -191,17 +218,13 @@ class Place(Gtk.Button):
         spacer = Gtk.Label(label="●")   # keeps icons level with the app items
         spacer.get_style_context().add_class("pier-dot")
         spacer.set_opacity(0.0)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.set_valign(Gtk.Align.END)
-        box.pack_start(self.image, False, False, 0)
-        box.pack_start(spacer, False, False, 0)
-        self.add(box)
+        self.add(icon_box(pier, self.image, spacer))
         name_tag(self, title)
 
     def popup(self, menu):
         menu.show_all()
         self.pier.hold_up(menu)
-        menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
+        self.pier.popup_beside(menu, self)
 
 
 class Stack(Place):
@@ -380,11 +403,7 @@ class Item(Gtk.Button):
         self.image.set_pixel_size(pier.base)
         self.dot = Gtk.Label(label="●")
         self.dot.get_style_context().add_class("pier-dot")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.set_valign(Gtk.Align.END)
-        box.pack_start(self.image, False, False, 0)
-        box.pack_start(self.dot, False, False, 0)
-        self.add(box)
+        self.add(icon_box(pier, self.image, self.dot))
         name_tag(self, apps.short_name(info) if info else apps.display_name(app_id))
         self.menu = None
         self.hold = 0
@@ -639,7 +658,7 @@ class Item(Gtk.Button):
     def popup(self, menu):
         menu.show_all()
         self.pier.hold_up(menu)
-        menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
+        self.pier.popup_beside(menu, self)
 
     def open_recent(self, path):
         """A recent file from the menu, opened in this app."""
@@ -672,20 +691,20 @@ class Item(Gtk.Button):
         elapsed = (GLib.get_monotonic_time() - started) / 1e6
         if elapsed > BOUNCE_LIMIT:
             self.bouncing = None
-            self.image.set_margin_bottom(0)
+            self.pier.lift(self.image, 0)
             self.dot.set_opacity(1.0 if (self.views or self.alive) and self.pier.show_dots() else 0.0)
             return False
         phase = (elapsed % BOUNCE_PERIOD) / BOUNCE_PERIOD
         # Up fast, ease at the top, down with a little weight: one sine arch per hop.
         height = int(round(self.pier.base * BOUNCE_HEIGHT * math.sin(math.pi * phase)))
-        self.image.set_margin_bottom(height)
+        self.pier.lift(self.image, height)
         return True
 
     def stop_bounce(self):
         if self.bouncing:
             GLib.source_remove(self.bouncing[1])
             self.bouncing = None
-            self.image.set_margin_bottom(0)
+            self.pier.lift(self.image, 0)
 
 
 class WindowPicture(Gtk.DrawingArea):
@@ -765,11 +784,7 @@ class MinimizedWindow(Gtk.Button):
         spacer = Gtk.Label(label="●")   # level with the app icons
         spacer.get_style_context().add_class("pier-dot")
         spacer.set_opacity(0.0)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.set_valign(Gtk.Align.END)
-        box.pack_start(self.image, False, False, 0)
-        box.pack_start(spacer, False, False, 0)
-        self.add(box)
+        self.add(icon_box(pier, self.image, spacer))
         name_tag(self, view.get("title") or apps.display_name(view.get("app-id")))
         self.connect("clicked", self._clicked)
 
@@ -793,17 +808,26 @@ class Pier(Gtk.Window):
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.TOP)
         GtkLayerShell.set_namespace(self, "freemac-pier")
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, True)
-        # Full width, so magnifying never resizes the surface: a resize makes
+        # Which edge of the screen the Dock sits on (Dials: Position on
+        # screen). Changing it starts the Dock again, laid out for that edge.
+        side = load_config().get("position")
+        self.side = side if side in SIDES else "bottom"
+        self.vertical = self.side != "bottom"
+        self.edge = {"left": GtkLayerShell.Edge.LEFT, "right": GtkLayerShell.Edge.RIGHT,
+                     "bottom": GtkLayerShell.Edge.BOTTOM}[self.side]
+        GtkLayerShell.set_anchor(self, self.edge, True)
+        # Full length, so magnifying never resizes the surface: a resize makes
         # the compositor take the pointer away from it for a moment, which
         # ended the magnification as soon as it began.
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, True)
-        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.RIGHT, True)
-        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, MARGIN)
+        for along in ((GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM) if self.vertical
+                      else (GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT)):
+            GtkLayerShell.set_anchor(self, along, True)
+        GtkLayerShell.set_margin(self, self.edge, MARGIN)
 
-        self.shelf = Gtk.Box(spacing=0)
-        self.shelf.set_valign(Gtk.Align.END)
-        self.shelf.set_halign(Gtk.Align.CENTER)
+        self.shelf = Gtk.Box(spacing=0, orientation=Gtk.Orientation.VERTICAL if self.vertical
+                             else Gtk.Orientation.HORIZONTAL)
+        self.shelf.get_style_context().add_class("pier-shelf-side" if self.vertical else "pier-shelf-bottom")
+        self._place_at_edge(self.shelf)
         self.shelf.get_style_context().add_class("pier-shelf")
         outer = Gtk.EventBox()
         self.outer = outer
@@ -812,19 +836,24 @@ class Pier(Gtk.Window):
         # the icons, so magnified and bouncing icons rise out of it, as on a
         # Mac, instead of stretching it.
         outer.connect("draw", self._draw_backing)
-        holder = Gtk.Box()
+        holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL if self.vertical else Gtk.Orientation.HORIZONTAL)
         self.holder = holder
-        holder.set_valign(Gtk.Align.END)
-        # Room at the sides for the shelf's soft shadow, so the window's own
+        self._place_at_edge(holder)
+        # Room at the ends for the shelf's soft shadow, so the window's own
         # edge never cuts it off in a straight line.
-        holder.set_margin_start(SHADOW_ROOM)
-        holder.set_margin_end(SHADOW_ROOM)
+        if self.vertical:
+            holder.set_margin_top(SHADOW_ROOM)
+            holder.set_margin_bottom(SHADOW_ROOM)
+        else:
+            holder.set_margin_start(SHADOW_ROOM)
+            holder.set_margin_end(SHADOW_ROOM)
         # The shelf sits in a revealer so a Dock that hides itself can slide
-        # down out of sight inside its own surface, which never moves: moving
-        # the surface under a still pointer confuses where the pointer is.
-        self.revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
-                                     transition_duration=SLIDE_MS, reveal_child=True)
-        self.revealer.set_valign(Gtk.Align.END)
+        # out of sight inside its own surface, which never moves: moving the
+        # surface under a still pointer confuses where the pointer is.
+        slide = {"bottom": Gtk.RevealerTransitionType.SLIDE_UP, "left": Gtk.RevealerTransitionType.SLIDE_RIGHT,
+                 "right": Gtk.RevealerTransitionType.SLIDE_LEFT}[self.side]
+        self.revealer = Gtk.Revealer(transition_type=slide, transition_duration=SLIDE_MS, reveal_child=True)
+        self._place_at_edge(self.revealer)
         self.revealer.add(self.shelf)
         self.revealer.connect("notify::child-revealed", lambda *_: self._slid())
         holder.pack_start(self.revealer, True, False, 0)
@@ -843,7 +872,7 @@ class Pier(Gtk.Window):
         # room above it, kept for magnified icons, is see-through, and the
         # bottom of a window behind it must still be clickable.
         self.input_full = False
-        self.hover_x = None
+        self.hover_x = None   # where the pointer is along the Dock (down it, for a side Dock)
         # Automatically hide and show, and what keeps the Dock up for now.
         self.autohide, self._hide_source, self.menus_up = False, None, 0
         self.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK)
@@ -869,16 +898,17 @@ class Pier(Gtk.Window):
         self.extra = {}
         self.recent = {}                 # desktop ID: Item, apps used lately
         self.recent_ids = load_recent_apps()
-        self.running_sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        line = Gtk.Orientation.HORIZONTAL if self.vertical else Gtk.Orientation.VERTICAL
+        self.running_sep = Gtk.Separator(orientation=line)
         self.running_sep.get_style_context().add_class("pier-sep")
         self.shelf.pack_start(self.running_sep, False, False, 0)
         # Folders and the Trash sit at the right end, after their own line.
-        self.places_sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        self.places_sep = Gtk.Separator(orientation=line)
         self.places_sep.get_style_context().add_class("pier-sep")
         self.shelf.pack_end(self.places_sep, False, False, 0)
         self.places = []
         # Minimized windows sit between the folders and the Trash.
-        self.min_box = Gtk.Box(spacing=0)
+        self.min_box = Gtk.Box(spacing=0, orientation=self.shelf.get_orientation())
         self.windows = {}
         self.config = None
         self.load()
@@ -894,9 +924,47 @@ class Pier(Gtk.Window):
             self.wf = None
         self.refresh()
 
+    # ---- which edge the Dock is on ---------------------------------------------------
+    def _place_at_edge(self, widget):
+        """Hold a part of the Dock against its edge of the screen, centred along it."""
+        if self.vertical:
+            widget.set_halign(Gtk.Align.START if self.side == "left" else Gtk.Align.END)
+            widget.set_valign(Gtk.Align.CENTER if widget is self.shelf else Gtk.Align.FILL)
+        else:
+            widget.set_valign(Gtk.Align.END)
+            if widget is self.shelf:
+                widget.set_halign(Gtk.Align.CENTER)
+
+    def along(self, x, y):
+        """The part of a point that runs along the Dock."""
+        return y if self.vertical else x
+
+    def lift(self, image, amount):
+        """Raise an icon off the Dock's edge, away from the screen's edge (a bounce)."""
+        {"bottom": image.set_margin_bottom, "left": image.set_margin_start,
+         "right": image.set_margin_end}[self.side](amount)
+
+    def popup_beside(self, menu, widget):
+        """Open a menu next to a Dock item, on the side away from the screen's edge."""
+        anchors = {"bottom": (Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH),
+                   "left": (Gdk.Gravity.EAST, Gdk.Gravity.WEST),
+                   "right": (Gdk.Gravity.WEST, Gdk.Gravity.EAST)}[self.side]
+        menu.popup_at_widget(widget, anchors[0], anchors[1], None)
+
+    def _span(self, widget, relative_to):
+        """Where a widget starts along the Dock and how long it is there."""
+        alloc = widget.get_allocation()
+        coords = widget.translate_coordinates(relative_to, 0, 0)
+        if not coords:
+            return None
+        return (coords[1], alloc.height) if self.vertical else (coords[0], alloc.width)
+
     def load(self):
         """(Re)read pier.json: sizes, magnification and the pinned apps."""
         config = load_config()
+        if config.get("position", "bottom") != self.side and (config.get("position") in SIDES or self.side != "bottom"):
+            # Moved to another edge: start again, laid out for it.
+            GLib.idle_add(lambda: os.execv(sys.executable, [sys.executable] + sys.argv))
         self.base = config["size"]
         self.peak = config["peak"] if config["magnify"] else config["size"]
         # Windows avoid the resting dock; magnified icons may overlap them. A
@@ -908,8 +976,9 @@ class Pier(Gtk.Window):
         # A Dock that hides reaches down to the screen's edge, with its gap
         # below inside it, so it slides out of sight past the edge and the
         # pointer resting on the edge is on it.
-        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, 0 if self.autohide else MARGIN)
-        self.shelf.set_margin_bottom(MARGIN if self.autohide else 0)
+        GtkLayerShell.set_margin(self, self.edge, 0 if self.autohide else MARGIN)
+        {"bottom": self.shelf.set_margin_bottom, "left": self.shelf.set_margin_start,
+         "right": self.shelf.set_margin_end}[self.side](MARGIN if self.autohide else 0)
         if self.autohide and not was_hiding:
             self._hide_later()
         elif was_hiding and not self.autohide:
@@ -918,7 +987,11 @@ class Pier(Gtk.Window):
             # The surface changes size once the compositor has the new margin;
             # take input again over where the Dock then is.
             GLib.timeout_add(400, self._settle)
-        self.outer.set_size_request(-1, self.peak + 30 + LABEL_ROOM + (MARGIN if self.autohide else 0))
+        across = self.peak + 30 + (MARGIN if self.autohide else 0)
+        if self.vertical:
+            self.outer.set_size_request(across + SIDE_LABEL_ROOM, -1)
+        else:
+            self.outer.set_size_request(-1, across + LABEL_ROOM)
         # Icon, the running dot under it and the shelf's top and bottom padding.
         self.rest_height = self.base + 22
         if self.config is None or config["pinned"] != self.config["pinned"]:
@@ -966,8 +1039,13 @@ class Pier(Gtk.Window):
         monitor = display.get_monitor_at_window(window) if window else display.get_monitor(0)
         if monitor is None:
             return False
-        room = monitor.get_geometry().width - 2 * SHADOW_ROOM - 24
-        natural = self.shelf.get_preferred_width()[1]
+        if self.vertical:
+            # Leave the menu bar its room at the top.
+            room = monitor.get_geometry().height - 2 * SHADOW_ROOM - 24 - 32
+            natural = self.shelf.get_preferred_height()[1]
+        else:
+            room = monitor.get_geometry().width - 2 * SHADOW_ROOM - 24
+            natural = self.shelf.get_preferred_width()[1]
         count = max(1, len(self.items()) + len(self.windows))
         wanted = self.config["size"]
         # How much wider magnified icons may make the Dock and stay on screen.
@@ -993,12 +1071,27 @@ class Pier(Gtk.Window):
         origin = self.shelf.translate_coordinates(widget, 0, 0)
         if not origin or alloc.width <= 1:
             return False
-        x, bottom = origin[0], origin[1] + alloc.height
+        rest = self.rest_height
+        if self.side == "left":
+            box = (origin[0], origin[1], rest, alloc.height)
+        elif self.side == "right":
+            box = (origin[0] + alloc.width - rest, origin[1], rest, alloc.height)
+        else:
+            box = (origin[0], origin[1] + alloc.height - rest, alloc.width, rest)
         context = self.shelf.get_style_context()
         context.save()
         context.add_class("pier-shelf-bg")
-        Gtk.render_background(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
-        Gtk.render_frame(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
+        cr.save()
+        if self.autohide and self.vertical:
+            # Only as much as has slid onto the screen.
+            shown = self.revealer.get_allocation()
+            at = self.revealer.translate_coordinates(widget, 0, 0)
+            if at:
+                cr.rectangle(at[0], 0, shown.width, widget.get_allocated_height())
+                cr.clip()
+        Gtk.render_background(context, cr, *box)
+        Gtk.render_frame(context, cr, *box)
+        cr.restore()
         context.restore()
         self._draw_name(widget, cr)
         return False
@@ -1009,16 +1102,15 @@ class Pier(Gtk.Window):
             return
         item = None
         for candidate in self.items() + list(self.windows.values()):
-            alloc = candidate.get_allocation()
-            coords = candidate.translate_coordinates(widget, 0, 0)
-            if coords and candidate.get_mapped() and coords[0] <= self.hover_x < coords[0] + alloc.width:
+            span = self._span(candidate, widget)
+            if span and candidate.get_mapped() and span[0] <= self.hover_x < span[0] + span[1]:
                 item = candidate
                 break
         name = getattr(item, "dock_name", "") if item is not None else ""
         if not name:
             return
         image = item.image.get_allocation()
-        coords = item.image.translate_coordinates(widget, image.width // 2, 0)
+        coords = item.image.translate_coordinates(widget, 0, 0)
         if not coords:
             return
         layout = PangoCairo.create_layout(cr)
@@ -1029,8 +1121,13 @@ class Pier(Gtk.Window):
         text_w, text_h = (v / Pango.SCALE for v in layout.get_size())
         pad_x, pad_y = 10, 4
         w, h = text_w + 2 * pad_x, text_h + 2 * pad_y
-        x = min(max(coords[0] - w / 2, 4), widget.get_allocated_width() - w - 4)
-        y = max(2, coords[1] - h - 8)
+        if self.side == "left":
+            x, y = coords[0] + image.width + 10, coords[1] + (image.height - h) / 2
+        elif self.side == "right":
+            x, y = coords[0] - w - 10, coords[1] + (image.height - h) / 2
+        else:
+            x = min(max(coords[0] + image.width / 2 - w / 2, 4), widget.get_allocated_width() - w - 4)
+            y = max(2, coords[1] - h - 8)
         radius = h / 2 if h < 26 else 8
         cr.new_sub_path()
         cr.arc(x + w - radius, y + radius, radius, -math.pi / 2, 0)
@@ -1227,15 +1324,15 @@ class Pier(Gtk.Window):
 
     # ---- dragging apps along the Dock, and files onto apps -------------------
     def _center(self, widget, relative_to):
-        alloc = widget.get_allocation()
-        coords = widget.translate_coordinates(relative_to, alloc.width // 2, 0)
-        return coords[0] if coords else None
+        """The middle of a widget, along the Dock."""
+        span = self._span(widget, relative_to)
+        return span[0] + span[1] // 2 if span else None
 
     def _item_at(self, x, relative_to):
+        """The item at this place along the Dock."""
         for item in self.items():
-            alloc = item.get_allocation()
-            coords = item.translate_coordinates(relative_to, 0, 0)
-            if coords and coords[0] <= x < coords[0] + alloc.width:
+            span = self._span(item, relative_to)
+            if span and span[0] <= x < span[0] + span[1]:
                 return item
         return None
 
@@ -1323,7 +1420,8 @@ class Pier(Gtk.Window):
             self._mark_drop(None)
             Gdk.drag_status(context, 0, time)
 
-    def _drag_motion(self, widget, context, x, _y, time):
+    def _drag_motion(self, widget, context, x, y, time):
+        x = self.along(x, y)
         self.show_now()
         target = widget.drag_dest_find_target(context, None)
         if target is None:
@@ -1357,7 +1455,8 @@ class Pier(Gtk.Window):
             self.drag_outside = True
             self.dragging.hide()
 
-    def _drag_drop(self, widget, context, x, _y, time):
+    def _drag_drop(self, widget, context, x, y, time):
+        x = self.along(x, y)
         target = widget.drag_dest_find_target(context, None)
         if target is None:
             return False
@@ -1425,6 +1524,10 @@ class Pier(Gtk.Window):
         if not origin or alloc.width <= 1:
             return None
         size = self.base
+        if self.side == "left":
+            return (origin[0], origin[1] + (alloc.height - size) // 2, size, size)
+        if self.side == "right":
+            return (origin[0] + alloc.width - size, origin[1] + (alloc.height - size) // 2, size, size)
         return (origin[0] + (alloc.width - size) // 2, origin[1] + alloc.height - size, size, size)
 
     def _next_window_slot(self):
@@ -1437,6 +1540,10 @@ class Pier(Gtk.Window):
         if anchor is not None:
             rect = self._icon_rect(anchor)
             if rect is not None:
+                if self.vertical:
+                    if trash is None:
+                        return (rect[0], rect[1] + rect[3], size, size)
+                    return (rect[0], rect[1] - size // 2, size, size)
                 if trash is None:
                     return (rect[0] + rect[2], rect[1], size, size)
                 return (rect[0] - size // 2, rect[1], size, size)
@@ -1444,6 +1551,9 @@ class Pier(Gtk.Window):
         origin = self.shelf.translate_coordinates(self, 0, 0)
         if not origin:
             return None
+        if self.vertical:
+            x = origin[0] if self.side == "left" else origin[0] + alloc.width - size
+            return (x, origin[1] + alloc.height - size - 16, size, size)
         return (origin[0] + alloc.width - size, origin[1] + alloc.height - size - 16, size, size)
 
     def _send_hints(self):
@@ -1489,7 +1599,7 @@ class Pier(Gtk.Window):
         # the icons move as they grow, so ask where the pointer is on the Dock.
         found = self.get_window().get_device_position(event.get_device())
         moved = self.translate_coordinates(widget, int(found[1]), int(found[2])) if found else None
-        self._magnify(moved[0] if moved else event.x, widget)
+        self._magnify(self.along(*moved) if moved else self.along(event.x, event.y), widget)
 
     def _left(self, _widget, event):
         if event.window == self.get_window() and event.detail != Gdk.NotifyType.INFERIOR:
@@ -1544,8 +1654,15 @@ class Pier(Gtk.Window):
         top = self.shelf.translate_coordinates(self, 0, 0)
         own = self.get_window()
         if top and own is not None and event.device is not None:
-            _w, _x, y, _mask = own.get_device_position(event.device)
-            if y < top[1] + self.shelf.get_allocated_height() - self.rest_height - 4:
+            _w, x, y, _mask = own.get_device_position(event.device)
+            rest = self.rest_height + 4
+            if self.side == "left":
+                away = x > top[0] + rest
+            elif self.side == "right":
+                away = x < top[0] + self.shelf.get_allocated_width() - rest
+            else:
+                away = y < top[1] + self.shelf.get_allocated_height() - rest
+            if away:
                 return False
         config = self.config or load_config()
         menu = Gtk.Menu()
@@ -1557,6 +1674,20 @@ class Pier(Gtk.Window):
             item = Gtk.MenuItem(label=label)
             item.connect("activate", lambda *_, action=action: action())
             menu.append(item)
+        position = Gtk.MenuItem(label="Position on Screen")
+        sides = Gtk.Menu()
+        for side in SIDES:
+            choice = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            mark = Gtk.Label(label="\u2713" if side == self.side else "", xalign=0)
+            mark.set_size_request(18, -1)
+            box.pack_start(mark, False, False, 0)
+            box.pack_start(Gtk.Label(label=side.capitalize(), xalign=0), True, True, 0)
+            choice.add(box)
+            choice.connect("activate", lambda *_, side=side: self.save_config(position=side))
+            sides.append(choice)
+        position.set_submenu(sides)
+        menu.append(position)
         menu.append(Gtk.SeparatorMenuItem())
         settings = Gtk.MenuItem(label="Dock Settings…")
         settings.connect("activate", lambda *_: subprocess.Popen(
@@ -1594,6 +1725,11 @@ class Pier(Gtk.Window):
         width, height = window.get_width(), window.get_height()
         alloc = self.shelf.get_allocation()
         origin = self.shelf.translate_coordinates(self, 0, 0)
+        if self.vertical:
+            area = self._side_input(full, width, height, alloc, origin)
+            window.input_shape_combine_region(cairo.Region(area), 0, 0)
+            self.queue_draw()
+            return False
         left, wide = (origin[0], alloc.width) if origin and alloc.width > 1 else (0, width)
         if self.autohide and self.hidden():
             # Hidden: only the bottom row, along the screen's edge under the Dock.
@@ -1612,6 +1748,24 @@ class Pier(Gtk.Window):
         self.queue_draw()
         return False
 
+    def _side_input(self, full, width, height, alloc, origin):
+        """_set_input's area for a Dock on the left or right edge."""
+        left = self.side == "left"
+        if not origin or alloc.height <= 1:
+            return cairo.RectangleInt(0, 0, width, height)
+        top, tall = origin[1], alloc.height
+        if self.autohide and self.hidden():
+            # Hidden: only the column of pixels along the screen's edge.
+            return cairo.RectangleInt(0 if left else width - 1, top, 1, tall)
+        if full:
+            # The magnified icons, but not the room for the name beside them.
+            reach = width - SIDE_LABEL_ROOM
+            return cairo.RectangleInt(0 if left else SIDE_LABEL_ROOM, top, reach, tall)
+        if left:
+            return cairo.RectangleInt(0, top, origin[0] + self.rest_height + 4, tall)
+        start = max(0, origin[0] + alloc.width - self.rest_height - 4)
+        return cairo.RectangleInt(start, top, width - start, tall)
+
     def _magnify(self, pointer_x, widget=None):
         """Grow icons near the pointer along a cosine curve."""
         if pointer_x is not None:
@@ -1621,8 +1775,9 @@ class Pier(Gtk.Window):
         # Where the pointer is along the Dock, for the name drawn above it.
         hover = None
         if pointer_x is not None and widget is not None:
-            moved = widget.translate_coordinates(self.outer, int(pointer_x), 0)
-            hover = moved[0] if moved else None
+            moved = widget.translate_coordinates(self.outer, *((0, int(pointer_x)) if self.vertical
+                                                                else (int(pointer_x), 0)))
+            hover = self.along(*moved) if moved else None
         if hover != self.hover_x:
             self.hover_x = hover
             self.outer.queue_draw()
@@ -1630,10 +1785,9 @@ class Pier(Gtk.Window):
         for item in self.items() + list(self.windows.values()):
             size = self.base
             if pointer_x is not None and widget is not None:
-                alloc = item.get_allocation()
-                coords = item.translate_coordinates(widget, alloc.width // 2, 0)
-                if coords:
-                    distance = abs(pointer_x - coords[0])
+                center = self._center(item, widget)
+                if center is not None:
+                    distance = abs(pointer_x - center)
                     if distance < REACH:
                         size = self.base + (self.peak - self.base) * math.cos(distance / REACH * math.pi / 2)
             sizes.append((item, size))

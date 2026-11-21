@@ -31,6 +31,7 @@ TEMPLATE = """
 .topline button.recording image { color: #e5484d; }
 
 .pier-shelf { padding: 6px 10px; }
+.pier-shelf-side { padding: 10px 6px; }
 .pier-shelf-bg {
   background-color: @shelf;
   border: 1px solid @edge;
@@ -49,6 +50,8 @@ TEMPLATE = """
 }
 .topline-popup label { color: @ink; }
 .pier-sep { background-color: @edge; min-width: 1px; margin: 8px 6px; }
+.pier-shelf-side .pier-sep { min-width: 0; min-height: 1px; margin: 6px 8px; }
+.pier-shelf-side .pier-item { padding: 3px 0; }
 
 .seek {
   background-color: @panel;
