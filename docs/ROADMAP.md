@@ -547,6 +547,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Pictures and PDFs show small pictures of themselves in Drawer's icon and list views | Drawer | done |
 | 6 | Guide topic: Take a quick look at a file | Guide | done |
 
+## 1.47 "drawer" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Put Back in the Trash (right-click or ⌘⌫), and an Empty button along the top of the Trash | Drawer | done |
+| 2 | Open With on a file's menu: the usual app first, the others that can open it, and Other… for any app | Drawer | done |
+| 3 | Sort By name, kind, date modified or size, from the View menu or a right-click on empty space; kept for every window | Drawer | done |
+| 4 | Show Path Bar (⌥⌘P): the folders above this one along the bottom, each a click away | Drawer | done |
+| 5 | Go to Folder… (⇧⌘G) with Tab to finish names and ~ for home; a file opens its folder with it chosen | Drawer | done |
+| 6 | Guide topic: Sort, find and put back files | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

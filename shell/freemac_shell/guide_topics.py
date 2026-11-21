@@ -65,7 +65,7 @@ TOPICS = {
         "- Space shows a quick preview of the file you chose.",
         "- F2 renames, and Delete moves a file to the Trash.",
         "- ⌘I shows a file's information, and ⌘T opens a tab.",
-        "Click the Trash in the Dock to see it and empty it.",
+        "Click the Trash in the Dock to see it and empty it. In the Trash, Put Back returns a file to its folder.",
     ]),
     "screenshot": ("Take a screenshot", "screenshot screen picture capture record print lens", [
         "- ⇧⌘3 takes a picture of the whole screen.",
@@ -494,6 +494,16 @@ TOPICS = {
         "step through them.",
         "Press Control+Command+F or click the arrows at the top right to fill the screen. Press Space again "
         "to close Glance, or click Open to open the file.",
+    ]),
+    "drawer-more": ("Sort, find and put back files", "drawer sort kind date size path bar go to folder open with put back trash empty finder", [
+        "Right-click an empty part of a Drawer window and choose Sort By to order files by name, kind, "
+        "date modified or size. Drawer remembers your choice.",
+        "Right-click a file and choose Open With to open it in another app, or Other… to pick any app.",
+        "Choose Go > Go to Folder… (Shift+Command+G) and type where to go, such as ~/Documents. "
+        "Press Tab to finish a name.",
+        "Choose View > Show Path Bar (Option+Command+P) to see the folders above this one. Click one to go there.",
+        "In the Trash, right-click a file and choose Put Back (or press Command+Delete) to return it to its folder. "
+        "Click Empty to erase everything in the Trash.",
     ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "

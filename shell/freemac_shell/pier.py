@@ -18,7 +18,6 @@ Hidden apps (Hide) get no picture.
 import json
 import math
 import os
-import shutil
 import subprocess
 
 import cairo
@@ -140,25 +139,8 @@ def trash_items():
 
 def empty_trash():
     """Delete everything in the Trash for good (the files and their notes)."""
-    for part in ("files", "info", "expunged"):
-        folder = os.path.join(TRASH, part)
-        try:
-            names = os.listdir(folder)
-        except OSError:
-            continue
-        for name in names:
-            path = os.path.join(folder, name)
-            try:
-                if os.path.isdir(path) and not os.path.islink(path):
-                    shutil.rmtree(path)
-                else:
-                    os.unlink(path)
-            except OSError:
-                pass
-    try:
-        os.unlink(os.path.join(TRASH, "directorysizes"))
-    except OSError:
-        pass
+    from .transfer import empty_trash as empty
+    empty(TRASH)
 
 
 def file_icon(path):
