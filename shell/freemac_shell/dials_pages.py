@@ -7,6 +7,7 @@ from dials.py so Seek can read it without loading the settings app."""
 PAGES = {
     "network": ("Network", "network-wired-symbolic"),
     "bluetooth": ("Bluetooth", "bluetooth-active-symbolic"),
+    "sharing": ("Sharing", "folder-publicshare-symbolic"),
     "notifications": ("Notifications", "preferences-system-notifications-symbolic"),
     "sound": ("Sound", "audio-volume-high-symbolic"),
     "about": ("About", "help-about-symbolic"),
@@ -32,9 +33,10 @@ PAGES = {
 SEARCH_WORDS = {
     "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections nearby sharing airdrop receive files localsend",
     "bluetooth": "pair headphones speaker mouse keyboard",
+    "sharing": "computer name rename hostname local network nearby sharing airdrop localsend remote login ssh terminal",
     "notifications": "alerts banners do not disturb focus",
     "sound": "volume speaker microphone output input audio alert chime",
-    "about": "version computer name storage memory system update",
+    "about": "version storage memory system update",
     "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode theme accent colour color highlight purple pink red orange yellow green graphite text size tiling",

@@ -438,13 +438,21 @@ TOPICS = {
         "When the copy is done, Drawer's status line or a notification says so. "
         "Eject the drive before you unplug it.",
     ]),
+    "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
+        "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
+        "administrator's password. Nearby devices and printers see the new name, and other computers "
+        "on your network can reach this one at the name shown underneath, ending in .local.",
+        "Remote Login lets someone at another computer on the same network use this one's Terminal: "
+        "they type ssh, your user name, @ and the computer's .local name, then your password. "
+        "It's off unless you turn it on; turn it off again when you're done.",
+    ]),
     "nearby": ("Send files to a computer or phone nearby", "nearby airdrop send share phone iphone android tablet wifi wireless localsend transfer receive photos", [
         "In Drawer, Cove or Frame, select what you want to send, click the Share button and choose "
         "Nearby\u2026. Computers and phones on the same Wi-Fi appear as round icons; click one to send.",
         "The other device asks its owner first. Its icon then says Waiting, Sending and Sent, or Declined. "
         "Click it while it's sending to stop.",
         "To let others send to you, turn on Let nearby devices send files here, at the bottom of the "
-        "Nearby window or in Dials > Network. Each time, you're asked whether to accept, and accepted "
+        "Nearby window or in Dials > Network or Sharing. Each time, you're asked whether to accept, and accepted "
         "files go in Downloads.",
         "Phones, tablets and Windows computers need the free LocalSend app. Other freemac computers "
         "already have it built in.",

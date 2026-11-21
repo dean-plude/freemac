@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -379,6 +379,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             (0, "network", "Network", "network-wired-symbolic", "blue", self.network),
             (0, "bluetooth", "Bluetooth", "bluetooth-active-symbolic", "blue",
              lambda: dials_people.BluetoothPanel(self, page)),
+            (0, "sharing", "Sharing", "folder-publicshare-symbolic", "blue",
+             lambda: dials_sharing.sharing_page(self)),
             (1, "notifications", "Notifications", "preferences-system-notifications-symbolic", "red",
              lambda: dials_more.notifications(self)),
             (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
@@ -977,7 +979,7 @@ MENU_PANELS = (
      ("notifications", "Notifications")),
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
-    (("network", "Network"), ("accessibility", "Accessibility"), ("users", "Users"),
+    (("network", "Network"), ("sharing", "Sharing"), ("accessibility", "Accessibility"), ("users", "Users"),
      ("loginitems", "Login Items"), ("softwareupdate", "Software Update"), ("about", "About")),
 )
 
