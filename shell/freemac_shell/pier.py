@@ -21,12 +21,15 @@ import os
 import shutil
 import subprocess
 
+import cairo
 import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
+gi.require_version("Pango", "1.0")
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
 from . import alert, apps, held, login_items, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
@@ -40,6 +43,7 @@ BOUNCE_LIMIT = 6.0     # stop hopping after this long even if no window shows
 HOLD_MS = 550        # hold an app in the dock this long to open its menu
 # Parts of the desktop that open without a window of their own don't hop.
 SHADOW_ROOM = 22   # px each side of the shelf for its shadow
+LABEL_ROOM = 36    # px above the magnified icons for the hovered app's name
 NO_BOUNCE = {"freemac-marina.desktop", "freemac-seek.desktop"}
 MARGIN = 8
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
@@ -62,6 +66,17 @@ TRASH = os.path.join(GLib.get_user_data_dir(), "Trash")
 def default_stacks():
     downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
     return [downloads or os.path.expanduser("~/Downloads")]
+
+
+def name_tag(widget, name):
+    """Give a Dock item its name: drawn above it while the pointer is over it, as
+    on a Mac, and read out by screen readers. (Not a GTK tooltip: that would pop
+    up under the pointer and steal it from the Dock.)"""
+    widget.dock_name = name or ""
+    widget.get_accessible().set_name(widget.dock_name)
+    pier = getattr(widget, "pier", None)
+    if pier is not None and getattr(pier, "hover_x", None) is not None:
+        pier.outer.queue_draw()
 
 
 def load_config():
@@ -157,6 +172,8 @@ class Place(Gtk.Button):
     def __init__(self, pier, icon_name, title):
         super().__init__()
         self.pier = pier
+        # Pointer motion over the button reaches the Dock, which magnifies.
+        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK)
         self.get_style_context().add_class("pier-item")
         self.set_relief(Gtk.ReliefStyle.NONE)
         self.image = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
@@ -169,7 +186,7 @@ class Place(Gtk.Button):
         box.pack_start(self.image, False, False, 0)
         box.pack_start(spacer, False, False, 0)
         self.add(box)
-        self.set_tooltip_text(title)
+        name_tag(self, title)
 
     def popup(self, menu):
         menu.show_all()
@@ -280,7 +297,7 @@ class TrashCan(Place):
         full = bool(trash_items())
         self.image.set_from_icon_name("user-trash-full" if full else "user-trash", Gtk.IconSize.DIALOG)
         self.image.set_pixel_size(self.pier.base)
-        self.set_tooltip_text("Trash" if full else "Trash (empty)")
+        name_tag(self, "Trash")
 
     def _press(self, _widget, event):
         if event.button != 3:
@@ -328,6 +345,8 @@ class Item(Gtk.Button):
     def __init__(self, pier, desktop_id=None, app_id=None):
         super().__init__()
         self.pier = pier
+        # Pointer motion over the button reaches the Dock, which magnifies.
+        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK)
         self.desktop_id = desktop_id
         self.app_id = app_id
         self.views = []
@@ -355,7 +374,7 @@ class Item(Gtk.Button):
         box.pack_start(self.image, False, False, 0)
         box.pack_start(self.dot, False, False, 0)
         self.add(box)
-        self.set_tooltip_text(apps.short_name(info) if info else apps.display_name(app_id))
+        name_tag(self, apps.short_name(info) if info else apps.display_name(app_id))
         self.menu = None
         self.hold = 0
         self.icon = icon
@@ -673,6 +692,8 @@ class MinimizedWindow(Gtk.Button):
     def __init__(self, pier, view, picture_path):
         super().__init__()
         self.pier = pier
+        # Pointer motion over the button reaches the Dock, which magnifies.
+        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK)
         self.view = view
         self.path = picture_path
         self.get_style_context().add_class("pier-item")
@@ -694,7 +715,7 @@ class MinimizedWindow(Gtk.Button):
         box.pack_start(self.image, False, False, 0)
         box.pack_start(spacer, False, False, 0)
         self.add(box)
-        self.set_tooltip_text(view.get("title") or apps.display_name(view.get("app-id")))
+        name_tag(self, view.get("title") or apps.display_name(view.get("app-id")))
         self.connect("clicked", self._clicked)
 
     def _clicked(self, _button):
@@ -718,6 +739,11 @@ class Pier(Gtk.Window):
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.TOP)
         GtkLayerShell.set_namespace(self, "freemac-pier")
         GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, True)
+        # Full width, so magnifying never resizes the surface: a resize makes
+        # the compositor take the pointer away from it for a moment, which
+        # ended the magnification as soon as it began.
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, True)
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.RIGHT, True)
         GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, MARGIN)
 
         self.shelf = Gtk.Box(spacing=0)
@@ -741,7 +767,14 @@ class Pier(Gtk.Window):
         outer.add(holder)
         outer.add_events(1 << 2 | 1 << 13)  # pointer motion, leave
         outer.connect("motion-notify-event", self._motion)
-        outer.connect("leave-notify-event", lambda *_: self._magnify(None))
+        outer.connect("leave-notify-event", self._left)
+        # Only the resting shelf takes clicks until the pointer reaches it: the
+        # room above it, kept for magnified icons, is see-through, and the
+        # bottom of a window behind it must still be clickable.
+        self.input_full = False
+        self.hover_x = None
+        outer.connect_after("size-allocate", lambda *_: GLib.idle_add(self._settle))
+        self.connect("map-event", lambda *_: self._set_input(False))
         # Apps dragged along the Dock, and files dropped on an app to open them.
         outer.drag_dest_set(0, [DOCK_TARGET, URI_TARGET], Gdk.DragAction.MOVE | Gdk.DragAction.COPY)
         outer.connect("drag-motion", self._drag_motion)
@@ -791,7 +824,7 @@ class Pier(Gtk.Window):
         self.peak = config["peak"] if config["magnify"] else config["size"]
         # Windows avoid the resting dock; magnified icons may overlap them.
         GtkLayerShell.set_exclusive_zone(self, self.base + 28)
-        self.outer.set_size_request(-1, self.peak + 30)
+        self.outer.set_size_request(-1, self.peak + 30 + LABEL_ROOM)
         # Icon, the running dot under it and the shelf's top and bottom padding.
         self.rest_height = self.base + 22
         if self.config is None or config["pinned"] != self.config["pinned"]:
@@ -827,6 +860,39 @@ class Pier(Gtk.Window):
         self.config = config
         for item in self.items() + list(self.windows.values()):
             item.image.set_pixel_size(self.base)
+        GLib.idle_add(self._fit)
+
+    def _fit(self):
+        """Shrink the icons when the Dock would be wider than the screen, as a
+        Mac does, and grow them back towards the chosen size when there's room."""
+        if self.input_full or self.dragging or self.config is None:
+            return False
+        display = Gdk.Display.get_default()
+        window = self.get_window()
+        monitor = display.get_monitor_at_window(window) if window else display.get_monitor(0)
+        if monitor is None:
+            return False
+        room = monitor.get_geometry().width - 2 * SHADOW_ROOM - 24
+        natural = self.shelf.get_preferred_width()[1]
+        count = max(1, len(self.items()) + len(self.windows))
+        wanted = self.config["size"]
+        # How much wider magnified icons may make the Dock and stay on screen.
+        self.slack = max(0, room - natural)
+        # Keep some room spare so magnified icons still have space to grow.
+        fit = room - 2 * (self.peak - self.base)
+        if natural > fit:
+            base = max(24, self.base - -(-(natural - fit) // count))
+        elif self.base < wanted:
+            base = min(wanted, self.base + (fit - natural) // count)
+        else:
+            return False
+        if base != self.base:
+            self.base = base
+            self.peak = max(base, self.config["peak"] if self.config["magnify"] else base)
+            self.rest_height = base + 22
+            self._magnify(None)
+            self.outer.queue_draw()
+        return False
 
     def _draw_backing(self, widget, cr):
         alloc = self.shelf.get_allocation()
@@ -840,7 +906,53 @@ class Pier(Gtk.Window):
         Gtk.render_background(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
         Gtk.render_frame(context, cr, x, bottom - self.rest_height, alloc.width, self.rest_height)
         context.restore()
+        self._draw_name(widget, cr)
         return False
+
+    def _draw_name(self, widget, cr):
+        """The hovered item's name in a small rounded label above its icon."""
+        if self.hover_x is None or self.dragging:
+            return
+        item = None
+        for candidate in self.items() + list(self.windows.values()):
+            alloc = candidate.get_allocation()
+            coords = candidate.translate_coordinates(widget, 0, 0)
+            if coords and candidate.get_mapped() and coords[0] <= self.hover_x < coords[0] + alloc.width:
+                item = candidate
+                break
+        name = getattr(item, "dock_name", "") if item is not None else ""
+        if not name:
+            return
+        image = item.image.get_allocation()
+        coords = item.image.translate_coordinates(widget, image.width // 2, 0)
+        if not coords:
+            return
+        layout = PangoCairo.create_layout(cr)
+        font = widget.get_pango_context().get_font_description().copy()
+        font.set_absolute_size(13 * Pango.SCALE)
+        layout.set_font_description(font)
+        layout.set_text(name if len(name) <= 40 else name[:39] + "\u2026", -1)
+        text_w, text_h = (v / Pango.SCALE for v in layout.get_size())
+        pad_x, pad_y = 10, 4
+        w, h = text_w + 2 * pad_x, text_h + 2 * pad_y
+        x = min(max(coords[0] - w / 2, 4), widget.get_allocated_width() - w - 4)
+        y = max(2, coords[1] - h - 8)
+        radius = h / 2 if h < 26 else 8
+        cr.new_sub_path()
+        cr.arc(x + w - radius, y + radius, radius, -math.pi / 2, 0)
+        cr.arc(x + w - radius, y + h - radius, radius, 0, math.pi / 2)
+        cr.arc(x + radius, y + h - radius, radius, math.pi / 2, math.pi)
+        cr.arc(x + radius, y + radius, radius, math.pi, 3 * math.pi / 2)
+        cr.close_path()
+        dark = style.is_dark()
+        cr.set_source_rgba(*((0.16, 0.16, 0.17, 0.94) if dark else (0.96, 0.96, 0.96, 0.95)))
+        cr.fill_preserve()
+        cr.set_source_rgba(*((1, 1, 1, 0.14) if dark else (0, 0, 0, 0.14)))
+        cr.set_line_width(1)
+        cr.stroke()
+        cr.set_source_rgba(*((1, 1, 1, 0.92) if dark else (0, 0, 0, 0.85)))
+        cr.move_to(x + pad_x, y + pad_y)
+        PangoCairo.show_layout(cr, layout)
 
     def _reload(self):
         self.load()
@@ -1213,10 +1325,64 @@ class Pier(Gtk.Window):
         return False
 
     def _motion(self, widget, event):
-        self._magnify(event.x, widget)
+        # The event may come from an icon's own button, in its coordinates, and
+        # the icons move as they grow, so ask where the pointer is on the Dock.
+        found = self.get_window().get_device_position(event.get_device())
+        moved = self.translate_coordinates(widget, int(found[1]), int(found[2])) if found else None
+        self._magnify(moved[0] if moved else event.x, widget)
+
+    def _left(self, *_):
+        # Moving onto an icon's button counts as leaving the box around them
+        # all; only stop magnifying once the pointer has left the Dock itself.
+        GLib.idle_add(self._check_left)
+
+    def _check_left(self):
+        seat = Gdk.Display.get_default().get_default_seat()
+        pointer = seat.get_pointer() if seat else None
+        under = pointer.get_window_at_position()[0] if pointer else None
+        if under is None or under.get_toplevel() != self.get_window():
+            self._magnify(None)
+        return False
+
+    def _settle(self):
+        self._set_input(self.input_full)
+        if not self.input_full:
+            self._fit()
+        return False
+
+    def _set_input(self, full):
+        """Take pointer input over the whole Dock while it's in use, else only over the shelf."""
+        self.input_full = full
+        window = self.get_window()
+        if window is None:
+            return False
+        width, height = window.get_width(), window.get_height()
+        alloc = self.shelf.get_allocation()
+        origin = self.shelf.translate_coordinates(self, 0, 0)
+        if not origin or alloc.width <= 1:
+            area = cairo.RectangleInt(0, 0, width, height)
+        elif full:
+            # The magnified icons, but not the room for the name above them.
+            area = cairo.RectangleInt(origin[0], LABEL_ROOM, alloc.width, height - LABEL_ROOM)
+        else:
+            top = max(0, origin[1] + alloc.height - self.rest_height - 4)
+            area = cairo.RectangleInt(origin[0], top, alloc.width, height - top)
+        window.input_shape_combine_region(cairo.Region(area), 0, 0)
+        return False
 
     def _magnify(self, pointer_x, widget=None):
         """Grow icons near the pointer along a cosine curve."""
+        if (pointer_x is not None) != self.input_full:
+            self._set_input(pointer_x is not None)
+        # Where the pointer is along the Dock, for the name drawn above it.
+        hover = None
+        if pointer_x is not None and widget is not None:
+            moved = widget.translate_coordinates(self.outer, int(pointer_x), 0)
+            hover = moved[0] if moved else None
+        if hover != self.hover_x:
+            self.hover_x = hover
+            self.outer.queue_draw()
+        sizes = []
         for item in self.items() + list(self.windows.values()):
             size = self.base
             if pointer_x is not None and widget is not None:
@@ -1225,8 +1391,14 @@ class Pier(Gtk.Window):
                 if coords:
                     distance = abs(pointer_x - coords[0])
                     if distance < REACH:
-                        size = int(self.base + (self.peak - self.base) * math.cos(distance / REACH * math.pi / 2))
-            item.image.set_pixel_size(size)
+                        size = self.base + (self.peak - self.base) * math.cos(distance / REACH * math.pi / 2)
+            sizes.append((item, size))
+        # A crowded Dock magnifies less, so its ends stay on the screen.
+        extra = sum(size - self.base for _, size in sizes)
+        slack = getattr(self, "slack", None)
+        scale = min(1.0, slack / extra) if slack is not None and extra > 0 else 1.0
+        for item, size in sizes:
+            item.image.set_pixel_size(int(self.base + (size - self.base) * scale))
 
 
 def main():
