@@ -482,7 +482,7 @@ TOPICS = {
         "It stays up while the pointer is on it or one of its menus is open, and hides again when you move away.",
         "Press ⌥⌘D again to keep it on screen all the time.",
     ]),
-    "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions", [
+    "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
         "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",
         "Click a stack to spread its files out on the desktop, and click it again to gather them up.",
@@ -491,6 +491,9 @@ TOPICS = {
         "Get Info (Command+I) tells you about a file.",
         "Right-click the desktop and choose Show Item Info to see, under each name, how big a picture is "
         "and how many items a folder holds.",
+        "To make the desktop's icons bigger or smaller, right-click the desktop and choose Show View Options, "
+        "or press Command+J. Slide Icon size and Grid spacing, pick a Text size, and click Use Defaults "
+        "to go back to how it was.",
     ]),
     "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
         "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "

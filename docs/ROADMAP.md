@@ -635,6 +635,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | View > Show View Options (⌘J): icon size slider, grid spacing, text size, Show item info, Sort By, kept for every window | Drawer | done |
 | 2 | Guide: View Options in Sort, find and put back files | Guide | done |
 
+## 1.57 "desktop view options" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Show View Options (⌘J) on the desktop: icon size, grid spacing, text size, Show item info, Use Defaults | Backdrop | done |
+| 2 | Get Info, Rename Items and View Options from the desktop open with a normal-sized frame | Backdrop | done |
+| 3 | Guide: View Options in Tidy the desktop with stacks | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

@@ -31,10 +31,16 @@ def app_info(app_id):
 
 # Helper programs with no app entry of their own, named the way a person
 # would think of them.
+# The app id of windows the desktop opens in a process of their own (Get Info,
+# Rename Items, View Options). Not "freemac-backdrop": a window with the
+# desktop's own id is given a frame the size of a big window.
+DESKTOP_WINDOW = "freemac-desktop-window"
+
 HELPER_NAMES = {
     "polkit-mate-authentication-agent-1": "Password",
     "gtklock": "Lock Screen",
     "freemac-backdrop": "Drawer",   # the desktop's own windows, such as Get Info
+    DESKTOP_WINDOW: "Drawer",
 }
 
 

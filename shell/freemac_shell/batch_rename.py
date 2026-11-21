@@ -20,6 +20,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
 from . import transfer  # noqa: E402
+from .apps import DESKTOP_WINDOW  # noqa: E402
 
 FORMATS = (("index", "Name and Index"), ("counter", "Name and Counter"), ("date", "Name and Date"))
 
@@ -231,7 +232,7 @@ def main(argv=None):
     for the desktop, which gives windows it opens itself the wrong size. Prints
     the (old, new) pairs renamed as JSON."""
     paths = [p for p in (argv if argv is not None else sys.argv[1:]) if os.path.lexists(p)]
-    GLib.set_prgname("freemac-backdrop")   # the desktop's window: the menu bar says Drawer
+    GLib.set_prgname(DESKTOP_WINDOW)   # the desktop's window: the menu bar says Drawer
     done = ask(None, paths) if len(paths) > 1 else []
     print(json.dumps(done))
     return 0
