@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_info, macapps, menus, quick_actions, recents, servers, share, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -226,6 +226,10 @@ class Folder:
                 except GLib.Error:
                     continue
                 self._add(info, full)
+        elif path == neighbours.PLACE:
+            # Network: the computers nearby, found as they answer.
+            self.browsing, self.on_change = True, None
+            neighbours.browse(self._add_neighbour, self._browsed)
         elif path.startswith(tags.PREFIX):
             # A tag in the sidebar: every file with that tag, wherever it is.
             for full in tags.tagged(path[len(tags.PREFIX):]):
@@ -254,6 +258,22 @@ class Folder:
             tags.note_folder(path, found)
         if self.waiting:
             GLib.idle_add(self._thumbnails, self.waiting)
+
+    def _add_neighbour(self, name, address, icon):
+        """One computer in the Network place; opening it connects."""
+        if not icon or not Gtk.IconTheme.get_default().lookup_by_gicon(icon, 16, 0):
+            icon = Gio.ThemedIcon.new("network-server")
+        self.store.append([
+            self.icon(icon, self.icon_size), name, neighbours.PREFIX + address, True, "", "",
+            "Computer", "0" + name.lower(), self.icon(icon, 20), 0.0, 0.0, GLib.markup_escape_text(name),
+        ])
+        if self.on_change:
+            self.on_change()
+
+    def _browsed(self):
+        self.browsing = False
+        if self.on_change:
+            self.on_change()
 
     def _add(self, info, full):
         """One row for the file; returns its tags."""
@@ -596,6 +616,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return path[len(tags.PREFIX):]
         if path == recents.PLACE:
             return "Recents"
+        if path == neighbours.PLACE:
+            return "Network"
         if path and os.path.realpath(path) == os.path.realpath(TRASH):
             return "Trash"
         return os.path.basename(path) or "Computer"
@@ -633,6 +655,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif folder is not None:
             model = self.icon_view.get_model()
         count = len(model) if model is not None else 0
+        if self.path == neighbours.PLACE and not count:
+            return ("Looking for computers\u2026" if folder is not None and folder.browsing
+                    else "No shared computers found on this network")
         chosen = len(self.selected_paths())
         text = f"{chosen} of {count} selected" if chosen else f"{count} item{'s' if count != 1 else ''}"
         if not self.in_virtual() and self.path:
@@ -900,6 +925,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.monitor.cancel()
             self.monitor = None
         self.watched = self.path
+        if self.path == neighbours.PLACE:
+            self.monitor = neighbours.watch(self._changed_soon)
+            return
         if self.in_virtual():
             return   # files from all over; changed tags refresh it themselves
         try:
@@ -960,6 +988,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "put-back": self.put_back,
             "go-to-folder": self.go_to_folder,
             "connect-to-server": self.connect_to_server,
+            "go-network": lambda: self.navigate(neighbours.PLACE),
             "go-recents": lambda: self.navigate(recents.PLACE),
             "new-folder-with": self.new_folder_with,
             "show-enclosing": self.show_enclosing,
@@ -1054,7 +1083,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         for child in self.loc_list.get_children():
             self.loc_list.remove(child)
         trash = TRASH
-        entries = [("Computer", "/", Gio.ThemedIcon.new("drive-harddisk-symbolic"), None)]
+        entries = [("Computer", "/", Gio.ThemedIcon.new("drive-harddisk-symbolic"), None),
+                   ("Network", neighbours.PLACE, Gio.ThemedIcon.new("network-workgroup-symbolic"), None)]
         for mount in volumes.drives():
             entries.append((mount.get_name(), volumes.path_of(mount), mount.get_symbolic_icon(), mount))
         for mount in servers.servers():
@@ -1100,7 +1130,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def in_virtual(self):
         """A tag or Recents: files gathered from all over, not one folder."""
-        return self.in_tag() or self.path == recents.PLACE
+        return self.in_tag() or self.path in (recents.PLACE, neighbours.PLACE)
 
     def _tags_changed(self, error, keep):
         if error is not None:
@@ -1432,7 +1462,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- navigation -----------------------------------------------------
     def navigate(self, path, remember=True):
-        if not path.startswith(tags.PREFIX) and path != recents.PLACE:
+        if not path.startswith(tags.PREFIX) and path not in (recents.PLACE, neighbours.PLACE):
             path = os.path.abspath(os.path.expanduser(path))
         if remember and self.path and path != self.path:
             self.history.append(self.path)
@@ -1462,6 +1492,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._show_place()
         folder = Folder(self.path, self.show_hidden, self.sort, self.icon_size, self.item_info_shown)
         self.folder = folder
+        if self.path == neighbours.PLACE:
+            folder.on_change = lambda: self.folder is folder and self._show_status()
         model = self._model(folder)
         self.icon_view.set_model(model)
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
@@ -1480,7 +1512,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.empty_button.set_sensitive(in_trash and count > 0)
         self.lookup_action("put-back").set_enabled(in_trash)
         self.lookup_action("new-folder-with").set_enabled(not self.in_virtual() and not in_trash)
-        self.lookup_action("show-enclosing").set_enabled(self.in_virtual())
+        self.lookup_action("show-enclosing").set_enabled(self.in_virtual() and self.path != neighbours.PLACE)
         self._draw_path_bar()
         self._watch()
 
@@ -1591,7 +1623,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _activate(self, model, tree_path):
         it = model.get_iter(tree_path)
         path, is_dir = model[it][C_PATH], model[it][C_IS_DIR]
-        if is_dir:
+        if neighbours.address_of(path):
+            self.connect_to(neighbours.address_of(path), model[it][C_NAME])
+        elif is_dir:
             self.navigate(path)
         else:
             self.open_file(path)
@@ -1975,6 +2009,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         path = self.path
         if path == recents.PLACE:
             crumbs = [("Recents", path, "document-open-recent-symbolic")]
+        elif path == neighbours.PLACE:
+            crumbs = [("Network", path, "network-workgroup-symbolic")]
         elif self.in_virtual():
             crumbs = [(self._label(path), path, None)]
         elif self.in_trash():
@@ -2014,6 +2050,17 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def connect_to_server(self):
         """⌘K: open a shared folder on another computer, like a drive."""
         servers.connect_dialog(self, self.navigate)
+
+    def connect_to(self, address, name=None):
+        """Open a computer from the Network place: sign in if it asks."""
+        self.notify("Connecting\u2026")
+
+        def done(path, problem):
+            if path:
+                self.navigate(path)
+            elif problem:
+                self.notify(problem)
+        servers.connect(address, self, done, name)
 
     # ---- Go to Folder ----------------------------------------------------
     last_typed = "~/"
@@ -2226,6 +2273,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self._reset_columns()
 
     def _menu(self, event):
+        if self.path == neighbours.PLACE:
+            self._network_menu(event)
+            return
         menu = Gtk.Menu()
         has_selection = bool(self.selected_paths())
         has_folder = any(os.path.isdir(p) for p in self.selected_paths()[:1])
@@ -2309,8 +2359,24 @@ class DrawerWindow(Gtk.ApplicationWindow):
         menu.attach_to_widget(self, None)
         menu.popup_at_pointer(event)
 
+    def _network_menu(self, event):
+        """In Network, a computer can only be connected to."""
+        menu = Gtk.Menu()
+        chosen = [neighbours.address_of(p) for p in self.selected_paths() if neighbours.address_of(p)]
+        for label, handler, enabled in (("Connect", lambda *_: self.connect_to(chosen[0]), bool(chosen)),
+                                        ("Connect to Server\u2026", lambda *_: self.connect_to_server(), True)):
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", handler)
+            item.set_sensitive(enabled)
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(self, None)
+        menu.popup_at_pointer(event)
+
     def open_or_enter(self, path):
-        if os.path.isdir(path) and not macapps.is_bundle(path):
+        if neighbours.address_of(path):
+            self.connect_to(neighbours.address_of(path))
+        elif os.path.isdir(path) and not macapps.is_bundle(path):
             self.navigate(path)
         else:
             self.open_file(path)
@@ -2451,7 +2517,7 @@ def menubar():
              ("Enclosing Folder", "win.up", "<Ctrl>Up")],
             [("Recents", "win.go-recents", "<Ctrl><Shift>f"), ("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
-             ("Computer", "win.go-computer", None)],
+             ("Computer", "win.go-computer", None), ("Network", "win.go-network", "<Ctrl><Shift>k")],
             [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g"),
              ("Connect to Server…", "win.connect-to-server", "<Ctrl>k")],
             [("Browse Backups", "win.browse-backups", None)],

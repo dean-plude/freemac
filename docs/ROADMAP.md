@@ -885,6 +885,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Connected servers under Locations with an Eject button; gvfs-fuse so every app can open their files | Drawer, ISO | done |
 | 4 | Guide: Open a shared folder on another computer | Guide | done |
 
+## 1.84 "who's there" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Network under Locations and in the Go menu (⇧⌘K): the computers and shared drives on the local network, appearing as they're found | Drawer | done |
+| 2 | Open one to connect, signing in if it asks; Connect and Connect to Server… on right-click | Drawer | done |
+| 3 | Errors name the computer ("There was a problem connecting to the server “Kids PC”…") | Drawer | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

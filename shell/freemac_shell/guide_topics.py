@@ -461,12 +461,14 @@ TOPICS = {
         "and pressing the space bar twice ends a sentence with a full stop. Each can be turned off on the "
         "same page.",
     ]),
-    "servers": ("Open a shared folder on another computer", "connect to server network shared folder smb windows share nas sftp ftp webdav file server mount drive", [
+    "servers": ("Open a shared folder on another computer", "connect to server network neighbourhood browse computers nearby shared folder smb windows share nas sftp ftp webdav file server mount drive", [
         "In Drawer, choose Go > Connect to Server\u2026 (\u2318K). Type the address, such as "
         "smb://office-pc/Photos, or just the computer's name for a Windows or Mac shared folder, and click "
         "Connect. If it asks, type the name and password you use on that computer.",
         "The folder opens like a drive and shows under Locations in the sidebar; click its Eject button when "
         "you're done. Click + to keep an address in Favourite Servers for next time.",
+        "Or click Network under Locations (Go > Network, \u21e7\u2318K) to see the computers and shared "
+        "drives nearby, and double-click one to open it.",
     ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
