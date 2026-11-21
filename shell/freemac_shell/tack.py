@@ -4,6 +4,7 @@ open app as a row of large icons on a translucent panel in the middle of the
 screen. Each Tab moves to the next app (Shift+Tab goes back); letting go
 brings the chosen app's windows to the front. A quick Command+Tab, let go at
 once, swaps straight to the app used before without the panel showing.
+While the panel is up, Q quits the chosen app and H hides it, as on a Mac.
 
     freemac-tack            run the switcher (started with the session)
     freemac-tack --next     what Command+Tab runs: show it, or move right
@@ -49,12 +50,12 @@ window.switcher, window.switcher > * {
 .switcher-panel.dark .switcher-app.chosen {
     background-color: rgba(255, 255, 255, 0.18);
 }
-.switcher-name {
+.switcher-name, .switcher-name:backdrop {
     font-size: 13px;
     color: #1d1d1f;
     margin-top: 4px;
 }
-.switcher-panel.dark .switcher-name {
+.switcher-panel.dark .switcher-name, .switcher-panel.dark .switcher-name:backdrop {
     color: #f2f2f4;
 }
 """
@@ -95,14 +96,21 @@ def minimized(view):
 
 def bring_forward(wayfire, views):
     """Bring all of an app's windows to the front, the one used last on top.
-    If every one of them is minimized, the last used comes back."""
-    shown = [v for v in views if not minimized(v)]
+    A hidden app (⌘H) comes back whole; if every window is minimized, the
+    last used one comes back."""
+    try:
+        hidden = wayfire.hidden()
+    except (ConnectionError, OSError, ValueError, AttributeError):
+        hidden = set()
+    shown = [v for v in views if not minimized(v) and v.get("id") not in hidden]
     if not shown and views:
-        try:
-            wayfire.set_minimized(views[0]["id"], False)
-        except (ConnectionError, OSError, ValueError):
-            return
-        shown = [views[0]]
+        back = [v for v in views if v.get("id") in hidden] or [views[0]]
+        for view in reversed(back):
+            try:
+                wayfire.set_minimized(view["id"], False)
+            except (ConnectionError, OSError, ValueError):
+                return
+        shown = back
     for view in reversed(shown):
         try:
             wayfire.focus(view["id"])
@@ -189,9 +197,12 @@ def run():
             dark = style.is_dark()
             (self.panel.get_style_context().add_class if dark else
              self.panel.get_style_context().remove_class)("dark")
-            for index, (app_id, _views) in enumerate(self.apps):
+            hidden = self.wayfire.hidden()
+            for index, (app_id, views) in enumerate(self.apps):
                 image = Gtk.Image.new_from_gicon(app_names.icon_for(app_id), Gtk.IconSize.DIALOG)
                 image.set_pixel_size(ICON)
+                if views and all(v.get("id") in hidden for v in views):
+                    image.set_opacity(0.5)   # a hidden app (⌘H) is dimmed
                 tile = Gtk.EventBox()
                 tile.set_visible_window(False)
                 box = Gtk.Box()   # draws the highlight; an EventBox without a window doesn't
@@ -260,7 +271,44 @@ def run():
                 self.step(1)
             elif key in (Gdk.KEY_Left, Gdk.KEY_ISO_Left_Tab):
                 self.step(-1)
+            elif key in (Gdk.KEY_q, Gdk.KEY_Q):
+                self.quit_chosen()
+            elif key in (Gdk.KEY_h, Gdk.KEY_H):
+                self.hide_chosen()
             return True
+
+        # -- Q and H, while the switcher is up (as on a Mac)
+        def quit_chosen(self):
+            """Quit the chosen app and take it out of the row; the rest stay."""
+            if not self.showing or not self.apps:
+                return
+            app_id, _views = self.apps[self.chosen]
+            try:
+                if self.held.is_running(app_id):
+                    self.held.quit(app_id)
+                else:
+                    self.wayfire.quit(app_id)
+            except (ConnectionError, OSError, ValueError):
+                return
+            del self.apps[self.chosen]
+            self.tiles.pop(self.chosen).destroy()
+            if not self.apps:
+                self.stop()
+                return
+            self.choose(min(self.chosen, len(self.apps) - 1))
+
+        def hide_chosen(self):
+            """Hide the chosen app's windows. It stays in the row, as on a Mac,
+            and choosing it again brings its windows back."""
+            if not self.showing or not self.apps:
+                return
+            app_id, views = self.apps[self.chosen]
+            for view in views:
+                try:
+                    self.wayfire.hide(view["id"])
+                except (ConnectionError, OSError, ValueError):
+                    pass
+            self.tiles[self.chosen].get_child().get_children()[0].set_opacity(0.5)   # dimmed, as on a Mac
 
         def finish(self, index):
             if not self.showing:
