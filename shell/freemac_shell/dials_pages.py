@@ -50,7 +50,7 @@ SEARCH_WORDS = {
     "users": "accounts password login automatic log in people",
     "loginitems": "startup start up open at login launch automatically apps autostart",
     "accounts": "icloud fastmail nextcloud yahoo caldav carddav sync online calendar contacts reminders",
-    "keyboard": "shortcuts command key layout input language typing",
+    "keyboard": "shortcuts command key layout input sources input menu language typing keyboard languages key repeat delay until repeat control space",
     "pointing": "trackpad mouse click scroll tap pointer speed",
     "printers": "print scanner",
 }
