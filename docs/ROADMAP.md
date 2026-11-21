@@ -465,13 +465,14 @@ The small things a Mac user notices in their first minute.
 | 2 | Draughts (checkers): the 8×8 game with forced captures and kings, against the computer or a friend, with undo and the legal moves shown | Kings | done |
 | 3 | Tile-matching solitaire: clear a stacked layout of original picture tiles by matching free pairs, with several layouts, hints, shuffle and undo | Cairn | done |
 
-## 1.38 "learning and scanning"
+## 1.38 "learning and scanning" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | Maths practice for children: rounds of adding, taking away, times tables and sharing, at levels from first sums upwards, with stars and a times-table chart | Sums | planned |
-| 2 | Flashcards: make decks of cards with a question and an answer, study them with the cards you know least coming back most often, and bring decks in from a spreadsheet file | Cue | planned |
-| 3 | Scanning: find a USB or network scanner, preview, pick the area, colour and resolution, and save pages as a picture or a many-page PDF | Glass | planned |
+| 1 | Maths practice for children: rounds of adding, taking away, times tables and sharing, at levels from first sums upwards, with stars and a times-table chart | Sums | done |
+| 2 | Flashcards: make decks of cards with a question and an answer, study them with the cards you know least coming back most often, and bring decks in from a spreadsheet file | Cue | done |
+| 3 | Scanning: find a USB or network scanner, preview, pick the area, colour and resolution, and save pages as a picture or a many-page PDF | Glass | done |
+| 4 | The Dock: names above icons, magnification that follows the pointer over the icons, shrinking to fit when crowded, and clicks through its clear top | Pier | done |
 
 ## Later
 
