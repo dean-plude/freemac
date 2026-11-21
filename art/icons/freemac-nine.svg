@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Nine: a 3 x 3 grid of squares with numbers. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b3fd6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="22" y="22" width="84" height="84" rx="8" fill="#ffffff"/>
+  <g stroke="#c9c4ea" stroke-width="2">
+    <line x1="50" y1="24" x2="50" y2="104"/><line x1="78" y1="24" x2="78" y2="104"/>
+    <line x1="24" y1="50" x2="104" y2="50"/><line x1="24" y1="78" x2="104" y2="78"/>
+  </g>
+  <rect x="51" y="51" width="26" height="26" fill="#dcd5ff"/>
+  <g font-family="Inter, DejaVu Sans, sans-serif" font-weight="700" font-size="20" text-anchor="middle">
+    <text x="36" y="43" fill="#2b2160">4</text><text x="92" y="43" fill="#2b2160">7</text>
+    <text x="64" y="71" fill="#5b3fd6">9</text><text x="36" y="99" fill="#2b2160">2</text>
+    <text x="92" y="99" fill="#5b3fd6">5</text>
+  </g>
+</svg>

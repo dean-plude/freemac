@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Nine
+GenericName=Number Puzzle
+Comment=Fill the grid so every row, column and box has 1 to 9
+Exec=freemac-nine
+Icon=freemac-nine
+Categories=Game;LogicGame;
+Keywords=sudoku;puzzle;numbers;logic;game;grid;
+StartupWMClass=org.freemac.Nine
+StartupNotify=true

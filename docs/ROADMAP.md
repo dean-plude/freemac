@@ -425,6 +425,14 @@ The small things a Mac user notices in their first minute.
 | 2 | A dictionary that works without the internet: definitions, examples and words that mean the same, from WordNet | Words | done |
 | 3 | Typing practice for children and grown-ups: lessons a few keys at a time, a keyboard that shows the next key, and speed and accuracy kept | Typist | done |
 
+## 1.33 "time, numbers and letters" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Screen time: how long each app was used today and this week, with a daily limit for an app that gives a warning before time is up | Logbook | done |
+| 2 | A number puzzle (sudoku) with easy to hard puzzles, pencil marks, hints and undo | Nine | done |
+| 3 | A font book: every font on the computer with a sample you can type, sizes, and adding a font file with a double-click | Typecase | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
