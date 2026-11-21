@@ -267,9 +267,10 @@ def run():
                 self.stop()
             elif key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
                 self.finish(self.chosen)
-            elif key in (Gdk.KEY_Right, Gdk.KEY_Tab):
+            # ⌘← and ⌘→ reach apps as Home and End (Strata's Command key).
+            elif key in (Gdk.KEY_Right, Gdk.KEY_Tab, Gdk.KEY_End, Gdk.KEY_KP_End):
                 self.step(1)
-            elif key in (Gdk.KEY_Left, Gdk.KEY_ISO_Left_Tab):
+            elif key in (Gdk.KEY_Left, Gdk.KEY_ISO_Left_Tab, Gdk.KEY_Home, Gdk.KEY_KP_Home, Gdk.KEY_grave):
                 self.step(-1)
             elif key in (Gdk.KEY_q, Gdk.KEY_Q):
                 self.quit_chosen()

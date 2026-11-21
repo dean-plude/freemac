@@ -89,7 +89,7 @@ def load_config():
     folder stacks and whether the Trash is shown."""
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
               "stacks": default_stacks(), "trash": True, "minimize_into_app": False,
-              "autohide": False, "recents": True}
+              "autohide": False, "recents": True, "indicators": True, "bounce": True}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -423,7 +423,7 @@ class Item(Gtk.Button):
     def set_views(self, views, alive=False):
         self.views = views
         self.alive = alive
-        self.dot.set_opacity(1.0 if views or alive else 0.0)
+        self.dot.set_opacity(1.0 if (views or alive) and self.pier.show_dots() else 0.0)
         if views:
             self.stop_bounce()
 
@@ -662,7 +662,9 @@ class Item(Gtk.Button):
         settings = Gtk.Settings.get_default()
         if self.bouncing or self.desktop_id in NO_BOUNCE or (settings and not settings.props.gtk_enable_animations):
             return
-        self.dot.set_opacity(1.0)
+        if self.pier.config and not self.pier.config.get("bounce", True):
+            return   # Dials: Animate opening applications is off
+        self.dot.set_opacity(1.0 if self.pier.show_dots() else 0.0)
         self.bouncing = (GLib.get_monotonic_time(), GLib.timeout_add(16, self._bounce_step))
 
     def _bounce_step(self):
@@ -671,7 +673,7 @@ class Item(Gtk.Button):
         if elapsed > BOUNCE_LIMIT:
             self.bouncing = None
             self.image.set_margin_bottom(0)
-            self.dot.set_opacity(1.0 if self.views or self.alive else 0.0)
+            self.dot.set_opacity(1.0 if (self.views or self.alive) and self.pier.show_dots() else 0.0)
             return False
         phase = (elapsed % BOUNCE_PERIOD) / BOUNCE_PERIOD
         # Up fast, ease at the top, down with a little weight: one sine arch per hop.
@@ -1050,6 +1052,10 @@ class Pier(Gtk.Window):
         self.load()
         self.refresh()
         return False
+
+    def show_dots(self):
+        """Dials: Show indicators for open applications."""
+        return self.config is None or self.config.get("indicators", True)
 
     def items(self):
         return self.pinned + list(self.extra.values()) + list(self.recent.values()) + self.places

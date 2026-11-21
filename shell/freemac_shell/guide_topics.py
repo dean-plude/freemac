@@ -26,7 +26,7 @@ TOPICS = {
         "Press F4 for every app on one screen. Drag an app onto another to make a folder.",
         "To switch apps, hold ⌘ and press Tab until the app you want is chosen, then let go. "
         "⌘` goes to the app's next window. While the switcher is up, press Q to quit the chosen app "
-        "or H to hide it.",
+        "or H to hide it. ⌘← and ⌘→ move along the row too.",
         "An app stays open after its last window closes, with a dot under it in the Dock. "
         "⌘Q quits it.",
     ]),
@@ -488,6 +488,8 @@ TOPICS = {
         "Up to three apps you used lately stay in the Dock after they quit, after the line by the open apps. "
         "To take one off, drag it out of the Dock or choose Options > Remove from Dock. To keep it, choose "
         "Options > Keep in Dock. Turn this off in Dials > Dock and Menu Bar with Show recent apps in Dock.",
+        "The same page turns off the dots under open apps (Show indicators for open apps) and the bounce "
+        "while an app opens (Animate opening apps).",
     ]),
     "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "

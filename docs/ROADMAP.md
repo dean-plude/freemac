@@ -680,6 +680,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Dials > Dock and Menu Bar: Show recent apps in Dock | Dials | done |
 | 4 | Guide: recent apps in Hide the Dock until you need it | Guide | done |
 
+## 1.62 "dock choices" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Dock and Menu Bar: Show indicators for open apps (the dots) | Pier, Dials | done |
+| 2 | Dials > Dock and Menu Bar: Animate opening apps (the bounce) | Pier, Dials | done |
+| 3 | ⌘← and ⌘→ move along ⌘Tab's row (they reach apps as Home and End) | Tack | done |
+| 4 | Guide: the new Dock switches, and ⌘← ⌘→ in the switcher | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
