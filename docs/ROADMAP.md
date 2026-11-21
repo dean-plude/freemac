@@ -449,13 +449,21 @@ The small things a Mac user notices in their first minute.
 | 2 | About this computer: processor, memory, graphics, storage and version at a glance, with a full report of the hardware, USB devices, displays, network and sound; About freemac in the menu bar opens it | Manifest | done |
 | 3 | A colour picker: pick a colour from anywhere on the screen, see it as hex, RGB and HSL, copy it, and keep the colours you like | Swatch | done |
 
-## 1.36 "shapes, feeds and words"
+## 1.36 "shapes, feeds and words" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
 | 1 | A shape puzzle: slide and turn seven flat pieces to fill a silhouette, from easy outlines for kids to harder ones, with a hint when you're stuck | Tangram | done |
 | 2 | Podcasts and news feeds: subscribe to a podcast or a website's feed, read new posts, and play episodes with the place remembered | Buoy | done |
 | 3 | A word search: find hidden words in a grid of letters, with themed word lists, three sizes and a timer | Hunt | done |
+
+## 1.37 "board games"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Four in a row: drop counters into a stand of seven columns, against the computer at three levels or a friend on the same computer | Fourway | planned |
+| 2 | Draughts (checkers): the 8×8 game with forced captures and kings, against the computer or a friend, with undo and the legal moves shown | Kings | planned |
+| 3 | Tile-matching solitaire: clear a stacked layout of original picture tiles by matching free pairs, with several layouts, hints, shuffle and undo | Cairn | planned |
 
 ## Later
 
