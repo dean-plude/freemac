@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Get Info for Drawer (Command+I): one small window per item with its icon,
 name, kind, size, where it is, when it was made and changed, and who can open
-it. A folder's size is added up in the background, so the window opens at
-once. Original freemac code.
+it. A document also shows the app that opens it, and Change All… makes that
+app open every document of its kind. A folder's size is added up in the
+background, so the window opens at once. Original freemac code.
 """
 import os
 import pwd
@@ -17,7 +18,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import macapps, tags  # noqa: E402
+from . import alert, default_apps, macapps, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -92,6 +93,9 @@ def who_can_open(info, path):
     return [("Owner", "You" if mine else owner), ("You", you), ("Others", others)]
 
 
+OTHER = "other…"   # the pop-up's last row, which asks for any app
+
+
 class InfoWindow(Gtk.Window):
     def __init__(self, path, parent=None):
         super().__init__(title=f"{os.path.basename(path.rstrip('/')) or path} Info")
@@ -164,6 +168,11 @@ class InfoWindow(Gtk.Window):
             self._row(grid, row, label, value)
         box.pack_start(grid, False, False, 0)
 
+        content = info.get_content_type() or ""
+        if not is_dir and not is_bundle and info.get_file_type() == Gio.FileType.REGULAR and content:
+            box.pack_start(Gtk.Separator(), False, False, 0)
+            box.pack_start(self._open_with(content, kind), False, False, 0)
+
         box.pack_start(Gtk.Separator(), False, False, 0)
         heading = Gtk.Label(label="Sharing and permissions", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
@@ -174,6 +183,104 @@ class InfoWindow(Gtk.Window):
         box.pack_start(perms, False, False, 0)
         self.add(box)
         self.connect("key-press-event", self._key)
+        # Nothing chosen when it opens: GTK would otherwise focus the Kind
+        # line and highlight it.
+        self.connect("map", lambda *_: GLib.idle_add(self._unfocus))
+
+    def _open_with(self, content, kind):
+        """Open with: the app that opens this kind of document, and Change
+        All… to make another one open them all."""
+        section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        heading = Gtk.Label(label="Open with", xalign=0)
+        heading.get_style_context().add_class("drawer-heading")
+        section.pack_start(heading, False, False, 0)
+        apps = default_apps.apps_for(content)
+        store = Gtk.ListStore(str, str, Gio.Icon)
+        for app in apps:
+            store.append([app.get_id(), default_apps.name_of(app), app.get_icon()])
+        store.append(["-", "", None])          # a line
+        store.append([OTHER, "Other…", None])
+        combo = Gtk.ComboBox(model=store, id_column=0)
+        combo.set_row_separator_func(lambda model, it: model[it][0] == "-")
+        icon = Gtk.CellRendererPixbuf()
+        combo.pack_start(icon, False)
+        combo.add_attribute(icon, "gicon", 2)
+        text = Gtk.CellRendererText()
+        combo.pack_start(text, True)
+        combo.add_attribute(text, "text", 1)
+        if apps:
+            combo.set_active_id(default_apps.default_id(content) or apps[0].get_id())
+        section.pack_start(combo, False, False, 0)
+        hint = Gtk.Label(xalign=0, wrap=True, max_width_chars=34)
+        hint.get_style_context().add_class("dim-label")
+        change = Gtk.Button(label="Change All…", halign=Gtk.Align.START)
+        kind_name = kind[:1].lower() + kind[1:] if kind[:2] != kind[:2].upper() else kind
+
+        last = [combo.get_active_id()]
+
+        def explain(*_):
+            chosen = combo.get_active_id()
+            if chosen == OTHER:
+                app = self._choose_other(content, kind_name)
+                if app is None:
+                    if last[0]:
+                        combo.set_active_id(last[0])
+                    else:
+                        combo.set_active(-1)
+                    return
+                if not any(r[0] == app.get_id() for r in store):
+                    store.insert(len(store) - 2, [app.get_id(), default_apps.name_of(app), app.get_icon()])
+                combo.set_active_id(app.get_id())
+                return
+            last[0] = chosen
+            if chosen is None:
+                change.set_sensitive(False)
+                hint.set_text("No app says it opens this kind of document. Choose Other… to pick one.")
+                return
+            same = chosen == default_apps.default_id(content)
+            change.set_sensitive(not same)
+            name = store[combo.get_active_iter()][1] if combo.get_active_iter() else ""
+            hint.set_text(f"Every {kind_name} opens with {name}." if same else
+                          f"Click Change All… to open every {kind_name} with {name}.")
+
+        def change_all(_b):
+            chosen = combo.get_active_id()
+            name = store[combo.get_active_iter()][1]
+            answer = alert.ask(self, f"Open every {kind_name} with {name}?",
+                               f"Documents of this kind will open with {name} when you double-click them, "
+                               "in Drawer and everywhere else.",
+                               [("Cancel", Gtk.ResponseType.CANCEL), ("Continue", Gtk.ResponseType.OK)],
+                               default=Gtk.ResponseType.OK)
+            if answer != Gtk.ResponseType.OK:
+                return
+            error = default_apps.set_default(chosen, (content,))
+            if error:
+                alert.tell(self, "The app couldn't be changed.", error)
+            explain()
+
+        combo.connect("changed", explain)
+        change.connect("clicked", change_all)
+        section.pack_start(change, False, False, 0)
+        section.pack_start(hint, False, False, 0)
+        explain()
+        return section
+
+    def _unfocus(self):
+        focus = self.get_focus()
+        if isinstance(focus, Gtk.Label):
+            focus.select_region(0, 0)
+        self.set_focus(None)
+        return False
+
+    def _choose_other(self, content, kind_name):
+        """Any app on the computer, for a kind of document no app says it
+        opens."""
+        dialog = Gtk.AppChooserDialog.new_for_content_type(self, Gtk.DialogFlags.MODAL, content)
+        dialog.set_heading(f"Choose an app to open every {kind_name}.")
+        dialog.get_widget().set_show_all(True)
+        app = dialog.get_app_info() if dialog.run() == Gtk.ResponseType.OK else None
+        dialog.destroy()
+        return app
 
     def _tagged(self, error):
         if error is not None:
