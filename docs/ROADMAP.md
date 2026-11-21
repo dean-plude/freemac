@@ -652,6 +652,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Dials > Notifications lists each app that has sent one, with Banners, In Notification Centre only or Off | Dials, Beacon | done |
 | 4 | Guide: Manage notifications and Do Not Disturb | Guide | done |
 
+## 1.59 "dock menus" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An app's Dock menu lists up to five files it had open lately; a click opens one in that app | Pier | done |
+| 2 | Right-click the Dock between its icons: Turn Hiding On/Off, Turn Magnification On/Off, Dock Settings… | Pier | done |
+| 3 | Fix: after hiding was turned off, the Dock ignored the pointer until it was restarted | Pier | done |
+| 4 | Guide: the Dock's menus in Hide the Dock until you need it | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

@@ -30,7 +30,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import alert, apps, held, login_items, style, volumes  # noqa: E402
+from . import alert, apps, held, login_items, recents, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -551,6 +551,15 @@ class Item(Gtk.Button):
             self.menu.append(item)
         if views:
             self.menu.append(Gtk.SeparatorMenuItem())
+        # The files this app had open lately, as a Mac's Dock lists them.
+        recent = recents.for_app(self.info) if self.info else []
+        for path in recent:
+            item = labelled(os.path.basename(path))
+            item.set_tooltip_text(path)
+            item.connect("activate", lambda *_, path=path: self.open_recent(path))
+            self.menu.append(item)
+        if recent:
+            self.menu.append(Gtk.SeparatorMenuItem())
         desktop_id = self.desktop_id or (self.info.get_id() if self.info else None)
         options = labelled("Options")
         options.set_sensitive(desktop_id is not None)
@@ -586,6 +595,18 @@ class Item(Gtk.Button):
         menu.show_all()
         self.pier.hold_up(menu)
         menu.popup_at_widget(self, Gdk.Gravity.NORTH, Gdk.Gravity.SOUTH, None)
+
+    def open_recent(self, path):
+        """A recent file from the menu, opened in this app."""
+        if not os.path.isfile(path):
+            return
+        try:
+            self.info.launch([Gio.File.new_for_path(path)], None)
+        except GLib.Error:
+            return
+        recents.note(path)
+        if not self.alive:
+            self.bounce()
 
     # ---- the launch bounce -------------------------------------------------
     # While an app starts, its icon hops up and down until its first window
@@ -763,6 +784,10 @@ class Pier(Gtk.Window):
         outer.add(holder)
         outer.add_events(1 << 2)  # pointer motion
         outer.connect("motion-notify-event", self._motion)
+        # A right-click between the icons reaches the window itself (the
+        # shelf sits in a revealer, which has its own window).
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.connect("button-press-event", self._shelf_press)
         # Moving onto an icon's button counts as leaving the box around them
         # all, so only the window itself says when the pointer has left.
         self.add_events(Gdk.EventMask.LEAVE_NOTIFY_MASK)
@@ -840,6 +865,10 @@ class Pier(Gtk.Window):
             self._hide_later()
         elif was_hiding and not self.autohide:
             self.show_now()
+        if was_hiding != self.autohide and self.get_window() is not None:
+            # The surface changes size once the compositor has the new margin;
+            # take input again over where the Dock then is.
+            GLib.timeout_add(400, self._settle)
         self.outer.set_size_request(-1, self.peak + 30 + LABEL_ROOM + (MARGIN if self.autohide else 0))
         # Icon, the running dot under it and the shelf's top and bottom padding.
         self.rest_height = self.base + 22
@@ -1072,12 +1101,18 @@ class Pier(Gtk.Window):
         return list(saved.get("pinned", self.config["pinned"] if self.config else DEFAULT_PINNED))
 
     def _save_pinned(self, pinned):
+        self.save_config(pinned=pinned)
+
+    def save_config(self, **changes):
+        """Change keys in pier.json, keeping the rest; the file watch then
+        applies them, as when Dials writes it."""
         try:
             with open(CONFIG) as f:
                 saved = json.load(f)
         except (OSError, ValueError):
             saved = {}
-        saved["pinned"] = pinned
+        saved = saved if isinstance(saved, dict) else {}
+        saved.update(changes)
         os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
         tmp = CONFIG + ".tmp"
         with open(tmp, "w") as f:
@@ -1394,6 +1429,39 @@ class Pier(Gtk.Window):
         """The slide has ended: take input over where the Dock now is."""
         self._set_input(self.input_full)
 
+    def _shelf_press(self, _widget, event):
+        """A right-click on the Dock between its icons, or on a dividing line:
+        the Dock's own menu, as on a Mac."""
+        if event.button != 3 or event.type != Gdk.EventType.BUTTON_PRESS:
+            return False
+        # Only on the shelf itself, not in the clear room above it.
+        top = self.shelf.translate_coordinates(self, 0, 0)
+        own = self.get_window()
+        if top and own is not None and event.device is not None:
+            _w, _x, y, _mask = own.get_device_position(event.device)
+            if y < top[1] + self.shelf.get_allocated_height() - self.rest_height - 4:
+                return False
+        config = self.config or load_config()
+        menu = Gtk.Menu()
+        for label, action in (
+                ("Turn Hiding Off" if config.get("autohide") else "Turn Hiding On",
+                 lambda: self.save_config(autohide=not config.get("autohide"))),
+                ("Turn Magnification Off" if config.get("magnify") else "Turn Magnification On",
+                 lambda: self.save_config(magnify=not config.get("magnify")))):
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda *_, action=action: action())
+            menu.append(item)
+        menu.append(Gtk.SeparatorMenuItem())
+        settings = Gtk.MenuItem(label="Dock Settings…")
+        settings.connect("activate", lambda *_: subprocess.Popen(
+            ["freemac-dials", "--panel", "dock"], start_new_session=True))
+        menu.append(settings)
+        menu.show_all()
+        self.hold_up(menu)
+        self.dock_menu = menu    # kept, or it may be dropped while it is open
+        menu.popup_at_pointer(event)
+        return True
+
     def hold_up(self, menu):
         """Keep the Dock up while one of its menus is open."""
         self.menus_up += 1
@@ -1433,6 +1501,9 @@ class Pier(Gtk.Window):
             top = max(0, origin[1] + alloc.height - self.rest_height - 4)
             area = cairo.RectangleInt(origin[0], top, alloc.width, height - top)
         window.input_shape_combine_region(cairo.Region(area), 0, 0)
+        # Wayland applies a new input region with the next frame; draw one so
+        # it takes effect even when nothing else on the Dock changes.
+        self.queue_draw()
         return False
 
     def _magnify(self, pointer_x, widget=None):
