@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Ivory
+GenericName=Piano
+Comment=Play the piano, organ and more, and record a tune
+Exec=freemac-ivory
+Icon=freemac-ivory
+Categories=AudioVideo;Audio;Music;
+Keywords=piano;keyboard;music;instrument;organ;play;notes;
+StartupWMClass=org.freemac.Ivory
+StartupNotify=true

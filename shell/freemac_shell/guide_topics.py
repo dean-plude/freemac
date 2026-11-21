@@ -197,6 +197,29 @@ TOPICS = {
         "Click the list button for the contents, and Aa for bigger text or sepia and night pages. "
         "Books keeps your place in every book.",
     ]),
+    "piano": ("Play the piano", "piano ivory music keyboard instrument organ notes play record tune", [
+        "Ivory is a piano. Press ⌘Space, type Ivory and press Return.",
+        "Click the keys, or play on the computer's keyboard: the bottom row of letters plays the lower notes "
+        "and the top row plays the higher ones. The letters are shown on the keys.",
+        "Choose another sound, like organ, music box or flute, from the menu at the top left. "
+        "The arrows move the keyboard higher or lower.",
+        "Click Record, play a tune, then click Stop. Click Play to hear it again.",
+    ]),
+    "dictionary": ("Look up a word", "dictionary words define definition meaning synonym thesaurus spelling", [
+        "Words is a dictionary that works without the internet. Press ⌘Space, type Words and press Return.",
+        "Type a word in the search box at the top and press Return. Words finds a word from its other forms "
+        "too, so ran finds run.",
+        "Click any blue word, like one that means the same, to look that up. The arrows go back and forward.",
+        "Words shows a new word of the day each time you open it.",
+    ]),
+    "typing": ("Learn to type", "typing typist keyboard lessons practice touch type speed", [
+        "Typist teaches typing without looking at the keys. Press ⌘Space, type Typist and press Return.",
+        "Start with lesson 1. Rest your fingers on the middle row of keys and type the letters you see. "
+        "The keyboard on the screen lights up the next key in the colour of the finger to use.",
+        "A wrong key turns red, and you can carry on once you type the right one.",
+        "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
+        "Press Return for the next lesson.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

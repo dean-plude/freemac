@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Typist
+GenericName=Typing Practice
+Comment=Learn to type without looking at the keys
+Exec=freemac-typist
+Icon=freemac-typist
+Categories=Education;
+Keywords=typing;keyboard;lessons;practice;touch typing;learn;speed;
+StartupWMClass=org.freemac.Typist
+StartupNotify=true
