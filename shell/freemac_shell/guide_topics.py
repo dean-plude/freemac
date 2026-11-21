@@ -494,6 +494,12 @@ TOPICS = {
         "Menu Bar, or right-click the Dock between its icons and choose Position on Screen. A Dock that hides "
         "itself comes back when the pointer reaches that edge.",
     ]),
+    "menubar-hide": ("Hide the menu bar until you need it", "menu bar hide hides automatically autohide auto-hide top screen more room topline", [
+        "Choose Dials > Dock and Menu Bar and turn on Automatically hide and show the menu bar.",
+        "The menu bar slides away and windows can use the top of the screen too. Move the pointer to the "
+        "top edge of the screen and it slides back down.",
+        "It stays while the pointer is on it or one of its menus is open, and hides again when you move away.",
+    ]),
     "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
         "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",

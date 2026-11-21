@@ -657,6 +657,11 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "A dot under each app that's open."),
             row("Animate opening apps", switch(config.get("bounce", True), lambda on: save_pier(bounce=on)),
                 "An app's icon bounces until its window appears."),
+        ), group(
+            row("Automatically hide and show the menu bar",
+                switch(bool(style.prefs().get("menubar_autohide")),
+                       lambda on: self.save_prefs(menubar_autohide=on)),
+                "The menu bar slides away until you move the pointer to the top of the screen."),
         ), group(row("Double-click a window's title bar to", self.title_double_click()),
                  row("Minimize windows into application icon",
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),

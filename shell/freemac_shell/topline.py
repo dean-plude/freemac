@@ -6,8 +6,10 @@ import signal
 import subprocess
 import time
 
+import cairo
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
@@ -22,6 +24,8 @@ DESKTOP_GO = (("Home", "", "⇧⌘H"), ("Desktop", "Desktop", "⇧⌘D"),
               ("Documents", "Documents", "⇧⌘O"), ("Downloads", "Downloads", "⌥⌘L"),
               ("Pictures", "Pictures", ""), ("Music", "Music", ""))
 HEIGHT = 28
+HIDE_DELAY = 400     # ms after the pointer leaves a menu bar that hides itself
+SLIDE_MS = 180
 
 
 def run(*cmd):
@@ -63,7 +67,19 @@ class Topline(Gtk.Window):
 
         bar = Gtk.Box(spacing=2)
         bar.get_style_context().add_class("topline")
-        self.add(bar)
+        # The bar slides up out of sight when it hides itself (shell.json's
+        # "menubar_autohide", set in Dials); the window itself stays put.
+        self.revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN,
+                                     transition_duration=SLIDE_MS, reveal_child=True,
+                                     valign=Gtk.Align.START)
+        self.revealer.add(bar)
+        self.add(self.revealer)
+        self.autohide, self._hide_source = False, None
+        self.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.connect("enter-notify-event", self._entered)
+        self.connect("leave-notify-event", self._left)
+        self.connect("map-event", lambda *_: self._set_input() and False)
+        self.revealer.connect("notify::child-revealed", lambda *_: self._set_input())
 
         # System menu behind the freemac mark.
         self.mark = Gtk.MenuButton()
@@ -358,6 +374,73 @@ class Topline(Gtk.Window):
 
     def _prefs_changed(self, *_args):
         self._show_time()
+        self._use_autohide(bool(style.prefs().get("menubar_autohide")))
+
+    # --- a menu bar that hides itself, as on a Mac ------------------------
+    def _use_autohide(self, on):
+        if on == self.autohide:
+            return
+        self.autohide = on
+        if on:
+            # Windows get the whole screen; the bar slides over them.
+            GtkLayerShell.set_exclusive_zone(self, -1)
+            self._hide_later()
+        else:
+            GtkLayerShell.auto_exclusive_zone_enable(self)
+            self.show_now()
+
+    def hidden(self):
+        return not self.revealer.get_reveal_child()
+
+    def show_now(self):
+        if self._hide_source:
+            GLib.source_remove(self._hide_source)
+            self._hide_source = None
+        if self.hidden():
+            self.revealer.set_reveal_child(True)
+        self._set_input()
+
+    def _hide_later(self):
+        if not self.autohide:
+            return
+        if self._hide_source:
+            GLib.source_remove(self._hide_source)
+        self._hide_source = GLib.timeout_add(HIDE_DELAY, self._hide_now)
+
+    def _busy(self):
+        """A menu or Help is open: the bar stays."""
+        return self._menu_open() or any(b.get_active() for b in self._menu_buttons())
+
+    def _hide_now(self):
+        self._hide_source = None
+        if self.autohide and not self._busy():
+            self.revealer.set_reveal_child(False)
+            self._set_input()
+        return False
+
+    def _set_input(self):
+        """Take the pointer over the whole bar, or, while it is hidden, only
+        on the screen's top row of pixels, so it comes back from there and
+        windows under it stay clickable."""
+        window = self.get_window()
+        if window is None:
+            return False
+        width = max(1, self.get_allocated_width())
+        tall = 1 if self.autohide and self.hidden() else max(HEIGHT, self.get_allocated_height())
+        window.input_shape_combine_region(cairo.Region(cairo.RectangleInt(0, 0, width, tall)), 0, 0)
+        # Wayland takes a new input region with the next frame.
+        self.queue_draw()
+        return False
+
+    def _entered(self, _widget, event):
+        if self.autohide and event.detail != Gdk.NotifyType.INFERIOR:
+            self.show_now()
+        return False
+
+    def _left(self, _widget, event):
+        if self.autohide and event.detail != Gdk.NotifyType.INFERIOR and event.mode == Gdk.CrossingMode.NORMAL:
+            self._hide_later()
+        return False
 
     def _show_time(self, *_args):
         prefs = style.prefs()
@@ -476,6 +559,7 @@ class Topline(Gtk.Window):
     def _help_toggled(self, button):
         if not button.get_active():
             self.help.close_panel()
+            self._hide_later()
             return
         # Clicking Help while it's open closes it: the click first takes the
         # focus from the panel (closing it), then would open it again.
@@ -546,6 +630,8 @@ class Topline(Gtk.Window):
         new menu and has it shut again at once (the compositor turns down
         its grab). A menu that closes that fast, untouched, opens again."""
         now = time.monotonic()
+        if button.get_active() and self.autohide:
+            self.show_now()
         if button.get_active():
             if now - getattr(button, "_fm_opened", 0) > 1:
                 button._fm_retried = False
@@ -613,6 +699,8 @@ class Topline(Gtk.Window):
 
     def _after_menu(self):
         self.refresh()
+        if self.autohide:
+            self._hide_later()
         return False
 
     # --- the app's own menus -------------------------------------------
