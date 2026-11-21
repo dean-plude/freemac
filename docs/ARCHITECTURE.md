@@ -245,7 +245,13 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   swap them into the one set of views when switching, rather than
   building a set of views per tab. **Favourites** live in
   `~/.config/freemac/drawer.json`. **Glance** (`drawer_glance.py`) is a
-  plain window that follows the selection while open.
+  plain window that follows the selection while open. Since 1.46 it also
+  opens from the desktop, plays movies and music with its own GStreamer
+  playbin into a gtksink, shows every PDF page (up to 60, drawn while you
+  read), steps through several selected files, fills the screen, and hands
+  arrow keys back to its owner (Drawer's view or the desktop) to move the
+  selection. Drawer's folders load picture and PDF thumbnails a few at a
+  time after the folder shows (`Folder._thumbnails`).
 - **Pier's places** sit after a separator at the dock's right end: folder
   stacks open as a menu of the newest files, and the Trash watches
   `~/.local/share/Trash/files` (the freedesktop.org trash that Drawer and

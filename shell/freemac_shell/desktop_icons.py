@@ -23,6 +23,9 @@ Documents, Movies, Music and so on. A click on a stack fans its files out in
 place, and another click gathers them up again; new files go straight into
 their stack. Clean Up By and Get Info (Command-I) work as on a Mac.
 
+Space opens Glance (drawer_glance.py) on the selected files, and the arrow
+keys move the selection from icon to icon.
+
 Edit Widgets… on the same menu puts a clock, the calendar, the weather and
 reminders on the desktop (desktop_widgets.py).
 """
@@ -38,6 +41,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import desktop_widgets, drawer_info, transfer, volumes  # noqa: E402
+from .drawer_glance import Glance  # noqa: E402
 
 try:
     import cairo
@@ -345,6 +349,7 @@ class DesktopIcons(Gtk.Layout):
         self.selected = []
         self.dragging = None
         self._pending = None
+        self.glance = None
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
@@ -624,17 +629,90 @@ class DesktopIcons(Gtk.Layout):
             else:
                 self.selected.append(icon)
                 icon.set_selected(True)
+            self._glance_follow()
             return
         if self.selected == [icon]:
             return
         self.clear_selection()
         self.selected = [icon]
         icon.set_selected(True)
+        self._glance_follow()
 
     def clear_selection(self):
         for icon in self.selected:
             icon.set_selected(False)
         self.selected = []
+
+    # ---- Glance (Space) and the arrow keys -----------------------------------------
+    def glance_paths(self):
+        """The selected files to look at: a stack stands for its files."""
+        paths = []
+        for icon in self.selected:
+            if isinstance(icon, StackIcon):
+                paths += [member.path for member in icon.members if member.path]
+            elif icon.path:
+                paths.append(icon.path)
+        return paths
+
+    def toggle_glance(self):
+        if self.glance is not None and self.glance.get_visible():
+            self.glance.hide()
+            return
+        paths = self.glance_paths()
+        if not paths:
+            return
+        if self.glance is None:
+            self.glance = Glance(None, self._glance_open, on_arrow=self.arrow)
+        self.glance.show_paths(paths)
+
+    def _glance_open(self, path):
+        self.glance.hide()
+        icons = [icon for icon in self.icons.values() if icon.path == path]
+        if icons:
+            self.open(icons)
+        else:
+            try:
+                Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
+            except GLib.Error:
+                pass
+
+    def _glance_follow(self):
+        if self.glance is not None and self.glance.get_visible():
+            paths = self.glance_paths()
+            if paths and paths != self.glance.paths:
+                self.glance.show_paths(paths)
+
+    def arrow(self, key):
+        """Select the nearest icon left, right, above or below the selected
+        one (the top-right icon when none is), as the Mac's desktop does."""
+        shown = [icon for icon in list(self.icons.values()) + list(self.stack_icons.values())
+                 if icon.get_visible() and icon.get_parent() is self]
+        if not shown:
+            return
+
+        def where(icon):
+            return self.child_get_property(icon, "x"), self.child_get_property(icon, "y")
+
+        if not self.selected:
+            pick = min(shown, key=lambda i: (where(i)[1], -where(i)[0]))
+        else:
+            x0, y0 = where(self.selected[-1])
+            dx, dy = {Gdk.KEY_Left: (-1, 0), Gdk.KEY_Right: (1, 0),
+                      Gdk.KEY_Up: (0, -1), Gdk.KEY_Down: (0, 1)}[key]
+            best = None
+            for icon in shown:
+                x, y = where(icon)
+                ahead = (x - x0) * dx + (y - y0) * dy
+                if icon is self.selected[-1] or ahead <= 0:
+                    continue
+                aside = abs((x - x0) * dy) + abs((y - y0) * dx)
+                score = ahead + aside * 3
+                if best is None or score < best[0]:
+                    best = (score, icon)
+            if best is None:
+                return
+            pick = best[1]
+        self.click(pick, False)
 
     def open(self, icons):
         for icon in icons:
@@ -686,6 +764,11 @@ class DesktopIcons(Gtk.Layout):
                 if icon.get_visible():
                     self.selected.append(icon)
                     icon.set_selected(True)
+        elif key == Gdk.KEY_space and self.selected:
+            self.toggle_glance()
+        elif key in (Gdk.KEY_Left, Gdk.KEY_Right, Gdk.KEY_Up, Gdk.KEY_Down) and not event.state & (
+                Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.MOD1_MASK):
+            self.arrow(key)
         elif key == Gdk.KEY_Escape:
             self.clear_selection()
         else:
@@ -727,7 +810,8 @@ class DesktopIcons(Gtk.Layout):
         items = [("Open", lambda: self.open(icons))]
         if len(icons) == 1:
             items.append(("Rename…", lambda: self.rename(icons[0])))
-        items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder), (None, None),
+        items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder),
+                  ("Glance" if len(icons) == 1 else f"Glance at {len(icons)} Items", self.toggle_glance), (None, None),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
                   ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
@@ -750,7 +834,8 @@ class DesktopIcons(Gtk.Layout):
         opened = stack.kind in self.open_stacks
         self.menu = self._menu([
             ("Collapse Stack" if opened else "Expand Stack", lambda: self.toggle_stack(stack.kind)),
-            ("Get Info", lambda: self.get_info(stack.members)), (None, None),
+            ("Get Info", lambda: self.get_info(stack.members)),
+            ("Glance", lambda: (self.click(stack, False), self.toggle_glance())), (None, None),
             ("Move to Trash", lambda: self.trash(list(stack.members))), (None, None),
             ("Use Stacks", (True, lambda: self.set_stacks(False)))], event)
 
