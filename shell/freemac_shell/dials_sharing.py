@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Dials > Sharing, as on a Mac: the computer's name, Nearby sharing, and
+"""Dials > Sharing, as on a Mac: the computer's name, Nearby sharing, File
+Sharing (the Public folder, for other computers on the network to open), and
 Remote Login (SSH) for someone at another computer on the same network.
-Renaming and Remote Login change the whole computer, so each asks for an
-administrator's password. Original freemac code."""
+Renaming, File Sharing and Remote Login change the whole computer, so each asks
+for an administrator's password. Original freemac code."""
 import os
 import pwd
 import re
@@ -55,6 +56,21 @@ def mdns_on():
 
 def remote_login_available():
     return os.path.exists("/usr/sbin/sshd") and os.path.exists(admin_switch.SYSTEM_HELPER)
+
+
+SMB_WANTS = "/etc/systemd/system/multi-user.target.wants/smbd.service"
+
+
+def file_sharing_available():
+    return os.path.exists("/usr/sbin/smbd") and os.path.exists(admin_switch.SYSTEM_HELPER)
+
+
+def file_sharing_on():
+    return os.path.exists(SMB_WANTS)
+
+
+def public_folder():
+    return os.path.join(GLib.get_home_dir(), "Public")
 
 
 def remote_login_on():
@@ -136,6 +152,36 @@ def sharing_page(window):
     sections.append(group(row("Nearby sharing", receive,
                               "Lets computers and phones on this Wi-Fi offer you files, which you "
                               "accept or decline. Phones need the free LocalSend app.")))
+
+    if file_sharing_available():
+        share_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=52, selectable=True)
+        open_public = Gtk.Button(label="Open Public Folder", halign=Gtk.Align.START)
+        open_public.connect("clicked", lambda *_: GLib.spawn_async(
+            ["freemac-drawer", public_folder()], flags=GLib.SpawnFlags.SEARCH_PATH))
+
+        def share_caption():
+            host = local_name(computer_name())
+            if file_sharing_on():
+                share_note.set_text(
+                    "Other computers on this network can open the Public folder in your home folder, "
+                    f"without a password. On a Mac or freemac, it's under Network as {host}; on Windows, "
+                    f"type \\\\{host}\\Public in File Explorer. They can look, but not change anything.")
+            else:
+                share_note.set_text("Lets other computers on this network open the Public folder in your "
+                                    "home folder, without a password. Put in it what you want to share.")
+            open_row.set_visible(file_sharing_on() and os.path.isdir(public_folder()))
+
+        open_row = Gtk.ListBoxRow(activatable=False)
+        open_row.add(open_public)
+        open_row.set_no_show_all(True)
+        open_public.show()
+        share_switch = admin_switch.admin_switch(file_sharing_on,
+                                                 lambda on: [admin_switch.SYSTEM_HELPER, "file-sharing",
+                                                             "on" if on else "off"],
+                                                 "File Sharing couldn’t be changed.")
+        share_switch.connect("notify::sensitive", lambda s, _p: s.get_sensitive() and share_caption())
+        share_caption()
+        sections.append(group(row("File Sharing", share_switch), _note(share_note), open_row))
 
     if remote_login_available():
         login_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=52, selectable=True)
