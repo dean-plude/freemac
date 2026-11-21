@@ -480,6 +480,13 @@ TOPICS = {
         "With stacks off, Clean Up By Name, Kind or Date Modified puts every icon back in a neat order. "
         "Get Info (Command+I) tells you about a file.",
     ]),
+    "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
+        "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "
+        "a calendar, the weather or your reminders.",
+        "Drag a widget to wherever you like it on the desktop. It stays there.",
+        "Click a widget to open its app, such as Sky for the weather. Right-click it and choose "
+        "Remove Widget to take it away.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",

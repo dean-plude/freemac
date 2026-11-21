@@ -526,6 +526,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Get Info (⌘I and the right-click menu) on desktop files, shown under Drawer's name | Backdrop, Topline | done |
 | 5 | Guide topic: Tidy the desktop with stacks | Guide | done |
 
+## 1.45 "widgets" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Desktop widgets: an analog clock, a calendar with today's events, the weather from Sky and reminders that are due | Backdrop | done |
+| 2 | Drag a widget anywhere on the desktop; its place is kept | Backdrop | done |
+| 3 | A click opens the widget's app (Chime, Tide, Sky, Nudge); right-click to remove it | Backdrop | done |
+| 4 | Edit Widgets… on the desktop's menu opens a gallery to add and remove them | Backdrop | done |
+| 5 | Guide topic: Put widgets on your desktop | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

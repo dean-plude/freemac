@@ -22,6 +22,9 @@ files of one kind into a pile: Images, Screenshots, Documents, PDF
 Documents, Movies, Music and so on. A click on a stack fans its files out in
 place, and another click gathers them up again; new files go straight into
 their stack. Clean Up By and Get Info (Command-I) work as on a Mac.
+
+Edit Widgets… on the same menu puts a clock, the calendar, the weather and
+reminders on the desktop (desktop_widgets.py).
 """
 import json
 import os
@@ -34,7 +37,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_info, transfer, volumes  # noqa: E402
+from . import desktop_widgets, drawer_info, transfer, volumes  # noqa: E402
 
 try:
     import cairo
@@ -361,6 +364,7 @@ class DesktopIcons(Gtk.Layout):
         volumes.watch(self.refresh_drives)
         self.refresh()
         self.refresh_drives()
+        self.widgets = desktop_widgets.WidgetHost(self)
 
     # ---- the grid -----------------------------------------------------------------
     def size(self):
@@ -736,7 +740,7 @@ class DesktopIcons(Gtk.Layout):
                     ("Clean Up By Kind", lambda: self.clean_up_by("kind")),
                     ("Clean Up By Date Modified", lambda: self.clean_up_by("modified"))]
         items = [("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
-                 ("Change Wallpaper…", self.change_wallpaper), (None, None),
+                 ("Change Wallpaper…", self.change_wallpaper), ("Edit Widgets…", self.widgets.edit), (None, None),
                  ("Use Stacks", (self.stacks_on, lambda: self.set_stacks(not self.stacks_on)))]
         if not self.stacks_on:
             items += [(None, None)] + clean_up
