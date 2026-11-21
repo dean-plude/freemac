@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Typecase
+GenericName=Font Book
+Comment=See every font, try one out, and add new fonts
+Exec=freemac-typecase %F
+Icon=freemac-typecase
+Categories=Utility;Graphics;
+Keywords=fonts;font book;typeface;install font;letters;type;
+MimeType=font/ttf;font/otf;font/collection;font/woff;font/woff2;application/x-font-ttf;application/x-font-otf;application/vnd.ms-opentype;
+StartupWMClass=org.freemac.Typecase
+StartupNotify=true

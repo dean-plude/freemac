@@ -220,6 +220,30 @@ TOPICS = {
         "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
         "Press Return for the next lesson.",
     ]),
+    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time", [
+        "Logbook shows how long each app was used. Press ⌘Space, type Logbook and press Return.",
+        "Today shows each hour of the day, and Last 7 Days shows each day of the week, with the apps used most "
+        "at the top. Time only counts while someone is using the computer, not while it's locked or left alone.",
+        "To limit an app, click Set Limit beside it and choose how long it may be used each day. Five minutes "
+        "before the time is up a notice says so, and at the limit its windows close until the next day.",
+        "Choose Limits ▸ Passcode… to set a passcode, so that only someone who knows it can change a limit.",
+    ]),
+    "sudoku": ("Play a number puzzle", "sudoku nine number puzzle game logic grid", [
+        "Nine is a number puzzle. Press ⌘Space, type Nine and press Return.",
+        "Fill the grid so that every row, every column and every 3 × 3 box has each number from 1 to 9 once. "
+        "Click a square, then click a number at the bottom or type it.",
+        "Turn on the pencil (or press P) to jot small numbers you think might fit. Hold Shift while typing a "
+        "number to do the same.",
+        "Choose Easy to Expert at the top. Hint fills in one square, and ⌘Z undoes a move.",
+    ]),
+    "fonts": ("See and add fonts", "fonts font book typecase typeface install font add font letters", [
+        "Typecase shows every font on the computer. Press ⌘Space, type Typecase and press Return.",
+        "Click a font to see all of its styles. Type in the box at the top to see your own words in it, and "
+        "drag the slider to make it bigger or smaller.",
+        "To add a font, double-click its file and click Install Font, or click + in Typecase and choose the files. "
+        "Every app can use it after that.",
+        "Fonts you added are under My Fonts. To take one away, choose it and click Remove Font.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

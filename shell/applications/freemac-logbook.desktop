@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Logbook
+GenericName=Screen Time
+Comment=See how long each app was used, and set daily limits
+Exec=freemac-logbook
+Icon=freemac-logbook
+Categories=Utility;Monitor;
+Keywords=screen time;usage;limits;parental;time;apps;hours;
+StartupWMClass=org.freemac.Logbook
+StartupNotify=true
