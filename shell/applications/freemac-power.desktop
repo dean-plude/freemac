@@ -2,8 +2,8 @@
 Type=Application
 Name=Log Out
 Comment=Restart, shut down or log out, after the apps have quit
-Exec=freemac-session logout
+Exec=freemac-power logout
 Icon=system-log-out
 Categories=System;
 NoDisplay=true
-StartupWMClass=freemac-session
+StartupWMClass=freemac-power

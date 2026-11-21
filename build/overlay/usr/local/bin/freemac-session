@@ -1,6 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Start the freemac desktop session (Wayfire configured as Strata).
+# freemac 1.70 to 1.72 called Restart, Shut Down and Log Out's question
+# "freemac-session" too (now freemac-power); a Shift-Command-Q set up then
+# still lands here, so pass it on rather than starting a second desktop.
+case "$1" in
+  restart|shutdown|logout|sleep) exec /usr/bin/freemac-power "$@" ;;
+esac
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=freemac:wayfire
 export XDG_SESSION_DESKTOP=freemac

@@ -366,7 +366,7 @@ class Topline(Gtk.Window):
     def _system_menu(self):
         """The freemac menu, in a Mac's order: About, Settings and the app
         centre, Recent Items, Force Quit, then Sleep, Restart, Shut Down,
-        Lock Screen and Log Out, which ask first (freemac-session)."""
+        Lock Screen and Log Out, which ask first (freemac-power)."""
         menu = Gtk.Menu()
         self._item(menu, "About freemac", self._about)
         menu.append(Gtk.SeparatorMenuItem())
@@ -381,12 +381,12 @@ class Topline(Gtk.Window):
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Force Quit\u2026", lambda: run("freemac-force-quit"), shortcut="\u2325\u2318\u238b")
         menu.append(Gtk.SeparatorMenuItem())
-        self._item(menu, "Sleep", lambda: run("freemac-session", "sleep"))
-        self._item(menu, "Restart\u2026", lambda: run("freemac-session", "restart"))
-        self._item(menu, "Shut Down\u2026", lambda: run("freemac-session", "shutdown"))
+        self._item(menu, "Sleep", lambda: run("freemac-power", "sleep"))
+        self._item(menu, "Restart\u2026", lambda: run("freemac-power", "restart"))
+        self._item(menu, "Shut Down\u2026", lambda: run("freemac-power", "shutdown"))
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Lock Screen", lambda: run("freemac-lock"), shortcut="\u2303\u2318Q")
-        self._item(menu, f"Log Out {_person_name()}\u2026", lambda: run("freemac-session", "logout"),
+        self._item(menu, f"Log Out {_person_name()}\u2026", lambda: run("freemac-power", "logout"),
                    shortcut="\u21e7\u2318Q")
         menu.show_all()
         return menu

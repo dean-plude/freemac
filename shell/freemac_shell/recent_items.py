@@ -17,7 +17,7 @@ FILE = os.path.join(GLib.get_user_state_dir(), "freemac", "recent-items.json")
 LIMIT = 10
 # The shell's own windows aren't apps a person opens.
 SKIP = {"freemac-pier.desktop", "freemac-topline.desktop", "freemac-force-quit.desktop",
-        "freemac-backdrop.desktop", "freemac-session.desktop"}
+        "freemac-backdrop.desktop", "freemac-power.desktop"}
 
 
 def _load():
