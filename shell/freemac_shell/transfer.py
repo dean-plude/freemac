@@ -195,7 +195,7 @@ def undo_label(record=None):
         return f"Undo Move of {_described([b for _a, b in record.get('pairs', [])])}"
     if kind == "copy":
         return f"Undo Copy of {_described(record.get('made', []))}"
-    if kind == "rename":
+    if kind in ("rename", "renames"):
         return "Undo Rename"
     if kind == "trash":
         return "Undo Move to Trash"
@@ -362,6 +362,17 @@ def undo_last(parent=None, done=None):
                 say(f"Renamed back to “{os.path.basename(old)}”.")
             except OSError as err:
                 say(f"Couldn’t undo the rename: {err.strerror}.")
+        return True
+    if kind == "renames":
+        from . import batch_rename
+        news = {new for _old, new in record.get("pairs", [])}
+        # An old name may be taken by another item of the same rename (a swap).
+        pairs = [(new, os.path.basename(old)) for old, new in record.get("pairs", [])
+                 if os.path.lexists(new) and (old in news or not os.path.lexists(old))]
+        if pairs:
+            done, error = batch_rename.apply([n for n, _o in pairs], [o for _n, o in pairs], remember=False)
+            say(f"Renamed {len(done)} item{'s' if len(done) != 1 else ''} back." if not error
+                else f"Couldn’t undo every rename: {error.strerror}.")
         return True
     if kind == "trash":
         back = restore_from_trash(record.get("paths", []))

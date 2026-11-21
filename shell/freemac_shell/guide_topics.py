@@ -66,12 +66,14 @@ TOPICS = {
         "Press Return to choose the first one; it does exactly what it does in its own menu.",
         "Guide topics that match are listed under them.",
     ]),
-    "files": ("Find and organize files", "drawer files folder finder documents downloads trash copy rename gallery view icons list columns", [
+    "files": ("Find and organize files", "drawer files folder finder documents downloads trash copy rename many batch several numbers gallery view icons list columns", [
         "Drawer shows your files. Click it in the Dock.",
         "- ⌘1, ⌘2, ⌘3 and ⌘4 show icons, a list, columns or a gallery, where the file you chose shows large "
         "over a strip of the others.",
         "- Space shows a quick preview of the file you chose.",
         "- F2 renames, and Delete moves a file to the Trash.",
+        "- Choose several files and press F2 (or right-click > Rename Items…) to rename them all at once: "
+        "replace text in their names, add text, or give them one name with a number, such as Holiday 1, Holiday 2.",
         "- ⌘I shows a file's information, and ⌘T opens a tab.",
         "Click the Trash in the Dock to see it and empty it. In the Trash, Put Back returns a file to its folder.",
     ]),

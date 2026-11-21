@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, quick_actions, recents, share, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_info, macapps, menus, quick_actions, recents, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -1270,7 +1270,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.preview_kind = Gtk.Label(xalign=0, wrap=True, max_width_chars=30)
         self.preview_kind.get_style_context().add_class("dim-label")
         pane.pack_start(self.preview_kind, False, False, 0)
-        heading = Gtk.Label(label="Information", xalign=0)
+        self.preview_heading = heading = Gtk.Label(label="Information", xalign=0)
         heading.get_style_context().add_class("drawer-preview-heading")
         pane.pack_start(heading, False, False, 6)
         self.preview_facts = Gtk.Grid(column_spacing=10, row_spacing=4)
@@ -1294,6 +1294,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         path = chosen[0] if len(chosen) == 1 else (None if chosen else self.path)
         for child in self.preview_facts.get_children():
             self.preview_facts.remove(child)
+        self.preview_heading.set_visible(bool(path) and not (self.in_virtual() and path == self.path))
         if not path or self.in_virtual() and path == self.path:
             self.preview_picture.show_pixbuf(None)
             self.preview_name.set_text(f"{len(chosen)} items" if chosen else self._label(self.path or ""))
@@ -1703,7 +1704,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def rename(self, path=None):
         paths = [path] if path else self.selected_paths()
-        if len(paths) != 1:
+        if len(paths) > 1:
+            batch_rename.ask(self, paths, self.notify)
+            self.refresh()
+            return
+        if not paths:
             return
         path = paths[0]
         dialog = Gtk.Dialog(title="Rename", transient_for=self, modal=True)
@@ -2110,7 +2115,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Open With", None, has_selection),
             ("Get Info", lambda *_: self.get_info(), True),
-            ("Rename…", lambda *_: self.rename(), has_selection),
+            ("Rename…" if len(selected) < 2 else f"Rename {len(selected)} Items…", lambda *_: self.rename(), has_selection),
             ("Put Back" if in_trash else "Move to Trash",
              (lambda *_: self.put_back()) if in_trash else (lambda *_: self.trash()), has_selection),
             (None, None, True),
