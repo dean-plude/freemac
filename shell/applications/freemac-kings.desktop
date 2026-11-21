@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Kings
+GenericName=Draughts
+Comment=Play draughts (checkers) against the computer or a friend
+Exec=freemac-kings
+Icon=freemac-kings
+Categories=Game;BoardGame;KidsGame;
+Keywords=draughts;checkers;board;game;kings;kids;
+StartupWMClass=org.freemac.Kings
+StartupNotify=true

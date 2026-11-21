@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Fourway
+GenericName=Four in a Row
+Comment=Drop counters and line up four in a row, against the computer or a friend
+Exec=freemac-fourway
+Icon=freemac-fourway
+Categories=Game;BoardGame;KidsGame;
+Keywords=four;row;connect;counters;board;game;kids;
+StartupWMClass=org.freemac.Fourway
+StartupNotify=true
