@@ -351,6 +351,22 @@ TOPICS = {
         "Click Save to keep the pages as one PDF or as pictures. They go to your Documents folder unless "
         "you choose another.",
     ]),
+    "spreadsheet": ("Make a spreadsheet", "spreadsheet table numbers sum formula csv chart budget ledger grades", [
+        "Ledger makes spreadsheets. Press ⌘Space, type Ledger and press Return.",
+        "Click a cell and type a number or words, then press Return. To work something out, start with =, "
+        "for example =SUM(B2:B6) or =AVERAGE(B2:D2). While typing a formula you can click cells to put them in.",
+        "Select cells and click Sum to add them up, Chart to draw them, or Sort to put the rows in order. "
+        "The total, average and count of the selected cells show along the bottom.",
+        "⌘D copies a cell down the selection, changing its formula to fit each row. Ledger opens and saves "
+        "CSV files as well as its own.",
+    ]),
+    "presentation": ("Make a presentation", "presentation slides slideshow lantern talk project school pdf", [
+        "Lantern makes slideshows. Press ⌘Space, type Lantern and press Return.",
+        "Type the slide's title and its points on the right, one point on each line. Choose… adds a picture.",
+        "Click Add Slide for the next slide, and Theme to change the colours of them all.",
+        "Click Play to show the slides full screen. Press the right arrow or Space for the next slide and Esc "
+        "to stop. File > Export as PDF makes a copy to print or hand in.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

@@ -474,6 +474,13 @@ The small things a Mac user notices in their first minute.
 | 3 | Scanning: find a USB or network scanner, preview, pick the area, colour and resolution, and save pages as a picture or a many-page PDF | Glass | done |
 | 4 | The Dock: names above icons, magnification that follows the pointer over the icons, shrinking to fit when crowded, and clicks through its clear top | Pier | done |
 
+## 1.39 "school work" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Spreadsheets: a grid of cells with sums and formulas (SUM, AVERAGE, MIN, MAX, COUNT, IF, ROUND), number formats, sorting, a chart of the selected cells, and CSV files in and out | Ledger | done |
+| 2 | Presentations: slides with a title, points and a picture, a few original themes, a full-screen show moved on with the arrow keys, and PDF out | Lantern | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
