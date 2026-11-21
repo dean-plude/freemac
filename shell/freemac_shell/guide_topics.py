@@ -54,12 +54,15 @@ TOPICS = {
         "Control+Down shows all four. Control+Shift with an arrow key takes the window in front "
         "to the next desktop.",
     ]),
-    "seek": ("Search with Seek", "seek search find spotlight calculate sum file", [
+    "seek": ("Search with Seek", "seek search find spotlight calculate sum file convert conversion units "
+             "miles kilometres celsius fahrenheit pounds kilograms cups", [
         "Press ⌘Space, type, and press Return to open the first result. The arrow keys move "
         "down the list.",
         "Seek finds apps, settings, the menu items of the app in front, files by their names "
         "and by the words inside them.",
         "Type a sum such as 12*7 to see the answer; Return copies it.",
+        "Type an amount with its unit to convert it: 5 km shows it in miles, 70 f in Celsius. Add \u201cin\u201d "
+        "and another unit for that one instead, as in 2 cups in ml or 6 ft in cm.",
     ]),
     "help": ("Find a menu item", "help menu item command search find", [
         "Click Help at the end of the menu bar and just type. The menu items that match show "

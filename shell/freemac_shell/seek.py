@@ -23,6 +23,7 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa:
 
 from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, style  # noqa: E402
 from .ready_panel import ReadyPanel  # noqa: E402
+from .convert import convert  # noqa: E402
 
 MAX_RESULTS = 8
 PREVIEW = 280      # width of the preview beside the results
@@ -308,6 +309,13 @@ class SeekWindow(ReadyPanel, Gtk.Window):
                 results.append(Result(answer, f"{query} =", Gio.ThemedIcon.new("accessories-calculator"),
                                       lambda a=answer: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1),
                                       about="Press Return to copy the answer."))
+            converted = None if answer is not None else convert(query)
+            if converted is not None:
+                text, bare, asked = converted
+                results.append(Result(text, f"{asked} =", Gio.ThemedIcon.new("accessories-calculator"),
+                                      lambda a=bare: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1),
+                                      about="Press Return to copy the number. Type “in” and another unit "
+                                            "to convert to that instead, as in “5 km in feet”."))
             scored = sorted(((score_app(a, query), a.get_name(), a) for a in self.apps
                              if score_app(a, query) is not None), key=lambda t: (t[0], t[1].lower()))
             apps = [Result(info.get_name(), "Application", info.get_icon(),
