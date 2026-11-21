@@ -268,6 +268,11 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   left unsorted). **New Folder with Selection** (`transfer.folder_with`)
   renames the items into a new folder beside them and notes a "group"
   record, which Undo moves back and removes the folder if it is empty.
+  **View Options** (1.56, ⌘J) keeps icon size (32 to 128 pixels), grid
+  spacing, text size and Show Item Info in drawer.json for every window.
+  Icon size and item info refill the folder (pictures are drawn at the new
+  size); spacing and text size (a CSS provider on the icon view) apply at
+  once. The item-info line is shared with the desktop (`drawer_info.item_info`).
   **Rename Items** (1.55, `batch_rename.py`) works out every new name first
   and refuses the lot if any is empty, taken or given twice; it then renames
   through hidden temporary names, so names can be swapped, and keeps one

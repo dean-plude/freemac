@@ -43,6 +43,7 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import desktop_widgets, drawer_info, quick_actions, recents, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
+from .drawer_info import item_info  # noqa: E402
 
 try:
     import cairo
@@ -119,22 +120,6 @@ def save_places(places, stacks=False, item_info=False):
         json.dump({"places": {k: list(v) for k, v in places.items()}, "stacks": bool(stacks),
                    "item_info": bool(item_info)}, f, indent=1)
     os.replace(tmp, LAYOUT)
-
-
-def item_info(path, content_type):
-    """The line Show Item Info puts under a name: how many items a folder
-    holds, or a picture's width and height, as a Mac's desktop does."""
-    if os.path.isdir(path):
-        try:
-            count = sum(1 for n in os.listdir(path) if not n.startswith("."))
-        except OSError:
-            return ""
-        return f"{count} item{'s' if count != 1 else ''}"
-    if (content_type or "").startswith("image/"):
-        found = GdkPixbuf.Pixbuf.get_file_info(path)
-        if found and found[0] is not None and found[1] > 0:
-            return f"{found[1]} \u00d7 {found[2]}"
-    return ""
 
 
 def kind_of(name, path, content_type):

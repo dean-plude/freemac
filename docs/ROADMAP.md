@@ -628,6 +628,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Preview pane: no empty Information heading for several files | Drawer | done |
 | 4 | Guide: Rename Items in Find and organize files | Guide | done |
 
+## 1.56 "view options" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | View > Show View Options (⌘J): icon size slider, grid spacing, text size, Show item info, Sort By, kept for every window | Drawer | done |
+| 2 | Guide: View Options in Sort, find and put back files | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

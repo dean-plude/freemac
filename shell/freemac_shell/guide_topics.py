@@ -516,6 +516,8 @@ TOPICS = {
         "Choose View > Show Path Bar (Option+Command+P) to see the folders above this one. Click one to go there.",
         "The status bar at the bottom of the window shows how many items there are, how many you've selected "
         "and how much space is left on the disk. Command+/ hides or shows it, and View > Show Sidebar hides the sidebar.",
+        "Choose View > Show View Options (Command+J) to make icons bigger or smaller, space them out, change "
+        "the size of their names, show a folder's item count or a picture's size under its name, and sort.",
         "Choose View > Show Preview (Shift+Command+P) for a pane on the right with a large picture of the chosen "
         "file and its information: when it was made and changed, a picture's size, and its tags.",
         "In the Trash, right-click a file and choose Put Back (or press Command+Delete) to return it to its folder. "
