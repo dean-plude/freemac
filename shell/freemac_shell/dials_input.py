@@ -119,3 +119,16 @@ def key_repeat_group(group, row, slider, ini_get, ini_set):
                    marks=((-1000, "Long"), (-150, "Short")))
     return group(row("Key repeat rate", rate), row("Delay until repeat", delay,
                                                    "How long to hold a key before it starts repeating."))
+
+
+def spelling_group(window, group, row, switch):
+    """Check spelling while typing, for every app where you write."""
+    from . import spelling
+
+    caption = ("Underlines misspelled words in red in Jot, Post, Stickies, Quill and the notes in "
+               "other apps. Right-click one for suggestions, or to add it to the dictionary.")
+    if not spelling.available():
+        caption = "Spell checking isn't installed on this computer."
+    toggle = switch(spelling.wanted(), lambda on: window.save_prefs(check_spelling=on))
+    toggle.set_sensitive(spelling.available())
+    return group(row("Check spelling while typing", toggle, caption))

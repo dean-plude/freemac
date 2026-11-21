@@ -19,7 +19,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import alert, menus, style  # noqa: E402
+from . import alert, menus, spelling, style  # noqa: E402
 from . import contacts_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Crew"
@@ -144,6 +144,7 @@ class Card(Gtk.ScrolledWindow):
             self.birthday = self._entry(birthday_text(contact.birthday) if contact.birthday else "", "Month Day, Year")
             self._place("birthday", self.birthday)
             self.notes = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR)
+            spelling.attach(self.notes)
             self.notes.get_buffer().set_text(contact.notes)
             frame = Gtk.Frame()
             frame.add(self.notes)

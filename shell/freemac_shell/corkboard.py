@@ -23,7 +23,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import menus, style  # noqa: E402
+from . import menus, spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Corkboard"
 HOME = os.path.join(GLib.get_user_data_dir(), "freemac", "corkboard")
@@ -450,6 +450,7 @@ class Canvas(Gtk.DrawingArea):
         scroller.set_shadow_type(Gtk.ShadowType.IN)
         view = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=6, right_margin=6,
                             top_margin=6, bottom_margin=6)
+        spelling.attach(view)
         view.get_buffer().set_text(item["text"])
         scroller.add(view)
         hint = Gtk.Label(label="Click outside to finish.", xalign=0)

@@ -858,6 +858,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Key repeat rate and Delay until repeat sliders | Dials | done |
 | 4 | Guide: Type in another language or keyboard layout | Guide | done |
 
+## 1.81 "spellbound" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Check spelling while typing: misspelled words underlined in red in Jot, Post, Stickies, Quill's plain text and Markdown, and the notes in Tide, Nudge, Crew, Corkboard and Lantern | Apps | done |
+| 2 | Right-click a misspelled word for suggestions, Ignore All, Add to Dictionary and the language to check in (U.S., British, Canadian, Australian English) | Apps, Build | done |
+| 3 | Dials > Keyboard > Text Input: one switch for every app | Dials | done |
+| 4 | Guide: Check your spelling as you type | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

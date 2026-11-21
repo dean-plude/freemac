@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "4")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkSource  # noqa: E402
 
-from . import alert, menus, savesheet, style  # noqa: E402
+from . import alert, menus, savesheet, spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Quill"
 LIGHT_SCHEME, DARK_SCHEME = "classic", "oblivion"
@@ -38,6 +38,9 @@ def guess_language(path, content_type):
     if language and language.get_id() == "python":
         language = manager.get_language("python3") or language
     return language
+
+
+PROSE = {None, "markdown", "text", "latex", "rst", "asciidoc"}
 
 
 class Editor(Gtk.ApplicationWindow):
@@ -72,6 +75,8 @@ class Editor(Gtk.ApplicationWindow):
         self.view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
         self.view.set_left_margin(6)
         self.view.set_top_margin(6)
+        spelling.attach(self.view)
+        self.buffer.connect("notify::language", lambda *_: spelling.allow(self.view, self._prose()))
         self._css = Gtk.CssProvider()
         self.view.get_style_context().add_provider(self._css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self._apply_font()
@@ -234,6 +239,11 @@ class Editor(Gtk.ApplicationWindow):
             self.buffer.set_language(guess_language(path, None))
         self._update_title()
         return True
+
+    def _prose(self):
+        """Plain text and Markdown get spelling; code doesn't."""
+        language = self.buffer.get_language()
+        return (language.get_id() if language else None) in PROSE
 
     def save(self):
         return self.write(self.path) if self.path else self.save_as()

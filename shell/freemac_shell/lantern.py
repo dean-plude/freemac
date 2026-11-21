@@ -24,7 +24,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import alert, menus, savesheet, style  # noqa: E402
+from . import alert, menus, savesheet, spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Lantern"
 W, H = 1600, 900            # a slide's own size; it is scaled to fit wherever it's drawn
@@ -462,6 +462,7 @@ class Window(Gtk.ApplicationWindow):
         inspector.pack_start(self.points_heading, False, False, 6)
         self.points_view = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=6, right_margin=6,
                                         top_margin=6, bottom_margin=6)
+        spelling.attach(self.points_view)
         self.points_view.get_buffer().connect("changed", self._points_changed)
         points_scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         points_scroll.get_style_context().add_class("lantern-points")

@@ -445,6 +445,14 @@ TOPICS = {
         "choose another, or press Control-Space to go to the next. Click \u2212 beside one to take it off.",
         "Key repeat rate and Delay until repeat, on the same page, set how fast a held key repeats.",
     ]),
+    "spelling": ("Check your spelling as you type", "spelling spell check checker misspelled typo dictionary correct underline red learn word ignore", [
+        "In Jot, Post, Stickies, Quill and the notes fields of other apps, a misspelled word gets a red "
+        "underline. Right-click it to pick the right spelling, Ignore All, or Add to Dictionary so it's "
+        "never underlined again.",
+        "The same right-click menu has Languages, to check in British, Canadian or Australian English "
+        "instead. Quill checks plain text and Markdown, not code.",
+        "To turn it off everywhere, choose Dials > Keyboard and turn off Check spelling while typing.",
+    ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
         "administrator's password. Nearby devices and printers see the new name, and other computers "

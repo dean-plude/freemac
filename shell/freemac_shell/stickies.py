@@ -29,7 +29,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import style  # noqa: E402
+from . import spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Stickies"
 STORE = os.path.join(GLib.get_user_data_dir(), "freemac", "stickies.json")
@@ -160,6 +160,7 @@ class Note(Gtk.Window):
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         self.text = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=10, right_margin=10,
                                  top_margin=6, bottom_margin=6)
+        spelling.attach(self.text)
         self.text.get_buffer().set_text(data.get("text", ""))
         self.text.get_buffer().connect("changed", self._typed)
         self.text.connect("key-press-event", self._key)

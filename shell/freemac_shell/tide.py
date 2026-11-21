@@ -29,6 +29,7 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 from . import calendar_store as store  # noqa: E402
+from . import spelling  # noqa: E402
 from . import calendars, contacts_store, menus, style  # noqa: E402
 from .minimonth import MiniMonth, month_weeks  # noqa: E402
 
@@ -669,6 +670,7 @@ class Editor(Gtk.Popover):
         box.pack_start(Gtk.Separator(), False, False, 2)
 
         self.notes = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, top_margin=4, left_margin=4)
+        spelling.attach(self.notes)
         self.notes.get_buffer().set_text(event.notes)
         frame = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, min_content_height=60)
         frame.set_shadow_type(Gtk.ShadowType.IN)
