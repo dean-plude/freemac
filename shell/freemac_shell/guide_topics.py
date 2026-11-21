@@ -244,6 +244,29 @@ TOPICS = {
         "Every app can use it after that.",
         "Fonts you added are under My Fonts. To take one away, choose it and click Remove Font.",
     ]),
+    "memory-game": ("Play the memory game", "memory game pairs match matching cards concentration kids two players", [
+        "Pairs is a memory game. Press ⌘Space, type Pairs and press Return.",
+        "Click a card to turn it over, then click another. If the pictures match, they stay up. If not, they "
+        "turn back over, so try to remember where they were.",
+        "Choose the size and the pictures at the top. With 2 Players, you take turns, and finding a pair "
+        "gives you another go.",
+    ]),
+    "graphs": ("Draw a graph of an equation", "graph graphing plot equation function curve math maths calculator", [
+        "Plot draws equations. Press ⌘Space, type Plot and press Return.",
+        "Type an equation in a box on the left, such as y = x^2 - 3 or sin(x). Use ^ for powers, and you can "
+        "write 2x for 2 times x. Click Add Equation for another one in a new colour.",
+        "Drag the graph to move it and scroll to zoom. Point at a curve to read its value there.",
+        "Put the letter a in an equation, such as a·x^2, and drag the slider for a to watch the curve change.",
+    ]),
+    "whiteboard": ("Plan ideas on a board", "whiteboard board corkboard sticky notes ideas brainstorm plan pictures", [
+        "Corkboard is a big board for notes and pictures. Press ⌘Space, type Corkboard and press Return.",
+        "Click Note, Text, Shape or Picture at the top, or double-click anywhere on the board for a note. "
+        "Double-click a note or shape to write in it.",
+        "Drag things to move them, and drag the small square at the corner to make them bigger. Choose a "
+        "colour with the round button at the top.",
+        "Drag empty space to move around the board, and hold ⌘ while you scroll to zoom. Click New Board "
+        "for another board.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

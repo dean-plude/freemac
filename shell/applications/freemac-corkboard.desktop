@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Corkboard
+GenericName=Whiteboard
+Comment=Pin up notes, shapes, arrows and pictures on a big board
+Exec=freemac-corkboard
+Icon=freemac-corkboard
+Categories=Office;Graphics;
+Keywords=whiteboard;board;sticky;notes;ideas;brainstorm;mood;moodboard;freeform;canvas;
+StartupWMClass=org.freemac.Corkboard
+StartupNotify=true

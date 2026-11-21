@@ -433,6 +433,14 @@ The small things a Mac user notices in their first minute.
 | 2 | A number puzzle (sudoku) with easy to hard puzzles, pencil marks, hints and undo | Nine | done |
 | 3 | A font book: every font on the computer with a sample you can type, sizes, and adding a font file with a double-click | Typecase | done |
 
+## 1.34 "graphs, boards and pairs" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A memory game: turn over cards to find the pairs, in four sizes and three picture sets, for one player or two taking turns | Pairs | done |
+| 2 | A graphing calculator: draw y = … equations in colour, zoom and drag, and read off any point on a curve | Plot | done |
+| 3 | A whiteboard: a big board for sticky notes, text, shapes, arrows and pictures, with as many boards as you like | Corkboard | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
