@@ -37,7 +37,9 @@ C_ICON, C_NAME, C_PATH, C_IS_DIR, C_SIZE, C_MODIFIED, C_KIND, C_SORT, C_SMALL, C
 SORTS = (("name", "Name"), ("kind", "Kind"), ("date", "Date Modified"), ("size", "Size"))
 VIEWS = (("icons", "view-grid-symbolic", "Icons"),
          ("list", "view-list-symbolic", "List"),
-         ("columns", "view-dual-symbolic", "Columns"))
+         ("columns", "view-dual-symbolic", "Columns"),
+         ("gallery", "view-paged-symbolic", "Gallery"))
+ICONISH = ("icons", "gallery")   # both show the files in the icon view
 CSS = b"""
 box.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 list.drawer-sidebar { background-color: transparent; }
@@ -52,6 +54,7 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-column { border-right: 1px solid rgba(120, 120, 150, 0.18); }
 .drawer-preview-name { font-weight: bold; font-size: 15px; }
 .drawer-status { font-size: 11px; opacity: 0.7; padding: 3px 10px; }
+.drawer-gallery-name { font-weight: bold; padding-top: 4px; }
 .drawer-tabs { padding: 4px 6px 0; }
 .drawer-tabs button { padding: 2px 8px; }
 .drawer-tab-close { padding: 0 2px; min-width: 0; min-height: 0; }
@@ -352,6 +355,58 @@ def name_column(title="Name"):
     return col
 
 
+def gallery_pixbuf(path, fallback=None):
+    """The chosen file as large as Gallery shows it: a picture or a PDF's
+    first page, or else its kind's icon, large."""
+    kind, _uncertain = Gio.content_type_guess(path, None)
+    try:
+        if path.lower().endswith(".pdf"):
+            from . import pdf
+            page = pdf.first_page(path, 900)
+            if page is not None:
+                return page
+        elif kind and kind.startswith("image/") and os.path.isfile(path):
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 1600, 1600, True)
+            return pixbuf.apply_embedded_orientation() or pixbuf
+    except GLib.Error:
+        pass
+    try:
+        info = Gio.File.new_for_path(path).query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
+        if macapps.is_bundle(path):
+            return Folder.app_icon(path, 256)
+        return Folder.icon(info.get_icon(), 256) or fallback
+    except GLib.Error:
+        return fallback
+
+
+class GalleryPicture(Gtk.DrawingArea):
+    """Gallery's large picture, fitted to the room it has, never past its
+    own size."""
+
+    def __init__(self):
+        super().__init__(hexpand=True, vexpand=True)
+        self.pixbuf, self.cache = None, None
+        self.connect("draw", self._draw)
+
+    def show_pixbuf(self, pixbuf):
+        self.pixbuf, self.cache = pixbuf, None
+        self.queue_draw()
+
+    def _draw(self, widget, cr):
+        if self.pixbuf is None:
+            return False
+        room_w, room_h = widget.get_allocated_width() - 40, widget.get_allocated_height() - 24
+        pw, ph = self.pixbuf.get_width(), self.pixbuf.get_height()
+        scale = min(room_w / pw, room_h / ph, 1.0)
+        w, h = max(1, round(pw * scale)), max(1, round(ph * scale))
+        if self.cache is None or (self.cache.get_width(), self.cache.get_height()) != (w, h):
+            self.cache = self.pixbuf.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
+        Gdk.cairo_set_source_pixbuf(cr, self.cache, (widget.get_allocated_width() - w) / 2,
+                                    (widget.get_allocated_height() - h) / 2)
+        cr.paint()
+        return False
+
+
 class DrawerWindow(Gtk.ApplicationWindow):
     dragging = None       # the files being dragged out of a Drawer window, while they are
 
@@ -437,6 +492,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._build_icon_view()
         self._build_list_view()
         self._build_column_view()
+        self._build_gallery_view()
         self.connect("key-press-event", self._key)
         self._add_actions()
         self.tabs.append({})
@@ -533,7 +589,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         across = key in (Gdk.KEY_Left, Gdk.KEY_Right)
         step = Gtk.MovementStep.VISUAL_POSITIONS if across else Gtk.MovementStep.DISPLAY_LINES
         count = -1 if key in (Gdk.KEY_Left, Gdk.KEY_Up) else 1
-        if self.view_mode == "icons":
+        if self.view_mode in ICONISH:
             self.icon_view.emit("move-cursor", step, count)
         elif self.view_mode == "list" and not across:
             self.list_view.emit("move-cursor", step, count)
@@ -579,6 +635,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def _selection_changed(self, *_args):
         self._show_status()
+        self._show_gallery()
         if self.glance and self.glance.get_visible():
             paths = self.selected_paths()
             if paths and paths != self.glance.paths:
@@ -784,7 +841,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         wanted = set(paths)
         if not wanted:
             return
-        if self.view_mode == "icons":
+        if self.view_mode in ICONISH:
             model = self.icon_view.get_model()
             self.icon_view.unselect_all()
             first = None
@@ -854,6 +911,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "view-icons": lambda: self.view_buttons["icons"].set_active(True),
             "view-list": lambda: self.view_buttons["list"].set_active(True),
             "view-columns": lambda: self.view_buttons["columns"].set_active(True),
+            "view-gallery": lambda: self.view_buttons["gallery"].set_active(True),
             "new-tab": self.new_tab,
             "close-tab": self.close_tab,
             "next-tab": lambda: self.switch_tab((self.current + 1) % len(self.tabs)),
@@ -1185,6 +1243,70 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.column_paths = []
         self.content.add_named(self.column_scroll, "columns")
 
+    # ---- gallery view -----------------------------------------------------
+    def _build_gallery_view(self):
+        """Finder's Gallery: the chosen file large, with its name and kind,
+        over a strip of every file in the folder. The strip is the icon view
+        itself, moved in and laid out in one row, so choosing, opening and
+        dragging work as they do with icons."""
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        page.get_style_context().add_class("drawer-gallery")
+        self.gallery_picture = GalleryPicture()
+        page.pack_start(self.gallery_picture, True, True, 0)
+        self.gallery_name = Gtk.Label(xalign=0.5, ellipsize=Pango.EllipsizeMode.MIDDLE)
+        self.gallery_name.get_style_context().add_class("drawer-gallery-name")
+        page.pack_start(self.gallery_name, False, False, 0)
+        self.gallery_kind = Gtk.Label(xalign=0.5, ellipsize=Pango.EllipsizeMode.END)
+        self.gallery_kind.get_style_context().add_class("drawer-status")
+        page.pack_start(self.gallery_kind, False, False, 0)
+        self.gallery_strip = Gtk.ScrolledWindow(vscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.gallery_strip.set_size_request(-1, 104)
+        page.pack_start(self.gallery_strip, False, False, 0)
+        self.content.add_named(page, "gallery")
+
+    def _place_icon_view(self):
+        """Put the icon view where the current view needs it."""
+        gallery = self.view_mode == "gallery"
+        home = self.gallery_strip if gallery else self.content.get_child_by_name("icons")
+        if self.icon_view.get_parent() is not home:
+            self.icon_view.get_parent().remove(self.icon_view)
+            home.add(self.icon_view)
+            self.icon_view.show()
+        if gallery:
+            self.icon_view.set_markup_column(-1)
+            self.icon_view.set_item_width(64)
+            self.icon_view.set_margin(6)
+            self.icon_view.set_columns(max(1, len(self.icon_view.get_model() or [])))
+        else:
+            self.icon_view.set_markup_column(C_MARKUP)
+            self.icon_view.set_item_width(96)
+            self.icon_view.set_margin(12)
+            self.icon_view.set_columns(-1)
+
+    def _show_gallery(self):
+        if self.view_mode != "gallery":
+            return
+        chosen = self.selected_paths()
+        model = self.icon_view.get_model()
+        if not chosen and model is not None and len(model):
+            # Gallery always shows something: the first file, as in Finder.
+            first = model.get_iter_first()
+            self.icon_view.select_path(model.get_path(first))
+            return   # selecting calls this again
+        if not chosen:
+            self.gallery_picture.show_pixbuf(None)
+            self.gallery_name.set_text("")
+            self.gallery_kind.set_text("")
+            return
+        path = chosen[0]
+        row = next((r for r in model if r[C_PATH] == path), None)
+        self.gallery_name.set_text(row[C_NAME] if row else os.path.basename(path))
+        kind = row[C_KIND] if row else ""
+        size = row[C_SIZE] if row else ""
+        self.gallery_kind.set_text(" \u2014 ".join(t for t in (kind, size, row[C_MODIFIED] if row else "") if t))
+        self.gallery_picture.show_pixbuf(gallery_pixbuf(path, row[C_ICON] if row else None))
+        self.icon_view.scroll_to_path(self.icon_view.get_selected_items()[0], False, 0, 0)
+
     # ---- navigation -----------------------------------------------------
     def navigate(self, path, remember=True):
         if not path.startswith(tags.PREFIX) and path != recents.PLACE:
@@ -1220,6 +1342,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         model = self._model(folder)
         self.icon_view.set_model(model)
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
+        self._place_icon_view()
         if self.view_mode == "columns" and not self.in_virtual():
             self._reset_columns()
         self._show_status()
@@ -1227,6 +1350,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         # A tag's files come from many folders, so it has no columns: a list.
         self.content.set_visible_child_name("list" if self.in_virtual() and self.view_mode == "columns"
                                             else self.view_mode)
+        self._show_gallery()
         in_trash = self.in_trash()
         self.trash_bar.set_visible(in_trash)
         self.empty_button.set_sensitive(in_trash and count > 0)
@@ -1429,7 +1553,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             pass
 
     def selected_paths(self):
-        if self.view_mode == "icons":
+        if self.view_mode in ICONISH:
             model = self.icon_view.get_model()
             return [model[p][C_PATH] for p in self.icon_view.get_selected_items()]
         if self.view_mode == "list":
@@ -1818,7 +1942,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.refresh()
 
     def select_all(self):
-        if self.view_mode == "icons":
+        if self.view_mode in ICONISH:
             self.icon_view.select_all()
         elif self.view_mode == "list":
             self.list_view.get_selection().select_all()
@@ -1833,14 +1957,17 @@ class DrawerWindow(Gtk.ApplicationWindow):
     # ---- events ---------------------------------------------------------
     def _view_toggled(self, button, mode):
         if button.get_active():
+            keep = self.selected_paths() if self.path else []
             self.view_mode = mode
             if self.path:
                 self.refresh()
+                if keep and mode != "columns":
+                    self.select_paths(keep)   # the same files stay chosen, as in Finder
             GLib.idle_add(self._focus_view)
 
     def _focus_view(self):
         """Keyboard focus follows the view, so arrow keys move through files."""
-        if self.view_mode == "icons":
+        if self.view_mode in ICONISH:
             self.icon_view.grab_focus()
         elif self.view_mode == "list":
             self.list_view.grab_focus()
@@ -2071,7 +2198,7 @@ def menubar():
         ]),
         ("_View", [
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
-             ("as Columns", "win.view-columns", "<Ctrl>3")],
+             ("as Columns", "win.view-columns", "<Ctrl>3"), ("as Gallery", "win.view-gallery", "<Ctrl>4")],
             [("Sort by " + title, f"win.sort-by::{key}", None) for key, title in SORTS],
             [("Show Sidebar", "win.sidebar", None), ("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
              ("Show Status Bar", "win.status-bar", "<Ctrl>slash"),
