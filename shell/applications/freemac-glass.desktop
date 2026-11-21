@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Glass
+GenericName=Scanner
+Comment=Scan documents and photos with a scanner or all-in-one printer
+Exec=freemac-glass
+Icon=freemac-glass
+Categories=Graphics;Scanning;Office;
+Keywords=scan;scanner;scanning;document;photo;pdf;printer;all-in-one;copy;
+StartupWMClass=org.freemac.Glass
+StartupNotify=true
