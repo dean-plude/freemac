@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Cairn: three stacked picture tiles. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f9b6e"/><stop offset="1" stop-color="#1f6b4a"/></linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#f1e9d6"/></linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="17" y="64" width="36" height="46" rx="5" fill="#000" fill-opacity="0.25"/>
+  <rect x="18" y="62" width="36" height="46" rx="5" fill="#c9b893"/>
+  <rect x="20" y="60" width="36" height="46" rx="5" fill="#e3d6b8"/>
+  <rect x="22" y="58" width="36" height="46" rx="5" fill="url(#face)" stroke="#000" stroke-opacity="0.18"/>
+  <path d="M40,75 c-9,-6 -18,0 -15,10 c2,8 8,13 15,9 c7,4 13,-1 15,-9 c3,-10 -6,-16 -15,-10 z" fill="#e2392f"/>
+  <path d="M40,75 q1,-6 5,-9" stroke="#6b3d14" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M42,71 q6,-5 10,-1 q-5,4 -10,1 z" fill="#3fa34d"/>
+  <rect x="65" y="64" width="36" height="46" rx="5" fill="#000" fill-opacity="0.25"/>
+  <rect x="66" y="62" width="36" height="46" rx="5" fill="#c9b893"/>
+  <rect x="68" y="60" width="36" height="46" rx="5" fill="#e3d6b8"/>
+  <rect x="70" y="58" width="36" height="46" rx="5" fill="url(#face)" stroke="#000" stroke-opacity="0.18"/>
+  <polygon points="88.0,69.0 91.1,76.8 99.4,77.3 92.9,82.6 95.1,90.7 88.0,86.2 80.9,90.7 83.1,82.6 76.6,77.3 84.9,76.8" fill="#f5b81c" stroke="#c98a08" stroke-width="1.2" stroke-linejoin="round"/>
+  <rect x="41" y="30" width="36" height="46" rx="5" fill="#000" fill-opacity="0.25"/>
+  <rect x="42" y="28" width="36" height="46" rx="5" fill="#c9b893"/>
+  <rect x="44" y="26" width="36" height="46" rx="5" fill="#e3d6b8"/>
+  <rect x="46" y="24" width="36" height="46" rx="5" fill="url(#face)" stroke="#000" stroke-opacity="0.18"/>
+  <circle cx="64" cy="47" r="11" fill="#2f7fe0"/>
+  <path d="M53,47 a11,11 0 0 0 22,0" fill="#5cc26a"/>
+  <circle cx="61" cy="43" r="3" fill="#fff" fill-opacity="0.5"/>
+</svg>

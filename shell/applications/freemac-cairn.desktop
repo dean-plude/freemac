@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cairn
+GenericName=Tile Matching
+Comment=Clear a stack of picture tiles by matching free pairs
+Exec=freemac-cairn
+Icon=freemac-cairn
+Categories=Game;BoardGame;KidsGame;
+Keywords=tiles;match;pairs;solitaire;stack;puzzle;kids;game;
+StartupWMClass=org.freemac.Cairn
+StartupNotify=true
