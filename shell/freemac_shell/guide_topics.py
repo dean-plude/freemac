@@ -517,6 +517,14 @@ TOPICS = {
         "Click + to choose an app to add, and \u2212 beside an app to stop it opening.",
         "You can also right-click an app in the Dock and choose Options > Open at Login.",
     ]),
+    "shut-down": ("Restart, shut down or log out", "restart shut down shutdown turn off power off log out logout sign out sleep recent items recently used apps documents", [
+        "Click the freemac mark at the left of the menu bar and choose Sleep, Restart\u2026, Shut Down\u2026 or "
+        "Log Out. Shift-Command-Q logs out too.",
+        "freemac asks first. If nobody answers, it goes ahead by itself after 60 seconds.",
+        "Each open app is then asked to quit, so you can save your work. If an app stays open, freemac "
+        "stops and tells you which one.",
+        "Recent Items in the same menu lists the apps and documents you used lately. Clear Menu empties it.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

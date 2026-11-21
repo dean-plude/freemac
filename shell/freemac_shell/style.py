@@ -24,7 +24,10 @@ TEMPLATE = """
 .topline menuitem:hover > label, .topline menuitem:hover > box label { color: white; }
 /* Items that can't be chosen now (a window's commands while its app has no
  * window open) are greyed out, as on a Mac. */
-.topline menuitem:disabled label, .topline menuitem:disabled box label { color: alpha(@ink, 0.4); }
+.topline menuitem:disabled label, .topline menuitem:disabled box label { color: alpha(@ink , 0.4); }
+/* A heading inside a menu, such as Applications in Recent Items. */
+menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled label {
+  color: alpha(@ink , 0.55); font-size: 12px; font-weight: 600; }
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }

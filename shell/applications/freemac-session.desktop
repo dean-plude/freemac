@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Log Out
+Comment=Restart, shut down or log out, after the apps have quit
+Exec=freemac-session logout
+Icon=system-log-out
+Categories=System;
+NoDisplay=true
+StartupWMClass=freemac-session

@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
+from . import dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -454,14 +454,10 @@ class DialsWindow(Gtk.ApplicationWindow):
         ini_set(WAYFIRE_INI, section, key, value)
 
     def confirm_power(self, action):
-        if action != "suspend":
-            words = {"reboot": ("Restart now?", "Restart"), "poweroff": ("Shut down now?", "Shut Down")}[action]
-            answer = alert.ask(self, words[0], "Unsaved work in open apps will be lost.",
-                               [("Cancel", Gtk.ResponseType.CANCEL), (words[1], Gtk.ResponseType.OK)],
-                               default=Gtk.ResponseType.OK)
-            if answer != Gtk.ResponseType.OK:
-                return
-        Gio.Subprocess.new(["systemctl", action], Gio.SubprocessFlags.NONE)
+        """Sleep, Restart… and Shut Down… ask and quit apps as the freemac
+        menu does (freemac-session)."""
+        words = {"suspend": "sleep", "reboot": "restart", "poweroff": "shutdown"}
+        Gio.Subprocess.new(["freemac-session", words[action]], Gio.SubprocessFlags.NONE)
 
     def _search_match(self, row):
         text = self.search.get_text().strip().lower()

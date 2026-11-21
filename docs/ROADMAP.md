@@ -748,6 +748,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | pkexec is now installed, so the administrator password prompt works for Users, Restart in Recovery and this | Build | done |
 | 3 | Guide: Limit adult websites in screen time | Guide | done |
 
+## 1.70 "the freemac menu" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The freemac menu in a Mac's order: About freemac, Settings…, Harbor…, Recent Items, Force Quit…, Sleep, Restart…, Shut Down…, Lock Screen, Log Out *name*… | Topline | done |
+| 2 | Recent Items: the apps and documents used lately, with Clear Menu | Topline | done |
+| 3 | Restart, Shut Down and Log Out ask "Are you sure…?" and go ahead by themselves after 60 seconds, as on a Mac (they used to happen at once, without asking) | Session | done |
+| 4 | Before restarting, shutting down or logging out, every app is asked to quit, so it can offer to save; an app that stays open stops it and is named | Session | done |
+| 5 | Shift-Command-Q logs out (asking first); Dials > Battery and Power's buttons ask the same way | Session, Dials | done |
+| 6 | Guide: Restart, shut down or log out | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
