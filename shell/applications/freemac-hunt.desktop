@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hunt
+GenericName=Word Search
+Comment=Find the hidden words in a grid of letters, with themes and three sizes
+Exec=freemac-hunt
+Icon=freemac-hunt
+Categories=Game;KidsGame;LogicGame;
+Keywords=word;search;find;puzzle;letters;spelling;kids;game;
+StartupWMClass=org.freemac.Hunt
+StartupNotify=true

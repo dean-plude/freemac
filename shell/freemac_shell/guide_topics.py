@@ -287,6 +287,26 @@ TOPICS = {
         "Click the copy button next to Hex, RGB or HSL to copy that value. Click Add to Palette to keep the "
         "colour for later.",
     ]),
+    "tangram": ("Make shapes with Tangram", "tangram shape puzzle pieces triangle kids game", [
+        "Tangram has seven flat pieces to make a shape. Press ⌘Space, type Tangram and press Return.",
+        "Pick a shape from the menu at the top. Drag pieces onto the grey outline to fill it.",
+        "Click a piece to turn it. Right-click the parallelogram to flip it over.",
+        "Click Hint to see where one piece goes.",
+    ]),
+    "podcasts": ("Listen to podcasts and follow news feeds", "podcast feed rss atom news subscribe episode buoy listen", [
+        "Buoy follows podcasts and websites. Press ⌘Space, type Buoy and press Return.",
+        "Click the + button (or press ⌘N) and type the address of a podcast's feed, or of a website that has a feed.",
+        "New posts and episodes show with a blue dot. Click one to read it, and click Play to listen.",
+        "Buoy keeps your place in every episode. Change the speed with the button at the right of the player.",
+        "To move your podcasts from another app, export them there as OPML and choose File > Import Subscriptions.",
+    ]),
+    "word-search": ("Play a word search", "word search hunt puzzle letters grid kids game", [
+        "Hunt hides words in a grid of letters. Press ⌘Space, type Hunt and press Return.",
+        "Drag from the first letter of a word to its last, or click one and then the other.",
+        "Pick a theme from the menu at the top, and Small, Medium or Large. Larger grids hide words on "
+        "slants and backwards.",
+        "Click Hint to see the first letter of a word you haven't found.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

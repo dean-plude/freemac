@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Hunt: a grid of letters with two words circled and a magnifying glass. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e8ebf0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5a6270"/><stop offset="1" stop-color="#2e333c"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="25.5" fill="none" stroke="#000" stroke-opacity="0.08"/>
+  <line x1="28" y1="34.5" x2="70" y2="34.5" stroke="#f26b5b" stroke-opacity="0.5" stroke-width="15" stroke-linecap="round"/>
+  <line x1="28" y1="48.5" x2="56" y2="76.5" stroke="#43a0ea" stroke-opacity="0.45" stroke-width="15" stroke-linecap="round"/>
+  <g font-family="Inter, Cantarell, sans-serif" font-weight="700" font-size="13" fill="#2a2d35" text-anchor="middle">
+    <text x="28" y="39">C</text><text x="42" y="39">A</text><text x="56" y="39">T</text><text x="70" y="39">S</text><text x="84" y="39">P</text><text x="98" y="39">E</text>
+    <text x="28" y="53">D</text><text x="42" y="53">R</text><text x="56" y="53">U</text><text x="70" y="53">K</text><text x="84" y="53">I</text><text x="98" y="53">W</text>
+    <text x="28" y="67">L</text><text x="42" y="67">O</text><text x="56" y="67">B</text><text x="70" y="67">N</text><text x="84" y="67">M</text><text x="98" y="67">A</text>
+    <text x="28" y="81">F</text><text x="42" y="81">E</text><text x="56" y="81">G</text><text x="70" y="81">H</text><text x="84" y="81">Y</text><text x="98" y="81">T</text>
+    <text x="28" y="95">J</text><text x="42" y="95">Q</text><text x="56" y="95">V</text><text x="70" y="95">X</text><text x="84" y="95">Z</text><text x="98" y="95">O</text>
+  </g>
+  <circle cx="80" cy="76" r="17" fill="#ffffff" fill-opacity="0.35" stroke="url(#rim)" stroke-width="6"/>
+  <line x1="92" y1="88" x2="106" y2="102" stroke="url(#rim)" stroke-width="9" stroke-linecap="round"/>
+</svg>

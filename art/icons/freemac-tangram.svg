@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Tangram: the seven pieces making a square. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfdfd"/><stop offset="1" stop-color="#e4e7ec"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" transform="translate(28 28) scale(18)">
+    <g stroke-width="0.14">
+      <polygon points="0,0 4,0 2,2" fill="#f2554d"/>
+      <polygon points="0,0 2,2 0,4" fill="#338cf2"/>
+      <polygon points="2,4 4,4 4,2" fill="#ffc229"/>
+      <polygon points="4,0 4,2 3,1" fill="#33bf73"/>
+      <polygon points="2,2 3,1 4,2 3,3" fill="#ff8c33"/>
+      <polygon points="2,2 3,3 1,3" fill="#a666e6"/>
+      <polygon points="1,3 3,3 2,4 0,4" fill="#26bfcc"/>
+    </g>
+  </g>
+</svg>
