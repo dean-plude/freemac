@@ -604,6 +604,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Show Item Info on the desktop: a picture's size or a folder's item count under its name | Backdrop | done |
 | 4 | Guide: status bar, sidebar and Show Item Info | Guide | done |
 
+## 1.53 "gallery" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Gallery view (⌘4): the chosen file large (a picture, a PDF's first page, or its icon) with its name, kind, size and date, over a strip of the folder's files | Drawer | done |
+| 2 | The chosen files stay chosen when the view changes | Drawer | done |
+| 3 | Guide: ⌘4 in Find and organize files | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

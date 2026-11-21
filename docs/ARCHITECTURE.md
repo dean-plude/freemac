@@ -272,6 +272,11 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   short timer when a drag rests on a folder and opens it when the timer
   ends; the drag hands over the files picked up when it began, not the
   window's selection, which is empty after the folder changes.
+  **Gallery view** (1.53) moves the icon view itself into a strip under a
+  large picture of the chosen file and lays it out in one row (no names,
+  narrower items), so choosing, opening, dragging and Glance work as they
+  do in icon view; switching back moves it home. The large picture is the
+  file itself for pictures, a PDF's first page, or its icon at 256 pixels.
   **Status bar** (1.52): the label under the files counts the open
   folder's items (the last column's in column view) and the chosen ones,
   and adds the space left from `os.statvfs`; a message Drawer shows there

@@ -66,9 +66,10 @@ TOPICS = {
         "Press Return to choose the first one; it does exactly what it does in its own menu.",
         "Guide topics that match are listed under them.",
     ]),
-    "files": ("Find and organize files", "drawer files folder finder documents downloads trash copy rename", [
+    "files": ("Find and organize files", "drawer files folder finder documents downloads trash copy rename gallery view icons list columns", [
         "Drawer shows your files. Click it in the Dock.",
-        "- ⌘1, ⌘2 and ⌘3 show icons, a list or columns.",
+        "- ⌘1, ⌘2, ⌘3 and ⌘4 show icons, a list, columns or a gallery, where the file you chose shows large "
+        "over a strip of the others.",
         "- Space shows a quick preview of the file you chose.",
         "- F2 renames, and Delete moves a file to the Trash.",
         "- ⌘I shows a file's information, and ⌘T opens a tab.",
