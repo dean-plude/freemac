@@ -385,7 +385,7 @@ The small things a Mac user notices in their first minute.
 | 2 | Backups to a drive: pick one in Dials, and while it's plugged in your home folder is copied every hour, keeping earlier copies with unchanged files shared | Lifeboat, Dials | done |
 | 3 | Bring back a file or folder from any backup, browsed by date | Lifeboat, Drawer | done |
 
-## 1.28 "videos, the machine, and drives"
+## 1.28 "videos, the machine, and drives" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
@@ -393,13 +393,21 @@ The small things a Mac user notices in their first minute.
 | 2 | See what's using the processor and memory, app by app, with a small history graph, and quit one that's stuck | Gauge | done |
 | 3 | See every drive with its space used, and eject, rename or erase one | Hull | done |
 
-## 1.29 "the camera, the weather, and notes"
+## 1.29 "the camera, the weather, and notes" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
 | 1 | Take pictures of yourself with the camera: a 3, 2, 1 countdown, a flash, and fun effects that bend and colour the picture, saved to Pictures | Pose | done |
 | 2 | The weather where you are and in places you add: now, by the hour and for the week, with no account needed | Sky | done |
 | 3 | Sticky notes on the desktop in a few colours, kept between restarts | Stickies | done |
+
+## 1.30 "record, draw, and play"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Record your voice: a big red button, a moving level, recordings listed with their length, play back, rename, trim the start and end, share to the Drawer | Echo | done |
+| 2 | Draw on a big canvas: pens, a highlighter, shapes, sticky text, stickers, an eraser, undo, saved as you go and exported as a picture | Easel | done |
+| 3 | Play chess against the computer at a few levels, or with a friend on the same screen, with hints and undo | Rook | done |
 
 ## Later
 

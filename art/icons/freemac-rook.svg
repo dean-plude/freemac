@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Rook: a castle tower piece on a chequered tile. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f8797"/><stop offset="1" stop-color="#4b6070"/>
+    </linearGradient>
+    <linearGradient id="piece" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe3ea"/>
+    </linearGradient>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <g filter="url(#sh)">
+    <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+    <g clip-path="url(#tile)" fill="#ebe6d9" opacity="0.22">
+      <rect x="8" y="8" width="28" height="28"/><rect x="64" y="8" width="28" height="28"/>
+      <rect x="36" y="36" width="28" height="28"/><rect x="92" y="36" width="28" height="28"/>
+      <rect x="8" y="64" width="28" height="28"/><rect x="64" y="64" width="28" height="28"/>
+      <rect x="36" y="92" width="28" height="28"/><rect x="92" y="92" width="28" height="28"/>
+    </g>
+  </g>
+  <g fill="url(#piece)" stroke="#1f2530" stroke-width="3" stroke-linejoin="round">
+    <path d="M38 30 H48 V38 H58 V30 H70 V38 H80 V30 H90 V50 L82 56 V86 L90 94 V100 H38 V94 L46 86 V56 L38 50 Z"/>
+    <path d="M32 100 H96 V108 H32 Z"/>
+  </g>
+  <path d="M46 56 H82" stroke="#1f2530" stroke-width="3"/>
+</svg>

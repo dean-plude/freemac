@@ -147,6 +147,33 @@ TOPICS = {
         "Notes stay under your windows. To keep one in front, right-click its strip and choose Float on Top.",
         "Your notes are kept as you type and come back when you log in. To throw one away, click the × on its strip.",
     ]),
+    "voice": ("Record your voice", "voice memo record recorder microphone audio echo trim", [
+        "Echo records your voice. Press ⌘Space, type Echo and press Return.",
+        "Click the big red button to start recording, and Done when you've finished. "
+        "Your recording appears at the top of the list.",
+        "Press Space to play it. Click the waveform to jump to a part, or skip back and forward 15 seconds.",
+        "Click the recording's name to rename it. Click Trim and drag the yellow handles to keep only the "
+        "part you want.",
+        "Recordings are kept in the Echo folder in Music. If Echo can't hear you, plug in a microphone "
+        "or choose one in Dials > Sound.",
+    ]),
+    "drawing": ("Draw a picture", "draw drawing paint sketch doodle pen easel art sticker", [
+        "Easel is for drawing. Press ⌘Space, type Easel and press Return.",
+        "Pick a pen, the highlighter or a shape at the top, then a colour and a size, and draw. "
+        "Hold Shift while you draw a shape for a perfect square, circle or straight line.",
+        "Click the smiley for stickers, or the A to type words. The eraser rubs out whatever it goes over.",
+        "Click the arrow to pick up something you drew and move it. Press Delete to throw it away. "
+        "⌘Z undoes your last change.",
+        "Your drawings are kept as you go and listed on the left. Click Export to save one as a picture "
+        "you can share.",
+    ]),
+    "chess": ("Play chess", "chess game play board checkmate rook computer friend", [
+        "Rook plays chess. Press ⌘Space, type Rook and press Return.",
+        "Click a piece to see where it can go, then click where you want it, or drag it there.",
+        "Click New Game to play the computer on Easy, Medium or Hard, or a friend on the same screen.",
+        "Stuck? Click Hint for a good move. The undo arrow takes your last move back.",
+        "Your game is kept, so you can stop and carry on later.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),
