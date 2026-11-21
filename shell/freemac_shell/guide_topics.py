@@ -553,6 +553,13 @@ TOPICS = {
         "Click the dot to see which app it is. Quit that app, or close its call, to turn the microphone or "
         "camera off.",
     ]),
+    "battery": ("Keep an eye on the battery", "battery low charge charging power percentage time left plug in sleep reserve laptop", [
+        "The battery icon in the menu bar shows how much charge is left. Point at it to see how long it "
+        "will last, or how long until it's full while it charges. Click it for Dials > Power.",
+        "When the battery runs down to 10%, and again at 5%, a notice asks you to plug in. At 2% the "
+        "computer goes to sleep, so nothing you're working on is lost. Plug it in, then wake it.",
+        "To hide the number next to the icon, turn off Show percentage in the menu bar in Dials > Power.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

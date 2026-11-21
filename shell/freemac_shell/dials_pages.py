@@ -43,7 +43,7 @@ SEARCH_WORDS = {
     "displays": "screen resolution brightness night light scale monitor",
     "wallpaper": "background desktop picture",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
-    "power": "battery sleep suspend energy shut down restart",
+    "power": "battery sleep suspend energy shut down restart percentage low battery time left charging",
     "lifeboat": "backup back up time machine restore drive disk copy",
     "users": "accounts password login automatic log in people",
     "loginitems": "startup start up open at login launch automatically apps autostart",
