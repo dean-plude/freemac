@@ -83,6 +83,8 @@ tzdata
 at-spi2-core
 # Speak selection (Option-Escape) reads out loud with eSpeak NG's voices.
 espeak-ng
+# Nearby sharing (Hail) makes its own certificate once with OpenSSL.
+openssl
 power-profiles-daemon
 # Night light (warmer colours in the evening) through Wayland's gamma control
 wlsunset

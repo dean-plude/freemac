@@ -84,7 +84,17 @@ class NetworkPanel(Gtk.Box):
         return False
 
     def sections(self):
-        return self.network_sections() + self.firewall_sections()
+        return self.network_sections() + self.nearby_sections() + self.firewall_sections()
+
+    def nearby_sections(self):
+        """Nearby sharing (Hail): whether other devices on this network may
+        offer files to this computer. Every offer still asks first."""
+        from . import hail
+        switch = Gtk.Switch(active=hail.receiving(), valign=Gtk.Align.CENTER)
+        switch.connect("notify::active", lambda s, _p: hail.set_receiving(s.get_active()))
+        return [self.group(self.row("Let nearby devices send files here", switch,
+                                    f"Others on this Wi-Fi see \u201c{hail.device_name()}\u201d and can offer "
+                                    "files, which you accept or decline. Phones need the free LocalSend app."))]
 
     def firewall_sections(self):
         """Network > Firewall, as on a Mac: turns away connections that other

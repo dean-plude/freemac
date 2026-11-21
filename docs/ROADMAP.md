@@ -821,6 +821,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Dials > Power shows "On battery, 2:15 left" and gets Show percentage in the menu bar | Dials | done |
 | 5 | Guide: Keep an eye on the battery | Guide | done |
 
+## 1.77 "over here" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Share > Nearby… in Drawer, Cove and Frame: nearby computers and phones as round icons; click one to send, with Waiting, Sending, Sent or Declined under it, and a click to stop | Hail, Share | done |
+| 2 | Receiving, off until turned on in the Nearby window or Dials > Network; every offer asks “Sam's Phone would like to share 3 photos” with Decline and Accept, and files land in Downloads with a notification | Hail, Dials | done |
+| 3 | Speaks LocalSend's open protocol (v2, HTTPS), so phones and tablets with the free LocalSend app work too; folders keep their shape, names can't climb out of Downloads | Hail | done |
+| 4 | Started at log in; the firewall lets it through from the local network only | Build | done |
+| 5 | Guide: Send files to a computer or phone nearby | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
