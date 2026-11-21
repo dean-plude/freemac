@@ -61,6 +61,10 @@ DOCK_TARGET = Gtk.TargetEntry.new(DOCK_TYPE, Gtk.TargetFlags.SAME_APP, 1)
 URI_TARGET = Gtk.TargetEntry.new("text/uri-list", 0, 0)
 
 STACK_LIMIT = 15   # newest files shown when a folder stack is opened
+# Apps used lately that aren't kept in the Dock stay in it after they quit,
+# after the open apps, as on a Mac ("Show suggested and recent apps").
+RECENT_SHOWN = 3
+RECENT_FILE = os.path.join(GLib.get_user_state_dir(), "freemac", "dock-recents.json")
 TRASH = os.path.join(GLib.get_user_data_dir(), "Trash")
 
 
@@ -85,7 +89,7 @@ def load_config():
     folder stacks and whether the Trash is shown."""
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
               "stacks": default_stacks(), "trash": True, "minimize_into_app": False,
-              "autohide": False}
+              "autohide": False, "recents": True}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -95,6 +99,27 @@ def load_config():
     config["peak"] = max(config["size"], min(128, int(config["peak"])))
     config["stacks"] = [os.path.expanduser(p) for p in config["stacks"] if isinstance(p, str)]
     return config
+
+
+def load_recent_apps():
+    """The desktop IDs of apps used lately, newest first."""
+    try:
+        with open(RECENT_FILE) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [d for d in data if isinstance(d, str) and d.endswith(".desktop")] if isinstance(data, list) else []
+
+
+def save_recent_apps(ids):
+    try:
+        os.makedirs(os.path.dirname(RECENT_FILE), exist_ok=True)
+        tmp = RECENT_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(ids, f)
+        os.replace(tmp, RECENT_FILE)
+    except OSError:
+        pass
 
 
 def open_in_drawer(path):
@@ -377,6 +402,11 @@ class Item(Gtk.Button):
         self.connect("drag-end", self._drag_end)
 
     @property
+    def is_recent(self):
+        """Shown only because it was used lately (not kept, not open)."""
+        return self.desktop_id is not None and self.pier.recent.get(self.desktop_id) is self
+
+    @property
     def ok(self):
         return self.info is not None or self.app_id is not None
 
@@ -509,6 +539,10 @@ class Item(Gtk.Button):
             self.pier.removed = True
             self.pier.set_pinned(self.pin_id, False)
             return True   # no fly-back to where it was
+        if away and self.is_recent:
+            self.pier.removed = True
+            self.pier.forget_recent(self.pin_id)
+            return True
         return False
 
     def _drag_end(self, _widget, _context):
@@ -579,6 +613,17 @@ class Item(Gtk.Button):
             choice.add(box)
             choice.connect("activate", lambda *_, on=on, turn=turn: turn(not on))
             sub.append(choice)
+        if self.is_recent:
+            sub.append(Gtk.SeparatorMenuItem())
+            remove = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            gap = Gtk.Label(label="")
+            gap.set_size_request(18, -1)
+            box.pack_start(gap, False, False, 0)
+            box.pack_start(Gtk.Label(label="Remove from Dock", xalign=0), True, True, 0)
+            remove.add(box)
+            remove.connect("activate", lambda *_: self.pier.forget_recent(desktop_id))
+            sub.append(remove)
         options.set_submenu(sub)
         self.menu.append(options)
         if views:
@@ -820,6 +865,8 @@ class Pier(Gtk.Window):
 
         self.pinned = []
         self.extra = {}
+        self.recent = {}                 # desktop ID: Item, apps used lately
+        self.recent_ids = load_recent_apps()
         self.running_sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
         self.running_sep.get_style_context().add_class("pier-sep")
         self.shelf.pack_start(self.running_sep, False, False, 0)
@@ -1005,7 +1052,7 @@ class Pier(Gtk.Window):
         return False
 
     def items(self):
-        return self.pinned + list(self.extra.values()) + self.places
+        return self.pinned + list(self.extra.values()) + list(self.recent.values()) + self.places
 
     def refresh(self):
         views = self.wf.views() if self.wf else []
@@ -1029,7 +1076,10 @@ class Pier(Gtk.Window):
             unpinned.setdefault(view.get("app-id") or f"view-{view['id']}", []).append(view)
         for app_id in list(self.extra):
             if app_id not in unpinned:
-                self.shelf.remove(self.extra.pop(app_id))
+                gone = self.extra.pop(app_id)
+                self.shelf.remove(gone)
+                if gone.pin_id:
+                    self.note_recent(gone.pin_id)   # it quit: it stays as a recent app
         for app_id, its_views in unpinned.items():
             if app_id not in self.extra:
                 item = Item(self, app_id=app_id)
@@ -1037,12 +1087,62 @@ class Pier(Gtk.Window):
                 self.shelf.pack_start(item, False, False, 0)
                 item.show_all()
             self.extra[app_id].set_views(its_views, False if its_views else app_id)
+        self._show_recents()
         self._refresh_windows(views)
-        self.running_sep.set_visible(bool(self.extra))
+        self.running_sep.set_visible(bool(self.extra) or bool(self.recent))
         self.places_sep.set_visible(bool(self.places) or bool(self.windows))
         if not self._hint_pending:
             self._hint_pending = GLib.timeout_add(200, self._send_hints)
         return False
+
+    # ---- recent apps ------------------------------------------------------------------
+    def note_recent(self, desktop_id):
+        """An app not kept in the Dock was open: it goes first in the recents."""
+        if desktop_id in [p.pin_id for p in self.pinned]:
+            return
+        ids = [desktop_id] + [d for d in self.recent_ids if d != desktop_id]
+        if ids != self.recent_ids:
+            self.recent_ids = ids[:12]
+            save_recent_apps(self.recent_ids)
+
+    def forget_recent(self, desktop_id):
+        """Remove from Dock, for a recent app: it goes until it's used again."""
+        self.recent_ids = [d for d in self.recent_ids if d != desktop_id]
+        save_recent_apps(self.recent_ids)
+        self.refresh()
+
+    def _show_recents(self):
+        """The few apps used last that are neither kept nor open, after the
+        open apps."""
+        kept = {p.pin_id for p in self.pinned}
+        open_now = {item.pin_id for item in self.extra.values()}
+        wanted = []
+        if self.config is None or self.config.get("recents", True):
+            for desktop_id in self.recent_ids:
+                if desktop_id in kept or desktop_id in open_now or desktop_id in wanted:
+                    continue
+                if desktop_id not in self.recent:
+                    try:
+                        if Gio.DesktopAppInfo.new(desktop_id) is None:
+                            continue
+                    except TypeError:
+                        continue
+                wanted.append(desktop_id)
+                if len(wanted) == RECENT_SHOWN:
+                    break
+        for desktop_id in list(self.recent):
+            if desktop_id not in wanted:
+                self.shelf.remove(self.recent.pop(desktop_id))
+        for desktop_id in wanted:
+            if desktop_id not in self.recent:
+                item = Item(self, desktop_id=desktop_id)
+                self.recent[desktop_id] = item
+                self.shelf.pack_start(item, False, False, 0)
+                item.show_all()
+                item.set_views([], False)
+        # After the open apps, the one used last first.
+        for desktop_id in wanted:
+            self.shelf.reorder_child(self.recent[desktop_id], -1)
 
     def _refresh_windows(self, views):
         """A picture in the Dock for each window minimized into it; hidden
@@ -1148,7 +1248,7 @@ class Pier(Gtk.Window):
         for index, item in enumerate(self.pinned):
             self.shelf.reorder_child(item, index)
         line = self.shelf.get_children().index(self.running_sep)
-        for item in self.extra.values():
+        for item in list(self.extra.values()) + list(self.recent.values()):
             if self.shelf.get_children().index(item) < line:
                 self.shelf.reorder_child(item, -1)
 

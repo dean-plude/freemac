@@ -644,6 +644,8 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "A folder on the dock that shows your newest downloads."),
             row("Trash", switch(config["trash"], lambda on: save_pier(trash=on)),
                 "Drop files on it to throw them away; right-click it to empty it."),
+            row("Show recent apps in Dock", switch(config.get("recents", True), lambda on: save_pier(recents=on)),
+                "Up to three apps you used lately stay in the Dock after they quit."),
         ), group(row("Double-click a window's title bar to", self.title_double_click()),
                  row("Minimize windows into application icon",
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),
