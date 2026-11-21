@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, dials_accounts, dials_backup, dials_keys, dials_more, dials_people, menus, pier, screen, style  # noqa: E402
+from . import alert, dials_accounts, dials_backup, dials_keys, dials_more, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -357,6 +357,8 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_more.notifications(self)),
             (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
             (2, "about", "About", "help-about-symbolic", "gray", self.about),
+            (2, "datetime", "Date & Time", "preferences-system-time-symbolic", "blue",
+             lambda: dials_time.DateTimePanel(self, page)),
             (2, "appearance", "Appearance", "preferences-desktop-appearance-symbolic", "dark", self.appearance),
             (2, "accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic", "blue",
              lambda: dials_more.accessibility(self)),
@@ -627,11 +629,6 @@ class DialsWindow(Gtk.ApplicationWindow):
             stacks = [f for f in pier_config()["stacks"] if f != downloads]
             save_pier(stacks=([downloads] if on else []) + stacks)
 
-        clock = Gtk.ComboBoxText()
-        for fmt, name in (("12", "12-hour (2:30 PM)"), ("24", "24-hour (14:30)")):
-            clock.append(fmt, name)
-        clock.set_active_id(style.prefs().get("clock", "12"))
-        clock.connect("changed", lambda c: self.save_prefs(clock=c.get_active_id()))
         return page("Dock and Menu Bar", group(
             row("Icon size", size),
             row("Magnification", switch(config["magnify"], magnify), "Icons grow as the pointer passes over them."),
@@ -645,7 +642,7 @@ class DialsWindow(Gtk.ApplicationWindow):
                  row("Minimize windows into application icon",
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),
                      "Off: a minimized window gets its own picture at the right end of the dock.")),
-            group(row("Clock", clock)), self.hot_corners())
+            self.hot_corners())
 
     # What a double-click on a title bar does: freemac's own title bars read
     # it from wayfire.ini, apps that draw their own read GNOME's setting.

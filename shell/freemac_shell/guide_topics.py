@@ -458,6 +458,13 @@ TOPICS = {
         "When the drive is full, the oldest go first.",
         "To eject the drive, eject it as usual. A backup that's running stops and starts again next time.",
     ]),
+    "date-time": ("Set the date, time and time zone", "date time clock time zone timezone city 24-hour 12-hour seconds automatic wrong time travel", [
+        "Choose Dials > Date & Time.",
+        "Turn on Set the time automatically to keep the clock right from the internet. Turn it off to set the date and time yourself with Set….",
+        "To change the time zone, click the box under Time zone, type a city and pick it from the list.",
+        "Choose 12-hour or 24-hour time, and whether the menu bar shows the day, the date and seconds.",
+        "Changing the time or time zone asks for an administrator's password.",
+    ]),
     "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl", [
         "freemac Recovery fixes a computer that won't start properly. To open it, hold Ctrl while the "
         "computer starts, or choose Dials > Power > Restart in Recovery….",

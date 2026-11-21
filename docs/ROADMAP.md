@@ -489,6 +489,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | --- | --- | --- | --- |
 | 1 | A recovery mode: hold Ctrl as the computer starts (or choose Restart in Recovery in Dials) to bring back files from a Lifeboat backup, reset a forgotten password, check a disk, reinstall, get help online or use a terminal, with Wi-Fi and an administrator's password asked first | Recovery | done |
 
+## 1.41 "date and time" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Date & Time settings: set the time automatically from the internet or by hand, choose the time zone by typing a city, 12 or 24 hours, and the day, date and seconds in the menu bar | Dials, Topline | done |
+| 2 | The clock keeps itself right: systemd-timesyncd is installed, so automatic time works | system | done |
+| 3 | Open and Save windows: the default button (Save, Open) is blue and readable; it was white on white | theme | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
