@@ -785,6 +785,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | Restart, Shut Down and Log Out's question is now freemac-power: in 1.70 to 1.72 it shared its name with the program that starts the desktop, which came first, so choosing Restart… could start a second desktop instead of asking | Session, Build | done |
 | 2 | The desktop's starter passes restart, shutdown, logout and sleep on to freemac-power, so a Shift-Command-Q set up by 1.70 to 1.72 still works | Build | done |
 
+## 1.73 "read it to me" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Accessibility > Spoken Content: Speak selection, a voice and a speaking rate, with a Play button to try them | Dials | done |
+| 2 | ⌥Esc reads the words selected in any app aloud, and stops when pressed again; the shortcut can be changed in Dials > Keyboard | Session | done |
+| 3 | espeak-ng in the image | Build | done |
+| 4 | Guide: Have the computer read words aloud | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

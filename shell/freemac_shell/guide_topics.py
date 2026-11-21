@@ -540,6 +540,11 @@ TOPICS = {
         "with, pick the app, then click Change All\u2026.",
         "To open one file in another app just this once, right-click it and choose Open With.",
     ]),
+    "speak": ("Have the computer read words aloud", "speak selection read aloud out loud text to speech speech voice spoken content listen hear dyslexia reading", [
+        "Choose Dials > Accessibility and turn on Speak selection, under Spoken Content.",
+        "Select some words in any app, then press \u2325Esc (Option+Esc) to hear them. Press it again to stop.",
+        "Pick a voice and a speaking rate on the same page. Click Play to hear how they sound.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

@@ -81,6 +81,8 @@ gstreamer1.0-plugins-bad
 sound-theme-freedesktop
 tzdata
 at-spi2-core
+# Speak selection (Option-Escape) reads out loud with eSpeak NG's voices.
+espeak-ng
 power-profiles-daemon
 # Night light (warmer colours in the evening) through Wayland's gamma control
 wlsunset

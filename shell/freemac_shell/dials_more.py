@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, notify_rules, startup_sound, style  # noqa: E402
+from . import alert, notify_rules, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -313,7 +313,53 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ))
+    ), *spoken_content(window))
+
+
+def spoken_content(window):
+    """Spoken Content: Speak selection with Option-Escape, its voice and how
+    fast it talks, and a Play button to hear them."""
+    group, row, _page, _slider, switch = window.helpers
+    if not speak.available():
+        return []
+    prefs = style.prefs()
+    voice = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for value, label in speak.VOICES:
+        voice.append(value, label)
+    voice.set_active_id(speak.voice())
+    voice.connect("changed", lambda c: window.save_prefs(speak_voice=c.get_active_id()))
+    speed = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, speak.SLOW, speak.FAST, 5)
+    speed.set_draw_value(False)
+    speed.set_size_request(200, -1)
+    speed.set_value(speak.rate())
+    speed.add_mark(speak.SLOW, Gtk.PositionType.BOTTOM, "Slow")
+    speed.add_mark(speak.FAST, Gtk.PositionType.BOTTOM, "Fast")
+    speed.connect("value-changed", lambda s: window.save_prefs(speak_rate=int(s.get_value())))
+    play = Gtk.Button(label="Play", valign=Gtk.Align.CENTER)
+    play.connect("clicked", lambda _b: speak.say(SAMPLE))
+    voice_box = Gtk.Box(spacing=8)
+    voice_box.pack_start(voice, False, False, 0)
+    voice_box.pack_start(play, False, False, 0)
+
+    def turned(on):
+        window.save_prefs(speak_selection=on)
+        if not on:
+            speak.stop()
+
+    heading = Gtk.Label(label="Spoken Content", xalign=0)
+    heading.get_style_context().add_class("dials-section")
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    box.pack_start(heading, False, False, 0)
+    box.pack_start(group(
+        row("Speak selection", switch(bool(prefs.get("speak_selection")), turned),
+            "Select some words in any app and press \u2325Esc to hear them. Press it again to stop."),
+        row("Voice", voice_box),
+        row("Speaking rate", speed),
+    ), False, False, 0)
+    return [box]
+
+
+SAMPLE = "This is how freemac reads the words you select."
 
 
 # ---- Notifications ----------------------------------------------------------------
