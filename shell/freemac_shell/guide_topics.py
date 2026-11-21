@@ -172,6 +172,15 @@ TOPICS = {
         "The song playing shows in the menu bar's quick settings, and the media keys on your keyboard work "
         "even when Shanty is behind other windows.",
     ]),
+    "videos": ("Watch a video", "video movie film play watch mp4 mov quicktime player reel full screen", [
+        "Reel plays videos. Double-click a video in Drawer. Or press ⌘Space, type Reel, and double-click "
+        "one of the videos in your Videos folder.",
+        "Move the pointer to show the controls; they fade while the video plays.",
+        "- Space plays and pauses. ← and → go back or forward 10 seconds.",
+        "- F, or the button at the right of the controls, fills the screen. Esc goes back.",
+        "- ↑ and ↓ turn the sound up and down.",
+        "Close a video partway through and Reel starts it again where you stopped next time.",
+    ]),
     "backups": ("Back up your files", "backup back up time machine lifeboat drive restore copy safe", [
         "Lifeboat copies your home folder to a drive every hour while the drive is plugged in, and keeps "
         "earlier backups, so you can get back a file you deleted or changed.",

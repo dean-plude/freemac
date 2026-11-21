@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Reel
+GenericName=Video Player
+Comment=Watch the videos in your Videos folder, or any video you open
+Exec=freemac-reel %U
+Icon=freemac-reel
+Categories=AudioVideo;Video;Player;
+Keywords=video;movie;film;player;mp4;mkv;webm;quicktime;watch;
+MimeType=video/mp4;video/x-m4v;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/ogg;video/mpeg;video/x-ms-wmv;video/3gpp;video/mp2t;
+StartupWMClass=org.freemac.Reel
+StartupNotify=true

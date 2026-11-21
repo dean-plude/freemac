@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Reel: a film reel with its film running out. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#16181d"/>
+    </linearGradient>
+    <linearGradient id="reel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd166"/><stop offset="1" stop-color="#f08a24"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+    <mask id="holes">
+      <rect width="128" height="128" fill="#fff"/>
+      <circle cx="56" cy="56" r="5" fill="#000"/>
+      <circle cx="56" cy="35" r="9" fill="#000"/>
+      <circle cx="76" cy="49.5" r="9" fill="#000"/>
+      <circle cx="68.3" cy="73" r="9" fill="#000"/>
+      <circle cx="43.7" cy="73" r="9" fill="#000"/>
+      <circle cx="36" cy="49.5" r="9" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <!-- the film, running from the reel to the bottom right -->
+    <path d="M56 90 L96 90 C108 90 112 98 112 108 L112 124 L92 124 L92 110 C92 108 91 107 89 107 L56 107 Z" fill="#0d0e11"/>
+    <g fill="#5b6070">
+      <rect x="62" y="93" width="5" height="3" rx="1"/><rect x="72" y="93" width="5" height="3" rx="1"/>
+      <rect x="82" y="93" width="5" height="3" rx="1"/><rect x="62" y="101" width="5" height="3" rx="1"/>
+      <rect x="72" y="101" width="5" height="3" rx="1"/><rect x="82" y="101" width="5" height="3" rx="1"/>
+    </g>
+  </g>
+  <circle cx="56" cy="56" r="34" fill="url(#reel)" mask="url(#holes)"/>
+  <circle cx="56" cy="56" r="34" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="1.5"/>
+</svg>
