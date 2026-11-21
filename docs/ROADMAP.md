@@ -453,9 +453,9 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | A shape puzzle: slide and turn seven flat pieces to fill a silhouette, from easy outlines for kids to harder ones, with a hint when you're stuck | Tangram | planned |
-| 2 | Podcasts and news feeds: subscribe to a podcast or a website's feed, read new posts, and play episodes with the place remembered | Buoy | planned |
-| 3 | A word search: find hidden words in a grid of letters, with themed word lists, three sizes and a timer | Hunt | planned |
+| 1 | A shape puzzle: slide and turn seven flat pieces to fill a silhouette, from easy outlines for kids to harder ones, with a hint when you're stuck | Tangram | done |
+| 2 | Podcasts and news feeds: subscribe to a podcast or a website's feed, read new posts, and play episodes with the place remembered | Buoy | done |
+| 3 | A word search: find hidden words in a grid of letters, with themed word lists, three sizes and a timer | Hunt | done |
 
 ## Later
 
