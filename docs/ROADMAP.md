@@ -811,6 +811,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | The Dock, menu bar, Drawer, Seek and freemac's other apps take their highlight from the accent instead of a fixed blue | Shell | done |
 | 4 | Guide: Change the look mentions the accent colour | Guide | done |
 
+## 1.76 "plug me in" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Low-battery notices at 10% and 5% while on battery, once each per charge | Topline | done |
+| 2 | At 2% the computer sleeps after 30 seconds' notice, unless it's plugged in first | Topline | done |
+| 3 | The battery icon's tooltip shows the time left, or the time until full; clicking it opens Dials > Power | Topline | done |
+| 4 | Dials > Power shows "On battery, 2:15 left" and gets Show percentage in the menu bar | Dials | done |
+| 5 | Guide: Keep an eye on the battery | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

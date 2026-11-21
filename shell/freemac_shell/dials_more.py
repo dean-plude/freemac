@@ -107,7 +107,8 @@ BLANK_CHOICES = (("-1", "Never"), ("60", "1 minute"), ("120", "2 minutes"), ("30
 
 
 def battery_state():
-    for path in sorted(glob.glob("/sys/class/power_supply/*")):
+    from .status import POWER_SUPPLY, battery_time
+    for path in sorted(glob.glob(os.path.join(POWER_SUPPLY, "*"))):
         def read(name):
             try:
                 with open(os.path.join(path, name)) as f:
@@ -115,8 +116,22 @@ def battery_state():
             except OSError:
                 return None
         if read("type") == "Battery" and read("present") != "0":
-            return read("capacity"), read("status")
+            state = read("status")
+            left = battery_time(path, lambda p, n: read(n))
+            return read("capacity"), (state, left)
     return None
+
+
+def battery_words(state):
+    """'On battery, 2:15 left' for the Battery row."""
+    status, left = state
+    if status == "Discharging":
+        return f"On battery, {left} left" if left else "On battery"
+    if status == "Charging":
+        return f"Charging, {left} until full" if left else "Charging"
+    if status in ("Full", "Not charging"):
+        return "Plugged in"
+    return status or None
 
 
 LOCK_CHOICES = (("0", "Never"), ("1", "1 minute"), ("2", "2 minutes"), ("5", "5 minutes"),
@@ -129,7 +144,13 @@ def power(window):
     battery = battery_state()
     if battery:
         capacity, state = battery
-        groups.append(group(row("Battery", Gtk.Label(label=f"{capacity}%"), state or None)))
+        prefs = style.prefs()
+        percent = _switch(bool(prefs.get("battery_percent", True)),
+                          lambda active: window.save_prefs(battery_percent=active))
+        groups.append(group(row("Battery", Gtk.Label(label=f"{capacity}%"), battery_words(state)),
+                            row("Show percentage in the menu bar", percent),
+                            row("Low battery", Gtk.Label(label="Warns at 10% and 5%"),
+                                "At 2% the computer goes to sleep so nothing is lost.")))
     blank = Gtk.ComboBoxText()
     for value, label in BLANK_CHOICES:
         blank.append(value, label)

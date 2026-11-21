@@ -214,26 +214,107 @@ class Sound(StatusButton):
         return True
 
 
+# Where the kernel lists batteries and chargers. FREEMAC_POWER_SUPPLY points
+# somewhere else to try the warnings without a real battery.
+POWER_SUPPLY = os.environ.get("FREEMAC_POWER_SUPPLY", "/sys/class/power_supply")
+
+# The warnings a Mac gives as its battery runs down, from the highest level.
+LOW_BATTERY = (
+    (10, "Low Battery", "Your computer will sleep soon unless it's plugged in."),
+    (5, "Reserve Battery", "Your computer is running on reserve power. Plug it in now, or it will sleep."),
+)
+SLEEP_AT = 2   # percent: sleep rather than run out mid-sentence
+
+
+def battery_time(path, read):
+    """'2:15' left on battery, or until full while charging, or None."""
+    def number(name):
+        try:
+            return int(read(path, name) or "")
+        except ValueError:
+            return None
+    now, rate, full = number("energy_now"), number("power_now"), number("energy_full")
+    if now is None or not rate:
+        now, rate, full = number("charge_now"), number("current_now"), number("charge_full")
+    if now is None or not rate or rate <= 0:
+        return None
+    status = read(path, "status")
+    if status == "Discharging":
+        hours = now / rate
+    elif status == "Charging" and full:
+        hours = max(0, full - now) / rate
+    else:
+        return None
+    if hours > 48:
+        return None
+    minutes = round(hours * 60)
+    return f"{minutes // 60}:{minutes % 60:02d}"
+
+
 class Battery(StatusButton):
+    """The battery level, with a Mac's warnings when it runs low: at 10% and
+    5% a notice to plug in, and at 2% the computer goes to sleep so nothing
+    is lost. Click for Dials' Battery panel."""
+
     def __init__(self):
         super().__init__()
         self.set_always_show_image(True)
+        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "power"))
+        self.warned = set()      # levels already warned about on this charge
+        self.sleeping = False
+        self._prefs_monitor = style.watch_prefs(self.update)   # Show percentage
         GLib.timeout_add_seconds(30, lambda: self.update() or True)
         self.update()
 
     def update(self):
-        batteries = [b for b in glob.glob("/sys/class/power_supply/*")
+        batteries = [b for b in glob.glob(os.path.join(POWER_SUPPLY, "*"))
                      if self._read(b, "type") == "Battery" and self._read(b, "present") != "0"]
         if not batteries:
             self.hide()
             return
         capacity = int(self._read(batteries[0], "capacity") or 0)
-        charging = self._read(batteries[0], "status") in ("Charging", "Full")
+        status = self._read(batteries[0], "status")
+        charging = status in ("Charging", "Full")
         level = min(100, max(0, round(capacity / 10) * 10))
         icon = f"battery-level-{level}{'-charging' if charging else ''}-symbolic"
-        self.show_icon(icon, f"Battery {capacity}%{' (charging)' if charging else ''}")
-        if self.get_label() != f"{capacity}%":
-            self.set_label(f"{capacity}%")
+        tooltip = f"Battery {capacity}%"
+        left = battery_time(batteries[0], self._read)
+        if charging:
+            tooltip += f" (charging, {left} until full)" if left and status == "Charging" else " (charging)"
+        elif left:
+            tooltip += f" ({left} left)"
+        self.show_icon(icon, tooltip)
+        label = f"{capacity}%" if style.prefs().get("battery_percent", True) else None
+        if self.get_label() != label:
+            self.set_label(label or "")
+        self._warn(capacity, status == "Discharging")
+
+    def _warn(self, capacity, discharging):
+        if not discharging:
+            self.warned.clear()   # plugged in: warn again next time it runs down
+            self.sleeping = False
+            return
+        # One notice for the most urgent level reached, then none for the
+        # levels above it.
+        for threshold, title, body in sorted(LOW_BATTERY):
+            if capacity <= threshold:
+                if threshold not in self.warned:
+                    self.warned.update(t for t, *_ in LOW_BATTERY if t >= threshold)
+                    beacon.send(title, f"{capacity}% left. {body}", icon="battery-caution-symbolic")
+                break
+        if capacity <= SLEEP_AT and not self.sleeping:
+            self.sleeping = True
+            beacon.send("Going to Sleep", "The battery is almost empty, so your computer is going to sleep. "
+                        "Plug it in, then wake it.", icon="battery-empty-symbolic")
+            GLib.timeout_add_seconds(30, self._sleep_now)
+
+    def _sleep_now(self):
+        """Sleep, unless it was plugged in during the 30 seconds' notice."""
+        batteries = [b for b in glob.glob(os.path.join(POWER_SUPPLY, "*")) if self._read(b, "type") == "Battery"]
+        if batteries and self._read(batteries[0], "status") == "Discharging":
+            subprocess.Popen(["systemctl", "suspend"])
+        self.sleeping = False
+        return False
 
     @staticmethod
     def _read(path, name):
