@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Echo
+GenericName=Voice Recorder
+Comment=Record your voice and play it back
+Exec=freemac-echo
+Icon=freemac-echo
+Categories=AudioVideo;Audio;Recorder;
+Keywords=voice;memo;record;recorder;microphone;audio;sound;
+StartupWMClass=org.freemac.Echo
+StartupNotify=true
