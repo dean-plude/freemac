@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tangram
+GenericName=Shape Puzzle
+Comment=Fill the outline with seven flat pieces: triangles, a square and a parallelogram
+Exec=freemac-tangram
+Icon=freemac-tangram
+Categories=Game;KidsGame;LogicGame;
+Keywords=tangram;shapes;puzzle;triangles;kids;game;
+StartupWMClass=org.freemac.Tangram
+StartupNotify=true

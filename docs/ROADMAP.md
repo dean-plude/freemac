@@ -449,6 +449,14 @@ The small things a Mac user notices in their first minute.
 | 2 | About this computer: processor, memory, graphics, storage and version at a glance, with a full report of the hardware, USB devices, displays, network and sound; About freemac in the menu bar opens it | Manifest | done |
 | 3 | A colour picker: pick a colour from anywhere on the screen, see it as hex, RGB and HSL, copy it, and keep the colours you like | Swatch | done |
 
+## 1.36 "shapes, feeds and words"
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A shape puzzle: slide and turn seven flat pieces to fill a silhouette, from easy outlines for kids to harder ones, with a hint when you're stuck | Tangram | planned |
+| 2 | Podcasts and news feeds: subscribe to a podcast or a website's feed, read new posts, and play episodes with the place remembered | Buoy | planned |
+| 3 | A word search: find hidden words in a grid of letters, with themed word lists, three sizes and a timer | Hunt | planned |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
