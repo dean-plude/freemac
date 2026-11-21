@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, share, transfer, volumes  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -33,7 +33,7 @@ ATTRS = ",".join([
     "standard::size", "standard::is-hidden", "standard::content-type", "time::modified",
 ])
 # ListStore columns.
-C_ICON, C_NAME, C_PATH, C_IS_DIR, C_SIZE, C_MODIFIED, C_KIND, C_SORT, C_SMALL, C_STAMP, C_BYTES = range(11)
+C_ICON, C_NAME, C_PATH, C_IS_DIR, C_SIZE, C_MODIFIED, C_KIND, C_SORT, C_SMALL, C_STAMP, C_BYTES, C_MARKUP = range(12)
 SORTS = (("name", "Name"), ("kind", "Kind"), ("date", "Date Modified"), ("size", "Size"))
 VIEWS = (("icons", "view-grid-symbolic", "Icons"),
          ("list", "view-list-symbolic", "List"),
@@ -204,44 +204,64 @@ class Folder:
     def __init__(self, path, show_hidden=False, sort="name"):
         self.path = path
         self.store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str, bool, str, str, str, str, GdkPixbuf.Pixbuf,
-                                   float, float)
+                                   float, float, str)
         self.store.set_sort_func(C_SORT, compare_rows, sort)
         self.store.set_sort_column_id(C_SORT, Gtk.SortType.ASCENDING)
         self.error = None
-        try:
-            enum = Gio.File.new_for_path(path).enumerate_children(ATTRS, Gio.FileQueryInfoFlags.NONE, None)
-        except GLib.Error as err:
-            self.error = err.message
-            return
-        waiting = []
-        for info in enum:
-            if info.get_is_hidden() and not show_hidden:
-                continue
-            is_dir = info.get_file_type() == Gio.FileType.DIRECTORY
-            modified = info.get_modification_date_time()
-            stamp = modified.to_unix() if modified else 0
-            kind = "Folder" if is_dir else Gio.content_type_get_description(info.get_content_type() or "")
-            name = info.get_display_name()
-            full = os.path.join(path, info.get_name())
-            big, small = self.icon(info.get_icon(), 48), self.icon(info.get_icon(), 20)
-            if is_dir and macapps.is_bundle(full):
-                # A Mac app is a folder, but it shows and opens as one app, with its own icon.
-                is_dir, kind = False, MAC_APP
-                name = macapps.display_name(full)
-                big, small = self.app_icon(full, 48), self.app_icon(full, 20)
-            it = self.store.append([
-                big, name, full, is_dir,
-                "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
-                ("0" if is_dir else "1") + name.lower(), small,
-                float(stamp), 0.0 if is_dir or kind == MAC_APP else float(info.get_size()),
-            ])
-            content = info.get_content_type() or ""
-            if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
-                    and info.get_size() < THUMB_LARGEST:
-                waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
-        enum.close(None)
-        if waiting:
-            GLib.idle_add(self._thumbnails, waiting)
+        self.waiting = []
+        if path.startswith(tags.PREFIX):
+            # A tag in the sidebar: every file with that tag, wherever it is.
+            for full in tags.tagged(path[len(tags.PREFIX):]):
+                try:
+                    info = Gio.File.new_for_path(full).query_info(ATTRS, Gio.FileQueryInfoFlags.NONE, None)
+                except GLib.Error:
+                    continue
+                self._add(info, full)
+        else:
+            try:
+                enum = Gio.File.new_for_path(path).enumerate_children(ATTRS, Gio.FileQueryInfoFlags.NONE, None)
+            except GLib.Error as err:
+                self.error = err.message
+                return
+            found = {}
+            for info in enum:
+                if info.get_is_hidden() and not show_hidden:
+                    continue
+                full = os.path.join(path, info.get_name())
+                names = self._add(info, full)
+                if names:
+                    found[full] = names
+            enum.close(None)
+            tags.note_folder(path, found)
+        if self.waiting:
+            GLib.idle_add(self._thumbnails, self.waiting)
+
+    def _add(self, info, full):
+        """One row for the file; returns its tags."""
+        is_dir = info.get_file_type() == Gio.FileType.DIRECTORY
+        modified = info.get_modification_date_time()
+        stamp = modified.to_unix() if modified else 0
+        kind = "Folder" if is_dir else Gio.content_type_get_description(info.get_content_type() or "")
+        name = info.get_display_name()
+        big, small = self.icon(info.get_icon(), 48), self.icon(info.get_icon(), 20)
+        if is_dir and macapps.is_bundle(full):
+            # A Mac app is a folder, but it shows and opens as one app, with its own icon.
+            is_dir, kind = False, MAC_APP
+            name = macapps.display_name(full)
+            big, small = self.app_icon(full, 48), self.app_icon(full, 20)
+        names = tags.get(full)
+        it = self.store.append([
+            big, name, full, is_dir,
+            "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
+            ("0" if is_dir else "1") + name.lower(), small,
+            float(stamp), 0.0 if is_dir or kind == MAC_APP else float(info.get_size()),
+            tags.markup(name, names),
+        ])
+        content = info.get_content_type() or ""
+        if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
+                and info.get_size() < THUMB_LARGEST:
+            self.waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
+        return names
 
     def _thumbnails(self, waiting):
         """Pictures and PDFs show a small picture of themselves instead of
@@ -316,7 +336,7 @@ def name_column(title="Name"):
     col.pack_start(icon, False)
     col.pack_start(text, True)
     col.add_attribute(icon, "pixbuf", C_SMALL)
-    col.add_attribute(text, "text", C_NAME)
+    col.add_attribute(text, "markup", C_MARKUP)
     col.set_expand(True)
     col.set_sort_column_id(C_SORT)
     return col
@@ -469,6 +489,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _label(path):
         if path == GLib.get_home_dir():
             return "Home"
+        if path and path.startswith(tags.PREFIX):
+            return path[len(tags.PREFIX):]
         if path and os.path.realpath(path) == os.path.realpath(TRASH):
             return "Trash"
         return os.path.basename(path) or "Computer"
@@ -561,6 +583,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def _drop_action(self, folder):
         paths = DrawerWindow.dragging or []
+        if folder.startswith(tags.PREFIX):
+            return Gdk.DragAction.LINK   # tags them; nothing moves
         if folder == TO_SIDEBAR:
             return Gdk.DragAction.LINK
         if folder == TO_TRASH:
@@ -574,7 +598,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return Gdk.DragAction.MOVE
 
     def _dropped(self, paths, folder):
-        if folder == TO_SIDEBAR:
+        if folder.startswith(tags.PREFIX):
+            self._tags_changed(tags.toggle(paths, folder[len(tags.PREFIX):], adding=True), [])
+        elif folder == TO_SIDEBAR:
             self.add_to_sidebar(paths)
         elif folder == TO_TRASH:
             self.trash(paths)
@@ -644,6 +670,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
                         f"somewhere else, ⌥⌘V moves {'it' if one else 'them'}.")
 
     def paste(self, move=False):
+        if self.in_tag():
+            self.notify("Open a folder to paste into.")
+            return
         paths = transfer.pasted_files()
         if not paths:
             self.notify("There are no files to paste. Copy some first with ⌘C.")
@@ -697,6 +726,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.monitor.cancel()
             self.monitor = None
         self.watched = self.path
+        if self.in_tag():
+            return   # files from all over; changed tags refresh it themselves
         try:
             self.monitor = Gio.File.new_for_path(self.path).monitor_directory(
                 Gio.FileMonitorFlags.WATCH_MOVES, None)
@@ -804,6 +835,16 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._accept_drops(self.loc_list, self._find_in_sidebar(self.loc_list, places_only=True))
         box.pack_start(self.loc_list, False, False, 0)
         self._fill_locations()
+        heading = Gtk.Label(label="Tags", xalign=0)
+        heading.get_style_context().add_class("drawer-heading")
+        box.pack_start(heading, False, False, 0)
+        self.tag_list = Gtk.ListBox(can_focus=False)
+        self.tag_list.get_style_context().add_class("drawer-sidebar")
+        self.tag_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
+        # Drop files on a tag to give them that tag.
+        self._accept_drops(self.tag_list, self._find_in_sidebar(self.tag_list, places_only=True))
+        box.pack_start(self.tag_list, False, False, 0)
+        self._fill_tags()
         # Drives come and go: the list follows, and a window on a drive that
         # went away goes back to the home folder.
         handlers = volumes.watch(self._drives_changed)
@@ -837,6 +878,34 @@ class DrawerWindow(Gtk.ApplicationWindow):
             if path:
                 self.place_rows.append((self.loc_list, row))
         self.loc_list.show_all()
+
+    def _fill_tags(self):
+        """The seven colours, then any other tags in use."""
+        self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.tag_list]
+        for child in self.tag_list.get_children():
+            self.tag_list.remove(child)
+        for name in [n for n, _c in tags.COLORS] + tags.used():
+            row = Gtk.ListBoxRow(can_focus=False)
+            row.path, row.mount = tags.PREFIX + name, "tag"
+            line = Gtk.Box(spacing=6)
+            line.pack_start(tags.dot(tags.COLOR.get(name, "#9a9aa0"), 11), False, False, 1)
+            line.pack_start(Gtk.Label(label=name, xalign=0, ellipsize=Pango.EllipsizeMode.END), True, True, 0)
+            row.add(line)
+            self.tag_list.add(row)
+            self.place_rows.append((self.tag_list, row))
+        self.tag_list.show_all()
+
+    def in_tag(self):
+        return bool(self.path) and self.path.startswith(tags.PREFIX)
+
+    def _tags_changed(self, error, keep):
+        if error is not None:
+            self.notify("This disk can’t keep tags." if error.errno in (1, 95) else
+                        f"Couldn’t change the tags: {error.strerror}.")
+        if len(tags.used()) + len(tags.COLORS) != len(self.tag_list.get_children()):
+            self._fill_tags()
+        self.refresh()
+        self.select_paths(keep)
 
     def _open_location(self, row):
         if row.path:
@@ -965,7 +1034,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _build_icon_view(self):
         self.icon_view = Gtk.IconView(item_width=96, margin=12, column_spacing=6, row_spacing=6)
         self.icon_view.set_pixbuf_column(C_ICON)
-        self.icon_view.set_text_column(C_NAME)
+        self.icon_view.set_markup_column(C_MARKUP)   # the name, with its tags' dots
         self.icon_view.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
         self.icon_view.connect("item-activated", lambda v, p: self._activate(v.get_model(), p))
         self.icon_view.connect("button-press-event", self._icon_button)
@@ -1009,7 +1078,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- navigation -----------------------------------------------------
     def navigate(self, path, remember=True):
-        path = os.path.abspath(os.path.expanduser(path))
+        if not path.startswith(tags.PREFIX):
+            path = os.path.abspath(os.path.expanduser(path))
         if remember and self.path and path != self.path:
             self.history.append(self.path)
             self.future.clear()
@@ -1041,11 +1111,13 @@ class DrawerWindow(Gtk.ApplicationWindow):
         model = self._model(folder)
         self.icon_view.set_model(model)
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
-        if self.view_mode == "columns":
+        if self.view_mode == "columns" and not self.in_tag():
             self._reset_columns()
         count = len(model)
         self.status.set_text(folder.error or f"{count} item{'s' if count != 1 else ''}")
-        self.content.set_visible_child_name(self.view_mode)
+        # A tag's files come from many folders, so it has no columns: a list.
+        self.content.set_visible_child_name("list" if self.in_tag() and self.view_mode == "columns"
+                                            else self.view_mode)
         in_trash = self.in_trash()
         self.trash_bar.set_visible(in_trash)
         self.empty_button.set_sensitive(in_trash and count > 0)
@@ -1258,6 +1330,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return []
 
     def new_folder(self):
+        if self.in_tag():
+            self.notify("Open a folder to make a new folder in.")
+            return
         base = self.path
         name, n = "untitled folder", 2
         while os.path.exists(os.path.join(base, name)):
@@ -1403,7 +1478,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return
         home = GLib.get_home_dir()
         path = self.path
-        if self.in_trash():
+        if self.in_tag():
+            crumbs = [(self._label(path), path, None)]
+        elif self.in_trash():
             crumbs = [("Trash", TRASH, "user-trash-symbolic")]
         elif path == home or path.startswith(home.rstrip(os.sep) + os.sep):
             crumbs = [("Home", home, "user-home-symbolic")]
@@ -1411,7 +1488,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         else:
             crumbs = [("Computer", "/", "drive-harddisk-symbolic")]
             base = "/"
-        if not self.in_trash():
+        if not self.in_trash() and not self.in_tag():
             for part in os.path.relpath(path, base).split(os.sep):
                 if part in ("", "."):
                     continue
@@ -1424,7 +1501,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 self.path_bar.pack_start(gap, False, False, 0)
             button = Gtk.Button(relief=Gtk.ReliefStyle.NONE, can_focus=False)
             inside = Gtk.Box(spacing=4)
-            inside.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
+            inside.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU) if icon else
+                              tags.dot(tags.COLOR.get(label, "#9a9aa0"), 9), False, False, 0)
             inside.pack_start(Gtk.Label(label=label, max_width_chars=20, ellipsize=Pango.EllipsizeMode.MIDDLE),
                               False, False, 0)
             button.add(inside)
@@ -1569,6 +1647,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.list_view.get_selection().select_all()
 
     def go_up(self):
+        if self.in_tag():
+            return
         parent = os.path.dirname(self.path)
         if parent != self.path:
             self.navigate(parent)
@@ -1641,6 +1721,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
             ("Glance", lambda *_: self.toggle_glance(), has_selection),
             (None, None, True),
+            ("Tags", None, has_selection and not in_trash),
+            (None, None, has_selection and not in_trash),
             ("New Folder", lambda *_: self.new_folder(), True),
             ("Sort By", None, True),
             ("Hide Hidden Files" if self.show_hidden else "Show Hidden Files", lambda *_: self.toggle_hidden(), True),
@@ -1655,6 +1737,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 continue
             if label == "Sort By":
                 menu.append(self._sort_item())
+                continue
+            if label == "Tags":
+                if enabled:
+                    menu.append(tags.menu_item(selected, lambda err, keep=selected: self._tags_changed(err, keep)))
+                continue
+            if label is None and not enabled:
                 continue
             item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
             if handler:
