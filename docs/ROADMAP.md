@@ -794,6 +794,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | espeak-ng in the image | Build | done |
 | 4 | Guide: Have the computer read words aloud | Guide | done |
 
+## 1.74 "who's listening" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A small orange dot in the menu bar while any app is using the microphone, green while one is using the camera; click it to see which apps | Topline | done |
+| 2 | Fixed: the volume, settings, clock and other icons on the right of the menu bar could ignore clicks when the bar started before it had its full width | Topline | done |
+| 3 | Guide: See when an app is using the microphone or camera | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

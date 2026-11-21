@@ -103,6 +103,11 @@ class Topline(Gtk.Window):
         self.connect("leave-notify-event", self._left)
         self.connect("map-event", lambda *_: self._set_input() and False)
         self.revealer.connect("notify::child-revealed", lambda *_: self._set_input())
+        # The bar can be mapped before the compositor has stretched it across
+        # the screen: take the pointer again once it has its full width, or
+        # the status icons on the right never get a click.
+        self._input_width = None
+        self.connect("size-allocate", self._resized)
 
         # System menu behind the freemac mark.
         self.mark = Gtk.MenuButton()
@@ -182,7 +187,7 @@ class Topline(Gtk.Window):
         # Status icons sit just left of the clock; each hides itself when the
         # computer has nothing to show (no battery, no sound server).
         for indicator in (status.Battery(), status.Sound(), status.Network(), status.Bluetooth(),
-                          status.Printing(), status.Recording()):
+                          status.Printing(), status.Recording(), status.InUse()):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
         self._seconds, self._tick_source = None, None
@@ -491,6 +496,11 @@ class Topline(Gtk.Window):
             self.revealer.set_reveal_child(False)
             self._set_input()
         return False
+
+    def _resized(self, _window, allocation):
+        if allocation.width != self._input_width:
+            self._input_width = allocation.width
+            GLib.idle_add(self._set_input)
 
     def _set_input(self):
         """Take the pointer over the whole bar, or, while it is hidden, only

@@ -545,6 +545,12 @@ TOPICS = {
         "Select some words in any app, then press \u2325Esc (Option+Esc) to hear them. Press it again to stop.",
         "Pick a voice and a speaking rate on the same page. Click Play to hear how they sound.",
     ]),
+    "mic-camera": ("See when an app is using the microphone or camera", "microphone mic camera webcam privacy listening watching recording orange dot green dot in use spy", [
+        "While an app is using the microphone, a small orange dot shows in the menu bar, next to the other "
+        "status icons. A green dot means an app is using the camera.",
+        "Click the dot to see which app it is. Quit that app, or close its call, to turn the microphone or "
+        "camera off.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",
