@@ -40,6 +40,9 @@ window.switcher, window.switcher > * {
     background-color: rgba(40, 40, 44, 0.70);
     border-color: rgba(255, 255, 255, 0.14);
 }
+/* Accessibility > Reduce transparency */
+.switcher-panel.solid { background-color: rgb(240, 240, 243); border-color: rgba(0, 0, 0, 0.12); }
+.switcher-panel.dark.solid { background-color: rgb(44, 44, 48); border-color: rgba(255, 255, 255, 0.16); }
 .switcher-app {
     border-radius: 16px;
     padding: 8px;
@@ -197,6 +200,8 @@ def run():
             dark = style.is_dark()
             (self.panel.get_style_context().add_class if dark else
              self.panel.get_style_context().remove_class)("dark")
+            (self.panel.get_style_context().add_class if style.solid() else
+             self.panel.get_style_context().remove_class)("solid")
             hidden = self.wayfire.hidden()
             for index, (app_id, views) in enumerate(self.apps):
                 image = Gtk.Image.new_from_gicon(app_names.icon_for(app_id), Gtk.IconSize.DIALOG)

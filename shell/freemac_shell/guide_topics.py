@@ -500,6 +500,13 @@ TOPICS = {
         "top edge of the screen and it slides back down.",
         "It stays while the pointer is on it or one of its menus is open, and hides again when you move away.",
     ]),
+    "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
+        "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
+        "become solid, so what's behind them no longer shows through.",
+        "Turn on Invert colours with \u2303\u2325\u23188, then press Control+Option+Command+8 to swap the "
+        "screen's colours. Press it again to put them back.",
+        "High contrast and Larger text are on the same page.",
+    ]),
     "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
         "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",
