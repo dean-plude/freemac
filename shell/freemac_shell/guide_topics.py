@@ -110,6 +110,15 @@ TOPICS = {
         "- To quit one, select it and click ✕ at the top left, or press Delete. Quit asks it to close; "
         "Force Quit ends it at once and loses what it hasn't saved.",
     ]),
+    "drives": ("Rename, erase or eject a drive", "disk utility hull drive usb stick format erase rename eject space full exfat fat", [
+        "Hull shows every drive, how full it is and what kind it is. Press ⌘Space, type Hull and press Return.",
+        "Choose a drive or a volume on the left, then use the buttons at the top.",
+        "- Rename: type a new name. Double-clicking a volume does the same.",
+        "- Erase: deletes everything on it. Choose ExFAT for a drive you'll also use with a Mac or "
+        "Windows computer.",
+        "- Eject: do this before you unplug a drive, so nothing being saved is lost.",
+        "Hull won't change the disk freemac is running from.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),
