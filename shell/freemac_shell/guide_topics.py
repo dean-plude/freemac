@@ -99,6 +99,16 @@ TOPICS = {
         "Press ⌥⌘⎋ (Option, Command and Escape), or choose Force Quit in the freemac menu, "
         "then choose the app and Force Quit.",
         "Anything not saved in that app is lost.",
+        "To see which app is slowing the computer down, open Gauge and look at the % CPU column.",
+    ]),
+    "busy": ("See what's using your computer", "activity monitor gauge slow cpu memory processor busy fan hot process task manager", [
+        "Gauge shows each open app with how much of the processor and memory it's using. Press ⌘Space, "
+        "type Gauge and press Return.",
+        "Click CPU or Memory at the top to switch. Click a column's heading to sort by it.",
+        "Under the list, a graph shows the last two minutes.",
+        "- View > My Processes or All Processes lists every program, not only apps.",
+        "- To quit one, select it and click ✕ at the top left, or press Delete. Quit asks it to close; "
+        "Force Quit ends it at once and loses what it hasn't saved.",
     ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",

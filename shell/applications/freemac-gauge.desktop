@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gauge
+GenericName=Activity Monitor
+Comment=See what each app is using of the processor and memory, and quit one that's stuck
+Exec=freemac-gauge
+Icon=freemac-gauge
+Categories=System;Monitor;
+Keywords=activity;monitor;task;manager;cpu;memory;process;slow;stuck;force;quit;
+StartupWMClass=org.freemac.Gauge
+StartupNotify=true

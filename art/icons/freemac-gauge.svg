@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Gauge: a dial whose needle shows how busy the computer is. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6f8f"/><stop offset="1" stop-color="#173b52"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e3e8ee"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <circle cx="64" cy="70" r="46" fill="url(#face)" stroke="#0e2533" stroke-opacity="0.25" stroke-width="1.5"/>
+  <path d="M27.6 91.0 A42 42 0 0 1 37.0 37.8" fill="none" stroke="#3fb56a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M39.3 36.0 A42 42 0 0 1 91.0 37.8" fill="none" stroke="#f2b632" stroke-width="6"/>
+  <path d="M93.2 39.8 A42 42 0 0 1 100.4 91.0" fill="none" stroke="#e5534b" stroke-width="6" stroke-linecap="round"/>
+  <g stroke="#2a3640" stroke-linecap="round">
+    <line x1="31.1" y1="89.0" x2="37.2" y2="85.5" stroke-width="3"/><line x1="26.2" y1="74.0" x2="33.2" y2="73.2" stroke-width="2"/><line x1="27.9" y1="58.3" x2="34.5" y2="60.4" stroke-width="2"/><line x1="35.8" y1="44.6" x2="41.0" y2="49.3" stroke-width="2"/><line x1="48.5" y1="35.3" x2="51.4" y2="41.7" stroke-width="2"/><line x1="64.0" y1="32.0" x2="64.0" y2="39.0" stroke-width="3"/><line x1="79.5" y1="35.3" x2="76.6" y2="41.7" stroke-width="2"/><line x1="92.2" y1="44.6" x2="87.0" y2="49.3" stroke-width="2"/><line x1="100.1" y1="58.3" x2="93.5" y2="60.4" stroke-width="2"/><line x1="101.8" y1="74.0" x2="94.8" y2="73.2" stroke-width="2"/><line x1="96.9" y1="89.0" x2="90.8" y2="85.5" stroke-width="3"/>
+  </g>
+  <line x1="64" y1="70" x2="81.0" y2="40.6" stroke="#d9412f" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="64" cy="70" r="7" fill="#2a3640"/>
+  <circle cx="64" cy="70" r="2.5" fill="#d9e2ea"/>
+  <rect x="48" y="92" width="32" height="10" rx="3" fill="#2a3640" fill-opacity="0.12"/>
+</svg>
