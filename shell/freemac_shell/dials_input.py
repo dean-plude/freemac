@@ -121,14 +121,94 @@ def key_repeat_group(group, row, slider, ini_get, ini_set):
                                                    "How long to hold a key before it starts repeating."))
 
 
-def spelling_group(window, group, row, switch):
-    """Check spelling while typing, for every app where you write."""
-    from . import spelling
+
+def replacements_dialog(parent):
+    """Text Replacements, as on a Mac: what you type and what it becomes."""
+    from . import textinput
+
+    dialog = Gtk.Dialog(title="Text Replacements", transient_for=parent, modal=True)
+    dialog.add_button("Done", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+    dialog.set_default_size(460, 380)
+    box = dialog.get_content_area()
+    box.set_spacing(8)
+    for side in ("top", "bottom", "start", "end"):
+        getattr(box, "set_margin_" + side)(12)
+    store = Gtk.ListStore(str, str)
+    for short, full in textinput.replacements():
+        store.append([short, full])
+    tree = Gtk.TreeView(model=store)
+
+    def save():
+        textinput.save_replacements([(row[0].strip(), row[1]) for row in store])
+
+    def edited(_cell, path, text, column):
+        store[path][column] = text.strip() if column == 0 else text
+        save()
+
+    for column, title in ((0, "Replace"), (1, "With")):
+        cell = Gtk.CellRendererText(editable=True)
+        cell.connect("edited", edited, column)
+        col = Gtk.TreeViewColumn(title, cell, text=column)
+        col.set_expand(column == 1)
+        col.set_min_width(120)
+        tree.append_column(col)
+    scroll = Gtk.ScrolledWindow(vexpand=True)
+    scroll.set_shadow_type(Gtk.ShadowType.IN)
+    scroll.add(tree)
+    box.pack_start(scroll, True, True, 0)
+    buttons = Gtk.Box(spacing=4)
+    add = Gtk.Button(label="+", tooltip_text="Add a replacement")
+    remove = Gtk.Button(label="\u2212", tooltip_text="Remove the selected replacement")
+
+    def add_row(*_):
+        it = store.append(["", ""])
+        path = store.get_path(it)
+        tree.set_cursor(path, tree.get_column(0), True)
+
+    def remove_row(*_):
+        model, it = tree.get_selection().get_selected()
+        if it is not None:
+            model.remove(it)
+            save()
+
+    add.connect("clicked", add_row)
+    remove.connect("clicked", remove_row)
+    buttons.pack_start(add, False, False, 0)
+    buttons.pack_start(remove, False, False, 0)
+    hint = Gtk.Label(label="Type the short form and a space, and it becomes the long one.", xalign=0)
+    hint.get_style_context().add_class("dials-caption")
+    buttons.pack_start(hint, True, True, 8)
+    box.pack_start(buttons, False, False, 0)
+    dialog.show_all()
+    dialog.run()
+    save()
+    dialog.destroy()
+
+
+def text_input_group(window, group, row, switch):
+    """Spelling, Text Replacements, smart quotes and the double-space full
+    stop, for every app where you write."""
+    from . import spelling, style as _style
 
     caption = ("Underlines misspelled words in red in Jot, Post, Stickies, Quill and the notes in "
                "other apps. Right-click one for suggestions, or to add it to the dictionary.")
     if not spelling.available():
         caption = "Spell checking isn't installed on this computer."
-    toggle = switch(spelling.wanted(), lambda on: window.save_prefs(check_spelling=on))
-    toggle.set_sensitive(spelling.available())
-    return group(row("Check spelling while typing", toggle, caption))
+    check = switch(spelling.wanted(), lambda on: window.save_prefs(check_spelling=on))
+    check.set_sensitive(spelling.available())
+    prefs = _style.prefs()
+    edit = Gtk.Button(label="Text Replacements\u2026")
+    edit.connect("clicked", lambda *_: replacements_dialog(window))
+    return group(
+        row("Check spelling while typing", check, caption),
+        row("Use text replacements", switch(prefs.get("text_replacements", True),
+                                            lambda on: window.save_prefs(text_replacements=on)),
+            "Type a short form, such as omw, and a space, and it becomes the long one (On my way!)."),
+        row("Your text replacements", edit),
+        row("Use smart quotes and dashes", switch(prefs.get("smart_quotes", True),
+                                                  lambda on: window.save_prefs(smart_quotes=on)),
+            "\u201cCurly\u201d quotes and apostrophes as you type, and two hyphens make a dash (\u2014)."),
+        row("Add full stop with double-space", switch(prefs.get("double_space_period", True),
+                                                      lambda on: window.save_prefs(double_space_period=on)),
+            "Press the space bar twice at the end of a sentence."),
+    )

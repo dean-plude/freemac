@@ -11,7 +11,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import style, textinput  # noqa: E402
 
 try:
     gi.require_version("Gspell", "1")
@@ -38,13 +38,14 @@ def _refresh():
 
 
 def _apply(view, on):
-    on = on and getattr(view, "_freemac_spelling_allowed", True) and view.get_editable()
+    on = on and getattr(view, "_freemac_prose", True) and view.get_editable()
     Gspell.TextView.get_from_gtk_text_view(view).set_inline_spell_checking(on)
 
 
 def attach(view):
     """Underline misspelled words in this Gtk.TextView (or GtkSource.View)."""
     global _watch
+    textinput.attach(view)   # Text Replacements, smart quotes, double-space full stop
     if Gspell is None or view in _views:
         return
     gview = Gspell.TextView.get_from_gtk_text_view(view)
@@ -60,8 +61,9 @@ def attach(view):
 
 
 def allow(view, allowed):
-    """For Quill: spelling only in prose (plain text, Markdown), not code."""
-    view._freemac_spelling_allowed = allowed
+    """For Quill: spelling and smart text input only in prose (plain text,
+    Markdown), not code."""
+    view._freemac_prose = allowed
     if Gspell is not None and view in _views:
         _apply(view, wanted())
 

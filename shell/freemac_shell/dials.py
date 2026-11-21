@@ -928,7 +928,7 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Passwords marked as secret by a password manager are never kept."),
             row("Forget what was copied", clear),
         ), sources_heading, sources, input_menu, text_heading,
-            dials_input.spelling_group(self, group, row, switch), heading, self.shortcuts.widget)
+            dials_input.text_input_group(self, group, row, switch), heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):

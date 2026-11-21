@@ -867,6 +867,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Dials > Keyboard > Text Input: one switch for every app | Dials | done |
 | 4 | Guide: Check your spelling as you type | Guide | done |
 
+## 1.82 "omw" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Text Replacements: type a short form and a space and it becomes the long one (omw: On my way!); a list to add to in Dials > Keyboard | Apps, Dials | done |
+| 2 | Smart quotes and dashes as you type: “ ” ‘ ’ and — for two hyphens, not in Quill's code | Apps | done |
+| 3 | A full stop when you press the space bar twice | Apps | done |
+| 4 | Guide: Type less with text replacements | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
