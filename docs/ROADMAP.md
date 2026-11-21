@@ -876,6 +876,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | A full stop when you press the space bar twice | Apps | done |
 | 4 | Guide: Type less with text replacements | Guide | done |
 
+## 1.83 "knock knock" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Connect to Server (Go menu, ⌘K): type smb://, sftp://, ftp:// or a WebDAV address, or just a computer's name, sign in if asked, and it opens like a drive | Drawer | done |
+| 2 | Favourite Servers in the same window, with + and − | Drawer | done |
+| 3 | Connected servers under Locations with an Eject button; gvfs-fuse so every app can open their files | Drawer, ISO | done |
+| 4 | Guide: Open a shared folder on another computer | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

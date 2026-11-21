@@ -120,6 +120,7 @@ exfatprogs
 dosfstools
 gvfs
 gvfs-backends
+gvfs-fuse
 usbmuxd
 # Bluetooth (Dials' Bluetooth panel talks to BlueZ) and printing: CUPS finds
 # network printers by itself; system-config-printer adds the rest.
