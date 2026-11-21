@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Shanty: a note sailing on the sea at dusk. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2f63"/><stop offset="0.62" stop-color="#2f5d8f"/><stop offset="1" stop-color="#3a8fa3"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffcf6b"/><stop offset="1" stop-color="#f2793a"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <circle cx="64" cy="88" r="34" fill="url(#sun)"/>
+    <path d="M8 88 C24 82 36 82 50 88 S80 96 96 90 S112 84 120 86 L120 120 L8 120 Z" fill="#163b66"/>
+    <path d="M8 100 C26 94 40 96 56 102 S90 108 120 98 L120 120 L8 120 Z" fill="#0f2a4d"/>
+    <path d="M22 93 C30 90 36 90 44 93" fill="none" stroke="#ffd9a0" stroke-opacity="0.6" stroke-width="2" stroke-linecap="round"/>
+    <path d="M76 97 C84 94 92 94 100 97" fill="none" stroke="#ffd9a0" stroke-opacity="0.45" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g fill="#ffffff">
+    <rect x="63" y="24" width="6.5" height="50" rx="2"/>
+    <path d="M69.5 24 C78 30 90 32 88 48 C86 40 79 38 69.5 37 Z"/>
+    <ellipse cx="57" cy="74" rx="12" ry="9" transform="rotate(-20 57 74)"/>
+  </g>
+</svg>

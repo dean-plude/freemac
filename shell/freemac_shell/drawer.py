@@ -605,6 +605,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "move-here": lambda: self.paste(move=True),
             "duplicate": self.duplicate,
             "undo": self.undo,
+            "browse-backups": self.browse_backups,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -1073,6 +1074,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.status.set_text(text)
         self.told_at = time.monotonic()
 
+    def browse_backups(self):
+        """Lifeboat, at this folder (and the chosen file) as it was."""
+        chosen = self.selected_paths()
+        target = chosen[0] if len(chosen) == 1 else self.path
+        try:
+            Gio.Subprocess.new(["freemac-lifeboat", target], Gio.SubprocessFlags.NONE)
+        except GLib.Error:
+            pass
+
     def selected_paths(self):
         if self.view_mode == "icons":
             model = self.icon_view.get_model()
@@ -1364,6 +1374,7 @@ def menubar():
             [("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
              ("Computer", "win.go-computer", None)],
+            [("Browse Backups", "win.browse-backups", None)],
         ]),
     ])
 
@@ -1388,9 +1399,13 @@ class Drawer(Gtk.Application):
     def do_open(self, files, _n, _hint):
         for file in files:
             path = file.get_path()
+            chosen = None
             if path and os.path.isfile(path):
-                path = os.path.dirname(path)
-            DrawerWindow(self, path or GLib.get_home_dir()).show_all()
+                path, chosen = os.path.dirname(path), path
+            window = DrawerWindow(self, path or GLib.get_home_dir())
+            window.show_all()
+            if chosen:   # opened with a file: show it chosen in its folder
+                GLib.idle_add(lambda w=window, c=chosen: w.select_paths([c]) and False)
 
 
 def main():
