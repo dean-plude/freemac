@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Books: an open book with a ribbon on a warm tile. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#f27a1a"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1ede4"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <path d="M64 42 C52 34 36 33 24 36 V90 C36 87 52 88 64 96 Z" fill="url(#page)"/>
+  <path d="M64 42 C76 34 92 33 104 36 V90 C92 87 76 88 64 96 Z" fill="url(#page)"/>
+  <path d="M64 42 V96" stroke="#d9cfbd" stroke-width="2"/>
+  <g stroke="#c8bba5" stroke-width="2" stroke-linecap="round">
+    <path d="M32 48 C40 46 48 47 56 50 M32 58 C40 56 48 57 56 60 M32 68 C40 66 48 67 56 70 M32 78 C40 76 48 77 56 80"/>
+    <path d="M72 50 C80 47 88 46 96 48 M72 60 C80 57 88 56 96 58 M72 70 C80 67 88 66 96 68"/>
+  </g>
+  <path d="M84 33 V58 L89 53 L94 58 V34 C91 33.5 87 33.2 84 33 Z" fill="#e5383b"/>
+</svg>

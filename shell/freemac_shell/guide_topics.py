@@ -174,6 +174,29 @@ TOPICS = {
         "Stuck? Click Hint for a good move. The undo arrow takes your last move back.",
         "Your game is kept, so you can stop and carry on later.",
     ]),
+    "patience": ("Play Patience (solitaire)", "solitaire patience cards card game klondike", [
+        "Patience is the classic card game. Press ⌘Space, type Patience and press Return.",
+        "Build each suit from Ace to King at the top right. On the seven columns, put cards in falling "
+        "order, red on black and black on red. Only a King goes in an empty column.",
+        "Click the deck to turn cards over. Drag a card to move it, or double-click it to send it home.",
+        "Stuck? Click Hint. ⌘Z undoes a move. Once every card is face up, click Finish.",
+    ]),
+    "mines": ("Play Mines", "mines minesweeper puzzle game flag", [
+        "Mines is a puzzle game. Press ⌘Space, type Mines and press Return.",
+        "Click a square to open it. A number tells how many squares around it hide a mine. "
+        "The first click is always safe.",
+        "Right-click, or hold Control and click, to flag a square you think hides a mine. Click a number "
+        "whose mines are all flagged to open everything around it.",
+        "Pick Small, Medium or Large at the top. Your best time for each is kept.",
+    ]),
+    "books": ("Read e-books", "books ebook epub read reader library novel kindle", [
+        "Books reads EPUB e-books. Press ⌘Space, type Books and press Return.",
+        "Click Add Books to bring books in, or put EPUB files in the Books folder in your home. "
+        "Many free classics are on Project Gutenberg.",
+        "Click a book to read it. Click the right side of the page or press → for the next page.",
+        "Click the list button for the contents, and Aa for bigger text or sepia and night pages. "
+        "Books keeps your place in every book.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

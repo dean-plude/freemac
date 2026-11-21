@@ -401,13 +401,21 @@ The small things a Mac user notices in their first minute.
 | 2 | The weather where you are and in places you add: now, by the hour and for the week, with no account needed | Sky | done |
 | 3 | Sticky notes on the desktop in a few colours, kept between restarts | Stickies | done |
 
-## 1.30 "record, draw, and play"
+## 1.30 "record, draw, and play" (done)
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
 | 1 | Record your voice: a big red button, a moving level, recordings listed with their length, play back, rename, trim the start and end, share to the Drawer | Echo | done |
 | 2 | Draw on a big canvas: pens, a highlighter, shapes, sticky text, stickers, an eraser, undo, saved as you go and exported as a picture | Easel | done |
 | 3 | Play chess against the computer at a few levels, or with a friend on the same screen, with hints and undo | Rook | done |
+
+## 1.31 "read and play" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Patience (solitaire): drag cards or double-click to send them home, draw one or three, undo, a hint, and the cards finish themselves at the end | Patience | done |
+| 2 | Mines: clear a field without setting off a mine, in three sizes; the first click is always safe, right-click flags, best times kept | Mines | done |
+| 3 | Read e-books: a shelf of your EPUB books with their covers, page by page with a contents list, bigger or smaller text, light, sepia or night pages, and it keeps your place | Books | done |
 
 ## Later
 
