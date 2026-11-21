@@ -79,18 +79,19 @@ def path_for(gfile):
 
 
 def host_of(uri):
-    return uri.split("://", 1)[1].split("/", 1)[0].rsplit("@", 1)[-1]
+    host = uri.split("://", 1)[1].split("/", 1)[0].rsplit("@", 1)[-1]
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
 
 
-def explain(uri, error):
+def explain(uri, error, name=None):
     """What went wrong, in plain words; the system's own message is technical."""
     if error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.PERMISSION_DENIED):
         return "The name or password wasn\u2019t accepted. Check them, and then try again."
-    return (f"There was a problem connecting to the server \u201c{host_of(uri)}\u201d. Check the "
+    return (f"There was a problem connecting to the server \u201c{name or host_of(uri)}\u201d. Check the "
             "server name or IP address, and then try again.")
 
 
-def connect(uri, parent, done):
+def connect(uri, parent, done, name=None):
     """Mount uri, asking for a name and password if the server wants one, then
     call done(path, None) or done(None, message)."""
     gfile = Gio.File.new_for_uri(uri)
@@ -106,7 +107,7 @@ def connect(uri, parent, done):
                 done(None, "")   # the person cancelled the sign-in
                 return
             else:
-                done(None, explain(uri, error))
+                done(None, explain(uri, error, name))
                 return
         path = path_for(source)
         done(path, None if path else "It connected, but its files can't be opened as a folder.")
