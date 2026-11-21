@@ -5,7 +5,9 @@ Icon, list and column views over local folders, tabs, a sidebar of
 favourite folders you can change, a preview of the selected files on Space
 (Glance), and the everyday file operations: open, new folder, rename, move
 to trash, copy and paste (⌘C, ⌘V, ⌥⌘V to move), Duplicate, drag onto a
-folder, and Undo (see transfer.py).
+folder, and Undo (see transfer.py). Like Finder it also sorts by name, kind,
+date or size, shows a path bar, goes to a typed folder (⇧⌘G), opens a file
+with another app (Open With), and puts things back from the Trash.
 """
 import json
 import os
@@ -31,7 +33,8 @@ ATTRS = ",".join([
     "standard::size", "standard::is-hidden", "standard::content-type", "time::modified",
 ])
 # ListStore columns.
-C_ICON, C_NAME, C_PATH, C_IS_DIR, C_SIZE, C_MODIFIED, C_KIND, C_SORT, C_SMALL = range(9)
+C_ICON, C_NAME, C_PATH, C_IS_DIR, C_SIZE, C_MODIFIED, C_KIND, C_SORT, C_SMALL, C_STAMP, C_BYTES = range(11)
+SORTS = (("name", "Name"), ("kind", "Kind"), ("date", "Date Modified"), ("size", "Size"))
 VIEWS = (("icons", "view-grid-symbolic", "Icons"),
          ("list", "view-list-symbolic", "List"),
          ("columns", "view-dual-symbolic", "Columns"))
@@ -52,6 +55,15 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-tabs { padding: 4px 6px 0; }
 .drawer-tabs button { padding: 2px 8px; }
 .drawer-tab-close { padding: 0 2px; min-width: 0; min-height: 0; }
+.drawer-pathbar { padding: 1px 6px; border-top: 1px solid rgba(120, 120, 150, 0.18); }
+.drawer-pathbar button { padding: 0 4px; min-height: 0; font-size: 11px; }
+.drawer-pathbar button image { color: #2f7bf5; }
+.drawer-crumb-gap { font-size: 11px; opacity: 0.45; }
+.drawer-trashbar { padding: 6px 12px; border-bottom: 1px solid rgba(120, 120, 150, 0.18);
+                   background-color: rgba(120, 120, 150, 0.06); }
+.drawer-trashbar label.title { font-weight: bold; }
+.drawer-go-hint { font-size: 11px; opacity: 0.65; }
+.drawer-go-hint.error { color: #d93a2b; opacity: 1; }
 """
 
 
@@ -93,29 +105,83 @@ def places():
     return found
 
 
+def load_config():
+    """Drawer's settings: the sidebar, how folders are sorted, the path bar."""
+    try:
+        with open(CONFIG) as f:
+            config = json.load(f)
+        return config if isinstance(config, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_setting(key, value):
+    config = load_config()
+    config[key] = value
+    try:
+        os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+        with open(CONFIG, "w") as f:
+            json.dump(config, f, indent=2)
+    except OSError:
+        pass
+
+
 def load_favourites():
     """The sidebar's folders: [(name, path)]. The list Drawer starts with is
     the home folder and its usual folders; people add, remove and reorder."""
-    try:
-        with open(CONFIG) as f:
-            saved = json.load(f).get("favourites")
-        if isinstance(saved, list):
-            return [(str(e[0]), str(e[1])) for e in saved if isinstance(e, list) and len(e) == 2]
-    except (OSError, ValueError, AttributeError):
-        pass
+    saved = load_config().get("favourites")
+    if isinstance(saved, list):
+        return [(str(e[0]), str(e[1])) for e in saved if isinstance(e, list) and len(e) == 2]
     return [(name, path) for name, path, _icon in places()]
 
 
 def save_favourites(entries):
-    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    save_setting("favourites", [[name, path] for name, path in entries])
+
+
+def sort_key(model, it, sort):
+    """How a row sorts: folders first by name, as before, or by kind, newest
+    first, or largest first (folders last, as in Finder)."""
+    is_dir, key, kind, stamp, size = model.get(it, C_IS_DIR, C_SORT, C_KIND, C_STAMP, C_BYTES)
+    key = key or ""
+    if sort == "kind":
+        return ((kind or "").lower(), key[1:])
+    if sort == "date":
+        return (-(stamp or 0), key[1:])
+    if sort == "size":
+        return (bool(is_dir), -(size or 0), key[1:])
+    return (key,)
+
+
+def compare_rows(model, a, b, sort):
+    ka, kb = sort_key(model, a, sort), sort_key(model, b, sort)
+    return (ka > kb) - (ka < kb)
+
+
+def complete_path(text, base):
+    """Tab in Go to Folder: finish the name being typed, as far as the names
+    that start that way agree. Returns the new text, or None."""
+    if text.strip() == "~":
+        return "~/"
+    full = os.path.expanduser(text)
+    if not os.path.isabs(full):
+        full = os.path.join(base, full)
+    folder, start = os.path.split(full)
     try:
-        with open(CONFIG) as f:
-            config = json.load(f)
-    except (OSError, ValueError):
-        config = {}
-    config["favourites"] = [[name, path] for name, path in entries]
-    with open(CONFIG, "w") as f:
-        json.dump(config, f, indent=2)
+        names = sorted(n for n in os.listdir(folder or "/")
+                       if n.lower().startswith(start.lower()) and (start.startswith(".") or not n.startswith(".")))
+    except OSError:
+        return None
+    if not names:
+        return None
+    if len(names) == 1:
+        done = names[0] + ("/" if os.path.isdir(os.path.join(folder, names[0])) else "")
+    else:
+        common = len(os.path.commonprefix([n.lower() for n in names]))
+        if common <= len(start):
+            return None
+        done = names[0][:common]
+    return text[:len(text) - len(start)] + done
 
 
 def place_icon(path):
@@ -135,9 +201,11 @@ class Folder:
     icon_cache = {}
     thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
-    def __init__(self, path, show_hidden=False):
+    def __init__(self, path, show_hidden=False, sort="name"):
         self.path = path
-        self.store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str, bool, str, str, str, str, GdkPixbuf.Pixbuf)
+        self.store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str, bool, str, str, str, str, GdkPixbuf.Pixbuf,
+                                   float, float)
+        self.store.set_sort_func(C_SORT, compare_rows, sort)
         self.store.set_sort_column_id(C_SORT, Gtk.SortType.ASCENDING)
         self.error = None
         try:
@@ -165,6 +233,7 @@ class Folder:
                 big, name, full, is_dir,
                 "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
                 ("0" if is_dir else "1") + name.lower(), small,
+                float(stamp), 0.0 if is_dir or kind == MAC_APP else float(info.get_size()),
             ])
             content = info.get_content_type() or ""
             if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
@@ -268,6 +337,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.current = 0
         self.glance = None
         self.monitor, self.watched, self.soon, self.told_at = None, None, 0, 0
+        config = load_config()
+        self.sort = config.get("sort") if config.get("sort") in dict(SORTS) else "name"
+        self.path_bar_shown = bool(config.get("path_bar", False))
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -311,8 +383,13 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.tab_bar.get_style_context().add_class("drawer-tabs")
         self.tab_bar.set_no_show_all(True)
         right.pack_start(self.tab_bar, False, False, 0)
+        right.pack_start(self._trash_bar(), False, False, 0)
         self.content = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
         right.pack_start(self.content, True, True, 0)
+        self.path_bar = Gtk.Box(spacing=0)
+        self.path_bar.get_style_context().add_class("drawer-pathbar")
+        self.path_bar.set_no_show_all(True)
+        right.pack_start(self.path_bar, False, False, 0)
         self.status = Gtk.Label(xalign=0)
         self.status.get_style_context().add_class("drawer-status")
         right.pack_start(self.status, False, False, 0)
@@ -392,6 +469,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _label(path):
         if path == GLib.get_home_dir():
             return "Home"
+        if path and os.path.realpath(path) == os.path.realpath(TRASH):
+            return "Trash"
         return os.path.basename(path) or "Computer"
 
     # ---- Glance (Space) -------------------------------------------------
@@ -672,6 +751,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "duplicate": self.duplicate,
             "undo": self.undo,
             "browse-backups": self.browse_backups,
+            "put-back": self.put_back,
+            "go-to-folder": self.go_to_folder,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -680,6 +761,13 @@ class DrawerWindow(Gtk.ApplicationWindow):
                            ("go-computer", "/")):
             menus.add_actions(self, {name: lambda p=path or GLib.get_home_dir(): self.navigate(p)})
         self.hidden_action = menus.add_toggle(self, "show-hidden", False, self._set_hidden)
+        self.path_bar_action = menus.add_toggle(self, "path-bar", self.path_bar_shown, self._set_path_bar)
+        # View › Sort By: one choice of four, kept for every window.
+        self.sort_action = Gio.SimpleAction.new_stateful("sort-by", GLib.VariantType.new("s"),
+                                                         GLib.Variant("s", self.sort))
+        self.sort_action.connect("change-state", lambda act, value: (act.set_state(value),
+                                                                    self.set_sort(value.get_string())))
+        self.add_action(self.sort_action)
 
     # ---- building -------------------------------------------------------
     def _button(self, icon, tip, handler):
@@ -893,11 +981,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _build_list_view(self):
         self.list_view = Gtk.TreeView(headers_visible=True, enable_search=False)
         self.list_view.append_column(name_column())
-        for title, col in (("Modified", C_MODIFIED), ("Size", C_SIZE), ("Kind", C_KIND)):
+        for title, col, by in (("Modified", C_MODIFIED, C_STAMP), ("Size", C_SIZE, C_BYTES), ("Kind", C_KIND, C_KIND)):
             renderer = Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END)
             renderer.set_property("foreground-rgba", Gdk.RGBA(0.45, 0.45, 0.5, 1))
             column = Gtk.TreeViewColumn(title, renderer, text=col)
             column.set_min_width(110)
+            column.set_sort_column_id(by)   # a click on the heading sorts by it
             self.list_view.append_column(column)
         self.list_view.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         self.list_view.connect("row-activated", lambda v, p, _c: self._activate(v.get_model(), p))
@@ -942,13 +1031,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def refresh(self):
         self.back.set_sensitive(bool(self.history))
         self.forward.set_sensitive(bool(self.future))
-        home = GLib.get_home_dir()
-        label = "Home" if self.path == home else (os.path.basename(self.path) or "Computer")
+        label = self._label(self.path)
         self._draw_tabs()
         self.title.set_text(label)
         self.set_title(f"{label} — Drawer")
         self._show_place()
-        folder = Folder(self.path, self.show_hidden)
+        folder = Folder(self.path, self.show_hidden, self.sort)
         self.folder = folder
         model = self._model(folder)
         self.icon_view.set_model(model)
@@ -958,6 +1046,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
         count = len(model)
         self.status.set_text(folder.error or f"{count} item{'s' if count != 1 else ''}")
         self.content.set_visible_child_name(self.view_mode)
+        in_trash = self.in_trash()
+        self.trash_bar.set_visible(in_trash)
+        self.empty_button.set_sensitive(in_trash and count > 0)
+        self.lookup_action("put-back").set_enabled(in_trash)
+        self._draw_path_bar()
         self._watch()
 
     # ---- column (Miller) view ------------------------------------------
@@ -978,7 +1071,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.path = chain[-1]
 
     def _add_column(self, path):
-        folder = Folder(path, self.show_hidden)
+        folder = Folder(path, self.show_hidden, self.sort)
         view = Gtk.TreeView(headers_visible=False, enable_search=False, model=self._model(folder))
         view.append_column(name_column())
         arrow = Gtk.CellRendererText(xalign=1)
@@ -1032,6 +1125,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             label = os.path.basename(path)
             self.title.set_text(label)
             self.path = path
+            self._draw_path_bar()
         else:
             self._add_preview(path, model[it])
 
@@ -1207,6 +1301,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def trash(self, paths=None):
         paths = paths if paths is not None else self.selected_paths()
+        if self.in_trash():
+            self.put_back(paths)   # ⌘⌫ in the Trash puts things back, as in Finder
+            return
         went, error = transfer.to_trash(paths)
         if went:
             transfer.note_done({"kind": "trash", "paths": went})
@@ -1216,6 +1313,243 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif went:
             self.notify(f"Moved {len(went)} item{'s' if len(went) != 1 else ''} to the Trash. ⌘Z puts "
                         f"{'it' if len(went) == 1 else 'them'} back.")
+
+    # ---- the Trash -----------------------------------------------------
+    def in_trash(self):
+        return bool(self.path) and os.path.realpath(self.path) == os.path.realpath(TRASH)
+
+    def _trash_bar(self):
+        """The strip along the top of the Trash, with its Empty button."""
+        self.trash_bar = Gtk.Box(spacing=10)
+        self.trash_bar.get_style_context().add_class("drawer-trashbar")
+        self.trash_bar.set_no_show_all(True)
+        title = Gtk.Label(label="Trash", xalign=0)
+        title.get_style_context().add_class("title")
+        hint = Gtk.Label(label="Select an item and choose Put Back to return it to where it was.", xalign=0,
+                         ellipsize=Pango.EllipsizeMode.END)
+        hint.get_style_context().add_class("dim-label")
+        self.empty_button = Gtk.Button(label="Empty")
+        self.empty_button.connect("clicked", lambda *_: self.empty_trash())
+        self.trash_bar.pack_start(title, False, False, 0)
+        self.trash_bar.pack_start(hint, True, True, 0)
+        self.trash_bar.pack_end(self.empty_button, False, False, 0)
+        for child in (title, hint, self.empty_button):
+            child.show()
+        return self.trash_bar
+
+    def empty_trash(self):
+        from . import alert
+        answer = alert.ask(self, "Are you sure you want to permanently erase the items in the Trash?",
+                           "You can’t undo this action.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Empty Trash", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK, icon="user-trash-full")
+        if answer == Gtk.ResponseType.OK:
+            transfer.empty_trash()
+            self.refresh()
+
+    def put_back(self, paths=None):
+        """Return items in the Trash to the folders they came from."""
+        if not self.in_trash():
+            return
+        paths = paths if paths is not None else self.selected_paths()
+        if not paths:
+            return
+        went, error = transfer.put_back(paths)
+        self.refresh()
+        if error is not None:
+            self.notify(f"Couldn’t put everything back: {error.strerror or error}.")
+        elif len(went) == 1:
+            where = os.path.basename(os.path.dirname(went[0])) or "Computer"
+            self.notify(f"Put “{os.path.basename(went[0])}” back in “{where}”.")
+        elif went:
+            self.notify(f"Put back {len(went)} items.")
+
+    # ---- sorting and the path bar ----------------------------------------
+    def set_sort(self, sort):
+        if sort not in dict(SORTS) or sort == self.sort:
+            return
+        self.sort = sort
+        save_setting("sort", sort)
+        keep = self.selected_paths()
+        self.refresh()
+        self.select_paths(keep)
+
+    def _sort_item(self):
+        item = Gtk.MenuItem(label="Sort By")
+        menu = Gtk.Menu()
+        group = None
+        for key, title in SORTS:
+            choice = Gtk.RadioMenuItem.new_with_label_from_widget(group, title)
+            group = group or choice
+            choice.set_active(key == self.sort)
+            choice.connect("toggled", lambda c, k=key: c.get_active() and self.sort_action.change_state(
+                GLib.Variant("s", k)))
+            menu.append(choice)
+        item.set_submenu(menu)
+        return item
+
+    def _set_path_bar(self, shown):
+        self.path_bar_shown = shown
+        save_setting("path_bar", shown)
+        self._draw_path_bar()
+
+    def _draw_path_bar(self):
+        """Along the bottom: each folder from the top down to this one, as in
+        Finder's path bar. A click on one goes there."""
+        for child in self.path_bar.get_children():
+            child.destroy()
+        if not self.path_bar_shown or not self.path:
+            self.path_bar.hide()
+            return
+        home = GLib.get_home_dir()
+        path = self.path
+        if self.in_trash():
+            crumbs = [("Trash", TRASH, "user-trash-symbolic")]
+        elif path == home or path.startswith(home.rstrip(os.sep) + os.sep):
+            crumbs = [("Home", home, "user-home-symbolic")]
+            base = home
+        else:
+            crumbs = [("Computer", "/", "drive-harddisk-symbolic")]
+            base = "/"
+        if not self.in_trash():
+            for part in os.path.relpath(path, base).split(os.sep):
+                if part in ("", "."):
+                    continue
+                base = os.path.join(base, part)
+                crumbs.append((part, base, "folder-symbolic"))
+        for index, (label, target, icon) in enumerate(crumbs):
+            if index:
+                gap = Gtk.Label(label="›")
+                gap.get_style_context().add_class("drawer-crumb-gap")
+                self.path_bar.pack_start(gap, False, False, 0)
+            button = Gtk.Button(relief=Gtk.ReliefStyle.NONE, can_focus=False)
+            inside = Gtk.Box(spacing=4)
+            inside.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
+            inside.pack_start(Gtk.Label(label=label, max_width_chars=20, ellipsize=Pango.EllipsizeMode.MIDDLE),
+                              False, False, 0)
+            button.add(inside)
+            button.set_tooltip_text(target)
+            button.connect("clicked", lambda _b, t=target: self.navigate(t) if t != self.path else None)
+            self.path_bar.pack_start(button, False, False, 0)
+        for child in self.path_bar.get_children():
+            child.show_all()   # (show_all skips a box that is set not to show with its window)
+        self.path_bar.show()
+
+    # ---- Go to Folder ----------------------------------------------------
+    last_typed = "~/"
+
+    def go_to_folder(self):
+        """⇧⌘G: type where to go. Tab finishes a name; ~ is the home folder.
+        A file opens its folder with the file chosen."""
+        dialog = Gtk.Dialog(title="Go to Folder", transient_for=self, modal=True)
+        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Go", Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        box = dialog.get_content_area()
+        box.set_spacing(6)
+        box.set_border_width(14)
+        box.pack_start(Gtk.Label(label="Go to the folder:", xalign=0), False, False, 0)
+        entry = Gtk.Entry(activates_default=True, width_chars=46, text=DrawerWindow.last_typed)
+        box.pack_start(entry, False, False, 0)
+        hint = Gtk.Label(label="Tab finishes a name. ~ is your home folder.", xalign=0)
+        hint.get_style_context().add_class("drawer-go-hint")
+        box.pack_start(hint, False, False, 0)
+
+        def tab(_e, event):
+            if event.keyval not in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab):
+                return False
+            done = complete_path(entry.get_text(), self.path)
+            if done is None:
+                Gdk.Display.get_default().beep()
+            else:
+                entry.set_text(done)
+                entry.set_position(-1)
+            return True   # Tab stays in the box
+
+        entry.connect("key-press-event", tab)
+        dialog.show_all()
+        entry.grab_focus()
+        while dialog.run() == Gtk.ResponseType.OK:
+            typed = entry.get_text().strip()
+            target = os.path.expanduser(typed)
+            if typed and not os.path.isabs(target):
+                target = os.path.join(self.path, target)
+            target = os.path.normpath(target) if typed else ""
+            if typed and os.path.isdir(target):
+                DrawerWindow.last_typed = typed
+                dialog.destroy()
+                self.navigate(target)
+                return
+            if typed and os.path.lexists(target):
+                DrawerWindow.last_typed = typed
+                dialog.destroy()
+                self.navigate(os.path.dirname(target))
+                GLib.idle_add(lambda: self.select_paths([target]) and False)
+                return
+            hint.set_text("There’s no folder there. Check the name and try again.")
+            hint.get_style_context().add_class("error")
+            entry.grab_focus()
+        dialog.destroy()
+
+    # ---- Open With ------------------------------------------------------
+    def _open_with_item(self, selected):
+        """Open With ›: the apps that can open these files, the usual one
+        first, then Other… to choose any app."""
+        files = [p for p in selected if not os.path.isdir(p)]
+        if not files or len(files) != len(selected):
+            return None
+        try:
+            info = Gio.File.new_for_path(files[0]).query_info("standard::content-type",
+                                                             Gio.FileQueryInfoFlags.NONE, None)
+            content = info.get_content_type() or "application/octet-stream"
+        except GLib.Error:
+            content = "application/octet-stream"
+        default = Gio.AppInfo.get_default_for_type(content, False)
+        apps, seen = [], set()
+        for app in ([default] if default else []) + list(Gio.AppInfo.get_all_for_type(content)):
+            if app.get_id() in seen or not app.should_show():
+                continue
+            seen.add(app.get_id())
+            apps.append(app)
+        item = Gtk.MenuItem(label="Open With")
+        menu = Gtk.Menu()
+        for index, app in enumerate(apps):
+            row = Gtk.MenuItem()
+            inside = Gtk.Box(spacing=8)
+            icon = app.get_icon()
+            image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU) if icon else Gtk.Image()
+            image.set_pixel_size(16)
+            inside.pack_start(image, False, False, 0)
+            name = app.get_display_name() or app.get_name()
+            inside.pack_start(Gtk.Label(label=f"{name} (default)" if index == 0 and default else name, xalign=0),
+                              False, False, 0)
+            row.add(inside)
+            row.connect("activate", lambda _i, a=app: self._open_with(a, files))
+            menu.append(row)
+            if index == 0 and default and len(apps) > 1:
+                menu.append(Gtk.SeparatorMenuItem())
+        if apps:
+            menu.append(Gtk.SeparatorMenuItem())
+        other = Gtk.MenuItem(label="Other…")
+        other.connect("activate", lambda *_: self._open_with_other(files))
+        menu.append(other)
+        item.set_submenu(menu)
+        return item
+
+    def _open_with(self, app, files):
+        try:
+            app.launch([Gio.File.new_for_path(f) for f in files], None)
+        except GLib.Error as err:
+            self.notify(f"{app.get_display_name()} couldn’t open it ({err.message}).")
+
+    def _open_with_other(self, files):
+        dialog = Gtk.AppChooserDialog.new(self, Gtk.DialogFlags.MODAL, Gio.File.new_for_path(files[0]))
+        dialog.set_heading(f"Choose an app to open “{os.path.basename(files[0])}”.")
+        widget = dialog.get_widget()
+        widget.set_show_all(True)
+        app = dialog.get_app_info() if dialog.run() == Gtk.ResponseType.OK else None
+        dialog.destroy()
+        if app is not None:
+            self._open_with(app, files)
 
     def get_info(self):
         paths = self.selected_paths() or [self.path]
@@ -1286,11 +1620,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
                  not macapps.in_applications(selected[0])),
                 (None, None, True),
             )
+        in_trash = self.in_trash()
         for label, handler, enabled in app_items + (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
+            ("Open With", None, has_selection),
             ("Get Info", lambda *_: self.get_info(), True),
             ("Rename…", lambda *_: self.rename(), has_selection),
-            ("Move to Trash", lambda *_: self.trash(), has_selection),
+            ("Put Back" if in_trash else "Move to Trash",
+             (lambda *_: self.put_back()) if in_trash else (lambda *_: self.trash()), has_selection),
             (None, None, True),
             ("Duplicate", lambda *_: self.duplicate(), has_selection),
             ("Copy", lambda *_: self.copy(), has_selection),
@@ -1305,10 +1642,19 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Glance", lambda *_: self.toggle_glance(), has_selection),
             (None, None, True),
             ("New Folder", lambda *_: self.new_folder(), True),
+            ("Sort By", None, True),
             ("Hide Hidden Files" if self.show_hidden else "Show Hidden Files", lambda *_: self.toggle_hidden(), True),
         ):
             if label == "Share":
                 menu.append(share.menu_item(self, selected, self.notify))
+                continue
+            if label == "Open With":
+                item = self._open_with_item(selected)
+                if item is not None:
+                    menu.append(item)
+                continue
+            if label == "Sort By":
+                menu.append(self._sort_item())
                 continue
             item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
             if handler:
@@ -1329,7 +1675,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if event.button != 3:
             return False
         item = view.get_path_at_pos(int(event.x), int(event.y))
-        if item and not view.path_is_selected(item):
+        if item is None:
+            view.unselect_all()   # a click on empty space is about the folder
+        elif not view.path_is_selected(item):
             view.unselect_all()
             view.select_path(item)
         self._menu(event)
@@ -1339,7 +1687,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if event.button != 3:
             return False
         hit = view.get_path_at_pos(int(event.x), int(event.y))
-        if hit and not view.get_selection().path_is_selected(hit[0]):
+        if hit is None and view is self.list_view:
+            view.get_selection().unselect_all()
+        elif hit and not view.get_selection().path_is_selected(hit[0]):
             view.get_selection().unselect_all()
             view.get_selection().select_path(hit[0])
         self._menu(event)
@@ -1394,6 +1744,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.get_application().activate_action("new-window", None)
         elif ctrl and shift and key in (Gdk.KEY_d, Gdk.KEY_D):
             self.add_to_sidebar()
+        elif ctrl and shift and key in (Gdk.KEY_g, Gdk.KEY_G):
+            self.go_to_folder()
+        elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_p, Gdk.KEY_P):
+            self.path_bar_action.change_state(GLib.Variant("b", not self.path_bar_shown))
         elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
             self.close_tab()
         elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O, Gdk.KEY_Down, Gdk.KEY_End):
@@ -1415,7 +1769,7 @@ def menubar():
             [("Duplicate", "win.duplicate", "<Ctrl>d")],
             [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
-             ("Move to Trash", "win.trash", "<Ctrl>BackSpace")],
+             ("Move to Trash", "win.trash", "<Ctrl>BackSpace"), ("Put Back", "win.put-back", None)],
             [("Share…", "win.share", None)],
             [("Add to Sidebar", "win.add-to-sidebar", "<Ctrl><Shift>d")],
             [("Eject", "win.eject", "<Ctrl>e")],
@@ -1431,7 +1785,9 @@ def menubar():
         ("_View", [
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
              ("as Columns", "win.view-columns", "<Ctrl>3")],
-            [("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
+            [("Sort by " + title, f"win.sort-by::{key}", None) for key, title in SORTS],
+            [("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
+             ("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
             [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),
         ("_Go", [
@@ -1440,6 +1796,7 @@ def menubar():
             [("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
              ("Computer", "win.go-computer", None)],
+            [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g")],
             [("Browse Backups", "win.browse-backups", None)],
         ]),
     ])

@@ -22,6 +22,7 @@ import os
 import shutil
 import threading
 import time
+from urllib.parse import unquote
 
 import gi
 
@@ -233,6 +234,76 @@ def restore_from_trash(paths):
         except GLib.Error:
             pass
     return back
+
+
+def trash_origin(path):
+    """Where an item in the Trash came from (from its note in Trash/info),
+    or None."""
+    files = os.path.dirname(os.path.abspath(path))
+    note = os.path.join(os.path.dirname(files), "info", os.path.basename(path) + ".trashinfo")
+    try:
+        with open(note, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith("Path="):
+                    orig = unquote(line[5:].strip())
+                    if not os.path.isabs(orig):   # a drive's own Trash keeps paths from the drive's top
+                        orig = os.path.join(os.path.dirname(os.path.dirname(files)), orig)
+                    return orig
+    except OSError:
+        pass
+    return None
+
+
+def put_back(paths):
+    """Move items in the Trash back where they came from, as Finder's Put
+    Back does. A folder that has gone is made again; a name that is taken
+    again gets "name 2". Returns the places they went and the first error."""
+    went, error = [], None
+    for path in paths:
+        orig = trash_origin(path)
+        if not orig:
+            error = error or OSError(0, f"“{os.path.basename(path)}” doesn’t say where it came from")
+            continue
+        folder = os.path.dirname(orig)
+        try:
+            os.makedirs(folder, exist_ok=True)
+            target = os.path.join(folder, free_name(folder, os.path.basename(orig)))
+            shutil.move(path, target)
+        except OSError as err:
+            error = error or err
+            continue
+        note = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(path))), "info",
+                            os.path.basename(path) + ".trashinfo")
+        try:
+            os.unlink(note)
+        except OSError:
+            pass
+        went.append(target)
+    return went, error
+
+
+def empty_trash(trash=None):
+    """Delete everything in the Trash for good (the files and their notes)."""
+    trash = trash or os.path.join(GLib.get_user_data_dir(), "Trash")
+    for part in ("files", "info", "expunged"):
+        folder = os.path.join(trash, part)
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            continue
+        for name in names:
+            path = os.path.join(folder, name)
+            try:
+                if os.path.isdir(path) and not os.path.islink(path):
+                    shutil.rmtree(path)
+                else:
+                    os.unlink(path)
+            except OSError:
+                pass
+    try:
+        os.unlink(os.path.join(trash, "directorysizes"))
+    except OSError:
+        pass
 
 
 def to_trash(paths):

@@ -244,7 +244,15 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 - **Drawer tabs** keep each tab's folder, history, view and filter and
   swap them into the one set of views when switching, rather than
   building a set of views per tab. **Favourites** live in
-  `~/.config/freemac/drawer.json`. **Glance** (`drawer_glance.py`) is a
+  `~/.config/freemac/drawer.json`, with the Sort By choice and whether the
+  path bar shows (1.47). Sorting is a sort function on each folder's
+  ListStore over two number columns (modified time and bytes), so every
+  view and the column view share it; list headings sort on those too.
+  **Put Back** (`transfer.put_back`) reads the item's `.trashinfo` note in
+  `Trash/info` for where it came from, moves it there (a taken name gets
+  "name 2", a missing folder is made again) and removes the note;
+  emptying the Trash is `transfer.empty_trash`, shared with the Dock.
+  **Glance** (`drawer_glance.py`) is a
   plain window that follows the selection while open. Since 1.46 it also
   opens from the desktop, plays movies and music with its own GStreamer
   playbin into a gtksink, shows every PDF page (up to 60, drawn while you
