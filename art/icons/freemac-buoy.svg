@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Buoy: a red-and-white buoy on the water, sending out signal rings. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fb6e8"/><stop offset="1" stop-color="#1572a8"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f5f91"/><stop offset="1" stop-color="#0a4670"/>
+    </linearGradient>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="26"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <g clip-path="url(#tile)">
+    <g fill="none" stroke="#ffffff" stroke-linecap="round" opacity="0.9">
+      <path d="M44 40 a28 28 0 0 1 40 0" stroke-width="5"/>
+      <path d="M34 30 a42 42 0 0 1 60 0" stroke-width="5" opacity="0.6"/>
+    </g>
+    <circle cx="64" cy="50" r="5" fill="#ffd54a"/>
+    <path d="M60 54 h8 l6 34 h-20 z" fill="#ffffff"/>
+    <path d="M58.8 61 h10.4 l1.5 8 h-13.4 z M56.5 75 h15 l1.4 8 h-17.8 z" fill="#e2403a"/>
+    <ellipse cx="64" cy="89" rx="20" ry="5" fill="#c8322c"/>
+    <path d="M0 92 q16 -8 32 0 t32 0 t32 0 t32 0 v40 h-128 z" fill="url(#sea)"/>
+    <path d="M0 102 q16 -6 32 0 t32 0 t32 0 t32 0" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.35"/>
+  </g>
+</svg>

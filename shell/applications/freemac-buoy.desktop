@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Buoy
+GenericName=Podcasts and News
+Comment=Follow podcasts and websites, read new posts and play episodes
+Exec=freemac-buoy
+Icon=freemac-buoy
+Categories=Network;Feed;AudioVideo;Audio;
+Keywords=podcast;podcasts;rss;atom;feed;news;reader;episodes;
+MimeType=application/rss+xml;application/atom+xml;text/x-opml+xml;
+StartupWMClass=org.freemac.Buoy
+StartupNotify=true
