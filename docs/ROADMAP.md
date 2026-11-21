@@ -671,6 +671,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Fix: the app's name under the icons was faint when the switcher didn't have the keyboard yet | Tack | done |
 | 5 | Guide: Q and H in Open and switch apps | Guide | done |
 
+## 1.61 "recent apps" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Up to three apps used lately that aren't kept in the Dock stay in it after they quit, newest first, after the open apps | Pier | done |
+| 2 | Options > Remove from Dock on a recent app, or drag it out of the Dock, takes it off; Keep in Dock keeps it | Pier | done |
+| 3 | Dials > Dock and Menu Bar: Show recent apps in Dock | Dials | done |
+| 4 | Guide: recent apps in Hide the Dock until you need it | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
