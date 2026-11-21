@@ -277,6 +277,11 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   narrower items), so choosing, opening, dragging and Glance work as they
   do in icon view; switching back moves it home. The large picture is the
   file itself for pictures, a PDF's first page, or its icon at 256 pixels.
+  **Preview pane** (1.54) sits right of the files in every view but
+  gallery (which already shows the file large). It uses the gallery's
+  picture widget and picture loader, and lists created and modified dates,
+  a folder's item count, a picture's size and the file's tags; with
+  nothing chosen it describes the open folder.
   **Status bar** (1.52): the label under the files counts the open
   folder's items (the last column's in column view) and the chosen ones,
   and adds the space left from `os.statvfs`; a message Drawer shows there

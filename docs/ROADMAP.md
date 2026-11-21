@@ -612,6 +612,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | The chosen files stay chosen when the view changes | Drawer | done |
 | 3 | Guide: ⌘4 in Find and organize files | Guide | done |
 
+## 1.54 "preview" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | View > Show Preview (⇧⌘P): a pane with a large picture of the chosen file, its name and kind, and an Information list (created, modified, items, dimensions, tags) | Drawer | done |
+| 2 | Guide: the Preview pane in Sort, find and put back files | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
