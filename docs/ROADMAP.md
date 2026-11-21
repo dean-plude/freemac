@@ -715,6 +715,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Invert colours with Control-Option-Command-8, switched on in Dials > Accessibility | Dials, Strata | done |
 | 3 | Guide: making the screen easier to see | Guide | done |
 
+## 1.66 "login items" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Login Items: the apps that open at login, with + to add one from a searchable list and − to take one off | Dials | done |
+| 2 | freemac's own apps (Quill, Chime and the rest) set to Open at Login now really open; before, they were skipped | Login items | done |
+| 3 | Chime's alarm watcher keeps its own entry, apart from Chime as a login item | Chime | done |
+| 4 | Guide: opening apps when you log in | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

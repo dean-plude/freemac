@@ -119,7 +119,17 @@ def ring_sound():
 
 def set_autostart(enabled):
     """Start Chime quietly at login only while an alarm is on."""
-    path = os.path.join(GLib.get_user_config_dir(), "autostart", "freemac-chime.desktop")
+    folder = os.path.join(GLib.get_user_config_dir(), "autostart")
+    path = os.path.join(folder, "freemac-chime-alarms.desktop")
+    # Before 1.66 this watcher used Chime's own name, which Login Items
+    # needs for Chime the app.
+    old = os.path.join(folder, "freemac-chime.desktop")
+    try:
+        with open(old) as f:
+            if "--background" in f.read():
+                os.remove(old)
+    except OSError:
+        pass
     if enabled:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:

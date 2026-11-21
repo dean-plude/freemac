@@ -17,8 +17,6 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 FOLDER = os.path.join(GLib.get_user_config_dir(), "autostart")
-# freemac's own parts start from wayfire.ini, not from here.
-OURS = "freemac-"
 
 
 def _path(desktop_id):
@@ -58,15 +56,17 @@ def set_on(desktop_id, on):
     return True
 
 
-def items():
-    """The desktop files set to open at login, by name."""
+def items(listed_only=False):
+    """The desktop files set to open at login, by name. listed_only leaves
+    out quiet helpers that aren't shown as apps (Chime's alarm watcher),
+    for Dials' list; they still open at login."""
     try:
         names = sorted(os.listdir(FOLDER))
     except OSError:
         return []
     found = []
     for name in names:
-        if not name.endswith(".desktop") or name.startswith(OURS):
+        if not name.endswith(".desktop"):
             continue
         try:
             info = Gio.DesktopAppInfo.new_from_filename(_path(name))
@@ -75,6 +75,8 @@ def items():
         if info is None or info.get_is_hidden():
             continue
         if not info.get_show_in(None):  # OnlyShowIn/NotShowIn, by XDG_CURRENT_DESKTOP
+            continue
+        if listed_only and info.get_nodisplay():
             continue
         found.append(info)
     return found

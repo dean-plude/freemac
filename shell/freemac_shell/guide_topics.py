@@ -500,6 +500,11 @@ TOPICS = {
         "top edge of the screen and it slides back down.",
         "It stays while the pointer is on it or one of its menus is open, and hides again when you move away.",
     ]),
+    "login-items": ("Open apps when you log in", "login items open at login startup start up launch automatically autostart", [
+        "Choose Dials > Login Items. The apps listed there open by themselves each time you log in.",
+        "Click + to choose an app to add, and \u2212 beside an app to stop it opening.",
+        "You can also right-click an app in the Dock and choose Options > Open at Login.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",
