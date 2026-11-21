@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Hull: a drive with a bar showing how full it is. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a6a80"/><stop offset="1" stop-color="#2c3646"/>
+    </linearGradient>
+    <linearGradient id="case" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6f9"/><stop offset="1" stop-color="#c9d0da"/>
+    </linearGradient>
+    <linearGradient id="fill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3fa0ff"/><stop offset="1" stop-color="#2a6fe0"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="22" y="34" width="84" height="62" rx="10" fill="#1b222c" opacity="0.35"/>
+  <rect x="22" y="30" width="84" height="62" rx="10" fill="url(#case)"/>
+  <path d="M22 70 H106 V82 a10 10 0 0 1 -10 10 H32 a10 10 0 0 1 -10 -10 Z" fill="#aab4c2" opacity="0.5"/>
+  <rect x="32" y="42" width="64" height="12" rx="6" fill="#dfe4ea"/>
+  <rect x="32" y="42" width="42" height="12" rx="6" fill="url(#fill)"/>
+  <circle cx="92" cy="80" r="4" fill="#3ccf6e"/>
+  <rect x="32" y="77" width="30" height="6" rx="3" fill="#7d8796"/>
+</svg>

@@ -88,6 +88,9 @@ mate-polkit
 # cards, GVfs reaches phones (MTP, and iPhones through usbmuxd) and cameras
 # (PTP), for Cove's import and for Drawer.
 udisks2
+# Erase in Hull can make ExFAT and MS-DOS (FAT) drives too.
+exfatprogs
+dosfstools
 gvfs
 gvfs-backends
 usbmuxd

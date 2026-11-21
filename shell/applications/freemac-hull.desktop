@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hull
+GenericName=Disk Utility
+Comment=See your drives and how full they are, and eject, rename or erase one
+Exec=freemac-hull
+Icon=freemac-hull
+Categories=System;Utility;
+Keywords=disk;utility;drive;usb;format;erase;eject;rename;partition;space;storage;
+StartupWMClass=org.freemac.Hull
+StartupNotify=true

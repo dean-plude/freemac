@@ -391,7 +391,7 @@ The small things a Mac user notices in their first minute.
 | --- | --- | --- | --- |
 | 1 | A video player: open a video from Drawer or the Videos folder, play, pause and scrub with controls that fade away, full screen, and pick up where you left off | Reel | done |
 | 2 | See what's using the processor and memory, app by app, with a small history graph, and quit one that's stuck | Gauge | done |
-| 3 | See every drive with its space used, and eject, rename or erase one | Hull | |
+| 3 | See every drive with its space used, and eject, rename or erase one | Hull | done |
 
 ## Later
 
