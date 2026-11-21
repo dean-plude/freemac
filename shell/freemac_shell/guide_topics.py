@@ -479,13 +479,15 @@ TOPICS = {
         "It stays up while the pointer is on it or one of its menus is open, and hides again when you move away.",
         "Press ⌥⌘D again to keep it on screen all the time.",
     ]),
-    "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info", [
+    "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
         "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",
         "Click a stack to spread its files out on the desktop, and click it again to gather them up.",
         "New files go straight into their stack, so a desktop full of screenshots stays tidy.",
         "With stacks off, Clean Up By Name, Kind or Date Modified puts every icon back in a neat order. "
         "Get Info (Command+I) tells you about a file.",
+        "Right-click the desktop and choose Show Item Info to see, under each name, how big a picture is "
+        "and how many items a folder holds.",
     ]),
     "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
         "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "
@@ -502,13 +504,15 @@ TOPICS = {
         "Press Control+Command+F or click the arrows at the top right to fill the screen. Press Space again "
         "to close Glance, or click Open to open the file.",
     ]),
-    "drawer-more": ("Sort, find and put back files", "drawer sort kind date size path bar go to folder open with put back trash empty finder", [
+    "drawer-more": ("Sort, find and put back files", "drawer sort kind date size path bar status bar space available free disk sidebar hide go to folder open with put back trash empty finder", [
         "Right-click an empty part of a Drawer window and choose Sort By to order files by name, kind, "
         "date modified or size. Drawer remembers your choice.",
         "Right-click a file and choose Open With to open it in another app, or Other… to pick any app.",
         "Choose Go > Go to Folder… (Shift+Command+G) and type where to go, such as ~/Documents. "
         "Press Tab to finish a name.",
         "Choose View > Show Path Bar (Option+Command+P) to see the folders above this one. Click one to go there.",
+        "The status bar at the bottom of the window shows how many items there are, how many you've selected "
+        "and how much space is left on the disk. Command+/ hides or shows it, and View > Show Sidebar hides the sidebar.",
         "In the Trash, right-click a file and choose Put Back (or press Command+Delete) to return it to its folder. "
         "Click Empty to erase everything in the Trash.",
     ]),

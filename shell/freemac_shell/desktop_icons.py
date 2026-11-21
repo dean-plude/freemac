@@ -61,6 +61,7 @@ CSS = b"""
 .desk-label { color: white; font-size: 12px; padding: 1px 5px; border-radius: 5px;
               text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
 .desk-label.selected { background-color: #2f7bf5; text-shadow: none; }
+.desk-info { color: #a8d4ff; font-size: 10px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
 .desk-icon.fanned { background-color: rgba(255, 255, 255, 0.16); }
 .desk-icon.stack-open { background-color: rgba(255, 255, 255, 0.28); }
 """
@@ -101,12 +102,38 @@ def load_places():
     return load_layout()[0]
 
 
-def save_places(places, stacks=False):
+def load_item_info():
+    """Whether the desktop shows a line of info under each name."""
+    try:
+        with open(LAYOUT) as f:
+            return bool(json.load(f).get("item_info", False))
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def save_places(places, stacks=False, item_info=False):
     os.makedirs(os.path.dirname(LAYOUT), exist_ok=True)
     tmp = LAYOUT + ".tmp"
     with open(tmp, "w") as f:
-        json.dump({"places": {k: list(v) for k, v in places.items()}, "stacks": bool(stacks)}, f, indent=1)
+        json.dump({"places": {k: list(v) for k, v in places.items()}, "stacks": bool(stacks),
+                   "item_info": bool(item_info)}, f, indent=1)
     os.replace(tmp, LAYOUT)
+
+
+def item_info(path, content_type):
+    """The line Show Item Info puts under a name: how many items a folder
+    holds, or a picture's width and height, as a Mac's desktop does."""
+    if os.path.isdir(path):
+        try:
+            count = sum(1 for n in os.listdir(path) if not n.startswith("."))
+        except OSError:
+            return ""
+        return f"{count} item{'s' if count != 1 else ''}"
+    if (content_type or "").startswith("image/"):
+        found = GdkPixbuf.Pixbuf.get_file_info(path)
+        if found and found[0] is not None and found[1] > 0:
+            return f"{found[1]} \u00d7 {found[2]}"
+    return ""
 
 
 def kind_of(name, path, content_type):
@@ -220,6 +247,12 @@ class DesktopIcon(Gtk.EventBox):
         self.title = name
         self.show_tags()
         box.pack_start(self.label, False, False, 0)
+        # Show Item Info: a picture's size, or how many items a folder holds.
+        self.info_label = Gtk.Label(justify=Gtk.Justification.CENTER, halign=Gtk.Align.CENTER)
+        self.info_label.get_style_context().add_class("desk-info")
+        self.info_label.set_no_show_all(True)
+        box.pack_start(self.info_label, False, False, 0)
+        self.show_info(getattr(owner, "item_info", False))
         self.add(box)
         self.connect("button-press-event", self._press)
         self.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, URI_TARGETS, Gdk.DragAction.MOVE | Gdk.DragAction.COPY)
@@ -238,6 +271,11 @@ class DesktopIcon(Gtk.EventBox):
             self.label.set_markup(tags.markup(self.title, names))
         else:
             self.label.set_text(self.title)
+
+    def show_info(self, on):
+        text = item_info(self.path, self.content_type) if on and self.path and type(self) is DesktopIcon else ""
+        self.info_label.set_text(text)
+        self.info_label.set_visible(bool(text))
 
     def set_selected(self, selected):
         for widget in (self.frame, self.label):
@@ -353,6 +391,7 @@ class DesktopIcons(Gtk.Layout):
             self.screen_size = (area.width, area.height)
         self.folder = desktop_dir()
         self.places, self.stacks_on = load_layout()
+        self.item_info = load_item_info()
         self.icons = {}           # file name -> DesktopIcon
         self.stack_icons = {}     # kind -> StackIcon, while stacks are on
         self.open_stacks = set()  # the kinds fanned out
@@ -390,15 +429,15 @@ class DesktopIcons(Gtk.Layout):
         return width, height
 
     def rows(self):
-        return max(1, (self.size()[1] - TOP - BOTTOM) // CELL_H)
+        return max(1, (self.size()[1] - TOP - BOTTOM) // self.cell_h)
 
     def cell_xy(self, cell):
         col, row = cell
-        return self.size()[0] - RIGHT - CELL_W * (col + 1), TOP + CELL_H * row
+        return self.size()[0] - RIGHT - CELL_W * (col + 1), TOP + self.cell_h * row
 
     def nearest_cell(self, x, y):
         col = round((self.size()[0] - RIGHT - CELL_W - x) / CELL_W)
-        row = round((y - TOP) / CELL_H)
+        row = round((y - TOP) / self.cell_h)
         return max(0, col), max(0, min(self.rows() - 1, row))
 
     def free_cell(self, taken, near=None):
@@ -531,6 +570,18 @@ class DesktopIcons(Gtk.Layout):
         self._arrange()
         self._save()
 
+    @property
+    def cell_h(self):
+        # The rows move apart to make room for Show Item Info's extra line.
+        return CELL_H + (14 if self.item_info else 0)
+
+    def set_item_info(self, on):
+        self.item_info = bool(on)
+        for icon in self.icons.values():
+            icon.show_info(self.item_info)
+        self._arrange()
+        self._save()
+
     def clean_up_by(self, how):
         """Put every icon back on the grid in order, from the top right down."""
         def modified(icon):
@@ -559,7 +610,7 @@ class DesktopIcons(Gtk.Layout):
 
     def _save(self):
         try:
-            save_places({k: v for k, v in self.places.items() if k in self.icons}, self.stacks_on)
+            save_places({k: v for k, v in self.places.items() if k in self.icons}, self.stacks_on, self.item_info)
         except OSError:
             pass
 
@@ -853,7 +904,8 @@ class DesktopIcons(Gtk.Layout):
                     ("Clean Up By Date Modified", lambda: self.clean_up_by("modified"))]
         items = [("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
                  ("Change Wallpaper…", self.change_wallpaper), ("Edit Widgets…", self.widgets.edit), (None, None),
-                 ("Use Stacks", (self.stacks_on, lambda: self.set_stacks(not self.stacks_on)))]
+                 ("Use Stacks", (self.stacks_on, lambda: self.set_stacks(not self.stacks_on))),
+                 ("Show Item Info", (self.item_info, lambda: self.set_item_info(not self.item_info)))]
         if not self.stacks_on:
             items += [(None, None)] + clean_up
         self.menu = self._menu(items, event)

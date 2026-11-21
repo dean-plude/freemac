@@ -370,6 +370,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         config = load_config()
         self.sort = config.get("sort") if config.get("sort") in dict(SORTS) else "name"
         self.path_bar_shown = bool(config.get("path_bar", False))
+        self.status_shown = bool(config.get("status_bar", True))
+        self.sidebar_shown = bool(config.get("sidebar", True))
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -407,7 +409,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
         paned = Gtk.Paned()
         self.add(paned)
-        paned.pack1(self._sidebar(), False, False)
+        self.side = self._sidebar()
+        self.side.set_no_show_all(not self.sidebar_shown)
+        paned.pack1(self.side, False, False)
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.tab_bar = Gtk.Box(spacing=4, homogeneous=True)
         self.tab_bar.get_style_context().add_class("drawer-tabs")
@@ -420,8 +424,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.path_bar.get_style_context().add_class("drawer-pathbar")
         self.path_bar.set_no_show_all(True)
         right.pack_start(self.path_bar, False, False, 0)
-        self.status = Gtk.Label(xalign=0)
+        # The status bar: how many items, how many are chosen, and the space
+        # left on the disk, as at the foot of a Finder window (View > Show
+        # Status Bar, ⌘/).
+        self.status = Gtk.Label(xalign=0.5, ellipsize=Pango.EllipsizeMode.MIDDLE)
         self.status.get_style_context().add_class("drawer-status")
+        self.status.set_no_show_all(not self.status_shown)
         right.pack_start(self.status, False, False, 0)
         paned.pack2(right, True, False)
         paned.set_position(190)
@@ -530,7 +538,47 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif self.view_mode == "list" and not across:
             self.list_view.emit("move-cursor", step, count)
 
+    def _status_text(self):
+        folder = getattr(self, "folder", None)
+        if folder is not None and folder.error:
+            return folder.error
+        model = None
+        if self.view_mode == "columns" and not self.in_virtual() and self.columns_box.get_children():
+            model = self.columns_box.get_children()[-1].view.get_model()
+        elif folder is not None:
+            model = self.icon_view.get_model()
+        count = len(model) if model is not None else 0
+        chosen = len(self.selected_paths())
+        text = f"{chosen} of {count} selected" if chosen else f"{count} item{'s' if count != 1 else ''}"
+        if not self.in_virtual() and self.path:
+            try:
+                disk = os.statvfs(self.path)
+                text += f", {GLib.format_size(disk.f_bavail * disk.f_frsize)} available"
+            except OSError:
+                pass
+        return text
+
+    def _show_status(self, *_args):
+        """The counts and free space, unless a message was just shown there."""
+        if time.monotonic() - self.told_at >= 4:
+            self.status.set_text(self._status_text())
+        return False
+
+    def _set_status_bar(self, shown):
+        self.status_shown = shown
+        save_setting("status_bar", shown)
+        self.status.set_visible(shown)
+
+    def _set_sidebar(self, shown):
+        self.sidebar_shown = shown
+        save_setting("sidebar", shown)
+        self.side.set_no_show_all(False)
+        self.side.set_visible(shown)
+        if shown:
+            self.side.show_all()
+
     def _selection_changed(self, *_args):
+        self._show_status()
         if self.glance and self.glance.get_visible():
             paths = self.selected_paths()
             if paths and paths != self.glance.paths:
@@ -835,6 +883,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             menus.add_actions(self, {name: lambda p=path or GLib.get_home_dir(): self.navigate(p)})
         self.hidden_action = menus.add_toggle(self, "show-hidden", False, self._set_hidden)
         self.path_bar_action = menus.add_toggle(self, "path-bar", self.path_bar_shown, self._set_path_bar)
+        self.status_bar_action = menus.add_toggle(self, "status-bar", self.status_shown, self._set_status_bar)
+        self.sidebar_action = menus.add_toggle(self, "sidebar", self.sidebar_shown, self._set_sidebar)
         # View › Sort By: one choice of four, kept for every window.
         self.sort_action = Gio.SimpleAction.new_stateful("sort-by", GLib.VariantType.new("s"),
                                                          GLib.Variant("s", self.sort))
@@ -1172,8 +1222,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
         if self.view_mode == "columns" and not self.in_virtual():
             self._reset_columns()
+        self._show_status()
         count = len(model)
-        self.status.set_text(folder.error or f"{count} item{'s' if count != 1 else ''}")
         # A tag's files come from many folders, so it has no columns: a list.
         self.content.set_visible_child_name("list" if self.in_virtual() and self.view_mode == "columns"
                                             else self.view_mode)
@@ -1245,6 +1295,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 return
 
     def _column_changed(self, selection, index):
+        GLib.idle_add(self._show_status)
         model, it = selection.get_selected()
         children = self.columns_box.get_children()
         for extra in children[index + 1:]:
@@ -1978,6 +2029,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.add_to_sidebar()
         elif ctrl and shift and key in (Gdk.KEY_g, Gdk.KEY_G):
             self.go_to_folder()
+        elif ctrl and key in (Gdk.KEY_slash, Gdk.KEY_question):
+            self.status_bar_action.change_state(GLib.Variant("b", not self.status_shown))
         elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_p, Gdk.KEY_P):
             self.path_bar_action.change_state(GLib.Variant("b", not self.path_bar_shown))
         elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
@@ -2020,7 +2073,8 @@ def menubar():
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),
              ("as Columns", "win.view-columns", "<Ctrl>3")],
             [("Sort by " + title, f"win.sort-by::{key}", None) for key, title in SORTS],
-            [("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
+            [("Show Sidebar", "win.sidebar", None), ("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
+             ("Show Status Bar", "win.status-bar", "<Ctrl>slash"),
              ("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
             [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),

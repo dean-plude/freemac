@@ -595,6 +595,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Screen zoom on or off, and the key to hold while scrolling (⌘, ⌥ or Control) | Dials | done |
 | 4 | Guide: Move & Resize in Arrange windows, and a new topic: Zoom in on the screen | Guide | done |
 
+## 1.52 "status bar" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Status bar: "2 of 15 selected, 1.4 GB available", View > Show Status Bar (⌘/) | Drawer | done |
+| 2 | View > Show Sidebar | Drawer | done |
+| 3 | Show Item Info on the desktop: a picture's size or a folder's item count under its name | Backdrop | done |
+| 4 | Guide: status bar, sidebar and Show Item Info | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
