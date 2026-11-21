@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Easel: a sheet of paper with colourful scribbles and a pencil. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf0"/>
+    </linearGradient>
+    <linearGradient id="pencil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb340"/><stop offset="1" stop-color="#ff9500"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+    <path d="M24 44 C36 26, 50 58, 64 36 S 86 30, 92 40" stroke="#007aff"/>
+    <path d="M26 72 C40 60, 48 84, 62 70" stroke="#ff2d55"/>
+    <circle cx="40" cy="96" r="9" stroke="#34c759"/>
+  </g>
+  <g transform="translate(96 64) rotate(40)">
+    <rect x="-7" y="-34" width="14" height="50" rx="2" fill="url(#pencil)"/>
+    <rect x="-7" y="-42" width="14" height="9" rx="3" fill="#ff8fa3"/>
+    <path d="M-7 16 L0 32 L7 16 Z" fill="#f3d3a1"/>
+    <path d="M-2.5 26.5 L0 32 L2.5 26.5 Z" fill="#3a3f4b"/>
+  </g>
+</svg>

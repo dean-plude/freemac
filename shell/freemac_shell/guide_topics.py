@@ -157,6 +157,16 @@ TOPICS = {
         "Recordings are kept in the Echo folder in Music. If Echo can't hear you, plug in a microphone "
         "or choose one in Dials > Sound.",
     ]),
+    "drawing": ("Draw a picture", "draw drawing paint sketch doodle pen easel art sticker", [
+        "Easel is for drawing. Press ⌘Space, type Easel and press Return.",
+        "Pick a pen, the highlighter or a shape at the top, then a colour and a size, and draw. "
+        "Hold Shift while you draw a shape for a perfect square, circle or straight line.",
+        "Click the smiley for stickers, or the A to type words. The eraser rubs out whatever it goes over.",
+        "Click the arrow to pick up something you drew and move it. Press Delete to throw it away. "
+        "⌘Z undoes your last change.",
+        "Your drawings are kept as you go and listed on the left. Click Export to save one as a picture "
+        "you can share.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

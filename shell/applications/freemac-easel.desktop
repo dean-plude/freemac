@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Easel
+GenericName=Drawing
+Comment=Draw and paint on a big canvas
+Exec=freemac-easel
+Icon=freemac-easel
+Categories=Graphics;2DGraphics;RasterGraphics;
+Keywords=draw;drawing;paint;sketch;doodle;pen;art;picture;
+StartupWMClass=org.freemac.Easel
+StartupNotify=true

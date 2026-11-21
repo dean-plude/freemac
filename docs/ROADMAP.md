@@ -406,7 +406,7 @@ The small things a Mac user notices in their first minute.
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
 | 1 | Record your voice: a big red button, a moving level, recordings listed with their length, play back, rename, trim the start and end, share to the Drawer | Echo | done |
-| 2 | Draw on a big canvas: pens, a highlighter, shapes, sticky text, stickers, an eraser, undo, saved as you go and exported as a picture | Easel | planned |
+| 2 | Draw on a big canvas: pens, a highlighter, shapes, sticky text, stickers, an eraser, undo, saved as you go and exported as a picture | Easel | done |
 | 3 | Play chess against the computer at a few levels, or with a friend on the same screen, with hints and undo | Rook | planned |
 
 ## Later
