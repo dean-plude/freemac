@@ -472,6 +472,14 @@ TOPICS = {
         "It stays up while the pointer is on it or one of its menus is open, and hides again when you move away.",
         "Press ⌥⌘D again to keep it on screen all the time.",
     ]),
+    "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info", [
+        "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
+        "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",
+        "Click a stack to spread its files out on the desktop, and click it again to gather them up.",
+        "New files go straight into their stack, so a desktop full of screenshots stays tidy.",
+        "With stacks off, Clean Up By Name, Kind or Date Modified puts every icon back in a neat order. "
+        "Get Info (Command+I) tells you about a file.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",

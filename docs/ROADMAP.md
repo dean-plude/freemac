@@ -516,6 +516,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | A hot corner can start the screen saver | Dials, corners | done |
 | 5 | Guide topic: Use a screen saver | Guide | done |
 
+## 1.44 "stacks" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Use Stacks: the Desktop's files pile up by kind (Images, Screenshots, Documents, PDF Documents, Movies, Music and more) | Backdrop | done |
+| 2 | A click fans a stack out in place and another gathers it; dragging a stack moves all its files; new files join their stack | Backdrop | done |
+| 3 | Clean Up By Name, Kind or Date Modified on the desktop's menu | Backdrop | done |
+| 4 | Get Info (⌘I and the right-click menu) on desktop files, shown under Drawer's name | Backdrop, Topline | done |
+| 5 | Guide topic: Tidy the desktop with stacks | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
