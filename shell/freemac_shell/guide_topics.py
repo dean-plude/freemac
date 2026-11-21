@@ -129,6 +129,16 @@ TOPICS = {
         "Double-click one to open it, or right-click it to move it to the Trash.",
         "If Pose says no camera is connected, plug one in. If another app is using the camera, quit it first.",
     ]),
+    "weather": ("See the weather", "weather forecast sky temperature rain snow sun hourly week celsius fahrenheit", [
+        "Sky shows the weather. Press ⌘Space, type Sky and press Return.",
+        "The first time, Sky shows the weather for the city of your time zone. Click + and type a city "
+        "or town to add more places, then click a place on the left to see its weather.",
+        "You'll see the temperature now, the next 24 hours, the next 10 days, and how it feels, the wind "
+        "and when the sun rises or sets.",
+        "To switch between °F and °C, choose View > Fahrenheit or View > Celsius. To remove a place, "
+        "right-click it and choose Remove.",
+        "Sky needs the internet. If it can't connect, it shows the last weather it got.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

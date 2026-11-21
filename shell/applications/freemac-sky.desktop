@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sky
+GenericName=Weather
+Comment=See the weather now, by the hour and for the next 10 days
+Exec=freemac-sky
+Icon=freemac-sky
+Categories=Utility;
+Keywords=weather;forecast;temperature;rain;snow;sun;
+StartupWMClass=org.freemac.Sky
+StartupNotify=true

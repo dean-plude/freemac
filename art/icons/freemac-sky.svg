@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Sky: a sun peeking out from behind a cloud on a blue tile. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f86e8"/><stop offset="1" stop-color="#7cc4f5"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#fff2a8"/><stop offset="1" stop-color="#ffc21a"/>
+    </radialGradient>
+    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe9f3"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#14457a" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g stroke="#ffd34d" stroke-width="5" stroke-linecap="round">
+    <path d="M50 22 V30"/><path d="M26 46 H34"/><path d="M33 29 L39 35"/>
+    <path d="M67 29 L61 35"/><path d="M33 63 L39 57"/>
+  </g>
+  <circle cx="50" cy="46" r="15" fill="url(#sun)"/>
+  <path d="M40 96 Q24 96 24 82 Q24 68 39 68 Q42 52 60 52 Q76 52 81 66 Q84 64 88 64 Q104 64 104 80 Q104 96 88 96 Z"
+        fill="url(#cloud)" filter="url(#soft)"/>
+</svg>
