@@ -21,11 +21,12 @@ TOPICS = {
         "- ⌘W closes the window and ⌘Q quits the app.",
         "With a Mac keyboard, choose Dials > Keyboard and make the Windows key Command.",
     ]),
-    "apps": ("Open and switch apps", "launch start open app switch tab dock marina launcher", [
+    "apps": ("Open and switch apps", "launch start open app switch tab dock marina launcher quit hide", [
         "Click an app in the Dock, or press ⌘Space and type the first letters of its name, then Return.",
         "Press F4 for every app on one screen. Drag an app onto another to make a folder.",
         "To switch apps, hold ⌘ and press Tab until the app you want is chosen, then let go. "
-        "⌘` goes to the app's next window.",
+        "⌘` goes to the app's next window. While the switcher is up, press Q to quit the chosen app "
+        "or H to hide it.",
         "An app stays open after its last window closes, with a dot under it in the Dock. "
         "⌘Q quits it.",
     ]),

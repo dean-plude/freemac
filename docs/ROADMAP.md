@@ -661,6 +661,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Fix: after hiding was turned off, the Dock ignored the pointer until it was restarted | Pier | done |
 | 4 | Guide: the Dock's menus in Hide the Dock until you need it | Guide | done |
 
+## 1.60 "switcher keys" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | While ⌘Tab's switcher is up, Q quits the chosen app and takes it out of the row | Tack | done |
+| 2 | H hides the chosen app; hidden apps show dimmed in the switcher | Tack | done |
+| 3 | Choosing a hidden app brings all its windows back, not just one | Tack | done |
+| 4 | Fix: the app's name under the icons was faint when the switcher didn't have the keyboard yet | Tack | done |
+| 5 | Guide: Q and H in Open and switch apps | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
