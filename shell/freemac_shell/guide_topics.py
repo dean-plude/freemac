@@ -234,13 +234,16 @@ TOPICS = {
         "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
         "Press Return for the next lesson.",
     ]),
-    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time", [
+    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time "
+                   "adult websites content filter block sites family safe", [
         "Logbook shows how long each app was used. Press ⌘Space, type Logbook and press Return.",
         "Today shows each hour of the day, and Last 7 Days shows each day of the week, with the apps used most "
         "at the top. Time only counts while someone is using the computer, not while it's locked or left alone.",
         "To limit an app, click Set Limit beside it and choose how long it may be used each day. Five minutes "
         "before the time is up a notice says so, and at the limit its windows close until the next day.",
         "Choose Limits ▸ Passcode… to set a passcode, so that only someone who knows it can change a limit.",
+        "Turn on Limit adult websites, under Content, to keep websites for grown-ups from opening in any browser "
+        "on the computer. It needs an administrator's password, and the passcode if there is one.",
     ]),
     "sudoku": ("Play a number puzzle", "sudoku nine number puzzle game logic grid", [
         "Nine is a number puzzle. Press ⌘Space, type Nine and press Return.",

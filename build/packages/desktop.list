@@ -31,6 +31,9 @@ dconf-service
 # Networking (wired and Wi-Fi) and the permission service it uses.
 network-manager
 polkitd
+# Runs freemac's small root helpers (Users, Restart in Recovery, Limit adult
+# websites) after an administrator's password; Ubuntu ships it on its own.
+pkexec
 # Everyday apps we ship but don't write: text editor, image viewer, web browser.
 gir1.2-gtksource-4
 grim

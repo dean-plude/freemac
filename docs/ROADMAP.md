@@ -740,6 +740,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | An amount alone converts between metric and US units; "in" or "to" picks the unit | Seek | done |
 | 3 | Guide: conversions in Search with Seek | Guide | done |
 
+## 1.69 "content limits" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Logbook > Content: Limit adult websites, for every browser and everyone on the computer (Cloudflare for Families name lookups), behind an administrator's password and Logbook's passcode | Logbook | done |
+| 2 | pkexec is now installed, so the administrator password prompt works for Users, Restart in Recovery and this | Build | done |
+| 3 | Guide: Limit adult websites in screen time | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
