@@ -97,6 +97,10 @@ openssl
 avahi-daemon
 libnss-mdns
 openssh-server
+# File Sharing (Dials > Sharing) shares the Public folder with Samba; wsdd-server
+# lets Windows find this computer. Both start off.
+samba
+wsdd-server
 power-profiles-daemon
 # Night light (warmer colours in the evening) through Wayland's gamma control
 wlsunset

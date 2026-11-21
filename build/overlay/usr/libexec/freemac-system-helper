@@ -5,6 +5,7 @@
 #   freemac-system-helper firewall on|off       Network > Firewall
 #   freemac-system-helper auto-updates on|off   Software Update > Automatic updates
 #   freemac-system-helper remote-login on|off   Sharing > Remote Login (SSH)
+#   freemac-system-helper file-sharing on|off   Sharing > File Sharing (SMB)
 #   freemac-system-helper computer-name NAME    Sharing > Computer name
 set -e
 LANS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
@@ -23,6 +24,26 @@ ssh_firewall() {
     else
       ufw delete allow in proto tcp from "$net" to any port 22 >/dev/null 2>&1 || true
     fi
+  done
+}
+
+smb_on() {
+  [ -e /etc/systemd/system/multi-user.target.wants/smbd.service ]
+}
+
+# File Sharing through the firewall, from this network only: SMB, and WS-Discovery
+# so Windows finds the computer.
+smb_firewall() {
+  command -v ufw >/dev/null || return 0
+  for net in $LANS; do
+    for rule in tcp:445 udp:3702 tcp:5357; do
+      proto=${rule%%:*} port=${rule#*:}
+      if [ "$1" = allow ]; then
+        ufw allow in proto "$proto" from "$net" to any port "$port" comment 'freemac: file sharing' >/dev/null
+      else
+        ufw delete allow in proto "$proto" from "$net" to any port "$port" >/dev/null 2>&1 || true
+      fi
+    done
   done
 }
 
@@ -63,6 +84,7 @@ case "$1 $2" in
       ufw allow in proto tcp from "$net" to any port 53317 comment 'freemac: nearby sharing' >/dev/null
     done
     if ssh_on; then ssh_firewall allow; fi
+    if smb_on; then smb_firewall allow; fi
     ufw --force enable >/dev/null
     ;;
   "firewall off")
@@ -84,12 +106,49 @@ CONF
     systemctl enable --now ssh.service >/dev/null
     ssh_firewall allow
     ;;
+  "file-sharing on")
+    # The Public folder of whoever asked (pkexec says who), for anyone on the
+    # network to read, without a password, as a Mac shares it.
+    user=$(id -nu "${PKEXEC_UID:?}") || { echo "Can't tell who asked." >&2; exit 2; }
+    home=$(getent passwd "$user" | cut -d: -f6)
+    [ -d "$home" ] || { echo "$user has no home folder." >&2; exit 2; }
+    if [ ! -d "$home/Public" ]; then
+      install -d -o "$user" -g "$(id -gn "$user")" "$home/Public"
+    fi
+    cat > /etc/samba/freemac.conf <<CONF
+# freemac: Dials > Sharing > File Sharing. Rewritten each time it's turned on.
+# Read from smb.conf's [global], so the first lines are global: other computers
+# see this one by its own name (Deans-freemac), not in capitals.
+   mdns name = mdns
+   server string = %h
+
+[Public]
+   comment = $user's Public folder
+   path = $home/Public
+   browseable = yes
+   read only = yes
+   guest ok = yes
+   guest only = yes
+   force user = $user
+CONF
+    if ! grep -q '^include = /etc/samba/freemac.conf' /etc/samba/smb.conf; then
+      sed -i '0,/^\[global\]/s//[global]\n# freemac: Dials > Sharing > File Sharing\ninclude = \/etc\/samba\/freemac.conf/' /etc/samba/smb.conf
+    fi
+    systemctl enable smbd.service >/dev/null 2>&1
+    systemctl restart smbd.service
+    systemctl enable --now wsdd-server.service >/dev/null 2>&1 || true
+    smb_firewall allow
+    ;;
+  "file-sharing off")
+    systemctl disable --now smbd.service nmbd.service wsdd-server.service >/dev/null 2>&1 || true
+    smb_firewall delete
+    ;;
   "remote-login off")
     systemctl disable --now ssh.socket ssh.service >/dev/null 2>&1 || true
     ssh_firewall delete
     ;;
   *)
-    echo "usage: freemac-system-helper firewall|auto-updates|remote-login on|off, or computer-name NAME" >&2
+    echo "usage: freemac-system-helper firewall|auto-updates|remote-login|file-sharing on|off, or computer-name NAME" >&2
     exit 2
     ;;
 esac

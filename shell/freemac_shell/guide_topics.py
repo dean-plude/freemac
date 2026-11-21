@@ -468,7 +468,17 @@ TOPICS = {
         "The folder opens like a drive and shows under Locations in the sidebar; click its Eject button when "
         "you're done. Click + to keep an address in Favourite Servers for next time.",
         "Or click Network under Locations (Go > Network, \u21e7\u2318K) to see the computers and shared "
-        "drives nearby, and double-click one to open it.",
+        "drives nearby, and double-click one to open it. A computer that shares several folders shows "
+        "them; double-click the one you want.",
+    ]),
+    "filesharing": ("Share a folder with the other computers at home", "file sharing share folder public network windows mac computers family smb samba guest read only kids pc", [
+        "Choose Dials > Sharing and turn on File Sharing; you're asked for an administrator's password. "
+        "Put whatever you want to share in the Public folder in your home folder (Open Public Folder "
+        "takes you there).",
+        "On another freemac or a Mac, it shows in Network under this computer's name. On Windows, type "
+        "two backslashes, the computer's name and \\Public in File Explorer's address bar. No password is "
+        "needed; they can open and copy what's there, but can't change or delete anything.",
+        "Turn File Sharing off when you don't need it.",
     ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "

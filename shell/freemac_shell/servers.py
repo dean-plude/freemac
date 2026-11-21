@@ -16,6 +16,9 @@ from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 SCHEMES = ("smb", "sftp", "ssh", "ftp", "ftps", "dav", "davs", "afp", "nfs")
 FAVOURITES = os.path.expanduser("~/.config/freemac/servers.json")
+# A server that answered but has no one folder to open, such as a Windows or
+# Mac computer that shares several: the caller shows its shared folders.
+NO_FOLDER = "no-folder"
 
 
 def normalise(address):
@@ -96,6 +99,19 @@ def connect(uri, parent, done, name=None):
     call done(path, None) or done(None, message)."""
     gfile = Gio.File.new_for_uri(uri)
     operation = Gtk.MountOperation(parent=parent)
+    tried_guest = []
+
+    def ask_password(op, _message, _user, _domain, flags):
+        # A folder shared for everyone (such as freemac's File Sharing) opens
+        # as a guest without asking; only if that's refused does the sign-in
+        # ask for a name and password.
+        if tried_guest or not flags & Gio.AskPasswordFlags.ANONYMOUS_SUPPORTED:
+            return
+        tried_guest.append(True)
+        op.stop_emission_by_name("ask-password")
+        op.set_anonymous(True)
+        op.reply(Gio.MountOperationResult.HANDLED)
+    operation.connect("ask-password", ask_password)
 
     def finished(source, result, _data):
         try:
@@ -110,12 +126,12 @@ def connect(uri, parent, done, name=None):
                 done(None, explain(uri, error, name))
                 return
         path = path_for(source)
-        done(path, None if path else "It connected, but its files can't be opened as a folder.")
+        done(path, None if path else NO_FOLDER)
 
     gfile.mount_enclosing_volume(Gio.MountMountFlags.NONE, operation, None, finished, None)
 
 
-def connect_dialog(parent, open_path):
+def connect_dialog(parent, open_path, open_server=None):
     """The Connect to Server window: an address, Favourite Servers, Connect."""
     dialog = Gtk.Dialog(title="Connect to Server", transient_for=parent, modal=True)
     dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
@@ -201,6 +217,11 @@ def connect_dialog(parent, open_path):
             if path:
                 dialog.destroy()
                 open_path(path)
+            elif problem == NO_FOLDER and open_server:
+                dialog.destroy()
+                open_server(uri)
+            elif problem == NO_FOLDER:
+                status.set_text("Type the shared folder's name after the computer's, such as smb://office-pc/Photos.")
             elif problem is not None:
                 status.set_text(problem or "Not connected.")
                 entry.grab_focus()
@@ -209,6 +230,32 @@ def connect_dialog(parent, open_path):
 
     dialog.connect("response", answered)
     return dialog
+
+
+NAMES = {}                    # a connected folder's path -> the name it was opened by
+
+
+def title(mount):
+    """What to call a connected server or shared folder: the name it was
+    opened by in Network ("Public"), else the share or server's own name."""
+    root = mount.get_root().get_path() or ""
+    if root in NAMES:
+        return NAMES[root]
+    base = os.path.basename(root)
+    if base.startswith("smb-share:"):
+        fields = dict(f.split("=", 1) for f in base.split(":", 1)[1].split(",") if "=" in f)
+        if fields.get("share"):
+            return fields["share"]
+    name = mount.get_name()
+    return name.split(" on ", 1)[0] if " on " in name else name
+
+
+def title_of(path):
+    """The title for a folder that is a connected server's top, else None."""
+    mount = mount_of(path)
+    if mount and mount.get_root().get_path() == path:
+        return title(mount)
+    return None
 
 
 def mount_of(path):

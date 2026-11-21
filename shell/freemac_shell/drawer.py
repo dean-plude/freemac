@@ -226,10 +226,11 @@ class Folder:
                 except GLib.Error:
                     continue
                 self._add(info, full)
-        elif path == neighbours.PLACE:
-            # Network: the computers nearby, found as they answer.
+        elif neighbours.is_place(path):
+            # Network: the computers nearby, found as they answer (or the
+            # folders one computer shares).
             self.browsing, self.on_change = True, None
-            neighbours.browse(self._add_neighbour, self._browsed)
+            neighbours.browse(self._add_neighbour, self._browsed, uri=neighbours.uri_of(path))
         elif path.startswith(tags.PREFIX):
             # A tag in the sidebar: every file with that tag, wherever it is.
             for full in tags.tagged(path[len(tags.PREFIX):]):
@@ -616,11 +617,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return path[len(tags.PREFIX):]
         if path == recents.PLACE:
             return "Recents"
-        if path == neighbours.PLACE:
-            return "Network"
+        if neighbours.is_place(path):
+            return neighbours.title(path)
         if path and os.path.realpath(path) == os.path.realpath(TRASH):
             return "Trash"
-        return os.path.basename(path) or "Computer"
+        return servers.title_of(path) or os.path.basename(path) or "Computer"
 
     # ---- Glance (Space) -------------------------------------------------
     def toggle_glance(self):
@@ -655,9 +656,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif folder is not None:
             model = self.icon_view.get_model()
         count = len(model) if model is not None else 0
-        if self.path == neighbours.PLACE and not count:
-            return ("Looking for computers\u2026" if folder is not None and folder.browsing
-                    else "No shared computers found on this network")
+        if neighbours.is_place(self.path) and not count:
+            if folder is not None and folder.browsing:
+                return "Looking\u2026"
+            return ("No shared computers found on this network" if self.path == neighbours.PLACE
+                    else "This computer shares no folders you can open")
         chosen = len(self.selected_paths())
         text = f"{chosen} of {count} selected" if chosen else f"{count} item{'s' if count != 1 else ''}"
         if not self.in_virtual() and self.path:
@@ -925,8 +928,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.monitor.cancel()
             self.monitor = None
         self.watched = self.path
-        if self.path == neighbours.PLACE:
-            self.monitor = neighbours.watch(self._changed_soon)
+        if neighbours.is_place(self.path):
+            self.monitor = neighbours.watch(self._changed_soon, neighbours.uri_of(self.path))
             return
         if self.in_virtual():
             return   # files from all over; changed tags refresh it themselves
@@ -1088,7 +1091,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         for mount in volumes.drives():
             entries.append((mount.get_name(), volumes.path_of(mount), mount.get_symbolic_icon(), mount))
         for mount in servers.servers():
-            entries.append((mount.get_name(), volumes.path_of(mount),
+            entries.append((servers.title(mount), volumes.path_of(mount),
                             Gio.ThemedIcon.new("network-server-symbolic"), mount))
         entries.append(("Trash", trash, Gio.ThemedIcon.new("user-trash-symbolic"), None))
         for name, path, icon, mount in entries:
@@ -1130,7 +1133,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def in_virtual(self):
         """A tag or Recents: files gathered from all over, not one folder."""
-        return self.in_tag() or self.path in (recents.PLACE, neighbours.PLACE)
+        return self.in_tag() or self.path == recents.PLACE or neighbours.is_place(self.path)
 
     def _tags_changed(self, error, keep):
         if error is not None:
@@ -1462,7 +1465,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- navigation -----------------------------------------------------
     def navigate(self, path, remember=True):
-        if not path.startswith(tags.PREFIX) and path not in (recents.PLACE, neighbours.PLACE):
+        if not path.startswith(tags.PREFIX) and path != recents.PLACE and not neighbours.is_place(path):
             path = os.path.abspath(os.path.expanduser(path))
         if remember and self.path and path != self.path:
             self.history.append(self.path)
@@ -1492,7 +1495,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._show_place()
         folder = Folder(self.path, self.show_hidden, self.sort, self.icon_size, self.item_info_shown)
         self.folder = folder
-        if self.path == neighbours.PLACE:
+        if neighbours.is_place(self.path):
             folder.on_change = lambda: self.folder is folder and self._show_status()
         model = self._model(folder)
         self.icon_view.set_model(model)
@@ -1512,7 +1515,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.empty_button.set_sensitive(in_trash and count > 0)
         self.lookup_action("put-back").set_enabled(in_trash)
         self.lookup_action("new-folder-with").set_enabled(not self.in_virtual() and not in_trash)
-        self.lookup_action("show-enclosing").set_enabled(self.in_virtual() and self.path != neighbours.PLACE)
+        self.lookup_action("show-enclosing").set_enabled(self.in_virtual() and not neighbours.is_place(self.path))
         self._draw_path_bar()
         self._watch()
 
@@ -2009,8 +2012,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         path = self.path
         if path == recents.PLACE:
             crumbs = [("Recents", path, "document-open-recent-symbolic")]
-        elif path == neighbours.PLACE:
-            crumbs = [("Network", path, "network-workgroup-symbolic")]
+        elif neighbours.is_place(path):
+            crumbs = [("Network", neighbours.PLACE, "network-workgroup-symbolic")]
+            if path != neighbours.PLACE:
+                crumbs.append((neighbours.title(path), path, "network-server-symbolic"))
         elif self.in_virtual():
             crumbs = [(self._label(path), path, None)]
         elif self.in_trash():
@@ -2018,6 +2023,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif path == home or path.startswith(home.rstrip(os.sep) + os.sep):
             crumbs = [("Home", home, "user-home-symbolic")]
             base = home
+        elif servers.mount_of(path):
+            # A connected server: from its top, not from where it's kept.
+            mount = servers.mount_of(path)
+            base = mount.get_root().get_path()
+            crumbs = [(servers.title(mount), base, "network-server-symbolic")]
         else:
             crumbs = [("Computer", "/", "drive-harddisk-symbolic")]
             base = "/"
@@ -2049,15 +2059,25 @@ class DrawerWindow(Gtk.ApplicationWindow):
     # ---- Connect to Server -----------------------------------------------
     def connect_to_server(self):
         """⌘K: open a shared folder on another computer, like a drive."""
-        servers.connect_dialog(self, self.navigate)
+        servers.connect_dialog(self, self.navigate, lambda uri: self.navigate(neighbours.place_for(uri)))
 
     def connect_to(self, address, name=None):
-        """Open a computer from the Network place: sign in if it asks."""
+        """Open a computer from the Network place: sign in if it asks. One
+        that shares several folders shows them, to pick one."""
         self.notify("Connecting\u2026")
+        if name:
+            neighbours.NAMES[address] = name
 
         def done(path, problem):
+            if path or problem == servers.NO_FOLDER:
+                self.told_at = 0          # "Connecting…" is over
             if path:
+                if name:
+                    servers.NAMES.setdefault(path, name)
+                self._fill_locations()
                 self.navigate(path)
+            elif problem == servers.NO_FOLDER:
+                self.navigate(neighbours.place_for(address))
             elif problem:
                 self.notify(problem)
         servers.connect(address, self, done, name)
@@ -2273,7 +2293,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self._reset_columns()
 
     def _menu(self, event):
-        if self.path == neighbours.PLACE:
+        if neighbours.is_place(self.path):
             self._network_menu(event)
             return
         menu = Gtk.Menu()

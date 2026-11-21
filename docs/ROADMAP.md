@@ -893,6 +893,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Open one to connect, signing in if it asks; Connect and Connect to Server… on right-click | Drawer | done |
 | 3 | Errors name the computer ("There was a problem connecting to the server “Kids PC”…") | Drawer | done |
 
+## 1.85 "open house" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File Sharing in Dials > Sharing: share your Public folder, read-only and with no password, with the other computers on the network (Windows, Mac and freemac) | Dials, system helper | done |
+| 2 | Open Public Folder button while it's on; the firewall lets it through to the local network only | Dials, system helper | done |
+| 3 | A computer in Network that shares several folders lists them; hidden admin shares (print$, C$) stay hidden | Drawer | done |
+| 4 | A folder shared for everyone opens as a guest without a password dialog, and is titled by its own name | Drawer | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
