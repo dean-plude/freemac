@@ -495,6 +495,16 @@ TOPICS = {
         "or press Command+J. Slide Icon size and Grid spacing, pick a Text size, and click Use Defaults "
         "to go back to how it was.",
     ]),
+    "notifications": ("Manage notifications and Do Not Disturb", "notifications notification centre center banners alerts do not disturb quiet schedule night sleep focus mute app", [
+        "Click the date and time in the menu bar to open the notification centre. Several notifications "
+        "from one app sit in a stack: click it to see them all, and click the x beside the app's name to "
+        "clear them.",
+        "Do Not Disturb hides banners, while notifications still collect in the centre. Turn it on with the "
+        "switch there, or have it come on by itself every day: open Dials > Notifications, turn on "
+        "Turn on at set times and choose the hours, for example 22:00 to 07:00.",
+        "In Dials > Notifications each app that has sent a notification has its own choice: Banners, "
+        "In Notification Centre only, or Off.",
+    ]),
     "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
         "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "
         "a calendar, the weather or your reminders.",

@@ -12,7 +12,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, quick, status, style  # noqa: E402
+from . import apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, notify_rules, quick, status, style  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -358,10 +358,12 @@ class Topline(Gtk.Window):
 
     def _prefs_changed(self, *_args):
         self._show_time()
-        self.dnd.set_visible(bool(style.prefs().get("dnd")))
 
     def _show_time(self, *_args):
         prefs = style.prefs()
+        # The moon shows while Do Not Disturb is on, by hand or by its schedule,
+        # which the clock's tick keeps up to date.
+        self.dnd.set_visible(notify_rules.quiet(prefs))
         self.clock.set_text(time.strftime(dials_time.clock_format(prefs), time.localtime()))
         if prefs.get("clock_seconds") != self._seconds:
             # Seconds on: tick every second; off: on each minute.
