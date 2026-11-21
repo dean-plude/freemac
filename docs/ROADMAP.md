@@ -759,6 +759,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Shift-Command-Q logs out (asking first); Dials > Battery and Power's buttons ask the same way | Session, Dials | done |
 | 6 | Guide: Restart, shut down or log out | Guide | done |
 
+## 1.71 "updates and firewall" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Software Update: the freemac version, Check for Updates… (opens Harbor's Updates) and "Install important updates automatically" (security fixes in the background through unattended-upgrades), on by default | Dials | done |
+| 2 | Dials > Network > Firewall: turns away connections other computers start (ufw), still letting printers and phones on the same network be found; off by default, as on a Mac | Dials | done |
+| 3 | One root helper and polkit action for both switches, so each asks for an administrator's password | Build | done |
+| 4 | freemac's own Software Update icon | Art | done |
+| 5 | Guide: Keep the computer up to date and safe | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

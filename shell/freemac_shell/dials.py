@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
+from . import dials_accounts, dials_backup, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -357,6 +357,8 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_more.notifications(self)),
             (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
             (2, "about", "About", "help-about-symbolic", "gray", self.about),
+            (2, "softwareupdate", "Software Update", "freemac-software-update-symbolic", "gray",
+             lambda: dials_update.software_update_page(self)),
             (2, "datetime", "Date & Time", "preferences-system-time-symbolic", "blue",
              lambda: dials_time.DateTimePanel(self, page)),
             (2, "appearance", "Appearance", "preferences-desktop-appearance-symbolic", "dark", self.appearance),
@@ -914,7 +916,7 @@ MENU_PANELS = (
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
     (("network", "Network"), ("accessibility", "Accessibility"), ("users", "Users"),
-     ("loginitems", "Login Items"), ("about", "About")),
+     ("loginitems", "Login Items"), ("softwareupdate", "Software Update"), ("about", "About")),
 )
 
 

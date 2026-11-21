@@ -525,6 +525,14 @@ TOPICS = {
         "stops and tells you which one.",
         "Recent Items in the same menu lists the apps and documents you used lately. Clear Menu empties it.",
     ]),
+    "stay-safe": ("Keep the computer up to date and safe", "software update updates security fixes automatic firewall block incoming connections protect safe virus", [
+        "Choose Dials > Software Update. Check for Updates\u2026 shows what's new in Harbor, where you install it.",
+        "Leave Install important updates automatically on, and security fixes are put in by themselves in "
+        "the background.",
+        "To turn away connections that other computers try to start, choose Dials > Network and turn on Firewall. "
+        "Browsing, mail and printing carry on as usual.",
+        "Both switches ask for an administrator's password.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

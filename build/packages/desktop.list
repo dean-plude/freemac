@@ -32,8 +32,13 @@ dconf-service
 network-manager
 polkitd
 # Runs freemac's small root helpers (Users, Restart in Recovery, Limit adult
-# websites) after an administrator's password; Ubuntu ships it on its own.
+# websites, Firewall, Automatic updates) after an administrator's password;
+# Ubuntu ships it on its own.
 pkexec
+# Network > Firewall (turns away connections other computers start) and
+# Software Update > Install important updates automatically.
+ufw
+unattended-upgrades
 # Everyday apps we ship but don't write: text editor, image viewer, web browser.
 gir1.2-gtksource-4
 grim

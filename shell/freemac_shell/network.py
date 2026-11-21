@@ -4,12 +4,15 @@
 Uses libnm over D-Bus, so Wi-Fi passwords go straight to NetworkManager and
 never appear on a command line.
 """
+import os
 import subprocess
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
+
+from . import admin_switch  # noqa: E402
 
 try:
     gi.require_version("NM", "1.0")
@@ -81,6 +84,18 @@ class NetworkPanel(Gtk.Box):
         return False
 
     def sections(self):
+        return self.network_sections() + self.firewall_sections()
+
+    def firewall_sections(self):
+        """Network > Firewall, as on a Mac: turns away connections that other
+        computers start. Changing it asks for an administrator's password."""
+        if not os.path.exists("/usr/sbin/ufw") or not os.path.exists(admin_switch.SYSTEM_HELPER):
+            return []
+        return [self.group(self.row("Firewall", admin_switch.firewall_switch(),
+                                    "Turns away connections that other computers try to start. "
+                                    "Browsing, mail and everything this computer starts carry on as usual."))]
+
+    def network_sections(self):
         if not self.client:
             return [self.group(*self.fallback_rows())]
         wired, wifi = [], []

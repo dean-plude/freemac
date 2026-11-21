@@ -1,0 +1,36 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Dials' switches that change the whole computer, run as root through pkexec
+# after an administrator's password:
+#   freemac-system-helper firewall on|off       Network > Firewall
+#   freemac-system-helper auto-updates on|off   Software Update > Automatic updates
+set -e
+case "$1 $2" in
+  "firewall on")
+    # Turn away connections that other computers start; the computer's own
+    # (browsing, mail, updates) carry on as before.
+    ufw default deny incoming >/dev/null
+    ufw default allow outgoing >/dev/null
+    # Except the local network's own "who's there?" (mDNS), so printers,
+    # scanners and phones on the same Wi-Fi are still found.
+    ufw allow in proto udp to 224.0.0.251 port 5353 comment 'freemac: find printers and phones' >/dev/null
+    ufw allow in proto udp to ff02::fb port 5353 comment 'freemac: find printers and phones' >/dev/null 2>&1 || true
+    ufw --force enable >/dev/null
+    ;;
+  "firewall off")
+    ufw disable >/dev/null
+    ;;
+  "auto-updates on"|"auto-updates off")
+    value=1
+    [ "$2" = off ] && value=0
+    cat > /etc/apt/apt.conf.d/20auto-upgrades <<CONF
+// freemac: Dials > Software Update > Install important updates automatically.
+APT::Periodic::Update-Package-Lists "$value";
+APT::Periodic::Unattended-Upgrade "$value";
+CONF
+    ;;
+  *)
+    echo "usage: freemac-system-helper firewall|auto-updates on|off" >&2
+    exit 2
+    ;;
+esac

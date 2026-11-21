@@ -10,6 +10,7 @@ PAGES = {
     "notifications": ("Notifications", "preferences-system-notifications-symbolic"),
     "sound": ("Sound", "audio-volume-high-symbolic"),
     "about": ("About", "help-about-symbolic"),
+    "softwareupdate": ("Software Update", "freemac-software-update-symbolic"),
     "datetime": ("Date & Time", "preferences-system-time-symbolic"),
     "appearance": ("Appearance", "preferences-desktop-appearance-symbolic"),
     "accessibility": ("Accessibility", "preferences-desktop-accessibility-symbolic"),
@@ -29,11 +30,12 @@ PAGES = {
 
 # Other words people use for what's on each page, for the sidebar's search.
 SEARCH_WORDS = {
-    "network": "wifi wi-fi internet wireless ethernet vpn proxy",
+    "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections",
     "bluetooth": "pair headphones speaker mouse keyboard",
     "notifications": "alerts banners do not disturb focus",
     "sound": "volume speaker microphone output input audio alert chime",
     "about": "version computer name storage memory system update",
+    "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode theme accent text size tiling",
     "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors",
