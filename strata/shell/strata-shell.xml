@@ -28,7 +28,7 @@
 		<option name="quit_whole_apps" type="string">
 			<_short>Apps that stay open</_short>
 			<_long>Apps that keep running with no window, as app-id=bus.name pairs separated by spaces; Quit asks them to quit over D-Bus instead of closing their windows.</_long>
-			<default>freemac-quill=org.freemac.Quill freemac-jot=org.freemac.Jot freemac-tide=org.freemac.Tide freemac-crew=org.freemac.Crew freemac-nudge=org.freemac.Nudge freemac-post=org.freemac.Post freemac-cove=org.freemac.Cove</default>
+			<default>freemac-quill=org.freemac.Quill freemac-jot=org.freemac.Jot freemac-tide=org.freemac.Tide freemac-crew=org.freemac.Crew freemac-nudge=org.freemac.Nudge freemac-post=org.freemac.Post freemac-cove=org.freemac.Cove freemac-shanty=org.freemac.Shanty</default>
 		</option>
 		<option name="hide_app" type="activator">
 			<_short>Hide the app</_short>

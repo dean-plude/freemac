@@ -161,6 +161,35 @@ TOPICS = {
         "copy is removed.",
         "Changed your mind? ⌘Z (Edit > Undo) takes back the last move, copy, rename, new folder or Move to Trash.",
     ]),
+    "music": ("Play your music", "music songs album artist play shuffle repeat mp3 shanty itunes playlist", [
+        "Shanty plays the music in your Music folder. Click it in the Dock. It finds new songs each time it opens.",
+        "To add songs, drag them or their folder onto Shanty's window, or choose File > Add to Library…. "
+        "They're copied into your Music folder.",
+        "Albums, Artists, Songs and Recently Added are in the sidebar. Double-click a song or an album to play it.",
+        "- Space plays and pauses, ⌘→ and ⌘← go to the next and previous song.",
+        "- The buttons at the top turn shuffle and repeat on and off. Click repeat again to repeat one song.",
+        "- Type in the search field to find a song, an artist or an album.",
+        "The song playing shows in the menu bar's quick settings, and the media keys on your keyboard work "
+        "even when Shanty is behind other windows.",
+    ]),
+    "backups": ("Back up your files", "backup back up time machine lifeboat drive restore copy safe", [
+        "Lifeboat copies your home folder to a drive every hour while the drive is plugged in, and keeps "
+        "earlier backups, so you can get back a file you deleted or changed.",
+        "Plug in a USB drive or another disk, choose Dials > Lifeboat, and pick it next to Backup drive. "
+        "The first backup starts within a minute and takes a while; later ones only copy what changed.",
+        "If it says the drive can't hold backups, click Erase Drive…. Everything on it is deleted.",
+        "Lifeboat keeps every backup of the last day, one a day for a month, and one a week before that. "
+        "When the drive is full, the oldest go first.",
+        "To eject the drive, eject it as usual. A backup that's running stops and starts again next time.",
+    ]),
+    "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
+        "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
+        "The backup drive must be plugged in.",
+        "Backups are listed by date on the left. Choose a time, then open folders as you would in Drawer.",
+        "The Now column says whether each file is the same now, has changed since, or is gone now.",
+        "Double-click a file to open a copy of it. Choose the files you want, then click Restore: copies go back "
+        "where they were. If there's already a file with that name, you're asked whether to keep both.",
+    ]),
 }
 
 

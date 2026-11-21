@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Lifeboat: a ring buoy on calm water. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fa6b8"/><stop offset="1" stop-color="#14627d"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <filter id="ring" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#0a2f40" flood-opacity="0.35"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+    <mask id="hole">
+      <rect width="128" height="128" fill="#fff"/>
+      <circle cx="64" cy="60" r="17" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <path d="M8 86 C26 80 40 80 56 86 S90 94 120 84 L120 120 L8 120 Z" fill="#0f4c66" fill-opacity="0.75"/>
+    <path d="M8 100 C28 94 44 96 60 101 S92 108 120 98 L120 120 L8 120 Z" fill="#0b3a50"/>
+  </g>
+  <g mask="url(#hole)" filter="url(#ring)">
+    <circle cx="64" cy="60" r="36" fill="#f7f4ee"/>
+    <g fill="#ef5a3c">
+      <path d="M64 60 L64 24 A36 36 0 0 1 89.46 34.54 Z"/>
+      <path d="M64 60 L100 60 A36 36 0 0 1 89.46 85.46 Z"/>
+      <path d="M64 60 L64 96 A36 36 0 0 1 38.54 85.46 Z"/>
+      <path d="M64 60 L28 60 A36 36 0 0 1 38.54 34.54 Z"/>
+    </g>
+  </g>
+  <circle cx="64" cy="60" r="36" fill="none" stroke="#000" stroke-opacity="0.08" stroke-width="1"/>
+  <circle cx="64" cy="60" r="17" fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="1"/>
+  <circle cx="64" cy="60" r="26.5" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="4 5"/>
+</svg>

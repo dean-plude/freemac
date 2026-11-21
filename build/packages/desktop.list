@@ -57,6 +57,14 @@ gnome-themes-extra
 pipewire
 pipewire-pulse
 wireplumber
+# Music for Shanty: GStreamer plays and reads the tags of MP3, AAC/M4A, FLAC,
+# Ogg, Opus and WAV, and sends the sound to PipeWire.
+gir1.2-gstreamer-1.0
+gir1.2-gst-plugins-base-1.0
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
+gstreamer1.0-libav
+gstreamer1.0-pipewire
 # Alarm and timer sounds for Chime (freedesktop sound theme), and time zones
 sound-theme-freedesktop
 tzdata

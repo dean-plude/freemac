@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Lifeboat
+GenericName=Backups
+Comment=Back up your files to a drive every hour, and bring back earlier versions
+Exec=freemac-lifeboat %f
+Icon=freemac-lifeboat
+Categories=System;Archiving;Utility;
+Keywords=backup;back up;restore;time machine;drive;versions;
+StartupWMClass=org.freemac.Lifeboat
+StartupNotify=true

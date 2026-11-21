@@ -104,7 +104,10 @@ button.suggested-action, button.default {
 button.suggested-action:hover { background-color: shade(@fm_accent, 1.08); }
 button.suggested-action:active { background-color: shade(@fm_accent, 0.9); }
 button.suggested-action label, button.default label { color: white; }
-button.suggested-action:disabled { background-color: alpha(@fm_accent, 0.45); color: alpha(white, 0.8); }
+button.suggested-action:disabled, button.default:disabled {
+  background-color: alpha(@fm_accent, 0.45); background-image: none; color: alpha(white, 0.85); box-shadow: none;
+}
+button.suggested-action:disabled label, button.default:disabled label { color: alpha(white, 0.85); }
 button.destructive-action { background-color: @fm_red; border-color: shade(@fm_red, 0.88); color: white; }
 button.destructive-action label { color: white; }
 .linked > button { border-radius: 0; }

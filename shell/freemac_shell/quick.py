@@ -14,7 +14,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
 
 from . import beacon, media, screen, style  # noqa: E402
 from .status import NM, StatusButton, launch  # noqa: E402
@@ -98,12 +98,30 @@ class NowPlaying(Gtk.Box):
         if self.player and media.send(action, self.bus, self.player["name"]):
             GLib.timeout_add(300, lambda: self.refresh() or False)
 
+    def _show_art(self, art):
+        """The album cover the player gives, or the music symbol."""
+        if art == getattr(self, "art_shown", None):
+            return
+        self.art_shown = art
+        path = Gio.File.new_for_uri(art).get_path() if art.startswith("file://") else None
+        size = 32 * self.get_scale_factor()
+        if path:
+            try:
+                picture = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, size, size, True)
+                surface = Gdk.cairo_surface_create_from_pixbuf(picture, self.get_scale_factor(), None)
+                self.icon.set_from_surface(surface)
+                return
+            except GLib.Error:
+                pass
+        self.icon.set_from_icon_name("audio-x-generic-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+
     def refresh(self):
         self.player = media.current(self.bus) if self.bus else None
         self.set_visible(self.player is not None)
         if not self.player:
             return
         p = self.player
+        self._show_art(p.get("art") or "")
         self.title.set_text(p["title"] or p["app"])
         self.subtitle.set_text(" · ".join(x for x in (p["artist"], p["app"]) if x and x != self.title.get_text()))
         playing = p["status"] == "Playing"

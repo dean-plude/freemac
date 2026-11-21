@@ -162,7 +162,8 @@ def icon_image(note, size=32):
                     GdkPixbuf.Pixbuf.new_from_file_at_scale(path, size, size, True))
             except GLib.Error:
                 pass
-    name = note.icon if note.icon and "/" not in note.icon else "dialog-information-symbolic"
+    # GLib apps send a named icon as image-path; the icon itself may be empty.
+    name = next((n for n in (note.image_path, note.icon) if n and "/" not in n), "dialog-information-symbolic")
     image = Gtk.Image.new_from_icon_name(name, Gtk.IconSize.DND)
     image.set_pixel_size(size)
     return image

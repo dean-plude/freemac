@@ -381,9 +381,9 @@ The small things a Mac user notices in their first minute.
 
 | # | Item | Component | Status |
 | --- | --- | --- | --- |
-| 1 | A music app for your Music folder, by album, artist and song, with play, shuffle and repeat, shown in the menu bar's what's playing and played with the media keys | new app | planned |
-| 2 | Backups to a drive: pick one in Dials, and while it's plugged in your home folder is copied every hour, keeping earlier copies with unchanged files shared | new app, Dials | planned |
-| 3 | Bring back a file or folder from any backup, browsed by date | new app | planned |
+| 1 | A music app for your Music folder, by album, artist and song, with play, shuffle and repeat, shown in the menu bar's what's playing and played with the media keys | Shanty | done |
+| 2 | Backups to a drive: pick one in Dials, and while it's plugged in your home folder is copied every hour, keeping earlier copies with unchanged files shared | Lifeboat, Dials | done |
+| 3 | Bring back a file or folder from any backup, browsed by date | Lifeboat, Drawer | done |
 
 ## Later
 

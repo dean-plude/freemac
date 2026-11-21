@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Shanty
+GenericName=Music
+Comment=Play the music in your Music folder, by album, artist and song
+Exec=freemac-shanty %U
+Icon=freemac-shanty
+Categories=AudioVideo;Audio;Player;
+Keywords=music;songs;albums;artists;player;mp3;itunes;playlist;
+MimeType=audio/mpeg;audio/mp4;audio/x-m4a;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/x-opus+ogg;audio/x-wav;audio/aac;audio/x-aiff;
+StartupWMClass=org.freemac.Shanty
+StartupNotify=true
