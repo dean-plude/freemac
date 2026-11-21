@@ -21,10 +21,11 @@ import time
 
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import alert, menus, style, transfer, volumes  # noqa: E402
+from . import alert, beacon, menus, style, transfer, volumes  # noqa: E402
 from . import backup_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Lifeboat"
@@ -189,10 +190,7 @@ class Watcher:
         return False
 
     def _notify(self, tag, title, body):
-        note = Gio.Notification.new(title)
-        note.set_body(body)
-        note.set_icon(Gio.ThemedIcon.new("freemac-lifeboat"))
-        self.app.send_notification("lifeboat-" + tag, note)
+        beacon.send(title, body, icon="freemac-lifeboat", app="Lifeboat")
 
 
 # ---- the window: backups by date, and Restore --------------------------------
@@ -572,9 +570,9 @@ class Window(Gtk.ApplicationWindow):
         def done(job):
             if job.made and not job.errors:
                 count = len(job.made)
+                self.show_folder()
                 self.note_label.set_text(("Restored " + (f"“{os.path.basename(job.made[0])}”" if count == 1
                                                          else f"{count} items")) + ".")
-                self.show_folder()
 
         transfer.Job(paths, target, parent=self, done=done).start()
 

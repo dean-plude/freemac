@@ -12,7 +12,7 @@ import time
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import alert, volumes  # noqa: E402
 from . import backup_store as store  # noqa: E402
@@ -26,6 +26,17 @@ def _run(*cmd):
         Gio.Subprocess.new(list(cmd), Gio.SubprocessFlags.NONE)
     except GLib.Error:
         pass
+
+
+def _alive(pid):
+    """Whether the watcher that wrote the status is still running."""
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (TypeError, ValueError, ProcessLookupError):
+        return False
+    except PermissionError:
+        return True
 
 
 def _ago(when, now=None):
@@ -64,11 +75,15 @@ class BackupPanel(Gtk.Box):
         facts = group(self.state_row, row("Oldest backup", self.oldest), row("Next backup", self.next),
                       row("Free on the drive", self.room))
 
-        self.progress = Gtk.ProgressBar(show_text=True)
+        # The file being copied goes in its own label: a progress bar's text
+        # asks for its whole width and would widen the window.
+        self.progress = Gtk.ProgressBar()
         self.progress.set_no_show_all(True)
-        self.progress.set_ellipsize(3)
+        self.progress_text = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=50)
+        self.progress_text.set_no_show_all(True)
+        self.progress_text.get_style_context().add_class("dials-caption")
 
-        self.warning = Gtk.Label(xalign=0, wrap=True)
+        self.warning = Gtk.Label(xalign=0, wrap=True, max_width_chars=70)
         self.warning.set_no_show_all(True)
         self.warning.get_style_context().add_class("dials-caption")
 
@@ -88,7 +103,8 @@ class BackupPanel(Gtk.Box):
             buttons.pack_start(button, False, False, 0)
         buttons.pack_end(browse, False, False, 0)
 
-        self.pack_start(page("Lifeboat", choose, facts, self.progress, self.warning, buttons), True, True, 0)
+        self.pack_start(page("Lifeboat", choose, facts, self.progress, self.progress_text,
+                                    self.warning, buttons), True, True, 0)
         self.handlers = volumes.watch(self._fill_drives)
         self.connect("destroy", self._gone)
         self._fill_drives()
@@ -138,8 +154,16 @@ class BackupPanel(Gtk.Box):
 
     def _check_drive(self):
         """Show the erase offer when the chosen drive can't hold backups."""
+        if getattr(self, "erasing", False):
+            # The drive is taken off while it's erased: keep saying so.
+            self.erase_button.set_visible(True)
+            self.warning.set_visible(True)
+            self.warning.set_text("Erasing…")
+            self.now_button.set_sensitive(False)
+            return False
         found = chosen_drive()
         ok = found is None or store.can_link(found[1])
+        self.can_hold = ok
         self.erase_button.set_visible(not ok)
         self.warning.set_visible(not ok)
         if not ok:
@@ -159,16 +183,19 @@ class BackupPanel(Gtk.Box):
         settings = store.settings()
         status = store.status()
         found = chosen_drive()
-        busy = status.get("state") == "backing-up"
+        busy = status.get("state") == "backing-up" and _alive(status.get("pid"))
         if found is not None and not busy:
             everything = store.backups(found[1])
         else:
             everything = []
         last = (everything[-1][0] if everything else None) or status.get("last_ok")
+        self.latest.set_tooltip_text(None)
         if busy:
             self.latest.set_text("Backing up now…")
-        elif status.get("state") == "error" and status.get("error"):
-            self.latest.set_text(status["error"])
+        elif status.get("state") == "error" and status.get("error") and getattr(self, "can_hold", True) \
+                and found is not None:
+            self.latest.set_text("The last backup didn't finish")
+            self.latest.set_tooltip_text(status["error"])
         else:
             self.latest.set_text(_ago(last) if last else "None yet")
         oldest = everything[0][0] if everything else status.get("oldest")
@@ -179,6 +206,8 @@ class BackupPanel(Gtk.Box):
             self.next.set_text("When the drive is plugged in")
         elif busy:
             self.next.set_text("—")
+        elif not getattr(self, "can_hold", True):
+            self.next.set_text("After the drive is erased")
         elif not settings.get("auto", True):
             self.next.set_text("When you click Back Up Now")
         elif last:
@@ -189,10 +218,11 @@ class BackupPanel(Gtk.Box):
             self.next.set_text("In a minute")
         self.room.set_text(store.size_words(store.free(found[1])) if found else "—")
         self.progress.set_visible(busy)
+        self.progress_text.set_visible(busy)
         if busy:
             self.progress.pulse()
             files, copied = status.get("files", 0), status.get("bytes", 0)
-            self.progress.set_text(f"{files:,} files looked at, {store.size_words(copied)} copied"
+            self.progress_text.set_text(f"{files:,} files looked at, {store.size_words(copied)} copied"
                                    + (f": {os.path.basename(status.get('current') or '')}"
                                       if status.get("current") else ""))
         self.stop_button.set_visible(busy)
@@ -219,6 +249,7 @@ class BackupPanel(Gtk.Box):
         if answer != Gtk.ResponseType.OK:
             return
         self.erase_button.set_sensitive(False)
+        self.erasing = True
         self.warning.set_text("Erasing…")
         name = "Lifeboat"
         obj = "/org/freedesktop/UDisks2/block_devices/" + os.path.basename(device)
@@ -226,11 +257,19 @@ class BackupPanel(Gtk.Box):
 
         def call(interface, method, args, then):
             bus.call("org.freedesktop.UDisks2", obj, interface, method, args, None,
-                     Gio.DBusCallFlags.NONE, 15 * 60 * 1000, None, then, None)
+                     Gio.DBusCallFlags.ALLOW_INTERACTIVE_AUTHORIZATION, 15 * 60 * 1000, None, then, None)
 
-        def failed(error):
+        def remounted(source, result, _data):
+            try:
+                source.call_finish(result)
+            except GLib.Error:
+                pass
+
+        def failed(error, mount_again=False):
             self.erase_button.set_sensitive(True)
-            self.warning.set_text("The drive wasn't erased.")
+            self.erasing = False
+            if mount_again:     # it was taken off to be erased: put it back as it was
+                call("org.freedesktop.UDisks2.Filesystem", "Mount", GLib.Variant("(a{sv})", ({},)), remounted)
             if not error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.CANCELLED) and \
                     "dismissed" not in error.message.lower() and "not authorized" not in error.message.lower():
                 alert.tell(self.get_toplevel(), "The drive wasn't erased.", Gio.DBusError.strip_remote_error(error))
@@ -241,13 +280,14 @@ class BackupPanel(Gtk.Box):
             except GLib.Error:
                 pass
             self.erase_button.set_sensitive(True)
+            self.erasing = False
             GLib.timeout_add(1500, self._after_erase)
 
         def formatted(source, result, _data):
             try:
                 source.call_finish(result)
             except GLib.Error as error:
-                failed(error)
+                failed(error, mount_again=True)
                 return
             call("org.freedesktop.UDisks2.Filesystem", "Mount", GLib.Variant("(a{sv})", ({},)), mounted)
 
