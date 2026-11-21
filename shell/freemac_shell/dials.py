@@ -457,9 +457,9 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     def confirm_power(self, action):
         """Sleep, Restart… and Shut Down… ask and quit apps as the freemac
-        menu does (freemac-session)."""
+        menu does (freemac-power)."""
         words = {"suspend": "sleep", "reboot": "restart", "poweroff": "shutdown"}
-        Gio.Subprocess.new(["freemac-session", words[action]], Gio.SubprocessFlags.NONE)
+        Gio.Subprocess.new(["freemac-power", words[action]], Gio.SubprocessFlags.NONE)
 
     def _search_match(self, row):
         text = self.search.get_text().strip().lower()

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Restart, Shut Down and Log Out the way a Mac does them.
 
-    freemac-session restart|shutdown|logout   ask first, then do it
-    freemac-session sleep                     sleep at once
-    freemac-session restart --now             don't ask
+    freemac-power restart|shutdown|logout   ask first, then do it
+    freemac-power sleep                     sleep at once
+    freemac-power restart --now             don't ask
 
 Asking shows "Are you sure you want to shut down your computer now?" and
 counts down: if nobody answers, it goes ahead after 60 seconds. Then every
@@ -26,7 +26,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from . import alert, apps, style  # noqa: E402
 from .wfipc import Wayfire  # noqa: E402
 
-PROGRAM = "freemac-session"
+PROGRAM = "freemac-power"
 COUNTDOWN = 60
 # Seconds to wait once nothing has changed (no window has closed or opened)
 # and no app is asking something, before saying an app didn't quit.
