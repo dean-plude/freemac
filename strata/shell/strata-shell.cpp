@@ -510,6 +510,39 @@ class strata_shell_impl : public wf::plugin_interface_t
         return out;
     };
 
+    /* strata/view-pids: which program each app window belongs to, so Gauge
+     * can show what an app uses. Only the user's own programs. */
+    wf::ipc::method_callback view_pids = [=] (nlohmann::json)
+    {
+        auto list = nlohmann::json::array();
+        for (auto& view : wf::get_core().get_all_views())
+        {
+            wl_client *client = view->get_client();
+            if ((view->role != wf::VIEW_ROLE_TOPLEVEL) || !client)
+            {
+                continue;
+            }
+
+            pid_t pid = 0;
+            uid_t uid = 0;
+            gid_t gid = 0;
+            wl_client_get_credentials(client, &pid, &uid, &gid);
+            if ((pid <= 1) || (uid != getuid()))
+            {
+                continue;
+            }
+
+            nlohmann::json one;
+            one["id"]  = view->get_id();
+            one["pid"] = pid;
+            list.push_back(one);
+        }
+
+        auto out = wf::ipc::json_ok();
+        out["views"] = list;
+        return out;
+    };
+
     /* strata/zoom {id}: fill the free part of the screen, or go back; what
      * the zoom button and the Window menu's Zoom do. */
     wf::ipc::method_callback zoom_view = [=] (nlohmann::json data)
@@ -678,6 +711,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/press", press_key);
         method_repository->register_method("strata/zoom", zoom_view);
         method_repository->register_method("strata/force-quit", force_quit_view);
+        method_repository->register_method("strata/view-pids", view_pids);
         method_repository->register_method("strata/snapshot", snapshot_view);
         method_repository->register_method("strata/hide", hide_view);
         method_repository->register_method("strata/hidden", list_hidden);

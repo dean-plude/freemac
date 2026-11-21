@@ -193,6 +193,16 @@ class Wayfire:
         except (ConnectionError, OSError, ValueError):
             return None
 
+    def view_pids(self):
+        """{window id: process id} from Strata, or None where it can't say."""
+        try:
+            reply = self.req.call("strata/view-pids")
+        except (ConnectionError, OSError, ValueError):
+            return None
+        if not isinstance(reply, dict) or not isinstance(reply.get("views"), list):
+            return None
+        return {v["id"]: v["pid"] for v in reply["views"] if isinstance(v, dict) and "id" in v and "pid" in v}
+
     def outputs(self):
         try:
             result = self.req.call("window-rules/list-outputs")
