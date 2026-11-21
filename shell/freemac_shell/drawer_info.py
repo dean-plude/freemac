@@ -7,6 +7,7 @@ once. Original freemac code.
 import os
 import pwd
 import stat
+import sys
 import threading
 import time
 
@@ -17,6 +18,7 @@ gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import macapps, tags  # noqa: E402
+from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
     "standard::display-name", "standard::content-type", "standard::icon", "standard::size",
@@ -222,3 +224,29 @@ def show(paths, parent=None):
         if parent is not None and parent.get_application() is not None:
             parent.get_application().add_window(window)
         window.show_all()
+
+
+def main(argv=None):
+    """`python3 -m freemac_shell.drawer_info PATH...`: Info windows on their
+    own, for the desktop, which gives windows it opens itself the wrong frame."""
+    paths = [p for p in (argv if argv is not None else sys.argv[1:]) if os.path.lexists(p)]
+    if not paths:
+        return 0
+    GLib.set_prgname(DESKTOP_WINDOW)   # the desktop's window: the menu bar says Drawer
+    open_windows = []
+
+    def closed(window):
+        open_windows.remove(window)
+        if not open_windows:
+            Gtk.main_quit()
+    for path in paths[:10]:
+        window = InfoWindow(path, None)
+        open_windows.append(window)
+        window.connect("destroy", closed)
+        window.show_all()
+    Gtk.main()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

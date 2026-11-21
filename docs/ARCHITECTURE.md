@@ -280,6 +280,15 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   (`python3 -m freemac_shell.batch_rename`), because dialogs that the
   layer-shell desktop opens itself get a frame far larger than the window;
   the process prints the names it changed so icons keep their places.
+  Every window the desktop opens is now such a process (Rename Items, Get
+  Info through `python3 -m freemac_shell.drawer_info`, and View Options),
+  with the app id `freemac-desktop-window` (`apps.DESKTOP_WINDOW`): any
+  window under the desktop's own app id gets the oversized frame, while this
+  id gets a normal one and the menu bar names it Drawer. **Desktop View
+  Options** (1.57, `desktop_view.py`) keeps icon size, grid spacing, text
+  size and Show Item Info in `desktop-view.json`; the panel writes the file
+  as each control rests and the desktop, watching it, works out a new grid
+  cell from the icon and text size and redraws, keeping the selection.
   **Spring-loaded folders** (1.50): every drop target in Drawer starts a
   short timer when a drag rests on a folder and opens it when the timer
   ends; the drag hands over the files picked up when it began, not the

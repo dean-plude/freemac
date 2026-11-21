@@ -41,8 +41,9 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, drawer_info, quick_actions, recents, tags, transfer, volumes  # noqa: E402
+from . import desktop_widgets, quick_actions, recents, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
+from . import desktop_view  # noqa: E402
 from .drawer_info import item_info  # noqa: E402
 
 try:
@@ -51,10 +52,22 @@ except ImportError:   # only the pictures of the stacks need it
     cairo = None
 
 LAYOUT = os.path.join(GLib.get_user_config_dir(), "freemac", "desktop.json")
-CELL_W, CELL_H = 100, 104   # one place on the grid
+CELL_W, CELL_H = 100, 104   # one place on the grid (View Options changes them: use_look)
 TOP, RIGHT = 40, 14         # below the menu bar, in from the right edge
 BOTTOM = 96                 # above the dock
 ICON = 64
+TEXT = 12   # the names' size, in pixels
+
+
+def use_look(settings):
+    """Set the icon size, the grid and the names' size from View Options.
+    Returns True when any of them changed."""
+    global ICON, CELL_W, CELL_H, TEXT
+    look = (settings["icon_size"], *desktop_view.cell_size(settings), settings["text_size"])
+    if look == (ICON, CELL_W, CELL_H, TEXT):
+        return False
+    ICON, CELL_W, CELL_H, TEXT = look
+    return True
 URI_TARGETS = [Gtk.TargetEntry.new("text/uri-list", 0, 0)]
 
 CSS = b"""
@@ -105,7 +118,11 @@ def load_places():
 
 
 def load_item_info():
-    """Whether the desktop shows a line of info under each name."""
+    """Whether the desktop shows a line of info under each name: as View
+    Options last set it, or else as the desktop's menu did before 1.57."""
+    chosen = desktop_view.load()["item_info"]
+    if chosen is not None:
+        return chosen
     try:
         with open(LAYOUT) as f:
             return bool(json.load(f).get("item_info", False))
@@ -378,6 +395,13 @@ class DesktopIcons(Gtk.Layout):
         self.folder = desktop_dir()
         self.places, self.stacks_on = load_layout()
         self.item_info = load_item_info()
+        use_look(desktop_view.load())
+        self.text_css = Gtk.CssProvider()
+        self._show_text_size()
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.text_css,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+        self.view_monitor = Gio.File.new_for_path(desktop_view.PATH).monitor_file(Gio.FileMonitorFlags.NONE, None)
+        self.view_monitor.connect("changed", lambda *_: GLib.timeout_add(80, self._view_changed))
         self.icons = {}           # file name -> DesktopIcon
         self.stack_icons = {}     # kind -> StackIcon, while stacks are on
         self.open_stacks = set()  # the kinds fanned out
@@ -561,8 +585,80 @@ class DesktopIcons(Gtk.Layout):
         # The rows move apart to make room for Show Item Info's extra line.
         return CELL_H + (14 if self.item_info else 0)
 
+    def _show_text_size(self):
+        self.text_css.load_from_data(f".desk-label {{ font-size: {TEXT}px; }}".encode())
+
+    def _view_changed(self):
+        """View Options changed: redraw every icon at its new size."""
+        settings = desktop_view.load()
+        if settings["item_info"] is not None and settings["item_info"] != self.item_info:
+            self.item_info = settings["item_info"]
+            for icon in self.icons.values():
+                icon.show_info(self.item_info)
+        if use_look(settings):
+            self._show_text_size()
+            self.rebuild()
+        else:
+            self._arrange()
+        self._save()
+        return False
+
+    def rebuild(self):
+        """Make every icon again, at the current size, keeping the selection."""
+        chosen = {icon.name for icon in self.selected}
+        self.selected = []
+        for icon in self.icons.values():
+            icon.info_key = None   # refresh() remakes it
+        for name in [n for n in self.icons if n.startswith("drive:")]:
+            self.icons.pop(name).destroy()
+        for stack in self.stack_icons.values():
+            stack.destroy()
+        self.stack_icons = {}
+        self.refresh()
+        self.refresh_drives()
+        for icon in list(self.icons.values()) + list(self.stack_icons.values()):
+            if icon.name in chosen:
+                self.selected.append(icon)
+                icon.set_selected(True)
+
+    def own_window(self, module, args, done=None):
+        """Run one of the desktop's windows as its own process, since a window
+        this layer-shell process opens itself gets a frame far bigger than it
+        is. done(output) gets what it prints."""
+        cmd = [sys.executable, "-m", f"freemac_shell.{module}"] + list(args)
+        try:
+            proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.STDOUT_PIPE if done else Gio.SubprocessFlags.NONE)
+        except GLib.Error:
+            if done:
+                done("")
+            return
+        if done is None:
+            return
+
+        def finished(proc, result):
+            try:
+                _ok, out, _err = proc.communicate_utf8_finish(result)
+            except GLib.Error:
+                out = ""
+            done(out or "")
+        proc.communicate_utf8_async(None, None, finished)
+
+    def view_options(self):
+        # One panel at a time: ⌘J again while it is open does nothing.
+        if getattr(self, "view_panel_open", False):
+            return
+        self.view_panel_open = True
+
+        def closed(_out):
+            self.view_panel_open = False
+        self.own_window("desktop_view", ["--item-info"] if self.item_info else [], closed)
+
     def set_item_info(self, on):
         self.item_info = bool(on)
+        try:
+            desktop_view.save(item_info=self.item_info)
+        except OSError:
+            pass
         for icon in self.icons.values():
             icon.show_info(self.item_info)
         self._arrange()
@@ -592,7 +688,7 @@ class DesktopIcons(Gtk.Layout):
     def get_info(self, icons):
         paths = [icon.path for icon in icons if icon.path]
         if paths:
-            drawer_info.show(paths)
+            self.own_window("drawer_info", paths)
 
     def _save(self):
         try:
@@ -803,6 +899,8 @@ class DesktopIcons(Gtk.Layout):
             self.eject([icon for icon in self.selected if icon.mount is not None])
         elif key in (Gdk.KEY_i, Gdk.KEY_I) and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.get_info(files)
+        elif key in (Gdk.KEY_j, Gdk.KEY_J) and event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.view_options()
         elif key in (Gdk.KEY_0, Gdk.KEY_KP_0) and event.state & Gdk.ModifierType.CONTROL_MASK:
             self.set_stacks(not self.stacks_on)
         elif key == Gdk.KEY_o and event.state & Gdk.ModifierType.CONTROL_MASK:
@@ -893,7 +991,8 @@ class DesktopIcons(Gtk.Layout):
         items = [("New Folder", self.new_folder), ("Paste Item", self.paste), (None, None),
                  ("Change Wallpaper…", self.change_wallpaper), ("Edit Widgets…", self.widgets.edit), (None, None),
                  ("Use Stacks", (self.stacks_on, lambda: self.set_stacks(not self.stacks_on))),
-                 ("Show Item Info", (self.item_info, lambda: self.set_item_info(not self.item_info)))]
+                 ("Show Item Info", (self.item_info, lambda: self.set_item_info(not self.item_info))),
+                 ("Show View Options", self.view_options)]
         if not self.stacks_on:
             items += [(None, None)] + clean_up
         self.menu = self._menu(items, event)
@@ -1003,18 +1102,12 @@ class DesktopIcons(Gtk.Layout):
     def rename_many(self, icons):
         # In its own process: a dialog this layer-shell process opens gets a frame
         # far bigger than the window. It prints the names it changed.
-        cmd = [sys.executable, "-m", "freemac_shell.batch_rename"] + [i.path for i in icons]
-        try:
-            proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.STDOUT_PIPE)
-        except GLib.Error:
-            return
-        proc.communicate_utf8_async(None, None, self._renamed_many)
+        self.own_window("batch_rename", [i.path for i in icons], self._renamed_many)
 
-    def _renamed_many(self, proc, result):
+    def _renamed_many(self, out):
         try:
-            _ok, out, _err = proc.communicate_utf8_finish(result)
             done = json.loads(out or "[]")
-        except (GLib.Error, ValueError):
+        except ValueError:
             done = []
         moved = {os.path.basename(old): os.path.basename(new) for old, new in done}
         if moved:   # keep each icon where it was (names may have been swapped)
