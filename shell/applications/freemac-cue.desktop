@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cue
+GenericName=Flashcards
+Comment=Learn anything with flashcards that come back when you need them
+Exec=freemac-cue
+Icon=freemac-cue
+Categories=Education;
+Keywords=flashcards;cards;study;revise;revision;learn;vocabulary;quiz;memorise;memorize;
+StartupWMClass=org.freemac.Cue
+StartupNotify=true
