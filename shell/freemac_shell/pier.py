@@ -50,7 +50,7 @@ SLIDE_MS = 220     # how long the Dock takes to slide away or back
 HIDE_DELAY = 350   # ms after the pointer leaves before a hidden Dock slides away
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
-SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit"}
+SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit", "freemac-session"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "freemac-post.desktop", "freemac-cove.desktop", "freemac-shanty.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-tide.desktop", "freemac-crew.desktop", "freemac-nudge.desktop", "freemac-jot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]

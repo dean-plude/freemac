@@ -14,7 +14,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, notify_rules, quick, status, style  # noqa: E402
+from . import (apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, notify_rules, quick,  # noqa: E402
+               recent_items, status, style)
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -30,6 +31,28 @@ SLIDE_MS = 180
 
 def run(*cmd):
     subprocess.Popen(cmd, start_new_session=True)
+
+
+def _person_name():
+    """The name for Log Out: the person's own name, or their user name."""
+    name = GLib.get_real_name()
+    return name if name and name != "Unknown" else GLib.get_user_name()
+
+
+def _file_icon(path):
+    try:
+        info = Gio.File.new_for_path(path).query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
+        return info.get_icon()
+    except GLib.Error:
+        return None
+
+
+def _open_file(path):
+    recent_items.recents.note(path)
+    try:
+        Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
+    except GLib.Error:
+        pass
 
 
 def _trash_dir():
@@ -198,6 +221,7 @@ class Topline(Gtk.Window):
                     # while the new app's arrive.
                     self._use_menus(None)
                 self._last_app, self._windowless = app_id, None
+                recent_items.note_app(app_id)   # for Recent Items in the freemac menu
                 # Show the app's name at once, from the event itself: while
                 # a new window opens Wayfire can take a while to answer, and
                 # the full refresh below asks it several things.
@@ -340,22 +364,72 @@ class Topline(Gtk.Window):
         return item
 
     def _system_menu(self):
+        """The freemac menu, in a Mac's order: About, Settings and the app
+        centre, Recent Items, Force Quit, then Sleep, Restart, Shut Down,
+        Lock Screen and Log Out, which ask first (freemac-session)."""
         menu = Gtk.Menu()
         self._item(menu, "About freemac", self._about)
-        self._item(menu, "Settings…", lambda: run("freemac-dials"))
-        self._item(menu, "Guide", lambda: run("freemac-guide"))
         menu.append(Gtk.SeparatorMenuItem())
-        self._item(menu, "Search…", lambda: run("freemac-seek"))
-        self._item(menu, "Terminal", lambda: run("foot"))
+        self._item(menu, "Settings\u2026", lambda: run("freemac-dials"))
+        self._item(menu, "Harbor\u2026", lambda: run("freemac-harbor"))
+        menu.append(Gtk.SeparatorMenuItem())
+        recent = Gtk.MenuItem(label="Recent Items")
+        self.recent_menu = Gtk.Menu()
+        recent.set_submenu(self.recent_menu)
+        menu.append(recent)
+        menu.connect("show", lambda _m: self._fill_recent_items())
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Force Quit\u2026", lambda: run("freemac-force-quit"), shortcut="\u2325\u2318\u238b")
         menu.append(Gtk.SeparatorMenuItem())
+        self._item(menu, "Sleep", lambda: run("freemac-session", "sleep"))
+        self._item(menu, "Restart\u2026", lambda: run("freemac-session", "restart"))
+        self._item(menu, "Shut Down\u2026", lambda: run("freemac-session", "shutdown"))
+        menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Lock Screen", lambda: run("freemac-lock"), shortcut="\u2303\u2318Q")
-        self._item(menu, "Restart…", lambda: run("systemctl", "reboot"))
-        self._item(menu, "Shut Down…", lambda: run("systemctl", "poweroff"))
-        self._item(menu, "Log Out", lambda: run("pkill", "-u", str(os.getuid()), "-x", "wayfire"))
+        self._item(menu, f"Log Out {_person_name()}\u2026", lambda: run("freemac-session", "logout"),
+                   shortcut="\u21e7\u2318Q")
         menu.show_all()
         return menu
+
+    def _fill_recent_items(self):
+        """Recent Items: the apps and documents used lately, then Clear Menu."""
+        menu = self.recent_menu
+        self._clear(menu)
+        found = False
+        for heading, entries in (("Applications", [(info.get_display_name() or info.get_name(),
+                                                     info.get_icon(), lambda i=info: i.launch([], None))
+                                                    for info in recent_items.recent_apps()]),
+                                 ("Documents", [(os.path.basename(path), _file_icon(path),
+                                                 lambda p=path: _open_file(p))
+                                                for path in recent_items.recent_documents()])):
+            if not entries:
+                continue
+            if found:
+                menu.append(Gtk.SeparatorMenuItem())
+            title = Gtk.MenuItem(label=heading, sensitive=False)
+            title.get_style_context().add_class("menu-heading")
+            menu.append(title)
+            for label, icon, callback in entries:
+                item = Gtk.MenuItem()
+                line = Gtk.Box(spacing=8)
+                image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU) if icon else Gtk.Image()
+                image.set_pixel_size(16)
+                line.pack_start(image, False, False, 0)
+                line.pack_start(Gtk.Label(label=label[:50], xalign=0), True, True, 0)
+                item.add(line)
+                item.connect("activate", lambda _i, c=callback: c())
+                menu.append(item)
+            found = True
+        if not found:
+            menu.append(Gtk.MenuItem(label="No Recent Items", sensitive=False))
+        menu.append(Gtk.SeparatorMenuItem())
+        clear = Gtk.MenuItem(label="Clear Menu", sensitive=found)
+        clear.connect("activate", lambda _i: recent_items.clear())
+        menu.append(clear)
+        # Each item, not the menu itself: showing the submenu would pop it up
+        # on its own while the freemac menu opens.
+        for child in menu.get_children():
+            child.show_all()
 
     def _about(self):
         if shutil.which("freemac-manifest"):
