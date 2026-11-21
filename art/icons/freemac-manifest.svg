@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Manifest: a computer chip with an information mark. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b7785"/><stop offset="1" stop-color="#36404b"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b3440"/><stop offset="1" stop-color="#151b22"/>
+    </linearGradient>
+    <linearGradient id="dot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fa3ff"/><stop offset="1" stop-color="#1f6fd6"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <g stroke="#d9c27a" stroke-width="4" stroke-linecap="round">
+    <line x1="44" y1="24" x2="44" y2="36"/><line x1="58" y1="24" x2="58" y2="36"/><line x1="72" y1="24" x2="72" y2="36"/><line x1="86" y1="24" x2="86" y2="36"/>
+    <line x1="44" y1="92" x2="44" y2="104"/><line x1="58" y1="92" x2="58" y2="104"/><line x1="72" y1="92" x2="72" y2="104"/><line x1="86" y1="92" x2="86" y2="104"/>
+    <line x1="24" y1="44" x2="36" y2="44"/><line x1="24" y1="58" x2="36" y2="58"/><line x1="24" y1="72" x2="36" y2="72"/><line x1="24" y1="86" x2="36" y2="86"/>
+    <line x1="92" y1="44" x2="104" y2="44"/><line x1="92" y1="58" x2="104" y2="58"/><line x1="92" y1="72" x2="104" y2="72"/><line x1="92" y1="86" x2="104" y2="86"/>
+  </g>
+  <rect x="34" y="34" width="60" height="60" rx="9" fill="url(#chip)" stroke="#0b0f14" stroke-width="1.5"/>
+  <rect x="38" y="38" width="52" height="52" rx="6" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5"/>
+  <circle cx="64" cy="64" r="19" fill="url(#dot)"/>
+  <circle cx="64" cy="55" r="3.4" fill="#ffffff"/>
+  <rect x="61" y="61" width="6" height="15" rx="3" fill="#ffffff"/>
+</svg>

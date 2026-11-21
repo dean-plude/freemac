@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Jigsaw
+GenericName=Jigsaw Puzzle
+Comment=Put together a jigsaw puzzle made from a picture or one of your photos
+Exec=freemac-jigsaw
+Icon=freemac-jigsaw
+Categories=Game;KidsGame;LogicGame;
+Keywords=jigsaw;puzzle;pieces;picture;photo;kids;game;
+StartupWMClass=org.freemac.Jigsaw
+StartupNotify=true

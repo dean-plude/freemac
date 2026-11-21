@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=About This Computer
+GenericName=System Information
+Comment=See what is inside this computer: processor, memory, storage, graphics, USB and more
+Exec=freemac-manifest
+Icon=freemac-manifest
+Categories=System;Monitor;
+Keywords=about;system;information;hardware;specs;processor;memory;report;manifest;
+StartupWMClass=org.freemac.Manifest
+StartupNotify=true
