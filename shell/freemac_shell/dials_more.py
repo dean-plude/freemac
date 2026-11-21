@@ -221,6 +221,9 @@ def restart_in_recovery(window):
 
 
 # ---- Accessibility ---------------------------------------------------------------
+INVERT_KEY = "<ctrl> <alt> <super> KEY_8"
+
+
 def accessibility(window):
     group, row, page, _slider, switch = window.helpers
     settings = window.settings
@@ -286,12 +289,25 @@ def accessibility(window):
     zoom_keys.connect("changed", lambda c: window.ini_set("zoom", "modifier", c.get_active_id()))
     zoom_on = "zoom" in plugins()
     zoom_keys.set_sensitive(zoom_on)
+
+    def invert_switch(on):
+        # The key is set first: Wayfire's own default for it is ⌘I, which
+        # is Get Info in freemac.
+        window.ini_set("invert", "toggle", INVERT_KEY)
+        names = [n for n in plugins() if n != "invert"]
+        if on:
+            names.append("invert")
+        window.ini_set("core", "plugins", " ".join(names))
     return page("Accessibility", group(
         row("Larger text", switch(get("text-scaling-factor", 1.0) > 1.05, larger_text)),
         row("High contrast", switch(get("gtk-theme", "freemac") == "HighContrast", high_contrast),
             "Stronger borders and colours in apps."),
         row("Reduce motion", switch(not get("enable-animations", True), reduce_motion),
             "Windows fade instead of zooming and don't wobble."),
+        row("Reduce transparency", switch(style.solid(), lambda on: window.save_prefs(reduce_transparency=on)),
+            "The menu bar, the Dock and panels are solid instead of see-through."),
+        row("Invert colours with \u2303\u2325\u23188", switch("invert" in plugins(), invert_switch),
+            "Press Control-Option-Command-8 to swap the screen's colours, and again to put them back."),
         row("Pointer size", pointer),
     ), group(
         row("Zoom", switch(zoom_on, zoom_switch),

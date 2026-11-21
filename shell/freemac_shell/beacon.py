@@ -780,7 +780,7 @@ class Beacon:
 
     def _restyle(self):
         text = CSS
-        for key, value in (style.DARK if style.is_dark() else style.LIGHT).items():
+        for key, value in style.palette().items():
             text = text.replace("@" + key + ";", value + ";")
         self._provider.load_from_data(text.encode())
 

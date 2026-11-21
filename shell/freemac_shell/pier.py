@@ -1802,6 +1802,9 @@ class Pier(Gtk.Window):
 def main():
     style.apply()
     win = Pier()
+    # The shelf's backing is drawn by hand: draw it again in the new colours
+    # (dark mode, Reduce transparency).
+    style.apply(on_change=lambda _dark: win.queue_draw())
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     win.refresh()

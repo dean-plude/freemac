@@ -100,6 +100,13 @@ DARK = {"bar": "rgba(30, 30, 33, 0.60)", "ink": "#ececef", "hover": "rgba(255, 2
         "shelf": "rgba(40, 40, 44, 0.50)", "edge": "rgba(255, 255, 255, 0.16)",
         "panel": "rgba(38, 38, 42, 0.985)", "dim": "rgba(236, 236, 239, 0.55)"}
 
+# Accessibility > Reduce transparency (shell.json "reduce_transparency"):
+# the menu bar, the Dock and the panels turn solid.
+SOLID_LIGHT = {"bar": "rgb(234, 234, 237)", "shelf": "rgb(226, 226, 231)",
+               "edge": "rgba(0, 0, 0, 0.12)", "panel": "rgb(246, 246, 248)"}
+SOLID_DARK = {"bar": "rgb(36, 36, 39)", "shelf": "rgb(48, 48, 52)",
+              "edge": "rgba(255, 255, 255, 0.16)", "panel": "rgb(38, 38, 42)"}
+
 PREFS = os.path.expanduser("~/.config/freemac/shell.json")
 
 
@@ -121,6 +128,9 @@ def watch_prefs(callback):
 
 _provider = None
 _settings = None
+_solid = None
+_prefs_watch = None
+_listeners = []
 
 
 def interface_settings():
@@ -136,27 +146,54 @@ def is_dark():
     return bool(settings) and settings.get_string("color-scheme") == "prefer-dark"
 
 
+def solid():
+    """Reduce transparency is on."""
+    return bool(prefs().get("reduce_transparency"))
+
+
+def palette(dark=None):
+    """The shell's colours for light or dark mode, solid when Reduce
+    transparency is on."""
+    dark = is_dark() if dark is None else dark
+    colours = dict(DARK if dark else LIGHT)
+    if solid():
+        colours.update(SOLID_DARK if dark else SOLID_LIGHT)
+    return colours
+
+
 def css(dark):
     text = TEMPLATE
-    for key, value in (DARK if dark else LIGHT).items():
+    for key, value in palette(dark).items():
         text = text.replace("@" + key + ";", value + ";").replace("@" + key + " ", value + " ")
     return text.encode()
 
 
 def apply(on_change=None):
-    """Load the shell's style and follow light/dark changes from Dials."""
-    global _provider, _settings
+    """Load the shell's style and follow light/dark and Reduce transparency
+    changes from Dials. on_change(dark) is called after each."""
+    global _provider, _settings, _solid, _prefs_watch
     screen = Gdk.Screen.get_default()
+    if on_change:
+        _listeners.append(on_change)
     if _provider is None:
         _provider = Gtk.CssProvider()
         Gtk.StyleContext.add_provider_for_screen(screen, _provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         _settings = interface_settings()
+
+        def changed(*_args):
+            _provider.load_from_data(css(is_dark()))
+            for listener in _listeners:
+                listener(is_dark())
         if _settings:
-            def changed(*_args):
-                _provider.load_from_data(css(is_dark()))
-                if on_change:
-                    on_change(is_dark())
             _settings.connect("changed::color-scheme", changed)
+
+        def prefs_changed():
+            global _solid
+            if solid() != _solid:
+                _solid = solid()
+                changed()
+        _prefs_watch = watch_prefs(prefs_changed)
+    _solid = solid()
     _provider.load_from_data(css(is_dark()))
 
 

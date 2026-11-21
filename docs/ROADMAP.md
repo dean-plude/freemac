@@ -707,6 +707,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Dials > Dock and Menu Bar: Automatically hide and show the menu bar | Dials | done |
 | 4 | Guide: hiding the menu bar | Guide | done |
 
+## 1.65 "reduce transparency" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Reduce transparency: the menu bar, the Dock, the switcher and notifications turn solid, at once | Dials, Topline, Pier, Tack, Beacon | done |
+| 2 | Invert colours with Control-Option-Command-8, switched on in Dials > Accessibility | Dials, Strata | done |
+| 3 | Guide: making the screen easier to see | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
