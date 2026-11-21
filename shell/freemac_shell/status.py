@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Status icons for Topline: network, sound, battery, Bluetooth and printing.
+"""Status icons for Topline: network, sound, battery, Bluetooth, printing, and
+the dot that shows an app is using the microphone or camera.
 
 Each one hides itself when the computer doesn't have the thing it shows (no
 battery on a desktop PC, no sound server, no NetworkManager, no Bluetooth
@@ -11,6 +12,7 @@ import re
 import shutil
 import subprocess
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -391,3 +393,73 @@ class Recording(StatusButton):
             self.show_icon("media-record-symbolic", "Recording the screen. Click to stop.")
         else:
             self.hide()
+
+
+class InUse(Gtk.MenuButton):
+    """A small dot while an app is using the microphone (orange) or the camera
+    (green), so nobody listens or watches unnoticed. Click it to see which
+    apps."""
+
+    COLOURS = {"microphone": (0.96, 0.60, 0.11), "camera": (0.19, 0.70, 0.31)}
+
+    def __init__(self):
+        super().__init__()
+        from . import inuse
+
+        self.inuse = inuse
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        self.get_style_context().add_class("in-use")
+        # A picture, not a drawing area: a drawing area has a window of its
+        # own, which would sit over the button and swallow its clicks.
+        self.dot = Gtk.Image()
+        self.add(self.dot)
+        self.set_no_show_all(True)
+        self.colour = None
+        self.menu = Gtk.Menu()
+        self.menu.set_halign(Gtk.Align.END)
+        self.set_popup(self.menu)
+        self.watcher = inuse.Watcher(on_change=self.update)
+        self.update()
+
+    def _paint(self, colour):
+        scale = max(1, self.get_scale_factor())
+        size = 10 * scale
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        surface.set_device_scale(scale, scale)
+        cr = cairo.Context(surface)
+        cr.set_source_rgb(*colour)
+        cr.arc(5, 5, 4, 0, 6.2832)
+        cr.fill()
+        self.dot.set_from_surface(surface)
+
+    def update(self):
+        users = self.watcher.users()
+        uses = set().union(*users.values()) if users else set()
+        if not uses:
+            self.colour = None
+            self.menu.popdown()
+            self.hide()
+            return
+        colour = self.COLOURS["camera" if "camera" in uses else "microphone"]
+        if colour != self.colour:
+            self.colour = colour
+            self._paint(colour)
+        self.set_tooltip_text("\n".join(self.inuse.describe(users)))
+        self._fill_menu(users)
+        self.show()
+        self.dot.show()
+
+    def _fill_menu(self, users):
+        """The menu is filled before it's needed: a menu button shows nothing
+        for a menu that is still empty when it's clicked."""
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+        for line in self.inuse.describe(users):
+            item = Gtk.MenuItem(label=line)
+            item.set_sensitive(False)
+            self.menu.append(item)
+        self.menu.append(Gtk.SeparatorMenuItem())
+        item = Gtk.MenuItem(label="Sound Settings…")
+        item.connect("activate", lambda *_: launch("freemac-dials", "--panel", "sound"))
+        self.menu.append(item)
+        self.menu.show_all()
