@@ -513,6 +513,13 @@ TOPICS = {
         "To put several files into a new folder at once, select them, right-click one and choose "
         "New Folder with Selection. Type a name for the folder. Command+Z puts them back.",
     ]),
+    "quick-actions": ("Turn pictures and make PDFs", "quick actions rotate turn picture photo pdf create spring loaded folder drag hold", [
+        "Right-click a picture in Drawer and choose Quick Actions, then Rotate Left or Rotate Right to turn it. "
+        "On the desktop, Rotate Left and Rotate Right are right in the picture's menu.",
+        "Select several pictures and choose Create PDF to put them into one PDF, a page for each.",
+        "To drop files deep inside a folder, drag them onto the folder and hold them there for a moment. "
+        "It opens, so you can keep going into the folder inside it.",
+    ]),
     "tags": ("Tag files with colours", "tags tag colour color label red orange yellow green blue purple gray finder", [
         "Right-click a file in Drawer or on the desktop and click a colour under Tags. A dot in that colour "
         "shows after the file's name.",

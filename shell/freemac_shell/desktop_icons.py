@@ -40,7 +40,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, drawer_info, recents, tags, transfer, volumes  # noqa: E402
+from . import desktop_widgets, drawer_info, quick_actions, recents, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 try:
@@ -828,6 +828,7 @@ class DesktopIcons(Gtk.Layout):
         items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder),
                   ("Glance" if len(icons) == 1 else f"Glance at {len(icons)} Items", self.toggle_glance), (None, None),
                   ("\0tags", [i.path for i in icons]), (None, None),
+                  ] + self._quick_items([i.path for i in icons]) + [
                   (f"New Folder with Selection ({len(icons)} Item{'s' if len(icons) != 1 else ''})",
                    lambda: self.new_folder_with(icons)),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
@@ -907,6 +908,27 @@ class DesktopIcons(Gtk.Layout):
         if icon:
             self.click(icon, False)
             GLib.idle_add(lambda: self.rename(icon) and False)
+
+    def _quick_items(self, paths):
+        """Quick Actions for pictures, spelled out (no submenus on the desktop)."""
+        if not quick_actions.can_make_pdf(paths):
+            return []
+        items = []
+        if quick_actions.can_rotate(paths):
+            items += [("Rotate Left", lambda: self._rotate(paths, False)),
+                      ("Rotate Right", lambda: self._rotate(paths, True))]
+        return items + [("Create PDF", lambda: self._make_pdf(paths)), (None, None)]
+
+    def _rotate(self, paths, clockwise):
+        quick_actions.rotate(paths, clockwise)
+        self.refresh()
+
+    def _make_pdf(self, paths):
+        pdf, _error = quick_actions.make_pdf(paths)
+        self.refresh()
+        icon = self.icons.get(os.path.basename(pdf)) if pdf else None
+        if icon:
+            self.click(icon, False)
 
     def new_folder_with(self, icons):
         """New Folder with Selection: the chosen icons go into a new folder."""

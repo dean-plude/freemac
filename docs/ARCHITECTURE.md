@@ -268,6 +268,14 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   left unsorted). **New Folder with Selection** (`transfer.folder_with`)
   renames the items into a new folder beside them and notes a "group"
   record, which Undo moves back and removes the folder if it is empty.
+  **Spring-loaded folders** (1.50): every drop target in Drawer starts a
+  short timer when a drag rests on a folder and opens it when the timer
+  ends; the drag hands over the files picked up when it began, not the
+  window's selection, which is empty after the folder changes.
+  **Quick Actions** (`quick_actions.py`, 1.50) turn a picture with
+  GdkPixbuf and save it back in its own format (JPEG, PNG, TIFF, BMP), and
+  make a PDF with cairo's PDF surface, one page per picture fitted to an
+  A4 page's long side; a made PDF is noted for Undo like a copy.
   **Glance** (`drawer_glance.py`) is a
   plain window that follows the selection while open. Since 1.46 it also
   opens from the desktop, plays movies and music with its own GStreamer
