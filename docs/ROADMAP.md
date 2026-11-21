@@ -698,6 +698,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Desktop icons keep clear of a Dock on the right, and use the whole height when the Dock is on a side or hides | Backdrop | done |
 | 4 | Guide: moving the Dock | Guide | done |
 
+## 1.64 "menu bar that hides" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The menu bar slides away and comes back when the pointer reaches the top of the screen; windows use the whole height | Topline | done |
+| 2 | Open menus and Help keep it on screen | Topline | done |
+| 3 | Dials > Dock and Menu Bar: Automatically hide and show the menu bar | Dials | done |
+| 4 | Guide: hiding the menu bar | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
