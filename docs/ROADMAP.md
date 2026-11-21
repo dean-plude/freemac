@@ -643,6 +643,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Get Info, Rename Items and View Options from the desktop open with a normal-sized frame | Backdrop | done |
 | 3 | Guide: View Options in Tidy the desktop with stacks | Guide | done |
 
+## 1.58 "notifications" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Notifications from one app sit in a stack in the centre; a click spreads them out, and the x by the app's name clears them | Beacon | done |
+| 2 | Do Not Disturb every day between two times, shown by the menu bar's icon and in the centre | Beacon, Topline, Dials | done |
+| 3 | Dials > Notifications lists each app that has sent one, with Banners, In Notification Centre only or Off | Dials, Beacon | done |
+| 4 | Guide: Manage notifications and Do Not Disturb | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

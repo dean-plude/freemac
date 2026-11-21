@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, startup_sound, style  # noqa: E402
+from . import alert, notify_rules, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -321,13 +321,92 @@ def notifications(window):
         GLib.timeout_add_seconds(2, lambda: clear.set_sensitive(True) or False)
 
     clear.connect("clicked", clear_history)
+
+    # Do Not Disturb every day between two times.
+    rule = notify_rules.schedule(prefs)
+
+    def times():
+        combo = Gtk.ComboBoxText()
+        for minutes in range(0, 24 * 60, 30):
+            text = f"{minutes // 60:02d}:{minutes % 60:02d}"
+            combo.append(text, text)
+        return combo
+    start, end = times(), times()
+    start.set_active_id(rule["from"])
+    end.set_active_id(rule["to"])
+    if not start.get_active_id():          # a time set by hand, not on the half hour
+        start.append(rule["from"], rule["from"])
+        start.set_active_id(rule["from"])
+    if not end.get_active_id():
+        end.append(rule["to"], rule["to"])
+        end.set_active_id(rule["to"])
+    span = Gtk.Box(spacing=6)
+    span.pack_start(Gtk.Label(label="From"), False, False, 0)
+    span.pack_start(start, False, False, 0)
+    span.pack_start(Gtk.Label(label="to"), False, False, 0)
+    span.pack_start(end, False, False, 0)
+
+    def save_schedule(**change):
+        now = notify_rules.schedule(style.prefs())
+        now.update(change)
+        window.save_prefs(dnd_schedule=now)
+        span.set_sensitive(now["on"])
+    start.connect("changed", lambda c: save_schedule(**{"from": c.get_active_id()}))
+    end.connect("changed", lambda c: save_schedule(to=c.get_active_id()))
+    span.set_sensitive(rule["on"])
+
+    # One row for each app that has sent a notification.
+    from . import beacon
+
+    apps = notify_rules.known_apps(beacon.APPS)
+    app_rows = []
+    for app in sorted(apps, key=str.casefold):
+        combo = Gtk.ComboBoxText()
+        for key, label in notify_rules.STYLES:
+            combo.append(key, label)
+        combo.set_active_id(notify_rules.app_style(prefs, app))
+
+        def chosen(c, app=app):
+            choices = style.prefs().get("notify_apps")
+            choices = dict(choices) if isinstance(choices, dict) else {}
+            if c.get_active_id() == "banners":
+                choices.pop(app, None)
+            else:
+                choices[app] = c.get_active_id()
+            window.save_prefs(notify_apps=choices)
+        combo.connect("changed", chosen)
+        line = row(app, combo)
+        icon = _app_icon(apps[app])
+        line.get_child().pack_start(icon, False, False, 0)
+        line.get_child().reorder_child(icon, 0)
+        app_rows.append(line)
+    if not app_rows:
+        app_rows.append(row("No apps have sent notifications yet."))
     return page("Notifications", group(
         row("Do Not Disturb", switch(bool(prefs.get("dnd")), lambda on: window.save_prefs(dnd=on)),
             "Banners stay hidden; notifications still collect in the list. Urgent ones still show."),
+        row("Turn on at set times", switch(rule["on"], lambda on: save_schedule(on=on)),
+            "Do Not Disturb comes on by itself every day, for example overnight."),
+        row("Every day", span),
         row("Show banners for", seconds),
-    ), group(
+    ), group(*app_rows), group(
         row("Notification history", clear, "Click the clock in the menu bar to see recent notifications."),
     ))
+
+
+def _app_icon(icon):
+    """A notifying app's icon for its row: a file or an icon name."""
+    if icon and os.path.isabs(icon) and os.path.exists(icon):
+        try:
+            from gi.repository import GdkPixbuf
+
+            return Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 24, 24, True))
+        except GLib.Error:
+            pass
+    name = icon if icon and not os.path.isabs(icon) else "preferences-system-notifications"
+    image = Gtk.Image.new_from_icon_name(name, Gtk.IconSize.LARGE_TOOLBAR)
+    image.set_pixel_size(24)
+    return image
 
 
 # ---- Screen Saver -----------------------------------------------------------------

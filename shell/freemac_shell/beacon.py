@@ -11,6 +11,8 @@ interface.
 Preferences live in ~/.config/freemac/shell.json, written by Dials:
   "dnd": true/false          Do Not Disturb (banners hidden, history kept)
   "banner_seconds": 5        how long a normal banner stays
+  "dnd_schedule", "notify_apps"   a Do Not Disturb schedule and each app's
+                                  choice (see notify_rules.py)
 """
 import datetime as dt
 import html
@@ -28,7 +30,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, minimonth, reminders_store, style  # noqa: E402
+from . import calendar_store, minimonth, notify_rules, reminders_store, style  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
@@ -36,6 +38,7 @@ OWN_IFACE = "org.freemac.Beacon"
 SNOOZE, SNOOZE_MINUTES = "x-freemac-snooze", 5
 DONE = "x-freemac-done"   # Nudge: mark the reminder completed
 HISTORY = os.path.join(GLib.get_user_state_dir(), "freemac", "notifications.json")
+APPS = os.path.join(GLib.get_user_state_dir(), "freemac", "notification-apps.json")
 KEEP = 50
 MAX_BANNERS = 3
 
@@ -95,6 +98,17 @@ CSS = """
 .beacon-center label { color: @ink; }
 .beacon-center .beacon-heading { font-weight: 700; font-size: 15px; }
 .beacon-center .beacon-empty { color: @dim; }
+.beacon-center .beacon-group { font-weight: 700; font-size: 13px; }
+.beacon-center button.beacon-more { padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+.beacon-center button.beacon-close { padding: 0; min-width: 20px; min-height: 20px; border-radius: 10px; }
+.beacon-center .beacon-stack-1, .beacon-center .beacon-stack-2 {
+  background-color: alpha(@ink, 0.05);
+  border: 1px solid @edge;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+}
+.beacon-center .beacon-stack-1 { margin: 0 8px; }
+.beacon-center .beacon-stack-2 { margin: 0 16px; opacity: 0.7; }
 .beacon-center .beacon-day { color: @dim; font-size: 12px; font-weight: 700; }
 .beacon-center button.beacon-event { padding: 3px 6px; border-radius: 8px; }
 .beacon-center .beacon-event-time { color: @dim; font-size: 12px; }
@@ -229,8 +243,12 @@ class Card(Gtk.EventBox):
         self.connect("button-release-event", self._clicked)
         self.show_all()
 
+    on_click = None
+
     def _clicked(self, _widget, event):
-        if event.button == 1:
+        if event.button == 1 and self.on_click:
+            self.on_click()
+        elif event.button == 1:
             self.beacon.activate(self.note)
         return False
 
@@ -259,6 +277,7 @@ class Beacon:
     def __init__(self):
         self.next_id = 1
         self.live = {}       # id -> (note, card, timer)
+        self.expanded = set()   # apps whose notifications are spread out in the centre
         self.history = self._load()
         self.events = []
         self.alert_events, self.alert_stamp = [], None
@@ -372,13 +391,17 @@ class Beacon:
         else:
             self._drop_banner(nid)
         note = Note(nid, app, icon, summary, body, actions, hints, timeout)
+        prefs = style.prefs()
+        notify_rules.remember_app(APPS, note.app, note.icon)
+        choice = notify_rules.app_style(prefs, note.app)
+        if choice == "off" and note.urgency < 2:
+            return nid          # turned off for this app in Dials: not shown, not kept
         if not note.transient:
             self.history = [n for n in self.history if n.id != nid]
             self.history.insert(0, note)
             del self.history[KEEP:]
             self._save()
-        prefs = style.prefs()
-        quiet = prefs.get("dnd") and note.urgency < 2
+        quiet = (notify_rules.quiet(prefs) or choice == "list") and note.urgency < 2
         if self.center and self.center.get_visible():
             self._fill_center()
         elif not quiet:
@@ -464,6 +487,20 @@ class Beacon:
         self._save()
         self._fill_center()
 
+    def forget_app(self, app):
+        """The x on an app's group in the centre: clear all of its notifications."""
+        self.history = [n for n in self.history if (n.app or "") != app]
+        self.expanded.discard(app)
+        self._save()
+        self._fill_center()
+
+    def toggle_group(self, app):
+        if app in self.expanded:
+            self.expanded.discard(app)
+        else:
+            self.expanded.add(app)
+        self._fill_center()
+
     def clear_all(self):
         self.history = []
         self._save()
@@ -513,6 +550,10 @@ class Beacon:
         self.dnd_handler = self.dnd.connect("notify::active", self._dnd_toggled)
         row.pack_start(self.dnd, False, False, 0)
         outer.pack_start(row, False, False, 0)
+        self.dnd_note = Gtk.Label(xalign=1)
+        self.dnd_note.get_style_context().add_class("beacon-empty")
+        self.dnd_note.set_no_show_all(True)
+        outer.pack_start(self.dnd_note, False, False, 0)
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroller.set_vexpand(True)
         scroller.set_min_content_height(260)
@@ -656,9 +697,56 @@ class Beacon:
             empty.get_style_context().add_class("beacon-empty")
             empty.set_margin_top(24)
             self.list_box.pack_start(empty, False, False, 0)
-        for note in self.history:
-            self.list_box.pack_start(Card(self, note, in_center=True), False, False, 0)
+        if notify_rules.scheduled_quiet(style.prefs()) and not style.prefs().get("dnd"):
+            until = notify_rules.schedule(style.prefs())["to"]
+            self.dnd_note.set_text(f"On by schedule until {until}")
+            self.dnd_note.show()
+        else:
+            self.dnd_note.hide()
+        for app, notes in notify_rules.grouped(self.history):
+            if len(notes) == 1:
+                self.list_box.pack_start(Card(self, notes[0], in_center=True), False, False, 0)
+                continue
+            self.list_box.pack_start(self._group(app, notes), False, False, 0)
         self.list_box.show_all()
+
+    def _group(self, app, notes):
+        """Several notifications from one app: the newest on top of a stack,
+        spread out by a click, as a Mac's notification centre does."""
+        open_ = app in self.expanded
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        head = Gtk.Box(spacing=6)
+        name = Gtk.Label(label=app or "Notifications", xalign=0)
+        name.get_style_context().add_class("beacon-group")
+        head.pack_start(name, True, True, 0)
+        more = Gtk.Button(label="Show Less" if open_ else f"Show All ({len(notes)})")
+        more.set_relief(Gtk.ReliefStyle.NONE)
+        more.get_style_context().add_class("beacon-more")
+        more.connect("clicked", lambda *_: self.toggle_group(app))
+        head.pack_start(more, False, False, 0)
+        clear = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
+        clear.set_relief(Gtk.ReliefStyle.NONE)
+        clear.set_tooltip_text(f"Clear {app or 'these'} notifications")
+        clear.get_style_context().add_class("beacon-close")
+        clear.connect("clicked", lambda *_: self.forget_app(app))
+        head.pack_start(clear, False, False, 0)
+        box.pack_start(head, False, False, 0)
+        if open_:
+            for note in notes:
+                box.pack_start(Card(self, note, in_center=True), False, False, 0)
+            return box
+        top = Card(self, notes[0], in_center=True)
+        top.on_click = lambda: self.toggle_group(app)   # a click spreads the stack out
+        box.pack_start(top, False, False, 0)
+        # The edges of the ones under it, peeking out below.
+        for depth in range(min(2, len(notes) - 1)):
+            edge = Gtk.Box()
+            edge.get_style_context().add_class(f"beacon-stack-{depth + 1}")
+            edge.set_size_request(-1, 6)
+            box.pack_start(edge, False, False, 0)
+        box.set_spacing(0)
+        head.set_margin_bottom(6)
+        return box
 
     def _center_key(self, _window, event):
         if event.keyval == Gdk.KEY_Escape:
