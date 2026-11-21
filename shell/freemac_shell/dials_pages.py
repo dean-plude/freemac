@@ -38,7 +38,7 @@ SEARCH_WORDS = {
     "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode theme accent text size tiling",
-    "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors",
+    "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors speak selection speech read aloud out loud voice spoken content text to speech",
     "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution brightness night light scale monitor",
     "wallpaper": "background desktop picture",
