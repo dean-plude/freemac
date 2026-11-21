@@ -15,6 +15,12 @@ case "$1 $2" in
     # scanners and phones on the same Wi-Fi are still found.
     ufw allow in proto udp to 224.0.0.251 port 5353 comment 'freemac: find printers and phones' >/dev/null
     ufw allow in proto udp to ff02::fb port 5353 comment 'freemac: find printers and phones' >/dev/null 2>&1 || true
+    # And nearby sharing (Hail), from this network only; it still asks
+    # before taking any file, and listens only while it's turned on.
+    ufw allow in proto udp to 224.0.0.167 port 53317 comment 'freemac: nearby sharing' >/dev/null
+    for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+      ufw allow in proto tcp from "$net" to any port 53317 comment 'freemac: nearby sharing' >/dev/null
+    done
     ufw --force enable >/dev/null
     ;;
   "firewall off")

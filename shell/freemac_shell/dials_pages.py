@@ -30,7 +30,7 @@ PAGES = {
 
 # Other words people use for what's on each page, for the sidebar's search.
 SEARCH_WORDS = {
-    "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections",
+    "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections nearby sharing airdrop receive files localsend",
     "bluetooth": "pair headphones speaker mouse keyboard",
     "notifications": "alerts banners do not disturb focus",
     "sound": "volume speaker microphone output input audio alert chime",

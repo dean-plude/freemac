@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Share: send files by mail in Post, or copy them to a drive.
+"""Share: send files to a device nearby (Hail), by mail in Post, or copy
+them to a drive.
 
 Drawer, Cove and Frame offer it the same way: a Share button in the
 toolbar, Share in the right-click menu, and File > Share. Mail opens a new
@@ -55,6 +56,14 @@ def mail(paths):
         pass
     try:
         subprocess.Popen(["freemac-post", uri], start_new_session=True)
+    except OSError:
+        pass
+
+
+def nearby(paths):
+    """Send the files to a computer or phone nearby, with Hail."""
+    try:
+        subprocess.Popen(["freemac-hail", "--send", *paths], start_new_session=True)
     except OSError:
         pass
 
@@ -139,8 +148,11 @@ def _drives_for(paths):
 
 
 def menu(parent, paths, told=None):
-    """The Share menu: Mail, then Copy to each drive that is plugged in."""
+    """The Share menu: Nearby, Mail, then Copy to each drive that is plugged in."""
     shown = Gtk.Menu()
+    item = Gtk.MenuItem(label="Nearby\u2026", sensitive=bool(paths))
+    item.connect("activate", lambda *_: nearby(paths))
+    shown.append(item)
     item = Gtk.MenuItem(label="Mail", sensitive=can_mail(paths))
     item.connect("activate", lambda *_: mail(paths))
     shown.append(item)
@@ -181,6 +193,7 @@ def popup(parent, paths, widget=None, told=None):
         section.append(label, "share." + name)
 
     first = Gio.Menu()
+    add(first, "Nearby\u2026", "nearby", lambda: nearby(paths), bool(paths))
     add(first, "Mail", "mail", lambda: mail(paths), can_mail(paths))
     model.append_section(None, first)
     drives = _drives_for(paths)

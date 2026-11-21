@@ -41,7 +41,8 @@ HELPER_NAMES = {
     "gtklock": "Lock Screen",
     "freemac-backdrop": "Drawer",   # the desktop's own windows, such as Get Info
     DESKTOP_WINDOW: "Drawer",
-    "freemac-power": "freemac",   # Restart, Shut Down and Log Out's question
+    "freemac-power": "freemac",
+    "freemac-hail": "Nearby",   # Hail's window and its questions   # Restart, Shut Down and Log Out's question
 }
 
 

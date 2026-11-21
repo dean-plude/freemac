@@ -427,11 +427,23 @@ TOPICS = {
     "share": ("Send files by mail or copy them to a drive", "share send mail email attach copy usb drive stick", [
         "In Drawer, Cove or Frame, select what you want to send and click the Share button at the top "
         "(a tray with an arrow), or right-click and choose Share. File > Share… does the same.",
+        "Nearby\u2026 sends them over Wi-Fi to a computer or phone in the same room.",
         "Mail opens a new message in Post with the files attached. Type who it's to and click Send.",
         "Copy to puts a copy on a USB drive or memory card that's plugged in. If the drive already has a file "
         "with that name, the copy is called “name 2”, so nothing is replaced.",
         "When the copy is done, Drawer's status line or a notification says so. "
         "Eject the drive before you unplug it.",
+    ]),
+    "nearby": ("Send files to a computer or phone nearby", "nearby airdrop send share phone iphone android tablet wifi wireless localsend transfer receive photos", [
+        "In Drawer, Cove or Frame, select what you want to send, click the Share button and choose "
+        "Nearby\u2026. Computers and phones on the same Wi-Fi appear as round icons; click one to send.",
+        "The other device asks its owner first. Its icon then says Waiting, Sending and Sent, or Declined. "
+        "Click it while it's sending to stop.",
+        "To let others send to you, turn on Let nearby devices send files here, at the bottom of the "
+        "Nearby window or in Dials > Network. Each time, you're asked whether to accept, and accepted "
+        "files go in Downloads.",
+        "Phones, tablets and Windows computers need the free LocalSend app. Other freemac computers "
+        "already have it built in.",
     ]),
     "copy-files": ("Copy, move and duplicate files", "copy paste move cut duplicate drag folder undo files "
                    "replace keep both", [
