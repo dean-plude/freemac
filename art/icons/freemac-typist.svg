@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Typist: a keyboard with one key lit up. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fd1a5"/><stop offset="1" stop-color="#1f9a72"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="18" y="40" width="92" height="56" rx="9" fill="#f4f6f8"/>
+  <g fill="#c9d0d8">
+    <rect x="24" y="47" width="11" height="11" rx="2.5"/><rect x="38" y="47" width="11" height="11" rx="2.5"/>
+    <rect x="52" y="47" width="11" height="11" rx="2.5"/><rect x="66" y="47" width="11" height="11" rx="2.5"/>
+    <rect x="80" y="47" width="11" height="11" rx="2.5"/><rect x="94" y="47" width="11" height="11" rx="2.5"/>
+    <rect x="28" y="62" width="11" height="11" rx="2.5"/><rect x="42" y="62" width="11" height="11" rx="2.5"/>
+    <rect x="70" y="62" width="11" height="11" rx="2.5"/>
+    <rect x="84" y="62" width="11" height="11" rx="2.5"/><rect x="36" y="78" width="56" height="11" rx="2.5"/>
+  </g>
+  <rect x="56" y="62" width="11" height="11" rx="2.5" fill="#ff8a3d"/>
+  <rect x="58.5" y="70" width="6" height="1.6" rx="0.8" fill="#ffffff"/>
+  <path d="M64 18 v16 M57 27 l7 7 l7 -7" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

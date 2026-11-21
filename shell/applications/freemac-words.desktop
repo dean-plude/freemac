@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Words
+GenericName=Dictionary
+Comment=Look up what a word means, with examples and words that mean the same
+Exec=freemac-words %u
+Icon=freemac-words
+Categories=Office;Dictionary;Education;
+Keywords=dictionary;define;definition;meaning;thesaurus;synonym;word;spelling;
+StartupWMClass=org.freemac.Words
+StartupNotify=true

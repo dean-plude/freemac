@@ -417,6 +417,14 @@ The small things a Mac user notices in their first minute.
 | 2 | Mines: clear a field without setting off a mine, in three sizes; the first click is always safe, right-click flags, best times kept | Mines | done |
 | 3 | Read e-books: a shelf of your EPUB books with their covers, page by page with a contents list, bigger or smaller text, light, sepia or night pages, and it keeps your place | Books | done |
 
+## 1.32 "play, look up and type" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A piano to play with the mouse or the keyboard, with a few instruments whose sounds freemac makes itself, and a way to record a tune and play it back | Ivory | done |
+| 2 | A dictionary that works without the internet: definitions, examples and words that mean the same, from WordNet | Words | done |
+| 3 | Typing practice for children and grown-ups: lessons a few keys at a time, a keyboard that shows the next key, and speed and accuracy kept | Typist | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
