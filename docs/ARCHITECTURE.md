@@ -272,6 +272,13 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   short timer when a drag rests on a folder and opens it when the timer
   ends; the drag hands over the files picked up when it began, not the
   window's selection, which is empty after the folder changes.
+  **Status bar** (1.52): the label under the files counts the open
+  folder's items (the last column's in column view) and the chosen ones,
+  and adds the space left from `os.statvfs`; a message Drawer shows there
+  stays for four seconds before the counts come back. **Show Item Info**
+  on the desktop (`desktop_icons.item_info`, saved in the layout file) reads
+  a picture's size from its header with `GdkPixbuf.Pixbuf.get_file_info`
+  and counts a folder's visible items; the grid's rows move apart to fit.
   **Quick Actions** (`quick_actions.py`, 1.50) turn a picture with
   GdkPixbuf and save it back in its own format (JPEG, PNG, TIFF, BMP), and
   make a PDF with cairo's PDF surface, one page per picture fitted to an
