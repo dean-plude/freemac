@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, share, tags, transfer, volumes  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, recents, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -209,7 +209,16 @@ class Folder:
         self.store.set_sort_column_id(C_SORT, Gtk.SortType.ASCENDING)
         self.error = None
         self.waiting = []
-        if path.startswith(tags.PREFIX):
+        if path == recents.PLACE:
+            # Recents: the files opened lately, newest first, from all over.
+            self.store.set_sort_column_id(Gtk.TREE_SORTABLE_UNSORTED_SORT_COLUMN_ID, Gtk.SortType.ASCENDING)
+            for full in recents.files():
+                try:
+                    info = Gio.File.new_for_path(full).query_info(ATTRS, Gio.FileQueryInfoFlags.NONE, None)
+                except GLib.Error:
+                    continue
+                self._add(info, full)
+        elif path.startswith(tags.PREFIX):
             # A tag in the sidebar: every file with that tag, wherever it is.
             for full in tags.tagged(path[len(tags.PREFIX):]):
                 try:
@@ -491,6 +500,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return "Home"
         if path and path.startswith(tags.PREFIX):
             return path[len(tags.PREFIX):]
+        if path == recents.PLACE:
+            return "Recents"
         if path and os.path.realpath(path) == os.path.realpath(TRASH):
             return "Trash"
         return os.path.basename(path) or "Computer"
@@ -670,7 +681,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                         f"somewhere else, ⌥⌘V moves {'it' if one else 'them'}.")
 
     def paste(self, move=False):
-        if self.in_tag():
+        if self.in_virtual():
             self.notify("Open a folder to paste into.")
             return
         paths = transfer.pasted_files()
@@ -726,7 +737,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.monitor.cancel()
             self.monitor = None
         self.watched = self.path
-        if self.in_tag():
+        if self.in_virtual():
             return   # files from all over; changed tags refresh it themselves
         try:
             self.monitor = Gio.File.new_for_path(self.path).monitor_directory(
@@ -784,6 +795,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "browse-backups": self.browse_backups,
             "put-back": self.put_back,
             "go-to-folder": self.go_to_folder,
+            "go-recents": lambda: self.navigate(recents.PLACE),
+            "new-folder-with": self.new_folder_with,
+            "show-enclosing": self.show_enclosing,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -816,6 +830,19 @@ class DrawerWindow(Gtk.ApplicationWindow):
         heading = Gtk.Label(label="Favorites", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
+        self.recent_list = Gtk.ListBox(can_focus=False)
+        self.recent_list.get_style_context().add_class("drawer-sidebar")
+        self.recent_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
+        row = Gtk.ListBoxRow(can_focus=False)
+        row.path, row.mount = recents.PLACE, "recents"
+        line = Gtk.Box(spacing=8)
+        line.pack_start(Gtk.Image.new_from_icon_name("document-open-recent-symbolic", Gtk.IconSize.MENU),
+                        False, False, 0)
+        line.pack_start(Gtk.Label(label="Recents", xalign=0), True, True, 0)
+        row.add(line)
+        self.recent_list.add(row)
+        self.place_rows.append((self.recent_list, row))
+        box.pack_start(self.recent_list, False, False, 0)
         self.fav_list = Gtk.ListBox(can_focus=False)
         self.fav_list.get_style_context().add_class("drawer-sidebar")
         self.fav_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
@@ -897,6 +924,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def in_tag(self):
         return bool(self.path) and self.path.startswith(tags.PREFIX)
+
+    def in_virtual(self):
+        """A tag or Recents: files gathered from all over, not one folder."""
+        return self.in_tag() or self.path == recents.PLACE
 
     def _tags_changed(self, error, keep):
         if error is not None:
@@ -1078,7 +1109,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- navigation -----------------------------------------------------
     def navigate(self, path, remember=True):
-        if not path.startswith(tags.PREFIX):
+        if not path.startswith(tags.PREFIX) and path != recents.PLACE:
             path = os.path.abspath(os.path.expanduser(path))
         if remember and self.path and path != self.path:
             self.history.append(self.path)
@@ -1111,17 +1142,19 @@ class DrawerWindow(Gtk.ApplicationWindow):
         model = self._model(folder)
         self.icon_view.set_model(model)
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
-        if self.view_mode == "columns" and not self.in_tag():
+        if self.view_mode == "columns" and not self.in_virtual():
             self._reset_columns()
         count = len(model)
         self.status.set_text(folder.error or f"{count} item{'s' if count != 1 else ''}")
         # A tag's files come from many folders, so it has no columns: a list.
-        self.content.set_visible_child_name("list" if self.in_tag() and self.view_mode == "columns"
+        self.content.set_visible_child_name("list" if self.in_virtual() and self.view_mode == "columns"
                                             else self.view_mode)
         in_trash = self.in_trash()
         self.trash_bar.set_visible(in_trash)
         self.empty_button.set_sensitive(in_trash and count > 0)
         self.lookup_action("put-back").set_enabled(in_trash)
+        self.lookup_action("new-folder-with").set_enabled(not self.in_virtual() and not in_trash)
+        self.lookup_action("show-enclosing").set_enabled(self.in_virtual())
         self._draw_path_bar()
         self._watch()
 
@@ -1245,6 +1278,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return
         try:
             Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
+            recents.note(path)
         except GLib.Error as err:
             self.notify(f"No app can open “{os.path.basename(path)}” ({err.message}).")
 
@@ -1330,7 +1364,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return []
 
     def new_folder(self):
-        if self.in_tag():
+        if self.in_virtual():
             self.notify("Open a folder to make a new folder in.")
             return
         base = self.path
@@ -1345,6 +1379,33 @@ class DrawerWindow(Gtk.ApplicationWindow):
         transfer.note_done({"kind": "new-folder", "path": os.path.join(base, name)})
         self.refresh()
         self.rename(os.path.join(base, name))
+
+    def new_folder_with(self):
+        """New Folder with Selection: the chosen items go into a new folder
+        beside them, which is then ready to be named."""
+        paths = self.selected_paths()
+        if not paths or self.in_virtual() or self.in_trash():
+            return
+        folder, error = transfer.folder_with(paths)
+        if error is not None:
+            self.notify(f"Couldn’t move everything into the new folder: {error.strerror}.")
+        if folder is None:
+            return
+        self.refresh()
+        self.select_paths([folder])
+        self.rename(folder)
+
+    def show_enclosing(self):
+        """From Recents or a tag: open the folder a file is in, with it chosen."""
+        paths = self.selected_paths()
+        if not paths:
+            return
+        self.navigate(os.path.dirname(paths[0]))
+        GLib.idle_add(lambda: self.select_paths([paths[0]]) and False)
+
+    def forget_recent(self):
+        recents.forget(self.selected_paths())
+        self.refresh()
 
     def rename(self, path=None):
         paths = [path] if path else self.selected_paths()
@@ -1478,7 +1539,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return
         home = GLib.get_home_dir()
         path = self.path
-        if self.in_tag():
+        if path == recents.PLACE:
+            crumbs = [("Recents", path, "document-open-recent-symbolic")]
+        elif self.in_virtual():
             crumbs = [(self._label(path), path, None)]
         elif self.in_trash():
             crumbs = [("Trash", TRASH, "user-trash-symbolic")]
@@ -1488,7 +1551,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         else:
             crumbs = [("Computer", "/", "drive-harddisk-symbolic")]
             base = "/"
-        if not self.in_trash() and not self.in_tag():
+        if not self.in_trash() and not self.in_virtual():
             for part in os.path.relpath(path, base).split(os.sep):
                 if part in ("", "."):
                     continue
@@ -1616,6 +1679,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
     def _open_with(self, app, files):
         try:
             app.launch([Gio.File.new_for_path(f) for f in files], None)
+            for f in files:
+                recents.note(f)
         except GLib.Error as err:
             self.notify(f"{app.get_display_name()} couldn’t open it ({err.message}).")
 
@@ -1647,7 +1712,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.list_view.get_selection().select_all()
 
     def go_up(self):
-        if self.in_tag():
+        if self.in_virtual():
             return
         parent = os.path.dirname(self.path)
         if parent != self.path:
@@ -1701,6 +1766,16 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 (None, None, True),
             )
         in_trash = self.in_trash()
+        extra = ()
+        if self.in_virtual():
+            extra += (("Show in Enclosing Folder", lambda *_: self.show_enclosing(), has_selection),)
+        if self.path == recents.PLACE:
+            extra += (("Remove from Recents", lambda *_: self.forget_recent(), has_selection),)
+        if selected and not self.in_virtual() and not in_trash:
+            extra += ((f"New Folder with Selection ({len(selected)} Item{'s' if len(selected) != 1 else ''})",
+                       lambda *_: self.new_folder_with(), True),)
+        if extra:
+            extra += ((None, None, True),)
         for label, handler, enabled in app_items + (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Open With", None, has_selection),
@@ -1709,6 +1784,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Put Back" if in_trash else "Move to Trash",
              (lambda *_: self.put_back()) if in_trash else (lambda *_: self.trash()), has_selection),
             (None, None, True),
+        ) + extra + (
             ("Duplicate", lambda *_: self.duplicate(), has_selection),
             ("Copy", lambda *_: self.copy(), has_selection),
             ("Paste Item", lambda *_: self.paste(), True),
@@ -1817,6 +1893,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.toggle_hidden()
         elif ctrl and key in (Gdk.KEY_1, Gdk.KEY_2, Gdk.KEY_3):
             self.view_buttons[VIEWS[key - Gdk.KEY_1][0]].set_active(True)
+        elif ctrl and shift and key in (Gdk.KEY_f, Gdk.KEY_F):
+            self.navigate(recents.PLACE)
         elif ctrl and key in (Gdk.KEY_f, Gdk.KEY_F):
             self.search.grab_focus()
         elif (ctrl and key == Gdk.KEY_bracketleft) or key == Gdk.KEY_BackSpace or (
@@ -1852,8 +1930,10 @@ def menubar():
     return menus.menubar([
         ("_File", [
             [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
-             ("New Folder", "win.new-folder", "<Ctrl><Shift>n")],
+             ("New Folder", "win.new-folder", "<Ctrl><Shift>n"),
+             ("New Folder with Selection", "win.new-folder-with", None)],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
+            [("Show in Enclosing Folder", "win.show-enclosing", None)],
             [("Duplicate", "win.duplicate", "<Ctrl>d")],
             [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
@@ -1881,7 +1961,7 @@ def menubar():
         ("_Go", [
             [("Back", "win.back", "<Ctrl>bracketleft"), ("Forward", "win.forward", "<Ctrl>bracketright"),
              ("Enclosing Folder", "win.up", "<Ctrl>Up")],
-            [("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
+            [("Recents", "win.go-recents", "<Ctrl><Shift>f"), ("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
              ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
              ("Computer", "win.go-computer", None)],
             [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g")],

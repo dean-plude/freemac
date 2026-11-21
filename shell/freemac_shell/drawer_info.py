@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import macapps  # noqa: E402
+from . import macapps, tags  # noqa: E402
 
 ATTRS = ",".join((
     "standard::display-name", "standard::content-type", "standard::icon", "standard::size",
@@ -134,6 +134,13 @@ class InfoWindow(Gtk.Window):
         modified = info.get_modification_date_time()
         rows.append(("Created", stamp_text(created.to_unix() if created else 0)))
         rows.append(("Modified", stamp_text(modified.to_unix() if modified else 0)))
+        self.tag_note = Gtk.Label(xalign=0)
+        self.tag_note.get_style_context().add_class("dim-label")
+        tag_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        tag_box.pack_start(tags.picker([path], self._tagged), False, False, 0)
+        tag_box.pack_start(self.tag_note, False, False, 0)
+        self.tag_note.set_no_show_all(True)
+        rows.append(("Tags", tag_box))
         for row, (label, value) in enumerate(rows):
             self._row(grid, row, label, value)
         box.pack_start(grid, False, False, 0)
@@ -148,6 +155,11 @@ class InfoWindow(Gtk.Window):
         box.pack_start(perms, False, False, 0)
         self.add(box)
         self.connect("key-press-event", self._key)
+
+    def _tagged(self, error):
+        if error is not None:
+            self.tag_note.set_text("This disk can’t keep tags.")
+            self.tag_note.show()
 
     @staticmethod
     def _row(grid, row, label, value):

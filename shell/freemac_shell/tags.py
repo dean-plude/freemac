@@ -212,6 +212,53 @@ def _style():
     _styled.append(provider)
 
 
+def picker(paths, done=None):
+    """The seven colours as a row of dots for a window (Get Info): a click
+    adds the tag or takes it off, and a tick shows the tags the files have."""
+    step, radius = 22, 7.5
+    area = Gtk.DrawingArea()
+    area.set_size_request(step * len(COLORS), 20)
+    area.set_halign(Gtk.Align.START)
+    area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK
+                    | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+    state = {"over": None}
+
+    def index(x):
+        i = int(x // step)
+        return i if 0 <= i < len(COLORS) else None
+
+    def draw(_w, cr):
+        every = [set(get(p)) for p in paths]
+        for i, (name, color) in enumerate(COLORS):
+            draw_dot(cr, i * step + step / 2, 10, radius, color, ring=i == state["over"],
+                     tick=bool(every) and all(name in s for s in every))
+        return False
+
+    def motion(_w, event):
+        over = index(event.x)
+        if over != state["over"]:
+            state["over"] = over
+            area.queue_draw()
+        return False
+
+    def press(_w, event):
+        i = index(event.x)
+        if i is None or event.button != 1:
+            return False
+        error = toggle(paths, COLORS[i][0])
+        area.queue_draw()
+        if done is not None:
+            done(error)
+        return True
+
+    area.set_tooltip_text("Click a colour to tag, click again to untag")
+    area.connect("draw", draw)
+    area.connect("motion-notify-event", motion)
+    area.connect("leave-notify-event", lambda *_: (state.update(over=None), area.queue_draw()) and False)
+    area.connect("button-press-event", press)
+    return area
+
+
 def menu_item(paths, done):
     """A menu row of the seven colours, as in Finder's menu: a click on one
     adds that tag to the chosen files, or takes it off. done(error) after."""

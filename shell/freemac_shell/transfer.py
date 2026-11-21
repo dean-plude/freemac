@@ -201,6 +201,8 @@ def undo_label(record=None):
         return "Undo Move to Trash"
     if kind == "new-folder":
         return "Undo New Folder"
+    if kind == "group":
+        return "Undo New Folder with Selection"
     return "Undo"
 
 
@@ -282,6 +284,31 @@ def put_back(paths):
     return went, error
 
 
+def folder_with(paths):
+    """New Folder with Selection: a new folder beside the items, named "New
+    Folder With Items", with the items moved into it. Returns the folder
+    (or None) and the first error."""
+    if not paths:
+        return None, None
+    base = os.path.dirname(os.path.abspath(paths[0]))
+    folder = os.path.join(base, free_name(base, "New Folder With Items"))
+    try:
+        os.mkdir(folder)
+    except OSError as err:
+        return None, err
+    pairs, error = [], None
+    for path in paths:
+        target = os.path.join(folder, os.path.basename(path))
+        try:
+            os.rename(path, target)   # beside it, so the same disk
+        except OSError as err:
+            error = error or err
+            continue
+        pairs.append((os.path.abspath(path), target))
+    note_done({"kind": "group", "folder": folder, "pairs": pairs})
+    return folder, error
+
+
 def empty_trash(trash=None):
     """Delete everything in the Trash for good (the files and their notes)."""
     trash = trash or os.path.join(GLib.get_user_data_dir(), "Trash")
@@ -345,6 +372,23 @@ def undo_last(parent=None, done=None):
         if path and os.path.isdir(path):
             to_trash([path])
             say(f"Moved “{os.path.basename(path)}” to the Trash.")
+        return True
+    if kind == "group":
+        back = []
+        for old, new in record.get("pairs", []):
+            if os.path.lexists(new) and not os.path.lexists(old):
+                try:
+                    os.rename(new, old)
+                    back.append(old)
+                except OSError:
+                    pass
+        folder = record.get("folder")
+        try:
+            if folder:
+                os.rmdir(folder)   # only when it is empty again
+        except OSError:
+            pass
+        say(f"Moved {_described(back)} back." if back else "Nothing was moved back.")
         return True
     if kind == "copy":
         made = [p for p in record.get("made", []) if os.path.lexists(p)]
