@@ -32,6 +32,7 @@ reminders on the desktop (desktop_widgets.py).
 import json
 import os
 import subprocess
+import sys
 from urllib.parse import unquote, urlparse
 
 import gi
@@ -876,6 +877,8 @@ class DesktopIcons(Gtk.Layout):
         items = [("Open", lambda: self.open(icons))]
         if len(icons) == 1:
             items.append(("Rename…", lambda: self.rename(icons[0])))
+        else:
+            items.append((f"Rename {len(icons)} Items…", lambda: self.rename_many(icons)))
         items += [("Get Info", lambda: self.get_info(icons)), ("Show in Drawer", self.show_folder),
                   ("Glance" if len(icons) == 1 else f"Glance at {len(icons)} Items", self.toggle_glance), (None, None),
                   ("\0tags", [i.path for i in icons]), (None, None),
@@ -1011,6 +1014,29 @@ class DesktopIcons(Gtk.Layout):
         entry.grab_focus()
         entry.select_region(0, len(stem))
         return True
+
+    def rename_many(self, icons):
+        # In its own process: a dialog this layer-shell process opens gets a frame
+        # far bigger than the window. It prints the names it changed.
+        cmd = [sys.executable, "-m", "freemac_shell.batch_rename"] + [i.path for i in icons]
+        try:
+            proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.STDOUT_PIPE)
+        except GLib.Error:
+            return
+        proc.communicate_utf8_async(None, None, self._renamed_many)
+
+    def _renamed_many(self, proc, result):
+        try:
+            _ok, out, _err = proc.communicate_utf8_finish(result)
+            done = json.loads(out or "[]")
+        except (GLib.Error, ValueError):
+            done = []
+        moved = {os.path.basename(old): os.path.basename(new) for old, new in done}
+        if moved:   # keep each icon where it was (names may have been swapped)
+            kept = {k: v for k, v in self.places.items() if k not in moved}
+            kept.update({moved[k]: v for k, v in self.places.items() if k in moved})
+            self.places = kept
+        self.refresh()
 
     def _apply_rename(self, icon, new, popover):
         popover.popdown()

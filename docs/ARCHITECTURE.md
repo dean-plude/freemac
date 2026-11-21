@@ -268,6 +268,13 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   left unsorted). **New Folder with Selection** (`transfer.folder_with`)
   renames the items into a new folder beside them and notes a "group"
   record, which Undo moves back and removes the folder if it is empty.
+  **Rename Items** (1.55, `batch_rename.py`) works out every new name first
+  and refuses the lot if any is empty, taken or given twice; it then renames
+  through hidden temporary names, so names can be swapped, and keeps one
+  Undo record for all of them. The desktop runs it as its own process
+  (`python3 -m freemac_shell.batch_rename`), because dialogs that the
+  layer-shell desktop opens itself get a frame far larger than the window;
+  the process prints the names it changed so icons keep their places.
   **Spring-loaded folders** (1.50): every drop target in Drawer starts a
   short timer when a drag rests on a folder and opens it when the timer
   ends; the drag hands over the files picked up when it began, not the

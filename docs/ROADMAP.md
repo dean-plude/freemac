@@ -619,6 +619,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | View > Show Preview (⇧⌘P): a pane with a large picture of the chosen file, its name and kind, and an Information list (created, modified, items, dimensions, tags) | Drawer | done |
 | 2 | Guide: the Preview pane in Sort, find and put back files | Guide | done |
 
+## 1.55 "rename items" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Rename Items for several files (F2 or right-click): Replace Text, Add Text before or after, or Format (name and index, counter or date), with an example and a warning for a taken name | Drawer, Backdrop | done |
+| 2 | One Undo puts every name back, swapped names included | Drawer, Backdrop | done |
+| 3 | Preview pane: no empty Information heading for several files | Drawer | done |
+| 4 | Guide: Rename Items in Find and organize files | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
