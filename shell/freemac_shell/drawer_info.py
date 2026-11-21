@@ -13,7 +13,8 @@ import time
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GLib, Gtk  # noqa: E402
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import macapps, tags  # noqa: E402
 
@@ -22,6 +23,22 @@ ATTRS = ",".join((
     "standard::type", "time::created", "time::modified", "unix::mode", "unix::uid",
     "access::can-read", "access::can-write",
 ))
+
+
+def item_info(path, content_type):
+    """The line Show Item Info puts under a name: how many items a folder
+    holds, or a picture's width and height, as a Mac's desktop does."""
+    if os.path.isdir(path):
+        try:
+            count = sum(1 for n in os.listdir(path) if not n.startswith("."))
+        except OSError:
+            return ""
+        return f"{count} item{'s' if count != 1 else ''}"
+    if (content_type or "").startswith("image/"):
+        found = GdkPixbuf.Pixbuf.get_file_info(path)
+        if found and found[0] is not None and found[1] > 0:
+            return f"{found[1]} \u00d7 {found[2]}"
+    return ""
 
 
 def nice_size(size):

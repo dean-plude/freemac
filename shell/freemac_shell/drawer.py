@@ -198,6 +198,7 @@ def place_icon(path):
 
 MAC_APP = "Mac App"
 SPRING_DELAY = 900   # ms a drag rests on a folder before it springs open
+TEXT_SIZES = (10, 11, 12, 13, 14, 16)   # points, for names in icon view
 THUMB_LARGEST = 60_000_000   # bytes; bigger pictures keep their kind's icon
 
 
@@ -207,8 +208,9 @@ class Folder:
     icon_cache = {}
     thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
-    def __init__(self, path, show_hidden=False, sort="name"):
+    def __init__(self, path, show_hidden=False, sort="name", icon_size=48, item_info=False):
         self.path = path
+        self.icon_size, self.item_info = icon_size, item_info
         self.store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str, bool, str, str, str, str, GdkPixbuf.Pixbuf,
                                    float, float, str)
         self.store.set_sort_func(C_SORT, compare_rows, sort)
@@ -258,25 +260,35 @@ class Folder:
         stamp = modified.to_unix() if modified else 0
         kind = "Folder" if is_dir else Gio.content_type_get_description(info.get_content_type() or "")
         name = info.get_display_name()
-        big, small = self.icon(info.get_icon(), 48), self.icon(info.get_icon(), 20)
+        big, small = self.icon(info.get_icon(), self.icon_size), self.icon(info.get_icon(), 20)
         if is_dir and macapps.is_bundle(full):
             # A Mac app is a folder, but it shows and opens as one app, with its own icon.
             is_dir, kind = False, MAC_APP
             name = macapps.display_name(full)
-            big, small = self.app_icon(full, 48), self.app_icon(full, 20)
+            big, small = self.app_icon(full, self.icon_size), self.app_icon(full, 20)
         names = tags.get(full)
         it = self.store.append([
             big, name, full, is_dir,
             "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
             ("0" if is_dir else "1") + name.lower(), small,
             float(stamp), 0.0 if is_dir or kind == MAC_APP else float(info.get_size()),
-            tags.markup(name, names),
+            self._markup(name, names, full, is_dir, info),
         ])
         content = info.get_content_type() or ""
         if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
                 and info.get_size() < THUMB_LARGEST:
             self.waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
         return names
+
+    def _markup(self, name, names, full, is_dir, info):
+        """The name under an icon, with its tags' dots and, with Show Item
+        Info, a folder's item count or a picture's size in blue below."""
+        markup = tags.markup(name, names)
+        if self.item_info and (is_dir or (info.get_content_type() or "").startswith("image/")):
+            extra = drawer_info.item_info(full, info.get_content_type())
+            if extra:
+                markup += f"\n<span size='smaller' foreground='#2f6fd6'>{GLib.markup_escape_text(extra)}</span>"
+        return markup
 
     def _thumbnails(self, waiting):
         """Pictures and PDFs show a small picture of themselves instead of
@@ -288,7 +300,7 @@ class Folder:
             ref, path, stamp = waiting.pop(0)
             if not ref.valid():
                 continue
-            big = self.thumbnail(path, stamp, 48)
+            big = self.thumbnail(path, stamp, self.icon_size)
             if big is not None:
                 it = self.store.get_iter(ref.get_path())
                 self.store.set(it, {C_ICON: big, C_SMALL: self.thumbnail(path, stamp, 20)})
@@ -430,6 +442,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.status_shown = bool(config.get("status_bar", True))
         self.sidebar_shown = bool(config.get("sidebar", True))
         self.preview_shown = bool(config.get("preview", False))
+        size = config.get("icon_size", 48)
+        self.icon_size = min(128, max(32, int(size) // 8 * 8)) if isinstance(size, (int, float)) else 48
+        spacing = config.get("grid_spacing", 6)
+        self.grid_spacing = min(40, max(0, int(spacing))) if isinstance(spacing, (int, float)) else 6
+        self.text_size = config.get("text_size") if config.get("text_size") in TEXT_SIZES else None
+        self.item_info_shown = bool(config.get("item_info", False))
+        self.view_options = None
+        self.text_css = Gtk.CssProvider()
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -940,6 +960,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "go-recents": lambda: self.navigate(recents.PLACE),
             "new-folder-with": self.new_folder_with,
             "show-enclosing": self.show_enclosing,
+            "view-options": self.show_view_options,
         })
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
@@ -1212,6 +1233,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.icon_view.set_pixbuf_column(C_ICON)
         self.icon_view.set_markup_column(C_MARKUP)   # the name, with its tags' dots
         self.icon_view.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
+        self.icon_view.get_style_context().add_provider(self.text_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self._apply_text_size()
         self.icon_view.connect("item-activated", lambda v, p: self._activate(v.get_model(), p))
         self.icon_view.connect("button-press-event", self._icon_button)
         self.icon_view.connect("selection-changed", self._selection_changed)
@@ -1370,8 +1393,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.icon_view.set_columns(max(1, len(self.icon_view.get_model() or [])))
         else:
             self.icon_view.set_markup_column(C_MARKUP)
-            self.icon_view.set_item_width(96)
+            self.icon_view.set_item_width(max(96, self.icon_size + 40))
             self.icon_view.set_margin(12)
+            self.icon_view.set_column_spacing(self.grid_spacing)
+            self.icon_view.set_row_spacing(self.grid_spacing)
             self.icon_view.set_columns(-1)
 
     def _show_gallery(self):
@@ -1428,7 +1453,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.title.set_text(label)
         self.set_title(f"{label} — Drawer")
         self._show_place()
-        folder = Folder(self.path, self.show_hidden, self.sort)
+        folder = Folder(self.path, self.show_hidden, self.sort, self.icon_size, self.item_info_shown)
         self.folder = folder
         model = self._model(folder)
         self.icon_view.set_model(model)
@@ -1798,6 +1823,109 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.notify(f"Put “{os.path.basename(went[0])}” back in “{where}”.")
         elif went:
             self.notify(f"Put back {len(went)} items.")
+
+    # ---- View Options (⌘J) ---------------------------------------------------
+    def _apply_text_size(self):
+        css = f"iconview {{ font-size: {self.text_size}pt; }}" if self.text_size else "iconview {}"
+        self.text_css.load_from_data(css.encode())
+
+    def show_view_options(self):
+        """A small panel, as Finder's View Options: icon size, grid spacing,
+        text size, Show Item Info and Sort By for icon view. Changes show at
+        once and are kept for every Drawer window."""
+        if self.view_options is not None:
+            self.view_options.present()
+            return
+        panel = Gtk.Window(title="View Options", transient_for=self, resizable=False,
+                           type_hint=Gdk.WindowTypeHint.UTILITY, destroy_with_parent=True)
+        panel.set_default_size(260, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=14)
+        panel.add(box)
+
+        def heading(text):
+            label = Gtk.Label(label=text, xalign=0)
+            label.get_style_context().add_class("drawer-preview-heading")
+            box.pack_start(label, False, False, 0)
+
+        def slider(low, high, step, value, small_icon, big_icon, changed):
+            row = Gtk.Box(spacing=6)
+            row.pack_start(Gtk.Image.new_from_icon_name(small_icon, Gtk.IconSize.MENU), False, False, 0)
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, low, high, step)
+            scale.set_draw_value(False)
+            scale.set_value(value)
+            scale.connect("value-changed", changed)
+            row.pack_start(scale, True, True, 0)
+            row.pack_start(Gtk.Image.new_from_icon_name(big_icon, Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
+            box.pack_start(row, False, False, 0)
+            return scale
+
+        heading("Icon size:")
+        slider(32, 128, 8, self.icon_size, "image-x-generic-symbolic", "image-x-generic-symbolic",
+               lambda s: self._set_icon_size(int(round(s.get_value() / 8)) * 8))
+        heading("Grid spacing:")
+        slider(0, 40, 2, self.grid_spacing, "view-grid-symbolic", "view-grid-symbolic",
+               lambda s: self._set_grid_spacing(int(s.get_value())))
+        row = Gtk.Box(spacing=8)
+        row.pack_start(Gtk.Label(label="Text size:", xalign=0), False, False, 0)
+        sizes = Gtk.ComboBoxText()
+        sizes.append("", "Standard")
+        for size in TEXT_SIZES:
+            sizes.append(str(size), f"{size} pt")
+        sizes.set_active_id(str(self.text_size) if self.text_size else "")
+        sizes.connect("changed", lambda c: self._set_text_size(int(c.get_active_id()) if c.get_active_id() else None))
+        row.pack_end(sizes, False, False, 0)
+        box.pack_start(row, False, False, 4)
+        info = Gtk.CheckButton(label="Show item info", active=self.item_info_shown)
+        info.connect("toggled", lambda b: self._set_item_info(b.get_active()))
+        box.pack_start(info, False, False, 0)
+        row = Gtk.Box(spacing=8)
+        row.pack_start(Gtk.Label(label="Sort By:", xalign=0), False, False, 0)
+        sorts = Gtk.ComboBoxText()
+        for key, title in SORTS:
+            sorts.append(key, title)
+        sorts.set_active_id(self.sort)
+        sorts.connect("changed", lambda c: self.set_sort(c.get_active_id()))
+        row.pack_end(sorts, False, False, 0)
+        box.pack_start(row, False, False, 4)
+
+        def closed(*_):
+            self.view_options = None
+        panel.connect("destroy", closed)
+        panel.connect("key-press-event", lambda w, e: e.keyval == Gdk.KEY_Escape and (w.destroy() or True))
+        self.view_options = panel
+        panel.show_all()
+
+    def _set_icon_size(self, size):
+        if size == self.icon_size:
+            return
+        self.icon_size = size
+        save_setting("icon_size", size)
+        if getattr(self, "_resize_soon", 0):
+            GLib.source_remove(self._resize_soon)
+        self._resize_soon = GLib.timeout_add(120, self._refill_kept)
+
+    def _refill_kept(self):
+        self._resize_soon = 0
+        keep = self.selected_paths()
+        self.refresh()
+        self.select_paths(keep)
+        return False
+
+    def _set_grid_spacing(self, spacing):
+        self.grid_spacing = spacing
+        save_setting("grid_spacing", spacing)
+        self._place_icon_view()
+
+    def _set_text_size(self, size):
+        self.text_size = size
+        save_setting("text_size", size)
+        self._apply_text_size()
+        self.icon_view.queue_resize()
+
+    def _set_item_info(self, on):
+        self.item_info_shown = on
+        save_setting("item_info", on)
+        self._refill_kept()
 
     # ---- sorting and the path bar ----------------------------------------
     def set_sort(self, sort):
@@ -2254,6 +2382,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.go_to_folder()
         elif ctrl and shift and key in (Gdk.KEY_p, Gdk.KEY_P) and not event.state & Gdk.ModifierType.MOD1_MASK:
             self.preview_action.change_state(GLib.Variant("b", not self.preview_shown))
+        elif ctrl and not shift and key in (Gdk.KEY_j, Gdk.KEY_J):
+            self.show_view_options()
         elif ctrl and key in (Gdk.KEY_slash, Gdk.KEY_question):
             self.status_bar_action.change_state(GLib.Variant("b", not self.status_shown))
         elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_p, Gdk.KEY_P):
@@ -2301,6 +2431,7 @@ def menubar():
             [("Show Sidebar", "win.sidebar", None), ("Show Path Bar", "win.path-bar", "<Ctrl><Alt>p"),
              ("Show Status Bar", "win.status-bar", "<Ctrl>slash"), ("Show Preview", "win.preview", "<Ctrl><Shift>p"),
              ("Show Hidden Files", "win.show-hidden", "<Ctrl><Shift>period")],
+            [("Show View Options", "win.view-options", "<Ctrl>j")],
             [("Next Tab", "win.next-tab", "<Ctrl>Tab"), ("Previous Tab", "win.previous-tab", "<Ctrl><Shift>Tab")],
         ]),
         ("_Go", [
