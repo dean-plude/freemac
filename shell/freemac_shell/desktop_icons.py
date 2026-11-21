@@ -55,6 +55,8 @@ LAYOUT = os.path.join(GLib.get_user_config_dir(), "freemac", "desktop.json")
 CELL_W, CELL_H = 100, 104   # one place on the grid (View Options changes them: use_look)
 TOP, RIGHT = 40, 14         # below the menu bar, in from the right edge
 BOTTOM = 96                 # above the dock
+DOCK_ROOM = 84              # a Dock on the right takes this much more
+PIER_CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "pier.json")
 ICON = 64
 TEXT = 12   # the names' size, in pixels
 
@@ -68,6 +70,27 @@ def use_look(settings):
         return False
     ICON, CELL_W, CELL_H, TEXT = look
     return True
+
+
+def use_dock():
+    """Keep the icons clear of the Dock, on whichever edge it sits (pier.json's
+    "position"). Returns True when that changed."""
+    global RIGHT, BOTTOM
+    try:
+        with open(PIER_CONFIG) as fh:
+            config = json.load(fh)
+        side = config.get("position")
+        if config.get("autohide"):
+            side = "hidden"     # it keeps out of the way by itself
+    except (OSError, ValueError, AttributeError):
+        side = None
+    room = {"right": (14 + DOCK_ROOM, 24), "left": (14, 24), "hidden": (14, 24)}.get(side, (14, 96))
+    if room == (RIGHT, BOTTOM):
+        return False
+    RIGHT, BOTTOM = room
+    return True
+
+
 URI_TARGETS = [Gtk.TargetEntry.new("text/uri-list", 0, 0)]
 
 CSS = b"""
@@ -402,6 +425,9 @@ class DesktopIcons(Gtk.Layout):
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         self.view_monitor = Gio.File.new_for_path(desktop_view.PATH).monitor_file(Gio.FileMonitorFlags.NONE, None)
         self.view_monitor.connect("changed", lambda *_: GLib.timeout_add(80, self._view_changed))
+        use_dock()
+        self.dock_monitor = Gio.File.new_for_path(PIER_CONFIG).monitor_file(Gio.FileMonitorFlags.NONE, None)
+        self.dock_monitor.connect("changed", lambda *_: GLib.timeout_add(80, self._dock_moved))
         self.icons = {}           # file name -> DesktopIcon
         self.stack_icons = {}     # kind -> StackIcon, while stacks are on
         self.open_stacks = set()  # the kinds fanned out
@@ -601,6 +627,12 @@ class DesktopIcons(Gtk.Layout):
         else:
             self._arrange()
         self._save()
+        return False
+
+    def _dock_moved(self):
+        """The Dock moved to another edge: move the icons out of its way."""
+        if use_dock():
+            self._arrange()
         return False
 
     def rebuild(self):

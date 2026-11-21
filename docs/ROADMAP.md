@@ -689,6 +689,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | ⌘← and ⌘→ move along ⌘Tab's row (they reach apps as Home and End) | Tack | done |
 | 4 | Guide: the new Dock switches, and ⌘← ⌘→ in the switcher | Guide | done |
 
+## 1.63 "dock position" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Dock on the left, bottom or right edge of the screen, with magnification, names, menus, drags and hiding along that edge | Pier | done |
+| 2 | Dials > Dock and Menu Bar: Position on screen; the Dock's right-click menu: Position on Screen | Dials, Pier | done |
+| 3 | Desktop icons keep clear of a Dock on the right, and use the whole height when the Dock is on a side or hides | Backdrop | done |
+| 4 | Guide: moving the Dock | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

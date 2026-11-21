@@ -625,6 +625,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             save_pier(magnify=on)
             peak.set_sensitive(on)
 
+        position = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        for side in pier.SIDES:
+            position.append(side, side.capitalize())
+        position.set_active_id(config.get("position") if config.get("position") in pier.SIDES else "bottom")
+        position.connect("changed", lambda c: save_pier(position=c.get_active_id()))
+
         downloads = pier.default_stacks()[0]
 
         def show_downloads(on):
@@ -635,9 +641,10 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Icon size", size),
             row("Magnification", switch(config["magnify"], magnify), "Icons grow as the pointer passes over them."),
             row("Magnified size", peak),
+            row("Position on screen", position),
             row("Automatically hide and show the Dock", switch(config.get("autohide", False),
                                                                  lambda on: save_pier(autohide=on)),
-                "The Dock slides away until you move the pointer to the bottom of the screen. "
+                "The Dock slides away until you move the pointer to the edge of the screen it sits on. "
                 "\u2325\u2318D turns this on and off."),
         ), group(
             row("Downloads", switch(downloads in config["stacks"], show_downloads),
