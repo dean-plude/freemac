@@ -453,6 +453,14 @@ TOPICS = {
         "instead. Quill checks plain text and Markdown, not code.",
         "To turn it off everywhere, choose Dials > Keyboard and turn off Check spelling while typing.",
     ]),
+    "text-replacements": ("Type less with text replacements", "text replacements replace abbreviation shortcut expand omw snippet smart quotes curly dash em dash double space full stop period", [
+        "Type omw and a space in Jot, Post, Stickies or Quill, and it becomes On my way! To add your own, "
+        "choose Dials > Keyboard > Text Replacements\u2026, click + and type what you'll type and what it "
+        "should become.",
+        "As you type, straight quotes become curly ones (\u201clike this\u201d), two hyphens become a dash (\u2014), "
+        "and pressing the space bar twice ends a sentence with a full stop. Each can be turned off on the "
+        "same page.",
+    ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
         "administrator's password. Nearby devices and printers see the new name, and other computers "
