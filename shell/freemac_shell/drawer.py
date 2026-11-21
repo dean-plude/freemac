@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import drawer_archive, drawer_info, macapps, menus, recents, share, tags, transfer, volumes  # noqa: E402
+from . import drawer_archive, drawer_info, macapps, menus, quick_actions, recents, share, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -192,6 +192,7 @@ def place_icon(path):
 
 
 MAC_APP = "Mac App"
+SPRING_DELAY = 900   # ms a drag rests on a folder before it springs open
 THUMB_LARGEST = 60_000_000   # bytes; bigger pictures keep their kind's icon
 
 
@@ -538,7 +539,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- dragging files out ---------------------------------------------
     def _drag_get(self, _widget, _context, data, _info, _time):
-        data.set_uris([Gio.File.new_for_path(p).get_uri() for p in self.selected_paths()])
+        # The files picked up when the drag began: a spring-loaded folder may
+        # have opened since, leaving nothing chosen in the window.
+        paths = DrawerWindow.dragging or self.selected_paths()
+        data.set_uris([Gio.File.new_for_path(p).get_uri() for p in paths])
 
     def _drag_source(self, widget):
         widget.connect("drag-data-get", self._drag_get)
@@ -551,6 +555,28 @@ class DrawerWindow(Gtk.ApplicationWindow):
         (folder, light) with light(on) showing the place, or None."""
         widget.drag_dest_set(0, URI_TARGETS, Gdk.DragAction.COPY | Gdk.DragAction.MOVE | Gdk.DragAction.LINK)
         lit = {"light": None}
+        spring = {"folder": None, "timer": 0}
+
+        def unspring():
+            if spring["timer"]:
+                GLib.source_remove(spring["timer"])
+            spring.update(folder=None, timer=0)
+
+        def sprung(folder):
+            # Spring-loaded folders: files held over a folder for a moment
+            # open it, so they can be dropped further in, as in Finder.
+            spring.update(folder=None, timer=0)
+            light(None)
+            if os.path.isdir(folder) and folder != self.path:
+                self.navigate(folder)
+            return False
+
+        def wait_on(folder):
+            if folder == spring["folder"]:
+                return
+            unspring()
+            if folder and folder != self.path and os.path.isdir(folder):
+                spring.update(folder=folder, timer=GLib.timeout_add(SPRING_DELAY, sprung, folder))
 
         def light(show):
             if lit["light"] is not None and lit["light"] is not show:
@@ -563,6 +589,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             found = find(x, y)
             action = self._drop_action(found[0]) if found else 0
             light(found[1] if found and action else None)
+            wait_on(found[0] if found and action else None)
             Gdk.drag_status(context, action, time)
             return True
 
@@ -572,6 +599,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
         def received(_w, context, x, y, data, _info, time):
             light(None)
+            unspring()
             found = find(x, y)
             paths = [Gio.File.new_for_uri(u).get_path() for u in data.get_uris() or []]
             paths = [p for p in paths if p]
@@ -581,7 +609,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 GLib.idle_add(lambda: self._dropped(paths, found[0]) and False)
 
         widget.connect("drag-motion", motion)
-        widget.connect("drag-leave", lambda *_: light(None))
+        widget.connect("drag-leave", lambda *_: (light(None), unspring()))
         widget.connect("drag-drop", drop)
         widget.connect("drag-data-received", received)
 
@@ -1676,6 +1704,39 @@ class DrawerWindow(Gtk.ApplicationWindow):
         item.set_submenu(menu)
         return item
 
+    def _quick_actions_item(self, paths):
+        """Rotate Left, Rotate Right and Create PDF, for pictures."""
+        item = Gtk.MenuItem(label="Quick Actions")
+        menu = Gtk.Menu()
+        for label, action, enabled in (
+                ("Rotate Left", lambda: self._rotate(paths, False), quick_actions.can_rotate(paths)),
+                ("Rotate Right", lambda: self._rotate(paths, True), quick_actions.can_rotate(paths)),
+                ("Create PDF", lambda: self._make_pdf(paths), True)):
+            entry = Gtk.MenuItem(label=label)
+            entry.set_sensitive(enabled)
+            entry.connect("activate", lambda _i, a=action: a())
+            menu.append(entry)
+        item.set_submenu(menu)
+        return item
+
+    def _rotate(self, paths, clockwise):
+        error = quick_actions.rotate(paths, clockwise)
+        if error is not None:
+            self.notify(f"Couldn’t turn it: {getattr(error, 'message', None) or error.strerror}.")
+        Folder.thumb_cache.clear()
+        self.refresh()
+        self.select_paths(paths)
+
+    def _make_pdf(self, paths):
+        pdf, error = quick_actions.make_pdf(paths)
+        if error is not None:
+            self.notify(f"Couldn’t add every picture: {getattr(error, 'message', None) or error}.")
+        if pdf:
+            self.refresh()
+            self.select_paths([pdf])
+            if error is None:
+                self.notify(f"Made “{os.path.basename(pdf)}”.")
+
     def _open_with(self, app, files):
         try:
             app.launch([Gio.File.new_for_path(f) for f in files], None)
@@ -1796,6 +1857,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Open in New Tab", lambda *_: self.new_tab(self.selected_paths()[0]), has_folder),
             ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
             ("Glance", lambda *_: self.toggle_glance(), has_selection),
+            ("Quick Actions", None, not in_trash and quick_actions.can_make_pdf(selected)),
             (None, None, True),
             ("Tags", None, has_selection and not in_trash),
             (None, None, has_selection and not in_trash),
@@ -1813,6 +1875,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 continue
             if label == "Sort By":
                 menu.append(self._sort_item())
+                continue
+            if label == "Quick Actions":
+                if enabled:
+                    menu.append(self._quick_actions_item(selected))
                 continue
             if label == "Tags":
                 if enabled:

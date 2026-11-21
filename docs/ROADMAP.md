@@ -578,6 +578,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Tags in Get Info: click a colour to tag or untag | Drawer, Backdrop | done |
 | 5 | Guide topic: Find files you opened lately | Guide | done |
 
+## 1.50 "quick actions" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Spring-loaded folders: hold a drag on a folder (in the window or the sidebar) and it opens | Drawer | done |
+| 2 | Quick Actions on pictures: Rotate Left, Rotate Right, Create PDF | Drawer, Backdrop | done |
+| 3 | Guide topic: Turn pictures and make PDFs | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
