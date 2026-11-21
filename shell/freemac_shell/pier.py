@@ -765,9 +765,12 @@ class Pier(Gtk.Window):
         holder.set_margin_end(SHADOW_ROOM)
         holder.pack_start(self.shelf, True, False, 0)
         outer.add(holder)
-        outer.add_events(1 << 2 | 1 << 13)  # pointer motion, leave
+        outer.add_events(1 << 2)  # pointer motion
         outer.connect("motion-notify-event", self._motion)
-        outer.connect("leave-notify-event", self._left)
+        # Moving onto an icon's button counts as leaving the box around them
+        # all, so only the window itself says when the pointer has left.
+        self.add_events(Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.connect("leave-notify-event", self._left)
         # Only the resting shelf takes clicks until the pointer reaches it: the
         # room above it, kept for magnified icons, is see-through, and the
         # bottom of a window behind it must still be clickable.
@@ -1331,16 +1334,8 @@ class Pier(Gtk.Window):
         moved = self.translate_coordinates(widget, int(found[1]), int(found[2])) if found else None
         self._magnify(moved[0] if moved else event.x, widget)
 
-    def _left(self, *_):
-        # Moving onto an icon's button counts as leaving the box around them
-        # all; only stop magnifying once the pointer has left the Dock itself.
-        GLib.idle_add(self._check_left)
-
-    def _check_left(self):
-        seat = Gdk.Display.get_default().get_default_seat()
-        pointer = seat.get_pointer() if seat else None
-        under = pointer.get_window_at_position()[0] if pointer else None
-        if under is None or under.get_toplevel() != self.get_window():
+    def _left(self, _widget, event):
+        if event.window == self.get_window() and event.detail != Gdk.NotifyType.INFERIOR:
             self._magnify(None)
         return False
 
