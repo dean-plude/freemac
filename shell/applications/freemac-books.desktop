@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Books
+GenericName=E-book Reader
+Comment=Read your EPUB books
+Exec=freemac-books %f
+Icon=freemac-books
+Categories=Office;Viewer;Literature;
+Keywords=books;ebook;epub;read;reader;library;novel;
+MimeType=application/epub+zip;
+StartupWMClass=org.freemac.Books
+StartupNotify=true

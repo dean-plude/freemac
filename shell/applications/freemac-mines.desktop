@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mines
+GenericName=Puzzle Game
+Comment=Clear a field without setting off a mine
+Exec=freemac-mines
+Icon=freemac-mines
+Categories=Game;LogicGame;
+Keywords=mines;minesweeper;puzzle;game;flag;
+StartupWMClass=org.freemac.Mines
+StartupNotify=true

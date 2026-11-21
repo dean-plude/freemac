@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Patience: two fanned playing cards on green felt. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f9a6e"/><stop offset="1" stop-color="#1b6b4c"/>
+    </linearGradient>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a72db"/><stop offset="1" stop-color="#2149a8"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <g transform="rotate(-14 64 70)">
+    <rect x="30" y="30" width="46" height="66" rx="6" fill="url(#back)" stroke="#fff" stroke-width="3"/>
+    <path d="M38 48 q4 -4 8 0 t8 0 t8 0 t8 0 M38 60 q4 -4 8 0 t8 0 t8 0 t8 0 M38 72 q4 -4 8 0 t8 0 t8 0 t8 0 M38 84 q4 -4 8 0 t8 0 t8 0 t8 0" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="2"/>
+  </g>
+  <g transform="rotate(10 64 70)">
+    <rect x="50" y="32" width="46" height="66" rx="6" fill="#fff" stroke="#000" stroke-opacity="0.15"/>
+    <text x="56" y="50" font-family="Inter, sans-serif" font-weight="700" font-size="15" fill="#d81f26">A</text>
+    <path d="M73 58 c-6 -9 -18 -2 -11 8 l11 13 l11 -13 c7 -10 -5 -17 -11 -8z" fill="#d81f26"/>
+  </g>
+</svg>

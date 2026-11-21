@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Patience
+GenericName=Card Game
+Comment=The classic one-player card game
+Exec=freemac-patience
+Icon=freemac-patience
+Categories=Game;CardGame;
+Keywords=solitaire;klondike;cards;game;patience;
+StartupWMClass=org.freemac.Patience
+StartupNotify=true

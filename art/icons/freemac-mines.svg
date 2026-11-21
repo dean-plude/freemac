@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Mines: a grid of tiles with a flag and a number. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9ebf0"/><stop offset="1" stop-color="#c9ced8"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8db3f5"/><stop offset="1" stop-color="#5c8ce6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <g>
+    <rect x="22" y="22" width="26" height="26" rx="5" fill="url(#tile)"/>
+    <rect x="51" y="22" width="26" height="26" rx="5" fill="#fafafc"/>
+    <rect x="80" y="22" width="26" height="26" rx="5" fill="url(#tile)"/>
+    <rect x="22" y="51" width="26" height="26" rx="5" fill="#fafafc"/>
+    <rect x="51" y="51" width="26" height="26" rx="5" fill="#fafafc"/>
+    <rect x="80" y="51" width="26" height="26" rx="5" fill="url(#tile)"/>
+    <rect x="22" y="80" width="26" height="26" rx="5" fill="url(#tile)"/>
+    <rect x="51" y="80" width="26" height="26" rx="5" fill="url(#tile)"/>
+    <rect x="80" y="80" width="26" height="26" rx="5" fill="url(#tile)"/>
+  </g>
+  <text x="64" y="71" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="18" fill="#007aff">1</text>
+  <text x="35" y="71" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="18" fill="#33a040">2</text>
+  <g transform="translate(80 51)">
+    <rect x="3" y="3" width="20" height="20" rx="4" fill="#fff" fill-opacity="0.9"/>
+    <path d="M10 6 v14 M7 20 h9" stroke="#3f3f47" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10.5 6 l9 3.5 l-9 3.5z" fill="#ff3b30"/>
+  </g>
+</svg>
