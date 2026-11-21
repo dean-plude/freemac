@@ -458,6 +458,17 @@ TOPICS = {
         "When the drive is full, the oldest go first.",
         "To eject the drive, eject it as usual. A backup that's running stops and starts again next time.",
     ]),
+    "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl", [
+        "freemac Recovery fixes a computer that won't start properly. To open it, hold Ctrl while the "
+        "computer starts, or choose Dials > Power > Restart in Recovery….",
+        "Type an administrator's password, then choose what to do and click Continue:",
+        "- Restore from Lifeboat brings a home folder back from a backup drive. Plug the drive in first.",
+        "- Reset a Password chooses a new password for someone who has forgotten theirs.",
+        "- Check a Disk looks for problems on a disk and fixes them.",
+        "- Reinstall freemac puts a fresh copy on the disk from a freemac USB stick.",
+        "- Get Help Online opens these pages on the web. Join a Wi-Fi network first, from the top right.",
+        "When you're done, click the power button at the top right and choose Restart.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",

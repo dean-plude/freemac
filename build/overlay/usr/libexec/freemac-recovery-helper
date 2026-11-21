@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Dials' Restart in Recovery, run as root through pkexec: start freemac
+# Recovery the next time the computer starts (once only), then restart.
+set -e
+if ! grep -q 'freemac-recovery' /boot/grub/grub.cfg 2>/dev/null; then
+  echo "This computer's start-up menu has no freemac Recovery." >&2
+  exit 1
+fi
+grub-reboot freemac-recovery
+exec systemctl reboot

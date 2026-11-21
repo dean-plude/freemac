@@ -1,0 +1,58 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# freemac Recovery in the start-up menu of a freemac installed on a disk.
+# grub-mkconfig runs this; it adds one entry that starts the newest kernel
+# into freemac-recovery.target instead of the desktop, and makes holding
+# Ctrl while the computer starts choose it, the way a Mac's recovery starts
+# from a key held down. Dials' Restart in Recovery picks it by its id with
+# grub-reboot.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$datarootdir/grub/grub-mkconfig_lib"
+
+kernel=""
+for candidate in /boot/vmlinuz-*; do
+  [ -e "$candidate" ] || continue
+  if [ -z "$kernel" ] || version_test_gt "${candidate#/boot/vmlinuz-}" "${kernel#/boot/vmlinuz-}"; then
+    kernel="$candidate"
+  fi
+done
+[ -n "$kernel" ] || exit 0
+version="${kernel#/boot/vmlinuz-}"
+initrd=""
+[ -e "/boot/initrd.img-$version" ] && initrd="/boot/initrd.img-$version"
+
+root_device="$(${grub_probe} --target=device /)"
+root_uuid="$(${grub_probe} --device "$root_device" --target=fs_uuid 2>/dev/null || true)"
+if [ -n "$root_uuid" ]; then
+  linux_root="UUID=$root_uuid"
+else
+  linux_root="$root_device"
+fi
+boot_device="$(${grub_probe} --target=device /boot)"
+kernel_path="$(make_system_path_relative_to_its_root "$kernel")"
+
+echo "Found freemac Recovery: $kernel" >&2
+cat <<GRUB
+menuentry "freemac Recovery" --id freemac-recovery {
+	load_video
+	insmod gzio
+GRUB
+prepare_grub_to_access_device "$boot_device" | sed 's/^/\t/'
+cat <<GRUB
+	linux $kernel_path root=$linux_root ro quiet splash loglevel=3 systemd.show_status=false vt.global_cursor_default=0 systemd.unit=freemac-recovery.target
+GRUB
+if [ -n "$initrd" ]; then
+  echo "	initrd $(make_system_path_relative_to_its_root "$initrd")"
+fi
+cat <<GRUB
+}
+insmod keystatus
+if keystatus --ctrl; then
+	set default="freemac-recovery"
+	set timeout=0
+fi
+GRUB

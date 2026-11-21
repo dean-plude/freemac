@@ -281,6 +281,41 @@ Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
   `hotspot <corner> 10x10 250`, so Dials adds that to the binding of the
   chosen action and removes it from every other one.
 
+## Recovery
+
+freemac Recovery (`recovery.py`, with the GTK-free `recovery_store.py`) is a
+full-screen app for fixing a computer that won't start properly, like a
+Mac's recovery. It is the same on an installed system and on the live USB.
+
+- **Getting in.** Holding Ctrl as the computer starts picks the "freemac
+  Recovery" entry: `/etc/grub.d/42_freemac_recovery` writes that entry (the
+  newest kernel with `systemd.unit=freemac-recovery.target`) and a
+  `keystatus --ctrl` test after it, and the live USB's `grub.cfg` has the
+  same. Dials > Power > Restart in Recovery… runs
+  `/usr/libexec/freemac-recovery-helper` with pkexec
+  (`org.freemac.recovery.restart`), which runs `grub-reboot
+  freemac-recovery` and restarts.
+- **Starting.** `freemac-recovery.target` stops the login screen and pulls in
+  `freemac-recovery.service`, which runs `cage -s -- freemac-recovery` as root
+  on tty1 (PAM service `freemac-recovery`), so there is no desktop, Dock or
+  menu bar, only Recovery. If it quits, systemd starts it again.
+- **Who may use it.** Started from the disk, it asks for an administrator's
+  password (a member of sudo, admin or wheel), checked against the system's
+  own `/etc/shadow` with libcrypt. From the live USB it doesn't ask.
+- **Which system.** From the disk it fixes `/`. From the live USB it mounts,
+  read-only, each fixed-disk partition whose `/etc/os-release` says
+  `ID=freemac` under `/run/freemac-recovery/drives/`, and remounts one
+  read-write only to change it.
+- **What it does.** Restore from Lifeboat (finds `freemac-backups/` on any
+  drive, lists backups newest first, and copies one back over a person's home
+  folder, keeping links as links and giving the files back to their owner);
+  Reinstall freemac (runs Keel from the live USB; from the disk it says how);
+  Reset a Password (`chpasswd`, with `-R` for a mounted system); Check a Disk
+  (`e2fsck -f -y`, `fsck.vfat -a -w` or `fsck.exfat -y` on a volume that isn't
+  mounted); Drives (Hull); Get Help Online (the browser, private); and
+  Terminal (foot). The bar at the top joins Wi-Fi through NetworkManager
+  (`nmcli`, one check at a time) and restarts or shuts down.
+
 ## Hard problems we know about
 
 - **Global menus on Wayland.** There is no single standard. GTK 3 apps with

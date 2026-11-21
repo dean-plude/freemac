@@ -13,9 +13,9 @@ import subprocess
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import startup_sound, style  # noqa: E402
+from . import alert, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -167,7 +167,57 @@ def power(window):
         button.connect("clicked", lambda _b, a=action: window.confirm_power(a))
         buttons.pack_start(button, False, False, 0)
     groups.append(buttons)
+    recovery = Gtk.Button(label="Restart in Recovery…")
+    if can_restart_in_recovery():
+        recovery.connect("clicked", lambda _b: restart_in_recovery(window))
+        groups.append(group(row("freemac Recovery", recovery,
+                                "Bring back files from a Lifeboat backup, reset a password or check a disk. "
+                                "You can also hold Ctrl while the computer starts.")))
+    else:
+        groups.append(group(row("freemac Recovery", Gtk.Label(label="Hold Ctrl as it starts"),
+                                "Bring back files from a Lifeboat backup, reset a password or check a disk.")))
     return page("Power", *groups)
+
+
+RECOVERY_HELPER = "/usr/libexec/freemac-recovery-helper"
+
+
+def can_restart_in_recovery():
+    """Only a freemac installed on a disk can choose what the next start-up
+    starts; a USB stick's menu can't be changed."""
+    if os.path.isdir("/run/live/medium") or not os.access(RECOVERY_HELPER, os.X_OK):
+        return False
+    try:
+        with open("/boot/grub/grub.cfg") as f:
+            return "freemac-recovery" in f.read()
+    except OSError:
+        return os.path.exists("/boot/grub/grubenv")
+
+
+def restart_in_recovery(window):
+    answer = alert.ask(window, "Restart in Recovery?",
+                       "The computer restarts into freemac Recovery, where you can bring back files from a "
+                       "Lifeboat backup, reset a password or check a disk. It starts as usual the time after. "
+                       "Unsaved work in open apps will be lost.",
+                       [("Cancel", Gtk.ResponseType.CANCEL), ("Restart", Gtk.ResponseType.OK)],
+                       default=Gtk.ResponseType.OK)
+    if answer != Gtk.ResponseType.OK:
+        return
+    try:
+        process = Gio.Subprocess.new(["pkexec", RECOVERY_HELPER], Gio.SubprocessFlags.STDERR_PIPE)
+    except GLib.Error as error:
+        alert.tell(window, "The computer couldn\u2019t restart in Recovery.", error.message)
+        return
+
+    def finished(proc, result):
+        try:
+            _ok, _out, err = proc.communicate_utf8_finish(result)
+        except GLib.Error:
+            return
+        # 126 is the password dialog being cancelled: nothing to say then.
+        if proc.get_exit_status() not in (0, 126):
+            alert.tell(window, "The computer couldn\u2019t restart in Recovery.", (err or "").strip())
+    process.communicate_utf8_async(None, None, finished)
 
 
 # ---- Accessibility ---------------------------------------------------------------

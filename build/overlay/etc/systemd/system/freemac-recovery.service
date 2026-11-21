@@ -1,0 +1,25 @@
+# freemac Recovery's one window, full screen in the cage kiosk compositor on
+# the first console, as root. Pulled in only by freemac-recovery.target.
+[Unit]
+Description=freemac Recovery window
+After=systemd-user-sessions.service plymouth-quit-wait.service NetworkManager.service seatd.service
+Wants=plymouth-quit.service
+Conflicts=getty@tty1.service greetd.service
+
+[Service]
+Type=simple
+User=root
+PAMName=freemac-recovery
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=XCURSOR_THEME=freemac XCURSOR_SIZE=24 HOME=/root
+ExecStart=/usr/bin/dbus-run-session -- /usr/bin/cage -s -- /usr/bin/freemac-recovery
+Restart=always
+RestartSec=1
