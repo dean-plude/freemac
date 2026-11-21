@@ -328,6 +328,29 @@ TOPICS = {
         "Click Hint to see a pair you can take, Shuffle to mix the tiles that are left, or ⌘Z to put a "
         "pair back. Every game can be cleared.",
     ]),
+    "maths-practice": ("Practise maths", "maths math sums adding times tables multiply divide sharing kids", [
+        "Sums is maths practice. Press ⌘Space, type Sums and press Return.",
+        "Pick Adding, Taking Away, Times Tables or Sharing, then a level. A round has ten questions.",
+        "Type the answer and press Return. A wrong answer gets one more try, then Sums shows the right one.",
+        "Get stars for answers right first time. Click Times Tables at the top to see every times table, "
+        "and click a number along the top of the chart to practise just that table.",
+    ]),
+    "flashcards": ("Study with flashcards", "flashcards cards study revise learn spelling cue deck", [
+        "Cue makes flashcards. Press ⌘Space, type Cue and press Return.",
+        "Click + to make a deck, then type a question and its answer and click Add Card.",
+        "Click Study. Press Space to turn a card over, then Knew It or Didn't Know It. Cards you didn't "
+        "know come back sooner, and ones you know well wait longer.",
+        "To bring in cards from a spreadsheet, save it as CSV and choose File > Import Cards.",
+    ]),
+    "scanning": ("Scan a document or photo", "scan scanner scanning document photo printer all-in-one pdf glass", [
+        "Glass scans with a scanner or an all-in-one printer, plugged in or on your network. Press ⌘Space, "
+        "type Glass and press Return.",
+        "Put the page face down on the glass and click Preview. To scan only part of it, drag over the "
+        "preview.",
+        "Choose Colour or Grey and a resolution, then click Scan. Each scan becomes a page along the bottom.",
+        "Click Save to keep the pages as one PDF or as pictures. They go to your Documents folder unless "
+        "you choose another.",
+    ]),
     "clipboard": ("Paste something copied earlier", "clipboard history paste copied earlier", [
         "Press ⇧⌘V to see what you copied recently. Click one to copy it again, then paste it with ⌘V.",
     ]),

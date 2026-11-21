@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sums
+GenericName=Maths Practice
+Comment=Practise adding, taking away, times tables and sharing
+Exec=freemac-sums
+Icon=freemac-sums
+Categories=Education;Math;KidsGame;
+Keywords=maths;math;sums;times tables;adding;subtraction;multiplication;division;kids;school;
+StartupWMClass=org.freemac.Sums
+StartupNotify=true
