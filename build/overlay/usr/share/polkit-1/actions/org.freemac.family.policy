@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- freemac: lets Logbook turn Limit adult websites on or off for the whole
+     computer after an administrator's password. -->
+<policyconfig>
+  <vendor>freemac</vendor>
+  <action id="org.freemac.family.websites">
+    <description>Limit adult websites</description>
+    <message>Changing which websites this computer can open needs an administrator's password.</message>
+    <icon_name>freemac-logbook</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/freemac-family-helper</annotate>
+  </action>
+</policyconfig>

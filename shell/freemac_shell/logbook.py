@@ -33,7 +33,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import apps, menus, style  # noqa: E402
+from . import alert, apps, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Logbook"
 DATA = os.path.join(GLib.get_user_data_dir(), "freemac", "logbook")
@@ -80,6 +80,15 @@ def load_config():
     limits = data.get("limits") if isinstance(data.get("limits"), dict) else {}
     data["limits"] = {k: int(v) for k, v in limits.items() if isinstance(v, int) and v > 0}
     return data
+
+
+# Limit adult websites: a NetworkManager setting written by the helper.
+FAMILY_CONF = "/etc/NetworkManager/conf.d/90-freemac-family.conf"
+FAMILY_HELPER = "/usr/libexec/freemac-family-helper"
+
+
+def websites_limited():
+    return os.path.exists(FAMILY_CONF)
 
 
 def check_passcode(config, code):
@@ -441,6 +450,7 @@ class Window(Gtk.ApplicationWindow):
         page.pack_start(self.empty, False, False, 12)
         self.empty.set_no_show_all(True)
         self.list.set_no_show_all(True)
+        page.pack_start(self._websites_box(), False, False, 18)
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroller.add(page)
         self.add(scroller)
@@ -456,6 +466,63 @@ class Window(Gtk.ApplicationWindow):
         self.refresh()
         GLib.timeout_add_seconds(30, self._timer)
         self.show_all()
+
+    # ---- Limit adult websites --------------------------------------------------------
+    def _websites_box(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        heading = Gtk.Label(xalign=0)
+        heading.set_markup("<b>Content</b>")
+        box.pack_start(heading, False, False, 0)
+        frame = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        frame.get_style_context().add_class("frame")
+        line = Gtk.Box(spacing=12)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(line, "set_margin_" + side)(10)
+        words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        words.pack_start(Gtk.Label(label="Limit adult websites", xalign=0), False, False, 0)
+        note = Gtk.Label(label="Websites for grown-ups, and ones known to spread harm, won't open in any "
+                               "browser on this computer, for everyone who uses it.", xalign=0, wrap=True)
+        note.get_style_context().add_class("dim-label")
+        words.pack_start(note, False, False, 0)
+        line.pack_start(words, True, True, 0)
+        self.websites = Gtk.Switch(active=websites_limited(), valign=Gtk.Align.CENTER)
+        self.websites_handler = self.websites.connect("notify::active", self._websites_toggled)
+        line.pack_end(self.websites, False, False, 0)
+        frame.add(line)
+        box.pack_start(frame, False, False, 0)
+        return box
+
+    def _websites_set(self, on):
+        with self.websites.handler_block(self.websites_handler):
+            self.websites.set_active(on)
+
+    def _websites_toggled(self, switch, _param):
+        on = switch.get_active()
+        if self.config.get("passcode") and not self.ask_passcode("Enter the passcode to change this."):
+            self._websites_set(not on)
+            return
+        switch.set_sensitive(False)
+        try:
+            process = Gio.Subprocess.new(["pkexec", FAMILY_HELPER, "on" if on else "off"],
+                                         Gio.SubprocessFlags.STDERR_PIPE)
+        except GLib.Error as error:
+            switch.set_sensitive(True)
+            self._websites_set(not on)
+            alert.tell(self, "Logbook couldn\u2019t change this.", error.message)
+            return
+
+        def finished(proc, result):
+            switch.set_sensitive(True)
+            try:
+                _ok, _out, err = proc.communicate_utf8_finish(result)
+            except GLib.Error:
+                err = ""
+            status = proc.get_exit_status()
+            self._websites_set(websites_limited())
+            # 126 is the password dialog being cancelled: nothing to say then.
+            if status not in (0, 126):
+                alert.tell(self, "Logbook couldn\u2019t change this.", (err or "").strip())
+        process.communicate_utf8_async(None, None, finished)
 
     def _timer(self):
         if self.get_window() is None:
