@@ -272,6 +272,16 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Dynamic wallpaper (1.106, `backdrop.py`, `sun.elevation`): with
+`[background] dynamic = true` and one of freemac's own scenes, Backdrop loads
+both the day and the night picture and works out once a minute how high the
+sun is where the computer is (the time zone's city, as for Auto
+appearance). `sky_mix` turns that into how much of the night picture to lay
+over the day one (eased from 6 degrees above the horizon to 6 below) and
+how warm the light is (a gold soft-light wash, strongest as the sun sits on
+the horizon). Light and dark mode no longer change the picture while it's on.
+`FREEMAC_SUN_HEIGHT` pins the sun's height, for screenshots and tests.
+
 Picture in Picture (1.105, `reel_pip.py`): Reel hides its title bar and
 controls, shows two buttons of its own over the middle, resizes to the
 video's shape at 384 pixels wide, and asks Wayfire to put the window in the

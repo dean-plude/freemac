@@ -1081,6 +1081,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 6 | A Guide topic | Guide | done |
 | 7 | Dials' sidebar scrolls, so the window fits an 800-pixel-high screen with every pane listed | Dials | done |
 
+## 1.106 "dynamic wallpaper" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dynamic wallpaper: the scene follows the sun where you are, fading into its night version through twilight | Backdrop | done |
+| 2 | A warm, golden light on the picture as the sun sets and rises | Backdrop | done |
+| 3 | The sun's height above the horizon, from the time zone's city | sun.py | done |
+| 4 | Dynamic switch in Dials > Wallpaper, found by searching "dynamic" or "sunset" | Dials | done |
+| 5 | A Guide line, and README screenshots retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

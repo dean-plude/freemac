@@ -98,12 +98,14 @@ TOPICS = {
         "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",
         "Type its password when asked. freemac remembers it next time.",
     ]),
-    "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper theme accent colour color highlight purple pink green favourite background appearance", [
+    "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper dynamic theme accent colour color highlight purple pink green favourite background appearance", [
         "Choose Dials > Appearance for Light, Dark or Auto, and Dials > Wallpaper for the picture on the desktop. "
         "Auto is light while the sun is up and dark after it sets, where you are.",
         "Pick an Accent colour on the same page: blue, purple, pink, red, orange, yellow, green or graphite. "
         "Selections, switches and buttons in every app change to it at once.",
         "Each wallpaper has a day and a night version, and follows light and dark.",
+        "Turn on Dynamic in Dials > Wallpaper and the picture follows the sun instead: "
+        "day while it's high, golden as it sets, and night after dark.",
     ]),
     "sound": ("Change the volume", "sound volume mute speaker headphones audio output", [
         "Use the volume keys, or click the sound icon in the menu bar and drag the slider.",
