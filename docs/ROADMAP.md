@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.118 "update count" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A red count beside Software Update in the Dials sidebar when updates are ready, as on a Mac; it changes as soon as Beacon finds more or Harbor installs them | Dials | done |
+| 2 | The Software Update page says how many are ready, and its button reads Update Now… then | Dials | done |
+| 3 | Badges come back when the Dock restarts: the Dock says it started, and every open app (Post, Nudge, Beacon for Harbor) sends its count again | Pier, all apps (launcher_badge.py) | done |
+| 4 | README row, every README screenshot retaken | Docs | done |
+
 ## 1.117 "update notices" (done)
 
 | # | Item | Component | Status |

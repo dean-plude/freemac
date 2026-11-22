@@ -335,13 +335,21 @@ out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
 
+Badges after a Dock restart (1.118, `launcher_badge.py`): apps send a
+LauncherEntry badge only when their count changes, so a Dock that starts later
+would miss it. When Pier starts it emits `org.freemac.Dock.Started` on
+`/org/freemac/Dock`; every app that has sent a badge listens for it (the
+subscription is made with its first `set_count`) and sends its non-zero counts
+again. Dials reads the same `updates.json` that Beacon writes and watches its
+folder, so the red count beside Software Update follows Beacon.
+
 Update notices (1.117, `update_notice.py`): Beacon, which runs for the whole
 session, keeps a `Watch`. A minute after login it calls PackageKit's
 `get_updates` (plus `refresh_cache` when the last refresh is a day old), and
 every 15 minutes it checks whether a day has passed. The count goes to
 Harbor's Dock icon as a LauncherEntry badge sent from Beacon, so it outlives
-Harbor; Pier asks Beacon (`org.freemac.Beacon.UpdatesChanged`) to send it
-again when the Dock starts, and Harbor asks after it checks or installs. A
+Harbor; Harbor asks Beacon (`org.freemac.Beacon.UpdatesChanged`) for a
+recount after it checks or installs. A
 notice (`x-freemac-uri` `harbor:updates`, opening `freemac-harbor --updates`)
 goes out only when the set of package ids includes some not already told;
 the ids are kept in `~/.local/state/freemac/updates.json`. Nothing runs on

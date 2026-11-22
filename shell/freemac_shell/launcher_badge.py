@@ -17,8 +17,12 @@ from gi.repository import Gio, GLib  # noqa: E402
 
 INTERFACE = "com.canonical.Unity.LauncherEntry"
 PATH = "/com/canonical/unity/launcherentry/freemac"
+# The Dock says when it starts, so apps already open send their badges again.
+DOCK_INTERFACE = "org.freemac.Dock"
+DOCK_PATH = "/org/freemac/Dock"
 
 _last = {}
+_watching = False
 
 
 def set_count(desktop_id, count, force=False):
@@ -30,11 +34,36 @@ def set_count(desktop_id, count, force=False):
     _last[desktop_id] = count
     try:
         bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        _watch_dock(bus)
         props = {"count": GLib.Variant("x", count), "count-visible": GLib.Variant("b", count > 0)}
         bus.emit_signal(None, PATH, INTERFACE, "Update",
                         GLib.Variant("(sa{sv})", ("application://" + desktop_id, props)))
     except GLib.Error:
         pass   # no session bus: no badge, nothing else changes
+
+
+def _watch_dock(bus):
+    """Once per app: when the Dock starts again, send every badge again."""
+    global _watching
+    if _watching:
+        return
+    _watching = True
+    bus.signal_subscribe(None, DOCK_INTERFACE, "Started", DOCK_PATH, None,
+                         Gio.DBusSignalFlags.NONE, _resend)
+
+
+def _resend(*_args):
+    for desktop_id, count in list(_last.items()):
+        if count:
+            set_count(desktop_id, count, force=True)
+
+
+def dock_started(bus):
+    """Called by the Dock when it starts: apps send their badges again."""
+    try:
+        bus.emit_signal(None, DOCK_PATH, DOCK_INTERFACE, "Started", None)
+    except GLib.Error:
+        pass
 
 
 def badge_text(count):

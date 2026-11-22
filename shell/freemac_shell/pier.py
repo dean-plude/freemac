@@ -1071,7 +1071,7 @@ class Pier(Gtk.Window):
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         # Red counts on icons, from apps that send them (Post, Nudge, others).
         self.badges = launcher_badge.Listener(self._badges_changed)
-        self._ask_update_badge()
+        self._ask_for_badges()
         # Apps asking for attention: Strata tells the Dock over its socket.
         self.asking = set()
         self._listen()
@@ -1327,14 +1327,11 @@ class Pier(Gtk.Window):
         """Dials: Show badges on Dock icons."""
         return self.config is None or self.config.get("badges", True)
 
-    def _ask_update_badge(self):
-        """Beacon counts software updates for Harbor's badge; a Dock that
-        starts after Beacon asks it to send the count again."""
-        if not self.badges.bus:
-            return
-        self.badges.bus.call("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
-                             "org.freemac.Beacon", "UpdatesChanged", None, None,
-                             Gio.DBusCallFlags.NO_AUTO_START, 2000, None, None, None)
+    def _ask_for_badges(self):
+        """Apps already open (Post, Nudge, Beacon for Harbor) sent their
+        badges before this Dock started: ask them to send them again."""
+        if self.badges.bus:
+            launcher_badge.dock_started(self.badges.bus)
 
     def _badges_changed(self):
         for item in self.items():
