@@ -37,6 +37,10 @@ PanelController awakeFromNib
 Panel loaded: yes, 2 top-level objects: Helper NSPanel
 panel: NSPanel "A Panel" visible no; note "From the panel nib"; helper yes
 missing nib: no
+Helper awakeFromNib, owner outlet set: yes
+PanelController awakeFromNib
+PanelArchive loaded: yes, 2 top-level objects: Helper NSPanel
+panel: NSPanel "A Panel" frame {240, 120}; note "From the panel nib" at {{20, 50}, {200, 20}}; helper yes, its owner set yes
 cmd-q:
 applicationWillTerminate
 exit=0

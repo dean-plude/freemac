@@ -4,7 +4,9 @@
  * "IB.objectdata", is an NSIBObjectData: the nib's root (File's Owner),
  * every object with its parent, the outlet and action connections, the
  * windows to show at launch, and names for special objects. A nib can be
- * a single file or a folder holding keyedobjects.nib.
+ * a single file or a folder holding keyedobjects.nib. Nibs compiled by
+ * current versions of Xcode hold the same objects in the "NIBArchive" form,
+ * which ANibArchive.m reads.
  *
  * Interface Builder writes stand-ins for some objects: NSCustomObject for
  * File's Owner, First Responder, the Application and custom objects;
@@ -443,8 +445,8 @@ static id resolve(id obj, NSDictionary *map)
 {
     if ((self = [super init])) {
         _root = [[c decodeObjectForKey:@"NSRoot"] retain];
-        _objects = [[(NSKeyedUnarchiver *)c _decodeArrayKeepingNullsForKey:@"NSObjectsKeys"] retain];
-        _parents = [[(NSKeyedUnarchiver *)c _decodeArrayKeepingNullsForKey:@"NSObjectsValues"] retain];
+        _objects = [[(ANibArchive *)c _decodeArrayKeepingNullsForKey:@"NSObjectsKeys"] retain];
+        _parents = [[(ANibArchive *)c _decodeArrayKeepingNullsForKey:@"NSObjectsValues"] retain];
         _connections = [[c decodeObjectForKey:@"NSConnections"] retain];
         id visible = [c decodeObjectForKey:@"NSVisibleWindows"];
         _visibleWindows = [([visible isKindOfClass:[NSSet class]] ? [visible allObjects] : visible) retain];
@@ -545,19 +547,23 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
 {
     if (topLevelObjects)
         *topLevelObjects = nil;
-    if ([_data length] >= 10 && !memcmp([_data bytes], "NIBArchive", 10)) {
-        AWarnOnce("nibs in the NIBArchive format (Ferry reads keyed-archive nibs only)");
-        return NO;
-    }
     ANibLoad load = {[NSMutableDictionary dictionary]};
     ANibLoad *outer = current_load;
     current_load = &load;
-    NSKeyedUnarchiver *u = [[NSKeyedUnarchiver alloc] initForReadingFromData:_data error:NULL];
-    [u setRequiresSecureCoding:NO];
+    /* Both readers answer _decodeArrayKeepingNullsForKey:, which NSIBObjectData uses. */
+    NSCoder *u;
+    BOOL nibArchive = [ANibArchive isNibArchive:_data];
+    if (nibArchive) {
+        u = [[ANibArchive alloc] initForReadingWithData:_data];
+    } else {
+        u = [[NSKeyedUnarchiver alloc] initForReadingFromData:_data error:NULL];
+        [(NSKeyedUnarchiver *)u setRequiresSecureCoding:NO];
+    }
     NSIBObjectData *nib = [u decodeObjectForKey:@"IB.objectdata"];
     current_load = outer;
     if (![nib isKindOfClass:[NSIBObjectData class]]) {
-        fprintf(stderr, "ferry: this nib couldn't be read%s\n", [u error] ? " (it isn't a keyed archive)" : "");
+        fprintf(stderr, "ferry: this nib couldn't be read%s\n",
+                !u || (!nibArchive && [u error]) ? " (it isn't a keyed archive or a NIBArchive)" : "");
         [u release];
         return NO;
     }

@@ -232,6 +232,7 @@ extern const unsigned ferry_static_rr_count;
 
 /* blocks.c */
 void ferry_blocks_init(void);
+void ferry_dispatch_init(void);
 void *_Block_copy(const void *block);
 void _Block_release(const void *block);
 
@@ -245,6 +246,7 @@ struct ferry_objc_image {
     struct c_category **nlcatlist; size_t nnlcats;
     struct c_protocol **protolist; size_t nprotos;
     struct c_protocol **protorefs; size_t nprotorefs;
+    void **msgrefs; size_t nmsgrefs;     /* {function, selector} pairs, counted in words */
     uint32_t imageinfo_flags;
 };
 void ferry_objc_map_image(struct ferry_objc_image *im);

@@ -1,0 +1,7 @@
+queued; done 0
+back on the main queue: done 1
+worker released
+the queue was released with its worker: yes
+dispatch_after fired: yes, after at least 0.1 s: yes
+both ran: runloop,dispatch
+exit=0

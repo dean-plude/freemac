@@ -66,10 +66,11 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, scroll views, text views, images) are missing, storyboards
-  aren't read, and nib loading hasn't yet been tried with nibs made by
-  Xcode. These are
-  being added step by step (see
+  views (tables, scroll views, text views, images) are missing and
+  storyboards aren't read. Real apps' nibs (made by Xcode, in both its
+  formats) load, and real apps start, but none runs all the way yet:
+  [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
+  what stops each one. These are being added step by step (see
   [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
   frameworks are further off.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
@@ -77,13 +78,18 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,
   C++ (libc++), Objective-C exceptions (`@throw`) or extra libraries. When a program reaches a call Ferry lacks,
   it stops with a message naming that call (`this program uses X, which Ferry
-  doesn't support yet`) and exit status 127, rather than guessing.
+  doesn't support yet`) and exit status 127, rather than guessing. A
+  program that links a system framework Ferry doesn't have still starts
+  (Ferry names the framework); the framework's classes are nil and its
+  calls stop the program as above. Grand Central Dispatch works, with
+  every queue run in order on the program's one thread.
 
 ## How it works
 
 1. **Loader** (`src/loader.c`). Reads the Mach-O file, maps its segments,
-   applies its relocations (classic rebase/bind opcodes and the newer chained
-   fixups) and calls `main`.
+   applies its relocations (classic rebase/bind opcodes, the newer chained
+   fixups, and the relocation entries of libraries built before Mac OS X
+   10.6) and calls `main`.
 2. **Symbol lookup** (`src/lookup.c`). Each imported call is matched against
    Ferry's own tables first, then against a short list of C library calls that
    behave identically on both systems (`src/passthrough.c`). Anything else gets
@@ -97,7 +103,8 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
    categories and protocols before `main` runs. `objc_msgSend` and friends
    (`msgsend.S`) look methods up in a per-class cache; `nsobject.c` has
    `NSObject`, reference counting, ARC, weak references and autorelease
-   pools; `blocks.c` has blocks.
+   pools; `blocks.c` has blocks; `dispatch.c` has Grand Central Dispatch,
+   run from Foundation's run loop.
 5. **Foundation** (`foundation/`). Written in Objective-C and built with
    `ferry-cc` into a Mac library, `frameworks/Foundation.framework/Foundation`,
    which the loader finds when a program asks for Foundation or
@@ -118,8 +125,9 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
    main loop runs inside Foundation's run loop. GTK is opened only when a
    program uses AppKit, and only for the calls in `appkit/gtk.h`. Without a
    display, windows still work off screen, which the tests use. Nib files
-   are keyed archives; `appkit/NSNib.m` turns Interface Builder's stand-in
-   objects into the real ones and makes the connections.
+   are keyed archives or, from current Xcode, `NIBArchive` files
+   (`appkit/ANibArchive.m` reads those); `appkit/NSNib.m` turns Interface
+   Builder's stand-in objects into the real ones and makes the connections.
 
 ## Sources
 

@@ -185,6 +185,12 @@ static void hsb_to_rgb(CGFloat h, CGFloat s, CGFloat v, CGFloat *r, CGFloat *g, 
 + (NSColor *)colorWithCalibratedWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
+/* Ferry has no NSImage yet, so a pattern colour is a plain light grey. */
++ (NSColor *)colorWithPatternImage:(id)image
+{
+    AWarnOnce("pattern colours (colorWithPatternImage: gives plain grey)");
+    return make_color(0.9, 0.9, 0.9, 1, NO);
+}
 + (NSColor *)colorWithHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)v alpha:(CGFloat)a
 {
     CGFloat r, g, b;

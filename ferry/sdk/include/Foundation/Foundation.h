@@ -170,6 +170,8 @@ typedef struct {
 /* Key-value coding, the simple part: getters, setters and ivars by name. */
 - (id)valueForKey:(NSString *)key;
 - (void)setValue:(id)value forKey:(NSString *)key;
+- (id)valueForKeyPath:(NSString *)keyPath;
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath;
 @end
 
 @interface NSObject (NSDelayedPerforming)
@@ -296,6 +298,7 @@ typedef struct {
 @interface NSValue : NSObject <NSCopying, NSSecureCoding>
 + (NSValue *)valueWithRange:(NSRange)range;
 + (NSValue *)valueWithPointer:(const void *)pointer;
++ (NSValue *)valueWithNonretainedObject:(id)object;
 + (NSValue *)valueWithPoint:(NSPoint)point;
 + (NSValue *)valueWithSize:(NSSize)size;
 + (NSValue *)valueWithRect:(NSRect)rect;
@@ -306,6 +309,7 @@ typedef struct {
 @property (readonly) NSRect rectValue;
 @property (readonly) NSEdgeInsets edgeInsetsValue;
 @property (readonly) void *pointerValue;
+@property (readonly) id nonretainedObjectValue;
 @property (readonly) const char *objCType NS_RETURNS_INNER_POINTER;
 @end
 
@@ -366,6 +370,8 @@ typedef struct {
 + (instancetype)arrayWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 + (instancetype)arrayWithArray:(NSArray<ObjectType> *)array;
 + (NSArray<ObjectType> *)arrayWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (instancetype)init;
 - (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 - (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
@@ -430,6 +436,8 @@ typedef struct {
 + (instancetype)dictionaryWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict;
 + (instancetype)dictionaryWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType> *)keys;
 + (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (instancetype)init;
 - (instancetype)initWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
                           count:(NSUInteger)count;
@@ -916,6 +924,25 @@ typedef NS_ENUM(NSInteger, NSDecodingFailurePolicy) {
 @end
 
 /* ---- notifications, run loops, timers ----------------------------------------------- */
+
+/* ---- NSValueTransformer ---------------------------------------------------------- */
+
+typedef NSString *NSValueTransformerName;
+FOUNDATION_EXPORT NSValueTransformerName const NSNegateBooleanTransformerName, NSIsNilTransformerName,
+    NSIsNotNilTransformerName, NSUnarchiveFromDataTransformerName, NSKeyedUnarchiveFromDataTransformerName,
+    NSSecureUnarchiveFromDataTransformerName;
+@interface NSValueTransformer : NSObject
++ (void)setValueTransformer:(NSValueTransformer *)transformer forName:(NSValueTransformerName)name;
++ (NSValueTransformer *)valueTransformerForName:(NSValueTransformerName)name;
++ (NSArray<NSValueTransformerName> *)valueTransformerNames;
++ (Class)transformedValueClass;
++ (BOOL)allowsReverseTransformation;
+- (id)transformedValue:(id)value;
+- (id)reverseTransformedValue:(id)value;
+@end
+@interface NSSecureUnarchiveFromDataTransformer : NSValueTransformer
+@property (class, readonly, copy) NSArray<Class> *allowedTopLevelClasses;
+@end
 
 typedef NSString *NSNotificationName;
 

@@ -177,6 +177,23 @@ FUNC ferry_objc_msgSendSuper2_stret
  * another receiver (forwardingTargetForSelector:) or stops the program;
  * the message is then sent again to the new receiver. */
 
+/* Message references (__objc_msgrefs), from compilers of the Mac OS X 10.5
+ * and 10.6 era: a call goes through {function, selector} pairs, with the
+ * pair's address where the selector would be. The loader registers each
+ * pair's selector, so these only fetch it and send as usual. */
+.macro FIXUP name, reg, target
+FUNC \name
+    movq    8(\reg), \reg
+    jmp     \target
+    .size \name, .-\name
+.endm
+FIXUP ferry_objc_msgSend_fixup, %rsi, ferry_objc_msgSend
+FIXUP ferry_objc_msgSend_fpret_fixup, %rsi, ferry_objc_msgSend_fpret
+FIXUP ferry_objc_msgSend_fp2ret_fixup, %rsi, ferry_objc_msgSend_fp2ret
+FIXUP ferry_objc_msgSend_stret_fixup, %rdx, ferry_objc_msgSend_stret
+FIXUP ferry_objc_msgSendSuper2_fixup, %rsi, ferry_objc_msgSendSuper2
+FIXUP ferry_objc_msgSendSuper2_stret_fixup, %rdx, ferry_objc_msgSendSuper2_stret
+
 FUNC ferry_objc_msgForward
     xorl    %r10d, %r10d
     SLOW    ferry_objc_forward_target, %rdi, %rsi, 0

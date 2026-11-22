@@ -305,6 +305,15 @@ static NSUserDefaults *standard_defaults;
     [_arguments release];
     [super dealloc];
 }
+/* Key-value coding on the defaults reads and writes the defaults themselves. */
+- (id)valueForKey:(NSString *)key { return [self objectForKey:key]; }
+- (void)setValue:(id)value forKey:(NSString *)key
+{
+    if (value)
+        [self setObject:value forKey:key];
+    else
+        [self removeObjectForKey:key];
+}
 - (id)objectForKey:(NSString *)key
 {
     return [_arguments objectForKey:key] ?: [_values objectForKey:key] ?: [_registered objectForKey:key];

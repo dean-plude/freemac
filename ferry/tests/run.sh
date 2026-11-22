@@ -28,6 +28,10 @@ run_one() {
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_bindings)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
@@ -51,6 +55,8 @@ for t in hello files; do
 done
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
+# Grand Central Dispatch from plain C (M6).
+run_one dispatch "$here/dispatch.c" "$here/dispatch.out" -fblocks
 run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
 run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
 run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
@@ -80,6 +86,10 @@ done
 run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/foundation/corefoundation.out" \
     -framework CoreFoundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
+run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
+# Linked against a system framework Ferry doesn't have (only its .tbd exists).
+run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missing.out" -framework Foundation \
+    -F"$here/foundation" -framework Imaginary
 run_one foundation_collections_chained "$here/foundation/collections.m" "$here/foundation/collections.out" \
     -framework Foundation -Wl,-fixup_chains
 run_one foundation_attributed "$here/foundation/attributed.m" "$here/foundation/attributed.out" -framework Foundation
@@ -146,6 +156,8 @@ else
     echo "FAIL foundation_bundle (did not compile)"; sed 's/^/    /' "$build/foundation_bundle.cc.log"
     fail=$((fail + 1))
 fi
+# Key paths, value transformers and bindings (M6).
+run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.
@@ -174,6 +186,15 @@ if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$buil
     echo "ok   foundation_exception message"; pass=$((pass + 1))
 else
     echo "FAIL foundation_exception message"; fail=$((fail + 1))
+fi
+# The missing framework, class and function are each named.
+if grep -q "uses Imaginary, which Ferry doesn't provide yet; carrying on" "$build/foundation_missing.err" 2>/dev/null &&
+        grep -q "the class MyThing is built on a class Ferry doesn't have yet" "$build/foundation_missing.err" &&
+        grep -q "uses 1 Objective-C class Ferry" "$build/foundation_missing.err" &&
+        grep -q "uses IMDoSomething, which Ferry doesn't support yet" "$build/foundation_missing.err"; then
+    echo "ok   foundation_missing messages"; pass=$((pass + 1))
+else
+    echo "FAIL foundation_missing messages"; sed 's/^/    stderr: /' "$build/foundation_missing.err"; fail=$((fail + 1))
 fi
 # An unknown selector must be reported as a Mac reports it.
 if grep -q "unrecognized selector sent to instance" "$build/objc_unknown.err" 2>/dev/null; then

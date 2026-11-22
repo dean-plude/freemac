@@ -101,7 +101,14 @@ static BOOL (*hook_dispatch)(void *ctx, struct pollfd *fds, int count);
 static void *hook_ctx;
 #define HOOK_FDS 64
 
-- (BOOL)hasWork { return [_timers count] || [_blocks count] || _nsources || hook_prepare; }
+/* libSystem's dispatch queues (src/objc/dispatch.c) run on this loop. */
+extern int ferry_dispatch_drain(void);
+extern int ferry_dispatch_timeout_ms(void);
+
+- (BOOL)hasWork
+{
+    return [_timers count] || [_blocks count] || _nsources || hook_prepare || ferry_dispatch_timeout_ms() >= 0;
+}
 
 /* One pass: run queued blocks, fire due timers, then wait for a descriptor
  * or the next timer, but not past limit. Returns NO when there is nothing that
@@ -120,6 +127,10 @@ static void *hook_ctx;
             }
         }
         [now release];
+        *handled = YES;
+        return YES;
+    }
+    if (ferry_dispatch_drain()) {
         *handled = YES;
         return YES;
     }
@@ -153,6 +164,9 @@ static void *hook_ctx;
     }
     double wait = next - t;
     int ms = wait <= 0 ? 0 : wait > 2e6 ? 2000000000 : (int)ceil(wait * 1000);
+    int dms = ferry_dispatch_timeout_ms();
+    if (dms >= 0 && dms < ms)
+        ms = dms;
     struct pollfd *fds = calloc(_nsources + HOOK_FDS + 1, sizeof *fds);
     for (int i = 0; i < _nsources; i++) {
         fds[i].fd = _sources[i].fd;

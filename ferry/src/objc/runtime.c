@@ -482,6 +482,8 @@ void ferry_objc_map_image(struct ferry_objc_image *im)
     LOCK();
     for (size_t i = 0; i < im->nselrefs; i++)
         im->selrefs[i] = register_sel(im->selrefs[i], 0);
+    for (size_t i = 0; i + 1 < im->nmsgrefs; i += 2)
+        im->msgrefs[i + 1] = (void *)register_sel(im->msgrefs[i + 1], 0);
     for (size_t i = 0; i < im->nprotos; i++)
         register_protocol(im->protolist[i]);
     for (size_t i = 0; i < im->nprotorefs; i++)
@@ -492,8 +494,7 @@ void ferry_objc_map_image(struct ferry_objc_image *im)
             continue;
         const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
         if (!cls->superclass && !(ro->flags & RO_ROOT)) {
-            if (ferry_verbose)
-                fprintf(stderr, "ferry: class %s has a missing superclass; skipped\n", ro->name);
+            fprintf(stderr, "ferry: the class %s is built on a class Ferry doesn't have yet; left out\n", ro->name);
             continue;
         }
         realize_class(cls);
@@ -642,6 +643,15 @@ IMP ferry_objc_forward_target(id self, SEL sel, Class unused, int stret)
         fflush(stdout);
         fprintf(stderr, "ferry: %s forwards %s with forwardInvocation:, which needs NSInvocation; "
                 "Ferry doesn't support that yet\n", class_getName(cls), sel);
+        _exit(127);
+    }
+    if (!ferry_objc_find_imp(cls, SEL_doesNotRecognizeSelector)) {
+        /* A class Ferry left out because its superclass is missing: it has
+         * no methods at all, not even NSObject's. */
+        const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
+        fflush(stdout);
+        fprintf(stderr, "ferry: the program sent %s to %s, a class Ferry left out because it is built on a class "
+                        "Ferry doesn't have yet\n", sel, ro && ro->name ? ro->name : "(unknown)");
         _exit(127);
     }
     FN(void (*)(id, SEL, SEL), ferry_objc_msgSend)(self, SEL_doesNotRecognizeSelector, sel);
@@ -1484,4 +1494,5 @@ __attribute__((constructor)) static void objc_setup(void)
     ferry_objc_runtime_init();
     ferry_objc_nsobject_init();
     ferry_blocks_init();
+    ferry_dispatch_init();
 }

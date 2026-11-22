@@ -29,6 +29,7 @@ extern const struct ferry_symbol ferry_stdio_symbols[];
 extern const struct ferry_symbol ferry_posix_symbols[];
 extern const char *const ferry_passthrough[];
 extern const struct ferry_symbol ferry_blocks_symbols[];   /* libSystem's blocks */
+extern const struct ferry_symbol ferry_dispatch_symbols[]; /* libSystem's libdispatch */
 extern const struct ferry_symbol ferry_objc_symbols[];     /* libobjc.A.dylib */
 
 /* host.c: this system's drawing libraries, for Ferry's own frameworks */

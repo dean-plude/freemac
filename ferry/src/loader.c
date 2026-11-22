@@ -35,7 +35,7 @@
 struct section {
     char segname[17], name[17];
     uint64_t addr, size;
-    uint32_t flags;
+    uint32_t flags, reserved1;
 };
 
 struct segment {
@@ -56,6 +56,8 @@ struct image {
     int ndylibs;
     struct macho_dyld_info *dyld_info;
     struct macho_linkedit_data *chained;
+    struct macho_symtab *symtab;        /* for libraries from before 10.6 */
+    struct macho_dysymtab *dysymtab;
     uint64_t entryoff;
     int has_main;
     struct section sect[MAX_SECTIONS];
@@ -224,6 +226,7 @@ static void parse_commands(struct image *im)
                 d->addr = sec[k].addr;
                 d->size = sec[k].size;
                 d->flags = sec[k].flags;
+                d->reserved1 = sec[k].reserved1;
             }
             break;
         }
@@ -255,6 +258,15 @@ static void parse_commands(struct image *im)
             break;
         case LC_DYLD_CHAINED_FIXUPS:
             im->chained = (void *)lc;
+            break;
+        case LC_SYMTAB:
+            im->symtab = (void *)lc;
+            if ((uint64_t)im->symtab->symoff + (uint64_t)im->symtab->nsyms * sizeof(struct macho_nlist) > im->size ||
+                (uint64_t)im->symtab->stroff + im->symtab->strsize > im->size)
+                die("%s: damaged symbol table", im->path);
+            break;
+        case LC_DYSYMTAB:
+            im->dysymtab = (void *)lc;
             break;
         case LC_MAIN:
             im->entryoff = ((struct macho_entry_point *)lc)->entryoff;
@@ -383,12 +395,84 @@ static void *lookup_symbol(struct image *im, const char *raw, int ordinal)
     return addr;
 }
 
+/* Objective-C classes Ferry doesn't have are bound to nil, as a Mac binds a
+ * weakly linked class that the system lacks: messages to them do nothing,
+ * and a class built on one is left out (runtime.c says which). A
+ * function stub in their place would be read as a class and crash. */
+static int missing_classes;
+
+static int is_class_symbol(const char *raw)
+{
+    return !strncmp(raw, "_OBJC_CLASS_$_", 14) || !strncmp(raw, "_OBJC_METACLASS_$_", 18);
+}
+
+/* A missing variable named like one of Apple's string constants
+ * (NSWorkspaceDidActivateApplicationNotification, kAXTrustedCheckOptionPrompt...)
+ * gets a string whose text is its own name, which is what most of them
+ * hold on a Mac. A function stub in its place would be read as an object
+ * and crash. */
+static int looks_like_string_constant(const char *raw)
+{
+    static const char *const ends[] = {"Key", "Notification", "Name", "Operation", "Attribute", "Identifier",
+                                       "Binding", "Option", "Domain", "AccountID", "Mode", NULL};
+    const char *n = raw[0] == '_' ? raw + 1 : raw;
+    if (n[0] == 'k' && n[1] >= 'A' && n[1] <= 'Z')
+        return 1;
+    if (strncmp(n, "NS", 2) || n[2] < 'A' || n[2] > 'Z')
+        return 0;
+    size_t len = strlen(n);
+    for (int i = 0; ends[i]; i++) {
+        size_t e = strlen(ends[i]);
+        if (len > e && !strcmp(n + len - e, ends[i]))
+            return 1;
+    }
+    return 0;
+}
+
+static void *missing_string_constant(struct image *im, const char *raw)
+{
+    void *cls = lookup_symbol(im, "___CFConstantStringClassReference", -2);
+    if (!cls)
+        return NULL;
+    struct constant_string {
+        void *isa;
+        int32_t flags;
+        const char *bytes;
+        long length;
+    } *str = calloc(1, sizeof *str);
+    void **cell = calloc(1, sizeof *cell);
+    const char *n = raw[0] == '_' ? raw + 1 : raw;
+    str->isa = cls;
+    str->flags = 0x7c8;
+    str->bytes = strdup(n);
+    str->length = (long)strlen(n);
+    *cell = str;
+    note("  missing %s (a string constant holding its name)", raw);
+    return cell;
+}
+
 static void *resolve(struct image *im, const char *raw, int weak, int ordinal)
 {
     void *addr = lookup_symbol(im, raw, ordinal);
     if (!addr) {
         if (weak)
             return NULL;
+        if (looks_like_string_constant(raw) && (addr = missing_string_constant(im, raw)))
+            return addr;
+        if (is_class_symbol(raw)) {
+            const char *name = raw[6] == 'C' ? raw + 14 : raw + 18;
+            static const char *seen[1024];
+            int known = 0;
+            for (int i = 0; i < missing_classes && i < 1024 && !known; i++)
+                known = !strcmp(seen[i], name);
+            if (!known) {
+                if (missing_classes < 1024)
+                    seen[missing_classes] = name;
+                missing_classes++;
+                note("  missing class %s (it will be nil)", name);
+            }
+            return NULL;
+        }
         addr = ferry_missing_stub(raw);
         note("  missing %s", raw);
     }
@@ -644,6 +728,7 @@ static int objc_find(struct image *im, struct ferry_objc_image *oi)
     oi->nlcatlist = objc_section(im, "__objc_nlcatlist", &oi->nnlcats);
     oi->protolist = objc_section(im, "__objc_protolist", &oi->nprotos);
     oi->protorefs = objc_section(im, "__objc_protorefs", &oi->nprotorefs);
+    oi->msgrefs = objc_section(im, "__objc_msgrefs", &oi->nmsgrefs);
     uint32_t *info = objc_section(im, "__objc_imageinfo", &n);
     if (info)
         oi->imageinfo_flags = info[1];
@@ -663,8 +748,35 @@ static uint64_t image_base(struct image *im)
     return im->seg[0].vmaddr + im->slide;
 }
 
+/* A library with no export trie (built before 10.6): its exported symbols
+ * are the symbol table's "externally defined" group. */
+static void *symtab_lookup(struct image *im, const char *raw)
+{
+    if (!im->symtab || !im->dysymtab)
+        return NULL;
+    const struct macho_nlist *syms = (const void *)(im->file + im->symtab->symoff);
+    const char *strs = (const char *)im->file + im->symtab->stroff;
+    uint32_t first = im->dysymtab->iextdefsym, n = im->dysymtab->nextdefsym;
+    if (first > im->symtab->nsyms || n > im->symtab->nsyms - first)
+        return NULL;
+    for (uint32_t i = first; i < first + n; i++) {
+        const struct macho_nlist *sym = &syms[i];
+        if (sym->n_strx >= im->symtab->strsize || (sym->n_type & N_STAB_MASK) || !(sym->n_type & N_EXT))
+            continue;
+        if (strcmp(strs + sym->n_strx, raw))
+            continue;
+        if ((sym->n_type & N_TYPE_MASK) == N_ABS)
+            return (void *)sym->n_value;
+        if ((sym->n_type & N_TYPE_MASK) == N_SECT)
+            return (void *)(sym->n_value + im->slide);
+    }
+    return NULL;
+}
+
 static void *trie_lookup(struct image *im, const char *raw, int depth)
 {
+    if (im && !im->exports && !im->dyld_info && !im->chained)
+        return symtab_lookup(im, raw);
     if (!im || !im->exports || depth > 8)
         return NULL;
     const uint8_t *start = im->exports, *end = start + im->exports_size, *p = start;
@@ -817,6 +929,13 @@ static int expand_path(struct image *loader, const char *name, char *out, size_t
 
 static struct image *load_image(const char *path);
 
+/* "Sparkle" for ".../Sparkle.framework/Versions/A/Sparkle". */
+static const char *short_name(const char *path)
+{
+    const char *b = strrchr(path, '/');
+    return b ? b + 1 : path;
+}
+
 static struct image *load_library(struct image *loader, const char *install_name, int weak)
 {
     if (ferry_library_supported(install_name))
@@ -834,9 +953,106 @@ static struct image *load_library(struct image *loader, const char *install_name
     if (!found) {
         if (weak)
             return NULL;
+        /* A system framework Ferry lacks: carry on, so that a program which
+         * never calls into it still runs. Its functions stop the program
+         * with their names if they are called, as other missing calls do. */
+        if (!strncmp(install_name, "/System/Library/", 16) || !strncmp(install_name, "/usr/lib/", 9)) {
+            static char warned[32][128];
+            static int nwarned;
+            const char *name = short_name(install_name);
+            for (int i = 0; i < nwarned; i++)
+                if (!strcmp(warned[i], name))
+                    return NULL;
+            if (nwarned < 32)
+                snprintf(warned[nwarned++], sizeof warned[0], "%s", name);
+            fprintf(stderr, "ferry: %s uses %s, which Ferry doesn't provide yet; carrying on without it\n",
+                    short_name(loader->path), name);
+            return NULL;
+        }
         die("%s needs %s, which Ferry doesn't provide yet", loader->path, install_name);
     }
     return load_image(path);
+}
+
+/* ---- fixups in the old form ----------------------------------------------------
+ * Before 10.6 a library listed its fixups as relocation entries: local ones
+ * (add the slide) and external ones (a symbol's address, plus what is
+ * stored), at offsets from its first writable segment, as on Intel Macs.
+ * Pointers to imported symbols sit in symbol-pointer sections, named one
+ * by one in the indirect symbol table. */
+
+static int classic_ordinal(uint16_t desc)
+{
+    int o = (desc >> 8) & 0xff;
+    return o == 0xfe ? -2 : o == 0xff ? -1 : o;
+}
+
+static void do_classic(struct image *im)
+{
+    if (!im->symtab || !im->dysymtab)
+        return;
+    const struct macho_dysymtab *d = im->dysymtab;
+    const struct macho_nlist *syms = (const void *)(im->file + im->symtab->symoff);
+    const char *strs = (const char *)im->file + im->symtab->stroff;
+    uint64_t reloc_base = 0;
+    for (int i = 0; i < im->nseg; i++)
+        if (im->seg[i].prot & 2) {
+            reloc_base = im->seg[i].vmaddr + im->slide;
+            break;
+        }
+    int count = 0;
+    if ((uint64_t)d->locreloff + (uint64_t)d->nlocrel * 8 > im->size ||
+        (uint64_t)d->extreloff + (uint64_t)d->nextrel * 8 > im->size ||
+        (uint64_t)d->indirectsymoff + (uint64_t)d->nindirectsyms * 4 > im->size)
+        die("%s: damaged relocation tables", im->path);
+    const struct macho_reloc *loc = (const void *)(im->file + d->locreloff);
+    for (uint32_t i = 0; i < d->nlocrel && im->slide; i++) {
+        uint32_t info = loc[i].r_info;
+        if (loc[i].r_address < 0 || (info >> 27) & 1 || ((info >> 25) & 3) != 3 || (info >> 28) != 0)
+            continue; /* only 64-bit absolute pointers need moving */
+        *(uint64_t *)(reloc_base + loc[i].r_address) += im->slide;
+        count++;
+    }
+    const struct macho_reloc *ext = (const void *)(im->file + d->extreloff);
+    for (uint32_t i = 0; i < d->nextrel; i++) {
+        uint32_t info = ext[i].r_info, symnum = info & 0xffffff;
+        if (!((info >> 27) & 1) || ((info >> 25) & 3) != 3 || (info >> 28) != 0 || symnum >= im->symtab->nsyms)
+            continue;
+        const struct macho_nlist *sym = &syms[symnum];
+        if (sym->n_strx >= im->symtab->strsize)
+            continue;
+        uint64_t *where = (uint64_t *)(reloc_base + ext[i].r_address);
+        void *addr = resolve(im, strs + sym->n_strx, sym->n_desc & N_WEAK_REF, classic_ordinal(sym->n_desc));
+        *where = (uint64_t)addr + (addr ? *where : 0);
+        count++;
+    }
+    const uint32_t *indirect = (const void *)(im->file + d->indirectsymoff);
+    for (int s = 0; s < im->nsect; s++) {
+        uint32_t type = im->sect[s].flags & S_TYPE_MASK;
+        if (type != S_NON_LAZY_SYMBOL_POINTERS && type != S_LAZY_SYMBOL_POINTERS)
+            continue;
+        uint64_t *slots = (uint64_t *)(im->sect[s].addr + im->slide);
+        for (uint64_t k = 0; k < im->sect[s].size / 8; k++) {
+            uint64_t idx = im->sect[s].reserved1 + k;
+            if (idx >= d->nindirectsyms)
+                break;
+            uint32_t symnum = indirect[idx];
+            if (symnum & INDIRECT_SYMBOL_ABS)
+                continue;
+            if (symnum & INDIRECT_SYMBOL_LOCAL) {
+                if (type == S_NON_LAZY_SYMBOL_POINTERS)
+                    slots[k] += im->slide;
+                continue;
+            }
+            if (symnum >= im->symtab->nsyms || syms[symnum].n_strx >= im->symtab->strsize)
+                continue;
+            const struct macho_nlist *sym = &syms[symnum];
+            slots[k] = (uint64_t)resolve(im, strs + sym->n_strx, sym->n_desc & N_WEAK_REF,
+                                         classic_ordinal(sym->n_desc));
+            count++;
+        }
+    }
+    note("applied %d fixups in the old (relocation entry) form", count);
 }
 
 /* ---- loading ----------------------------------------------------------------- */
@@ -850,6 +1066,8 @@ static void apply_fixups(struct image *im)
         do_binds(im, im->dyld_info->bind_off, im->dyld_info->bind_size, 0, 0);
         do_binds(im, im->dyld_info->lazy_bind_off, im->dyld_info->lazy_bind_size, 1, 0);
         do_binds(im, im->dyld_info->weak_bind_off, im->dyld_info->weak_bind_size, 0, 1);
+    } else {
+        do_classic(im);
     }
 }
 
@@ -923,6 +1141,10 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
 {
     struct image *im = load_image(path);
     ferry_seal_stubs();
+    if (missing_classes)
+        fprintf(stderr, "ferry: %s uses %d Objective-C class%s Ferry doesn't have yet; %s nil "
+                        "(FERRY_VERBOSE=1 lists them)\n", short_name(path), missing_classes,
+                missing_classes == 1 ? "" : "es", missing_classes == 1 ? "it is" : "they are");
     mac_main entry = (mac_main)(image_base(im) + im->entryoff);
     char *apple[] = {NULL};
     ferry_program_started(path, argc, argv);
