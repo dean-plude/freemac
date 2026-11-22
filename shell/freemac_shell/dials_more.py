@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, background_sounds, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -475,15 +475,37 @@ def sticky_keys(window):
 
 def audio(window):
     """Audio: flash the screen with the alert sound, as a Mac can, for
-    anyone who can't hear it, with a button to see what it looks like."""
-    group, row, _page, _slider, switch = window.helpers
+    anyone who can't hear it, with a button to see what it looks like; and
+    Background Sounds, a steady sound behind everything else, its sound and
+    its volume (background_sounds.py plays it from Topline)."""
+    group, row, _page, slider, switch = window.helpers
     test = Gtk.Button(label="Test Screen Flash", valign=Gtk.Align.CENTER)
     test.connect("clicked", lambda _b: sounds.flash())
+
+    on, sound, volume = background_sounds.wanted()
+    choice = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for name, title in background_sounds.SOUNDS:
+        choice.append(name, title)
+    choice.set_active_id(sound)
+    choice.connect("changed", lambda c: window.save_prefs(background_sound=c.get_active_id()))
+    level = slider(0, 100, 5, volume, lambda v: window.save_prefs(background_volume=int(v)))
+
+    def turned(active):
+        window.save_prefs(background_sounds=active)
+        choice.set_sensitive(active)
+        level.set_sensitive(active)
+    choice.set_sensitive(on)
+    level.set_sensitive(on)
     return group(
         row("Flash the screen when an alert sound occurs",
             switch(sounds.flash_screen(), lambda on: window.save_prefs(flash_screen=on)),
             "Every display flashes when there's an alert, even with the sound turned down."),
-        row("See how it looks", test))
+        row("See how it looks", test),
+        row("Background sounds", switch(on, turned),
+            "Plays a steady sound behind everything else, to mask noise around you "
+            "and help you focus or rest."),
+        row("Sound", choice),
+        row("Volume", level))
 
 
 def spoken_content(window):

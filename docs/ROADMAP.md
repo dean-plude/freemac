@@ -1021,6 +1021,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | Colour filters for the whole screen: greyscale, red/green (protanopia), green/red (deuteranopia), blue/yellow (tritanopia) and a colour tint | Strata | done |
 | 2 | An intensity slider and a tint colour, in Dials > Accessibility, and a Guide topic | Dials, Guide | done |
 
+## 1.100 "background sounds" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Six background sounds made at build time: balanced, bright and dark noise, ocean, rain and a stream, each a seamless loop at the same level | Art | done |
+| 2 | Topline plays the chosen one steadily behind everything else, at its own volume | Topline | done |
+| 3 | Background sounds, its sound and volume in Dials > Accessibility, and a Guide topic | Dials, Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
