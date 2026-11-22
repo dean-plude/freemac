@@ -47,7 +47,7 @@ SEARCH_WORDS = {
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light schedule sunset sunrise warm scale monitor",
     "wallpaper": "background desktop picture",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
-    "power": "battery sleep suspend energy shut down restart percentage low battery time left charging",
+    "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep",
     "lifeboat": "backup back up time machine restore drive disk copy",
     "users": "accounts password login automatic log in people guest user visitor",
     "loginitems": "startup start up open at login launch automatically apps autostart",

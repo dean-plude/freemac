@@ -715,6 +715,14 @@ TOPICS = {
         "Pick a sound: Balanced, Bright or Dark noise, Ocean, Rain or Stream, and drag Volume until it's just right.",
         "The sound plays behind everything else until you turn Background sounds off.",
     ]),
+    "keep-awake": ("Keep the screen on", "keep awake screen on stay on stop sleeping prevent sleep display off caffeinate video movie watching lock screen saver presentation", [
+        "While a video plays in Reel or a web browser, the screen stays on and doesn\u2019t lock, "
+        "however long it is since you touched the mouse.",
+        "To keep it on for something else, open Terminal and type caffeinate. The screen stays on "
+        "until you press Control+C. caffeinate -t 3600 keeps it on for an hour, and caffeinate "
+        "followed by a command keeps it on until the command finishes.",
+        "Dials > Power shows what is keeping the screen on. Closing a laptop\u2019s lid still puts it to sleep.",
+    ]),
     "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
         "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
         "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "

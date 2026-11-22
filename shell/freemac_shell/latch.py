@@ -4,7 +4,9 @@
     freemac-lock            lock the screen now (Ctrl+Command+Q, Topline > Lock Screen)
     freemac-lock --watch    started at login: locks after the idle time set in
                             Dials > Power, and before the computer sleeps;
-                            starts the screen saver (Dials > Screen Saver)
+                            starts the screen saver (Dials > Screen Saver),
+                            and keeps the computer awake for those who ask
+                            (awake.py: videos playing, caffeinate)
     freemac-lock --idle     what the idle timer runs: while a screen saver
                             shows, it marks the lock for when it ends instead
 
@@ -269,9 +271,15 @@ def watch():
     loop = GLib.MainLoop()
     watcher = Watcher()
     GLib.timeout_add_seconds(10, watcher.check)
+    # What keeps the computer awake (a video playing, caffeinate) is asked
+    # for here, beside the idle timers it holds back.
+    from . import awake
+    keep_awake = awake.Service()
+    keep_awake.start()
     for sig in (signal.SIGTERM, signal.SIGINT):
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, loop.quit)
     loop.run()
+    keep_awake.stop()
     watcher.stop()
     return 0
 

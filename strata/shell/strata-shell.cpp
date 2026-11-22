@@ -31,6 +31,7 @@
 #include <wayfire/plugins/common/shared-core-data.hpp>
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
+#include <wayfire/idle.hpp>
 #include <wayfire/input-device.hpp>
 #include <wayfire/output-layout.hpp>
 #include <wayfire/output.hpp>
@@ -894,6 +895,35 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/keep-awake {"on": true|false}: while something needs the
+     * computer awake (a video playing, caffeinate), it isn't counted as idle,
+     * so the screen stays on and neither the screen saver nor the lock comes.
+     * freemac-lock --watch asks, on behalf of every app that asks it
+     * (shell/freemac_shell/awake.py). */
+    std::unique_ptr<wf::idle_inhibitor_t> awake;
+    wf::ipc::method_callback keep_awake = [=] (nlohmann::json data)
+    {
+        if (!data.contains("on") || !data["on"].is_boolean())
+        {
+            return wf::ipc::json_error("\"on\" must be true or false");
+        }
+
+        if (data["on"].get<bool>())
+        {
+            if (!awake)
+            {
+                awake = std::make_unique<wf::idle_inhibitor_t>();
+            }
+        } else
+        {
+            awake.reset();
+        }
+
+        auto out = wf::ipc::json_ok();
+        out["on"] = (bool)awake;
+        return out;
+    };
+
     /* strata/pointer: where the pointer is, in the layout's coordinates, and
      * the app window under it (view 0 when none). Topline asks when the
      * pointer rests on an app's own green button, which only the app sees. */
@@ -939,6 +969,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/outputs", list_outputs);
         method_repository->register_method("strata/flash", flash_screen);
         method_repository->register_method("strata/pointer", pointer);
+        method_repository->register_method("strata/keep-awake", keep_awake);
         method_repository->register_method("strata/accent-type", accent_type);
         method_repository->register_method("strata/accent-closed", accent_closed);
         flashes.init();

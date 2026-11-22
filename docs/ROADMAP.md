@@ -1049,6 +1049,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Keep folders on top when sorting, or mix them in | Drawer | done |
 | 6 | A Guide topic | Guide | done |
 
+## 1.103 "keep awake" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The screen stays on and doesn't lock while something asks (Strata `strata/keep-awake`) | Strata | done |
+| 2 | Apps can ask the usual Linux way (org.freedesktop.ScreenSaver and PowerManagement Inhibit) | Latch | done |
+| 3 | Reel keeps the screen on while a video plays | Reel | done |
+| 4 | `caffeinate`, with -t, -w and a command to run, as on a Mac | Terminal | done |
+| 5 | Dials > Power shows what is keeping the screen on | Dials | done |
+| 6 | A Guide topic | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
