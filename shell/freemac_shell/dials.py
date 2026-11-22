@@ -862,7 +862,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Left-handed buttons", switch(flag("left_handed_mode", "false"), setter("left_handed_mode"))),
         ), group(
             row("Gestures", None, "Three fingers left or right: switch desktop. Four fingers up: all windows. "
-                                  "Four fingers down: all desktops."),
+                                  "Four fingers down: the app's windows (App Exposé)."),
         ))
 
     # Keyboard -----------------------------------------------------------------

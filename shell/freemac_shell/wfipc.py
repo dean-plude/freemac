@@ -128,6 +128,13 @@ class Wayfire:
             return None
         return result if isinstance(result, dict) and "grid" in result else None
 
+    def app_expose(self, app_id):
+        """App Exposé: every window of the app, side by side (Strata)."""
+        try:
+            return self.req.call("strata/app-expose", **{"app-id": app_id}).get("result") == "ok"
+        except (ConnectionError, OSError, ValueError, AttributeError):
+            return False
+
     def assignments(self):
         """{app-id: "all" or a desktop index} for apps assigned to desktops."""
         try:

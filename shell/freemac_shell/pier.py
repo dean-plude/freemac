@@ -653,6 +653,7 @@ class Item(Gtk.Button):
         options.set_submenu(sub)
         self.menu.append(options)
         if views:
+            add("Show All Windows", lambda: self.pier.wf and self.pier.wf.app_expose(self.views[0].get("app-id", "")))
             self.menu.append(Gtk.SeparatorMenuItem())
             add("Hide", lambda: [self.pier.wf.hide(v["id"]) for v in self.views if not is_minimized(v)])
             add("Quit", lambda: self.pier.quit_app(self.running_app_id()))

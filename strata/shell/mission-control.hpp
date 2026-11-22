@@ -24,6 +24,10 @@
 // (its windows open there, and you're taken there). strata/assign sets it,
 // strata/assignments lists them; they are kept in
 // ~/.config/freemac/desktop-assignments, one "all APP-ID" or "N APP-ID" a line.
+// App Exposé (Ctrl+Down, a 4-finger swipe down, or Show All Windows in the
+// Dock) opens the same overview with only the windows of one app, from
+// every desktop, and without the row of desktops, as on a Mac. Strata keeps
+// the other apps' windows out through scale's filter (strata/app-expose).
 // Original freemac code.
 #pragma once
 
@@ -95,6 +99,25 @@ class spaces_t
         wf::get_core().connect(&on_mapped);
         drag->connect(&on_drag_done);
         load_assignments();
+        wf::get_core().bindings->add_activator(app_expose_key, &on_app_expose);
+    }
+
+    /* strata/app-expose {"app-id": ID}: App Exposé for that app (the focused
+     * app when none is given); again to close it. */
+    nlohmann::json app_expose(nlohmann::json data)
+    {
+        std::string app;
+        if (data.contains("app-id") && data["app-id"].is_string())
+        {
+            app = data["app-id"];
+        }
+
+        if (!expose(app))
+        {
+            return wf::ipc::json_error("no windows to show");
+        }
+
+        return wf::ipc::json_ok();
     }
 
     /* strata/assignments: {"apps": {APP-ID: "all" or a desktop index}}. */
@@ -261,6 +284,64 @@ class spaces_t
      * once the other plugins have placed them. */
     std::vector<uint32_t> to_follow;
     wf::wl_idle_call idle_follow;
+    wf::option_wrapper_t<wf::activatorbinding_t> app_expose_key{"strata-shell/app_expose"};
+    /* The app App Exposé is showing, while it's open. */
+    std::string expose_app;
+
+    bool expose(std::string app)
+    {
+        if (!expose_app.empty())
+        {
+            // Open already: the same key closes it.
+            methods->call_method("scale/toggle_all", nlohmann::json::object());
+            return true;
+        }
+
+        if (open_on)
+        {
+            return false;
+        }
+
+        if (app.empty())
+        {
+            auto view = wf::toplevel_cast(wf::get_core().seat->get_active_view());
+            if (!view || (view->role != wf::VIEW_ROLE_TOPLEVEL))
+            {
+                return false;
+            }
+
+            app = view->get_app_id();
+        }
+
+        bool any = false;
+        for (auto output : wf::get_core().output_layout->get_outputs())
+        {
+            for (auto& view : output->wset()->get_views(wf::WSET_MAPPED_ONLY))
+            {
+                any = any || (view->get_app_id() == app);
+            }
+        }
+
+        if (!any)
+        {
+            return false;
+        }
+
+        expose_app = app;
+        auto reply = methods->call_method("scale/toggle_all", nlohmann::json::object());
+        if (reply.value("result", "") != "ok")
+        {
+            expose_app.clear();
+            return false;
+        }
+
+        return true;
+    }
+
+    wf::activator_callback on_app_expose = [=] (const wf::activator_data_t&)
+    {
+        return expose("");
+    };
 
     static std::string assignments_path()
     {
@@ -659,8 +740,24 @@ class spaces_t
         desktop_closed(gone);
     }
 
-    wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal*)
+    wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal *ev)
     {
+        if (!expose_app.empty())
+        {
+            // App Exposé: that app's windows only, and no row of desktops.
+            scale_filter_views(ev, [=] (wayfire_toplevel_view view)
+            {
+                auto main = view->parent ? view->parent : view;
+                while (main->parent)
+                {
+                    main = main->parent;
+                }
+
+                return main->get_app_id() != expose_app;
+            });
+            return;
+        }
+
         auto output = wf::get_core().seat->get_active_output();
         if (!open_on && output)
         {
@@ -737,6 +834,7 @@ class spaces_t
 
     wf::signal::connection_t<scale_end_signal> on_end = [=] (scale_end_signal*)
     {
+        expose_app.clear();
         closed();
         if (have_pending)
         {

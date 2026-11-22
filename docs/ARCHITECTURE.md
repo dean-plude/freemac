@@ -311,6 +311,12 @@ applies them: an app on all desktops has its windows made sticky; an app on
 one desktop has its windows moved there, and a window it opens is moved there
 on idle after mapping (after the other plugins have placed it) and the
 desktop is switched to it with `request_workspace`, as on a Mac.
+App Exposé (1.112) reuses the same scale session: the `app_expose` key
+binding, or `strata/app-expose` with an app-id (the Dock's Show All Windows),
+remembers the app and calls `scale/toggle_all`. While it is set, Strata's
+scale filter hides every view whose root parent has another app-id, and the
+desktops row is not opened; the same key again calls `scale/toggle_all` to
+close it, and the end of scale clears it.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
