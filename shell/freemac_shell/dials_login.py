@@ -20,9 +20,11 @@ def _app_row(info):
     return line
 
 
-def choose_app(parent):
-    """Ask which app to add. Returns its desktop id, or None."""
-    dialog = Gtk.Dialog(title="Add Login Item", transient_for=parent, modal=True)
+def choose_app(parent, title="Add Login Item", already=None):
+    """Ask which app to add. Returns its desktop id, or None. Apps whose
+    desktop ids are in `already` (the login items, unless given) aren't
+    offered."""
+    dialog = Gtk.Dialog(title=title, transient_for=parent, modal=True)
     dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
     add = dialog.add_button("Add", Gtk.ResponseType.OK)
     add.get_style_context().add_class("suggested-action")
@@ -36,7 +38,8 @@ def choose_app(parent):
     search = Gtk.SearchEntry(placeholder_text="Search apps")
     box.pack_start(search, False, False, 0)
     listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
-    already = {info.get_id() for info in login_items.items()}
+    if already is None:
+        already = {info.get_id() for info in login_items.items()}
     apps = sorted((a for a in Gio.AppInfo.get_all() if a.should_show() and a.get_id() not in already),
                   key=lambda a: (a.get_display_name() or a.get_name() or "").lower())
     for info in apps:
