@@ -335,6 +335,16 @@ out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
 
+Dock badges (1.115, `launcher_badge.py`): apps send
+`com.canonical.Unity.LauncherEntry.Update(app_uri, properties)` on the
+session bus, the signal Thunderbird, Telegram and others already send, with
+"count"/"count-visible" and "progress"/"progress-visible". Pier subscribes to
+it from any sender, keeps the latest badge per desktop file, watches each
+sender's bus name and drops its badges when it goes, and each Dock item draws
+its own count and progress bar after its icon. Post sends the unread count of
+every Inbox, Nudge the reminders due today or late; `"badges": false` in
+pier.json (Dials) hides them.
+
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
 When a window of another app comes forward, every visible window of the

@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.115 "dock badges" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A red count on a Dock icon when an app sends one over the LauncherEntry signal many Linux apps already use; a progress bar along its foot for a download or copy | Pier (launcher_badge.py) | done |
+| 2 | Post's icon shows the unread messages in every Inbox; Nudge's shows the reminders due today or late | Post, Nudge | done |
+| 3 | A badge goes when its app quits | Pier | done |
+| 4 | Dials > Dock and Menu Bar: Show badges on Dock icons | Dials | done |
+| 5 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

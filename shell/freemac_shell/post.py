@@ -25,7 +25,7 @@ try:
 except (ValueError, ImportError):   # no WebKit: messages show as text
     WebKit2 = None
 
-from . import alert, menus, spelling, style  # noqa: E402
+from . import alert, launcher_badge, menus, spelling, style  # noqa: E402
 from . import mail_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Post"
@@ -1080,6 +1080,7 @@ class Post(Gtk.Application):
         def got(boxes):
             self.mailboxes[account.id] = boxes
             store.save_mailboxes(account, boxes)
+            self.badge()
             self.window.fill_sidebar()
             self.window.busy(False)
             inbox = next((b.name for b in boxes if b.kind == "inbox"), "INBOX")
@@ -1105,6 +1106,7 @@ class Post(Gtk.Application):
                 if box.name == name and box.unread != unread:
                     box.unread = unread
                     store.save_mailboxes(account, self.mailboxes[account.id])
+                    self.badge()
                     if self.window:
                         self.window.fill_sidebar()
             if self.window and self.window.current and self.window.current[0].id == account.id and self.window.current[1] == name:
@@ -1140,6 +1142,7 @@ class Post(Gtk.Application):
             if unread != box.unread:
                 box.unread = unread
                 store.save_mailboxes(account, self.mailboxes[account.id])
+                self.badge()
                 self.window.fill_sidebar()
 
     def forget_message(self, account, name, uid):
@@ -1236,6 +1239,13 @@ class Post(Gtk.Application):
         for account in self.accounts:
             self.mailboxes[account.id] = store.load_mailboxes(account)
         GLib.timeout_add_seconds(CHECK_EVERY, self.refresh_all)
+        self.badge()
+
+    def badge(self):
+        """Post's Dock icon shows the unread messages in every Inbox, as on a Mac."""
+        unread = sum(box.unread for boxes in self.mailboxes.values() for box in boxes
+                     if box.kind == "inbox")
+        launcher_badge.set_count("freemac-post.desktop", unread)
 
     def _main_window(self):
         if self.window is None:
