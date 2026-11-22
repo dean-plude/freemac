@@ -335,6 +335,48 @@ def empty_trash(trash=None):
         pass
 
 
+def purge_old_trash(days=30, now=None, trash=None):
+    """Delete for good what has been in the Trash for more than `days` days,
+    by the date each item's note gives (Drawer > Settings > Advanced).
+    Returns how many items went."""
+    import datetime
+    trash = trash or os.path.join(GLib.get_user_data_dir(), "Trash")
+    now = datetime.datetime.now() if now is None else now
+    info = os.path.join(trash, "info")
+    try:
+        notes = [n for n in os.listdir(info) if n.endswith(".trashinfo")]
+    except OSError:
+        return 0
+    gone = 0
+    for note in notes:
+        when = None
+        try:
+            with open(os.path.join(info, note)) as f:
+                for line in f:
+                    if line.startswith("DeletionDate="):
+                        when = datetime.datetime.fromisoformat(line.split("=", 1)[1].strip())
+        except (OSError, ValueError):
+            continue
+        if when is None or (now - when).days < days:
+            continue
+        path = os.path.join(trash, "files", note[:-len(".trashinfo")])
+        try:
+            if os.path.isdir(path) and not os.path.islink(path):
+                shutil.rmtree(path)
+            elif os.path.lexists(path):
+                os.unlink(path)
+            os.unlink(os.path.join(info, note))
+            gone += 1
+        except OSError:
+            pass
+    if gone:
+        try:
+            os.unlink(os.path.join(trash, "directorysizes"))
+        except OSError:
+            pass
+    return gone
+
+
 def to_trash(paths):
     """Move to the Trash; returns the ones that went and the first error."""
     went, error = [], None

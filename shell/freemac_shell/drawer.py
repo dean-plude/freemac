@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -151,18 +151,23 @@ def save_favourites(entries):
     save_setting("favourites", [[name, path] for name, path in entries])
 
 
+# Keep folders on top, whatever the sort (Drawer > Settings > Advanced).
+FOLDERS_ON_TOP = [drawer_settings.get("folders_on_top")]
+
+
 def sort_key(model, it, sort):
-    """How a row sorts: folders first by name, as before, or by kind, newest
-    first, or largest first (folders last, as in Finder)."""
+    """How a row sorts: by name, by kind, newest first, or largest first
+    (folders last, as in Finder), with folders on top unless that's off."""
     is_dir, key, kind, stamp, size = model.get(it, C_IS_DIR, C_SORT, C_KIND, C_STAMP, C_BYTES)
     key = key or ""
+    first = (not is_dir,) if FOLDERS_ON_TOP[0] else ()
     if sort == "kind":
-        return ((kind or "").lower(), key[1:])
+        return first + ((kind or "").lower(), key[1:])
     if sort == "date":
-        return (-(stamp or 0), key[1:])
+        return first + (-(stamp or 0), key[1:])
     if sort == "size":
         return (bool(is_dir), -(size or 0), key[1:])
-    return (key,)
+    return first + (key[1:],)
 
 
 def compare_rows(model, a, b, sort):
@@ -1956,6 +1961,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def empty_trash(self):
         from . import alert
+        if not drawer_settings.get("warn_empty_trash"):
+            transfer.empty_trash()
+            self.refresh()
+            return
         answer = alert.ask(self, "Are you sure you want to permanently erase the items in the Trash?",
                            "You can’t undo this action.",
                            [("Cancel", Gtk.ResponseType.CANCEL), ("Empty Trash", Gtk.ResponseType.OK)],
@@ -2927,15 +2936,37 @@ class Drawer(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
-        menus.add_actions(self, {"new-window": lambda: DrawerWindow(self, GLib.get_home_dir()).show_all()})
+        menus.add_actions(self, {"new-window": lambda: DrawerWindow(self, self.start_folder()).show_all(),
+                                 "settings": self.show_settings})
+        self.set_accels_for_action("app.settings", ["<Control>comma"])
         self.set_menubar(menubar())
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
+    @staticmethod
+    def start_folder():
+        return drawer_settings.start_folder(recents.PLACE)
+
+    def show_settings(self):
+        window = getattr(self, "settings_window", None)
+        if window is None:
+            window = self.settings_window = drawer_settings.SettingsWindow(self._setting_changed)
+            window.set_application(self)
+            window.connect("destroy", lambda *_: setattr(self, "settings_window", None))
+        window.show_all()
+        window.present()
+
+    def _setting_changed(self, key):
+        if key == "folders_on_top":
+            FOLDERS_ON_TOP[0] = drawer_settings.get(key)
+            for window in self.get_windows():
+                if isinstance(window, DrawerWindow):
+                    window.refresh()
+
     def do_activate(self):
-        DrawerWindow(self, GLib.get_home_dir()).show_all()
+        DrawerWindow(self, self.start_folder()).show_all()
 
     def do_open(self, files, _n, _hint):
         for file in files:

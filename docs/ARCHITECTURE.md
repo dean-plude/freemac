@@ -270,6 +270,13 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Drawer's settings (1.102, `drawer_settings.py`) live in
+`~/.config/freemac/drawer.json`: the folder new windows open in, the
+warning before emptying the Trash (the Dock's Empty Trash follows it
+too), removing items from the Trash after 30 days and keeping folders on
+top. Topline does the 30 days (`transfer.purge_old_trash`, by each item's
+DeletionDate) shortly after login and every six hours.
+
 Sunrise and sunset (1.101) come from `sun.py`: the time zone's city in
 the tz database (`zone1970.tab`, with `tzdata.zi` for older names) gives
 a latitude and longitude, and the usual sunrise equation gives the times.
