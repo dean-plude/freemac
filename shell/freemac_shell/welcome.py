@@ -22,7 +22,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import guest_user, style  # noqa: E402
 
 LIVE = os.path.isdir("/run/live/medium")
 SEEN = os.path.join(GLib.get_user_config_dir(), "freemac", "welcome-seen")
@@ -267,6 +267,8 @@ def finished(*_args):
 
 def main():
     GLib.set_prgname("freemac-welcome")
+    if guest_user.is_guest(pwd.getpwuid(os.getuid()).pw_name) and "--always" not in sys.argv:
+        return 0   # a guest's things are erased anyway; no tour each time
     if not LIVE and os.path.exists(SEEN) and "--always" not in sys.argv:
         return 0   # an installed system shows Welcome once per account
     style.apply()

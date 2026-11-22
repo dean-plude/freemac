@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import style  # noqa: E402
+from . import guest_user, style  # noqa: E402
 
 SESSION = ["/usr/local/bin/freemac-session"]
 WALLPAPER = "/usr/share/backgrounds/freemac/dusk-tide.png"
@@ -182,6 +182,7 @@ class Gangway(Gtk.Window):
         stack.add(self.password)
         stack.add_overlay(placeholder)
         stack.set_overlay_pass_through(placeholder, True)
+        self.stack = stack
         self.field.pack_start(stack, True, True, 0)
         self.button = Gtk.Button.new_from_icon_name("go-next-symbolic", Gtk.IconSize.BUTTON)
         self.button.set_tooltip_text("Log In")
@@ -247,13 +248,20 @@ class Gangway(Gtk.Window):
             self.people.pack_start(button, False, False, 0)
         self.person.show_all()
         self.people.show_all()
+        # The Guest User needs no password: just the arrow to log in.
+        guest = guest_user.is_guest(self.chosen.pw_name)
+        self.stack.set_visible(not guest)
+        self.field.set_size_request(-1 if guest else 240, -1)
+        if guest and not self.message.get_text():
+            self.message.get_style_context().remove_class("gangway-error")
+            self.message.set_text("No password needed. Everything is erased when you log out.")
 
     def _choose(self, entry):
         self.chosen = entry
         self.message.set_text("")
         self.password.set_text("")
         self._show_person()
-        self.password.grab_focus()
+        (self.button if guest_user.is_guest(entry.pw_name) else self.password).grab_focus()
 
     def _draw_background(self, widget, cr):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
@@ -309,7 +317,8 @@ class Gangway(Gtk.Window):
                 answer = self.password.get_text() if kind in ("secret", "visible") else None
                 reply = self.greetd.request(type="post_auth_message_response", response=answer)
             if reply.get("type") != "success":
-                self.fail("That password didn’t work. Try again.")
+                self.fail("The Guest User couldn’t log in." if guest_user.is_guest(user)
+                          else "That password didn’t work. Try again.")
                 return
             reply = self.greetd.request(type="start_session", cmd=SESSION, env=[])
             if reply.get("type") == "success":
@@ -334,5 +343,7 @@ def main():
     window.connect("destroy", Gtk.main_quit)
     window.fullscreen()
     window.show_all()
+    # show_all brings back the password box the Guest User doesn't have.
+    window.stack.set_visible(not guest_user.is_guest(window.username() or ""))
     window.password.grab_focus()
     Gtk.main()
