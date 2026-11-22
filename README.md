@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.118 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.119 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
