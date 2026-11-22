@@ -61,12 +61,14 @@ TOPICS = {
     ]),
     "mission-control": ("See every window and desktop with Mission Control", "mission control overview all windows "
                         "desktops spaces row top switch control up four finger swipe drag move window "
-                        "add new close remove plus app expose exposé show all windows control down full screen", [
+                        "add new close remove plus app expose exposé show all windows control down full screen empty", [
         "Press Control+Up, or swipe up with four fingers, to see every window on this desktop side by side. "
         "Click one to bring it forward.",
         "Your desktops are named along the top of the screen. Move the pointer up to them and they open out "
         "into small pictures of each desktop with its windows.",
         "Click a desktop to go straight to it.",
+        "On a desktop with no windows, Control+Up opens the row of desktops on its own. Click one to go "
+        "there, or press Esc or click away to close it.",
         "Press Control+Down, or swipe down with four fingers, for App Exposé: every window of the app "
         "you're using, from every desktop. Show All Windows in an app's Dock menu does the same for that app.",
         "To move a window to another desktop, drag it up onto that desktop and let go.",
