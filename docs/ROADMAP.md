@@ -997,6 +997,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | Shake the mouse quickly back and forth and the pointer grows big for a moment, so it's easy to find | Strata | done |
 | 2 | Shake mouse pointer to locate, on by default, in Dials > Accessibility | Dials | done |
 
+## 1.97 "press and hold for accents" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Hold a letter such as e in a text field and a small panel by the text cursor offers è é ê ë ē ė ę; a number key, a click, or the arrows and Return pick one, and Shift gives capitals | Strata, Topline | done |
+| 2 | freemac-im, a quiet input method, so apps say which text field has the keyboard and where its cursor is | Strata | done |
+| 3 | Press and hold for accents, on by default, in Dials > Keyboard, and a Guide topic | Dials, Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

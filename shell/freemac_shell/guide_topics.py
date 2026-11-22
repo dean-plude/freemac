@@ -677,6 +677,14 @@ TOPICS = {
         "screen's colours. Press it again to put them back.",
         "High contrast and Larger text are on the same page.",
     ]),
+    "accents": ("Type accented letters", "accent accents accented letter é è ê ñ ü ç umlaut cedilla tilde grave acute diacritic press hold key foreign language french spanish german", [
+        "In a text field, press and hold a letter such as e. A small panel shows its accented forms, "
+        "each with a number under it.",
+        "Press the number, or click the letter you want, and it takes the place of the one you typed. "
+        "The arrow keys and Return pick one too, and Escape closes the panel.",
+        "Hold Shift as well for capitals. Letters with accents are a, c, e, i, l, n, o, s, u, y and z.",
+        "To have held letters repeat instead, open Dials > Keyboard and turn off Press and hold for accents.",
+    ]),
     "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
         "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
         "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "

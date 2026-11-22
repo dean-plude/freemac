@@ -15,6 +15,11 @@
 			<_long>Moving the mouse quickly back and forth makes the pointer big for a moment.</_long>
 			<default>true</default>
 		</option>
+		<option name="press_and_hold" type="bool">
+			<_short>Press and hold a letter for its accents</_short>
+			<_long>Holding a letter such as e in a text field shows its accented forms to pick from, instead of repeating it.</_long>
+			<default>true</default>
+		</option>
 		<option name="command_key" type="bool">
 			<_short>Super is the Command key</_short>
 			<_long>Super with a key does in apps what Ctrl with it does (Ctrl+Shift in a terminal); Super+Left/Right/Up/Down and Alt+Left/Right/Backspace move through text as on a Mac.</_long>

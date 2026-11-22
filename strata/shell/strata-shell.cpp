@@ -43,6 +43,7 @@
 #include "sheets.hpp"
 #include "screen-flash.hpp"
 #include "pointer-locate.hpp"
+#include "press-hold.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -860,6 +861,26 @@ class strata_shell_impl : public wf::plugin_interface_t
 
     strata_flash::flashes_t flashes;
     strata_locate::locate_t locate;
+    strata_accents::hold_t accents;
+
+    /* strata/accent-type {text}: Topline's press-and-hold panel picked an
+     * accent; type it in place of the held letter. typed is false when the
+     * app has no text field Strata can type into (Topline then types it). */
+    wf::ipc::method_callback accent_type = [=] (nlohmann::json data)
+    {
+        WFJSON_EXPECT_FIELD(data, "text", string);
+        auto out = wf::ipc::json_ok();
+        out["typed"] = accents.type(data["text"]);
+        return out;
+    };
+
+    /* strata/accent-closed: the panel has gone, so the number keys and the
+     * arrows go to the app again. */
+    wf::ipc::method_callback accent_closed = [=] (nlohmann::json)
+    {
+        accents.closed();
+        return wf::ipc::json_ok();
+    };
 
     /* Flash every display once, for "Flash the screen when an alert sound
      * occurs". The alert sound's player calls it. */
@@ -914,10 +935,13 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/outputs", list_outputs);
         method_repository->register_method("strata/flash", flash_screen);
         method_repository->register_method("strata/pointer", pointer);
+        method_repository->register_method("strata/accent-type", accent_type);
+        method_repository->register_method("strata/accent-closed", accent_closed);
         flashes.init();
         locate.init();
         window_places.init();
         command_key.init();
+        accents.init();
         glides.init();
         sheets.init();
     }

@@ -387,8 +387,10 @@ class TilesPanel(Gtk.Window):
             self._close_source = 0
 
 
-def listen(panel):
-    """Take the decorator's messages for `panel` from now on."""
+def listen(panel, others=None):
+    """Take the decorator's messages for `panel` from now on. `others` maps
+    a message's first word to what handles it instead ("accent" for the
+    press-and-hold panel, accents.py)."""
     try:
         os.unlink(SOCKET)
     except FileNotFoundError:
@@ -406,7 +408,12 @@ def listen(panel):
                 line = conn.recv(128).decode()
             except (OSError, UnicodeDecodeError):
                 return True
-        panel.handle(line.strip())
+        line = line.strip()
+        word = line.split(" ", 1)[0]
+        if others and word in others:
+            others[word](line)
+        else:
+            panel.handle(line)
         return True
 
     GLib.io_add_watch(server.fileno(), GLib.IO_IN, on_connect)

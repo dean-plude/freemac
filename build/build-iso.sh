@@ -246,6 +246,9 @@ if in_chroot apt-get install -y --no-install-recommends $STRATA_BUILD_DEPS \
     [ -n "$gtkmods" ] || gtkmods=/usr/lib/x86_64-linux-gnu
     install -D -m 0644 "$ROOTFS/tmp/strata/out/libfreemac-zoom.so" "$ROOTFS$gtkmods/gtk-3.0/modules/libfreemac-zoom.so"
   fi
+  if [ -f "$ROOTFS/tmp/strata/out/freemac-im" ]; then
+    install -D -m 0755 "$ROOTFS/tmp/strata/out/freemac-im" "$ROOTFS/usr/local/bin/freemac-im"
+  fi
   if [ -f "$ROOTFS/tmp/strata/out/freemac-latch.so" ]; then
     install -D -m 0644 "$ROOTFS/tmp/strata/out/freemac-latch.so" "$ROOTFS/usr/lib/gtklock/freemac-latch.so"
   fi

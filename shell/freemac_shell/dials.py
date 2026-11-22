@@ -866,7 +866,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         wf_get = lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default)  # noqa: E731
         wf_set = lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value)  # noqa: E731
         sources, input_menu = dials_input.input_sources_group(self, group, row, switch, wf_get, wf_set)
-        repeat = dials_input.key_repeat_group(group, row, slider, wf_get, wf_set)
+        repeat = dials_input.key_repeat_group(group, row, slider, wf_get, wf_set, switch)
         sources_heading = Gtk.Label(label="Input Sources", xalign=0)
         sources_heading.get_style_context().add_class("dials-section")
         text_heading = Gtk.Label(label="Text Input", xalign=0)

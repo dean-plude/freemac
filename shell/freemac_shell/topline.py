@@ -1282,7 +1282,11 @@ def main():
     # The green button's menu (window_tiles.py), opened by Strata's decorator.
     from . import window_tiles
     win.tiles = window_tiles.TilesPanel(win)
-    win._tiles_server = window_tiles.listen(win.tiles)
+    # Press and hold a letter for its accents (accents.py), shown by Strata.
+    from . import accents
+    win.accents = accents.AccentPanel()
+    win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle})
+    accents.start_input_method()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()

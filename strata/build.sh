@@ -6,6 +6,7 @@
 # lock screen module).
 # Usage: build.sh OUTDIR   -> OUTDIR/libstrata-decor.so, OUTDIR/libstrata-shell.so,
 #                             OUTDIR/libfreemac-zoom.so (GTK 3 module),
+#                             OUTDIR/freemac-im (input method),
 #                             OUTDIR/freemac-latch.so (with gtklock 2.1)
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -38,6 +39,17 @@ gcc -O2 -fPIC -c "$GEN/gtk-shell-protocol.c" -o "$GEN/gtk-shell-protocol.o" $(pk
 g++ $FLAGS $CFLAGS -I"$GEN" "$HERE/shell/strata-shell.cpp" "$GEN/gtk-shell-protocol.o" \
   -o "$OUT/libstrata-shell.so" $(pkg-config --libs cairo)
 echo "strata: built $OUT/libstrata-shell.so"
+
+# freemac's input method (see im/freemac-im.c): with it running, apps say
+# which text field has the keyboard, for pressing and holding a letter.
+if pkg-config --exists wayland-client; then
+  wayland-scanner client-header "$HERE/im/input-method-unstable-v2.xml" "$GEN/input-method-unstable-v2-client-protocol.h"
+  wayland-scanner private-code "$HERE/im/input-method-unstable-v2.xml" "$GEN/input-method-unstable-v2-protocol.c"
+  # shellcheck disable=SC2046
+  gcc -O2 -I"$GEN" "$HERE/im/freemac-im.c" "$GEN/input-method-unstable-v2-protocol.c" \
+    -o "$OUT/freemac-im" $(pkg-config --cflags --libs wayland-client)
+  echo "strata: built $OUT/freemac-im"
+fi
 
 # The GTK 3 module that lets an app's own green button open Topline's
 # Move & Resize menu (see gtk/freemac-zoom.c).
