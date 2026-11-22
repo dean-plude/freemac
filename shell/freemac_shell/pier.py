@@ -31,7 +31,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import alert, apps, held, login_items, main_display, recents, style, volumes  # noqa: E402
+from . import alert, apps, held, login_items, main_display, recents, stage, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -116,7 +116,8 @@ def load_config():
     folder stacks and whether the Trash is shown."""
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
               "stacks": default_stacks(), "trash": True, "minimize_into_app": False,
-              "autohide": False, "recents": True, "indicators": True, "bounce": True}
+              "autohide": False, "recents": True, "indicators": True, "bounce": True,
+              "stage": False}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -924,9 +925,18 @@ class Pier(Gtk.Window):
         # Apps still open with no window keep their dot.
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         try:
-            self.wf = Wayfire(on_event=lambda _e: self.refresh())
+            self.wf = Wayfire(on_event=self._wayfire_event)
         except OSError:
             self.wf = None
+        # Stage Manager lives in the Dock, which is always running.
+        self.stage = stage.StageManager(self.wf)
+        self.stage.set_enabled(self.config.get("stage", False))
+        self.refresh()
+
+    def _wayfire_event(self, event):
+        stage_manager = getattr(self, "stage", None)
+        if stage_manager is not None:
+            stage_manager.event(event)
         self.refresh()
 
     # ---- which edge the Dock is on ---------------------------------------------------
@@ -1030,6 +1040,8 @@ class Pier(Gtk.Window):
             self.min_box.show()
             self.shelf.reorder_child(self.places_sep, -1)
         self.config = config
+        if getattr(self, "stage", None) is not None:
+            self.stage.set_enabled(config.get("stage", False))
         for item in self.items() + list(self.windows.values()):
             item.image.set_pixel_size(self.base)
         GLib.idle_add(self._fit)

@@ -1091,6 +1091,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Dynamic switch in Dials > Wallpaper, found by searching "dynamic" or "sunset" | Dials | done |
 | 5 | A Guide line, and README screenshots retaken | Guide, Docs | done |
 
+## 1.107 "stage manager" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Stage Manager: one app in the middle, the others hidden as pictures in a strip down the left | Pier (stage.py) | done |
+| 2 | Click a picture, the app's Dock icon or ⌘Tab to swap the app on the stage | Pier | done |
+| 3 | A window under the strip moves beside it as its app comes forward | Pier | done |
+| 4 | Stage Manager tile in Quick Settings, and a switch in Dials > Dock and Menu Bar | Quick Settings, Dials | done |
+| 5 | Turning it off brings back every window it hid; what it hid survives a restart of the Dock | Pier | done |
+| 6 | A Guide topic, a README screenshot, and every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

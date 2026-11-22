@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Quick settings: one panel from Topline for the switches people reach for
-most. Wi-Fi, Bluetooth, Do Not Disturb, dark mode and night light as tiles,
+most. Wi-Fi, Bluetooth, Do Not Disturb, dark mode, night light and Stage Manager as tiles,
 what's playing (with back, play/pause and forward) when a player is open,
 and brightness and volume sliders under them. A tile is left out when the
 computer doesn't have the thing (no Wi-Fi card, no Bluetooth adapter), and so
@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
 
-from . import beacon, media, screen, style  # noqa: E402
+from . import beacon, media, screen, stage, style  # noqa: E402
 from .status import NM, StatusButton, launch  # noqa: E402
 
 CSS = b"""
@@ -172,9 +172,10 @@ class QuickSettings(StatusButton):
         self.dnd = Tile("notifications-disabled-symbolic", "Do Not Disturb", self._set_dnd)
         self.dark = Tile("weather-clear-night-symbolic", "Dark Mode", self._set_dark)
         self.night = Tile("night-light-symbolic", "Night Light", self._set_night)
+        self.stage = Tile("freemac-stage-manager-symbolic", "Stage Manager", self._set_stage)
         self.tiles = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=2,
                                  min_children_per_line=2, homogeneous=True, column_spacing=8, row_spacing=8)
-        for tile in (self.wifi, self.bluetooth, self.dnd, self.dark, self.night):
+        for tile in (self.wifi, self.bluetooth, self.dnd, self.dark, self.night, self.stage):
             self.tiles.add(tile)
         panel.pack_start(self.tiles, False, False, 0)
         self.now_playing = NowPlaying()
@@ -237,6 +238,7 @@ class QuickSettings(StatusButton):
         self.now_playing.refresh()
         self.dnd.show_state(bool(style.prefs().get("dnd")))
         self.dark.show_state(style.is_dark())
+        self.stage.show_state(stage.is_on())
         night = screen.night_settings()
         self.night.show_state(night["on"], f"{night['from']} to {night['to']}" if night["on"] else None)
 
@@ -299,6 +301,11 @@ class QuickSettings(StatusButton):
         # Dials does the whole switch: GTK theme, title bars and wallpaper.
         launch("freemac-dials", "--appearance", "dark" if on else "light")
         self.dark.detail.set_text("On" if on else "Off")
+
+    def _set_stage(self, on):
+        # The Dock watches its settings and turns Stage Manager on or off.
+        stage.set_on(on)
+        self.stage.detail.set_text("On" if on else "Off")
 
     def _set_night(self, on):
         settings = screen.night_settings()

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- freemac's Stage Manager icon: one window in the middle, three small ones down the left. Original artwork. -->
+  <path fill="#2e3436" d="M6.4 3C5.9 3 5.5 3.4 5.5 3.9v8.2c0 .5.4.9.9.9h7.7c.5 0 .9-.4.9-.9V3.9c0-.5-.4-.9-.9-.9zm.4 1.3h6.9v7.4H6.8z"/>
+  <rect fill="#2e3436" x="1" y="3" width="3.2" height="2.4" rx=".6"/>
+  <rect fill="#2e3436" x="1" y="6.8" width="3.2" height="2.4" rx=".6"/>
+  <rect fill="#2e3436" x="1" y="10.6" width="3.2" height="2.4" rx=".6"/>
+</svg>
