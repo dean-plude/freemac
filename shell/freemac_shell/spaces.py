@@ -37,6 +37,7 @@ OPEN_H = PICTURE_H + 44
 LABEL_W, LABEL_H, GAP = 112, 26, 12
 # How long the row stays open after the pointer leaves it.
 CLOSE_MS = 350
+REACH = 40          # how far below the names the pointer opens them out
 
 
 def parse(line):
@@ -279,7 +280,9 @@ class SpacesRow(Gtk.Window):
         self._call("strata/spaces-areas", areas=areas)
 
     def _pointer(self, x, y):
-        height = OPEN_H if self.opened else NAMES_H
+        # The names open out a little before the pointer reaches them, so a
+        # window dragged up towards them gets there too.
+        height = OPEN_H if self.opened else NAMES_H + REACH
         inside = 0 <= y < height
         if inside:
             self._cancel_close()

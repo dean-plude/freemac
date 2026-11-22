@@ -57,12 +57,13 @@ TOPICS = {
         "to the next desktop.",
     ]),
     "mission-control": ("See every window and desktop with Mission Control", "mission control overview all windows "
-                        "desktops spaces row top switch control up four finger swipe", [
+                        "desktops spaces row top switch control up four finger swipe drag move window", [
         "Press Control+Up, or swipe up with four fingers, to see every window on this desktop side by side. "
         "Click one to bring it forward.",
         "Your desktops are named along the top of the screen. Move the pointer up to them and they open out "
         "into small pictures of each desktop with its windows.",
         "Click a desktop to go straight to it.",
+        "To move a window to another desktop, drag it up onto that desktop and let go.",
     ]),
     "seek": ("Search with Seek", "seek search find spotlight calculate sum file convert conversion units "
              "miles kilometres celsius fahrenheit pounds kilograms cups", [

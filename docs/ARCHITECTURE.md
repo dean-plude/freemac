@@ -288,7 +288,13 @@ of those areas from the overview, closes the overview through its own
 `scale/toggle` IPC method, and once scale has ended asks for that desktop
 (`request_workspace`, so vswitch slides there) and brings its front window
 forward. Wayfire 0.9 has no IPC call to change desktop, so this lives in
-Strata.
+Strata. Dragging a window onto a desktop in the row (1.109) uses the drag
+that scale already does: while scale's drag holds the pointer no motion
+signals arrive, so Strata looks at the pointer on a 40 ms timer while the
+overview is open and a window is dragged, shrinks the dragged window near the
+row (`core_drag_t::set_scale`), and on the drag's `drag_done_signal` over one
+of the desktops moves the window there (`move_to_workspace`); scale lays out
+the windows left when the window's geometry changes.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
