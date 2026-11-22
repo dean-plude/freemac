@@ -1171,6 +1171,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.120 "screen reader" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A screen reader, as a Mac has: Command+F5 anywhere turns it on or off, and it speaks the window and control you move to, the text under the cursor and what you type, in GTK and Qt apps, Firefox and LibreOffice | Strata, screen_reader.py, Orca | done |
+| 2 | Dials > Accessibility: a Screen reader switch and Screen Reader Settings for its voice, speed and keys; it comes back at the next login if it was on | Dials, Topline | done |
+| 3 | Listed in Dials > Keyboard's shortcuts; Guide topic; README row; every README screenshot retaken | Dials, Guide, Docs | done |
+
 ## 1.119 "full size" (done)
 
 | # | Item | Component | Status |

@@ -1298,6 +1298,9 @@ def main():
     from . import background_sounds
     win.background_sounds = background_sounds.Player()
     win.background_sounds.start()
+    # The screen reader (screen_reader.py) comes back if it was on at log out.
+    from . import screen_reader
+    GLib.timeout_add_seconds(2, lambda: screen_reader.at_login() and False)
     # Auto appearance: light by day, dark at night (auto_mode.py).
     from . import auto_mode
     win.auto_mode = auto_mode.Follower()

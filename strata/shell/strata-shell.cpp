@@ -950,6 +950,16 @@ class strata_shell_impl : public wf::plugin_interface_t
         return out;
     };
 
+    /* Command-F5 turns the screen reader on or off, as VoiceOver's key does
+     * on a Mac (1.120). An option here, not a [command] binding, so a
+     * wayfire.ini from before 1.120 gets it too. */
+    wf::option_wrapper_t<wf::activatorbinding_t> screen_reader_key{"strata-shell/screen_reader"};
+    wf::activator_callback on_screen_reader = [=] (const wf::activator_data_t&)
+    {
+        wf::get_core().run("freemac-screen-reader --toggle");
+        return true;
+    };
+
   public:
     void init() override
     {
@@ -999,6 +1009,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         spaces.init(&strata_accents::strata_tell_topline);
         glides.init();
         sheets.init();
+        wf::get_core().bindings->add_activator(screen_reader_key, &on_screen_reader);
     }
 
     bool is_unloadable() override

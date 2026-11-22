@@ -41,6 +41,7 @@ SHORTCUTS = (
     ("command", "binding_lock", "Lock the screen", "<super> <ctrl> KEY_Q"),
     ("command", "binding_logout", "Log out", "<super> <shift> KEY_Q"),
     ("command", "binding_speak", "Speak the selected words", "<alt> KEY_ESC"),
+    ("strata-shell", "screen_reader", "Turn the screen reader on or off", "<super> KEY_F5"),
     ("command", "binding_terminal", "Open a terminal", "<ctrl> <alt> KEY_T"),
     ("command", "binding_lens_screen", "Screenshot", "<super> <shift> KEY_3 | KEY_SYSRQ"),
     ("command", "binding_lens_area", "Screenshot of an area", "<super> <shift> KEY_4 | <shift> KEY_SYSRQ"),

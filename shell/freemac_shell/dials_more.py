@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, awake, background_sounds, dials_pointer, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -383,7 +383,31 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), colour_filters(window), sticky_keys(window), audio(window), *spoken_content(window))
+    ), *reader_group(window), colour_filters(window), sticky_keys(window), audio(window),
+        *spoken_content(window))
+
+
+def reader_group(window):
+    """The screen reader: on or off (as Command-F5 does anywhere), and Orca's
+    own settings for its voice, how much it says and its keys."""
+    group, row, _page, _slider, switch = window.helpers
+    if not screen_reader.available():
+        return []
+    options = Gtk.Button(label="Screen Reader Settings\u2026", valign=Gtk.Align.CENTER)
+    options.connect("clicked", lambda _b: screen_reader.settings())
+    on = screen_reader.running() or screen_reader.wanted()
+    options.set_sensitive(on)
+
+    def turned(active):
+        screen_reader.set_on(active)
+        options.set_sensitive(active)
+    return [group(
+        row("Screen reader", switch(on, turned),
+            "Speaks what's on the screen and what you type. Press \u2318F5 to turn it on or off "
+            "anywhere."),
+        row("Voice, speed and keys", options,
+            "Insert is the screen reader key: hold it with other keys to hear where you are."),
+    )]
 
 
 COLOUR_FILTERS = (("none", "Off"), ("greyscale", "Greyscale"),
