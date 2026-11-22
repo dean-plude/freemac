@@ -734,6 +734,14 @@ TOPICS = {
         "Folder, open it, change the words or menus and click Save. Right-click it and choose Remove Smart "
         "Folder to take it away; the files it showed stay where they are.",
     ]),
+    "seek-settings": ("Choose what Seek finds, and keep folders private", "seek spotlight search results privacy private folder hide index rebuild settings command space", [
+        "Choose Dials > Seek. Under Search Results, turn off any kind of thing you don't want Seek to list, "
+        "such as Events or Menu items. It counts the next time you type in Seek.",
+        "Under Privacy, click + and choose a folder to keep it out of Seek and out of Drawer's This Mac "
+        "searches and Smart Folders. Click − beside it to let them look there again.",
+        "Turning off Words inside documents makes Seek forget what it read inside your files. If Seek ever "
+        "misses a document you know is there, click Rebuild Index.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",

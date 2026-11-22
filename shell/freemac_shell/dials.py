@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
@@ -395,6 +395,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             (2, "accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic", "blue",
              lambda: dials_more.accessibility(self)),
             (2, "dock", "Dock and Menu Bar", "view-app-grid-symbolic", "dark", self.dock),
+            (2, "seek", "Seek", "system-search-symbolic", "gray", lambda: dials_seek.seek_page(self)),
             (2, "displays", "Displays", "video-display-symbolic", "blue", self.displays),
             (2, "wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", "teal", self.wallpaper),
             (2, "screensaver", "Screen Saver", "weather-clear-night-symbolic", "indigo",
@@ -981,7 +982,7 @@ class DialsWindow(Gtk.ApplicationWindow):
 # The View menu, grouped; the names match DialsWindow's panels.
 MENU_PANELS = (
     (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("screensaver", "Screen Saver"),
-     ("dock", "Dock and Menu Bar"),
+     ("dock", "Dock and Menu Bar"), ("seek", "Seek"),
      ("notifications", "Notifications")),
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
