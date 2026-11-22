@@ -950,6 +950,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Gangway shows the Guest User with no password box, just the arrow | Gangway | done |
 | 4 | Fix: the login screen came back black after logging out, because the greeter couldn't open the seat | Image | done |
 
+## 1.91 "sound effects" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Alert sounds: Pebble, Droplet, Knock, Chirp, Bell and Hum, all made from scratch, and an alert volume, in Dials > Sound | Dials, art | done |
+| 2 | Every GTK app's alert (a Backspace with nothing to delete) plays the alert sound; Wayfire made none | Strata | done |
+| 3 | Play feedback when volume is changed: a pop at the new level | freemac-keys, Topline | done |
+| 4 | Play user interface sound effects: a crumple when the Trash is emptied, a shutter for a screenshot | Drawer, Pier, Lens | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

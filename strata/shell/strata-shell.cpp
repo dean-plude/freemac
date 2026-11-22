@@ -8,9 +8,12 @@
 // and draws small pictures of minimized windows for the dock (strata/snapshot).
 // strata/input-source reads and switches the keyboard's input source (the XKB
 // layout group), for Topline's input menu.
+// It also plays freemac's alert sound (freemac-sound alert) for gtk_shell1's
+// system bell, which GTK apps ring when something can't be done.
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
+#include <chrono>
 #include <map>
 #include <csignal>
 #include <sys/types.h>
@@ -356,6 +359,17 @@ static void handle_gtk_shell_system_bell(wl_client *client, wl_resource *resourc
     }
 
     wf::get_core().emit(&data);
+
+    // freemac: play the alert sound chosen in Dials > Sound. Wayfire itself
+    // makes no sound for the bell. A burst of bells (a key held down) plays
+    // once, at most every 150 ms.
+    static std::chrono::steady_clock::time_point last;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::milliseconds(150))
+    {
+        last = now;
+        wf::get_core().run("freemac-sound alert");
+    }
 }
 
 /**

@@ -327,6 +327,8 @@ def empty_trash(trash=None):
                     os.unlink(path)
             except OSError:
                 pass
+    from . import sounds
+    sounds.effect("trash")
     try:
         os.unlink(os.path.join(trash, "directorysizes"))
     except OSError:

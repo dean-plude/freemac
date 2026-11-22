@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, notify_rules, speak, startup_sound, style  # noqa: E402
+from . import alert, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -59,13 +59,42 @@ def volume_of(target):
     return (float(match.group(1)) * 100 if match else None), "MUTED" in result.stdout
 
 
-def start_up_group(group, row, switch):
-    def changed(on):
+def sound_effects_group(window, group, row, slider, switch):
+    """Sound Effects, as on a Mac: the alert sound and its volume, the pop as
+    the volume changes, interface sounds and the start-up sound."""
+    heading = Gtk.Label(label="Sound Effects", xalign=0)
+    heading.get_style_context().add_class("dials-caption")
+
+    choice = Gtk.ComboBoxText()
+    for name, title in sounds.ALERTS:
+        choice.append(name, title)
+    choice.set_active_id(sounds.alert_name())
+
+    def picked(combo):
+        window.save_prefs(alert_sound=combo.get_active_id())
+        sounds.alert(combo.get_active_id())
+    choice.connect("changed", picked)
+
+    level = slider(0, 100, 5, sounds.alert_volume(),
+                   lambda v: window.save_prefs(alert_volume=int(v)))
+    # Let go of the slider to hear the alert at the new level.
+    level.connect("button-release-event", lambda *_: sounds.alert(volume=int(level.get_value())) and False)
+
+    def on_start_up(on):
         startup_sound.set_enabled(on)
         if on:
             startup_sound.play()
-    return group(row("Play a sound at start-up", switch(startup_sound.enabled(), changed),
-                     "freemac's own chime as the desktop first appears after the computer starts."))
+
+    return heading, group(
+        row("Alert sound", choice, "Plays when something can’t be done."),
+        row("Alert volume", level),
+        row("Play sound on start-up", switch(startup_sound.enabled(), on_start_up),
+            "freemac’s own chime as the desktop first appears after the computer starts."),
+        row("Play user interface sound effects", switch(sounds.ui_sounds(), lambda on: window.save_prefs(ui_sounds=on)),
+            "A crumple when you empty the Trash and a shutter for a screenshot."),
+        row("Play feedback when volume is changed", switch(sounds.volume_feedback(),
+                                                           lambda on: window.save_prefs(volume_feedback=on)),
+            "A little pop at the new level."))
 
 
 def sound(window):
@@ -73,7 +102,7 @@ def sound(window):
     if not shutil.which("wpctl"):
         return page("Sound", group(row("Sound isn't running", None,
                                        "freemac uses PipeWire for sound; its control tool wasn't found.")),
-                    start_up_group(group, row, switch))
+                    *sound_effects_group(window, group, row, slider, switch))
     status = run("wpctl", "status")
     devices = parse_wpctl_status(status.stdout if status else "")
     groups = []
@@ -97,8 +126,7 @@ def sound(window):
             rows.append(row("Mute", switch(muted, lambda on, t=target: run(
                 "wpctl", "set-mute", t, "1" if on else "0"))))
         groups.append(group(*rows))
-    groups.append(start_up_group(group, row, switch))
-    return page("Sound", *groups)
+    return page("Sound", *sound_effects_group(window, group, row, slider, switch), *groups)
 
 
 # ---- Power ----------------------------------------------------------------------

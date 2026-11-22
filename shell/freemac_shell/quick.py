@@ -183,6 +183,9 @@ class QuickSettings(StatusButton):
         self.brightness_row, self.brightness = self._slider("display-brightness-symbolic", 5, 100,
                                                             lambda v: screen.set_brightness(v / 100))
         self.volume_row, self.volume = self._slider("audio-volume-high-symbolic", 0, 100, self._set_volume)
+        if self.volume is not None:
+            from . import sounds
+            self.volume.connect("button-release-event", lambda *_: sounds.feedback())
         panel.pack_start(self.brightness_row, False, False, 0)
         panel.pack_start(self.volume_row, False, False, 0)
         more = Gtk.Button(label="Settings…", relief=Gtk.ReliefStyle.NONE, halign=Gtk.Align.END)

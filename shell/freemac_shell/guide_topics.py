@@ -611,6 +611,13 @@ TOPICS = {
         "stay private.",
         "Turn the switch off to remove the Guest User again.",
     ]),
+    "alert-sound": ("Change the alert sound", "alert sound beep sound effects error noise volume feedback pop trash screenshot shutter quiet", [
+        "Choose Dials > Sound. Under Sound Effects, pick an Alert sound; you hear each one as you pick it.",
+        "The alert sound plays when something can\u2019t be done, like pressing Delete with nothing to delete. "
+        "Alert volume sets how loud it is, apart from everything else.",
+        "Turn off Play feedback when volume is changed to stop the little pop, or Play user interface sound "
+        "effects to stop the Trash and screenshot sounds.",
+    ]),
     "shut-down": ("Restart, shut down or log out", "restart shut down shutdown turn off power off log out logout sign out sleep recent items recently used apps documents", [
         "Click the freemac mark at the left of the menu bar and choose Sleep, Restart\u2026, Shut Down\u2026 or "
         "Log Out. Shift-Command-Q logs out too.",
