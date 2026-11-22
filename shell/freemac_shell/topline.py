@@ -1279,6 +1279,10 @@ def main():
     win = Topline()
     # The menu bar sits on the main display (Dials > Displays).
     main_display.follow(win)
+    # The green button's menu (window_tiles.py), opened by Strata's decorator.
+    from . import window_tiles
+    win.tiles = window_tiles.TilesPanel(win)
+    win._tiles_server = window_tiles.listen(win.tiles)
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()

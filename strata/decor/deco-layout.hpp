@@ -142,6 +142,10 @@ class decoration_layout_t
     /** Strata: tell the buttons whether their window is the active one. */
     void set_active(bool active);
 
+    /** Strata: whether @point is on the green (zoom) button, and where
+     *  that button is, relative to the decoration. */
+    bool zoom_button_at(wf::point_t point, wf::geometry_t& box);
+
   private:
     const int titlebar_size;
     const int border_size;

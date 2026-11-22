@@ -241,6 +241,11 @@ if in_chroot apt-get install -y --no-install-recommends $STRATA_BUILD_DEPS \
     install -m 0644 "$ROOTFS/tmp/strata/out/libstrata-$plugin.so" "$ROOTFS$plugdir/libstrata-$plugin.so"
     install -D -m 0644 "$REPO/strata/$plugin/strata-$plugin.xml" "$ROOTFS/usr/share/wayfire/metadata/strata-$plugin.xml"
   done
+  if [ -f "$ROOTFS/tmp/strata/out/libfreemac-zoom.so" ]; then
+    gtkmods=$(in_chroot pkg-config --variable=libdir gtk+-3.0 2>/dev/null || true)
+    [ -n "$gtkmods" ] || gtkmods=/usr/lib/x86_64-linux-gnu
+    install -D -m 0644 "$ROOTFS/tmp/strata/out/libfreemac-zoom.so" "$ROOTFS$gtkmods/gtk-3.0/modules/libfreemac-zoom.so"
+  fi
   if [ -f "$ROOTFS/tmp/strata/out/freemac-latch.so" ]; then
     install -D -m 0644 "$ROOTFS/tmp/strata/out/freemac-latch.so" "$ROOTFS/usr/lib/gtklock/freemac-latch.so"
   fi

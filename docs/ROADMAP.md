@@ -982,6 +982,14 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | Flash every display white for a moment, through Strata's IPC method strata/flash | Strata | done |
 | 2 | Flash the screen when an alert sound occurs, in Dials > Accessibility, even with the alert sound turned down; Test Screen Flash shows how it looks | Dials, freemac-sound | done |
 
+## 1.95 "green button" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Rest the pointer on a window's green button for a menu: left, right, top and bottom halves, the four quarters, Fill, Centre, Left & Right with the window used before it, and Return to Previous Size | Topline | done |
+| 2 | Strata's own title bars say when the pointer rests on the green button; Strata tells where the pointer is and which window is under it (strata/pointer) | Strata | done |
+| 3 | A GTK 3 module so the green buttons that GTK apps draw themselves open the same menu | Strata, session | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

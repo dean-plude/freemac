@@ -322,6 +322,19 @@ decoration_layout_t::action_response_t decoration_layout_t::handle_press_event(
  * Find the layout area at the given coordinates, if any
  * @return The layout area or null on failure
  */
+bool decoration_layout_t::zoom_button_at(wf::point_t point, wf::geometry_t& box)
+{
+    auto area = find_area_at(point);
+    if (area && (area->get_type() == DECORATION_AREA_BUTTON) &&
+        (area->as_button().get_button_type() == BUTTON_TOGGLE_MAXIMIZE))
+    {
+        box = area->get_geometry();
+        return true;
+    }
+
+    return false;
+}
+
 nonstd::observer_ptr<decoration_area_t> decoration_layout_t::find_area_at(
     wf::point_t point)
 {
