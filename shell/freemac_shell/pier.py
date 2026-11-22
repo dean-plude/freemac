@@ -31,7 +31,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import alert, apps, held, login_items, main_display, recents, stage, style, volumes  # noqa: E402
+from . import alert, apps, held, launcher_badge, login_items, main_display, recents, stage, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -117,7 +117,7 @@ def load_config():
     config = {"pinned": DEFAULT_PINNED, "size": BASE, "magnify": True, "peak": PEAK,
               "stacks": default_stacks(), "trash": True, "minimize_into_app": False,
               "autohide": False, "recents": True, "indicators": True, "bounce": True,
-              "stage": False}
+              "stage": False, "badges": True}
     try:
         with open(CONFIG) as f:
             config.update(json.load(f))
@@ -381,6 +381,56 @@ class TrashCan(Place):
         self.update()
 
 
+def draw_count(widget, cr, right, top, size, text, room):
+    """A red rounded badge with a white number, its top right corner a little
+    outside the icon's, as far as the item has room (room: its width)."""
+    height = max(16.0, size * 0.36)
+    layout = PangoCairo.create_layout(cr)
+    font = Pango.FontDescription.from_string("Sans Bold")
+    font.set_absolute_size(height * 0.62 * Pango.SCALE)
+    layout.set_font_description(font)
+    layout.set_text(text, -1)
+    ink, logical = layout.get_pixel_extents()
+    width = max(height, logical.width + height * 0.55)
+    x = min(right + height * 0.22, room - 1) - width
+    y = max(top - height * 0.22, 1)
+    radius = height / 2
+    cr.save()
+    cr.new_sub_path()
+    cr.arc(x + width - radius, y + radius, radius, -math.pi / 2, math.pi / 2)
+    cr.arc(x + radius, y + radius, radius, math.pi / 2, 3 * math.pi / 2)
+    cr.close_path()
+    cr.set_source_rgba(0, 0, 0, 0.25)
+    cr.set_line_width(1.0)
+    cr.stroke_preserve()
+    cr.set_source_rgb(0.96, 0.24, 0.20)
+    cr.fill()
+    cr.set_source_rgb(1, 1, 1)
+    cr.move_to(x + (width - logical.width) / 2 - logical.x, y + (height - logical.height) / 2 - logical.y)
+    PangoCairo.show_layout(cr, layout)
+    cr.restore()
+
+
+def draw_progress(cr, x, y, width, height, fraction):
+    """A small rounded progress bar: dark track, light fill."""
+    radius = height / 2
+
+    def bar(w):
+        cr.new_sub_path()
+        cr.arc(x + w - radius, y + radius, radius, -math.pi / 2, math.pi / 2)
+        cr.arc(x + radius, y + radius, radius, math.pi / 2, 3 * math.pi / 2)
+        cr.close_path()
+    cr.save()
+    bar(width)
+    cr.set_source_rgba(0.12, 0.12, 0.14, 0.78)
+    cr.fill()
+    filled = max(height, width * fraction)
+    bar(filled)
+    cr.set_source_rgba(0.95, 0.95, 0.97, 0.95)
+    cr.fill()
+    cr.restore()
+
+
 class Item(Gtk.Button):
     def __init__(self, pier, desktop_id=None, app_id=None):
         super().__init__()
@@ -422,6 +472,7 @@ class Item(Gtk.Button):
         # Darkened while a file it can open is held over it, as on a Mac.
         self.drop_glow = False
         self.connect_after("draw", self._draw_drop_glow)
+        self.connect_after("draw", self._draw_badge)
         self.connect("drag-begin", self._drag_begin)
         self.connect("drag-failed", self._drag_failed)
         self.connect("drag-end", self._drag_end)
@@ -531,6 +582,35 @@ class Item(Gtk.Button):
         cr.close_path()
         cr.set_source_rgba(0, 0, 0, 0.32)
         cr.fill()
+        return False
+
+    def badge_id(self):
+        """The desktop file an app's badge is sent for."""
+        if self.desktop_id:
+            return self.desktop_id
+        return self.info.get_id() if self.info is not None else None
+
+    def _draw_badge(self, _widget, cr):
+        """A red count at the icon's top right, and a progress bar along its
+        foot, as an app asks for (see launcher_badge)."""
+        badges = getattr(self.pier, "badges", None)
+        if badges is None or not self.pier.show_badges():
+            return False
+        count, progress = launcher_badge.shown(badges.get(self.badge_id()))
+        if not count and progress is None:
+            return False
+        alloc = self.image.get_allocation()
+        origin = self.image.translate_coordinates(self, 0, 0)
+        if not origin:
+            return False
+        size = min(alloc.width, alloc.height)
+        x = origin[0] + (alloc.width - size) / 2
+        y = origin[1] + (alloc.height - size) / 2
+        if progress is not None:
+            draw_progress(cr, x + size * 0.12, y + size * 0.78, size * 0.76, max(4, size * 0.1), progress)
+        if count:
+            draw_count(self, cr, x + size, y, size, launcher_badge.badge_text(count),
+                       self.get_allocated_width())
         return False
 
     @property
@@ -962,6 +1042,8 @@ class Pier(Gtk.Window):
         self._hint_pending, self.own_id, self.hints = 0, None, {}
         # Apps still open with no window keep their dot.
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
+        # Red counts on icons, from apps that send them (Post, Nudge, others).
+        self.badges = launcher_badge.Listener(self._badges_changed)
         try:
             self.wf = Wayfire(on_event=self._wayfire_event)
         except OSError:
@@ -1204,6 +1286,14 @@ class Pier(Gtk.Window):
         self.load()
         self.refresh()
         return False
+
+    def show_badges(self):
+        """Dials: Show badges on Dock icons."""
+        return self.config is None or self.config.get("badges", True)
+
+    def _badges_changed(self):
+        for item in self.items():
+            item.queue_draw()
 
     def show_dots(self):
         """Dials: Show indicators for open applications."""

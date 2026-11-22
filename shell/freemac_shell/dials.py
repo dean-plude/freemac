@@ -692,6 +692,8 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Up to three apps you used lately stay in the Dock after they quit."),
             row("Show indicators for open apps", switch(config.get("indicators", True), lambda on: save_pier(indicators=on)),
                 "A dot under each app that's open."),
+            row("Show badges on Dock icons", switch(config.get("badges", True), lambda on: save_pier(badges=on)),
+                "A red number on an app's icon, such as unread mail in Post or reminders due in Nudge."),
             row("Animate opening apps", switch(config.get("bounce", True), lambda on: save_pier(bounce=on)),
                 "An app's icon bounces until its window appears."),
         ), group(

@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import alert, menus, spelling, style  # noqa: E402
+from . import alert, launcher_badge, menus, spelling, style  # noqa: E402
 from . import reminders_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Nudge"
@@ -487,6 +487,8 @@ class Window(Gtk.ApplicationWindow):
         for key, tile in self.tiles.items():
             tile.count.set_text(str(self._count(key)))
             tile.set_active(self.showing == key)
+        # The Dock icon shows what's due today or late, as on a Mac.
+        launcher_badge.set_count("freemac-nudge.desktop", self._count("today"))
         for row in self.side_lists.get_children():
             row.destroy()
         for rlist in self.lists:

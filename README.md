@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.114 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.115 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -101,6 +101,7 @@ one of them will be reverted.
 | Mission Control: add a desktop with + (or drag a window onto it), close one with the button on its corner; the count is kept | **Strata**, **Topline** | 1.110 |
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
+| Dock badges: a red number on an app's icon for unread mail in Post, reminders due in Nudge, or any app that sends a count | **Pier**, **Post**, **Nudge** | 1.115 |
 | Mission Control on an empty desktop: Control+Up still shows your desktops along the top, so you can pick one or add another | **Strata**, **Topline** | 1.114 |
 | Full screen gets its own desktop: the window slides onto a new desktop named after its app in Mission Control, and slides back when it leaves full screen | **Strata**, **Topline** | 1.113 |
 | Mission Control: the window overview names your desktops along the top; move the pointer up to see a picture of each, and click one to go there | **Strata**, **Topline** | 1.108 |
