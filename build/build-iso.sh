@@ -270,6 +270,7 @@ mkdir -p "$ROOTFS/usr/share/backgrounds/freemac"
 python3 "$REPO/art/make-wallpaper.py" --all "$ROOTFS/usr/share/backgrounds/freemac"
 # freemac's own start-up sound, made from scratch
 python3 "$REPO/art/sounds/make-sounds.py" "$ROOTFS/usr/share/sounds/freemac"
+python3 "$REPO/art/sounds/make-background-sounds.py" "$ROOTFS/usr/share/sounds/freemac/background"
 # Start-up screen: freemac's own Plymouth theme (overlay), built into the initramfs.
 # Debian has plymouth-set-default-theme; Ubuntu picks the theme with an
 # alternative instead.

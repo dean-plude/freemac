@@ -1290,6 +1290,10 @@ def main():
     win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle,
                                                         "sticky": win.sticky.handle})
     accents.start_input_method()
+    # Background Sounds (background_sounds.py) play for as long as Topline runs.
+    from . import background_sounds
+    win.background_sounds = background_sounds.Player()
+    win.background_sounds.start()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()

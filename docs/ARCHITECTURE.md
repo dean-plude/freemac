@@ -270,6 +270,15 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Background sounds (1.100) are Topline's (`background_sounds.py`): a
+GStreamer playbin plays one of six loops from
+`/usr/share/sounds/freemac/background`, queued again on about-to-finish so
+it repeats with no gap, at `(volume/100)**2`, following shell.json
+(`background_sounds`, `background_sound`, `background_volume`).
+`art/sounds/make-background-sounds.py` makes the loops at build time from
+seeded noise (pink, white, brown, filtered and shaped), each crossfaded
+end to start and matched in level.
+
 Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 
 ## Menus, tiling, quick settings and night light (0.9)

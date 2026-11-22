@@ -698,6 +698,11 @@ TOPICS = {
         "Tap a modifier twice to lock it, and once more to let it go.",
         "Press Shift five times again to turn Sticky Keys off.",
     ]),
+    "background-sounds": ("Play calming background sounds", "background sounds noise white pink brown rain ocean waves stream water focus calm rest mask distractions tinnitus accessibility", [
+        "Choose Dials > Accessibility and, under Audio, turn on Background sounds.",
+        "Pick a sound: Balanced, Bright or Dark noise, Ocean, Rain or Stream, and drag Volume until it's just right.",
+        "The sound plays behind everything else until you turn Background sounds off.",
+    ]),
     "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
         "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
         "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "
