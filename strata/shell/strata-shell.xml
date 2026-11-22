@@ -20,6 +20,21 @@
 			<_long>Holding a letter such as e in a text field shows its accented forms to pick from, instead of repeating it.</_long>
 			<default>true</default>
 		</option>
+		<option name="colour_filter" type="string">
+			<_short>Colour filter</_short>
+			<_long>none, greyscale, protanopia, deuteranopia, tritanopia or tint.</_long>
+			<default>none</default>
+		</option>
+		<option name="colour_filter_intensity" type="double">
+			<_short>Colour filter intensity</_short>
+			<default>1.0</default>
+			<min>0.0</min>
+			<max>1.0</max>
+		</option>
+		<option name="colour_filter_tint" type="color">
+			<_short>Colour tint</_short>
+			<default>0.85 0.45 0.55 1.0</default>
+		</option>
 		<option name="sticky_keys" type="bool">
 			<_short>Sticky Keys</_short>
 			<_long>A modifier key tapped on its own stays down for the next key; tapped twice it locks.</_long>
