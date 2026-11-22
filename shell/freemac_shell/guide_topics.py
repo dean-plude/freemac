@@ -677,6 +677,11 @@ TOPICS = {
         "screen's colours. Press it again to put them back.",
         "High contrast and Larger text are on the same page.",
     ]),
+    "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
+        "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
+        "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "
+        "change Shake mouse pointer to locate or Pointer size.",
+    ]),
     "screen-flash": ("Flash the screen for alerts", "flash screen alert sound beep hear deaf hard of hearing visual bell blink accessibility", [
         "Choose Dials > Accessibility and turn on Flash the screen when an alert sound occurs.",
         "Whenever an app plays the alert sound, because something can\u2019t be done, every display flashes "

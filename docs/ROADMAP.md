@@ -990,6 +990,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Strata's own title bars say when the pointer rests on the green button; Strata tells where the pointer is and which window is under it (strata/pointer) | Strata | done |
 | 3 | A GTK 3 module so the green buttons that GTK apps draw themselves open the same menu | Strata, session | done |
 
+## 1.96 "shake to find the pointer" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Shake the mouse quickly back and forth and the pointer grows big for a moment, so it's easy to find | Strata | done |
+| 2 | Shake mouse pointer to locate, on by default, in Dials > Accessibility | Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

@@ -42,6 +42,7 @@
 #include "minimize-glide.hpp"
 #include "sheets.hpp"
 #include "screen-flash.hpp"
+#include "pointer-locate.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -858,6 +859,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     };
 
     strata_flash::flashes_t flashes;
+    strata_locate::locate_t locate;
 
     /* Flash every display once, for "Flash the screen when an alert sound
      * occurs". The alert sound's player calls it. */
@@ -913,6 +915,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/flash", flash_screen);
         method_repository->register_method("strata/pointer", pointer);
         flashes.init();
+        locate.init();
         window_places.init();
         command_key.init();
         glides.init();

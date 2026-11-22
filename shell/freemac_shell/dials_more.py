@@ -341,6 +341,13 @@ def accessibility(window):
     zoom_on = "zoom" in plugins()
     zoom_keys.set_sensitive(zoom_on)
 
+    # Strata watches for the shake itself (strata-shell/shake_to_locate).
+    shake_on = (window.ini_get("strata-shell", "shake_to_locate", "true") or "true").strip().lower() \
+        not in ("false", "0", "no", "off")
+
+    def shake_switch(on):
+        window.ini_set("strata-shell", "shake_to_locate", "true" if on else "false")
+
     def invert_switch(on):
         # The key is set first: Wayfire's own default for it is ⌘I, which
         # is Get Info in freemac.
@@ -360,6 +367,8 @@ def accessibility(window):
         row("Invert colours with \u2303\u2325\u23188", switch("invert" in plugins(), invert_switch),
             "Press Control-Option-Command-8 to swap the screen's colours, and again to put them back."),
         row("Pointer size", pointer),
+        row("Shake mouse pointer to locate", switch(shake_on, shake_switch),
+            "Move the mouse quickly back and forth and the pointer grows big for a moment."),
     ), group(
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),

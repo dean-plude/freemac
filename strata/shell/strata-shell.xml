@@ -10,6 +10,11 @@
 			<_long>Tell GTK apps that the menu bar at the top of the screen shows their menus, so they leave them out of their windows.</_long>
 			<default>true</default>
 		</option>
+		<option name="shake_to_locate" type="bool">
+			<_short>Shake the pointer to find it</_short>
+			<_long>Moving the mouse quickly back and forth makes the pointer big for a moment.</_long>
+			<default>true</default>
+		</option>
 		<option name="command_key" type="bool">
 			<_short>Super is the Command key</_short>
 			<_long>Super with a key does in apps what Ctrl with it does (Ctrl+Shift in a terminal); Super+Left/Right/Up/Down and Alt+Left/Right/Backspace move through text as on a Mac.</_long>
