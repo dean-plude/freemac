@@ -90,6 +90,12 @@ tzdata
 at-spi2-core
 # Speak selection (Option-Escape) reads out loud with eSpeak NG's voices.
 espeak-ng
+# The screen reader (Command-F5, Dials > Accessibility) is Orca, speaking
+# through speech-dispatcher with eSpeak NG's voices.
+orca
+speech-dispatcher-espeak-ng
+# Orca's keyboard handling needs an X11 display: a private, rootless Xwayland.
+xwayland
 # Nearby sharing (Hail) makes its own certificate once with OpenSSL.
 openssl
 # Dials > Sharing: the computer answers to its-name.local (Avahi), and Remote

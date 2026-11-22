@@ -94,6 +94,11 @@
 			<_long>Show every window of the focused app, from every desktop, side by side.</_long>
 			<default>&lt;ctrl&gt; KEY_DOWN | swipe down 4</default>
 		</option>
+		<option name="screen_reader" type="activator">
+			<_short>Turn the screen reader on or off</_short>
+			<_long>The screen reader speaks what's on the screen and what you type.</_long>
+			<default>&lt;super&gt; KEY_F5</default>
+		</option>
 		<option name="prev_app_window" type="activator">
 			<_short>Previous window of the app</_short>
 			<_long>Bring the focused app's previous window to the front.</_long>

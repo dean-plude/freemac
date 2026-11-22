@@ -708,6 +708,15 @@ TOPICS = {
         "Select some words in any app, then press \u2325Esc (Option+Esc) to hear them. Press it again to stop.",
         "Pick a voice and a speaking rate on the same page. Click Play to hear how they sound.",
     ]),
+    "screen-reader": ("Use the screen reader", "screen reader blind low vision orca voiceover speak screen read out talk command f5 insert navigate keyboard", [
+        "Press \u2318F5 (Command+F5) to turn the screen reader on, and again to turn it off. It's also in "
+        "Dials > Accessibility.",
+        "It speaks the window and control you move to, the text under the cursor and what you type. Use Tab "
+        "and the arrow keys to move around an app.",
+        "Insert is the screen reader key. Hold it and press H to learn the keys, or press Insert+Space for "
+        "its settings. Screen Reader Settings in Dials changes its voice and speed too.",
+        "If it was on when you logged out, it comes back on when you log in.",
+    ]),
     "mic-camera": ("See when an app is using the microphone or camera", "microphone mic camera webcam privacy listening watching recording orange dot green dot in use spy", [
         "While an app is using the microphone, a small orange dot shows in the menu bar, next to the other "
         "status icons. A green dot means an app is using the camera.",

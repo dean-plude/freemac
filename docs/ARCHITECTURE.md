@@ -57,6 +57,8 @@ only ship alongside, which is fine for any free licence).
 | wl-clipboard | Clipboard for Lens | GPL-3.0-or-later (separate program) |
 | power-profiles-daemon | Power modes in Dials | GPL-3.0-or-later (separate program) |
 | at-spi2-core | Accessibility bus for screen readers | LGPL-2.1-or-later |
+| Orca | Screen reader (Command+F5, 1.120) | LGPL-2.1-or-later |
+| speech-dispatcher | Speech for the screen reader | GPL-2.0-or-later, LGPL-2.1-or-later |
 | clang, lld (build only) | Compiling Mac test programs for Ferry | Apache-2.0 with LLVM exception |
 | wayvnc | Screen Sharing: shares the Wayland screen over VNC | ISC (separate program) |
 | GTK-VNC | The screen view in Porthole | LGPL-2.1-or-later |
@@ -334,6 +336,28 @@ it tells Topline `spaces open OUTPUT out`, which shows the desktops row opened
 out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
+
+Screen reader (1.120, `screen_reader.py`): the reader is Orca (LGPL-2.1),
+which apps reach over the AT-SPI accessibility bus that at-spi2-core already
+runs; it speaks through speech-dispatcher and eSpeak NG. Command+F5 is the
+`strata-shell/screen_reader` activator, an option of Strata's own (default
+`<super> KEY_F5`) so wayfire.ini files from before 1.120 get it, and runs
+`freemac-screen-reader --toggle`. That starts Orca with `--replace`, or
+stops it with SIGTERM (Orca 46 has no `--quit`; unknown options start a
+second reader), sets `org.gnome.desktop.a11y.applications
+screen-reader-enabled` for apps that look before they speak, and keeps
+`screen_reader` in shell.json. Topline calls `at_login()` two seconds after
+it starts, so the reader comes back at the next login.
+
+Orca 46's keyboard device (libatspi 2.52's legacy device) calls
+`XOpenDisplay` and stops or hangs when there is no X11 display, and
+freemac's desktop has none. So `freemac-screen-reader --orca` starts a
+private `Xwayland -rootless -displayfd` for Orca alone, runs Orca with that
+`DISPLAY`, and ends the X server when Orca ends. It shows no windows; Orca's
+own settings window is a Wayland window. Keys reach Orca through the apps'
+AT-SPI bridge. Screen Reader Settings in Dials stops the running reader
+before `orca --setup`, because that window goes on as the reader when it
+closes and two readers at once leave the window you came from stuck.
 
 Full-screen size (1.119, `mission-control.hpp`): `move_to_workspace` moves a
 window with the size it has now. When a window goes full screen, Strata moves
