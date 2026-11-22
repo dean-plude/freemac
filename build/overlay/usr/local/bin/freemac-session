@@ -21,8 +21,29 @@ export WLR_RENDERER_ALLOW_SOFTWARE=1
 if systemd-detect-virt -q 2>/dev/null; then
   export WLR_NO_HARDWARE_CURSORS=1
 fi
+# The Guest User (Dials > Users) starts each time from a fresh home folder
+# and leaves nothing behind. Only the account called guest, with the mark
+# the users helper writes and its home at /home/guest, is ever emptied.
+is_guest() {
+  [ "$(id -un)" = guest ] && [ -e /etc/freemac/guest-user ] && [ "$HOME" = /home/guest ]
+}
+empty_guest_home() {
+  find /home/guest -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null
+  cp -a /etc/skel/. /home/guest/ 2>/dev/null
+  mkdir -p /home/guest/.config/freemac
+  : >/home/guest/.config/freemac/welcome-seen
+}
+if is_guest; then
+  cd / && empty_guest_home && cd /home/guest
+fi
 mkdir -p "$HOME/.cache"
 # Make Desktop, Documents, Downloads and the rest, and record them so apps
 # (and their icons) know which folder is which.
 command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update
+if is_guest; then
+  wayfire >/dev/null 2>&1
+  status=$?
+  cd / && empty_guest_home
+  exit $status
+fi
 exec wayfire >"$HOME/.cache/wayfire.log" 2>&1

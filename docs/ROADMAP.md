@@ -941,6 +941,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | 15 More Minutes: on an app whose time is up, and to hold off downtime for a while | Logbook | done |
 | 4 | The passcode guards downtime, Always Allowed and more time as well as limits | Logbook | done |
 
+## 1.90 "guest" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Guest User: a switch in Dials > Users makes an account anyone can log in to without a password | Dials, users helper | done |
+| 2 | Everything a guest does is erased when they log out, and again before the next guest logs in; no Welcome for the guest | freemac-session | done |
+| 3 | Gangway shows the Guest User with no password box, just the arrow | Gangway | done |
+| 4 | Fix: the login screen came back black after logging out, because the greeter couldn't open the seat | Image | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

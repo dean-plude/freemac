@@ -18,7 +18,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert  # noqa: E402
+from . import alert, guest_user  # noqa: E402
 
 HELPER = "/usr/libexec/freemac-users-helper"
 GREETD = "/etc/greetd/config.toml"
@@ -72,6 +72,8 @@ def people():
     found = []
     for entry in pwd.getpwall():
         if 1000 <= entry.pw_uid < 60000 and not entry.pw_shell.endswith(("nologin", "false")):
+            if guest_user.is_guest(entry.pw_name):
+                continue   # shown on its own, with a switch
             full = entry.pw_gecos.split(",")[0] or entry.pw_name
             found.append((entry.pw_name, full, entry.pw_name in admins))
     return sorted(found, key=lambda p: p[1].lower())
@@ -117,8 +119,15 @@ class UsersPanel(Gtk.Box):
         auto_row = Gtk.ListBoxRow(activatable=False)
         auto_row.add(line)
         auto_group.add(auto_row)
+        guest_group = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        guest_group.get_style_context().add_class("dials-group")
+        self.guest = Gtk.Switch(valign=Gtk.Align.CENTER)
+        self.guest_handler = self.guest.connect("notify::active", self.on_guest)
+        guest_group.add(item_row("avatar-default-symbolic", "Guest User",
+                                 "Lets anyone log in without a password. Everything a guest does is "
+                                 "erased when they log out.", self.guest))
         self.status = caption("")
-        self.pack_start(page("Users", self.list, add, auto_group, self.status), True, True, 0)
+        self.pack_start(page("Users", self.list, add, guest_group, auto_group, self.status), True, True, 0)
         self.refresh()
 
     def refresh(self):
@@ -141,6 +150,8 @@ class UsersPanel(Gtk.Box):
             more.set_popup(menu)
             self.list.add(item_row("avatar-default-symbolic", full, subtitle, password, more))
         self.list.show_all()
+        with self.guest.handler_block(self.guest_handler):
+            self.guest.set_active(guest_user.enabled())
         current = autologin_user()
         with self.auto.handler_block(self.auto_handler):
             self.auto.remove_all()
@@ -262,6 +273,12 @@ class UsersPanel(Gtk.Box):
                            default=1, destructive=2)
         if answer in (1, 2):
             self.helper("delete", name, "keep" if answer == 1 else "remove")
+
+    def on_guest(self, switch, _param):
+        on = switch.get_active()
+        if on == guest_user.enabled():
+            return
+        self.helper("guest", "on" if on else "off")
 
     def on_autologin(self, combo):
         self.helper("autologin", combo.get_active_id() or "-")

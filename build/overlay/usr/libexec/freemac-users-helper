@@ -7,6 +7,7 @@
   freemac-users-helper password NAME                 new password on stdin
   freemac-users-helper admin NAME 0|1
   freemac-users-helper autologin NAME|-              - turns automatic login off
+  freemac-users-helper guest on|off                  the Guest User, with no password
 
 Only people's accounts (uid 1000-59999) can be changed, and nobody can delete
 the account they're running Dials from.
@@ -22,6 +23,10 @@ NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
 GREETD = "/etc/greetd/config.toml"
 GROUPS = ("audio", "video", "render", "input", "plugdev", "netdev", "bluetooth", "lpadmin")
 ADMIN_GROUP = "sudo"
+# The Guest User (see freemac_shell/guest_user.py): only the account called
+# guest while this mark exists, which freemac-session empties at each login.
+GUEST, GUEST_MARK, GUEST_HOME = "guest", "/etc/freemac/guest-user", "/home/guest"
+GUEST_GROUPS = ("audio", "video", "render", "input", "plugdev", "netdev", "bluetooth")
 
 
 def fail(message):
@@ -38,6 +43,8 @@ def person(name):
         fail(f"There's no user called {name}.")
     if not 1000 <= entry.pw_uid < 60000:
         fail(f"{name} is a system account and can't be changed here.")
+    if name == GUEST and os.path.exists(GUEST_MARK):
+        fail("The Guest User is turned on and off with its own switch.")
     return entry
 
 
@@ -139,10 +146,42 @@ def main(args):
             if not admins:
                 fail("At least one administrator has to stay.")
             run("gpasswd", "--delete", entry.pw_name, ADMIN_GROUP)
+    elif command == "guest" and rest in (["on"], ["off"]):
+        guest(rest[0] == "on")
     elif command == "autologin" and len(rest) == 1:
         set_autologin(None if rest[0] == "-" else person(rest[0]).pw_name)
     else:
         fail(__doc__)
+
+
+def guest(on):
+    try:
+        entry = pwd.getpwnam(GUEST)
+    except KeyError:
+        entry = None
+    if on:
+        if entry and not os.path.exists(GUEST_MARK):
+            fail("There's already an account called guest, so the Guest User can't be added.")
+        if not entry:
+            run("useradd", "--create-home", "--shell", "/bin/bash", "--user-group",
+                "--groups", ",".join(existing_groups(GUEST_GROUPS)), "--comment", "Guest User", GUEST)
+            entry = pwd.getpwnam(GUEST)
+        if entry.pw_dir != GUEST_HOME:
+            fail("The guest account's home folder isn't /home/guest.")
+        run("passwd", "--delete", GUEST)   # no password, as on a Mac
+        os.makedirs(os.path.dirname(GUEST_MARK), exist_ok=True)
+        with open(GUEST_MARK, "w") as f:
+            f.write("The Guest User is on. Its home folder is emptied at each login and logout.\n")
+    else:
+        if not os.path.exists(GUEST_MARK):
+            return
+        if entry:
+            if subprocess.run(["pgrep", "-u", GUEST], capture_output=True).returncode == 0:
+                fail("A guest is logged in. They need to log out first.")
+            run("userdel", "--remove", GUEST)
+        os.remove(GUEST_MARK)
+        if autologin_user() == GUEST:
+            set_autologin(None)
 
 
 def autologin_user():

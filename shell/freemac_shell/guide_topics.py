@@ -604,6 +604,13 @@ TOPICS = {
         "Click + to choose an app to add, and \u2212 beside an app to stop it opening.",
         "You can also right-click an app in the Dock and choose Options > Open at Login.",
     ]),
+    "guest-user": ("Let someone use the computer as a guest", "guest user visitor guest account no password borrow share computer friend erase log in", [
+        "Choose Dials > Users and turn on Guest User. You'll be asked for an administrator's password.",
+        "Guest User then shows on the login screen. A guest just clicks the arrow; no password is needed.",
+        "Nothing a guest does is kept: their files and settings are erased when they log out. Your own files "
+        "stay private.",
+        "Turn the switch off to remove the Guest User again.",
+    ]),
     "shut-down": ("Restart, shut down or log out", "restart shut down shutdown turn off power off log out logout sign out sleep recent items recently used apps documents", [
         "Click the freemac mark at the left of the menu bar and choose Sleep, Restart\u2026, Shut Down\u2026 or "
         "Log Out. Shift-Command-Q logs out too.",

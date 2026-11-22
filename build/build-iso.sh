@@ -175,6 +175,12 @@ fi
 # NetworkManager handles wired and Wi-Fi networks.
 in_chroot systemctl enable NetworkManager.service
 in_chroot systemctl enable seatd.service greetd.service
+# seatd only lets the video group open the screen, keyboard and mouse, and the
+# login screen runs as greetd's own user: without this, logging out (or a
+# computer that doesn't log in automatically) leaves a black screen.
+if in_chroot getent passwd _greetd >/dev/null; then
+  in_chroot usermod -aG video _greetd
+fi
 # Remote Login (Dials > Sharing) starts off, and every computer makes its own
 # SSH keys when it's turned on, rather than all sharing the image's.
 in_chroot systemctl disable ssh.service ssh.socket >/dev/null 2>&1 || true
