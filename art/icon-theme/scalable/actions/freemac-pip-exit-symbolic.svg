@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- freemac's leave Picture in Picture icon: a screen with an arrow from its corner back into the middle. Original artwork. -->
+  <path fill="#2e3436" d="M1.9 2C1.4 2 1 2.4 1 2.9v10.2c0 .5.4.9.9.9h12.2c.5 0 .9-.4.9-.9V2.9c0-.5-.4-.9-.9-.9zm.4 1.3h11.4v9.4H2.3z"/>
+  <path fill="#2e3436" d="M5 5.2h4v1.3H7.2l4 4-.9.9-4-4v1.8H5z"/>
+</svg>

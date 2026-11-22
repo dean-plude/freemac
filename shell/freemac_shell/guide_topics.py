@@ -553,7 +553,17 @@ TOPICS = {
         "- Space plays and pauses. ← and → go back or forward 10 seconds.",
         "- F, or the button at the right of the controls, fills the screen. Esc goes back.",
         "- ↑ and ↓ turn the sound up and down.",
+        "- P, or the button beside full screen, puts the video in a small window that stays above the "
+        "others while you work (Picture in Picture).",
         "Close a video partway through and Reel starts it again where you stopped next time.",
+    ]),
+    "picture-in-picture": ("Watch a video while you work", "picture in picture pip small window float on top corner video movie reel keep watching", [
+        "In Reel, press P, or click the Picture in Picture button beside the full-screen button. The "
+        "video shrinks into a small window in the bottom right corner, above all your other windows, "
+        "and keeps playing.",
+        "Drag the video to move it anywhere on the screen. Point at it to show its buttons: play or pause, "
+        "and back to the window.",
+        "Double-click the video or press Esc to put it back where it was, at its old size.",
     ]),
     "backups": ("Back up your files", "backup back up time machine lifeboat drive restore copy safe", [
         "Lifeboat copies your home folder to a drive every hour while the drive is plugged in, and keeps "

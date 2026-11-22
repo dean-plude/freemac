@@ -148,6 +148,7 @@ CSS = b"""
 .dials-search { margin: 10px 10px 4px 10px; }
 .dials-sidebar { background-color: rgba(120, 120, 150, 0.08); }
 .dials-sidebar list, .dials-sidebar list row { background: none; border: none; box-shadow: none; }
+.dials-sidebar scrolledwindow, .dials-sidebar viewport { background: none; border: none; }
 .dials-sidebar list row { padding: 4px 8px; border-radius: 6px; margin: 0 10px; min-height: 0; }
 .dials-sidebar list row:hover { background-color: rgba(120, 120, 150, 0.12); }
 .dials-sidebar list row:selected { background-color: @theme_selected_bg_color; color: #ffffff; }
@@ -294,7 +295,12 @@ class DialsWindow(Gtk.ApplicationWindow):
         self.search.connect("search-changed", self._search_changed)
         self.search.connect("activate", self._search_open)
         side_box.pack_start(self.search, False, False, 0)
-        side_box.pack_start(sidebar, True, True, 6)
+        # The list scrolls, so that with every pane in it the window still
+        # fits a small screen, as a Mac's settings sidebar does.
+        side_scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                         vscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
+        side_scroll.add(sidebar)
+        side_box.pack_start(side_scroll, True, True, 6)
         sidebar.set_filter_func(self._search_match)
         paned.pack1(side_box, False, False)
         paned.pack2(self.stack, True, False)
