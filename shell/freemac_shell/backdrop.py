@@ -6,7 +6,13 @@ menu bar and the dock. The picture fills the screen at any shape by default
 (cropping the edges rather than leaving bars). Dials writes the choice to the
 [background] section of ~/.config/wf-shell.ini; Backdrop watches that file.
 
-Keys: image = path, fit = fill | fit | stretch.
+Keys: image = path, fit = fill | fit | stretch, dynamic = true | false.
+
+Dynamic (Dials > Wallpaper): with one of freemac's own scenes, the picture
+follows the sun where you are (sun.py) instead of light and dark mode, as a
+Mac's Dynamic Desktop does. The day version is shown while the sun is high,
+it warms toward gold as the sun nears the horizon, and it fades into the
+night version through twilight. Checked once a minute.
 
 The first screen also shows the Desktop folder's files and the plugged-in
 drives (desktop_icons.py). Backdrop runs for the whole session, so it is
@@ -14,6 +20,7 @@ also what mounts a USB drive, memory card or phone as it is plugged in.
 """
 import os
 
+import cairo
 import gi
 
 gi.require_version("Gdk", "3.0")
@@ -24,6 +31,36 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa:
 CONFIG = os.path.join(GLib.get_user_config_dir(), "wf-shell.ini")
 DEFAULT_IMAGE = "/usr/share/backgrounds/freemac/dusk-tide.png"
 FALLBACK = (0.11, 0.12, 0.29)
+WALLPAPERS = "/usr/share/backgrounds/freemac"
+# freemac's own scenes as (day, night) files; the same list as Dials'.
+SCENES = (("dusk-tide.png", "night-tide.png"), ("lagoon-day.png", "lagoon-night.png"),
+          ("prism-day.png", "prism-night.png"), ("harbor-day.png", "harbor-night.png"))
+DYNAMIC_SECONDS = 60
+GOLD = (1.0, 0.58, 0.32)
+
+
+def scene_pair(path):
+    """The (day, night) paths of the built-in scene a picture belongs to, or None."""
+    if not path or os.path.dirname(path) != WALLPAPERS:
+        return None
+    name = os.path.basename(path)
+    for day, night in SCENES:
+        if name in (day, night):
+            return os.path.join(WALLPAPERS, day), os.path.join(WALLPAPERS, night)
+    return None
+
+
+def sky_mix(height):
+    """(night, gold) for the sun at `height` degrees: how much of the night
+    picture to show (0 by day, 1 at night, eased through twilight, from 6°
+    above the horizon to 6° below) and how warm the light is (strongest as
+    the sun sits on the horizon)."""
+    if height is None:
+        return None
+    t = min(1.0, max(0.0, (6.0 - height) / 12.0))
+    night = t * t * (3 - 2 * t)
+    gold = max(0.0, 1.0 - abs(height - 1.0) / 9.0)
+    return round(night, 2), round(0.28 * gold * (1 - night * 0.6), 2)
 
 
 def read_settings(path=CONFIG):
@@ -89,19 +126,39 @@ class BackdropWindow(Gtk.Window):
         picture, fit = self.owner.picture, self.owner.fit
         if not picture or width < 2 or height < 2:
             return False
-        key = (id(picture), width, height, fit)
+        night_picture, mix = self.owner.night_picture, self.owner.mix
+        key = (id(picture), id(night_picture), width, height, fit)
         if not self.cache or self.cache[0] != key:
             w, h, x, y = placement(picture.get_width(), picture.get_height(), width, height, fit)
-            self.cache = (key, picture.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR), x, y)
-        _key, scaled, x, y = self.cache
+            scaled = picture.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
+            night = None
+            if night_picture is not None:
+                nw, nh, nx, ny = placement(night_picture.get_width(), night_picture.get_height(),
+                                           width, height, fit)
+                night = (night_picture.scale_simple(nw, nh, GdkPixbuf.InterpType.BILINEAR), nx, ny)
+            self.cache = (key, scaled, x, y, night)
+        _key, scaled, x, y, night = self.cache
         Gdk.cairo_set_source_pixbuf(cr, scaled, x, y)
         cr.paint()
+        if mix and night_picture is not None:
+            amount, gold = mix
+            if gold > 0:
+                # The low sun's warm light, over the day picture.
+                cr.save()
+                cr.set_operator(cairo.OPERATOR_SOFT_LIGHT)   # warms, keeps the contrast
+                cr.set_source_rgba(*GOLD, gold)
+                cr.paint()
+                cr.restore()
+            if amount > 0 and night:
+                Gdk.cairo_set_source_pixbuf(cr, night[0], night[1], night[2])
+                cr.paint_with_alpha(amount)
         return False
 
 
 class Backdrop:
     def __init__(self):
         self.picture, self.fit, self.path = None, "fill", None
+        self.night_picture, self.mix, self.dynamic = None, None, False
         self.windows = []
         self.load()
         display = Gdk.Display.get_default()
@@ -120,6 +177,26 @@ class Backdrop:
         from . import volumes
         volumes.monitor().connect("volume-added", lambda _m, volume: volumes.mount_volume(volume))
         volumes.mount_new()
+        GLib.timeout_add_seconds(DYNAMIC_SECONDS, self._sun_tick)
+
+    def _sun_tick(self):
+        if self.night_picture is not None and self.update_mix():
+            for window in self.windows:
+                window.queue_draw()
+        return True
+
+    def update_mix(self):
+        """Work out the Dynamic wallpaper's light now; True if it changed."""
+        from . import sun
+        # FREEMAC_SUN_HEIGHT (degrees) pins the sun, to see a sunset at noon.
+        pinned = os.environ.get("FREEMAC_SUN_HEIGHT")
+        try:
+            height = float(pinned) if pinned else sun.elevation()
+        except ValueError:
+            height = sun.elevation()
+        mix = sky_mix(height) if self.night_picture is not None else None
+        changed, self.mix = mix != self.mix, mix
+        return changed
 
     def _changed(self, _monitor, file, other, _event):
         names = {f.get_basename() for f in (file, other) if f}
@@ -138,7 +215,13 @@ class Backdrop:
         path = os.path.expanduser(settings.get("image") or DEFAULT_IMAGE)
         fit = settings.get("fit", "fill")
         fit = fit if fit in ("fill", "fit", "stretch") else "fill"
-        if path == self.path and fit == self.fit and self.picture:
+        dynamic = settings.get("dynamic", "false").lower() == "true"
+        pair = scene_pair(path) if dynamic else None
+        if pair:
+            # Dynamic: the scene's day picture, with its night one to fade into.
+            path = pair[0]
+        if (path == self.path and fit == self.fit and self.picture
+                and dynamic == self.dynamic and (pair is None) == (self.night_picture is None)):
             return False
         try:
             picture = GdkPixbuf.Pixbuf.new_from_file(path)
@@ -147,7 +230,15 @@ class Backdrop:
                 picture = GdkPixbuf.Pixbuf.new_from_file(DEFAULT_IMAGE)
             except GLib.Error:
                 picture = None
-        self.picture, self.fit, self.path = picture, fit, path
+        night = None
+        if pair:
+            try:
+                night = GdkPixbuf.Pixbuf.new_from_file(pair[1])
+            except GLib.Error:
+                night = None
+        self.picture, self.fit, self.path, self.dynamic = picture, fit, path, dynamic
+        self.night_picture = night
+        self.update_mix()
         return True
 
     def _main_changed(self):

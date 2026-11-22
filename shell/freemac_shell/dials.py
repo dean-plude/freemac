@@ -575,8 +575,8 @@ class DialsWindow(Gtk.ApplicationWindow):
         self.wall_flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
                                      column_spacing=12, row_spacing=12, homogeneous=True)
         self.refresh_wallpapers()
-        note = Gtk.Label(label="Each freemac wallpaper has a day and a night version, "
-                               "and follows light and dark mode.", xalign=0, wrap=True)
+        note = Gtk.Label(label="Each freemac wallpaper has a day and a night version. It follows "
+                               "light and dark mode, or the sun when Dynamic is on.", xalign=0, wrap=True)
         note.get_style_context().add_class("dials-caption")
         choose = Gtk.Button(label="Choose a Picture…", halign=Gtk.Align.START)
         choose.connect("clicked", self.choose_wallpaper)
@@ -586,7 +586,16 @@ class DialsWindow(Gtk.ApplicationWindow):
         fit.append("stretch", "Stretch")
         fit.set_active_id(ini_get(SHELL_INI, "background", "fit", "fill"))
         fit.connect("changed", lambda c: ini_set(SHELL_INI, "background", "fit", c.get_active_id()))
-        return page("Wallpaper", self.wall_flow, note, choose, group(row("Picture fit", fit)))
+        # Dynamic, as a Mac's Dynamic Desktop: the scene follows the sun (backdrop.py).
+        dynamic = Gtk.Switch(active=ini_get(SHELL_INI, "background", "dynamic", "false") == "true",
+                             valign=Gtk.Align.CENTER)
+        dynamic.connect("notify::active", lambda s, _p: ini_set(
+            SHELL_INI, "background", "dynamic", "true" if s.get_active() else "false"))
+        return page("Wallpaper", self.wall_flow, note, choose,
+                    group(row("Dynamic", dynamic,
+                              "freemac's own wallpapers follow the sun where you are: day, "
+                              "a golden sunset, then night."),
+                          row("Picture fit", fit)))
 
     def refresh_wallpapers(self):
         """One tile per scene, showing the version for the current mode."""

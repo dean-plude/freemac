@@ -150,3 +150,27 @@ def times_today(where=None, h24=False):
     if rise is None or rise == "night":
         return None
     return tuple(time.strftime("%H:%M" if h24 else "%-I:%M %p", time.localtime(t)) for t in (rise, sets))
+
+
+def elevation(now=None, where=None):
+    """How high the sun is here now, in degrees above the horizon (below it
+    is negative), or None if we don't know where we are. For the Dynamic
+    wallpaper, whose light follows the sun through the day."""
+    where = where if where is not None else place()
+    if where is None:
+        return None
+    latitude, longitude = where
+    now = time.time() if now is None else now
+    d = now / 86400 + 2440587.5 - 2451545.0          # days since noon, 1 January 2000
+    g = math.radians((357.529 + 0.98560028 * d) % 360)
+    q = (280.459 + 0.98564736 * d) % 360
+    lam = math.radians((q + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)) % 360)
+    tilt = math.radians(23.439 - 0.00000036 * d)
+    right_ascension = math.degrees(math.atan2(math.cos(tilt) * math.sin(lam), math.cos(lam)))
+    declination = math.asin(math.sin(tilt) * math.sin(lam))
+    sidereal = (280.46061837 + 360.98564736629 * d + longitude) % 360
+    hour_angle = math.radians((sidereal - right_ascension) % 360)
+    phi = math.radians(latitude)
+    height = math.asin(math.sin(phi) * math.sin(declination) +
+                       math.cos(phi) * math.cos(declination) * math.cos(hour_angle))
+    return math.degrees(height)

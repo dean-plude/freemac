@@ -45,7 +45,7 @@ SEARCH_WORDS = {
     "seek": "spotlight search results privacy private folders index rebuild find launcher command space hide",
     "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light schedule sunset sunrise warm scale monitor",
-    "wallpaper": "background desktop picture",
+    "wallpaper": "background desktop picture dynamic sun sunset",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
     "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep",
     "lifeboat": "backup back up time machine restore drive disk copy",
