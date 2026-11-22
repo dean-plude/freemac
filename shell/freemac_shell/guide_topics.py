@@ -56,17 +56,19 @@ TOPICS = {
         "To add a desktop or close one, use the row of desktops in Mission Control (Control+Up).",
         "To keep an app on every desktop, or on one, Control-click its icon in the Dock and choose "
         "Options, then All Desktops or This Desktop under Assign To. None puts it back.",
-        "Control+Down shows them all. Control+Shift with an arrow key takes the window in front "
+        "Control+Option+Down shows them all. Control+Shift with an arrow key takes the window in front "
         "to the next desktop.",
     ]),
     "mission-control": ("See every window and desktop with Mission Control", "mission control overview all windows "
                         "desktops spaces row top switch control up four finger swipe drag move window "
-                        "add new close remove plus", [
+                        "add new close remove plus app expose exposé show all windows control down", [
         "Press Control+Up, or swipe up with four fingers, to see every window on this desktop side by side. "
         "Click one to bring it forward.",
         "Your desktops are named along the top of the screen. Move the pointer up to them and they open out "
         "into small pictures of each desktop with its windows.",
         "Click a desktop to go straight to it.",
+        "Press Control+Down, or swipe down with four fingers, for App Exposé: every window of the app "
+        "you're using, from every desktop. Show All Windows in an app's Dock menu does the same for that app.",
         "To move a window to another desktop, drag it up onto that desktop and let go.",
         "To add a desktop, click + at the right end of the row. Drag a window onto + to give it a new "
         "desktop of its own.",

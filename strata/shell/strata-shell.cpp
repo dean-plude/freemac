@@ -982,6 +982,8 @@ class strata_shell_impl : public wf::plugin_interface_t
             [=] (nlohmann::json data) { return spaces.assign(data); });
         method_repository->register_method("strata/assignments",
             [=] (nlohmann::json data) { return spaces.assignments(data); });
+        method_repository->register_method("strata/app-expose",
+            [=] (nlohmann::json data) { return spaces.app_expose(data); });
         flashes.init();
         locate.init();
         window_places.init();

@@ -89,6 +89,11 @@
 			<_long>Bring the focused app's next window to the front.</_long>
 			<default>&lt;super&gt; KEY_GRAVE</default>
 		</option>
+		<option name="app_expose" type="activator">
+			<_short>App Exposé</_short>
+			<_long>Show every window of the focused app, from every desktop, side by side.</_long>
+			<default>&lt;ctrl&gt; KEY_DOWN | swipe down 4</default>
+		</option>
 		<option name="prev_app_window" type="activator">
 			<_short>Previous window of the app</_short>
 			<_long>Bring the focused app's previous window to the front.</_long>

@@ -1143,6 +1143,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Kept in ~/.config/freemac/desktop-assignments; closing a desktop moves the later ones' assignments along and drops its own | Strata | done |
 | 5 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.112 "app exposé" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Ctrl+Down (or a four-finger swipe down) spreads out every window of the app in front, and nothing else; again, Esc or a click closes it | Strata (mission-control.hpp) | done |
+| 2 | Dock > Show All Windows does the same for that app | Pier | done |
+| 3 | Show all desktops moves to Ctrl+Option+Down; Dials > Keyboard and Gestures list both | Dials, wayfire.ini | done |
+| 4 | Guide line, README row and shortcut, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
