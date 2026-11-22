@@ -32,6 +32,10 @@
 // row, named after its app in Mission Control, as on a Mac; out of full
 // screen (or closed) it goes back to the desktop it came from and its
 // desktop goes away. These desktops are never saved for the next login.
+// Mission Control on a desktop with no windows: the overview won't open with
+// nothing to show, so the row of desktops shows alone, opened out, as on a
+// Mac. A click on a desktop goes there, and a click elsewhere, Esc or the
+// same key again closes it.
 // Original freemac code.
 #pragma once
 
@@ -51,6 +55,7 @@
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
 #include <wayfire/view-helpers.hpp>
+#include <linux/input-event-codes.h>
 #include <wayfire/window-manager.hpp>
 #include <wayfire/workspace-set.hpp>
 #include <wayfire/plugins/scale-signal.hpp>
@@ -108,6 +113,10 @@ class spaces_t
         drag->connect(&on_drag_done);
         load_assignments();
         wf::get_core().bindings->add_activator(app_expose_key, &on_app_expose);
+        // The overview's own keys, swipes and corners, so Mission Control
+        // still opens on a desktop with no windows.
+        wf::get_core().bindings->add_activator(overview_key, &on_mission_control);
+        wf::get_core().bindings->add_activator(overview_all_key, &on_mission_control);
     }
 
     /* strata/app-expose {"app-id": ID}: App Exposé for that app (the focused
@@ -316,6 +325,83 @@ class spaces_t
     std::map<uint32_t, full_t> full;
     std::vector<std::pair<uint32_t, bool>> full_changes;
     wf::wl_idle_call idle_full;
+    /* The row of desktops showing alone, with no overview behind it. */
+    bool row_only = false;
+    bool scale_active = false;
+    uint32_t scale_ended = 0;
+    bool swallow_release = false;
+    wf::wl_idle_call idle_row;
+    wf::option_wrapper_t<wf::activatorbinding_t> overview_key{"scale/toggle"};
+    wf::option_wrapper_t<wf::activatorbinding_t> overview_all_key{"scale/toggle_all"};
+
+    /* After the overview's own binding has had its turn: if it opened,
+     * nothing more to do; if it just closed, the key was to close it;
+     * otherwise there was nothing to show, so the row shows alone. */
+    wf::activator_callback on_mission_control = [=] (const wf::activator_data_t&)
+    {
+        bool was_row = row_only;
+        auto output  = wf::get_core().seat->get_active_output();
+        idle_row.run_once([=] ()
+        {
+            if (was_row)
+            {
+                if (scale_active)
+                {
+                    methods->call_method("scale/toggle", nlohmann::json::object());
+                }
+
+                close_row_only();
+                return;
+            }
+
+            if (open_on || scale_active || !output || !expose_app.empty() ||
+                (wf::get_current_time() - scale_ended < 300))
+            {
+                return;
+            }
+
+            open_row_only(output);
+        });
+        return false;
+    };
+
+    void open_row_only(wf::output_t *output)
+    {
+        open_on  = output;
+        row_only = true;
+        tell("spaces open " + output->to_string() + " out");
+        moved();
+        watch_pointer.set_timeout(40, [=] ()
+        {
+            moved();
+            return open_on != nullptr;
+        });
+        wf::get_core().connect(&on_key);
+    }
+
+    void close_row_only()
+    {
+        if (!row_only)
+        {
+            return;
+        }
+
+        row_only = false;
+        on_key.disconnect();
+        closed();
+    }
+
+    wf::signal::connection_t<wf::input_event_signal<wlr_keyboard_key_event>> on_key =
+        [=] (wf::input_event_signal<wlr_keyboard_key_event> *ev)
+    {
+        if (row_only && (ev->event->keycode == KEY_ESC) &&
+            (ev->event->state == WL_KEYBOARD_KEY_STATE_PRESSED))
+        {
+            ev->mode = wf::input_event_processing_mode_t::IGNORE;
+            idle_change.run_once([=] () { close_row_only(); });
+        }
+    };
+
     /* A full-screen window's desktop, closed once the slide back is over. */
     std::vector<int> to_close;
     wf::wl_timer<false> close_later;
@@ -848,6 +934,16 @@ class spaces_t
     {
         have_pending = true;
         pending = desktop;
+        if (row_only)
+        {
+            idle_go.run_once([=] ()
+            {
+                close_row_only();
+                switch_now();
+            });
+            return;
+        }
+
         idle_go.run_once([=] ()
         {
             if (open_on)
@@ -1023,6 +1119,7 @@ class spaces_t
 
     wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal *ev)
     {
+        scale_active = true;
         if (!expose_app.empty())
         {
             // App Exposé: that app's windows only, and no row of desktops.
@@ -1115,6 +1212,13 @@ class spaces_t
 
     wf::signal::connection_t<scale_end_signal> on_end = [=] (scale_end_signal*)
     {
+        scale_active = false;
+        scale_ended  = wf::get_current_time();
+        if (row_only)
+        {
+            return;
+        }
+
         expose_app.clear();
         closed();
         if (have_pending)
@@ -1135,6 +1239,23 @@ class spaces_t
     wf::signal::connection_t<wf::input_event_signal<wlr_pointer_button_event>> on_button =
         [=] (wf::input_event_signal<wlr_pointer_button_event> *ev)
     {
+        if (swallow_release && (ev->event->state != WLR_BUTTON_PRESSED))
+        {
+            swallow_release = false;
+            ev->mode = wf::input_event_processing_mode_t::IGNORE;
+            return;
+        }
+
+        if (row_only && (ev->event->state == WLR_BUTTON_PRESSED) &&
+            (area_at(wf::get_core().get_cursor_position()) < 0))
+        {
+            // A click away from the row closes it, and goes no further.
+            ev->mode = wf::input_event_processing_mode_t::IGNORE;
+            swallow_release = true;
+            idle_change.run_once([=] () { close_row_only(); });
+            return;
+        }
+
         if (!open_on || areas.empty())
         {
             return;

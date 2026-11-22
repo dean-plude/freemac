@@ -1162,6 +1162,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | These desktops are never saved for the next login | Strata, Topline | done |
 | 5 | Guide lines, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.114 "mission control on an empty desktop" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Control+Up (or a four-finger swipe up) on a desktop with no windows opens the row of desktops on its own, already opened out | Strata (mission-control.hpp), Topline (spaces.py) | done |
+| 2 | Click a desktop to go there; Esc, a click away or Control+Up again closes the row | Strata | done |
+| 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
+| 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

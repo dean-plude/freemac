@@ -52,13 +52,16 @@ WAYFIRE_INI = os.path.join(os.path.expanduser("~/.config"), "wayfire.ini")
 
 
 def parse(line):
-    """("open", output) / ("close",) / ("changed",) / ("pointer", x, y), or None."""
+    """("open", output, opened out) / ("close",) / ("changed",) / ("pointer", x, y), or None."""
     words = line.split()
     if len(words) < 2 or words[0] != "spaces":
         return None
     kind = words[1]
     if kind == "open" and len(words) == 3:
-        return ("open", words[2])
+        return ("open", words[2], False)
+    if kind == "open" and len(words) == 4 and words[3] == "out":
+        # Mission Control with no windows: the row shows alone, opened out.
+        return ("open", words[2], True)
     if kind in ("close", "changed") and len(words) == 2:
         return (kind,)
     if kind == "desktops" and len(words) == 3:
@@ -218,6 +221,7 @@ class SpacesRow(Gtk.Window):
         self.origin = (0, 0)
         self.info = None
         self.opened = False
+        self.stay_open = False
         self.hover = None
         self.close_timer = 0
         self.wallpaper = None
@@ -239,10 +243,11 @@ class SpacesRow(Gtk.Window):
         kind = message[0]
         if kind == "open":
             self.output = message[1]
-            self.opened, self.hover = False, None
+            self.stay_open = message[2]
+            self.opened, self.hover = self.stay_open, None
             self._load()
             self._place()
-            self.set_size_request(-1, NAMES_H)
+            self.set_size_request(-1, OPEN_H if self.opened else NAMES_H)
             self.show_all()
             self._layout()
         elif kind == "close":
@@ -369,7 +374,7 @@ class SpacesRow(Gtk.Window):
                 self.opened = True
                 self.set_size_request(-1, OPEN_H)
                 self._layout()
-        elif self.opened and not self.close_timer:
+        elif self.opened and not self.close_timer and not self.stay_open:
             self.close_timer = GLib.timeout_add(CLOSE_MS, self._close_row)
         hover = None
         # The close button pokes out past the picture's corner.

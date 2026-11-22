@@ -327,6 +327,13 @@ desktops under "full-screen" so Topline names them after the app, and the
 corner button on one calls `fullscreen_request(false)` instead of closing it.
 Because Topline writing wayfire.ini makes Wayfire read it again, the count is
 only saved while no window has a desktop of its own, so these are never kept.
+Mission Control on an empty desktop (1.114): Wayfire's scale will not open
+with no views, so Strata also binds the scale keys itself. On idle after the
+key, if neither scale nor App Exposé opened (and scale did not just close),
+it tells Topline `spaces open OUTPUT out`, which shows the desktops row opened
+out and keeps it open while the pointer is away. A click on a desktop goes
+there, and Esc, a click elsewhere or the key again closes the row; Strata
+takes those presses so they do not reach the desktop underneath.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
