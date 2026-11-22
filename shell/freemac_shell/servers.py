@@ -31,6 +31,8 @@ def normalise(address):
     if "://" not in text:
         text = "smb://" + text
     scheme = text.split("://", 1)[0].lower()
+    if scheme == "vnc":           # a screen, not files: Porthole opens it
+        return text if text.split("://", 1)[1].strip("/") else None
     if scheme not in SCHEMES:
         return None
     if scheme == "ssh":
@@ -206,6 +208,10 @@ def connect_dialog(parent, open_path, open_server=None):
         uri = normalise(entry.get_text())
         if uri is None:
             status.set_text("Type an address such as smb://computer-name/shared-folder.")
+            return
+        if uri.lower().startswith("vnc://"):
+            dialog.destroy()
+            GLib.spawn_async(["freemac-porthole", uri], flags=GLib.SpawnFlags.SEARCH_PATH)
             return
         state["busy"] = True
         go.set_sensitive(False)

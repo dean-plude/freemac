@@ -6,6 +6,7 @@
 #   freemac-system-helper auto-updates on|off   Software Update > Automatic updates
 #   freemac-system-helper remote-login on|off   Sharing > Remote Login (SSH)
 #   freemac-system-helper file-sharing on|off   Sharing > File Sharing (SMB)
+#   freemac-system-helper screen-sharing on|off Sharing > Screen Sharing (VNC)
 #   freemac-system-helper computer-name NAME    Sharing > Computer name
 set -e
 LANS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
@@ -47,6 +48,21 @@ smb_firewall() {
   done
 }
 
+# Screen Sharing runs in the person's own session (wayvnc); the computer only
+# keeps a note that it's on, for the firewall.
+SCREEN_MARK=/var/lib/freemac/screen-sharing
+
+screen_firewall() {
+  command -v ufw >/dev/null || return 0
+  for net in $LANS; do
+    if [ "$1" = allow ]; then
+      ufw allow in proto tcp from "$net" to any port 5900 comment 'freemac: screen sharing' >/dev/null
+    else
+      ufw delete allow in proto tcp from "$net" to any port 5900 >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 if [ "$1" = computer-name ]; then
   # The name people see ("Dean's freemac") and the one computers use on the
   # network ("Deans-freemac", and Deans-freemac.local through Avahi).
@@ -85,6 +101,7 @@ case "$1 $2" in
     done
     if ssh_on; then ssh_firewall allow; fi
     if smb_on; then smb_firewall allow; fi
+    if [ -e "$SCREEN_MARK" ]; then screen_firewall allow; fi
     ufw --force enable >/dev/null
     ;;
   "firewall off")
@@ -143,12 +160,28 @@ CONF
     systemctl disable --now smbd.service nmbd.service wsdd-server.service >/dev/null 2>&1 || true
     smb_firewall delete
     ;;
+  "screen-sharing on")
+    # Whoever connects signs in with this account's own password, so it must
+    # have one: an account with none (as on the live disk) can't share.
+    user=$(id -nu "${PKEXEC_UID:?}") || { echo "Can't tell who asked." >&2; exit 2; }
+    if [ "$(passwd -S "$user" 2>/dev/null | cut -d' ' -f2)" != P ]; then
+      echo "Your account needs a password first: Screen Sharing asks for it. Set one in Dials > Users." >&2
+      exit 3
+    fi
+    install -d /var/lib/freemac
+    touch "$SCREEN_MARK"
+    screen_firewall allow
+    ;;
+  "screen-sharing off")
+    rm -f "$SCREEN_MARK"
+    screen_firewall delete
+    ;;
   "remote-login off")
     systemctl disable --now ssh.socket ssh.service >/dev/null 2>&1 || true
     ssh_firewall delete
     ;;
   *)
-    echo "usage: freemac-system-helper firewall|auto-updates|remote-login|file-sharing on|off, or computer-name NAME" >&2
+    echo "usage: freemac-system-helper firewall|auto-updates|remote-login|file-sharing|screen-sharing on|off, or computer-name NAME" >&2
     exit 2
     ;;
 esac

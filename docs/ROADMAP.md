@@ -902,6 +902,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | A computer in Network that shares several folders lists them; hidden admin shares (print$, C$) stay hidden | Drawer | done |
 | 4 | A folder shared for everyone opens as a guest without a password dialog, and is titled by its own name | Drawer | done |
 
+## 1.86 "porthole" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Screen Sharing in Dials > Sharing: someone at another computer on the network can see and use this screen, after signing in with your name and password; an account without a password can't turn it on | Dials, system helper | done |
+| 2 | Always encrypted, with the computer's own certificate made the first time; the firewall lets it through to the local network only | Screen Sharing | done |
+| 3 | An icon in the menu bar while someone is using the screen, saying who, with Disconnect | Topline | done |
+| 4 | Porthole, the viewer: type a computer's name, sign in, and see and use its screen; recent computers, Fit to Window, full screen, Send Control-Alt-Delete | Porthole | done |
+| 5 | Porthole remembers each computer's identity and warns if it changes | Porthole | done |
+| 6 | vnc:// addresses in Connect to Server open Porthole | Drawer | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

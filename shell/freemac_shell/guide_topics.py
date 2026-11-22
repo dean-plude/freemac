@@ -480,6 +480,17 @@ TOPICS = {
         "needed; they can open and copy what's there, but can't change or delete anything.",
         "Turn File Sharing off when you don't need it.",
     ]),
+    "screensharing": ("See and use another computer's screen", "screen sharing remote desktop vnc porthole help someone another computer see screen control family kids", [
+        "On the computer you want to see: choose Dials > Sharing and turn on Screen Sharing; you're "
+        "asked for an administrator's password. Your account needs a password of its own (set one in "
+        "Dials > Users).",
+        "On the other computer, open Porthole and type the first computer's name, then sign in with "
+        "that computer's name and password. You see its screen and can use its mouse and keyboard. "
+        "Porthole remembers recent computers, and View has Fit to Window and full screen.",
+        "While someone is using your screen, an icon in the menu bar shows who; click it and choose "
+        "Disconnect to end it. Porthole also connects to a Mac with Screen Sharing on, or any other "
+        "VNC computer.",
+    ]),
     "sharing": ("Rename this computer, or log in to it from another", "sharing computer name rename hostname local network remote login ssh terminal another computer", [
         "Choose Dials > Sharing. Type a new Computer name and press Return; you're asked for an "
         "administrator's password. Nearby devices and printers see the new name, and other computers "

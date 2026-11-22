@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Porthole
+GenericName=Screen Sharing
+Comment=See and use another computer's screen
+Exec=freemac-porthole %u
+Icon=freemac-porthole
+Categories=Network;RemoteAccess;
+Keywords=screen sharing;remote;desktop;vnc;help;control;another computer;
+MimeType=x-scheme-handler/vnc;
+StartupWMClass=org.freemac.Porthole
+StartupNotify=true

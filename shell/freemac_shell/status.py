@@ -476,6 +476,69 @@ class Recording(StatusButton):
             self.hide()
 
 
+class ScreenShared(Gtk.MenuButton):
+    """While someone at another computer is looking at this screen (Screen
+    Sharing), an icon in the menu bar, as on a Mac: its menu says who, and
+    disconnects them."""
+
+    def __init__(self):
+        super().__init__()
+        from . import screen_sharing
+
+        self.sharing = screen_sharing
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        self.get_style_context().add_class("screen-shared")
+        self.add(Gtk.Image.new_from_icon_name("preferences-desktop-remote-desktop-symbolic",
+                                              Gtk.IconSize.MENU))
+        self.set_no_show_all(True)
+        self.menu = Gtk.Menu()
+        self.menu.set_halign(Gtk.Align.END)
+        self.set_popup(self.menu)
+        # The watcher keeps the list from wayvnc's events; the bar looks at
+        # it on a timer, as its other icons do (shown straight from the
+        # pipe's callback, the icon waited for the clock to tick to appear).
+        self.watcher = screen_sharing.Watcher(lambda _viewers: None)
+        self.shown = []
+        GLib.timeout_add_seconds(1, self._poll)
+
+    def _poll(self):
+        viewers = list(self.watcher.viewers.values())
+        if [v.get("id") for v in viewers] != [v.get("id") for v in self.shown]:
+            self.shown = viewers
+            self.update(viewers)
+        return True
+
+    @staticmethod
+    def _who(viewer):
+        user = viewer.get("username") or "Someone"
+        where = viewer.get("hostname") or viewer.get("address")
+        return f"{user} at {where}" if where else user
+
+    def update(self, viewers):
+        if not viewers:
+            self.menu.popdown()
+            self.hide()
+            return
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+        for viewer in viewers:
+            item = Gtk.MenuItem(label=f"{self._who(viewer)} is using this screen")
+            item.set_sensitive(False)
+            self.menu.append(item)
+        self.menu.append(Gtk.SeparatorMenuItem())
+        label = "Disconnect" if len(viewers) == 1 else "Disconnect Everyone"
+        item = Gtk.MenuItem(label=label)
+        item.connect("activate", lambda *_: [self.sharing.disconnect(v.get("id")) for v in viewers])
+        self.menu.append(item)
+        item = Gtk.MenuItem(label="Sharing Settings…")
+        item.connect("activate", lambda *_: launch("freemac-dials", "--panel", "sharing"))
+        self.menu.append(item)
+        self.menu.show_all()
+        self.set_tooltip_text("\n".join(f"{self._who(v)} is using this screen" for v in viewers))
+        self.show()
+        self.get_child().show()
+
+
 class InUse(Gtk.MenuButton):
     """A small dot while an app is using the microphone (orange) or the camera
     (green), so nobody listens or watches unnoticed. Click it to see which

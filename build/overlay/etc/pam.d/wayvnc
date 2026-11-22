@@ -1,0 +1,5 @@
+# freemac: Dials > Sharing > Screen Sharing. Whoever connects signs in with the
+# name and password of the person logged in here; an empty password is never
+# accepted (no nullok), and nothing else is tried.
+auth     required   pam_unix.so
+account  required   pam_unix.so
