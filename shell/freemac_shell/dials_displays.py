@@ -2,8 +2,9 @@
 """Dials > Displays, as a Mac's Displays settings:
 
 - with two or more displays, a picture of them to drag into the way they sit
-  on the desk, and for each one Use as: Extended display or Mirror for
-  another;
+  on the desk (the main one, with the menu bar and the Dock, has a white bar
+  to drag), and for each one Use as: Main display, Extended display or
+  Mirror for another;
 - for each display, Resolution (each size it can show, or Default), Refresh
   rate, Size of text and icons (the scale), and Rotation;
 - Brightness and Night Light, as before.
@@ -23,6 +24,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
+from . import main_display  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
 SCALES = ("1", "1.25", "1.5", "1.75", "2")
@@ -130,13 +132,17 @@ def snap(moving, others):
 
 
 class Arrangement(Gtk.DrawingArea):
-    """The displays drawn to scale; drag one to move it beside another."""
+    """The displays drawn to scale; drag one to move it beside another. The
+    main display has a white bar along its top, for the menu bar; drag the
+    bar to another display to make that one the main display."""
 
-    def __init__(self, boxes, on_moved):
+    def __init__(self, boxes, on_moved, main=None, on_main=None):
         super().__init__()
         self.boxes = dict(boxes)       # name -> [x, y, w, h, label]
         self.on_moved = on_moved
+        self.main, self.on_main = main, on_main
         self.dragging = None
+        self.bar_at = None             # where the menu bar is being dragged
         self.set_size_request(-1, 190)
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK
                         | Gdk.EventMask.POINTER_MOTION_MASK)
@@ -179,12 +185,34 @@ class Arrangement(Gtk.DrawingArea):
             cr.set_source_rgba(fg.red, fg.green, fg.blue, 0.35)
             cr.set_line_width(1)
             cr.stroke()
+            if name == self.main and self.bar_at is None:
+                self._bar(cr, rx, ry, rw, rh)
             cr.set_source_rgba(1, 1, 1, 0.95)
             cr.select_font_face("Inter", 0, 1)
             cr.set_font_size(12)
             ext = cr.text_extents(label)
             cr.move_to(rx + (rw - ext.width) / 2 - ext.x_bearing, ry + (rh - ext.height) / 2 - ext.y_bearing)
             cr.show_text(label)
+        if self.bar_at is not None:
+            main = self.boxes.get(self.main)
+            if main:
+                width = main[2] * scale
+                self._bar(cr, self.bar_at[0] - width / 2, self.bar_at[1], width, main[3] * scale)
+
+    @staticmethod
+    def _bar(cr, rx, ry, rw, rh):
+        """The menu bar on the main display: a white strip along its top."""
+        cr.set_source_rgba(1, 1, 1, 0.92)
+        cr.rectangle(rx + 3, ry + 3, rw - 6, max(4, rh * 0.08))
+        cr.fill()
+
+    def _on_bar(self, px, py):
+        main = self.boxes.get(self.main)
+        if not main:
+            return False
+        scale, ox, oy = self._fit()
+        rx, ry, rw, rh = ox + main[0] * scale, oy + main[1] * scale, main[2] * scale, main[3] * scale
+        return rx <= px <= rx + rw and ry <= py <= ry + max(10, rh * 0.18)
 
     def _hit(self, px, py):
         scale, ox, oy = self._fit()
@@ -196,6 +224,10 @@ class Arrangement(Gtk.DrawingArea):
     def _press(self, _widget, event):
         if len(self.boxes) < 2 or event.button != 1:
             return False
+        if self.on_main and self._on_bar(event.x, event.y):
+            self.bar_at = (event.x, event.y)
+            self.queue_draw()
+            return True
         self.dragging = self._hit(event.x, event.y)
         if self.dragging:
             box = self.boxes[self.dragging]
@@ -204,6 +236,10 @@ class Arrangement(Gtk.DrawingArea):
         return True
 
     def _motion(self, _widget, event):
+        if self.bar_at is not None:
+            self.bar_at = (event.x, event.y)
+            self.queue_draw()
+            return True
         if not self.dragging:
             return False
         sx, sy, bx, by, (scale, _ox, _oy) = self.grab
@@ -213,7 +249,15 @@ class Arrangement(Gtk.DrawingArea):
         self.queue_draw()
         return True
 
-    def _release(self, _widget, _event):
+    def _release(self, _widget, event):
+        if self.bar_at is not None:
+            self.bar_at = None
+            target = self._hit(event.x, event.y)
+            if target and target != self.main:
+                self.main = target
+                self.on_main(target)
+            self.queue_draw()
+            return True
         if not self.dragging:
             return False
         name, self.dragging = self.dragging, None
@@ -353,9 +397,16 @@ class DisplaysPage:
             for name, (x, y) in places.items():
                 self.set(name, position=f"{x},{y}")
 
-        picture = Arrangement(boxes, moved)
+        def made_main(name):
+            self.window.save_prefs(**{main_display.KEY: name})
+            GLib.timeout_add(600, self.refill)
+
+        main = main_display.main_output(outputs)
+        picture = Arrangement(boxes, moved, main["name"] if main else None, made_main)
         caption = Gtk.Label(label="Drag the displays to match how they sit on your desk. The pointer and "
-                                  "windows cross from one to the other where they touch.", xalign=0, wrap=True)
+                                  "windows cross from one to the other where they touch. Drag the white "
+                                  "bar to choose which display has the menu bar and the Dock.",
+                            xalign=0, wrap=True)
         caption.get_style_context().add_class("dials-caption")
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         frame = Gtk.Frame()
@@ -367,11 +418,16 @@ class DisplaysPage:
 
     def _use_as(self, output, outputs):
         combo = Gtk.ComboBoxText()
-        combo.append("extended", "Extended display")
+        main = main_display.main_output(outputs)
+        is_main = main is not None and main["name"] == output["name"]
+        combo.append("main", "Main display")
+        if not is_main:
+            combo.append("extended", "Extended display")
         for other in outputs:
             if other["name"] != output["name"] and other.get("source") == "self":
                 combo.append("mirror:" + other["name"], f"Mirror for {display_name(other)}")
-        current = ("mirror:" + output["mirror_from"]) if output.get("source") == "mirror" else "extended"
+        current = ("mirror:" + output["mirror_from"]) if output.get("source") == "mirror" else \
+            "main" if is_main else "extended"
         combo.set_active_id(current)
         if combo.get_active_id() is None:
             combo.set_active_id("extended")
@@ -379,6 +435,16 @@ class DisplaysPage:
         def changed(c):
             pick = c.get_active_id()
             if pick == current:
+                return
+            if pick == "main":
+                # The menu bar, the Dock and the Desktop's files move there.
+                self.window.save_prefs(**{main_display.KEY: output["name"]})
+                if output.get("source") != "self":
+                    self.change(output["name"], mode="auto")
+                else:
+                    GLib.timeout_add(600, self.refill)
+                return
+            if pick == "extended" and output.get("source") == "self":
                 return
             mode = "mirror " + pick.split(":", 1)[1] if pick.startswith("mirror:") else "auto"
             self.change(output["name"], mode=mode)

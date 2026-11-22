@@ -968,6 +968,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | "Keep these display settings?" after a new resolution, refresh rate, rotation or mirroring; the old settings come back after 15 seconds | Dials | done |
 | 4 | With two or more displays: drag them into place in a picture of the desk, where they snap together, and Use as Extended display or Mirror for another | Dials | done |
 
+## 1.93 "main display" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The menu bar, the Dock and the files on the Desktop sit on the main display, and move when it changes or is unplugged (the built-in display first, then the first one) | Topline, Pier, Backdrop | done |
+| 2 | Choose the main display in Dials > Displays: Use as Main display, or drag the white bar in the picture to another display | Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

@@ -618,12 +618,14 @@ TOPICS = {
         "Turn off Play feedback when volume is changed to stop the little pop, or Play user interface sound "
         "effects to stop the Trash and screenshot sounds.",
     ]),
-    "displays": ("Change your display's resolution or use two displays", "display monitor screen resolution refresh rate hz rotate rotation turn sideways portrait second display two displays external projector tv arrange mirror mirroring extend extended bigger text icons scale", [
+    "displays": ("Change your display's resolution or use two displays", "display monitor screen resolution refresh rate hz rotate rotation turn sideways portrait second display two displays external projector tv arrange mirror mirroring extend extended main display menu bar dock bigger text icons scale", [
         "Choose Dials > Displays. Pick a Resolution, a Refresh rate, the Size of text and icons, or a Rotation for each display.",
         "After a new resolution, refresh rate, rotation or mirroring, freemac asks \u201cKeep these display settings?\u201d "
         "If you don\u2019t click Keep within 15 seconds, the old settings come back, so a screen that goes blank fixes itself.",
         "With two or more displays, drag them in the picture to match how they sit on your desk; the pointer crosses where they touch. "
         "Use as \u201cMirror for\u201d another display to show the same thing on both, as for a projector.",
+        "The main display has the menu bar, the Dock and the files on the Desktop. To pick another, drag the white bar "
+        "in the picture onto it, or choose Use as \u201cMain display\u201d.",
     ]),
     "shut-down": ("Restart, shut down or log out", "restart shut down shutdown turn off power off log out logout sign out sleep recent items recently used apps documents", [
         "Click the freemac mark at the left of the menu bar and choose Sleep, Restart\u2026, Shut Down\u2026 or "

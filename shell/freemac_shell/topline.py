@@ -15,7 +15,7 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import (apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, notify_rules, quick,  # noqa: E402
-               recent_items, status, style)
+               main_display, recent_items, status, style)
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -1277,6 +1277,8 @@ def _os_version():
 def main():
     style.apply()
     win = Topline()
+    # The menu bar sits on the main display (Dials > Displays).
+    main_display.follow(win)
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
