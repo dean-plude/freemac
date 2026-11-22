@@ -335,6 +335,14 @@ out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
 
+Full-screen size (1.119, `mission-control.hpp`): `move_to_workspace` moves a
+window with the size it has now. When a window goes full screen, Strata moves
+it to its own desktop on the next idle, and an app that hasn't yet answered
+the full-screen configure is moved at its old size, which then sticks. So
+for three seconds after `enter_full`, once `vswitch` has finished sliding and
+the app has answered, Strata sets the window's geometry to the whole output
+at its desktop if it isn't already.
+
 Badges after a Dock restart (1.118, `launcher_badge.py`): apps send a
 LauncherEntry badge only when their count changes, so a Dock that starts later
 would miss it. When Pier starts it emits `org.freemac.Dock.Started` on

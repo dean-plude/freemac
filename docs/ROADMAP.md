@@ -1171,6 +1171,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.119 "full size" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A window put in full screen right after it opened (Quill showed it every time) could slide onto its own desktop still at its old size. Strata now sets the full-screen size again once the slide is over, whether the green button, Control+⌘F or the app itself asked | Strata (mission-control.hpp) | done |
+| 2 | Every README screenshot retaken | Docs | done |
+
 ## 1.118 "update count" (done)
 
 | # | Item | Component | Status |

@@ -44,6 +44,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
@@ -494,6 +495,72 @@ class spaces_t
         {
             move_with_dialogs(wset, view, here);
         }
+
+        size_full_soon(view->get_id());
+    }
+
+    /* Moving a window to another desktop keeps the size it has now. When the
+     * move comes before the app has taken its full-screen size, the window
+     * would stay at its old size on its new desktop, so the size is set
+     * again once the slide is over. */
+    std::set<uint32_t> to_size;
+    int size_checks = 0;
+    wf::wl_timer<true> size_timer;
+
+    void size_full_soon(uint32_t id)
+    {
+        to_size.insert(id);
+        size_checks = 30;
+        if (!size_timer.is_connected())
+        {
+            size_timer.set_timeout(100, [=] () { return size_full(); });
+        }
+    }
+
+    bool size_full()
+    {
+        if (--size_checks < 0)
+        {
+            to_size.clear();
+            return false;
+        }
+
+        for (auto it = to_size.begin(); it != to_size.end();)
+        {
+            auto view = wf::toplevel_cast(wf::ipc::find_view_by_id(*it));
+            if (!view || !view->is_mapped() || !view->get_output() ||
+                !view->toplevel()->current().fullscreen || !full.count(*it))
+            {
+                it = to_size.erase(it);
+                continue;
+            }
+
+            auto output = view->get_output();
+            if (output->is_plugin_active("vswitch"))
+            {
+                ++it; // still sliding over
+                continue;
+            }
+
+            auto wset  = output->wset().get();
+            auto here  = wset->get_view_main_workspace(view);
+            auto now   = wset->get_current_workspace();
+            auto whole = output->get_relative_geometry();
+            wf::geometry_t want = {
+                whole.x + (here.x - now.x) * whole.width,
+                whole.y + (here.y - now.y) * whole.height,
+                whole.width, whole.height};
+            if ((view->get_pending_geometry() == view->toplevel()->current().geometry) &&
+                (view->toplevel()->current().geometry != want))
+            {
+                LOGI("strata: ", view->get_app_id(), " gets its full-screen size again");
+                view->set_geometry(want);
+            }
+
+            ++it;
+        }
+
+        return !to_size.empty();
     }
 
     /* Out of full screen or closed: back to where it came from, and its
