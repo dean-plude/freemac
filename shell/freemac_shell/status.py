@@ -19,7 +19,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import beacon, style  # noqa: E402
+from . import beacon, sounds, style  # noqa: E402
 
 try:
     import cups  # python3-cups, which system-config-printer brings along
@@ -122,6 +122,7 @@ class Sound(StatusButton):
         self.scale.set_draw_value(False)
         self.scale.set_size_request(180, -1)
         self.scale_handler = self.scale.connect("value-changed", self._set_volume)
+        self.scale.connect("button-release-event", lambda *_: sounds.feedback())
         box.pack_start(self.mute, False, False, 0)
         box.pack_start(self.scale, True, True, 0)
         self.popup.add(box)
@@ -210,6 +211,7 @@ class Sound(StatusButton):
         step = "5%+" if event.direction == Gdk.ScrollDirection.UP else "5%-"
         if event.direction in (Gdk.ScrollDirection.UP, Gdk.ScrollDirection.DOWN):
             subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", step], capture_output=True)
+            sounds.feedback()
             self.update()
         return True
 

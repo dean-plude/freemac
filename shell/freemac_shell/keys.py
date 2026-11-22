@@ -17,7 +17,7 @@ import sys
 
 from gi.repository import Gio, GLib
 
-from . import screen
+from . import screen, sounds
 
 STEP = 5           # percent per press
 SINK = "@DEFAULT_AUDIO_SINK@"
@@ -76,6 +76,7 @@ def do(action):
             run("wpctl", "set-mute", SINK, "0")
             sign = "+" if action == "volume-up" else "-"
             run("wpctl", "set-volume", "-l", "1.0", SINK, f"{STEP}%{sign}")
+            sounds.feedback()   # a pop at the new level, as a Mac does
         percent, muted = volume()
         return volume_icon(percent, muted), 0.0 if muted else percent / 100, "Muted" if muted else ""
     if action == "mic-mute":

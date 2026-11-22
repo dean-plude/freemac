@@ -36,7 +36,7 @@ SEARCH_WORDS = {
     "bluetooth": "pair headphones speaker mouse keyboard",
     "sharing": "computer name rename hostname local network nearby sharing airdrop localsend remote login ssh terminal file sharing public folder windows smb samba screen sharing remote desktop vnc porthole",
     "notifications": "alerts banners do not disturb focus",
-    "sound": "volume speaker microphone output input audio alert chime",
+    "sound": "volume speaker microphone output input audio alert chime sound effects beep feedback pop start-up",
     "about": "version storage memory system update",
     "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",

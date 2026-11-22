@@ -218,6 +218,8 @@ def capture(mode):
     cmd = ["grim"] + (["-g", region] if region else []) + [path]
     if subprocess.run(cmd, capture_output=True).returncode != 0 or not os.path.exists(path):
         return None, "The screenshot couldn't be taken."
+    from . import sounds
+    sounds.effect("shutter")
     if shutil.which("wl-copy"):
         # wl-copy keeps running in the background to serve the clipboard, so
         # don't wait on its output pipes.
