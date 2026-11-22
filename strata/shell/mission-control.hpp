@@ -12,6 +12,8 @@
 // (strata/spaces-areas), and a click inside one of those areas is kept from
 // the overview, which is closed before Strata moves to that desktop.
 // strata/desktops lists the desktops and the windows on each, for drawing.
+// A window dragged out of the overview and let go over a desktop in the row
+// moves to that desktop, as on a Mac.
 // Original freemac code.
 #pragma once
 
@@ -30,6 +32,7 @@
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
 #include <wayfire/plugins/common/shared-core-data.hpp>
+#include <wayfire/plugins/common/move-drag-interface.hpp>
 
 namespace strata_spaces
 {
@@ -59,6 +62,7 @@ class spaces_t
         wf::get_core().connect(&on_motion);
         wf::get_core().connect(&on_motion_absolute);
         wf::get_core().connect(&on_button);
+        drag->connect(&on_drag_done);
     }
 
     /* strata/desktops {"output": NAME}: the desktop grid, the one showing,
@@ -142,6 +146,13 @@ class spaces_t
   private:
     std::function<void(const std::string&)> tell;
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> methods;
+    wf::shared_data::ref_ptr_t<wf::move_drag::core_drag_t> drag;
+    wf::wl_idle_call idle_move;
+    /* While a window is dragged the overview takes the pointer in a way
+     * that sends no motion signals, so the pointer is also looked at on a
+     * timer for as long as the overview is open. */
+    wf::wl_timer<true> watch_pointer;
+    int drag_small = -1;
     wf::output_t *open_on = nullptr;
     std::vector<area_t> areas;
     int pressed = -1;
@@ -178,6 +189,7 @@ class spaces_t
         }
 
         open_on = nullptr;
+        watch_pointer.disconnect();
         areas.clear();
         pressed  = -1;
         reported = false;
@@ -253,6 +265,29 @@ class spaces_t
         }
     }
 
+    void move_window(uint32_t id, wf::point_t desktop)
+    {
+        auto view = wf::toplevel_cast(wf::ipc::find_view_by_id(id));
+        if (!view || !view->is_mapped() || !view->get_output())
+        {
+            return;
+        }
+
+        auto wset = view->get_output()->wset();
+        auto grid = wset->get_workspace_grid_size();
+        if ((desktop.x < 0) || (desktop.y < 0) || (desktop.x >= grid.width) || (desktop.y >= grid.height) ||
+            (wset->get_view_main_workspace(view) == desktop))
+        {
+            return;
+        }
+
+        wset->move_to_workspace(view, desktop);
+        if (open_on)
+        {
+            tell("spaces changed");
+        }
+    }
+
     wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal*)
     {
         auto output = wf::get_core().seat->get_active_output();
@@ -261,7 +296,53 @@ class spaces_t
             open_on = output;
             tell("spaces open " + output->to_string());
             moved();
+            watch_pointer.set_timeout(40, [=] ()
+            {
+                if (drag->view)
+                {
+                    moved();
+                    /* Near the row the window being dragged shrinks, so the
+                     * desktops stay in sight, as on a Mac. */
+                    if (!drag->is_view_held_in_place())
+                    {
+                        int small = reported ? 1 : 0;
+                        if (small != drag_small)
+                        {
+                            drag_small = small;
+                            // The drag divides the size by this.
+                            drag->set_scale(small ? 4.0 : 1.0);
+                        }
+                    }
+                } else
+                {
+                    drag_small = -1;
+                }
+
+                return open_on != nullptr;
+            });
         }
+    };
+
+    /* A window dragged out of the overview and let go over one of the
+     * desktops: the overview puts it back in its place, then it moves to
+     * that desktop and the overview lays out the ones left. */
+    wf::signal::connection_t<wf::move_drag::drag_done_signal> on_drag_done =
+        [=] (wf::move_drag::drag_done_signal *ev)
+    {
+        if (!open_on || !ev->main_view)
+        {
+            return;
+        }
+
+        int at = area_at({(double)ev->grab_position.x, (double)ev->grab_position.y});
+        if (at < 0)
+        {
+            return;
+        }
+
+        auto id = ev->main_view->get_id();
+        auto desktop = areas[at].desktop;
+        idle_move.run_once([=] () { move_window(id, desktop); });
     };
 
     wf::signal::connection_t<scale_end_signal> on_end = [=] (scale_end_signal*)

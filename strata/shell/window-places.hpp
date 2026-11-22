@@ -59,7 +59,9 @@ class strata_window_places
         for (auto it = settle.begin(); it != settle.end();)
         {
             auto view = wf::toplevel_cast(wf::ipc::find_view_by_id(it->id));
-            if (!view || !view->is_mapped() || (--it->checks < 0))
+            /* A window put above the others meanwhile (Reel's Picture in
+             * Picture) has a place of its own now. */
+            if (!view || !view->is_mapped() || (--it->checks < 0) || view->has_data("wm-actions-above"))
             {
                 it = settle.erase(it);
                 continue;

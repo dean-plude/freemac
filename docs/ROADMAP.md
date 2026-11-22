@@ -1113,6 +1113,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | A window remembered at the top of the screen reopens below the menu bar, title bar and all | Strata (window-places.hpp) | done |
 | 6 | A Guide topic, a README screenshot, and every README screenshot retaken | Guide, Docs | done |
 
+## 1.109 "drag to a desktop" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | In the window overview, drag a window up onto one of the desktops along the top and let go to move it there | Strata (mission-control.hpp) | done |
+| 2 | The window being dragged shrinks as it nears the row, so the desktops stay in sight | Strata | done |
+| 3 | The row opens out a little before the pointer reaches the names | Topline (spaces.py) | done |
+| 4 | Picture in Picture turned on just after Reel opens stays in its corner (the window's remembered place no longer pulls it back) | Strata (window-places.hpp) | done |
+| 5 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
