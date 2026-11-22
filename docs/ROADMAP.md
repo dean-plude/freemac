@@ -959,6 +959,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Play feedback when volume is changed: a pop at the new level | freemac-keys, Topline | done |
 | 4 | Play user interface sound effects: a crumple when the Trash is emptied, a shutter for a screenshot | Drawer, Pier, Lens | done |
 
+## 1.92 "displays" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Displays lists each display by name and size, with its Resolution (every size it can show, or Default) and Refresh rate | Dials, Strata | done |
+| 2 | Size of text and icons and Rotation (Standard, 90°, 180°, 270°) for each display | Dials | done |
+| 3 | "Keep these display settings?" after a new resolution, refresh rate, rotation or mirroring; the old settings come back after 15 seconds | Dials | done |
+| 4 | With two or more displays: drag them into place in a picture of the desk, where they snap together, and Use as Extended display or Mirror for another | Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
