@@ -675,6 +675,12 @@ TOPICS = {
         "screen's colours. Press it again to put them back.",
         "High contrast and Larger text are on the same page.",
     ]),
+    "screen-flash": ("Flash the screen for alerts", "flash screen alert sound beep hear deaf hard of hearing visual bell blink accessibility", [
+        "Choose Dials > Accessibility and turn on Flash the screen when an alert sound occurs.",
+        "Whenever an app plays the alert sound, because something can\u2019t be done, every display flashes "
+        "for a moment, even with the alert volume turned all the way down.",
+        "Click Test Screen Flash to see how it looks.",
+    ]),
     "stacks": ("Tidy the desktop with stacks", "stacks stack desktop tidy clean up arrange sort kind messy screenshots get info item info size dimensions view options icon size bigger smaller text spacing", [
         "Right-click an empty part of the desktop and choose Use Stacks, or press Control+Command+0. "
         "Files of one kind go into a pile: Images, Screenshots, Documents, PDF Documents and so on.",
