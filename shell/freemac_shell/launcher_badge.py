@@ -5,7 +5,8 @@ Apps say what to show with the LauncherEntry signal that many Linux apps
 already send (Thunderbird, Telegram, Firefox's downloads and others):
 Update(app_uri, properties) on the session bus, where app_uri is
 "application://name.desktop" and properties can hold "count" with
-"count-visible", and "progress" (0 to 1) with "progress-visible". The Dock
+"count-visible", "progress" (0 to 1) with "progress-visible", and "urgent",
+which makes the icon hop until you go to the app. The Dock
 listens for it and draws the badge; when the app quits, its badge goes.
 """
 
@@ -87,6 +88,8 @@ class Listener:
             badge["progress"] = min(1.0, max(0.0, float(props["progress"])))
         if "progress-visible" in props:
             badge["progress-visible"] = bool(props["progress-visible"])
+        if "urgent" in props:
+            badge["urgent"] = bool(props["urgent"])
         self.badges[desktop_id] = badge
         if sender:
             self.senders.setdefault(sender, set()).add(desktop_id)

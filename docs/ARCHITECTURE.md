@@ -335,6 +335,24 @@ out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
 
+Coming forward and asking for attention (1.116, `strata/shell/attention.hpp`):
+Strata creates the xdg-activation global, which Wayfire 0.8 leaves to an
+optional plugin. A request whose token carries a seat (made from an input
+event the app got, as when the Dock or Seek launches with a GTK launch
+context) is granted with `focus_request`, which raises the window and goes to
+its desktop. Any other request, and Xwayland's urgency hint
+(`view_hints_changed_signal`), marks the app as asking instead: Strata writes
+`attention APP-ID on` to the Dock's socket (`$XDG_RUNTIME_DIR/freemac-pier.sock`),
+and `off` when the app gets the keyboard or its last window closes. The Dock
+bounces the icon of an app that is asking (also for a LauncherEntry
+`"urgent": true`), and asks `strata/attention` for the list when it starts.
+
+The ISO build copies `build/overlay` with `cp -a --no-preserve=ownership`
+and checks that nothing outside /home belongs to an account (uid or gid 1000
+and up, apart from nobody) before it makes the squashfs. Before 1.116, CI
+images had /, /etc and /usr owned by the runner's uid 1001. Keel's
+`own_by_root` gives any such file back to root after it unpacks the image.
+
 Dock badges (1.115, `launcher_badge.py`): apps send
 `com.canonical.Unity.LauncherEntry.Update(app_uri, properties)` on the
 session bus, the signal Thunderbird, Telegram and others already send, with

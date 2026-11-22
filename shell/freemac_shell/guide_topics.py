@@ -607,7 +607,7 @@ TOPICS = {
         "Choose 12-hour or 24-hour time, and whether the menu bar shows the day, the date and seconds.",
         "Changing the time or time zone asks for an administrator's password.",
     ]),
-    "dock-hide": ("Hide the Dock until you need it", "dock hide hides automatically autohide auto-hide show more room bottom screen magnification recent files recent apps right-click menu position left right side move edge badge badges red number count unread", [
+    "dock-hide": ("Hide the Dock until you need it", "dock hide hides automatically autohide auto-hide show more room bottom screen magnification recent files recent apps right-click menu position left right side move edge badge badges red number count unread bounce bouncing bounces attention needs you", [
         "Choose Dials > Dock and Menu Bar and turn on Automatically hide and show the Dock, or press ⌥⌘D.",
         "The Dock slides away and windows can use the whole screen. Move the pointer to the bottom "
         "edge of the screen and it slides back up.",
@@ -623,6 +623,8 @@ TOPICS = {
         "due today on Nudge. Other apps that send a count, or a download's progress, show it the same way.",
         "The same page turns off the dots under open apps (Show indicators for open apps), the red numbers "
         "(Show badges on Dock icons) and the bounce while an app opens (Animate opening apps).",
+        "When an app in the background needs you, its icon keeps bouncing in the Dock until you go to it. "
+        "Click the icon, or switch to the app, and it stops.",
         "To put the Dock on the left or right of the screen, choose Position on screen in Dials > Dock and "
         "Menu Bar, or right-click the Dock between its icons and choose Position on Screen. A Dock that hides "
         "itself comes back when the pointer reaches that edge.",

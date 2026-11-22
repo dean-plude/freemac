@@ -48,6 +48,7 @@
 #include "sticky-keys.hpp"
 #include "colour-filters.hpp"
 #include "mission-control.hpp"
+#include "attention.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -865,6 +866,7 @@ class strata_shell_impl : public wf::plugin_interface_t
 
     strata_flash::flashes_t flashes;
     strata_spaces::spaces_t spaces;
+    strata_attention::attention_t attention;
     strata_locate::locate_t locate;
     strata_accents::hold_t accents;
     strata_sticky::sticky_t sticky;
@@ -984,6 +986,9 @@ class strata_shell_impl : public wf::plugin_interface_t
             [=] (nlohmann::json data) { return spaces.assignments(data); });
         method_repository->register_method("strata/app-expose",
             [=] (nlohmann::json data) { return spaces.app_expose(data); });
+        method_repository->register_method("strata/attention",
+            [=] (nlohmann::json data) { return attention.list(data); });
+        attention.init();
         flashes.init();
         locate.init();
         window_places.init();

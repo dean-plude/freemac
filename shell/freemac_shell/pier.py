@@ -18,6 +18,7 @@ Hidden apps (Hide) get no picture.
 import json
 import math
 import os
+import socket
 import subprocess
 import sys
 
@@ -40,6 +41,7 @@ REACH = 150        # pixels over which magnification fades out
 BOUNCE_PERIOD = 0.62   # seconds per hop while an app starts
 BOUNCE_HEIGHT = 0.42   # share of the icon size
 BOUNCE_LIMIT = 6.0     # stop hopping after this long even if no window shows
+ATTENTION_REST = 0.55  # seconds between hops while an app asks for attention
 HOLD_MS = 550        # hold an app in the dock this long to open its menu
 # Parts of the desktop that open without a window of their own don't hop.
 SHADOW_ROOM = 22   # px each side of the shelf for its shadow
@@ -49,6 +51,8 @@ MARGIN = 8
 SLIDE_MS = 220     # how long the Dock takes to slide away or back
 HIDE_DELAY = 350   # ms after the pointer leaves before a hidden Dock slides away
 CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
+# Strata says here when an app asks for attention ("attention APP-ID on|off").
+SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "freemac-pier.sock")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
 SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit", "freemac-power"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "freemac-post.desktop", "freemac-cove.desktop", "freemac-shanty.desktop", "org.codeberg.dnkl.foot.desktop",
@@ -500,7 +504,7 @@ class Item(Gtk.Button):
         self.views = views
         self.alive = alive
         self.dot.set_opacity(1.0 if (views or alive) and self.pier.show_dots() else 0.0)
-        if views:
+        if views and not self.attention:
             self.stop_bounce()
 
     def running_app_id(self):
@@ -800,6 +804,23 @@ class Item(Gtk.Button):
     # While an app starts, its icon hops up and down until its first window
     # shows (or for BOUNCE_LIMIT seconds), so a click always gets an answer.
     bouncing = None
+    # An app in the background that wants you hops, with a rest between
+    # hops, until you go to it (Strata's word, or the app's own "urgent").
+    attention = False
+
+    def set_attention(self, on):
+        on = bool(on)
+        if on == self.attention:
+            return
+        self.attention = on
+        if not on:
+            self.stop_bounce()
+            return
+        settings = Gtk.Settings.get_default()
+        if settings and not settings.props.gtk_enable_animations:
+            return   # Reduce motion: no hopping
+        self.stop_bounce()
+        self.bouncing = (GLib.get_monotonic_time(), GLib.timeout_add(16, self._bounce_step))
 
     def bounce(self):
         settings = Gtk.Settings.get_default()
@@ -813,6 +834,12 @@ class Item(Gtk.Button):
     def _bounce_step(self):
         started, _source = self.bouncing
         elapsed = (GLib.get_monotonic_time() - started) / 1e6
+        if self.attention:
+            cycle = BOUNCE_PERIOD + ATTENTION_REST
+            phase = (elapsed % cycle) / BOUNCE_PERIOD
+            height = 0 if phase >= 1 else int(round(self.pier.base * BOUNCE_HEIGHT * math.sin(math.pi * phase)))
+            self.pier.lift(self.image, height)
+            return True
         if elapsed > BOUNCE_LIMIT:
             self.bouncing = None
             self.pier.lift(self.image, 0)
@@ -1044,10 +1071,18 @@ class Pier(Gtk.Window):
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         # Red counts on icons, from apps that send them (Post, Nudge, others).
         self.badges = launcher_badge.Listener(self._badges_changed)
+        # Apps asking for attention: Strata tells the Dock over its socket.
+        self.asking = set()
+        self._listen()
         try:
             self.wf = Wayfire(on_event=self._wayfire_event)
         except OSError:
             self.wf = None
+        try:
+            reply = self.wf.req.call("strata/attention") if self.wf else {}
+            self.asking = {a.lower() for a in reply.get("apps", []) if isinstance(a, str)}
+        except (ConnectionError, OSError, ValueError, AttributeError):
+            pass
         # Stage Manager lives in the Dock, which is always running.
         self.stage = stage.StageManager(self.wf)
         self.stage.set_enabled(self.config.get("stage", False))
@@ -1294,6 +1329,57 @@ class Pier(Gtk.Window):
     def _badges_changed(self):
         for item in self.items():
             item.queue_draw()
+        self._show_attention()
+
+    def _show_attention(self):
+        """Hop each icon whose app asks for attention, and stop the others."""
+        badges = getattr(self, "badges", None)
+        asking = getattr(self, "asking", set())
+        for item in self.items():
+            if not isinstance(item, Item):
+                continue
+            app_ids = {v.get("app-id", "").lower() for v in item.views}
+            if item.app_id:
+                app_ids.add(item.app_id.lower())
+            if isinstance(item.alive, str):
+                app_ids.add(item.alive.lower())
+            urgent = bool(badges and (badges.get(item.badge_id()) or {}).get("urgent"))
+            item.set_attention(urgent or bool(app_ids & asking) or any(item.matches({"app-id": a}) for a in asking))
+
+    def _listen(self):
+        """Take Strata's attention messages from now on."""
+        try:
+            os.unlink(SOCKET)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return
+        try:
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(SOCKET)
+            os.chmod(SOCKET, 0o600)
+            server.listen(8)
+        except OSError:
+            return
+        self._server = server
+
+        def on_connect(_fd, _condition):
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return True
+            with conn:
+                conn.settimeout(0.5)
+                try:
+                    line = conn.recv(512).decode()
+                except (OSError, UnicodeDecodeError):
+                    return True
+            words = line.split()
+            if len(words) == 3 and words[0] == "attention" and words[2] in ("on", "off"):
+                (self.asking.add if words[2] == "on" else self.asking.discard)(words[1].lower())
+                self._show_attention()
+            return True
+        GLib.io_add_watch(server.fileno(), GLib.IO_IN, on_connect)
 
     def show_dots(self):
         """Dials: Show indicators for open applications."""
@@ -1336,6 +1422,7 @@ class Pier(Gtk.Window):
                 item.show_all()
             self.extra[app_id].set_views(its_views, False if its_views else app_id)
         self._show_recents()
+        self._show_attention()
         self._refresh_windows(views)
         self.running_sep.set_visible(bool(self.extra) or bool(self.recent))
         self.places_sep.set_visible(bool(self.places) or bool(self.windows))
