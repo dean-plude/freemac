@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style, sun  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -452,28 +452,42 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     # Appearance ---------------------------------------------------------------
     def appearance(self):
-        dark = style.is_dark()
-        choices = Gtk.Box(spacing=16)
-        light_button = None
+        """Light, Dark or Auto (light by day and dark at night, from
+        sunrise and sunset where you are; Topline does the switching)."""
+        choices = Gtk.Box(spacing=10)
+        first = None
         self.mode_buttons = {}
-        for label, is_dark, wall in (("Light", False, LIGHT_WALL), ("Dark", True, DARK_WALL)):
-            button = Gtk.RadioButton.new_from_widget(light_button)
-            light_button = light_button or button
+        light_pix, dark_pix = thumbnail(LIGHT_WALL, 100, 62), thumbnail(DARK_WALL, 100, 62)
+        auto_pix = None
+        if light_pix and dark_pix:
+            # Half day, half night.
+            auto_pix = light_pix.copy()
+            dark_pix.copy_area(50, 0, 50, 62, auto_pix, 50, 0)
+        for mode, label, pixbuf in (("light", "Light", light_pix), ("dark", "Dark", dark_pix),
+                                    ("auto", "Auto", auto_pix)):
+            button = Gtk.RadioButton.new_from_widget(first)
+            first = first or button
             button.set_mode(False)
             button.get_style_context().add_class("dials-choice")
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-            pixbuf = thumbnail(wall, 160, 96)
             if pixbuf:
                 inner.pack_start(Gtk.Image.new_from_pixbuf(pixbuf), False, False, 0)
             inner.pack_start(Gtk.Label(label=label), False, False, 0)
             button.add(inner)
-            button.set_active(is_dark == dark)
-            button.handler = button.connect("toggled", lambda b, d=is_dark: b.get_active() and self.set_dark(d))
-            self.mode_buttons[is_dark] = button
+            button.handler = button.connect("toggled", lambda b, m=mode: b.get_active() and self.set_mode(m))
+            self.mode_buttons[mode] = button
             choices.pack_start(button, False, False, 0)
+        self._show_mode()
         if self.settings:
             # Show the change when the mode is switched from elsewhere.
             self.settings.connect("changed::color-scheme", lambda *_: self._show_mode())
+        where = sun.times_today(h24=style.prefs().get("clock") == "24")
+        self.auto_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        self.auto_note.get_style_context().add_class("dials-caption")
+        self.auto_note.set_label(
+            f"Auto is light from sunrise ({where[0]}) and dark from sunset ({where[1]}) today, "
+            "for your time zone in Date & Time." if where else
+            "Auto needs a time zone in Date & Time to know when the sun rises and sets.")
         self.follow_wallpaper = Gtk.Switch(active=True)
         text_size = Gtk.ComboBoxText()
         for value, name in (("1.0", "Default"), ("1.15", "Large"), ("1.3", "Larger")):
@@ -485,7 +499,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         snap = Gtk.Switch(active=ini_get(WAYFIRE_INI, "move", "enable_snap", "true") != "false")
         snap.connect("notify::active", lambda sw, _p: ini_set(
             WAYFIRE_INI, "move", "enable_snap", "true" if sw.get_active() else "false"))
-        return page("Appearance", choices, group(
+        return page("Appearance", choices, self.auto_note, group(
             row("Accent colour", self.accent_choices(),
                 "Used for selections, switches and buttons in every app."),
             row("Switch wallpaper with the mode", self.follow_wallpaper,
@@ -527,9 +541,23 @@ class DialsWindow(Gtk.ApplicationWindow):
             pass
 
     def _show_mode(self):
-        button = self.mode_buttons[style.is_dark()]
+        if style.prefs().get("appearance_auto", False):
+            mode = "auto"
+        else:
+            mode = "dark" if style.is_dark() else "light"
+        button = self.mode_buttons[mode]
         with button.handler_block(button.handler):
             button.set_active(True)
+
+    def set_mode(self, mode):
+        """Light or Dark stays as it is; Auto follows the sun from now on."""
+        self.save_prefs(appearance_auto=(mode == "auto"))
+        if mode == "auto":
+            day = sun.is_day()
+            if day is not None and day == style.is_dark():
+                self.set_dark(not day)
+        else:
+            self.set_dark(mode == "dark")
 
     def set_dark(self, dark):
         self._built("appearance")
@@ -766,10 +794,27 @@ class DialsWindow(Gtk.ApplicationWindow):
         hours.pack_start(time_box("from"), False, False, 0)
         hours.pack_start(Gtk.Label(label="to"), False, False, 0)
         hours.pack_start(time_box("to"), False, False, 0)
+        schedule = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        schedule.append("sun", "Sunset to Sunrise")
+        schedule.append("custom", "Custom")
+        where = sun.times_today(h24=style.prefs().get("clock") == "24")
+        if where is None:
+            schedule.set_sensitive(settings["schedule"] == "sun")
+        schedule.set_active_id(settings["schedule"])
+        from_row = row("From", hours, "It fades in and out over half an hour.")
+
+        def scheduled(combo):
+            changed("schedule", combo.get_active_id())
+            from_row.set_sensitive(combo.get_active_id() == "custom")
+        schedule.connect("changed", scheduled)
+        from_row.set_sensitive(settings["schedule"] == "custom")
         return group(
             row("Night Light", switch(settings["on"], lambda on: changed("on", on)),
                 "Warmer colours in the evening, which are easier on the eyes at night."),
-            row("From", hours, "It fades in and out over half an hour."),
+            row("Schedule", schedule,
+                f"Sunset is at {where[1]} and sunrise at {where[0]} today, for your time zone."
+                if where else "Sunset to Sunrise needs a time zone in Date & Time."),
+            from_row,
             row("Colour", warmth),
         )
 

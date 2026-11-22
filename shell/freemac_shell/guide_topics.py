@@ -98,8 +98,9 @@ TOPICS = {
         "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",
         "Type its password when asked. freemac remembers it next time.",
     ]),
-    "appearance": ("Change the look", "dark light mode wallpaper theme accent colour color highlight purple pink green favourite background appearance", [
-        "Choose Dials > Appearance for light or dark, and Dials > Wallpaper for the picture on the desktop.",
+    "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper theme accent colour color highlight purple pink green favourite background appearance", [
+        "Choose Dials > Appearance for Light, Dark or Auto, and Dials > Wallpaper for the picture on the desktop. "
+        "Auto is light while the sun is up and dark after it sets, where you are.",
         "Pick an Accent colour on the same page: blue, purple, pink, red, orange, yellow, green or graphite. "
         "Selections, switches and buttons in every app change to it at once.",
         "Each wallpaper has a day and a night version, and follows light and dark.",
@@ -697,6 +698,11 @@ TOPICS = {
         "The modifier's symbol shows in the top-right corner until you press the next key.",
         "Tap a modifier twice to lock it, and once more to let it go.",
         "Press Shift five times again to turn Sticky Keys off.",
+    ]),
+    "night-light": ("Make the screen warmer at night", "night light shift warm warmer yellow orange blue light eyes sleep evening sunset sunrise schedule colour temperature", [
+        "Choose Dials > Displays and turn on Night Light.",
+        "Set Schedule to Sunset to Sunrise to follow the sun where you are, or to Custom to pick the hours.",
+        "Drag Colour toward Warmer or Less warm.",
     ]),
     "background-sounds": ("Play calming background sounds", "background sounds noise white pink brown rain ocean waves stream water focus calm rest mask distractions tinnitus accessibility", [
         "Choose Dials > Accessibility and, under Audio, turn on Background sounds.",
