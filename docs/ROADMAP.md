@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.116 "come forward" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Apps can ask to bring a window forward (xdg-activation): opening a link, or an app that's already open from the Dock, Seek or Drawer, brings its window to the front on its own desktop. Granted when it comes from something you did | Strata (attention.hpp) | done |
+| 2 | An app that asks with nothing you did behind it, or an X11 app that sets the urgency hint, doesn't take the keyboard: its Dock icon bounces until you go to it, as on a Mac. A LauncherEntry "urgent" does the same | Strata, Pier | done |
+| 3 | Downloads: root owns everything outside /home. The ISO build kept the build machine's user (1001) on /, /etc and /usr, which a PC's second account then got; the build now copies the overlay as root and stops if any system file belongs to an account, and Keel gives such files back to root when it installs. README has a one-line repair for PCs installed before | Build, Keel | done |
+| 4 | Live session: sudo works without a password again (sudo had ignored /etc/sudoers.d while the build machine's user owned it) | Build | done |
+| 5 | Guide line, README rows, every README screenshot retaken | Guide, Docs | done |
+
 ## 1.115 "dock badges" (done)
 
 | # | Item | Component | Status |

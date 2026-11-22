@@ -133,6 +133,7 @@ def install(request):
 
     progress(10, "Copying freemac to the disk (this is the long part)")
     copy_system(squashfs)
+    own_by_root(TARGET)
 
     progress(70, "Setting up the boot partition")
     os.makedirs(os.path.join(TARGET, "boot/efi"), exist_ok=True)
@@ -182,6 +183,32 @@ def copy_system(squashfs):
                 last = percent
     if proc.wait() != 0:
         raise InstallError("Copying the system failed: " + proc.stderr.read().strip()[-400:])
+
+
+def own_by_root(top):
+    """Give root back anything of the system that a person's account owns.
+
+    Images made before 1.116 had /, /etc and /usr owned by number 1001, which
+    the computer's second account then got. Nothing outside /home should
+    belong to an account (1000 and up, apart from nobody)."""
+    def stray(st):
+        return (999 < st.st_uid != 65534) or (999 < st.st_gid != 65534)
+
+    def fix(path):
+        st = os.lstat(path)
+        if stray(st):
+            os.lchown(path, 0, 0)
+
+    fix(top)
+    for name in os.listdir(top):
+        path = os.path.join(top, name)
+        if name in ("home", "proc", "sys", "dev", "run", "tmp") or os.path.ismount(path):
+            continue
+        fix(path)
+        if os.path.isdir(path) and not os.path.islink(path):
+            for root, dirs, files in os.walk(path):
+                for entry in dirs + files:
+                    fix(os.path.join(root, entry))
 
 
 def uuid_of(device):

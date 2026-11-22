@@ -137,7 +137,11 @@ in_chroot apt-get install -y --no-install-recommends $KERNEL $PACKAGES
 in_chroot apt-get update || log "Warning: couldn't download the app catalogue; Harbor will fetch it later"
 
 log "Applying freemac overlay"
-cp -a "$REPO/build/overlay/." "$ROOTFS/"
+# Root owns everything the overlay adds. cp -a alone would keep the owner of
+# the checkout (the build machine's own user, 1001 on GitHub's runners), and
+# then /etc, /usr and the image's / belonged to whoever got that number next:
+# the second account made on the computer.
+cp -a --no-preserve=ownership "$REPO/build/overlay/." "$ROOTFS/"
 chmod 0440 "$ROOTFS/etc/sudoers.d/freemac-live"
 # freemac's own shell (Topline, Pier, Seek, ...).
 mkdir -p "$ROOTFS/usr/lib/python3/dist-packages"
@@ -306,6 +310,17 @@ umount_chroot
 log "Normalising timestamps"
 find "$ROOTFS" -newermt "@$SOURCE_DATE_EPOCH" -print0 \
   | xargs -0r touch --no-dereference --date="@$SOURCE_DATE_EPOCH"
+
+log "Checking file owners"
+# Nothing outside /home may belong to a person's account (1000 and up, apart
+# from nobody), or that account could change the system.
+strays=$(find "$ROOTFS" -xdev -path "$ROOTFS/home" -prune -o \
+  \( \( -uid +999 ! -uid 65534 \) -o \( -gid +999 ! -gid 65534 \) \) -print | head -n 5)
+if [ -n "$strays" ]; then
+  echo "These files belong to a person's account, not to the system:" >&2
+  echo "$strays" | sed "s|^$ROOTFS|  |" >&2
+  exit 1
+fi
 
 log "Creating squashfs"
 # mksquashfs reads SOURCE_DATE_EPOCH itself for the image timestamps. /boot

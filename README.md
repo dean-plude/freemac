@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.115 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.116 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -101,6 +101,7 @@ one of them will be reverted.
 | Mission Control: add a desktop with + (or drag a window onto it), close one with the button on its corner; the count is kept | **Strata**, **Topline** | 1.110 |
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
+| Windows come forward when you ask: open a link or an app that's already open and its window comes to the front, on its own desktop; an app in the background that needs you bounces in the Dock until you go to it | **Strata**, **Pier** | 1.116 |
 | Dock badges: a red number on an app's icon for unread mail in Post, reminders due in Nudge, or any app that sends a count | **Pier**, **Post**, **Nudge** | 1.115 |
 | Mission Control on an empty desktop: Control+Up still shows your desktops along the top, so you can pick one or add another | **Strata**, **Topline** | 1.114 |
 | Full screen gets its own desktop: the window slides onto a new desktop named after its app in Mission Control, and slides back when it leaves full screen | **Strata**, **Topline** | 1.113 |
@@ -315,6 +316,16 @@ search for it with Super+Space). Keel asks for a disk and your account, erases
 that disk, and installs freemac so it starts on both BIOS and UEFI PCs. It
 uses the whole disk; dual-booting isn't supported yet. The boot loader is not
 signed, so turn Secure Boot off first.
+
+If you installed freemac from a download older than 1.116, some system
+folders (`/`, `/etc`, `/usr` and parts of them) belong to account number 1001,
+which is the second account you make on that PC, instead of to the system.
+That account could change the system. Run this once in Terminal to give them
+back to the system (it asks for your password):
+
+```sh
+sudo chown root:root / && sudo find /etc /usr -xdev \( -uid 1001 -o -gid 1001 \) -exec chown -h root:root {} +
+```
 
 The live session logs in automatically as user `freemac` (desktop on VT 7, text console on VT 1) (no password; `sudo`
 works without one on the live image).
