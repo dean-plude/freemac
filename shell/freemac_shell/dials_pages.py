@@ -32,7 +32,7 @@ PAGES = {
 
 # Other words people use for what's on each page, for the sidebar's search.
 SEARCH_WORDS = {
-    "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections nearby sharing airdrop receive files localsend",
+    "network": "wifi wi-fi internet wireless ethernet vpn proxy firewall security block incoming connections nearby sharing airdrop receive files localsend known networks password qr code share forget join automatically",
     "bluetooth": "pair headphones speaker mouse keyboard",
     "sharing": "computer name rename hostname local network nearby sharing airdrop localsend remote login ssh terminal file sharing public folder windows smb samba screen sharing remote desktop vnc porthole",
     "notifications": "alerts banners do not disturb focus",

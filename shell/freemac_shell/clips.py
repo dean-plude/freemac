@@ -8,7 +8,7 @@ small list to search; Enter or a click copies the chosen text again, ready to
 paste.
 
 Text that a password manager marks as secret (the x-kde-passwordManagerHint
-type) is never kept, and nothing is kept while history is turned off in
+type, or a password freemac's own apps copy and mark) is never kept, and nothing is kept while history is turned off in
 Dials (the "clipboard_history" key in shell.json). The history stays on this
 computer and Clear History empties it.
 """
@@ -66,6 +66,37 @@ def offered_types():
         return []
 
 
+# freemac's own apps mark a password they copy here (a hash, never the text),
+# because a GTK app can't offer the x-kde-passwordManagerHint type itself.
+SECRET_MARK = os.path.join(GLib.get_user_runtime_dir(), "freemac-clips-secret")
+SECRET_FOR = 30   # seconds a mark counts
+
+
+def _digest(text):
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()
+
+
+def mark_secret(text):
+    """Have the next copy of this text left out of the history."""
+    try:
+        fd = os.open(SECRET_MARK, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(_digest(text))
+    except OSError:
+        pass
+
+
+def marked_secret(text):
+    try:
+        if time.time() - os.path.getmtime(SECRET_MARK) > SECRET_FOR:
+            return False
+        with open(SECRET_MARK) as f:
+            return f.read().strip() == _digest(text)
+    except OSError:
+        return False
+
+
 def store(stream=None):
     """Called by wl-paste for each new copy, with the text on stdin."""
     stream = stream or sys.stdin
@@ -75,6 +106,8 @@ def store(stream=None):
     if any(t in SECRET_TYPES for t in offered_types()):
         return
     text = data.decode("utf-8", "replace") if isinstance(data, bytes) else data
+    if marked_secret(text) or marked_secret(text.rstrip("\n")):
+        return
     save(add(load(), text))
 
 
