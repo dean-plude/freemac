@@ -22,7 +22,6 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
 from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
-from .wfipc import Connection  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
 WAYFIRE_INI = os.path.join(CONFIG, "wayfire.ini")
@@ -256,13 +255,6 @@ def save_pier(**changes):
     os.makedirs(os.path.dirname(pier.CONFIG), exist_ok=True)
     with open(pier.CONFIG, "w") as f:
         json.dump(config, f, indent=2)
-
-
-def wayfire_outputs():
-    try:
-        return Connection().call("window-rules/list-outputs")
-    except (OSError, ValueError):
-        return []
 
 
 # ---- widgets -----------------------------------------------------------------
@@ -800,26 +792,13 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     # Displays -----------------------------------------------------------------
     def displays(self):
-        outputs = wayfire_outputs()
-        rows = []
-        for output in outputs:
-            name = output.get("name", "?")
-            geo = output.get("geometry", {})
-            scale = Gtk.ComboBoxText()
-            for value in ("1", "1.25", "1.5", "1.75", "2"):
-                scale.append(value, f"{int(float(value) * 100)}%")
-            scale.set_active_id(ini_get(WAYFIRE_INI, f"output:{name}", "scale", "1"))
-            scale.connect("changed", lambda c, n=name: ini_set(WAYFIRE_INI, f"output:{n}", "scale", c.get_active_id()))
-            caption = f"{geo.get('width', '?')} × {geo.get('height', '?')}" if geo else None
-            rows.append(row(f"{name} scale", scale, caption))
-        if not rows:
-            rows.append(row("No displays found", None, "Dials reads displays from the window manager."))
+        from .dials_displays import displays_page
         level = screen.brightness()
         if level is not None:
-            rows.insert(0, row("Brightness", slider(0.05, 1, 0.01, level, screen.set_brightness)))
+            light = group(row("Brightness", slider(0.05, 1, 0.01, level, screen.set_brightness)))
         else:
-            rows.append(row("Brightness", None, "This display sets its own brightness, with its buttons."))
-        return page("Displays", group(*rows), self.night_light())
+            light = group(row("Brightness", None, "This display sets its own brightness, with its buttons."))
+        return displays_page(self, light, self.night_light())
 
     def night_light(self):
         settings = screen.night_settings()

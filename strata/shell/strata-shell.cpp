@@ -10,6 +10,7 @@
 // layout group), for Topline's input menu.
 // It also plays freemac's alert sound (freemac-sound alert) for gtk_shell1's
 // system bell, which GTK apps ring when something can't be done.
+// strata/outputs lists the displays and the modes each can show, for Dials.
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -31,6 +32,8 @@
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
 #include <wayfire/input-device.hpp>
+#include <wayfire/output-layout.hpp>
+#include <wayfire/output.hpp>
 
 #include "gtk-shell.hpp"
 #include "window-places.hpp"
@@ -784,6 +787,75 @@ class strata_shell_impl : public wf::plugin_interface_t
         return out;
     };
 
+    /* strata/outputs: every display the computer has, with the modes it
+     * can show, for Dials > Displays. Dials changes a display by writing
+     * [output:NAME] in wayfire.ini, which Wayfire applies at once. */
+    wf::ipc::method_callback list_outputs = [=] (nlohmann::json)
+    {
+        auto out = wf::ipc::json_ok();
+        out["outputs"] = nlohmann::json::array();
+        for (auto& [handle, state] : wf::get_core().output_layout->get_current_configuration())
+        {
+            nlohmann::json o;
+            o["name"]  = handle->name ? handle->name : "";
+            o["make"]  = handle->make ? handle->make : "";
+            o["model"] = handle->model ? handle->model : "";
+            o["serial"] = handle->serial ? handle->serial : "";
+            o["description"] = handle->description ? handle->description : "";
+            o["physical"] = {handle->phys_width, handle->phys_height};
+            o["built_in"] = wlr_output_is_drm(handle) && handle->name &&
+                (std::string(handle->name).rfind("eDP", 0) == 0 ||
+                 std::string(handle->name).rfind("LVDS", 0) == 0 ||
+                 std::string(handle->name).rfind("DSI", 0) == 0);
+            switch (state.source)
+            {
+              case wf::OUTPUT_IMAGE_SOURCE_SELF:
+                o["source"] = "self";
+                break;
+
+              case wf::OUTPUT_IMAGE_SOURCE_MIRROR:
+                o["source"] = "mirror";
+                break;
+
+              case wf::OUTPUT_IMAGE_SOURCE_DPMS:
+                o["source"] = "dpms";
+                break;
+
+              default:
+                o["source"] = "off";
+            }
+
+            o["mirror_from"] = state.mirror_from;
+            o["width"]   = handle->width;
+            o["height"]  = handle->height;
+            o["refresh"] = handle->refresh;
+            o["scale"]   = state.scale;
+            o["transform"] = (int)state.transform;
+            o["x"] = 0;
+            o["y"] = 0;
+            if (auto wo = wf::get_core().output_layout->find_output(handle))
+            {
+                auto geometry = wo->get_layout_geometry();
+                o["x"] = geometry.x;
+                o["y"] = geometry.y;
+                o["layout_width"]  = geometry.width;
+                o["layout_height"] = geometry.height;
+            }
+
+            o["modes"] = nlohmann::json::array();
+            wlr_output_mode *mode;
+            wl_list_for_each(mode, &handle->modes, link)
+            {
+                o["modes"].push_back({{"width", mode->width}, {"height", mode->height},
+                    {"refresh", mode->refresh}, {"preferred", mode->preferred}});
+            }
+
+            out["outputs"].push_back(o);
+        }
+
+        return out;
+    };
+
   public:
     void init() override
     {
@@ -804,6 +876,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/hide", hide_view);
         method_repository->register_method("strata/hidden", list_hidden);
         method_repository->register_method("strata/input-source", input_source);
+        method_repository->register_method("strata/outputs", list_outputs);
         window_places.init();
         command_key.init();
         glides.init();
