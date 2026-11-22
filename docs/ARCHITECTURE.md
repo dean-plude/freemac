@@ -294,7 +294,16 @@ signals arrive, so Strata looks at the pointer on a 40 ms timer while the
 overview is open and a window is dragged, shrinks the dragged window near the
 row (`core_drag_t::set_scale`), and on the drag's `drag_done_signal` over one
 of the desktops moves the window there (`move_to_workspace`); scale lays out
-the windows left when the window's geometry changes.
+the windows left when the window's geometry changes. Adding and closing
+desktops (1.110) changes the `core/vwidth` option in place, so every output's
+workspace set picks up the new grid through the option's callback; Topline
+sends the "+" and each corner button as extra areas (desktop -1 for "+", -2
+and an index for a close button) and saves the count to wayfire.ini when
+Strata says "spaces desktops N". Closing a desktop first moves the desktop
+showing, with its windows held in place (`set_workspace` with them as fixed
+views), so scale never finds itself on an empty desktop and ends; then the
+windows on later desktops move along by one, and the closed desktop's go to
+Desktop 1. Desktops are only added or closed when the grid is a single row.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.

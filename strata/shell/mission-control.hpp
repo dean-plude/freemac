@@ -14,6 +14,11 @@
 // strata/desktops lists the desktops and the windows on each, for drawing.
 // A window dragged out of the overview and let go over a desktop in the row
 // moves to that desktop, as on a Mac.
+// With the row opened out, a "+" at its right end adds a desktop and the
+// round button on a desktop's corner closes it, its windows going to the
+// first desktop (a window dragged onto the "+" goes to a new desktop of its
+// own). The count is the core/vwidth option, set here at once; Topline
+// saves it in wayfire.ini ("spaces desktops N").
 // Original freemac code.
 #pragma once
 
@@ -39,11 +44,24 @@ namespace strata_spaces
 /* How far down the screen the pointer is reported while the overview is
  * open: the row, opened out, is never taller than this. */
 static const int REPORT_HEIGHT = 240;
+/* As many desktops as a Mac allows. */
+static const int MOST_DESKTOPS = 16;
+
+/* What a click in one of Topline's areas does. Topline sends an area's
+ * desktop as (-1, 0) for the "+" and (-2, N) for the button that closes
+ * desktop N. */
+enum area_kind_t
+{
+    AREA_DESKTOP,
+    AREA_ADD,
+    AREA_CLOSE,
+};
 
 struct area_t
 {
     wf::geometry_t box;
     wf::point_t desktop;
+    area_kind_t kind = AREA_DESKTOP;
 };
 
 class spaces_t
@@ -134,8 +152,18 @@ class spaces_t
             {
                 if (a.is_array() && (a.size() == 6))
                 {
-                    areas.push_back({{a[0].get<int>(), a[1].get<int>(), a[2].get<int>(), a[3].get<int>()},
-                        {a[4].get<int>(), a[5].get<int>()}});
+                    area_t area;
+                    area.box = {a[0].get<int>(), a[1].get<int>(), a[2].get<int>(), a[3].get<int>()};
+                    area.desktop = {a[4].get<int>(), a[5].get<int>()};
+                    if (area.desktop.x == -1)
+                    {
+                        area.kind = AREA_ADD;
+                    } else if (area.desktop.x == -2)
+                    {
+                        area.kind = AREA_CLOSE;
+                    }
+
+                    areas.push_back(area);
                 }
             }
         }
@@ -148,6 +176,7 @@ class spaces_t
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> methods;
     wf::shared_data::ref_ptr_t<wf::move_drag::core_drag_t> drag;
     wf::wl_idle_call idle_move;
+    wf::wl_idle_call idle_change;
     /* While a window is dragged the overview takes the pointer in a way
      * that sends no motion signals, so the pointer is also looked at on a
      * timer for as long as the overview is open. */
@@ -288,6 +317,103 @@ class spaces_t
         }
     }
 
+    wf::workspace_set_t *row_wset()
+    {
+        auto output = open_on ? open_on : wf::get_core().seat->get_active_output();
+        return output ? output->wset().get() : nullptr;
+    }
+
+    /* Desktops are added and closed along a single row, as on a Mac. */
+    void set_count(int count)
+    {
+        auto option = wf::get_core().config.get_option("core/vwidth");
+        if (option)
+        {
+            option->set_value_str(std::to_string(count));
+        }
+
+        tell("spaces desktops " + std::to_string(count));
+        if (open_on)
+        {
+            tell("spaces changed");
+        }
+    }
+
+    /* A new desktop at the end of the row; true if there's room for one. */
+    bool add_desktop()
+    {
+        auto wset = row_wset();
+        if (!wset)
+        {
+            return false;
+        }
+
+        auto grid = wset->get_workspace_grid_size();
+        if ((grid.height != 1) || (grid.width >= MOST_DESKTOPS))
+        {
+            return false;
+        }
+
+        set_count(grid.width + 1);
+        return wset->get_workspace_grid_size().width == grid.width + 1;
+    }
+
+    /* Close desktop `gone`: its windows go to the first desktop and the
+     * ones after it move along by one. */
+    void close_desktop(int gone)
+    {
+        auto wset = row_wset();
+        if (!wset)
+        {
+            return;
+        }
+
+        auto grid = wset->get_workspace_grid_size();
+        if ((grid.height != 1) || (grid.width <= 1) || (gone < 0) || (gone >= grid.width))
+        {
+            return;
+        }
+
+        auto to = [=] (int x) { return (x < gone) ? x : ((x == gone) ? 0 : x - 1); };
+        auto current = wset->get_current_workspace();
+        std::vector<wayfire_toplevel_view> here;
+        std::vector<std::pair<wayfire_toplevel_view, int>> moves;
+        for (auto& view : wset->get_views(wf::WSET_MAPPED_ONLY))
+        {
+            if (view->sticky)
+            {
+                continue;
+            }
+
+            int x = wset->get_view_main_workspace(view).x;
+            if ((x == current.x) && (to(x) != x))
+            {
+                // A dialog goes along with its window.
+                if (!view->parent)
+                {
+                    here.push_back(view);
+                }
+            } else if (to(x) != x)
+            {
+                moves.push_back({view, to(x)});
+            }
+        }
+
+        /* The desktop showing moves first and takes its windows with it, so
+         * the overview never finds itself on an empty desktop and closes. */
+        if (to(current.x) != current.x)
+        {
+            wset->set_workspace({to(current.x), 0}, here);
+        }
+
+        for (auto& [view, x] : moves)
+        {
+            wset->move_to_workspace(view, {x, 0});
+        }
+
+        set_count(grid.width - 1);
+    }
+
     wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal*)
     {
         auto output = wf::get_core().seat->get_active_output();
@@ -341,8 +467,27 @@ class spaces_t
         }
 
         auto id = ev->main_view->get_id();
-        auto desktop = areas[at].desktop;
-        idle_move.run_once([=] () { move_window(id, desktop); });
+        auto area = areas[at];
+        if (area.kind == AREA_CLOSE)
+        {
+            return;
+        }
+
+        idle_move.run_once([=] ()
+        {
+            if (area.kind == AREA_ADD)
+            {
+                // Onto the "+": a new desktop with this window on it.
+                if (add_desktop())
+                {
+                    auto wset = row_wset();
+                    move_window(id, {wset->get_workspace_grid_size().width - 1, 0});
+                }
+            } else
+            {
+                move_window(id, area.desktop);
+            }
+        });
     };
 
     wf::signal::connection_t<scale_end_signal> on_end = [=] (scale_end_signal*)
@@ -388,7 +533,17 @@ class spaces_t
             ev->mode = wf::input_event_processing_mode_t::IGNORE;
             if ((at == pressed) && (ev->event->button == BTN_LEFT))
             {
-                go_to(areas[at].desktop);
+                auto area = areas[at];
+                if (area.kind == AREA_ADD)
+                {
+                    idle_change.run_once([=] () { add_desktop(); });
+                } else if (area.kind == AREA_CLOSE)
+                {
+                    idle_change.run_once([=] () { close_desktop(area.desktop.y); });
+                } else
+                {
+                    go_to(area.desktop);
+                }
             }
 
             pressed = -1;
