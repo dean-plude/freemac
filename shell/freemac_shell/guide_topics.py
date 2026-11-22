@@ -121,6 +121,14 @@ TOPICS = {
         "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",
         "Type its password when asked. freemac remembers it next time.",
     ]),
+    "wifi-password": ("Find or share a Wi-Fi password", "wifi wi-fi password forgot share guest phone qr code scan known networks forget join automatically", [
+        "Choose Dials > Network. Known Networks lists every Wi-Fi network this computer has joined.",
+        "Click the ⋯ button next to a network and choose Show Password and Code. After an administrator's "
+        "password you see the password, and a code a phone's camera can scan to join without typing it.",
+        "Copy Password puts it on the clipboard instead, ready to paste. Clipboard history doesn't keep it.",
+        "Turn off Join Automatically for a network you only want to join by hand, or choose Forget This "
+        "Network to remove it and its password.",
+    ]),
     "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper dynamic theme accent colour color highlight purple pink green favourite background appearance", [
         "Choose Dials > Appearance for Light, Dark or Auto, and Dials > Wallpaper for the picture on the desktop. "
         "Auto is light while the sun is up and dark after it sets, where you are.",

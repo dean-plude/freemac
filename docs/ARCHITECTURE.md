@@ -59,6 +59,7 @@ only ship alongside, which is fine for any free licence).
 | at-spi2-core | Accessibility bus for screen readers | LGPL-2.1-or-later |
 | Orca | Screen reader (Command+F5, 1.120) | LGPL-2.1-or-later |
 | speech-dispatcher | Speech for the screen reader | GPL-2.0-or-later, LGPL-2.1-or-later |
+| python3-qrcode | QR codes for known Wi-Fi networks (1.121) | BSD-3-Clause |
 | clang, lld (build only) | Compiling Mac test programs for Ferry | Apache-2.0 with LLVM exception |
 | wayvnc | Screen Sharing: shares the Wayland screen over VNC | ISC (separate program) |
 | GTK-VNC | The screen view in Porthole | LGPL-2.1-or-later |
@@ -336,6 +337,22 @@ it tells Topline `spaces open OUTPUT out`, which shows the desktops row opened
 out and keeps it open while the pointer is away. A click on a desktop goes
 there, and Esc, a click elsewhere or the key again closes the row; Strata
 takes those presses so they do not reach the desktop underneath.
+
+Known Networks (1.121, `known_networks.py`): Dials > Network lists
+NetworkManager's saved Wi-Fi connections (libnm, newest `connection.timestamp`
+first). Join Automatically sets `connection.autoconnect` and Forget deletes
+the connection, both through libnm, which freemac's polkit rule already allows
+for people in the sudo or netdev group. The password is kept for the whole
+computer, so showing or copying it runs `/usr/libexec/freemac-wifi-password
+UUID` through pkexec (its own polkit action, `org.freemac.wifi.password`,
+auth_admin_keep, so the prompt says what it's for). The helper reads only a
+saved Wi-Fi connection named by a well-formed UUID and prints its PSK (or WEP
+key) with `nmcli -s`; the window reads it from the helper's output. The
+QR code is the usual `WIFI:T:WPA;S:…;P:…;;` text, drawn with python3-qrcode's
+matrix in Cairo. GTK can't offer the x-kde-passwordManagerHint type, so a
+copied password is marked for clipboard history instead: a SHA-256 of it in
+`$XDG_RUNTIME_DIR/freemac-clips-secret` (mode 600) for 30 seconds, which
+`clips.store()` checks before keeping a copy.
 
 Screen reader (1.120, `screen_reader.py`): the reader is Orca (LGPL-2.1),
 which apps reach over the AT-SPI accessibility bus that at-spi2-core already

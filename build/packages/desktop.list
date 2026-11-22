@@ -61,6 +61,8 @@ file
 xdg-user-dirs
 epiphany-browser
 gir1.2-nm-1.0
+# The code a phone scans to join a known Wi-Fi network (Dials > Network).
+python3-qrcode
 gtk-update-icon-cache
 python3-gi-cairo
 # PDF pages for Frame, Seek's preview and Glance.

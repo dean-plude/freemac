@@ -63,6 +63,9 @@ class NetworkPanel(Gtk.Box):
             except GLib.Error:
                 self.client = None
         if self.client:
+            # Known Networks: a network joined, forgotten or changed elsewhere.
+            for signal in ("connection-added", "connection-removed"):
+                self.client.connect(signal, lambda *_: self.schedule())
             for device in self.client.get_devices():
                 device.connect("state-changed", lambda *_: GLib.idle_add(self.rebuild))
                 if device.get_device_type() == NM.DeviceType.WIFI:
@@ -84,7 +87,9 @@ class NetworkPanel(Gtk.Box):
         return False
 
     def sections(self):
-        return self.network_sections() + self.nearby_sections() + self.firewall_sections()
+        from .known_networks import KnownNetworks
+        return (self.network_sections() + KnownNetworks(self).sections()
+                + self.nearby_sections() + self.firewall_sections())
 
     def nearby_sections(self):
         """Nearby sharing (Hail): whether other devices on this network may

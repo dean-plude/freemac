@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.121 "known networks" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Network > Known Networks, as on a Mac: every Wi-Fi network this computer has joined, the newest first, with when it was last joined and whether it joins by itself | Dials | done |
+| 2 | A ⋯ menu for each: Copy Password and Show Password and Code (after an administrator's password), with a QR code a phone's camera scans to join; Join Automatically; Forget This Network | Dials, freemac-wifi-password | done |
+| 3 | A copied Wi-Fi password is left out of clipboard history | Clips | done |
+| 4 | Guide topic; README row; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.120 "screen reader" (done)
 
 | # | Item | Component | Status |
