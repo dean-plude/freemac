@@ -1152,6 +1152,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Show all desktops moves to Ctrl+Option+Down; Dials > Keyboard and Gestures list both | Dials, wayfire.ini | done |
 | 4 | Guide line, README row and shortcut, every README screenshot retaken | Guide, Docs | done |
 
+## 1.113 "full screen gets its own desktop" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A window put in full screen (green button, Control+⌘F or the app itself) slides onto a new desktop of its own at the end of the row | Strata (mission-control.hpp) | done |
+| 2 | Out of full screen, or closed, it goes back to the desktop it came from and its desktop goes away | Strata | done |
+| 3 | Mission Control names that desktop after the app and numbers the others without it; its corner button shows two arrows and leaves full screen | Topline (spaces.py), Strata | done |
+| 4 | These desktops are never saved for the next login | Strata, Topline | done |
+| 5 | Guide lines, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
