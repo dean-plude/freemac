@@ -260,6 +260,15 @@ plugins stay in use.
   row turn it on or off (`strata-shell/sticky_keys`,
   `strata-shell/sticky_keys_shift`); Topline saves that and shows the
   modifiers that are set in the top-right corner ("sticky state ...").
+  `colour-filters.hpp` (1.99) is Colour filters: greyscale, filters for
+  red/green and blue/yellow colour blindness, or a colour tint, at a chosen
+  intensity (`strata-shell/colour_filter`, `colour_filter_intensity`,
+  `colour_filter_tint`). Each display gets a post-processing pass that
+  multiplies every pixel by one colour matrix, worked out from the filter
+  and blended toward no change by the intensity. The colour-blindness
+  filters take the screen as it would be seen (widely published
+  simulation matrices), and add what's lost back into the channels that
+  remain. With the filter off there's no pass at all.
 
 Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 

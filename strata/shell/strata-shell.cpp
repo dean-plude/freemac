@@ -45,6 +45,7 @@
 #include "pointer-locate.hpp"
 #include "press-hold.hpp"
 #include "sticky-keys.hpp"
+#include "colour-filters.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -864,6 +865,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_locate::locate_t locate;
     strata_accents::hold_t accents;
     strata_sticky::sticky_t sticky;
+    strata_filters::filters_t colour_filters;
 
     /* strata/accent-type {text}: Topline's press-and-hold panel picked an
      * accent; type it in place of the held letter. typed is false when the
@@ -945,6 +947,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         command_key.init();
         accents.init();
         sticky.init(&strata_accents::strata_tell_topline);
+        colour_filters.init();
         glides.init();
         sheets.init();
     }

@@ -13,7 +13,8 @@ import subprocess
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GLib, Gtk  # noqa: E402
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import alert, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
 
@@ -373,7 +374,76 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), sticky_keys(window), audio(window), *spoken_content(window))
+    ), colour_filters(window), sticky_keys(window), audio(window), *spoken_content(window))
+
+
+COLOUR_FILTERS = (("none", "Off"), ("greyscale", "Greyscale"),
+                  ("protanopia", "Red/green filter (protanopia)"),
+                  ("deuteranopia", "Green/red filter (deuteranopia)"),
+                  ("tritanopia", "Blue/yellow filter (tritanopia)"),
+                  ("tint", "Colour tint"))
+DEFAULT_TINT = "0.85 0.45 0.55 1.0"
+
+
+def parse_colour(text, default=DEFAULT_TINT):
+    """An RGBA from a Wayfire colour ("r g b a" from 0 to 1, or #RRGGBB[AA])."""
+    rgba = Gdk.RGBA()
+    text = (text or default).strip()
+    parts = text.split()
+    try:
+        if len(parts) == 4:
+            rgba.red, rgba.green, rgba.blue, rgba.alpha = (float(p) for p in parts)
+            return rgba
+    except ValueError:
+        pass
+    if not rgba.parse(text[:7] if text.startswith("#") else text):
+        return parse_colour(default)
+    return rgba
+
+
+def colour_filters(window):
+    """Colour filters, as on a Mac: the screen in greys, adjusted for colour
+    blindness, or tinted, at a chosen strength. Strata draws it
+    (strata-shell/colour_filter, strata/shell/colour-filters.hpp)."""
+    group, row, _page, slider, _switch = window.helpers
+    kind = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for value, label in COLOUR_FILTERS:
+        kind.append(value, label)
+    current = (window.ini_get("strata-shell", "colour_filter", "none") or "none").strip()
+    if not kind.set_active_id(current):
+        kind.set_active_id("none")
+    try:
+        strength = float(window.ini_get("strata-shell", "colour_filter_intensity", "1.0") or 1.0)
+    except ValueError:
+        strength = 1.0
+    intensity = slider(0.1, 1.0, 0.05, max(0.1, min(1.0, strength)),
+                       lambda v: window.ini_set("strata-shell", "colour_filter_intensity", f"{v:.2f}"),
+                       marks=((0.1, "Less"), (1.0, "More")))
+    tint = Gtk.ColorButton(valign=Gtk.Align.CENTER, use_alpha=False)
+    tint.set_rgba(parse_colour(window.ini_get("strata-shell", "colour_filter_tint", DEFAULT_TINT)))
+
+    def tint_set(button):
+        c = button.get_rgba()
+        window.ini_set("strata-shell", "colour_filter_tint", f"{c.red:.3f} {c.green:.3f} {c.blue:.3f} 1.0")
+
+    tint.connect("color-set", tint_set)
+
+    def sensitive():
+        chosen = kind.get_active_id()
+        intensity.set_sensitive(chosen != "none")
+        tint.set_sensitive(chosen == "tint")
+
+    def kind_set(combo):
+        window.ini_set("strata-shell", "colour_filter", combo.get_active_id() or "none")
+        sensitive()
+
+    kind.connect("changed", kind_set)
+    sensitive()
+    return group(
+        row("Colour filters", kind,
+            "Show the screen in greys, adjusted for colour blindness, or tinted with a colour."),
+        row("Intensity", intensity),
+        row("Tint colour", tint))
 
 
 def sticky_keys(window):

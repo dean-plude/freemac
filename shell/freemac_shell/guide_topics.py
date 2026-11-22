@@ -685,6 +685,12 @@ TOPICS = {
         "Hold Shift as well for capitals. Letters with accents are a, c, e, i, l, n, o, s, u, y and z.",
         "To have held letters repeat instead, open Dials > Keyboard and turn off Press and hold for accents.",
     ]),
+    "colour-filters": ("Change the screen's colours", "colour color filter greyscale grayscale black and white colour blind color blind red green blue yellow protanopia deuteranopia tritanopia tint accessibility see", [
+        "Choose Dials > Accessibility and pick one of the Colour filters: Greyscale, a red/green or "
+        "blue/yellow filter for colour blindness, or Colour tint.",
+        "Drag Intensity to make the filter stronger or weaker. With Colour tint, click Tint colour to pick its colour.",
+        "To see the screen's own colours again, set Colour filters to Off.",
+    ]),
     "sticky-keys": ("Press keyboard shortcuts one key at a time", "sticky keys modifier one hand one finger shift control option command shortcut hold two keys at once latch lock accessibility", [
         "Choose Dials > Accessibility and turn on Sticky Keys, or press Shift five times in a row.",
         "Now tap a modifier key such as \u2318 Command, then the key that goes with it: \u2318 then C copies. "
