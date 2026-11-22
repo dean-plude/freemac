@@ -31,7 +31,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import alert, apps, held, login_items, recents, style, volumes  # noqa: E402
+from . import alert, apps, held, login_items, main_display, recents, style, volumes  # noqa: E402
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -1802,6 +1802,8 @@ class Pier(Gtk.Window):
 def main():
     style.apply()
     win = Pier()
+    # The Dock sits on the main display (Dials > Displays), fitted to it.
+    main_display.follow(win, lambda _monitor: GLib.timeout_add(300, lambda: win._fit() and False))
     # The shelf's backing is drawn by hand: draw it again in the new colours
     # (dark mode, Reduce transparency).
     style.apply(on_change=lambda _dark: win.queue_draw())

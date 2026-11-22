@@ -70,7 +70,7 @@ class BackdropWindow(Gtk.Window):
         self.area.connect("draw", self.draw)
         self.icons = None
         if with_icons:
-            # The Desktop folder's files, over the picture (first screen only).
+            # The Desktop folder's files, over the picture (main display only).
             from .desktop_icons import DesktopIcons
             GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.ON_DEMAND)
             overlay = Gtk.Overlay()
@@ -108,6 +108,9 @@ class Backdrop:
         display.connect("monitor-added", lambda *_: self.rebuild())
         display.connect("monitor-removed", lambda *_: self.rebuild())
         self.rebuild()
+        # Dials > Displays > Use as: Main display moves the Desktop's files.
+        from . import style
+        self.main_watch = style.watch_prefs(self._main_changed)
         os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
         # Watch the folder: Dials replaces the file atomically.
         self.monitor = Gio.File.new_for_path(os.path.dirname(CONFIG)).monitor_directory(
@@ -147,11 +150,19 @@ class Backdrop:
         self.picture, self.fit, self.path = picture, fit, path
         return True
 
+    def _main_changed(self):
+        from . import main_display
+        if main_display.monitor() != self.main:
+            self.rebuild()
+
     def rebuild(self):
+        from . import main_display
         for window in self.windows:
             window.destroy()
         display = Gdk.Display.get_default()
-        self.windows = [BackdropWindow(self, display.get_monitor(i), with_icons=(i == 0))
+        # The Desktop's files go on the main display, as on a Mac.
+        self.main = main_display.monitor(display)
+        self.windows = [BackdropWindow(self, display.get_monitor(i), with_icons=(display.get_monitor(i) == self.main))
                         for i in range(display.get_n_monitors())]
 
 
