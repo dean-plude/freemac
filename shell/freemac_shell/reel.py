@@ -8,7 +8,8 @@ Right skip back and forward 10 seconds, Up and Down change the volume, and
 F (or Control+Command+F) fills the screen; Esc leaves full screen.
 
 Where you stopped is kept for each video (~/.cache/freemac/reel.json), so
-opening it again goes on from there, as a Mac's player does. Opened with no
+opening it again goes on from there, as a Mac's player does. While a video
+plays, the screen stays on and doesn't lock (awake.py). Opened with no
 video, Reel shows the videos in your Videos folder to choose from.
 
 GStreamer's playbin plays the video into a gtksink, whose widget is the
@@ -25,7 +26,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import menus, style  # noqa: E402
+from . import awake, menus, style  # noqa: E402
 
 try:
     gi.require_version("Gst", "1.0")
@@ -153,6 +154,8 @@ class Window(Gtk.ApplicationWindow):
         self.hide_timer = 0
         self.resume_at = 0
         self.last_saved = 0
+        # While a video plays, the screen stays on and doesn't lock (awake.py).
+        self.keep_awake = awake.Request("org.freemac.Reel", "Playing a video")
 
         self.header = Gtk.HeaderBar(show_close_button=True, title="Reel")
         self.set_titlebar(self.header)
@@ -365,6 +368,7 @@ class Window(Gtk.ApplicationWindow):
         GLib.timeout_add(250, self._tick)
 
     def stop(self):
+        self.keep_awake.release()
         if self.playbin is not None and self.path:
             self.remember()
             self.playbin.set_state(Gst.State.NULL)
@@ -399,6 +403,7 @@ class Window(Gtk.ApplicationWindow):
             self.wake_controls(stay=True)
         elif kind == Gst.MessageType.ERROR:
             error, _debug = message.parse_error()
+            self.keep_awake.release()
             self.playbin.set_state(Gst.State.NULL)
             self.video_box.remove(self.video_box.get_child())
             self.video_box.add(self.message)
@@ -458,6 +463,7 @@ class Window(Gtk.ApplicationWindow):
         self.pause() if self.playing() else self.play()
 
     def _show_playing(self, on):
+        self.keep_awake.set(on)
         name = "media-playback-pause-symbolic" if on else "media-playback-start-symbolic"
         self.play_button.get_image().set_from_icon_name(name, Gtk.IconSize.LARGE_TOOLBAR)
         self.play_button.set_tooltip_text("Pause (Space)" if on else "Play (Space)")

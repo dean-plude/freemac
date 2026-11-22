@@ -230,6 +230,8 @@ plugins stay in use.
   window under it; Topline asks when an app's own green button says the
   pointer is resting on it (1.95). The decorator tells Topline itself when
   the pointer rests 550 ms on one of its own green buttons.
+  `strata/keep-awake` (1.103) holds or lets go of a Wayfire idle
+  inhibitor, for the keep-awake service in `freemac-lock --watch`.
   `pointer-locate.hpp` (1.96) watches pointer motion after Wayfire handles
   it; five quick turns within 900 ms, each after 40 px of travel, are a
   shake. The pointer is then hidden and a large arrow, drawn once with
@@ -269,6 +271,20 @@ plugins stay in use.
   filters take the screen as it would be seen (widely published
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
+
+Keeping the computer awake (1.103, `awake.py`): `freemac-lock --watch`,
+which runs the idle timers, also owns `org.freedesktop.ScreenSaver` and
+`org.freedesktop.PowerManagement` on the session bus, the usual way Linux
+apps (web browsers, video players) ask the screen to stay on. While anyone
+holds a request it asks Strata (`strata/keep-awake`), which holds a
+`wf::idle_inhibitor_t`: the compositor stops counting the computer as
+idle, so swayidle's screen saver and lock and Wayfire's screen-off all
+wait, and their timers start fresh afterwards. Requests end when taken
+back or when their program leaves the bus, and the watcher drops any left
+over when it starts. Reel holds one while a video plays; `caffeinate`
+(`-t`, `-w`, or a command to run) holds one for as long as it runs; Dials
+> Power lists them (`org.freemac.KeepAwake.List`). Closing the lid still
+sleeps and locks.
 
 Drawer's settings (1.102, `drawer_settings.py`) live in
 `~/.config/freemac/drawer.json`: the folder new windows open in, the

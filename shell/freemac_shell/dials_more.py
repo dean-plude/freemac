@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, background_sounds, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, awake, background_sounds, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -187,8 +187,16 @@ def power(window):
     if not blank.get_active_id():
         blank.set_active_id("600")
     blank.connect("changed", lambda c: window.ini_set("idle", "dpms_timeout", c.get_active_id()))
-    groups.append(group(row("Turn the screen off after", blank,
-                            "When nothing has been touched for this long.")))
+    awake_rows = [row("Turn the screen off after", blank, "When nothing has been touched for this long.")]
+    holds = awake.holds_now()
+    if holds:
+        # What a Mac's Activity Monitor calls "Preventing Sleep".
+        names = ", ".join(dict.fromkeys(app for app, _reason in holds))
+        reasons = "; ".join(dict.fromkeys(reason for _app, reason in holds if reason))
+        awake_rows.append(row("Keeping the screen on", Gtk.Label(label=names),
+                              (reasons + ". " if reasons else "") +
+                              "The screen stays on and doesn't lock until they're done."))
+    groups.append(group(*awake_rows))
     prefs = style.prefs()
     lock_after = Gtk.ComboBoxText()
     for value, label in LOCK_CHOICES:
