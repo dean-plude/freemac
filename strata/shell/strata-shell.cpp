@@ -47,6 +47,7 @@
 #include "press-hold.hpp"
 #include "sticky-keys.hpp"
 #include "colour-filters.hpp"
+#include "mission-control.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -863,6 +864,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     };
 
     strata_flash::flashes_t flashes;
+    strata_spaces::spaces_t spaces;
     strata_locate::locate_t locate;
     strata_accents::hold_t accents;
     strata_sticky::sticky_t sticky;
@@ -972,6 +974,10 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/keep-awake", keep_awake);
         method_repository->register_method("strata/accent-type", accent_type);
         method_repository->register_method("strata/accent-closed", accent_closed);
+        method_repository->register_method("strata/desktops",
+            [=] (nlohmann::json data) { return spaces.desktops(data); });
+        method_repository->register_method("strata/spaces-areas",
+            [=] (nlohmann::json data) { return spaces.set_areas(data); });
         flashes.init();
         locate.init();
         window_places.init();
@@ -979,6 +985,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         accents.init();
         sticky.init(&strata_accents::strata_tell_topline);
         colour_filters.init();
+        spaces.init(&strata_accents::strata_tell_topline);
         glides.init();
         sheets.init();
     }

@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.107 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.108 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -26,6 +26,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/dark-mode.png" alt="Dark mode, with the night wallpaper"><br><sub>Dark mode, with the night wallpaper</sub></td><td width="50%"><img src="docs/screenshots/dials-dark.png" alt="Dials, the settings app, in dark mode"><br><sub>Dials, the settings app, in dark mode</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td><td width="50%"><img src="docs/screenshots/reel-pip.png" alt="Picture in Picture: a Reel video floating above Tide in the corner"><br><sub>Picture in Picture: a Reel video floating above Tide</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/dynamic-wallpaper.png" alt="Dynamic wallpaper: Tide turning golden at sunset, with the Dynamic switch in Dials"><br><sub>Dynamic wallpaper: the picture turns golden at sunset</sub></td><td width="50%"><img src="docs/screenshots/stage-manager.png" alt="Stage Manager: Crew in the middle, with Quill, Tide and Nudge as small pictures down the left"><br><sub>Stage Manager: one app in front, the others down the side</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control: Tide and Crew side by side, with pictures of four desktops along the top"><br><sub>Mission Control: every window, and your desktops along the top</sub></td><td width="50%"></td></tr>
 </table>
 
 ## Download
@@ -96,6 +97,7 @@ one of them will be reverted.
 | Videos: plays them in a window or full screen, with controls that fade away, and starts each where you stopped | **Reel** | 1.28 |
 | Picture in Picture: a video in a small window that floats above the others in a corner while you work, and drags anywhere | **Reel**, **Strata** | 1.105 |
 | Dynamic wallpaper: freemac's own scenes follow the sun where you are, day while it's high, golden as it sets, then night | **Backdrop**, **Dials** | 1.106 |
+| Mission Control: the window overview names your desktops along the top; move the pointer up to see a picture of each, and click one to go there | **Strata**, **Topline** | 1.108 |
 | Stage Manager: the app you're using stands alone in the middle, the apps you used just before it wait as small pictures down the left, and a click brings one forward | **Pier**, **Strata**, **Quick Settings** | 1.107 |
 | Keep the screen on while a video plays, or for as long as you ask (`caffeinate` in Terminal) | **Strata**, **Latch** | 1.103 |
 | Activity Monitor: each app's share of the processor and memory, every process if you like, a graph of the last two minutes, and Quit or Force Quit for one that's stuck | **Gauge** | 1.28 |

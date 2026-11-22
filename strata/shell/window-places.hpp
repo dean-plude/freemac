@@ -68,6 +68,15 @@ class strata_window_places
             auto& now = view->toplevel()->current();
             at_least_min_size(view, it->content);
             auto want = wf::expand_geometry_by_margins(it->content, now.margins);
+            /* The noted place is of the content; with its title bar the
+             * window must still sit below the menu bar and inside the screen. */
+            auto area  = view->get_output()->workarea->get_workarea();
+            auto fixed = want;
+            fixed.x = std::clamp(fixed.x, area.x, std::max(area.x, area.x + area.width - fixed.width));
+            fixed.y = std::clamp(fixed.y, area.y, std::max(area.y, area.y + area.height - fixed.height));
+            it->content.x += fixed.x - want.x;
+            it->content.y += fixed.y - want.y;
+            want = fixed;
             if ((view->get_pending_geometry() != now.geometry) || (now.geometry == want))
             {
                 ++it; // the app hasn't answered yet, or has the noted size
@@ -80,8 +89,7 @@ class strata_window_places
                 view->set_geometry(want);
             } else
             {
-                auto area = view->get_output()->workarea->get_workarea();
-                auto g    = now.geometry;
+                auto g = now.geometry;
                 g.x = std::clamp(g.x, area.x, std::max(area.x, area.x + area.width - g.width));
                 g.y = std::clamp(g.y, area.y, std::max(area.y, area.y + area.height - g.height));
                 if (g != now.geometry)
