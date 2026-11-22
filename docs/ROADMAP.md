@@ -1123,6 +1123,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | Picture in Picture turned on just after Reel opens stays in its corner (the window's remembered place no longer pulls it back) | Strata (window-places.hpp) | done |
 | 5 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.110 "add and close desktops" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A + at the right end of Mission Control's opened row adds a desktop (up to 16) | Strata (mission-control.hpp), Topline (spaces.py) | done |
+| 2 | Drag a window onto + to give it a desktop of its own | Strata | done |
+| 3 | A round button on the corner of the desktop under the pointer closes it; its windows go to Desktop 1 and the overview stays open | Strata, Topline | done |
+| 4 | The number of desktops is kept in wayfire.ini for the next login | Topline | done |
+| 5 | Guide lines, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

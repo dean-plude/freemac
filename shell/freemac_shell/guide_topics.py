@@ -51,19 +51,25 @@ TOPICS = {
         "To zoom with ⌥ Option or Control instead, or to turn zooming off, open Dials > Accessibility.",
     ]),
     "desktops": ("Use more than one desktop", "desktop space workspace virtual swipe overview", [
-        "freemac has four desktops. Control+Left and Control+Right move between them, "
+        "freemac starts with four desktops. Control+Left and Control+Right move between them, "
         "as a three-finger swipe does.",
-        "Control+Down shows all four. Control+Shift with an arrow key takes the window in front "
+        "To add a desktop or close one, use the row of desktops in Mission Control (Control+Up).",
+        "Control+Down shows them all. Control+Shift with an arrow key takes the window in front "
         "to the next desktop.",
     ]),
     "mission-control": ("See every window and desktop with Mission Control", "mission control overview all windows "
-                        "desktops spaces row top switch control up four finger swipe drag move window", [
+                        "desktops spaces row top switch control up four finger swipe drag move window "
+                        "add new close remove plus", [
         "Press Control+Up, or swipe up with four fingers, to see every window on this desktop side by side. "
         "Click one to bring it forward.",
         "Your desktops are named along the top of the screen. Move the pointer up to them and they open out "
         "into small pictures of each desktop with its windows.",
         "Click a desktop to go straight to it.",
         "To move a window to another desktop, drag it up onto that desktop and let go.",
+        "To add a desktop, click + at the right end of the row. Drag a window onto + to give it a new "
+        "desktop of its own.",
+        "To close a desktop, point at it and click the round button on its corner. Its windows move to "
+        "Desktop 1.",
     ]),
     "seek": ("Search with Seek", "seek search find spotlight calculate sum file convert conversion units "
              "miles kilometres celsius fahrenheit pounds kilograms cups", [

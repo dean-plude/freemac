@@ -15,6 +15,11 @@ tells Topline over its socket: "spaces open OUTPUT", "spaces close",
 which desktop the pointer is over, and tells Strata where each desktop is
 drawn (strata/spaces-areas), so that a click there goes to that desktop.
 The desktops and their windows come from strata/desktops.
+
+Opened out, the row has a "+" at its right end that adds a desktop, and a
+round button on the corner of the desktop under the pointer that closes it
+(its windows go to the first desktop). Strata changes the desktops and says
+"spaces desktops N"; the count is saved in wayfire.ini as [core] vwidth.
 Original freemac code.
 """
 import os
@@ -38,6 +43,11 @@ LABEL_W, LABEL_H, GAP = 112, 26, 12
 # How long the row stays open after the pointer leaves it.
 CLOSE_MS = 350
 REACH = 40          # how far below the names the pointer opens them out
+# The "+" at the right end of the opened row, and the button that closes a desktop.
+ADD_W = 64
+CLOSE_D = 20
+MOST_DESKTOPS = 16
+WAYFIRE_INI = os.path.join(os.path.expanduser("~/.config"), "wayfire.ini")
 
 
 def parse(line):
@@ -50,6 +60,12 @@ def parse(line):
         return ("open", words[2])
     if kind in ("close", "changed") and len(words) == 2:
         return (kind,)
+    if kind == "desktops" and len(words) == 3:
+        try:
+            count = int(words[2])
+        except ValueError:
+            return None
+        return ("desktops", count) if 1 <= count <= MOST_DESKTOPS else None
     if kind == "pointer" and len(words) == 4:
         try:
             return ("pointer", int(words[2]), int(words[3]))
@@ -76,6 +92,28 @@ def row_boxes(count, width, box_w, box_h, gap, top):
     total = count * box_w + (count - 1) * gap
     left = (width - total) // 2
     return [(left + i * (box_w + gap), top, box_w, box_h) for i in range(count)]
+
+
+def add_box(width, height, gap, top):
+    """Where the "+" goes in the opened row: (x, y, w, h) at its right end."""
+    return (width - gap - ADD_W, top, ADD_W, height)
+
+
+def close_box(box):
+    """The round button on a desktop's top-left corner: (x, y, d, d)."""
+    x, y, _w, _h = box
+    return (x - CLOSE_D // 2 + 2, y - CLOSE_D // 2 + 2, CLOSE_D, CLOSE_D)
+
+
+def can_change(grid):
+    """Desktops are added and closed only along a single row, as on a Mac."""
+    return len(grid) == 2 and grid[1] == 1
+
+
+def save_count(count):
+    """The number of desktops, kept for the next time you log in."""
+    from .ini import ini_set
+    ini_set(WAYFIRE_INI, "core", "vwidth", count)
 
 
 def scaled_window(geometry, screen, box):
@@ -164,6 +202,7 @@ class SpacesRow(Gtk.Window):
         self.wallpaper_path = None
         self.icons = {}
         self.boxes = []
+        self.add = None
         # Small pictures of the windows, taken one at a time once the row shows.
         self.pictures = {}
         self.to_picture = []
@@ -193,6 +232,8 @@ class SpacesRow(Gtk.Window):
             if self.get_visible():
                 self._load()
                 self._layout()
+        elif kind == "desktops":
+            save_count(message[1])
         elif kind == "pointer" and self.get_visible():
             self._pointer(message[1] - self.origin[0], message[2] - self.origin[1] - TOP)
 
@@ -258,10 +299,18 @@ class SpacesRow(Gtk.Window):
         if width < 100:
             width = self.info.get("size", [1280, 800])[0]
         names = desktop_names(self.info["grid"])
+        self.add = None
         if self.opened:
             sw, sh = self.info.get("size", [1280, 800])
             pw = int(PICTURE_H * sw / sh) if sh else 147
-            spots = row_boxes(len(names), width, pw, PICTURE_H, 22, 10)
+            room = width
+            if can_change(self.info["grid"]) and len(names) < MOST_DESKTOPS:
+                # Keep the pictures clear of the "+" on either side, so they stay centred.
+                room = width - 2 * (ADD_W + 22)
+                self.add = add_box(width, PICTURE_H, 22, 10)
+            spots = row_boxes(len(names), room, pw, PICTURE_H, 22, 10)
+            shift = (width - room) // 2
+            spots = [(x + shift, y, w, h) for x, y, w, h in spots]
         else:
             spots = row_boxes(len(names), width, LABEL_W, LABEL_H, GAP, (NAMES_H - LABEL_H) // 2)
         self.boxes = [(spot, (x, y), name) for spot, (x, y, name) in zip(spots, names)]
@@ -273,6 +322,14 @@ class SpacesRow(Gtk.Window):
             return
         ox, oy = self.origin
         areas = []
+        if self.opened and self.add is not None:
+            x, y, w, h = self.add
+            areas.append([ox + x, oy + TOP + y, w, h, -1, 0])
+        if self.opened and can_change(self.info["grid"]) and len(self.boxes) > 1:
+            # Before the desktops, so a click on the button closes rather than goes there.
+            for i, (box, _desk, _name) in enumerate(self.boxes):
+                x, y, w, h = close_box(box)
+                areas.append([ox + x, oy + TOP + y, w, h, -2, i])
         for (x, y, w, h), (dx, dy), _name in self.boxes:
             # The name under a picture counts too.
             extra = 24 if self.opened else 0
@@ -293,9 +350,15 @@ class SpacesRow(Gtk.Window):
         elif self.opened and not self.close_timer:
             self.close_timer = GLib.timeout_add(CLOSE_MS, self._close_row)
         hover = None
+        # The close button pokes out past the picture's corner.
+        edge = CLOSE_D // 2 if self.opened else 0
         for i, ((bx, by, bw, bh), _desk, _name) in enumerate(self.boxes):
-            if inside and bx <= x < bx + bw and by <= y < by + bh + (24 if self.opened else 0):
+            if inside and bx - edge <= x < bx + bw and by - edge <= y < by + bh + (24 if self.opened else 0):
                 hover = i
+        if self.opened and self.add is not None and inside:
+            ax, ay, aw, ah = self.add
+            if ax <= x < ax + aw and ay <= y < ay + ah:
+                hover = "add"
         if hover != self.hover:
             self.hover = hover
             self.area.queue_draw()
@@ -376,12 +439,51 @@ class SpacesRow(Gtk.Window):
                     _rounded(cr, x - 2, y - 2, w + 4, h + 4, 9)
                     cr.stroke()
                 self._label(cr, name, x + w / 2, y + h + 14, bold=here)
+                if hovered and can_change(self.info["grid"]) and len(self.boxes) > 1:
+                    self._draw_close(cr, close_box((x, y, w, h)))
             else:
                 cr.set_source_rgba(1, 1, 1, 0.92 if here else (0.42 if hovered else 0.22))
                 _rounded(cr, x, y, w, h, h / 2)
                 cr.fill()
                 self._label(cr, name, x + w / 2, y + h / 2, bold=here, dark=here)
+        if self.opened and self.add is not None:
+            self._draw_add(cr, self.add, self.hover == "add")
         return False
+
+    def _draw_add(self, cr, box, hovered):
+        x, y, w, h = box
+        cr.set_source_rgba(1, 1, 1, 0.34 if hovered else 0.18)
+        _rounded(cr, x, y, w, h, 9)
+        cr.fill()
+        cx, cy, arm = x + w / 2, y + h / 2, 11
+        cr.set_source_rgba(1, 1, 1, 0.95)
+        cr.set_line_width(3)
+        cr.set_line_cap(1)  # round
+        cr.move_to(cx - arm, cy)
+        cr.line_to(cx + arm, cy)
+        cr.move_to(cx, cy - arm)
+        cr.line_to(cx, cy + arm)
+        cr.stroke()
+
+    def _draw_close(self, cr, box):
+        x, y, d, _d = box
+        cx, cy, r = x + d / 2, y + d / 2, d / 2
+        cr.new_sub_path()
+        cr.arc(cx, cy, r, 0, 6.2832)
+        cr.set_source_rgba(0.24, 0.24, 0.26, 0.96)
+        cr.fill_preserve()
+        cr.set_source_rgba(1, 1, 1, 0.5)
+        cr.set_line_width(1)
+        cr.stroke()
+        arm = r * 0.42
+        cr.set_source_rgba(1, 1, 1, 0.95)
+        cr.set_line_width(2)
+        cr.set_line_cap(1)
+        cr.move_to(cx - arm, cy - arm)
+        cr.line_to(cx + arm, cy + arm)
+        cr.move_to(cx + arm, cy - arm)
+        cr.line_to(cx - arm, cy + arm)
+        cr.stroke()
 
     def _draw_desktop(self, cr, box, desk):
         x, y, w, h = box
