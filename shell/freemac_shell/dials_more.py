@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, awake, background_sounds, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, awake, background_sounds, dials_pointer, notify_rules, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -376,6 +376,7 @@ def accessibility(window):
         row("Invert colours with \u2303\u2325\u23188", switch("invert" in plugins(), invert_switch),
             "Press Control-Option-Command-8 to swap the screen's colours, and again to put them back."),
         row("Pointer size", pointer),
+        *dials_pointer.rows(window, row),
         row("Shake mouse pointer to locate", switch(shake_on, shake_switch),
             "Move the mouse quickly back and forth and the pointer grows big for a moment."),
     ), group(

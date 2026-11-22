@@ -75,6 +75,11 @@ class locate_t
 
   private:
     wf::option_wrapper_t<bool> enabled{"strata-shell/shake_to_locate"};
+    // The pointer's colours (Dials > Accessibility), so the big arrow
+    // matches the pointer it stands for.
+    wf::option_wrapper_t<wf::color_t> fill_colour{"strata-shell/pointer_fill"};
+    wf::option_wrapper_t<wf::color_t> outline_colour{"strata-shell/pointer_outline"};
+    wf::color_t made_fill{0, 0, 0, 1}, made_outline{1, 1, 1, 1};
     wf::simple_texture_t texture;
     double tex_scale = 1.0;   // TEXTURE_PX / the arrow's height in its own units
 
@@ -280,12 +285,29 @@ class locate_t
 
     static constexpr double MARGIN = 6;   // px of the texture around the arrow
 
+    static bool same(const wf::color_t& a, const wf::color_t& b)
+    {
+        return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+    }
+
     void make_texture()
     {
+        wf::color_t fill = fill_colour, outline = outline_colour;
         if (texture.tex != (GLuint)-1)
         {
-            return;
+            if (same(fill, made_fill) && same(outline, made_outline))
+            {
+                return;
+            }
+
+            // The colours changed since it was drawn: draw it again.
+            OpenGL::render_begin();
+            texture.release();
+            OpenGL::render_end();
         }
+
+        made_fill    = fill;
+        made_outline = outline;
 
         /* The arrow is 19 units tall; fit it, with a margin, in TEXTURE_PX. */
         tex_scale = (TEXTURE_PX - 2 * MARGIN) / 19.0;
@@ -305,10 +327,10 @@ class locate_t
         cairo_fill(cr);
         cairo_restore(cr);
         arrow_path(cr);
-        cairo_set_source_rgb(cr, 1, 1, 1);
+        cairo_set_source_rgb(cr, outline.r, outline.g, outline.b);
         cairo_set_line_width(cr, 1.7);
         cairo_stroke_preserve(cr);
-        cairo_set_source_rgb(cr, 0, 0, 0);
+        cairo_set_source_rgb(cr, fill.r, fill.g, fill.b);
         cairo_fill(cr);
         cairo_destroy(cr);
         cairo_surface_flush(surface);

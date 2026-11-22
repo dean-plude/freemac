@@ -1060,6 +1060,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Dials > Power shows what is keeping the screen on | Dials | done |
 | 6 | A Guide topic | Guide | done |
 
+## 1.104 "pointer colours" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Pointer outline colour and Pointer fill colour, with Reset | Dials | done |
+| 2 | freemac's pointer drawing takes colours, and stays in the image for Dials | Art | done |
+| 3 | The big pointer a shake shows uses the same colours | Strata | done |
+| 4 | A Guide topic | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

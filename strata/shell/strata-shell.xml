@@ -15,6 +15,15 @@
 			<_long>Moving the mouse quickly back and forth makes the pointer big for a moment.</_long>
 			<default>true</default>
 		</option>
+		<option name="pointer_fill" type="color">
+			<_short>Pointer fill colour</_short>
+			<_long>The colour inside the pointer, for the big pointer when it's shaken (Dials draws the pointer itself).</_long>
+			<default>0.0 0.0 0.0 1.0</default>
+		</option>
+		<option name="pointer_outline" type="color">
+			<_short>Pointer outline colour</_short>
+			<default>1.0 1.0 1.0 1.0</default>
+		</option>
 		<option name="press_and_hold" type="bool">
 			<_short>Press and hold a letter for its accents</_short>
 			<_long>Holding a letter such as e in a text field shows its accented forms to pick from, instead of repeating it.</_long>
