@@ -272,6 +272,16 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Pointer colours (1.104, `dials_pointer.py`): Dials runs freemac's own
+pointer drawing (`art/cursors/make-cursors.py`, kept in the image at
+`/usr/share/freemac`) again with `--fill` and `--outline`, into
+`~/.icons/freemac-pointer-RRGGBBRRGGBB` (a theme that inherits `freemac`),
+in the background, then sets Wayfire's `[input] cursor_theme`, GTK's
+`cursor-theme` and Strata's `pointer_fill` and `pointer_outline`, which
+colour the big arrow a shake shows. The theme is named after its colours
+because Wayfire and apps load a theme afresh only under a new name; older
+ones are removed. Reset goes back to the `freemac` theme.
+
 Keeping the computer awake (1.103, `awake.py`): `freemac-lock --watch`,
 which runs the idle timers, also owns `org.freedesktop.ScreenSaver` and
 `org.freedesktop.PowerManagement` on the session bus, the usual way Linux

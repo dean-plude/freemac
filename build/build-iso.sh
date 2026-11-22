@@ -203,9 +203,9 @@ python3 "$REPO/art/kvantum/make-kvantum.py" "$ROOTFS/usr/share/Kvantum"
 rm -rf "$ROOTFS/usr/share/icons/freemac"
 cp -r "$REPO/art/icon-theme" "$ROOTFS/usr/share/icons/freemac"
 # freemac's own pointer (art/cursors), drawn into the same theme.
-cp "$REPO/art/cursors/make-cursors.py" "$ROOTFS/tmp/make-cursors.py"
-in_chroot python3 /tmp/make-cursors.py /usr/share/icons/freemac || log "Warning: couldn't draw freemac's pointer"
-rm -f "$ROOTFS/tmp/make-cursors.py"
+# It stays in the image, so Dials can draw the pointer in colours of your own.
+install -D -m 0644 "$REPO/art/cursors/make-cursors.py" "$ROOTFS/usr/share/freemac/make-cursors.py"
+in_chroot python3 /usr/share/freemac/make-cursors.py /usr/share/icons/freemac || log "Warning: couldn't draw freemac's pointer"
 in_chroot gtk-update-icon-cache -f -t /usr/share/icons/freemac
 # Every installed app's own icon on freemac's rounded-square tile. The apt hook
 # in the overlay does the same for apps installed later.

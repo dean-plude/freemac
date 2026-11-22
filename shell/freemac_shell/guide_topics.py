@@ -723,6 +723,13 @@ TOPICS = {
         "followed by a command keeps it on until the command finishes.",
         "Dials > Power shows what is keeping the screen on. Closing a laptop\u2019s lid still puts it to sleep.",
     ]),
+    "pointer-colour": ("Change the pointer\u2019s colours", "pointer cursor mouse arrow colour color fill outline orange pink red bright see easier accessibility reset", [
+        "Choose Dials > Accessibility.",
+        "Click Pointer fill colour to choose the colour inside the pointer, and Pointer outline colour "
+        "for the edge round it. The pointer changes everywhere a moment later.",
+        "Colours that differ a lot, like a bright fill with a dark outline, are the easiest to see.",
+        "Click Reset to go back to a black pointer with a white edge.",
+    ]),
     "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
         "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
         "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "

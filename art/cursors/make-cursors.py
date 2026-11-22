@@ -4,8 +4,13 @@
 files, the format Wayland compositors and X apps read.
 
     python3 art/cursors/make-cursors.py OUTDIR
+    make-cursors.py OUTDIR --fill '#RRGGBB' --outline '#RRGGBB' --name NAME
 
-OUTDIR gets cursors/ (and an index.theme if it has none). Every shape here is drawn from scratch:
+OUTDIR gets cursors/ (and an index.theme if it has none). With colours, the
+pointer is drawn in them instead, as Dials > Accessibility > Pointer colour
+asks (dials_pointer.py runs this from /usr/share/freemac), and OUTDIR is a
+theme of its own called NAME that takes what it lacks from freemac's.
+Every shape here is drawn from scratch:
 a black arrow with a white edge and a soft shadow, a white pointing hand, an
 I-beam, a ring of dots while something is busy, double arrows for resizing.
 Shapes we don't draw come from Adwaita (index.theme inherits it).
@@ -87,15 +92,17 @@ def rotated(shape, degrees):
     return f'<g transform="rotate({degrees} 16 16)">{shape}</g>'
 
 
-def lines(shape, edge_width=3.6, width=1.6):
-    return (f'<g stroke="#fff" stroke-width="{edge_width}" stroke-linecap="round" fill="none">{shape}</g>'
-            f'<g stroke="#000" stroke-width="{width}" stroke-linecap="round" fill="none">{shape}</g>')
+def lines(shape, edge_width=3.6, width=1.6, fill="#000", edge="#fff"):
+    return (f'<g stroke="{edge}" stroke-width="{edge_width}" stroke-linecap="round" fill="none">{shape}</g>'
+            f'<g stroke="{fill}" stroke-width="{width}" stroke-linecap="round" fill="none">{shape}</g>')
 
 
 # name -> (frames as a list of svg strings, hotspot on the 32 grid, other names)
-def shapes():
-    arrow = svg(edged(ARROW), ARROW)
-    hand = svg(edged(HAND, fill="#fff", edge="#000", width=2.0) + HAND_LINES, HAND)
+def shapes(fill="#000", edge="#fff"):
+    """Every pointer, drawn in `fill` with an `edge` round it (the hand the
+    other way round, as it's white with a black edge)."""
+    arrow = svg(edged(ARROW, fill, edge), ARROW)
+    hand = svg(edged(HAND, fill=edge, edge=fill, width=2.0) + HAND_LINES.replace("#000", fill), HAND)
     resize = {}
     for name, degrees, aliases in (
             ("ew-resize", 0, ["e-resize", "w-resize", "col-resize", "h_double_arrow", "sb_h_double_arrow",
@@ -105,20 +112,20 @@ def shapes():
             ("nwse-resize", 45, ["nw-resize", "se-resize", "top_left_corner", "bottom_right_corner", "size_fdiag"]),
             ("nesw-resize", -45, ["ne-resize", "sw-resize", "top_right_corner", "bottom_left_corner", "size_bdiag"])):
         shape = rotated(DOUBLE, degrees)
-        resize[name] = ([svg(edged(shape, width=2.2), shape)], (16, 16), aliases)
+        resize[name] = ([svg(edged(shape, fill, edge, width=2.2), shape)], (16, 16), aliases)
     out = {
         "default": ([arrow], HOTSPOT_ARROW, ["left_ptr", "arrow", "top_left_arrow", "context-menu",
                                              "dnd-move", "dnd-copy", "dnd-none", "dnd-link", "dnd-ask"]),
         "pointer": ([hand], HOTSPOT_HAND, ["hand", "hand1", "hand2", "pointing_hand",
                                            "9d800788f1b08800ae810202380a0822", "e29285e634086352946a0e7090d73106"]),
-        "text": ([svg(edged(IBEAM, width=2.0), IBEAM)], (16, 16), ["xterm", "ibeam"]),
+        "text": ([svg(edged(IBEAM, fill, edge, width=2.0), IBEAM)], (16, 16), ["xterm", "ibeam"]),
         "wait": ([svg(spinner(f)) for f in range(SPIN_FRAMES)], (16, 16), ["watch"]),
-        "progress": ([svg(edged(ARROW) + spinner(f, 23.5, 23.5, 4.4, 1.35), ARROW) for f in range(SPIN_FRAMES)],
+        "progress": ([svg(edged(ARROW, fill, edge) + spinner(f, 23.5, 23.5, 4.4, 1.35), ARROW) for f in range(SPIN_FRAMES)],
                      HOTSPOT_ARROW, ["left_ptr_watch", "half-busy", "3ecb610c1bf2410f44200f48c40d3599",
                                      "08e8e1c95fe2fc01f976f1e063a24ccd"]),
-        "move": ([svg(edged(FOUR, width=2.2), FOUR)], (16, 16), ["all-scroll", "fleur", "size_all"]),
-        "crosshair": ([svg(lines(CROSS))], (16, 16), ["cross", "tcross"]),
-        "not-allowed": ([svg(lines(FORBIDDEN, 5.2, 3.0))], (16, 16),
+        "move": ([svg(edged(FOUR, fill, edge, width=2.2), FOUR)], (16, 16), ["all-scroll", "fleur", "size_all"]),
+        "crosshair": ([svg(lines(CROSS, fill=fill, edge=edge))], (16, 16), ["cross", "tcross"]),
+        "not-allowed": ([svg(lines(FORBIDDEN, 5.2, 3.0, fill, edge))], (16, 16),
                         ["no-drop", "crossed_circle", "forbidden", "circle"]),
     }
     out.update(resize)
@@ -171,15 +178,45 @@ Inherits=Adwaita
 """
 
 
-def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "freemac-cursors"
+CUSTOM_INDEX = """[Icon Theme]
+Name={name}
+Comment=freemac's pointer in colours of your own
+Inherits=freemac,Adwaita
+"""
+
+
+def colour(text):
+    """'#RRGGBB' (or #RGB) checked, for the SVG."""
+    text = (text or "").strip()
+    digits = text[1:] if text.startswith("#") else ""
+    if len(digits) in (3, 6) and all(c in "0123456789abcdefABCDEF" for c in digits):
+        return "#" + digits.lower()
+    raise SystemExit(f"make-cursors: not a colour: {text!r} (use #RRGGBB)")
+
+
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    options = {"--fill": None, "--outline": None, "--name": None}
+    rest = []
+    while args:
+        arg = args.pop(0)
+        if arg in options and args:
+            options[arg] = args.pop(0)
+        else:
+            rest.append(arg)
+    out = rest[0] if rest else "freemac-cursors"
+    fill = colour(options["--fill"]) if options["--fill"] else "#000"
+    edge = colour(options["--outline"]) if options["--outline"] else "#fff"
     cursors = os.path.join(out, "cursors")
     os.makedirs(cursors, exist_ok=True)
     index = os.path.join(out, "index.theme")
-    if not os.path.exists(index):  # an icon theme of the same name already inherits Adwaita
+    if options["--name"]:
+        with open(index, "w") as f:
+            f.write(CUSTOM_INDEX.format(name=options["--name"]))
+    elif not os.path.exists(index):  # an icon theme of the same name already inherits Adwaita
         with open(index, "w") as f:
             f.write(INDEX)
-    for name, (frames, hotspot, aliases) in shapes().items():
+    for name, (frames, hotspot, aliases) in shapes(fill, edge).items():
         with open(os.path.join(cursors, name), "wb") as f:
             f.write(xcursor(frames, hotspot, SPIN_DELAY if len(frames) > 1 else 0))
         for alias in aliases:
