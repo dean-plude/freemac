@@ -685,6 +685,13 @@ TOPICS = {
         "Hold Shift as well for capitals. Letters with accents are a, c, e, i, l, n, o, s, u, y and z.",
         "To have held letters repeat instead, open Dials > Keyboard and turn off Press and hold for accents.",
     ]),
+    "sticky-keys": ("Press keyboard shortcuts one key at a time", "sticky keys modifier one hand one finger shift control option command shortcut hold two keys at once latch lock accessibility", [
+        "Choose Dials > Accessibility and turn on Sticky Keys, or press Shift five times in a row.",
+        "Now tap a modifier key such as \u2318 Command, then the key that goes with it: \u2318 then C copies. "
+        "The modifier's symbol shows in the top-right corner until you press the next key.",
+        "Tap a modifier twice to lock it, and once more to let it go.",
+        "Press Shift five times again to turn Sticky Keys off.",
+    ]),
     "find-pointer": ("Find the pointer", "find pointer cursor mouse lost shake big larger size locate where see", [
         "Lost the pointer? Move the mouse quickly back and forth and the pointer grows big for a moment.",
         "To turn this off, or to make the pointer bigger all the time, open Dials > Accessibility and "

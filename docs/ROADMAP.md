@@ -1005,6 +1005,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | freemac-im, a quiet input method, so apps say which text field has the keyboard and where its cursor is | Strata | done |
 | 3 | Press and hold for accents, on by default, in Dials > Keyboard, and a Guide topic | Dials, Guide | done |
 
+## 1.98 "sticky keys" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Sticky Keys: tap Shift, Control, Option or Command and it stays down for the next key; tap twice to lock it, once more to let it go | Strata | done |
+| 2 | Press Shift five times to turn Sticky Keys on or off, with a notice on screen | Strata, Topline | done |
+| 3 | The modifiers that are set show in the top-right corner, with a soft click as each one is set | Topline | done |
+| 4 | Sticky Keys, its Shift shortcut, the click and the symbols in Dials > Accessibility, and a Guide topic | Dials, Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
