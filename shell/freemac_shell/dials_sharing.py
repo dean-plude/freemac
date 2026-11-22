@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Dials > Sharing, as on a Mac: the computer's name, Nearby sharing, File
-Sharing (the Public folder, for other computers on the network to open), and
-Remote Login (SSH) for someone at another computer on the same network.
-Renaming, File Sharing and Remote Login change the whole computer, so each asks
-for an administrator's password. Original freemac code."""
+Sharing (the Public folder, for other computers on the network to open),
+Screen Sharing (seeing and using this screen from another computer, after
+signing in) and Remote Login (SSH) for someone at another computer on the same
+network. Renaming and the three kinds of sharing change the whole computer, so
+each asks for an administrator's password. Original freemac code."""
 import os
 import pwd
 import re
@@ -139,6 +140,7 @@ def sharing_page(window):
             entry.set_text(computer_name())
             describe()
             login_caption()
+            screen_caption()
         rename(window, new, done)
 
     entry.connect("activate", apply)
@@ -182,6 +184,38 @@ def sharing_page(window):
         share_switch.connect("notify::sensitive", lambda s, _p: s.get_sensitive() and share_caption())
         share_caption()
         sections.append(group(row("File Sharing", share_switch), _note(share_note), open_row))
+
+    from . import screen_sharing
+
+    if screen_sharing.available() and os.path.exists(admin_switch.SYSTEM_HELPER):
+        screen_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=52, selectable=True)
+
+        def screen_caption():
+            try:
+                user = pwd.getpwuid(os.getuid()).pw_name
+            except KeyError:
+                user = "your user name"
+            host = local_name(computer_name())
+            if screen_sharing.enabled():
+                screen_note.set_text(
+                    f"From another freemac on this network, open Porthole and type {host}. It asks for a "
+                    f"name and password: {user} and your password. They can see and use this screen; "
+                    "the menu bar shows when someone is, and you can disconnect them.")
+            else:
+                screen_note.set_text("Lets you see and use this computer from another one on the network, "
+                                     "after signing in with your password.")
+
+        screen_switch = admin_switch.admin_switch(
+            screen_sharing.enabled,
+            lambda on: [admin_switch.SYSTEM_HELPER, "screen-sharing", "on" if on else "off"],
+            "Screen Sharing couldn’t be changed.",
+            then=lambda on: screen_sharing.turn_on() if on else screen_sharing.turn_off())
+        screen_switch.connect("notify::sensitive", lambda s, _p: s.get_sensitive() and screen_caption())
+        screen_caption()
+        sections.append(group(row("Screen Sharing", screen_switch), _note(screen_note)))
+    else:
+        def screen_caption():
+            pass
 
     if remote_login_available():
         login_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=52, selectable=True)

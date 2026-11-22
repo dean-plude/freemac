@@ -14,9 +14,10 @@ from . import alert  # noqa: E402
 SYSTEM_HELPER = "/usr/libexec/freemac-system-helper"
 
 
-def admin_switch(read, command, failed="This setting couldn’t be changed."):
+def admin_switch(read, command, failed="This setting couldn’t be changed.", then=None):
     """read() -> bool says whether the setting is on; command(on) -> argv to
-    run as root. Returns the Gtk.Switch."""
+    run as root; then(on), if given, finishes the change as the person once
+    the root part has worked. Returns the Gtk.Switch."""
     switch = Gtk.Switch(valign=Gtk.Align.CENTER, active=read())
 
     def show(on):
@@ -41,6 +42,8 @@ def admin_switch(read, command, failed="This setting couldn’t be changed."):
                 _ok, _out, err = proc.communicate_utf8_finish(result)
             except GLib.Error:
                 err = ""
+            if proc.get_exit_status() == 0 and then is not None:
+                then(on)
             show(read())
             # 126 and 127: the password was cancelled, or not given.
             if proc.get_exit_status() not in (0, 126, 127):
