@@ -22,7 +22,7 @@ from urllib.parse import parse_qsl, urlencode
 
 from gi.repository import Gio, GLib
 
-from . import seek_index
+from . import seek_index, seek_settings
 
 PREFIX = "search:"
 SAVED = "smart:"
@@ -204,17 +204,20 @@ def matches(query, path, is_dir, mtime, by_content=False):
 def find(query, found, stop=None, limit=LIMIT):
     """Calls found(path) for each match, names first, then files whose words
     match; returns how many. Hidden folders, the Trash and build folders are
-    left out, as they are in Seek."""
+    left out, as they are in Seek, and so are the folders kept private in
+    Dials > Seek."""
     query = clean(query)
     if is_empty(query):
         return 0
     where = query["where"]
     seen, count, given = 0, 0, set()
     base = where.rstrip(os.sep).count(os.sep)
+    private = seek_settings.private()   # Dials > Seek > Privacy
     for root, dirs, files in os.walk(where):
         if stop is not None and stop.is_set():
             return count
-        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d not in SKIP_DIRS)
+        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d not in SKIP_DIRS
+                         and not seek_settings.is_private(os.path.join(root, d), private))
         if root.count(os.sep) - base >= MAX_DEPTH:
             dirs[:] = []
         for name, is_dir in [(d, True) for d in dirs] + [(f, False) for f in files if not f.startswith(".")]:

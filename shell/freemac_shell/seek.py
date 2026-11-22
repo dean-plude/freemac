@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, style  # noqa: E402
+from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, seek_settings, style  # noqa: E402
 from .ready_panel import ReadyPanel  # noqa: E402
 from .convert import convert  # noqa: E402
 
@@ -86,8 +86,10 @@ def find_files(query, limit):
     home = os.path.expanduser("~")
     q = query.lower()
     found = []
+    private = seek_settings.private()   # Dials > Seek > Privacy
     for root, dirs, files in os.walk(home):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not d.startswith(".")
+                   and not seek_settings.is_private(os.path.join(root, d), private)]
         for name in dirs + files:
             if q in name.lower():
                 found.append(os.path.join(root, name))
@@ -304,12 +306,14 @@ class SeekWindow(ReadyPanel, Gtk.Window):
         query = self.query = self.entry.get_text().strip()
         results = []
         if query:
-            answer = calculate(query)
+            # What Seek shows is chosen in Dials > Seek.
+            show = seek_settings.shown
+            answer = calculate(query) if show("calculator") else None
             if answer is not None:
                 results.append(Result(answer, f"{query} =", Gio.ThemedIcon.new("accessories-calculator"),
                                       lambda a=answer: Gtk.Clipboard.get_default(self.get_display()).set_text(a, -1),
                                       about="Press Return to copy the answer."))
-            converted = None if answer is not None else convert(query)
+            converted = None if answer is not None or not show("calculator") else convert(query)
             if converted is not None:
                 text, bare, asked = converted
                 results.append(Result(text, f"{asked} =", Gio.ThemedIcon.new("accessories-calculator"),
@@ -317,7 +321,8 @@ class SeekWindow(ReadyPanel, Gtk.Window):
                                       about="Press Return to copy the number. Type “in” and another unit "
                                             "to convert to that instead, as in “5 km in feet”."))
             scored = sorted(((score_app(a, query), a.get_name(), a) for a in self.apps
-                             if score_app(a, query) is not None), key=lambda t: (t[0], t[1].lower()))
+                             if show("apps") and score_app(a, query) is not None),
+                            key=lambda t: (t[0], t[1].lower()))
             apps = [Result(info.get_name(), "Application", info.get_icon(),
                            lambda i=info: i.launch([], None), about=info.get_description() or "")
                     for _score, _name, info in scored[:MAX_RESULTS]]
@@ -327,20 +332,20 @@ class SeekWindow(ReadyPanel, Gtk.Window):
             results += apps[:named_apps]
             # Settings by name or by what's on the page ("wallpaper", "night
             # light"), opened in Dials at that page.
-            for name in dials_pages.matching(query)[:2]:
+            for name in dials_pages.matching(query)[:2] if show("settings") else []:
                 title, _symbol = dials_pages.PAGES[name]
                 results.append(Result(title, "Settings", Gio.ThemedIcon.new("freemac-dials"),
                                       lambda n=name: launch("freemac-dials", "--panel", n),
                                       about=f"Opens Dials at {title}."))
             # How-to topics in Guide ("screenshot", "wifi").
-            if len(query) >= 3:
+            if len(query) >= 3 and show("guide"):
                 for name in guide_topics.matching(query)[:1]:
                     title, _usual, body = guide_topics.TOPICS[name]
                     results.append(Result(title, "Guide", Gio.ThemedIcon.new("freemac-guide"),
                                           lambda n=name: launch("freemac-guide", "--topic", n),
                                           about=body[0].lstrip("- ")))
             # The app in front's own menu items, as its Help menu finds them.
-            if len(query) >= 2:
+            if len(query) >= 2 and show("menus"):
                 found, app_icon = menu_items(query)
                 for index, (name, where, keys) in enumerate(found[:2]):
                     results.append(Result(name, f"Menu item: {where}" + (f"  {keys}" if keys else ""),
@@ -349,12 +354,12 @@ class SeekWindow(ReadyPanel, Gtk.Window):
                                           about=f"Does {name} in {where}, as choosing it in the menu does."))
             # People from Crew and coming events from Tide.
             if len(query) >= 2:
-                results += self._people(query)[:2]
-                results += self._events(query)[:2]
-                results += self._reminders(query)[:2]
+                results += self._people(query)[:2] if show("contacts") else []
+                results += self._events(query)[:2] if show("events") else []
+                results += self._reminders(query)[:2] if show("reminders") else []
             results += apps[named_apps:]
             if len(query) >= 2:
-                named = find_files(query, MAX_RESULTS - len(results))
+                named = find_files(query, MAX_RESULTS - len(results)) if show("files") else []
                 for path in named:
                     results.append(Result(os.path.basename(path), short(path),
                                           Gio.ThemedIcon.new("folder" if os.path.isdir(path) else "text-x-generic"),

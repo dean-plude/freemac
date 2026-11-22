@@ -17,6 +17,8 @@ import zipfile
 
 from gi.repository import GLib
 
+from . import seek_settings
+
 DB = os.path.join(GLib.get_user_cache_dir(), "freemac", "seek.db")
 MAX_BYTES = 2 * 1024 * 1024      # files bigger than this are left out
 MAX_FILES = 20000
@@ -42,8 +44,10 @@ def candidates(home):
     """Paths, mtimes and sizes of the files worth reading."""
     base_depth = home.rstrip(os.sep).count(os.sep)
     count = 0
+    private = seek_settings.private()   # Dials > Seek > Privacy
     for root, dirs, files in os.walk(home):
-        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in SKIP_DIRS]
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in SKIP_DIRS
+                   and not seek_settings.is_private(os.path.join(root, d), private)]
         if root.count(os.sep) - base_depth >= MAX_DEPTH:
             dirs[:] = []
         for name in files:
@@ -85,6 +89,13 @@ def update(home=None, stop=None):
     """Bring the index up to date. Returns how many files were (re)read."""
     home = home or os.path.expanduser("~")
     db = connect()
+    if not seek_settings.shown("contents"):
+        # Words inside documents is off: keep nothing of what they say.
+        db.execute("DELETE FROM words")
+        db.execute("DELETE FROM files")
+        db.commit()
+        db.close()
+        return 0
     known = dict(db.execute("SELECT path, mtime FROM files"))
     seen = set()
     changed = 0
@@ -124,7 +135,7 @@ def excerpt(text, query, width=36):
 
 def search(query, limit, exclude=()):
     """[(path, excerpt)] of indexed files whose text contains query."""
-    if len(query) < 3 or not os.path.exists(DB):
+    if len(query) < 3 or not os.path.exists(DB) or not seek_settings.shown("contents"):
         return []   # the trigram index needs at least three characters
     try:
         db = sqlite3.connect(DB, timeout=1)
@@ -134,8 +145,9 @@ def search(query, limit, exclude=()):
     except sqlite3.Error:
         return []
     found = []
+    private = seek_settings.private()
     for path, body in rows:
-        if path in exclude or not os.path.exists(path):
+        if path in exclude or not os.path.exists(path) or seek_settings.is_private(path, private):
             continue
         found.append((path, excerpt(body, query)))
         if len(found) >= limit:

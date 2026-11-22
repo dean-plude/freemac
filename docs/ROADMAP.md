@@ -923,6 +923,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | File > New Smart Folder (⌥⌘N), Edit > Find (⌘F) and Save Search; Remove Smart Folder on its right-click menu, which leaves the files alone | Drawer | done |
 | 5 | The sidebar scrolls when its places, Smart Folders and tags don't fit | Drawer | done |
 
+## 1.88 "spotlight settings" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Seek: a switch for each kind of result Seek lists (apps, sums and conversions, settings, Guide, menu items, contacts, events, reminders, files, words inside documents), counted the moment it's flipped | Dials, Seek | done |
+| 2 | Privacy: + and − keep folders out of Seek, its index of words inside documents and Drawer's This Mac searches and Smart Folders | Dials, Seek, Drawer | done |
+| 3 | Turning off Words inside documents forgets what Seek had read; Rebuild Index reads them all again | Dials, Seek | done |
+| 4 | Seek is on Dials' View menu and found by searching Dials or Seek for "spotlight", "privacy" or "index" | Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in
