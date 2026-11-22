@@ -1029,6 +1029,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 2 | Topline plays the chosen one steadily behind everything else, at its own volume | Topline | done |
 | 3 | Background sounds, its sound and volume in Dials > Accessibility, and a Guide topic | Dials, Guide | done |
 
+## 1.101 "sunset" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Sunrise and sunset where you are, from the time zone's city, with no location service | Shell | done |
+| 2 | Auto appearance: light while the sun is up, dark after it sets, in Dials > Appearance beside Light and Dark | Dials, Topline | done |
+| 3 | Night Light's schedule: Sunset to Sunrise or Custom hours | Dials | done |
+| 4 | Guide topics for Auto and Night Light | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

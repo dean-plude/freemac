@@ -7,7 +7,7 @@ at the seat change it without a password. Desktop monitors set their own
 brightness and have no backlight here.
 
 Night light: wlsunset (Wayland's gamma control) makes colours warmer between
-two times of day. The settings live in ~/.config/freemac/nightlight.json;
+two times of day, or from sunset to sunrise where you are. The settings live in ~/.config/freemac/nightlight.json;
 freemac-nightlight runs at login and starts wlsunset when it's on.
 """
 import json
@@ -17,9 +17,12 @@ import sys
 
 from gi.repository import Gio, GLib
 
+from . import sun
+
 BACKLIGHT = "/sys/class/backlight"
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "nightlight.json")
-DEFAULTS = {"on": False, "from": "20:00", "to": "07:00", "warmth": 4000}
+# schedule: "sun" (sunset to sunrise where you are, sun.py) or "custom" (from and to).
+DEFAULTS = {"on": False, "schedule": "custom", "from": "20:00", "to": "07:00", "warmth": 4000}
 DAYLIGHT = 6500   # colour temperature (kelvin) outside night light hours
 
 
@@ -97,8 +100,12 @@ def wlsunset_command(settings):
     warmth = max(2500, min(DAYLIGHT - 100, int(settings["warmth"])))
     # -s is when it gets warm (sunset), -S when it goes back (sunrise);
     # -d spreads the change over half an hour.
-    return ["wlsunset", "-t", str(warmth), "-T", str(DAYLIGHT),
-            "-s", settings["from"], "-S", settings["to"], "-d", "1800"]
+    command = ["wlsunset", "-t", str(warmth), "-T", str(DAYLIGHT)]
+    where = sun.place() if settings.get("schedule") == "sun" else None
+    if where:
+        # wlsunset works out sunset and sunrise itself from where we are.
+        return command + ["-l", f"{where[0]:.2f}", "-L", f"{where[1]:.2f}"]
+    return command + ["-s", settings["from"], "-S", settings["to"], "-d", "1800"]
 
 
 def restart_night_light():

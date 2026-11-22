@@ -270,6 +270,16 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Sunrise and sunset (1.101) come from `sun.py`: the time zone's city in
+the tz database (`zone1970.tab`, with `tzdata.zi` for older names) gives
+a latitude and longitude, and the usual sunrise equation gives the times.
+Auto appearance (`appearance_auto` in shell.json) is Topline's
+(`auto_mode.py`): once a minute it checks whether the sun is up and, only
+as the sun rises or sets or as Auto is chosen, runs
+`freemac-dials --appearance`, so Dark Mode chosen by hand lasts until the
+next change. Night Light's Sunset to Sunrise passes the same place to
+wlsunset (`-l`, `-L`), which works out the times itself.
+
 Background sounds (1.100) are Topline's (`background_sounds.py`): a
 GStreamer playbin plays one of six loops from
 `/usr/share/sounds/freemac/background`, queued again on about-to-finish so

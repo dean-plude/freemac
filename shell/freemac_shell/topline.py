@@ -1294,6 +1294,10 @@ def main():
     from . import background_sounds
     win.background_sounds = background_sounds.Player()
     win.background_sounds.start()
+    # Auto appearance: light by day, dark at night (auto_mode.py).
+    from . import auto_mode
+    win.auto_mode = auto_mode.Follower()
+    win.auto_mode.start()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
