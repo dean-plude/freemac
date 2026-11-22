@@ -1133,6 +1133,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 4 | The number of desktops is kept in wayfire.ini for the next login | Topline | done |
 | 5 | Guide lines, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.111 "assign to a desktop" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dock > Options > Assign To: All Desktops, This Desktop (or the desktop it's assigned to, ticked) and None, while the app has a window | Pier | done |
+| 2 | All Desktops: the app's windows show on every desktop | Strata (mission-control.hpp) | done |
+| 3 | This Desktop: the app's windows move there, new ones open there and take you there | Strata | done |
+| 4 | Kept in ~/.config/freemac/desktop-assignments; closing a desktop moves the later ones' assignments along and drops its own | Strata | done |
+| 5 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

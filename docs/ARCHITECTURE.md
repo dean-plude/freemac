@@ -304,6 +304,13 @@ showing, with its windows held in place (`set_workspace` with them as fixed
 views), so scale never finds itself on an empty desktop and ends; then the
 windows on later desktops move along by one, and the closed desktop's go to
 Desktop 1. Desktops are only added or closed when the grid is a single row.
+Assigning an app to desktops (1.111) is the Dock's Options > Assign To menu
+calling `strata/assign` ("all", "none" or a desktop index; `strata/assignments`
+lists them). Strata keeps them in `~/.config/freemac/desktop-assignments` and
+applies them: an app on all desktops has its windows made sticky; an app on
+one desktop has its windows moved there, and a window it opens is moved there
+on idle after mapping (after the other plugins have placed it) and the
+desktop is switched to it with `request_workspace`, as on a Mac.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.

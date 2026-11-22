@@ -638,6 +638,7 @@ class Item(Gtk.Button):
             choice.add(box)
             choice.connect("activate", lambda *_, on=on, turn=turn: turn(not on))
             sub.append(choice)
+        self._assign_items(sub)
         if self.is_recent:
             sub.append(Gtk.SeparatorMenuItem())
             remove = Gtk.MenuItem()
@@ -660,6 +661,42 @@ class Item(Gtk.Button):
         elif self.info:
             add("Open", lambda: self._clicked(None))
         self.popup(self.menu)
+
+    def _assign_items(self, sub):
+        """Options > Assign To, as on a Mac: the app's windows on every
+        desktop, on this one (they open there and take you there), or
+        wherever they're opened. Only while the app has a window, and only
+        when there's more than one desktop in a single row."""
+        app_id = self.views[0].get("app-id") if self.views else ""
+        wf = self.pier.wf
+        info = wf.desktops() if (wf and app_id) else None
+        if not info:
+            return
+        columns, rows = (list(info.get("grid", [1, 1])) + [1, 1])[:2]
+        if rows != 1 or columns < 2:
+            return
+        current = (info.get("current") or [0, 0])[0]
+        now = wf.assignments().get(app_id, "none")
+        sub.append(Gtk.SeparatorMenuItem())
+        heading = Gtk.MenuItem()
+        heading.add(Gtk.Label(label="Assign To", xalign=0))
+        heading.set_sensitive(False)
+        sub.append(heading)
+        choices = [("All Desktops", "all"), ("This Desktop", current)]
+        if isinstance(now, int) and now != current:
+            # Assigned to another desktop: name it, ticked, as a Mac does.
+            choices.append(("Desktop %d" % (now + 1), now))
+        choices.append(("None", "none"))
+        for label, to in choices:
+            choice = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            mark = Gtk.Label(label="\u2713" if to == now else "", xalign=0)
+            mark.set_size_request(18, -1)
+            box.pack_start(mark, False, False, 0)
+            box.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            choice.add(box)
+            choice.connect("activate", lambda *_, to=to: wf.assign(app_id, to))
+            sub.append(choice)
 
     def popup(self, menu):
         menu.show_all()

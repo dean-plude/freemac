@@ -119,6 +119,31 @@ class Wayfire:
             return None
         return result
 
+    def desktops(self):
+        """Strata's strata/desktops for the active output (grid, current,
+        windows), or None."""
+        try:
+            result = self.req.call("strata/desktops")
+        except (ConnectionError, OSError, ValueError):
+            return None
+        return result if isinstance(result, dict) and "grid" in result else None
+
+    def assignments(self):
+        """{app-id: "all" or a desktop index} for apps assigned to desktops."""
+        try:
+            result = self.req.call("strata/assignments")
+        except (ConnectionError, OSError, ValueError):
+            return {}
+        apps = result.get("apps") if isinstance(result, dict) else None
+        return apps if isinstance(apps, dict) else {}
+
+    def assign(self, app_id, to):
+        """Assign an app to "all" desktops, one desktop (an index) or "none"."""
+        try:
+            return self.req.call("strata/assign", **{"app-id": app_id, "to": to}).get("result") == "ok"
+        except (ConnectionError, OSError, ValueError, AttributeError):
+            return False
+
     def minimize_hint(self, view_id, x, y, width, height, relative_to=None):
         """Where the window shrinks to when minimized (Strata's strata-shell);
         False when that isn't available."""
