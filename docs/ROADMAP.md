@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.117 "update notices" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Once a day, freemac asks the archive for new updates (PackageKit, no password in the desktop session); a minute after login it counts the ones it already knows | Beacon (update_notice.py) | done |
+| 2 | A notice when updates are ready, once for each new set rather than every day; a click opens Harbor's Updates page | Beacon | done |
+| 3 | A red badge on Harbor's Dock icon with the count; Harbor asks for a recount after it checks or installs, so the badge goes when they're in | Beacon, Harbor, Pier | done |
+| 4 | The live system doesn't look or nag, since nothing there is kept | Beacon | done |
+| 5 | The ISO brings its base system up to date while it's built, so it starts with the archive's current security fixes (the 1.114 image had 31 waiting) | Build | done |
+| 6 | Guide lines, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## 1.116 "come forward" (done)
 
 | # | Item | Component | Status |

@@ -30,7 +30,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, minimonth, notify_rules, reminders_store, style  # noqa: E402
+from . import calendar_store, minimonth, notify_rules, reminders_store, style, update_notice  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
@@ -64,6 +64,7 @@ XML = f"""
     <method name="ToggleCenter"/>
     <method name="ClearAll"/>
     <method name="Count"><arg type="u" direction="out"/></method>
+    <method name="UpdatesChanged"/>
     <method name="ShowLevel">
       <arg type="s" direction="in"/><arg type="d" direction="in"/><arg type="s" direction="in"/>
     </method>
@@ -284,6 +285,7 @@ class Beacon:
         self.reminder_lists, self.reminder_stamp = [], None
         self.alerts_until = dt.datetime.now() - dt.timedelta(minutes=1)
         GLib.timeout_add_seconds(15, self._check_alerts)
+        self.updates = update_notice.Watch(self._updates_ready)
         self.connection = None
         self.banners = Overlay("freemac-beacon")
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -333,6 +335,9 @@ class Beacon:
             invocation.return_value(None)
         elif iface == OWN_IFACE and method == "Count":
             invocation.return_value(GLib.Variant("(u)", (len(self.history),)))
+        elif iface == OWN_IFACE and method == "UpdatesChanged":
+            self.updates.look(refresh=False)   # Harbor checked or installed: count again
+            invocation.return_value(None)
         elif iface == OWN_IFACE and method == "ShowLevel":
             self.show_level(*args)
             invocation.return_value(None)
@@ -467,7 +472,12 @@ class Beacon:
         if any(key == "default" for key, _label in note.actions):
             self.invoke(note, "default")
             return
-        if note.open_uri.startswith(("tide-event:", "nudge-reminder:")):
+        if note.open_uri == "harbor:updates":
+            try:
+                GLib.spawn_async(["freemac-harbor", "--updates"], flags=GLib.SpawnFlags.SEARCH_PATH)
+            except GLib.Error:
+                pass
+        elif note.open_uri.startswith(("tide-event:", "nudge-reminder:")):
             program = "freemac-tide" if note.open_uri.startswith("tide-event:") else "freemac-nudge"
             try:
                 GLib.spawn_async([program, note.open_uri], flags=GLib.SpawnFlags.SEARCH_PATH)
@@ -628,6 +638,12 @@ class Beacon:
                          + "@@" + occ.start.date().isoformat()}, 0)
         self._check_reminders(since, now)
         return True
+
+    # --- Software updates -------------------------------------------------
+    def _updates_ready(self, count):
+        self.notify("Software Update", 0, "freemac-harbor", "Software updates are ready",
+                    f"{update_notice.summary(count)} for this computer. Click to see them in Harbor.",
+                    [], {"x-freemac-uri": "harbor:updates"}, -1)
 
     # --- Nudge's reminders ------------------------------------------------
     def _reminder_files(self):
