@@ -272,6 +272,21 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
+running): with `"stage": true` in pier.json it follows Wayfire's focus events.
+When a window of another app comes forward, every visible window of the
+other apps is hidden through Strata (`strata/hide`, so nothing shrinks into
+the Dock), and a picture of each app's front window is drawn a moment later
+with `strata/snapshot`, which works on hidden windows. The pictures sit in a
+`gtk-layer-shell` strip on the bottom layer down the left edge, under the
+windows and reserving no room, so the Dock stays centred and a zoomed window
+covers it; only the pictures take clicks. Clicking one un-minimizes the
+windows Stage Manager hid for that app and focuses the newest. Windows the
+person hid or minimized are never touched. What it hid, the strip's order and
+the app on stage are kept in the Dock's runtime folder, so a restart of the
+Dock (a new position, say) doesn't lose them; turning it off brings them all
+back, least recent first.
+
 Dynamic wallpaper (1.106, `backdrop.py`, `sun.elevation`): with
 `[background] dynamic = true` and one of freemac's own scenes, Backdrop loads
 both the day and the night picture and works out once a minute how high the

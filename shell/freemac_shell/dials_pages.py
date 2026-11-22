@@ -43,7 +43,7 @@ SEARCH_WORDS = {
     "appearance": "dark light mode auto automatic sunset sunrise day night theme accent colour color highlight purple pink red orange yellow green graphite text size tiling",
     "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors speak selection speech read aloud out loud voice spoken content text to speech flash screen alert visual bell hearing deaf shake pointer cursor mouse find locate big sticky keys modifier one hand shift control option command latch lock colour color filters greyscale grayscale black white colour blind color blind protanopia deuteranopia tritanopia red green blue yellow tint background sounds noise rain ocean stream white pink brown focus calm pointer colour color fill outline",
     "seek": "spotlight search results privacy private folders index rebuild find launcher command space hide",
-    "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
+    "dock": "stage manager recent apps strip side windows hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light schedule sunset sunrise warm scale monitor",
     "wallpaper": "background desktop picture dynamic sun sunset",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",

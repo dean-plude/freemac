@@ -602,6 +602,15 @@ TOPICS = {
         "Menu Bar, or right-click the Dock between its icons and choose Position on Screen. A Dock that hides "
         "itself comes back when the pointer reaches that edge.",
     ]),
+    "stage-manager": ("Keep one app in front with Stage Manager", "stage manager windows apps strip side left recent switch focus tidy clutter one app quick settings", [
+        "Click the quick settings icon in the menu bar and click Stage Manager, or turn it on in Dials > Dock and Menu Bar.",
+        "The app you're using stays in the middle of the screen. The apps you used just before it wait as "
+        "small pictures down the left side, newest at the top.",
+        "Click a picture to bring that app forward; the one you were using takes its place in the strip. "
+        "Clicking an app in the Dock, or switching with ⌘Tab, does the same.",
+        "A window moved or zoomed over the strip covers it. Windows you hid or minimized yourself stay as they are.",
+        "Turn Stage Manager off the same way, and every window comes back where it was.",
+    ]),
     "menubar-hide": ("Hide the menu bar until you need it", "menu bar hide hides automatically autohide auto-hide top screen more room topline", [
         "Choose Dials > Dock and Menu Bar and turn on Automatically hide and show the menu bar.",
         "The menu bar slides away and windows can use the top of the screen too. Move the pointer to the "

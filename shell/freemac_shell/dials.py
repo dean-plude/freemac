@@ -695,6 +695,10 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Animate opening apps", switch(config.get("bounce", True), lambda on: save_pier(bounce=on)),
                 "An app's icon bounces until its window appears."),
         ), group(
+            row("Stage Manager", switch(config.get("stage", False), lambda on: save_pier(stage=on)),
+                "The app you're using stands alone in the middle, and the apps you used just before it "
+                "wait as small pictures down the left side. Click one to bring it forward."),
+        ), group(
             row("Automatically hide and show the menu bar",
                 switch(bool(style.prefs().get("menubar_autohide")),
                        lambda on: self.save_prefs(menubar_autohide=on)),
