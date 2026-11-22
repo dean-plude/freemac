@@ -10,7 +10,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import admin_switch  # noqa: E402
+from . import admin_switch, update_notice  # noqa: E402
 
 
 def _release():
@@ -30,7 +30,8 @@ def software_update_page(window):
     group, row, page, _slider, _switch = window.helpers
     release = _release()
     name = release.get("PRETTY_NAME") or "freemac"
-    check = Gtk.Button(label="Check for Updates…")
+    count = len(update_notice.load().get("ids") or [])
+    check = Gtk.Button(label="Update Now…" if count else "Check for Updates…")
 
     def open_updates(_button):
         try:
@@ -38,8 +39,11 @@ def software_update_page(window):
         except GLib.Error:
             pass
     check.connect("clicked", open_updates)
-    rows = [row(name, check, "freemac looks for updates once a day and tells you when some are ready. "
-                             "Harbor installs them.")]
+    if count:
+        caption = update_notice.summary(count) + ". Harbor shows what they are and installs them."
+    else:
+        caption = "freemac looks for updates once a day and tells you when some are ready. Harbor installs them."
+    rows = [row(name, check, caption)]
     if os.path.exists("/usr/bin/unattended-upgrade") and os.path.exists(admin_switch.SYSTEM_HELPER):
         rows.append(row("Install important updates automatically", admin_switch.auto_updates_switch(),
                         "Security fixes are installed in the background, so the computer stays safe "

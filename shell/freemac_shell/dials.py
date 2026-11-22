@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style, sun  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -176,6 +176,8 @@ CSS = b"""
 .dials-accent:checked { box-shadow: 0 0 0 2px @theme_bg_color, 0 0 0 4px alpha(@theme_fg_color, 0.35); }
 .dials-chosen { border-color: @theme_selected_bg_color; }
 .dials-section { font-weight: bold; margin-top: 12px; }
+.dials-count { background-color: #f04d3e; color: #ffffff; border-radius: 99px; min-width: 18px;
+  padding: 0 5px; font-size: 11px; font-weight: bold; }
 .input-badge { min-width: 30px; padding: 1px 4px; border-radius: 4px; font-size: 11px; font-weight: bold;
   border: 1px solid alpha(@theme_fg_color, 0.5); }
 """
@@ -362,6 +364,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             tile.set_center_widget(image)
             line.pack_start(tile, False, False, 0)
             line.pack_start(Gtk.Label(label=title, xalign=0), True, True, 0)
+            if name == "softwareupdate":
+                # A red count when updates are ready, as a Mac's settings show.
+                self.update_count = Gtk.Label(valign=Gtk.Align.CENTER)
+                self.update_count.get_style_context().add_class("dials-count")
+                self.update_count.set_no_show_all(True)
+                line.pack_end(self.update_count, False, False, 0)
             item.add(line)
             sidebar.add(item)
             self.rows[name] = item
@@ -379,6 +387,14 @@ class DialsWindow(Gtk.ApplicationWindow):
 
         sidebar.set_header_func(gap)
         self.sidebar = sidebar
+        self._show_update_count()
+        try:
+            os.makedirs(os.path.dirname(update_notice.STATE), exist_ok=True)
+            folder = Gio.File.new_for_path(os.path.dirname(update_notice.STATE))
+            self.update_watch = folder.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, None)
+            self.update_watch.connect("changed", lambda *_: self._show_update_count())
+        except (OSError, GLib.Error):
+            self.update_watch = None
         sidebar.select_row(self.rows["appearance"])
         # The stack can't show a page before the window is shown, so it
         # opened on the first one; show the selected page once it can.
@@ -388,6 +404,12 @@ class DialsWindow(Gtk.ApplicationWindow):
             actions["show-" + name] = lambda n=name: self.show_panel(n)
         menus.add_actions(self, actions)
         self.connect("key-press-event", self._on_key)
+
+    def _show_update_count(self):
+        """The red count beside Software Update: the updates Beacon found."""
+        count = len(update_notice.load().get("ids") or [])
+        self.update_count.set_text(str(count))
+        self.update_count.set_visible(count > 0)
 
     def _show_selected(self):
         row = self.sidebar.get_selected_row()

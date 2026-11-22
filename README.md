@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.117 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.118 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -101,6 +101,7 @@ one of them will be reverted.
 | Mission Control: add a desktop with + (or drag a window onto it), close one with the button on its corner; the count is kept | **Strata**, **Topline** | 1.110 |
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
+| Dials shows a red count beside Software Update when updates are ready, and Dock badges come back if the Dock restarts | **Dials**, **Pier** | 1.118 |
 | Software update notices: freemac looks for updates once a day, says when some are ready, and Harbor's Dock icon shows how many | **Beacon**, **Harbor**, **Pier** | 1.117 |
 | Windows come forward when you ask: open a link or an app that's already open and its window comes to the front, on its own desktop; an app in the background that needs you bounces in the Dock until you go to it | **Strata**, **Pier** | 1.116 |
 | Dock badges: a red number on an app's icon for unread mail in Post, reminders due in Nudge, or any app that sends a count | **Pier**, **Post**, **Nudge** | 1.115 |
