@@ -1038,6 +1038,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Night Light's schedule: Sunset to Sunrise or Custom hours | Dials | done |
 | 4 | Guide topics for Auto and Night Light | Guide | done |
 
+## 1.102 "drawer settings" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Drawer > Settings… (⌘,) with General and Advanced | Drawer | done |
+| 2 | Choose the folder new Drawer windows open in | Drawer | done |
+| 3 | Turn off the warning before emptying the Trash, in Drawer and the Dock | Drawer, Dock | done |
+| 4 | Remove items from the Trash after 30 days | Drawer, Topline | done |
+| 5 | Keep folders on top when sorting, or mix them in | Drawer | done |
+| 6 | A Guide topic | Guide | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

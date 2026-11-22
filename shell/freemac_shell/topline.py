@@ -1298,6 +1298,15 @@ def main():
     from . import auto_mode
     win.auto_mode = auto_mode.Follower()
     win.auto_mode.start()
+    # Remove items from the Trash after 30 days, if Drawer's settings say so.
+    from . import drawer_settings, transfer
+
+    def purge_trash():
+        if drawer_settings.get("trash_after_30_days"):
+            transfer.purge_old_trash(30)
+        return True
+    GLib.timeout_add_seconds(30, lambda: purge_trash() and False)
+    GLib.timeout_add_seconds(6 * 3600, purge_trash)
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()

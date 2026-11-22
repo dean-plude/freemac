@@ -348,6 +348,11 @@ class TrashCan(Place):
         return True
 
     def ask_to_empty(self):
+        from . import drawer_settings
+        if not drawer_settings.get("warn_empty_trash"):
+            empty_trash()
+            self.update()
+            return
         count = len(trash_items())
         answer = alert.ask(None, "Are you sure you want to permanently erase the items in the Trash?"
                            if count != 1 else "Are you sure you want to permanently erase the item in the Trash?",

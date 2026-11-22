@@ -699,6 +699,12 @@ TOPICS = {
         "Tap a modifier twice to lock it, and once more to let it go.",
         "Press Shift five times again to turn Sticky Keys off.",
     ]),
+    "drawer-settings": ("Change Drawer's settings", "drawer settings preferences finder new window opens folder trash empty 30 days automatically warning folders on top sort", [
+        "In Drawer, choose Drawer > Settings, or press \u2318,.",
+        "General: pick the folder new Drawer windows open in.",
+        "Advanced: turn the warning before emptying the Trash on or off, have items removed from the Trash "
+        "after 30 days, and keep folders on top when sorting.",
+    ]),
     "night-light": ("Make the screen warmer at night", "night light shift warm warmer yellow orange blue light eyes sleep evening sunset sunrise schedule colour temperature", [
         "Choose Dials > Displays and turn on Night Light.",
         "Set Schedule to Sunset to Sunrise to follow the sun where you are, or to Custom to pick the hours.",
