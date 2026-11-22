@@ -975,6 +975,13 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 1 | The menu bar, the Dock and the files on the Desktop sit on the main display, and move when it changes or is unplugged (the built-in display first, then the first one) | Topline, Pier, Backdrop | done |
 | 2 | Choose the main display in Dials > Displays: Use as Main display, or drag the white bar in the picture to another display | Dials | done |
 
+## 1.94 "screen flash" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Flash every display white for a moment, through Strata's IPC method strata/flash | Strata | done |
+| 2 | Flash the screen when an alert sound occurs, in Dials > Accessibility, even with the alert sound turned down; Test Screen Flash shows how it looks | Dials, freemac-sound | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

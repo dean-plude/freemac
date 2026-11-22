@@ -11,13 +11,19 @@
 The sounds are made by art/sounds/make-sounds.py. The choices are kept in
 ~/.config/freemac/shell.json:
     "alert_sound": "pebble", "alert_volume": 70,
-    "volume_feedback": true, "ui_sounds": true
+    "volume_feedback": true, "ui_sounds": true, "flash_screen": false
+
+With "flash_screen" on (Dials > Accessibility, "Flash the screen when an
+alert sound occurs"), every display also flashes white with the alert
+sound, through Strata's IPC method strata/flash, even with the alert
+volume turned all the way down.
 
 Every GTK app's own alert (a Backspace with nothing to delete, say) reaches
 the compositor as gtk_shell1's system bell, and Strata's shell plugin runs
 `freemac-sound alert` for it, so those play the same sound:
 
     freemac-sound alert            the chosen alert sound
+    freemac-sound flash            flash the screen, as the alert can
     freemac-sound preview NAME     an alert sound by name, at the alert volume
     freemac-sound pop | trash | shutter
 
@@ -27,6 +33,8 @@ command starts without loading GTK. Original freemac code.
 import json
 import os
 import shutil
+import socket
+import struct
 import subprocess
 import sys
 import time
@@ -74,8 +82,39 @@ def ui_sounds():
     return bool(_prefs().get("ui_sounds", True))
 
 
+def flash_screen():
+    return bool(_prefs().get("flash_screen", False))
+
+
+def flash():
+    """Flash every display once (Strata's strata/flash); False if Strata
+    couldn't be asked. Talks to Wayfire's socket directly, as wfipc does,
+    so that `freemac-sound alert` still starts without GTK."""
+    path = os.environ.get("WAYFIRE_SOCKET") or \
+        f"/tmp/wayfire-{os.environ.get('WAYLAND_DISPLAY', 'wayland-1')}.socket"
+    raw = json.dumps({"method": "strata/flash", "data": {}}).encode()
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            sock.connect(path)
+            sock.sendall(struct.pack("<I", len(raw)) + raw)
+            sock.recv(64)
+    except OSError:
+        return False
+    return True
+
+
 def path_of(name):
     return os.path.join(DIR, f"{name}.wav")
+
+
+def _first(key, gap=0.12):
+    """True unless `key` was asked for within `gap` seconds."""
+    now = time.monotonic()
+    if now - _last.get(key, -gap) < gap:
+        return False
+    _last[key] = now
+    return True
 
 
 def play(path, volume=100, gap=0.12):
@@ -83,10 +122,8 @@ def play(path, volume=100, gap=0.12):
     The same sound asked for again within `gap` seconds plays once."""
     if volume <= 0 or not os.path.exists(path):
         return False
-    now = time.monotonic()
-    if now - _last.get(path, -gap) < gap:
+    if not _first(path, gap):
         return True
-    _last[path] = now
     level = volume / 100
     for cmd in (["pw-play", f"--volume={level:.2f}", path],
                 ["paplay", f"--volume={int(level * 65536)}", path],
@@ -103,6 +140,8 @@ def play(path, volume=100, gap=0.12):
 
 def alert(name=None, volume=None):
     """The alert sound: what a Mac plays when something can't be done."""
+    if name is None and flash_screen() and _first("flash"):
+        flash()
     return play(path_of("alert-" + (name or alert_name())),
                 alert_volume() if volume is None else volume)
 
@@ -131,6 +170,8 @@ def main(argv=None):
         alert()
     elif what == "preview" and len(args) > 1 and args[1] in dict(ALERTS):
         alert(args[1])
+    elif what == "flash":
+        return 0 if flash() else 1
     elif what == "pop":
         feedback()
     elif what in ("trash", "shutter"):

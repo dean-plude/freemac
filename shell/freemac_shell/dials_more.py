@@ -364,7 +364,20 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), *spoken_content(window))
+    ), audio(window), *spoken_content(window))
+
+
+def audio(window):
+    """Audio: flash the screen with the alert sound, as a Mac can, for
+    anyone who can't hear it, with a button to see what it looks like."""
+    group, row, _page, _slider, switch = window.helpers
+    test = Gtk.Button(label="Test Screen Flash", valign=Gtk.Align.CENTER)
+    test.connect("clicked", lambda _b: sounds.flash())
+    return group(
+        row("Flash the screen when an alert sound occurs",
+            switch(sounds.flash_screen(), lambda on: window.save_prefs(flash_screen=on)),
+            "Every display flashes when there's an alert, even with the sound turned down."),
+        row("See how it looks", test))
 
 
 def spoken_content(window):

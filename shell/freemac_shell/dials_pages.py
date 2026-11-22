@@ -41,7 +41,7 @@ SEARCH_WORDS = {
     "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode theme accent colour color highlight purple pink red orange yellow green graphite text size tiling",
-    "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors speak selection speech read aloud out loud voice spoken content text to speech",
+    "accessibility": "zoom contrast larger text reduce motion screen reader transparency solid invert colours colors speak selection speech read aloud out loud voice spoken content text to speech flash screen alert visual bell hearing deaf",
     "seek": "spotlight search results privacy private folders index rebuild find launcher command space hide",
     "dock": "hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light scale monitor",

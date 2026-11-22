@@ -41,6 +41,7 @@
 #include "window-snapshot.hpp"
 #include "minimize-glide.hpp"
 #include "sheets.hpp"
+#include "screen-flash.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -856,6 +857,16 @@ class strata_shell_impl : public wf::plugin_interface_t
         return out;
     };
 
+    strata_flash::flashes_t flashes;
+
+    /* Flash every display once, for "Flash the screen when an alert sound
+     * occurs". The alert sound's player calls it. */
+    wf::ipc::method_callback flash_screen = [=] (nlohmann::json)
+    {
+        flashes.flash();
+        return wf::ipc::json_ok();
+    };
+
   public:
     void init() override
     {
@@ -877,6 +888,8 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/hidden", list_hidden);
         method_repository->register_method("strata/input-source", input_source);
         method_repository->register_method("strata/outputs", list_outputs);
+        method_repository->register_method("strata/flash", flash_screen);
+        flashes.init();
         window_places.init();
         command_key.init();
         glides.init();
