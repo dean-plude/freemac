@@ -5,6 +5,7 @@
 # libwayland-bin and nlohmann-json3-dev installed (and libgtk-3-dev for the
 # lock screen module).
 # Usage: build.sh OUTDIR   -> OUTDIR/libstrata-decor.so, OUTDIR/libstrata-shell.so,
+#                             OUTDIR/libfreemac-zoom.so (GTK 3 module),
 #                             OUTDIR/freemac-latch.so (with gtklock 2.1)
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -37,6 +38,15 @@ gcc -O2 -fPIC -c "$GEN/gtk-shell-protocol.c" -o "$GEN/gtk-shell-protocol.o" $(pk
 g++ $FLAGS $CFLAGS -I"$GEN" "$HERE/shell/strata-shell.cpp" "$GEN/gtk-shell-protocol.o" \
   -o "$OUT/libstrata-shell.so" $(pkg-config --libs cairo)
 echo "strata: built $OUT/libstrata-shell.so"
+
+# The GTK 3 module that lets an app's own green button open Topline's
+# Move & Resize menu (see gtk/freemac-zoom.c).
+if pkg-config --exists gtk+-3.0; then
+  # shellcheck disable=SC2046
+  gcc -O2 -fPIC -shared $(pkg-config --cflags gtk+-3.0) "$HERE/gtk/freemac-zoom.c" \
+    -o "$OUT/libfreemac-zoom.so" $(pkg-config --libs gtk+-3.0)
+  echo "strata: built $OUT/libfreemac-zoom.so"
+fi
 
 # Latch: the gtklock module that lays the lock screen out like the login
 # screen. It follows gtklock 2.1's structures, so it's only built for that.

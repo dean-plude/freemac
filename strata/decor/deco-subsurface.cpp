@@ -26,6 +26,51 @@
 #include <wayfire/plugins/common/cairo-util.hpp>
 
 #include <cairo.h>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <wayfire/util.hpp>
+
+/* Strata: the green button's menu. Resting the pointer on the green button
+ * asks Topline to open it ("tiles VIEW X Y", X and Y just under the button
+ * in the layout); moving off it says "leave VIEW". Topline keeps the menu
+ * open while the pointer is on it (shell/freemac_shell/window_tiles.py). */
+static const int TILES_AFTER_MS = 550;
+
+static void tell_topline(const std::string& line)
+{
+    const char *dir = std::getenv("XDG_RUNTIME_DIR");
+    if (!dir)
+    {
+        return;
+    }
+
+    sockaddr_un address{};
+    address.sun_family = AF_UNIX;
+    std::string path   = std::string(dir) + "/freemac-topline.sock";
+    if (path.size() >= sizeof(address.sun_path))
+    {
+        return;
+    }
+
+    std::strcpy(address.sun_path, path.c_str());
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+    {
+        return;
+    }
+
+    if (connect(fd, (sockaddr*)&address, sizeof(address)) == 0)
+    {
+        std::string text = line + "\n";
+        send(fd, text.data(), text.size(), MSG_NOSIGNAL);
+    }
+
+    close(fd);
+}
 
 class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_interaction_t,
     public wf::touch_interaction_t
@@ -281,12 +326,69 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     void handle_pointer_leave() override
     {
         layout.handle_focus_lost();
+        zoom_hover(false);
     }
 
     void handle_pointer_motion(wf::pointf_t to, uint32_t) override
     {
         to -= wf::pointf_t{get_offset()};
         handle_action(layout.handle_motion(to.x, to.y));
+        wf::geometry_t box;
+        bool on = layout.zoom_button_at({(int)to.x, (int)to.y}, box);
+        if (on)
+        {
+            zoom_box   = box;
+            zoom_point = {(int)to.x, (int)to.y};
+        }
+
+        zoom_hover(on);
+    }
+
+    /* The green button's menu: wait for the pointer to rest, then ask. */
+    wf::wl_timer<false> zoom_timer;
+    bool zoom_hovered = false;
+    bool tiles_asked  = false;
+    wf::geometry_t zoom_box{};
+    wf::point_t zoom_point{};
+
+    void zoom_hover(bool on)
+    {
+        if (on == zoom_hovered)
+        {
+            return;
+        }
+
+        zoom_hovered = on;
+        zoom_timer.disconnect();
+        if (on)
+        {
+            zoom_timer.set_timeout(TILES_AFTER_MS, [=] () { ask_for_tiles(); });
+        } else if (tiles_asked)
+        {
+            tiles_asked = false;
+            if (auto view = _view.lock())
+            {
+                tell_topline("leave " + std::to_string(view->get_id()));
+            }
+        }
+    }
+
+    void ask_for_tiles()
+    {
+        auto view = _view.lock();
+        if (!view || view->toplevel()->current().fullscreen || !zoom_hovered)
+        {
+            return;
+        }
+
+        // The pointer is on the button: work out where the button is on
+        // the screen from where the pointer is on it.
+        auto cursor = wf::get_core().get_cursor_position();
+        int x = (int)cursor.x - (zoom_point.x - zoom_box.x);
+        int y = (int)cursor.y - (zoom_point.y - zoom_box.y) + zoom_box.height;
+        tiles_asked = true;
+        tell_topline("tiles " + std::to_string(view->get_id()) + " " +
+            std::to_string(x) + " " + std::to_string(y));
     }
 
     void handle_pointer_button(const wlr_pointer_button_event& ev) override
@@ -294,6 +396,21 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         if (ev.button != BTN_LEFT)
         {
             return;
+        }
+
+        if (ev.state == WLR_BUTTON_PRESSED)
+        {
+            // A click on the green button does its own job; no menu.
+            zoom_timer.disconnect();
+            zoom_hovered = false;
+            if (tiles_asked)
+            {
+                tiles_asked = false;
+                if (auto view = _view.lock())
+                {
+                    tell_topline("leave " + std::to_string(view->get_id()));
+                }
+            }
         }
 
         handle_action(layout.handle_press_event(ev.state == WLR_BUTTON_PRESSED));

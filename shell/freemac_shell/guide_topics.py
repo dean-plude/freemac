@@ -30,7 +30,7 @@ TOPICS = {
         "An app stays open after its last window closes, with a dot under it in the Dock. "
         "⌘Q quits it.",
     ]),
-    "windows": ("Arrange windows", "window close tile half quarter fill center minimize zoom full screen resize move desktop previous size", [
+    "windows": ("Arrange windows", "window close tile half quarter fill center centre minimize zoom full screen resize move desktop previous size green button side by side left right", [
         "The three round buttons at the top left of a window close it, minimize it into the Dock, "
         "and zoom it.",
         "Drag a window to the left or right edge to fill that half of the screen, "
@@ -42,6 +42,8 @@ TOPICS = {
         "Window > Fill and Window > Center in the menu bar work on the window in front.",
         "Window > Move & Resize puts the window in a half or a quarter of the screen. "
         "Return to Previous Size there puts it back as it was.",
+        "Rest the pointer on the green button for a moment to choose the same places from pictures. "
+        "Left & Right puts the window on the left and the one you used before it on the right.",
     ]),
     "screen-zoom": ("Zoom in on the screen", "zoom magnify enlarge screen bigger accessibility scroll see", [
         "Hold ⌘ and scroll up to zoom in on the part of the screen under the pointer. "

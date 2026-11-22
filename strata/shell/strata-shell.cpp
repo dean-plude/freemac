@@ -867,6 +867,28 @@ class strata_shell_impl : public wf::plugin_interface_t
         return wf::ipc::json_ok();
     };
 
+    /* strata/pointer: where the pointer is, in the layout's coordinates, and
+     * the app window under it (view 0 when none). Topline asks when the
+     * pointer rests on an app's own green button, which only the app sees. */
+    wf::ipc::method_callback pointer = [=] (nlohmann::json)
+    {
+        auto at  = wf::get_core().get_cursor_position();
+        auto out = wf::ipc::json_ok();
+        out["x"]    = (int)at.x;
+        out["y"]    = (int)at.y;
+        out["view"] = 0;
+        if (auto view = wf::get_core().get_cursor_focus_view())
+        {
+            view = wf::find_topmost_parent(view);
+            if (view && (view->role == wf::VIEW_ROLE_TOPLEVEL))
+            {
+                out["view"] = view->get_id();
+            }
+        }
+
+        return out;
+    };
+
   public:
     void init() override
     {
@@ -889,6 +911,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         method_repository->register_method("strata/input-source", input_source);
         method_repository->register_method("strata/outputs", list_outputs);
         method_repository->register_method("strata/flash", flash_screen);
+        method_repository->register_method("strata/pointer", pointer);
         flashes.init();
         window_places.init();
         command_key.init();
