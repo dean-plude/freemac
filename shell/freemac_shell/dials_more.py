@@ -373,7 +373,34 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), audio(window), *spoken_content(window))
+    ), sticky_keys(window), audio(window), *spoken_content(window))
+
+
+def sticky_keys(window):
+    """Sticky Keys, as on a Mac: a modifier key tapped on its own stays down
+    for the next key (strata-shell/sticky_keys, done by Strata), with what
+    Topline shows and plays while one is set (sticky.py)."""
+    group, row, _page, _slider, switch = window.helpers
+
+    def on(key, default):
+        value = window.ini_get("strata-shell", key, default) or default
+        return value.strip().lower() not in ("false", "0", "no", "off")
+
+    def setter(key):
+        return lambda value: window.ini_set("strata-shell", key, "true" if value else "false")
+
+    prefs = style.prefs()
+    return group(
+        row("Sticky Keys", switch(on("sticky_keys", "false"), setter("sticky_keys")),
+            "Tap \u21e7 Shift, \u2303 Control, \u2325 Option or \u2318 Command and it stays down for "
+            "the next key you press. Tap it twice to lock it, and once more to let it go."),
+        row("Press Shift five times to turn Sticky Keys on or off",
+            switch(on("sticky_keys_shift", "true"), setter("sticky_keys_shift"))),
+        row("Beep when a modifier key is set",
+            switch(prefs.get("sticky_beep", True), lambda value: window.save_prefs(sticky_beep=value))),
+        row("Show pressed modifier keys on screen",
+            switch(prefs.get("sticky_show", True), lambda value: window.save_prefs(sticky_show=value)),
+            "Their symbols show in the top-right corner while they're set."))
 
 
 def audio(window):

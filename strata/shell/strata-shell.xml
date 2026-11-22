@@ -20,6 +20,16 @@
 			<_long>Holding a letter such as e in a text field shows its accented forms to pick from, instead of repeating it.</_long>
 			<default>true</default>
 		</option>
+		<option name="sticky_keys" type="bool">
+			<_short>Sticky Keys</_short>
+			<_long>A modifier key tapped on its own stays down for the next key; tapped twice it locks.</_long>
+			<default>false</default>
+		</option>
+		<option name="sticky_keys_shift" type="bool">
+			<_short>Press Shift five times to turn Sticky Keys on or off</_short>
+			<_long>Five taps of Shift in a row turn Sticky Keys on, or off again.</_long>
+			<default>true</default>
+		</option>
 		<option name="command_key" type="bool">
 			<_short>Super is the Command key</_short>
 			<_long>Super with a key does in apps what Ctrl with it does (Ctrl+Shift in a terminal); Super+Left/Right/Up/Down and Alt+Left/Right/Backspace move through text as on a Mac.</_long>

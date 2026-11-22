@@ -249,6 +249,17 @@ plugins stay in use.
   (strata/im, started by Topline) is a quiet input method that does nothing
   else; an app that says nothing gets the panel by its window and the
   accent through wtype (`strata-shell/press_and_hold`).
+  `sticky-keys.hpp` (1.98) is Sticky Keys: a modifier key tapped on its
+  own (Shift, Control, Option or Command, by what the layout makes the key)
+  stays down for the next key, and a second tap locks it until a third.
+  Strata only watches the keys; once a tap counts, it sets the sticky
+  modifiers on the keyboard itself with `wlr_keyboard_notify_modifiers`
+  when the key event is over (wlroots updates the keyboard's state after
+  the event), so apps, Wayfire's bindings and the Command key all see them
+  held. A latched one is let go just after the next key. Five Shifts in a
+  row turn it on or off (`strata-shell/sticky_keys`,
+  `strata-shell/sticky_keys_shift`); Topline saves that and shows the
+  modifiers that are set in the top-right corner ("sticky state ...").
 
 Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 

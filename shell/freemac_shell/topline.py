@@ -1283,9 +1283,12 @@ def main():
     from . import window_tiles
     win.tiles = window_tiles.TilesPanel(win)
     # Press and hold a letter for its accents (accents.py), shown by Strata.
-    from . import accents
+    # Sticky Keys' symbols in the corner (sticky.py), from Strata too.
+    from . import accents, sticky
     win.accents = accents.AccentPanel()
-    win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle})
+    win.sticky = sticky.StickyPanel()
+    win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle,
+                                                        "sticky": win.sticky.handle})
     accents.start_input_method()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
