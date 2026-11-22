@@ -932,6 +932,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | Turning off Words inside documents forgets what Seek had read; Rebuild Index reads them all again | Dials, Seek | done |
 | 4 | Seek is on Dials' View menu and found by searching Dials or Seek for "spotlight", "privacy" or "index" | Dials | done |
 
+## 1.89 "downtime" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Downtime in Logbook: hours of each day (overnight too) when only Always Allowed apps can be used; other apps close when brought to the front, with a notice five minutes before it starts | Logbook | done |
+| 2 | Always Allowed: + and − to choose apps that work in downtime and have no daily limit; freemac's own Drawer, Dials, Guide and Logbook always work | Logbook | done |
+| 3 | 15 More Minutes: on an app whose time is up, and to hold off downtime for a while | Logbook | done |
+| 4 | The passcode guards downtime, Always Allowed and more time as well as limits | Logbook | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

@@ -240,14 +240,22 @@ TOPICS = {
         "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
         "Press Return for the next lesson.",
     ]),
-    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time "
+    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time downtime bedtime always allowed more minutes "
                    "adult websites content filter block sites family safe", [
         "Logbook shows how long each app was used. Press ⌘Space, type Logbook and press Return.",
         "Today shows each hour of the day, and Last 7 Days shows each day of the week, with the apps used most "
         "at the top. Time only counts while someone is using the computer, not while it's locked or left alone.",
         "To limit an app, click Set Limit beside it and choose how long it may be used each day. Five minutes "
         "before the time is up a notice says so, and at the limit its windows close until the next day.",
-        "Choose Limits ▸ Passcode… to set a passcode, so that only someone who knows it can change a limit.",
+        "When an app's time is up, click Time's Up beside it and choose 15 More Minutes to give it a little "
+        "longer today.",
+        "Turn on Downtime and choose the hours, such as 9:00 PM to 7:00 AM, for time away from the screen. "
+        "Only the apps under Always Allowed, and Drawer, Dials and Guide, can be used then. A notice comes "
+        "five minutes before it starts, and 15 More Minutes holds it off for a while.",
+        "Click + under Always Allowed to add an app that should always work, such as Jot for homework. "
+        "Always Allowed apps have no daily limit either.",
+        "Choose Limits ▸ Passcode… to set a passcode, so that only someone who knows it can change a limit, "
+        "downtime or Always Allowed, or give more time.",
         "Turn on Limit adult websites, under Content, to keep websites for grown-ups from opening in any browser "
         "on the computer. It needs an administrator's password, and the passcode if there is one.",
     ]),

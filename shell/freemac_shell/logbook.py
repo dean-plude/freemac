@@ -10,7 +10,11 @@ Time counts only while someone is using the computer: not while the screen is
 locked, nor after two minutes with no typing or mouse movement (swayidle).
 An app with a daily limit gets a notice five minutes before its time is up;
 at the limit its windows close, and they close again if it's opened later
-that day. A passcode, if one is set, is needed to change a limit.
+that day, unless someone gives it more time. Downtime is a part of each day
+(bedtime, say) when only the apps you always allow can be used, with a notice
+five minutes before it starts; freemac's own Drawer, Dials, Guide and Logbook
+always work. Apps you always allow have no daily limit either. A passcode, if
+one is set, is needed to change any of this.
 
 Original freemac code. Each day's times are kept in
 ~/.local/share/freemac/logbook/DATE.json (five weeks of them), limits and the
@@ -79,7 +83,104 @@ def load_config():
     data = read_json(CONFIG)
     limits = data.get("limits") if isinstance(data.get("limits"), dict) else {}
     data["limits"] = {k: int(v) for k, v in limits.items() if isinstance(v, int) and v > 0}
+    allowed = data.get("allowed") if isinstance(data.get("allowed"), list) else []
+    data["allowed"] = [a for a in allowed if isinstance(a, str) and a.endswith(".desktop")]
+    down = data.get("downtime") if isinstance(data.get("downtime"), dict) else {}
+    data["downtime"] = {"on": down.get("on") is True,
+                        "start": _minutes(down.get("start"), DOWNTIME_START),
+                        "end": _minutes(down.get("end"), DOWNTIME_END),
+                        "paused": down.get("paused") if isinstance(down.get("paused"), (int, float)) else 0}
+    extra = data.get("extra") if isinstance(data.get("extra"), dict) else {}
+    given = extra.get("apps") if isinstance(extra.get("apps"), dict) else {}
+    data["extra"] = {"day": extra.get("day") if isinstance(extra.get("day"), str) else "",
+                     "apps": {k: int(v) for k, v in given.items() if isinstance(v, int) and v > 0}}
     return data
+
+
+# ---- Downtime and Always Allowed --------------------------------------------------
+DOWNTIME_START = 22 * 60   # minutes after midnight
+DOWNTIME_END = 7 * 60
+MORE_TIME = 15             # minutes, for "15 More Minutes"
+
+# freemac's own apps, which keep working in downtime and have no limit: the
+# desktop and Drawer, Dials, Guide, Logbook, Force Quit, the password and
+# Restart questions, and Seek.
+ALWAYS_IDS = {"freemac-drawer", "org.freemac.drawer", "freemac-backdrop", "freemac-desktop-window",
+              "freemac-dials", "org.freemac.dials", "freemac-guide", "org.freemac.guide",
+              "freemac-logbook", "org.freemac.logbook", "freemac-force-quit", "org.freemac.forcequit",
+              "freemac-power", "freemac-seek", "freemac-hail", "gtklock",
+              "polkit-mate-authentication-agent-1"}
+ALWAYS_DESKTOP = {"freemac-drawer.desktop", "freemac-dials.desktop", "freemac-guide.desktop",
+                  "freemac-logbook.desktop", "freemac-force-quit.desktop"}
+
+
+def _minutes(text, fallback):
+    """"21:30" -> 1290 minutes after midnight (a number is taken as minutes)."""
+    if isinstance(text, int) and not isinstance(text, bool):
+        return text if 0 <= text < 1440 else fallback
+    try:
+        hour, minute = (int(part) for part in str(text).split(":"))
+    except (TypeError, ValueError):
+        return fallback
+    return hour * 60 + minute if 0 <= hour < 24 and 0 <= minute < 60 else fallback
+
+
+def hhmm(minutes):
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def clock(minutes):
+    """How the menu bar would write the time: 9:30 PM, or 21:30."""
+    when = datetime.time(minutes // 60 % 24, minutes % 60)
+    return when.strftime("%H:%M") if style.prefs().get("clock") == "24" else when.strftime("%-I:%M %p")
+
+
+def in_downtime(config, now=None):
+    down = config["downtime"]
+    now = now or datetime.datetime.now()
+    if not down["on"] or down["start"] == down["end"] or down["paused"] > now.timestamp():
+        return False
+    minute = now.hour * 60 + now.minute
+    if down["start"] < down["end"]:
+        return down["start"] <= minute < down["end"]
+    return minute >= down["start"] or minute < down["end"]   # past midnight
+
+
+def minutes_to_downtime(config, now=None):
+    """Minutes until downtime starts, or None while it's on or turned off."""
+    down = config["downtime"]
+    now = now or datetime.datetime.now()
+    if not down["on"] or down["start"] == down["end"] or in_downtime(config, now):
+        return None
+    return (down["start"] - (now.hour * 60 + now.minute)) % 1440
+
+
+def desktop_id(app):
+    info = apps.app_info(app)
+    return info.get_id() if info else None
+
+
+def always_allowed(config, app):
+    if app.lower() in ALWAYS_IDS:
+        return True
+    found = desktop_id(app)
+    return bool(found) and (found in ALWAYS_DESKTOP or found in config["allowed"])
+
+
+def extra_minutes(config, app, day=None):
+    extra = config["extra"]
+    if extra["day"] != (day or datetime.date.today()).isoformat():
+        return 0
+    return extra["apps"].get(app, 0)
+
+
+def limit_for(config, app):
+    """Minutes the app may be used today, counting any time given since; None
+    for no limit."""
+    limit = config["limits"].get(app)
+    if not limit or always_allowed(config, app):
+        return None
+    return limit + extra_minutes(config, app)
 
 
 # Limit adult websites: a NetworkManager setting written by the helper.
@@ -221,7 +322,22 @@ class Tracker:
         self._account()
         self.locked = self._locked()
         self._check_limit()
+        self._warn_downtime()
         return True
+
+    def _warn_downtime(self):
+        self._reload_config()
+        left = minutes_to_downtime(self.config)
+        if left is None or left > 5:
+            return
+        key = ("downtime", self.today.isoformat(), self.config["downtime"]["start"])
+        if key in self.warned:
+            return
+        self.warned.add(key)
+        down = self.config["downtime"]
+        notify(f"Downtime starts in {left} minute{'s' if left != 1 else ''}" if left else "Downtime is starting",
+               f"From {clock(down['start'])} until {clock(down['end'])}, only the apps you always allow "
+               "can be used.")
 
     def _reload_config(self):
         try:
@@ -237,11 +353,25 @@ class Tracker:
         if not app:
             return
         self._reload_config()
-        limit = self.config["limits"].get(app)
-        if not limit or app.lower() in OWN_IDS:
+        if app.lower() in OWN_IDS:
+            return
+        name = apps.display_name(app)
+        if in_downtime(self.config) and not always_allowed(self.config, app):
+            now = time.monotonic()
+            if now - self.stopped_at.get(("downtime", app), -999) > 20:
+                self.stopped_at[("downtime", app)] = now
+                notify(f"{name} is off during downtime",
+                       f"It can be used again at {clock(self.config['downtime']['end'])}.")
+            if self.wf:
+                try:
+                    self.wf.quit(app)
+                except (OSError, ConnectionError, ValueError):
+                    pass
+            return
+        limit = limit_for(self.config, app)
+        if not limit:
             return
         used = self.day["apps"].get(app, 0.0)
-        name = apps.display_name(app)
         if used >= limit * 60:
             now = time.monotonic()
             if now - self.stopped_at.get(app, -999) > 20:
@@ -253,8 +383,8 @@ class Tracker:
                     self.wf.quit(app)
                 except (OSError, ConnectionError, ValueError):
                     pass
-        elif used >= limit * 60 - WARN_BEFORE and app not in self.warned:
-            self.warned.add(app)
+        elif used >= limit * 60 - WARN_BEFORE and (app, limit) not in self.warned:
+            self.warned.add((app, limit))
             left = max(1, round((limit * 60 - used) / 60))
             notify(f"{left} minute{'s' if left != 1 else ''} left for {name}",
                    f"{name} has a limit of {duration(limit * 60)} a day.")
@@ -450,6 +580,8 @@ class Window(Gtk.ApplicationWindow):
         page.pack_start(self.empty, False, False, 12)
         self.empty.set_no_show_all(True)
         self.list.set_no_show_all(True)
+        page.pack_start(self._downtime_box(), False, False, 18)
+        page.pack_start(self._allowed_box(), False, False, 0)
         page.pack_start(self._websites_box(), False, False, 18)
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroller.add(page)
@@ -466,6 +598,190 @@ class Window(Gtk.ApplicationWindow):
         self.refresh()
         GLib.timeout_add_seconds(30, self._timer)
         self.show_all()
+
+    # ---- Downtime and Always Allowed ----------------------------------------------
+    def _section(self, title):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        heading = Gtk.Label(xalign=0)
+        heading.set_markup(f"<b>{title}</b>")
+        box.pack_start(heading, False, False, 0)
+        frame = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        frame.get_style_context().add_class("frame")
+        box.pack_start(frame, False, False, 0)
+        return box, frame
+
+    @staticmethod
+    def _line():
+        line = Gtk.Box(spacing=12)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(line, "set_margin_" + side)(10)
+        return line
+
+    def _time_combo(self, minutes):
+        combo = Gtk.ComboBoxText()
+        for step in range(0, 1440, 30):
+            combo.append(hhmm(step), clock(step))
+        if minutes % 30:
+            combo.append(hhmm(minutes), clock(minutes))
+        combo.set_active_id(hhmm(minutes))
+        combo.connect("changed", lambda _c: self._downtime_changed())
+        return combo
+
+    def _downtime_box(self):
+        box, frame = self._section("Downtime")
+        down = self.config["downtime"]
+        line = self._line()
+        words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        words.pack_start(Gtk.Label(label="Downtime", xalign=0), False, False, 0)
+        note = Gtk.Label(label="Time away from the screen. Only the apps you always allow, and freemac's own "
+                               "Drawer, Dials and Guide, can be used. A notice comes five minutes before.",
+                         xalign=0, wrap=True)
+        note.get_style_context().add_class("dim-label")
+        words.pack_start(note, False, False, 0)
+        line.pack_start(words, True, True, 0)
+        self.downtime_switch = Gtk.Switch(active=down["on"], valign=Gtk.Align.CENTER)
+        self.downtime_switch.connect("notify::active", lambda *_: self._downtime_changed())
+        line.pack_end(self.downtime_switch, False, False, 0)
+        frame.add(line)
+        times = self._line()
+        times.pack_start(Gtk.Label(label="From"), False, False, 0)
+        self.downtime_from = self._time_combo(down["start"])
+        times.pack_start(self.downtime_from, False, False, 0)
+        times.pack_start(Gtk.Label(label="to"), False, False, 0)
+        self.downtime_to = self._time_combo(down["end"])
+        times.pack_start(self.downtime_to, False, False, 0)
+        times.pack_start(Gtk.Label(label="every day"), False, False, 0)
+        frame.add(times)
+        now = self._line()
+        self.downtime_now = Gtk.Label(xalign=0)
+        now.pack_start(self.downtime_now, True, True, 0)
+        more = Gtk.Button(label=f"{MORE_TIME} More Minutes")
+        more.connect("clicked", lambda _b: self._pause_downtime())
+        now.pack_end(more, False, False, 0)
+        self.downtime_now_row = Gtk.ListBoxRow(activatable=False)
+        self.downtime_now_row.add(now)
+        self.downtime_now_row.set_no_show_all(True)
+        frame.add(self.downtime_now_row)
+        self._downtime_shown()
+        return box
+
+    def _downtime_shown(self):
+        """Put the switch and times back as they're kept, and say whether
+        downtime is on now."""
+        self.updating = True
+        down = self.config["downtime"]
+        self.downtime_switch.set_active(down["on"])
+        for combo, minutes in ((self.downtime_from, down["start"]), (self.downtime_to, down["end"])):
+            if not combo.set_active_id(hhmm(minutes)):
+                combo.append(hhmm(minutes), clock(minutes))
+                combo.set_active_id(hhmm(minutes))
+            combo.set_sensitive(down["on"])
+        self.updating = False
+        if in_downtime(self.config):
+            self.downtime_now.set_text(f"Downtime until {clock(down['end'])}")
+            self.downtime_now_row.get_child().show_all()   # the row ignores show_all
+            self.downtime_now_row.show()
+        else:
+            self.downtime_now_row.hide()
+
+    def _change_config(self, change, ask):
+        """Re-read the settings, ask for the passcode if there is one, then
+        change and keep them. Returns whether it was changed."""
+        self.config = load_config()
+        if self.config.get("passcode") and not self.ask_passcode(ask):
+            return False
+        change(self.config)
+        write_json(CONFIG, {**self.config, "downtime": {**self.config["downtime"],
+                                                        "start": hhmm(self.config["downtime"]["start"]),
+                                                        "end": hhmm(self.config["downtime"]["end"])}})
+        self.config = load_config()
+        return True
+
+    def _downtime_changed(self):
+        if getattr(self, "updating", False):
+            return
+        on = self.downtime_switch.get_active()
+        start = _minutes(self.downtime_from.get_active_id(), DOWNTIME_START)
+        end = _minutes(self.downtime_to.get_active_id(), DOWNTIME_END)
+
+        def change(config):
+            config["downtime"].update(on=on, start=start, end=end, paused=0)
+        self._change_config(change, "Enter the passcode to change downtime.")
+        self._downtime_shown()
+
+    def _pause_downtime(self):
+        until = time.time() + MORE_TIME * 60
+        if self._change_config(lambda config: config["downtime"].update(paused=until),
+                               f"Enter the passcode to give {MORE_TIME} more minutes."):
+            self._downtime_shown()
+
+    def _allowed_box(self):
+        box, self.allowed_list = self._section("Always Allowed")
+        add = Gtk.Button(label="+", tooltip_text="Always allow an app", halign=Gtk.Align.START)
+        add.connect("clicked", lambda _b: self._add_allowed())
+        box.pack_start(add, False, False, 0)
+        note = Gtk.Label(label="These apps can be used during downtime, and have no daily limit.",
+                         xalign=0, wrap=True)
+        note.get_style_context().add_class("dim-label")
+        box.pack_start(note, False, False, 0)
+        self._fill_allowed()
+        return box
+
+    def _fill_allowed(self):
+        for row in self.allowed_list.get_children():
+            self.allowed_list.remove(row)
+        found = []
+        for desktop in self.config["allowed"]:
+            try:
+                info = Gio.DesktopAppInfo.new(desktop)
+            except TypeError:
+                info = None
+            if info:
+                found.append(info)
+        if not found:
+            empty = Gtk.Label(label="No apps yet. Drawer, Dials, Guide and Logbook always work.", xalign=0)
+            empty.get_style_context().add_class("dim-label")
+            line = self._line()
+            line.pack_start(empty, True, True, 0)
+            self.allowed_list.add(line)
+        for info in sorted(found, key=lambda i: (i.get_display_name() or "").lower()):
+            line = self._line()
+            icon = info.get_icon()
+            image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DND) if icon else Gtk.Image()
+            image.set_pixel_size(28)
+            line.pack_start(image, False, False, 0)
+            line.pack_start(Gtk.Label(label=info.get_display_name() or info.get_name(), xalign=0), True, True, 0)
+            remove = Gtk.Button(label="\u2212", tooltip_text="Don't always allow it")
+            remove.set_relief(Gtk.ReliefStyle.NONE)
+            remove.connect("clicked", lambda _b, d=info.get_id(): self._remove_allowed(d))
+            line.pack_end(remove, False, False, 0)
+            self.allowed_list.add(line)
+        self.allowed_list.show_all()
+
+    def _add_allowed(self):
+        from .dials_login import choose_app
+        desktop = choose_app(self, "Always Allow", set(self.config["allowed"]) | ALWAYS_DESKTOP)
+        if desktop and self._change_config(
+                lambda config: config["allowed"].append(desktop) if desktop not in config["allowed"] else None,
+                "Enter the passcode to always allow an app."):
+            self._fill_allowed()
+            self.refresh()
+
+    def _remove_allowed(self, desktop):
+        if self._change_config(lambda config: config.update(allowed=[a for a in config["allowed"] if a != desktop]),
+                               "Enter the passcode to change Always Allowed."):
+            self._fill_allowed()
+            self.refresh()
+
+    def give_more_time(self, app):
+        today = datetime.date.today().isoformat()
+
+        def change(config):
+            if config["extra"]["day"] != today:
+                config["extra"] = {"day": today, "apps": {}}
+            config["extra"]["apps"][app] = config["extra"]["apps"].get(app, 0) + MORE_TIME
+        if self._change_config(change, f"Enter the passcode to give {MORE_TIME} more minutes."):
+            self.refresh()
 
     # ---- Limit adult websites --------------------------------------------------------
     def _websites_box(self):
@@ -527,6 +843,8 @@ class Window(Gtk.ApplicationWindow):
     def _timer(self):
         if self.get_window() is None:
             return False
+        self.config = load_config()
+        self._downtime_shown()
         self.refresh()
         return True
 
@@ -592,8 +910,19 @@ class Window(Gtk.ApplicationWindow):
             spacer.set_size_request(118, -1)
             box.pack_start(spacer, False, False, 0)
             return finish_row(box)
+        if always_allowed(self.config, app):
+            allowed = Gtk.Label(label="Always Allowed")
+            allowed.get_style_context().add_class("dim-label")
+            allowed.set_size_request(118, -1)
+            box.pack_start(allowed, False, False, 0)
+            return finish_row(box)
         limit = self.config["limits"].get(app)
-        button = Gtk.MenuButton(label=f"Limit {duration(limit * 60)}" if limit else "Set Limit")
+        allowance = limit_for(self.config, app)
+        if allowance and self.span == "today" and secs >= allowance * 60:
+            label = "Time's Up"
+        else:
+            label = f"Limit {duration(limit * 60)}" if limit else "Set Limit"
+        button = Gtk.MenuButton(label=label)
         button.set_relief(Gtk.ReliefStyle.NONE if not limit else Gtk.ReliefStyle.NORMAL)
         button.set_size_request(118, -1)
         button.set_popover(self._limit_popover(button, app, limit))
@@ -619,6 +948,11 @@ class Window(Gtk.ApplicationWindow):
         line.pack_start(Gtk.Label(label="min a day"), False, False, 0)
         box.pack_start(line, False, False, 0)
         buttons = Gtk.Box(spacing=6, halign=Gtk.Align.END)
+        allowance = limit_for(self.config, app)
+        if allowance and load_day(datetime.date.today())["apps"].get(app, 0.0) >= allowance * 60:
+            more = Gtk.Button(label=f"{MORE_TIME} More Minutes")
+            more.connect("clicked", lambda _b: (pop.popdown(), self.give_more_time(app)))
+            buttons.pack_start(more, False, False, 0)
         if limit:
             off = Gtk.Button(label="No Limit")
             off.connect("clicked", lambda _b: (pop.popdown(), self.change_limit(app, 0)))
@@ -639,15 +973,13 @@ class Window(Gtk.ApplicationWindow):
         return pop
 
     def change_limit(self, app, minutes):
-        self.config = load_config()
-        if self.config.get("passcode") and not self.ask_passcode("Enter the passcode to change a limit."):
-            return
-        if minutes > 0:
-            self.config["limits"][app] = minutes
-        else:
-            self.config["limits"].pop(app, None)
-        write_json(CONFIG, self.config)
-        self.refresh()
+        def change(config):
+            if minutes > 0:
+                config["limits"][app] = minutes
+            else:
+                config["limits"].pop(app, None)
+        if self._change_config(change, "Enter the passcode to change a limit."):
+            self.refresh()
 
     def ask_passcode(self, text):
         dialog = Gtk.MessageDialog(transient_for=self, modal=True, buttons=Gtk.ButtonsType.OK_CANCEL,
