@@ -272,6 +272,17 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Picture in Picture (1.105, `reel_pip.py`): Reel hides its title bar and
+controls, shows two buttons of its own over the middle, resizes to the
+video's shape at 384 pixels wide, and asks Wayfire to put the window in the
+bottom right of its output's work area (`window-rules/configure-view`) and
+keep it above the others (`wm-actions/set-always-on-top`). The window's
+place and size are noted first and given back on the way out. With no title
+bar, a press on the picture that moves more than a few pixels starts the
+compositor's own move (`begin_move_drag`). Strata's window places skip a
+window held above the others as it closes, so a picture closed in its
+corner doesn't become the size Reel opens at next time.
+
 Pointer colours (1.104, `dials_pointer.py`): Dials runs freemac's own
 pointer drawing (`art/cursors/make-cursors.py`, kept in the image at
 `/usr/share/freemac`) again with `--fill` and `--outline`, into

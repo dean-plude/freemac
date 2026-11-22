@@ -1069,6 +1069,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | The big pointer a shake shows uses the same colours | Strata | done |
 | 4 | A Guide topic | Guide | done |
 
+## 1.105 "picture in picture" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Picture in Picture: the video in a small window above the others, in the corner, playing on | Reel | done |
+| 2 | Drag the picture anywhere; double-click or Esc puts it back as it was | Reel | done |
+| 3 | A window held above the others isn't remembered as the app's size | Strata | done |
+| 4 | Reel's controls fit its smallest window | Reel | done |
+| 5 | README screenshots retaken, with Picture in Picture added | Docs | done |
+| 6 | A Guide topic | Guide | done |
+| 7 | Dials' sidebar scrolls, so the window fits an 800-pixel-high screen with every pane listed | Dials | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

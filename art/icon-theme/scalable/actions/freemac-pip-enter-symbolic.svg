@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- freemac's Picture in Picture icon: a screen with a small filled picture in its lower right corner. Original artwork. -->
+  <path fill="#2e3436" d="M1.9 2C1.4 2 1 2.4 1 2.9v10.2c0 .5.4.9.9.9h12.2c.5 0 .9-.4.9-.9V2.9c0-.5-.4-.9-.9-.9zm.4 1.3h11.4v9.4H2.3z"/>
+  <rect fill="#2e3436" x="8" y="8" width="4.6" height="3.6" rx=".5"/>
+</svg>

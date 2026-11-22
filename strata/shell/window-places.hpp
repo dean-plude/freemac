@@ -245,6 +245,13 @@ class strata_window_places
             return;
         }
 
+        /* A window kept above the others (Reel's Picture in Picture) is a
+         * small floating picture, not the size the app should come back at. */
+        if (view->has_data("wm-actions-above"))
+        {
+            return;
+        }
+
         load();
         auto area = view->get_output()->workarea->get_workarea();
         auto& now = view->toplevel()->current();

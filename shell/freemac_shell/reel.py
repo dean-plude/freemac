@@ -5,7 +5,9 @@ Each video opens in its own window, sized to the picture. The controls float
 over the bottom of the video and fade away while it plays and the pointer
 rests; moving the pointer brings them back. Space plays and pauses, Left and
 Right skip back and forward 10 seconds, Up and Down change the volume, and
-F (or Control+Command+F) fills the screen; Esc leaves full screen.
+F (or Control+Command+F) fills the screen; Esc leaves full screen. P (or
+View > Picture in Picture) shrinks the video into a small window that floats
+above the others in a corner of the screen (reel_pip.py).
 
 Where you stopped is kept for each video (~/.cache/freemac/reel.json), so
 opening it again goes on from there, as a Mac's player does. While a video
@@ -26,7 +28,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import awake, menus, style  # noqa: E402
+from . import awake, menus, reel_pip, style  # noqa: E402
 
 try:
     gi.require_version("Gst", "1.0")
@@ -156,6 +158,9 @@ class Window(Gtk.ApplicationWindow):
         self.last_saved = 0
         # While a video plays, the screen stays on and doesn't lock (awake.py).
         self.keep_awake = awake.Request("org.freemac.Reel", "Playing a video")
+        self.pip = reel_pip.PictureInPicture(self)
+        self.press_at = None   # where a press on the picture began, to drag it
+        self.last_press = None
 
         self.header = Gtk.HeaderBar(show_close_button=True, title="Reel")
         self.set_titlebar(self.header)
@@ -169,7 +174,7 @@ class Window(Gtk.ApplicationWindow):
             "open": self.open_dialog, "close": self.close, "play-pause": self.play_pause,
             "forward": lambda: self.skip(SKIP), "back": lambda: self.skip(-SKIP),
             "louder": lambda: self.change_volume(0.1), "quieter": lambda: self.change_volume(-0.1),
-            "full-screen": self.toggle_full, "to-start": lambda: self.seek(0),
+            "full-screen": self.toggle_full, "pip": self.toggle_pip, "to-start": lambda: self.seek(0),
             "show-in-drawer": self.show_in_drawer,
         })
         self.connect("key-press-event", self._key)
@@ -260,9 +265,11 @@ class Window(Gtk.ApplicationWindow):
         overlay.get_style_context().add_class("reel-video")
         self.video_box = Gtk.EventBox()
         self.video_box.get_style_context().add_class("reel-video")
-        self.video_box.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK)
-        self.video_box.connect("motion-notify-event", lambda *_: self.wake_controls())
+        self.video_box.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK |
+                       Gdk.EventMask.BUTTON_RELEASE_MASK)
+        self.video_box.connect("motion-notify-event", self._moved)
         self.video_box.connect("button-press-event", self._clicked)
+        self.video_box.connect("button-release-event", lambda *_: setattr(self, "press_at", None) or False)
         self.message = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER)
         self.message.get_style_context().add_class("reel-message")
         self.video_box.add(self.message)
@@ -270,7 +277,7 @@ class Window(Gtk.ApplicationWindow):
 
         self.hud = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER, valign=Gtk.Align.END, margin_bottom=18)
         self.hud.get_style_context().add_class("reel-hud")
-        self.hud.set_size_request(520, -1)
+        self.hud.set_size_request(440, -1)
         self.volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1, 0.05)
         self.volume.set_draw_value(False)
         self.volume.set_size_request(70, -1)
@@ -298,6 +305,8 @@ class Window(Gtk.ApplicationWindow):
         self.hud.pack_start(self.bar, True, True, 0)
         self.remaining = Gtk.Label(label="-0:00", width_chars=8, xalign=0)
         self.hud.pack_start(self.remaining, False, False, 0)
+        self.hud.pack_start(icon_button("freemac-pip-enter-symbolic", "Picture in Picture (P)",
+                                        self.toggle_pip), False, False, 0)
         self.full_button = icon_button("view-fullscreen-symbolic", "Full Screen (F)", self.toggle_full)
         self.hud.pack_start(self.full_button, False, False, 0)
         self.hud.connect("enter-notify-event", lambda *_: self.wake_controls(stay=True))
@@ -315,7 +324,16 @@ class Window(Gtk.ApplicationWindow):
                                            reveal_child=False)
         self.title_revealer.add(self.full_title)
         overlay.add_overlay(self.title_revealer)
-        for child in (self.hud_revealer, self.title_revealer):
+
+        # In Picture in Picture, two buttons show over the middle instead.
+        pip_box, self.pip_play_button = reel_pip.pip_controls(self.play_pause, self.toggle_pip)
+        self.pip_revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.CROSSFADE,
+                                         transition_duration=250, halign=Gtk.Align.CENTER,
+                                         valign=Gtk.Align.CENTER, reveal_child=False, no_show_all=True)
+        self.pip_revealer.add(pip_box)
+        pip_box.show_all()
+        overlay.add_overlay(self.pip_revealer)
+        for child in (self.hud_revealer, self.title_revealer, self.pip_revealer):
             overlay.set_overlay_pass_through(child, False)
         return overlay
 
@@ -330,9 +348,11 @@ class Window(Gtk.ApplicationWindow):
         widget = sink.get_property("widget")
         widget.set_hexpand(True)
         widget.set_vexpand(True)
-        widget.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK)
-        widget.connect("motion-notify-event", lambda *_: self.wake_controls())
+        widget.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK |
+                       Gdk.EventMask.BUTTON_RELEASE_MASK)
+        widget.connect("motion-notify-event", self._moved)
         widget.connect("button-press-event", self._clicked)
+        widget.connect("button-release-event", lambda *_: setattr(self, "press_at", None) or False)
         bus = playbin.get_bus()
         bus.add_signal_watch()
         bus.connect("message", self._message)
@@ -411,20 +431,27 @@ class Window(Gtk.ApplicationWindow):
             self.message.show()
             self.playbin = None
 
-    def _fit_window(self):
-        """Size the window to the picture, within most of the screen."""
-        pad = self.playbin.emit("get-video-pad", 0)
+    def video_size(self):
+        """The video's picture size, (0, 0) when it isn't known yet."""
+        pad = self.playbin.emit("get-video-pad", 0) if self.playbin is not None else None
         caps = pad.get_current_caps() if pad else None
-        if not caps or self.full or self.is_maximized():
-            return
+        if not caps:
+            return 0, 0
         info = caps.get_structure(0)
         ok_w, width = info.get_int("width")
         ok_h, height = info.get_int("height")
         if not (ok_w and ok_h and width and height):
-            return
+            return 0, 0
         ok, num, den = info.get_fraction("pixel-aspect-ratio")
         if ok and num and den:
             width = width * num // den
+        return width, height
+
+    def _fit_window(self):
+        """Size the window to the picture, within most of the screen."""
+        width, height = self.video_size()
+        if not width or self.full or self.pip.on or self.is_maximized():
+            return
         monitor = Gdk.Display.get_default().get_monitor_at_window(self.get_window()) \
             if self.get_window() else None
         area = monitor.get_workarea() if monitor else None
@@ -467,6 +494,8 @@ class Window(Gtk.ApplicationWindow):
         name = "media-playback-pause-symbolic" if on else "media-playback-start-symbolic"
         self.play_button.get_image().set_from_icon_name(name, Gtk.IconSize.LARGE_TOOLBAR)
         self.play_button.set_tooltip_text("Pause (Space)" if on else "Play (Space)")
+        self.pip_play_button.get_image().set_from_icon_name(name, Gtk.IconSize.LARGE_TOOLBAR)
+        self.pip_play_button.set_tooltip_text("Pause (Space)" if on else "Play (Space)")
 
     def position(self):
         if self.playbin is None:
@@ -531,8 +560,9 @@ class Window(Gtk.ApplicationWindow):
     # -- controls that fade --
 
     def wake_controls(self, stay=False):
-        self.hud_revealer.set_reveal_child(True)
+        self.hud_revealer.set_reveal_child(not self.pip.on)
         self.title_revealer.set_reveal_child(self.full)
+        self.pip_revealer.set_reveal_child(self.pip.on)
         self._show_pointer(True)
         if self.hide_timer:
             GLib.source_remove(self.hide_timer)
@@ -546,6 +576,7 @@ class Window(Gtk.ApplicationWindow):
         if self.playing() and not self.dragging:
             self.hud_revealer.set_reveal_child(False)
             self.title_revealer.set_reveal_child(False)
+            self.pip_revealer.set_reveal_child(False)
             self._show_pointer(False)
         return False
 
@@ -557,10 +588,27 @@ class Window(Gtk.ApplicationWindow):
         window.set_cursor(cursor)
 
     def _clicked(self, _w, event):
+        # The picture and the box around it both see each press; act once.
+        press = (event.type, event.time)
+        if press == self.last_press:
+            return False
+        self.last_press = press
         if event.type == Gdk.EventType._2BUTTON_PRESS:
-            self.toggle_full()
+            self.toggle_pip() if self.pip.on else self.toggle_full()
         elif event.button == 1:
             self.wake_controls()
+            # The picture has no title bar, so dragging it anywhere moves it
+            # (_moved), once the pointer has gone a few pixels with the button down.
+            self.press_at = (event.x_root, event.y_root) if self.pip.on else None
+        return False
+
+    def _moved(self, _w, event):
+        self.wake_controls()
+        if self.press_at and self.pip.on and event.state & Gdk.ModifierType.BUTTON1_MASK:
+            x, y = self.press_at
+            if abs(event.x_root - x) + abs(event.y_root - y) > 4:
+                self.press_at = None
+                self.begin_move_drag(1, int(event.x_root), int(event.y_root), event.time)
         return False
 
     # -- full screen --
@@ -569,6 +617,8 @@ class Window(Gtk.ApplicationWindow):
         if self.full:
             self.unfullscreen()
             return
+        if self.pip.on:
+            self.pip.leave()
         # GTK keeps the size _fit_window asked for and asks for it again
         # when the controls change, which shrinks a full-screen window back.
         # Ask for the screen's size instead, and give the old size back on
@@ -593,6 +643,30 @@ class Window(Gtk.ApplicationWindow):
         self.wake_controls()
         return False
 
+    # -- Picture in Picture (reel_pip.py) --
+
+    def toggle_pip(self):
+        if self.stack.get_visible_child_name() != "play" or self.playbin is None:
+            return
+        if self.full and not self.pip.on:
+            # Out of full screen first; the window comes back, then shrinks.
+            self.unfullscreen()
+            GLib.timeout_add(300, lambda: self.pip.enter(*self.video_size()) and False)
+            return
+        self.pip.toggle(*self.video_size())
+
+    def pip_changed(self, on):
+        """The window's look in and out of Picture in Picture."""
+        self.header.set_visible(not on)
+        self.hud_revealer.set_visible(not on)
+        self.title_revealer.set_visible(not on)
+        self.pip_revealer.set_visible(on)
+        # The list of videos and the controls mustn't hold the picture wide.
+        self.stack.set_hhomogeneous(not on)
+        self.stack.set_vhomogeneous(not on)
+        self.set_keep_above(on)
+        self.wake_controls()
+
     # -- keys, files --
 
     def _key(self, _w, event):
@@ -616,6 +690,10 @@ class Window(Gtk.ApplicationWindow):
             self.change_volume(-0.1)
         elif key in (Gdk.KEY_f, Gdk.KEY_F11):
             self.toggle_full()
+        elif key == Gdk.KEY_p:
+            self.toggle_pip()
+        elif key == Gdk.KEY_Escape and self.pip.on:
+            self.toggle_pip()
         elif key == Gdk.KEY_Escape and self.full:
             self.unfullscreen()
         elif key == Gdk.KEY_Home:
@@ -664,7 +742,8 @@ def menubar():
         ("_File", [[("Open File…", "win.open", "<Ctrl>o")],
                    [("Show in Drawer", "win.show-in-drawer", "<Ctrl>r")],
                    [("Close", "win.close", "<Ctrl>w")]]),
-        ("_View", [[("Enter Full Screen", "win.full-screen", "<Ctrl><Super>f")]]),
+        ("_View", [[("Enter Full Screen", "win.full-screen", "<Ctrl><Super>f"),
+                    ("Picture in Picture", "win.pip", "<Ctrl><Super>p")]]),
         ("_Controls", [[("Play/Pause", "win.play-pause", None)],
                        [("Skip Forward", "win.forward", "<Ctrl>Right"),
                         ("Skip Back", "win.back", "<Ctrl>Left"),

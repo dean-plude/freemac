@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.23 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.105 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -24,7 +24,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/quick-settings.png" alt="Quick settings from the menu bar"><br><sub>Quick settings from the menu bar</sub></td><td width="50%"><img src="docs/screenshots/nudge.png" alt="Nudge, for reminders"><br><sub>Nudge, for reminders</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/tide.png" alt="Tide, the calendar"><br><sub>Tide, the calendar</sub></td><td width="50%"><img src="docs/screenshots/crew.png" alt="Crew, for contacts"><br><sub>Crew, for contacts</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/dark-mode.png" alt="Dark mode, with the night wallpaper"><br><sub>Dark mode, with the night wallpaper</sub></td><td width="50%"><img src="docs/screenshots/dials-dark.png" alt="Dials, the settings app, in dark mode"><br><sub>Dials, the settings app, in dark mode</sub></td></tr>
-<tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td><td width="50%"><img src="docs/screenshots/reel-pip.png" alt="Picture in Picture: a Reel video floating above Tide in the corner"><br><sub>Picture in Picture: a Reel video floating above Tide</sub></td></tr>
 </table>
 
 ## Download
@@ -93,6 +93,7 @@ one of them will be reverted.
 | Photos: everything in your Pictures folder by month, a large view with favourites, and import from a camera, phone or memory card | **Cove** | 1.24; 1.25: albums you make and name, photos added by drag or right-click, and a slideshow of any album or the whole library; Share, to mail photos or copy them to a drive |
 | Music: the songs in your Music folder by album, artist and song, with album covers, shuffle and repeat, songs played one after another with no gap, and the media keys and menu bar's what's playing | **Shanty** | 1.27 |
 | Videos: plays them in a window or full screen, with controls that fade away, and starts each where you stopped | **Reel** | 1.28 |
+| Picture in Picture: a video in a small window that floats above the others in a corner while you work, and drags anywhere | **Reel**, **Strata** | 1.105 |
 | Keep the screen on while a video plays, or for as long as you ask (`caffeinate` in Terminal) | **Strata**, **Latch** | 1.103 |
 | Activity Monitor: each app's share of the processor and memory, every process if you like, a graph of the last two minutes, and Quit or Force Quit for one that's stuck | **Gauge** | 1.28 |
 | Disk Utility: every drive with how full it is, and Rename, Erase (ExFAT, MS-DOS or ext4) and Eject, with no password for USB drives | **Hull** | 1.28 |
