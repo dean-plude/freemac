@@ -21,10 +21,11 @@ PATH = "/com/canonical/unity/launcherentry/freemac"
 _last = {}
 
 
-def set_count(desktop_id, count):
-    """Show count on the app's Dock icon, or no badge for 0."""
+def set_count(desktop_id, count, force=False):
+    """Show count on the app's Dock icon, or no badge for 0. force sends it
+    even when it hasn't changed, for a Dock that started since."""
     count = max(0, int(count or 0))
-    if _last.get(desktop_id) == count:
+    if _last.get(desktop_id) == count and not force:
         return
     _last[desktop_id] = count
     try:

@@ -136,7 +136,7 @@ TOPICS = {
     ]),
     "install": ("Install apps", "install app store harbor download update software", [
         "Harbor lists free apps. Click Install beside one; it shows in the Dock and in F4 when it's ready.",
-        "Harbor also installs updates for freemac itself.",
+        "Harbor also installs updates for freemac itself. A red number on its Dock icon says how many are ready.",
         "Apps from the Mac App Store don't run on freemac.",
     ]),
     "lock": ("Lock, restart or shut down", "lock shut down restart reboot log out power off", [
@@ -686,8 +686,10 @@ TOPICS = {
         "stops and tells you which one.",
         "Recent Items in the same menu lists the apps and documents you used lately. Clear Menu empties it.",
     ]),
-    "stay-safe": ("Keep the computer up to date and safe", "software update updates security fixes automatic firewall block incoming connections protect safe virus", [
+    "stay-safe": ("Keep the computer up to date and safe", "software update updates security fixes automatic notice badge daily firewall block incoming connections protect safe virus", [
         "Choose Dials > Software Update. Check for Updates\u2026 shows what's new in Harbor, where you install it.",
+        "freemac also looks once a day. When updates are ready, a notice says so and Harbor's icon in the Dock "
+        "shows how many. Click the notice to see them in Harbor.",
         "Leave Install important updates automatically on, and security fixes are put in by themselves in "
         "the background.",
         "To turn away connections that other computers try to start, choose Dials > Network and turn on Firewall. "

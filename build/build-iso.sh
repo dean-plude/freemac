@@ -130,6 +130,9 @@ log "Installing packages"
 printf '#!/bin/sh\nexit 101\n' > "$ROOTFS/usr/sbin/policy-rc.d"
 chmod 755 "$ROOTFS/usr/sbin/policy-rc.d"
 in_chroot apt-get update
+# The base system comes from the release itself; bring it up to date, so the
+# image starts with today's security fixes rather than dozens of updates.
+in_chroot apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade
 # shellcheck disable=SC2086
 in_chroot apt-get install -y --no-install-recommends $KERNEL $PACKAGES
 # A second update, now that AppStream is installed, downloads the app

@@ -520,6 +520,8 @@ class UpdatesPage(Gtk.Box):
             self.window.reload_catalogue()   # a refresh also brings the catalogue
         for row in self.list.get_children():
             self.list.remove(row)
+        if not error:
+            beacon.call("UpdatesChanged")   # the Dock badge follows what Harbor found
         if error:
             self.status.set_text(error)
             return
