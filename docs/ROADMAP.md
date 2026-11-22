@@ -913,6 +913,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Porthole remembers each computer's identity and warns if it changes | Porthole | done |
 | 6 | vnc:// addresses in Connect to Server open Porthole | Drawer | done |
 
+## 1.87 "smart folders" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Search This Mac from a Drawer window's toolbar: every file and folder in your home whose name matches, then documents whose words match, as they're found | Drawer | done |
+| 2 | A scope bar while searching: This Mac or the folder you're in, a kind (Documents, PDF, Images, Music, Movies, Folders) and when it last changed; kind and date work without any words | Drawer | done |
+| 3 | Save a search as a Smart Folder under Smart Folders in the sidebar; it looks again each time it opens, and changing one and pressing Save updates it | Drawer | done |
+| 4 | File > New Smart Folder (⌥⌘N), Edit > Find (⌘F) and Save Search; Remove Smart Folder on its right-click menu, which leaves the files alone | Drawer | done |
+| 5 | The sidebar scrolls when its places, Smart Folders and tags don't fit | Drawer | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

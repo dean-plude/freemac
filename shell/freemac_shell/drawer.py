@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -42,6 +42,7 @@ VIEWS = (("icons", "view-grid-symbolic", "Icons"),
 ICONISH = ("icons", "gallery")   # both show the files in the icon view
 CSS = b"""
 box.drawer-sidebar { background-color: rgba(120, 120, 150, 0.08); }
+viewport { background-color: transparent; }
 list.drawer-sidebar { background-color: transparent; }
 .drawer-sidebar row { padding: 4px 8px; border-radius: 6px; margin: 0 8px; background-color: transparent; }
 .drawer-sidebar row image { color: @theme_selected_bg_color; }
@@ -67,6 +68,12 @@ list.drawer-sidebar { background-color: transparent; }
 .drawer-trashbar { padding: 6px 12px; border-bottom: 1px solid rgba(120, 120, 150, 0.18);
                    background-color: rgba(120, 120, 150, 0.06); }
 .drawer-trashbar label.title { font-weight: bold; }
+.drawer-scopebar { padding: 5px 8px; border-bottom: 1px solid rgba(120, 120, 150, 0.18);
+                   background-color: rgba(120, 120, 150, 0.06); }
+.drawer-scopebar button, .drawer-scopebar combobox button { padding: 1px 10px; min-height: 0; font-size: 12px; }
+.drawer-scopebar label { font-size: 12px; }
+.drawer-scopebar button:checked { background-image: none; background-color: @theme_selected_bg_color;
+                                  color: @theme_selected_fg_color; }
 .drawer-go-hint { font-size: 11px; opacity: 0.65; }
 .drawer-go-hint.error { color: #d93a2b; opacity: 1; }
 """
@@ -231,6 +238,17 @@ class Folder:
             # folders one computer shares).
             self.browsing, self.on_change = True, None
             neighbours.browse(self._add_neighbour, self._browsed, uri=neighbours.uri_of(path))
+        elif smart_folders.is_place(path):
+            # A search, or a Smart Folder: files from all over, found by a
+            # walk through the home folder in the background.
+            self.browsing, self.on_change = True, None
+            query = smart_folders.query_of(path)
+            if query is None:
+                self.error, self.browsing = "This Smart Folder isn’t there any more.", False
+            elif smart_folders.is_empty(query):
+                self.browsing = False
+            else:
+                self._search(query)
         elif path.startswith(tags.PREFIX):
             # A tag in the sidebar: every file with that tag, wherever it is.
             for full in tags.tagged(path[len(tags.PREFIX):]):
@@ -259,6 +277,47 @@ class Folder:
             tags.note_folder(path, found)
         if self.waiting:
             GLib.idle_add(self._thumbnails, self.waiting)
+
+    def _search(self, query):
+        self.stop = threading.Event()
+        self.pending, lock = [], threading.Lock()
+
+        def found(full):
+            try:
+                info = Gio.File.new_for_path(full).query_info(ATTRS, Gio.FileQueryInfoFlags.NONE, None)
+            except GLib.Error:
+                return
+            with lock:
+                self.pending.append((info, full))
+
+        def run():
+            try:
+                smart_folders.find(query, found, self.stop)
+            finally:
+                self.finished = True
+
+        def show():
+            with lock:
+                batch, self.pending = self.pending, []
+            for info, full in batch:
+                self._add(info, full)
+            if self.waiting:
+                GLib.idle_add(self._thumbnails, self.waiting)
+                self.waiting = []
+            done = self.finished and not self.pending
+            if done:
+                self.browsing = False
+            if (batch or done) and self.on_change:
+                self.on_change()
+            return not done and not self.stop.is_set()
+        self.finished = False
+        threading.Thread(target=run, daemon=True).start()
+        GLib.timeout_add(120, show)
+
+    def cancel(self):
+        stop = getattr(self, "stop", None)
+        if stop is not None:
+            stop.set()
 
     def _add_neighbour(self, name, address, icon):
         """One computer in the Network place; opening it connects."""
@@ -455,6 +514,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.view_mode = "icons"
         self.show_hidden = False
         self.filter_text = ""
+        # Searching: the folder a search began in, the Smart Folder being
+        # changed, and a search waiting for the typing to pause.
+        self.search_from, self.editing_smart, self.search_soon, self.quiet = None, None, 0, False
         self.tabs = []        # one dict per tab; the open tab's state lives on self
         self.current = 0
         self.glance = None
@@ -500,7 +562,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             button.connect("toggled", self._view_toggled, mode)
             views.add(button)
             self.view_buttons[mode] = button
-        self.search = Gtk.SearchEntry(placeholder_text="Filter", width_chars=16)
+        self.search = Gtk.SearchEntry(placeholder_text="Search", width_chars=16)
         self.search.connect("search-changed", self._filter_changed)
         header.pack_end(self.search)
         header.pack_end(views)
@@ -510,7 +572,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
         paned = Gtk.Paned()
         self.add(paned)
-        self.side = self._sidebar()
+        # The sidebar scrolls when its places, Smart Folders and tags don't fit.
+        self.side = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_width=True)
+        self.side.add(self._sidebar())
+        self.side.get_child().set_shadow_type(Gtk.ShadowType.NONE)
         self.side.set_no_show_all(not self.sidebar_shown)
         paned.pack1(self.side, False, False)
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -519,6 +584,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.tab_bar.set_no_show_all(True)
         right.pack_start(self.tab_bar, False, False, 0)
         right.pack_start(self._trash_bar(), False, False, 0)
+        right.pack_start(self._scope_bar(), False, False, 0)
         self.content = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
         middle = Gtk.Box()
         middle.pack_start(self.content, True, True, 0)
@@ -567,7 +633,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def new_tab(self, path=None):
         self._save_tab()
-        self.tabs.append({"path": os.path.abspath(path or self.path), "history": [], "future": [],
+        self.tabs.append({"path": self._real(path or self.path), "history": [], "future": [],
                           "view": self.view_mode, "filter": ""})
         self._load_tab(len(self.tabs) - 1)
 
@@ -619,6 +685,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return "Recents"
         if neighbours.is_place(path):
             return neighbours.title(path)
+        if smart_folders.is_place(path):
+            return smart_folders.title(path)
         if path and os.path.realpath(path) == os.path.realpath(TRASH):
             return "Trash"
         return servers.title_of(path) or os.path.basename(path) or "Computer"
@@ -661,6 +729,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 return "Looking\u2026"
             return ("No shared computers found on this network" if self.path == neighbours.PLACE
                     else "This computer shares no folders you can open")
+        if self.in_search() and folder is not None and not folder.error:
+            query = smart_folders.query_of(self.path)
+            if smart_folders.is_empty(query):
+                return "Type a name, or choose a kind or a time"
+            if folder.browsing:
+                return f"Searching\u2026 {count} found" if count else "Searching\u2026"
+            if not count:
+                return smart_folders.describe(query, lead="No")
         chosen = len(self.selected_paths())
         text = f"{chosen} of {count} selected" if chosen else f"{count} item{'s' if count != 1 else ''}"
         if not self.in_virtual() and self.path:
@@ -965,7 +1041,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "trash": self.trash,
             "close": self.close,
             "select-all": self.select_all,
-            "filter": self.search.grab_focus,
+            "filter": self.find,
+            "new-smart-folder": self.new_smart_folder,
+            "save-search": self.save_search,
             "back": self.go_back,
             "forward": self.go_forward,
             "up": self.go_up,
@@ -1053,6 +1131,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self._accept_drops(self.fav_list, self._find_in_sidebar(self.fav_list))
         box.pack_start(self.fav_list, False, False, 0)
         self._fill_favourites()
+        self.smart_heading = Gtk.Label(label="Smart Folders", xalign=0, no_show_all=True)
+        self.smart_heading.get_style_context().add_class("drawer-heading")
+        box.pack_start(self.smart_heading, False, False, 0)
+        self.smart_list = Gtk.ListBox(can_focus=False, no_show_all=True)
+        self.smart_list.get_style_context().add_class("drawer-sidebar")
+        self.smart_list.connect("row-activated", lambda _l, row: self.navigate(row.path))
+        self.smart_list.connect("button-press-event", self._smart_button)
+        box.pack_start(self.smart_list, False, False, 0)
+        self._fill_smart()
         heading = Gtk.Label(label="Locations", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
@@ -1133,7 +1220,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def in_virtual(self):
         """A tag or Recents: files gathered from all over, not one folder."""
-        return self.in_tag() or self.path == recents.PLACE or neighbours.is_place(self.path)
+        return (self.in_tag() or self.path == recents.PLACE or neighbours.is_place(self.path)
+                or self.in_search())
+
+    def in_search(self):
+        """A search, or a Smart Folder."""
+        return smart_folders.is_place(self.path)
 
     def _tags_changed(self, error, keep):
         if error is not None:
@@ -1265,7 +1357,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def _model(self, folder):
         model = folder.store.filter_new()
-        model.set_visible_func(lambda m, it, _d: not self.filter_text or self.filter_text in m[it][C_NAME].lower())
+        # A search shows what it found; the box's words aren't a filter there.
+        model.set_visible_func(lambda m, it, _d: not self.filter_text or self.in_search()
+                               or self.filter_text in m[it][C_NAME].lower())
         return model
 
     def _build_icon_view(self):
@@ -1464,9 +1558,16 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.icon_view.scroll_to_path(self.icon_view.get_selected_items()[0], False, 0, 0)
 
     # ---- navigation -----------------------------------------------------
+    @staticmethod
+    def _real(path):
+        """The path tidied, unless it's a place that isn't a folder."""
+        if (path.startswith(tags.PREFIX) or path == recents.PLACE or neighbours.is_place(path)
+                or smart_folders.is_place(path)):
+            return path
+        return os.path.abspath(os.path.expanduser(path))
+
     def navigate(self, path, remember=True):
-        if not path.startswith(tags.PREFIX) and path != recents.PLACE and not neighbours.is_place(path):
-            path = os.path.abspath(os.path.expanduser(path))
+        path = self._real(path)
         if remember and self.path and path != self.path:
             self.history.append(self.path)
             self.future.clear()
@@ -1493,9 +1594,21 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.title.set_text(label)
         self.set_title(f"{label} — Drawer")
         self._show_place()
+        old = getattr(self, "folder", None)
+        if old is not None:
+            old.cancel()   # a search still looking is no longer wanted
+            if smart_folders.is_place(old.path) and not self.in_search():
+                # Out of a search: the box is empty again, not a filter here.
+                self.quiet = True
+                self.search.set_text("")
+                self.quiet = False
+                self.filter_text, self.editing_smart = "", None
+        if not self.in_virtual() and not self.in_trash():
+            self.search_from = self.path   # where “this folder” is, when searching
+        self._show_scope()
         folder = Folder(self.path, self.show_hidden, self.sort, self.icon_size, self.item_info_shown)
         self.folder = folder
-        if neighbours.is_place(self.path):
+        if neighbours.is_place(self.path) or self.in_search():
             folder.on_change = lambda: self.folder is folder and self._show_status()
         model = self._model(folder)
         self.icon_view.set_model(model)
@@ -2287,10 +2400,269 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return False
 
     def _filter_changed(self, entry):
+        if self.quiet:
+            return
         self.filter_text = entry.get_text().strip().lower()
+        if self.in_search():
+            # Look again once the typing pauses.
+            if self.search_soon:
+                GLib.source_remove(self.search_soon)
+            self.search_soon = GLib.timeout_add(350, self._search_typed)
+            return
         self.icon_view.get_model().refilter()
         if self.view_mode == "columns":
             self._reset_columns()
+        self._show_scope()
+        self._show_status()
+
+    # ---- searching and Smart Folders --------------------------------------
+    def _scope_bar(self):
+        """Under the toolbar while searching, as in Finder: where to look
+        (This Mac, or just this folder), what kind of file, changed when,
+        and Save to keep the search as a Smart Folder."""
+        bar = Gtk.Box(spacing=6)
+        bar.get_style_context().add_class("drawer-scopebar")
+        bar.set_no_show_all(True)
+        bar.pack_start(Gtk.Label(label="Search:"), False, False, 4)
+        scopes = Gtk.Box()
+        scopes.get_style_context().add_class("linked")
+        self.scope_mac = Gtk.RadioButton.new_with_label_from_widget(None, "This Mac")
+        self.scope_here = Gtk.RadioButton.new_with_label_from_widget(self.scope_mac, "")
+        for button in (self.scope_mac, self.scope_here):
+            button.set_mode(False)
+            button.connect("toggled", self._scope_toggled)
+            scopes.add(button)
+        bar.pack_start(scopes, False, False, 0)
+        self.scope_kind = Gtk.ComboBoxText(tooltip_text="Kind")
+        for key, name in smart_folders.KINDS:
+            self.scope_kind.append(key, name)
+        self.scope_when = Gtk.ComboBoxText(tooltip_text="Last changed")
+        for key, name in smart_folders.WHEN:
+            self.scope_when.append(key, name)
+        for combo in (self.scope_kind, self.scope_when):
+            combo.connect("changed", lambda _c: self._criteria_changed())
+        self.scope_save = Gtk.Button(label="Save", tooltip_text="Keep this search as a Smart Folder in the sidebar")
+        self.scope_save.connect("clicked", lambda _b: self.save_search())
+        bar.pack_end(self.scope_save, False, False, 4)
+        bar.pack_end(self.scope_when, False, False, 0)
+        bar.pack_end(self.scope_kind, False, False, 0)
+        for child in bar.get_children():
+            child.show_all()   # the bar itself shows only while searching
+        self.scope_bar = bar
+        return bar
+
+    def _show_scope(self):
+        """Show the scope bar when there's a search, set to match it."""
+        searching = self.in_search()
+        typed = bool(self.search.get_text().strip())
+        if not searching and not typed:
+            self.scope_bar.hide()
+            return
+        self.quiet = True
+        try:
+            if searching:
+                query = smart_folders.query_of(self.path) or smart_folders.blank()
+                self.scope_mac.set_active(True)
+                self.scope_kind.set_active_id(query["kind"])
+                self.scope_when.set_active_id(query["when"])
+                if self.search.get_text().strip() != query["text"] and not self.search_soon:
+                    self.search.set_text(query["text"])
+                self.filter_text = query["text"].lower()
+            else:
+                self.scope_here.set_active(True)
+            here = self.search_from if searching else self.path
+            self.scope_here.set_label(f"“{self._label(here)}”" if here else "")
+        finally:
+            self.quiet = False
+        self.scope_save.set_sensitive(searching and not smart_folders.is_empty(
+            smart_folders.query_of(self.path) or smart_folders.blank()))
+        self.scope_bar.show()
+        self.scope_here.set_visible(bool(here) and (not searching or here != GLib.get_home_dir()))
+        for widget in (self.scope_kind, self.scope_when, self.scope_save):
+            widget.set_visible(searching)
+
+    def _current_query(self):
+        query = dict(smart_folders.query_of(self.path) or smart_folders.blank()) if self.in_search() \
+            else smart_folders.blank()
+        query["text"] = self.search.get_text().strip()
+        query["kind"] = self.scope_kind.get_active_id() or "any"
+        query["when"] = self.scope_when.get_active_id() or "any"
+        return query
+
+    def _show_search(self, query):
+        """Go to the search; while searching, a change replaces the search
+        rather than adding a step to Back."""
+        place = smart_folders.place(query)
+        if place == self.path or (self.in_search() and smart_folders.query_of(self.path) == smart_folders.clean(query)):
+            return
+        if self.in_search():
+            if self.path.startswith(smart_folders.SAVED):
+                self.editing_smart = self.path[len(smart_folders.SAVED):]
+            self.path = place
+            self.refresh()
+        else:
+            self.editing_smart = None
+            self.navigate(place)
+
+    def _search_typed(self):
+        self.search_soon = 0
+        if self.in_search():
+            self._show_search(self._current_query())
+        return False
+
+    def _criteria_changed(self):
+        if not self.quiet and self.in_search():
+            self._show_search(self._current_query())
+
+    def _scope_toggled(self, button):
+        if self.quiet or not button.get_active():
+            return
+        if button is self.scope_mac and not self.in_search():
+            self._show_search(dict(smart_folders.blank(), text=self.search.get_text().strip()))
+        elif button is self.scope_here and self.in_search() and self.search_from:
+            text = self.search.get_text()
+            self.navigate(self.search_from)
+            self.search.set_text(text)   # filters that folder
+
+    def new_smart_folder(self):
+        """File › New Smart Folder: an empty search of This Mac, ready to type."""
+        self.editing_smart = None
+        self.quiet = True
+        self.search.set_text("")
+        self.quiet = False
+        self.navigate(smart_folders.place({}))
+        self.search.grab_focus()
+
+    def find(self):
+        """⌘F: search, starting with This Mac as Finder does."""
+        if not self.in_search() and not self.search.get_text().strip():
+            self._show_scope()
+            self.scope_bar.show()
+            self.quiet = True
+            self.scope_here.set_active(True)
+            self.scope_here.set_label(f"“{self._label(self.path)}”")
+            self.quiet = False
+            for widget in (self.scope_kind, self.scope_when, self.scope_save):
+                widget.hide()
+        self.search.grab_focus()
+
+    def save_search(self):
+        """Save: name the search, and it's kept in the sidebar."""
+        if not self.in_search():
+            return
+        query = self._current_query()
+        popover = Gtk.Popover(relative_to=self.scope_save, position=Gtk.PositionType.BOTTOM)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=12)
+        box.pack_start(Gtk.Label(label="Save this search as a Smart Folder:", xalign=0), False, False, 0)
+        default = self.editing_smart or (self.path[len(smart_folders.SAVED):]
+                                         if self.path.startswith(smart_folders.SAVED) else None)
+        entry = Gtk.Entry(activates_default=True, width_chars=28,
+                          text=default or (query["text"].capitalize() if query["text"] else
+                                           smart_folders.unused_name()))
+        box.pack_start(entry, False, False, 0)
+        problem = Gtk.Label(xalign=0, no_show_all=True)
+        problem.get_style_context().add_class("dim-label")
+        box.pack_start(problem, False, False, 0)
+        save = Gtk.Button(label="Save", can_default=True)
+        save.get_style_context().add_class("suggested-action")
+        line = Gtk.Box()
+        line.pack_end(save, False, False, 0)
+        box.pack_start(line, False, False, 0)
+
+        def done(*_):
+            name = " ".join(entry.get_text().replace("/", "-").split())
+            if not name:
+                problem.set_text("Give it a name.")
+                problem.show()
+                return
+            if name != default and any(e["name"] == name for e in smart_folders.load()):
+                problem.set_text(f"There’s already a Smart Folder called “{name}”.")
+                problem.show()
+                return
+            try:
+                place = smart_folders.save(name, query)
+            except OSError as error:
+                problem.set_text(f"Couldn’t save it: {error.strerror}.")
+                problem.show()
+                return
+            popover.hide()
+            popover.destroy()
+            self._save_popover = None
+            self.editing_smart = None
+            self._smart_folders_changed()
+            self.path = place
+            self.refresh()
+            self.notify(f"Saved “{name}” in the sidebar. It looks again each time you open it.")
+        save.connect("clicked", done)
+        entry.connect("activate", done)
+        popover.add(box)
+        box.show_all()
+        popover.popup()
+        entry.grab_focus()
+        save.grab_default()
+        self._save_popover = popover
+
+    def _fill_smart(self):
+        self.place_rows = [(lb, row) for lb, row in self.place_rows if lb is not self.smart_list]
+        for child in self.smart_list.get_children():
+            self.smart_list.remove(child)
+        entries = smart_folders.load()
+        for entry in entries:
+            row = Gtk.ListBoxRow(can_focus=False)
+            row.path, row.mount = smart_folders.SAVED + entry["name"], "smart"
+            line = Gtk.Box(spacing=8)
+            line.pack_start(Gtk.Image.new_from_icon_name("folder-saved-search-symbolic", Gtk.IconSize.MENU),
+                            False, False, 0)
+            line.pack_start(Gtk.Label(label=entry["name"], xalign=0, ellipsize=Pango.EllipsizeMode.END),
+                            True, True, 0)
+            row.add(line)
+            row.show_all()
+            self.smart_list.add(row)
+            self.place_rows.append((self.smart_list, row))
+        self.smart_heading.set_visible(bool(entries))
+        self.smart_list.set_visible(bool(entries))
+
+    def _smart_folders_changed(self):
+        """Every Drawer window shows the same sidebar."""
+        for window in self.get_application().get_windows() if self.get_application() else [self]:
+            if isinstance(window, DrawerWindow):
+                window._fill_smart()
+                window._show_place()
+
+    def _smart_button(self, listbox, event):
+        if event.button != 3:
+            return False
+        row = listbox.get_row_at_y(int(event.y))
+        if row is None:
+            return True
+        name = row.path[len(smart_folders.SAVED):]
+        menu = Gtk.Menu()
+        menu.attach_to_widget(listbox, None)
+        for label, action in (("Open", lambda: self.navigate(row.path)),
+                              ("Open in New Tab", lambda: self.new_tab(row.path)),
+                              (None, None),
+                              ("Remove Smart Folder", lambda: self.remove_smart(name))):
+            item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
+            if label is not None:
+                item.connect("activate", lambda _i, a=action: a())
+            menu.append(item)
+        menu.show_all()
+        menu.popup_at_pointer(event)
+        self._smart_menu = menu
+        return True
+
+    def remove_smart(self, name):
+        """Only the search goes; the files it found stay where they are."""
+        try:
+            smart_folders.remove(name)
+        except OSError as error:
+            self.notify(f"Couldn’t remove it: {error.strerror}.")
+            return
+        self._smart_folders_changed()
+        for window in self.get_application().get_windows() if self.get_application() else [self]:
+            if isinstance(window, DrawerWindow) and window.path == smart_folders.SAVED + name:
+                window.navigate(window.search_from or GLib.get_home_dir())
+        self.notify(f"Removed the Smart Folder “{name}”. The files it showed are where they were.")
 
     def _menu(self, event):
         if neighbours.is_place(self.path):
@@ -2452,6 +2824,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.undo()
         elif key == Gdk.KEY_F2:
             self.rename()
+        elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_N, Gdk.KEY_n):
+            self.new_smart_folder()
         elif ctrl and shift and key in (Gdk.KEY_N, Gdk.KEY_n):
             self.new_folder()
         elif (ctrl and key in (Gdk.KEY_h, Gdk.KEY_H)) or (ctrl and shift and key in (Gdk.KEY_period,
@@ -2462,7 +2836,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         elif ctrl and shift and key in (Gdk.KEY_f, Gdk.KEY_F):
             self.navigate(recents.PLACE)
         elif ctrl and key in (Gdk.KEY_f, Gdk.KEY_F):
-            self.search.grab_focus()
+            self.find()
         elif (ctrl and key == Gdk.KEY_bracketleft) or key == Gdk.KEY_BackSpace or (
                 event.state & Gdk.ModifierType.MOD1_MASK and key == Gdk.KEY_Left):
             self.go_back()
@@ -2503,7 +2877,8 @@ def menubar():
         ("_File", [
             [("New Window", "app.new-window", "<Ctrl>n"), ("New Tab", "win.new-tab", "<Ctrl>t"),
              ("New Folder", "win.new-folder", "<Ctrl><Shift>n"),
-             ("New Folder with Selection", "win.new-folder-with", None)],
+             ("New Folder with Selection", "win.new-folder-with", None),
+             ("New Smart Folder", "win.new-smart-folder", "<Ctrl><Alt>n")],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
             [("Show in Enclosing Folder", "win.show-enclosing", None)],
             [("Duplicate", "win.duplicate", "<Ctrl>d")],
@@ -2520,7 +2895,7 @@ def menubar():
             [("Copy", "win.copy", "<Ctrl>c"), ("Paste Item", "win.paste", "<Ctrl>v"),
              ("Move Item Here", "win.move-here", "<Ctrl><Alt>v")],
             [("Select All", "win.select-all", "<Ctrl>a")],
-            [("Filter…", "win.filter", "<Ctrl>f")],
+            [("Find…", "win.filter", "<Ctrl>f"), ("Save Search…", "win.save-search", None)],
         ]),
         ("_View", [
             [("as Icons", "win.view-icons", "<Ctrl>1"), ("as List", "win.view-list", "<Ctrl>2"),

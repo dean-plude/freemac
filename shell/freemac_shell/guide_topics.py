@@ -722,6 +722,18 @@ TOPICS = {
         "in Get Info (Command+I).",
         "Memory cards and some USB drives can't keep tags.",
     ]),
+    "smart-folders": ("Search all your files, and keep searches as Smart Folders", "search find file everywhere this mac smart folder saved search kind images pdf documents date today week lost where is", [
+        "In a Drawer window, type in the search box at the top right. Drawer shows the matching files in the "
+        "folder you're in straight away; click This Mac under the toolbar to look through all your files, "
+        "by name and by the words inside documents.",
+        "Use the Kind and time menus beside it to narrow it down, such as PDF Documents changed in the "
+        "past 30 days. They work without any words too: choose Images and Today to see today's pictures.",
+        "Click Save to keep the search as a Smart Folder. It shows under Smart Folders in the sidebar and "
+        "looks again each time you open it, so new files that match appear by themselves.",
+        "Choose File > New Smart Folder (Option+Command+N) to start one from scratch. To change a Smart "
+        "Folder, open it, change the words or menus and click Save. Right-click it and choose Remove Smart "
+        "Folder to take it away; the files it showed stay where they are.",
+    ]),
     "screen-saver": ("Use a screen saver", "screen saver screensaver idle drift clock album photos slideshow", [
         "Choose Dials > Screen Saver and click the one you like: Drift, Clock or Album, which shows the "
         "photos in your Pictures folder.",
