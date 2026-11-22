@@ -272,6 +272,24 @@ plugins stay in use.
   simulation matrices), and add what's lost back into the channels that
   remain. With the filter off there's no pass at all.
 
+Mission Control's row of desktops (1.108, `strata/shell/mission-control.hpp`
+and `spaces.py` in Topline): the overview of windows is Wayfire's scale
+plugin, which holds the pointer while it is open, so the row along the top
+never gets the pointer itself. Strata notices scale opening (its
+`scale-filter` signal) and closing (`scale-end`) and tells Topline over
+Topline's socket ("spaces open OUTPUT", "spaces close", "spaces changed"), and
+while it is open reports where the pointer is near the top of the screen
+("spaces pointer X Y"). Topline draws the row as an overlay layer surface that
+takes no input: desktop names, opened out into pictures (the wallpaper, and a
+`strata/snapshot` picture of each window, with its shadow cut away, placed
+from `strata/desktops`) when the pointer comes up to it. It sends where each
+desktop is drawn with `strata/spaces-areas`; Strata keeps a click inside one
+of those areas from the overview, closes the overview through its own
+`scale/toggle` IPC method, and once scale has ended asks for that desktop
+(`request_workspace`, so vswitch slides there) and brings its front window
+forward. Wayfire 0.9 has no IPC call to change desktop, so this lives in
+Strata.
+
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
 When a window of another app comes forward, every visible window of the

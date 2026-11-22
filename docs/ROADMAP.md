@@ -1102,6 +1102,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 5 | Turning it off brings back every window it hid; what it hid survives a restart of the Dock | Pier | done |
 | 6 | A Guide topic, a README screenshot, and every README screenshot retaken | Guide, Docs | done |
 
+## 1.108 "mission control" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The window overview (Control+Up) names the desktops along the top of the screen | Strata (mission-control.hpp), Topline (spaces.py) | done |
+| 2 | Move the pointer up and the row opens out into pictures of each desktop: its wallpaper and its windows | Topline | done |
+| 3 | Click a desktop to leave the overview and go there, with its front window active | Strata | done |
+| 4 | `strata/desktops` lists the desktops and the windows on each | Strata | done |
+| 5 | A window remembered at the top of the screen reopens below the menu bar, title bar and all | Strata (window-places.hpp) | done |
+| 6 | A Guide topic, a README screenshot, and every README screenshot retaken | Guide, Docs | done |
+
 ## Later
 
 - App menus from Qt apps in Topline (needs KDE's app-menu protocol in

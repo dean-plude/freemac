@@ -1287,8 +1287,12 @@ def main():
     from . import accents, sticky
     win.accents = accents.AccentPanel()
     win.sticky = sticky.StickyPanel()
+    # Mission Control's row of desktops (spaces.py), opened by Strata too.
+    from . import spaces
+    win.spaces = spaces.SpacesRow()
     win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle,
-                                                        "sticky": win.sticky.handle})
+                                                        "sticky": win.sticky.handle,
+                                                        "spaces": win.spaces.handle})
     accents.start_input_method()
     # Background Sounds (background_sounds.py) play for as long as Topline runs.
     from . import background_sounds
