@@ -236,6 +236,19 @@ plugins stay in use.
   Cairo, is drawn in its place as an overlay on the display under it,
   growing to four times the size, staying while the shaking goes on and
   shrinking back 450 ms after it stops (`strata-shell/shake_to_locate`).
+  `press-hold.hpp` (1.97) gives held letters their accents. A plain letter
+  that has accents (a c e i l n o s u y z, Shift allowed) is sent to the app
+  once, as a press and a release, so it never repeats; held 450 ms, Strata
+  tells Topline over its socket to show the panel at the text cursor
+  ("accent show LETTER X Y H"), passes it the number keys, arrows, Return
+  and Escape while it shows, and types the pick (`strata/accent-type`): with
+  delete-surrounding-text and commit-string where the app reports the text
+  around its cursor, otherwise with a Backspace key and then the accent,
+  sent once the app has answered the Backspace. Apps only say which text
+  field has the keyboard while an input method runs, so `freemac-im`
+  (strata/im, started by Topline) is a quiet input method that does nothing
+  else; an app that says nothing gets the panel by its window and the
+  accent through wtype (`strata-shell/press_and_hold`).
 
 Both start from Wayfire's own MIT-licensed plugins; see each folder's README.
 

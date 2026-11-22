@@ -103,8 +103,9 @@ def input_sources_group(window, group, row, switch, ini_get, ini_set):
     return listbox, menu
 
 
-def key_repeat_group(group, row, slider, ini_get, ini_set):
-    """Key repeat rate and Delay until repeat, as on a Mac."""
+def key_repeat_group(group, row, slider, ini_get, ini_set, switch=None):
+    """Key repeat rate and Delay until repeat, as on a Mac, and whether
+    holding a letter shows its accents (accents.py) instead of repeating it."""
     def number(key, default):
         try:
             return int(float(ini_get("input", key, default) or default))
@@ -117,8 +118,17 @@ def key_repeat_group(group, row, slider, ini_get, ini_set):
     delay = slider(-1000, -150, 50, -number("kb_repeat_delay", 400),
                    lambda v: ini_set("input", "kb_repeat_delay", str(int(-v))),
                    marks=((-1000, "Long"), (-150, "Short")))
-    return group(row("Key repeat rate", rate), row("Delay until repeat", delay,
-                                                   "How long to hold a key before it starts repeating."))
+    rows = [row("Key repeat rate", rate), row("Delay until repeat", delay,
+                                              "How long to hold a key before it starts repeating.")]
+    if switch is not None:
+        accents_on = (ini_get("strata-shell", "press_and_hold", "true") or "true").strip().lower() \
+            not in ("false", "0", "no", "off")
+        rows.append(row("Press and hold for accents",
+                        switch(accents_on, lambda on: ini_set("strata-shell", "press_and_hold",
+                                                              "true" if on else "false")),
+                        "Hold a letter such as e in a text field to pick é, è, ê and the rest, "
+                        "instead of repeating it."))
+    return group(*rows)
 
 
 
