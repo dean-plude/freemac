@@ -19,11 +19,21 @@
 // first desktop (a window dragged onto the "+" goes to a new desktop of its
 // own). The count is the core/vwidth option, set here at once; Topline
 // saves it in wayfire.ini ("spaces desktops N").
+// An app can be assigned to a desktop from its Dock menu (Options > Assign
+// To), as on a Mac: to all desktops (its windows are sticky), or to one
+// (its windows open there, and you're taken there). strata/assign sets it,
+// strata/assignments lists them; they are kept in
+// ~/.config/freemac/desktop-assignments, one "all APP-ID" or "N APP-ID" a line.
 // Original freemac code.
 #pragma once
 
+#include <cstdlib>
+#include <fstream>
 #include <functional>
+#include <map>
+#include <sstream>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 #include <wayfire/core.hpp>
 #include <wayfire/output.hpp>
@@ -46,6 +56,8 @@ namespace strata_spaces
 static const int REPORT_HEIGHT = 240;
 /* As many desktops as a Mac allows. */
 static const int MOST_DESKTOPS = 16;
+/* An app assigned to all desktops. */
+static const int ALL_DESKTOPS = -1;
 
 /* What a click in one of Topline's areas does. Topline sends an area's
  * desktop as (-1, 0) for the "+" and (-2, N) for the button that closes
@@ -80,7 +92,74 @@ class spaces_t
         wf::get_core().connect(&on_motion);
         wf::get_core().connect(&on_motion_absolute);
         wf::get_core().connect(&on_button);
+        wf::get_core().connect(&on_mapped);
         drag->connect(&on_drag_done);
+        load_assignments();
+    }
+
+    /* strata/assignments: {"apps": {APP-ID: "all" or a desktop index}}. */
+    nlohmann::json assignments(nlohmann::json)
+    {
+        auto out = wf::ipc::json_ok();
+        out["apps"] = nlohmann::json::object();
+        for (auto& [app, to] : assigned)
+        {
+            if (to == ALL_DESKTOPS)
+            {
+                out["apps"][app] = "all";
+            } else
+            {
+                out["apps"][app] = to;
+            }
+        }
+
+        return out;
+    }
+
+    /* strata/assign {"app-id": ID, "to": "all", "none" or a desktop index}:
+     * kept, and the app's open windows follow at once. */
+    nlohmann::json assign(nlohmann::json data)
+    {
+        if (!data.contains("app-id") || !data["app-id"].is_string() || !data.contains("to"))
+        {
+            return wf::ipc::json_error("app-id and to are needed");
+        }
+
+        std::string app = data["app-id"];
+        auto& to = data["to"];
+        if (app.empty() || (app.find('\n') != std::string::npos))
+        {
+            return wf::ipc::json_error("bad app-id");
+        }
+
+        if (to.is_string() && (to.get<std::string>() == "none"))
+        {
+            assigned.erase(app);
+        } else if (to.is_string() && (to.get<std::string>() == "all"))
+        {
+            assigned[app] = ALL_DESKTOPS;
+        } else if (to.is_number_integer() && (to.get<int>() >= 0) && (to.get<int>() < MOST_DESKTOPS))
+        {
+            assigned[app] = to.get<int>();
+        } else
+        {
+            return wf::ipc::json_error("to must be all, none or a desktop");
+        }
+
+        save_assignments();
+        for (auto output : wf::get_core().output_layout->get_outputs())
+        {
+            auto wset = output->wset();
+            for (auto& view : wset->get_views(wf::WSET_MAPPED_ONLY))
+            {
+                if (!view->parent && (view->get_app_id() == app))
+                {
+                    follow(view, false);
+                }
+            }
+        }
+
+        return wf::ipc::json_ok();
     }
 
     /* strata/desktops {"output": NAME}: the desktop grid, the one showing,
@@ -177,6 +256,171 @@ class spaces_t
     wf::shared_data::ref_ptr_t<wf::move_drag::core_drag_t> drag;
     wf::wl_idle_call idle_move;
     wf::wl_idle_call idle_change;
+    std::map<std::string, int> assigned;
+    /* Windows just opened by an app assigned to one desktop, moved there
+     * once the other plugins have placed them. */
+    std::vector<uint32_t> to_follow;
+    wf::wl_idle_call idle_follow;
+
+    static std::string assignments_path()
+    {
+        const char *config = std::getenv("XDG_CONFIG_HOME");
+        std::string base;
+        if (config && *config)
+        {
+            base = config;
+        } else
+        {
+            const char *home = std::getenv("HOME");
+            base = std::string(home ? home : "/tmp") + "/.config";
+        }
+
+        return base + "/freemac/desktop-assignments";
+    }
+
+    void load_assignments()
+    {
+        assigned.clear();
+        std::ifstream in(assignments_path());
+        std::string line;
+        while (std::getline(in, line))
+        {
+            std::istringstream fields(line);
+            std::string to, app;
+            if (!(fields >> to) || !std::getline(fields >> std::ws, app) || app.empty())
+            {
+                continue;
+            }
+
+            if (to == "all")
+            {
+                assigned[app] = ALL_DESKTOPS;
+            } else
+            {
+                char *end = nullptr;
+                long n = std::strtol(to.c_str(), &end, 10);
+                if (end && !*end && (n >= 0) && (n < MOST_DESKTOPS))
+                {
+                    assigned[app] = (int)n;
+                }
+            }
+        }
+    }
+
+    void save_assignments()
+    {
+        auto path = assignments_path();
+        mkdir(path.substr(0, path.rfind('/')).c_str(), 0755);
+        std::ofstream out(path, std::ios::trunc);
+        for (auto& [app, to] : assigned)
+        {
+            out << ((to == ALL_DESKTOPS) ? std::string("all") : std::to_string(to)) << " " << app << "\n";
+        }
+    }
+
+    /* Put a window where its app is assigned; a window just opened takes
+     * you to its desktop too, as on a Mac. */
+    void follow(wayfire_toplevel_view view, bool opened)
+    {
+        auto it = assigned.find(view->get_app_id());
+        if (it == assigned.end())
+        {
+            if (view->sticky && !opened)
+            {
+                view->set_sticky(false);
+            }
+
+            return;
+        }
+
+        if (it->second == ALL_DESKTOPS)
+        {
+            view->set_sticky(true);
+            return;
+        }
+
+        if (!view->get_output())
+        {
+            return;
+        }
+
+        auto wset = view->get_output()->wset();
+        auto grid = wset->get_workspace_grid_size();
+        wf::point_t desktop = {it->second, 0};
+        if ((grid.height != 1) || (desktop.x >= grid.width))
+        {
+            return;
+        }
+
+        if (view->sticky)
+        {
+            view->set_sticky(false);
+        }
+
+        if (wset->get_view_main_workspace(view) != desktop)
+        {
+            wset->move_to_workspace(view, desktop);
+        }
+
+        if (opened && (wset->get_current_workspace() != desktop))
+        {
+            wset->request_workspace(desktop);
+        }
+    }
+
+    /* Desktop `gone` closed: assignments after it move along by one, and
+     * those to it are dropped. */
+    void desktop_closed(int gone)
+    {
+        bool changed = false;
+        for (auto it = assigned.begin(); it != assigned.end();)
+        {
+            if (it->second == gone)
+            {
+                it = assigned.erase(it);
+                changed = true;
+                continue;
+            }
+
+            if (it->second > gone)
+            {
+                it->second--;
+                changed = true;
+            }
+
+            ++it;
+        }
+
+        if (changed)
+        {
+            save_assignments();
+        }
+    }
+
+    wf::signal::connection_t<wf::view_mapped_signal> on_mapped = [=] (wf::view_mapped_signal *ev)
+    {
+        auto view = wf::toplevel_cast(ev->view);
+        if (!view || view->parent || (view->role != wf::VIEW_ROLE_TOPLEVEL) ||
+            !assigned.count(view->get_app_id()))
+        {
+            return;
+        }
+
+        to_follow.push_back(view->get_id());
+        idle_follow.run_once([=] ()
+        {
+            auto ids = std::move(to_follow);
+            to_follow.clear();
+            for (auto id : ids)
+            {
+                auto v = wf::toplevel_cast(wf::ipc::find_view_by_id(id));
+                if (v && v->is_mapped())
+                {
+                    follow(v, true);
+                }
+            }
+        });
+    };
     /* While a window is dragged the overview takes the pointer in a way
      * that sends no motion signals, so the pointer is also looked at on a
      * timer for as long as the overview is open. */
@@ -412,6 +656,7 @@ class spaces_t
         }
 
         set_count(grid.width - 1);
+        desktop_closed(gone);
     }
 
     wf::signal::connection_t<scale_filter_signal> on_filter = [=] (scale_filter_signal*)

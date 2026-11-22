@@ -978,6 +978,10 @@ class strata_shell_impl : public wf::plugin_interface_t
             [=] (nlohmann::json data) { return spaces.desktops(data); });
         method_repository->register_method("strata/spaces-areas",
             [=] (nlohmann::json data) { return spaces.set_areas(data); });
+        method_repository->register_method("strata/assign",
+            [=] (nlohmann::json data) { return spaces.assign(data); });
+        method_repository->register_method("strata/assignments",
+            [=] (nlohmann::json data) { return spaces.assignments(data); });
         flashes.init();
         locate.init();
         window_places.init();

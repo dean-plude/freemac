@@ -50,10 +50,12 @@ TOPICS = {
         "Scroll down to zoom out again.",
         "To zoom with ⌥ Option or Control instead, or to turn zooming off, open Dials > Accessibility.",
     ]),
-    "desktops": ("Use more than one desktop", "desktop space workspace virtual swipe overview", [
+    "desktops": ("Use more than one desktop", "desktop space workspace virtual swipe overview assign all desktops dock options", [
         "freemac starts with four desktops. Control+Left and Control+Right move between them, "
         "as a three-finger swipe does.",
         "To add a desktop or close one, use the row of desktops in Mission Control (Control+Up).",
+        "To keep an app on every desktop, or on one, Control-click its icon in the Dock and choose "
+        "Options, then All Desktops or This Desktop under Assign To. None puts it back.",
         "Control+Down shows them all. Control+Shift with an arrow key takes the window in front "
         "to the next desktop.",
     ]),
