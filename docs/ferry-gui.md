@@ -16,7 +16,7 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M2 | Foundation core + CoreFoundation basics | **done**, merged (#28) |
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
 | M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
-| M5 | Nibs (compiled .nib) | **done**, pull request open (see the M5 report below) |
+| M5 | Nibs (compiled .nib) | **done**, merged (#37) |
 | M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | planned |
 | M7 | Polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | planned |
 
