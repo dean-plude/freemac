@@ -317,6 +317,16 @@ remembers the app and calls `scale/toggle_all`. While it is set, Strata's
 scale filter hides every view whose root parent has another app-id, and the
 desktops row is not opened; the same key again calls `scale/toggle_all` to
 close it, and the end of scale clears it.
+A window put in full screen (1.113) gets a desktop of its own, as on a Mac.
+Strata watches `view_fullscreen_signal` and, on idle once core has given the
+window its new size, adds a desktop at the end of the row and slides there
+with `request_workspace` and the window as a fixed view. Leaving full screen
+or closing the window slides back to the desktop it came from, and the empty
+desktop is closed once the slide is over. `strata/desktops` lists these
+desktops under "full-screen" so Topline names them after the app, and the
+corner button on one calls `fullscreen_request(false)` instead of closing it.
+Because Topline writing wayfire.ini makes Wayfire read it again, the count is
+only saved while no window has a desktop of its own, so these are never kept.
 
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.

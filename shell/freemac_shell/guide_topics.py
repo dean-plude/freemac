@@ -36,7 +36,7 @@ TOPICS = {
         "Drag a window to the left or right edge to fill that half of the screen, "
         "or press Control+⌘ with an arrow key.",
         "- ⌘M minimizes the window.",
-        "- Control+⌘F makes it full screen.",
+        "- Control+⌘F makes it full screen, on a desktop of its own; again to come back.",
         "- ⌘H hides the app and ⌥⌘H hides the others.",
         "- Control+Up shows every window; click one to bring it forward.",
         "Window > Fill and Window > Center in the menu bar work on the window in front.",
@@ -61,7 +61,7 @@ TOPICS = {
     ]),
     "mission-control": ("See every window and desktop with Mission Control", "mission control overview all windows "
                         "desktops spaces row top switch control up four finger swipe drag move window "
-                        "add new close remove plus app expose exposé show all windows control down", [
+                        "add new close remove plus app expose exposé show all windows control down full screen", [
         "Press Control+Up, or swipe up with four fingers, to see every window on this desktop side by side. "
         "Click one to bring it forward.",
         "Your desktops are named along the top of the screen. Move the pointer up to them and they open out "
@@ -74,6 +74,8 @@ TOPICS = {
         "desktop of its own.",
         "To close a desktop, point at it and click the round button on its corner. Its windows move to "
         "Desktop 1.",
+        "A window in full screen has a desktop of its own, named after its app. Swipe or press "
+        "Control+Left to go back to your other desktops; the button on its corner leaves full screen.",
     ]),
     "seek": ("Search with Seek", "seek search find spotlight calculate sum file convert conversion units "
              "miles kilometres celsius fahrenheit pounds kilograms cups", [

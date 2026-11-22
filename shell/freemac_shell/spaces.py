@@ -3,6 +3,7 @@
 
 While the overview of windows is open (Ctrl+Up, a 4-finger swipe up), the
 desktops are named along the top of the screen: "Desktop 1", "Desktop 2"…
+(a desktop a full-screen window has to itself takes its app's name)
 with the one you're on picked out. Move the pointer up to them and the row
 opens out into small pictures of each desktop, its wallpaper with its
 windows on it (pictures of the windows themselves, from strata/snapshot,
@@ -74,10 +75,31 @@ def parse(line):
     return None
 
 
-def desktop_names(grid):
-    """[(x, y, "Desktop N"), …] along the rows of the grid, as a Mac names them."""
+def desktop_names(grid, full=None):
+    """[(x, y, "Desktop N"), …] along the rows of the grid, as a Mac names them.
+    `full` = {x: app name} for desktops a full-screen window has to itself:
+    those take the app's name and the others are numbered without them."""
+    full = full or {}
     columns, rows = grid
-    return [(x, y, "Desktop %d" % (y * columns + x + 1)) for y in range(rows) for x in range(columns)]
+    names = []
+    number = 0
+    for y in range(rows):
+        for x in range(columns):
+            if rows == 1 and x in full:
+                names.append((x, y, full[x]))
+            else:
+                number += 1
+                names.append((x, y, "Desktop %d" % number))
+    return names
+
+
+def full_screen_names(entries):
+    """{x: app name} from strata/desktops' "full-screen": [[x, app-id, title], …]."""
+    names = {}
+    for entry in entries or []:
+        if isinstance(entry, list) and len(entry) == 3 and isinstance(entry[0], int):
+            names[entry[0]] = apps.display_name(str(entry[1] or ""), str(entry[2] or ""))
+    return names
 
 
 def row_boxes(count, width, box_w, box_h, gap, top):
@@ -298,7 +320,7 @@ class SpacesRow(Gtk.Window):
         width = self.get_allocated_width()
         if width < 100:
             width = self.info.get("size", [1280, 800])[0]
-        names = desktop_names(self.info["grid"])
+        names = desktop_names(self.info["grid"], full_screen_names(self.info.get("full-screen")))
         self.add = None
         if self.opened:
             sw, sh = self.info.get("size", [1280, 800])
@@ -440,7 +462,8 @@ class SpacesRow(Gtk.Window):
                     cr.stroke()
                 self._label(cr, name, x + w / 2, y + h + 14, bold=here)
                 if hovered and can_change(self.info["grid"]) and len(self.boxes) > 1:
-                    self._draw_close(cr, close_box((x, y, w, h)))
+                    full = desk[0] in full_screen_names(self.info.get("full-screen"))
+                    self._draw_close(cr, close_box((x, y, w, h)), leave_full_screen=full)
             else:
                 cr.set_source_rgba(1, 1, 1, 0.92 if here else (0.42 if hovered else 0.22))
                 _rounded(cr, x, y, w, h, h / 2)
@@ -465,7 +488,9 @@ class SpacesRow(Gtk.Window):
         cr.line_to(cx, cy + arm)
         cr.stroke()
 
-    def _draw_close(self, cr, box):
+    def _draw_close(self, cr, box, leave_full_screen=False):
+        """The corner button: × closes a desktop; on a full-screen window's
+        desktop two arrows pointing in take the window out of full screen."""
         x, y, d, _d = box
         cx, cy, r = x + d / 2, y + d / 2, d / 2
         cr.new_sub_path()
@@ -479,6 +504,21 @@ class SpacesRow(Gtk.Window):
         cr.set_source_rgba(1, 1, 1, 0.95)
         cr.set_line_width(2)
         cr.set_line_cap(1)
+        if leave_full_screen:
+            # Two arrows meeting in the middle, top-left and bottom-right.
+            cr.set_line_join(1)
+            arm = r * 0.5
+            tip = r * 0.1
+            head = r * 0.3
+            for sx in (-1, 1):
+                cr.move_to(cx + sx * arm, cy + sx * arm)
+                cr.line_to(cx + sx * tip, cy + sx * tip)
+                cr.stroke()
+                cr.move_to(cx + sx * tip, cy + sx * (tip + head))
+                cr.line_to(cx + sx * tip, cy + sx * tip)
+                cr.line_to(cx + sx * (tip + head), cy + sx * tip)
+                cr.stroke()
+            return
         cr.move_to(cx - arm, cy - arm)
         cr.line_to(cx + arm, cy + arm)
         cr.move_to(cx + arm, cy - arm)

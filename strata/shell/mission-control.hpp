@@ -28,9 +28,14 @@
 // Dock) opens the same overview with only the windows of one app, from
 // every desktop, and without the row of desktops, as on a Mac. Strata keeps
 // the other apps' windows out through scale's filter (strata/app-expose).
+// A window put in full screen gets a desktop of its own at the end of the
+// row, named after its app in Mission Control, as on a Mac; out of full
+// screen (or closed) it goes back to the desktop it came from and its
+// desktop goes away. These desktops are never saved for the next login.
 // Original freemac code.
 #pragma once
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -45,6 +50,7 @@
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
+#include <wayfire/view-helpers.hpp>
 #include <wayfire/window-manager.hpp>
 #include <wayfire/workspace-set.hpp>
 #include <wayfire/plugins/scale-signal.hpp>
@@ -97,6 +103,8 @@ class spaces_t
         wf::get_core().connect(&on_motion_absolute);
         wf::get_core().connect(&on_button);
         wf::get_core().connect(&on_mapped);
+        wf::get_core().connect(&on_fullscreen);
+        wf::get_core().connect(&on_unmapped);
         drag->connect(&on_drag_done);
         load_assignments();
         wf::get_core().bindings->add_activator(app_expose_key, &on_app_expose);
@@ -240,6 +248,17 @@ class spaces_t
         }
 
         std::reverse(out["windows"].begin(), out["windows"].end());
+        // Desktops a full-screen window has to itself: [[x, app-id, title], ...]
+        out["full-screen"] = nlohmann::json::array();
+        for (auto& [id, f] : full)
+        {
+            auto view = wf::toplevel_cast(wf::ipc::find_view_by_id(id));
+            if (view && (view->get_output() == output) && (f.desktop < grid.width))
+            {
+                out["full-screen"].push_back({f.desktop, view->get_app_id(), view->get_title()});
+            }
+        }
+
         return out;
     }
 
@@ -287,6 +306,232 @@ class spaces_t
     wf::option_wrapper_t<wf::activatorbinding_t> app_expose_key{"strata-shell/app_expose"};
     /* The app App Exposé is showing, while it's open. */
     std::string expose_app;
+    /* Windows in full screen on a desktop of their own: view id -> that
+     * desktop and the one the window came from. */
+    struct full_t
+    {
+        int desktop;
+        int from;
+    };
+    std::map<uint32_t, full_t> full;
+    std::vector<std::pair<uint32_t, bool>> full_changes;
+    wf::wl_idle_call idle_full;
+    /* A full-screen window's desktop, closed once the slide back is over. */
+    std::vector<int> to_close;
+    wf::wl_timer<false> close_later;
+
+    /* Full screen changes after core has made them, so the window is moved
+     * once it has its new size. */
+    wf::signal::connection_t<wf::view_fullscreen_signal> on_fullscreen =
+        [=] (wf::view_fullscreen_signal *ev)
+    {
+        auto view = ev->view;
+        if (!view || view->parent || (view->role != wf::VIEW_ROLE_TOPLEVEL))
+        {
+            return;
+        }
+
+        full_changes.push_back({view->get_id(), ev->state});
+        idle_full.run_once([=] () { apply_full(); });
+    };
+
+    wf::signal::connection_t<wf::view_unmapped_signal> on_unmapped = [=] (wf::view_unmapped_signal *ev)
+    {
+        if (ev->view && full.count(ev->view->get_id()))
+        {
+            full_changes.push_back({ev->view->get_id(), false});
+            idle_full.run_once([=] () { apply_full(); });
+        }
+    };
+
+    void apply_full()
+    {
+        auto changes = std::move(full_changes);
+        full_changes.clear();
+        for (auto& [id, state] : changes)
+        {
+            auto view  = wf::toplevel_cast(wf::ipc::find_view_by_id(id));
+            bool alive = view && view->is_mapped() && view->get_output();
+            if (state && alive && view->toplevel()->current().fullscreen)
+            {
+                enter_full(view);
+            } else if (!state || !alive)
+            {
+                leave_full(id, alive ? view : nullptr);
+            }
+        }
+    }
+
+    /* The window and its dialogs onto desktop x. */
+    void move_with_dialogs(wf::workspace_set_t *wset, wayfire_toplevel_view view, int x)
+    {
+        for (auto& v : view->enumerate_views())
+        {
+            wset->move_to_workspace(v, {x, 0});
+        }
+    }
+
+    void enter_full(wayfire_toplevel_view view)
+    {
+        if (full.count(view->get_id()) || view->sticky)
+        {
+            return;
+        }
+
+        auto wset = view->get_output()->wset().get();
+        auto grid = wset->get_workspace_grid_size();
+        if ((grid.height != 1) || (grid.width >= MOST_DESKTOPS))
+        {
+            return;
+        }
+
+        int from = wset->get_view_main_workspace(view).x;
+        int here = grid.width;
+        full[view->get_id()] = {here, from};
+        set_count(grid.width + 1);
+        if (wset->get_workspace_grid_size().width != grid.width + 1)
+        {
+            full.erase(view->get_id());
+            return;
+        }
+
+        if (wset->get_current_workspace().x == from)
+        {
+            // The window slides over to its new desktop, as on a Mac.
+            wset->request_workspace({here, 0}, {view});
+        } else
+        {
+            move_with_dialogs(wset, view, here);
+        }
+
+        if (wset->get_view_main_workspace(view).x != here)
+        {
+            move_with_dialogs(wset, view, here);
+        }
+    }
+
+    /* Out of full screen or closed: back to where it came from, and its
+     * desktop goes once the slide back is over. */
+    void leave_full(uint32_t id, wayfire_toplevel_view view)
+    {
+        auto it = full.find(id);
+        if (it == full.end())
+        {
+            return;
+        }
+
+        int here = it->second.desktop;
+        int from = it->second.from;
+        full.erase(it);
+        auto output = view ? view->get_output() : wf::get_core().seat->get_active_output();
+        if (!output)
+        {
+            return;
+        }
+
+        auto wset = output->wset().get();
+        auto grid = wset->get_workspace_grid_size();
+        if ((grid.height != 1) || (here >= grid.width))
+        {
+            return;
+        }
+
+        if ((from >= grid.width) || (from == here))
+        {
+            from = 0;
+        }
+
+        bool showing = wset->get_current_workspace().x == here;
+        if (view && (wset->get_view_main_workspace(view).x == here))
+        {
+            if (showing && open_on)
+            {
+                wset->set_workspace({from, 0}, {view});
+            } else if (showing)
+            {
+                wset->request_workspace({from, 0}, {view});
+            } else
+            {
+                move_with_dialogs(wset, view, from);
+            }
+        } else if (showing)
+        {
+            if (open_on)
+            {
+                wset->set_workspace({from, 0});
+            } else
+            {
+                wset->request_workspace({from, 0});
+            }
+        }
+
+        to_close.push_back(here);
+        close_later.disconnect();
+        close_later.set_timeout(open_on ? 1 : 450, [=] () { close_emptied(); });
+    }
+
+    /* Close the desktops full-screen windows left, unless something else
+     * has gone there meanwhile; the highest first, so the others keep their
+     * places. */
+    void close_emptied()
+    {
+        auto gone = std::move(to_close);
+        to_close.clear();
+        std::sort(gone.rbegin(), gone.rend());
+        for (int x : gone)
+        {
+            auto wset = row_wset();
+            if (!wset)
+            {
+                return;
+            }
+
+            auto grid = wset->get_workspace_grid_size();
+            if ((grid.height != 1) || (x >= grid.width) || (grid.width <= 1) ||
+                (wset->get_current_workspace().x == x))
+            {
+                continue;
+            }
+
+            bool used = false;
+            for (auto& v : wset->get_views(wf::WSET_MAPPED_ONLY))
+            {
+                used = used || (!v->sticky && (wset->get_view_main_workspace(v).x == x));
+            }
+
+            for (auto& [id, f] : full)
+            {
+                used = used || (f.desktop == x);
+            }
+
+            if (!used)
+            {
+                close_desktop(x);
+            }
+        }
+    }
+
+    /* The corner button on a full-screen window's desktop takes it out of
+     * full screen; true if there was one. */
+    bool leave_full_screen_on(int x)
+    {
+        for (auto& [id, f] : full)
+        {
+            if (f.desktop != x)
+            {
+                continue;
+            }
+
+            auto view = wf::toplevel_cast(wf::ipc::find_view_by_id(id));
+            if (view && view->is_mapped())
+            {
+                wf::get_core().default_wm->fullscreen_request(view, view->get_output(), false);
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     bool expose(std::string app)
     {
@@ -476,6 +721,35 @@ class spaces_t
         {
             save_assignments();
         }
+
+        for (auto it = full.begin(); it != full.end();)
+        {
+            if (it->second.desktop == gone)
+            {
+                it = full.erase(it);
+                continue;
+            }
+
+            if (it->second.desktop > gone)
+            {
+                it->second.desktop--;
+            }
+
+            if (it->second.from == gone)
+            {
+                it->second.from = 0;
+            } else if (it->second.from > gone)
+            {
+                it->second.from--;
+            }
+
+            ++it;
+        }
+
+        for (auto& x : to_close)
+        {
+            x = (x > gone) ? x - 1 : ((x == gone) ? MOST_DESKTOPS : x);
+        }
     }
 
     wf::signal::connection_t<wf::view_mapped_signal> on_mapped = [=] (wf::view_mapped_signal *ev)
@@ -657,7 +931,14 @@ class spaces_t
             option->set_value_str(std::to_string(count));
         }
 
-        tell("spaces desktops " + std::to_string(count));
+        // Saving makes Wayfire read wayfire.ini again, so the count is only
+        // saved while no window has a desktop of its own in full screen
+        // (those desktops aren't kept for next time); it is saved once the
+        // last one closes.
+        if (full.empty())
+        {
+            tell("spaces desktops " + std::to_string(count));
+        }
         if (open_on)
         {
             tell("spaces changed");
@@ -882,7 +1163,13 @@ class spaces_t
                     idle_change.run_once([=] () { add_desktop(); });
                 } else if (area.kind == AREA_CLOSE)
                 {
-                    idle_change.run_once([=] () { close_desktop(area.desktop.y); });
+                    idle_change.run_once([=] ()
+                    {
+                        if (!leave_full_screen_on(area.desktop.y))
+                        {
+                            close_desktop(area.desktop.y);
+                        }
+                    });
                 } else
                 {
                     go_to(area.desktop);
