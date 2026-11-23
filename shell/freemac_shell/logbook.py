@@ -24,10 +24,15 @@ the person's screen (freemac-screen-time-helper, through pkexec). The
 person's tracker copies each day to /var/lib/freemac/screen-time/NAME/, where
 administrators can read it.
 
+1.139: Downtime can be Custom, with its own hours (or none) for each day of
+the week, and a limit can be on a category (every game, say), counting all
+the apps of that kind together.
+
 Original freemac code. Each day's times are kept in
 ~/.local/share/freemac/logbook/DATE.json (five weeks of them), limits and the
 passcode (salted and hashed) in ~/.config/freemac/logbook.json.
 """
+import calendar
 import datetime
 import grp
 import hashlib
@@ -161,9 +166,18 @@ def load_config(user=None):
     allowed = data.get("allowed") if isinstance(data.get("allowed"), list) else []
     data["allowed"] = [a for a in allowed if isinstance(a, str) and a.endswith(".desktop")]
     down = data.get("downtime") if isinstance(data.get("downtime"), dict) else {}
-    data["downtime"] = {"on": down.get("on") is True,
-                        "start": _minutes(down.get("start"), DOWNTIME_START),
-                        "end": _minutes(down.get("end"), DOWNTIME_END),
+    start, end = _minutes(down.get("start"), DOWNTIME_START), _minutes(down.get("end"), DOWNTIME_END)
+    kept_days = down.get("days") if isinstance(down.get("days"), list) else []
+    days = []
+    for weekday in range(7):   # Monday first, as datetime counts
+        day = kept_days[weekday] if weekday < len(kept_days) else {}
+        if isinstance(day, dict):
+            begin, finish = _minutes(day.get("start"), start), _minutes(day.get("end"), end)
+            days.append((begin, finish) if begin != finish else None)
+        else:
+            days.append(None)   # no downtime that day
+    data["downtime"] = {"on": down.get("on") is True, "start": start, "end": end,
+                        "custom": down.get("custom") is True, "days": days,
                         "paused": down.get("paused") if isinstance(down.get("paused"), (int, float)) else 0}
     extra = data.get("extra") if isinstance(data.get("extra"), dict) else {}
     given = extra.get("apps") if isinstance(extra.get("apps"), dict) else {}
@@ -210,24 +224,64 @@ def clock(minutes):
     return when.strftime("%H:%M") if style.prefs().get("clock") == "24" else when.strftime("%-I:%M %p")
 
 
-def in_downtime(config, now=None):
+def day_window(down, weekday):
+    """Downtime that starts on this day (0 is Monday), as (start, end) in
+    minutes after midnight, or None. An end before the start is the next
+    morning."""
+    if down.get("custom"):
+        return down["days"][weekday]
+    return (down["start"], down["end"]) if down["start"] != down["end"] else None
+
+
+def downtime_end(config, now=None):
+    """When the downtime that's on now ends, in minutes after midnight, or
+    None when it isn't on."""
     down = config["downtime"]
     now = now or datetime.datetime.now()
-    if not down["on"] or down["start"] == down["end"] or down["paused"] > now.timestamp():
-        return False
+    if not down["on"] or down["paused"] > now.timestamp():
+        return None
     minute = now.hour * 60 + now.minute
-    if down["start"] < down["end"]:
-        return down["start"] <= minute < down["end"]
-    return minute >= down["start"] or minute < down["end"]   # past midnight
+    today = day_window(down, now.weekday())
+    if today:
+        start, end = today
+        if start <= minute < end or end < start <= minute:
+            return end
+    last_night = day_window(down, (now.weekday() - 1) % 7)
+    if last_night and last_night[1] < last_night[0] and minute < last_night[1]:
+        return last_night[1]
+    return None
+
+
+def in_downtime(config, now=None):
+    return downtime_end(config, now) is not None
+
+
+def next_downtime(config, now=None):
+    """(minutes until it starts, start, end) for the next downtime, or None
+    while it's on or turned off."""
+    down = config["downtime"]
+    now = now or datetime.datetime.now()
+    if not down["on"] or in_downtime(config, now):
+        return None
+    minute = now.hour * 60 + now.minute
+    for ahead in range(8):
+        window = day_window(down, (now.weekday() + ahead) % 7)
+        if window and ahead * 1440 + window[0] - minute > 0:
+            return ahead * 1440 + window[0] - minute, window[0], window[1]
+    return None
 
 
 def minutes_to_downtime(config, now=None):
     """Minutes until downtime starts, or None while it's on or turned off."""
-    down = config["downtime"]
-    now = now or datetime.datetime.now()
-    if not down["on"] or down["start"] == down["end"] or in_downtime(config, now):
-        return None
-    return (down["start"] - (now.hour * 60 + now.minute)) % 1440
+    coming = next_downtime(config, now)
+    return coming[0] if coming else None
+
+
+def downtime_kept(down):
+    """Downtime as the settings file keeps it."""
+    return {"on": down["on"], "start": hhmm(down["start"]), "end": hhmm(down["end"]),
+            "custom": down["custom"],
+            "days": [{"start": hhmm(day[0]), "end": hhmm(day[1])} if day else None for day in down["days"]]}
 
 
 def desktop_id(app):
@@ -236,6 +290,8 @@ def desktop_id(app):
 
 
 def always_allowed(config, app):
+    if is_category(app):
+        return False
     if app.lower() in ALWAYS_IDS:
         return True
     found = app if app.endswith(".desktop") else desktop_id(app)
@@ -252,13 +308,15 @@ def extra_minutes(config, app, day=None):
 def limit_key(config, app):
     """Where the app's limit is kept: under its window's app id, or under its
     desktop id when a parent added the limit before it was ever used."""
-    if app in config["limits"] or app.endswith(".desktop"):
+    if app in config["limits"] or app.endswith(".desktop") or is_category(app):
         return app
     found = desktop_id(app)
     return found if found and found in config["limits"] else app
 
 
 def app_info_any(app):
+    if is_category(app):
+        return None
     if app.endswith(".desktop"):
         try:
             return Gio.DesktopAppInfo.new(app)
@@ -268,11 +326,15 @@ def app_info_any(app):
 
 
 def app_name(app):
+    if is_category(app):
+        return category_name(app)
     info = app_info_any(app) if app.endswith(".desktop") else None
     return apps.short_name(info) if info else apps.display_name(app)
 
 
 def app_icon(app):
+    if is_category(app):
+        return Gio.ThemedIcon.new_from_names(list(_category(app)[3]))
     info = app_info_any(app) if app.endswith(".desktop") else None
     icon = info.get_icon() if info else None
     return icon or apps.icon_for(app)
@@ -285,6 +347,76 @@ def limit_for(config, app):
     if not limit or always_allowed(config, app):
         return None
     return limit + extra_minutes(config, app)
+
+
+# ---- Limits for a kind of app ------------------------------------------------------
+# A limit on a category counts every app in it together. The kind comes from
+# the Categories line of each app's .desktop file; the first rule that
+# matches decides, so a maths game is Education and a photo editor is
+# Creativity.
+CATEGORIES = (
+    ("reading", "Information & Reading", {"Literature", "Dictionary", "News", "WebBrowser"},
+     ("accessories-dictionary-symbolic", "x-office-document-symbolic")),
+    ("education", "Education", {"Education", "Math", "Science", "Languages", "ArtificialIntelligence",
+                                "Astronomy", "Biology", "Chemistry", "Geography", "Geology", "Physics"},
+     ("applications-science-symbolic", "accessories-calculator-symbolic")),
+    ("games", "Games", {"Game"}, ("applications-games-symbolic", "input-gaming-symbolic")),
+    ("social", "Social", {"InstantMessaging", "Chat", "Email", "IRCClient", "VideoConference",
+                          "Telephony", "ContactManagement"},
+     ("user-available-symbolic", "mail-unread-symbolic")),
+    ("creativity", "Creativity", {"Graphics", "2DGraphics", "3DGraphics", "RasterGraphics", "VectorGraphics",
+                                  "Photography", "AudioVideoEditing", "Recorder", "Publishing"},
+     ("applications-graphics-symbolic", "image-x-generic-symbolic")),
+    ("entertainment", "Entertainment", {"AudioVideo", "Audio", "Video", "Player", "TV", "Feed", "Music"},
+     ("applications-multimedia-symbolic", "media-playback-start-symbolic")),
+    ("productivity", "Productivity & Finance", {"Office", "Finance", "ProjectManagement", "Calendar",
+                                                "Spreadsheet", "WordProcessor", "Presentation",
+                                                "TextEditor", "Development", "Database"},
+     ("x-office-document-symbolic", "x-office-spreadsheet-symbolic")),
+    ("utilities", "Utilities", {"Utility", "System", "Settings", "Accessibility", "FileManager",
+                                "TerminalEmulator", "Monitor", "Security", "Archiving", "PackageManager",
+                                "Network"},
+     ("emblem-system-symbolic", "applications-system-symbolic")),
+)
+OTHER = ("other", "Other", set(), ("applications-other-symbolic", "view-app-grid-symbolic"))
+CATEGORY_PREFIX = "category:"
+# Each category's tile colour, as red, green and blue from 0 to 1.
+CATEGORY_COLOURS = {"reading": (0.78, 0.48, 0.23), "education": (0.08, 0.64, 0.72),
+                    "games": (0.56, 0.36, 0.97), "social": (0.18, 0.70, 0.43),
+                    "creativity": (0.95, 0.60, 0.20), "entertainment": (0.91, 0.34, 0.25),
+                    "productivity": (0.23, 0.51, 0.96), "utilities": (0.42, 0.45, 0.50),
+                    "other": (0.61, 0.64, 0.69)}
+_kinds = {}
+
+
+def is_category(key):
+    return key.startswith(CATEGORY_PREFIX)
+
+
+def _category(key):
+    wanted = key[len(CATEGORY_PREFIX):]
+    return next((c for c in CATEGORIES if c[0] == wanted), OTHER)
+
+
+def category_of(app):
+    """The category key an app counts toward: category:games, say."""
+    if app not in _kinds:
+        info = app_info_any(app)
+        listed = set(filter(None, (info.get_categories() or "").split(";"))) if info else set()
+        kind = next((c for c in CATEGORIES if c[2] & listed), OTHER)
+        _kinds[app] = CATEGORY_PREFIX + kind[0]
+    return _kinds[app]
+
+
+def category_name(key):
+    return _category(key)[1]
+
+
+def category_used(config, used, key):
+    """Seconds the apps of a category have had, from a day's times."""
+    return sum(secs for app, secs in used.items()
+               if not is_category(app) and app.lower() not in OWN_IDS
+               and category_of(app) == key and not always_allowed(config, app))
 
 
 # Limit adult websites: a NetworkManager setting written by the helper.
@@ -434,17 +566,16 @@ class Tracker:
 
     def _warn_downtime(self):
         self._reload_config()
-        left = minutes_to_downtime(self.config)
-        if left is None or left > 5:
+        coming = next_downtime(self.config)
+        if coming is None or coming[0] > 5:
             return
-        key = ("downtime", self.today.isoformat(), self.config["downtime"]["start"])
+        left, start, end = coming
+        key = ("downtime", self.today.isoformat(), start)
         if key in self.warned:
             return
         self.warned.add(key)
-        down = self.config["downtime"]
-        notify(f"Downtime starts in {left} minute{'s' if left != 1 else ''}" if left else "Downtime is starting",
-               f"From {clock(down['start'])} until {clock(down['end'])}, only the apps you always allow "
-               "can be used.")
+        notify(f"Downtime starts in {left} minute{'s' if left != 1 else ''}",
+               f"From {clock(start)} until {clock(end)}, only the apps you always allow can be used.")
 
     def _reload_config(self):
         stamp = config_stamp()
@@ -465,34 +596,54 @@ class Tracker:
             if now - self.stopped_at.get(("downtime", app), -999) > 20:
                 self.stopped_at[("downtime", app)] = now
                 notify(f"{name} is off during downtime",
-                       f"It can be used again at {clock(self.config['downtime']['end'])}.")
+                       f"It can be used again at {clock(downtime_end(self.config))}.")
             if self.wf:
                 try:
                     self.wf.quit(app)
                 except (OSError, ConnectionError, ValueError):
                     pass
             return
+        # The app's own limit, then its category's: the first one used up
+        # closes the app.
+        checks = []
         limit = limit_for(self.config, app)
-        if not limit:
-            return
-        used = self.day["apps"].get(app, 0.0)
-        if used >= limit * 60:
+        if limit:
+            checks.append((app, name, limit, self.day["apps"].get(app, 0.0)))
+        kind = category_of(app)
+        kind_limit = limit_for(self.config, kind) if not always_allowed(self.config, app) else None
+        if kind_limit:
+            checks.append((kind, category_name(kind), kind_limit,
+                           category_used(self.config, self.day["apps"], kind)))
+        managed = " A parent can give more time in Logbook." if self.config.get("managed") else ""
+        for key, label, limit, used in checks:
+            if used < limit * 60:
+                continue
             now = time.monotonic()
-            if now - self.stopped_at.get(app, -999) > 20:
-                self.stopped_at[app] = now
-                notify(f"Time's up for {name}",
-                       f"{name} has had its {duration(limit * 60)} for today."
-                       + (" A parent can give more time in Logbook." if self.config.get("managed") else ""))
+            if now - self.stopped_at.get((key, app), -999) > 20:
+                self.stopped_at[(key, app)] = now
+                if key == app:
+                    notify(f"Time's up for {name}",
+                           f"{name} has had its {duration(limit * 60)} for today." + managed)
+                else:
+                    notify(f"Time's up for {label}",
+                           f"{label} apps, {name} among them, have had their {duration(limit * 60)} "
+                           "for today." + managed)
             if self.wf:
                 try:
                     self.wf.quit(app)
                 except (OSError, ConnectionError, ValueError):
                     pass
-        elif used >= limit * 60 - WARN_BEFORE and (app, limit) not in self.warned:
-            self.warned.add((app, limit))
-            left = max(1, round((limit * 60 - used) / 60))
-            notify(f"{left} minute{'s' if left != 1 else ''} left for {name}",
-                   f"{name} has a limit of {duration(limit * 60)} a day.")
+            return
+        for key, label, limit, used in checks:
+            if used >= limit * 60 - WARN_BEFORE and (key, limit) not in self.warned:
+                self.warned.add((key, limit))
+                left = max(1, round((limit * 60 - used) / 60))
+                if key == app:
+                    notify(f"{left} minute{'s' if left != 1 else ''} left for {name}",
+                           f"{name} has a limit of {duration(limit * 60)} a day.")
+                else:
+                    notify(f"{left} minute{'s' if left != 1 else ''} left for {label}",
+                           f"{label} apps, {name} among them, have a limit of {duration(limit * 60)} a day.")
 
     def _save(self):
         if self.dirty:
@@ -628,6 +779,36 @@ def finish_row(box):
     row = Gtk.ListBoxRow(activatable=False)
     row.add(box)
     return row
+
+
+def category_tile(key, size, scale=1):
+    """A category's icon: its glyph in white on a rounded tile of its colour."""
+    import cairo
+    pixels = size * scale
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, pixels, pixels)
+    cr = cairo.Context(surface)
+    radius = pixels * 0.24
+    cr.new_sub_path()
+    for x, y, angle in ((pixels - radius, radius, -0.5), (pixels - radius, pixels - radius, 0),
+                        (radius, pixels - radius, 0.5), (radius, radius, 1)):
+        cr.arc(x, y, radius, angle * 3.14159265, (angle + 0.5) * 3.14159265)
+    cr.close_path()
+    cr.set_source_rgb(*CATEGORY_COLOURS.get(key[len(CATEGORY_PREFIX):], CATEGORY_COLOURS["other"]))
+    cr.fill()
+    glyph = int(pixels * 0.56)
+    info = Gtk.IconTheme.get_default().lookup_by_gicon(app_icon(key), glyph, Gtk.IconLookupFlags.FORCE_SIZE)
+    if info is not None:
+        white = Gdk.RGBA(1, 1, 1, 1)
+        try:
+            pixbuf, _was_symbolic = info.load_symbolic(white, None, None, None)
+        except GLib.Error:
+            pixbuf = None
+        if pixbuf is not None:
+            Gdk.cairo_set_source_pixbuf(cr, pixbuf, (pixels - pixbuf.get_width()) / 2,
+                                        (pixels - pixbuf.get_height()) / 2)
+            cr.paint()
+    surface.set_device_scale(scale, scale)
+    return surface
 
 
 class Meter(Gtk.DrawingArea):
@@ -825,10 +1006,8 @@ class Window(Gtk.ApplicationWindow):
 
     @staticmethod
     def _managed_settings(config):
-        down = config["downtime"]
         return json.dumps({"limits": config["limits"], "allowed": config["allowed"],
-                           "downtime": {"on": down["on"], "start": hhmm(down["start"]),
-                                        "end": hhmm(down["end"])}})
+                           "downtime": downtime_kept(config["downtime"])})
 
     def _start_managing(self):
         if self._run_root([HELPER, "set", self.person], self._managed_settings(load_config(self.person))):
@@ -905,6 +1084,22 @@ class Window(Gtk.ApplicationWindow):
                              tooltip_text="A daily limit for an app, used yet or not")
             add.connect("clicked", lambda _b: self._add_limit())
             page.pack_start(add, False, False, 4)
+        # Categories: the time of every app of a kind, with a limit for them
+        # all together.
+        self.kinds_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        heading = Gtk.Label(xalign=0)
+        heading.set_markup("<b>Categories</b>")
+        self.kinds_box.pack_start(heading, False, False, 6)
+        self.kinds = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.kinds.get_style_context().add_class("frame")
+        self.kinds_box.pack_start(self.kinds, False, False, 0)
+        if not self.locked:
+            add_kind = Gtk.Button(label="Add Category Limit\u2026", halign=Gtk.Align.START,
+                                  tooltip_text="One daily limit for every app of a kind, such as Games")
+            add_kind.connect("clicked", lambda _b: self._add_category_limit())
+            self.kinds_box.pack_start(add_kind, False, False, 4)
+        self.kinds_box.set_no_show_all(True)
+        page.pack_start(self.kinds_box, False, False, 12)
         page.pack_start(self._downtime_box(), False, False, 18)
         page.pack_start(self._allowed_box(), False, False, 0)
         if self.mine:   # a setting for the whole computer
@@ -959,14 +1154,44 @@ class Window(Gtk.ApplicationWindow):
         line.pack_end(self.downtime_switch, False, False, 0)
         frame.add(line)
         times = self._line()
-        times.pack_start(Gtk.Label(label="From"), False, False, 0)
+        self.downtime_mode = Gtk.ComboBoxText()
+        self.downtime_mode.append("every", "Every Day")
+        self.downtime_mode.append("custom", "Custom")
+        self.downtime_mode.set_active_id("custom" if down["custom"] else "every")
+        self.downtime_mode.connect("changed", lambda _c: self._downtime_changed())
+        times.pack_start(self.downtime_mode, False, False, 0)
+        self.everyday = Gtk.Box(spacing=12)
+        self.everyday.pack_start(Gtk.Label(label="From"), False, False, 0)
         self.downtime_from = self._time_combo(down["start"])
-        times.pack_start(self.downtime_from, False, False, 0)
-        times.pack_start(Gtk.Label(label="to"), False, False, 0)
+        self.everyday.pack_start(self.downtime_from, False, False, 0)
+        self.everyday.pack_start(Gtk.Label(label="to"), False, False, 0)
         self.downtime_to = self._time_combo(down["end"])
-        times.pack_start(self.downtime_to, False, False, 0)
-        times.pack_start(Gtk.Label(label="every day"), False, False, 0)
+        self.everyday.pack_start(self.downtime_to, False, False, 0)
+        times.pack_start(self.everyday, False, False, 0)
+        self.everyday.set_no_show_all(True)   # shown or not by _downtime_shown
         frame.add(times)
+        # Custom: each day with its own hours, or none. The week starts on
+        # Sunday, as the calendar in the menu bar does.
+        self.day_rows = []
+        for weekday in (6, 0, 1, 2, 3, 4, 5):
+            window = down["days"][weekday]
+            line = self._line()
+            line.set_margin_start(28)
+            line.set_margin_top(3)
+            line.set_margin_bottom(3)
+            check = Gtk.CheckButton(label=calendar.day_name[weekday], active=window is not None)
+            check.set_size_request(130, -1)
+            check.connect("toggled", lambda _c: self._downtime_changed())
+            line.pack_start(check, False, False, 0)
+            begin = self._time_combo(window[0] if window else down["start"])
+            finish = self._time_combo(window[1] if window else down["end"])
+            for widget in (Gtk.Label(label="From"), begin, Gtk.Label(label="to"), finish):
+                line.pack_start(widget, False, False, 0)
+            row = Gtk.ListBoxRow(activatable=False)
+            row.add(line)
+            row.set_no_show_all(True)
+            frame.add(row)
+            self.day_rows.append((weekday, row, check, begin, finish))
         now = self._line()
         self.downtime_now = Gtk.Label(xalign=0)
         now.pack_start(self.downtime_now, True, True, 0)
@@ -984,17 +1209,44 @@ class Window(Gtk.ApplicationWindow):
         downtime is on now."""
         self.updating = True
         down = self.config["downtime"]
-        self.downtime_switch.set_active(down["on"])
-        for combo, minutes in ((self.downtime_from, down["start"]), (self.downtime_to, down["end"])):
+        changeable = down["on"] and not self.locked
+
+        def show_time(combo, minutes):
             if not combo.set_active_id(hhmm(minutes)):
                 combo.append(hhmm(minutes), clock(minutes))
                 combo.set_active_id(hhmm(minutes))
-            combo.set_sensitive(down["on"] and not self.locked)
+        self.downtime_switch.set_active(down["on"])
         self.downtime_switch.set_sensitive(not self.locked)
+        self.downtime_mode.set_active_id("custom" if down["custom"] else "every")
+        self.downtime_mode.set_sensitive(changeable)
+        for combo, minutes in ((self.downtime_from, down["start"]), (self.downtime_to, down["end"])):
+            show_time(combo, minutes)
+            combo.set_sensitive(changeable)
+        if down["custom"]:
+            self.everyday.hide()
+        else:
+            for child in self.everyday.get_children():
+                child.show_all()
+            self.everyday.show()
+        for weekday, row, check, begin, finish in self.day_rows:
+            window = down["days"][weekday]
+            check.set_active(window is not None)
+            check.set_sensitive(changeable)
+            if window:
+                show_time(begin, window[0])
+                show_time(finish, window[1])
+            begin.set_sensitive(changeable and window is not None)
+            finish.set_sensitive(changeable and window is not None)
+            if down["custom"]:
+                row.get_child().show_all()   # the row ignores show_all
+                row.show()
+            else:
+                row.hide()
         self.updating = False
-        if in_downtime(self.config):
-            self.downtime_now.set_text(f"Downtime until {clock(down['end'])}")
-            self.downtime_now_row.get_child().show_all()   # the row ignores show_all
+        ends = downtime_end(self.config)
+        if ends is not None:
+            self.downtime_now.set_text(f"Downtime until {clock(ends)}")
+            self.downtime_now_row.get_child().show_all()
             self.downtime_now_row.show()
         else:
             self.downtime_now_row.hide()
@@ -1010,14 +1262,15 @@ class Window(Gtk.ApplicationWindow):
             change(self.config)
             done = self._run_root([HELPER, "set", self.person], self._managed_settings(self.config))
             self.config = load_config(self.person)
+            self.stamp = config_stamp(self.person)   # changed here: no need to rebuild the page
             return done
         if self.config.get("passcode") and not self.ask_passcode(ask):
             return False
         change(self.config)
-        write_json(CONFIG, {**self.config, "downtime": {**self.config["downtime"],
-                                                        "start": hhmm(self.config["downtime"]["start"]),
-                                                        "end": hhmm(self.config["downtime"]["end"])}})
+        write_json(CONFIG, {**self.config, "downtime": {**downtime_kept(self.config["downtime"]),
+                                                        "paused": self.config["downtime"]["paused"]}})
         self.config = load_config()
+        self.stamp = config_stamp(self.person)
         return True
 
     def _downtime_changed(self):
@@ -1026,9 +1279,15 @@ class Window(Gtk.ApplicationWindow):
         on = self.downtime_switch.get_active()
         start = _minutes(self.downtime_from.get_active_id(), DOWNTIME_START)
         end = _minutes(self.downtime_to.get_active_id(), DOWNTIME_END)
+        custom = self.downtime_mode.get_active_id() == "custom"
+        days = list(self.config["downtime"]["days"])
+        for weekday, _row, check, begin, finish in self.day_rows:
+            begin_at = _minutes(begin.get_active_id(), start)
+            finish_at = _minutes(finish.get_active_id(), end)
+            days[weekday] = (begin_at, finish_at) if check.get_active() and begin_at != finish_at else None
 
         def change(config):
-            config["downtime"].update(on=on, start=start, end=end, paused=0)
+            config["downtime"].update(on=on, start=start, end=end, custom=custom, days=days, paused=0)
         self._change_config(change, "Enter the passcode to change downtime.")
         self._downtime_shown()
 
@@ -1036,6 +1295,7 @@ class Window(Gtk.ApplicationWindow):
         if self.config.get("managed"):
             if self._grant("downtime"):
                 self.config = load_config(self.person)
+                self.stamp = config_stamp(self.person)
                 self._downtime_shown()
             return
         until = time.time() + MORE_TIME * 60
@@ -1107,6 +1367,7 @@ class Window(Gtk.ApplicationWindow):
         if self.config.get("managed"):
             if self._grant("more", app):
                 self.config = load_config(self.person)
+                self.stamp = config_stamp(self.person)
                 self.refresh()
             return
         today = datetime.date.today().isoformat()
@@ -1207,7 +1468,7 @@ class Window(Gtk.ApplicationWindow):
     def _popover_open(self):
         """Whether a row's limit pop-over is showing; the rows aren't
         rebuilt under it."""
-        for row in self.list.get_children():
+        for row in [*self.list.get_children(), *self.kinds.get_children()]:
             stack = [row]
             while stack:
                 widget = stack.pop()
@@ -1258,18 +1519,40 @@ class Window(Gtk.ApplicationWindow):
             self.list.add(self._row(app, secs, top))
             shown.add(limit_key(self.config, app))
         for key in sorted(set(self.config["limits"]) - shown, key=lambda k: app_name(k).lower()):
-            self.list.add(self._row(key, used.get(key, 0.0), top))   # limited, not used yet
+            if not is_category(key):
+                self.list.add(self._row(key, used.get(key, 0.0), top))   # limited, not used yet
         for row in self.list.get_children():
             row.show_all()
         has = bool(self.list.get_children())
         self.list.set_visible(has)
         self.empty.set_visible(not has)
+        # Categories with time in them, or a limit.
+        for row in self.kinds.get_children():
+            self.kinds.remove(row)
+        kinds = {CATEGORY_PREFIX + c[0]: 0.0 for c in (*CATEGORIES, OTHER)}
+        for key in kinds:
+            kinds[key] = category_used(self.config, used, key)
+        listed = [k for k in kinds if kinds[k] >= 30 or k in self.config["limits"]]
+        listed.sort(key=lambda k: -kinds[k])
+        top_kind = max([kinds[k] for k in listed] + [1.0])
+        for key in listed:
+            self.kinds.add(self._row(key, kinds[key], top_kind))
+        if listed or not self.locked:
+            for child in self.kinds_box.get_children():   # the box ignores show_all
+                child.show_all()
+            self.kinds_box.show()
+            self.kinds.set_visible(bool(listed))
+        else:
+            self.kinds_box.hide()
 
     def _row(self, app, secs, top):
         box = Gtk.Box(spacing=12)
         box.set_border_width(10)
-        icon = Gtk.Image.new_from_gicon(app_icon(app), Gtk.IconSize.DND)
-        icon.set_pixel_size(32)
+        if is_category(app):
+            icon = Gtk.Image.new_from_surface(category_tile(app, 32, self.get_scale_factor()))
+        else:
+            icon = Gtk.Image.new_from_gicon(app_icon(app), Gtk.IconSize.DND)
+            icon.set_pixel_size(32)
         box.pack_start(icon, False, False, 0)
         middle = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         name = Gtk.Label(label=app_name(app), xalign=0, ellipsize=Pango.EllipsizeMode.END)
@@ -1344,7 +1627,7 @@ class Window(Gtk.ApplicationWindow):
             note = Gtk.Label(label="A parent sets this limit.", xalign=0)
             note.get_style_context().add_class("dim-label")
             box.pack_start(note, False, False, 0)
-            used = load_day(datetime.date.today())["apps"].get(app, 0.0)
+            used = self.used_today(app)
             if allowance and used >= allowance * 60:
                 more = Gtk.Button(label=f"{MORE_TIME} More Minutes", halign=Gtk.Align.END)
                 more.get_style_context().add_class("suggested-action")
@@ -1353,7 +1636,7 @@ class Window(Gtk.ApplicationWindow):
             box.show_all()
             pop.add(box)
             return pop
-        if allowance and load_day(datetime.date.today(), self.person)["apps"].get(app, 0.0) >= allowance * 60:
+        if allowance and self.used_today(app) >= allowance * 60:
             more = Gtk.Button(label=f"{MORE_TIME} More Minutes")
             more.connect("clicked", lambda _b: (pop.popdown(), self.give_more_time(app)))
             buttons.pack_start(more, False, False, 0)
@@ -1369,12 +1652,67 @@ class Window(Gtk.ApplicationWindow):
         buttons.pack_start(save, False, False, 0)
         box.pack_start(buttons, False, False, 0)
         note = Gtk.Label(label="Five minutes before the time is up, a notice says so.\n"
-                               "At the limit, the app's windows close for the rest of the day.", xalign=0)
+                               + ("At the limit, the windows of every app in it close for the rest of the day."
+                                  if is_category(app) else
+                                  "At the limit, the app's windows close for the rest of the day."), xalign=0)
         note.get_style_context().add_class("dim-label")
         box.pack_start(note, False, False, 0)
         box.show_all()
         pop.add(box)
         return pop
+
+    def used_today(self, key):
+        used = load_day(datetime.date.today(), self.person)["apps"]
+        return category_used(self.config, used, key) if is_category(key) else used.get(key, 0.0)
+
+    def _add_category_limit(self):
+        self.config = load_config(self.person)
+        dialog = Gtk.Dialog(title="Category Limit", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Set Limit", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        area = dialog.get_content_area()
+        area.set_spacing(10)
+        area.set_border_width(16)
+        title = Gtk.Label(xalign=0)
+        title.set_markup("<b>One daily limit for every app of a kind</b>")
+        area.pack_start(title, False, False, 0)
+        kind = Gtk.ComboBoxText()
+        for key, label, *_rest in (*CATEGORIES, OTHER):
+            kind.append(CATEGORY_PREFIX + key, label)
+        free = [CATEGORY_PREFIX + c[0] for c in (*CATEGORIES, OTHER)
+                if CATEGORY_PREFIX + c[0] not in self.config["limits"]]
+        kind.set_active_id(CATEGORY_PREFIX + "games" if CATEGORY_PREFIX + "games" in free
+                           else (free or [CATEGORY_PREFIX + "games"])[0])
+        area.pack_start(kind, False, False, 0)
+        line = Gtk.Box(spacing=6)
+        hours = Gtk.SpinButton.new_with_range(0, 12, 1)
+        minutes = Gtk.SpinButton.new_with_range(0, 55, 5)
+        hours.set_value(1)
+        for widget in (hours, Gtk.Label(label="h"), minutes, Gtk.Label(label="min a day")):
+            line.pack_start(widget, False, False, 0)
+        area.pack_start(line, False, False, 0)
+        members = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        members.get_style_context().add_class("dim-label")
+        area.pack_start(members, False, False, 0)
+
+        def show_members(_c=None):
+            key = kind.get_active_id()
+            names = sorted({apps.short_name(info) for info in Gio.AppInfo.get_all()
+                            if info.should_show() and isinstance(info, Gio.DesktopAppInfo)
+                            and category_of(info.get_id()) == key
+                            and not always_allowed(self.config, info.get_id())}, key=str.lower)
+            members.set_text(("Counts " + ", ".join(names[:8]) + (" and more." if len(names) > 8 else "."))
+                             if names else "No apps of this kind are installed yet.")
+        kind.connect("changed", show_members)
+        show_members()
+        area.show_all()
+        answer = dialog.run()
+        total = int(hours.get_value()) * 60 + int(minutes.get_value())
+        key = kind.get_active_id()
+        dialog.destroy()
+        if answer == Gtk.ResponseType.OK and total > 0 and key:
+            self.change_limit(key, total)
 
     def _add_limit(self):
         from .dials_login import choose_app

@@ -6,6 +6,7 @@ and that person can't change them. Run as root through pkexec.
   freemac-screen-time-helper set NAME        the settings, as JSON, on stdin
   freemac-screen-time-helper off NAME        stop managing NAME's screen time
   freemac-screen-time-helper grant NAME more APP-ID     15 more minutes today
+                                                        (APP-ID can be category:games)
   freemac-screen-time-helper grant NAME downtime        15 minutes out of downtime
 
 set and off need an administrator (org.freemac.screen-time.manage); grant is
@@ -31,7 +32,8 @@ import sys
 import time
 
 NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
-APP = re.compile(r"^[A-Za-z0-9._+-]{1,200}$")
+# An app's id, or a kind of app (category:games) for a limit on them all.
+APP = re.compile(r"^(category:[a-z]{1,20}|[A-Za-z0-9._+-]{1,200})$")
 SETTINGS = "/etc/freemac/screen-time"
 SHARED = "/var/lib/freemac/screen-time"
 ADMIN_GROUP = "sudo"
@@ -84,7 +86,14 @@ def clean(data):
     clock = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
     downtime = {"on": down.get("on") is True,
                 "start": down["start"] if clock.match(str(down.get("start", ""))) else "22:00",
-                "end": down["end"] if clock.match(str(down.get("end", ""))) else "07:00"}
+                "end": down["end"] if clock.match(str(down.get("end", ""))) else "07:00",
+                "custom": down.get("custom") is True}
+    days = down.get("days") if isinstance(down.get("days"), list) else []
+    if days:   # Monday first; null is a day without downtime
+        downtime["days"] = [{"start": day["start"], "end": day["end"]}
+                            if isinstance(day, dict) and clock.match(str(day.get("start", "")))
+                            and clock.match(str(day.get("end", ""))) else None
+                            for day in (days + [None] * 7)[:7]]
     return {"limits": dict(list(limits.items())[:500]), "allowed": allowed[:500], "downtime": downtime}
 
 
