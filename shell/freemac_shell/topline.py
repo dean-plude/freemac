@@ -1297,6 +1297,9 @@ def main():
     # The Accessibility Keyboard (screen_keyboard.py), while Dials has it on.
     from . import screen_keyboard
     win.screen_keyboard = screen_keyboard.ScreenKeyboard()
+    # Mouse Keys turned on or off with five Options (mouse_keys.py).
+    from . import mouse_keys
+    win.mouse_keys = mouse_keys.Toggle(win.sticky.show_notice)
     # Mission Control's row of desktops (spaces.py), opened by Strata too.
     from . import spaces
     win.spaces = spaces.SpacesRow()
@@ -1304,6 +1307,7 @@ def main():
                                                         "sticky": win.sticky.handle,
                                                         "hover": win.hover_text.handle,
                                                         "slow": win.slow_clicks.handle,
+                                                        "mouse": win.mouse_keys.handle,
                                                         "spaces": win.spaces.handle})
     accents.start_input_method()
     # Background Sounds (background_sounds.py) play for as long as Topline runs.

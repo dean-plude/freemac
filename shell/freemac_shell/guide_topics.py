@@ -811,6 +811,14 @@ TOPICS = {
         "Shift, Control, Option and Command work at once, so a shortcut only waits for its last key.",
         "Turn off Use click key sounds if you'd rather not hear a click as each key goes down and counts.",
     ]),
+    "mouse-keys": ("Move the pointer with the keyboard", "mouse keys keypad numpad number pad move pointer cursor without mouse trackpad click drag keyboard accessibility", [
+        "Choose Dials > Accessibility and turn on Mouse Keys, or press Option five times in a row.",
+        "On the number keypad, 8, 2, 4 and 6 move the pointer up, down, left and right, and 7, 9, 1 and 3 move it diagonally. "
+        "Hold a key and the pointer speeds up.",
+        "Press 5 to click, or Control and 5 for a secondary click. Press 0 to hold the button down, move to drag, then press the full stop to let go.",
+        "No keypad? Turn on Use the letter keys too, and use 8, K, U and O to move, I to click, M to hold and the full stop to let go.",
+        "Drag Initial delay and Maximum speed until the pointer moves the way you like.",
+    ]),
     "accessibility-keyboard": ("Type with a keyboard on the screen", "accessibility keyboard on screen onscreen virtual keyboard type with mouse pointer trackpad touch no keyboard broken keys accessibility", [
         "Choose Dials > Accessibility and turn on Accessibility Keyboard.",
         "Click the keys to type in the app you're using, just as if you'd pressed them.",

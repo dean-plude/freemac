@@ -61,6 +61,35 @@
 			<_long>A soft click as a key goes down and another once it counts.</_long>
 			<default>true</default>
 		</option>
+		<option name="mouse_keys" type="bool">
+			<_short>Mouse Keys</_short>
+			<_long>Move the pointer and click with the numeric keypad.</_long>
+			<default>false</default>
+		</option>
+		<option name="mouse_keys_letters" type="bool">
+			<_short>Mouse Keys with the letter keys too</_short>
+			<_long>8, K, U, O, 7, 9, J, L, I, M and the full stop do what the keypad does, for a keyboard without one.</_long>
+			<default>false</default>
+		</option>
+		<option name="mouse_keys_delay" type="int">
+			<_short>Mouse Keys initial delay</_short>
+			<_long>How long a direction is held before the pointer starts to move on its own, in milliseconds.</_long>
+			<default>300</default>
+			<min>0</min>
+			<max>2000</max>
+		</option>
+		<option name="mouse_keys_speed" type="int">
+			<_short>Mouse Keys maximum speed</_short>
+			<_long>How fast the pointer goes once it has sped up, from 1 to 10.</_long>
+			<default>5</default>
+			<min>1</min>
+			<max>10</max>
+		</option>
+		<option name="mouse_keys_option" type="bool">
+			<_short>Press Option five times to turn Mouse Keys on or off</_short>
+			<_long>Five taps of Option in a row turn Mouse Keys on, or off again.</_long>
+			<default>true</default>
+		</option>
 		<option name="sticky_keys" type="bool">
 			<_short>Sticky Keys</_short>
 			<_long>A modifier key tapped on its own stays down for the next key; tapped twice it locks.</_long>

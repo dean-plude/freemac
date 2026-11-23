@@ -383,7 +383,7 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window), screen_keyboard_group(window),
+    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window), mouse_keys(window), screen_keyboard_group(window),
         audio(window), *spoken_content(window))
 
 
@@ -576,6 +576,44 @@ def slow_keys(window):
         row("Acceptance delay", acceptance),
         row("Use click key sounds", switch(on("slow_keys_click", "true"), setter("slow_keys_click")),
             "A soft click as a key goes down, and another once it counts."))
+
+
+def mouse_keys(window):
+    """Mouse Keys, as on a Mac: the keypad moves the pointer and clicks
+    (strata-shell/mouse_keys and the rest, done by Strata)."""
+    group, row, _page, slider, switch = window.helpers
+
+    def on(key, default):
+        value = window.ini_get("strata-shell", key, default) or default
+        return value.strip().lower() not in ("false", "0", "no", "off")
+
+    def setter(key):
+        return lambda value: window.ini_set("strata-shell", key, "true" if value else "false")
+
+    def number(key, default, low, high):
+        try:
+            value = int(window.ini_get("strata-shell", key, str(default)) or default)
+        except ValueError:
+            value = default
+        return max(low, min(high, value))
+
+    delay = slider(0, 2000, 100, number("mouse_keys_delay", 300, 0, 2000),
+                   lambda value: window.ini_set("strata-shell", "mouse_keys_delay", str(int(value))),
+                   marks=((0, "Short"), (2000, "Long")))
+    speed = slider(1, 10, 1, number("mouse_keys_speed", 5, 1, 10),
+                   lambda value: window.ini_set("strata-shell", "mouse_keys_speed", str(int(value))),
+                   marks=((1, "Slow"), (10, "Fast")))
+    return group(
+        row("Mouse Keys", switch(on("mouse_keys", "false"), setter("mouse_keys")),
+            "Move the pointer with the number keypad: 8, 2, 4 and 6 go up, down, left and right, "
+            "5 clicks, 0 holds the button down to drag and the full stop lets it go."),
+        row("Press Option five times to turn Mouse Keys on or off",
+            switch(on("mouse_keys_option", "true"), setter("mouse_keys_option"))),
+        row("Use the letter keys too", switch(on("mouse_keys_letters", "false"), setter("mouse_keys_letters")),
+            "For a keyboard without a keypad: 8, K, U and O move, 7, 9, J and L go diagonally, "
+            "I clicks, M holds and the full stop lets go. Those keys don't type while Mouse Keys is on."),
+        row("Initial delay", delay),
+        row("Maximum speed", speed))
 
 
 def screen_keyboard_group(window):

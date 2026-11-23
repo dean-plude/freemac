@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.128 "mouse keys" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Mouse Keys, as on a Mac: the number keypad moves the pointer (8, 2, 4 and 6, with 7, 9, 1 and 3 for diagonals), slowly at first and faster while a key is held; 5 clicks, Control with 5 right-clicks, 0 holds the button down to drag and . lets it go | Strata (mouse-keys.hpp) | done |
+| 2 | The pointer is a pointer device of its own, so every app sees an ordinary mouse; a laptop with no keypad can use 7, 8, 9, U, I, O, J, K, L and M instead | Strata | done |
+| 3 | Press Option five times to turn it on or off, with a sound and a notice at the top right | Strata, Topline (mouse_keys.py) | done |
+| 4 | Dials > Accessibility: Mouse Keys switch, Option five times, letter keys, Initial delay and Maximum speed | Dials | done |
+| 5 | Guide topic; README row; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.127 "accessibility keyboard" (done)
 
 | # | Item | Component | Status |
