@@ -15,6 +15,11 @@ def socket_path():
     path = os.environ.get("WAYFIRE_SOCKET")
     if path:
         return path
+    # freemac-session puts it in the person's runtime folder (1.138); older
+    # sessions, and plain Wayfire, use /tmp.
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime and os.path.exists(os.path.join(runtime, "wayfire.socket")):
+        return os.path.join(runtime, "wayfire.socket")
     display = os.environ.get("WAYLAND_DISPLAY", "wayland-1")
     return f"/tmp/wayfire-{display}.socket"
 

@@ -90,8 +90,9 @@ def flash():
     """Flash every display once (Strata's strata/flash); False if Strata
     couldn't be asked. Talks to Wayfire's socket directly, as wfipc does,
     so that `freemac-sound alert` still starts without GTK."""
-    path = os.environ.get("WAYFIRE_SOCKET") or \
-        f"/tmp/wayfire-{os.environ.get('WAYLAND_DISPLAY', 'wayland-1')}.socket"
+    runtime = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or "/nonexistent", "wayfire.socket")
+    path = os.environ.get("WAYFIRE_SOCKET") or (runtime if os.path.exists(runtime) else
+                                                 f"/tmp/wayfire-{os.environ.get('WAYLAND_DISPLAY', 'wayland-1')}.socket")
     raw = json.dumps({"method": "strata/flash", "data": {}}).encode()
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:

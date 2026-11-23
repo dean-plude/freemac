@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# More time for someone whose screen time a parent manages, run as root
+# through pkexec (org.freemac.screen-time.grant), which asks for an
+# administrator's password every time.
+#   freemac-screen-time-grant NAME more APP-ID | NAME downtime
+exec /usr/libexec/freemac-screen-time-helper grant "$@"
