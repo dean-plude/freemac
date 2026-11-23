@@ -32,7 +32,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import announce, calendar_store, minimonth, notify_rules, reminders_store, style, update_notice  # noqa: E402
+from . import announce, calendar_store, desktop_widgets, minimonth, notify_rules, reminders_store, style, update_notice  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
@@ -537,6 +537,7 @@ class Beacon:
         for nid in list(self.live):
             self._drop_banner(nid)
         self._fill_center()
+        self.center_scroller.get_vadjustment().set_value(0)    # open at the top
         self.center.show_all()
         self.center.present()
 
@@ -552,13 +553,16 @@ class Beacon:
         date.get_style_context().add_class("beacon-heading")
         self.date_label = date
         outer.pack_start(date, False, False, 0)
+        # The month, the day's events, the notifications and the widgets
+        # all scroll together, so the widgets get room on a short screen.
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         # The month, with a dot under days that have events in Tide, and
         # the chosen day's events under it; a click on one opens Tide.
         self.month = minimonth.MiniMonth(picked=self._show_events, marked=self._event_days)
         self.month.set_halign(Gtk.Align.CENTER)
-        outer.pack_start(self.month, False, False, 0)
+        body.pack_start(self.month, False, False, 0)
         self.events_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        outer.pack_start(self.events_box, False, False, 0)
+        body.pack_start(self.events_box, False, False, 0)
         row = Gtk.Box(spacing=8)
         heading = Gtk.Label(label="Notifications", xalign=0)
         heading.get_style_context().add_class("beacon-heading")
@@ -571,16 +575,23 @@ class Beacon:
             self.dnd.append(focus, name)
         self.dnd_handler = self.dnd.connect("changed", self._dnd_toggled)
         row.pack_start(self.dnd, False, False, 0)
-        outer.pack_start(row, False, False, 0)
+        body.pack_start(row, False, False, 0)
         self.dnd_note = Gtk.Label(xalign=1)
         self.dnd_note.get_style_context().add_class("beacon-empty")
         self.dnd_note.set_no_show_all(True)
-        outer.pack_start(self.dnd_note, False, False, 0)
+        body.pack_start(self.dnd_note, False, False, 0)
+        self.list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        # Widgets under the notifications, as on a Mac (desktop_widgets.py).
+        inside = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        inside.pack_start(self.list_box, False, False, 0)
+        self.widgets = desktop_widgets.CentreWidgets(opened=lambda: self.center.hide())
+        inside.pack_start(self.widgets, False, False, 0)
+        body.pack_start(inside, False, False, 0)
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroller.set_vexpand(True)
         scroller.set_min_content_height(260)
-        self.list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        scroller.add(self.list_box)
+        scroller.add(body)
+        self.center_scroller = scroller
         outer.pack_start(scroller, True, True, 0)
         clear = Gtk.Button(label="Clear All", halign=Gtk.Align.END)
         clear.connect("clicked", lambda *_: self.clear_all())
@@ -755,6 +766,7 @@ class Beacon:
                 continue
             self.list_box.pack_start(self._group(app, notes), False, False, 0)
         self.list_box.show_all()
+        self.widgets.refresh()
 
     def _group(self, app, notes):
         """Several notifications from one app: the newest on top of a stack,
