@@ -383,8 +383,50 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), *reader_group(window), colour_filters(window), sticky_keys(window), audio(window),
-        *spoken_content(window))
+    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window),
+        audio(window), *spoken_content(window))
+
+
+HOVER_KEYS = (("command", "\u2318 Command"), ("option", "\u2325 Option"), ("control", "\u2303 Control"))
+HOVER_SIZES = (("24", "Small"), ("36", "Medium"), ("48", "Large"), ("64", "Huge"))
+
+
+def hover_text_group(window):
+    """Hover Text: hold a key and point at words to see them large (Strata
+    watches the key, Topline reads and shows the words: hover_text.py)."""
+    group, row, _page, _slider, switch = window.helpers
+    from . import livetext
+    if not livetext.available():
+        return []
+    on = (window.ini_get("strata-shell", "hover_text", "false") or "false").strip().lower() \
+        in ("true", "1", "yes", "on")
+    keys = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for value, label in HOVER_KEYS:
+        keys.append(value, label)
+    keys.set_active_id((window.ini_get("strata-shell", "hover_text_key", "command") or "command").strip())
+    if not keys.get_active_id():
+        keys.set_active_id("command")
+    keys.connect("changed", lambda c: window.ini_set("strata-shell", "hover_text_key", c.get_active_id()))
+    size = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for value, label in HOVER_SIZES:
+        size.append(value, label)
+    size.set_active_id(str(style.prefs().get("hover_text_size", 36)))
+    if not size.get_active_id():
+        size.set_active_id("36")
+    size.connect("changed", lambda c: window.save_prefs(hover_text_size=int(c.get_active_id())))
+
+    def turned(active):
+        window.ini_set("strata-shell", "hover_text", "true" if active else "false")
+        keys.set_sensitive(active)
+        size.set_sensitive(active)
+    keys.set_sensitive(on)
+    size.set_sensitive(on)
+    return [group(
+        row("Hover Text", switch(on, turned),
+            "Hold a key and point at some words to see them large above the pointer."),
+        row("Hold", keys),
+        row("Text size", size),
+    )]
 
 
 def reader_group(window):

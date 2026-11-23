@@ -54,6 +54,16 @@
 			<_long>Five taps of Shift in a row turn Sticky Keys on, or off again.</_long>
 			<default>true</default>
 		</option>
+		<option name="hover_text" type="bool">
+			<_short>Hover Text</_short>
+			<_long>Hold a key and point at some words to see them large above the pointer.</_long>
+			<default>false</default>
+		</option>
+		<option name="hover_text_key" type="string">
+			<_short>Hover Text key</_short>
+			<_long>The key to hold for Hover Text: command, option or control.</_long>
+			<default>command</default>
+		</option>
 		<option name="command_key" type="bool">
 			<_short>Super is the Command key</_short>
 			<_long>Super with a key does in apps what Ctrl with it does (Ctrl+Shift in a terminal); Super+Left/Right/Up/Down and Alt+Left/Right/Backspace move through text as on a Mac.</_long>
