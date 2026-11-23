@@ -521,6 +521,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     id _delegate;
     NSMenu *_mainMenu;
     NSMenu *_windowsMenu, *_servicesMenu, *_helpMenu;
+    id _servicesProvider;
     BOOL _running, _launched, _active;
     NSEvent *_current;
     NSApplicationActivationPolicy _policy;
@@ -564,6 +565,10 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 - (void)setWindowsMenu:(NSMenu *)m { _windowsMenu = m; }
 - (NSMenu *)servicesMenu { return _servicesMenu; }
 - (void)setServicesMenu:(NSMenu *)m { _servicesMenu = m; }
+/* The Services menu's providers and types: kept, but nothing offers services here. */
+- (id)servicesProvider { return _servicesProvider; }
+- (void)setServicesProvider:(id)p { _servicesProvider = p; }
+- (void)registerServicesMenuSendTypes:(NSArray *)send returnTypes:(NSArray *)ret {}
 - (NSMenu *)helpMenu { return _helpMenu; }
 - (void)setHelpMenu:(NSMenu *)m { _helpMenu = m; }
 - (NSArray *)windows { return AAllWindows(); }

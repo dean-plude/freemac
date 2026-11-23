@@ -11,6 +11,9 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
       src/objc/symbols.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
+# Link stubs for the Mac libraries served by this system's copy (src/host.c).
+TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
+           sdk/lib/libicucore.tbd
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
 # and lld, as the tests do). CoreFoundation is served from the same file.
@@ -18,7 +21,7 @@ FOUNDATION_SRC = $(wildcard foundation/*.m)
 FOUNDATION_OBJ = $(FOUNDATION_SRC:foundation/%.m=foundation/build/%.o)
 FOUNDATION = frameworks/Foundation.framework/Foundation
 FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h \
-                     sdk/include/CoreFoundation/CoreFoundation.h
+                     sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
 # Core Graphics and Core Text (M3), one Mac library that draws with this
@@ -38,7 +41,12 @@ APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
 APPKIT = frameworks/AppKit.framework/AppKit
 APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(GRAPHICS_HEADERS)
 
-all: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
+# Ferry's own Installer (installer/), a Mac app built against the frameworks above.
+INSTALLER_SRC = installer/Installer.m installer/IPackage.m
+INSTALLER_APP = installer/Installer.app
+INSTALLER = $(INSTALLER_APP)/Contents/MacOS/Installer
+
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLER)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -60,6 +68,25 @@ sdk/lib/libSystem.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libSystem > $@
 
+sdk/lib/libz.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libz.1.dylib libz.so.1 > $@
+sdk/lib/libbz2.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libbz2.1.0.dylib libbz2.so.1.0 > $@
+sdk/lib/liblzma.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/liblzma.5.dylib liblzma.so.5 > $@
+sdk/lib/libxml2.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libxml2.2.dylib libxml2.so.2 > $@
+sdk/lib/libsqlite3.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libsqlite3.dylib libsqlite3.so.0 > $@
+sdk/lib/libicucore.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libicucore.A.dylib icu > $@
+
 sdk/lib/libobjc.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libobjc > $@
@@ -74,6 +101,8 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	    -o $@ $(FOUNDATION_OBJ) -lobjc
 	@mkdir -p frameworks/CoreFoundation.framework
 	sdk/gen-cf-tbd.sh $@ > frameworks/CoreFoundation.framework/CoreFoundation.tbd
+	@mkdir -p frameworks/SystemConfiguration.framework
+	sdk/gen-alias-tbd.sh SystemConfiguration $@ > frameworks/SystemConfiguration.framework/SystemConfiguration.tbd
 
 $(HOST_TBD): ferry sdk/gen-tbd.sh
 	@mkdir -p graphics/build
@@ -101,11 +130,21 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(HOST_TBD)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
 	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
+	@mkdir -p frameworks/Carbon.framework
+	sdk/gen-alias-tbd.sh Carbon $@ > frameworks/Carbon.framework/Carbon.tbd
+
+$(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKIT) $(TWIN_TBD)
+	@mkdir -p $(INSTALLER_APP)/Contents/MacOS
+	cp installer/Info.plist $(INSTALLER_APP)/Contents/Info.plist
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -o $@ $(INSTALLER_SRC) -framework Cocoa -lz -llzma
 
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLER)
+	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
+	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
+	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
@@ -115,13 +154,13 @@ install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
 	install -Dm755 $(GRAPHICS) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreGraphics.framework/CoreGraphics
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h
-	rm -rf tests/build foundation/build graphics/build appkit/build frameworks
+	rm -rf tests/build foundation/build graphics/build appkit/build frameworks installer/Installer.app
 
 .PHONY: all check install clean

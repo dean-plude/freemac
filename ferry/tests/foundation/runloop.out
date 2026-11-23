@@ -6,6 +6,7 @@ tick 1 (info)
 tick 2 (info)
 performed later with an argument
 tick 3 (info)
+performed later with kept
 block timer fired, step 2
 run returned after the work; ticks 3, took between 0.4 and 3 seconds: 1
 timer valid after invalidate 0

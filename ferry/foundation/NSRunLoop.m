@@ -5,6 +5,7 @@
  * can be added as input sources; AppKit (M4) adds its Wayland connection that
  * way. */
 #import "FInternal.h"
+#include <os/lock.h>
 #include <poll.h>
 #include <sys/time.h>
 
@@ -337,19 +338,72 @@ F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollf
 
 /* ---- delayed and main-thread performs ------------------------------------------------- */
 
+/* Each delayed perform waiting to happen, so that
+ * cancelPreviousPerformRequestsWithTarget: can find it. */
+@interface FDelayedPerform : NSObject {
+@public
+    id target, arg;
+    SEL sel;
+    NSTimer *timer;
+}
+@end
+@implementation FDelayedPerform
+@end
+static NSMutableArray *delayed_performs;
+static os_unfair_lock delayed_lock = OS_UNFAIR_LOCK_INIT;
+
 @implementation NSObject (NSDelayedPerforming)
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay
 {
-    [self retain];
-    [arg retain];
-    [[NSRunLoop mainRunLoop] addTimer:[NSTimer timerWithTimeInterval:delay
-                                                            repeats:NO
-                                                              block:^(NSTimer *t) {
-                                                                ((void (*)(id, SEL, id))objc_msgSend)(self, aSelector, arg);
-                                                                [self release];
-                                                                [arg release];
-                                                              }]
-                              forMode:NSDefaultRunLoopMode];
+    FDelayedPerform *p = [[FDelayedPerform alloc] init];
+    p->target = [self retain];
+    p->arg = [arg retain];
+    p->sel = aSelector;
+    p->timer = [NSTimer timerWithTimeInterval:delay
+                                      repeats:NO
+                                        block:^(NSTimer *t) {
+                                          os_unfair_lock_lock(&delayed_lock);
+                                          [p retain];
+                                          [delayed_performs removeObjectIdenticalTo:p];
+                                          os_unfair_lock_unlock(&delayed_lock);
+                                          ((void (*)(id, SEL, id))objc_msgSend)(p->target, p->sel, p->arg);
+                                          [p->target release];
+                                          [p->arg release];
+                                          p->target = p->arg = nil;
+                                          [p release];
+                                        }];
+    os_unfair_lock_lock(&delayed_lock);
+    if (!delayed_performs)
+        delayed_performs = [[NSMutableArray alloc] init];
+    [delayed_performs addObject:p];
+    os_unfair_lock_unlock(&delayed_lock);
+    [p release];
+    [[NSRunLoop mainRunLoop] addTimer:p->timer forMode:NSDefaultRunLoopMode];
+}
+static void cancel_performs(id target, BOOL any, SEL sel, id arg)
+{
+    NSMutableArray *gone = [NSMutableArray array];
+    os_unfair_lock_lock(&delayed_lock);
+    for (FDelayedPerform *p in delayed_performs)
+        if (p->target == target && (any || (p->sel == sel && (p->arg == arg || [p->arg isEqual:arg]))))
+            [gone addObject:p];
+    for (FDelayedPerform *p in gone)
+        [delayed_performs removeObjectIdenticalTo:p];
+    os_unfair_lock_unlock(&delayed_lock);
+    for (FDelayedPerform *p in gone) {
+        [p->timer invalidate];
+        [p->target release];
+        [p->arg release];
+        p->target = p->arg = nil;
+    }
+}
++ (void)cancelPreviousPerformRequestsWithTarget:(id)target
+{
+    cancel_performs(target, YES, NULL, nil);
+}
++ (void)cancelPreviousPerformRequestsWithTarget:(id)target selector:(SEL)sel object:(id)arg
+{
+    cancel_performs(target, NO, sel, arg);
 }
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay
                 inModes:(NSArray *)modes

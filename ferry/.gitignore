@@ -9,3 +9,5 @@
 /graphics/build/
 /appkit/build/
 /src/host_names.h
+/installer/Installer.app/
+/installer/build/

@@ -1,0 +1,43 @@
+clip view: 1,1 183x83
+vertical scroller: 184,1 15x83
+horizontal scroller: 1,84 183x15
+content size 183x83, frame for it 200x100
+visible at first: 0,917 183x83
+knob 0.08 at 0.00
+scrolled to the bottom: 50,0 183x83
+knob at 1.00, horizontal at 0.23
+kept inside the document: 0,917 183x83
+after scrollRectToVisible: 137,400 183x83
+visibleRect of the document: 137,400 183x83
+enclosing scroll view found: 1
+scroller half way: 137,458 183x83
+short document: vertical hidden 1, horizontal hidden 1
+clip view now: 1,1 198x98
+text view flipped 1, editable 1, width follows 1
+wrapped: grew 1, width 145
+used rect is several lines: 1
+text ends "wenty
+las", selected "las", 4 changes
+down one line: past the first line 1
+index at the top left 0
+select all 140
+not editable: length still 140
+after the storage changed: "short", height back to the clip view's 1
+rtf text: Plain bold italic|red é€ café| centred
+"bold" is bold 1, size 14
+"italic" is italic 1
+"red" has a colour 1
+last line centred 1
+round trip same text 1, still bold 1
+not RTF: nil
+html (NSHTML): Welcome||To the installer & more text.||• one|• two|a link|end
+link: https://example.org/
+plain (NSPlainText): 15 characters
+drawn: dark text 1, red text 1
+progress: indeterminate 1, range 0-100
+progress value 100 (clamped)
+small spinner: 0,0 16x16
+box content: 5,5 190x74
+title rect is at the top 1
+untitled box content: 10,10 180x80
+exit=0

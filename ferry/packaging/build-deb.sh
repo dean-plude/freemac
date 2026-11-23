@@ -20,7 +20,7 @@ Architecture: amd64
 Maintainer: freemac project <noreply@freemac.invalid>
 Installed-Size: $size
 Depends: libc6
-Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0, libgdk-pixbuf-2.0-0, libpoppler-glib8
+Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0, libgdk-pixbuf-2.0-0, libpoppler-glib8, zlib1g, libbz2-1.0, liblzma5, libxml2, libsqlite3-0, 7zip | p7zip-full
 Suggests: clang, lld
 Section: otherosfs
 Priority: optional
@@ -32,8 +32,10 @@ Description: Ferry, runs simple Intel Mac programs
  programs (windows, views, buttons, text fields, menus' keyboard
  shortcuts), built in code or from nib files (both of Xcode's formats),
  drawn with this system's Cairo and Pango and shown through GTK 3 on
- Wayland or X11, with Grand Central Dispatch. Larger Mac apps start but do
- not run all the way yet; App Store apps do not run.
+ Wayland or X11, with Grand Central Dispatch, scroll and text views. It
+ has its own Installer for Mac installer packages (.pkg) and disk images
+ (.dmg, opened with 7-Zip), which installs for the user alone. Larger Mac
+ apps start but do not run all the way yet; App Store apps do not run.
 CONTROL
 cat > "$root/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh

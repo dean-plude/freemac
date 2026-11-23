@@ -83,6 +83,11 @@ stored: {
 }
 reloaded 11, missing key 0
 from arguments fast
+CFPreferences volume 11, enabled 1
+set from CF yes
+keys enabled,fromCF,recent,volume,zoom
+another app x, ours unset
+compare: 1 1 1 0
 url https | example.com | 8443 | /a/b/c.html | x=1&y=2 | top | c.html | html
 relative: https://user@example.com:8443/a/d/e.png
 file url file:///tmp/some%20file.txt path /tmp/some file.txt isFile 1

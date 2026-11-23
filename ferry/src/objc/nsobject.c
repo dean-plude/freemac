@@ -608,6 +608,17 @@ void objc_setProperty_nonatomic(id self, SEL _cmd, id value, ptrdiff_t offset) {
 void objc_setProperty_atomic_copy(id self, SEL _cmd, id value, ptrdiff_t offset) { (void)_cmd; set_property(self, offset, value, YES, 1); }
 void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id value, ptrdiff_t offset) { (void)_cmd; set_property(self, offset, value, NO, 1); }
 
+/* The write barriers of the old garbage collector, which apps built for
+ * both memory models still call. Without a collector they are plain stores. */
+id objc_assign_global(id value, id *dest) { *dest = value; return value; }
+id objc_assign_threadlocal(id value, id *dest) { *dest = value; return value; }
+id objc_assign_strongCast(id value, id *dest) { *dest = value; return value; }
+id objc_assign_ivar(id value, id dest, ptrdiff_t offset) { *(id *)((char *)dest + offset) = value; return value; }
+id objc_assign_weak(id value, id *dest) { *dest = value; return value; }
+id objc_read_weak(id *location) { return *location; }
+void *objc_memmove_collectable(void *dst, const void *src, size_t size) { return memmove(dst, src, size); }
+BOOL objc_collectingEnabled(void) { return NO; }
+
 void objc_copyStruct(void *dest, const void *src, ptrdiff_t size, BOOL atomic, BOOL has_strong)
 {
     (void)has_strong;

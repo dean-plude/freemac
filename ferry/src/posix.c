@@ -14,7 +14,9 @@
 #include <locale.h>
 #include <pwd.h>
 #include <signal.h>
+#include <sched.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -735,7 +737,100 @@ static int mac_getopt_long_only(int argc, char *const argv[], const char *opts, 
     return getopt_long_only(argc, argv, bsd_optstring(opts), lo, idx);
 }
 
+/* ---- libkern's atomics and spin locks (OSAtomic.h, OSSpinLockDeprecated.h,
+ * os/lock.h), on the compiler's atomic builtins. A spin lock is an int32 (0
+ * when free); an unfair lock is a uint32 owner word. */
+static void mac_OSSpinLockLock(volatile int32_t *l)
+{
+    while (__atomic_exchange_n(l, 1, __ATOMIC_ACQUIRE))
+        sched_yield();
+}
+static bool mac_OSSpinLockTry(volatile int32_t *l) { return !__atomic_exchange_n(l, 1, __ATOMIC_ACQUIRE); }
+static void mac_OSSpinLockUnlock(volatile int32_t *l) { __atomic_store_n(l, 0, __ATOMIC_RELEASE); }
+static void mac_os_unfair_lock_lock(volatile uint32_t *l) { mac_OSSpinLockLock((volatile int32_t *)l); }
+static bool mac_os_unfair_lock_trylock(volatile uint32_t *l) { return mac_OSSpinLockTry((volatile int32_t *)l); }
+static void mac_os_unfair_lock_unlock(volatile uint32_t *l) { mac_OSSpinLockUnlock((volatile int32_t *)l); }
+static void mac_os_unfair_lock_assert(volatile uint32_t *l) { (void)l; }
+static void mac_OSMemoryBarrier(void) { __atomic_thread_fence(__ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicAdd32(int32_t v, volatile int32_t *p) { return __atomic_add_fetch(p, v, __ATOMIC_SEQ_CST); }
+static int64_t mac_OSAtomicAdd64(int64_t v, volatile int64_t *p) { return __atomic_add_fetch(p, v, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicIncrement32(volatile int32_t *p) { return __atomic_add_fetch(p, 1, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicDecrement32(volatile int32_t *p) { return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST); }
+static int64_t mac_OSAtomicIncrement64(volatile int64_t *p) { return __atomic_add_fetch(p, 1, __ATOMIC_SEQ_CST); }
+static int64_t mac_OSAtomicDecrement64(volatile int64_t *p) { return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicOr32(uint32_t v, volatile uint32_t *p) { return (int32_t)__atomic_or_fetch(p, v, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicAnd32(uint32_t v, volatile uint32_t *p) { return (int32_t)__atomic_and_fetch(p, v, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicOr32Orig(uint32_t v, volatile uint32_t *p) { return (int32_t)__atomic_fetch_or(p, v, __ATOMIC_SEQ_CST); }
+static int32_t mac_OSAtomicAnd32Orig(uint32_t v, volatile uint32_t *p) { return (int32_t)__atomic_fetch_and(p, v, __ATOMIC_SEQ_CST); }
+static bool mac_OSAtomicCompareAndSwap32(int32_t o, int32_t n, volatile int32_t *p)
+{
+    return __atomic_compare_exchange_n(p, &o, n, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+static bool mac_OSAtomicCompareAndSwap64(int64_t o, int64_t n, volatile int64_t *p)
+{
+    return __atomic_compare_exchange_n(p, &o, n, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+static bool mac_OSAtomicCompareAndSwapPtr(void *o, void *n, void *volatile *p)
+{
+    return __atomic_compare_exchange_n(p, &o, n, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+static bool mac_OSAtomicTestAndSet(uint32_t n, volatile void *addr)
+{
+    volatile uint8_t *b = (volatile uint8_t *)addr + (n >> 3);
+    uint8_t mask = (uint8_t)(0x80 >> (n & 7));
+    return (__atomic_fetch_or(b, mask, __ATOMIC_SEQ_CST) & mask) != 0;
+}
+static bool mac_OSAtomicTestAndClear(uint32_t n, volatile void *addr)
+{
+    volatile uint8_t *b = (volatile uint8_t *)addr + (n >> 3);
+    uint8_t mask = (uint8_t)(0x80 >> (n & 7));
+    return (__atomic_fetch_and(b, (uint8_t)~mask, __ATOMIC_SEQ_CST) & mask) != 0;
+}
+
 const struct ferry_symbol ferry_posix_symbols[] = {
+    {"OSSpinLockLock", mac_OSSpinLockLock},
+    {"OSSpinLockTry", mac_OSSpinLockTry},
+    {"OSSpinLockUnlock", mac_OSSpinLockUnlock},
+    {"os_unfair_lock_lock", mac_os_unfair_lock_lock},
+    {"os_unfair_lock_trylock", mac_os_unfair_lock_trylock},
+    {"os_unfair_lock_unlock", mac_os_unfair_lock_unlock},
+    {"os_unfair_lock_assert_owner", mac_os_unfair_lock_assert},
+    {"os_unfair_lock_assert_not_owner", mac_os_unfair_lock_assert},
+    {"OSMemoryBarrier", mac_OSMemoryBarrier},
+    {"OSAtomicAdd32", mac_OSAtomicAdd32},
+    {"OSAtomicAdd32Barrier", mac_OSAtomicAdd32},
+    {"OSAtomicAdd64", mac_OSAtomicAdd64},
+    {"OSAtomicAdd64Barrier", mac_OSAtomicAdd64},
+    {"OSAtomicIncrement32", mac_OSAtomicIncrement32},
+    {"OSAtomicIncrement32Barrier", mac_OSAtomicIncrement32},
+    {"OSAtomicDecrement32", mac_OSAtomicDecrement32},
+    {"OSAtomicDecrement32Barrier", mac_OSAtomicDecrement32},
+    {"OSAtomicIncrement64", mac_OSAtomicIncrement64},
+    {"OSAtomicIncrement64Barrier", mac_OSAtomicIncrement64},
+    {"OSAtomicDecrement64", mac_OSAtomicDecrement64},
+    {"OSAtomicDecrement64Barrier", mac_OSAtomicDecrement64},
+    {"OSAtomicOr32", mac_OSAtomicOr32},
+    {"OSAtomicOr32Barrier", mac_OSAtomicOr32},
+    {"OSAtomicAnd32", mac_OSAtomicAnd32},
+    {"OSAtomicAnd32Barrier", mac_OSAtomicAnd32},
+    {"OSAtomicOr32Orig", mac_OSAtomicOr32Orig},
+    {"OSAtomicOr32OrigBarrier", mac_OSAtomicOr32Orig},
+    {"OSAtomicAnd32Orig", mac_OSAtomicAnd32Orig},
+    {"OSAtomicAnd32OrigBarrier", mac_OSAtomicAnd32Orig},
+    {"OSAtomicCompareAndSwap32", mac_OSAtomicCompareAndSwap32},
+    {"OSAtomicCompareAndSwap32Barrier", mac_OSAtomicCompareAndSwap32},
+    {"OSAtomicCompareAndSwap64", mac_OSAtomicCompareAndSwap64},
+    {"OSAtomicCompareAndSwap64Barrier", mac_OSAtomicCompareAndSwap64},
+    {"OSAtomicCompareAndSwapPtr", mac_OSAtomicCompareAndSwapPtr},
+    {"OSAtomicCompareAndSwapPtrBarrier", mac_OSAtomicCompareAndSwapPtr},
+    {"OSAtomicTestAndSet", mac_OSAtomicTestAndSet},
+    {"OSAtomicTestAndSetBarrier", mac_OSAtomicTestAndSet},
+    {"OSAtomicTestAndClear", mac_OSAtomicTestAndClear},
+    {"OSAtomicTestAndClearBarrier", mac_OSAtomicTestAndClear},
+    {"OSAtomicCompareAndSwapInt", mac_OSAtomicCompareAndSwap32},
+    {"OSAtomicCompareAndSwapIntBarrier", mac_OSAtomicCompareAndSwap32},
+    {"OSAtomicCompareAndSwapLong", mac_OSAtomicCompareAndSwap64},
+    {"OSAtomicCompareAndSwapLongBarrier", mac_OSAtomicCompareAndSwap64},
     {"open", mac_open},
     {"openat", mac_openat},
     {"creat", mac_creat},

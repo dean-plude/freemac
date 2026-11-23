@@ -514,6 +514,24 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
         alignment = kCTTextAlignmentNatural;
     return self;
 }
+/* From a nib or an archived attributed string: the alignment is kept; tab
+ * stops and the rest take their defaults. */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if ((self = [self init])) {
+        if ([coder containsValueForKey:@"NSAlignment"])
+            alignment = (uint8_t)[coder decodeIntegerForKey:@"NSAlignment"];
+        if ([coder containsValueForKey:@"NSLineBreakMode"])
+            lineBreakMode = (uint8_t)[coder decodeIntegerForKey:@"NSLineBreakMode"];
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeInteger:alignment forKey:@"NSAlignment"];
+    if (lineBreakMode)
+        [coder encodeInteger:lineBreakMode forKey:@"NSLineBreakMode"];
+}
 - (id)copyWithZone:(NSZone *)zone
 {
     if ([self class] == [NSParagraphStyle class])

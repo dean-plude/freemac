@@ -181,7 +181,17 @@ static id box(id self, SEL sel, char type)
            object_getClassName(self), self, key);
 }
 
+/* Observers of the key hear of the change (NSKeyValueObserving.m). */
 - (void)setValue:(id)value forKey:(NSString *)key
+{
+    BOOL observed = FKVOIsObserved(self);
+    if (observed)
+        [self willChangeValueForKey:key];
+    [self _ferrySetValue:value forKey:key];
+    if (observed)
+        [self didChangeValueForKey:key];
+}
+- (void)_ferrySetValue:(id)value forKey:(NSString *)key
 {
     const char *k = [key UTF8String];
     char name[256];
@@ -237,6 +247,27 @@ static id box(id self, SEL sel, char type)
     }
     [[self valueForKeyPath:[path substringToIndex:dot.location]] setValue:value
                                                                    forKey:[path substringFromIndex:dot.location + 1]];
+}
+@end
+
+/* ---- NSComparisonMethods: isEqual:, and compare: where the object has it ---------- */
+
+@implementation NSObject (NSComparisonMethods)
+static NSComparisonResult compare_objects(id a, id b)
+{
+    if ([a respondsToSelector:@selector(compare:)])
+        return (NSComparisonResult)[(NSString *)a compare:b];
+    return [a isEqual:b] ? NSOrderedSame : (NSComparisonResult)2; /* neither smaller nor larger */
+}
+- (BOOL)isEqualTo:(id)object { return [self isEqual:object]; }
+- (BOOL)isNotEqualTo:(id)object { return ![self isEqual:object]; }
+- (BOOL)isLessThan:(id)object { return compare_objects(self, object) == NSOrderedAscending; }
+- (BOOL)isLessThanOrEqualTo:(id)object { return compare_objects(self, object) <= NSOrderedSame; }
+- (BOOL)isGreaterThan:(id)object { return compare_objects(self, object) == NSOrderedDescending; }
+- (BOOL)isGreaterThanOrEqualTo:(id)object
+{
+    NSComparisonResult r = compare_objects(self, object);
+    return r == NSOrderedSame || r == NSOrderedDescending;
 }
 @end
 

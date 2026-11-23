@@ -1,0 +1,9 @@
+name: kind 1, old -, new Ada, context one
+name: kind 1, old Ada, new Grace, context one
+name: kind 1, old Grace, new Hedy, context one
+age: kind 1, old -, new - (prior), context two
+age: kind 1, old -, new 38, context two
+friend.name: kind 1, old -, new Alan, context none
+heard 6
+heard 6 after the observed object went away
+exit=0

@@ -36,7 +36,8 @@ int ferry_library_supported(const char *name)
     return !strcmp(name, "/usr/lib/libSystem.B.dylib")
         || !strncmp(name, "/usr/lib/system/", 16)
         || !strcmp(name, "/usr/lib/libobjc.A.dylib")
-        || !strcmp(name, FERRY_HOST_LIBRARY);
+        || !strcmp(name, FERRY_HOST_LIBRARY)
+        || ferry_twin_library(name);
 }
 
 /* ---- the program's own details ------------------------------------------------- */
@@ -288,7 +289,9 @@ void *ferry_lookup(const char *name)
     }
     if ((addr = find_passthrough(base)))
         return addr;
-    return ferry_host_lookup(base);
+    if ((addr = ferry_host_lookup(base)))
+        return addr;
+    return ferry_twin_lookup(base);
 }
 
 /* ---- stubs for what Ferry doesn't have ---------------------------------------- */

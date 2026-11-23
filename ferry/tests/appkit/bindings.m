@@ -73,8 +73,33 @@ int main(void)
         printf("info: observed is the settings %s, key path %s\n",
                info[NSObservedObjectKey] == s ? "yes" : "no", [info[NSObservedKeyPathKey] UTF8String]);
         printf("exposed: %s\n", [[[[Swatch new] exposedBindings] componentsJoinedByString:@","] UTF8String]);
+        /* a change made through key-value coding reaches the bound views */
+        [s setValue:@"changed" forKey:@"name"];
+        [s setValue:@YES forKey:@"enabled"];
+        printf("after a change: field %s, box enabled %s\n", field.stringValue.UTF8String, box.isEnabled ? "yes" : "no");
         [field unbind:NSValueBinding];
         printf("after unbind: %s\n", [field infoForBinding:NSValueBinding] ? "still bound" : "unbound");
+        [s setValue:@"not followed" forKey:@"name"];
+        printf("unbound field kept: %s\n", field.stringValue.UTF8String);
+
+        /* the user's defaults through their controller */
+        NSUserDefaultsController *udc = [NSUserDefaultsController sharedUserDefaultsController];
+        [udc.values setValue:@"first" forKey:@"FerryControllerTest"];
+        NSTextField *pref = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 100, 20)];
+        [pref bind:NSValueBinding toObject:udc withKeyPath:@"values.FerryControllerTest" options:nil];
+        printf("defaults controller: field %s, defaults %s\n", pref.stringValue.UTF8String,
+               [[[NSUserDefaults standardUserDefaults] stringForKey:@"FerryControllerTest"] UTF8String]);
+        [udc.values setValue:@"second" forKey:@"FerryControllerTest"];
+        printf("after a change: field %s\n", pref.stringValue.UTF8String);
+        udc.appliesImmediately = NO;
+        [udc.values setValue:@"third" forKey:@"FerryControllerTest"];
+        printf("held: field %s, defaults %s, unapplied %d\n", pref.stringValue.UTF8String,
+               [[[NSUserDefaults standardUserDefaults] stringForKey:@"FerryControllerTest"] UTF8String],
+               udc.hasUnappliedChanges);
+        [udc revert:nil];
+        printf("reverted: field %s\n", pref.stringValue.UTF8String);
+        [pref unbind:NSValueBinding];
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"FerryControllerTest"];
 
         [[NSUserDefaults standardUserDefaults] setValue:@"kv" forKey:@"FerryBindingsTest"];
         printf("defaults by key-value coding: %s\n",

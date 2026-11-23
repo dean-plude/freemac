@@ -44,8 +44,14 @@ static id coder_value(NSCoder *c, NSString *key)
     id _target;
     SEL _action;
     NSView *_controlView;
+    NSInteger _backgroundStyle;
 }
 
+/* Light or dark ground behind the cell (a selected table row is dark):
+ * kept for the app; Ferry's cells draw the same either way. */
+- (NSBackgroundStyle)backgroundStyle { return (NSBackgroundStyle)_backgroundStyle; }
+- (void)setBackgroundStyle:(NSBackgroundStyle)style { _backgroundStyle = style; }
+- (NSBackgroundStyle)interiorBackgroundStyle { return (NSBackgroundStyle)_backgroundStyle; }
 - (instancetype)init { return [self initTextCell:@""]; }
 - (instancetype)initTextCell:(NSString *)string
 {

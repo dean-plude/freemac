@@ -309,7 +309,19 @@ void AViewDecode(NSView *v, NSCoder *c)
 - (BOOL)inLiveResize { return NO; }
 - (BOOL)translatesAutoresizingMaskIntoConstraints { return _translates; }
 - (void)setTranslatesAutoresizingMaskIntoConstraints:(BOOL)flag { _translates = flag; }
-- (NSRect)visibleRect { return _window || !_superview ? _bounds : NSZeroRect; }
+/* The part of the bounds that no superview clips away. */
+- (NSRect)visibleRect
+{
+    if (!_window && _superview)
+        return NSZeroRect;
+    NSRect r = _bounds;
+    NSView *v = self;
+    while (v->_superview && !NSIsEmptyRect(r)) {
+        r = NSIntersectionRect(CGRectApplyAffineTransform(r, [v _transformToSuperview]), v->_superview->_bounds);
+        v = v->_superview;
+    }
+    return NSIsEmptyRect(r) ? NSZeroRect : [self convertRect:r fromView:v];
+}
 
 /* ---- the view tree ----------------------------------------------------------------- */
 
@@ -703,5 +715,15 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     CGContextFlush(ctx);
 }
 
-- (void)scrollPoint:(NSPoint)point { AWarnOnce("-[NSView scrollPoint:] (no NSScrollView yet)"); }
+/* Scrolls the clip view this view is (or is inside) the document of. */
+- (void)scrollPoint:(NSPoint)point
+{
+    for (NSView *v = self; v; v = v->_superview)
+        if ([v->_superview isKindOfClass:[NSClipView class]]) {
+            NSClipView *clip = (NSClipView *)v->_superview;
+            [clip scrollToPoint:[clip constrainBoundsRect:(NSRect){[self convertPoint:point toView:clip],
+                                                                  [clip bounds].size}].origin];
+            return;
+        }
+}
 @end

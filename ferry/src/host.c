@@ -78,3 +78,94 @@ void *ferry_host_lookup(const char *name)
     }
     return NULL;
 }
+
+/* ---- libraries with Linux twins ------------------------------------------------
+ * A few of the libraries in a Mac's /usr/lib are the same open-source
+ * libraries Linux has, with the same calls and the same data layouts on
+ * 64-bit Intel: zlib, bzip2, xz (liblzma), libxml2, SQLite and ICU. A program
+ * that links one gets this system's copy. Calls that take a C library FILE
+ * (whose layout differs between the two systems) are left out, so they stop
+ * the program with their name instead. Each twin is opened only when a
+ * program links it. */
+static const struct twin {
+    const char *mac, *linux_name;
+} twins[] = {
+    {"/usr/lib/libz.1.dylib", "libz.so.1"},
+    {"/usr/lib/libz.dylib", "libz.so.1"},
+    {"/usr/lib/libbz2.1.0.dylib", "libbz2.so.1.0"},
+    {"/usr/lib/libbz2.dylib", "libbz2.so.1.0"},
+    {"/usr/lib/liblzma.5.dylib", "liblzma.so.5"},
+    {"/usr/lib/libxml2.2.dylib", "libxml2.so.2"},
+    {"/usr/lib/libxml2.dylib", "libxml2.so.2"},
+    {"/usr/lib/libsqlite3.dylib", "libsqlite3.so.0"},
+    {"/usr/lib/libsqlite3.0.dylib", "libsqlite3.so.0"},
+    /* ICU's C calls (regular expressions, collation, breaking), which
+     * Linux builds name with the version, as uregex_open_74 */
+    {"/usr/lib/libicucore.A.dylib", "icu"},
+    {NULL, NULL},
+};
+static char icu_suffix[8];
+
+/* This system's ICU, whichever version it has. */
+static void *open_icu(void)
+{
+    for (int v = 99; v >= 50; v--) {
+        char name[32];
+        snprintf(name, sizeof name, "libicui18n.so.%d", v);
+        void *h = dlopen(name, RTLD_NOW | RTLD_LOCAL);
+        if (h) {
+            snprintf(icu_suffix, sizeof icu_suffix, "_%d", v);
+            return h;
+        }
+    }
+    return NULL;
+}
+static void *twin_handles[16];
+static int twin_linked[16];
+
+static const char *const takes_a_file[] = {
+    "BZ2_bzReadOpen", "BZ2_bzWriteOpen", "xmlDocDump", "xmlDocFormatDump", "xmlElemDump", "xmlBufferDump",
+    "htmlDocDump", "xmlParserInputBufferCreateFile", "xmlOutputBufferCreateFile", "xmlCatalogDump",
+    "xmlACatalogDump", "xmlLsOneNode", "xmlShell", "xmlPrintURI", "xmlMemDisplay", "xmlMemShow",
+    "xmlDebugDumpString", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
+    "xmlDebugDumpNodeList", "xmlDebugDumpDocumentHead", "xmlDebugDumpDocument", "xmlDebugDumpDTD",
+    "xmlDebugDumpEntities", "xmlDebugCheckDocument", "xmlRegexpPrint", "xmlNanoHTTPSave", NULL,
+};
+
+int ferry_twin_library(const char *install_name)
+{
+    for (int i = 0; twins[i].mac; i++)
+        if (!strcmp(install_name, twins[i].mac)) {
+            if (!twin_linked[i]) {
+                twin_linked[i] = 1;
+                int icu = !strcmp(twins[i].linux_name, "icu");
+                twin_handles[i] = icu ? open_icu() : dlopen(twins[i].linux_name, RTLD_NOW | RTLD_LOCAL);
+                if (!twin_handles[i])
+                    fprintf(stderr, "ferry: this program uses %s, but %s isn't installed\n",
+                            strrchr(twins[i].mac, '/') + 1, icu ? "ICU (libicu)" : twins[i].linux_name);
+            }
+            return 1;
+        }
+    return 0;
+}
+
+void *ferry_twin_lookup(const char *name)
+{
+    for (int i = 0; takes_a_file[i]; i++)
+        if (!strcmp(name, takes_a_file[i]))
+            return NULL;
+    for (int i = 0; twins[i].mac; i++) {
+        if (!twin_handles[i])
+            continue;
+        void *addr;
+        if (!strcmp(twins[i].linux_name, "icu")) {
+            char versioned[256];
+            snprintf(versioned, sizeof versioned, "%s%s", name, icu_suffix);
+            addr = dlsym(twin_handles[i], versioned);
+        } else
+            addr = dlsym(twin_handles[i], name);
+        if (addr)
+            return addr;
+    }
+    return NULL;
+}

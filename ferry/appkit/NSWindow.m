@@ -30,6 +30,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 /* The base view a window's content view sits in is the window itself; this
  * view fills the window with its background colour under the content. */
 @implementation NSWindow {
+    CGFloat _contentBorder[4];
     NSRect _frame;
     NSWindowStyleMask _style;
     NSString *_title;
@@ -204,6 +205,16 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 /* ---- properties ------------------------------------------------------------------ */
 
 - (NSString *)title { return _title; }
+/* The thick bottom or top border of textured windows: kept, but drawn as
+ * part of the window's ordinary background. */
+- (void)setContentBorderThickness:(CGFloat)thickness forEdge:(NSRectEdge)edge
+{
+    if (edge < 4)
+        _contentBorder[edge] = thickness;
+}
+- (CGFloat)contentBorderThicknessForEdge:(NSRectEdge)edge { return edge < 4 ? _contentBorder[edge] : 0; }
+- (void)setAutorecalculatesContentBorderThickness:(BOOL)flag forEdge:(NSRectEdge)edge {}
+- (BOOL)autorecalculatesContentBorderThicknessForEdge:(NSRectEdge)edge { return YES; }
 - (void)setTitle:(NSString *)title
 {
     [_title release];

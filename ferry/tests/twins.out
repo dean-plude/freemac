@@ -1,0 +1,9 @@
+zlib found
+compress 0, smaller: yes
+uncompress 0, same: yes
+crc32 of "123456789": cbf43926
+bzip2 0, starts BZh: yes
+bunzip2 0, same: yes
+ICU regex, status 0: 6-9 14-16 21-22
+ferry: this program uses BZ2_bzReadOpen, which Ferry doesn't support yet
+exit=127

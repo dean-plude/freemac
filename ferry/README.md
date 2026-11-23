@@ -6,6 +6,8 @@ documentation, and an optional add-on: it isn't on the freemac ISO.
 
 ```
 ferry ./program [arguments]
+ferry "Some App.app"                  # an app bundle: its program, from Info.plist
+ferry SomeInstaller.pkg               # Ferry's Installer, for .pkg and .dmg files
 ```
 
 With the package installed, `./program` also works directly, because Ferry
@@ -66,16 +68,38 @@ cut, copy and paste in text fields), Open and Save panels (the system's
 file chooser), files and text dropped onto views from other apps, and the
 app's icon in the dock. Exceptions work as on a Mac: `@try`/`@catch`/
 `@finally` catch them, and one a program leaves uncaught in its event loop
-is reported and the app carries on. Ctrl works as Command (and Super too);
+is reported and the app carries on. Scroll views, text views (with RTF
+and simple HTML documents), progress indicators and boxes are there too,
+and key-value observing, so bindings follow the values they are bound to.
+Ctrl works as Command (and Super too);
 `FERRY_CONTROL_KEY=control` makes it the Mac's Control key instead.
+
+### Installing Mac apps
+
+Ferry has its own Installer, a Mac app of its own built with Ferry's
+AppKit (`installer/`). `ferry SomeApp.pkg` (or a `.dmg`, or a double-click
+in the file manager) opens it: it shows the package's welcome, read-me and
+licence pages, then installs **for the user alone**: apps go to
+`~/Applications` (and into the desktop's app list, through
+`freemac-mac-app` when the desktop has it), everything else into Ferry's
+own folder, `~/.local/share/ferry/root`. Nothing outside the home folder
+changes, so no password is asked for. It reads flat packages (`.pkg`,
+`.mpkg`: xar archives with gzip, `pbzx` or plain cpio payloads), old
+bundle packages, and disk images, which it opens with this system's 7-Zip
+(`7z`; a disk image holding an app to drag to Applications is copied
+straight there). A package's install scripts and its JavaScript checks
+are not run, and the Installer says so before installing; anything only
+those scripts would have set up is missing. `ferry X.pkg --info` and
+`ferry X.pkg --install [--applications DIR] [--root DIR]` do the same
+without a window.
 
 ## What doesn't run, and won't
 
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, scroll views, text views, pop-up buttons) and the document
-  classes are missing, and
+  views (tables, outline and split views, pop-up buttons, tab views,
+  status bar items, alerts) and the document classes are missing, and
   storyboards aren't read. Real apps' nibs (made by Xcode, in both its
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
@@ -85,7 +109,9 @@ is reported and the app carries on. Ctrl works as Command (and Super too);
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
   so when given an arm64 one.
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,
-  C++ (libc++), `NSInvocation` or extra libraries. When a program reaches a call Ferry lacks,
+  C++ (libc++), `NSInvocation` or extra libraries. (Some of a Mac's
+  `/usr/lib` libraries come from this system's copy: zlib, bzip2, xz,
+  libxml2, SQLite and ICU.) When a program reaches a call Ferry lacks,
   it stops with a message naming that call (`this program uses X, which Ferry
   doesn't support yet`) and exit status 127, rather than guessing. A
   program that links a system framework Ferry doesn't have still starts
@@ -141,6 +167,14 @@ is reported and the app carries on. Ctrl works as Command (and Super too);
    are keyed archives or, from current Xcode, `NIBArchive` files
    (`appkit/ANibArchive.m` reads those); `appkit/NSNib.m` turns Interface
    Builder's stand-in objects into the real ones and makes the connections.
+   The few Carbon calls Cocoa apps still make (global hotkeys, keyboard
+   layouts, Accessibility) are answered here too (`appkit/Carbon.m`), the
+   way a Mac answers when the thing isn't available.
+8. **The Installer** (`installer/`), a Mac app built with the frameworks
+   above, which `ferry` starts for a `.pkg` or `.dmg`. Its package reader
+   (`installer/IPackage.m`) is written from the public descriptions of the
+   xar, cpio and `pbzx` formats and of the Distribution and PackageInfo
+   files; `tests/tools/make_pkg.py` builds the package its test installs.
 
 ## Sources
 
@@ -181,7 +215,7 @@ ferry-cc -O1 -fobjc-arc -o app app.m -framework Cocoa
 
 `make check` builds every program in `tests/` this way, in both relocation
 formats, runs it through Ferry and compares the output. It needs `clang`,
-`lld` and `llvm` (for `llvm-nm`); the drawing tests also need Cairo, Pango
+`lld` and `llvm` (for `llvm-nm`), and `python3` for the Installer's test; the drawing tests also need Cairo, Pango
 and HarfBuzz (the runtime libraries, not their `-dev` packages) and some
 fonts, and the AppKit tests need GTK 3 (and GdkPixbuf and Poppler for
 images). The on-screen tests (a window, the dock icon, a screen at scale 2)

@@ -25,6 +25,7 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len);       /* autoreleased 
 NSString *FStringFromChars(const unichar *c, NSUInteger len);   /* autoreleased */
 NSString *FFormat(NSString *format, va_list ap);                 /* autoreleased */
 NSString *FFormatC(const char *format, ...);                     /* autoreleased */
+BOOL FKVOIsObserved(id object);   /* has key-value observers (NSKeyValueObserving.m) */
 unichar *FDecodeUTF8(const char *s, NSUInteger len, NSUInteger *outLen);   /* malloc'd */
 char *FEncodeUTF8(const unichar *c, NSUInteger len, NSUInteger *outLen);   /* malloc'd */
 NSUInteger FHashChars(const unichar *c, NSUInteger len);
@@ -48,5 +49,9 @@ NSString *FUserFolder(NSSearchPathDirectory dir);
 
 /* Collections */
 void FSortObjects(id *items, NSUInteger n, SEL selector);
+
+@interface NSUserDefaults (FerryInternal)
+- (NSString *)_ferryDomain; /* the application id the defaults are saved under */
+@end
 
 #endif

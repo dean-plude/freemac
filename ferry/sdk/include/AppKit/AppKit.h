@@ -291,9 +291,9 @@ typedef NS_ENUM(NSInteger, NSWritingDirection) {
 };
 
 #ifdef FERRY_APPKIT_BUILD
-@interface NSParagraphStyle : GParagraphStyle <NSCopying, NSMutableCopying>
+@interface NSParagraphStyle : GParagraphStyle <NSCopying, NSMutableCopying, NSCoding>
 #else
-@interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying>
+@interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying, NSCoding>
 #endif
 @property (class, readonly) NSParagraphStyle *defaultParagraphStyle;
 @property (readonly) NSTextAlignment alignment;
@@ -708,6 +708,10 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 
 /* Cells. Ferry's controls draw and keep their state themselves; a cell is
  * the record of a control's settings that nib files store. */
+typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
+    NSBackgroundStyleNormal = 0, NSBackgroundStyleEmphasized = 1, NSBackgroundStyleRaised = 2,
+    NSBackgroundStyleLowered = 3, NSBackgroundStyleLight = 0, NSBackgroundStyleDark = 1,
+};
 @interface NSCell : NSObject <NSCopying, NSCoding>
 - (instancetype)initTextCell:(NSString *)string;
 - (instancetype)initImageCell:(NSImage *)image;
@@ -736,6 +740,8 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property SEL action;
 @property (assign) NSView *controlView;
 @property (retain) NSImage *image;
+@property NSBackgroundStyle backgroundStyle;
+@property (readonly) NSBackgroundStyle interiorBackgroundStyle;
 @end
 
 @interface NSActionCell : NSCell
@@ -978,6 +984,10 @@ enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLev
 @property (assign) NSWindowController *windowController;
 @property (retain) NSViewController *contentViewController;
 @property (getter=isDocumentEdited) BOOL documentEdited;
+- (void)setContentBorderThickness:(CGFloat)thickness forEdge:(NSRectEdge)edge;
+- (CGFloat)contentBorderThicknessForEdge:(NSRectEdge)edge;
+- (void)setAutorecalculatesContentBorderThickness:(BOOL)flag forEdge:(NSRectEdge)edge;
+- (BOOL)autorecalculatesContentBorderThicknessForEdge:(NSRectEdge)edge;
 @end
 APPKIT_EXTERN NSNotificationName const NSWindowWillCloseNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidResizeNotification;
@@ -1093,6 +1103,8 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @property (assign) id<NSApplicationDelegate> delegate;
 @property (retain) NSMenu *mainMenu;
 @property (assign) NSMenu *windowsMenu, *servicesMenu, *helpMenu;
+@property (assign) id servicesProvider;
+- (void)registerServicesMenuSendTypes:(NSArray *)sendTypes returnTypes:(NSArray *)returnTypes;
 @property (readonly, copy) NSArray<NSWindow *> *windows;
 @property (readonly) NSWindow *keyWindow, *mainWindow;
 @property (readonly, getter=isRunning) BOOL running;
@@ -1191,6 +1203,27 @@ typedef NSString *NSNibName;
 /* Loads its view from a nib (named after the class unless given) the first
  * time the view is asked for, and sits between the view and its superview
  * in the responder chain. Sheets and popovers are shown as windows. */
+/* Controllers for bindings: the user's defaults by key. */
+@interface NSController : NSObject <NSCoding>
+- (BOOL)commitEditing;
+- (void)discardEditing;
+@property (readonly, getter=isEditing) BOOL editing;
+- (void)objectDidBeginEditing:(id)editor;
+- (void)objectDidEndEditing:(id)editor;
+@end
+@interface NSUserDefaultsController : NSController
+@property (class, readonly) NSUserDefaultsController *sharedUserDefaultsController;
+- (instancetype)initWithDefaults:(NSUserDefaults *)defaults initialValues:(NSDictionary *)initialValues;
+@property (readonly) NSUserDefaults *defaults;
+@property (readonly) id values;
+@property (copy) NSDictionary *initialValues;
+@property BOOL appliesImmediately;
+@property (readonly) BOOL hasUnappliedChanges;
+- (void)save:(id)sender;
+- (void)revert:(id)sender;
+- (void)revertToInitialValues:(id)sender;
+@end
+
 @interface NSViewController : NSResponder <NSCoding>
 - (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle;
 @property (readonly, copy) NSNibName nibName;
@@ -1405,6 +1438,91 @@ typedef NS_OPTIONS(NSUInteger, NSPasteboardContentsOptions) { NSPasteboardConten
 + (BOOL)canInitWithPasteboard:(NSPasteboard *)pasteboard;
 - (instancetype)initWithPasteboard:(NSPasteboard *)pasteboard;
 @end
+/* The commands keys are bound to (interpretKeyEvents: sends them) */
+@protocol NSStandardKeyBindingResponding <NSObject>
+@optional
+- (void)insertText:(id)insertString;
+- (void)moveForward:(id)sender;
+- (void)moveRight:(id)sender;
+- (void)moveBackward:(id)sender;
+- (void)moveLeft:(id)sender;
+- (void)moveUp:(id)sender;
+- (void)moveDown:(id)sender;
+- (void)moveWordForward:(id)sender;
+- (void)moveWordBackward:(id)sender;
+- (void)moveToBeginningOfLine:(id)sender;
+- (void)moveToEndOfLine:(id)sender;
+- (void)moveToBeginningOfParagraph:(id)sender;
+- (void)moveToEndOfParagraph:(id)sender;
+- (void)moveToEndOfDocument:(id)sender;
+- (void)moveToBeginningOfDocument:(id)sender;
+- (void)pageDown:(id)sender;
+- (void)pageUp:(id)sender;
+- (void)centerSelectionInVisibleArea:(id)sender;
+- (void)moveBackwardAndModifySelection:(id)sender;
+- (void)moveForwardAndModifySelection:(id)sender;
+- (void)moveWordForwardAndModifySelection:(id)sender;
+- (void)moveWordBackwardAndModifySelection:(id)sender;
+- (void)moveUpAndModifySelection:(id)sender;
+- (void)moveDownAndModifySelection:(id)sender;
+- (void)moveToBeginningOfLineAndModifySelection:(id)sender;
+- (void)moveToEndOfLineAndModifySelection:(id)sender;
+- (void)moveToBeginningOfParagraphAndModifySelection:(id)sender;
+- (void)moveToEndOfParagraphAndModifySelection:(id)sender;
+- (void)moveToEndOfDocumentAndModifySelection:(id)sender;
+- (void)moveToBeginningOfDocumentAndModifySelection:(id)sender;
+- (void)pageDownAndModifySelection:(id)sender;
+- (void)pageUpAndModifySelection:(id)sender;
+- (void)moveWordRight:(id)sender;
+- (void)moveWordLeft:(id)sender;
+- (void)moveRightAndModifySelection:(id)sender;
+- (void)moveLeftAndModifySelection:(id)sender;
+- (void)moveWordRightAndModifySelection:(id)sender;
+- (void)moveWordLeftAndModifySelection:(id)sender;
+- (void)moveToLeftEndOfLine:(id)sender;
+- (void)moveToRightEndOfLine:(id)sender;
+- (void)scrollPageUp:(id)sender;
+- (void)scrollPageDown:(id)sender;
+- (void)scrollLineUp:(id)sender;
+- (void)scrollLineDown:(id)sender;
+- (void)scrollToBeginningOfDocument:(id)sender;
+- (void)scrollToEndOfDocument:(id)sender;
+- (void)transpose:(id)sender;
+- (void)indent:(id)sender;
+- (void)insertTab:(id)sender;
+- (void)insertBacktab:(id)sender;
+- (void)insertNewline:(id)sender;
+- (void)insertParagraphSeparator:(id)sender;
+- (void)insertNewlineIgnoringFieldEditor:(id)sender;
+- (void)insertTabIgnoringFieldEditor:(id)sender;
+- (void)insertLineBreak:(id)sender;
+- (void)capitalizeWord:(id)sender;
+- (void)uppercaseWord:(id)sender;
+- (void)lowercaseWord:(id)sender;
+- (void)deleteForward:(id)sender;
+- (void)deleteBackward:(id)sender;
+- (void)deleteWordForward:(id)sender;
+- (void)deleteWordBackward:(id)sender;
+- (void)deleteToBeginningOfLine:(id)sender;
+- (void)deleteToEndOfLine:(id)sender;
+- (void)deleteToBeginningOfParagraph:(id)sender;
+- (void)deleteToEndOfParagraph:(id)sender;
+- (void)yank:(id)sender;
+- (void)complete:(id)sender;
+- (void)setMark:(id)sender;
+- (void)deleteToMark:(id)sender;
+- (void)selectToMark:(id)sender;
+- (void)swapWithMark:(id)sender;
+- (void)cancelOperation:(id)sender;
+- (void)selectAll:(id)sender;
+- (void)selectLine:(id)sender;
+- (void)selectParagraph:(id)sender;
+- (void)selectWord:(id)sender;
+- (void)doCommandBySelector:(SEL)selector;
+@end
+@interface NSResponder (NSStandardKeyBindingMethods) <NSStandardKeyBindingResponding>
+@end
+
 @interface NSResponder (NSStandardEditing)
 - (IBAction)cut:(id)sender;
 - (IBAction)copy:(id)sender;
@@ -1521,6 +1639,257 @@ enum { NSCancelButton = 0, NSOKButton = 1 };
 - (NSArray<NSString *> *)filenames;
 - (NSInteger)runModalForTypes:(NSArray *)fileTypes;
 - (NSInteger)runModalForDirectory:(NSString *)path file:(NSString *)name types:(NSArray *)fileTypes;
+@end
+
+
+/* ---- scrolling, text, progress and boxes ------------------------------------------- */
+
+typedef NS_ENUM(NSUInteger, NSBorderType) {
+    NSNoBorder = 0, NSLineBorder = 1, NSBezelBorder = 2, NSGrooveBorder = 3,
+};
+typedef NS_ENUM(NSInteger, NSScrollerStyle) { NSScrollerStyleLegacy = 0, NSScrollerStyleOverlay = 1 };
+typedef NS_ENUM(NSUInteger, NSScrollerPart) {
+    NSScrollerNoPart = 0, NSScrollerDecrementPage = 1, NSScrollerKnob = 2, NSScrollerIncrementPage = 3,
+    NSScrollerDecrementLine = 4, NSScrollerIncrementLine = 5, NSScrollerKnobSlot = 6,
+};
+typedef NS_ENUM(NSUInteger, NSScrollElasticity) {
+    NSScrollElasticityAutomatic = 0, NSScrollElasticityNone = 1, NSScrollElasticityAllowed = 2,
+};
+@interface NSScroller : NSControl
++ (CGFloat)scrollerWidthForControlSize:(NSControlSize)size scrollerStyle:(NSScrollerStyle)style;
++ (CGFloat)scrollerWidth;
++ (NSScrollerStyle)preferredScrollerStyle;
+@property CGFloat knobProportion;
+@property NSScrollerStyle scrollerStyle;
+@property NSInteger knobStyle;
+@property (readonly) NSScrollerPart hitPart;
+- (NSRect)rectForPart:(NSScrollerPart)part;
+- (NSScrollerPart)testPart:(NSPoint)point;
+- (void)drawKnob;
+- (void)drawKnobSlotInRect:(NSRect)rect highlight:(BOOL)flag;
+- (void)setFloatValue:(float)value knobProportion:(CGFloat)proportion;
+@end
+
+@interface NSClipView : NSView
+@property (retain) __kindof NSView *documentView;
+@property (readonly) NSRect documentRect;
+@property (readonly) NSRect documentVisibleRect;
+@property BOOL drawsBackground;
+@property (copy) NSColor *backgroundColor;
+@property BOOL copiesOnScroll;
+@property NSEdgeInsets contentInsets;
+@property BOOL automaticallyAdjustsContentInsets;
+- (void)scrollToPoint:(NSPoint)point;
+- (BOOL)autoscroll:(NSEvent *)event;
+- (NSRect)constrainBoundsRect:(NSRect)proposed;
+- (void)viewFrameChanged:(NSNotification *)note;
+@end
+
+@interface NSScrollView : NSView
++ (NSSize)contentSizeForFrameSize:(NSSize)frameSize horizontalScrollerClass:(Class)h
+            verticalScrollerClass:(Class)v borderType:(NSBorderType)type controlSize:(NSControlSize)size
+                    scrollerStyle:(NSScrollerStyle)style;
++ (NSSize)frameSizeForContentSize:(NSSize)contentSize horizontalScrollerClass:(Class)h
+            verticalScrollerClass:(Class)v borderType:(NSBorderType)type controlSize:(NSControlSize)size
+                    scrollerStyle:(NSScrollerStyle)style;
+@property (retain) NSClipView *contentView;
+@property (retain) __kindof NSView *documentView;
+@property (readonly) NSSize contentSize;
+@property (readonly) NSRect documentVisibleRect;
+@property BOOL hasVerticalScroller, hasHorizontalScroller, autohidesScrollers;
+@property (retain) NSScroller *verticalScroller, *horizontalScroller;
+@property NSBorderType borderType;
+@property BOOL drawsBackground;
+@property (copy) NSColor *backgroundColor;
+@property CGFloat lineScroll, verticalLineScroll, horizontalLineScroll;
+@property CGFloat pageScroll, verticalPageScroll, horizontalPageScroll;
+@property NSScrollerStyle scrollerStyle;
+@property NSScrollElasticity verticalScrollElasticity, horizontalScrollElasticity;
+@property BOOL scrollsDynamically, usesPredominantAxisScrolling, allowsMagnification;
+@property CGFloat magnification, minMagnification, maxMagnification;
+@property NSEdgeInsets contentInsets, scrollerInsets;
+@property BOOL automaticallyAdjustsContentInsets;
+@property (getter=isFindBarVisible) BOOL findBarVisible;
+@property NSInteger findBarPosition;
+@property BOOL hasVerticalRuler, hasHorizontalRuler, rulersVisible;
+- (void)tile;
+- (void)reflectScrolledClipView:(NSClipView *)clipView;
+- (void)flashScrollers;
+@end
+APPKIT_EXTERN NSNotificationName const NSScrollViewWillStartLiveScrollNotification;
+APPKIT_EXTERN NSNotificationName const NSScrollViewDidLiveScrollNotification;
+APPKIT_EXTERN NSNotificationName const NSScrollViewDidEndLiveScrollNotification;
+
+@interface NSView (NSScrolling)
+@property (readonly) NSScrollView *enclosingScrollView;
+- (BOOL)scrollRectToVisible:(NSRect)rect;
+- (BOOL)autoscroll:(NSEvent *)event;
+- (NSRect)adjustScroll:(NSRect)proposed;
+@end
+
+
+/* Documents to and from attributed strings: RTF, simple HTML and plain text */
+typedef NSString *NSAttributedStringDocumentAttributeKey;
+typedef NSString *NSAttributedStringDocumentReadingOptionKey;
+typedef NSString *NSAttributedStringDocumentType;
+APPKIT_EXTERN NSAttributedStringKey const NSLinkAttributeName;
+APPKIT_EXTERN NSAttributedStringDocumentAttributeKey const NSDocumentTypeDocumentAttribute;
+APPKIT_EXTERN NSAttributedStringDocumentAttributeKey const NSCharacterEncodingDocumentAttribute;
+APPKIT_EXTERN NSAttributedStringDocumentReadingOptionKey const NSDocumentTypeDocumentOption;
+APPKIT_EXTERN NSAttributedStringDocumentReadingOptionKey const NSCharacterEncodingDocumentOption;
+APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRTFTextDocumentType,
+    NSRTFDTextDocumentType, NSHTMLTextDocumentType;
+@interface NSAttributedString (NSAttributedStringDocumentFormats)
+- (instancetype)initWithRTF:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype)initWithRTFD:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype)initWithHTML:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype)initWithHTML:(NSData *)data baseURL:(NSURL *)base documentAttributes:(NSDictionary **)attributes;
+- (instancetype)initWithData:(NSData *)data options:(NSDictionary *)options
+          documentAttributes:(NSDictionary **)attributes error:(NSError **)error;
+- (instancetype)initWithURL:(NSURL *)url options:(NSDictionary *)options
+         documentAttributes:(NSDictionary **)attributes error:(NSError **)error;
+- (instancetype)initWithPath:(NSString *)path documentAttributes:(NSDictionary **)attributes;
+- (NSData *)RTFFromRange:(NSRange)range documentAttributes:(NSDictionary *)attributes;
+- (NSData *)RTFDFromRange:(NSRange)range documentAttributes:(NSDictionary *)attributes;
+- (NSData *)dataFromRange:(NSRange)range documentAttributes:(NSDictionary *)attributes error:(NSError **)error;
+@end
+
+/* Text: Ferry's NSTextView lays out its own text with Core Text. The text
+ * system's other classes (NSLayoutManager, NSTextContainer) are kept as
+ * small objects that answer for the text view. */
+@class NSTextView, NSLayoutManager;
+@interface NSTextStorage : NSMutableAttributedString
+@property (readonly, copy) NSArray<NSLayoutManager *> *layoutManagers;
+@property (assign) id delegate;
+@property (readonly) NSInteger changeInLength;
+- (void)addLayoutManager:(NSLayoutManager *)lm;
+- (void)removeLayoutManager:(NSLayoutManager *)lm;
+@end
+@interface NSTextContainer : NSObject <NSCoding>
+- (instancetype)initWithSize:(NSSize)size;
+- (instancetype)initWithContainerSize:(NSSize)size;
+@property NSSize size, containerSize;
+@property (assign) NSTextView *textView;
+@property (assign) NSLayoutManager *layoutManager;
+@property BOOL widthTracksTextView, heightTracksTextView;
+@property CGFloat lineFragmentPadding;
+@property NSUInteger maximumNumberOfLines;
+@property NSLineBreakMode lineBreakMode;
+@end
+@interface NSLayoutManager : NSObject <NSCoding>
+@property (readonly, assign) NSTextStorage *textStorage;
+@property (readonly) NSArray<NSTextContainer *> *textContainers;
+@property BOOL allowsNonContiguousLayout, usesFontLeading, showsInvisibleCharacters, showsControlCharacters;
+@property (readonly) NSTextView *firstTextView;
+- (void)setTextStorage:(NSTextStorage *)storage;
+- (void)replaceTextStorage:(NSTextStorage *)storage;
+- (void)addTextContainer:(NSTextContainer *)container;
+- (NSRect)usedRectForTextContainer:(NSTextContainer *)container;
+- (NSRange)glyphRangeForTextContainer:(NSTextContainer *)container;
+- (void)ensureLayoutForTextContainer:(NSTextContainer *)container;
+- (CGFloat)defaultLineHeightForFont:(NSFont *)font;
+- (NSUInteger)numberOfGlyphs;
+@end
+
+@interface NSText : NSView
+@property (copy) NSString *string;
+@property (getter=isEditable) BOOL editable;
+@property (getter=isSelectable) BOOL selectable;
+@property (getter=isRichText) BOOL richText;
+@property BOOL importsGraphics, fieldEditor, usesFontPanel, drawsBackground;
+@property (copy) NSColor *backgroundColor, *textColor;
+@property (retain) NSFont *font;
+@property NSTextAlignment alignment;
+@property NSRange selectedRange;
+@property (assign) id delegate;
+@property (getter=isHorizontallyResizable) BOOL horizontallyResizable;
+@property (getter=isVerticallyResizable) BOOL verticallyResizable;
+@property NSSize minSize, maxSize;
+- (void)replaceCharactersInRange:(NSRange)range withString:(NSString *)string;
+- (void)scrollRangeToVisible:(NSRange)range;
+- (void)sizeToFit;
+- (void)selectAll:(id)sender;
+- (void)setFont:(NSFont *)font range:(NSRange)range;
+- (void)setTextColor:(NSColor *)color range:(NSRange)range;
+- (NSData *)RTFFromRange:(NSRange)range;
+- (BOOL)readRTFDFromFile:(NSString *)path;
+- (void)replaceCharactersInRange:(NSRange)range withRTF:(NSData *)rtf;
+@end
+@interface NSTextView : NSText
+- (instancetype)initWithFrame:(NSRect)frame textContainer:(NSTextContainer *)container;
++ (NSScrollView *)scrollableTextView;
+@property (readonly) NSTextStorage *textStorage;
+@property (readonly) NSLayoutManager *layoutManager;
+@property (retain) NSTextContainer *textContainer;
+@property NSSize textContainerInset;
+@property (readonly) NSPoint textContainerOrigin;
+@property (copy) NSDictionary<NSAttributedStringKey, id> *typingAttributes, *selectedTextAttributes,
+    *linkTextAttributes, *markedTextAttributes;
+@property BOOL allowsUndo, usesFindBar, usesFindPanel, usesRuler, rulerVisible, smartInsertDeleteEnabled;
+@property BOOL continuousSpellCheckingEnabled, grammarCheckingEnabled, automaticQuoteSubstitutionEnabled,
+    automaticDashSubstitutionEnabled, automaticLinkDetectionEnabled, automaticTextReplacementEnabled,
+    automaticSpellingCorrectionEnabled, automaticDataDetectionEnabled, displaysLinkToolTips,
+    allowsImageEditing, allowsDocumentBackgroundColorChange, usesInspectorBar;
+@property (getter=isAutomaticTextCompletionEnabled) BOOL automaticTextCompletionEnabled;
+@property (copy) NSColor *insertionPointColor;
+@property (copy) NSParagraphStyle *defaultParagraphStyle;
+@property (readonly) NSArray<NSValue *> *selectedRanges;
+- (void)setSelectedRange:(NSRange)range affinity:(NSInteger)affinity stillSelecting:(BOOL)still;
+- (void)insertText:(id)string replacementRange:(NSRange)range;
+- (BOOL)shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)string;
+- (void)didChangeText;
+- (NSUInteger)characterIndexForInsertionAtPoint:(NSPoint)point;
+@end
+APPKIT_EXTERN NSNotificationName const NSTextDidBeginEditingNotification;
+APPKIT_EXTERN NSNotificationName const NSTextDidEndEditingNotification;
+APPKIT_EXTERN NSNotificationName const NSTextDidChangeNotification;
+APPKIT_EXTERN NSNotificationName const NSTextViewDidChangeSelectionNotification;
+@protocol NSTextViewDelegate <NSObject>
+@optional
+- (void)textDidChange:(NSNotification *)note;
+- (void)textDidBeginEditing:(NSNotification *)note;
+- (void)textDidEndEditing:(NSNotification *)note;
+- (void)textViewDidChangeSelection:(NSNotification *)note;
+- (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)string;
+- (BOOL)textView:(NSTextView *)tv doCommandBySelector:(SEL)sel;
+@end
+
+typedef NS_ENUM(NSUInteger, NSProgressIndicatorStyle) {
+    NSProgressIndicatorStyleBar = 0, NSProgressIndicatorStyleSpinning = 1,
+};
+@interface NSProgressIndicator : NSView
+@property double doubleValue, minValue, maxValue;
+@property (getter=isIndeterminate) BOOL indeterminate;
+@property NSProgressIndicatorStyle style;
+@property NSControlSize controlSize;
+@property BOOL displayedWhenStopped, usesThreadedAnimation, bezeled;
+- (void)incrementBy:(double)delta;
+- (void)startAnimation:(id)sender;
+- (void)stopAnimation:(id)sender;
+- (void)sizeToFit;
+@end
+
+typedef NS_ENUM(NSUInteger, NSBoxType) {
+    NSBoxPrimary = 0, NSBoxSeparator = 2, NSBoxCustom = 4,
+};
+typedef NS_ENUM(NSUInteger, NSTitlePosition) {
+    NSNoTitle = 0, NSAboveTop = 1, NSAtTop = 2, NSBelowTop = 3, NSAboveBottom = 4, NSAtBottom = 5,
+    NSBelowBottom = 6,
+};
+@interface NSBox : NSView
+@property NSBoxType boxType;
+@property (copy) NSString *title;
+@property (retain) NSFont *titleFont;
+@property NSTitlePosition titlePosition;
+@property (getter=isTransparent) BOOL transparent;
+@property NSSize contentViewMargins;
+@property (retain) __kindof NSView *contentView;
+@property (copy) NSColor *fillColor, *borderColor;
+@property CGFloat borderWidth, cornerRadius;
+@property NSBorderType borderType;
+@property (readonly) NSRect titleRect, borderRect;
+- (void)setFrameFromContentFrame:(NSRect)contentFrame;
+- (void)sizeToFit;
 @end
 
 #endif

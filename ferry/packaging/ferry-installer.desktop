@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Installer
+GenericName=Mac Installer
+Comment=Install Mac apps from installer packages (.pkg) and disk images (.dmg) with Ferry
+Exec=ferry %f
+Icon=system-software-install
+Terminal=false
+NoDisplay=true
+Categories=System;PackageManager;
+MimeType=application/x-apple-diskimage;application/x-xar;application/vnd.apple.installer+xml;

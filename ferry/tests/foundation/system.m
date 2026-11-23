@@ -93,6 +93,27 @@ int main(int argc, char **argv)
                (long)[[NSUserDefaults standardUserDefaults] integerForKey:@"nothing"]);
         printf("from arguments %s\n", [[[NSUserDefaults standardUserDefaults] stringForKey:@"Mode"] UTF8String]);
 
+        /* the CFPreferences calls read and write the same store */
+        CFPropertyListRef v = CFPreferencesCopyAppValue(CFSTR("volume"), kCFPreferencesCurrentApplication);
+        Boolean valid;
+        printf("CFPreferences volume %s, enabled %d\n", [[(id)v description] UTF8String],
+               CFPreferencesGetAppBooleanValue(CFSTR("enabled"), kCFPreferencesCurrentApplication, &valid));
+        CFRelease(v);
+        CFPreferencesSetAppValue(CFSTR("fromCF"), CFSTR("yes"), kCFPreferencesCurrentApplication);
+        CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication);
+        printf("set from CF %s\n", [[[NSUserDefaults standardUserDefaults] stringForKey:@"fromCF"] UTF8String]);
+        CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser,
+                                                   kCFPreferencesAnyHost);
+        printf("keys %s\n", [[[(NSArray *)keys sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@","]
+                                 UTF8String]);
+        CFRelease(keys);
+        CFPreferencesSetAppValue(CFSTR("other"), CFSTR("x"), CFSTR("org.example.Other"));
+        printf("another app %s, ours %s\n",
+               [[(id)CFPreferencesCopyAppValue(CFSTR("other"), CFSTR("org.example.Other")) autorelease] UTF8String],
+               CFPreferencesCopyAppValue(CFSTR("other"), kCFPreferencesCurrentApplication) ? "set" : "unset");
+        printf("compare: %d %d %d %d\n", [@3 isLessThan:@4], [@"b" isGreaterThanOrEqualTo:@"a"], [@"a" isEqualTo:@"a"],
+               [[NSObject new] isLessThan:@1]);
+
         /* URLs */
         NSURL *u = [NSURL URLWithString:@"https://user@example.com:8443/a/b/c.html?x=1&y=2#top"];
         printf("url %s | %s | %s | %s | %s | %s | %s | %s\n", [[u scheme] UTF8String], [[u host] UTF8String],

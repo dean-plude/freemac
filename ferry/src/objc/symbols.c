@@ -159,6 +159,14 @@ extern char _objc_empty_cache_storage[];
     X(objc_setProperty_atomic_copy, objc_setProperty_atomic_copy) \
     X(objc_setProperty_nonatomic_copy, objc_setProperty_nonatomic_copy) \
     X(objc_copyStruct, objc_copyStruct) \
+    X(objc_assign_global, objc_assign_global) \
+    X(objc_assign_threadlocal, objc_assign_threadlocal) \
+    X(objc_assign_strongCast, objc_assign_strongCast) \
+    X(objc_assign_ivar, objc_assign_ivar) \
+    X(objc_assign_weak, objc_assign_weak) \
+    X(objc_read_weak, objc_read_weak) \
+    X(objc_memmove_collectable, objc_memmove_collectable) \
+    X(objc_collectingEnabled, objc_collectingEnabled) \
     X(objc_copyCppObjectAtomic, objc_copyCppObjectAtomic) \
     X(objc_alloc, objc_alloc) \
     X(objc_allocWithZone, objc_allocWithZone) \

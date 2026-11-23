@@ -23,7 +23,9 @@ case $framework in
     CoreText) pattern='^_(CT|kCT)' ;;
     ApplicationServices) pattern='^_(CG|kCG|CT|kCT)' ;;
     ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
+    SystemConfiguration) pattern='^_(SC|kSC)' ;;
     Cocoa) pattern='.' ;;
+    Carbon) pattern='^_(GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac
 {

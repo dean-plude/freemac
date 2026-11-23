@@ -17,6 +17,9 @@ run_one() {
         echo "FAIL $name (did not compile)"; sed 's/^/    /' "$build/$name.cc.log"
         fail=$((fail + 1)); return
     fi
+    if [ "$name" = hello_unixthread ]; then
+        python3 "$here/tools/unixthread.py" "$exe" "$(llvm-nm "$exe" | awk '/ T _old_start$/ {print $1}')"
+    fi
     case $name in
         hello*) FERRY_TEST_VALUE=tide "$top/ferry" "$exe" boat > "$build/$name.got" 2> "$build/$name.err" ;;
         system) "$top/ferry" "$exe" -a -b val file > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -36,6 +39,8 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
+        atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -56,6 +61,10 @@ run_one unsupported "$here/unsupported.c" "$here/unsupported.out" -Wl,-undefined
 for t in hello files; do
     run_one "${t}_chained" "$here/$t.c" "$here/$t.out" -Wl,-fixup_chains
 done
+# The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
+run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
+run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore
+run_one atomics "$here/atomics.c" "$here/atomics.out"
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).
@@ -104,6 +113,7 @@ run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missin
 run_one foundation_collections_chained "$here/foundation/collections.m" "$here/foundation/collections.out" \
     -framework Foundation -Wl,-fixup_chains
 run_one foundation_attributed "$here/foundation/attributed.m" "$here/foundation/attributed.out" -framework Foundation
+run_one foundation_kvo "$here/foundation/kvo.m" "$here/foundation/kvo.out" -framework Foundation
 # Keyed archives (M5), the format of nib files.
 run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archive.out" -framework Foundation
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
@@ -200,6 +210,9 @@ fi
 # Key paths, value transformers and bindings (M6).
 run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
 # An exception left uncaught in the event loop is reported, not fatal (M7).
+run_one appkit_scrolling "$here/appkit/scrolling.m" "$here/appkit/scrolling.out" -fobjc-arc -framework Cocoa
+run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
+    -framework SystemConfiguration
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
 # Pasteboards, and cut, copy and paste in text fields (M7).
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
@@ -268,6 +281,37 @@ if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/ImageApp" "$here/a
 else
     echo "FAIL appkit_image (did not compile)"; sed 's/^/    /' "$build/appkit_image.cc.log"
     fail=$((fail + 1))
+fi
+# Ferry's Installer: a package made by make_pkg.py (two components, gzip/odc
+# and pbzx/newc payloads, a member that climbs out, a link), described and
+# installed into test folders; the same package cut short; and a program
+# started by its app bundle's folder.
+inst="$build/installer"
+rm -rf "$inst"; mkdir -p "$inst"
+if python3 "$here/tools/make_pkg.py" "$inst/tiny.pkg"; then
+    head -c 3000 "$inst/tiny.pkg" > "$inst/cut.pkg"
+    (
+        cd "$inst"
+        "$top/ferry" tiny.pkg --info; echo "exit=$?"
+        "$top/ferry" tiny.pkg --install --applications Apps --root root; echo "exit=$?"
+        find Apps root | sort
+        echo "link: $(readlink Apps/Tiny.app/Contents/Resources)"
+        [ -e escaped.txt ] || [ -e ../escaped.txt ] && echo "a member climbed out"
+        tail -1 root/usr/local/bin/tiny-tool
+        "$top/ferry" cut.pkg --install --applications Apps2 --root root2 2>&1; echo "exit=$?"
+    ) > "$build/installer.got" 2> "$build/installer.err"
+    mkdir -p "$build/Bundled.app/Contents/MacOS"
+    cp "$build/hello" "$build/Bundled.app/Contents/MacOS/Bundled"
+    FERRY_TEST_VALUE=tide "$top/ferry" "$build/Bundled.app" boat >> "$build/installer.got" 2>> "$build/installer.err"
+    echo "exit=$?" >> "$build/installer.got"
+    if diff -u "$here/installer.out" "$build/installer.got" > "$build/installer.diff"; then
+        echo "ok   installer"; pass=$((pass + 1))
+    else
+        echo "FAIL installer"; sed 's/^/    /' "$build/installer.diff"; sed 's/^/    stderr: /' "$build/installer.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL installer (make_pkg.py failed)"; fail=$((fail + 1))
 fi
 # An exception nobody catches ends the program with the Mac's message.
 if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$build/foundation_exception.err" 2>/dev/null; then
