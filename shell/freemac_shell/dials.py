@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import battery, default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -432,8 +432,11 @@ class DialsWindow(Gtk.ApplicationWindow):
         self.connect("key-press-event", self._on_key)
 
     def _show_update_count(self):
-        """The red count beside Software Update: the updates Beacon found."""
+        """The red count beside Software Update: the updates Beacon found,
+        and a new version of freemac."""
         count = len(update_notice.load().get("ids") or [])
+        if freemac_update.available() and (freemac_update.pending() or freemac_update.offer()):
+            count += 1
         self.update_count.set_text(str(count))
         self.update_count.set_visible(count > 0)
 

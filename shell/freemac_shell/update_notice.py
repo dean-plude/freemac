@@ -10,6 +10,10 @@ day. A click on the notice opens Harbor's Updates page. Harbor asks Beacon
 to look again after it checks or installs, so the badge goes when they're in.
 The live system doesn't look for them.
 
+New versions of freemac itself are looked for once a day too
+(freemac_update.py), and noticed once each; and after a restart that
+installed one, a notice says it's in.
+
 What was found is kept in ~/.local/state/freemac/updates.json.
 Original freemac code.
 """
@@ -21,7 +25,7 @@ import time
 import gi
 from gi.repository import GLib
 
-from . import launcher_badge
+from . import freemac_update, launcher_badge
 
 try:
     gi.require_version("PackageKitGlib", "1.0")
@@ -65,25 +69,69 @@ def summary(count):
 class Watch:
     """Looks for updates and calls tell(count) when there are new ones."""
 
-    def __init__(self, tell):
+    def __init__(self, tell, tell_freemac=None, tell_installed=None):
         self.tell = tell
+        self.tell_freemac = tell_freemac
+        self.tell_installed = tell_installed
         self.busy = False
         self.state = load()
         # The live system isn't kept up to date, so it gets no badge or notice.
         self.live = os.path.isdir("/run/live/medium")
-        if PK is None or self.live:
+        if self.live:
             return
         GLib.timeout_add_seconds(FIRST_LOOK, self._first)
         GLib.timeout_add_seconds(WAKE, self._wake)
 
     def _first(self):
+        self._installed()
         self.look(refresh=self._due())
+        if self._freemac_due():
+            self.look_for_freemac()
         return False
 
     def _wake(self):
         if self._due():
             self.look(refresh=True)
+        if self._freemac_due():
+            self.look_for_freemac()
         return True
+
+    # -- freemac itself ----------------------------------------------------
+    def _freemac_due(self):
+        return (self.tell_freemac is not None and freemac_update.available()
+                and time.time() - float(self.state.get("freemac_checked", 0)) >= DAILY)
+
+    def look_for_freemac(self):
+        def work():
+            try:
+                found = freemac_update.check()
+            except Exception:  # noqa: BLE001 - offline: look again in a day
+                found = None
+            GLib.idle_add(self._freemac_found, found)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _freemac_found(self, found):
+        self.state["freemac_checked"] = time.time()
+        told = self.state.get("freemac_told", [])
+        if found and found.get("version") not in told and not freemac_update.pending():
+            self.tell_freemac(found)
+            self.state["freemac_told"] = (told + [found["version"]])[-10:]
+        self._keep()
+        return False
+
+    def _installed(self):
+        """Say once what the last restart did to freemac."""
+        done = freemac_update.result() if self.tell_installed else None
+        if done and float(done.get("time", 0)) > float(self.state.get("freemac_result", 0)):
+            self.state["freemac_result"] = float(done["time"])
+            self.tell_installed(done)
+            self._keep()
+
+    def _keep(self):
+        try:
+            save(self.state)
+        except OSError:
+            pass
 
     def _due(self):
         return time.time() - float(self.state.get("refreshed", 0)) >= DAILY

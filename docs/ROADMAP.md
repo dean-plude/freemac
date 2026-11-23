@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.134 "software update" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Software Update shows when a new version of freemac is out, with what's new in it; Update Now downloads it while you carry on working, after an administrator's password | Dials (dials_update.py), freemac_update.py | done |
+| 2 | Restart Now installs it while the computer restarts, before anyone logs in, and a notice says once it's in; if anything goes wrong, everything is put back as it was | freemac-update-helper, freemac-update-install.service, Beacon | done |
+| 3 | freemac looks for a new version once a day and says when one is ready, once for each version; Software Update's red count includes it | Beacon (update_notice.py), Dials | done |
+| 4 | Undo Last Update in freemac Recovery puts back the version from before the last update | Recovery | done |
+| 5 | Every release carries an update bundle beside its ISO: freemac's own files with a checksum for each, checked before anything is changed, and only ever written into freemac's own places | build-iso.sh, make-update-bundle.py, release workflow | done |
+| 6 | Each release's notes list what's new in it, the same list Software Update shows; the Guide explains updating and undoing; every README screenshot retaken, with two of Software Update | Docs, Guide | done |
+
 ## 1.133 "battery" (done)
 
 | # | Item | Component | Status |
@@ -1367,5 +1378,5 @@ From 1.40 on, the work is on the desktop and the system itself.
   libraries. Frameworks such as Foundation
   only after that, and only from public documentation. See
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
-- Signed images and a package repository.
+- Signed images and update bundles, with a key kept outside the repository.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.

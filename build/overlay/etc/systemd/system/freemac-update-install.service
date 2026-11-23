@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Installs a new version of freemac that Dials > Software Update downloaded,
+# while the computer restarts and before anyone logs in, as a Mac does.
+[Unit]
+Description=Install a freemac update
+ConditionPathExists=/var/lib/freemac/update/pending/manifest.json
+After=local-fs.target plymouth-start.service
+Before=greetd.service display-manager.service systemd-user-sessions.service freemac-recovery.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/freemac-update-helper apply
+TimeoutStartSec=30min
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

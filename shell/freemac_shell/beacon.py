@@ -287,7 +287,7 @@ class Beacon:
         self.reminder_lists, self.reminder_stamp = [], None
         self.alerts_until = dt.datetime.now() - dt.timedelta(minutes=1)
         GLib.timeout_add_seconds(15, self._check_alerts)
-        self.updates = update_notice.Watch(self._updates_ready)
+        self.updates = update_notice.Watch(self._updates_ready, self._freemac_ready, self._freemac_installed)
         self.connection = None
         self.banners = Overlay("freemac-beacon")
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -480,6 +480,11 @@ class Beacon:
                 GLib.spawn_async(["freemac-harbor", "--updates"], flags=GLib.SpawnFlags.SEARCH_PATH)
             except GLib.Error:
                 pass
+        elif note.open_uri == "dials:softwareupdate":
+            try:
+                GLib.spawn_async(["freemac-dials", "--panel", "softwareupdate"], flags=GLib.SpawnFlags.SEARCH_PATH)
+            except GLib.Error:
+                pass
         elif note.open_uri.startswith(("tide-event:", "nudge-reminder:")):
             program = "freemac-tide" if note.open_uri.startswith("tide-event:") else "freemac-nudge"
             try:
@@ -651,6 +656,24 @@ class Beacon:
         self.notify("Software Update", 0, "freemac-harbor", "Software updates are ready",
                     f"{update_notice.summary(count)} for this computer. Click to see them in Harbor.",
                     [], {"x-freemac-uri": "harbor:updates"}, -1)
+
+    def _freemac_ready(self, offer):
+        body = "A new version of freemac is ready to download. Click to see what's new and install it."
+        self.notify("Software Update", 0, "freemac-dials", f"freemac {offer['version']} is available",
+                    body, [], {"x-freemac-uri": "dials:softwareupdate"}, -1)
+
+    def _freemac_installed(self, done):
+        if done.get("undone"):
+            title, body = f"freemac {done.get('to')} is back", "The last update was undone in Recovery."
+        elif done.get("ok"):
+            title = f"freemac {done.get('to')} is installed"
+            body = f"Your computer was updated from freemac {done.get('from')}. " \
+                "Dials > Software Update shows what's new."
+        else:
+            title = "freemac couldn't be updated"
+            body = f"{done.get('error') or 'Something went wrong.'} Your computer is as it was."
+        self.notify("Software Update", 0, "freemac-dials", title, body, [],
+                    {"x-freemac-uri": "dials:softwareupdate"}, -1)
 
     # --- Nudge's reminders ------------------------------------------------
     def _reminder_files(self):
