@@ -19,7 +19,9 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import beacon, sounds, style  # noqa: E402
+from . import audio, beacon, sounds, style  # noqa: E402
+
+SOUND_MENU_WIDTH = 260
 
 try:
     import cups  # python3-cups, which system-config-printer brings along
@@ -96,14 +98,21 @@ class Network(StatusButton):
 
 
 class Sound(StatusButton):
-    """Volume through WirePlumber's wpctl; scroll or click to change it."""
+    """The Sound menu, as on a Mac: the volume slider, the outputs to play
+    through (click one to switch) and Sound Settings…, from the speaker in the
+    menu bar. Scroll on the speaker to change the volume.
+
+    Volume goes through audio.py, which keeps the left/right balance. Topline
+    also listens for the sound server's changes (`pactl subscribe`), so the
+    speaker follows the volume keys and other apps at once, and keeps mono
+    audio in front of whichever output plays (audio.keep_mono)."""
 
     def __init__(self):
         super().__init__()
         # Topline's window is only as tall as the bar, and a GTK 3 popover
-        # can't draw outside its window, so the slider lives in a small
-        # layer-shell window of its own, placed under the icon.
-        self.popup = Gtk.Window(title="Volume")
+        # can't draw outside its window, so the menu is a small layer-shell
+        # window of its own, placed under the icon.
+        self.popup = Gtk.Window(title="Sound")
         style.make_transparent(self.popup)
         GtkLayerShell.init_for_window(self.popup)
         GtkLayerShell.set_layer(self.popup, GtkLayerShell.Layer.OVERLAY)
@@ -112,21 +121,56 @@ class Sound(StatusButton):
         GtkLayerShell.set_anchor(self.popup, GtkLayerShell.Edge.RIGHT, True)
         GtkLayerShell.set_margin(self.popup, GtkLayerShell.Edge.TOP, 32)
         GtkLayerShell.set_keyboard_mode(self.popup, GtkLayerShell.KeyboardMode.ON_DEMAND)
+        menu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        menu.get_style_context().add_class("topline-popup")
+        menu.get_style_context().add_class("sound-menu")
+        menu.set_size_request(SOUND_MENU_WIDTH, -1)
+        title = Gtk.Label(label="Sound", xalign=0)
+        title.get_style_context().add_class("sound-menu-title")
+        menu.pack_start(title, False, False, 0)
+
         box = Gtk.Box(spacing=8)
-        box.get_style_context().add_class("topline-popup")
-        self.mute = Gtk.ToggleButton()
-        self.mute.set_image(Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic", Gtk.IconSize.MENU))
+        self.mute = Gtk.ToggleButton(relief=Gtk.ReliefStyle.NONE)
+        # The speaker beside the slider shows the level, as on a Mac; a click
+        # mutes or unmutes.
+        self.mute_image = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.MENU)
+        self.mute.set_image(self.mute_image)
+        self.mute.get_style_context().add_class("sound-mute")
+        self.mute.set_can_focus(False)
         self.mute.set_tooltip_text("Mute")
         self.mute_handler = self.mute.connect("toggled", self._mute)
         self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 5)
         self.scale.set_draw_value(False)
-        self.scale.set_size_request(180, -1)
         self.scale_handler = self.scale.connect("value-changed", self._set_volume)
         self.scale.connect("button-release-event", lambda *_: sounds.feedback())
         box.pack_start(self.mute, False, False, 0)
         box.pack_start(self.scale, True, True, 0)
-        self.popup.add(box)
-        box.show_all()
+        menu.pack_start(box, False, False, 0)
+
+        # Output: each device as a row, the one playing in the accent colour.
+        self.outputs_part = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.outputs_part.set_no_show_all(True)
+        self.outputs_part.pack_start(Gtk.Separator(), False, False, 4)
+        heading = Gtk.Label(label="Output", xalign=0)
+        heading.get_style_context().add_class("sound-menu-heading")
+        self.outputs_part.pack_start(heading, False, False, 0)
+        self.output_rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.outputs_part.pack_start(self.output_rows, False, False, 0)
+        for child in self.outputs_part.get_children():
+            child.show_all()
+        menu.pack_start(self.outputs_part, False, False, 0)
+        self.shown_outputs = None
+
+        menu.pack_start(Gtk.Separator(), False, False, 4)
+        settings = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+        settings.add(Gtk.Label(label="Sound Settings…", xalign=0))
+        settings.get_style_context().add_class("sound-menu-item")
+        settings.connect("clicked", lambda *_: (self.popup.hide(), launch("freemac-dials", "--panel", "sound")))
+        menu.pack_start(settings, False, False, 0)
+        self.popup.add(menu)
+        menu.show_all()
+        self.outputs_part.hide()
+
         self.popup.connect("key-press-event", self._popup_key)
         self.popup.connect("leave-notify-event", self._popup_leave)
         self.popup.connect("enter-notify-event", self._popup_enter)
@@ -134,21 +178,93 @@ class Sound(StatusButton):
         self.connect("clicked", self._toggle_popup)
         self.add_events(1 << 21)  # scroll
         self.connect("scroll-event", self._scroll)
-        GLib.timeout_add_seconds(10, lambda: self.update() or True)
-        self.update()
+        self.changed_timer = None
+        self.listener = None
+        self._listen()
+        GLib.timeout_add_seconds(10, lambda: self._changed() or True)
+        self._changed()
 
+    # -- following the sound server ---------------------------------------------
+    def _listen(self):
+        """Hear about every change to devices and volumes from `pactl subscribe`."""
+        if not audio.available():
+            return False
+        try:
+            self.listener = Gio.Subprocess.new(["pactl", "subscribe"], Gio.SubprocessFlags.STDOUT_PIPE)
+        except GLib.Error:
+            self.listener = None
+            return False
+        lines = Gio.DataInputStream.new(self.listener.get_stdout_pipe())
+        lines.read_line_async(GLib.PRIORITY_DEFAULT, None, self._heard, lines)
+        return False
+
+    def _heard(self, stream, result, lines):
+        try:
+            line, _length = stream.read_line_finish_utf8(result)
+        except GLib.Error:
+            line = None
+        if line is None:
+            # The sound server went away: listen again once it's back.
+            self.listener = None
+            GLib.timeout_add_seconds(5, self._listen)
+            return
+        if any(word in line for word in (" sink ", " server ", " module ", " card ")):
+            if self.changed_timer:
+                GLib.source_remove(self.changed_timer)
+            self.changed_timer = GLib.timeout_add(200, self._changed)
+        lines.read_line_async(GLib.PRIORITY_DEFAULT, None, self._heard, lines)
+
+    def _changed(self):
+        self.changed_timer = None
+        audio.keep_mono()
+        self.update()
+        return False
+
+    # -- the menu -----------------------------------------------------------------
     def _toggle_popup(self, *_args):
         if self.popup.get_visible():
             self.popup.hide()
             return
         self.update()
+        self._fill_outputs(force=True)
         top = self.get_toplevel()
         alloc = self.get_allocation()
         x, _y = self.translate_coordinates(top, 0, 0)
-        right = top.get_allocated_width() - (x + alloc.width // 2) - 110
+        right = top.get_allocated_width() - (x + alloc.width // 2) - SOUND_MENU_WIDTH // 2
         GtkLayerShell.set_margin(self.popup, GtkLayerShell.Edge.RIGHT, max(8, right))
         self.popup.show()
         self._popup_leave()   # closes by itself if the pointer never goes in
+
+    def _fill_outputs(self, force=False):
+        """One row for each output, the one playing marked."""
+        devices = audio.outputs() if audio.available() else []
+        playing = audio.current_output() if devices else None
+        shown = (tuple(devices), playing)
+        if shown == self.shown_outputs and not force:
+            return
+        self.shown_outputs = shown
+        for child in self.output_rows.get_children():
+            child.destroy()
+        for name, description, icon in devices:
+            button = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+            button.get_style_context().add_class("sound-menu-item")
+            line = Gtk.Box(spacing=10)
+            symbol = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU)
+            symbol.get_style_context().add_class("sound-device")
+            if name == playing:
+                symbol.get_style_context().add_class("sound-device-on")
+            line.pack_start(symbol, False, False, 0)
+            line.pack_start(Gtk.Label(label=description, xalign=0, ellipsize=3, max_width_chars=26), True, True, 0)
+            button.add(line)
+            button.connect("clicked", lambda _b, n=name: self._pick(n))
+            self.output_rows.pack_start(button, False, False, 0)
+        self.output_rows.show_all()
+        self.outputs_part.set_visible(bool(devices))
+
+    def _pick(self, name):
+        audio.set_output(name)
+        self.update()
+        self._fill_outputs(force=True)
 
     def _popup_key(self, _window, event):
         if event.keyval == Gdk.KEY_Escape:
@@ -172,6 +288,10 @@ class Sound(StatusButton):
         return False
 
     def read(self):
+        # pactl answers after the server has made a change; wpctl can lag it.
+        state = audio.state() if audio.available() else None
+        if state is not None:
+            return state
         if not shutil.which("wpctl"):
             return None
         try:
@@ -190,27 +310,28 @@ class Sound(StatusButton):
         volume, muted = state
         level = "muted" if muted or volume == 0 else "low" if volume < 34 else "medium" if volume < 67 else "high"
         self.show_icon(f"audio-volume-{level}-symbolic", "Muted" if muted else f"Volume {volume}%")
+        self.mute_image.set_from_icon_name(f"audio-volume-{level}-symbolic", Gtk.IconSize.MENU)
+        self.mute.set_tooltip_text("Unmute" if muted else "Mute")
         if round(self.scale.get_value()) != volume:
             with self.scale.handler_block(self.scale_handler):
                 self.scale.set_value(volume)
         if self.mute.get_active() != muted:
             with self.mute.handler_block(self.mute_handler):
                 self.mute.set_active(muted)
+        if self.popup.get_visible():
+            self._fill_outputs()
 
     def _set_volume(self, scale):
-        subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{int(scale.get_value())}%"],
-                       capture_output=True)
+        audio.set_level(int(scale.get_value()))
         self.update()
 
     def _mute(self, button):
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if button.get_active() else "0"],
-                       capture_output=True)
+        audio.set_muted(button.get_active())
         self.update()
 
     def _scroll(self, _widget, event):
-        step = "5%+" if event.direction == Gdk.ScrollDirection.UP else "5%-"
         if event.direction in (Gdk.ScrollDirection.UP, Gdk.ScrollDirection.DOWN):
-            subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", step], capture_output=True)
+            audio.step(5 if event.direction == Gdk.ScrollDirection.UP else -5)
             sounds.feedback()
             self.update()
         return True

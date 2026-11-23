@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.131 "sound menu" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Sound menu, as on a Mac: click the speaker in the menu bar for the volume slider, the outputs (speakers, headphones, a display) with the one playing marked, and Sound Settings…; click an output to play through it | Topline (status.py) | done |
+| 2 | Balance, in Dials > Sound: a slider from Left to Right; the volume keys, the menu bar, Quick Settings and Dials keep it as the volume changes | audio.py, Dials | done |
+| 3 | Input level, in Dials > Sound: a row of lights that follow what the microphone hears while the page is showing | Dials | done |
+| 4 | Play stereo audio as mono, in Dials > Accessibility > Audio: both sides play the same sound; it stays in front of whichever output is chosen, and comes back at the next login | audio.py, Topline | done |
+| 5 | The speaker in the menu bar follows the volume keys and other apps at once, not every 10 seconds; the speaker beside the menu's slider shows the level and mutes with a click, and mute is read and set through the same sound server call so the icon never lags | Topline, keys, Dials | done |
+| 6 | Guide topic; README row; every README screenshot retaken, with one of the Sound menu | Guide, Docs | done |
+| 7 | Release builds no longer hang on a stalled package download: apt gives up on a silent mirror after 30 seconds and tries again (five times), and the build step stops after 70 minutes instead of holding the release for 2.5 hours | build-iso.sh, release.yml | done |
+
 ## 1.130 "spoken content" (done)
 
 | # | Item | Component | Status |

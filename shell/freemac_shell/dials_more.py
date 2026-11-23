@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, announce, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, announce, audio, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -98,7 +98,159 @@ def sound_effects_group(window, group, row, slider, switch):
             "A little pop at the new level."))
 
 
+class InputLevel(Gtk.LevelBar):
+    """The input level, as on a Mac: a row of lights that rise and fall with
+    the sound the microphone hears, while the Sound page is showing. It
+    records a little at a time with parec and keeps none of it."""
+    LIGHTS = 16
+
+    def __init__(self):
+        super().__init__(mode=Gtk.LevelBarMode.DISCRETE, min_value=0, max_value=self.LIGHTS)
+        for name in ("low", "high", "full"):   # one colour, not GTK's warning shades
+            self.remove_offset_value(name)
+        self.set_hexpand(False)
+        self.get_style_context().add_class("input-level")
+        self.proc = None
+        self.peak = 0.0
+        self.timer = None
+        self.connect("map", lambda *_: self.start())
+        self.connect("unmap", lambda *_: self.stop())
+        self.connect("destroy", lambda *_: self.stop())
+
+    def start(self):
+        self.stop()
+        if not shutil.which("parec"):
+            return
+        command = ["parec", "--raw", "--format=s16le", "--channels=1", "--rate=16000", "--latency-msec=40",
+                   "--client-name=Dials", "--stream-name=Input level"]
+        source = audio.default_input()
+        if source:
+            command.append(f"--device={source}")
+        try:
+            self.proc = Gio.Subprocess.new(command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        except GLib.Error:
+            self.proc = None
+            return
+        self._read(self.proc)
+        self.timer = GLib.timeout_add(60, self._show)
+
+    def _read(self, proc):
+        proc.get_stdout_pipe().read_bytes_async(1280, GLib.PRIORITY_DEFAULT, None, self._got, proc)
+
+    def _got(self, stream, result, proc):
+        try:
+            data = stream.read_bytes_finish(result).get_data()
+        except GLib.Error:
+            data = b""
+        if proc is not self.proc or not data:
+            return
+        self.peak = max(self.peak, peak_of(data))
+        self._read(proc)
+
+    def _show(self):
+        lit = lights_for(self.peak, self.LIGHTS)
+        self.peak = 0.0
+        # Rise at once, fall a light at a time, like a meter's needle.
+        self.set_value(max(lit, self.get_value() - 1))
+        return True
+
+    def stop(self):
+        if self.timer:
+            GLib.source_remove(self.timer)
+            self.timer = None
+        if self.proc:
+            self.proc.force_exit()
+            self.proc = None
+        self.set_value(0)
+
+
+def peak_of(data):
+    """The loudest sample of 16-bit sound, 0..1."""
+    import array
+    samples = array.array("h")
+    samples.frombytes(data[:len(data) - len(data) % 2])
+    if not samples:
+        return 0.0
+    return min(1.0, max(max(samples), -min(samples)) / 32768)
+
+
+def lights_for(peak, lights=16):
+    """How many of the input level's lights a peak lights: 60 dB across."""
+    import math
+    if peak <= 0:
+        return 0
+    db = 20 * math.log10(peak)
+    return max(0, min(lights, round((db + 60) / 60 * lights)))
+
+
 def sound(window):
+    group, row, page, slider, switch = window.helpers
+    if not audio.available():
+        return wpctl_sound(window)
+    groups = []
+
+    # Output: the device, its balance, its volume.
+    outputs = audio.outputs()
+    if outputs:
+        combo = Gtk.ComboBoxText()
+        for name, description, _icon in outputs:
+            combo.append(name, description)
+        combo.set_active_id(audio.current_output())
+        rows = [row("Output device", combo,
+                    "Sound plays through this. The speaker in the menu bar switches it too.")]
+        balance = slider(-1, 1, 0.05, audio.balance(), audio.set_balance,
+                         marks=((-1, "Left"), (0, None), (1, "Right")))
+        balance.set_has_origin(False)   # a balance has no "more" side to fill
+        balance_row = row("Balance", balance)
+        balance_row.set_no_show_all(True)
+        balance_row.get_child().show_all()
+        balance_row.set_visible(audio.has_balance())
+        rows.append(balance_row)
+
+        def picked(c):
+            if c.get_active_id():
+                audio.set_output(c.get_active_id())
+                balance_row.set_visible(audio.has_balance())
+                balance.set_value(audio.balance())   # writes back the same balance
+        combo.connect("changed", picked)
+        level, muted = volume_of("@DEFAULT_AUDIO_SINK@")
+        if level is not None:
+            rows.append(row("Output volume", slider(0, 100, 1, level, lambda v: audio.set_level(int(v)))))
+            rows.append(row("Mute", switch(muted, audio.set_muted)))
+        groups.append(group(*rows))
+    else:
+        groups.append(group(row("No output devices", None)))
+
+    # Input: the device, its volume and what it hears.
+    inputs = audio.inputs()
+    if inputs:
+        combo = Gtk.ComboBoxText()
+        for name, description, _icon in inputs:
+            combo.append(name, description)
+        combo.set_active_id(audio.default_input())
+        meter = InputLevel()
+
+        def picked_input(c):
+            if c.get_active_id():
+                audio.set_input(c.get_active_id())
+                if meter.get_mapped():
+                    meter.start()
+        combo.connect("changed", picked_input)
+        rows = [row("Input device", combo)]
+        level, muted = volume_of("@DEFAULT_AUDIO_SOURCE@")
+        if level is not None:
+            rows.append(row("Input volume", slider(0, 100, 1, level, lambda v: run(
+                "wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SOURCE@", f"{int(v)}%"))))
+        rows.append(row("Input level", meter, "The lights follow what the microphone hears."))
+        groups.append(group(*rows))
+    else:
+        groups.append(group(row("No input devices", None)))
+    return page("Sound", *sound_effects_group(window, group, row, slider, switch), *groups)
+
+
+def wpctl_sound(window):
+    """The Sound page with WirePlumber's wpctl alone (no pactl): devices,
+    volume and mute, but no balance or input level."""
     group, row, page, slider, switch = window.helpers
     if not shutil.which("wpctl"):
         return page("Sound", group(row("Sound isn't running", None,
@@ -384,7 +536,7 @@ def accessibility(window):
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
     ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window), mouse_keys(window), screen_keyboard_group(window),
-        audio(window), *spoken_content(window))
+        audio_group(window), *spoken_content(window))
 
 
 HOVER_KEYS = (("command", "\u2318 Command"), ("option", "\u2325 Option"), ("control", "\u2303 Control"))
@@ -630,8 +782,8 @@ def screen_keyboard_group(window):
             "Shift, Control, Option and Command stay down for the next key you click."))
 
 
-def audio(window):
-    """Audio: flash the screen with the alert sound, as a Mac can, for
+def audio_group(window):
+    """Audio: play stereo as mono; flash the screen with the alert sound, as a Mac can, for
     anyone who can't hear it, with a button to see what it looks like; and
     Background Sounds, a steady sound behind everything else, its sound and
     its volume (background_sounds.py plays it from Topline)."""
@@ -653,7 +805,17 @@ def audio(window):
         level.set_sensitive(active)
     choice.set_sensitive(on)
     level.set_sensitive(on)
+
+    def mono(active):
+        window.save_prefs(mono_audio=active)   # first, so Topline keeps it so
+        audio.set_mono(active)
+    mono_rows = []
+    if audio.available():
+        mono_rows.append(row("Play stereo audio as mono", switch(audio.mono_wanted(), mono),
+                             "Both speakers or both sides of your headphones play the same sound, "
+                             "so nothing is missed with one ear."))
     return group(
+        *mono_rows,
         row("Flash the screen when an alert sound occurs",
             switch(sounds.flash_screen(), lambda on: window.save_prefs(flash_screen=on)),
             "Every display flashes when there's an alert, even with the sound turned down."),

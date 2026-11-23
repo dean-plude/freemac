@@ -175,9 +175,14 @@ TOPICS = {
         "Turn on Dynamic in Dials > Wallpaper and the picture follows the sun instead: "
         "day while it's high, golden as it sets, and night after dark.",
     ]),
-    "sound": ("Change the volume", "sound volume mute speaker headphones audio output", [
-        "Use the volume keys, or click the sound icon in the menu bar and drag the slider.",
-        "Choose Dials > Sound to pick the output, such as headphones.",
+    "sound": ("Change the volume or where sound plays", "sound volume mute speaker speakers headphones audio output "
+              "input microphone mic level balance left right mono one ear hearing", [
+        "Use the volume keys, or click the speaker in the menu bar and drag the slider. Click the small "
+        "speaker beside the slider to mute or unmute.",
+        "The same menu lists the outputs, such as speakers and headphones: click one to play through it.",
+        "Dials > Sound has the Balance between left and right, and the input device with its volume and "
+        "Input level, a row of lights that follow what the microphone hears.",
+        "To hear everything in both ears, turn on Play stereo audio as mono in Dials > Accessibility.",
     ]),
     "install": ("Install apps", "install app store harbor download update software", [
         "Harbor lists free apps. Click Install beside one; it shows in the Dock and in F4 when it's ready.",
