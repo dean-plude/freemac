@@ -52,6 +52,7 @@ only ship alongside, which is fine for any free licence).
 | dconf | Stores GSettings such as light/dark mode for all apps | LGPL-2.1-or-later |
 | cage | Kiosk compositor that shows Gangway, the login screen | MIT |
 | gdisk, parted, dosfstools, e2fsprogs, squashfs-tools | Partitioning and copying the system in Keel | GPL-2.0-or-later (separate programs) |
+| cryptsetup, cryptsetup-initramfs | Encrypted disks: Keel, the start-up unlock and Dials > Privacy & Security (1.141) | GPL-2.0-or-later (separate programs) |
 | GtkSourceView 4 | Text view with syntax colours, used by Quill | LGPL-2.1-or-later |
 | grim, slurp | Screen capture and area picking for Lens | MIT (separate programs) |
 | wl-clipboard | Clipboard for Lens | GPL-3.0-or-later (separate program) |
@@ -156,7 +157,7 @@ only ship alongside, which is fine for any free licence).
 | **Jot** | Notes | Python + GTK 3 | Each note is a plain text file in `~/Documents/Notes`; the first line is the title. Saves a moment after typing stops, searches as you type, and notes show up in Seek and Drawer like any file. |
 | **Guide** | How-to topics | Python + GTK 3 | Short topics in `guide_topics.py` (no GTK, so Topline's Help and Seek read them cheaply); `freemac-guide --topic NAME` opens one, in the window already open if there is one. |
 | **Ferry** | Optional Mac program layer | C | Loads Intel Mach-O programs and connects them to our own libSystem conversions. Not on the ISO; see [Mac app compatibility](#mac-app-compatibility-optional-layer). |
-| **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
+| **Keel** | Installer | Python + GTK 3, root backend | Whole-disk GPT install (BIOS boot, EFI and ext4 partitions, or with encryption a separate /boot and a LUKS2 root, 1.141); copies the pristine live image, creates the account, removes live-only parts, installs GRUB for BIOS and UEFI. The password goes to the backend on stdin, never on a command line. |
 | **Gangway** | Login screen | Python + GTK 3 in cage | A greetd greeter that starts freemac-session.; 1.90: the Guest User (the account `guest` with the mark `/etc/freemac/guest-user`, made and removed by `freemac-users-helper guest on` or `off`, with no password) is chosen with no password box; `freemac-session` empties `/home/guest` and copies `/etc/skel` in before the guest's session starts and again after it ends; the image adds `_greetd` to the `video` group so cage can open the seat again after a log-out. Since 1.137, fast user switching (`switch_user.py`): every person after the first logs in on terminal 8 to 12, where `freemac-greeter@N.service` runs `/usr/libexec/freemac-switch-helper greeter N` (a second greetd with its own config and socket in `/run`); `freemac-switch-to@N.service` shows a terminal with VT_ACTIVATE, and seatd hands the screen to that terminal's compositor. A polkit rule (`50-freemac-switch-user.rules`) lets `_greetd` and the active local session start only those two units for terminals 7 to 12. Topline's user menu locks first; the pick is left in `/tmp/freemac-switch-choice-UID` for Gangway to choose that person. Gangway asks logind which people already have a session and switches to it instead of logging in again. |
 | **freemac-theme** | GTK theme layer, cursor, icon set, wallpapers | CSS, SVG, generated PNG | 0.4: a GTK 3 CSS layer over Adwaita with freemac's window buttons and indigo accent, and two generated wallpapers (Dusk Tide, Night Tide). 0.7: original icons for every freemac app (`art/icons`), a `freemac` icon theme with our own folder and file-type icons that inherits Adwaita for everything else (`art/icon-theme`), and four wallpaper scenes (Tide, Lagoon, Prism, Harbor), each computed in a day and a night version that Dials swaps with light and dark mode (`art/make-wallpaper.py`). |
 | **build/** | ISO build tooling | POSIX shell | This repository's `build/build-iso.sh`. |
@@ -845,6 +846,37 @@ Because `wayfire.ini` and `wf-shell.ini` are copied from `/etc/skel` only
 when an account is made, `freemac-config-upgrade` runs at each login and adds
 every setting the shipped file has that the person's lacks, at the end of its
 section. Anything already there, even turned off, is left alone.
+
+## Disk encryption (1.141)
+
+With "Encrypt the disk" on, Keel's backend lays the disk out as BIOS boot,
+EFI, a 1 GB ext4 `/boot` and a LUKS2 volume (GPT type 8309) for the rest.
+`cryptsetup luksFormat` uses argon2id at 256 MB, so a PC with little memory
+can still unlock it, and the account's password goes in key slot 0. A
+recovery key (24 letters and digits from an alphabet without 0/O or 1/I, in
+groups of four: 120 random bits) goes in slot 1, and the backend prints it
+once as `RECOVERYKEY …` for Keel to show; it isn't stored anywhere. Keys
+reach cryptsetup through files only root can read in `/run`, removed at
+once, never on a command line. The volume opens as
+`/dev/mapper/freemac_root`, which is formatted ext4 and becomes `/`.
+
+The installed system gets `/etc/crypttab`
+(`freemac_root UUID=… none luks,discard,initramfs`). The `initramfs` option
+makes cryptsetup-initramfs's hook put the volume and cryptsetup in the
+initramfs that `update-initramfs` builds in the chroot (where it can't see
+`/` as the booted system will), and in every rebuild after a kernel update,
+so the package's own conf-hook is left as shipped. cryptsetup asks through Plymouth, whose freemac theme draws the
+password field. GRUB reads the kernel from the plain `/boot`, so it needs no
+crypto of its own.
+
+`/usr/libexec/freemac-disk-helper`, run by Dials through pkexec
+(`org.freemac.disk-encryption`, an administrator's password), finds the
+volume behind `/` with findmnt and lsblk (`status` needs no root).
+`password` changes slot 0 and only when the current password opens slot 0;
+`recovery` adds a new key in a free slot, then removes every older slot but
+the password's, so an old written-down key stops working. `freemac-users-helper password`, given
+the old password as a second line when you change your own, calls it too, so
+the disk follows the login password when they were the same.
 
 ## Hard problems we know about
 

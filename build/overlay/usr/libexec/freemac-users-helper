@@ -4,7 +4,8 @@
 
   freemac-users-helper add NAME "Full Name" 0|1     password on stdin; 1 = administrator
   freemac-users-helper delete NAME keep|remove       keep or remove the home folder
-  freemac-users-helper password NAME                 new password on stdin
+  freemac-users-helper password NAME                 new password on stdin, then
+                                                     optionally the old one
   freemac-users-helper admin NAME 0|1
   freemac-users-helper autologin NAME|-              - turns automatic login off
   freemac-users-helper guest on|off                  the Guest User, with no password
@@ -21,6 +22,7 @@ import sys
 
 NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
 GREETD = "/etc/greetd/config.toml"
+DISK_HELPER = "/usr/libexec/freemac-disk-helper"
 GROUPS = ("audio", "video", "render", "input", "plugdev", "netdev", "bluetooth", "lpadmin")
 ADMIN_GROUP = "sudo"
 # The Guest User (see freemac_shell/guest_user.py): only the account called
@@ -140,7 +142,10 @@ def main(args):
                            capture_output=True)
     elif command == "password" and len(rest) == 1:
         entry = person(rest[0])
-        run("chpasswd", stdin=f"{entry.pw_name}:{read_password()}\n")
+        new = read_password()
+        old = sys.stdin.readline().rstrip("\n")
+        run("chpasswd", stdin=f"{entry.pw_name}:{new}\n")
+        follow_disk(old, new)
     elif command == "admin" and len(rest) == 2:
         entry = person(rest[0])
         if rest[1] == "1":
@@ -156,6 +161,19 @@ def main(args):
         set_autologin(None if rest[0] == "-" else person(rest[0]).pw_name)
     else:
         fail(__doc__)
+
+
+def follow_disk(old, new):
+    """When the start-up disk is encrypted and the old login password also
+    unlocks it, change that too, as FileVault does. Prints what happened, for
+    Dials to say; a disk with a different password is left alone."""
+    if not old or not os.path.exists(DISK_HELPER):
+        return
+    status = subprocess.run([DISK_HELPER, "status"], capture_output=True, text=True).stdout
+    if '"encrypted": true' not in status:
+        return
+    done = subprocess.run([DISK_HELPER, "password"], input=f"{old}\n{new}\n", text=True, capture_output=True)
+    print("disk-password-changed" if done.returncode == 0 else "disk-password-unchanged")
 
 
 def guest(on):

@@ -277,6 +277,20 @@ TOPICS = {
         "Your notes are kept as you type and come back when you log in. To throw one away, click the × on its strip.",
         "To make a note from words in another app, select them and press ⇧⌘Y.",
     ]),
+    "encryption": ("Keep your disk private with encryption", "encrypt encryption encrypted disk filevault "
+                   "recovery key lost stolen password start-up unlock privacy security protect", [
+        "With encryption, everything on the disk is scrambled until your password is typed, so nobody can "
+        "read your files if the computer is lost or stolen, even by taking the disk out.",
+        "Encryption is turned on when you install freemac: on the “Encrypt your disk?” step, turn on "
+        "Encrypt the disk. Each time the computer starts, type your password on the start-up screen.",
+        "When installing finishes, freemac shows a recovery key. Write it down and keep it away from the "
+        "computer. If you forget your password, type the recovery key on the start-up screen instead.",
+        "- To see whether your disk is encrypted, choose Dials > Privacy & Security.",
+        "- Change Disk Password… changes the password typed at start-up. Changing your own login "
+        "password in Dials > Users changes it too, when the two were the same.",
+        "- New Recovery Key… makes a new key; the old one stops working.",
+        "Without your password or the recovery key, nobody can unlock the disk, not even freemac.",
+    ]),
     "services": ("Use selected words in another app", "services service selected text selection sticky note look up "
                  "define dictionary words search seek jot speak read aloud open url link show in drawer terminal "
                  "folder desktop picture wallpaper shift command y", [

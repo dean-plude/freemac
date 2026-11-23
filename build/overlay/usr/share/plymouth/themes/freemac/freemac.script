@@ -36,21 +36,69 @@ fun progress_callback(duration, progress) {
 }
 Plymouth.SetBootProgressFunction(progress_callback);
 
-# Password prompts (an encrypted disk): a plain field under the mark.
+# Password prompts (an encrypted disk): the bar gives way to a rounded field
+# with a dot for each character typed, and a line of text under it. Plymouth
+# script variables made inside a function are local, so everything drawn here
+# lives in global. or it would vanish when the function returns.
+field.image = Image("field.png");
+dot.image = Image("dot.png");
+field.x = Window.GetX() + screen_w / 2 - field.image.GetWidth() / 2;
+field.y = track.y - 14;
+global.dots = [];
+global.ndots = 0;
+global.typed = 0;      # dots in the field when it was last drawn
+global.tries = 0;      # passwords that didn't unlock the disk
+
 fun display_password_callback(prompt, bullets) {
-    question.image = Image.Text(prompt, 1, 1, 1);
-    question.sprite = Sprite(question.image);
-    question.sprite.SetPosition(Window.GetX() + screen_w / 2 - question.image.GetWidth() / 2, track.y + 24, 3);
-    text = "";
-    for (i = 0; i < bullets; i++) text += "●";
-    dots.image = Image.Text(text, 1, 1, 1);
-    dots.sprite = Sprite(dots.image);
-    dots.sprite.SetPosition(Window.GetX() + screen_w / 2 - dots.image.GetWidth() / 2, track.y + 52, 3);
+    track.sprite.SetOpacity(0);
+    fill.sprite.SetOpacity(0);
+    if (!global.field_sprite) {
+        global.field_sprite = Sprite(field.image);
+        global.field_sprite.SetPosition(field.x, field.y, 3);
+        global.question_sprite = Sprite();
+        global.question_tries = -1;
+    }
+    if (global.question_tries != global.tries) {
+        # cryptsetup asks "Please unlock disk freemac_root"; say it plainly,
+        # and after a wrong password, say so and where else to turn.
+        if (global.tries == 0) words = "Enter your password to unlock this disk";
+        else words = "That password didn't work. Try again, or type your recovery key.";
+        global.question_image = Image.Text(words, 1, 1, 1, 0.85);
+        global.question_sprite.SetImage(global.question_image);
+        global.question_sprite.SetPosition(Window.GetX() + screen_w / 2 - global.question_image.GetWidth() / 2,
+                                           field.y + field.image.GetHeight() + 16, 3);
+        global.question_tries = global.tries;
+    }
+    global.typed = bullets;
+    global.field_sprite.SetOpacity(1);
+    global.question_sprite.SetOpacity(1);
+    shown = bullets;
+    if (shown > 20) shown = 20;     # the field holds 20; longer passwords still work
+    for (i = 0; i < global.ndots; i++) global.dots[i].SetOpacity(0);
+    gap = 12;
+    left = Window.GetX() + screen_w / 2 - (shown * gap - (gap - dot.image.GetWidth())) / 2;
+    for (i = 0; i < shown; i++) {
+        if (i >= global.ndots) {
+            global.dots[i] = Sprite(dot.image);
+            global.ndots = i + 1;
+        }
+        global.dots[i].SetPosition(left + i * gap, field.y + field.image.GetHeight() / 2 - dot.image.GetHeight() / 2, 4);
+        global.dots[i].SetOpacity(1);
+    }
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
 
 fun display_normal_callback() {
-    question.sprite = NULL;
-    dots.sprite = NULL;
+    # A field that had something typed in and is put away was an answer; if
+    # another prompt follows, that answer was wrong.
+    if (global.typed > 0) global.tries++;
+    global.typed = 0;
+    if (global.field_sprite) {
+        global.field_sprite.SetOpacity(0);
+        global.question_sprite.SetOpacity(0);
+    }
+    for (i = 0; i < global.ndots; i++) global.dots[i].SetOpacity(0);
+    track.sprite.SetOpacity(1);
+    fill.sprite.SetOpacity(1);
 }
 Plymouth.SetDisplayNormalFunction(display_normal_callback);

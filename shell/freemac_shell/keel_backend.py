@@ -6,12 +6,19 @@ on a command line:
 
     {"disk": "/dev/vda", "fullname": "Ada", "username": "ada",
      "password": "...", "hostname": "ada-pc", "timezone": "Europe/London",
-     "autologin": true}
+     "autologin": true, "encrypt": false}
 
 Prints one line per step, "PROGRESS <percent> <message>", then "DONE" or
 "ERROR <message>". The disk is erased: GPT with a BIOS boot partition, an EFI
 system partition and an ext4 root, so the result boots on BIOS and UEFI PCs.
+
+With "encrypt", the root is a LUKS2 volume, as a Mac's FileVault: its
+password is the account's, typed on the start-up screen, and a second key
+slot holds a recovery key, printed once as "RECOVERYKEY <key>" for the person
+to write down. /boot is then a small ext4 partition of its own, since the
+boot loader reads the kernel before anything is unlocked.
 """
+import secrets
 import json
 import os
 import re
@@ -23,6 +30,9 @@ import time
 TARGET = "/mnt/freemac-target"
 SQUASHFS_CANDIDATES = ("/run/live/medium/live/filesystem.squashfs", "/lib/live/mount/medium/live/filesystem.squashfs")
 LIVE_PACKAGES = ("live-boot", "live-boot-initramfs-tools")
+MAPPER = "freemac_root"                 # /dev/mapper/freemac_root when encrypted
+KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # no 0/O or 1/I to mix up
+PASSWORD_SLOT, RECOVERY_SLOT = 0, 1
 USER_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
 HOST_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 RESERVED = {"root", "daemon", "bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp", "proxy",
@@ -87,11 +97,51 @@ def validate(request):
         raise InstallError("Choose a computer name made of letters, digits and -.")
     if len(request.get("password", "")) < 4:
         raise InstallError("Choose a password of at least 4 characters.")
+    if request.get("encrypt") and not shutil.which("cryptsetup"):
+        raise InstallError("This copy of freemac can't encrypt disks (cryptsetup is missing). "
+                           "Go back and turn encryption off.")
     tz = request.get("timezone") or "UTC"
     if not os.path.exists(os.path.join("/usr/share/zoneinfo", tz)) or ".." in tz:
         request["timezone"] = "UTC"
     for key in ("fullname",):
         request[key] = str(request.get(key, "")).replace(":", " ").replace(",", " ").strip()
+
+
+def recovery_key():
+    """24 letters and digits in groups of four: 120 random bits."""
+    letters = "".join(secrets.choice(KEY_ALPHABET) for _ in range(24))
+    return "-".join(letters[i:i + 4] for i in range(0, 24, 4))
+
+
+def secret_file(text):
+    """A file only root can read, in RAM (/run), holding text with no newline."""
+    folder = "/run/freemac-keel"
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    path = os.path.join(folder, secrets.token_hex(8))
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    return path
+
+
+def encrypt_root(device, password):
+    """Make device a LUKS2 volume opened by the password (slot 0) or a new
+    recovery key (slot 1), open it, and return the key."""
+    key = recovery_key()
+    password_file, key_file = secret_file(password), secret_file(key)
+    try:
+        # argon2id with a modest memory cost, so a PC with little RAM can
+        # still unlock it from the start-up screen.
+        run("cryptsetup", "luksFormat", "--batch-mode", "--type", "luks2", "--pbkdf", "argon2id",
+            "--pbkdf-memory", "262144", "--key-slot", str(PASSWORD_SLOT), "--label", "freemac",
+            "--key-file", password_file, device)
+        run("cryptsetup", "luksAddKey", "--batch-mode", "--pbkdf", "argon2id", "--pbkdf-memory", "262144",
+            "--key-file", password_file, "--new-key-slot", str(RECOVERY_SLOT), device, key_file)
+        run("cryptsetup", "open", "--allow-discards", "--key-file", password_file, device, MAPPER)
+    finally:
+        for path in (password_file, key_file):
+            os.remove(path)
+    return key
 
 
 def find_squashfs():
@@ -103,6 +153,8 @@ def find_squashfs():
 
 def unmount_all():
     subprocess.run(["umount", "-R", TARGET], capture_output=True)
+    if os.path.exists("/dev/mapper/" + MAPPER):
+        subprocess.run(["cryptsetup", "close", MAPPER], capture_output=True)
 
 
 def install(request):
@@ -117,19 +169,37 @@ def install(request):
         subprocess.run(["swapoff", part], capture_output=True)
     run("wipefs", "-a", disk)
     run("sgdisk", "--zap-all", disk)
-    run("sgdisk", "-n", "1:0:+1M", "-t", "1:ef02", "-c", "1:bios",
-        "-n", "2:0:+512M", "-t", "2:ef00", "-c", "2:efi",
-        "-n", "3:0:0", "-t", "3:8304", "-c", "3:freemac", disk)
+    encrypt = bool(request.get("encrypt"))
+    layout = ["-n", "1:0:+1M", "-t", "1:ef02", "-c", "1:bios",
+              "-n", "2:0:+512M", "-t", "2:ef00", "-c", "2:efi"]
+    if encrypt:
+        layout += ["-n", "3:0:+1G", "-t", "3:8300", "-c", "3:boot",
+                   "-n", "4:0:0", "-t", "4:8309", "-c", "4:freemac"]
+    else:
+        layout += ["-n", "3:0:0", "-t", "3:8304", "-c", "3:freemac"]
+    run("sgdisk", *layout, disk)
     run("partprobe", disk)
     run("udevadm", "settle")
     time.sleep(1)
-    efi, root = partition_path(disk, 2), partition_path(disk, 3)
+    efi = partition_path(disk, 2)
+    boot = partition_path(disk, 3) if encrypt else None
+    luks = partition_path(disk, 4) if encrypt else None
+    root = "/dev/mapper/" + MAPPER if encrypt else partition_path(disk, 3)
+
+    if encrypt:
+        progress(4, "Encrypting the disk")
+        key = encrypt_root(luks, request["password"])
+        print(f"RECOVERYKEY {key}", flush=True)
 
     progress(6, "Formatting")
     run("mkfs.vfat", "-F", "32", "-n", "EFI", efi)
     run("mkfs.ext4", "-F", "-q", "-L", "freemac", root)
     os.makedirs(TARGET, exist_ok=True)
     run("mount", root, TARGET)
+    if encrypt:
+        run("mkfs.ext4", "-F", "-q", "-L", "boot", boot)
+        os.makedirs(os.path.join(TARGET, "boot"), exist_ok=True)
+        run("mount", boot, os.path.join(TARGET, "boot"))
 
     progress(10, "Copying freemac to the disk (this is the long part)")
     copy_system(squashfs)
@@ -149,7 +219,9 @@ def install(request):
         subprocess.run(["mount", "-t", "efivarfs", "efivarfs", os.path.join(TARGET, "sys/firmware/efi/efivars")],
                        capture_output=True)
 
-    write_fstab(root, efi)
+    write_fstab(root, efi, boot)
+    if encrypt:
+        write_crypttab(luks)
 
     progress(74, "Creating your account")
     configure_system(request)
@@ -215,11 +287,25 @@ def uuid_of(device):
     return run("blkid", "-s", "UUID", "-o", "value", device).strip()
 
 
-def write_fstab(root, efi):
+def write_fstab(root, efi, boot=None):
     with open(os.path.join(TARGET, "etc/fstab"), "w") as f:
         f.write("# freemac: created by the installer\n")
         f.write(f"UUID={uuid_of(root)}  /          ext4  errors=remount-ro  0  1\n")
+        if boot:
+            f.write(f"UUID={uuid_of(boot)}  /boot      ext4  defaults           0  2\n")
         f.write(f"UUID={uuid_of(efi)}  /boot/efi  vfat  umask=0077         0  1\n")
+
+
+def write_crypttab(luks):
+    """Unlock the root at start-up. "initramfs" makes cryptsetup's hook put it
+    (and cryptsetup) in the initramfs even though update-initramfs runs in a
+    chroot, where it can't see / as the booted system will, and on every
+    rebuild after a kernel update. cryptsetup-initramfs's conf-hook, a
+    package config file, is left alone so its updates never stop to ask.
+    Plymouth asks for the password on the start-up screen."""
+    with open(os.path.join(TARGET, "etc/crypttab"), "w") as f:
+        f.write("# freemac: created by the installer\n")
+        f.write(f"{MAPPER} UUID={uuid_of(luks)} none luks,discard,initramfs\n")
 
 
 def configure_system(request):

@@ -26,6 +26,7 @@ CSS = b"""
 .keel-warning { color: #b3261e; font-weight: 600; }
 .keel-disk { padding: 10px 14px; border-radius: 10px; }
 .keel-caption { opacity: 0.65; font-size: 12px; }
+.keel-key { font-family: monospace; font-size: 22px; font-weight: 600; letter-spacing: 1px; padding: 10px 14px; border-radius: 8px; background: alpha(currentColor, 0.07); }
 """
 
 
@@ -84,12 +85,13 @@ class Keel(Gtk.ApplicationWindow):
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         self.add(self.stack)
-        self.pages = ["welcome", "disk", "account", "confirm", "progress", "done"]
+        self.pages = ["welcome", "disk", "account", "encrypt", "confirm", "progress", "done"]
         self.index = 0
         self.ready = False
         self.stack.add_named(self.welcome_page(), "welcome")
         self.stack.add_named(self.disk_page(), "disk")
         self.stack.add_named(self.account_page(), "account")
+        self.stack.add_named(self.encrypt_page(), "encrypt")
         self.stack.add_named(self.confirm_page(), "confirm")
         self.stack.add_named(self.progress_page(), "progress")
         self.stack.add_named(self.done_page(), "done")
@@ -216,6 +218,24 @@ class Keel(Gtk.ApplicationWindow):
             return "The two passwords don't match yet."
         return None
 
+    def encrypt_page(self):
+        box = page("Encrypt your disk?",
+                   "With encryption, everything on the disk is scrambled until your password is typed, so "
+                   "nobody can read your files if the computer is lost or stolen, even by taking the disk out.")
+        row = Gtk.Box(spacing=12)
+        row.pack_start(Gtk.Label(label="Encrypt the disk", xalign=0), False, False, 0)
+        self.encrypt = Gtk.Switch(active=False, valign=Gtk.Align.CENTER)
+        row.pack_start(self.encrypt, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        for line in ("Each time the computer starts, you type your password on the start-up screen to unlock it.",
+                     "When installing finishes, Keel shows a recovery key. Write it down and keep it somewhere "
+                     "safe: if you forget your password, it is the only other way to unlock the disk.",
+                     "You can change the disk's password or make a new recovery key later in Dials > "
+                     "Privacy & Security."):
+            label = Gtk.Label(label="•  " + line, xalign=0, wrap=True, max_width_chars=70)
+            box.pack_start(label, False, False, 0)
+        return box
+
     def confirm_page(self):
         box = page("Ready to install")
         self.summary = Gtk.Label(xalign=0, wrap=True, max_width_chars=70)
@@ -239,6 +259,19 @@ class Keel(Gtk.ApplicationWindow):
         self.done_text = Gtk.Label(xalign=0, wrap=True, max_width_chars=70,
                                    label="Remove the USB stick or disc, then restart to start using freemac.")
         box.pack_start(self.done_text, False, False, 0)
+        self.recovery = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, no_show_all=True)
+        self.recovery.pack_start(Gtk.Label(
+            label="Your recovery key. Write it down now and keep it away from the computer: it is shown only "
+                  "once, and without it or your password nobody can unlock the disk.",
+            xalign=0, wrap=True, max_width_chars=70, visible=True), False, False, 0)
+        self.recovery_key = Gtk.Label(xalign=0, selectable=True, visible=True)
+        self.recovery_key.get_style_context().add_class("keel-key")
+        self.recovery.pack_start(self.recovery_key, False, False, 4)
+        self.wrote_it = Gtk.CheckButton(label="I've written down my recovery key", visible=True)
+        self.wrote_it.connect("toggled", lambda b: self.restart.set_sensitive(b.get_active()))
+        self.recovery.pack_start(self.wrote_it, False, False, 0)
+        box.pack_start(self.recovery, False, False, 0)
+        self.key = None
         self.restart = Gtk.Button(label="Restart Now", halign=Gtk.Align.START)
         self.restart.get_style_context().add_class("suggested-action")
         self.restart.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
@@ -261,7 +294,8 @@ class Keel(Gtk.ApplicationWindow):
                 f"Keel will erase <b>{GLib.markup_escape_text(disk['model'])}</b> "
                 f"({human(disk['size'])}, {disk['path']}) and install freemac on it for "
                 f"<b>{GLib.markup_escape_text(self.fullname.get_text() or self.username.get_text())}</b> "
-                f"(user name {GLib.markup_escape_text(self.username.get_text())}).")
+                f"(user name {GLib.markup_escape_text(self.username.get_text())})"
+                + (". The disk will be encrypted." if self.encrypt.get_active() else "."))
         self.stack.set_visible_child_name(self.current())
         self.update_buttons()
 
@@ -298,6 +332,7 @@ class Keel(Gtk.ApplicationWindow):
             "password": self.password.get_text(),
             "timezone": self.zone.get_active_id() or self.zone.get_child().get_text().replace(" ", "_") or "UTC",
             "autologin": self.autologin.get_active(),
+            "encrypt": self.encrypt.get_active(),
         }
         self.index = self.pages.index("progress")
         self.stack.set_visible_child_name("progress")
@@ -323,6 +358,8 @@ class Keel(Gtk.ApplicationWindow):
             self.bar.set_fraction(int(percent) / 100)
             self.bar.set_text(f"{percent}%")
             self.step.set_text(message)
+        elif line.startswith("RECOVERYKEY "):
+            self.key = line.split(" ", 1)[1]
         elif line == "DONE":
             self.finish(True)
         elif line.startswith("ERROR "):
@@ -337,6 +374,10 @@ class Keel(Gtk.ApplicationWindow):
                                     "changed apart from the disk you chose.")
             self.restart.set_visible(False)
             self.done_heading.set_text("Installation didn\u2019t finish")
+        elif self.key:
+            self.recovery_key.set_text(self.key)
+            self.recovery.show()
+            self.restart.set_sensitive(False)
         self.stack.set_visible_child_name("done")
         self.update_buttons()
 
