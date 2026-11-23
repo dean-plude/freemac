@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.133 "battery" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Battery, as on a Mac: the battery's level every 15 minutes over the last 24 hours, with a green strip under the times it was plugged in, and when it was last charged | Dials (dials_battery.py), battery.py | done |
+| 2 | Last 10 Days: how long the computer ran on battery each day, and in all | Dials | done |
+| 3 | Battery Health: Normal, or Service Recommended once the battery holds under 80% of what it did new, with its maximum capacity and charge cycles | battery.py, Dials | done |
+| 4 | Low Power Mode: Never, Always, Only on Battery or Only on Power Adapter; it switches as the computer is plugged in or unplugged, and the battery in the menu bar turns yellow while it's on | Topline (status.py), battery.py | done |
+| 5 | Topline keeps a sample of the battery every 5 minutes, and when it's plugged in or unplugged, for ten days; the page is called Battery on a computer that has one, and Power otherwise | Topline, Dials | done |
+| 6 | Guide topic updated; README row; every README screenshot retaken, with two of the Battery page | Guide, Docs | done |
+
 ## 1.132 "storage" (done)
 
 | # | Item | Component | Status |

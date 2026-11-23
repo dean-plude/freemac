@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import battery, default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -365,7 +365,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             (2, "wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic", "teal", self.wallpaper),
             (2, "screensaver", "Screen Saver", "weather-clear-night-symbolic", "indigo",
              lambda: dials_more.screen_saver(self)),
-            (3, "power", "Power", "battery-good-symbolic", "green", lambda: dials_more.power(self)),
+            (3, "power", "Battery" if battery.find() else "Power", "battery-good-symbolic", "green",
+             lambda: dials_more.power(self)),
             (3, "lifeboat", "Lifeboat", "document-open-recent-symbolic", "teal",
              lambda: dials_backup.BackupPanel(self, page)),
             (4, "users", "Users", "system-users-symbolic", "indigo", lambda: dials_people.UsersPanel(self, page)),
