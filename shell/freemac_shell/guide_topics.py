@@ -140,6 +140,15 @@ TOPICS = {
         "Wi-Fi lists the networks this computer has joined, with their passwords after an administrator's "
         "password.",
     ]),
+    "livetext": ("Copy text from a picture", "live text copy text picture photo image screenshot scan scanned pdf words select ocr recognise recognize read worksheet sign frame", [
+        "Open the picture or PDF in Frame. A moment later, if it holds words, a Live Text button shows in the "
+        "bottom-right corner.",
+        "Drag across the words to select them, then press Command-C to copy them. Double-click a word to "
+        "select it, or click three times for the whole line.",
+        "Command-A selects all the text. Right-click the text for Copy, Select All and Copy All Text.",
+        "Click the Live Text button to see all the text the picture holds, lit up.",
+        "Paste the words anywhere, such as a note, a mail or a search.",
+    ]),
     "codes": ("Use verification codes for two-step sign-in", "verification code codes two-step two step two-factor 2fa mfa authenticator app otp totp six digit 6-digit qr setup key sign in login purser passwords", [
         "When a website offers two-step sign-in with an authenticator app, Purser can be that app.",
         "Open Purser, choose the website's login, then Set Up Verification Code.",

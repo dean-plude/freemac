@@ -10,18 +10,24 @@ Markup (Shift+Command+A, or the pen button) shows a row of tools: choose and
 move marks, draw, draw a box, add text, and sign with a signature drawn once
 on a pad. Save a Copy (Command+S) writes the picture or PDF with the marks
 on it next to the original, which is left as it was (markup.py).
+
+Live Text: the words in a picture or page are found in the background
+(livetext.py, with Tesseract). Drag across them to select, ⌘C copies, ⌘A
+selects them all; the Live Text button over the picture shows them all.
 """
 import copy
 import os
 import sys
+import threading
 
+import cairo
 import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, markup, menus, pdf, share, style  # noqa: E402
+from . import alert, livetext, markup, menus, pdf, share, style  # noqa: E402
 
 TOOLS = (("select", "edit-select-symbolic", "Choose and move marks"),
          ("ink", "document-edit-symbolic", "Draw"),
@@ -71,6 +77,14 @@ class Viewer(Gtk.ApplicationWindow):
         self.unsaved = False
         self.last_copy = None     # (file, the copy last saved from it)
         self.scale = 1.0
+        self.words = []           # Live Text: words found in the picture shown
+        self.selection = None     # (first, last) word indices chosen
+        self.anchor = None
+        self.text_cache = {}      # (path, page) -> words
+        self.reader = livetext.Reader()
+        self.reading = 0          # counts reads, so a late answer is dropped
+        self.read_timer = None
+        self.text_cursor = None
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -107,7 +121,7 @@ class Viewer(Gtk.ApplicationWindow):
         self.image = Gtk.Image()   # animated pictures
         self.canvas = Gtk.DrawingArea()   # still pictures and PDF pages, with marks
         self.canvas.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_MOTION_MASK
-                               | Gdk.EventMask.BUTTON_RELEASE_MASK)
+                               | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
         self.canvas.connect("draw", self._draw_canvas)
         self.canvas.connect("button-press-event", self._press)
         self.canvas.connect("motion-notify-event", self._motion)
@@ -126,11 +140,27 @@ class Viewer(Gtk.ApplicationWindow):
         self.toolbar = Gtk.Revealer()
         self.toolbar.add(self._build_toolbar())
         outer.pack_start(self.toolbar, False, False, 0)
-        outer.pack_start(self.stack, True, True, 0)
+        overlay = Gtk.Overlay()
+        overlay.add(self.stack)
+        self.text_button = Gtk.ToggleButton()
+        icon = self._text_icon()
+        icon.show()   # the button is shown only once there's text, the icon always
+        self.text_button.add(icon)
+        self.text_button.set_tooltip_text("Live Text: show the text in this picture")
+        self.text_button.get_style_context().add_class("osd")
+        self.text_button.set_halign(Gtk.Align.END)
+        self.text_button.set_valign(Gtk.Align.END)
+        self.text_button.set_margin_end(16)
+        self.text_button.set_margin_bottom(16)
+        self.text_button.set_no_show_all(True)
+        self.text_button.connect("toggled", lambda *_: self.canvas.queue_draw())
+        overlay.add_overlay(self.text_button)
+        outer.pack_start(overlay, True, True, 0)
         self.add(outer)
         # A stack only switches to children that are already shown.
         self.stack.show_all()
         self.connect("delete-event", self._closing)
+        self.connect("destroy", lambda *_: self.reader.stop())
         self._last_size = None
 
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
@@ -161,6 +191,8 @@ class Viewer(Gtk.ApplicationWindow):
             "save-copy": self.save_copy,
             "undo": self.undo,
             "share": lambda: share.popup(self, self.shown_paths(), self.share_button),
+            "copy": self.copy_text,
+            "select-all": self.select_all_text,
         })
 
     def shown_paths(self):
@@ -225,6 +257,7 @@ class Viewer(Gtk.ApplicationWindow):
                                  f"{self.index + 1} of {len(self.files)}")
         self._last_size = None
         self._render()
+        self.find_text()
 
     def _show_page(self, path):
         pixbuf = pdf.page_pixbuf(self.document, self.page, 2000)
@@ -242,6 +275,7 @@ class Viewer(Gtk.ApplicationWindow):
         self.header.set_subtitle(f"Page {self.page + 1} of {self.document.get_n_pages()}")
         self._last_size = None
         self._render()
+        self.find_text()
 
     def step(self, delta):
         if self.document is not None:
@@ -306,6 +340,8 @@ class Viewer(Gtk.ApplicationWindow):
         self.original = self.original.rotate_simple(angle)
         self.animation = None
         self._render()
+        self.text_cache.pop(self._text_key(), None)
+        self.find_text()
 
     def _refit(self):
         alloc = self.scroller.get_allocation()
@@ -412,6 +448,11 @@ class Viewer(Gtk.ApplicationWindow):
 
     def show_markup(self, on):
         self.toolbar.set_reveal_child(on)
+        self.selection = None
+        self._set_text_cursor(False)
+        if on:
+            self.text_button.set_active(False)
+        self.text_button.set_visible(bool(self.words) and not on)
         if self.markup_button.get_active() != on:
             self.markup_button.set_active(on)
         self.chosen = None
@@ -474,13 +515,17 @@ class Viewer(Gtk.ApplicationWindow):
             markup.draw_mark(cr, self.drawing)
         if self.chosen is not None and self.toolbar.get_reveal_child():
             markup.outline(cr, self.chosen, self.scale)
+        if self.words and not self.toolbar.get_reveal_child():
+            self._draw_text(cr)
         return False
 
     def _pen(self):
         return markup.line_width(self.original.get_width(), self.original.get_height())
 
     def _press(self, _w, event):
-        if not self.toolbar.get_reveal_child() or self.original is None or event.button != 1:
+        if not self.toolbar.get_reveal_child():
+            return self._text_press(event)
+        if self.original is None or event.button != 1:
             return False
         x, y = self._to_picture(event)
         if self.tool == "select" or event.type == Gdk.EventType._2BUTTON_PRESS:
@@ -504,6 +549,8 @@ class Viewer(Gtk.ApplicationWindow):
     def _motion(self, _w, event):
         if self.original is None:
             return False
+        if not self.toolbar.get_reveal_child():
+            return self._text_motion(event)
         x, y = self._to_picture(event)
         if self.drawing is not None and self.drawing["kind"] == "ink":
             self.drawing["points"].append((x, y))
@@ -519,6 +566,7 @@ class Viewer(Gtk.ApplicationWindow):
         return True
 
     def _release(self, _w, _event):
+        self.anchor = None
         mark, self.drawing, self.drag_from = self.drawing, None, None
         if mark is None:
             return False
@@ -676,6 +724,224 @@ class Viewer(Gtk.ApplicationWindow):
     def _closing(self, *_):
         return not self._may_leave()
 
+    # --- Live Text ---------------------------------------------------------
+    def _text_key(self):
+        if not self.files:
+            return None
+        return (self.files[self.index], self.page)
+
+    def find_text(self):
+        """Look for words in the picture shown, a moment after it shows."""
+        self.reading += 1
+        self.words, self.selection, self.anchor = [], None, None
+        self.text_button.set_active(False)
+        self.text_button.hide()
+        if self.read_timer:
+            GLib.source_remove(self.read_timer)
+            self.read_timer = None
+        self.reader.stop()
+        if self.original is None or self.animation is not None or not livetext.available():
+            return
+        key = self._text_key()
+        if key in self.text_cache:
+            self._found_text(self.reading, key, self.text_cache[key])
+            return
+        self.read_timer = GLib.timeout_add(500, self._start_reading, self.reading, key)
+
+    def _start_reading(self, reading, key):
+        self.read_timer = None
+        if reading != self.reading or self.original is None:
+            return False
+        picture = self.original
+        factor = livetext.factor_for(picture.get_width(), picture.get_height())
+        if factor != 1.0:
+            picture = picture.scale_simple(max(1, round(picture.get_width() * factor)),
+                                           max(1, round(picture.get_height() * factor)),
+                                           GdkPixbuf.InterpType.BILINEAR)
+        try:
+            ok, png = picture.save_to_bufferv("png", [], [])
+        except GLib.Error:
+            return False
+        if not ok:
+            return False
+
+        def work():
+            words = self.reader.read(bytes(png), factor)
+            GLib.idle_add(self._found_text, reading, key, words)
+        threading.Thread(target=work, daemon=True).start()
+        return False
+
+    def _found_text(self, reading, key, words):
+        if reading != self.reading:
+            return False
+        self.text_cache[key] = words
+        while len(self.text_cache) > 30:
+            self.text_cache.pop(next(iter(self.text_cache)))
+        self.words = words
+        self.text_button.set_visible(bool(words) and not self.toolbar.get_reveal_child())
+        self.canvas.queue_draw()
+        return False
+
+    def _word_at(self, event, nearest=False):
+        x, y = self._to_picture(event)
+        slack = 4 / self.scale
+        for n, word in enumerate(self.words):
+            if word.contains(x, y, slack):
+                return n
+        if nearest and self.words:
+            return min(range(len(self.words)), key=lambda n: self.words[n].distance(x, y))
+        return None
+
+    def _set_text_cursor(self, on):
+        window = self.canvas.get_window()
+        if window is None or on == (self.text_cursor is not None):
+            return
+        self.text_cursor = Gdk.Cursor.new_from_name(window.get_display(), "text") if on else None
+        window.set_cursor(self.text_cursor)
+
+    def _text_press(self, event):
+        if not self.words:
+            return False
+        at = self._word_at(event)
+        if event.button == 3:
+            self._text_menu(event)
+            return True
+        if event.button != 1:
+            return False
+        if at is None:
+            if self.selection:
+                self.selection = None
+                self.canvas.queue_draw()
+            return False
+        if event.type == Gdk.EventType._3BUTTON_PRESS:
+            line = self.words[at].line_key()
+            same = [n for n, w in enumerate(self.words) if w.line_key() == line]
+            self.selection = (same[0], same[-1])
+        elif event.type == Gdk.EventType._2BUTTON_PRESS:
+            self.selection = (at, at)
+        else:
+            self.anchor = at
+            self.selection = (at, at)
+        self.canvas.queue_draw()
+        return True
+
+    def _text_motion(self, event):
+        if self.anchor is not None and event.state & Gdk.ModifierType.BUTTON1_MASK:
+            at = self._word_at(event, nearest=True)
+            self.selection = (min(self.anchor, at), max(self.anchor, at))
+            self.canvas.queue_draw()
+            return True
+        self._set_text_cursor(bool(self.words) and self._word_at(event) is not None)
+        return False
+
+    def _text_menu(self, event):
+        menu = Gtk.Menu()
+        for label, callback, sensitive in (("Copy", self.copy_text, bool(self.selection)),
+                                           ("Select All", self.select_all_text, True),
+                                           ("Copy All Text", self.copy_all_text, True)):
+            item = Gtk.MenuItem(label=label)
+            item.set_sensitive(sensitive)
+            item.connect("activate", lambda *_a, c=callback: c())
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(self.canvas, None)
+        menu.popup_at_pointer(event)
+
+    def selected_words(self):
+        if not self.selection:
+            return []
+        first, last = self.selection
+        return self.words[first:last + 1]
+
+    def _put_on_clipboard(self, words):
+        text = livetext.text_of(words)
+        if text:
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            clipboard.set_text(text, -1)
+            clipboard.store()
+
+    def copy_text(self):
+        self._put_on_clipboard(self.selected_words())
+
+    def copy_all_text(self):
+        self._put_on_clipboard(self.words)
+
+    def select_all_text(self):
+        if self.words and not self.toolbar.get_reveal_child():
+            self.selection = (0, len(self.words) - 1)
+            self.canvas.queue_draw()
+
+    @staticmethod
+    def _line_boxes(words, pad):
+        boxes, current, last = [], None, None
+        for word in words:
+            if current is not None and word.line_key() == last:
+                x0 = min(current[0], word.x - pad)
+                y0 = min(current[1], word.y - pad)
+                x1 = max(current[2], word.x + word.w + pad)
+                y1 = max(current[3], word.y + word.h + pad)
+                current = [x0, y0, x1, y1]
+            else:
+                if current is not None:
+                    boxes.append(current)
+                current = [word.x - pad, word.y - pad, word.x + word.w + pad, word.y + word.h + pad]
+            last = word.line_key()
+        if current is not None:
+            boxes.append(current)
+        return boxes
+
+    def _draw_text(self, cr):
+        """In picture pixels (the canvas is already scaled)."""
+        pad = 3 / self.scale
+        if self.text_button.get_active():
+            # Dim the picture and light up the lines of text, as Live Text does.
+            boxes = self._line_boxes(self.words, pad)
+            cr.push_group()
+            cr.set_source_rgba(0, 0, 0, 0.35)
+            cr.rectangle(0, 0, self.original.get_width(), self.original.get_height())
+            cr.fill()
+            cr.set_operator(cairo.OPERATOR_CLEAR)   # the lines of text stay bright
+            for x0, y0, x1, y1 in boxes:
+                cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.fill()
+            cr.set_operator(cairo.OPERATOR_OVER)
+            cr.pop_group_to_source()
+            cr.paint()
+            cr.set_source_rgba(1, 1, 1, 0.9)
+            cr.set_line_width(1.5 / self.scale)
+            for x0, y0, x1, y1 in boxes:
+                cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.stroke()
+        chosen = self.selected_words()
+        if chosen:
+            cr.set_source_rgba(0.18, 0.48, 0.96, 0.38)
+            for x0, y0, x1, y1 in self._line_boxes(chosen, pad):
+                cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.fill()
+
+    @staticmethod
+    def _text_icon():
+        """Corners of a viewfinder around three lines of text, in the button's colour."""
+        area = Gtk.DrawingArea(halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+        area.set_size_request(18, 18)
+
+        def draw(widget, cr):
+            ink = widget.get_style_context().get_color(widget.get_state_flags())
+            cr.set_source_rgba(ink.red, ink.green, ink.blue, ink.alpha)
+            cr.set_line_width(1.6)
+            for (x, y, dx, dy) in ((1.5, 1.5, 1, 1), (16.5, 1.5, -1, 1), (1.5, 16.5, 1, -1), (16.5, 16.5, -1, -1)):
+                cr.move_to(x, y + 4.5 * dy)
+                cr.line_to(x, y)
+                cr.line_to(x + 4.5 * dx, y)
+            cr.stroke()
+            for y, length in ((6, 10), (9, 10), (12, 6)):
+                cr.move_to(4, y)
+                cr.line_to(4 + length, y)
+            cr.stroke()
+            return False
+        area.connect("draw", draw)
+        return area
+
     # --- input -----------------------------------------------------------
     def _on_key(self, _widget, event):
         key = event.keyval
@@ -696,6 +962,14 @@ class Viewer(Gtk.ApplicationWindow):
                 self.canvas.queue_draw()
             else:
                 self.markup_button.set_active(False)
+        elif ctrl and key in (Gdk.KEY_c, Gdk.KEY_C) and not marking:
+            self.copy_text()
+        elif ctrl and key in (Gdk.KEY_a, Gdk.KEY_A) and not marking:
+            self.select_all_text()
+        elif not marking and key == Gdk.KEY_Escape and (self.selection or self.text_button.get_active()):
+            self.selection = None
+            self.text_button.set_active(False)
+            self.canvas.queue_draw()
         elif ctrl and key in (Gdk.KEY_o, Gdk.KEY_O):
             self.open_dialog()
         elif ctrl and key in (Gdk.KEY_w, Gdk.KEY_W):
@@ -744,6 +1018,7 @@ def menubar():
         ]),
         ("_Edit", [
             [("Undo", "win.undo", "<Ctrl>z")],
+            [("Copy", "win.copy", "<Ctrl>c"), ("Select All", "win.select-all", "<Ctrl>a")],
         ]),
         ("_Tools", [
             [("Show Markup", "win.markup", "<Shift><Ctrl>a")],
