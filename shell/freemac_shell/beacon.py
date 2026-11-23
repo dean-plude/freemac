@@ -32,7 +32,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, minimonth, notify_rules, reminders_store, style, update_notice  # noqa: E402
+from . import announce, calendar_store, minimonth, notify_rules, reminders_store, style, update_notice  # noqa: E402
 
 BUS_NAME = "org.freedesktop.Notifications"
 PATH = "/org/freedesktop/Notifications"
@@ -413,6 +413,7 @@ class Beacon:
             self._fill_center()
         elif not quiet:
             self._show_banner(note, prefs)
+            announce.notification(prefs, note.app, note.summary)
         return nid
 
     def _show_banner(self, note, prefs):

@@ -105,6 +105,11 @@
 			<_long>Hold a key and point at some words to see them large above the pointer.</_long>
 			<default>false</default>
 		</option>
+		<option name="hover_speak" type="bool">
+			<_short>Speak items under the pointer</_short>
+			<_long>Hold the Hover Text key and point at some words to hear them read aloud.</_long>
+			<default>false</default>
+		</option>
 		<option name="hover_text_key" type="string">
 			<_short>Hover Text key</_short>
 			<_long>The key to hold for Hover Text: command, option or control.</_long>

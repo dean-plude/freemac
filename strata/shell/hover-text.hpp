@@ -10,15 +10,24 @@
 // button, or scrolling tells it "hover stop". Topline reads the words under
 // the pointer off the screen and draws the panel (hover_text.py). No key or
 // button is swallowed, so the key still does what it did before.
+// The same watch serves Speak items under the pointer (Dials > Accessibility
+// > Spoken Content, strata-shell/hover_speak): Topline reads the line aloud
+// instead of, or as well as, showing it.
 //
 // strata/hover-cursor {"hide": bool}: Topline hides the pointer for the
 // moment it takes the picture, so the arrow doesn't cover the very word it
 // points at (on a display drawn without a hardware cursor, the arrow is in
 // the picture). It comes back by itself after HIDE_MAX_MS whatever happens.
+// Hiding asks every output for a fresh frame; {"query": true} answers
+// {"drawn": bool}, true once each has been drawn without the pointer, so
+// Topline takes the picture only then (a fixed wait could still catch the
+// arrow on a busy computer).
 // Original freemac code.
 #pragma once
 
 #include <cmath>
+#include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <xkbcommon/xkbcommon.h>
@@ -26,6 +35,9 @@
 #include <wayfire/core.hpp>
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/option-wrapper.hpp>
+#include <wayfire/output.hpp>
+#include <wayfire/output-layout.hpp>
+#include <wayfire/render-manager.hpp>
 #include <wayfire/seat.hpp>
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/util.hpp>
@@ -34,7 +46,7 @@
 namespace strata_hover
 {
 static const int REST_MS = 120;   // the pointer still this long, the panel follows it
-static const int HIDE_MAX_MS = 600;
+static const int HIDE_MAX_MS = 3000;   // a safety net: taking the picture can take a second
 
 class hover_t
 {
@@ -51,7 +63,14 @@ class hover_t
         wf::get_core().connect(&on_motion_absolute);
         enabled.set_callback([=] ()
         {
-            if (!enabled)
+            if (!on())
+            {
+                stop();
+            }
+        });
+        speak.set_callback([=] ()
+        {
+            if (!on())
             {
                 stop();
             }
@@ -60,11 +79,25 @@ class hover_t
 
     nlohmann::json cursor(nlohmann::json data)
     {
+        if (data.contains("query"))
+        {
+            auto answer = wf::ipc::json_ok();
+            bool drawn = true;
+            for (auto& [output, watch] : waiting)
+            {
+                drawn = drawn && (watch->drawn || !still_there(output));
+            }
+
+            answer["drawn"] = drawn;
+            return answer;
+        }
+
         bool hide = data.contains("hide") && data["hide"].is_boolean() && data["hide"].get<bool>();
         if (hide && active() && !hidden)
         {
             hidden = true;
             wf::get_core().hide_cursor();
+            watch_frames();
             unhide_timer.set_timeout(HIDE_MAX_MS, [=] () { show_cursor(); });
         } else if (!hide)
         {
@@ -76,6 +109,7 @@ class hover_t
 
   private:
     wf::option_wrapper_t<bool> enabled{"strata-shell/hover_text"};
+    wf::option_wrapper_t<bool> speak{"strata-shell/hover_speak"};   // Spoken Content
     wf::option_wrapper_t<std::string> key_name{"strata-shell/hover_text_key"};
     tell_fn tell = nullptr;
 
@@ -87,8 +121,68 @@ class hover_t
     wf::wl_timer<false> unhide_timer;
     bool hidden = false;
 
+    /* One per output still to be drawn since the pointer was hidden. */
+    struct frame_watch
+    {
+        wf::effect_hook_t hook;
+        bool drawn = false;
+    };
+    std::map<wf::output_t*, std::unique_ptr<frame_watch>> waiting;
+
+    void watch_frames()
+    {
+        stop_watching();
+        for (auto output : wf::get_core().output_layout->get_outputs())
+        {
+            auto watch = std::make_unique<frame_watch>();
+            auto *w    = watch.get();
+            watch->hook = [w] () { w->drawn = true; };
+            output->render->add_effect(&watch->hook, wf::OUTPUT_EFFECT_POST);
+            output->render->damage_whole();
+            waiting[output] = std::move(watch);
+        }
+    }
+
+    void forget(wf::output_t *output)
+    {
+        auto it = waiting.find(output);
+        if (it == waiting.end())
+        {
+            return;
+        }
+
+        if (still_there(output))
+        {
+            output->render->rem_effect(&it->second->hook);
+        }
+
+        waiting.erase(it);
+    }
+
+    static bool still_there(wf::output_t *output)
+    {
+        for (auto o : wf::get_core().output_layout->get_outputs())
+        {
+            if (o == output)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void stop_watching()
+    {
+        while (!waiting.empty())
+        {
+            forget(waiting.begin()->first);
+        }
+    }
+
     void show_cursor()
     {
+        stop_watching();
         unhide_timer.disconnect();
         if (hidden)
         {
@@ -123,9 +217,15 @@ class hover_t
                sym == XKB_KEY_Hyper_R;
     }
 
+    /* Shown large, read aloud, or both: the same key and pointer either way. */
+    bool on() const
+    {
+        return enabled || speak;
+    }
+
     bool active() const
     {
-        return enabled && !held.empty() && !spoiled;
+        return on() && !held.empty() && !spoiled;
     }
 
     void stop()

@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, announce, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -417,9 +417,9 @@ def hover_text_group(window):
 
     def turned(active):
         window.ini_set("strata-shell", "hover_text", "true" if active else "false")
-        keys.set_sensitive(active)
         size.set_sensitive(active)
-    keys.set_sensitive(on)
+    # The key also speaks the words under the pointer (Spoken Content), so it
+    # stays open to change with Hover Text off.
     size.set_sensitive(on)
     return [group(
         row("Hover Text", switch(on, turned),
@@ -666,8 +666,10 @@ def audio(window):
 
 
 def spoken_content(window):
-    """Spoken Content: Speak selection with Option-Escape, its voice and how
-    fast it talks, and a Play button to hear them."""
+    """Spoken Content: Speak selection with Option-Escape, speak the words
+    under the pointer (with the Hover Text key), announce notifications and
+    the time (announce.py), the voice and how fast it talks, and a Play
+    button to hear them."""
     group, row, _page, _slider, switch = window.helpers
     if not speak.available():
         return []
@@ -695,6 +697,20 @@ def spoken_content(window):
         if not on:
             speak.stop()
 
+    pointer_on = (window.ini_get("strata-shell", "hover_speak", "false") or "false").strip().lower() \
+        in ("true", "1", "yes", "on")
+    from . import livetext
+    pointer_rows = [row(
+        "Speak items under the pointer",
+        switch(pointer_on, lambda on: window.ini_set("strata-shell", "hover_speak", "true" if on else "false")),
+        "Hold the Hover Text key (\u2318 unless you chose another) and point at some words to hear them.")] \
+        if livetext.available() else []
+    every = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+    for value, label in announce.EVERY:
+        every.append(value, label)
+    every.set_active_id(announce.time_every(prefs))
+    every.connect("changed", lambda c: window.save_prefs(announce_time=c.get_active_id()))
+
     heading = Gtk.Label(label="Spoken Content", xalign=0)
     heading.get_style_context().add_class("dials-section")
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -702,6 +718,11 @@ def spoken_content(window):
     box.pack_start(group(
         row("Speak selection", switch(bool(prefs.get("speak_selection")), turned),
             "Select some words in any app and press \u2325Esc to hear them. Press it again to stop."),
+        *pointer_rows,
+        row("Announce notifications",
+            switch(bool(prefs.get("announce_notifications")), lambda on: window.save_prefs(announce_notifications=on)),
+            "Read out each notification as it shows. Not while a Focus is on."),
+        row("Announce the time", every, "Say the time out loud. Not while a Focus is on."),
         row("Voice", voice_box),
         row("Speaking rate", speed),
     ), False, False, 0)

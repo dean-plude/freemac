@@ -14,8 +14,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import (apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel, notify_rules, quick,  # noqa: E402
-               main_display, recent_items, status, style)
+from . import (announce, apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
+               notify_rules, quick, main_display, recent_items, status, style)
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -191,6 +191,7 @@ class Topline(Gtk.Window):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
         self._seconds, self._tick_source = None, None
+        self.announcer = announce.Clock()
         self._tick()
         self._prefs_monitor = style.watch_prefs(self._prefs_changed)
         self._zone_monitor = Gio.File.new_for_path("/etc/localtime").monitor_file(Gio.FileMonitorFlags.NONE, None)
@@ -539,6 +540,7 @@ class Topline(Gtk.Window):
                 self.dnd.set_tooltip_text(f"{notify_rules.focus_name(focus)} is on")
         self.dnd.set_visible(focus is not None)
         self.clock.set_text(time.strftime(dials_time.clock_format(prefs), time.localtime()))
+        self.announcer.tick(prefs)   # Announce the time (announce.py)
         if prefs.get("clock_seconds") != self._seconds:
             # Seconds on: tick every second; off: on each minute.
             self._seconds = prefs.get("clock_seconds")

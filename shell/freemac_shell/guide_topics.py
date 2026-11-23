@@ -748,10 +748,13 @@ TOPICS = {
         "with, pick the app, then click Change All\u2026.",
         "To open one file in another app just this once, right-click it and choose Open With.",
     ]),
-    "speak": ("Have the computer read words aloud", "speak selection read aloud out loud text to speech speech voice spoken content listen hear dyslexia reading", [
+    "speak": ("Have the computer read words aloud", "speak selection read aloud out loud text to speech speech voice spoken content listen hear dyslexia reading pointer hover announce notifications time clock hour chime", [
         "Choose Dials > Accessibility and turn on Speak selection, under Spoken Content.",
         "Select some words in any app, then press \u2325Esc (Option+Esc) to hear them. Press it again to stop.",
         "Pick a voice and a speaking rate on the same page. Click Play to hear how they sound.",
+        "Turn on Speak items under the pointer, then hold Command and point at some words to hear that line.",
+        "Announce notifications reads each notification out as it shows. Announce the time says the time on "
+        "the hour, half hour or quarter hour. Neither speaks while a Focus is on.",
     ]),
     "screen-reader": ("Use the screen reader", "screen reader blind low vision orca voiceover speak screen read out talk command f5 insert navigate keyboard", [
         "Press \u2318F5 (Command+F5) to turn the screen reader on, and again to turn it off. It's also in "

@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.130 "spoken content" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Speak items under the pointer, as on a Mac: hold the Hover Text key and point at some words to hear that line read aloud, with or without Hover Text's panel; each line is read once until the pointer moves to another | Strata (hover-text.hpp, `hover_speak`), Topline (hover_text.py) | done |
+| 2 | Announce notifications: each banner is read out as it shows ("Nudge: Call Sam back"), not while a Focus is on | Beacon (announce.py) | done |
+| 3 | Announce the time: on the hour, half hour or quarter hour, in the menu bar clock's 12 or 24 hours, not while a Focus is on | Topline (announce.py) | done |
+| 4 | Dials > Accessibility > Spoken Content: a row for each, in the voice and speed already chosen there | Dials | done |
+| 5 | Hover Text fix: the word under the pointer was missed about one time in three, as the pointer came back before the picture was taken; now Strata waits for a frame drawn without it and keeps it hidden until Topline is done | Strata, Topline | done |
+| 6 | Guide topic; README row; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.129 "focus" (done)
 
 | # | Item | Component | Status |

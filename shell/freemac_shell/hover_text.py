@@ -14,8 +14,15 @@ reads the screen, not the app. Nothing is saved: the picture stays in memory
 and is gone once read.
 
 The text size is shell.json "hover_text_size" (Dials > Accessibility).
+
+Speak items under the pointer (Dials > Accessibility > Spoken Content,
+wayfire.ini strata-shell/hover_speak) uses the same key and the same read:
+the line is read out loud in the Spoken Content voice (speak.py), with or
+without the panel. Each line is read once, until the pointer moves to
+another one or the key is let go.
 Original freemac code.
 """
+import os
 import subprocess
 import threading
 import time
@@ -28,7 +35,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import GdkPixbuf, GLib, Gdk, Gtk, GtkLayerShell  # noqa: E402
 
-from . import livetext, style  # noqa: E402
+from . import livetext, speak, style  # noqa: E402
+from .ini import ini_get  # noqa: E402
 from .wfipc import Connection  # noqa: E402
 
 # The strip of screen read around the pointer, in layout pixels.
@@ -39,8 +47,12 @@ GAP = 14
 SIZES = (("24", "Small"), ("36", "Medium"), ("48", "Large"), ("64", "Huge"))
 DEFAULT_SIZE = 36
 SCALE = 3.0   # screen text is small: enlarge it for Tesseract
-HIDE_SETTLE = 0.12
+HIDE_SETTLE = 0.12        # without Strata's answer, a frame or two
+HIDE_WAIT = 0.4          # at most this long for a frame without the pointer
+FRAME = 0.016
+GRAB_LOCK = threading.Lock()
 PANEL_EXTRA = 50   # the panel's padding, border and margin, each side
+WAYFIRE_INI = os.path.expanduser("~/.config/wayfire.ini")
 
 CSS = b"""
 window.hover-window, window.hover-window > * { background: transparent; }
@@ -127,13 +139,36 @@ def text_size():
     return min(max(size, 14), 120)
 
 
+def modes():
+    """(show, say): whether the line is shown large, read out loud, or both."""
+    def on(key):
+        return ini_get(WAYFIRE_INI, "strata-shell", key, "false").lower() == "true"
+    return on("hover_text"), on("hover_speak")
+
+
 def _pointer(hide):
+    """Hide or show the pointer (Strata). After hiding, wait until every
+    display has been drawn without it, up to HIDE_WAIT; a Strata too old to
+    say gets the fixed HIDE_SETTLE."""
     try:
         connection = Connection()
     except OSError:
         return
     try:
         connection.call("strata/hover-cursor", hide=hide)
+        if not hide:
+            return
+        waited = 0.0
+        while waited < HIDE_WAIT:
+            answer = connection.call("strata/hover-cursor", query=True)
+            if "drawn" not in answer:
+                time.sleep(HIDE_SETTLE)
+                return
+            if answer["drawn"]:
+                time.sleep(FRAME)   # that frame on its way to the screen
+                return
+            time.sleep(FRAME)
+            waited += FRAME
     except (OSError, ValueError, ConnectionError):
         pass
     finally:
@@ -144,7 +179,6 @@ def grab(left, top, width, height):
     """A PNG of that part of the screen, enlarged for reading, or None. The
     pointer is hidden for the moment (Strata), so it doesn't cover a word."""
     _pointer(hide=True)
-    time.sleep(HIDE_SETTLE)   # a frame or two, drawn without the pointer
     try:
         done = subprocess.run(["grim", "-g", f"{left},{top} {width}x{height}", "-t", "png", "-"],
                               capture_output=True, timeout=10, check=True)
@@ -198,6 +232,7 @@ class HoverPanel(Gtk.Window):
         self.wanted = 0          # bumped by every request and stop
         self.shown_rect = None   # where the panel is, in layout pixels
         self.pending = 0
+        self.spoken = None       # the line last read out loud, until the key is let go
 
     def _pass_clicks(self, _widget):
         import cairo
@@ -210,6 +245,7 @@ class HoverPanel(Gtk.Window):
         if message[0] == "stop":
             self.wanted += 1
             self.reader.stop()
+            self.spoken = None
             self._hide()
             return
         self.request(message[1], message[2])
@@ -253,7 +289,12 @@ class HoverPanel(Gtk.Window):
             return False
 
         def work():
-            png = grab(*strip)
+            # One picture at a time: a read still finishing would show the
+            # pointer again in the middle of this one's picture.
+            with GRAB_LOCK:
+                if ticket != self.wanted:
+                    return
+                png = grab(*strip)
             words = self.reader.read(png, SCALE) if png else []
             text = line_at(words, x - strip[0], y - strip[1])
             GLib.idle_add(self._found, ticket, text, x, monitor, area, strip)
@@ -265,6 +306,13 @@ class HoverPanel(Gtk.Window):
         if ticket != self.wanted:
             return False
         if not text:
+            self._hide()
+            return False
+        show, say = modes()
+        if say and text != self.spoken:
+            self.spoken = text
+            speak.say(text)
+        if not show:
             self._hide()
             return False
         ax, ay, aw, ah = area
