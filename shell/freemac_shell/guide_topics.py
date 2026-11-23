@@ -932,12 +932,20 @@ TOPICS = {
         "and days, for example Work from 09:00 to 17:00, Monday to Friday. If you turn it off early, it "
         "stays off until the next time.",
     ]),
-    "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
+    "widgets": ("Put widgets on your desktop or in the Notification Centre",
+                "widgets widget desktop clock calendar weather reminders battery screen time world clock "
+                "sticky note photo notification centre gallery edit", [
         "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "
-        "a calendar, the weather or your reminders.",
+        "a calendar, the weather, your reminders, the battery, Screen Time, world clocks, your newest "
+        "sticky note or a photo of the day.",
+        "To put widgets in the Notification Centre instead, click the date and time in the menu bar, "
+        "scroll to the bottom and click Edit Widgets…, or choose the Notification Centre tab at the top "
+        "of the widget gallery.",
         "Drag a widget to wherever you like it on the desktop. It stays there.",
-        "Click a widget to open its app, such as Sky for the weather. Right-click it and choose "
-        "Remove Widget to take it away.",
+        "Click a widget to open its app, such as Sky for the weather. Right-click one on the desktop and "
+        "choose Remove Widget to take it away, or click Remove beside it in the gallery.",
+        "The World Clock widget shows the cities you added in Chime. The Photo widget picks a different "
+        "picture from your Pictures folder each day.",
     ]),
     "glance": ("Take a quick look at a file", "glance quick look preview space peek video movie music pdf photo full screen", [
         "Click a file in Drawer or on the desktop and press Space. Glance shows it without opening an app.",

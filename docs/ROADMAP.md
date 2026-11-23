@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.135 "widgets" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Five new widgets: Battery (how full, and whether it's charging, or the power adapter on a computer with no battery), Screen Time (today's total and the three apps used most), World Clock (the cities added in Chime, each with its own clock), Sticky Note (the newest note, in its colour) and Photo (a different picture from Pictures each day) | Backdrop (desktop_widgets.py) | done |
+| 2 | Widgets in the Notification Centre, under the notifications: two small ones to a row and a wide one on its own, light or dark to match it; a click opens the widget's app. The month, the day's events, the notifications and the widgets now scroll together | Beacon | done |
+| 3 | Edit Widgets… at the foot of the Notification Centre, and on the desktop, opens one gallery with a tab for each place; adding or removing a widget shows at once in the other place too | Backdrop, Beacon | done |
+| 4 | A widget added to the desktop goes into the first free spot; the Notification Centre's name shows in the menu bar while its gallery is open | Backdrop, apps.py | done |
+| 5 | Guide topic updated; README row; every README screenshot retaken, with two of the widgets | Guide, Docs | done |
+
 ## 1.134 "software update" (done)
 
 | # | Item | Component | Status |

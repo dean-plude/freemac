@@ -42,6 +42,7 @@ HELPER_NAMES = {
     "freemac-backdrop": "Drawer",   # the desktop's own windows, such as Get Info
     DESKTOP_WINDOW: "Drawer",
     "freemac-power": "freemac",
+    "freemac-beacon": "Notification Centre",   # its Widgets window
     "freemac-hail": "Nearby",   # Hail's window and its questions   # Restart, Shut Down and Log Out's question
 }
 
