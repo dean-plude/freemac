@@ -62,6 +62,7 @@ NSArray *AAllWindows(void);
 void AWindowDidClose(NSWindow *window);
 
 @interface NSView (FerryPrivate)
+- (void)_backingPropertiesChanged;
 - (void)_setWindow:(NSWindow *)window;
 - (CGAffineTransform)_transformToSuperview;
 - (CGAffineTransform)_transformToWindow;

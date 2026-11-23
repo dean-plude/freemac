@@ -1266,6 +1266,42 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
 - (NSArray *)optionDescriptionsForBinding:(NSString *)binding;
 @end
 
+/* ---- Backing scale (M7): points to the window's pixels ------------------------------- */
+typedef NS_OPTIONS(unsigned long long, NSAlignmentOptions) {
+    NSAlignMinXInward = 1ULL << 0, NSAlignMinYInward = 1ULL << 1, NSAlignMaxXInward = 1ULL << 2,
+    NSAlignMaxYInward = 1ULL << 3, NSAlignWidthInward = 1ULL << 4, NSAlignHeightInward = 1ULL << 5,
+    NSAlignMinXOutward = 1ULL << 8, NSAlignMinYOutward = 1ULL << 9, NSAlignMaxXOutward = 1ULL << 10,
+    NSAlignMaxYOutward = 1ULL << 11, NSAlignWidthOutward = 1ULL << 12, NSAlignHeightOutward = 1ULL << 13,
+    NSAlignMinXNearest = 1ULL << 16, NSAlignMinYNearest = 1ULL << 17, NSAlignMaxXNearest = 1ULL << 18,
+    NSAlignMaxYNearest = 1ULL << 19, NSAlignWidthNearest = 1ULL << 20, NSAlignHeightNearest = 1ULL << 21,
+    NSAlignRectFlipped = 1ULL << 63,
+    NSAlignAllEdgesInward = NSAlignMinXInward | NSAlignMaxXInward | NSAlignMinYInward | NSAlignMaxYInward,
+    NSAlignAllEdgesOutward = NSAlignMinXOutward | NSAlignMaxXOutward | NSAlignMinYOutward | NSAlignMaxYOutward,
+    NSAlignAllEdgesNearest = NSAlignMinXNearest | NSAlignMaxXNearest | NSAlignMinYNearest | NSAlignMaxYNearest,
+};
+APPKIT_EXTERN NSNotificationName const NSWindowDidChangeBackingPropertiesNotification;
+APPKIT_EXTERN NSString *const NSBackingPropertyOldScaleFactorKey, *const NSBackingPropertyOldColorSpaceKey;
+@interface NSWindow (NSBackingCoordinates)
+- (NSRect)convertRectToBacking:(NSRect)rect;
+- (NSRect)convertRectFromBacking:(NSRect)rect;
+- (NSPoint)convertPointToBacking:(NSPoint)point;
+- (NSPoint)convertPointFromBacking:(NSPoint)point;
+- (NSRect)backingAlignedRect:(NSRect)rect options:(NSAlignmentOptions)options;
+@end
+@interface NSView (NSBackingCoordinates)
+- (NSRect)convertRectToBacking:(NSRect)rect;
+- (NSRect)convertRectFromBacking:(NSRect)rect;
+- (NSPoint)convertPointToBacking:(NSPoint)point;
+- (NSPoint)convertPointFromBacking:(NSPoint)point;
+- (NSSize)convertSizeToBacking:(NSSize)size;
+- (NSSize)convertSizeFromBacking:(NSSize)size;
+- (NSRect)backingAlignedRect:(NSRect)rect options:(NSAlignmentOptions)options;
+- (void)viewDidChangeBackingProperties;
+@end
+@interface NSObject (NSWindowBackingDelegate)
+- (void)windowDidChangeBackingProperties:(NSNotification *)notification;
+@end
+
 /* ---- Pasteboards (M7) ----------------------------------------------------------------
  * The general pasteboard is this system's clipboard for text (and, read
  * only, for files and images copied in other apps); everything else stays

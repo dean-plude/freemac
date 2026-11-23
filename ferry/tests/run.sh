@@ -25,6 +25,9 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_hidpi)
+            XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-hidpi DISPLAY= \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -127,6 +130,36 @@ if command -v weston > /dev/null 2>&1; then
     weston_pid=$!
     for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-test" ] && break; sleep 0.5; done
     run_one appkit_window "$here/appkit/window.m" "$here/appkit/window.out" -framework Cocoa
+    # The app's icon for the dock (M7): an app bundle with an icon, on the display
+    app="$build/IconApp.app"
+    rm -rf "$app" "$build/home_icon"; mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$build/home_icon"
+    cp "$here/appkit/NibApp.app/Contents/Resources/dot.png" "$app/Contents/Resources/"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+        '<key>CFBundleExecutable</key><string>IconApp</string>' \
+        '<key>CFBundleIdentifier</key><string>org.freemac.ferry.iconapp</string>' \
+        '<key>CFBundleName</key><string>Icon App</string>' \
+        '<key>CFBundleIconFile</key><string>dot.png</string>' '</dict></plist>' > "$app/Contents/Info.plist"
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/IconApp" "$here/appkit/icon.m" -framework Cocoa \
+            2> "$build/appkit_icon.cc.log"; then
+        HOME="$build/home_icon" XDG_DATA_HOME= XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
+            "$top/ferry" "$app/Contents/MacOS/IconApp" > "$build/appkit_icon.got" 2> "$build/appkit_icon.err"
+        echo "exit=$?" >> "$build/appkit_icon.got"
+        if diff -u "$here/appkit/icon.out" "$build/appkit_icon.got" > "$build/appkit_icon.diff"; then
+            echo "ok   appkit_icon"; pass=$((pass + 1))
+        else
+            echo "FAIL appkit_icon"; sed 's/^/    /' "$build/appkit_icon.diff"; sed 's/^/    stderr: /' "$build/appkit_icon.err"
+            fail=$((fail + 1))
+        fi
+    else
+        echo "FAIL appkit_icon (did not compile)"; sed 's/^/    /' "$build/appkit_icon.cc.log"
+        fail=$((fail + 1))
+    fi
+    kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
+    # and a screen at scale 2 (M7)
+    XDG_RUNTIME_DIR="$xdg" weston --backend=headless --socket=ferry-hidpi --scale=2 > "$build/weston-hidpi.log" 2>&1 &
+    weston_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-hidpi" ] && break; sleep 0.5; done
+    run_one appkit_hidpi "$here/appkit/hidpi.m" "$here/appkit/hidpi.out" -fobjc-arc -framework Cocoa
     kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
 else
     echo "skip appkit_window (needs weston, for a test display)"

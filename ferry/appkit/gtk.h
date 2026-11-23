@@ -127,6 +127,7 @@ enum { GTK_FILE_CHOOSER_ACTION_OPEN = 0, GTK_FILE_CHOOSER_ACTION_SAVE = 1,
 enum { GTK_RESPONSE_ACCEPT = -3, GTK_RESPONSE_CANCEL = -6 };
 enum { GDK_ACTION_DEFAULT = 1 << 0, GDK_ACTION_COPY = 1 << 1, GDK_ACTION_MOVE = 1 << 2, GDK_ACTION_LINK = 1 << 3,
        GDK_ACTION_PRIVATE = 1 << 4, GDK_ACTION_ASK = 1 << 5 };
+void gtk_window_set_default_icon(GdkPixbuf *icon);
 void *gdk_display_get_default_seat(GdkDisplay *display);
 GdkAtom gdk_atom_intern(const char *name, gboolean only_if_exists);
 char *gdk_atom_name(GdkAtom atom);

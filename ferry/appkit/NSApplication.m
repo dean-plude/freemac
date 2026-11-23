@@ -640,11 +640,115 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 }
 - (NSInteger)requestUserAttention:(NSInteger)type { return 0; }
 
+/* ---- the app's icon in the dock ---------------------------------------------------------
+ * A Wayland dock finds an app's icon through a desktop entry named after
+ * the app's id (the bundle identifier here), so an app bundle with an icon
+ * gets a hidden one in the user's own data folder, as other compatibility
+ * layers do, with the icon beside it; FERRY_NO_DESKTOP_ENTRY=1 turns that
+ * off. X11 window managers take the icon from the windows themselves. */
+
+static NSData *icon_png(NSImage *icon, CGFloat side)
+{
+    NSBitmapImageRep *rep = [[[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:(NSInteger)side
+        pixelsHigh:(NSInteger)side bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+        colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0] autorelease];
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:rep]];
+    [icon drawInRect:NSMakeRect(0, 0, side, side) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver
+            fraction:1];
+    [NSGraphicsContext restoreGraphicsState];
+    return [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+}
+
+static BOOL write_if_changed(NSString *path, NSData *data)
+{
+    if ([[NSData dataWithContentsOfFile:path] isEqualToData:data])
+        return YES;
+    [[NSFileManager defaultManager] createDirectoryAtPath:[path stringByDeletingLastPathComponent]
+                              withIntermediateDirectories:YES attributes:nil error:NULL];
+    return [data writeToFile:path atomically:YES];
+}
+
+/* The desktop entry format quotes arguments with double quotes, escaping
+ * ", `, $ and \ inside them with a backslash, itself escaped once more
+ * because the whole value is an escaped string; % is doubled. */
+static NSString *desktop_quoted(NSString *s)
+{
+    NSMutableString *q = [NSMutableString stringWithString:@"\""];
+    for (NSUInteger i = 0; i < [s length]; i++) {
+        unichar c = [s characterAtIndex:i];
+        if (c == '"' || c == '`' || c == '$' || c == '\\')
+            [q appendString:@"\\\\"];
+        if (c == '\n')
+            continue;
+        if (c == '%')
+            [q appendString:@"%"]; /* a field code otherwise */
+        [q appendFormat:@"%C", c];
+    }
+    [q appendString:@"\""];
+    return q;
+}
+
+static void register_app_icon(void)
+{
+    NSBundle *main = [NSBundle mainBundle];
+    NSString *ident = [main bundleIdentifier];
+    NSString *file = [main objectForInfoDictionaryKey:@"CFBundleIconFile"];
+    if (![ident length] || ![file isKindOfClass:[NSString class]] || ![file length])
+        return;
+    NSImage *icon = [NSApp applicationIconImage];
+    if (![icon isValid])
+        return;
+    NSData *png = icon_png(icon, 256);
+    if (!png)
+        return;
+    GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
+    if (loader) {
+        gdk_pixbuf_loader_write(loader, [png bytes], [png length], NULL);
+        gdk_pixbuf_loader_close(loader, NULL);
+        GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
+        if (pixbuf)
+            gtk_window_set_default_icon(pixbuf);
+        g_object_unref(loader);
+    }
+    const char *off = getenv("FERRY_NO_DESKTOP_ENTRY");
+    if (off && *off && strcmp(off, "0"))
+        return;
+    const char *data = getenv("XDG_DATA_HOME"), *home = getenv("HOME");
+    NSString *share = data && *data ? [NSString stringWithUTF8String:data]
+                      : home && *home ? [[NSString stringWithUTF8String:home] stringByAppendingPathComponent:@".local/share"]
+                                      : nil;
+    if (!share)
+        return;
+    NSString *iconPath = [share stringByAppendingFormat:@"/icons/hicolor/256x256/apps/%@.png", ident];
+    if (!write_if_changed(iconPath, png))
+        return;
+    NSString *name = [main objectForInfoDictionaryKey:@"CFBundleDisplayName"]
+                         ?: [main objectForInfoDictionaryKey:@"CFBundleName"]
+                         ?: [[[main bundlePath] lastPathComponent] stringByDeletingPathExtension];
+    NSString *entry = [NSString stringWithFormat:@"[Desktop Entry]\n"
+                                                  "Type=Application\n"
+                                                  "Name=%@\n"
+                                                  "Comment=A Mac app, run by Ferry\n"
+                                                  "Exec=ferry %@\n"
+                                                  "Icon=%@\n"
+                                                  "StartupWMClass=%@\n"
+                                                  "NoDisplay=true\n"
+                                                  "X-Ferry-Bundle=%@\n",
+                                                  [[name componentsSeparatedByString:@"\n"] componentsJoinedByString:@" "],
+                                                  desktop_quoted([main executablePath]), ident, ident,
+                                                  [main bundlePath]];
+    write_if_changed([share stringByAppendingFormat:@"/applications/%@.desktop", ident],
+                     [entry dataUsingEncoding:NSUTF8StringEncoding]);
+}
+
 - (void)finishLaunching
 {
     if (_launched)
         return;
     _launched = YES;
+    if (ADisplayAvailable())
+        register_app_icon();
     [self _post:NSApplicationWillFinishLaunchingNotification selector:@selector(applicationWillFinishLaunching:)];
     [self activateIgnoringOtherApps:YES];
     [self _post:NSApplicationDidFinishLaunchingNotification selector:@selector(applicationDidFinishLaunching:)];

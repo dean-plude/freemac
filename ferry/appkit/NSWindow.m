@@ -10,6 +10,9 @@
 
 NSNotificationName const NSWindowWillCloseNotification = @"NSWindowWillCloseNotification";
 NSNotificationName const NSWindowDidResizeNotification = @"NSWindowDidResizeNotification";
+NSNotificationName const NSWindowDidChangeBackingPropertiesNotification = @"NSWindowDidChangeBackingPropertiesNotification";
+NSString *const NSBackingPropertyOldScaleFactorKey = @"NSBackingPropertyOldScaleFactorKey";
+NSString *const NSBackingPropertyOldColorSpaceKey = @"NSBackingPropertyOldColorSpaceKey";
 NSNotificationName const NSWindowDidMoveNotification = @"NSWindowDidMoveNotification";
 NSNotificationName const NSWindowDidBecomeKeyNotification = @"NSWindowDidBecomeKeyNotification";
 NSNotificationName const NSWindowDidResignKeyNotification = @"NSWindowDidResignKeyNotification";
@@ -65,6 +68,39 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 /* Drag and drop (NSDragging.m): the window's own types, whose drops go to
  * its delegate, and the GTK drop target, set up once anything in the
  * window takes drops. */
+/* Backing coordinates: points times the scale, the window's pixels. */
+- (NSRect)convertRectToBacking:(NSRect)r
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakeRect(r.origin.x * s, r.origin.y * s, r.size.width * s, r.size.height * s);
+}
+- (NSRect)convertRectFromBacking:(NSRect)r
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakeRect(r.origin.x / s, r.origin.y / s, r.size.width / s, r.size.height / s);
+}
+- (NSPoint)convertPointToBacking:(NSPoint)p
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakePoint(p.x * s, p.y * s);
+}
+- (NSPoint)convertPointFromBacking:(NSPoint)p
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakePoint(p.x / s, p.y / s);
+}
+/* Out to whole pixels (or in, or to the nearest, as the options say). */
+- (NSRect)backingAlignedRect:(NSRect)r options:(NSAlignmentOptions)options
+{
+    NSRect b = [self convertRectToBacking:r];
+    CGFloat x0 = NSMinX(b), y0 = NSMinY(b), x1 = NSMaxX(b), y1 = NSMaxY(b);
+    x0 = options & NSAlignMinXInward ? ceil(x0) : options & NSAlignMinXNearest ? round(x0) : floor(x0);
+    y0 = options & NSAlignMinYInward ? ceil(y0) : options & NSAlignMinYNearest ? round(y0) : floor(y0);
+    x1 = options & NSAlignMaxXInward ? floor(x1) : options & NSAlignMaxXNearest ? round(x1) : ceil(x1);
+    y1 = options & NSAlignMaxYInward ? floor(y1) : options & NSAlignMaxYNearest ? round(y1) : ceil(y1);
+    return [self convertRectFromBacking:NSMakeRect(x0, y0, x1 - x0, y1 - y0)];
+}
+
 - (void)registerForDraggedTypes:(NSArray *)types
 {
     [_draggedTypes release];
@@ -407,7 +443,18 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
         cairo_surface_destroy(_backing);
     _backingW = w;
     _backingH = h;
+    CGFloat old = _scale;
     _scale = scale;
+    if (old > 0 && old != scale) {
+        /* moved to a screen of another scale (or the screen's scale changed) */
+        [_contentView _backingPropertiesChanged];
+        NSNotification *n = [NSNotification notificationWithName:NSWindowDidChangeBackingPropertiesNotification
+                                                          object:self
+                                                        userInfo:@{NSBackingPropertyOldScaleFactorKey : @(old)}];
+        if ([_delegate respondsToSelector:@selector(windowDidChangeBackingProperties:)])
+            [_delegate windowDidChangeBackingProperties:n];
+        [[NSNotificationCenter defaultCenter] postNotification:n];
+    }
     _backing = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)(w * scale), (int)(h * scale));
     cairo_surface_set_device_scale(_backing, scale, scale);
     _ctx = GContextCreateWithSurface(_backing, h);
