@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import default_apps, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -168,6 +168,7 @@ CSS = b"""
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
+.storage-key, .storage-key flowboxchild { background: none; padding: 0; }
 /* Sound > Input level: a row of round lights, as on a Mac. */
 levelbar.input-level trough { border: none; background: none; box-shadow: none; padding: 0; }
 levelbar.input-level block { min-width: 9px; min-height: 9px; border-radius: 5px; margin: 0 2px;
@@ -349,6 +350,8 @@ class DialsWindow(Gtk.ApplicationWindow):
             (1, "focus", "Focus", "freemac-focus-dnd-symbolic", "indigo", lambda: dials_more.focus(self)),
             (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
             (2, "about", "About", "help-about-symbolic", "gray", self.about),
+            (2, "storage", "Storage", "drive-harddisk-symbolic", "gray",
+             lambda: dials_storage.storage_page(self)),
             (2, "softwareupdate", "Software Update", "freemac-software-update-symbolic", "gray",
              lambda: dials_update.software_update_page(self)),
             (2, "datetime", "Date & Time", "preferences-system-time-symbolic", "blue",
@@ -999,10 +1002,15 @@ class DialsWindow(Gtk.ApplicationWindow):
             pass
         name = Gtk.Label(label=release.get("PRETTY_NAME", "freemac"))
         name.get_style_context().add_class("dials-title")
+        storage_info = Gtk.Box(spacing=10)
+        storage_info.pack_start(Gtk.Label(label=f"{free:.1f} GB free of {total:.1f} GB"), False, False, 0)
+        more = Gtk.Button(label="Storage Settings…")
+        more.connect("clicked", lambda *_: self.show_panel("storage"))
+        storage_info.pack_start(more, False, False, 0)
         return page("About", mark, name, group(
             row("Processor", Gtk.Label(label=cpu or "Unknown", ellipsize=3, max_width_chars=40)),
             row("Memory", Gtk.Label(label=memory or "Unknown")),
-            row("Storage", Gtk.Label(label=f"{free:.1f} GB free of {total:.1f} GB")),
+            row("Storage", storage_info),
             row("Kernel", Gtk.Label(label=platform.release())),
             row("Licence", Gtk.Label(label="GPL-3.0-or-later")),
         ))
