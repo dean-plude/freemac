@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.123 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.124 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -27,6 +27,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td><td width="50%"><img src="docs/screenshots/reel-pip.png" alt="Picture in Picture: a Reel video floating above Tide in the corner"><br><sub>Picture in Picture: a Reel video floating above Tide</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/dynamic-wallpaper.png" alt="Dynamic wallpaper: Tide turning golden at sunset, with the Dynamic switch in Dials"><br><sub>Dynamic wallpaper: the picture turns golden at sunset</sub></td><td width="50%"><img src="docs/screenshots/stage-manager.png" alt="Stage Manager: Crew in the middle, with Quill, Tide and Nudge as small pictures down the left"><br><sub>Stage Manager: one app in front, the others down the side</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control on Desktop 3, holding a Drawer window, with the row of desktops opened out along the top: the button to close Desktop 3 on its corner and + at the right end"><br><sub>Mission Control: add a desktop with +, close one from its corner, drag windows onto them</sub></td><td width="50%"><img src="docs/screenshots/passwords.png" alt="Purser, the Passwords app, showing a saved login with its six-digit verification code and a warning that its password is used on another website"><br><sub>Purser keeps website and Wi-Fi passwords and verification codes, and warns about reused passwords</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/live-text.png" alt="Frame showing a school trip form with Live Text on: the picture dimmed, every line of text lit up, and two lines selected for copying"><br><sub>Live Text in Frame: select and copy the words in a picture</sub></td><td width="50%"></td></tr>
 </table>
 
 ## Download
@@ -86,7 +87,7 @@ one of them will be reverted.
 | Force Quit window on ⌥⌘⎋ for an app that has stopped answering | **Force Quit**, Strata | 1.9 |
 | Alerts in a small panel with the app's icon on top and equal buttons, used by every freemac app | alert.py, theme | 1.10 |
 | Text editor | **Quill** | 0.5; 1.13: stays open with no window; ⌘Q asks about unsaved changes, then quits; 1.15: a small Save sheet (name and where) that opens out to the full browser |
-| Picture and PDF viewer | **Frame** | 0.5; 1.21: opens PDFs, page by page, and is the default for them; 1.22: Markup (⇧⌘A): draw, boxes, text and a signature drawn once on a pad, saved as a copy beside the original; 1.25: Share |
+| Picture and PDF viewer | **Frame** | 0.5; 1.21: opens PDFs, page by page, and is the default for them; 1.22: Markup (⇧⌘A): draw, boxes, text and a signature drawn once on a pad, saved as a copy beside the original; 1.25: Share; 1.124: Live Text, select and copy the words in a picture |
 | Calendar with day, week and month views, events that repeat, kept as a standard .ics file | **Tide** | 1.22; 1.23: notices before events, Crew's birthdays; 1.24: online calendars; 1.25: a colour for each calendar and a Calendars list to show or hide each one, with a month to jump from |
 | Contacts, kept as one standard .vcf card per person | **Crew** | 1.22; 1.24: online address books |
 | Reminders in coloured lists, with due dates, flags and a notice when one is due | **Nudge** | 1.23; 1.24: online reminder lists |
@@ -102,6 +103,7 @@ one of them will be reverted.
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
 | Screen reader: Command+F5 (or Dials > Accessibility) speaks what's on the screen, the control you move to and what you type, and comes back at the next login | **Dials**, **Strata**, Orca | 1.120 |
+| Live Text: Frame finds the words in a picture or a scanned PDF, so you can select and copy them (⌘C), or light up all of them with the Live Text button | **Frame**, Tesseract | 1.124 |
 | Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |
 | Known Wi-Fi networks in Dials > Network: show or copy a saved password after an administrator's password, a QR code a phone scans to join, join automatically, forget | **Dials** | 1.121 |

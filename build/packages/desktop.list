@@ -173,3 +173,6 @@ gir1.2-secret-1
 # (python3-pil, only suggested by the package) to read the picture.
 python3-pyzbar
 python3-pil
+# Live Text in Frame: Tesseract finds the words in a picture or a PDF page
+# (tesseract-ocr brings its English data, tesseract-ocr-eng).
+tesseract-ocr

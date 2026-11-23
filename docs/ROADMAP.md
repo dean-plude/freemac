@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.124 "live text" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Live Text, as on a Mac: Frame finds the words in a picture or PDF page by itself; drag across them to select, ⌘C to copy, ⌘A for all, a double click for a word and three for a line, with the text pointer over words | Frame (livetext.py), Tesseract | done |
+| 2 | A Live Text button over the picture lights up all its text; right-click for Copy, Select All and Copy All Text, also in the Edit menu | Frame | done |
+| 3 | Copied text keeps its lines and paragraphs; nothing is written to disk to read it | livetext.py | done |
+| 4 | Guide topic; README row and screenshot; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.123 "codes" (done)
 
 | # | Item | Component | Status |
