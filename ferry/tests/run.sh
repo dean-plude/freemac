@@ -39,6 +39,7 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -61,6 +62,7 @@ for t in hello files; do
 done
 # The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
 run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
+run_one twins "$here/twins.c" "$here/twins.out" "$here/tools/libz.tbd" "$here/tools/libbz2.tbd"
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).

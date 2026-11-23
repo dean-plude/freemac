@@ -47,6 +47,8 @@ extern const struct ferry_symbol ferry_objc_symbols[];     /* libobjc.A.dylib */
 #define FERRY_HOST_LIBRARY "/usr/lib/ferry/libFerryHost.dylib"
 extern const char *const ferry_host_names[];
 void *ferry_host_lookup(const char *name);
+int ferry_twin_library(const char *install_name);   /* zlib and the like: this system's copy */
+void *ferry_twin_lookup(const char *name);
 
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);

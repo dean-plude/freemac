@@ -1,0 +1,9 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ x86_64-macos ]
+install-name:    '/usr/lib/libz.1.dylib'
+current-version: 1.2.12
+exports:
+  - targets:     [ x86_64-macos ]
+    symbols:     [ _compress, _uncompress, _crc32, _zlibVersion, _deflateInit_, _deflate, _deflateEnd ]
+...
