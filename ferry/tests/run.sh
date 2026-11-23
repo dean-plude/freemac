@@ -25,6 +25,9 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_hidpi)
+            XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-hidpi DISPLAY= \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -87,6 +90,14 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
     -framework CoreFoundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
+# Exceptions a program catches (M7), unwound through frame-pointer and
+# frameless functions, and through Foundation's frames.
+run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \
+    -framework Foundation
+run_one foundation_trycatch_frameless "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -O2 \
+    -fomit-frame-pointer -fobjc-arc -framework Foundation
+run_one foundation_trycatch_mrc "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -O0 \
+    -framework Foundation -Wl,-fixup_chains
 # Linked against a system framework Ferry doesn't have (only its .tbd exists).
 run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missing.out" -framework Foundation \
     -F"$here/foundation" -framework Imaginary
@@ -119,9 +130,39 @@ if command -v weston > /dev/null 2>&1; then
     weston_pid=$!
     for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-test" ] && break; sleep 0.5; done
     run_one appkit_window "$here/appkit/window.m" "$here/appkit/window.out" -framework Cocoa
+    # The app's icon for the dock (M7): an app bundle with an icon, on the display
+    app="$build/IconApp.app"
+    rm -rf "$app" "$build/home_icon"; mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$build/home_icon"
+    cp "$here/appkit/NibApp.app/Contents/Resources/dot.png" "$app/Contents/Resources/"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+        '<key>CFBundleExecutable</key><string>IconApp</string>' \
+        '<key>CFBundleIdentifier</key><string>org.freemac.ferry.iconapp</string>' \
+        '<key>CFBundleName</key><string>Icon App</string>' \
+        '<key>CFBundleIconFile</key><string>dot.png</string>' '</dict></plist>' > "$app/Contents/Info.plist"
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/IconApp" "$here/appkit/icon.m" -framework Cocoa \
+            2> "$build/appkit_icon.cc.log"; then
+        HOME="$build/home_icon" XDG_DATA_HOME= XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
+            "$top/ferry" "$app/Contents/MacOS/IconApp" > "$build/appkit_icon.got" 2> "$build/appkit_icon.err"
+        echo "exit=$?" >> "$build/appkit_icon.got"
+        if diff -u "$here/appkit/icon.out" "$build/appkit_icon.got" > "$build/appkit_icon.diff"; then
+            echo "ok   appkit_icon"; pass=$((pass + 1))
+        else
+            echo "FAIL appkit_icon"; sed 's/^/    /' "$build/appkit_icon.diff"; sed 's/^/    stderr: /' "$build/appkit_icon.err"
+            fail=$((fail + 1))
+        fi
+    else
+        echo "FAIL appkit_icon (did not compile)"; sed 's/^/    /' "$build/appkit_icon.cc.log"
+        fail=$((fail + 1))
+    fi
+    kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
+    # and a screen at scale 2 (M7)
+    XDG_RUNTIME_DIR="$xdg" weston --backend=headless --socket=ferry-hidpi --scale=2 > "$build/weston-hidpi.log" 2>&1 &
+    weston_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-hidpi" ] && break; sleep 0.5; done
+    run_one appkit_hidpi "$here/appkit/hidpi.m" "$here/appkit/hidpi.out" -fobjc-arc -framework Cocoa
     kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
 else
-    echo "skip appkit_window (needs weston, for a test display)"
+    echo "skip appkit_window, appkit_icon, appkit_hidpi (need weston, for a test display)"
 fi
 # Cairo is loaded only by programs that draw, and GTK only by AppKit's
 # (glibc's LD_DEBUG lists each library loaded).
@@ -158,6 +199,14 @@ else
 fi
 # Key paths, value transformers and bindings (M6).
 run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
+# An exception left uncaught in the event loop is reported, not fatal (M7).
+run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
+# Pasteboards, and cut, copy and paste in text fields (M7).
+run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
+# Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).
+run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
+# Drag and drop into a window: the steps GTK's drop signals take (M7).
+run_one appkit_dragging "$here/appkit/dragging.m" "$here/appkit/dragging.out" -fobjc-arc -framework Cocoa
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.
@@ -181,11 +230,56 @@ else
     echo "FAIL appkit_nib (did not compile)"; sed 's/^/    /' "$build/appkit_nib.cc.log"
     fail=$((fail + 1))
 fi
+# Window and view controllers loading their own nibs (M7), from a copy
+# of NibApp.app.
+app="$build/ControllerApp.app"
+rm -rf "$app"; cp -r "$here/appkit/NibApp.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/NibApp" "$here/appkit/controllers.m" -framework Cocoa \
+        2> "$build/appkit_controllers.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$app/Contents/MacOS/NibApp" \
+        > "$build/appkit_controllers.got" 2> "$build/appkit_controllers.err"
+    echo "exit=$?" >> "$build/appkit_controllers.got"
+    if diff -u "$here/appkit/controllers.out" "$build/appkit_controllers.got" > "$build/appkit_controllers.diff"; then
+        echo "ok   appkit_controllers"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_controllers"; sed 's/^/    /' "$build/appkit_controllers.diff"
+        sed 's/^/    stderr: /' "$build/appkit_controllers.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_controllers (did not compile)"; sed 's/^/    /' "$build/appkit_controllers.cc.log"
+    fail=$((fail + 1))
+fi
+# Images (M7), in an app bundle the test writes its image files into: it
+# runs from there, so imageNamed: finds them. No image files are kept here.
+app="$build/ImageApp.app"
+rm -rf "$app"; mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/ImageApp" "$here/appkit/image.m" -framework Cocoa \
+        -framework ImageIO 2> "$build/appkit_image.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$app/Contents/MacOS/ImageApp" \
+        > "$build/appkit_image.got" 2> "$build/appkit_image.err"
+    echo "exit=$?" >> "$build/appkit_image.got"
+    if diff -u "$here/appkit/image.out" "$build/appkit_image.got" > "$build/appkit_image.diff"; then
+        echo "ok   appkit_image"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_image"; sed 's/^/    /' "$build/appkit_image.diff"; sed 's/^/    stderr: /' "$build/appkit_image.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_image (did not compile)"; sed 's/^/    /' "$build/appkit_image.cc.log"
+    fail=$((fail + 1))
+fi
 # An exception nobody catches ends the program with the Mac's message.
 if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$build/foundation_exception.err" 2>/dev/null; then
     echo "ok   foundation_exception message"; pass=$((pass + 1))
 else
     echo "FAIL foundation_exception message"; fail=$((fail + 1))
+fi
+if grep -q "raised NSInternalInconsistencyException (timer 2 went wrong) and didn't catch it" \
+        "$build/appkit_report.err" 2>/dev/null; then
+    echo "ok   appkit_report message"; pass=$((pass + 1))
+else
+    echo "FAIL appkit_report message"; sed 's/^/    stderr: /' "$build/appkit_report.err"; fail=$((fail + 1))
 fi
 # The missing framework, class and function are each named.
 if grep -q "uses Imaginary, which Ferry doesn't provide yet; carrying on" "$build/foundation_missing.err" 2>/dev/null &&

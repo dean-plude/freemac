@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Writes the link stub for a Mac framework that one of Ferry's own framework
-# files serves (CoreText and ApplicationServices live in CoreGraphics' file,
+# files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
 # Cocoa in AppKit's): the calls the files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
@@ -22,6 +22,7 @@ version=A
 case $framework in
     CoreText) pattern='^_(CT|kCT)' ;;
     ApplicationServices) pattern='^_(CG|kCG|CT|kCT)' ;;
+    ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
     Cocoa) pattern='.' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

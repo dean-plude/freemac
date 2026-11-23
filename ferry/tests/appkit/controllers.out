@@ -1,0 +1,21 @@
+nib name Controlled, loaded before asking: no
+windowWillLoad (loaded: no)
+windowDidLoad: "Controlled", status says "Not pressed"
+loaded after asking: yes; the window's controller is it: yes
+window nextResponder is the controller: yes
+after two clicks: Pressed 2
+showWindow: visible yes
+sendAction to nil from the window's view: sent, Pressed 3
+after close: visible no
+nibName ListViewController, view loaded: no
+viewDidLoad: label says "From the view nib"
+view 200x80, loaded: yes, viewDidLoad ran: yes
+view -> controller: yes; controller -> superview: yes
+label -> view: yes
+window for a view controller: "Made in code", content 320x180, contentViewController is it: yes
+its content view is the controller's view: yes
+viewDidLoad: label says "From the view nib"
+window controller's contentViewController: yes, window shows its view: yes
+children 1, parent is vc: yes
+after removing: children 0
+exit=0

@@ -3,6 +3,7 @@
 #define FERRY_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* One function or variable a Mac program can import. Names are written the
  * way C code spells them, without the leading underscore Mach-O adds. */
@@ -20,6 +21,16 @@ int ferry_run(const char *path, int argc, char **argv, char **envp);
 int ferry_library_supported(const char *install_name);
 void *ferry_lookup(const char *name);
 void *ferry_missing_stub(const char *raw_name);
+
+/* Where a loaded image's unwind tables are, for the exception unwinder. */
+struct ferry_unwind_sections {
+    const char *path;
+    uint64_t base;                  /* the image's Mach-O header */
+    const uint8_t *unwind_info, *eh_frame;
+    size_t unwind_size, eh_size;
+};
+int ferry_find_unwind(uint64_t pc, struct ferry_unwind_sections *out);
+extern const struct ferry_ehtype { const void *vtable; const char *name; void *cls; } ferry_ehtype_missing;
 void ferry_seal_stubs(void);
 void ferry_program_started(const char *path, int argc, char **argv);
 

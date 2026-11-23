@@ -20,7 +20,7 @@ Architecture: amd64
 Maintainer: freemac project <noreply@freemac.invalid>
 Installed-Size: $size
 Depends: libc6
-Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0
+Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0, libgdk-pixbuf-2.0-0, libpoppler-glib8
 Suggests: clang, lld
 Section: otherosfs
 Priority: optional

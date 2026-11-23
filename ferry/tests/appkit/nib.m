@@ -51,6 +51,7 @@ static const char *yes(BOOL b) { return b ? "yes" : "no"; }
 @property (strong) NSPanel *panel;
 @property (strong) NSTextField *note;
 @property (strong) Helper *helper;
+@property (strong) NSImageView *badge;
 @end
 @implementation PanelController
 - (void)awakeFromNib { printf("PanelController awakeFromNib\n"); }
@@ -177,6 +178,12 @@ static NSEvent *key(NSString *chars)
            object_getClassName(pc2.panel), str(pc2.panel.title), NSStringFromSize(pc2.panel.contentView.frame.size).UTF8String,
            str(pc2.note.stringValue), NSStringFromRect(pc2.note.frame).UTF8String, yes(pc2.helper != nil),
            yes(pc2.helper.owner == pc2));
+    for (PanelController *c in @[ pc, pc2 ]) { /* the image view's image, found by name in the bundle (M7) */
+        NSImage *im = c.badge.image;
+        printf("badge: %s, image \"%s\" %s, scaling %lu, same image %s\n", object_getClassName(c.badge),
+               str(im.name), NSStringFromSize(im.size).UTF8String, (unsigned long)c.badge.imageScaling,
+               yes(im == [NSImage imageNamed:@"dot"]));
+    }
 
     printf("cmd-q:\n");
     fflush(stdout);

@@ -1,0 +1,5 @@
+timer 1
+timer 2
+timer 3
+run returned after 3 timers
+exit=0

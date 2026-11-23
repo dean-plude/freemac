@@ -185,12 +185,34 @@ static void hsb_to_rgb(CGFloat h, CGFloat s, CGFloat v, CGFloat *r, CGFloat *g, 
 + (NSColor *)colorWithCalibratedWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
-/* Ferry has no NSImage yet, so a pattern colour is a plain light grey. */
-+ (NSColor *)colorWithPatternImage:(id)image
+/* Ferry doesn't fill with patterns yet: a pattern colour fills with the
+ * image's average colour, and keeps the image for patternImage. */
+static char pattern_key;
++ (NSColor *)colorWithPatternImage:(NSImage *)image
 {
-    AWarnOnce("pattern colours (colorWithPatternImage: gives plain grey)");
-    return make_color(0.9, 0.9, 0.9, 1, NO);
+    AWarnOnce("filling with a pattern colour (the image's average colour is used instead)");
+    CGFloat rgba[4] = {0.9, 0.9, 0.9, 1};
+    CGImageRef cg = [image CGImageForProposedRect:NULL context:nil hints:nil];
+    if (cg) {
+        /* averaged by drawing the image into one pixel */
+        unsigned char px[4] = {0};
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+        CGContextRef c = CGBitmapContextCreate(px, 1, 1, 8, 4, space, kCGImageAlphaPremultipliedLast);
+        CGColorSpaceRelease(space);
+        CGContextSetInterpolationQuality(c, kCGInterpolationHigh);
+        CGContextDrawImage(c, CGRectMake(0, 0, 1, 1), cg);
+        CGContextRelease(c);
+        if (px[3])
+            for (int i = 0; i < 3; i++)
+                rgba[i] = px[i] / (CGFloat)px[3];
+        rgba[3] = px[3] / 255.0;
+    }
+    NSColor *color = make_color(rgba[0], rgba[1], rgba[2], rgba[3], NO);
+    if (image)
+        objc_setAssociatedObject(color, &pattern_key, image, OBJC_ASSOCIATION_RETAIN);
+    return color;
 }
+- (NSImage *)patternImage { return objc_getAssociatedObject(self, &pattern_key); }
 + (NSColor *)colorWithHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)v alpha:(CGFloat)a
 {
     CGFloat r, g, b;
@@ -1072,6 +1094,8 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
 @implementation NSBitmapImageRep {
     unsigned char *_data;
     BOOL _owns;
+    BOOL _exposed; /* bitmapData was handed out, so the pixels may change at any time */
+    BOOL _stale;   /* _image is out of date */
     NSInteger _bpr, _spp;
     CGImageRef _image;
 }
@@ -1121,7 +1145,37 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
     CGColorSpaceRelease(space);
     CGContextDrawImage(cg, CGRectMake(0, 0, w, h), image);
     CGContextRelease(cg);
+    /* drawn as itself until the pixels change */
+    _image = CGImageRetain(image);
+    CGImageAlphaInfo a = CGImageGetAlphaInfo(image);
+    _alpha = a != kCGImageAlphaNone && a != kCGImageAlphaNoneSkipFirst && a != kCGImageAlphaNoneSkipLast;
     return self;
+}
+
+- (instancetype)initWithData:(NSData *)data
+{
+    CGImageSourceRef src = data ? CGImageSourceCreateWithData((CFDataRef)data, NULL) : NULL;
+    CGImageRef image = src ? CGImageSourceCreateImageAtIndex(src, 0, NULL) : NULL;
+    if (src)
+        CFRelease(src);
+    if (!image) {
+        [self release];
+        return nil;
+    }
+    self = [self initWithCGImage:image];
+    CGImageRelease(image);
+    return self;
+}
++ (instancetype)imageRepWithData:(NSData *)data { return [[[self alloc] initWithData:data] autorelease]; }
+
+- (BOOL)drawInRect:(NSRect)rect
+{
+    CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
+    CGImageRef image = cg ? [self CGImage] : NULL;
+    if (!image)
+        return NO;
+    CGContextDrawImage(cg, rect, image);
+    return YES;
 }
 
 - (void)dealloc
@@ -1132,7 +1186,11 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
     [super dealloc];
 }
 
-- (unsigned char *)bitmapData { return _data; }
+- (unsigned char *)bitmapData
+{
+    _exposed = YES;
+    return _data;
+}
 - (NSInteger)bytesPerRow { return _bpr; }
 - (NSInteger)samplesPerPixel { return _spp; }
 - (NSInteger)bitsPerPixel { return 32; }
@@ -1140,6 +1198,9 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
 
 - (CGImageRef)CGImage
 {
+    if (_image && !_exposed && !_stale)
+        return _image;
+    _stale = NO;
     CGImageRelease(_image);
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
     CGContextRef cg = CGBitmapContextCreate(_data, _wide, _high, 8, _bpr, space,
@@ -1170,6 +1231,7 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
     AColorRGBA(color, c);
     unsigned char *p = _data + y * _bpr + x * 4;
     CGFloat a = _alpha ? c[3] : 1;
+    _stale = YES;
     for (int i = 0; i < 3; i++)
         p[i] = (unsigned char)lround(c[i] * a * 255);
     p[3] = (unsigned char)lround(a * 255);
@@ -1181,10 +1243,58 @@ static cairo_status_t append_png(void *closure, const unsigned char *data, unsig
     return 0;
 }
 
+/* TIFF, JPEG and BMP files are written by this system's GdkPixbuf, from
+ * the pixels un-premultiplied; PNG files by Cairo. */
+- (NSData *)_pixbufFileOfType:(const char *)type quality:(NSNumber *)quality
+{
+    size_t bpr = (size_t)_wide * 4;
+    unsigned char *plain = malloc(bpr * (_high ? _high : 1));
+    for (NSInteger y = 0; y < _high; y++) {
+        const unsigned char *p = _data + y * _bpr;
+        unsigned char *q = plain + y * bpr;
+        for (NSInteger x = 0; x < _wide; x++, p += 4, q += 4) {
+            unsigned a = _alpha ? p[3] : 255;
+            for (int i = 0; i < 3; i++)
+                q[i] = a ? (unsigned char)(a == 255 ? p[i] : (p[i] * 255 + a / 2) / a) : 0;
+            q[3] = (unsigned char)a;
+        }
+    }
+    BOOL alpha = _alpha && strcmp(type, "jpeg") && strcmp(type, "bmp");
+    if (!alpha) /* packed to RGB */
+        for (NSInteger i = 0; i < _wide * _high; i++)
+            memmove(plain + i * 3, plain + i * 4, 3);
+    GdkPixbuf *pb = gdk_pixbuf_new_from_data(plain, 0, alpha, 8, (int)_wide, (int)_high,
+                                             (int)(alpha ? bpr : (size_t)_wide * 3), NULL, NULL);
+    char *buffer = NULL;
+    unsigned long size = 0;
+    GError *error = NULL;
+    char q[8];
+    char *keys[2] = {"quality", NULL}, *values[2] = {q, NULL};
+    snprintf(q, sizeof q, "%d", quality ? (int)lround(fmin(fmax([quality doubleValue], 0), 1) * 100) : 90);
+    BOOL ok = pb && gdk_pixbuf_save_to_bufferv(pb, &buffer, &size, type, !strcmp(type, "jpeg") ? keys : NULL,
+                                               !strcmp(type, "jpeg") ? values : NULL, &error);
+    if (error)
+        g_error_free(error);
+    NSData *out = ok ? [NSData dataWithBytes:buffer length:size] : nil;
+    g_free(buffer);
+    if (pb)
+        g_object_unref(pb);
+    free(plain);
+    return out;
+}
+
+- (NSData *)TIFFRepresentation { return [self representationUsingType:NSBitmapImageFileTypeTIFF properties:@{}]; }
+
 - (NSData *)representationUsingType:(NSBitmapImageFileType)type properties:(NSDictionary *)properties
 {
+    if (type == NSBitmapImageFileTypeTIFF)
+        return [self _pixbufFileOfType:"tiff" quality:nil];
+    if (type == NSBitmapImageFileTypeJPEG)
+        return [self _pixbufFileOfType:"jpeg" quality:properties[NSImageCompressionFactor]];
+    if (type == NSBitmapImageFileTypeBMP)
+        return [self _pixbufFileOfType:"bmp" quality:nil];
     if (type != NSBitmapImageFileTypePNG) {
-        AWarnOnce("NSBitmapImageRep files other than PNG");
+        AWarnOnce("writing GIF files");
         return nil;
     }
     cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)_wide, (int)_high);

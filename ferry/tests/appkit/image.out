@@ -1,0 +1,41 @@
+lockFocus: NSBitmapImageRep 4x4 valid 1
+top row (0,0): 1.0 0.0 0.0 1.0
+bottom row (0,3): 0.0 0.0 1.0 1.0
+png: written, 4x4, top red, bottom blue
+jpg: written, 4x4, top red, bottom blue
+tiff: written, 4x4, top red, bottom blue
+bmp: written, 4x4, top red, bottom blue
+garbage: image 0 rep 0
+logo: 4x4
+logo: name logo, reps 2, same again 1, by file name 1
+  rep 4x4 pixels, size 4x4
+  rep 8x8 pixels, size 4x4
+missing: 0
+scaled top (4,1): 1.0 0.0 0.0 1.0
+scaled bottom (4,6): 0.0 0.0 1.0 1.0
+part top (4,1): 0.0 0.0 1.0 1.0
+flipped context, upright top (4,1): 1.0 0.0 0.0 1.0
+half strength (3,3): 1.0 0.0 0.0 0.5
+outside (0,0): 0.0 0.0 0.0 0.0
+pdf: NSPDFImageRep pages 1
+pdf size: 20x10
+pdf top-left (5,3): 1.0 0.0 0.0 1.0
+pdf bottom-left (5,15): 0.0 0.0 0.0 0.0
+pdf right (30,10): 0.0 1.0 0.0 1.0
+pdf as CGImage: 20x10
+add template: template 1, name NSAddTemplate
+add template: 14x14
+app icon: 1, caution: 1
+tinted plus centre (7,7): 1.0 0.0 0.0 1.0
+tinted plus corner (0,0): 0.0 0.0 0.0 0.0
+image view left (2,2): 1.0 0.0 0.0 1.0
+image view right (15,5): 0.0 0.0 0.0 0.0
+image view intrinsic: 4x4
+image button: position 1
+image button: 32x32
+titled image button: position 7, wider 1
+image source: 1 image(s), public.jpeg
+properties: 4 x 4
+image: 4x4
+pattern: image kept 1, average 0.0 1.0 0.0
+exit=0

@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <objc/message.h>
 #include "gtk.h"
+#include <ImageIO/ImageIO.h>
 
 #define A_EXPORT __attribute__((visibility("default")))
 
@@ -35,6 +36,16 @@ BOOL ADisplayAvailable(void);
 NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
 void AWarnOnce(const char *what);
+
+/* Code GTK calls back into (drawing, resizing, closing, focus, drops) runs
+ * the app's code under GTK's own frames, which Ferry can't unwind through,
+ * so an exception is caught here and reported, as the event loop does. */
+#define A_REPORTING(...)                                                                                        \
+    @try {                                                                                                      \
+        __VA_ARGS__                                                                                             \
+    } @catch (NSException * x_) {                                                                               \
+        [NSApp reportException:x_];                                                                             \
+    }
 
 /* ---- events -------------------------------------------------------------------------- */
 
@@ -61,6 +72,7 @@ NSArray *AAllWindows(void);
 void AWindowDidClose(NSWindow *window);
 
 @interface NSView (FerryPrivate)
+- (void)_backingPropertiesChanged;
 - (void)_setWindow:(NSWindow *)window;
 - (CGAffineTransform)_transformToSuperview;
 - (CGAffineTransform)_transformToWindow;
@@ -68,7 +80,16 @@ void AWindowDidClose(NSWindow *window);
 - (BOOL)_needsDisplayAnywhere;
 @end
 
+/* Drag and drop (NSDragging.m): makes a window's GTK drawing area a drop
+ * target, and the steps of a drop, which GTK's signals call (and tests). */
+void ADragAttach(NSWindow *window, GtkWidget *area);
+
 @interface NSWindow (FerryPrivate)
+- (void)_enableDrops;
+- (NSArray *)_registeredDraggedTypes;
+- (NSDragOperation)_dragUpdateAt:(NSPoint)point pasteboard:(NSPasteboard *)pb operations:(NSDragOperation)mask;
+- (void)_dragExit;
+- (BOOL)_dragDropAt:(NSPoint)point pasteboard:(NSPasteboard *)pb operations:(NSDragOperation)mask;
 - (void)_noteNeedsDisplay;
 - (BOOL)_wantsMouseMoved;
 - (NSSize)_contentSize;
@@ -97,9 +118,21 @@ void AWindowDidClose(NSWindow *window);
 @end
 NSRect AViewFrameFromCoder(NSCoder *coder);
 void AViewDecode(NSView *view, NSCoder *coder);
-/* Image references in nibs, kept by name until Ferry has NSImage. */
+/* The name of an image, or of a nib's stand-in for one (NSSwitch...). */
 @interface NSObject (FerryNibImage)
 - (NSString *)_imageName;
+@end
+@interface NSWindow (FerryControllers)
+- (NSWindowController *)_windowController;
+- (void)_setWindowController:(NSWindowController *)wc;
+@end
+@interface NSView (FerryControllers)
+- (NSViewController *)_viewController;
+- (void)_setViewController:(NSViewController *)vc;
+@end
+@interface NSImage (FerryPrivate)
+/* In rect, upright in flipped views; a template is filled with color. */
+- (void)_drawInControlRect:(NSRect)rect color:(NSColor *)color fraction:(CGFloat)fraction;
 @end
 /* Records a menu named in a nib ("_NSMainMenu", "_NSWindowsMenu"...). */
 void ANibNoteNamedMenu(NSMenu *menu, NSString *name);

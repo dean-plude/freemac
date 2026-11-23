@@ -58,7 +58,15 @@ in code or loaded from nib files (an app's `MainMenu.nib` is loaded by
 `NSBezierPath`, buttons, check boxes, radio buttons, text fields and
 labels, and menus' keyboard shortcuts. Windows are shown through this
 system's GTK 3 (on Wayland, or X11), get the desktop's own title bars, and
-are sharp on HiDPI screens. Ctrl works as Command (and Super too);
+are sharp on HiDPI screens. It also has `NSImage` and image views (PNG,
+JPEG, GIF, TIFF, BMP, ICO, `.icns` and PDF images, read with this system's
+GdkPixbuf and Poppler), window and view controllers that load their own
+nibs, the clipboard (`NSPasteboard`, shared with other apps for text, with
+cut, copy and paste in text fields), Open and Save panels (the system's
+file chooser), files and text dropped onto views from other apps, and the
+app's icon in the dock. Exceptions work as on a Mac: `@try`/`@catch`/
+`@finally` catch them, and one a program leaves uncaught in its event loop
+is reported and the app carries on. Ctrl works as Command (and Super too);
 `FERRY_CONTROL_KEY=control` makes it the Mac's Control key instead.
 
 ## What doesn't run, and won't
@@ -66,7 +74,8 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, scroll views, text views, images) are missing and
+  views (tables, scroll views, text views, pop-up buttons) and the document
+  classes are missing, and
   storyboards aren't read. Real apps' nibs (made by Xcode, in both its
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
@@ -76,7 +85,7 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
   so when given an arm64 one.
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,
-  C++ (libc++), Objective-C exceptions (`@throw`) or extra libraries. When a program reaches a call Ferry lacks,
+  C++ (libc++), `NSInvocation` or extra libraries. When a program reaches a call Ferry lacks,
   it stops with a message naming that call (`this program uses X, which Ferry
   doesn't support yet`) and exit status 127, rather than guessing. A
   program that links a system framework Ferry doesn't have still starts
@@ -104,7 +113,11 @@ are sharp on HiDPI screens. Ctrl works as Command (and Super too);
    (`msgsend.S`) look methods up in a per-class cache; `nsobject.c` has
    `NSObject`, reference counting, ARC, weak references and autorelease
    pools; `blocks.c` has blocks; `dispatch.c` has Grand Central Dispatch,
-   run from Foundation's run loop.
+   run from Foundation's run loop. `exception.c` and `unwind.S` throw and
+   catch Objective-C exceptions: Ferry's own two-phase unwinder walks the
+   program's frames with the compact unwind and DWARF tables the linker
+   leaves in each Mach-O image, and finds the `@catch` blocks in the
+   compiler's tables for each function.
 5. **Foundation** (`foundation/`). Written in Objective-C and built with
    `ferry-cc` into a Mac library, `frameworks/Foundation.framework/Foundation`,
    which the loader finds when a program asks for Foundation or
@@ -138,7 +151,10 @@ the POSIX standard, and the open-source C library headers that document
 structure layouts and constant values. The Objective-C runtime follows
 Apple's public API documentation, clang's published ARC and block ABI
 specifications, and the metadata clang emits for our own test programs (read
-with LLVM's `llvm-objdump --objc-meta-data`); it uses no code from Apple's,
+with LLVM's `llvm-objdump --objc-meta-data`); exceptions follow the
+Itanium C++ ABI's exception-handling specification, the DWARF standard's
+call frame information, and the compact unwind format as LLVM documents it
+in its own headers; it uses no code from Apple's,
 GNUstep's or Darling's runtimes. Foundation, Core Graphics, Core Text and AppKit are written from Apple's
 public API documentation and the published descriptions of the property
 list formats; they use no code from Apple's, GNUstep's or Darling's
@@ -167,8 +183,10 @@ ferry-cc -O1 -fobjc-arc -o app app.m -framework Cocoa
 formats, runs it through Ferry and compares the output. It needs `clang`,
 `lld` and `llvm` (for `llvm-nm`); the drawing tests also need Cairo, Pango
 and HarfBuzz (the runtime libraries, not their `-dev` packages) and some
-fonts, and the AppKit tests need GTK 3. The on-screen window test also
-needs `weston`, which it starts headless; without it that test is skipped.
+fonts, and the AppKit tests need GTK 3 (and GdkPixbuf and Poppler for
+images). The on-screen tests (a window, the dock icon, a screen at scale 2)
+also need `weston`, which they start headless; without it they are
+skipped.
 
 ## Building and packaging
 

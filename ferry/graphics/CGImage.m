@@ -2,7 +2,7 @@
  * Data providers, bitmap images and gradients, and the pixel conversions
  * between a Mac program's 8-bit-per-component layouts and Cairo's (32-bit
  * words holding premultiplied alpha, red, green, blue). PNG files are read
- * by Cairo; other image formats aren't supported yet. */
+ * by Cairo, and the other common formats by GdkPixbuf. */
 #import "GInternal.h"
 
 /* ---- pixel layouts --------------------------------------------------------------- */
@@ -278,6 +278,68 @@ CGImageRef CGImageCreateWithPNGDataProvider(CGDataProviderRef source, const CGFl
     cairo_surface_destroy(s);
     im->interpolate = shouldInterpolate;
     return (CGImageRef)im;
+}
+
+CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGFloat *decode, bool shouldInterpolate,
+                                             CGColorRenderingIntent intent)
+{
+    GImage *im = source ? GImageDecode(((GDataProvider *)source)->data, NULL) : nil;
+    if (im)
+        im->interpolate = shouldInterpolate;
+    return (CGImageRef)im;
+}
+
+/* Any image file this system's GdkPixbuf reads (PNG, JPEG, GIF, TIFF, BMP,
+ * ICO, ICNS and more), as 8-bit RGB or RGBA, not premultiplied. *type is
+ * set to the file's kind as a uniform type identifier. */
+GImage *GImageDecode(NSData *data, NSString **type)
+{
+    if (type)
+        *type = nil;
+    if (data.length < 4)
+        return nil;
+    GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
+    GError *error = NULL;
+    BOOL ok = gdk_pixbuf_loader_write(loader, data.bytes, data.length, &error);
+    if (error)
+        g_error_free(error), error = NULL;
+    gdk_pixbuf_loader_close(loader, &error);
+    if (error)
+        g_error_free(error);
+    GdkPixbuf *pb = ok ? gdk_pixbuf_loader_get_pixbuf(loader) : NULL;
+    GImage *im = nil;
+    if (pb) {
+        int w = gdk_pixbuf_get_width(pb), h = gdk_pixbuf_get_height(pb);
+        int n = gdk_pixbuf_get_n_channels(pb), stride = gdk_pixbuf_get_rowstride(pb);
+        BOOL alpha = gdk_pixbuf_get_has_alpha(pb);
+        if (w > 0 && h > 0 && (n == 3 || n == 4) && (n == 4) == alpha) {
+            size_t bpr = (size_t)w * n;
+            NSMutableData *copy = [NSMutableData dataWithLength:bpr * h];
+            const unsigned char *src = gdk_pixbuf_get_pixels(pb);
+            for (int y = 0; y < h; y++)
+                memcpy((uint8_t *)copy.mutableBytes + y * bpr, src + (size_t)y * stride, bpr);
+            GDataProvider *p = (GDataProvider *)CGDataProviderCreateWithCFData((CFDataRef)copy);
+            im = make_image(w, h, 8, 8 * n, bpr, GSpaceRGB(), alpha ? kCGImageAlphaLast : kCGImageAlphaNone, p);
+            [p release];
+        }
+    }
+    if (type && im) {
+        GdkPixbufFormat *f = gdk_pixbuf_loader_get_format(loader);
+        char *name = f ? gdk_pixbuf_format_get_name(f) : NULL;
+        static const char *const utis[][2] = {
+            {"png", "public.png"},         {"jpeg", "public.jpeg"},      {"gif", "com.compuserve.gif"},
+            {"tiff", "public.tiff"},       {"bmp", "com.microsoft.bmp"}, {"ico", "com.microsoft.ico"},
+            {"icns", "com.apple.icns"},    {"svg", "public.svg-image"},
+        };
+        for (size_t i = 0; name && i < sizeof utis / sizeof *utis; i++)
+            if (!strcmp(name, utis[i][0]))
+                *type = [NSString stringWithUTF8String:utis[i][1]];
+        if (name && !*type)
+            *type = [NSString stringWithFormat:@"public.%s", name];
+        g_free(name);
+    }
+    g_object_unref(loader);
+    return im;
 }
 
 CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect)

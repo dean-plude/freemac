@@ -131,6 +131,15 @@ void objc_removeAssociatedObjects(id object);
 
 void objc_enumerationMutation(id obj);
 void objc_setEnumerationMutationHandler(void (*handler)(id));
+
+/* exceptions */
+typedef void (*objc_uncaught_exception_handler)(id exception);
+typedef id (*objc_exception_preprocessor)(id exception);
+void objc_exception_throw(id exception) __attribute__((noreturn));
+void objc_exception_rethrow(void) __attribute__((noreturn));
+objc_uncaught_exception_handler objc_setUncaughtExceptionHandler(objc_uncaught_exception_handler fn);
+objc_exception_preprocessor objc_setExceptionPreprocessor(objc_exception_preprocessor fn);
+void objc_terminate(void) __attribute__((noreturn));
 __FERRY_END
 
 #define _C_ID       '@'

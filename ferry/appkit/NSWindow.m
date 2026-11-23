@@ -10,6 +10,9 @@
 
 NSNotificationName const NSWindowWillCloseNotification = @"NSWindowWillCloseNotification";
 NSNotificationName const NSWindowDidResizeNotification = @"NSWindowDidResizeNotification";
+NSNotificationName const NSWindowDidChangeBackingPropertiesNotification = @"NSWindowDidChangeBackingPropertiesNotification";
+NSString *const NSBackingPropertyOldScaleFactorKey = @"NSBackingPropertyOldScaleFactorKey";
+NSString *const NSBackingPropertyOldColorSpaceKey = @"NSBackingPropertyOldColorSpaceKey";
 NSNotificationName const NSWindowDidMoveNotification = @"NSWindowDidMoveNotification";
 NSNotificationName const NSWindowDidBecomeKeyNotification = @"NSWindowDidBecomeKeyNotification";
 NSNotificationName const NSWindowDidResignKeyNotification = @"NSWindowDidResignKeyNotification";
@@ -43,6 +46,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSWindowLevel _level;
     CGFloat _alpha;
     NSString *_autosaveName;
+    NSWindowController *_windowController;      /* not retained */
+    NSViewController *_contentViewController;
+    BOOL _edited;
     NSView *_mouseView[3];            /* retained while a button is down */
     NSEvent *_current;
     /* drawing and GTK */
@@ -55,6 +61,65 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSInteger _lastButton, _clicks;
     NSTimeInterval _lastClickTime;
     NSPoint _lastClickPoint;
+    NSArray *_draggedTypes;
+    BOOL _dropsWanted, _dropsOn;
+}
+
+/* Drag and drop (NSDragging.m): the window's own types, whose drops go to
+ * its delegate, and the GTK drop target, set up once anything in the
+ * window takes drops. */
+/* Backing coordinates: points times the scale, the window's pixels. */
+- (NSRect)convertRectToBacking:(NSRect)r
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakeRect(r.origin.x * s, r.origin.y * s, r.size.width * s, r.size.height * s);
+}
+- (NSRect)convertRectFromBacking:(NSRect)r
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakeRect(r.origin.x / s, r.origin.y / s, r.size.width / s, r.size.height / s);
+}
+- (NSPoint)convertPointToBacking:(NSPoint)p
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakePoint(p.x * s, p.y * s);
+}
+- (NSPoint)convertPointFromBacking:(NSPoint)p
+{
+    CGFloat s = [self backingScaleFactor];
+    return NSMakePoint(p.x / s, p.y / s);
+}
+/* Out to whole pixels (or in, or to the nearest, as the options say). */
+- (NSRect)backingAlignedRect:(NSRect)r options:(NSAlignmentOptions)options
+{
+    NSRect b = [self convertRectToBacking:r];
+    CGFloat x0 = NSMinX(b), y0 = NSMinY(b), x1 = NSMaxX(b), y1 = NSMaxY(b);
+    x0 = options & NSAlignMinXInward ? ceil(x0) : options & NSAlignMinXNearest ? round(x0) : floor(x0);
+    y0 = options & NSAlignMinYInward ? ceil(y0) : options & NSAlignMinYNearest ? round(y0) : floor(y0);
+    x1 = options & NSAlignMaxXInward ? floor(x1) : options & NSAlignMaxXNearest ? round(x1) : ceil(x1);
+    y1 = options & NSAlignMaxYInward ? floor(y1) : options & NSAlignMaxYNearest ? round(y1) : ceil(y1);
+    return [self convertRectFromBacking:NSMakeRect(x0, y0, x1 - x0, y1 - y0)];
+}
+
+- (void)registerForDraggedTypes:(NSArray *)types
+{
+    [_draggedTypes release];
+    _draggedTypes = [types copy];
+    [self _enableDrops];
+}
+- (void)unregisterDraggedTypes
+{
+    [_draggedTypes release];
+    _draggedTypes = nil;
+}
+- (NSArray *)_registeredDraggedTypes { return _draggedTypes ?: @[]; }
+- (void)_enableDrops
+{
+    _dropsWanted = YES;
+    if (_area && !_dropsOn) {
+        _dropsOn = YES;
+        ADragAttach(self, _area);
+    }
 }
 
 + (NSRect)frameRectForContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style { return rect; }
@@ -103,6 +168,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     if (_gtk) {
         GtkWidget *w = _gtk;
         _gtk = _area = NULL;
+        _dropsOn = NO;
         gtk_widget_destroy(w);
     }
 }
@@ -110,6 +176,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (void)dealloc
 {
     [self _destroyGtk];
+    [_draggedTypes release];
     [_contentView _setWindow:nil];
     [_contentView setNextResponder:nil];
     [_contentView release];
@@ -240,6 +307,46 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     return YES;
 }
 - (BOOL)setFrameUsingName:(NSString *)name { return NO; }
+
+/* ---- controllers ---- */
+- (NSWindowController *)windowController { return _windowController; }
+- (void)setWindowController:(NSWindowController *)wc { [wc setWindow:self]; }
+- (NSWindowController *)_windowController { return _windowController; }
+- (void)_setWindowController:(NSWindowController *)wc { _windowController = wc; }
+- (NSViewController *)contentViewController { return _contentViewController; }
+- (void)setContentViewController:(NSViewController *)vc
+{
+    if (vc == _contentViewController)
+        return;
+    [vc retain];
+    [_contentViewController release];
+    _contentViewController = vc;
+    NSView *view = [vc view];
+    if (view) {
+        NSSize size = [view frame].size;
+        if (size.width > 0 && size.height > 0)
+            [self setContentSize:size];
+        [self setContentView:view];
+    }
+    if ([vc title] && ![[self title] length])
+        [self setTitle:[vc title]];
+}
++ (instancetype)windowWithContentViewController:(NSViewController *)vc
+{
+    NSView *view = [vc view];
+    NSRect r = NSMakeRect(0, 0, view ? [view frame].size.width : 480, view ? [view frame].size.height : 270);
+    NSWindow *w = [[[self alloc] initWithContentRect:r
+                                           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                                                     NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+                                             backing:NSBackingStoreBuffered
+                                               defer:NO] autorelease];
+    [w setReleasedWhenClosed:NO];
+    [w setContentViewController:vc];
+    [w center];
+    return w;
+}
+- (BOOL)isDocumentEdited { return _edited; }
+- (void)setDocumentEdited:(BOOL)f { _edited = f; }
 - (BOOL)titlebarAppearsTransparent { return _transparentTitle; }
 - (void)setTitlebarAppearsTransparent:(BOOL)flag { _transparentTitle = flag; }
 - (NSInteger)titleVisibility { return _titleVisibility; }
@@ -336,7 +443,18 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
         cairo_surface_destroy(_backing);
     _backingW = w;
     _backingH = h;
+    CGFloat old = _scale;
     _scale = scale;
+    if (old > 0 && old != scale) {
+        /* moved to a screen of another scale (or the screen's scale changed) */
+        [_contentView _backingPropertiesChanged];
+        NSNotification *n = [NSNotification notificationWithName:NSWindowDidChangeBackingPropertiesNotification
+                                                          object:self
+                                                        userInfo:@{NSBackingPropertyOldScaleFactorKey : @(old)}];
+        if ([_delegate respondsToSelector:@selector(windowDidChangeBackingProperties:)])
+            [_delegate windowDidChangeBackingProperties:n];
+        [[NSNotificationCenter defaultCenter] postNotification:n];
+    }
     _backing = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)(w * scale), (int)(h * scale));
     cairo_surface_set_device_scale(_backing, scale, scale);
     _ctx = GContextCreateWithSurface(_backing, h);
@@ -416,6 +534,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "delete-event", on_delete, self);
     connect(_gtk, "focus-in-event", on_focus_in, self);
     connect(_gtk, "focus-out-event", on_focus_out, self);
+    if (_dropsWanted)
+        [self _enableDrops];
     gtk_widget_show_all(_gtk);
     gtk_widget_grab_focus(_area);
 }
@@ -794,9 +914,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
     @autoreleasepool {
         NSWindow *win = data;
         int width = gtk_widget_get_allocated_width(w), height = gtk_widget_get_allocated_height(w);
-        [win _resizedTo:NSMakeSize(width, height)];
-        [win _ensureBacking];
-        [win displayIfNeeded];
+        A_REPORTING([win _resizedTo:NSMakeSize(width, height)]; [win _ensureBacking]; [win displayIfNeeded];)
         if (win->_backing) {
             cairo_set_source_surface(cr, win->_backing, 0, 0);
             cairo_paint(cr);
@@ -808,7 +926,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
 static void on_size(GtkWidget *w, GdkRectangle *r, void *data)
 {
     @autoreleasepool {
-        [(NSWindow *)data _resizedTo:NSMakeSize(r->width, r->height)];
+        A_REPORTING([(NSWindow *)data _resizedTo:NSMakeSize(r->width, r->height)];)
     }
 }
 
@@ -970,7 +1088,7 @@ static int on_key(GtkWidget *w, GdkEvent *e, void *data)
 static int on_delete(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
-        [(NSWindow *)data performClose:nil];
+        A_REPORTING([(NSWindow *)data performClose:nil];)
     }
     return 1;   /* AppKit decides; GTK mustn't destroy the window itself */
 }
@@ -979,8 +1097,7 @@ static int on_focus_in(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
-        [win makeKeyWindow];
-        [win makeMainWindow];
+        A_REPORTING([win makeKeyWindow]; [win makeMainWindow];)
     }
     return 0;
 }
@@ -990,7 +1107,7 @@ static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
     @autoreleasepool {
         NSWindow *win = data;
         if (key_window == win)
-            [win resignKeyWindow];
+            A_REPORTING([win resignKeyWindow];)
     }
     return 0;
 }

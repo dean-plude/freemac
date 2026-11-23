@@ -1,0 +1,9 @@
+scale: screen 2, window 2
+view rect in pixels: 20,20 20x20
+and back: 0,0 10x10
+size: 6x8
+aligned outward: 0.00 0.00 10.50 10.50
+aligned inward: 0.50 0.50 9.50 9.50
+an 8x8 point image has 16x16 pixels
+no change of scale seen: yes
+exit=0

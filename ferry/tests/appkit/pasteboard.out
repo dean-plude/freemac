@@ -1,0 +1,30 @@
+general is general: yes, named: yes
+changeCount went up: yes
+read as NSStringPboardType: hello
+as data: 5 bytes
+available from [PNG, string]: public.utf8-plain-text
+no PNG: nil
+types: public.utf8-plain-text, com.example.private
+string old style, plist k=v
+owner asked before reading: 0
+read: made when asked; owner asked 1
+read again: owner asked 1
+items: 3
+as strings: NSString(plain text) NSString(/tmp/some file.txt) NSString(https://example.org/x)
+as URLs: NSURL(file:///tmp/some%20file.txt) NSURL(https://example.org/x)
+file URLs only: NSURL(file:///tmp/some%20file.txt)
+filenames: NSString(/tmp/some file.txt)
+URL from pasteboard: /tmp/some file.txt
+filenames back: NSString(/a/one) NSString(/b/two)
+as URLs: NSURL(file:///a/one) NSURL(file:///b/two)
+provider: from the provider (asked 1)
+image back: 4x3, can init: yes
+unique: mine; general still has an image: yes
+copy enabled with a selection: yes
+copied: Hello world
+copy enabled with no selection: no
+after paste: Hello worldHello world
+after cutting a word: "Hello worldHello ", pasteboard "world"
+paste enabled with nothing to paste: no
+copy enabled in a password field: no
+exit=0

@@ -109,6 +109,7 @@ void GFromCairo(const struct gfmt *f, const uint32_t *src, uint8_t *dst, size_t 
 }
 @end
 cairo_surface_t *GImageSurface(GImage *image);
+GImage *GImageDecode(NSData *data, NSString **type);   /* retained; nil if unreadable */
 
 @interface GGradient : NSObject {
 @public
@@ -142,6 +143,7 @@ struct gstate {
     /* bitmap contexts */
     void *data;
     BOOL ownsData, shadow;
+    BOOL shadowLoaded;   /* the shadow surface holds the pixels: between GContextWillDraw and DidDraw */
     size_t width, height, bpc, bpp, bpr;
     uint32_t info;
     GColorSpace *space;

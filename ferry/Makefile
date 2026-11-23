@@ -7,8 +7,9 @@ PREFIX ?= /usr
 DESTDIR ?=
 
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/passthrough.c src/host.c \
-      src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/symbols.c
-OBJ = $(SRC:.c=.o) src/objc/msgsend.o
+      src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
+      src/objc/symbols.c
+OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
@@ -21,13 +22,13 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
 # Core Graphics and Core Text (M3), one Mac library that draws with this
-# system's Cairo and Pango. CoreText and ApplicationServices are served from
+# system's Cairo and Pango. CoreText, ApplicationServices and ImageIO are served from
 # it, as CoreFoundation is from Foundation.
 GRAPHICS_SRC = $(wildcard graphics/*.m)
 GRAPHICS_OBJ = $(GRAPHICS_SRC:graphics/%.m=graphics/build/%.o)
 GRAPHICS = frameworks/CoreGraphics.framework/CoreGraphics
 GRAPHICS_HEADERS = graphics/GInternal.h graphics/host.h sdk/include/CoreGraphics/CoreGraphics.h \
-                   sdk/include/CoreText/CoreText.h $(FOUNDATION_HEADERS)
+                   sdk/include/CoreText/CoreText.h sdk/include/ImageIO/ImageIO.h $(FOUNDATION_HEADERS)
 HOST_TBD = graphics/build/libFerryHost.tbd
 
 # AppKit (M4): windows through this system's GTK, drawn with the library
@@ -45,14 +46,14 @@ ferry: $(OBJ)
 src/%.o: src/%.c src/ferry.h src/macho.h src/objc/objc-private.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# The Cairo, Pango, HarfBuzz and GTK calls Ferry's frameworks may make:
+# The Cairo, Pango, HarfBuzz, GTK, GdkPixbuf and Poppler calls Ferry's frameworks may make:
 # exactly the ones graphics/host.h and appkit/gtk.h declare.
 src/host_names.h: graphics/host.h appkit/gtk.h
-	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
+	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk|poppler)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
 src/host.o: src/host_names.h
 
-src/objc/msgsend.o: src/objc/msgsend.S
+src/objc/%.o: src/objc/%.S
 	$(CC) -c -o $@ $<
 
 sdk/lib/libSystem.tbd: ferry sdk/gen-tbd.sh
@@ -86,8 +87,9 @@ $(GRAPHICS): $(GRAPHICS_OBJ) $(FOUNDATION) $(HOST_TBD)
 	@mkdir -p frameworks/CoreGraphics.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics \
 	    -o $@ $(GRAPHICS_OBJ) -framework Foundation $(HOST_TBD)
-	@mkdir -p frameworks/CoreText.framework frameworks/ApplicationServices.framework
+	@mkdir -p frameworks/CoreText.framework frameworks/ApplicationServices.framework frameworks/ImageIO.framework
 	sdk/gen-alias-tbd.sh CoreText $@ > frameworks/CoreText.framework/CoreText.tbd
+	sdk/gen-alias-tbd.sh ImageIO $@ > frameworks/ImageIO.framework/ImageIO.tbd
 	sdk/gen-alias-tbd.sh ApplicationServices $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
 
 appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
@@ -113,7 +115,7 @@ install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
 	install -Dm755 $(GRAPHICS) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreGraphics.framework/CoreGraphics
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices Cocoa; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

@@ -14,6 +14,7 @@
 
 @class NSApplication, NSWindow, NSView, NSEvent, NSColor, NSFont, NSMenu, NSMenuItem, NSScreen;
 @class NSGraphicsContext, NSBitmapImageRep, NSParagraphStyle, NSBezierPath, NSCursor, NSImage;
+@class NSWindowController, NSViewController, NSStoryboard;
 
 /* ---- events ----------------------------------------------------------------------- */
 
@@ -190,7 +191,8 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
-+ (NSColor *)colorWithPatternImage:(id)image; /* plain grey until Ferry has NSImage */
++ (NSColor *)colorWithPatternImage:(NSImage *)image;
+@property (readonly) NSImage *patternImage;
 + (NSColor *)colorWithCalibratedHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithDeviceHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithCGColor:(CGColorRef)color;
@@ -439,6 +441,107 @@ APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 - (NSData *)representationUsingType:(NSBitmapImageFileType)type properties:(NSDictionary *)properties;
 @end
 
+/* Vector images from PDF files, drawn by this system's Poppler. */
+@interface NSPDFImageRep : NSImageRep
++ (instancetype)imageRepWithData:(NSData *)data;
+- (instancetype)initWithData:(NSData *)data;
+@property (readonly) NSData *PDFRepresentation;
+@property (readonly) NSRect bounds;
+@property (readonly) NSInteger pageCount;
+@property NSInteger currentPage;
+@end
+
+/* An image drawn by a block each time it is drawn. */
+@interface NSCustomImageRep : NSImageRep
+- (instancetype)initWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
+@property (readonly) BOOL (^drawingHandler)(NSRect dstRect);
+@end
+
+typedef NSString *NSImageName;
+APPKIT_EXTERN NSImageName const NSImageNameAddTemplate, NSImageNameRemoveTemplate, NSImageNameStopProgressTemplate,
+    NSImageNameGoLeftTemplate, NSImageNameGoRightTemplate, NSImageNameGoBackTemplate,
+    NSImageNameGoForwardTemplate, NSImageNameMenuOnStateTemplate, NSImageNameMenuMixedStateTemplate,
+    NSImageNameRefreshTemplate, NSImageNameActionTemplate, NSImageNameApplicationIcon, NSImageNameCaution,
+    NSImageNameInfo, NSImageNameStatusAvailable, NSImageNameStatusUnavailable, NSImageNameStatusPartiallyAvailable,
+    NSImageNameStatusNone, NSImageNameFolder, NSImageNameTouchBarAddTemplate;
+typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
+    NSImageCacheDefault, NSImageCacheAlways, NSImageCacheBySize, NSImageCacheNever,
+};
+typedef NSString *NSImageHintKey;
+APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation;
+APPKIT_EXTERN NSString *const NSImageCompressionFactor;
+
+/* Images: read from PNG, JPEG, GIF, TIFF, BMP, ICO and ICNS files (by this
+ * system's GdkPixbuf) and from PDF files (vector, by Poppler), drawn by a
+ * block, or drawn into with lockFocus. Images named in an app's resources
+ * are found by imageNamed:, as are a few standard template images, which
+ * Ferry draws itself. */
+@interface NSImage : NSObject <NSCopying, NSCoding>
++ (NSImage *)imageNamed:(NSImageName)name;
++ (instancetype)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
++ (NSArray<NSString *> *)imageTypes;
++ (NSArray<NSString *> *)imageUnfilteredTypes;
++ (NSArray<NSString *> *)imageFileTypes;
+- (instancetype)initWithSize:(NSSize)size;
+- (instancetype)initWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfURL:(NSURL *)url;
+- (instancetype)initByReferencingFile:(NSString *)path;
+- (instancetype)initByReferencingURL:(NSURL *)url;
+- (instancetype)initWithData:(NSData *)data;
+- (instancetype)initWithCGImage:(CGImageRef)image size:(NSSize)size;
+- (BOOL)setName:(NSImageName)name;
+- (NSImageName)name;
+@property NSSize size;
+@property (getter=isTemplate) BOOL template;
+@property (readonly, getter=isValid) BOOL valid;
+@property (copy) NSString *accessibilityDescription;
+@property (copy) NSColor *backgroundColor;
+@property NSImageCacheMode cacheMode;
+@property BOOL matchesOnMultipleResolution, usesEPSOnResolutionMismatch, prefersColorMatch;
+@property NSRect alignmentRect;
+@property (getter=isFlipped) BOOL flipped; /* deprecated on a Mac; kept */
+@property BOOL scalesWhenResized;
+@property (readonly, copy) NSArray<NSImageRep *> *representations;
+- (void)addRepresentation:(NSImageRep *)rep;
+- (void)addRepresentations:(NSArray<NSImageRep *> *)reps;
+- (void)removeRepresentation:(NSImageRep *)rep;
+- (NSImageRep *)bestRepresentationForRect:(NSRect)rect context:(NSGraphicsContext *)context
+                                    hints:(NSDictionary *)hints;
+- (void)drawAtPoint:(NSPoint)point fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)drawInRect:(NSRect)rect fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)drawInRect:(NSRect)rect fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f
+    respectFlipped:(BOOL)respect hints:(NSDictionary *)hints;
+- (void)drawInRect:(NSRect)rect;
+- (void)compositeToPoint:(NSPoint)point operation:(NSCompositingOperation)op;
+- (void)compositeToPoint:(NSPoint)point operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)dissolveToPoint:(NSPoint)point fraction:(CGFloat)f;
+- (void)lockFocus;
+- (void)lockFocusFlipped:(BOOL)flipped;
+- (void)unlockFocus;
+- (void)recache;
+- (CGImageRef)CGImageForProposedRect:(NSRect *)rect context:(NSGraphicsContext *)context hints:(NSDictionary *)hints;
+@property (readonly) NSData *TIFFRepresentation;
+@end
+
+@interface NSImageRep (FerryFiles)
++ (Class)imageRepClassForData:(NSData *)data;
++ (instancetype)imageRepWithContentsOfFile:(NSString *)path;
++ (NSArray<NSImageRep *> *)imageRepsWithContentsOfFile:(NSString *)path;
++ (NSArray<NSImageRep *> *)imageRepsWithData:(NSData *)data;
+@end
+
+@interface NSBitmapImageRep (FerryFiles)
++ (instancetype)imageRepWithData:(NSData *)data;
+- (instancetype)initWithData:(NSData *)data;
+@property (readonly) NSData *TIFFRepresentation;
+@end
+
+@interface NSBundle (NSBundleImageExtension)
+- (NSImage *)imageForResource:(NSImageName)name;
+- (NSString *)pathForImageResource:(NSImageName)name;
+- (NSURL *)URLForImageResource:(NSImageName)name;
+@end
+
 /* ---- views ----------------------------------------------------------------------- */
 
 typedef NS_OPTIONS(NSUInteger, NSAutoresizingMaskOptions) {
@@ -530,6 +633,23 @@ typedef NS_ENUM(NSInteger, NSControlStateValue) {
 #define NSOnState NSControlStateValueOn
 
 @class NSCell;
+typedef NS_ENUM(NSUInteger, NSImageScaling) {
+    NSImageScaleProportionallyDown = 0, NSImageScaleAxesIndependently = 1, NSImageScaleNone = 2,
+    NSImageScaleProportionallyUpOrDown = 3,
+};
+typedef NS_ENUM(NSUInteger, NSImageAlignment) {
+    NSImageAlignCenter = 0, NSImageAlignTop = 1, NSImageAlignTopLeft = 2, NSImageAlignTopRight = 3,
+    NSImageAlignLeft = 4, NSImageAlignBottom = 5, NSImageAlignBottomLeft = 6, NSImageAlignBottomRight = 7,
+    NSImageAlignRight = 8,
+};
+typedef NS_ENUM(NSUInteger, NSImageFrameStyle) {
+    NSImageFrameNone = 0, NSImageFramePhoto = 1, NSImageFrameGrayBezel = 2, NSImageFrameGroove = 3,
+    NSImageFrameButton = 4,
+};
+typedef NS_ENUM(NSUInteger, NSCellImagePosition) {
+    NSNoImage = 0, NSImageOnly = 1, NSImageLeft = 2, NSImageRight = 3, NSImageBelow = 4, NSImageAbove = 5,
+    NSImageOverlaps = 6, NSImageLeading = 7, NSImageTrailing = 8,
+};
 @interface NSControl : NSView
 @property (retain) __kindof NSCell *cell;
 @property (class) Class cellClass;
@@ -615,6 +735,7 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property (assign) id target;
 @property SEL action;
 @property (assign) NSView *controlView;
+@property (retain) NSImage *image;
 @end
 
 @interface NSActionCell : NSCell
@@ -626,6 +747,7 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property NSBezelStyle bezelStyle;
 @property (getter=isTransparent) BOOL transparent;
 @property BOOL allowsMixedState;
+@property (retain) NSImage *alternateImage;
 - (void)setButtonType:(NSButtonType)type;
 @end
 
@@ -653,7 +775,12 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property (copy) NSString *keyEquivalent;
 @property NSEventModifierFlags keyEquivalentModifierMask;
 @property (retain) NSColor *contentTintColor, *bezelColor;
-@property (retain) NSImage *image;
+@property (retain) NSImage *image, *alternateImage;
+@property NSCellImagePosition imagePosition;
+@property NSImageScaling imageScaling;
+@property BOOL imageHugsTitle;
++ (instancetype)buttonWithImage:(NSImage *)image target:(id)target action:(SEL)action;
++ (instancetype)buttonWithTitle:(NSString *)title image:(NSImage *)image target:(id)target action:(SEL)action;
 - (void)setButtonType:(NSButtonType)type;
 - (void)setNextState;
 - (void)highlight:(BOOL)flag;
@@ -682,6 +809,25 @@ typedef NS_ENUM(NSUInteger, NSTextFieldBezelStyle) { NSTextFieldSquareBezel = 0,
 @property BOOL allowsEditingTextAttributes, importsGraphics; /* kept; text is plain for now */
 - (void)selectText:(id)sender;
 @end
+@interface NSImageCell : NSCell
+@property NSImageScaling imageScaling;
+@property NSImageAlignment imageAlignment;
+@property NSImageFrameStyle imageFrameStyle;
+@end
+
+/* Shows an image, scaled and placed as its settings say. Template images
+ * are drawn in the label colour, or the content tint colour if set. */
+@interface NSImageView : NSControl
++ (instancetype)imageViewWithImage:(NSImage *)image;
+@property (retain) NSImage *image;
+@property NSImageScaling imageScaling;
+@property NSImageAlignment imageAlignment;
+@property NSImageFrameStyle imageFrameStyle;
+@property (getter=isEditable) BOOL editable;
+@property BOOL animates, allowsCutCopyPaste;
+@property (retain) NSColor *contentTintColor;
+@end
+
 /* An NSTextField that hides what is typed. */
 @interface NSSecureTextField : NSTextField
 @end
@@ -828,6 +974,10 @@ enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLev
 - (BOOL)setFrameAutosaveName:(NSString *)name;
 - (void)setTitleWithRepresentedFilename:(NSString *)path;
 - (NSPoint)cascadeTopLeftFromPoint:(NSPoint)point;
++ (instancetype)windowWithContentViewController:(NSViewController *)vc;
+@property (assign) NSWindowController *windowController;
+@property (retain) NSViewController *contentViewController;
+@property (getter=isDocumentEdited) BOOL documentEdited;
 @end
 APPKIT_EXTERN NSNotificationName const NSWindowWillCloseNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidResizeNotification;
@@ -948,6 +1098,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @property (readonly, getter=isRunning) BOOL running;
 @property (readonly, getter=isActive) BOOL active;
 @property (readonly) NSEvent *currentEvent;
+- (void)reportException:(NSException *)exception;
 @property (retain) NSImage *applicationIconImage;
 @property (readonly) NSWindow *modalWindow;
 - (void)finishLaunching;
@@ -1004,6 +1155,78 @@ APPKIT_EXTERN NSNotificationName const NSApplicationDidResignActiveNotification;
 #ifndef IBInspectable
 #define IBInspectable
 #endif
+
+/* ---- controllers ------------------------------------------------------------------- */
+
+typedef NSString *NSNibName;
+
+/* Loads its window from a nib (as File's Owner) the first time the window
+ * is asked for, and follows the window in the responder chain. */
+@interface NSWindowController : NSResponder <NSCoding>
+- (instancetype)initWithWindow:(NSWindow *)window;
+- (instancetype)initWithWindowNibName:(NSNibName)name;
+- (instancetype)initWithWindowNibName:(NSNibName)name owner:(id)owner;
+- (instancetype)initWithWindowNibPath:(NSString *)path owner:(id)owner;
+@property (retain) NSWindow *window;
+@property (readonly, copy) NSNibName windowNibName;
+@property (readonly, copy) NSString *windowNibPath;
+@property (readonly, assign) id owner;
+@property (readonly, getter=isWindowLoaded) BOOL windowLoaded;
+@property (copy) NSString *windowFrameAutosaveName;
+@property BOOL shouldCascadeWindows, shouldCloseDocument;
+@property (assign) id document;
+@property (retain) NSViewController *contentViewController;
+@property (readonly) NSStoryboard *storyboard;
+- (void)loadWindow;
+- (void)windowWillLoad;
+- (void)windowDidLoad;
+- (IBAction)showWindow:(id)sender;
+- (void)close;
+- (void)dismissController:(id)sender;
+- (NSString *)windowTitleForDocumentDisplayName:(NSString *)displayName;
+- (void)synchronizeWindowTitleWithDocumentName;
+- (void)setDocumentEdited:(BOOL)edited;
+@end
+
+/* Loads its view from a nib (named after the class unless given) the first
+ * time the view is asked for, and sits between the view and its superview
+ * in the responder chain. Sheets and popovers are shown as windows. */
+@interface NSViewController : NSResponder <NSCoding>
+- (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle;
+@property (readonly, copy) NSNibName nibName;
+@property (readonly, retain) NSBundle *nibBundle;
+@property (retain) NSView *view;
+@property (readonly) NSView *viewIfLoaded;
+@property (readonly, getter=isViewLoaded) BOOL viewLoaded;
+@property (copy) NSString *title;
+@property (retain) id representedObject;
+@property NSSize preferredContentSize;
+@property (copy) NSArray<NSViewController *> *childViewControllers;
+@property (readonly, assign) NSViewController *parentViewController;
+@property (readonly, assign) NSViewController *presentingViewController;
+@property (readonly) NSArray<NSViewController *> *presentedViewControllers;
+@property (readonly) NSStoryboard *storyboard;
+- (void)loadView;
+- (void)loadViewIfNeeded;
+- (void)viewDidLoad;
+- (void)viewWillAppear;
+- (void)viewDidAppear;
+- (void)viewWillDisappear;
+- (void)viewDidDisappear;
+- (void)updateViewConstraints;
+- (void)viewWillLayout;
+- (void)viewDidLayout;
+- (void)addChildViewController:(NSViewController *)child;
+- (void)insertChildViewController:(NSViewController *)child atIndex:(NSInteger)index;
+- (void)removeChildViewControllerAtIndex:(NSInteger)index;
+- (void)removeFromParentViewController;
+- (void)presentViewControllerAsSheet:(NSViewController *)vc;
+- (void)presentViewControllerAsModalWindow:(NSViewController *)vc;
+- (void)presentViewController:(NSViewController *)vc asPopoverRelativeToRect:(NSRect)rect ofView:(NSView *)view
+                preferredEdge:(NSRectEdge)edge behavior:(NSInteger)behavior;
+- (void)dismissViewController:(NSViewController *)vc;
+- (void)dismissController:(id)sender;
+@end
 #ifndef IB_DESIGNABLE
 #define IB_DESIGNABLE
 #endif
@@ -1041,6 +1264,263 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
 - (void)unbind:(NSString *)binding;
 - (NSDictionary *)infoForBinding:(NSString *)binding;
 - (NSArray *)optionDescriptionsForBinding:(NSString *)binding;
+@end
+
+/* ---- Backing scale (M7): points to the window's pixels ------------------------------- */
+typedef NS_OPTIONS(unsigned long long, NSAlignmentOptions) {
+    NSAlignMinXInward = 1ULL << 0, NSAlignMinYInward = 1ULL << 1, NSAlignMaxXInward = 1ULL << 2,
+    NSAlignMaxYInward = 1ULL << 3, NSAlignWidthInward = 1ULL << 4, NSAlignHeightInward = 1ULL << 5,
+    NSAlignMinXOutward = 1ULL << 8, NSAlignMinYOutward = 1ULL << 9, NSAlignMaxXOutward = 1ULL << 10,
+    NSAlignMaxYOutward = 1ULL << 11, NSAlignWidthOutward = 1ULL << 12, NSAlignHeightOutward = 1ULL << 13,
+    NSAlignMinXNearest = 1ULL << 16, NSAlignMinYNearest = 1ULL << 17, NSAlignMaxXNearest = 1ULL << 18,
+    NSAlignMaxYNearest = 1ULL << 19, NSAlignWidthNearest = 1ULL << 20, NSAlignHeightNearest = 1ULL << 21,
+    NSAlignRectFlipped = 1ULL << 63,
+    NSAlignAllEdgesInward = NSAlignMinXInward | NSAlignMaxXInward | NSAlignMinYInward | NSAlignMaxYInward,
+    NSAlignAllEdgesOutward = NSAlignMinXOutward | NSAlignMaxXOutward | NSAlignMinYOutward | NSAlignMaxYOutward,
+    NSAlignAllEdgesNearest = NSAlignMinXNearest | NSAlignMaxXNearest | NSAlignMinYNearest | NSAlignMaxYNearest,
+};
+APPKIT_EXTERN NSNotificationName const NSWindowDidChangeBackingPropertiesNotification;
+APPKIT_EXTERN NSString *const NSBackingPropertyOldScaleFactorKey, *const NSBackingPropertyOldColorSpaceKey;
+@interface NSWindow (NSBackingCoordinates)
+- (NSRect)convertRectToBacking:(NSRect)rect;
+- (NSRect)convertRectFromBacking:(NSRect)rect;
+- (NSPoint)convertPointToBacking:(NSPoint)point;
+- (NSPoint)convertPointFromBacking:(NSPoint)point;
+- (NSRect)backingAlignedRect:(NSRect)rect options:(NSAlignmentOptions)options;
+@end
+@interface NSView (NSBackingCoordinates)
+- (NSRect)convertRectToBacking:(NSRect)rect;
+- (NSRect)convertRectFromBacking:(NSRect)rect;
+- (NSPoint)convertPointToBacking:(NSPoint)point;
+- (NSPoint)convertPointFromBacking:(NSPoint)point;
+- (NSSize)convertSizeToBacking:(NSSize)size;
+- (NSSize)convertSizeFromBacking:(NSSize)size;
+- (NSRect)backingAlignedRect:(NSRect)rect options:(NSAlignmentOptions)options;
+- (void)viewDidChangeBackingProperties;
+@end
+@interface NSObject (NSWindowBackingDelegate)
+- (void)windowDidChangeBackingProperties:(NSNotification *)notification;
+@end
+
+/* ---- Pasteboards (M7) ----------------------------------------------------------------
+ * The general pasteboard is this system's clipboard for text (and, read
+ * only, for files and images copied in other apps); everything else stays
+ * inside the program. The old ...PboardType names are the same types as the
+ * new ones, except NSFilenamesPboardType, an array of paths. */
+typedef NSString *NSPasteboardType;
+typedef NSString *NSPasteboardName;
+typedef NSString *NSPasteboardReadingOptionKey;
+APPKIT_EXTERN NSPasteboardType const NSPasteboardTypeString, NSPasteboardTypePDF, NSPasteboardTypeTIFF,
+    NSPasteboardTypePNG, NSPasteboardTypeRTF, NSPasteboardTypeRTFD, NSPasteboardTypeHTML,
+    NSPasteboardTypeTabularText, NSPasteboardTypeFont, NSPasteboardTypeRuler, NSPasteboardTypeColor,
+    NSPasteboardTypeSound, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypeTextFinderOptions,
+    NSPasteboardTypeURL, NSPasteboardTypeFileURL;
+APPKIT_EXTERN NSPasteboardType const NSStringPboardType, NSFilenamesPboardType, NSTIFFPboardType, NSPDFPboardType,
+    NSRTFPboardType, NSRTFDPboardType, NSHTMLPboardType, NSTabularTextPboardType, NSFontPboardType,
+    NSRulerPboardType, NSColorPboardType, NSURLPboardType, NSFileContentsPboardType, NSMultipleTextSelectionPboardType,
+    NSPostScriptPboardType, NSVCardPboardType, NSInkTextPboardType, NSFilesPromisePboardType, NSPICTPboardType;
+APPKIT_EXTERN NSPasteboardName const NSPasteboardNameGeneral, NSPasteboardNameFont, NSPasteboardNameRuler,
+    NSPasteboardNameFind, NSPasteboardNameDrag;
+APPKIT_EXTERN NSPasteboardName const NSGeneralPboard, NSFontPboard, NSRulerPboard, NSFindPboard, NSDragPboard;
+APPKIT_EXTERN NSPasteboardReadingOptionKey const NSPasteboardURLReadingFileURLsOnlyKey,
+    NSPasteboardURLReadingContentsConformToTypesKey;
+
+typedef NS_OPTIONS(NSUInteger, NSPasteboardWritingOptions) { NSPasteboardWritingPromised = 1 << 9 };
+typedef NS_OPTIONS(NSUInteger, NSPasteboardReadingOptions) {
+    NSPasteboardReadingAsData = 0, NSPasteboardReadingAsString = 1 << 0,
+    NSPasteboardReadingAsPropertyList = 1 << 1, NSPasteboardReadingAsKeyedArchive = 1 << 2,
+};
+typedef NS_OPTIONS(NSUInteger, NSPasteboardContentsOptions) { NSPasteboardContentsCurrentHostOnly = 1 << 0 };
+
+@class NSPasteboard, NSPasteboardItem;
+@protocol NSPasteboardWriting <NSObject>
+- (NSArray<NSPasteboardType> *)writableTypesForPasteboard:(NSPasteboard *)pasteboard;
+@optional
+- (NSPasteboardWritingOptions)writingOptionsForType:(NSPasteboardType)type pasteboard:(NSPasteboard *)pasteboard;
+@required
+- (id)pasteboardPropertyListForType:(NSPasteboardType)type;
+@end
+@protocol NSPasteboardReading <NSObject>
++ (NSArray<NSPasteboardType> *)readableTypesForPasteboard:(NSPasteboard *)pasteboard;
+@optional
++ (NSPasteboardReadingOptions)readingOptionsForType:(NSPasteboardType)type pasteboard:(NSPasteboard *)pasteboard;
+- (id)initWithPasteboardPropertyList:(id)propertyList ofType:(NSPasteboardType)type;
+@end
+@protocol NSPasteboardItemDataProvider <NSObject>
+- (void)pasteboard:(NSPasteboard *)pasteboard item:(NSPasteboardItem *)item provideDataForType:(NSPasteboardType)type;
+@optional
+- (void)pasteboardFinishedWithDataProvider:(NSPasteboard *)pasteboard;
+@end
+@interface NSObject (NSPasteboardOwner)
+- (void)pasteboard:(NSPasteboard *)sender provideDataForType:(NSPasteboardType)type;
+- (void)pasteboardChangedOwner:(NSPasteboard *)sender;
+@end
+
+@interface NSPasteboardItem : NSObject <NSPasteboardWriting, NSPasteboardReading>
+@property (readonly, copy) NSArray<NSPasteboardType> *types;
+- (NSPasteboardType)availableTypeFromArray:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setDataProvider:(id<NSPasteboardItemDataProvider>)provider forTypes:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setData:(NSData *)data forType:(NSPasteboardType)type;
+- (BOOL)setString:(NSString *)string forType:(NSPasteboardType)type;
+- (BOOL)setPropertyList:(id)propertyList forType:(NSPasteboardType)type;
+- (NSData *)dataForType:(NSPasteboardType)type;
+- (NSString *)stringForType:(NSPasteboardType)type;
+- (id)propertyListForType:(NSPasteboardType)type;
+@end
+
+@interface NSPasteboard : NSObject
+@property (class, readonly, strong) NSPasteboard *generalPasteboard;
++ (NSPasteboard *)pasteboardWithName:(NSPasteboardName)name;
++ (NSPasteboard *)pasteboardWithUniqueName;
+@property (readonly, copy) NSPasteboardName name;
+@property (readonly) NSInteger changeCount;
+- (void)releaseGlobally;
+- (NSInteger)prepareForNewContentsWithOptions:(NSPasteboardContentsOptions)options;
+- (NSInteger)clearContents;
+- (BOOL)writeObjects:(NSArray<id<NSPasteboardWriting>> *)objects;
+- (NSArray *)readObjectsForClasses:(NSArray<Class> *)classes options:(NSDictionary *)options;
+@property (readonly, copy) NSArray<NSPasteboardItem *> *pasteboardItems;
+- (NSUInteger)indexOfPasteboardItem:(NSPasteboardItem *)item;
+- (BOOL)canReadItemWithDataConformingToTypes:(NSArray<NSString *> *)types;
+- (BOOL)canReadObjectForClasses:(NSArray<Class> *)classes options:(NSDictionary *)options;
+- (NSInteger)declareTypes:(NSArray<NSPasteboardType> *)types owner:(id)owner;
+- (NSInteger)addTypes:(NSArray<NSPasteboardType> *)types owner:(id)owner;
+@property (readonly, copy) NSArray<NSPasteboardType> *types;
+- (NSPasteboardType)availableTypeFromArray:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setData:(NSData *)data forType:(NSPasteboardType)type;
+- (BOOL)setPropertyList:(id)plist forType:(NSPasteboardType)type;
+- (BOOL)setString:(NSString *)string forType:(NSPasteboardType)type;
+- (NSData *)dataForType:(NSPasteboardType)type;
+- (id)propertyListForType:(NSPasteboardType)type;
+- (NSString *)stringForType:(NSPasteboardType)type;
+@end
+
+@interface NSString (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
+@end
+@interface NSURL (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
++ (NSURL *)URLFromPasteboard:(NSPasteboard *)pasteboard;
+- (void)writeToPasteboard:(NSPasteboard *)pasteboard;
+@end
+@interface NSImage (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
++ (BOOL)canInitWithPasteboard:(NSPasteboard *)pasteboard;
+- (instancetype)initWithPasteboard:(NSPasteboard *)pasteboard;
+@end
+@interface NSResponder (NSStandardEditing)
+- (IBAction)cut:(id)sender;
+- (IBAction)copy:(id)sender;
+- (IBAction)paste:(id)sender;
+@end
+
+/* ---- Drag and drop (M7) --------------------------------------------------------------
+ * Views take files and text dropped on them from other apps. Dragging out
+ * of a Ferry window is not done yet. */
+typedef NS_OPTIONS(NSUInteger, NSDragOperation) {
+    NSDragOperationNone = 0, NSDragOperationCopy = 1, NSDragOperationLink = 2, NSDragOperationGeneric = 4,
+    NSDragOperationPrivate = 8, NSDragOperationMove = 16, NSDragOperationDelete = 32,
+    NSDragOperationEvery = NSUIntegerMax,
+};
+typedef NS_ENUM(NSInteger, NSDraggingFormation) {
+    NSDraggingFormationDefault = 0, NSDraggingFormationNone, NSDraggingFormationPile, NSDraggingFormationList,
+    NSDraggingFormationStack,
+};
+typedef NS_ENUM(NSInteger, NSDraggingContext) { NSDraggingContextOutsideApplication = 0, NSDraggingContextWithinApplication };
+@protocol NSDraggingInfo <NSObject>
+@property (readonly, strong) NSWindow *draggingDestinationWindow;
+@property (readonly) NSDragOperation draggingSourceOperationMask;
+@property (readonly) NSPoint draggingLocation;
+@property (readonly) NSPoint draggedImageLocation;
+@property (readonly, strong) NSImage *draggedImage;
+@property (readonly, strong) NSPasteboard *draggingPasteboard;
+@property (readonly, strong) id draggingSource;
+@property (readonly) NSInteger draggingSequenceNumber;
+@property NSDraggingFormation draggingFormation;
+@property BOOL animatesToDestination;
+@property NSInteger numberOfValidItemsForDrop;
+@end
+@protocol NSDraggingDestination <NSObject>
+@optional
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender;
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender;
+- (void)draggingExited:(id<NSDraggingInfo>)sender;
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender;
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender;
+- (void)concludeDragOperation:(id<NSDraggingInfo>)sender;
+- (void)draggingEnded:(id<NSDraggingInfo>)sender;
+- (BOOL)wantsPeriodicDraggingUpdates;
+@end
+@interface NSView (NSDragging)
+- (void)registerForDraggedTypes:(NSArray<NSPasteboardType> *)types;
+- (void)unregisterDraggedTypes;
+@property (readonly, copy) NSArray<NSPasteboardType> *registeredDraggedTypes;
+@end
+@interface NSWindow (NSDragging)
+- (void)registerForDraggedTypes:(NSArray<NSPasteboardType> *)types;
+- (void)unregisterDraggedTypes;
+@end
+
+/* ---- Open and Save panels (M7) -------------------------------------------------------
+ * This system's file chooser. With no display, a panel answers Cancel,
+ * unless FERRY_PANEL_ANSWER holds the paths to answer with, separated by
+ * newlines (for scripted runs and tests). */
+@class NSSavePanel, NSOpenPanel;
+@protocol NSOpenSavePanelDelegate <NSObject>
+@optional
+- (BOOL)panel:(id)sender shouldEnableURL:(NSURL *)url;
+- (BOOL)panel:(id)sender validateURL:(NSURL *)url error:(NSError **)outError;
+- (void)panel:(id)sender didChangeToDirectoryURL:(NSURL *)url;
+- (NSString *)panel:(id)sender userEnteredFilename:(NSString *)filename confirmed:(BOOL)okFlag;
+- (void)panel:(id)sender willExpand:(BOOL)expanding;
+- (void)panelSelectionDidChange:(id)sender;
+@end
+enum { NSFileHandlingPanelCancelButton = 0, NSFileHandlingPanelOKButton = 1 };
+enum { NSCancelButton = 0, NSOKButton = 1 };
+@interface NSSavePanel : NSPanel
++ (NSSavePanel *)savePanel;
+@property (copy) NSURL *directoryURL;
+@property (readonly, copy) NSURL *URL;
+@property (copy) NSString *nameFieldStringValue;
+@property (copy) NSString *nameFieldLabel;
+@property (copy) NSString *message;
+@property (copy) NSString *prompt;
+@property (copy) NSArray<NSString *> *allowedFileTypes;
+@property BOOL allowsOtherFileTypes;
+@property BOOL canCreateDirectories;
+@property BOOL canSelectHiddenExtension;
+@property (getter=isExtensionHidden) BOOL extensionHidden;
+@property BOOL showsHiddenFiles;
+@property BOOL treatsFilePackagesAsDirectories;
+@property BOOL showsTagField;
+@property (copy) NSArray<NSString *> *tagNames;
+@property (strong) NSView *accessoryView;
+@property (weak) id<NSOpenSavePanelDelegate> delegate;
+@property (getter=isExpanded, readonly) BOOL expanded;
+- (NSModalResponse)runModal;
+- (void)beginSheetModalForWindow:(NSWindow *)window completionHandler:(void (^)(NSModalResponse result))handler;
+- (void)beginWithCompletionHandler:(void (^)(NSModalResponse result))handler;
+- (IBAction)ok:(id)sender;
+- (IBAction)cancel:(id)sender;
+- (void)validateVisibleColumns;
+/* older calls */
+- (NSString *)filename;
+- (NSString *)directory;
+- (void)setDirectory:(NSString *)path;
+- (NSInteger)runModalForDirectory:(NSString *)path file:(NSString *)name;
+- (NSString *)requiredFileType;
+- (void)setRequiredFileType:(NSString *)type;
+@end
+@interface NSOpenPanel : NSSavePanel
++ (NSOpenPanel *)openPanel;
+@property (readonly, copy) NSArray<NSURL *> *URLs;
+@property BOOL canChooseFiles;
+@property BOOL canChooseDirectories;
+@property BOOL allowsMultipleSelection;
+@property BOOL resolvesAliases;
+@property (getter=isAccessoryViewDisclosed) BOOL accessoryViewDisclosed;
+@property BOOL canDownloadUbiquitousContents;
+@property BOOL canResolveUbiquitousConflicts;
+- (NSArray<NSString *> *)filenames;
+- (NSInteger)runModalForTypes:(NSArray *)fileTypes;
+- (NSInteger)runModalForDirectory:(NSString *)path file:(NSString *)name types:(NSArray *)fileTypes;
 @end
 
 #endif

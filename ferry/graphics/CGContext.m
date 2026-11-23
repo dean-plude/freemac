@@ -140,15 +140,19 @@ void GContextWillDraw(GContext *c)
         }
     }
     cairo_surface_mark_dirty(c->surface);
+    c->shadowLoaded = YES;
 }
 
+/* Only after GContextWillDraw: otherwise the caller's pixels are already
+ * current, and the shadow surface may not be. */
 void GContextDidDraw(GContext *c)
 {
     if (!c->data)
         return;
     cairo_surface_flush(c->surface);
-    if (!c->shadow)
+    if (!c->shadow || !c->shadowLoaded)
         return;
+    c->shadowLoaded = NO;
     const uint8_t *src = cairo_image_surface_get_data(c->surface);
     int stride = cairo_image_surface_get_stride(c->surface);
     BOOL opaque = c->fmt.a < 0;

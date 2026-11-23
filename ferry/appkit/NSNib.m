@@ -154,8 +154,10 @@ static int parse_components(NSData *d, CGFloat *out, int max)
 @end
 
 /* Image references: "NSButtonImageSource" names a system image (NSSwitch,
- * NSRadioButton) and "NSCustomResource" an image in the app's resources.
- * Ferry has no NSImage yet, so only the name is kept. */
+ * NSRadioButton), which only says what kind of button it is in, and
+ * "NSCustomResource" an image in the app's resources, which becomes that
+ * NSImage. An image that can't be found becomes an empty image with the
+ * name, and a warning. */
 @interface NSButtonImageSource : NSObject <NSCoding> {
     NSString *_name;
 }
@@ -201,6 +203,19 @@ static int parse_components(NSData *d, CGFloat *out, int max)
     [super dealloc];
 }
 - (NSString *)_imageName { return _name; }
+- (id)awakeAfterUsingCoder:(NSCoder *)coder
+{
+    if (![_class isEqualToString:@"NSImage"] || ![_name isKindOfClass:[NSString class]])
+        return self;
+    NSImage *image = [NSImage imageNamed:_name];
+    if (image)
+        return image;
+    fprintf(stderr, "ferry: the nib names an image, \"%s\", that Ferry can't find or read; left empty\n",
+            [_name UTF8String]);
+    image = [[[NSImage alloc] initWithSize:NSZeroSize] autorelease];
+    [image setName:_name];
+    return image;
+}
 @end
 
 /* ---- stand-ins ------------------------------------------------------------------------- */

@@ -17,8 +17,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
 | M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
 | M5 | Nibs (compiled .nib) | **done**, merged (#37) |
-| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, pull request open (see the M6 report below) |
-| M7 | Polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | planned |
+| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, merged (#136) |
+| M7 | What the apps needed first (`NSImage`, exceptions, window and view controllers), then polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | **done** (see the M7 report below) |
 
 ## Ground rules
 
@@ -866,6 +866,128 @@ clipboard, drag and drop, scaling). Given what the apps need, I'd suggest
 starting it with `NSImage`, catchable exceptions and `NSWindowController`/
 `NSViewController`, which every app here reaches before any polish.
 
+## M7: what the apps needed, then polish
+
+M6 showed every app reaching `NSImage`, a caught exception or a window
+controller before any of the planned polish would matter, so M7 did those
+first (Dean: "Do whatever is best"), then the polish.
+
+### Design
+
+- **Images** (`appkit/NSImage.m`, `appkit/NSImageView.m`,
+  `graphics/ImageIO.m`). Files are decoded by this system's GdkPixbuf
+  (PNG, JPEG, GIF, TIFF, BMP, ICO, `.icns`) and PDF pages are drawn by
+  Poppler, both new optional groups in `src/host.c` (quiet when missing).
+  An `NSImage` holds representations: bitmaps (`NSBitmapImageRep`, which
+  caches its `CGImage`), PDF pages (`NSPDFImageRep`) and drawing blocks
+  (`NSCustomImageRep`); drawing picks the best one for the destination's
+  pixels. `imageNamed:` looks in the registry, the app bundle (with `@2x`
+  files) and then at a few standard images Ferry draws itself (never
+  Apple's artwork); names ending in `Template` tint. Image I/O's
+  `CGImageSource` calls are served from Core Graphics. Fixed on the way: a
+  bitmap context's contents were wiped when an image was made from it.
+- **Exceptions** (`src/objc/exception.c`, `src/objc/unwind.S`). Ferry's
+  own two-phase unwinder, as the Itanium C++ ABI describes: the throw
+  captures the registers, the search phase walks the frames with each
+  image's compact unwind entries (frame-pointer, frameless with the stack
+  size in the entry or in the code, and DWARF), reads each function's
+  table of `@catch` clauses (the LSDA) and matches the exception's class;
+  the cleanup phase runs `@finally` blocks and lands in the handler. An
+  exception nobody catches goes to the uncaught-exception handler, where
+  Foundation prints the Mac's "Terminating app due to uncaught exception"
+  message; `NSApplication`'s event loop catches what an app's event
+  handling throws, reports it and carries on, as a Mac app does. Only
+  frames of Mac code can be unwound.
+- **Controllers** (`appkit/NSViewController.m`). A window controller loads
+  its window from its nib when first asked, and is the window's next
+  responder; a view controller loads the nib named after its class (or its
+  `nibName`), and sits between its view and the view's superview in the
+  responder chain. `windowWithContentViewController:` makes a window
+  around one. Sheets, modal windows and popovers presented by a view
+  controller open a window of their own, with a warning.
+- **Clipboard** (`appkit/NSPasteboard.m`). Pasteboards are Ferry's own
+  objects; the general one also talks to GTK's clipboard: text written to
+  it goes there, and when another app has copied something, the next read
+  takes its text, files or image. Text fields cut, copy and paste.
+- **Open and Save panels** (`appkit/NSSavePanel.m`): GTK's file chooser
+  (`GtkFileChooserNative`, so the desktop's own through a portal where
+  there is one), with filters from the allowed types. With no display, a
+  panel answers Cancel, or the paths in `FERRY_PANEL_ANSWER`.
+- **Drag and drop** (`appkit/NSDragging.m`): each window's GTK drawing area
+  becomes a drop target once something in it registers types; files and
+  text dropped from other apps go on the drag pasteboard and through the
+  `NSDraggingDestination` messages. Dragging out of a Ferry window is not
+  done.
+- **Dock icons**: an app bundle with an icon, started on a display, writes
+  a hidden desktop entry named after its bundle identifier (its Wayland app
+  id) and its icon as a PNG into `~/.local/share`, which is how a Wayland
+  dock finds an app's icon (`FERRY_NO_DESKTOP_ENTRY=1` turns it off). Under
+  X11 the icon is also the windows' own.
+- **Scaling**: windows were already drawn at the screen's whole-number
+  scale; M7 adds the conversions between points and pixels
+  (`convertRectToBacking:` and friends, `backingAlignedRect:options:`) and
+  tells windows and views when their scale changes.
+
+### M7 report (2026-11-23)
+
+**What works now.** A Mac program can load and draw images, catch
+exceptions, use window and view controllers with their own nibs, copy and
+paste (with other apps too), ask for files with the system's Open and Save
+panels, take files dropped on it, and show its icon in the dock. In the
+seven apps from M6, 160 of the 162 image files load and draw, and Flycut
+no longer crashes. `make check` runs 60 tests (48 before M7), all passing.
+The new ones:
+
+| Test | Proves |
+| --- | --- |
+| `foundation_trycatch` (three builds: ARC, `-O2 -fomit-frame-pointer`, `-O0` without ARC) | `@catch` by class and by `id`, the first matching clause winning, a string thrown, `@finally` with and without an exception, `@throw;` rethrowing, exceptions through Foundation's own frames (a block called by `enumerateObjectsUsingBlock:`), `NSArray`'s range exception, `@synchronized` unlocking on the way out, `NS_DURING`/`NS_HANDLER`, a thousand in a row, and values in callee-saved registers surviving the unwind, over frame-pointer, frameless and DWARF frames |
+| `appkit_report` (+ message check) | An exception raised in the event loop (from a timer) is reported and the app keeps running |
+| `appkit_image` | An image drawn with `lockFocus`, written as PNG, JPEG, TIFF and BMP into the test's own app bundle and read back, unreadable data refused, `imageNamed:` finding a file and its `@2x` twin, drawing scaled, from part of the image, into a flipped context and at half strength (checked pixel by pixel), a PDF page as an image, standard and template images (tinted), the app icon, an image view and image buttons, Image I/O's `CGImageSource`, a pattern colour |
+| `appkit_nib` | now also an image view in both panel nibs, its image (`NSCustomResource`) found in the bundle |
+| `appkit_controllers` | A window controller loading its window lazily (`windowWillLoad`, `windowDidLoad`), its outlets and the button's action, the window's next responder, `showWindow:` and `close`; a view controller loading the nib named after its class (in the `NIBArchive` form), `viewDidLoad`, the responder chain view → controller → superview, `windowWithContentViewController:`, a window controller's `contentViewController`, child controllers |
+| `appkit_pasteboard` | Types by old and new names, items, `writeObjects:`/`readObjectsForClasses:` with strings, URLs (file URLs only, on request), `NSFilenamesPboardType` both ways, an image, data promised by an owner and by an item's provider (asked once), a separate pasteboard, and cut/copy/paste in a text field with the Edit menu items enabled to match (copy disabled in a password field) |
+| `appkit_panels` | Open panels choosing one or several files, by extension or type identifier in either case, folders only when allowed, missing files and the delegate turned down; save panels adding the extension and remembering the folder; begin calls running their handler after they return |
+| `appkit_dragging` | Which view gets a drop (the one under the pointer that took the pasteboard's types, else the window's delegate), the order of the destination messages, the operation limited to what the source allows, the dropped files read back |
+| `appkit_icon` | An app bundle with an icon writing its desktop entry and a 256-pixel icon, on the headless Weston |
+| `appkit_hidpi` | On a headless Weston at scale 2: the scale reported by screen and window, points to pixels and back, aligned rectangles, an image drawn with twice the pixels |
+
+Checked by hand, beyond `make check`: copying text from one Ferry program
+and pasting it in another, the file chooser opening on the right folder
+with its filter, and a real drag of two files from a GTK program into a
+Ferry window, all under Xvfb (the headless Weston has no seat, so no
+clipboard or drag there).
+
+**What isn't done yet (and why).**
+
+- **No real app is usable yet.** The next things they stop at: the views
+  nibs use (`NSScrollView`, `NSTableView`, `NSTextView`, `NSPopUpButton`,
+  `NSBox`...), the document classes (MacPass), `NSInvocation` (KeyCastr),
+  and Carbon's hotkeys (Flycut, Spectacle). See `docs/ferry-compat.md`.
+- **Exceptions through Linux code.** Only Mac frames can be unwound, so an
+  exception can't cross a frame of a Linux library. AppKit catches and
+  reports exceptions in the code GTK calls back into (drawing, resizing,
+  closing, focus, drops) before they reach GTK's frames; an exception
+  thrown inside some other Linux callback would be treated as uncaught.
+- **JPEG 2000 icons.** `.icns` files holding only JPEG 2000 artwork (both
+  of KeyCastr's) don't load: GdkPixbuf has no reader for it.
+- **Drag sources.** Dragging out of a Ferry window, or between views of
+  the same app, is not done; only drops from other apps.
+- **The clipboard is text both ways, and files and images one way.**
+  Files and images copied in a Ferry app stay inside it.
+- **Panel accessory views** aren't shown, and an Open panel can't choose
+  files and folders at once (GTK's chooser does one or the other); each
+  says so once.
+- **Dock icons on Wayland** depend on the dock reading desktop entries by
+  app id, as GNOME's and KDE's do; whether freemac's own dock does is for
+  the desktop side. Changing the icon while the app runs
+  (`setApplicationIconImage:`) only reaches X11 windows opened later.
+- **Whole-number scales only**, as GTK 3 draws: at a fractional scale the
+  compositor scales the next whole one down.
+
+**What's next.** From what the apps hit: the scrolling views and tables
+(every app's nibs use them), then `NSDocument`/`NSDocumentController`,
+`NSInvocation`, and `NSAlert`/`NSWorkspace`/`NSStatusBar`.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -895,3 +1017,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M3 merged (#33). M4 done: AppKit on GTK 3 (Wayland or X11), windows, views, events, controls, `make check` 41/41.
 - 2026-11-20: M4 merged (#35). M5 done: keyed archives, nib loading, `NSApplicationMain` with a main nib, `make check` 43/43.
 - 2026-11-22: M5 merged (#37). M6 done: real apps tried (docs/ferry-compat.md), NIBArchive nibs, missing frameworks tolerated, Grand Central Dispatch, pre-10.6 libraries, `make check` 48/48.
+- 2026-11-23: M6 merged (#136). M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.

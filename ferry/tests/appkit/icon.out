@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Icon App
+Comment=A Mac app, run by Ferry
+Exec=ferry "<bundle>/Contents/MacOS/IconApp"
+Icon=org.freemac.ferry.iconapp
+StartupWMClass=org.freemac.ferry.iconapp
+NoDisplay=true
+X-Ferry-Bundle=<bundle>
+icon: 256x256
+middle: r 0 g 0 b 1 a 1
+exit=0

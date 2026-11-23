@@ -162,6 +162,15 @@ typedef struct {
 
 /* ---- NSObject additions ------------------------------------------------------ */
 
+/* Moving objects between Core Foundation and Objective-C ownership. */
+#if __has_feature(objc_arc)
+static inline id CFBridgingRelease(CFTypeRef X) { return (__bridge_transfer id)X; }
+static inline CFTypeRef CFBridgingRetain(id X) { return (__bridge_retained CFTypeRef)X; }
+#else
+static inline id CFBridgingRelease(CFTypeRef X) { return [(id)X autorelease]; }
+static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
+#endif
+
 @interface NSObject (NSObjectFoundation)
 - (NSString *)description;
 - (NSString *)debugDescription;
@@ -635,8 +644,19 @@ FOUNDATION_EXPORT NSExceptionName const NSRangeException;
 FOUNDATION_EXPORT NSExceptionName const NSInvalidArgumentException;
 FOUNDATION_EXPORT NSExceptionName const NSInternalInconsistencyException;
 
-@interface NSException : NSObject <NSCopying>
+FOUNDATION_EXPORT NSExceptionName const NSMallocException, NSObjectInaccessibleException,
+    NSObjectNotAvailableException, NSDestinationInvalidException, NSPortTimeoutException,
+    NSInvalidSendPortException, NSInvalidReceivePortException, NSPortSendException, NSPortReceiveException,
+    NSCharacterConversionException, NSFileHandleOperationException, NSParseErrorException,
+    NSUndefinedKeyException, NSInvalidArchiveOperationException, NSInvalidUnarchiveOperationException;
+
+/* Exceptions can be caught (@try/@catch) since Ferry M7. */
+__attribute__((__objc_exception__))
+@interface NSException : NSObject <NSCopying, NSCoding>
 + (NSException *)exceptionWithName:(NSExceptionName)name reason:(NSString *)reason userInfo:(NSDictionary *)userInfo;
++ (void)raise:(NSExceptionName)name format:(NSString *)format arguments:(va_list)args;
+@property (readonly, copy) NSArray<NSNumber *> *callStackReturnAddresses;
+@property (readonly, copy) NSArray<NSString *> *callStackSymbols;
 - (instancetype)initWithName:(NSExceptionName)name reason:(NSString *)reason userInfo:(NSDictionary *)userInfo;
 + (void)raise:(NSExceptionName)name format:(NSString *)format, ... NS_FORMAT_FUNCTION(2, 3);
 @property (readonly, copy) NSExceptionName name;
@@ -651,6 +671,12 @@ extern "C" {
 #endif
 void NSSetUncaughtExceptionHandler(NSUncaughtExceptionHandler *handler);
 NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void);
+/* The old way of writing @try/@catch */
+#define NS_DURING @try {
+#define NS_HANDLER } @catch (NSException *localException) {
+#define NS_ENDHANDLER }
+#define NS_VALUERETURN(val, type) return (val)
+#define NS_VOIDRETURN return
 #ifdef __cplusplus
 }
 #endif

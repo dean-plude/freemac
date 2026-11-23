@@ -162,6 +162,8 @@ CGImageRef CGImageCreate(size_t width, size_t height, size_t bitsPerComponent, s
                          CGColorRenderingIntent intent);
 CGImageRef CGImageCreateWithPNGDataProvider(CGDataProviderRef source, const CGFloat *decode, bool shouldInterpolate,
                                             CGColorRenderingIntent intent);
+CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGFloat *decode, bool shouldInterpolate,
+                                             CGColorRenderingIntent intent);
 CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect);
 CGImageRef CGImageCreateCopy(CGImageRef image);
 CGImageRef CGImageRetain(CGImageRef image);
@@ -321,6 +323,32 @@ void CGContextSetCMYKStrokeColor(CGContextRef c, CGFloat cyan, CGFloat magenta, 
 
 void CGContextDrawImage(CGContextRef c, CGRect rect, CGImageRef image);
 void CGContextDrawTiledImage(CGContextRef c, CGRect rect, CGImageRef image);
+
+/* ---- PDF documents (drawn by this system's Poppler) ------------------------------ */
+
+typedef struct CGPDFDocument *CGPDFDocumentRef;
+typedef struct CGPDFPage *CGPDFPageRef;
+typedef enum { kCGPDFMediaBox = 0, kCGPDFCropBox = 1, kCGPDFBleedBox = 2, kCGPDFTrimBox = 3, kCGPDFArtBox = 4 } CGPDFBox;
+CGPDFDocumentRef CGPDFDocumentCreateWithProvider(CGDataProviderRef provider);
+CGPDFDocumentRef CGPDFDocumentCreateWithURL(CFURLRef url);
+CGPDFDocumentRef CGPDFDocumentRetain(CGPDFDocumentRef document);
+void CGPDFDocumentRelease(CGPDFDocumentRef document);
+CFTypeID CGPDFDocumentGetTypeID(void);
+size_t CGPDFDocumentGetNumberOfPages(CGPDFDocumentRef document);
+CGPDFPageRef CGPDFDocumentGetPage(CGPDFDocumentRef document, size_t pageNumber);
+bool CGPDFDocumentIsEncrypted(CGPDFDocumentRef document);
+bool CGPDFDocumentIsUnlocked(CGPDFDocumentRef document);
+bool CGPDFDocumentAllowsPrinting(CGPDFDocumentRef document);
+bool CGPDFDocumentAllowsCopying(CGPDFDocumentRef document);
+CGPDFPageRef CGPDFPageRetain(CGPDFPageRef page);
+void CGPDFPageRelease(CGPDFPageRef page);
+CFTypeID CGPDFPageGetTypeID(void);
+size_t CGPDFPageGetPageNumber(CGPDFPageRef page);
+int CGPDFPageGetRotationAngle(CGPDFPageRef page);
+CGRect CGPDFPageGetBoxRect(CGPDFPageRef page, CGPDFBox box);
+CGAffineTransform CGPDFPageGetDrawingTransform(CGPDFPageRef page, CGPDFBox box, CGRect rect, int rotate,
+                                               bool preserveAspectRatio);
+void CGContextDrawPDFPage(CGContextRef c, CGPDFPageRef page);
 void CGContextDrawLinearGradient(CGContextRef c, CGGradientRef gradient, CGPoint startPoint, CGPoint endPoint,
                                  CGGradientDrawingOptions options);
 void CGContextDrawRadialGradient(CGContextRef c, CGGradientRef gradient, CGPoint startCenter, CGFloat startRadius,

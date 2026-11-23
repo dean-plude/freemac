@@ -22,30 +22,36 @@ const char *const ferry_host_names[] = {
     NULL,
 };
 
-/* Two groups: the drawing libraries Core Graphics and Core Text use, and
- * GTK, which AppKit uses for windows. Each is opened the first time one of
- * its calls is looked up. */
+/* Four groups: the drawing libraries Core Graphics and Core Text use, GTK,
+ * which AppKit uses for windows, and GdkPixbuf and Poppler, which read image
+ * and PDF files. Each is opened the first time one of its calls is looked
+ * up. */
 struct group {
     const char *what;
     const char *const *libraries;
     size_t count;
     void *handles[8];
     int opened;
+    int optional; /* quiet if missing: only a call into it stops the program */
 };
 static const char *const drawing_libraries[] = {
     "libcairo.so.2",     "libpangocairo-1.0.so.0", "libpango-1.0.so.0",
     "libgobject-2.0.so.0", "libglib-2.0.so.0",     "libharfbuzz.so.0",
 };
 static const char *const window_libraries[] = {"libgtk-3.so.0", "libgdk-3.so.0"};
-static struct group drawing = {"drawing", drawing_libraries, 6, {0}, 0};
-static struct group windows = {"windows", window_libraries, 2, {0}, 0};
+static const char *const image_libraries[] = {"libgdk_pixbuf-2.0.so.0"};
+static const char *const pdf_libraries[] = {"libpoppler-glib.so.8"};
+static struct group drawing = {"drawing", drawing_libraries, 6, {0}, 0, 0};
+static struct group windows = {"windows", window_libraries, 2, {0}, 0, 0};
+static struct group images = {"reading image files", image_libraries, 1, {0}, 0, 1};
+static struct group pdf = {"reading PDF files", pdf_libraries, 1, {0}, 0, 1};
 
 static void open_group(struct group *g)
 {
     g->opened = 1;
     for (size_t i = 0; i < g->count; i++) {
         g->handles[i] = dlopen(g->libraries[i], RTLD_NOW | RTLD_GLOBAL);
-        if (!g->handles[i])
+        if (!g->handles[i] && !g->optional)
             fprintf(stderr, "ferry: %s needs %s, which isn't installed (%s)\n", g->what, g->libraries[i],
                     dlerror());
     }
@@ -59,7 +65,10 @@ void *ferry_host_lookup(const char *name)
             break;
     if (!*p)
         return NULL;
-    struct group *g = !strncmp(name, "gtk_", 4) || !strncmp(name, "gdk_", 4) ? &windows : &drawing;
+    struct group *g = !strncmp(name, "gdk_pixbuf_", 11)                  ? &images
+                      : !strncmp(name, "poppler_", 8)                   ? &pdf
+                      : !strncmp(name, "gtk_", 4) || !strncmp(name, "gdk_", 4) ? &windows
+                                                                         : &drawing;
     if (!g->opened)
         open_group(g);
     for (size_t i = 0; i < g->count; i++) {

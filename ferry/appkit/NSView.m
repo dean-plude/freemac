@@ -22,6 +22,92 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     NSString *_toolTip;
     NSFocusRingType _focusRing;
     BOOL _focusLocked;
+    NSViewController *_viewController;   /* not retained */
+    NSArray *_draggedTypes;
+}
+
+/* Drag and drop: the types a view takes (NSDragging.m does the rest). */
+- (void)registerForDraggedTypes:(NSArray *)types
+{
+    NSMutableArray *all = [NSMutableArray arrayWithArray:_draggedTypes ?: @[]];
+    for (NSString *t in types)
+        if (![all containsObject:t])
+            [all addObject:t];
+    [_draggedTypes release];
+    _draggedTypes = [all copy];
+    [_window _enableDrops];
+}
+- (void)unregisterDraggedTypes
+{
+    [_draggedTypes release];
+    _draggedTypes = nil;
+}
+- (NSArray *)registeredDraggedTypes { return _draggedTypes ?: @[]; }
+
+/* Backing coordinates: the window's pixels (see NSWindow). */
+- (NSRect)convertRectToBacking:(NSRect)r
+{
+    NSRect w = [self convertRect:r toView:nil];
+    CGFloat s = _window ? [_window backingScaleFactor] : AScreenScale();
+    return NSMakeRect(w.origin.x * s, w.origin.y * s, w.size.width * s, w.size.height * s);
+}
+- (NSRect)convertRectFromBacking:(NSRect)r
+{
+    CGFloat s = _window ? [_window backingScaleFactor] : AScreenScale();
+    return [self convertRect:NSMakeRect(r.origin.x / s, r.origin.y / s, r.size.width / s, r.size.height / s)
+                    fromView:nil];
+}
+- (NSPoint)convertPointToBacking:(NSPoint)p
+{
+    return [self convertRectToBacking:NSMakeRect(p.x, p.y, 0, 0)].origin;
+}
+- (NSPoint)convertPointFromBacking:(NSPoint)p
+{
+    return [self convertRectFromBacking:NSMakeRect(p.x, p.y, 0, 0)].origin;
+}
+- (NSSize)convertSizeToBacking:(NSSize)size
+{
+    CGFloat s = _window ? [_window backingScaleFactor] : AScreenScale();
+    return NSMakeSize(size.width * s, size.height * s);
+}
+- (NSSize)convertSizeFromBacking:(NSSize)size
+{
+    CGFloat s = _window ? [_window backingScaleFactor] : AScreenScale();
+    return NSMakeSize(size.width / s, size.height / s);
+}
+- (NSRect)backingAlignedRect:(NSRect)r options:(NSAlignmentOptions)options
+{
+    NSRect inWindow = [self convertRect:r toView:nil];
+    NSRect aligned = _window ? [_window backingAlignedRect:inWindow options:options] : inWindow;
+    return [self convertRect:aligned fromView:nil];
+}
+- (void)viewDidChangeBackingProperties {}
+- (void)_backingPropertiesChanged
+{
+    [self viewDidChangeBackingProperties];
+    [self setNeedsDisplay:YES];
+    for (NSView *v in _subviews)
+        [v _backingPropertiesChanged];
+}
+
+/* A view controller comes between its view and whatever would follow the
+ * view in the responder chain. */
+- (void)setNextResponder:(NSResponder *)next
+{
+    if (_viewController && next != (NSResponder *)_viewController) {
+        [_viewController setNextResponder:next];
+        [super setNextResponder:_viewController];
+    } else {
+        [super setNextResponder:next];
+    }
+}
+- (NSViewController *)_viewController { return _viewController; }
+- (void)_setViewController:(NSViewController *)vc
+{
+    NSResponder *outer = _viewController ? [_viewController nextResponder] : [self nextResponder];
+    [_viewController setNextResponder:nil];
+    _viewController = vc;
+    [self setNextResponder:outer];
 }
 
 - (instancetype)init { return [self initWithFrame:NSZeroRect]; }
@@ -105,6 +191,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     }
     [_subviews release];
     [_toolTip release];
+    [_draggedTypes release];
     [super dealloc];
 }
 
@@ -248,6 +335,8 @@ void AViewDecode(NSView *v, NSCoder *c)
         return;
     [self viewWillMoveToWindow:window];
     _window = window;
+    if ([_draggedTypes count])
+        [window _enableDrops];
     for (NSView *v in _subviews)
         [v _setWindow:window];
     [self viewDidMoveToWindow];
