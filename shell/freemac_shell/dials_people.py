@@ -252,8 +252,26 @@ class UsersPanel(Gtk.Box):
         dialog.destroy()
 
     def on_password(self, name, full):
+        mine = name == self.me
         dialog, grid, ok = self.dialog(f"Password for {full}", "Change")
-        first, second = self.password_fields(grid, 0)
+        top = 0
+        current = None
+        if mine:
+            current = Gtk.Entry(visibility=False, activates_default=True, hexpand=True,
+                                placeholder_text="Leave empty if you have none")
+            grid.attach(Gtk.Label(label="Current", xalign=1), 0, 0, 1, 1)
+            grid.attach(current, 1, 0, 1, 1)
+            top = 1
+        first, second = self.password_fields(grid, top)
+        if mine:
+            note = ("Your keychain gets the new password too, so Web and Purser keep "
+                    "your saved passwords.")
+        else:
+            note = (f"{full}'s keychain keeps the old password: the first time they log in, "
+                    "they're asked for it once to open their saved passwords.")
+        text = caption(note)
+        text.set_max_width_chars(44)
+        grid.attach(text, 0, top + 2, 2, 1)
 
         def update(*_):
             ok.set_sensitive(bool(first.get_text()) and first.get_text() == second.get_text())
@@ -263,8 +281,31 @@ class UsersPanel(Gtk.Box):
         update()
         dialog.show_all()
         if dialog.run() == Gtk.ResponseType.OK:
-            self.helper("password", name, stdin=first.get_text() + "\n")
+            old = current.get_text() if current else ""
+            new = first.get_text()
+            done = (lambda changed: changed and self.update_keychain(old, new)) if mine else None
+            self.helper("password", name, stdin=new + "\n", done=done)
         dialog.destroy()
+
+    def update_keychain(self, old, new):
+        """After your own password changed: give the login keychain the new one
+        (keychain.py), so the next login still opens it."""
+        from . import keychain
+        if not keychain.available():
+            return
+        tries = [old] if old else []
+        # An account that logs in by itself keeps a keychain with no password
+        # (nothing types one at login to open it).
+        if autologin_user() != self.me and "" not in tries:
+            tries.append("")
+        if any(keychain.change_password(t, new) for t in tries):
+            return
+        if autologin_user() == self.me and not old:
+            return
+        message(self.window, "Your keychain still has your old password",
+                "Your login password changed, but your saved passwords are still locked with the "
+                "old one. The next time an app needs them, you'll be asked for the old password "
+                "once.")
 
     def on_delete(self, name, full):
         answer = alert.ask(self.window, f"Delete {full}?",

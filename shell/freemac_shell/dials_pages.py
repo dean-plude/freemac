@@ -49,7 +49,7 @@ SEARCH_WORDS = {
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
     "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep",
     "lifeboat": "backup back up time machine restore drive disk copy",
-    "users": "accounts password login automatic log in people guest user visitor",
+    "users": "accounts password login automatic log in people guest user visitor keychain",
     "loginitems": "startup start up open at login launch automatically apps autostart",
     "accounts": "icloud fastmail nextcloud yahoo caldav carddav sync online calendar contacts reminders",
     "keyboard": "shortcuts command key layout input sources input menu language typing keyboard languages key repeat delay until repeat press and hold accents accented letters é ñ ü umlaut cedilla diacritics control space spelling spell check misspelled dictionary text input text replacements shortcuts abbreviations smart quotes curly apostrophe dash double space full stop period",

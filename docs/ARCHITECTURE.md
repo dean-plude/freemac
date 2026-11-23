@@ -60,6 +60,9 @@ only ship alongside, which is fine for any free licence).
 | Orca | Screen reader (Command+F5, 1.120) | LGPL-2.1-or-later |
 | speech-dispatcher | Speech for the screen reader | GPL-2.0-or-later, LGPL-2.1-or-later |
 | python3-qrcode | QR codes for known Wi-Fi networks (1.121) | BSD-3-Clause |
+| gnome-keyring, libpam-gnome-keyring | The keychain: the secret service, opened at login (1.122) | GPL-2.0-or-later, LGPL-2.0-or-later (separate program) |
+| libsecret (gir1.2-secret-1) | Purser reads and changes saved logins (1.122) | LGPL-2.1-or-later |
+| gcr | Asks for a keychain password when one is needed (1.122) | LGPL-2.0-or-later |
 | clang, lld (build only) | Compiling Mac test programs for Ferry | Apache-2.0 with LLVM exception |
 | wayvnc | Screen Sharing: shares the Wayland screen over VNC | ISC (separate program) |
 | GTK-VNC | The screen view in Porthole | LGPL-2.1-or-later |
@@ -353,6 +356,32 @@ matrix in Cairo. GTK can't offer the x-kde-passwordManagerHint type, so a
 copied password is marked for clipboard history instead: a SHA-256 of it in
 `$XDG_RUNTIME_DIR/freemac-clips-secret` (mode 600) for 30 seconds, which
 `clips.store()` checks before keeping a copy.
+
+Passwords (1.122, `keychain.py`, `logins.py`, `purser.py`): the keychain is
+gnome-keyring's secret service (org.freedesktop.secrets), which Web and other
+apps already use through libsecret. greetd's PAM file opens its "login"
+keyring with the login password (pam_gnome_keyring). An automatic login types
+no password, so `freemac-login-items` calls `keychain.ensure_login()`, which,
+when there is no login keyring yet, makes one with an empty password through
+gnome-keyring's own D-Bus interface (CreateWithMasterPassword; the label
+"login" picks the keyring's name) and makes it the default alias. Changing
+your own password in Dials asks for the current one and, once the account
+helper has changed it, calls ChangeWithMasterPassword with the old and new
+passwords (an empty old one too, unless the account logs in by itself, whose
+keyring keeps no password); if neither opens it, Dials says the old password
+will be asked for once. Purser reads and writes the items Web saves, of the
+`org.epiphany.FormPassword` kind (uri, username, form field names; the
+password as the secret), through libsecret, so a login changed in Purser is
+the one Web fills in. Logins added by hand have no form field names, which
+Web needs to fill a page, until Web saves its own. Before showing anything
+Purser asks polkit about its own action, `org.freemac.passwords.unlock`
+(auth_self_keep), for its own process (CheckAuthorization with a unix-process
+subject and AllowUserInteraction), so the agent asks for the person's own
+login password; no helper runs as root. It locks after 5 minutes without
+focus. Wi-Fi passwords come through `known_networks.fetch_password`, the
+1.121 helper. The Security list compares passwords in memory: one used on
+more than one origin, or one that is short, all digits, from few characters
+or on a short list of the passwords people pick most.
 
 Screen reader (1.120, `screen_reader.py`): the reader is Orca (LGPL-2.1),
 which apps reach over the AT-SPI accessibility bus that at-spi2-core already

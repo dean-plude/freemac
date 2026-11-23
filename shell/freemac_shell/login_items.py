@@ -91,6 +91,13 @@ def open_all():
 
 
 def main():
+    # A login with no password (automatic login) opens no keychain; make one
+    # without a password, so the first saved password doesn't ask for one.
+    try:
+        from . import keychain
+        keychain.ensure_login()
+    except Exception:   # never keep login items from opening
+        pass
     open_all()
 
 

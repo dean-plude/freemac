@@ -129,6 +129,17 @@ TOPICS = {
         "Turn off Join Automatically for a network you only want to join by hand, or choose Forget This "
         "Network to remove it and its password.",
     ]),
+    "passwords": ("See or change saved passwords", "passwords password keychain login logins saved website site web browser forgot copy autofill fill in reused strong suggest purser", [
+        "When you log in to a website in Web, it offers to save the login. Next time it fills it in for you.",
+        "Open Purser (Passwords) to see them. It asks for your login password first, and locks again "
+        "after 5 minutes in the background.",
+        "Choose a website, then Copy beside the user name or password. Edit changes a login; + adds one "
+        "with a strong password ready to use.",
+        "Security lists passwords you use on more than one website, or that are easy to guess. Change "
+        "them on the website first, then in Purser.",
+        "Wi-Fi lists the networks this computer has joined, with their passwords after an administrator's "
+        "password.",
+    ]),
     "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper dynamic theme accent colour color highlight purple pink green favourite background appearance", [
         "Choose Dials > Appearance for Light, Dark or Auto, and Dials > Wallpaper for the picture on the desktop. "
         "Auto is light while the sun is up and dark after it sets, where you are.",
