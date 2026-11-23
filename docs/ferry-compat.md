@@ -8,37 +8,50 @@ them is in this repository**: they are tested by hand, and only what
 happened is written down here. Ferry's own tests (`make check`) use
 programs and nibs written for Ferry.
 
-Last checked: 2026-11-23, with Ferry 0.8.0 (milestone M7).
+Last checked: 2026-11-23, with Ferry 0.9.0 (after M7: more apps, and the Installer).
 
 ## Summary
 
-No real app runs all the way yet. Five of the seven apps below start
-(Ferry loads them, their libraries and frameworks, and runs their start-up
-code), and four of those get through `NSApplicationMain`, their main nib
-and part of their own launch code before they reach something Ferry can't
-do yet. Each stops with a message that names what was missing. (Flycut crashed
-in M6; M7 traced that to a missing pasteboard constant and fixed it, so it
-now stops with a message like the others.)
+No real app runs all the way yet, but they get much further than at M7.
+Nine apps have been tried (the seven of M6, plus MacDown and Sequel Pro).
+Seven start and get through `NSApplicationMain` and their main nib; ShiftIt
+now gets all the way into its event loop and keeps running (it shows
+nothing, because its only window is a status bar item, which Ferry doesn't
+have yet), and Gas Mask gets through its whole launch until it lays out
+its main window. Each of the others stops with a message that names what
+was missing.
 
-All 53 nib files in these apps load (with the parts Ferry lacks left out,
-and a warning for each): Ferry reads both the keyed-archive nibs of older
-Xcode versions and the `NIBArchive` form current Xcode writes. Since M7
-their images load too: 160 of the 162 image files in the seven apps (PNG,
-TIFF, PDF and `.icns`) read and draw. The two that don't are KeyCastr's
-`.icns` files, which hold only JPEG 2000 artwork that this system's image
-reader can't decode.
+Ferry also has its own **Installer** now. Three real installers were
+tried, and all three install: the MacPorts and XQuartz packages (`.pkg`)
+and the Sequel Pro disk image (`.dmg`). See "Installers" below.
 
 ## The apps
 
 | App (version) | What it is | How far it gets | What stops it |
 | --- | --- | --- | --- |
-| [Hex Fiend](https://github.com/HexFiend/HexFiend) 2.18.1 | Hex editor | Doesn't start | Part of it is written in Swift (`libswiftCore.dylib`), a known limit. All 16 of its nibs (`NIBArchive`) load when tried on their own: windows, panels, menus, buttons, labels and text fields come out right; tables, scroll views, split and stack views, pop-up buttons, segmented controls, search fields, colour wells, formatters and layout constraints are left out |
-| [Flycut](https://github.com/TermiT/Flycut) 1.9.6 | Clipboard history (menu bar) | Starts, loads its main nib, sets up its defaults and bindings, and runs its launch code as far as its hotkeys | Carbon's keyboard input sources (`TISCopyCurrentKeyboardInputSource`), for its global hotkey; then `RegisterEventHotKey` and a status bar item (`NSStatusBar`). Its clipboard watching (`NSPasteboard`'s `changeCount`) is in Ferry now |
-| [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | Starts, loads its main nib (`NIBArchive`) | Its ShortcutRecorder library calls `+instanceMethodSignatureForSelector:`: Ferry has no `NSMethodSignature` or `NSInvocation` yet, so the app ends with an uncaught `NSInvalidArgumentException` (reported as a Mac reports it, since M7). It also needs to see every key pressed in other apps, which Wayland doesn't allow |
-| [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | Starts, including its 2011 Sparkle library (built before Mac OS X 10.6, now loadable), loads its nibs | Asks for the Accessibility API (`AXIsProcessTrusted`) to move other apps' windows. That can't work as such on Wayland, where an app may not move another app's windows |
-| [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | Starts, loads its main nib and preferences nib | Carbon's global hotkeys (`GetApplicationEventTarget`, `RegisterEventHotKey`), then the Accessibility API, as for ShiftIt |
-| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | Starts; all 30 of its nibs (`NIBArchive`) load on their own | Built on the document architecture: `NSDocumentController` and `NSDocument` aren't in Ferry yet (window and view controllers are, since M7), so its own document controller class is left out and the app stops when it makes one |
-| [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | Doesn't start | Its program uses the start-up format of Mac OS X 10.7 and earlier (`LC_UNIXTHREAD`), which Ferry doesn't load yet. Its nib loads |
+| [Hex Fiend](https://github.com/HexFiend/HexFiend) 2.18.1 | Hex editor | Doesn't start | Part of it is written in Swift (`libswiftCore.dylib`), a known limit. All 16 of its nibs (`NIBArchive`) load when tried on their own |
+| [Flycut](https://github.com/TermiT/Flycut) 1.9.6 | Clipboard history (menu bar) | Starts, loads its main nib, sets up its defaults and bindings, registers its global hotkey (accepted, never pressed), and opens its preferences nib | `NSTabView` in its preferences nib (`selectTabViewItemAtIndex:` sent to the plain view Ferry put in its place). Then `NSStatusBar`, for its menu bar item |
+| [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | Starts, loads its main nib (`NIBArchive`) | `NSInvocation`/`NSMethodSignature` (forwarding), which Ferry doesn't have yet. It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
+| [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (Ferry answers no, as a Mac does before the user allows it), and waits in its event loop | Nothing visible: its only window is a status bar item (`NSStatusBar`, not in Ferry yet). Moving other apps' windows can't work as such on Wayland |
+| [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | Starts, loads its nibs, registers its shortcuts (accepted, never pressed) | Its Sparkle updater checks its own code signature (`SecStaticCodeCreateWithPath`, the Security framework). It also couldn't save its shortcuts file. Then the Accessibility API, as for ShiftIt |
+| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | Starts; all 30 of its nibs (`NIBArchive`) load on their own | The document classes (`NSDocumentController`, `NSDocument`): its own document controller class is left out and the app stops when it makes one |
+| [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | Starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | `NSSplitView` in its main window (`positionOfDividerAtIndex:`). Its hosts list is an `NSOutlineView`, also not in Ferry yet |
+| [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | Starts, loads its main nib | Its Sparkle updater asserts that `/System/Library/CoreServices/SystemVersion.plist` (the Mac's version file) exists. It is also built on `NSDocument` and WebKit (a known limit) |
+| [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; starts, loads its main nib | An array made with a nil object (`initWithObjects:count:`), most likely one of the 89 classes it uses that Ferry doesn't have yet (tables, outline and split views, documents...) being nil |
+
+## Installers
+
+Ferry's Installer (`ferry SomeApp.pkg` or `ferry SomeApp.dmg`, or a
+double-click) shows a package's welcome, read-me and licence pages, then
+installs for the user alone: apps to `~/Applications`, everything else to
+`~/.local/share/ferry/root`. Install scripts and JavaScript checks are not
+run, and it says so before installing.
+
+| Installer | Kind | Result |
+| --- | --- | --- |
+| [MacPorts](https://www.macports.org/) 2.10.5 for macOS 13 | Flat `.pkg`, with JavaScript checks and install scripts | Every page shows (welcome, read-me and licence); 1,364 files install in under a second, the same files 7-Zip extracts. Its install scripts aren't run, and its absolute links (to `/opt/local/...`) point outside Ferry's folder, so the installed tools aren't usable as they are |
+| [XQuartz](https://www.xquartz.org/) 2.8.5 | Flat `.pkg` (a 107 MB package holding 310 MB) | Installs in about 1.5 seconds: `XQuartz.app` to Applications, 349 MB of libraries and tools into Ferry's folder. Running XQuartz itself wasn't tried |
+| Sequel Pro 1.1.2 | Disk image (`.dmg`) holding the app | The app is copied to Applications; "Open Sequel Pro" on the last page starts it through Ferry |
 
 ## What M6 changed to get this far
 
@@ -77,22 +90,59 @@ framework Ferry doesn't have (Carbon, IOKit, Security, WebKit, Quartz...).
   now holds its own name, like the other missing string constants, instead
   of pointing at a stub.
 
+## What changed after M7
+
+Trying more apps, and an installer, filled these gaps:
+
+- **The Installer**, and `ferry` given an app bundle (`ferry Foo.app`) or
+  an installer.
+- **Views**: scroll views (with scrollers, clip views, wheel and
+  autoscrolling), text views (editing, selection, the keyboard's standard
+  commands, copy and paste, RTF and simple HTML in and out), progress
+  indicators, boxes.
+- **Key-value observing**, so Cocoa bindings now follow the values they
+  are bound to; `NSUserDefaultsController`; cancelling delayed performs.
+- **Libraries from this system**: zlib, bzip2, xz, libxml2, SQLite and ICU
+  (Gas Mask's regular expressions).
+- **Carbon and Accessibility answers**: global hotkeys are accepted but
+  never pressed, keyboard layouts have no Mac layout data, and the
+  Accessibility API is "not trusted", which is how a Mac answers when
+  these aren't available. SystemConfiguration's network reachability
+  (always reachable). This let Flycut, Spectacle, ShiftIt and Gas Mask go on.
+- **Smaller pieces**: `CFPreferences`, `OSSpinLock` and `OSAtomic`,
+  `os_unfair_lock`, the old garbage collector's write barriers, the
+  Services menu's provider, paragraph styles in nibs, content borders,
+  cell background styles, `URLByResolvingSymlinksInPath`,
+  `CFStringGetCharacters`.
+- **Two crashes fixed**: a message to a class Ferry left out could crash
+  instead of being reported (older linkers leave different values in a
+  class's cache words), and a program that redirected its stderr to a file
+  it couldn't open closed the stream Ferry reports on.
+
 ## What the apps need most
 
-Counted over the apps that start and the nibs of all seven, the gaps that come up most:
+Counted over the nine apps:
 
-1. **`NSScrollView`, `NSTableView`, `NSTextView`, `NSPopUpButton`,
-   `NSBox`, `NSTabView`, `NSStackView`, `NSSplitView`** in nibs (every
-   app's nibs use some of them).
-2. **The document classes** (`NSDocument`, `NSDocumentController`), which
-   stop MacPass.
-3. **`NSInvocation` and `NSMethodSignature`** (forwarding), which stop
-   KeyCastr.
-4. **`NSAlert`, `NSWorkspace`, `NSStatusBar`**, `NSUserDefaultsController`.
-5. **Common libraries with Linux twins**: `libz`, `libbz2`, `libxml2`
-   could come from this system, as Cairo does for drawing.
-6. **Threads** (`pthread_create`, `NSThread`): Ferry runs a program on one
-   thread; dispatch queues run there too.
+1. **More views**: `NSTableView` and `NSOutlineView` (with
+   `NSTableColumn` and `NSTableHeaderView`), `NSSplitView`,
+   `NSTabView`, `NSPopUpButton`, `NSToolbar`, `NSSegmentedControl`,
+   `NSSearchField` and `NSStackView`. Every app's nibs use some of them,
+   and they are now what stops Flycut, Gas Mask and (most likely) Sequel
+   Pro.
+2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
+   (Flycut, ShiftIt, Spectacle, Gas Mask). On freemac this would become a
+   tray icon (StatusNotifierItem), which needs the desktop's support.
+3. **The document classes** (`NSDocument`, `NSDocumentController`):
+   MacPass, MacDown, Sequel Pro.
+4. **`NSAlert`, `NSWorkspace`, `NSInvocation`**, and Foundation's
+   `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle`, `NSDateFormatter`,
+   `NSXMLDocument`, `NSJSONSerialization` and `NSIndexSet` (each used by
+   five or more of the apps).
+5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
+   file or the app's code signature at start. Ferry could provide a version
+   file of its own and answer the signature check plainly.
+6. **Threads**: Ferry runs a program on one thread; dispatch queues run
+   there too.
 
 Things that are out of reach by design on Wayland, and so will need
 another approach: global hotkeys, reading other apps' key presses, and
@@ -101,8 +151,9 @@ moving other apps' windows (the Accessibility API).
 ## Trying an app yourself
 
 ```sh
-ferry "Some App.app/Contents/MacOS/Some App"
-FERRY_VERBOSE=1 ferry "Some App.app/Contents/MacOS/Some App"   # every library, missing call and class
+ferry "Some App.app"
+FERRY_VERBOSE=1 ferry "Some App.app"   # every library, missing call and class
+ferry SomeApp.pkg                      # or .dmg: Ferry's Installer
 ```
 
 Ferry prints what it leaves out on the way; the last line before it

@@ -18,7 +18,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
 | M5 | Nibs (compiled .nib) | **done**, merged (#37) |
 | M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, merged (#136) |
-| M7 | What the apps needed first (`NSImage`, exceptions, window and view controllers), then polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | **done** (see the M7 report below) |
+| M7 | What the apps needed first (`NSImage`, exceptions, window and view controllers), then polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | **done**, merged (#171) |
+| After M7 | More apps, and a graphical installer: Ferry's Installer, scroll and text views, key-value observing, Carbon answers | **in review** (see "More apps, and the Installer" below) |
 
 ## Ground rules
 
@@ -988,6 +989,143 @@ clipboard or drag there).
 (every app's nibs use them), then `NSDocument`/`NSDocumentController`,
 `NSInvocation`, and `NSAlert`/`NSWorkspace`/`NSStatusBar`.
 
+## More apps, and the Installer
+
+Dean (2026-11-23): "can you make sure other apps will work as well, try
+something with a GUI installer". Two new apps (MacDown, Sequel Pro) and
+three real installers (MacPorts' and XQuartz's `.pkg`, Sequel Pro's
+`.dmg`) were added to the seven of M6, and the gaps they showed were
+filled in order.
+
+### Design
+
+- **`ferry` and bundles** (`src/main.c`). `ferry Foo.app` runs the bundle's
+  program (`CFBundleExecutable`, else `Contents/MacOS/<name>`). A `.pkg`,
+  `.mpkg` or `.dmg` (or a file that starts with `xar!` or ends with a disk
+  image's `koly` trailer) starts the Installer instead, found through
+  `FERRY_INSTALLER`, next to `ferry`, or in `/usr/lib/ferry`.
+- **The Installer** (`installer/`), a Mac app built with `ferry-cc`
+  against Ferry's own frameworks. `IPackage.m` reads the formats:
+  - a flat package is a xar archive: a header, a zlib-compressed XML table
+    of contents, then the heap; the Distribution file gives the title,
+    the welcome, read-me, licence and conclusion documents (RTF, HTML or
+    text, from `en.lproj`, `English.lproj`, `Base.lproj`...) and the
+    components; each component's PackageInfo gives its install location;
+  - a Payload is a cpio archive (the portable `070707` form or the newer
+    `070701`), gzip-compressed or in `pbzx` chunks of xz, read as a stream
+    a megabyte at a time so the window stays live;
+  - an old bundle package's `Contents/Archive.pax.gz`;
+  - a disk image is opened with this system's 7-Zip (`7z`, else `7zz`) into
+    a temporary folder; it is searched for packages, and if there are none
+    its apps are copied (7-Zip's `com.apple.*` metadata files left out).
+  Where things go (`IDestination`): anything inside an `X.app` folder to
+  `~/Applications`, everything else under `~/.local/share/ferry/root`.
+  Paths that climb out are skipped, nothing is written through a link the
+  archive made, and an app already installed is replaced. Scripts and the
+  Distribution's JavaScript checks are never run; the pages say so. The
+  window (`Installer.m`) has the usual steps in a sidebar, a licence to
+  agree to, a destination page that says where things go and how much
+  space it takes, a progress page and a summary with "Open <App>"; an
+  installed app is added to the desktop's list with `freemac-mac-app
+  install` when the desktop has it (`FERRY_NO_DESKTOP_ENTRY=1` turns that
+  off). `--info` and `--install` do the same without a window.
+- **Scroll views and text views** (`appkit/NSScrollView.m`,
+  `appkit/NSTextView.m`, `appkit/ATextFormats.m`). `NSClipView` scrolls by
+  moving its bounds origin; scrollers are drawn and dragged; wheel events
+  scroll by lines or by the touchpad's exact amounts. The text view lays
+  out its storage with a Core Text framesetter, draws selection and
+  caret, takes the standard key commands (`moveWordLeft:`,
+  `deleteBackward:`...), copy and paste, and reads and writes RTF (from
+  Microsoft's published RTF specification) and simple HTML, which the
+  Installer's pages use. `NSProgressIndicator` and `NSBox` came with them.
+- **Key-value observing** (`foundation/NSKeyValueObserving.m`).
+  Observers registered for a key path hear changes an object announces
+  with `will/didChangeValueForKey:` and changes made through
+  `setValue:forKey:`, with the New, Old, Initial and Prior options and
+  contexts; an observed object that goes away takes its registrations
+  along. Bindings (`appkit/NSKeyValueBinding.m`) now observe the key path
+  they are bound to and set the view again on a change.
+  `NSUserDefaultsController` reads and writes defaults through its
+  `values` proxy.
+- **Libraries from this system** (`src/host.c`). ICU joins zlib, bzip2,
+  xz, libxml2 and SQLite: a Mac's `libicucore` calls go to this system's
+  ICU under its versioned names (`uregex_open_74`), and
+  `sdk/gen-twin-tbd.sh` writes the matching link stub.
+- **Carbon and Accessibility** (`appkit/Carbon.m`, served as `Carbon`
+  from AppKit's file) and **SystemConfiguration**
+  (`foundation/SystemConfiguration.m`, from Foundation's file): each call
+  answers as a Mac does when the thing isn't available, so apps carry on.
+  Hotkeys are registered but never pressed (Wayland doesn't let one app
+  see another's keys); the keyboard layout has no Mac layout data; the
+  process is never trusted for Accessibility; every address is reachable.
+- **Smaller pieces**: `OSSpinLock`, `OSAtomic...` and `os_unfair_lock`
+  (`src/posix.c`, with headers in the SDK), the old garbage collector's
+  write barriers (plain stores), `CFPreferences`, `CFStringGetCharacters`,
+  cancelling delayed performs, the Services menu's provider, paragraph
+  styles in archives, content borders, cell background styles.
+- **Fixes**: a class left out for a missing superclass now gets an empty
+  method cache, so a message to it is reported instead of crashing (older
+  linkers fill a class's cache words with `_objc_empty_cache` and
+  `_objc_empty_vtable`); `freopen` on stdout or stderr moves the file onto
+  the same descriptor and leaves the stream open when the new file can't
+  be opened, so Ferry's own messages still reach the terminal (Gas Mask
+  redirects its stderr to a log); the Installer counts files it couldn't
+  write and fails instead of reporting success.
+
+### Report (2026-11-23)
+
+**What works now.** A Mac installer package or disk image opens in
+Ferry's Installer and installs for the user: MacPorts' package (1,364
+files, the same as 7-Zip extracts), XQuartz's (310 MB in about 1.5
+seconds) and Sequel Pro's disk image all install through the window,
+checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
+the nine apps, ShiftIt now runs into its event loop and stays there, and
+Gas Mask, Flycut and Spectacle get much further than before. `make
+check` runs 67 tests (60 at M7), all passing. The new or extended ones:
+
+| Test | Proves |
+| --- | --- |
+| `installer` | A package made by `tests/tools/make_pkg.py` (two components, a gzip/`070707` payload and a `pbzx`/`070701` one, an RTF licence, an HTML welcome, a member that climbs out, a link): `--info`, `--install` into test folders (apps and the rest in the right places, nothing outside them, the link kept), the same package cut short failing cleanly, and `ferry Bundled.app` running the bundle's program |
+| `atomics` | Spin locks, unfair locks, the `OSAtomic` calls' results, and stderr still working after a failed `freopen` of it |
+| `twins` | now also ICU's regular expressions through `libicucore` |
+| `foundation_kvo` | Key-value observing: options, contexts, key paths, will/didChange around a setter, `setValue:forKey:`, removal, an observed object going away |
+| `foundation_runloop` | now also cancelling delayed performs, by object and by selector |
+| `appkit_bindings` | now also bindings following changes, and `NSUserDefaultsController` (applied at once, held until saved, reverted) |
+| `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
+| `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
+
+**What isn't done yet (and why).**
+
+- **No real app is usable yet.** The next things they stop at are views
+  Ferry doesn't have (`NSTabView` for Flycut, `NSSplitView` and
+  `NSOutlineView` for Gas Mask, tables for Sequel Pro), `NSStatusBar` (four
+  apps live in the menu bar), the document classes (MacPass, MacDown,
+  Sequel Pro), and their Sparkle updaters' checks of the Mac's version file
+  and code signatures. `docs/ferry-compat.md` has the list.
+- **Install scripts aren't run**, by design: they expect a Mac and root.
+  Packages whose files only work after their scripts (MacPorts) install
+  their files but aren't usable as they are. Absolute links in a payload
+  point at the Mac's paths, outside Ferry's folder.
+- **Disk images need 7-Zip** (`7zip` or `p7zip-full`, now a recommended
+  package); without it the Installer says so. Encrypted images aren't
+  handled.
+- **Key-value observing doesn't rewrite setters**: a class's own setter,
+  called directly, notifies only if the class announces the change (a Mac
+  makes a subclass whose setters do it). Dependent keys aren't followed.
+  Bindings made in nibs are still skipped, and a control's edits aren't
+  written back to the key path.
+- **The desktop's "can't run graphical Mac apps yet" message.** The shell's
+  `freemac-mac-app open` (outside `ferry/`, the desktop side) runs an app
+  with Ferry, and when the app stops it shows Ferry's last line followed
+  by "freemac can't run graphical Mac apps yet". That sentence is now out
+  of date (some apps start, and the Installer is one); left for the
+  desktop side to reword.
+
+**What's next.** The views every app's nibs use (`NSTableView`,
+`NSOutlineView`, `NSSplitView`, `NSTabView`, `NSPopUpButton`), then
+`NSStatusBar` as a tray icon, the document classes, `NSAlert` and
+`NSWorkspace`.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -1018,3 +1156,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M4 merged (#35). M5 done: keyed archives, nib loading, `NSApplicationMain` with a main nib, `make check` 43/43.
 - 2026-11-22: M5 merged (#37). M6 done: real apps tried (docs/ferry-compat.md), NIBArchive nibs, missing frameworks tolerated, Grand Central Dispatch, pre-10.6 libraries, `make check` 48/48.
 - 2026-11-23: M6 merged (#136). M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.
+- 2026-11-23: M7 merged (#171). More apps and installers: Ferry's Installer (.pkg, .dmg), scroll and text views, key-value observing, ICU, Carbon and Accessibility answers; ShiftIt runs into its event loop; MacPorts, XQuartz and Sequel Pro install, `make check` 67/67.
