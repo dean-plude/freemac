@@ -22,6 +22,27 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     NSString *_toolTip;
     NSFocusRingType _focusRing;
     BOOL _focusLocked;
+    NSViewController *_viewController;   /* not retained */
+}
+
+/* A view controller comes between its view and whatever would follow the
+ * view in the responder chain. */
+- (void)setNextResponder:(NSResponder *)next
+{
+    if (_viewController && next != (NSResponder *)_viewController) {
+        [_viewController setNextResponder:next];
+        [super setNextResponder:_viewController];
+    } else {
+        [super setNextResponder:next];
+    }
+}
+- (NSViewController *)_viewController { return _viewController; }
+- (void)_setViewController:(NSViewController *)vc
+{
+    NSResponder *outer = _viewController ? [_viewController nextResponder] : [self nextResponder];
+    [_viewController setNextResponder:nil];
+    _viewController = vc;
+    [self setNextResponder:outer];
 }
 
 - (instancetype)init { return [self initWithFrame:NSZeroRect]; }

@@ -191,6 +191,26 @@ else
     echo "FAIL appkit_nib (did not compile)"; sed 's/^/    /' "$build/appkit_nib.cc.log"
     fail=$((fail + 1))
 fi
+# Window and view controllers loading their own nibs (M7), from a copy
+# of NibApp.app.
+app="$build/ControllerApp.app"
+rm -rf "$app"; cp -r "$here/appkit/NibApp.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/NibApp" "$here/appkit/controllers.m" -framework Cocoa \
+        2> "$build/appkit_controllers.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$app/Contents/MacOS/NibApp" \
+        > "$build/appkit_controllers.got" 2> "$build/appkit_controllers.err"
+    echo "exit=$?" >> "$build/appkit_controllers.got"
+    if diff -u "$here/appkit/controllers.out" "$build/appkit_controllers.got" > "$build/appkit_controllers.diff"; then
+        echo "ok   appkit_controllers"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_controllers"; sed 's/^/    /' "$build/appkit_controllers.diff"
+        sed 's/^/    stderr: /' "$build/appkit_controllers.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_controllers (did not compile)"; sed 's/^/    /' "$build/appkit_controllers.cc.log"
+    fail=$((fail + 1))
+fi
 # Images (M7), in an app bundle the test writes its image files into: it
 # runs from there, so imageNamed: finds them. No image files are kept here.
 app="$build/ImageApp.app"

@@ -348,6 +348,48 @@ def panel_nib(path, nib_archive_form=False):
         a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def window_controller_nib(path):
+    """A window nib owned by a window controller: the window, a label and a
+    button that sends press: to the owner."""
+    a = Archive()
+    owner = custom(a, "MyWindowController")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    content, status, button = a.reserve(), a.reserve(), a.reserve()
+    window = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=15, NSWindowBacking=2,
+                         NSWindowRect="{{120, 120}, {300, 140}}", NSWindowTitle=a.add("Controlled"),
+                         NSWindowClass=a.add("NSWindow"), NSWindowView=content))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {300, 140}}", 256 | 18, UID(0), NSSubviews=a.array([status, button]))
+    view(a, status, "NSTextField", CONTROL, "{{20, 90}, {260, 20}}", 256, content,
+         NSCell=text_cell(a, "NSTextFieldCell", "Not pressed", 0x04000000, background=False))
+    view(a, button, "NSButton", CONTROL, "{{20, 30}, {100, 32}}", 256, content,
+         NSCell=button_cell(a, "Press"), NSEnabled=True)
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, window, "window"), connector(a, out, owner, status, "status"),
+             connector(a, "NSNibControlConnector", button, owner, "press:")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (window, owner),
+             (content, window), (status, content), (button, content)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
+def view_controller_nib(path):
+    """A view nib owned by a view controller, in the NIBArchive form."""
+    a = Archive()
+    owner = custom(a, "ListViewController")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    top, label = a.reserve(), a.reserve()
+    view(a, top, "NSView", VIEW, "{{0, 0}, {200, 80}}", 256 | 18, UID(0), NSSubviews=a.array([label]))
+    view(a, label, "NSTextField", CONTROL, "{{10, 30}, {180, 20}}", 256, top,
+         NSCell=text_cell(a, "NSTextFieldCell", "From the view nib", 0x04000000, background=False))
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, top, "view"), connector(a, out, owner, label, "label")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (top, owner), (label, top)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save_nib_archive(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 def dot_png(path):
     """An 8x8 blue disc on clear, as PNG, drawn here pixel by pixel."""
     import zlib
@@ -372,6 +414,8 @@ main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
 panel_nib(os.path.join(resources, "Panel.nib", "keyedobjects.nib"))
 panel_nib(os.path.join(resources, "PanelArchive.nib"), nib_archive_form=True)
 dot_png(os.path.join(resources, "dot.png"))
+window_controller_nib(os.path.join(resources, "Controlled.nib"))
+view_controller_nib(os.path.join(resources, "ListViewController.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

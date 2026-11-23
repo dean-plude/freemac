@@ -102,6 +102,14 @@ void AViewDecode(NSView *view, NSCoder *coder);
 @interface NSObject (FerryNibImage)
 - (NSString *)_imageName;
 @end
+@interface NSWindow (FerryControllers)
+- (NSWindowController *)_windowController;
+- (void)_setWindowController:(NSWindowController *)wc;
+@end
+@interface NSView (FerryControllers)
+- (NSViewController *)_viewController;
+- (void)_setViewController:(NSViewController *)vc;
+@end
 @interface NSImage (FerryPrivate)
 /* In rect, upright in flipped views; a template is filled with color. */
 - (void)_drawInControlRect:(NSRect)rect color:(NSColor *)color fraction:(CGFloat)fraction;

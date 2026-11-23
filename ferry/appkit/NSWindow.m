@@ -43,6 +43,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSWindowLevel _level;
     CGFloat _alpha;
     NSString *_autosaveName;
+    NSWindowController *_windowController;      /* not retained */
+    NSViewController *_contentViewController;
+    BOOL _edited;
     NSView *_mouseView[3];            /* retained while a button is down */
     NSEvent *_current;
     /* drawing and GTK */
@@ -240,6 +243,46 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     return YES;
 }
 - (BOOL)setFrameUsingName:(NSString *)name { return NO; }
+
+/* ---- controllers ---- */
+- (NSWindowController *)windowController { return _windowController; }
+- (void)setWindowController:(NSWindowController *)wc { [wc setWindow:self]; }
+- (NSWindowController *)_windowController { return _windowController; }
+- (void)_setWindowController:(NSWindowController *)wc { _windowController = wc; }
+- (NSViewController *)contentViewController { return _contentViewController; }
+- (void)setContentViewController:(NSViewController *)vc
+{
+    if (vc == _contentViewController)
+        return;
+    [vc retain];
+    [_contentViewController release];
+    _contentViewController = vc;
+    NSView *view = [vc view];
+    if (view) {
+        NSSize size = [view frame].size;
+        if (size.width > 0 && size.height > 0)
+            [self setContentSize:size];
+        [self setContentView:view];
+    }
+    if ([vc title] && ![[self title] length])
+        [self setTitle:[vc title]];
+}
++ (instancetype)windowWithContentViewController:(NSViewController *)vc
+{
+    NSView *view = [vc view];
+    NSRect r = NSMakeRect(0, 0, view ? [view frame].size.width : 480, view ? [view frame].size.height : 270);
+    NSWindow *w = [[[self alloc] initWithContentRect:r
+                                           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                                                     NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+                                             backing:NSBackingStoreBuffered
+                                               defer:NO] autorelease];
+    [w setReleasedWhenClosed:NO];
+    [w setContentViewController:vc];
+    [w center];
+    return w;
+}
+- (BOOL)isDocumentEdited { return _edited; }
+- (void)setDocumentEdited:(BOOL)f { _edited = f; }
 - (BOOL)titlebarAppearsTransparent { return _transparentTitle; }
 - (void)setTitlebarAppearsTransparent:(BOOL)flag { _transparentTitle = flag; }
 - (NSInteger)titleVisibility { return _titleVisibility; }

@@ -14,6 +14,7 @@
 
 @class NSApplication, NSWindow, NSView, NSEvent, NSColor, NSFont, NSMenu, NSMenuItem, NSScreen;
 @class NSGraphicsContext, NSBitmapImageRep, NSParagraphStyle, NSBezierPath, NSCursor, NSImage;
+@class NSWindowController, NSViewController, NSStoryboard;
 
 /* ---- events ----------------------------------------------------------------------- */
 
@@ -973,6 +974,10 @@ enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLev
 - (BOOL)setFrameAutosaveName:(NSString *)name;
 - (void)setTitleWithRepresentedFilename:(NSString *)path;
 - (NSPoint)cascadeTopLeftFromPoint:(NSPoint)point;
++ (instancetype)windowWithContentViewController:(NSViewController *)vc;
+@property (assign) NSWindowController *windowController;
+@property (retain) NSViewController *contentViewController;
+@property (getter=isDocumentEdited) BOOL documentEdited;
 @end
 APPKIT_EXTERN NSNotificationName const NSWindowWillCloseNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidResizeNotification;
@@ -1150,6 +1155,78 @@ APPKIT_EXTERN NSNotificationName const NSApplicationDidResignActiveNotification;
 #ifndef IBInspectable
 #define IBInspectable
 #endif
+
+/* ---- controllers ------------------------------------------------------------------- */
+
+typedef NSString *NSNibName;
+
+/* Loads its window from a nib (as File's Owner) the first time the window
+ * is asked for, and follows the window in the responder chain. */
+@interface NSWindowController : NSResponder <NSCoding>
+- (instancetype)initWithWindow:(NSWindow *)window;
+- (instancetype)initWithWindowNibName:(NSNibName)name;
+- (instancetype)initWithWindowNibName:(NSNibName)name owner:(id)owner;
+- (instancetype)initWithWindowNibPath:(NSString *)path owner:(id)owner;
+@property (retain) NSWindow *window;
+@property (readonly, copy) NSNibName windowNibName;
+@property (readonly, copy) NSString *windowNibPath;
+@property (readonly, assign) id owner;
+@property (readonly, getter=isWindowLoaded) BOOL windowLoaded;
+@property (copy) NSString *windowFrameAutosaveName;
+@property BOOL shouldCascadeWindows, shouldCloseDocument;
+@property (assign) id document;
+@property (retain) NSViewController *contentViewController;
+@property (readonly) NSStoryboard *storyboard;
+- (void)loadWindow;
+- (void)windowWillLoad;
+- (void)windowDidLoad;
+- (IBAction)showWindow:(id)sender;
+- (void)close;
+- (void)dismissController:(id)sender;
+- (NSString *)windowTitleForDocumentDisplayName:(NSString *)displayName;
+- (void)synchronizeWindowTitleWithDocumentName;
+- (void)setDocumentEdited:(BOOL)edited;
+@end
+
+/* Loads its view from a nib (named after the class unless given) the first
+ * time the view is asked for, and sits between the view and its superview
+ * in the responder chain. Sheets and popovers are shown as windows. */
+@interface NSViewController : NSResponder <NSCoding>
+- (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle;
+@property (readonly, copy) NSNibName nibName;
+@property (readonly, retain) NSBundle *nibBundle;
+@property (retain) NSView *view;
+@property (readonly) NSView *viewIfLoaded;
+@property (readonly, getter=isViewLoaded) BOOL viewLoaded;
+@property (copy) NSString *title;
+@property (retain) id representedObject;
+@property NSSize preferredContentSize;
+@property (copy) NSArray<NSViewController *> *childViewControllers;
+@property (readonly, assign) NSViewController *parentViewController;
+@property (readonly, assign) NSViewController *presentingViewController;
+@property (readonly) NSArray<NSViewController *> *presentedViewControllers;
+@property (readonly) NSStoryboard *storyboard;
+- (void)loadView;
+- (void)loadViewIfNeeded;
+- (void)viewDidLoad;
+- (void)viewWillAppear;
+- (void)viewDidAppear;
+- (void)viewWillDisappear;
+- (void)viewDidDisappear;
+- (void)updateViewConstraints;
+- (void)viewWillLayout;
+- (void)viewDidLayout;
+- (void)addChildViewController:(NSViewController *)child;
+- (void)insertChildViewController:(NSViewController *)child atIndex:(NSInteger)index;
+- (void)removeChildViewControllerAtIndex:(NSInteger)index;
+- (void)removeFromParentViewController;
+- (void)presentViewControllerAsSheet:(NSViewController *)vc;
+- (void)presentViewControllerAsModalWindow:(NSViewController *)vc;
+- (void)presentViewController:(NSViewController *)vc asPopoverRelativeToRect:(NSRect)rect ofView:(NSView *)view
+                preferredEdge:(NSRectEdge)edge behavior:(NSInteger)behavior;
+- (void)dismissViewController:(NSViewController *)vc;
+- (void)dismissController:(id)sender;
+@end
 #ifndef IB_DESIGNABLE
 #define IB_DESIGNABLE
 #endif
