@@ -367,9 +367,24 @@ def power(window):
     lock_after.connect("changed", lambda c: window.save_prefs(lock_after=int(c.get_active_id())))
     on_sleep = _switch(bool(prefs.get("lock_on_sleep", True)),
                        lambda active: window.save_prefs(lock_on_sleep=active))
+    message = Gtk.Entry(text=str(prefs.get("lock_message") or ""), placeholder_text="If found, please call…",
+                        max_length=200, width_chars=28)
+    message.set_sensitive(bool(prefs.get("lock_message_on")))
+    message.connect("changed", lambda e: window.save_prefs(lock_message=e.get_text()))
+
+    def message_switched(active):
+        message.set_sensitive(active)
+        window.save_prefs(lock_message_on=active)
+        if active:
+            message.grab_focus()
+    show_message = _switch(bool(prefs.get("lock_message_on")), message_switched)
     groups.append(group(row("Lock the screen after", lock_after,
                             "You'll need your password to get back in. \u2303\u2318Q locks at once."),
-                        row("Lock before sleeping", on_sleep)))
+                        row("Lock before sleeping", on_sleep),
+                        row("Show message when locked", show_message,
+                            "A few words under the password field, such as how to return the computer "
+                            "if it's lost."),
+                        row("Message", message)))
     if shutil.which("powerprofilesctl") and not battery_state():
         # A computer with a battery has Low Power Mode instead, as a Mac does.
         mode = Gtk.ComboBoxText()
@@ -914,6 +929,12 @@ def notifications(window):
     if not seconds.get_active_id():
         seconds.set_active_id("5")
     seconds.connect("changed", lambda c: window.save_prefs(banner_seconds=int(c.get_active_id())))
+    from . import latch
+    previews = Gtk.ComboBoxText()
+    for value, label in latch.PREVIEWS:
+        previews.append(value, label)
+    previews.set_active_id(latch.previews(prefs))
+    previews.connect("changed", lambda c: window.save_prefs(notify_previews=c.get_active_id()))
     clear = Gtk.Button(label="Clear")
 
     def clear_history(_button):
@@ -958,6 +979,9 @@ def notifications(window):
         row("Focus", to_focus,
             "Do Not Disturb, Sleep, Work and Personal quiet banners, at set times or whenever you like."),
         row("Show banners for", seconds),
+        row("Show previews", previews,
+            "What notifications say. When Unlocked keeps it off the lock screen, which shows only "
+            "which app sent one."),
     ), group(*app_rows), group(
         row("Notification history", clear, "Click the clock in the menu bar to see recent notifications."),
     ))

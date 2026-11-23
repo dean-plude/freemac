@@ -203,6 +203,16 @@ TOPICS = {
         "Control+⌘Q locks the screen. Type your password to come back.",
         "The freemac menu at the left end of the menu bar has Lock Screen, Restart, Shut Down and Log Out.",
     ]),
+    "lock-screen": ("What the lock screen shows", "lock screen locked now playing music notifications battery message "
+                    "if found lost previews", [
+        "While music plays, the lock screen shows the song with buttons to go back, pause and skip.",
+        "Notifications that come in while the computer is locked show under the clock. Dials > Notifications > "
+        "Show previews chooses what they say there: Always shows the words; When Unlocked and Never show only "
+        "which app sent one.",
+        "A computer with a battery shows how charged it is in the top right corner.",
+        "To show a message under the password field, such as how to return the computer if it's lost, turn on "
+        "Show message when locked in Dials > Power (Battery on a laptop) and type it in.",
+    ]),
     "stuck": ("When an app stops answering", "force quit frozen stuck hang not responding crash", [
         "Press ⌥⌘⎋ (Option, Command and Escape), or choose Force Quit in the freemac menu, "
         "then choose the app and Force Quit.",

@@ -217,11 +217,14 @@ class Card(Gtk.EventBox):
         stamp.get_style_context().add_class("beacon-time")
         top.pack_start(stamp, False, False, 0)
         text.pack_start(top, False, False, 0)
-        if note.summary:
-            summary = Gtk.Label(label=plain(note.summary), xalign=0, wrap=True, max_width_chars=34)
+        # Dials > Notifications > Show previews: Never keeps what they say hidden.
+        hidden = style.prefs().get("notify_previews") == "never"
+        if note.summary or hidden:
+            summary = Gtk.Label(label="Notification" if hidden else plain(note.summary), xalign=0, wrap=True,
+                                max_width_chars=34)
             summary.get_style_context().add_class("beacon-summary")
             text.pack_start(summary, False, False, 0)
-        if note.body:
+        if note.body and not hidden:
             body = Gtk.Label(label=plain(note.body), xalign=0, wrap=True, max_width_chars=38, lines=4)
             body.set_ellipsize(3)  # Pango.EllipsizeMode.END
             text.pack_start(body, False, False, 0)

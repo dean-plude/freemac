@@ -9,12 +9,15 @@
                             (awake.py: videos playing, caffeinate)
     freemac-lock --idle     what the idle timer runs: while a screen saver
                             shows, it marks the lock for when it ends instead
+    freemac-lock --feed [T] run by the lock screen itself (freemac-latch.so):
+                            what to show on it, one line at a time (below)
 
 The lock itself is gtklock (Wayland session locking with PAM), dressed to
 look like the login screen: the blurred wallpaper, the date and a large
 clock, the person's picture and name, and a round password field. Idle detection is swayidle. Settings live in ~/.config/freemac/shell.json
 as "lock_after" (minutes, 0 for never) and "lock_on_sleep".
 """
+import json
 import os
 import shutil
 import signal
@@ -76,6 +79,23 @@ label { color: #ffffff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
 #unlock-button:disabled { background-color: rgba(255, 255, 255, 0.12); }
 #error-label { color: #ffd8d4; font-size: 13px; }
 #warning-label { color: rgba(255, 255, 255, 0.80); font-size: 13px; }
+#message-label { color: rgba(255, 255, 255, 0.88); font-size: 13px; }
+#battery-label { font-size: 13px; font-weight: 500; }
+#latch-card, #latch-playing {
+    background-color: rgba(255, 255, 255, 0.24);
+    border-radius: 16px;
+    padding: 10px 12px;
+}
+#latch-card label, #latch-playing label { text-shadow: none; }
+#latch-card-app { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.72); }
+#latch-card-when { font-size: 11px; color: rgba(255, 255, 255, 0.72); }
+#latch-card-title { font-size: 13px; font-weight: 600; }
+#latch-card-body, #latch-card-artist { font-size: 13px; color: rgba(255, 255, 255, 0.88); }
+#latch-media-button { color: #ffffff; min-width: 32px; min-height: 32px; padding: 2px;
+                      border-radius: 16px; background: none; border: none; box-shadow: none; }
+#latch-media-button:hover { background-color: rgba(255, 255, 255, 0.18); }
+#latch-media-button:disabled { color: rgba(255, 255, 255, 0.35); }
+#latch-more { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.80); }
 """
 
 MODULE = "/usr/lib/gtklock/freemac-latch.so"
@@ -284,6 +304,178 @@ def watch():
     return 0
 
 
+# ---- What the lock screen shows besides the clock ---------------------------
+# freemac-latch.so starts "freemac-lock --feed" when the screen locks and
+# reads what to show from it, a block at a time, each line's fields split by
+# tabs:
+#     clear
+#     battery   <percent> <charging|plugged|battery>
+#     playing   <app> <title> <artist> <Playing|Paused> <can previous> <can next>
+#     note      <app> <icon> <title> <body> <when>
+#     more      <count>
+#     message   <text>
+#     end
+# and it writes back "play-pause", "next" or "previous" when one of the
+# Now Playing buttons is pressed. A block is only sent when something in it
+# changed. Notifications are the ones that came in since the screen locked,
+# newest first; how much of them shows follows Dials > Notifications > Show
+# previews ("always", "unlocked" or "never"; on a Mac, When Unlocked keeps
+# what they say off the lock screen).
+PREVIEWS = (("always", "Always"), ("unlocked", "When Unlocked"), ("never", "Never"))
+SHOWN_NOTES = 4
+
+
+def previews(prefs=None):
+    value = (prefs if prefs is not None else style.prefs()).get("notify_previews")
+    return value if value in dict(PREVIEWS) else "unlocked"
+
+
+def message(prefs=None):
+    """The message under the password field, or "" for none."""
+    prefs = prefs if prefs is not None else style.prefs()
+    text = str(prefs.get("lock_message") or "").strip()
+    return " ".join(text.split())[:200] if prefs.get("lock_message_on") else ""
+
+
+def _clean(text):
+    return " ".join(str(text or "").replace("\t", " ").split())
+
+
+def _plain(text):
+    """Notification bodies may carry a little markup; the lock screen shows words."""
+    import re
+    text = re.sub(r"<[^>]+>", "", str(text or ""))
+    for old, new in (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'"), ("&amp;", "&")):
+        text = text.replace(old, new)
+    return _clean(text)
+
+
+def notes_since(since, history_path=None, prefs=None):
+    """The notifications that came in since the screen locked, newest first,
+    as (app, icon, title, body), with what they say hidden as the previews
+    setting asks, and those a Focus keeps quiet left out."""
+    from . import beacon, notify_rules
+    prefs = prefs if prefs is not None else style.prefs()
+    try:
+        with open(history_path or beacon.HISTORY) as f:
+            history = json.load(f)
+    except (OSError, ValueError):
+        return []
+    shown = previews(prefs) == "always"
+    notes = []
+    for item in history if isinstance(history, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            when = float(item.get("when") or 0)
+        except (TypeError, ValueError):
+            continue
+        app = _clean(item.get("app")) or "Notification"
+        if when < since or not notify_rules.allowed(prefs, app):
+            continue
+        if shown:
+            title, body = _plain(item.get("summary")), _plain(item.get("body"))
+        else:
+            title, body = "Notification", ""
+        notes.append((when, app, _clean(item.get("icon")), title, body))
+    notes.sort(key=lambda n: -n[0])
+    return [(app, icon, title, body, when) for when, app, icon, title, body in notes]
+
+
+def feed_block(since, prefs=None, history_path=None, playing=None, power=None):
+    """The lines of one block, without "end"."""
+    prefs = prefs if prefs is not None else style.prefs()
+    lines = ["clear"]
+    if power:
+        percent, state = power
+        lines.append(f"battery\t{percent}\t{state}")
+    if playing:
+        lines.append("\t".join(["playing", _clean(playing.get("app")), _clean(playing.get("title")),
+                                 _clean(playing.get("artist")), playing.get("status") or "Paused",
+                                 "1" if playing.get("can_previous") else "0",
+                                 "1" if playing.get("can_next") else "0"]))
+    notes = notes_since(since, history_path, prefs)
+    for app, icon, title, body, when in notes[:SHOWN_NOTES]:
+        lines.append("\t".join(["note", app, icon, title, body, str(int(when))]))
+    if len(notes) > SHOWN_NOTES:
+        lines.append(f"more\t{len(notes) - SHOWN_NOTES}")
+    text = message(prefs)
+    if text:
+        lines.append("message\t" + text)
+    return lines
+
+
+def power_now():
+    """(percent, "charging" | "plugged" | "battery") or None with no battery."""
+    from . import battery
+    path = battery.find()
+    if path is None:
+        return None
+    try:
+        percent = max(0, min(100, int(battery.read(path, "capacity") or 0)))
+    except ValueError:
+        return None
+    status = battery.read(path, "status") or ""
+    if status == "Charging":
+        return percent, "charging"
+    return percent, "plugged" if battery.on_adapter(path) else "battery"
+
+
+def feed(since=None):
+    """What the lock screen reads; see above. Looks again every two seconds
+    and stops when the lock screen closes its end. since is when the screen
+    locked (the lock screen passes it, as this takes a moment to start)."""
+    from . import media
+    since = (since or time.time()) - 1
+    bus = media.session()
+    last = None
+    loop = GLib.MainLoop()
+    state = {"power": None, "power_at": 0}
+
+    def send():
+        now = time.time()
+        if now - state["power_at"] > 30:
+            state["power"], state["power_at"] = power_now(), now
+        playing = media.current(bus) if bus else None
+        block = feed_block(since, playing=playing, power=state["power"])
+        nonlocal last
+        if block != last:
+            last = block
+            try:
+                sys.stdout.write("\n".join(block + ["end"]) + "\n")
+                sys.stdout.flush()
+            except (BrokenPipeError, OSError):
+                loop.quit()
+                return False
+        return True
+
+    def command(channel, condition):
+        if condition & (GLib.IOCondition.HUP | GLib.IOCondition.ERR):
+            loop.quit()
+            return False
+        try:
+            line = sys.stdin.readline()
+        except OSError:
+            line = ""
+        if not line:
+            loop.quit()
+            return False
+        word = line.strip()
+        if bus and word in ("play-pause", "next", "previous"):
+            media.send(word, bus)
+            GLib.timeout_add(300, lambda: send() and False)
+        return True
+
+    send()
+    GLib.timeout_add_seconds(2, send)
+    GLib.io_add_watch(sys.stdin.fileno(), GLib.PRIORITY_DEFAULT,
+                      GLib.IOCondition.IN | GLib.IOCondition.HUP | GLib.IOCondition.ERR, command)
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, loop.quit)
+    loop.run()
+    return 0
+
+
 def main():
     args = sys.argv[1:]
     if args in (["-h"], ["--help"]):
@@ -293,6 +485,13 @@ def main():
         return watch()
     if "--idle" in args:
         return idle_lock()
+    if "--feed" in args:
+        rest = args[args.index("--feed") + 1:]
+        try:
+            since = float(rest[0]) if rest else None
+        except ValueError:
+            since = None
+        return feed(since)
     return lock()
 
 

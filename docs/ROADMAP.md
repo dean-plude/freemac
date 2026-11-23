@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.136 "lock screen" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Now Playing on the lock screen: the song, its artist and app, with back, play or pause, and skip buttons that work without unlocking | Latch (freemac-latch.c, latch.py), media.py | done |
+| 2 | Notifications that come in while locked show under the clock, newest first, as many as fit and then "N more notifications"; a Focus keeps its quiet apps off it too | Latch, Beacon's history | done |
+| 3 | Dials > Notifications > Show previews: Always, When Unlocked (as on a Mac) or Never; When Unlocked and Never show only which app sent one on the lock screen, and Never hides the words in banners and the Notification Centre as well | Dials, Latch, Beacon | done |
+| 4 | The battery's level in the lock screen's top right, green while charging | Latch, battery.py | done |
+| 5 | Show message when locked (Dials > Power or Battery): a few words under the password field, such as how to return a lost computer | Dials, Latch | done |
+| 6 | Guide topic; README row and lock screen screenshot; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.135 "widgets" (done)
 
 | # | Item | Component | Status |
