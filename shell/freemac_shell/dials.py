@@ -168,6 +168,11 @@ CSS = b"""
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
+.dials-flow, .dials-flow flowboxchild { background: none; padding: 0; }
+.dials-days button:checked { background-image: none; background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color; border-color: @theme_selected_bg_color; box-shadow: none; }
+.dials-days button:checked:disabled { background-color: alpha(@theme_fg_color, 0.12); color: alpha(@theme_fg_color, 0.45);
+  border-color: alpha(@theme_fg_color, 0.12); }
 .dials-error { color: #f04d3e; font-size: 12px; }
 .dials-choice { padding: 8px; border-radius: 12px; border: 2px solid transparent; background: none; box-shadow: none; }
 .dials-choice:checked { border-color: @theme_selected_bg_color; }
@@ -325,6 +330,7 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_sharing.sharing_page(self)),
             (1, "notifications", "Notifications", "preferences-system-notifications-symbolic", "red",
              lambda: dials_more.notifications(self)),
+            (1, "focus", "Focus", "freemac-focus-dnd-symbolic", "indigo", lambda: dials_more.focus(self)),
             (1, "sound", "Sound", "audio-volume-high-symbolic", "pink", lambda: dials_more.sound(self)),
             (2, "about", "About", "help-about-symbolic", "gray", self.about),
             (2, "softwareupdate", "Software Update", "freemac-software-update-symbolic", "gray",
@@ -990,7 +996,7 @@ class DialsWindow(Gtk.ApplicationWindow):
 MENU_PANELS = (
     (("appearance", "Appearance"), ("wallpaper", "Wallpaper"), ("screensaver", "Screen Saver"),
      ("dock", "Dock and Menu Bar"), ("seek", "Seek"),
-     ("notifications", "Notifications")),
+     ("notifications", "Notifications"), ("focus", "Focus")),
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
     (("network", "Network"), ("sharing", "Sharing"), ("accessibility", "Accessibility"), ("users", "Users"),

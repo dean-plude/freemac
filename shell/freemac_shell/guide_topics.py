@@ -885,11 +885,24 @@ TOPICS = {
         "Click the date and time in the menu bar to open the notification centre. Several notifications "
         "from one app sit in a stack: click it to see them all, and click the x beside the app's name to "
         "clear them.",
-        "Do Not Disturb hides banners, while notifications still collect in the centre. Turn it on with the "
-        "switch there, or have it come on by itself every day: open Dials > Notifications, turn on "
-        "Turn on at set times and choose the hours, for example 22:00 to 07:00.",
+        "To quiet banners for a while, turn on a Focus, such as Do Not Disturb: choose it from Focus at the "
+        "top of the centre, or from Focus in Quick Settings.",
         "In Dials > Notifications each app that has sent a notification has its own choice: Banners, "
         "In Notification Centre only, or Off.",
+    ]),
+    "focus": ("Use Focus to quiet notifications", "focus do not disturb dnd quiet silence sleep bedtime night work personal schedule allowed apps moon bed concentrate mute", [
+        "A Focus hides banners so you can get on with things. Notifications still collect in the "
+        "notification centre, and urgent ones always show. There are four: Do Not Disturb, Sleep, Work "
+        "and Personal.",
+        "To turn one on, click Quick Settings in the menu bar, click Focus and choose one. Click it again "
+        "to turn it off. You can also choose it from Focus at the top of the notification centre.",
+        "While a Focus is on, its symbol shows in the menu bar: a moon for Do Not Disturb, a bed for "
+        "Sleep, a briefcase for Work and a person for Personal.",
+        "To choose the apps that can still reach you, open Dials > Focus and tick them under the Focus's "
+        "Allowed apps.",
+        "To have a Focus come on by itself, turn on Turn on at set times under it and choose the hours "
+        "and days, for example Work from 09:00 to 17:00, Monday to Friday. If you turn it off early, it "
+        "stays off until the next time.",
     ]),
     "widgets": ("Put widgets on your desktop", "widgets widget desktop clock calendar weather reminders gallery edit", [
         "Right-click an empty part of the desktop and choose Edit Widgets…. Click Add beside a clock, "

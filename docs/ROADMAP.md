@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.129 "focus" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Focus, as on a Mac: Do Not Disturb, Sleep, Work and Personal, one at a time; Quick Settings' Focus tile opens a list to pick one, and the menu bar shows its symbol | Beacon (notify_rules.py), Topline (quick.py, topline.py) | done |
+| 2 | Each Focus has its own allowed apps, whose banners still show while it's on; urgent notices always show | Beacon | done |
+| 3 | Each Focus can turn on by itself at set times on chosen days (Work: 9 to 5, Monday to Friday); turning it off by hand keeps it off until that stretch ends | Beacon (notify_rules.py) | done |
+| 4 | Dials > Focus: a page for each Focus with its switch, allowed apps and schedule; the Notification Centre's menu picks a Focus too | Dials, Beacon | done |
+| 5 | Original symbols for the four Focuses; Guide topic; README row; every README screenshot retaken | Art, Guide, Docs | done |
+
 ## 1.128 "mouse keys" (done)
 
 | # | Item | Component | Status |

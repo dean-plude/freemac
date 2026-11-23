@@ -733,39 +733,6 @@ def notifications(window):
 
     clear.connect("clicked", clear_history)
 
-    # Do Not Disturb every day between two times.
-    rule = notify_rules.schedule(prefs)
-
-    def times():
-        combo = Gtk.ComboBoxText()
-        for minutes in range(0, 24 * 60, 30):
-            text = f"{minutes // 60:02d}:{minutes % 60:02d}"
-            combo.append(text, text)
-        return combo
-    start, end = times(), times()
-    start.set_active_id(rule["from"])
-    end.set_active_id(rule["to"])
-    if not start.get_active_id():          # a time set by hand, not on the half hour
-        start.append(rule["from"], rule["from"])
-        start.set_active_id(rule["from"])
-    if not end.get_active_id():
-        end.append(rule["to"], rule["to"])
-        end.set_active_id(rule["to"])
-    span = Gtk.Box(spacing=6)
-    span.pack_start(Gtk.Label(label="From"), False, False, 0)
-    span.pack_start(start, False, False, 0)
-    span.pack_start(Gtk.Label(label="to"), False, False, 0)
-    span.pack_start(end, False, False, 0)
-
-    def save_schedule(**change):
-        now = notify_rules.schedule(style.prefs())
-        now.update(change)
-        window.save_prefs(dnd_schedule=now)
-        span.set_sensitive(now["on"])
-    start.connect("changed", lambda c: save_schedule(**{"from": c.get_active_id()}))
-    end.connect("changed", lambda c: save_schedule(to=c.get_active_id()))
-    span.set_sensitive(rule["on"])
-
     # One row for each app that has sent a notification.
     from . import beacon
 
@@ -793,16 +760,148 @@ def notifications(window):
         app_rows.append(line)
     if not app_rows:
         app_rows.append(row("No apps have sent notifications yet."))
+    to_focus = Gtk.Button(label="Focus Settings…")
+    to_focus.connect("clicked", lambda *_: window.show_panel("focus"))
     return page("Notifications", group(
-        row("Do Not Disturb", switch(bool(prefs.get("dnd")), lambda on: window.save_prefs(dnd=on)),
-            "Banners stay hidden; notifications still collect in the list. Urgent ones still show."),
-        row("Turn on at set times", switch(rule["on"], lambda on: save_schedule(on=on)),
-            "Do Not Disturb comes on by itself every day, for example overnight."),
-        row("Every day", span),
+        row("Focus", to_focus,
+            "Do Not Disturb, Sleep, Work and Personal quiet banners, at set times or whenever you like."),
         row("Show banners for", seconds),
     ), group(*app_rows), group(
         row("Notification history", clear, "Click the clock in the menu bar to see recent notifications."),
     ))
+
+
+def _time_choice(value):
+    """A drop-down of times on the half hour, showing value."""
+    combo = Gtk.ComboBoxText()
+    for minutes in range(0, 24 * 60, 30):
+        text = f"{minutes // 60:02d}:{minutes % 60:02d}"
+        combo.append(text, text)
+    combo.set_active_id(value)
+    if not combo.get_active_id():          # a time set by hand, not on the half hour
+        combo.append(value, value)
+        combo.set_active_id(value)
+    return combo
+
+
+# ---- Focus ------------------------------------------------------------------------
+FOCUS_ABOUT = {
+    "dnd": "Quiet everything, for as long as you like.",
+    "sleep": "Quiet the evening and night, so the computer doesn't wake you.",
+    "work": "Hear only from the apps you work with.",
+    "personal": "Leave work behind and hear from the apps you choose.",
+}
+
+
+def focus(window):
+    """Focus, as on a Mac: Do Not Disturb, Sleep, Work and Personal. Each
+    hides banners while it's on (they still collect in the notification
+    centre), lets the apps you choose through, and can come on by itself at
+    set times on set days (notify_rules.py has the rules)."""
+    from . import beacon
+
+    group, row, page, _slider, switch = window.helpers
+    prefs = style.prefs()
+    apps = notify_rules.known_apps(beacon.APPS)
+    on_switches = {}
+    syncing = {"busy": False}
+
+    def turn(focus_id, on):
+        if syncing["busy"]:
+            return
+        now = style.prefs()
+        if on:
+            window.save_prefs(**notify_rules.focus_writes(focus_id))
+        elif notify_rules.active_focus(now) == focus_id:
+            window.save_prefs(**notify_rules.focus_writes(None, now))
+        # Only one Focus is on at a time: the others' switches follow.
+        syncing["busy"] = True
+        current = notify_rules.active_focus(style.prefs())
+        for key, other in on_switches.items():
+            other.set_active(key == current)
+        syncing["busy"] = False
+
+    def save_schedule(focus_id, **change):
+        now = style.prefs()
+        rule = notify_rules.schedule(now, focus_id)
+        rule.update(change)
+        if focus_id == "dnd":
+            window.save_prefs(dnd_schedule=rule)
+        else:
+            window.save_prefs(focus_settings=notify_rules.with_focus_setting(now, focus_id, "schedule", rule))
+
+    def save_allowed(focus_id, app, on):
+        now = style.prefs()
+        allowed = [a for a in notify_rules.allowed_apps(now, focus_id) if a != app]
+        if on:
+            allowed.append(app)
+        window.save_prefs(focus_settings=notify_rules.with_focus_setting(now, focus_id, "allow", sorted(allowed)))
+
+    groups = []
+    active = notify_rules.active_focus(prefs)
+    for focus_id, name, icon, _start in notify_rules.FOCUSES:
+        rule = notify_rules.schedule(prefs, focus_id)
+        on = switch(active == focus_id, lambda value, f=focus_id: turn(f, value))
+        on_switches[focus_id] = on
+        head = row(name, on, FOCUS_ABOUT[focus_id])
+        symbol = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR)
+        head.get_child().pack_start(symbol, False, False, 0)
+        head.get_child().reorder_child(symbol, 0)
+
+        # Allowed apps: their banners still show while this Focus is on.
+        allowed = notify_rules.allowed_apps(prefs, focus_id)
+        if apps:
+            flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3,
+                               min_children_per_line=2, column_spacing=6, row_spacing=2)
+            flow.get_style_context().add_class("dials-flow")
+            for app in sorted(apps, key=str.casefold):
+                check = Gtk.CheckButton(label=app, active=app in allowed)
+                check.connect("toggled", lambda c, f=focus_id, a=app: save_allowed(f, a, c.get_active()))
+                flow.add(check)
+            allow = row("Allowed apps", None, "Banners from these apps still show while it's on.")
+            allow.get_child().get_children()[0].pack_start(flow, False, False, 4)
+        else:
+            allow = row("Allowed apps", None, "Apps show here once they've sent a notification.")
+
+        # Turn on at set times, on the days chosen.
+        start, end = _time_choice(rule["from"]), _time_choice(rule["to"])
+        span = Gtk.Box(spacing=6)
+        span.pack_start(Gtk.Label(label="From"), False, False, 0)
+        span.pack_start(start, False, False, 0)
+        span.pack_start(Gtk.Label(label="to"), False, False, 0)
+        span.pack_start(end, False, False, 0)
+        days = Gtk.Box(spacing=2)
+        days.get_style_context().add_class("linked")
+        days.get_style_context().add_class("dials-days")
+        for number, letter in enumerate(notify_rules.DAY_NAMES):
+            day = Gtk.ToggleButton(label=letter, active=number in rule["days"])
+            day.set_tooltip_text(("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                                  "Saturday", "Sunday")[number])
+
+            def picked(_button, f=focus_id, box=days):
+                chosen = [i for i, b in enumerate(box.get_children()) if b.get_active()]
+                save_schedule(f, days=chosen)
+            day.connect("toggled", picked)
+            days.pack_start(day, False, False, 0)
+        when = Gtk.Box(spacing=12)
+        when.pack_start(span, False, False, 0)
+        when.pack_start(days, False, False, 0)
+        when.set_sensitive(rule["on"])
+
+        def timed(value, f=focus_id, box=when):
+            save_schedule(f, on=value)
+            box.set_sensitive(value)
+        start.connect("changed", lambda c, f=focus_id: save_schedule(f, **{"from": c.get_active_id()}))
+        end.connect("changed", lambda c, f=focus_id: save_schedule(f, to=c.get_active_id()))
+        times = row("Turn on at set times", switch(rule["on"], timed))
+        times_detail = row("", when)
+        groups.append(group(head, allow, times, times_detail))
+
+    intro = Gtk.Label(label="A Focus hides banners so you can get on with things; they still collect in "
+                            "the notification centre, and urgent ones always show. Turn one on here, from "
+                            "Quick Settings or from the notification centre.", xalign=0, wrap=True)
+    intro.get_style_context().add_class("dials-caption")
+    return page("Focus", intro, *groups)
 
 
 def _app_icon(icon):

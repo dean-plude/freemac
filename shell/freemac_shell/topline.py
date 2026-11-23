@@ -180,8 +180,8 @@ class Topline(Gtk.Window):
         quick_settings = quick.QuickSettings()
         quick_settings.get_style_context().add_class("status")
         bar.pack_end(quick_settings, False, False, 0)
-        self.dnd = Gtk.Image.new_from_icon_name("notifications-disabled-symbolic", Gtk.IconSize.MENU)
-        self.dnd.set_tooltip_text("Do Not Disturb is on")
+        self.dnd = Gtk.Image.new_from_icon_name("freemac-focus-dnd-symbolic", Gtk.IconSize.MENU)
+        self.dnd_focus = None
         self.dnd.set_no_show_all(True)
         bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
@@ -528,9 +528,16 @@ class Topline(Gtk.Window):
 
     def _show_time(self, *_args):
         prefs = style.prefs()
-        # The moon shows while Do Not Disturb is on, by hand or by its schedule,
-        # which the clock's tick keeps up to date.
-        self.dnd.set_visible(notify_rules.quiet(prefs))
+        # The Focus on, by hand or by its schedule, shows by its symbol (a
+        # moon for Do Not Disturb, a bed for Sleep...); the clock's tick keeps
+        # it up to date.
+        focus = notify_rules.active_focus(prefs)
+        if focus != self.dnd_focus:
+            self.dnd_focus = focus
+            if focus:
+                self.dnd.set_from_icon_name(notify_rules.focus_icon(focus), Gtk.IconSize.MENU)
+                self.dnd.set_tooltip_text(f"{notify_rules.focus_name(focus)} is on")
+        self.dnd.set_visible(focus is not None)
         self.clock.set_text(time.strftime(dials_time.clock_format(prefs), time.localtime()))
         if prefs.get("clock_seconds") != self._seconds:
             # Seconds on: tick every second; off: on each minute.

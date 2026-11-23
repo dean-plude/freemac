@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Quick settings: one panel from Topline for the switches people reach for
-most. Wi-Fi, Bluetooth, Do Not Disturb, dark mode, night light and Stage Manager as tiles,
+most. Wi-Fi, Bluetooth, Focus, dark mode, night light and Stage Manager as tiles,
 what's playing (with back, play/pause and forward) when a player is open,
 and brightness and volume sliders under them. A tile is left out when the
 computer doesn't have the thing (no Wi-Fi card, no Bluetooth adapter), and so
@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
 
-from . import beacon, media, screen, stage, style  # noqa: E402
+from . import beacon, media, notify_rules, screen, stage, style  # noqa: E402
 from .status import NM, StatusButton, launch  # noqa: E402
 
 CSS = b"""
@@ -27,6 +27,9 @@ CSS = b"""
 .quick-tile:checked .dim-label { color: rgba(255, 255, 255, 0.8); }
 .quick-tile-title { font-weight: bold; }
 .now-playing { padding: 6px 4px; border-top: 1px solid alpha(currentColor, 0.12); }
+.focus-list { padding: 4px; border-radius: 12px; background-color: alpha(currentColor, 0.06); }
+.focus-choice { padding: 5px 8px; border-radius: 8px; }
+.focus-choice-on image.focus-symbol { color: @theme_selected_bg_color; }
 """
 
 
@@ -42,10 +45,12 @@ class Tile(Gtk.ToggleButton):
         super().__init__()
         self.get_style_context().add_class("quick-tile")
         box = Gtk.Box(spacing=10)
-        box.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
+        self.image = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR)
+        box.pack_start(self.image, False, False, 0)
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        heading = Gtk.Label(label=title, xalign=0)
+        heading = Gtk.Label(label=title, xalign=0, ellipsize=3, max_width_chars=14)
         heading.get_style_context().add_class("quick-tile-title")
+        self.heading = heading
         self.detail = Gtk.Label(xalign=0, ellipsize=3, max_width_chars=14)
         self.detail.get_style_context().add_class("dim-label")
         text.pack_start(heading, False, False, 0)
@@ -169,7 +174,7 @@ class QuickSettings(StatusButton):
 
         self.wifi = Tile("network-wireless-symbolic", "Wi-Fi", self._set_wifi)
         self.bluetooth = Tile("bluetooth-active-symbolic", "Bluetooth", self._set_bluetooth)
-        self.dnd = Tile("notifications-disabled-symbolic", "Do Not Disturb", self._set_dnd)
+        self.dnd = Tile("freemac-focus-dnd-symbolic", "Focus", self._focus_clicked)
         self.dark = Tile("weather-clear-night-symbolic", "Dark Mode", self._set_dark)
         self.night = Tile("night-light-symbolic", "Night Light", self._set_night)
         self.stage = Tile("freemac-stage-manager-symbolic", "Stage Manager", self._set_stage)
@@ -178,6 +183,35 @@ class QuickSettings(StatusButton):
         for tile in (self.wifi, self.bluetooth, self.dnd, self.dark, self.night, self.stage):
             self.tiles.add(tile)
         panel.pack_start(self.tiles, False, False, 0)
+        # The Focus tile opens a list of the Focuses under the tiles, as a
+        # Mac's Control Centre does.
+        self.focus_list = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN,
+                                       transition_duration=150)
+        choices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        choices.get_style_context().add_class("focus-list")
+        self.focus_rows = {}
+        for focus, name, icon, _start in notify_rules.FOCUSES:
+            button = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+            button.get_style_context().add_class("focus-choice")
+            line = Gtk.Box(spacing=10)
+            symbol = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU)
+            symbol.get_style_context().add_class("focus-symbol")
+            line.pack_start(symbol, False, False, 0)
+            line.pack_start(Gtk.Label(label=name, xalign=0), True, True, 0)
+            tick = Gtk.Image.new_from_icon_name("object-select-symbolic", Gtk.IconSize.MENU)
+            tick.set_no_show_all(True)
+            line.pack_start(tick, False, False, 0)
+            button.add(line)
+            button.tick = tick
+            button.connect("clicked", lambda _b, focus=focus: self._pick_focus(focus))
+            choices.pack_start(button, False, False, 0)
+            self.focus_rows[focus] = button
+        settings = Gtk.Button(label="Focus Settings…", relief=Gtk.ReliefStyle.NONE, halign=Gtk.Align.START)
+        settings.connect("clicked", lambda *_: (self.popup.hide(),
+                                                launch("freemac-dials", "--panel", "focus")))
+        choices.pack_start(settings, False, False, 0)
+        self.focus_list.add(choices)
+        panel.pack_start(self.focus_list, False, False, 0)
         self.now_playing = NowPlaying()
         panel.pack_start(self.now_playing, False, False, 0)
 
@@ -236,7 +270,7 @@ class QuickSettings(StatusButton):
             self.bluetooth.show_state(adapter[1])
 
         self.now_playing.refresh()
-        self.dnd.show_state(bool(style.prefs().get("dnd")))
+        self._show_focus()
         self.dark.show_state(style.is_dark())
         self.stage.show_state(stage.is_on())
         night = screen.night_settings()
@@ -293,9 +327,28 @@ class QuickSettings(StatusButton):
                 pass
         self.refresh()
 
-    def _set_dnd(self, on):
-        beacon.write_pref("dnd", on)
-        self.refresh()
+    def _show_focus(self):
+        prefs = style.prefs()
+        focus = notify_rules.active_focus(prefs)
+        self.dnd.heading.set_text(notify_rules.focus_name(focus) if focus else "Focus")
+        self.dnd.image.set_from_icon_name(notify_rules.focus_icon(focus), Gtk.IconSize.LARGE_TOOLBAR)
+        detail = notify_rules.until(prefs).capitalize() if focus else None
+        self.dnd.show_state(focus is not None, detail or None)
+        for key, button in self.focus_rows.items():
+            button.tick.set_visible(key == focus)
+            context = button.get_style_context()
+            (context.add_class if key == focus else context.remove_class)("focus-choice-on")
+
+    def _focus_clicked(self, _on):
+        self._show_focus()   # the tile shows the Focus; a click opens the list
+        self.focus_list.set_reveal_child(not self.focus_list.get_reveal_child())
+
+    def _pick_focus(self, focus):
+        prefs = style.prefs()
+        # The one on already: a click turns it off.
+        chosen = None if notify_rules.active_focus(prefs) == focus else focus
+        beacon.write_prefs(**notify_rules.focus_writes(chosen, prefs))
+        self._show_focus()
 
     def _set_dark(self, on):
         # Dials does the whole switch: GTK theme, title bars and wallpaper.
@@ -321,6 +374,7 @@ class QuickSettings(StatusButton):
         if self.popup.get_visible():
             self.popup.hide()
             return
+        self.focus_list.set_reveal_child(False)
         self.refresh()
         self.popup.show()
         self._popup_leave()

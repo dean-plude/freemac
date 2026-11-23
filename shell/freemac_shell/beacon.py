@@ -3,16 +3,18 @@
 
 Beacon owns org.freedesktop.Notifications on the session bus, so any app that
 sends a desktop notification reaches it. New notifications show as banners in
-the top-right corner; the notification centre (a calendar, Do Not Disturb and
+the top-right corner; the notification centre (a calendar, Focus and
 the recent history) slides in from the right when the clock in Topline is
 clicked. Topline talks to Beacon through the small org.freemac.Beacon
 interface.
 
 Preferences live in ~/.config/freemac/shell.json, written by Dials:
-  "dnd": true/false          Do Not Disturb (banners hidden, history kept)
+  "focus", "dnd"             the Focus on by hand (banners hidden, history kept,
+                             except for the apps that Focus allows)
   "banner_seconds": 5        how long a normal banner stays
-  "dnd_schedule", "notify_apps"   a Do Not Disturb schedule and each app's
-                                  choice (see notify_rules.py)
+  "dnd_schedule", "focus_settings", "notify_apps"
+                             each Focus's schedule and allowed apps, and each
+                             app's choice (see notify_rules.py)
 """
 import datetime as dt
 import html
@@ -406,7 +408,7 @@ class Beacon:
             self.history.insert(0, note)
             del self.history[KEEP:]
             self._save()
-        quiet = (notify_rules.quiet(prefs) or choice == "list") and note.urgency < 2
+        quiet = (not notify_rules.allowed(prefs, note.app) or choice == "list") and note.urgency < 2
         if self.center and self.center.get_visible():
             self._fill_center()
         elif not quiet:
@@ -555,9 +557,13 @@ class Beacon:
         heading = Gtk.Label(label="Notifications", xalign=0)
         heading.get_style_context().add_class("beacon-heading")
         row.pack_start(heading, True, True, 0)
-        row.pack_start(Gtk.Label(label="Do Not Disturb"), False, False, 0)
-        self.dnd = Gtk.Switch(valign=Gtk.Align.CENTER)
-        self.dnd_handler = self.dnd.connect("notify::active", self._dnd_toggled)
+        # Focus, as on a Mac: Do Not Disturb, Sleep, Work or Personal.
+        row.pack_start(Gtk.Label(label="Focus"), False, False, 0)
+        self.dnd = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        self.dnd.append("", "Off")
+        for focus, name, _icon, _start in notify_rules.FOCUSES:
+            self.dnd.append(focus, name)
+        self.dnd_handler = self.dnd.connect("changed", self._dnd_toggled)
         row.pack_start(self.dnd, False, False, 0)
         outer.pack_start(row, False, False, 0)
         self.dnd_note = Gtk.Label(xalign=1)
@@ -705,7 +711,7 @@ class Beacon:
         self.month.show_day(dt.date.today())
         self._show_events(dt.date.today())
         with self.dnd.handler_block(self.dnd_handler):
-            self.dnd.set_active(bool(style.prefs().get("dnd")))
+            self.dnd.set_active_id(notify_rules.active_focus(style.prefs()) or "")
         for child in self.list_box.get_children():
             child.destroy()
         if not self.history:
@@ -713,9 +719,9 @@ class Beacon:
             empty.get_style_context().add_class("beacon-empty")
             empty.set_margin_top(24)
             self.list_box.pack_start(empty, False, False, 0)
-        if notify_rules.scheduled_quiet(style.prefs()) and not style.prefs().get("dnd"):
-            until = notify_rules.schedule(style.prefs())["to"]
-            self.dnd_note.set_text(f"On by schedule until {until}")
+        until = notify_rules.until(style.prefs())
+        if until:
+            self.dnd_note.set_text(f"On by schedule {until}")
             self.dnd_note.show()
         else:
             self.dnd_note.hide()
@@ -770,8 +776,8 @@ class Beacon:
             return True
         return False
 
-    def _dnd_toggled(self, switch, _param):
-        write_pref("dnd", switch.get_active())
+    def _dnd_toggled(self, combo):
+        write_prefs(**notify_rules.focus_writes(combo.get_active_id() or None, style.prefs()))
 
     # --- storage and look ------------------------------------------------
     def _load(self):
@@ -803,8 +809,13 @@ class Beacon:
 
 def write_pref(key, value):
     """Change one key in shell.json, keeping the others."""
+    write_prefs(**{key: value})
+
+
+def write_prefs(**changes):
+    """Change some keys in shell.json, keeping the others."""
     data = style.prefs()
-    data[key] = value
+    data.update(changes)
     os.makedirs(os.path.dirname(style.PREFS), exist_ok=True)
     tmp = style.PREFS + ".tmp"
     with open(tmp, "w") as f:
