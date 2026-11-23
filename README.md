@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.124 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.125 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -27,7 +27,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td><td width="50%"><img src="docs/screenshots/reel-pip.png" alt="Picture in Picture: a Reel video floating above Tide in the corner"><br><sub>Picture in Picture: a Reel video floating above Tide</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/dynamic-wallpaper.png" alt="Dynamic wallpaper: Tide turning golden at sunset, with the Dynamic switch in Dials"><br><sub>Dynamic wallpaper: the picture turns golden at sunset</sub></td><td width="50%"><img src="docs/screenshots/stage-manager.png" alt="Stage Manager: Crew in the middle, with Quill, Tide and Nudge as small pictures down the left"><br><sub>Stage Manager: one app in front, the others down the side</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control on Desktop 3, holding a Drawer window, with the row of desktops opened out along the top: the button to close Desktop 3 on its corner and + at the right end"><br><sub>Mission Control: add a desktop with +, close one from its corner, drag windows onto them</sub></td><td width="50%"><img src="docs/screenshots/passwords.png" alt="Purser, the Passwords app, showing a saved login with its six-digit verification code and a warning that its password is used on another website"><br><sub>Purser keeps website and Wi-Fi passwords and verification codes, and warns about reused passwords</sub></td></tr>
-<tr><td width="50%"><img src="docs/screenshots/live-text.png" alt="Frame showing a school trip form with Live Text on: the picture dimmed, every line of text lit up, and two lines selected for copying"><br><sub>Live Text in Frame: select and copy the words in a picture</sub></td><td width="50%"></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/live-text.png" alt="Frame showing a school trip form with Live Text on: the picture dimmed, every line of text lit up, and two lines selected for copying"><br><sub>Live Text in Frame: select and copy the words in a picture</sub></td><td width="50%"><img src="docs/screenshots/hover-text.png" alt="Hover Text: Command held over a line of small text in the Welcome window, and the same line shown large in a panel above the pointer"><br><sub>Hover Text: hold ⌘ and point to see small words large</sub></td></tr>
 </table>
 
 ## Download
@@ -103,6 +103,7 @@ one of them will be reverted.
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
 | Screen reader: Command+F5 (or Dials > Accessibility) speaks what's on the screen, the control you move to and what you type, and comes back at the next login | **Dials**, **Strata**, Orca | 1.120 |
+| Hover Text: hold Command and point at some words to see that line large above the pointer, in any app (Dials > Accessibility) | **Strata**, **Topline**, Tesseract | 1.125 |
 | Live Text: Frame finds the words in a picture or a scanned PDF, so you can select and copy them (⌘C), or light up all of them with the Live Text button | **Frame**, Tesseract | 1.124 |
 | Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |

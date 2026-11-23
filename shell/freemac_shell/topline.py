@@ -1287,11 +1287,16 @@ def main():
     from . import accents, sticky
     win.accents = accents.AccentPanel()
     win.sticky = sticky.StickyPanel()
+    # Hover Text (hover_text.py): words under the pointer, shown large, while
+    # Strata says the Hover Text key is held.
+    from . import hover_text
+    win.hover_text = hover_text.HoverPanel()
     # Mission Control's row of desktops (spaces.py), opened by Strata too.
     from . import spaces
     win.spaces = spaces.SpacesRow()
     win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle,
                                                         "sticky": win.sticky.handle,
+                                                        "hover": win.hover_text.handle,
                                                         "spaces": win.spaces.handle})
     accents.start_input_method()
     # Background Sounds (background_sounds.py) play for as long as Topline runs.

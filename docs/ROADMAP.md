@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.125 "hover text" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Hover Text, as on a Mac: hold Command and point at some words, and the line under the pointer shows large in a panel just above it, in any app; letting go, another key or a click puts it away | Strata (hover-text.hpp), Topline (hover_text.py), Tesseract | done |
+| 2 | The words are read off the screen with the same reader as Live Text; the pointer is hidden for the moment the picture is taken, so it doesn't cover the word it points at; nothing is saved | Strata, hover_text.py | done |
+| 3 | Dials > Accessibility: a Hover Text switch, the key to hold (Command, Option or Control) and the text size | Dials | done |
+| 4 | Guide topic; README row and screenshot; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.124 "live text" (done)
 
 | # | Item | Component | Status |

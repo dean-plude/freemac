@@ -140,6 +140,13 @@ TOPICS = {
         "Wi-Fi lists the networks this computer has joined, with their passwords after an administrator's "
         "password.",
     ]),
+    "hovertext": ("See the words under the pointer larger", "hover text larger bigger big text zoom read small words pointer magnify magnifier low vision see accessibility command hold", [
+        "Open Dials, choose Accessibility, then turn on Hover Text.",
+        "Hold Command and point at some words: they show large in a panel just above the pointer.",
+        "Move the pointer to another line to read that one. Let go of Command and the panel goes.",
+        "In Dials > Accessibility, choose Option or Control to hold instead, and the size of the text.",
+        "Hover Text reads the words on the screen, so it works in every app. Nothing is saved.",
+    ]),
     "livetext": ("Copy text from a picture", "live text copy text picture photo image screenshot scan scanned pdf words select ocr recognise recognize read worksheet sign frame", [
         "Open the picture or PDF in Frame. A moment later, if it holds words, a Live Text button shows in the "
         "bottom-right corner.",
