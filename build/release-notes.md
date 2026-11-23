@@ -2,12 +2,20 @@ freemac @VERSION@: a live ISO you can start in a virtual machine (or on a PC fro
 
 freemac is an original, free desktop for x86-64 PCs that works like a classic Mac-style desktop: a menu bar along the top, a dock along the bottom, Command-key shortcuts and its own apps. It is Linux underneath and contains nothing from Apple. It is not macOS and doesn't run Mac apps.
 
+## What's new in @VERSION@
+
+<!-- whats-new -->
+@WHATSNEW@
+<!-- /whats-new -->
+
 ## Download
 
 - **freemac-@VERSION@-amd64.iso** (about @SIZE@ MB)
 - **freemac-@VERSION@-amd64.iso.sha256**, to check the download: `sha256sum -c freemac-@VERSION@-amd64.iso.sha256`
 
 SHA-256: `@SHA256@`
+
+A computer that already has freemac 1.134 or later installed gets this version in **Dials > Software Update**, from **freemac-update-@VERSION@-ubuntu-amd64.tar.xz**; it installs when the computer restarts.
 
 ## Trying it in a virtual machine
 

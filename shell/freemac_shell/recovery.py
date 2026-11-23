@@ -7,6 +7,7 @@ short list of things to do, the way a Mac's recovery does.
 
 - Restore from Lifeboat: bring a whole home folder back from a backup drive.
 - Reinstall freemac: put a fresh copy on a disk (from a freemac USB stick).
+- Undo Last Update: put back the freemac from before the last update.
 - Reset a Password: for someone who has forgotten theirs.
 - Check a Disk: look for problems on a volume that isn't in use, and fix them.
 - Drives: Hull, to look at, erase and name drives.
@@ -68,6 +69,8 @@ CHOICES = (
      "Bring a home folder back from a Lifeboat backup drive."),
     ("reinstall", "freemac-keel", "Reinstall freemac",
      "Put a fresh copy of freemac on a disk."),
+    ("undo", "freemac-dials", "Undo Last Update",
+     "Go back to the version of freemac from before the last update."),
     ("password", "freemac-crew", "Reset a Password",
      "Choose a new password for someone who has forgotten theirs."),
     ("check", "freemac-hull", "Check a Disk",
@@ -620,6 +623,39 @@ class Recovery(Gtk.ApplicationWindow):
                   "(download one from freemac’s Releases page), hold Ctrl as it starts, and choose "
                   "Reinstall freemac.\n\nReinstalling erases the disk, so bring your files back afterwards "
                   "with Restore from Lifeboat.", "freemac-keel")
+
+    # -- Undo the last update ----------------------------------------------------------------
+
+    def do_undo(self):
+        self.pick_system(self._undo_page)
+
+    def _undo_page(self, system):
+        before, now = store.update_undo(system)
+        if not before:
+            self.done("There’s no update to undo",
+                      f"{system.name} hasn’t been updated since it was installed, or its last update "
+                      "was already undone.", "freemac-dials")
+            return
+        page = self.page("undo", "Undo Last Update",
+                         f"This puts back freemac {before}, the version this computer had before it was "
+                         f"updated to {now}. Everyone’s files, apps and settings stay as they are.")
+        page.go.set_label("Undo Update")
+
+        def go(*_args):
+            self.start_work("Undoing the update…", f"Putting back freemac {before}.")
+
+            def finished(_result, error):
+                self.end_work()
+                if error:
+                    self.done("The update couldn’t be undone", str(error), "freemac-dials")
+                else:
+                    self.done(f"freemac {before} is back",
+                              "Restart the computer to use it. Software Update will offer the new "
+                              "version again once it’s fixed.", "freemac-dials")
+            in_background(lambda: store.undo_update(system), finished)
+        page.go.connect("clicked", go)
+        page.show_all()
+        self.show("undo")
 
     # -- Reset a password -----------------------------------------------------------------
 

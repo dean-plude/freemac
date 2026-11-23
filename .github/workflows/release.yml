@@ -79,13 +79,13 @@ jobs:
           TAG="v$VERSION"
           ISO=$(ls out/freemac-*-amd64.iso)
           SIZE=$(du -m "$ISO" | cut -f1)
-          sed -e "s/@VERSION@/$VERSION/g" -e "s/@SIZE@/$SIZE/g" \
-            -e "s/@SHA256@/$(cut -d' ' -f1 "$ISO.sha256")/g" \
-            build/release-notes.md > notes.md
+          # The update bundle installed computers download from Software Update.
+          UPDATE=$(ls out/freemac-update-*.tar.xz)
+          python3 scripts/release-notes.py "$VERSION" "$SIZE" "$(cut -d' ' -f1 "$ISO.sha256")" > notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ISO" "$ISO.sha256" --clobber
+            gh release upload "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" "$ISO" "$ISO.sha256" --target "$(git rev-parse HEAD)" \
+            gh release create "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" --target "$(git rev-parse HEAD)" \
               --title "freemac $VERSION" --notes-file notes.md --prerelease
           fi

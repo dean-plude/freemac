@@ -203,6 +203,8 @@ rm -f "$ROOTFS"/etc/ssh/ssh_host_*
 # File Sharing starts off too.
 in_chroot systemctl disable smbd.service nmbd.service samba-ad-dc.service wsdd-server.service >/dev/null 2>&1 || true
 in_chroot systemctl set-default graphical.target
+# Installs a new freemac that Software Update downloaded, while the computer restarts.
+in_chroot systemctl enable freemac-update-install.service
 in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 # freemac's own app icons (art/icons), then refresh the cache so apps and the
 # dock find them.
@@ -332,6 +334,11 @@ if [ -n "$strays" ]; then
   echo "$strays" | sed "s|^$ROOTFS|  |" >&2
   exit 1
 fi
+
+log "Making the update bundle"
+# What installed computers download from Dials > Software Update: freemac's own
+# files from this image, with a manifest of their checksums.
+python3 "$REPO/scripts/make-update-bundle.py" "$ROOTFS" "$VERSION" "${ID_LIKE%% *}" "$OUTDIR"
 
 log "Creating squashfs"
 # mksquashfs reads SOURCE_DATE_EPOCH itself for the image timestamps. /boot

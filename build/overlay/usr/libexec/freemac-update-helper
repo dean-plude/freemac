@@ -1,0 +1,557 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""New versions of freemac itself, as a Mac's Software Update installs them:
+download while you work, install while the computer restarts.
+
+Each freemac release on GitHub carries, beside its ISO, an update bundle:
+freemac-update-VERSION-BASE-amd64.tar.xz, with its SHA-256 in a .sha256 file
+next to it. The bundle holds freemac's own files (the shell, its apps, the
+helpers, icons, themes, wallpapers, sounds and Strata's plugins, built for
+that base: ubuntu or debian) and manifest.json, which lists each file with its
+own SHA-256. Nothing in it comes from Ubuntu or Debian; those packages stay
+with apt and Harbor.
+
+Run as root (Dials runs it through pkexec, after an administrator's
+password; the restart runs it through freemac-update-install.service):
+
+  freemac-update-helper check             print the newest version on offer, as JSON
+  freemac-update-helper download VERSION  download, check and get it ready to install
+  freemac-update-helper stage FILE        get a bundle already on the disk ready
+  freemac-update-helper cancel            forget the one that's ready
+  freemac-update-helper apply             install the one that's ready (at restart)
+  freemac-update-helper rollback          put the version before the last update back
+  --root DIR                              apply or roll back a freemac mounted at DIR
+
+Everything is kept in /var/lib/freemac/update: pending/ (ready to install),
+previous/ (what the last update replaced, for Recovery's Undo Last Update),
+installed.json (the files the last update put in) and result.json (what the
+last restart did, for Beacon's notice). Releases come from GitHub's API over
+HTTPS; /etc/freemac/update.conf can name another feed (feed=URL).
+
+It imports nothing from freemac_shell, so it can bring a computer from before
+1.134 up to date too. Original freemac code.
+"""
+import hashlib
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tarfile
+import time
+import urllib.request
+
+FEED = "https://api.github.com/repos/dean-plude/freemac/releases?per_page=30"
+CONF = "etc/freemac/update.conf"
+STATE = "var/lib/freemac/update"
+LIVE = "/run/live/medium"
+ARCH = "amd64"
+CHUNK = 256 * 1024
+NEVER = {"etc/sudoers.d/freemac-live"}      # the live disk's own; the installer removes it
+
+
+class Failed(Exception):
+    """Something to tell the person, in words they can use."""
+
+
+# ---- versions and the feed ----------------------------------------------------
+def version_key(text):
+    parts = []
+    for piece in str(text).lstrip("v").split("."):
+        digits = "".join(c for c in piece if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts + [0] * (3 - len(parts)))
+
+
+def os_release(root="/"):
+    found = {}
+    try:
+        with open(os.path.join(root, "etc/os-release")) as f:
+            for line in f:
+                if "=" in line:
+                    key, value = line.rstrip("\n").split("=", 1)
+                    found[key] = value.strip().strip('"')
+    except OSError:
+        pass
+    return found
+
+
+def current_version(root="/"):
+    return os_release(root).get("VERSION_ID", "0")
+
+
+def base(root="/"):
+    """ubuntu or debian: which archive this freemac was built from."""
+    release = os_release(root)
+    words = (release.get("ID_LIKE", "") + " " + release.get("ID", "")).split()
+    return "ubuntu" if "ubuntu" in words else "debian"
+
+
+def conf(root="/"):
+    found = {}
+    try:
+        with open(os.path.join(root, CONF)) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    found[key.strip()] = value.strip()
+    except OSError:
+        pass
+    return found
+
+
+def feed_url(root="/"):
+    return conf(root).get("feed") or FEED
+
+
+def bundle_name(version, kind):
+    return f"freemac-update-{version}-{kind}-{ARCH}.tar.xz"
+
+
+def _open(url, timeout=30):
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "freemac-software-update", "Accept": "application/vnd.github+json, */*"})
+    return urllib.request.urlopen(request, timeout=timeout)
+
+
+def fetch_feed(url=None):
+    url = url or feed_url()
+    try:
+        with _open(url) as response:
+            data = json.load(response)
+    except (OSError, ValueError) as error:
+        raise Failed("freemac couldn’t reach its update server. Check that the computer is "
+                     "connected to the internet, then try again.") from error
+    return data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+
+
+def whats_new(body):
+    """The bullet points between the release notes' what's-new markers."""
+    lines, inside = [], False
+    for line in (body or "").splitlines():
+        if "<!-- whats-new -->" in line:
+            inside = True
+        elif "<!-- /whats-new -->" in line:
+            break
+        elif inside and line.lstrip().startswith(("- ", "* ")):
+            lines.append(line.lstrip()[2:].replace("**", "").strip())
+    return lines
+
+
+def offers(releases, kind, secure=True):
+    """[(version, release, bundle asset, sha256 asset)] in the feed for this base."""
+    found = []
+    for release in releases:
+        if not isinstance(release, dict) or release.get("draft"):
+            continue
+        version = str(release.get("tag_name", "")).lstrip("v")
+        assets = {a.get("name"): a for a in release.get("assets") or [] if isinstance(a, dict)}
+        name = bundle_name(version, kind)
+        bundle, checksum = assets.get(name), assets.get(name + ".sha256")
+        if not (version and bundle and checksum):
+            continue
+        urls = (bundle.get("browser_download_url", ""), checksum.get("browser_download_url", ""))
+        if secure and not all(u.startswith("https://") for u in urls):
+            continue
+        found.append((version, release, bundle, checksum))
+    return sorted(found, key=lambda o: version_key(o[0]), reverse=True)
+
+
+def newest(root="/"):
+    """The newest version on offer that's newer than this one, as a dict, or None."""
+    url = feed_url(root)
+    choices = offers(fetch_feed(url), base(root), secure=url.startswith("https://"))
+    here = version_key(current_version(root))
+    for version, release, bundle, _checksum in choices:
+        if version_key(version) > here:
+            return {"version": version, "size": int(bundle.get("size") or 0),
+                    "whats_new": whats_new(release.get("body")),
+                    "published": release.get("published_at", ""),
+                    "page": release.get("html_url", "")}
+    return None
+
+
+# ---- checking a bundle ----------------------------------------------------------
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(CHUNK), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def allowed(path):
+    """Whether a bundle may put a file here: freemac's own places only."""
+    if not path or path.startswith("/") or "\\" in path or path in NEVER:
+        return False
+    parts = path.split("/")
+    if any(p in ("", ".", "..") for p in parts):
+        return False
+    if parts[0] == "usr":
+        return True
+    if parts[0] == "etc":
+        return path == "etc/os-release" or parts[1:2] == ["skel"] or "freemac" in path
+    return False
+
+
+def check_manifest(manifest, root="/"):
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), dict):
+        raise Failed("The update is damaged (it has no list of files).")
+    if manifest.get("base") != base(root) or manifest.get("arch") != ARCH:
+        raise Failed(f"This update is for freemac on {manifest.get('base')}, not this computer.")
+    for path in list(manifest["files"]) + list((manifest.get("links") or {})):
+        if not allowed(path):
+            raise Failed(f"The update tried to change {path}, which it mustn't. Nothing was changed.")
+
+
+def unpack(bundle, into, root="/"):
+    """Unpack a bundle into a fresh folder and check every file against its
+    manifest. Returns the manifest."""
+    shutil.rmtree(into, ignore_errors=True)
+    os.makedirs(into, mode=0o755)
+    try:
+        with tarfile.open(bundle, "r:xz") as tar:
+            for member in tar:
+                name = member.name.lstrip("./")
+                if not (name == "manifest.json" or name.startswith("files/") or name == "files"):
+                    raise Failed("The update is damaged (it has unexpected contents).")
+                if member.isdir():
+                    continue
+                if not member.isfile() or ".." in name.split("/"):
+                    raise Failed("The update is damaged (it has unexpected contents).")
+                target = os.path.join(into, name)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with tar.extractfile(member) as src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst, CHUNK)
+    except (tarfile.TarError, EOFError, OSError) as error:
+        raise Failed("The update is damaged and couldn’t be opened.") from error
+    try:
+        with open(os.path.join(into, "manifest.json")) as f:
+            manifest = json.load(f)
+    except (OSError, ValueError) as error:
+        raise Failed("The update is damaged (its list of files can’t be read).") from error
+    check_manifest(manifest, root)
+    for path, info in manifest["files"].items():
+        here = os.path.join(into, "files", path)
+        if not os.path.isfile(here) or sha256_file(here) != info.get("sha256"):
+            raise Failed(f"The update is damaged ({path} isn’t what it should be).")
+    return manifest
+
+
+# ---- downloading -----------------------------------------------------------------
+def say(*words):
+    print(*words, flush=True)
+
+
+def state(root="/", *more):
+    return os.path.join(root, STATE, *more)
+
+
+def live(root="/"):
+    return root == "/" and os.path.isdir(LIVE)
+
+
+def download(version, root="/"):
+    if live(root):
+        raise Failed("This is freemac running from its USB stick, so it can’t be updated. "
+                     "Install freemac on the computer to get new versions.")
+    url = feed_url(root)
+    kind = base(root)
+    match = [o for o in offers(fetch_feed(url), kind, secure=url.startswith("https://")) if o[0] == version]
+    if not match:
+        raise Failed(f"freemac {version} isn’t on offer for this computer any more.")
+    _version, _release, bundle, checksum = match[0]
+    size = int(bundle.get("size") or 0)
+    folder = state(root)
+    os.makedirs(folder, mode=0o755, exist_ok=True)
+    free = shutil.disk_usage(folder).free
+    if size and free < size * 4:
+        raise Failed(f"There isn’t enough free space to download and install it: it needs about "
+                     f"{round(size * 4 / 1e6)} MB. Dials > Storage shows what’s taking the space.")
+    try:
+        with _open(checksum["browser_download_url"]) as response:
+            expected = response.read(4096).decode("ascii", "replace").split()[0].lower()
+    except (OSError, IndexError) as error:
+        raise Failed("The update’s checksum couldn’t be downloaded. Try again in a moment.") from error
+    part = os.path.join(folder, bundle_name(version, kind) + ".part")
+    try:
+        with _open(bundle["browser_download_url"], timeout=60) as response, open(part, "wb") as out:
+            total = int(response.headers.get("Content-Length") or size or 0)
+            done, last = 0, 0
+            say("progress", 0, total)
+            for block in iter(lambda: response.read(CHUNK), b""):
+                out.write(block)
+                done += len(block)
+                if time.monotonic() - last > 0.25:
+                    say("progress", done, total)
+                    last = time.monotonic()
+            say("progress", done, total)
+    except OSError as error:
+        _remove(part)
+        raise Failed("The download stopped before it finished. Check the internet connection, "
+                     "then try again.") from error
+    say("checking")
+    if sha256_file(part) != expected:
+        _remove(part)
+        raise Failed("The download didn’t match its checksum, so it wasn’t used. Try again.")
+    try:
+        stage(part, root)
+    finally:
+        _remove(part)
+
+
+def stage(bundle, root="/"):
+    """Check a bundle and leave it in pending/, ready for the next restart."""
+    staging = state(root, "staging")
+    manifest = unpack(bundle, staging, root)
+    if version_key(manifest.get("version")) == version_key(current_version(root)):
+        shutil.rmtree(staging, ignore_errors=True)
+        raise Failed(f"This computer already has freemac {manifest.get('version')}.")
+    pending = state(root, "pending")
+    shutil.rmtree(pending, ignore_errors=True)
+    os.replace(staging, pending)
+    _readable(state(root))
+    say("ready", manifest.get("version"))
+
+
+def cancel(root="/"):
+    shutil.rmtree(state(root, "pending"), ignore_errors=True)
+    shutil.rmtree(state(root, "staging"), ignore_errors=True)
+
+
+# ---- installing -------------------------------------------------------------------
+def _remove(path):
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except IsADirectoryError:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _readable(folder):
+    """The update's own records can be read by anyone (Dials and Beacon read
+    them); only root changes them. The saved files keep their own modes, so
+    putting them back keeps programs runnable and private files private."""
+    os.chmod(folder, 0o755)
+    for name in os.listdir(folder):
+        if name.endswith(".json"):
+            os.chmod(os.path.join(folder, name), 0o644)
+
+
+def _put(source, target, mode):
+    """Copy a file into place in one step, so nothing ever sees half of it."""
+    os.makedirs(os.path.dirname(target), mode=0o755, exist_ok=True)
+    temporary = target + ".freemac-new"
+    shutil.copyfile(source, temporary)
+    os.chown(temporary, 0, 0)
+    os.chmod(temporary, mode & 0o7777)
+    if os.path.isdir(target) and not os.path.islink(target):
+        shutil.rmtree(target)
+    os.replace(temporary, target)
+
+
+def _link(target_path, points_to):
+    os.makedirs(os.path.dirname(target_path), mode=0o755, exist_ok=True)
+    temporary = target_path + ".freemac-new"
+    _remove(temporary)
+    os.symlink(points_to, temporary)
+    os.replace(temporary, target_path)
+
+
+def _backup(root, path, into, modes=None):
+    """Copy what's at path now into the previous/ folder, noting its mode in
+    modes. Returns whether there was anything."""
+    here = os.path.join(root, path)
+    if not os.path.lexists(here) or (os.path.isdir(here) and not os.path.islink(here)):
+        return False
+    target = os.path.join(into, "files", path)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    if os.path.islink(here):
+        os.symlink(os.readlink(here), target)
+    else:
+        shutil.copy2(here, target)
+        if modes is not None:
+            modes[path] = stat.S_IMODE(os.lstat(here).st_mode)
+    return True
+
+
+def _in_root(root, *command):
+    if root != "/":
+        command = ("chroot", root) + command
+    try:
+        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600, check=False)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def after(root, paths):
+    """Bring caches up to date for what changed."""
+    paths = list(paths)
+    themes = sorted({p.split("/")[3] for p in paths if p.startswith("usr/share/icons/") and p.count("/") > 3})
+    for theme in themes:
+        if os.path.exists(os.path.join(root, "usr/share/icons", theme, "index.theme")):
+            _in_root(root, "gtk-update-icon-cache", "-f", "-t", "/usr/share/icons/" + theme)
+    if any(p.startswith("usr/share/glib-2.0/schemas/") for p in paths):
+        _in_root(root, "glib-compile-schemas", "/usr/share/glib-2.0/schemas")
+    if any(p.startswith("usr/lib/python3/dist-packages/freemac_shell/") for p in paths):
+        _in_root(root, "python3", "-m", "compileall", "-q", "/usr/lib/python3/dist-packages/freemac_shell")
+    if any(p.startswith("etc/systemd/") for p in paths):
+        _in_root(root, "systemctl", "daemon-reload")
+        _in_root(root, "systemctl", "enable", "freemac-update-install.service")
+    if any(p.startswith("etc/grub.d/") for p in paths) and os.path.exists(os.path.join(root, "boot/grub/grub.cfg")):
+        _in_root(root, "update-grub")
+
+
+def _plymouth(text):
+    if shutil.which("plymouth"):
+        _in_root("/", "plymouth", "display-message", "--text=" + text)
+
+
+def _load(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def _save(path, data):
+    with open(path + ".new", "w") as f:
+        json.dump(data, f, indent=1)
+    os.chmod(path + ".new", 0o644)
+    os.replace(path + ".new", path)
+
+
+def apply(root="/"):
+    """Install what's in pending/, keeping what it replaces in previous/.
+    If anything goes wrong, put back what was changed."""
+    pending = state(root, "pending")
+    manifest = _load(os.path.join(pending, "manifest.json"))
+    if manifest is None:
+        return
+    was = current_version(root)
+    try:
+        check_manifest(manifest, root)
+    except Failed as error:
+        shutil.rmtree(pending, ignore_errors=True)
+        _save(state(root, "result.json"), {"ok": False, "from": was, "to": manifest.get("version"),
+                                           "error": str(error), "time": time.time()})
+        raise
+    _plymouth(f"Installing freemac {manifest.get('version')}…")
+    previous = state(root, "previous")
+    shutil.rmtree(previous, ignore_errors=True)
+    os.makedirs(os.path.join(previous, "files"), mode=0o755)
+    installed = _load(state(root, "installed.json"), {})
+    if installed:
+        _save(os.path.join(previous, "installed.json"), installed)
+    files = manifest["files"]
+    links = manifest.get("links") or {}
+    gone = [p for p in list((installed.get("files") or {})) + list(installed.get("links") or {})
+            if p not in files and p not in links and allowed(p)]
+    record = {"version": was, "replaced": [], "added": [], "removed": [], "modes": {}, "time": time.time()}
+    done = []
+    try:
+        for path, info in sorted(files.items()):
+            (record["replaced"] if _backup(root, path, previous, record["modes"]) else record["added"]).append(path)
+            _put(os.path.join(pending, "files", path), os.path.join(root, path), int(info.get("mode", 0o644)))
+            done.append(path)
+        for path, points_to in sorted(links.items()):
+            (record["replaced"] if _backup(root, path, previous, record["modes"]) else record["added"]).append(path)
+            _link(os.path.join(root, path), points_to)
+            done.append(path)
+        for path in gone:
+            if _backup(root, path, previous, record["modes"]):
+                record["removed"].append(path)
+                _remove(os.path.join(root, path))
+                done.append(path)
+    except OSError as error:
+        _undo(root, previous, record)
+        _save(os.path.join(previous, "manifest.json"), record)
+        shutil.rmtree(pending, ignore_errors=True)
+        _save(state(root, "result.json"), {"ok": False, "from": was, "to": manifest.get("version"),
+                                           "error": f"{error}", "time": time.time()})
+        shutil.rmtree(previous, ignore_errors=True)
+        raise Failed(f"The update couldn’t be installed ({error}); everything was put back as it was.")
+    _save(os.path.join(previous, "manifest.json"), record)
+    _readable(previous)
+    _save(state(root, "installed.json"), {"version": manifest.get("version"), "files": files, "links": links})
+    after(root, done)
+    _save(state(root, "result.json"), {"ok": True, "from": was, "to": manifest.get("version"),
+                                       "whats_new": manifest.get("whats_new") or [], "time": time.time()})
+    shutil.rmtree(pending, ignore_errors=True)
+    say("installed", manifest.get("version"))
+
+
+def _undo(root, previous, record):
+    for path in record["added"]:
+        _remove(os.path.join(root, path))
+    for path in record["replaced"] + record["removed"]:
+        saved = os.path.join(previous, "files", path)
+        if os.path.islink(saved):
+            _link(os.path.join(root, path), os.readlink(saved))
+        elif os.path.isfile(saved):
+            mode = (record.get("modes") or {}).get(path)
+            _put(saved, os.path.join(root, path), int(mode) if mode is not None else stat.S_IMODE(os.stat(saved).st_mode))
+
+
+def rollback(root="/"):
+    """Put back the version from before the last update."""
+    previous = state(root, "previous")
+    record = _load(os.path.join(previous, "manifest.json"))
+    if not record:
+        raise Failed("There’s no earlier version of freemac to go back to.")
+    now = current_version(root)
+    _undo(root, previous, record)
+    installed = _load(os.path.join(previous, "installed.json"))
+    if installed:
+        _save(state(root, "installed.json"), installed)
+    else:
+        _remove(state(root, "installed.json"))
+    after(root, record["added"] + record["replaced"] + record["removed"])
+    _save(state(root, "result.json"), {"ok": True, "from": now, "to": record.get("version"),
+                                       "undone": True, "time": time.time()})
+    shutil.rmtree(previous, ignore_errors=True)
+    say("restored", record.get("version"))
+
+
+# ---- the command ----------------------------------------------------------------------
+def main(argv):
+    root = "/"
+    if "--root" in argv:
+        at = argv.index("--root")
+        root = os.path.abspath(argv[at + 1])
+        del argv[at:at + 2]
+    if not argv:
+        print(__doc__)
+        return 2
+    command, rest = argv[0], argv[1:]
+    if command != "check" and os.geteuid() != 0:
+        say("error", "This needs an administrator’s password.")
+        return 1
+    try:
+        if command == "check":
+            print(json.dumps(newest(root)))
+        elif command == "download" and len(rest) == 1:
+            download(rest[0], root)
+        elif command == "stage" and len(rest) == 1:
+            stage(os.path.abspath(rest[0]), root)
+        elif command == "cancel":
+            cancel(root)
+        elif command == "apply":
+            apply(root)
+        elif command == "rollback":
+            rollback(root)
+        else:
+            print(__doc__)
+            return 2
+    except Failed as error:
+        say("error", error)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

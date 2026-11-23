@@ -42,7 +42,7 @@ SEARCH_WORDS = {
     "sound": "volume speaker microphone output input audio alert chime sound effects beep feedback pop start-up balance left right input level meter headphones",
     "about": "version storage memory system update",
     "storage": "disk space full free up clean up available capacity hard drive ssd trash empty large big files review applications documents",
-    "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check",
+    "softwareupdate": "software update updates upgrade security patches automatic automatically install new version check freemac what's new release restart now",
     "datetime": "date time clock time zone timezone 24-hour 12-hour seconds automatic internet ntp city",
     "appearance": "dark light mode auto automatic sunset sunrise day night theme accent colour color highlight purple pink red orange yellow green graphite text size tiling",
     "accessibility": "mono audio stereo one ear zoom contrast larger text reduce motion screen reader orca blind low vision talk read screen transparency solid invert colours colors speak selection speech read aloud out loud voice spoken content text to speech flash screen alert visual bell hearing deaf shake pointer cursor mouse find locate big sticky keys modifier one hand shift control option command latch lock colour color filters greyscale grayscale black white colour blind color blind protanopia deuteranopia tritanopia red green blue yellow tint background sounds noise rain ocean stream white pink brown focus calm pointer colour color fill outline",

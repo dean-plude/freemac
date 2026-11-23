@@ -746,10 +746,15 @@ TOPICS = {
         "stops and tells you which one.",
         "Recent Items in the same menu lists the apps and documents you used lately. Clear Menu empties it.",
     ]),
-    "stay-safe": ("Keep the computer up to date and safe", "software update updates security fixes automatic notice badge daily firewall block incoming connections protect safe virus", [
-        "Choose Dials > Software Update. Check for Updates\u2026 shows what's new in Harbor, where you install it.",
+    "stay-safe": ("Keep the computer up to date and safe", "software update updates security fixes automatic notice badge daily firewall block incoming connections protect safe virus new version freemac upgrade restart now what's new undo", [
+        "Choose Dials > Software Update. When a new version of freemac is out, it's at the top with what's "
+        "new in it. Click Update Now and type an administrator's password: it downloads while you carry on.",
+        "Then click Restart Now. freemac installs while the computer restarts, and a notice says once it's in. "
+        "If the new version stops something working, Undo Last Update in freemac Recovery puts the old one back.",
+        "Updates for apps and the rest of the system are below: Check for Updates\u2026 shows them in Harbor, "
+        "where you install them.",
         "freemac also looks once a day. When updates are ready, a notice says so and Harbor's icon in the Dock "
-        "shows how many. Click the notice to see them in Harbor.",
+        "shows how many. Click the notice to see them.",
         "Leave Install important updates automatically on, and security fixes are put in by themselves in "
         "the background.",
         "To turn away connections that other computers try to start, choose Dials > Network and turn on Firewall. "
@@ -1010,11 +1015,12 @@ TOPICS = {
         "Move the pointer or press a key to end it. If the screen was due to lock, it asks for your password.",
         "To start it from a corner of the screen, choose it under Hot Corners in Dials > Dock and Menu Bar.",
     ]),
-    "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl", [
+    "recovery": ("Fix a computer that won't start", "recovery mode recover repair fix start startup boot won't start forgotten password reset reinstall disk check ctrl undo update go back previous version", [
         "freemac Recovery fixes a computer that won't start properly. To open it, hold Ctrl while the "
         "computer starts, or choose Dials > Power > Restart in Recovery….",
         "Type an administrator's password, then choose what to do and click Continue:",
         "- Restore from Lifeboat brings a home folder back from a backup drive. Plug the drive in first.",
+        "- Undo Last Update puts back the version of freemac from before the last update.",
         "- Reset a Password chooses a new password for someone who has forgotten theirs.",
         "- Check a Disk looks for problems on a disk and fixes them.",
         "- Reinstall freemac puts a fresh copy on the disk from a freemac USB stick.",

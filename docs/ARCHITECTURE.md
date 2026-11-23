@@ -778,6 +778,50 @@ Mac's recovery. It is the same on an installed system and on the live USB.
   mounted); Drives (Hull); Get Help Online (the browser, private); and
   Terminal (foot). The bar at the top joins Wi-Fi through NetworkManager
   (`nmcli`, one check at a time) and restarts or shuts down.
+  Undo Last Update (1.134) runs `freemac-update-helper --root ROOT rollback`
+  on the chosen system (see below).
+
+## Software Update for freemac itself (1.134)
+
+Apps and the rest of the system come from Ubuntu or Debian through apt and
+Harbor. freemac's own files (the shell, the apps' launchers, icons, helpers,
+themes, wallpapers, sounds, Strata's plugins and freemac's files in `/etc`)
+are updated separately, a whole version at a time, the way a Mac installs a
+new macOS:
+
+- **The bundle.** `build-iso.sh` runs `scripts/make-update-bundle.py` on the
+  finished image, which writes `freemac-update-VERSION-BASE-amd64.tar.xz`:
+  `manifest.json` (version, base, each file's SHA-256 and mode, links, and
+  what's new from this repository's ROADMAP via `scripts/whats_new.py`) and
+  `files/`. The release workflow uploads it and its `.sha256` beside the
+  ISO, and `scripts/release-notes.py` puts the same what's-new list in the
+  release notes between `<!-- whats-new -->` markers.
+- **Finding it.** `freemac_update.py` (user side) and Beacon's daily look
+  read GitHub's releases API (`/etc/freemac/update.conf` `feed=` can name
+  another) and pick the newest release newer than `/etc/os-release`'s
+  `VERSION_ID` that has a bundle for this base. The result is cached in
+  `~/.local/state/freemac/freemac-update.json`.
+- **Downloading.** Update Now runs `pkexec freemac-update-helper download
+  VERSION` (`org.freemac.update`, auth_admin_keep). The helper (root, standard
+  library only, importing nothing from the shell so it can also bring an older
+  computer up to date) fetches the `.sha256`, downloads the bundle with
+  progress lines on stdout, checks the checksum, unpacks it (regular files
+  only, no `..`), checks every file against the manifest, and refuses any
+  path outside `usr/`, `etc/os-release`, `etc/skel/` and `/etc` paths named
+  for freemac (never the live disk's sudoers file). The result waits in
+  `/var/lib/freemac/update/pending/`.
+- **Installing.** `freemac-update-install.service` runs `freemac-update-helper
+  apply` at the next start, before greetd: each file goes in through a
+  temporary name and `rename`, what it replaces is copied to `previous/`,
+  files the last update put in that the new one doesn't have are removed,
+  then the icon caches, GSettings schemas, compiled Python, systemd and GRUB
+  are brought up to date as needed. If any step fails, what was changed is
+  put back. `result.json` says what happened, for Beacon's notice and Dials;
+  `installed.json` lists what this version put in.
+- **Undoing.** `rollback` puts `previous/` back and removes what the update
+  added; Recovery's Undo Last Update runs it.
+- The bundle's integrity rests on HTTPS to GitHub and its checksum; signing
+  bundles with a key kept outside the repository is on the roadmap.
 
 ## Hard problems we know about
 

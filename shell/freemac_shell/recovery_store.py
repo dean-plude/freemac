@@ -203,6 +203,32 @@ def writable(system):
         raise OSError(result.stderr.strip() or "The disk couldn't be opened for changes.")
 
 
+# -- undoing an update -----------------------------------------------------------
+
+UPDATE_HELPER = "/usr/libexec/freemac-update-helper"
+
+
+def update_undo(system):
+    """(the version Undo Last Update puts back, the version now) or (None, now)."""
+    now = _os_release(system.root).get("VERSION_ID", "")
+    try:
+        with open(system.path("var/lib/freemac/update/previous/manifest.json")) as f:
+            before = json.load(f).get("version")
+    except (OSError, ValueError, AttributeError):
+        before = None
+    return before, now
+
+
+def undo_update(system):
+    writable(system)
+    helper = UPDATE_HELPER if os.path.exists(UPDATE_HELPER) else system.path(UPDATE_HELPER.lstrip("/"))
+    result = _run("python3", helper, "--root", system.root, "rollback", timeout=1200)
+    if result.returncode != 0:
+        words = (result.stdout or "").strip().removeprefix("error ").strip()
+        raise OSError(words or "Something went wrong.")
+    return True
+
+
 # -- passwords --------------------------------------------------------------------
 
 ADMIN_GROUPS = ("sudo", "admin", "wheel")
