@@ -1291,12 +1291,16 @@ def main():
     # Strata says the Hover Text key is held.
     from . import hover_text
     win.hover_text = hover_text.HoverPanel()
+    # Slow Keys' clicks (slow_keys.py), as Strata holds back each key.
+    from . import slow_keys
+    win.slow_clicks = slow_keys.Clicks()
     # Mission Control's row of desktops (spaces.py), opened by Strata too.
     from . import spaces
     win.spaces = spaces.SpacesRow()
     win._tiles_server = window_tiles.listen(win.tiles, {"accent": win.accents.handle,
                                                         "sticky": win.sticky.handle,
                                                         "hover": win.hover_text.handle,
+                                                        "slow": win.slow_clicks.handle,
                                                         "spaces": win.spaces.handle})
     accents.start_input_method()
     # Background Sounds (background_sounds.py) play for as long as Topline runs.

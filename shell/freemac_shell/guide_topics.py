@@ -803,6 +803,14 @@ TOPICS = {
         "Tap a modifier twice to lock it, and once more to let it go.",
         "Press Shift five times again to turn Sticky Keys off.",
     ]),
+    "slow-keys": ("Type only the keys you mean to", "slow keys accidental keys bumped brushed tremor shaky hands delay hold acceptance typing accessibility click", [
+        "Choose Dials > Accessibility and turn on Slow Keys.",
+        "Now hold each key down for a moment before it counts. A key you only brush on the way to "
+        "another isn't typed.",
+        "Drag Acceptance delay toward Long if keys still get typed by accident, or toward Short if typing feels slow.",
+        "Shift, Control, Option and Command work at once, so a shortcut only waits for its last key.",
+        "Turn off Use click key sounds if you'd rather not hear a click as each key goes down and counts.",
+    ]),
     "drawer-settings": ("Change Drawer's settings", "drawer settings preferences finder new window opens folder trash empty 30 days automatically warning folders on top sort", [
         "In Drawer, choose Drawer > Settings, or press \u2318,.",
         "General: pick the folder new Drawer windows open in.",

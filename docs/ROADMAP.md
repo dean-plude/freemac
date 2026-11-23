@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.126 "slow keys" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Slow Keys, as on a Mac: a key counts only once it has been held for the acceptance delay, so a key brushed by accident isn't typed; Shift, Control, Option and Command act at once, so shortcuts still work | Strata (slow-keys.hpp) | done |
+| 2 | A soft click as each key goes down and another once it counts, from sounds kept loaded so they never hold up typing | Topline (slow_keys.py) | done |
+| 3 | Dials > Accessibility: Slow Keys switch, Acceptance delay (Short to Long) and Use click key sounds | Dials | done |
+| 4 | Guide topic; README row; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.125 "hover text" (done)
 
 | # | Item | Component | Status |

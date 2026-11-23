@@ -383,7 +383,7 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window),
+    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window),
         audio(window), *spoken_content(window))
 
 
@@ -546,6 +546,36 @@ def sticky_keys(window):
         row("Show pressed modifier keys on screen",
             switch(prefs.get("sticky_show", True), lambda value: window.save_prefs(sticky_show=value)),
             "Their symbols show in the top-right corner while they're set."))
+
+
+def slow_keys(window):
+    """Slow Keys, as on a Mac: a key counts only once it has been held for
+    the acceptance delay (strata-shell/slow_keys and slow_keys_delay, done by
+    Strata), with a click as each key goes down and counts (slow_keys.py)."""
+    group, row, _page, slider, switch = window.helpers
+
+    def on(key, default):
+        value = window.ini_get("strata-shell", key, default) or default
+        return value.strip().lower() not in ("false", "0", "no", "off")
+
+    def setter(key):
+        return lambda value: window.ini_set("strata-shell", key, "true" if value else "false")
+
+    try:
+        delay = int(window.ini_get("strata-shell", "slow_keys_delay", "500") or 500)
+    except ValueError:
+        delay = 500
+    delay = max(100, min(2000, delay))
+    acceptance = slider(100, 2000, 100, delay,
+                        lambda value: window.ini_set("strata-shell", "slow_keys_delay", str(int(value))),
+                        marks=((100, "Short"), (2000, "Long")))
+    return group(
+        row("Slow Keys", switch(on("slow_keys", "false"), setter("slow_keys")),
+            "A key counts only once you've held it down for a moment, so a key brushed by "
+            "accident isn't typed. Shift, Control, Option and Command work at once."),
+        row("Acceptance delay", acceptance),
+        row("Use click key sounds", switch(on("slow_keys_click", "true"), setter("slow_keys_click")),
+            "A soft click as a key goes down, and another once it counts."))
 
 
 def audio(window):
