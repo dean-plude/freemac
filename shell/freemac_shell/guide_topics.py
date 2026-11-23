@@ -213,6 +213,17 @@ TOPICS = {
         "To show a message under the password field, such as how to return the computer if it's lost, turn on "
         "Show message when locked in Dials > Power (Battery on a laptop) and type it in.",
     ]),
+    "switch-user": ("Switch to another person without logging out", "fast user switching switch user family "
+                    "kids accounts login window another person logged in", [
+        "When the computer has more than one account, your name shows in the menu bar. Click it and choose "
+        "someone: your apps stay open behind your lock screen while they use the computer.",
+        "If they're already logged in, their own screen comes back, locked, for their password. If not, the "
+        "login screen opens with them chosen.",
+        "Login Window… opens the login screen to choose anyone. People already logged in have a dot by their "
+        "name there; choose one and click the arrow to go back to their session.",
+        "To come back, choose your name in their menu bar (or the login screen) and type your password.",
+        "Dials > Users adds accounts. Turn off Show fast user switching menu there to hide your name.",
+    ]),
     "stuck": ("When an app stops answering", "force quit frozen stuck hang not responding crash", [
         "Press ⌥⌘⎋ (Option, Command and Escape), or choose Force Quit in the freemac menu, "
         "then choose the app and Force Quit.",

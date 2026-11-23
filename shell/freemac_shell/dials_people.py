@@ -18,7 +18,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, guest_user  # noqa: E402
+from . import alert, guest_user, style  # noqa: E402
 
 HELPER = "/usr/libexec/freemac-users-helper"
 GREETD = "/etc/greetd/config.toml"
@@ -126,6 +126,14 @@ class UsersPanel(Gtk.Box):
         guest_group.add(item_row("avatar-default-symbolic", "Guest User",
                                  "Lets anyone log in without a password. Everything a guest does is "
                                  "erased when they log out.", self.guest))
+        # Fast user switching: the menu bar shows who's logged in and lets
+        # someone else log in without the first person logging out.
+        switching = Gtk.Switch(valign=Gtk.Align.CENTER,
+                               active=bool(style.prefs().get("user_menu", True)))
+        switching.connect("notify::active", lambda s, _p: window.save_prefs(user_menu=s.get_active()))
+        guest_group.add(item_row("system-users-symbolic", "Show fast user switching menu",
+                                 "Puts your name in the menu bar, to switch to someone else "
+                                 "while your apps stay open.", switching))
         self.status = caption("")
         self.pack_start(page("Users", self.list, add, guest_group, auto_group, self.status), True, True, 0)
         self.refresh()

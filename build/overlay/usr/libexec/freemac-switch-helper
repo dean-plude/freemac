@@ -1,0 +1,73 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Fast user switching, the part that needs root. Original freemac code.
+
+    freemac-switch-helper greeter VT   run a login screen (Gangway, in greetd)
+                                       on virtual terminal VT, beside the
+                                       sessions already running, and show it
+    freemac-switch-helper to VT        show virtual terminal VT: the session
+                                       or login screen running there
+
+Only ever started by freemac-greeter@VT.service and freemac-switch-to@VT.service,
+which polkit lets the person at the computer (and the login screen) start
+(etc/polkit-1/rules.d/50-freemac-switch-user.rules). VT must be 8 to 12, so
+the console's own terminals and the first login screen (7) are left alone.
+"""
+import fcntl
+import os
+import sys
+
+FIRST, LAST = 8, 12
+VT_ACTIVATE, VT_WAITACTIVE = 0x5606, 0x5607
+GREETER = "env XCURSOR_THEME=freemac XCURSOR_SIZE=24 cage -s -- freemac-gangway"
+
+
+def terminal(text):
+    try:
+        number = int(text)
+    except (TypeError, ValueError):
+        return None
+    return number if FIRST <= number <= LAST or number == 7 else None
+
+
+def switch_to(vt):
+    fd = os.open("/dev/tty0", os.O_RDWR | os.O_NOCTTY)
+    try:
+        fcntl.ioctl(fd, VT_ACTIVATE, vt)
+        fcntl.ioctl(fd, VT_WAITACTIVE, vt)
+    finally:
+        os.close(fd)
+
+
+def greeter(vt):
+    """greetd for one more login screen. It switches to its terminal as it
+    starts, and when the person who logs in there logs out, shows the login
+    screen there again."""
+    folder = "/run/freemac-switch"
+    os.makedirs(folder, mode=0o755, exist_ok=True)
+    config = os.path.join(folder, f"greetd-vt{vt}.toml")
+    with open(config, "w") as f:
+        f.write(f'[terminal]\nvt = {vt}\n\n[default_session]\ncommand = "{GREETER}"\nuser = "_greetd"\n')
+    os.execvp("greetd", ["greetd", "--config", config, "--socket-path", f"/run/greetd-vt{vt}.sock"])
+
+
+def main(argv):
+    if len(argv) != 2 or argv[0] not in ("greeter", "to"):
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    vt = terminal(argv[1])
+    if vt is None or (argv[0] == "greeter" and vt == 7):
+        print("freemac-switch-helper: the terminal must be 8 to 12", file=sys.stderr)
+        return 2
+    if os.geteuid() != 0:
+        print("freemac-switch-helper: run through its service", file=sys.stderr)
+        return 1
+    if argv[0] == "to":
+        switch_to(vt)
+        return 0
+    greeter(vt)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

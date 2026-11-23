@@ -1,0 +1,11 @@
+# freemac fast user switching: one more login screen, on virtual terminal %i,
+# for someone else to log in while the first person's session keeps running.
+# Started from the user menu in the menu bar or Gangway (switch_user.py).
+[Unit]
+Description=freemac login screen on terminal %i
+After=systemd-user-sessions.service seatd.service greetd.service
+Conflicts=getty@tty%i.service
+
+[Service]
+ExecStart=/usr/libexec/freemac-switch-helper greeter %i
+Restart=no

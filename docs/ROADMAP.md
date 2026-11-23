@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.137 "fast user switching" (done)
+
+A family computer where each person has their own account: someone else can log in while the first person's apps keep running.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | With more than one account, the menu bar shows your name; its menu lists everyone, with a tick by those logged in, Login Window… and Users & Groups Settings… | Topline (status.py UserMenu), switch_user.py | done |
+| 2 | Picking someone locks your session and shows their session, or a login screen with them chosen, on another terminal (8 to 12), started by `freemac-greeter@N.service` | switch_user.py, freemac-switch-helper, systemd, polkit | done |
+| 3 | The login screen marks people already logged in; choosing one shows an arrow that goes back to their session, where their own lock screen asks for the password | Gangway | done |
+| 4 | Dials > Users: Show fast user switching menu | Dials | done |
+| 5 | Banners no longer show over the lock screen (a reminder that stays until it's dealt with hid it); they come back after unlocking | Beacon | done |
+| 6 | Guide topic, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## 1.136 "lock screen" (done)
 
 | # | Item | Component | Status |

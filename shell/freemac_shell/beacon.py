@@ -279,6 +279,29 @@ class Overlay(Gtk.Window):
             GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.ON_DEMAND)
 
 
+def screen_locked():
+    """Whether this person's lock screen (gtklock) is up. Banners stay off
+    it: it shows notifications itself, as Show previews allows."""
+    me = os.getuid()
+    try:
+        entries = os.scandir("/proc")
+    except OSError:
+        return False
+    with entries:
+        for entry in entries:
+            if not entry.name.isdigit():
+                continue
+            try:
+                if entry.stat().st_uid != me:
+                    continue
+                with open(f"/proc/{entry.name}/comm") as f:
+                    if f.read().strip() == "gtklock":
+                        return True
+            except OSError:
+                continue
+    return False
+
+
 class Beacon:
     def __init__(self):
         self.next_id = 1
@@ -292,6 +315,7 @@ class Beacon:
         GLib.timeout_add_seconds(15, self._check_alerts)
         self.updates = update_notice.Watch(self._updates_ready, self._freemac_ready, self._freemac_installed)
         self.connection = None
+        self.lock_watch = None
         self.banners = Overlay("freemac-beacon")
         self.banner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.banners.add(self.banner_box)
@@ -414,7 +438,7 @@ class Beacon:
         quiet = (not notify_rules.allowed(prefs, note.app) or choice == "list") and note.urgency < 2
         if self.center and self.center.get_visible():
             self._fill_center()
-        elif not quiet:
+        elif not quiet and not screen_locked():
             self._show_banner(note, prefs)
             announce.notification(prefs, note.app, note.summary)
         return nid
@@ -431,6 +455,20 @@ class Beacon:
         for old in cards[:-MAX_BANNERS]:
             self._drop_banner(old.note.id)
         self.banners.show_all()
+        if self.lock_watch is None:
+            self.lock_watch = GLib.timeout_add_seconds(1, self._watch_lock)
+
+    def _watch_lock(self):
+        """While banners are up, hide them when the screen locks (a reminder
+        can stay until it's dealt with) and bring them back after."""
+        if not self.banner_box.get_children():
+            self.lock_watch = None
+            return False
+        if screen_locked():
+            self.banners.hide()
+        elif not self.banners.get_visible():
+            self.banners.show_all()
+        return True
 
     def _expire(self, nid):
         entry = self.live.get(nid)
