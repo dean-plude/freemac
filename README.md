@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.130 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.131 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -30,6 +30,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/live-text.png" alt="Frame showing a school trip form with Live Text on: the picture dimmed, every line of text lit up, and two lines selected for copying"><br><sub>Live Text in Frame: select and copy the words in a picture</sub></td><td width="50%"><img src="docs/screenshots/hover-text.png" alt="Hover Text: Command held over a line of small text in Dials, and the same line shown large in a panel above the pointer"><br><sub>Hover Text: hold ⌘ and point to see small words large</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/focus.png" alt="Quick Settings with the Focus list open and Work picked: the tile turns blue and the menu bar shows a briefcase"><br><sub>Focus: pick Do Not Disturb, Sleep, Work or Personal from Quick Settings</sub></td><td width="50%"><img src="docs/screenshots/focus-settings.png" alt="Dials > Focus: Work lets Nudge and Tide through and turns on from 9:00 to 17:00, Monday to Friday"><br><sub>Each Focus has its own allowed apps and set times, in Dials</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/accessibility-keyboard.png" alt="The Accessibility Keyboard floating over Quill, with a line typed by clicking its keys"><br><sub>Accessibility Keyboard: type by clicking the keys on the screen</sub></td><td width="50%"><img src="docs/screenshots/accessibility-keyboard-dark.png" alt="The Accessibility Keyboard in dark mode, with Shift held so its keys show capitals"><br><sub>In dark mode, with ⇧ Shift held for the next key</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/sound-menu.png" alt="The Sound menu open under the speaker in the menu bar: a volume slider, the outputs Speakers and Headphones with Speakers marked, and Sound Settings"><br><sub>The Sound menu: the volume, and the output to play through</sub></td><td width="50%"><img src="docs/screenshots/sound-settings.png" alt="Dials > Sound with the output, its Balance slider and volume, and the microphone's Input level lit up"><br><sub>Balance and Input level in Dials > Sound</sub></td></tr>
 </table>
 
 ## Download
@@ -111,6 +112,7 @@ one of them will be reverted.
 | Mouse Keys: move the pointer and click with the number keypad, or press Option five times to turn it on (Dials > Accessibility) | **Strata**, Topline, Dials | 1.128 |
 | Focus: Do Not Disturb, Sleep, Work and Personal, picked from Quick Settings or the Notification Centre, each letting through only the apps you choose and turning on by itself at set times on chosen days (Dials > Focus) | **Beacon**, Topline, Dials | 1.129 |
 | Spoken Content: hold ⌘ and point at some words to hear them, and have notifications and the time (on the hour, half or quarter hour) read out (Dials > Accessibility) | **Topline**, **Beacon**, **Strata**, eSpeak NG | 1.130 |
+| Sound menu: the volume and the outputs to play through from the speaker in the menu bar; Balance and Input level in Dials > Sound; Play stereo audio as mono in Dials > Accessibility | **Topline**, **Dials**, PipeWire | 1.131 |
 | Live Text: Frame finds the words in a picture or a scanned PDF, so you can select and copy them (⌘C), or light up all of them with the Live Text button | **Frame**, Tesseract | 1.124 |
 | Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |

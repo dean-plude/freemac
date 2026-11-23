@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
 
-from . import beacon, media, notify_rules, screen, stage, style  # noqa: E402
+from . import audio, beacon, media, notify_rules, screen, stage, style  # noqa: E402
 from .status import NM, StatusButton, launch  # noqa: E402
 
 CSS = b"""
@@ -367,7 +367,7 @@ class QuickSettings(StatusButton):
         self.refresh()
 
     def _set_volume(self, value):
-        run("wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{int(value)}%")
+        audio.set_level(int(value))   # keeps the balance
 
     # -- the panel -------------------------------------------------------------
     def _toggle(self, *_args):

@@ -168,6 +168,12 @@ CSS = b"""
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
+/* Sound > Input level: a row of round lights, as on a Mac. */
+levelbar.input-level trough { border: none; background: none; box-shadow: none; padding: 0; }
+levelbar.input-level block { min-width: 9px; min-height: 9px; border-radius: 5px; margin: 0 2px;
+                             border: none; box-shadow: none; }
+levelbar.input-level block.empty { background-color: alpha(currentColor, 0.15); }
+levelbar.input-level block.filled { background-color: @theme_selected_bg_color; }
 .dials-flow, .dials-flow flowboxchild { background: none; padding: 0; }
 .dials-days button:checked { background-image: none; background-color: @theme_selected_bg_color;
   color: @theme_selected_fg_color; border-color: @theme_selected_bg_color; box-shadow: none; }
@@ -253,7 +259,17 @@ def slider(low, high, step, value, on_change, width=220, marks=()):
         pending["id"] = GLib.timeout_add(250, lambda: on_change(s.get_value()) or pending.clear() or False)
 
     scale.connect("value-changed", changed)
+    scale.connect("scroll-event", _scroll_page)
     return scale
+
+
+def _scroll_page(widget, event):
+    """A scroll over a slider scrolls the page, as on a Mac, rather than
+    moving the slider as the page goes by under the pointer."""
+    page = widget.get_ancestor(Gtk.ScrolledWindow)
+    if page is not None:
+        page.event(event)
+    return True
 
 
 def thumbnail(path, width=180, height=110):

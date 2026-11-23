@@ -76,6 +76,9 @@ gnome-themes-extra
 pipewire
 pipewire-pulse
 wireplumber
+# pactl and parec talk to PipeWire's PulseAudio server: the Sound menu's
+# outputs, balance, mono audio and Dials' input level (audio.py).
+pulseaudio-utils
 # Music for Shanty: GStreamer plays and reads the tags of MP3, AAC/M4A, FLAC,
 # Ogg, Opus and WAV, and sends the sound to PipeWire.
 gir1.2-gstreamer-1.0

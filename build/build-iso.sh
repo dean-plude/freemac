@@ -116,6 +116,14 @@ esac
 } > "$ROOTFS/etc/apt/sources.list"
 [ -n "${SNAPSHOT:-}" ] && printf 'Acquire::Check-Valid-Until "false";\n' \
   > "$ROOTFS/etc/apt/apt.conf.d/10freemac-snapshot"
+# While building, a mirror that stops answering is given up on after 30
+# seconds and tried again, rather than holding the build until the CI job's
+# time runs out (two release builds hung for hours on one stalled download).
+cat > "$ROOTFS/etc/apt/apt.conf.d/99freemac-build" <<'APT'
+Acquire::Retries "5";
+Acquire::http::Timeout "30";
+Acquire::https::Timeout "30";
+APT
 
 mount -t proc proc "$ROOTFS/proc"
 mount -t sysfs sys "$ROOTFS/sys"
@@ -291,7 +299,7 @@ else
 fi
 
 log "Cleaning the image"
-rm -f "$ROOTFS/usr/sbin/policy-rc.d"
+rm -f "$ROOTFS/usr/sbin/policy-rc.d" "$ROOTFS/etc/apt/apt.conf.d/99freemac-build"
 in_chroot apt-get clean
 # The package lists stay: Harbor's app catalogue (AppStream DEP-11 data) and
 # installs work straight away; Harbor refreshes them when they get old.

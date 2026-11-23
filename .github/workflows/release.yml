@@ -55,6 +55,8 @@ jobs:
           fi
 
       - name: Build the ISO
+        # A build takes about 20 minutes; one that stalls stops here.
+        timeout-minutes: 70
         run: |
           # Ferry, the optional Mac layer, isn't part of the desktop image.
           rm -rf ferry

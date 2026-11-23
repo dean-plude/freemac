@@ -17,7 +17,7 @@ import sys
 
 from gi.repository import Gio, GLib
 
-from . import screen, sounds
+from . import audio, screen, sounds
 
 STEP = 5           # percent per press
 SINK = "@DEFAULT_AUDIO_SINK@"
@@ -33,7 +33,12 @@ def run(*cmd):
 
 
 def volume(device=SINK):
-    """(percent, muted) from wpctl, or None without a sound server."""
+    """(percent, muted), or None without a sound server. The output is read
+    through pactl, which answers after a change has been made."""
+    if device == SINK and audio.available():
+        state = audio.state()
+        if state is not None:
+            return state
     if not shutil.which("wpctl"):
         return None
     out = run("wpctl", "get-volume", device)
@@ -71,11 +76,11 @@ def do(action):
         if volume() is None:
             return None
         if action == "mute":
-            run("wpctl", "set-mute", SINK, "toggle")
+            audio.set_muted(not volume()[1])
         else:
-            run("wpctl", "set-mute", SINK, "0")
-            sign = "+" if action == "volume-up" else "-"
-            run("wpctl", "set-volume", "-l", "1.0", SINK, f"{STEP}%{sign}")
+            audio.set_muted(False)
+            # Through audio.py, which keeps the left/right balance.
+            audio.step(STEP if action == "volume-up" else -STEP)
             sounds.feedback()   # a pop at the new level, as a Mac does
         percent, muted = volume()
         return volume_icon(percent, muted), 0.0 if muted else percent / 100, "Muted" if muted else ""

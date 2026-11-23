@@ -52,6 +52,16 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
   padding: 10px 12px;
 }
 .topline-popup label { color: @ink; }
+/* The Sound menu (status.py): a title, the slider, the outputs, Settings. */
+.sound-menu { padding: 10px 8px; }
+.sound-menu-title { font-weight: bold; padding: 0 6px; }
+.sound-menu-heading { color: @dim; font-size: 12px; font-weight: 600; padding: 2px 6px; }
+.sound-menu-item { padding: 4px 6px; border-radius: 7px; }
+.sound-menu-item:hover { background-color: alpha(currentColor, 0.08); }
+.sound-device { border-radius: 50%; padding: 5px; background-color: alpha(currentColor, 0.12); }
+.sound-device-on { background-color: @theme_selected_bg_color; color: white; }
+.sound-mute, .sound-mute:checked { background: none; border: none; box-shadow: none; padding: 2px 4px; color: @ink; }
+.sound-mute:checked { color: @dim; }
 .pier-sep { background-color: @edge; min-width: 1px; margin: 8px 6px; }
 .pier-shelf-side .pier-sep { min-width: 0; min-height: 1px; margin: 6px 8px; }
 .pier-shelf-side .pier-item { padding: 3px 0; }
