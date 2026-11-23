@@ -349,7 +349,7 @@ TOPICS = {
         "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
         "Press Return for the next lesson.",
     ]),
-    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids child family parent manage apps time downtime bedtime always allowed more minutes "
+    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids child family parent manage apps time downtime bedtime always allowed more minutes category categories games social schedule weekend custom "
                    "adult websites content filter block sites family safe", [
         "Logbook shows how long each app was used. Press ⌘Space, type Logbook and press Return.",
         "Today shows each hour of the day, and Last 7 Days shows each day of the week, with the apps used most "
@@ -361,6 +361,11 @@ TOPICS = {
         "Turn on Downtime and choose the hours, such as 9:00 PM to 7:00 AM, for time away from the screen. "
         "Only the apps under Always Allowed, and Drawer, Dials and Guide, can be used then. A notice comes "
         "five minutes before it starts, and 15 More Minutes holds it off for a while.",
+        "To give each day its own downtime, such as later on Fridays and none on Saturdays, choose Custom "
+        "instead of Every Day and set the hours beside each day. Untick a day to have no downtime that day.",
+        "Categories adds up the time for each kind of app, such as Games or Social. To limit them all together, "
+        "click Set Limit beside the category, or Add Category Limit… for one not used yet. At the limit, every "
+        "app of that kind closes for the rest of the day.",
         "Click + under Always Allowed to add an app that should always work, such as Jot for homework. "
         "Always Allowed apps have no daily limit either.",
         "Choose Limits ▸ Passcode… to set a passcode, so that only someone who knows it can change a limit, "

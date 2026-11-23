@@ -1430,3 +1430,16 @@ A family computer where each person has their own account: someone else can log 
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images and update bundles, with a key kept outside the repository.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.
+
+## 1.139 "Screen Time schedules and categories" (done)
+
+Downtime can follow the week, and one limit can cover every app of a kind.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Downtime: Every Day or Custom; Custom gives each day its own hours or none, and a night's downtime runs into the next morning | Logbook | done |
+| 2 | The downtime notice and "can be used again at" use that day's hours | Logbook | done |
+| 3 | Categories: Logbook adds up each kind of app (Games, Social, Entertainment, Creativity, Education, Information & Reading, Productivity & Finance, Utilities, Other), from the Categories line of each app's .desktop file | Logbook | done |
+| 4 | A daily limit on a category counts all its apps together and closes them at the limit, with a notice five minutes before; Add Category Limit… lists the apps it counts | Logbook | done |
+| 5 | A parent sets a child's custom downtime and category limits too, and More Time… works for a category | Logbook, freemac-screen-time-helper | done |
+| 6 | The window no longer rebuilds itself after its own changes | Logbook | done |
