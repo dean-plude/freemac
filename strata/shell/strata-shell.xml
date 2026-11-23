@@ -44,6 +44,23 @@
 			<_short>Colour tint</_short>
 			<default>0.85 0.45 0.55 1.0</default>
 		</option>
+		<option name="slow_keys" type="bool">
+			<_short>Slow Keys</_short>
+			<_long>A key counts only once it has been held down for the acceptance delay.</_long>
+			<default>false</default>
+		</option>
+		<option name="slow_keys_delay" type="int">
+			<_short>Slow Keys acceptance delay (ms)</_short>
+			<_long>How long a key must be held before it counts.</_long>
+			<default>500</default>
+			<min>100</min>
+			<max>2000</max>
+		</option>
+		<option name="slow_keys_click" type="bool">
+			<_short>Slow Keys click sounds</_short>
+			<_long>A soft click as a key goes down and another once it counts.</_long>
+			<default>true</default>
+		</option>
 		<option name="sticky_keys" type="bool">
 			<_short>Sticky Keys</_short>
 			<_long>A modifier key tapped on its own stays down for the next key; tapped twice it locks.</_long>

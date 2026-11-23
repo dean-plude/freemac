@@ -46,6 +46,7 @@
 #include "pointer-locate.hpp"
 #include "press-hold.hpp"
 #include "sticky-keys.hpp"
+#include "slow-keys.hpp"
 #include "hover-text.hpp"
 #include "colour-filters.hpp"
 #include "mission-control.hpp"
@@ -870,6 +871,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_attention::attention_t attention;
     strata_locate::locate_t locate;
     strata_accents::hold_t accents;
+    strata_slow::slow_t slow_keys;
     strata_sticky::sticky_t sticky;
     strata_hover::hover_t hover_text;
     strata_filters::filters_t colour_filters;
@@ -1006,6 +1008,8 @@ class strata_shell_impl : public wf::plugin_interface_t
         flashes.init();
         locate.init();
         window_places.init();
+        // Slow Keys first: it holds a key back before anything else sees it.
+        slow_keys.init(&strata_accents::strata_tell_topline);
         command_key.init();
         accents.init();
         sticky.init(&strata_accents::strata_tell_topline);

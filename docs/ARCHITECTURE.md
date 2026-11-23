@@ -270,6 +270,19 @@ plugins stay in use.
   row turn it on or off (`strata-shell/sticky_keys`,
   `strata-shell/sticky_keys_shift`); Topline saves that and shows the
   modifiers that are set in the top-right corner ("sticky state ...").
+  `slow-keys.hpp` (1.126) is Slow Keys: Strata connects to the keyboard
+  first and holds back each key press (`IGNORE`). Let go before the
+  acceptance delay (`strata-shell/slow_keys_delay`, 100 to 2000 ms) and the
+  press and its release go nowhere; held that long, the press is sent again
+  as the keyboard itself would send it, with `wlr_keyboard_notify_key`
+  (without updating the keyboard's state a second time), so Wayfire's
+  bindings, the Command key, press and hold and the app all see an ordinary
+  key, and the app repeats it while it's held. Modifier keys pass at once.
+  With `strata-shell/slow_keys_click` on it sends "slow pressed" and "slow
+  accepted" to Topline, which plays a tick and a pop from two GStreamer
+  players kept loaded (`slow_keys.py`): starting a player program for each
+  key held the keyboard up long enough on a slow machine for the app to
+  repeat the key.
   `colour-filters.hpp` (1.99) is Colour filters: greyscale, filters for
   red/green and blue/yellow colour blindness, or a colour tint, at a chosen
   intensity (`strata-shell/colour_filter`, `colour_filter_intensity`,
