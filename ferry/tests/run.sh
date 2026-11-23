@@ -168,6 +168,10 @@ fi
 run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
 # An exception left uncaught in the event loop is reported, not fatal (M7).
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
+# Pasteboards, and cut, copy and paste in text fields (M7).
+run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
+# Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).
+run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.

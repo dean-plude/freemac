@@ -1105,6 +1105,51 @@ static BOOL keeps_state(NSButtonType t)
 - (void)deleteToBeginningOfLine:(id)sender { [self _deleteTo:0]; }
 - (void)deleteToEndOfLine:(id)sender { [self _deleteTo:[_text length]]; }
 - (void)deleteToEndOfParagraph:(id)sender { [self _deleteTo:[_text length]]; }
+
+/* The clipboard: the general pasteboard, which is this system's clipboard. */
+- (void)copy:(id)sender
+{
+    NSRange r = [self _selection];
+    if (!_editing || !r.length || [self isKindOfClass:[NSSecureTextField class]]) {
+        NSBeep();
+        return;
+    }
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb setString:[_text substringWithRange:r] forType:NSPasteboardTypeString];
+}
+- (void)cut:(id)sender
+{
+    if (!_editable || ![self _selection].length || [self isKindOfClass:[NSSecureTextField class]]) {
+        NSBeep();
+        return;
+    }
+    [self copy:sender];
+    [self _replaceSelectionWith:@""];
+}
+- (void)paste:(id)sender
+{
+    NSString *s = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+    if (!s || !_editing) {
+        NSBeep();
+        return;
+    }
+    [self insertText:s];
+}
+- (BOOL)validateMenuItem:(NSMenuItem *)item
+{
+    SEL a = [item action];
+    if (a == @selector(copy:))
+        return _editing && [self _selection].length && ![self isKindOfClass:[NSSecureTextField class]];
+    if (a == @selector(cut:))
+        return _editing && _editable && [self _selection].length && ![self isKindOfClass:[NSSecureTextField class]];
+    if (a == @selector(paste:))
+        return _editing && _editable &&
+               [[NSPasteboard generalPasteboard] availableTypeFromArray:@[ NSPasteboardTypeString ]] != nil;
+    if (a == @selector(selectAll:))
+        return _editing;
+    return YES;
+}
 - (void)moveLeft:(id)sender
 {
     NSRange r = [self _selection];

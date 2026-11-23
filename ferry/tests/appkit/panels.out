@@ -1,0 +1,20 @@
+defaults: files 1, folders 0, several 0
+no answer: Cancel, 0 URLs
+one file: OK, a.txt
+several: OK, a.txt b.png
+directory remembered: yes
+plain text only: OK, a.txt c.TXT
+png only: OK, b.png
+a folder when choosing files: Cancel
+a folder when choosing folders: OK, folder
+a missing file: Cancel
+with the delegate: OK, a.txt
+filenames: a.txt
+save defaults: create folders 1, name Untitled
+save as notes: OK, notes.txt, name now notes.txt
+save as notes.TXT: OK, notes.TXT
+refused by the delegate: Cancel
+begin returned; handler ran yet: no
+handler: OK, b.png
+sheet handler: OK
+exit=0

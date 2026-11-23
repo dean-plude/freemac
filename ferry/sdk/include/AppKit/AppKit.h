@@ -1266,4 +1266,225 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
 - (NSArray *)optionDescriptionsForBinding:(NSString *)binding;
 @end
 
+/* ---- Pasteboards (M7) ----------------------------------------------------------------
+ * The general pasteboard is this system's clipboard for text (and, read
+ * only, for files and images copied in other apps); everything else stays
+ * inside the program. The old ...PboardType names are the same types as the
+ * new ones, except NSFilenamesPboardType, an array of paths. */
+typedef NSString *NSPasteboardType;
+typedef NSString *NSPasteboardName;
+typedef NSString *NSPasteboardReadingOptionKey;
+APPKIT_EXTERN NSPasteboardType const NSPasteboardTypeString, NSPasteboardTypePDF, NSPasteboardTypeTIFF,
+    NSPasteboardTypePNG, NSPasteboardTypeRTF, NSPasteboardTypeRTFD, NSPasteboardTypeHTML,
+    NSPasteboardTypeTabularText, NSPasteboardTypeFont, NSPasteboardTypeRuler, NSPasteboardTypeColor,
+    NSPasteboardTypeSound, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypeTextFinderOptions,
+    NSPasteboardTypeURL, NSPasteboardTypeFileURL;
+APPKIT_EXTERN NSPasteboardType const NSStringPboardType, NSFilenamesPboardType, NSTIFFPboardType, NSPDFPboardType,
+    NSRTFPboardType, NSRTFDPboardType, NSHTMLPboardType, NSTabularTextPboardType, NSFontPboardType,
+    NSRulerPboardType, NSColorPboardType, NSURLPboardType, NSFileContentsPboardType, NSMultipleTextSelectionPboardType,
+    NSPostScriptPboardType, NSVCardPboardType, NSInkTextPboardType, NSFilesPromisePboardType, NSPICTPboardType;
+APPKIT_EXTERN NSPasteboardName const NSPasteboardNameGeneral, NSPasteboardNameFont, NSPasteboardNameRuler,
+    NSPasteboardNameFind, NSPasteboardNameDrag;
+APPKIT_EXTERN NSPasteboardName const NSGeneralPboard, NSFontPboard, NSRulerPboard, NSFindPboard, NSDragPboard;
+APPKIT_EXTERN NSPasteboardReadingOptionKey const NSPasteboardURLReadingFileURLsOnlyKey,
+    NSPasteboardURLReadingContentsConformToTypesKey;
+
+typedef NS_OPTIONS(NSUInteger, NSPasteboardWritingOptions) { NSPasteboardWritingPromised = 1 << 9 };
+typedef NS_OPTIONS(NSUInteger, NSPasteboardReadingOptions) {
+    NSPasteboardReadingAsData = 0, NSPasteboardReadingAsString = 1 << 0,
+    NSPasteboardReadingAsPropertyList = 1 << 1, NSPasteboardReadingAsKeyedArchive = 1 << 2,
+};
+typedef NS_OPTIONS(NSUInteger, NSPasteboardContentsOptions) { NSPasteboardContentsCurrentHostOnly = 1 << 0 };
+
+@class NSPasteboard, NSPasteboardItem;
+@protocol NSPasteboardWriting <NSObject>
+- (NSArray<NSPasteboardType> *)writableTypesForPasteboard:(NSPasteboard *)pasteboard;
+@optional
+- (NSPasteboardWritingOptions)writingOptionsForType:(NSPasteboardType)type pasteboard:(NSPasteboard *)pasteboard;
+@required
+- (id)pasteboardPropertyListForType:(NSPasteboardType)type;
+@end
+@protocol NSPasteboardReading <NSObject>
++ (NSArray<NSPasteboardType> *)readableTypesForPasteboard:(NSPasteboard *)pasteboard;
+@optional
++ (NSPasteboardReadingOptions)readingOptionsForType:(NSPasteboardType)type pasteboard:(NSPasteboard *)pasteboard;
+- (id)initWithPasteboardPropertyList:(id)propertyList ofType:(NSPasteboardType)type;
+@end
+@protocol NSPasteboardItemDataProvider <NSObject>
+- (void)pasteboard:(NSPasteboard *)pasteboard item:(NSPasteboardItem *)item provideDataForType:(NSPasteboardType)type;
+@optional
+- (void)pasteboardFinishedWithDataProvider:(NSPasteboard *)pasteboard;
+@end
+@interface NSObject (NSPasteboardOwner)
+- (void)pasteboard:(NSPasteboard *)sender provideDataForType:(NSPasteboardType)type;
+- (void)pasteboardChangedOwner:(NSPasteboard *)sender;
+@end
+
+@interface NSPasteboardItem : NSObject <NSPasteboardWriting, NSPasteboardReading>
+@property (readonly, copy) NSArray<NSPasteboardType> *types;
+- (NSPasteboardType)availableTypeFromArray:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setDataProvider:(id<NSPasteboardItemDataProvider>)provider forTypes:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setData:(NSData *)data forType:(NSPasteboardType)type;
+- (BOOL)setString:(NSString *)string forType:(NSPasteboardType)type;
+- (BOOL)setPropertyList:(id)propertyList forType:(NSPasteboardType)type;
+- (NSData *)dataForType:(NSPasteboardType)type;
+- (NSString *)stringForType:(NSPasteboardType)type;
+- (id)propertyListForType:(NSPasteboardType)type;
+@end
+
+@interface NSPasteboard : NSObject
+@property (class, readonly, strong) NSPasteboard *generalPasteboard;
++ (NSPasteboard *)pasteboardWithName:(NSPasteboardName)name;
++ (NSPasteboard *)pasteboardWithUniqueName;
+@property (readonly, copy) NSPasteboardName name;
+@property (readonly) NSInteger changeCount;
+- (void)releaseGlobally;
+- (NSInteger)prepareForNewContentsWithOptions:(NSPasteboardContentsOptions)options;
+- (NSInteger)clearContents;
+- (BOOL)writeObjects:(NSArray<id<NSPasteboardWriting>> *)objects;
+- (NSArray *)readObjectsForClasses:(NSArray<Class> *)classes options:(NSDictionary *)options;
+@property (readonly, copy) NSArray<NSPasteboardItem *> *pasteboardItems;
+- (NSUInteger)indexOfPasteboardItem:(NSPasteboardItem *)item;
+- (BOOL)canReadItemWithDataConformingToTypes:(NSArray<NSString *> *)types;
+- (BOOL)canReadObjectForClasses:(NSArray<Class> *)classes options:(NSDictionary *)options;
+- (NSInteger)declareTypes:(NSArray<NSPasteboardType> *)types owner:(id)owner;
+- (NSInteger)addTypes:(NSArray<NSPasteboardType> *)types owner:(id)owner;
+@property (readonly, copy) NSArray<NSPasteboardType> *types;
+- (NSPasteboardType)availableTypeFromArray:(NSArray<NSPasteboardType> *)types;
+- (BOOL)setData:(NSData *)data forType:(NSPasteboardType)type;
+- (BOOL)setPropertyList:(id)plist forType:(NSPasteboardType)type;
+- (BOOL)setString:(NSString *)string forType:(NSPasteboardType)type;
+- (NSData *)dataForType:(NSPasteboardType)type;
+- (id)propertyListForType:(NSPasteboardType)type;
+- (NSString *)stringForType:(NSPasteboardType)type;
+@end
+
+@interface NSString (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
+@end
+@interface NSURL (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
++ (NSURL *)URLFromPasteboard:(NSPasteboard *)pasteboard;
+- (void)writeToPasteboard:(NSPasteboard *)pasteboard;
+@end
+@interface NSImage (NSPasteboardSupport) <NSPasteboardWriting, NSPasteboardReading>
++ (BOOL)canInitWithPasteboard:(NSPasteboard *)pasteboard;
+- (instancetype)initWithPasteboard:(NSPasteboard *)pasteboard;
+@end
+@interface NSResponder (NSStandardEditing)
+- (IBAction)cut:(id)sender;
+- (IBAction)copy:(id)sender;
+- (IBAction)paste:(id)sender;
+@end
+
+/* ---- Drag and drop (M7) --------------------------------------------------------------
+ * Views take files and text dropped on them from other apps. Dragging out
+ * of a Ferry window is not done yet. */
+typedef NS_OPTIONS(NSUInteger, NSDragOperation) {
+    NSDragOperationNone = 0, NSDragOperationCopy = 1, NSDragOperationLink = 2, NSDragOperationGeneric = 4,
+    NSDragOperationPrivate = 8, NSDragOperationMove = 16, NSDragOperationDelete = 32,
+    NSDragOperationEvery = NSUIntegerMax,
+};
+typedef NS_ENUM(NSInteger, NSDraggingFormation) {
+    NSDraggingFormationDefault = 0, NSDraggingFormationNone, NSDraggingFormationPile, NSDraggingFormationList,
+    NSDraggingFormationStack,
+};
+typedef NS_ENUM(NSInteger, NSDraggingContext) { NSDraggingContextOutsideApplication = 0, NSDraggingContextWithinApplication };
+@protocol NSDraggingInfo <NSObject>
+@property (readonly, strong) NSWindow *draggingDestinationWindow;
+@property (readonly) NSDragOperation draggingSourceOperationMask;
+@property (readonly) NSPoint draggingLocation;
+@property (readonly) NSPoint draggedImageLocation;
+@property (readonly, strong) NSImage *draggedImage;
+@property (readonly, strong) NSPasteboard *draggingPasteboard;
+@property (readonly, strong) id draggingSource;
+@property (readonly) NSInteger draggingSequenceNumber;
+@property NSDraggingFormation draggingFormation;
+@property BOOL animatesToDestination;
+@property NSInteger numberOfValidItemsForDrop;
+@end
+@protocol NSDraggingDestination <NSObject>
+@optional
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender;
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender;
+- (void)draggingExited:(id<NSDraggingInfo>)sender;
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender;
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender;
+- (void)concludeDragOperation:(id<NSDraggingInfo>)sender;
+- (void)draggingEnded:(id<NSDraggingInfo>)sender;
+- (BOOL)wantsPeriodicDraggingUpdates;
+@end
+@interface NSView (NSDragging)
+- (void)registerForDraggedTypes:(NSArray<NSPasteboardType> *)types;
+- (void)unregisterDraggedTypes;
+@property (readonly, copy) NSArray<NSPasteboardType> *registeredDraggedTypes;
+@end
+@interface NSWindow (NSDragging)
+- (void)registerForDraggedTypes:(NSArray<NSPasteboardType> *)types;
+- (void)unregisterDraggedTypes;
+@end
+
+/* ---- Open and Save panels (M7) -------------------------------------------------------
+ * This system's file chooser. With no display, a panel answers Cancel,
+ * unless FERRY_PANEL_ANSWER holds the paths to answer with, separated by
+ * newlines (for scripted runs and tests). */
+@class NSSavePanel, NSOpenPanel;
+@protocol NSOpenSavePanelDelegate <NSObject>
+@optional
+- (BOOL)panel:(id)sender shouldEnableURL:(NSURL *)url;
+- (BOOL)panel:(id)sender validateURL:(NSURL *)url error:(NSError **)outError;
+- (void)panel:(id)sender didChangeToDirectoryURL:(NSURL *)url;
+- (NSString *)panel:(id)sender userEnteredFilename:(NSString *)filename confirmed:(BOOL)okFlag;
+- (void)panel:(id)sender willExpand:(BOOL)expanding;
+- (void)panelSelectionDidChange:(id)sender;
+@end
+enum { NSFileHandlingPanelCancelButton = 0, NSFileHandlingPanelOKButton = 1 };
+enum { NSCancelButton = 0, NSOKButton = 1 };
+@interface NSSavePanel : NSPanel
++ (NSSavePanel *)savePanel;
+@property (copy) NSURL *directoryURL;
+@property (readonly, copy) NSURL *URL;
+@property (copy) NSString *nameFieldStringValue;
+@property (copy) NSString *nameFieldLabel;
+@property (copy) NSString *message;
+@property (copy) NSString *prompt;
+@property (copy) NSArray<NSString *> *allowedFileTypes;
+@property BOOL allowsOtherFileTypes;
+@property BOOL canCreateDirectories;
+@property BOOL canSelectHiddenExtension;
+@property (getter=isExtensionHidden) BOOL extensionHidden;
+@property BOOL showsHiddenFiles;
+@property BOOL treatsFilePackagesAsDirectories;
+@property BOOL showsTagField;
+@property (copy) NSArray<NSString *> *tagNames;
+@property (strong) NSView *accessoryView;
+@property (weak) id<NSOpenSavePanelDelegate> delegate;
+@property (getter=isExpanded, readonly) BOOL expanded;
+- (NSModalResponse)runModal;
+- (void)beginSheetModalForWindow:(NSWindow *)window completionHandler:(void (^)(NSModalResponse result))handler;
+- (void)beginWithCompletionHandler:(void (^)(NSModalResponse result))handler;
+- (IBAction)ok:(id)sender;
+- (IBAction)cancel:(id)sender;
+- (void)validateVisibleColumns;
+/* older calls */
+- (NSString *)filename;
+- (NSString *)directory;
+- (void)setDirectory:(NSString *)path;
+- (NSInteger)runModalForDirectory:(NSString *)path file:(NSString *)name;
+- (NSString *)requiredFileType;
+- (void)setRequiredFileType:(NSString *)type;
+@end
+@interface NSOpenPanel : NSSavePanel
++ (NSOpenPanel *)openPanel;
+@property (readonly, copy) NSArray<NSURL *> *URLs;
+@property BOOL canChooseFiles;
+@property BOOL canChooseDirectories;
+@property BOOL allowsMultipleSelection;
+@property BOOL resolvesAliases;
+@property (getter=isAccessoryViewDisclosed) BOOL accessoryViewDisclosed;
+@property BOOL canDownloadUbiquitousContents;
+@property BOOL canResolveUbiquitousConflicts;
+- (NSArray<NSString *> *)filenames;
+- (NSInteger)runModalForTypes:(NSArray *)fileTypes;
+- (NSInteger)runModalForDirectory:(NSString *)path file:(NSString *)name types:(NSArray *)fileTypes;
+@end
+
 #endif

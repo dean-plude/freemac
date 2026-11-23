@@ -112,4 +112,55 @@ gboolean gdk_event_get_scroll_deltas(const GdkEvent *event, double *dx, double *
 uint32_t gdk_keyval_to_unicode(unsigned keyval);
 unsigned gdk_keyval_to_lower(unsigned keyval);
 
+/* Clipboard, file choosers and drops (M7) */
+typedef void *GdkAtom;
+typedef struct _GtkClipboard GtkClipboard;
+typedef struct _GtkFileChooser GtkFileChooser;
+typedef struct _GtkFileFilter GtkFileFilter;
+typedef struct _GtkFileChooserNative GtkFileChooserNative;
+typedef struct _GdkDragContext GdkDragContext;
+typedef struct _GtkSelectionData GtkSelectionData;
+typedef struct _GList { void *data; struct _GList *next, *prev; } GList;
+typedef struct { char *target; unsigned flags, info; } GtkTargetEntry;
+enum { GTK_FILE_CHOOSER_ACTION_OPEN = 0, GTK_FILE_CHOOSER_ACTION_SAVE = 1,
+       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER = 2 };
+enum { GTK_RESPONSE_ACCEPT = -3, GTK_RESPONSE_CANCEL = -6 };
+enum { GDK_ACTION_DEFAULT = 1 << 0, GDK_ACTION_COPY = 1 << 1, GDK_ACTION_MOVE = 1 << 2, GDK_ACTION_LINK = 1 << 3,
+       GDK_ACTION_PRIVATE = 1 << 4, GDK_ACTION_ASK = 1 << 5 };
+void *gdk_display_get_default_seat(GdkDisplay *display);
+GdkAtom gdk_atom_intern(const char *name, gboolean only_if_exists);
+char *gdk_atom_name(GdkAtom atom);
+GtkClipboard *gtk_clipboard_get(GdkAtom selection);
+void gtk_clipboard_set_text(GtkClipboard *clipboard, const char *text, int len);
+char *gtk_clipboard_wait_for_text(GtkClipboard *clipboard);
+char **gtk_clipboard_wait_for_uris(GtkClipboard *clipboard);
+GdkPixbuf *gtk_clipboard_wait_for_image(GtkClipboard *clipboard);
+void gtk_clipboard_set_image(GtkClipboard *clipboard, GdkPixbuf *pixbuf);
+void g_strfreev(char **strv);
+char *g_filename_from_uri(const char *uri, char **hostname, void *error);
+GtkFileChooserNative *gtk_file_chooser_native_new(const char *title, GtkWidget *parent, int action,
+                                                  const char *accept_label, const char *cancel_label);
+int gtk_native_dialog_run(void *dialog);
+void gtk_file_chooser_set_select_multiple(void *chooser, gboolean select_multiple);
+void gtk_file_chooser_set_do_overwrite_confirmation(void *chooser, gboolean confirm);
+void gtk_file_chooser_set_create_folders(void *chooser, gboolean create_folders);
+void gtk_file_chooser_set_show_hidden(void *chooser, gboolean show_hidden);
+gboolean gtk_file_chooser_set_current_folder(void *chooser, const char *filename);
+void gtk_file_chooser_set_current_name(void *chooser, const char *name);
+GSList *gtk_file_chooser_get_filenames(void *chooser);
+void gtk_file_chooser_add_filter(void *chooser, GtkFileFilter *filter);
+GtkFileFilter *gtk_file_filter_new(void);
+void gtk_file_filter_set_name(GtkFileFilter *filter, const char *name);
+void gtk_file_filter_add_pattern(GtkFileFilter *filter, const char *pattern);
+void g_slist_free(GSList *list);
+void gtk_drag_dest_set(GtkWidget *widget, int flags, const GtkTargetEntry *targets, int n_targets, int actions);
+void gtk_drag_dest_unset(GtkWidget *widget);
+GdkAtom gtk_drag_dest_find_target(GtkWidget *widget, GdkDragContext *context, void *target_list);
+void gtk_drag_get_data(GtkWidget *widget, GdkDragContext *context, GdkAtom target, uint32_t time);
+void gtk_drag_finish(GdkDragContext *context, gboolean success, gboolean del, uint32_t time);
+void gdk_drag_status(GdkDragContext *context, int action, uint32_t time);
+int gdk_drag_context_get_actions(GdkDragContext *context);
+char **gtk_selection_data_get_uris(const GtkSelectionData *data);
+unsigned char *gtk_selection_data_get_text(const GtkSelectionData *data);
+
 #endif

@@ -407,14 +407,15 @@ static int is_class_symbol(const char *raw)
 }
 
 /* A missing variable named like one of Apple's string constants
- * (NSWorkspaceDidActivateApplicationNotification, kAXTrustedCheckOptionPrompt...)
+ * (NSWorkspaceDidActivateApplicationNotification, NSStringPboardType,
+ * kAXTrustedCheckOptionPrompt...)
  * gets a string whose text is its own name, which is what most of them
  * hold on a Mac. A function stub in its place would be read as an object
  * and crash. */
 static int looks_like_string_constant(const char *raw)
 {
     static const char *const ends[] = {"Key", "Notification", "Name", "Operation", "Attribute", "Identifier",
-                                       "Binding", "Option", "Domain", "AccountID", "Mode", NULL};
+                                       "Binding", "Option", "Domain", "AccountID", "Mode", "Type", NULL};
     const char *n = raw[0] == '_' ? raw + 1 : raw;
     if (n[0] == 'k' && n[1] >= 'A' && n[1] <= 'Z')
         return 1;
