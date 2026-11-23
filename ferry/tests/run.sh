@@ -207,6 +207,7 @@ fi
 # Key paths, value transformers and bindings (M6).
 run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
 # An exception left uncaught in the event loop is reported, not fatal (M7).
+run_one appkit_scrolling "$here/appkit/scrolling.m" "$here/appkit/scrolling.out" -fobjc-arc -framework Cocoa
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
 # Pasteboards, and cut, copy and paste in text fields (M7).
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
