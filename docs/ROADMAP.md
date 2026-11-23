@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.127 "accessibility keyboard" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Accessibility Keyboard, as on a Mac: a keyboard on the screen to type with the mouse, a trackpad or a touch screen; it floats above the windows without taking the keyboard from the app, can be dragged by its top edge and closed with its red button | Topline (screen_keyboard.py) | done |
+| 2 | Each key is sent through the computer's own keyboard, so shortcuts, Slow Keys and every app see an ordinary key; Shift, Control, Option and Command stay down for the next key, twice locks them | Strata (screen-keyboard.hpp) | done |
+| 3 | Keys show what the keyboard layout types, capitals while Shift is down; light and dark | Topline | done |
+| 4 | Dials > Accessibility switch; Guide topic; README row; every README screenshot retaken | Dials, Guide, Docs | done |
+
 ## 1.126 "slow keys" (done)
 
 | # | Item | Component | Status |

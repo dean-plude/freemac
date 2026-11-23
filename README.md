@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.126 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.127 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -28,6 +28,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/dynamic-wallpaper.png" alt="Dynamic wallpaper: Tide turning golden at sunset, with the Dynamic switch in Dials"><br><sub>Dynamic wallpaper: the picture turns golden at sunset</sub></td><td width="50%"><img src="docs/screenshots/stage-manager.png" alt="Stage Manager: Crew in the middle, with Quill, Tide and Nudge as small pictures down the left"><br><sub>Stage Manager: one app in front, the others down the side</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control on Desktop 3, holding a Drawer window, with the row of desktops opened out along the top: the button to close Desktop 3 on its corner and + at the right end"><br><sub>Mission Control: add a desktop with +, close one from its corner, drag windows onto them</sub></td><td width="50%"><img src="docs/screenshots/passwords.png" alt="Purser, the Passwords app, showing a saved login with its six-digit verification code and a warning that its password is used on another website"><br><sub>Purser keeps website and Wi-Fi passwords and verification codes, and warns about reused passwords</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/live-text.png" alt="Frame showing a school trip form with Live Text on: the picture dimmed, every line of text lit up, and two lines selected for copying"><br><sub>Live Text in Frame: select and copy the words in a picture</sub></td><td width="50%"><img src="docs/screenshots/hover-text.png" alt="Hover Text: Command held over a line of small text in Dials, and the same line shown large in a panel above the pointer"><br><sub>Hover Text: hold ⌘ and point to see small words large</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/accessibility-keyboard.png" alt="The Accessibility Keyboard floating over Quill, with a line typed by clicking its keys"><br><sub>Accessibility Keyboard: type by clicking the keys on the screen</sub></td><td width="50%"><img src="docs/screenshots/accessibility-keyboard-dark.png" alt="The Accessibility Keyboard in dark mode, with Shift held so its keys show capitals"><br><sub>In dark mode, with ⇧ Shift held for the next key</sub></td></tr>
 </table>
 
 ## Download
@@ -105,6 +106,7 @@ one of them will be reverted.
 | Screen reader: Command+F5 (or Dials > Accessibility) speaks what's on the screen, the control you move to and what you type, and comes back at the next login | **Dials**, **Strata**, Orca | 1.120 |
 | Hover Text: hold Command and point at some words to see that line large above the pointer, in any app (Dials > Accessibility) | **Strata**, **Topline**, Tesseract | 1.125 |
 | Slow Keys: a key counts only once it has been held for a moment, so keys brushed by accident aren't typed, with a click as each one goes down and counts (Dials > Accessibility) | **Strata**, **Topline**, Dials | 1.126 |
+| Accessibility Keyboard: a keyboard on the screen to type with the pointer alone, with Shift, Control, Option and Command held for the next key (Dials > Accessibility) | **Topline**, **Strata**, Dials | 1.127 |
 | Live Text: Frame finds the words in a picture or a scanned PDF, so you can select and copy them (⌘C), or light up all of them with the Live Text button | **Frame**, Tesseract | 1.124 |
 | Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |

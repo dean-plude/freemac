@@ -283,6 +283,17 @@ plugins stay in use.
   players kept loaded (`slow_keys.py`): starting a player program for each
   key held the keyboard up long enough on a slow machine for the app to
   repeat the key.
+  `screen-keyboard.hpp` (1.127) types for the Accessibility Keyboard:
+  Topline's panel (`screen_keyboard.py`, a layer-shell surface that never
+  takes the keyboard, so the app being typed in keeps it) calls
+  `strata/press-key` with a key code and "tap", "press" or "release", and
+  Strata sends it through the seat's own keyboard with
+  `wlr_keyboard_notify_key`, updating its state, so a clicked Shift or
+  Command is held for the next key exactly as a pressed one is. Slow Keys
+  lets these through at once. `strata/release-keys` lets go of anything
+  still held when the panel closes. The panel labels its keys from the
+  keyboard layout in use (`Gdk.Keymap`), and is dragged with
+  `strata/pointer`, since a Wayland window doesn't know where it is.
   `colour-filters.hpp` (1.99) is Colour filters: greyscale, filters for
   red/green and blue/yellow colour blindness, or a colour tint, at a chosen
   intensity (`strata-shell/colour_filter`, `colour_filter_intensity`,

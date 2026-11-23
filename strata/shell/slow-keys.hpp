@@ -49,6 +49,17 @@ class slow_t
         });
     }
 
+    /* Keys Strata sends itself (the Accessibility Keyboard) go straight
+     * through: they were chosen on purpose, not brushed by accident. */
+    template<class F>
+    void pass(F send)
+    {
+        bool before = replaying;
+        replaying = true;
+        send();
+        replaying = before;
+    }
+
   private:
     wf::option_wrapper_t<bool> enabled{"strata-shell/slow_keys"};
     wf::option_wrapper_t<int> delay_ms{"strata-shell/slow_keys_delay"};
