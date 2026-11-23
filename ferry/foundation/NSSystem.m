@@ -429,6 +429,7 @@ static NSUserDefaults *standard_defaults;
     }
 }
 - (BOOL)synchronize { return YES; }
+- (NSString *)_ferryDomain { return _domain; }
 @end
 
 /* ---- NSFileManager ------------------------------------------------------------------------ */

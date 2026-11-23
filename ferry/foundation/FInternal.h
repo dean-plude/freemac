@@ -49,4 +49,8 @@ NSString *FUserFolder(NSSearchPathDirectory dir);
 /* Collections */
 void FSortObjects(id *items, NSUInteger n, SEL selector);
 
+@interface NSUserDefaults (FerryInternal)
+- (NSString *)_ferryDomain; /* the application id the defaults are saved under */
+@end
+
 #endif

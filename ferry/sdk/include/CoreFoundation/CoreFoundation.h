@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 typedef const void *CFTypeRef;
+typedef CFTypeRef CFPropertyListRef;
 typedef long CFIndex;
 typedef unsigned long CFHashCode;
 typedef unsigned long CFOptionFlags;
@@ -166,5 +167,23 @@ void CFAttributedStringEndEditing(CFMutableAttributedStringRef str);
 CFBundleRef CFBundleGetMainBundle(void);
 CFTypeRef CFBundleGetValueForInfoDictionaryKey(CFBundleRef bundle, CFStringRef key);
 CFStringRef CFBundleGetIdentifier(CFBundleRef bundle);
+
+/* Preferences: the same store as NSUserDefaults; the user and host arguments are ignored */
+extern const CFStringRef kCFPreferencesAnyApplication, kCFPreferencesCurrentApplication, kCFPreferencesAnyHost,
+    kCFPreferencesCurrentHost, kCFPreferencesAnyUser, kCFPreferencesCurrentUser;
+CFPropertyListRef CFPreferencesCopyAppValue(CFStringRef key, CFStringRef applicationID);
+Boolean CFPreferencesGetAppBooleanValue(CFStringRef key, CFStringRef applicationID, Boolean *keyExistsAndHasValidFormat);
+CFIndex CFPreferencesGetAppIntegerValue(CFStringRef key, CFStringRef applicationID, Boolean *keyExistsAndHasValidFormat);
+void CFPreferencesSetAppValue(CFStringRef key, CFPropertyListRef value, CFStringRef applicationID);
+Boolean CFPreferencesAppSynchronize(CFStringRef applicationID);
+Boolean CFPreferencesAppValueIsForced(CFStringRef key, CFStringRef applicationID);
+CFPropertyListRef CFPreferencesCopyValue(CFStringRef key, CFStringRef applicationID, CFStringRef userName,
+                                         CFStringRef hostName);
+void CFPreferencesSetValue(CFStringRef key, CFPropertyListRef value, CFStringRef applicationID, CFStringRef userName,
+                           CFStringRef hostName);
+CFDictionaryRef CFPreferencesCopyMultiple(CFArrayRef keysToFetch, CFStringRef applicationID, CFStringRef userName,
+                                          CFStringRef hostName);
+Boolean CFPreferencesSynchronize(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
+CFArrayRef CFPreferencesCopyKeyList(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 __FERRY_END
 #endif

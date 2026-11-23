@@ -183,6 +183,16 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath;
 @end
 
+/* Comparison by isEqual: and compare:, as scripting and predicates use them */
+@interface NSObject (NSComparisonMethods)
+- (BOOL)isEqualTo:(id)object;
+- (BOOL)isNotEqualTo:(id)object;
+- (BOOL)isLessThan:(id)object;
+- (BOOL)isLessThanOrEqualTo:(id)object;
+- (BOOL)isGreaterThan:(id)object;
+- (BOOL)isGreaterThanOrEqualTo:(id)object;
+@end
+
 @interface NSObject (NSDelayedPerforming)
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay;
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay inModes:(NSArray *)modes;

@@ -240,6 +240,27 @@ static id box(id self, SEL sel, char type)
 }
 @end
 
+/* ---- NSComparisonMethods: isEqual:, and compare: where the object has it ---------- */
+
+@implementation NSObject (NSComparisonMethods)
+static NSComparisonResult compare_objects(id a, id b)
+{
+    if ([a respondsToSelector:@selector(compare:)])
+        return (NSComparisonResult)[(NSString *)a compare:b];
+    return [a isEqual:b] ? NSOrderedSame : (NSComparisonResult)2; /* neither smaller nor larger */
+}
+- (BOOL)isEqualTo:(id)object { return [self isEqual:object]; }
+- (BOOL)isNotEqualTo:(id)object { return ![self isEqual:object]; }
+- (BOOL)isLessThan:(id)object { return compare_objects(self, object) == NSOrderedAscending; }
+- (BOOL)isLessThanOrEqualTo:(id)object { return compare_objects(self, object) <= NSOrderedSame; }
+- (BOOL)isGreaterThan:(id)object { return compare_objects(self, object) == NSOrderedDescending; }
+- (BOOL)isGreaterThanOrEqualTo:(id)object
+{
+    NSComparisonResult r = compare_objects(self, object);
+    return r == NSOrderedSame || r == NSOrderedDescending;
+}
+@end
+
 /* ---- NSError ----------------------------------------------------------------------- */
 
 @implementation NSError {

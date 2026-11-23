@@ -203,3 +203,84 @@ CFTypeRef CFBundleGetValueForInfoDictionaryKey(CFBundleRef bundle, CFStringRef k
     return [OBJ(bundle) objectForInfoDictionaryKey:OBJ(key)];
 }
 CFStringRef CFBundleGetIdentifier(CFBundleRef bundle) { return (CFStringRef)[OBJ(bundle) bundleIdentifier]; }
+
+/* ---- preferences: the NSUserDefaults store, by application id -------------------------- */
+
+const CFStringRef kCFPreferencesAnyApplication = (CFStringRef)@"kCFPreferencesAnyApplication";
+const CFStringRef kCFPreferencesCurrentApplication = (CFStringRef)@"kCFPreferencesCurrentApplication";
+const CFStringRef kCFPreferencesAnyHost = (CFStringRef)@"kCFPreferencesAnyHost";
+const CFStringRef kCFPreferencesCurrentHost = (CFStringRef)@"kCFPreferencesCurrentHost";
+const CFStringRef kCFPreferencesAnyUser = (CFStringRef)@"kCFPreferencesAnyUser";
+const CFStringRef kCFPreferencesCurrentUser = (CFStringRef)@"kCFPreferencesCurrentUser";
+
+static NSUserDefaults *prefs_for(CFStringRef app)
+{
+    static NSMutableDictionary *others;
+    NSString *name = OBJ(app);
+    if (!name || [name isEqual:OBJ(kCFPreferencesCurrentApplication)] ||
+        [name isEqual:[[NSBundle mainBundle] bundleIdentifier]])
+        return [NSUserDefaults standardUserDefaults];
+    if (!others)
+        others = [[NSMutableDictionary alloc] init];
+    NSUserDefaults *d = [others objectForKey:name];
+    if (!d) {
+        d = [[NSUserDefaults alloc] initWithSuiteName:name];
+        [others setObject:d forKey:name];
+        [d release];
+    }
+    return d;
+}
+
+CFPropertyListRef CFPreferencesCopyAppValue(CFStringRef key, CFStringRef app)
+{
+    return [[prefs_for(app) objectForKey:OBJ(key)] copy];
+}
+Boolean CFPreferencesGetAppBooleanValue(CFStringRef key, CFStringRef app, Boolean *valid)
+{
+    id v = [prefs_for(app) objectForKey:OBJ(key)];
+    BOOL ok = [v respondsToSelector:@selector(boolValue)];
+    if (valid)
+        *valid = ok;
+    return ok ? [prefs_for(app) boolForKey:OBJ(key)] : false;
+}
+CFIndex CFPreferencesGetAppIntegerValue(CFStringRef key, CFStringRef app, Boolean *valid)
+{
+    id v = [prefs_for(app) objectForKey:OBJ(key)];
+    BOOL ok = [v respondsToSelector:@selector(integerValue)];
+    if (valid)
+        *valid = ok;
+    return ok ? [v integerValue] : 0;
+}
+void CFPreferencesSetAppValue(CFStringRef key, CFPropertyListRef value, CFStringRef app)
+{
+    [prefs_for(app) setObject:OBJ(value) forKey:OBJ(key)];
+}
+Boolean CFPreferencesAppSynchronize(CFStringRef app) { return [prefs_for(app) synchronize]; }
+Boolean CFPreferencesAppValueIsForced(CFStringRef key, CFStringRef app) { return false; }
+CFPropertyListRef CFPreferencesCopyValue(CFStringRef key, CFStringRef app, CFStringRef user, CFStringRef host)
+{
+    return CFPreferencesCopyAppValue(key, app);
+}
+void CFPreferencesSetValue(CFStringRef key, CFPropertyListRef value, CFStringRef app, CFStringRef user, CFStringRef host)
+{
+    CFPreferencesSetAppValue(key, value, app);
+}
+CFDictionaryRef CFPreferencesCopyMultiple(CFArrayRef keys, CFStringRef app, CFStringRef user, CFStringRef host)
+{
+    NSUserDefaults *d = prefs_for(app);
+    NSMutableDictionary *out = [[NSMutableDictionary alloc] init];
+    NSArray *want = keys ? OBJ(keys) : [[d dictionaryRepresentation] allKeys];
+    for (NSString *k in want) {
+        id v = [d objectForKey:k];
+        if (v)
+            [out setObject:v forKey:k];
+    }
+    return (CFDictionaryRef)out;
+}
+Boolean CFPreferencesSynchronize(CFStringRef app, CFStringRef user, CFStringRef host) { return true; }
+CFArrayRef CFPreferencesCopyKeyList(CFStringRef app, CFStringRef user, CFStringRef host)
+{
+    NSUserDefaults *d = prefs_for(app);
+    NSDictionary *saved = [d persistentDomainForName:[d _ferryDomain]];
+    return [saved count] ? (CFArrayRef)[[saved allKeys] copy] : NULL;
+}
