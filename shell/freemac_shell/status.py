@@ -97,6 +97,108 @@ class Network(StatusButton):
             self.show_icon("network-wired-symbolic", f"Wired: {name}")
 
 
+class VPN(Gtk.MenuButton):
+    """The VPN menu, as on a Mac: with a VPN configuration added in Dials >
+    Network, the menu bar shows the VPN (filled while one is connected), and
+    its menu connects or disconnects each. Dials can hide it (pref
+    "vpn_menu"). The menu is filled as things change, not as it opens, since
+    a menu that opens late is refused by the compositor."""
+
+    def __init__(self):
+        super().__init__()
+        from . import vpn
+
+        self.vpn = vpn
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        self.image = Gtk.Image()
+        self.add(self.image)
+        self.set_no_show_all(True)
+        self.menu = Gtk.Menu()
+        self.menu.set_halign(Gtk.Align.END)
+        self.set_popup(self.menu)
+        self.menu.connect("hide", lambda *_: GLib.idle_add(self._refill))
+        self.shown = None
+        self.client = vpn.new_client()
+        if self.client:
+            for signal in ("connection-added", "connection-removed",
+                           "active-connection-added", "active-connection-removed"):
+                self.client.connect(signal, lambda *_: GLib.timeout_add(300, self._later))
+        self._prefs_monitor = style.watch_prefs(self.update)
+        # A connection's own state (connecting, connected) has no client
+        # signal; look every few seconds.
+        GLib.timeout_add_seconds(3, lambda: self.update() or True)
+        self.update()
+
+    def _later(self):
+        self.update()
+        return False
+
+    def update(self):
+        configs = self.vpn.configurations(self.client)
+        if not configs or not self.vpn.menu_bar_shown():
+            self.shown = None
+            self.menu.popdown()
+            self.hide()
+            return
+        states = [(c.get_uuid(), c.get_id(), self.vpn.state(self.client, c)) for c in configs]
+        if self.shown == states:
+            return
+        self.shown = states
+        kinds = {s for _u, _n, s in states}
+        if "connected" in kinds:
+            icon = "network-vpn-symbolic"
+        elif "connecting" in kinds:
+            icon = "network-vpn-acquiring-symbolic"
+        else:
+            icon = "network-vpn-disconnected-symbolic"
+        self.image.set_from_icon_name(icon, Gtk.IconSize.MENU)
+        on = [n for _u, n, s in states if s == "connected"]
+        self.set_tooltip_text(f"VPN: connected to {', '.join(on)}" if on else "VPN: not connected")
+        if self.menu.get_visible():
+            return      # refill once it closes, not under the pointer
+        self.fill(configs)
+        self.show()
+        self.image.show()
+
+    def fill(self, configs):
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+        for connection in configs:
+            now = self.vpn.state(self.client, connection)
+            status = Gtk.MenuItem(label=f"{connection.get_id()}: {self.vpn.STATE_TEXT[now]}")
+            status.set_sensitive(False)
+            self.menu.append(status)
+            if now in ("connected", "connecting"):
+                action = Gtk.MenuItem(label=f"Disconnect {connection.get_id()}")
+                action.connect("activate", lambda _i, c=connection: self._off(c))
+            else:
+                action = Gtk.MenuItem(label=f"Connect {connection.get_id()}")
+                action.connect("activate", lambda _i, c=connection: self._on(c))
+            self.menu.append(action)
+            self.menu.append(Gtk.SeparatorMenuItem())
+        settings = Gtk.MenuItem(label="Open VPN Settings…")
+        settings.connect("activate", lambda *_: launch("freemac-dials", "--panel", "network"))
+        self.menu.append(settings)
+        self.menu.show_all()
+
+    def _refill(self):
+        self.shown = None
+        self.update()
+        return False
+
+    def _on(self, connection):
+        def done(error):
+            if error:
+                beacon.send(f"\u201c{connection.get_id()}\u201d couldn\u2019t connect", error,
+                            "network-vpn-symbolic", "VPN")
+            self._refill()
+        self.vpn.turn_on(self.client, connection, done)
+
+    def _off(self, connection):
+        self.vpn.turn_off(self.client, connection)
+        GLib.timeout_add(500, self._refill)
+
+
 class Sound(StatusButton):
     """The Sound menu, as on a Mac: the volume slider, the outputs to play
     through (click one to switch) and Sound Settings…, from the speaker in the
