@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import guest_user, style  # noqa: E402
+from . import guest_user, style, switch_user  # noqa: E402
 
 SESSION = ["/usr/local/bin/freemac-session"]
 WALLPAPER = "/usr/share/backgrounds/freemac/dusk-tide.png"
@@ -136,6 +136,13 @@ class Gangway(Gtk.Window):
         self.greetd = None
         self.users = people()
         self.chosen = self.users[0] if self.users else None
+        # People already logged in on another terminal (fast user switching):
+        # choosing them goes back to their session, where their own lock
+        # screen asks for the password.
+        self.running = switch_user.sessions()
+        # Opened from someone's user menu: show the person they picked.
+        self.picked = 0
+        self._take_pick()
         overlay = Gtk.Overlay()
         self.add(overlay)
         self.background = Gtk.DrawingArea()
@@ -183,6 +190,8 @@ class Gangway(Gtk.Window):
         stack.add_overlay(placeholder)
         stack.set_overlay_pass_through(placeholder, True)
         self.stack = stack
+        stack.show_all()
+        stack.set_no_show_all(True)
         self.field.pack_start(stack, True, True, 0)
         self.button = Gtk.Button.new_from_icon_name("go-next-symbolic", Gtk.IconSize.BUTTON)
         self.button.set_tooltip_text("Log In")
@@ -240,7 +249,10 @@ class Gangway(Gtk.Window):
             button = Gtk.Button()
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             inner.pack_start(avatar(entry, 44), False, False, 0)
-            small = Gtk.Label(label=display_name(entry))
+            small = Gtk.Label(label=display_name(entry)
+                              + ("  ●" if entry.pw_name in self.running else ""))
+            if entry.pw_name in self.running:
+                small.set_tooltip_text("Logged in")
             small.get_style_context().add_class("gangway-hint")
             inner.pack_start(small, False, False, 0)
             button.add(inner)
@@ -248,16 +260,23 @@ class Gangway(Gtk.Window):
             self.people.pack_start(button, False, False, 0)
         self.person.show_all()
         self.people.show_all()
-        # The Guest User needs no password: just the arrow to log in.
+        # The Guest User needs no password: just the arrow to log in. Someone
+        # already logged in gets the arrow too, back to their session.
         guest = guest_user.is_guest(self.chosen.pw_name)
-        self.stack.set_visible(not guest)
-        self.field.set_size_request(-1 if guest else 240, -1)
-        if guest and not self.message.get_text():
+        back = self.chosen.pw_name in self.running
+        self.stack.set_visible(not (guest or back))
+        self.field.set_size_request(-1 if guest or back else 240, -1)
+        self.button.set_tooltip_text("Switch Back" if back else "Log In")
+        if back and not self.message.get_text():
+            self.message.get_style_context().remove_class("gangway-error")
+            self.message.set_text("Already logged in. Their apps are still open.")
+        elif guest and not self.message.get_text():
             self.message.get_style_context().remove_class("gangway-error")
             self.message.set_text("No password needed. Everything is erased when you log out.")
 
     def _choose(self, entry):
         self.chosen = entry
+        self.running = switch_user.sessions()
         self.message.set_text("")
         self.password.set_text("")
         self._show_person()
@@ -277,7 +296,21 @@ class Gangway(Gtk.Window):
         cr.paint()
         return False
 
+    def _take_pick(self):
+        """Choose the person last picked in a user menu, if that's new."""
+        found = switch_user.latest_choice(newer_than=self.picked)
+        if not found:
+            return False
+        self.picked = found[0]
+        for entry in self.users:
+            if entry.pw_name == found[1]:
+                self.chosen = entry
+                return True
+        return False
+
     def tick(self):
+        if self._take_pick():
+            self._choose(self.chosen)
         now = time.localtime()
         self.clock.set_text(time.strftime("%-I:%M", now))
         self.date.set_text(time.strftime("%A, %B %-d", now))
@@ -301,6 +334,11 @@ class Gangway(Gtk.Window):
     def log_in(self):
         user = self.username()
         if not user:
+            return
+        self.running = switch_user.sessions()
+        if user in self.running:
+            if not switch_user.show(self.running[user]):
+                self.fail("Couldn’t switch to them. Try again.")
             return
         self.button.set_sensitive(False)
         self.message.get_style_context().remove_class("gangway-error")

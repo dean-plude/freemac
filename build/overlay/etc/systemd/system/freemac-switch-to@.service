@@ -1,0 +1,8 @@
+# freemac fast user switching: show the session or login screen on virtual
+# terminal %i. Started from the user menu in the menu bar or Gangway.
+[Unit]
+Description=Show terminal %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/freemac-switch-helper to %i

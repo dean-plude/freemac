@@ -814,3 +814,106 @@ class InputMenu(Gtk.MenuButton):
     def _choose(self, index):
         self.sources.choose(self.wf, index)
         GLib.timeout_add(150, lambda: self.update() and False)
+
+
+class UserMenu(Gtk.MenuButton):
+    """Fast user switching, as on a Mac: with more than one account, the menu
+    bar shows your name, and its menu lists everyone (a tick by those
+    logged in) to switch to without logging out, and Login Window….
+    Dials > Users & Groups can hide it (pref "user_menu")."""
+
+    def __init__(self):
+        super().__init__()
+        from . import gangway, switch_user
+
+        self.switch, self.avatar = switch_user, gangway.avatar
+        self.set_relief(Gtk.ReliefStyle.NONE)
+        self.get_style_context().add_class("user-menu")
+        self.label = Gtk.Label()
+        self.add(self.label)
+        self.set_no_show_all(True)
+        self.menu = Gtk.Menu()
+        self.menu.set_halign(Gtk.Align.END)
+        self.set_popup(self.menu)
+        self.ticks, self.names = {}, None
+        # Who's logged in can change while the menu is closed: look as it
+        # opens. Only the ticks change then, so the menu keeps its size and
+        # opens where it should; the people are listed again when accounts
+        # are added or removed.
+        self.connect("button-press-event", lambda *_: self.mark() and False)
+        GLib.timeout_add_seconds(30, lambda: self.update() or True)
+        self._prefs_monitor = style.watch_prefs(self.update)
+        self.update()
+
+    def update(self):
+        if not style.prefs().get("user_menu", True) or not self.switch.available():
+            self.hide()
+            return
+        me = pwd_entry()
+        self.label.set_text(self.switch.full_name(me) if me else os.environ.get("USER", ""))
+        names = [e.pw_name for e in self.switch.accounts()]
+        if names != self.names:
+            self.names = names
+            self.fill()
+        self.show()
+        self.label.show()
+
+    def fill(self):
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+        me = os.getuid()
+        self.ticks = {}
+        for entry in self.switch.accounts():
+            row = Gtk.Box(spacing=8)
+            tick = Gtk.Image.new_from_icon_name("object-select-symbolic", Gtk.IconSize.MENU)
+            self.ticks[entry.pw_name] = (tick, entry.pw_uid == me)
+            row.pack_start(tick, False, False, 0)
+            row.pack_start(self.avatar(entry, 20), False, False, 0)
+            row.pack_start(Gtk.Label(label=self.switch.full_name(entry), xalign=0), True, True, 0)
+            item = Gtk.MenuItem()
+            item.add(row)
+            if entry.pw_uid == me:
+                item.set_sensitive(False)
+            else:
+                item.connect("activate", lambda _i, n=entry.pw_name: self._go(self.switch.to_user, n))
+            self.menu.append(item)
+        self.menu.append(Gtk.SeparatorMenuItem())
+        window = Gtk.MenuItem(label="Login Window…")
+        window.connect("activate", lambda *_: self._go(self.switch.login_window))
+        self.menu.append(window)
+        settings = Gtk.MenuItem(label="Users & Groups Settings…")
+        settings.connect("activate", lambda *_: launch("freemac-dials", "--panel", "users"))
+        self.menu.append(settings)
+        self.menu.show_all()
+        self.mark()
+        return True
+
+    def mark(self):
+        """Tick the people logged in. Asking logind takes a moment, and a
+        menu that opens late is refused by the compositor (its click is
+        over), so ask away from the bar and tick when the answer comes."""
+        import threading
+
+        def ask():
+            logged_in = self.switch.sessions()
+            GLib.idle_add(self._ticked, logged_in)
+        threading.Thread(target=ask, daemon=True).start()
+        return True
+
+    def _ticked(self, logged_in):
+        for name, (tick, mine) in self.ticks.items():
+            tick.set_opacity(1 if mine or name in logged_in else 0)
+        return False
+
+    def _go(self, action, *args):
+        """Locking waits for the lock screen; do it away from the bar."""
+        import threading
+        threading.Thread(target=action, args=args, daemon=True).start()
+
+
+def pwd_entry():
+    import pwd
+    try:
+        return pwd.getpwuid(os.getuid())
+    except KeyError:
+        return None
