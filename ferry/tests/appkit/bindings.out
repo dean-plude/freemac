@@ -8,6 +8,12 @@ initWithContentsOfFile: v, mutable 2 keys
 bound field: bound, box enabled no, title kept "Button"
 info: observed is the settings yes, key path name
 exposed: color
+after a change: field changed, box enabled yes
 after unbind: unbound
+unbound field kept: changed
+defaults controller: field first, defaults first
+after a change: field second
+held: field third, defaults second, unapplied 1
+reverted: field second
 defaults by key-value coding: kv
 exit=0

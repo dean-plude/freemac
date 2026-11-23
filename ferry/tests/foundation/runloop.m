@@ -54,6 +54,14 @@ int main(void)
           printf("block timer fired, step %d\n", ++order);
         }];
         [t performSelector:@selector(later:) withObject:@"an argument" afterDelay:0.025];
+        /* cancelled before they come due: never performed */
+        [t performSelector:@selector(later:) withObject:@"a cancelled argument" afterDelay:0.02];
+        [t performSelector:@selector(later:) withObject:@"another cancelled one" afterDelay:0.02];
+        [NSObject cancelPreviousPerformRequestsWithTarget:t selector:@selector(later:)
+                                                   object:@"a cancelled argument"];
+        [t performSelector:@selector(later:) withObject:@"kept" afterDelay:0.1];
+        [NSObject cancelPreviousPerformRequestsWithTarget:t selector:@selector(later:)
+                                                   object:@"another cancelled one"];
         [loop performBlock:^{
           printf("queued block ran first, step %d\n", ++order);
         }];

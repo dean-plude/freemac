@@ -367,6 +367,15 @@ static NSString *percent_encode_path(NSString *s)
 }
 - (NSURL *)URLByDeletingPathExtension { return [self withPath:[[self path] stringByDeletingPathExtension]]; }
 - (NSURL *)URLByStandardizingPath { return [self withPath:[[self path] stringByStandardizingPath]]; }
+- (NSURL *)URLByResolvingSymlinksInPath
+{
+    if (![self isFileURL])
+        return self;
+    char buf[4096];
+    if (!realpath([[self path] fileSystemRepresentation], buf))
+        return [self URLByStandardizingPath];
+    return [self withPath:[NSString stringWithUTF8String:buf]];
+}
 - (BOOL)isEqual:(id)other
 {
     return [other isKindOfClass:[NSURL class]] && [[self absoluteString] isEqualToString:[other absoluteString]];

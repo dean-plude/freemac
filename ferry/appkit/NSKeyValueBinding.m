@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's AppKit: Cocoa bindings, the first step. A binding ties a property
  * of one object (a control's value, say) to a key path of another (a
- * controller, or the user's defaults). Ferry records each binding and sets
- * the bound property once, from the key path's value when the binding is
- * made; it doesn't follow later changes in either direction yet, because
- * Ferry's Foundation has no key-value observing.
+ * controller, or the user's defaults). Ferry records each binding, sets the
+ * bound property from the key path's value when the binding is made, and
+ * sets it again whenever the observed object announces a change of that key
+ * path (key-value observing, in Ferry's Foundation). Changes made in the
+ * control aren't written back to the key path yet.
  *
  * Written from Apple's public documentation of NSKeyValueBindingCreation;
  * no Apple code was used. */
@@ -23,6 +24,61 @@ NSString *const NSToolTipBinding = @"toolTip";
 
 static char bindings_key;
 static NSMutableDictionary *exposed; /* class name -> bindings */
+
+/* Sets the bound property from the key path's value now. */
+static void apply_binding(id target, NSString *binding, id observable, NSString *keyPath)
+{
+    id value = observable;
+    for (NSString *key in [keyPath componentsSeparatedByString:@"."]) {
+        if ([value isKindOfClass:[NSDictionary class]])
+            value = [value objectForKey:key];
+        else if ([value respondsToSelector:@selector(_ferryIsKeyValueProxy)])
+            value = [value valueForKey:key];
+        else if ([value respondsToSelector:NSSelectorFromString(key)])
+            value = [value valueForKey:key];
+        else
+            return; /* a key the observed object doesn't have: leave the property as it is */
+    }
+    if ([binding isEqualToString:NSValueBinding] && [target respondsToSelector:@selector(setObjectValue:)]) {
+        [(NSControl *)target setObjectValue:value];
+        return;
+    }
+    NSString *setter = [NSString stringWithFormat:@"set%@%@:", [[binding substringToIndex:1] uppercaseString],
+                                                  [binding substringFromIndex:1]];
+    if ([target respondsToSelector:NSSelectorFromString(setter)])
+        [target setValue:value forKey:binding];
+}
+
+/* Watches one binding's key path and sets the property again on a change.
+ * It holds neither object, as a Mac's bindings hold neither strongly. */
+@interface ABindingObserver : NSObject {
+@public
+    id target, observed;
+    NSString *binding, *keyPath;
+    BOOL observing;
+}
+- (void)stop;
+@end
+@implementation ABindingObserver
+- (void)observeValueForKeyPath:(NSString *)path ofObject:(id)object change:(NSDictionary *)change
+                       context:(void *)context
+{
+    apply_binding(target, binding, observed, keyPath);
+}
+- (void)stop
+{
+    if (observing)
+        [observed removeObserver:self forKeyPath:keyPath];
+    observing = NO;
+}
+- (void)dealloc
+{
+    [self stop];
+    [binding release];
+    [keyPath release];
+    [super dealloc];
+}
+@end
 
 @implementation NSObject (NSKeyValueBindingCreation)
 + (void)exposeBinding:(NSString *)binding
@@ -67,30 +123,23 @@ static NSMutableDictionary *exposed; /* class name -> bindings */
     [info setObject:keyPath forKey:NSObservedKeyPathKey];
     [info setObject:options ?: [NSDictionary dictionary] forKey:NSOptionsKey];
     [all setObject:info forKey:binding];
-    AWarnOnce("Cocoa bindings that follow changes (each bound value is set once)");
     if (!observable)
         return;
-    id value = observable;
-    for (NSString *key in [keyPath componentsSeparatedByString:@"."]) {
-        if ([value isKindOfClass:[NSDictionary class]])
-            value = [value objectForKey:key];
-        else if ([value respondsToSelector:NSSelectorFromString(key)])
-            value = [value valueForKey:key];
-        else
-            return; /* a key the observed object doesn't have: leave the property as it is */
-    }
-    if ([binding isEqualToString:NSValueBinding] && [self respondsToSelector:@selector(setObjectValue:)]) {
-        [(NSControl *)self setObjectValue:value];
-        return;
-    }
-    NSString *setter = [NSString stringWithFormat:@"set%@%@:", [[binding substringToIndex:1] uppercaseString],
-                                                  [binding substringFromIndex:1]];
-    if ([self respondsToSelector:NSSelectorFromString(setter)])
-        [self setValue:value forKey:binding];
+    ABindingObserver *o = [[[ABindingObserver alloc] init] autorelease];
+    o->target = self;
+    o->binding = [binding copy];
+    o->observed = observable;
+    o->keyPath = [keyPath copy];
+    [info setObject:o forKey:@"ferryObserver"];
+    [observable addObserver:o forKeyPath:keyPath options:0 context:NULL];
+    o->observing = YES;
+    apply_binding(self, binding, observable, keyPath);
 }
 - (void)unbind:(NSString *)binding
 {
-    [objc_getAssociatedObject(self, &bindings_key) removeObjectForKey:binding];
+    NSMutableDictionary *all = objc_getAssociatedObject(self, &bindings_key);
+    [(ABindingObserver *)[[all objectForKey:binding] objectForKey:@"ferryObserver"] stop];
+    [all removeObjectForKey:binding];
 }
 - (NSDictionary *)infoForBinding:(NSString *)binding
 {

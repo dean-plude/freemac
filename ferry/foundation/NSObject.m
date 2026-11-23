@@ -181,7 +181,17 @@ static id box(id self, SEL sel, char type)
            object_getClassName(self), self, key);
 }
 
+/* Observers of the key hear of the change (NSKeyValueObserving.m). */
 - (void)setValue:(id)value forKey:(NSString *)key
+{
+    BOOL observed = FKVOIsObserved(self);
+    if (observed)
+        [self willChangeValueForKey:key];
+    [self _ferrySetValue:value forKey:key];
+    if (observed)
+        [self didChangeValueForKey:key];
+}
+- (void)_ferrySetValue:(id)value forKey:(NSString *)key
 {
     const char *k = [key UTF8String];
     char name[256];

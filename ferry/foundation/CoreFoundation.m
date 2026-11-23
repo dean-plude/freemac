@@ -87,6 +87,13 @@ const char *CFStringGetCStringPtr(CFStringRef s, CFStringEncoding enc)
                 return NULL;
     return p;
 }
+/* "May return NULL at any time", as the documentation says: callers then
+ * copy the characters with CFStringGetCharacters. */
+const UniChar *CFStringGetCharactersPtr(CFStringRef s) { return NULL; }
+void CFStringGetCharacters(CFStringRef s, CFRange range, UniChar *buffer)
+{
+    [OBJ(s) getCharacters:buffer range:NSMakeRange((NSUInteger)range.location, (NSUInteger)range.length)];
+}
 CFComparisonResult CFStringCompare(CFStringRef a, CFStringRef b, CFOptionFlags options)
 {
     return (CFComparisonResult)[OBJ(a) compare:OBJ(b) options:options];

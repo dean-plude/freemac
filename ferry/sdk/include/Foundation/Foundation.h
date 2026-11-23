@@ -183,6 +183,40 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath;
 @end
 
+/* Key-value observing: observers hear of changes the object announces
+ * (will/didChangeValueForKey:) or that setValue:forKey: makes. */
+@class NSIndexSet, NSSet, NSDictionary;
+typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
+    NSKeyValueObservingOptionNew = 0x01, NSKeyValueObservingOptionOld = 0x02,
+    NSKeyValueObservingOptionInitial = 0x04, NSKeyValueObservingOptionPrior = 0x08,
+};
+typedef NS_ENUM(NSUInteger, NSKeyValueChange) {
+    NSKeyValueChangeSetting = 1, NSKeyValueChangeInsertion = 2, NSKeyValueChangeRemoval = 3,
+    NSKeyValueChangeReplacement = 4,
+};
+FOUNDATION_EXPORT NSString *const NSKeyValueChangeKindKey;
+FOUNDATION_EXPORT NSString *const NSKeyValueChangeNewKey;
+FOUNDATION_EXPORT NSString *const NSKeyValueChangeOldKey;
+FOUNDATION_EXPORT NSString *const NSKeyValueChangeIndexesKey;
+FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
+@interface NSObject (NSKeyValueObserverRegistration)
+- (void)addObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath
+            options:(NSKeyValueObservingOptions)options context:(void *)context;
+- (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath;
+- (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath context:(void *)context;
+@end
+@interface NSObject (NSKeyValueObserving)
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change
+                       context:(void *)context;
+- (void)willChangeValueForKey:(NSString *)key;
+- (void)didChangeValueForKey:(NSString *)key;
+- (void)willChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
+- (void)didChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key;
++ (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key;
+@property void *observationInfo;
+@end
+
 /* Comparison by isEqual: and compare:, as scripting and predicates use them */
 @interface NSObject (NSComparisonMethods)
 - (BOOL)isEqualTo:(id)object;
@@ -196,6 +230,8 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 @interface NSObject (NSDelayedPerforming)
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay;
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay inModes:(NSArray *)modes;
++ (void)cancelPreviousPerformRequestsWithTarget:(id)target;
++ (void)cancelPreviousPerformRequestsWithTarget:(id)target selector:(SEL)aSelector object:(id)arg;
 - (void)performSelectorOnMainThread:(SEL)aSelector withObject:(id)arg waitUntilDone:(BOOL)wait;
 @end
 
@@ -601,6 +637,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 }
 @property (readonly, copy) NSString *user;
 @property (readonly) BOOL hasDirectoryPath;
 @property (readonly, copy) NSURL *URLByStandardizingPath;
+@property (readonly, copy) NSURL *URLByResolvingSymlinksInPath;
 @property (readonly, copy) NSString *absoluteString;
 @property (readonly, copy) NSString *scheme;
 @property (readonly, copy) NSString *host;

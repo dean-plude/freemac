@@ -291,9 +291,9 @@ typedef NS_ENUM(NSInteger, NSWritingDirection) {
 };
 
 #ifdef FERRY_APPKIT_BUILD
-@interface NSParagraphStyle : GParagraphStyle <NSCopying, NSMutableCopying>
+@interface NSParagraphStyle : GParagraphStyle <NSCopying, NSMutableCopying, NSCoding>
 #else
-@interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying>
+@interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying, NSCoding>
 #endif
 @property (class, readonly) NSParagraphStyle *defaultParagraphStyle;
 @property (readonly) NSTextAlignment alignment;
@@ -708,6 +708,10 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 
 /* Cells. Ferry's controls draw and keep their state themselves; a cell is
  * the record of a control's settings that nib files store. */
+typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
+    NSBackgroundStyleNormal = 0, NSBackgroundStyleEmphasized = 1, NSBackgroundStyleRaised = 2,
+    NSBackgroundStyleLowered = 3, NSBackgroundStyleLight = 0, NSBackgroundStyleDark = 1,
+};
 @interface NSCell : NSObject <NSCopying, NSCoding>
 - (instancetype)initTextCell:(NSString *)string;
 - (instancetype)initImageCell:(NSImage *)image;
@@ -736,6 +740,8 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property SEL action;
 @property (assign) NSView *controlView;
 @property (retain) NSImage *image;
+@property NSBackgroundStyle backgroundStyle;
+@property (readonly) NSBackgroundStyle interiorBackgroundStyle;
 @end
 
 @interface NSActionCell : NSCell
@@ -978,6 +984,10 @@ enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLev
 @property (assign) NSWindowController *windowController;
 @property (retain) NSViewController *contentViewController;
 @property (getter=isDocumentEdited) BOOL documentEdited;
+- (void)setContentBorderThickness:(CGFloat)thickness forEdge:(NSRectEdge)edge;
+- (CGFloat)contentBorderThicknessForEdge:(NSRectEdge)edge;
+- (void)setAutorecalculatesContentBorderThickness:(BOOL)flag forEdge:(NSRectEdge)edge;
+- (BOOL)autorecalculatesContentBorderThicknessForEdge:(NSRectEdge)edge;
 @end
 APPKIT_EXTERN NSNotificationName const NSWindowWillCloseNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidResizeNotification;
@@ -1093,6 +1103,8 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @property (assign) id<NSApplicationDelegate> delegate;
 @property (retain) NSMenu *mainMenu;
 @property (assign) NSMenu *windowsMenu, *servicesMenu, *helpMenu;
+@property (assign) id servicesProvider;
+- (void)registerServicesMenuSendTypes:(NSArray *)sendTypes returnTypes:(NSArray *)returnTypes;
 @property (readonly, copy) NSArray<NSWindow *> *windows;
 @property (readonly) NSWindow *keyWindow, *mainWindow;
 @property (readonly, getter=isRunning) BOOL running;
@@ -1191,6 +1203,27 @@ typedef NSString *NSNibName;
 /* Loads its view from a nib (named after the class unless given) the first
  * time the view is asked for, and sits between the view and its superview
  * in the responder chain. Sheets and popovers are shown as windows. */
+/* Controllers for bindings: the user's defaults by key. */
+@interface NSController : NSObject <NSCoding>
+- (BOOL)commitEditing;
+- (void)discardEditing;
+@property (readonly, getter=isEditing) BOOL editing;
+- (void)objectDidBeginEditing:(id)editor;
+- (void)objectDidEndEditing:(id)editor;
+@end
+@interface NSUserDefaultsController : NSController
+@property (class, readonly) NSUserDefaultsController *sharedUserDefaultsController;
+- (instancetype)initWithDefaults:(NSUserDefaults *)defaults initialValues:(NSDictionary *)initialValues;
+@property (readonly) NSUserDefaults *defaults;
+@property (readonly) id values;
+@property (copy) NSDictionary *initialValues;
+@property BOOL appliesImmediately;
+@property (readonly) BOOL hasUnappliedChanges;
+- (void)save:(id)sender;
+- (void)revert:(id)sender;
+- (void)revertToInitialValues:(id)sender;
+@end
+
 @interface NSViewController : NSResponder <NSCoding>
 - (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle;
 @property (readonly, copy) NSNibName nibName;

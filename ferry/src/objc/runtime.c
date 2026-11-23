@@ -495,6 +495,15 @@ void ferry_objc_map_image(struct ferry_objc_image *im)
         const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
         if (!cls->superclass && !(ro->flags & RO_ROOT)) {
             fprintf(stderr, "ferry: the class %s is built on a class Ferry doesn't have yet; left out\n", ro->name);
+            /* Its cache words may still hold what older linkers put there
+             * (_objc_empty_cache and _objc_empty_vtable): make them an empty
+             * cache, so a message to it misses and is reported, not a crash. */
+            cls->cache = _objc_empty_cache_storage;
+            cls->mask16 = 0;
+            if (cls->isa) {
+                cls->isa->cache = _objc_empty_cache_storage;
+                cls->isa->mask16 = 0;
+            }
             continue;
         }
         realize_class(cls);

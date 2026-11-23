@@ -1,0 +1,10 @@
+spin lock: 400000, unfair lock: 400000, atomic32: 400000, atomic64: 800000
+try on a held lock: 0
+try on a free lock: 1
+swap 5->6: 1, then 5->7: 0, now 6
+pointer swapped: 1
+test and set bit 9: was 0, byte 0x40
+or: 0xff, and orig: 0xff, now 0x3c
+freopen of stderr failed, as it should
+stderr still works
+exit=0

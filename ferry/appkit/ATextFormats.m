@@ -636,7 +636,7 @@ static NSString *html_string(NSData *data, NSStringEncoding enc)
         if (len >= 5 && !memcmp(bytes, "{\\rtf", 5))
             type = NSRTFTextDocumentType;
         else {
-            NSString *head = [plain_text([data subdataWithRange:NSMakeRange(0, MIN(len, 512))], enc) lowercaseString];
+            NSString *head = [plain_text([data subdataWithRange:NSMakeRange(0, MIN(len, 512))], enc) lowercaseString] ?: @"";
             type = [head rangeOfString:@"<html"].location != NSNotFound || [head rangeOfString:@"<!doctype html"].location != NSNotFound ||
                            [head rangeOfString:@"<body"].location != NSNotFound || [head rangeOfString:@"<p>"].location != NSNotFound
                        ? NSHTMLTextDocumentType : NSPlainTextDocumentType;

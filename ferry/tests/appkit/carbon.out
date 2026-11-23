@@ -1,0 +1,13 @@
+event handler 0, ref yes
+hotkey 0, ref yes, unregister 0
+input source yes, layout data none, translate -50 (length 0)
+current process is this one: 1, transform 0
+trusted 0, with options 0, attribute -25211, value NULL
+reachability 1, reachable 1, scheduled 1
+computer name yes
+services provider kept 1
+paragraph style archived and back, centred 1
+content border 24
+background style 1
+resolved /tmp
+exit=0

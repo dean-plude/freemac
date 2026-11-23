@@ -100,6 +100,8 @@ CFIndex CFStringGetLength(CFStringRef s);
 UniChar CFStringGetCharacterAtIndex(CFStringRef s, CFIndex i);
 Boolean CFStringGetCString(CFStringRef s, char *buffer, CFIndex size, CFStringEncoding enc);
 const char *CFStringGetCStringPtr(CFStringRef s, CFStringEncoding enc);
+const UniChar *CFStringGetCharactersPtr(CFStringRef s);
+void CFStringGetCharacters(CFStringRef s, CFRange range, UniChar *buffer);
 CFComparisonResult CFStringCompare(CFStringRef a, CFStringRef b, CFOptionFlags options);
 Boolean CFStringHasPrefix(CFStringRef s, CFStringRef prefix);
 Boolean CFStringHasSuffix(CFStringRef s, CFStringRef suffix);

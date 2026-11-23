@@ -1,0 +1,35 @@
+title: Tiny Test
+component: org.freemac.tiny.app 1.0, installs at /Applications, 4 KB
+component: org.freemac.tiny.tool 2.0, installs at /usr/local, 2 KB, has scripts (not run)
+welcome: 26 characters, read me: 0, licence: 30
+licence begins: Tiny licence: do as you like. 
+checks in JavaScript: no
+exit=0
+installed Tiny Test: 5 files
+app: Tiny.app
+exit=0
+Apps
+Apps/Tiny.app
+Apps/Tiny.app/Contents
+Apps/Tiny.app/Contents/Info.plist
+Apps/Tiny.app/Contents/MacOS
+Apps/Tiny.app/Contents/MacOS/Tiny
+Apps/Tiny.app/Contents/Resources
+root
+root/usr
+root/usr/local
+root/usr/local/bin
+root/usr/local/bin/tiny-tool
+root/usr/local/share
+root/usr/local/share/tiny
+root/usr/local/share/tiny/README
+link: MacOS
+echo tiny
+Installer: the installation failed. The package's Payload is cut short or damaged.
+exit=1
+hello from a Mac program
+puts works
+argc=2 first=boat
+env=tide
+done
+exit=3

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "ferry.h"
 
@@ -110,6 +111,23 @@ static struct mac_FILE *mac_open_memstream(char **ptr, size_t *size) { return wr
 
 static struct mac_FILE *mac_freopen(const char *path, const char *mode, struct mac_FILE *f)
 {
+    /* stdin, stdout and stderr are this system's own, which Ferry writes its
+     * messages to as well: the new file takes over their descriptor, and if
+     * it can't be opened they stay as they were (rather than closed). */
+    if (path && is_std(f) && f->cookie) {
+        FILE *fresh = fopen(path, mode);
+        if (!fresh)
+            return NULL;
+        FILE *fp = real(f);
+        fflush(fp);
+        int rc = dup2(fileno(fresh), fileno(fp));
+        fclose(fresh);
+        if (rc < 0)
+            return NULL;
+        clearerr(fp);
+        f->flags &= ~(MAC_SEOF | MAC_SERR);
+        return f;
+    }
     FILE *fp = freopen(path, mode, real(f));
     if (!fp)
         return NULL;
