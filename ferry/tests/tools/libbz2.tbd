@@ -1,9 +1,0 @@
---- !tapi-tbd
-tbd-version:     4
-targets:         [ x86_64-macos ]
-install-name:    '/usr/lib/libbz2.1.0.dylib'
-current-version: 1.0.8
-exports:
-  - targets:     [ x86_64-macos ]
-    symbols:     [ _BZ2_bzBuffToBuffCompress, _BZ2_bzBuffToBuffDecompress, _BZ2_bzReadOpen ]
-...

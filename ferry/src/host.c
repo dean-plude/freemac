@@ -99,7 +99,7 @@ static const struct twin {
     {"/usr/lib/libxml2.dylib", "libxml2.so.2"},
     {"/usr/lib/libsqlite3.dylib", "libsqlite3.so.0"},
     {"/usr/lib/libsqlite3.0.dylib", "libsqlite3.so.0"},
-    {NULL, NULL, NULL},
+    {NULL, NULL},
 };
 static void *twin_handles[16];
 static int twin_linked[16];

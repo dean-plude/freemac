@@ -11,6 +11,8 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
       src/objc/symbols.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
+# Link stubs for the Mac libraries served by this system's copy (src/host.c).
+TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
 # and lld, as the tests do). CoreFoundation is served from the same file.
@@ -38,7 +40,7 @@ APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
 APPKIT = frameworks/AppKit.framework/AppKit
 APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(GRAPHICS_HEADERS)
 
-all: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -59,6 +61,22 @@ src/objc/%.o: src/objc/%.S
 sdk/lib/libSystem.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libSystem > $@
+
+sdk/lib/libz.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libz.1.dylib libz.so.1 > $@
+sdk/lib/libbz2.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libbz2.1.0.dylib libbz2.so.1.0 > $@
+sdk/lib/liblzma.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/liblzma.5.dylib liblzma.so.5 > $@
+sdk/lib/libxml2.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libxml2.2.dylib libxml2.so.2 > $@
+sdk/lib/libsqlite3.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libsqlite3.dylib libsqlite3.so.0 > $@
 
 sdk/lib/libobjc.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
@@ -105,7 +123,7 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(HOST_TBD)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT)
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk

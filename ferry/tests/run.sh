@@ -62,7 +62,7 @@ for t in hello files; do
 done
 # The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
 run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
-run_one twins "$here/twins.c" "$here/twins.out" "$here/tools/libz.tbd" "$here/tools/libbz2.tbd"
+run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).
