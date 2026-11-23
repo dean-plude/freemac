@@ -22,7 +22,9 @@ doesn't keep it.
 
 Website logins live in the login keychain (logins.py); Wi-Fi passwords are
 kept for the whole computer, so showing one asks for an administrator's
-password, as Dials > Network does (known_networks.py). Original freemac code.
+password, as Dials > Network does (known_networks.py). A login can also keep
+a verification code for two-step sign-in (codes.py), shown beside it and
+listed under Codes. Original freemac code.
 """
 import os
 import sys
@@ -34,7 +36,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import alert, known_networks, logins, menus, style  # noqa: E402
+from . import alert, codes, known_networks, logins, menus, style  # noqa: E402
 
 APP_ID = "org.freemac.Purser"
 ACTION = "org.freemac.passwords.unlock"
@@ -54,6 +56,8 @@ CSS = b"""
 .purser-empty { color: alpha(currentColor, 0.45); font-size: 15px; }
 .purser-warning { background: alpha(#e5a52e, 0.16); border-radius: 8px; padding: 10px 12px; }
 .purser-locked-title { font-size: 20px; font-weight: 700; }
+.purser-code { font-family: Monospace; font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.purser-left { color: alpha(currentColor, 0.55); font-size: 12px; min-width: 34px; }
 """
 
 
@@ -214,6 +218,10 @@ class LoginCard(Gtk.ScrolledWindow):
             self.password.connect("changed", lambda *_: self._update_hint())
             self._update_hint()
             box.pack_start(hint, False, False, 0)
+            if login and login.key() in win.codes:
+                drop = Gtk.Button(label="Remove Verification Code…", halign=Gtk.Align.START)
+                drop.connect("clicked", lambda *_: win.remove_code(login))
+                box.pack_start(drop, False, False, 0)
             if login:
                 delete = Gtk.Button(label="Delete Login…", halign=Gtk.Align.START)
                 delete.get_style_context().add_class("destructive-action")
@@ -233,6 +241,18 @@ class LoginCard(Gtk.ScrolledWindow):
         site = Gtk.LinkButton(uri=login.origin, label=login.origin, halign=Gtk.Align.START)
         site.get_child().set_ellipsize(Pango.EllipsizeMode.END)
         field_row(grid, 2, "Website", site)
+        self.code = win.codes.get(login.key())
+        if self.code is not None:
+            self.code_label = Gtk.Label(xalign=0)
+            self.code_label.get_style_context().add_class("purser-code")
+            self.code_left = Gtk.Label(xalign=1)
+            self.code_left.get_style_context().add_class("purser-left")
+            copy_code = small_button("Copy", "Copy Verification Code (⌥⌘C)")
+            copy_code.connect("clicked", lambda b: (copy_secret(self.code.now()[0]), b.set_label("Copied")))
+            field_row(grid, 3, "Code", self.code_label, self.code_left, copy_code)
+            self.tick()
+            timer = GLib.timeout_add(500, self.tick)
+            self.connect("destroy", lambda *_: GLib.source_remove(timer))
         for problem in logins.problems(login, win.shared):
             note = Gtk.Box(spacing=10)
             note.get_style_context().add_class("purser-warning")
@@ -248,6 +268,17 @@ class LoginCard(Gtk.ScrolledWindow):
                              xalign=0, wrap=True, max_width_chars=50)
             hint.get_style_context().add_class("purser-sub")
             box.pack_start(hint, False, False, 0)
+        if self.code is None:
+            setup = Gtk.Button(label="Set Up Verification Code…", halign=Gtk.Align.START)
+            setup.set_tooltip_text("Keep the codes this website asks for when you sign in in two steps")
+            setup.connect("clicked", lambda *_: win.set_up_code(login))
+            box.pack_start(setup, False, False, 0)
+
+    def tick(self):
+        text, left = self.code.now()
+        self.code_label.set_text(codes.shown(text))
+        self.code_left.set_text(f"{left} s")
+        return True
 
     def _update_hint(self):
         text = self.password.get_text()
@@ -345,7 +376,7 @@ class Window(Gtk.ApplicationWindow):
         super().__init__(application=app, title="Purser")
         self.set_default_size(940, 580)
         self.set_icon_name("freemac-purser")
-        self.logins, self.shared, self.networks = [], {}, []
+        self.logins, self.shared, self.networks, self.codes = [], {}, [], {}
         self.category = "all"
         self.chosen = None      # a Login, or a Wi-Fi connection's UUID
         self.card = None
@@ -379,6 +410,7 @@ class Window(Gtk.ApplicationWindow):
             "new-login": self.new_login, "edit": self.toggle_editing, "delete": self.delete_chosen,
             "find": lambda: self.search.grab_focus(), "lock": self.lock, "close": self.close,
             "copy-password": self.copy_chosen_password, "copy-username": self.copy_chosen_username,
+            "copy-code": self.copy_chosen_code,
         })
         self.connect("key-press-event", self._key)
         self.connect("focus-in-event", self._focus_in)
@@ -439,7 +471,7 @@ class Window(Gtk.ApplicationWindow):
         if not self.unlocked:
             return
         self.unlocked = False
-        self.logins, self.shared = [], {}
+        self.logins, self.shared, self.codes = [], {}, {}
         self.adding = False
         self.card = None
         self.chosen = None
@@ -475,6 +507,10 @@ class Window(Gtk.ApplicationWindow):
                                       "isn't running. " + (error.message or ""))
             return False
         self.shared = logins.reused(self.logins)
+        try:
+            self.codes = codes.load()
+        except Exception:   # passwords still work without codes
+            self.codes = {}
         self.networks = self._read_networks()
         return True
 
@@ -490,11 +526,11 @@ class Window(Gtk.ApplicationWindow):
 
     def reload(self):
         before = (sorted((l.key(), l.password) for l in self.logins),
-                  [c.get_uuid() for c in self.networks])
+                  [c.get_uuid() for c in self.networks], sorted(self.codes))
         if not self.read_all():
             return
         after = (sorted((l.key(), l.password) for l in self.logins),
-                 [c.get_uuid() for c in self.networks])
+                 [c.get_uuid() for c in self.networks], sorted(self.codes))
         if before != after:
             if isinstance(self.chosen, logins.Login):
                 self.chosen = next((l for l in self.logins if l.key() == self.chosen.key()), None)
@@ -509,6 +545,7 @@ class Window(Gtk.ApplicationWindow):
         self.categories.get_style_context().add_class("purser-side")
         self.category_counts = {}
         for key, icon, name in (("all", "dialog-password-symbolic", "All Passwords"),
+                                ("codes", "preferences-system-time-symbolic", "Codes"),
                                 ("wifi", "network-wireless-symbolic", "Wi-Fi"),
                                 ("security", "dialog-warning-symbolic", "Security")):
             row = Gtk.ListBoxRow()
@@ -550,11 +587,15 @@ class Window(Gtk.ApplicationWindow):
             return self.networks
         if self.category == "security":
             return [l for l in self.logins if logins.problems(l, self.shared)]
+        if self.category == "codes":
+            return [l for l in self.logins if l.key() in self.codes]
         return self.logins
 
     def fill_lists(self):
         self.category_counts["all"].set_text(str(len(self.logins)))
         self.category_counts["wifi"].set_text(str(len(self.networks)))
+        with_code = sum(1 for l in self.logins if l.key() in self.codes)
+        self.category_counts["codes"].set_text(str(with_code) if with_code else "")
         trouble = sum(1 for l in self.logins if logins.problems(l, self.shared))
         self.category_counts["security"].set_text(str(trouble) if trouble else "")
         row = next(r for r in self.categories.get_children() if r.key == self.category)
@@ -672,6 +713,10 @@ class Window(Gtk.ApplicationWindow):
             head, text = "No Results", "Nothing here matches your search."
         elif self.category == "wifi":
             head, text = "No Wi-Fi Networks", "Networks this computer joins appear here."
+        elif self.category == "codes":
+            head, text = "No Verification Codes", ("When a website asks for a code from an authenticator "
+                                                   "app, choose its login and Set Up Verification Code. "
+                                                   "The codes then show here.")
         elif self.category == "security":
             head, text = "No Problems Found", "None of your passwords is used twice or easy to guess."
         elif not self.logins:
@@ -718,7 +763,9 @@ class Window(Gtk.ApplicationWindow):
             if login is None:
                 logins.add(website, username, password)
             elif (origin, username, password) != (login.origin, login.username, login.password):
+                old = login.key()
                 logins.change(login, website, username, password)
+                codes.move(*old, origin, username)
         except Exception as error:   # the keychain said no, or isn't there
             alert.tell(self, "The login couldn't be saved.", getattr(error, "message", str(error)))
             return False
@@ -743,7 +790,7 @@ class Window(Gtk.ApplicationWindow):
             return
         if self.card and getattr(self.card, "editing", False) and not self.finish_editing():
             return
-        if self.category == "wifi":
+        if self.category in ("wifi", "codes"):
             self.category = "all"
             self.fill_lists()
         self.search.set_text("")
@@ -765,6 +812,8 @@ class Window(Gtk.ApplicationWindow):
             return
         try:
             logins.delete(login)
+            if login.key() in self.codes:
+                codes.remove(*login.key())
         except Exception as error:
             alert.tell(self, "The login couldn't be deleted.", getattr(error, "message", str(error)))
             return
@@ -774,6 +823,109 @@ class Window(Gtk.ApplicationWindow):
         shown = [l for l in self.shown_category() if l.key() != login.key()]
         self.chosen = shown[min(at, len(shown) - 1)] if shown else None
         self.fill_lists()
+
+    def copy_chosen_code(self):
+        if isinstance(self.chosen, logins.Login) and self.unlocked and self.chosen.key() in self.codes:
+            copy_secret(self.codes[self.chosen.key()].now()[0])
+
+    def set_up_code(self, login):
+        """Ask for a setup key, or read the website's QR code off the screen."""
+        dialog = Gtk.Dialog(title="Set Up Verification Code", transient_for=self, modal=True,
+                            use_header_bar=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        ok = dialog.add_button("Set Up", Gtk.ResponseType.OK)
+        ok.get_style_context().add_class("suggested-action")
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        box = dialog.get_content_area()
+        box.set_spacing(12)
+        box.set_border_width(20)
+        intro = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        intro.set_markup(
+            f"On <b>{GLib.markup_escape_text(login.site)}</b>, turn on two-step sign-in with an "
+            "authenticator app. When it shows a QR code, leave it on the screen and choose Scan QR "
+            "Code. Or copy the setup key it shows and paste it here.")
+        box.pack_start(intro, False, False, 0)
+        line = Gtk.Box(spacing=8)
+        entry = Gtk.Entry(placeholder_text="Setup key", activates_default=True, hexpand=True)
+        entry.get_style_context().add_class("purser-secret")
+        line.pack_start(entry, True, True, 0)
+        scan = Gtk.Button(label="Scan QR Code")
+        scan.set_tooltip_text("Read the website's QR code from the screen")
+        scan.set_sensitive(codes.can_scan())
+        line.pack_start(scan, False, False, 0)
+        box.pack_start(line, False, False, 0)
+        status = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        status.get_style_context().add_class("purser-sub")
+        box.pack_start(status, False, False, 0)
+        found = {"code": None}
+
+        def check(*_):
+            text = entry.get_text().strip()
+            found["code"] = None
+            if not text:
+                status.set_text("")
+            else:
+                try:
+                    found["code"] = codes.parse(text)
+                    now = codes.shown(found["code"].now()[0])
+                    status.set_text(f"The code now is {now}. Type it into the website to finish "
+                                    "turning on two-step sign-in, then choose Set Up.")
+                except codes.BadKey as error:
+                    status.set_text(str(error))
+            ok.set_sensitive(found["code"] is not None)
+
+        def scanned(texts):
+            self.set_opacity(1)
+            dialog.set_opacity(1)
+            usable = [t for t in texts if t.lower().startswith("otpauth://totp")]
+            if not usable:
+                status.set_text("No setup QR code was found on the screen. Make sure the website's "
+                                "code is showing and not covered, then try again." if not texts else
+                                "The QR code on the screen isn't a verification code setup.")
+                return
+            entry.set_text(usable[0])
+
+        def do_scan(*_):
+            status.set_text("Looking at the screen…")
+            # See through Purser's windows for a moment (hiding them would
+            # lose the dialog behind its window), then read the screen.
+            dialog.set_opacity(0)
+            self.set_opacity(0)
+            GLib.timeout_add(500, lambda: (scanned(codes.scan_screen()), False)[1])
+
+        entry.connect("changed", check)
+        scan.connect("clicked", do_scan)
+        check()
+        dialog.show_all()
+        while dialog.run() == Gtk.ResponseType.OK and found["code"] is not None:
+            try:
+                codes.save(found["code"], *login.key())
+            except Exception as error:
+                alert.tell(dialog, "The code couldn't be saved.", getattr(error, "message", str(error)))
+                continue
+            break
+        dialog.destroy()
+        self.read_all()
+        self.fill_lists()
+
+    def remove_code(self, login):
+        answer = alert.ask(self, f"Remove the verification code for {login.site}?",
+                           "Turn off two-step sign-in on the website first, or set it up again with "
+                           "another app, or you may not be able to sign in there.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Remove", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.CANCEL, destructive=Gtk.ResponseType.OK)
+        if answer != Gtk.ResponseType.OK:
+            return
+        try:
+            codes.remove(*login.key())
+        except Exception as error:
+            alert.tell(self, "The code couldn't be removed.", getattr(error, "message", str(error)))
+            return
+        self.read_all()
+        if self.category == "codes":
+            self.category = "all"   # the login leaves this list; stay on it
+        self.fill_lists()
+        self.show_card(editing=True)
 
     def copy_chosen_password(self):
         if isinstance(self.chosen, logins.Login) and self.unlocked:
@@ -827,7 +979,8 @@ def menubar():
                    [("Lock Purser", "win.lock", "<Ctrl>l")],
                    [("Close Window", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("Copy Password", "win.copy-password", "<Ctrl><Shift>c"),
-                    ("Copy User Name", "win.copy-username", None)],
+                    ("Copy User Name", "win.copy-username", None),
+                    ("Copy Verification Code", "win.copy-code", "<Ctrl><Alt>c")],
                    [("Edit Login", "win.edit", "<Ctrl>e"), ("Delete Login", "win.delete", "<Ctrl>BackSpace")],
                    [("Find", "win.find", "<Ctrl>f")]]),
     ])

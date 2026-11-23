@@ -63,6 +63,7 @@ only ship alongside, which is fine for any free licence).
 | gnome-keyring, libpam-gnome-keyring | The keychain: the secret service, opened at login (1.122) | GPL-2.0-or-later, LGPL-2.0-or-later (separate program) |
 | libsecret (gir1.2-secret-1) | Purser reads and changes saved logins (1.122) | LGPL-2.1-or-later |
 | gcr | Asks for a keychain password when one is needed (1.122) | LGPL-2.0-or-later |
+| pyzbar (python3-pyzbar), ZBar (libzbar0), Pillow (python3-pil) | Purser reads a setup QR code off the screen (1.123) | MIT; LGPL-2.1-or-later; MIT-CMU |
 | clang, lld (build only) | Compiling Mac test programs for Ferry | Apache-2.0 with LLVM exception |
 | wayvnc | Screen Sharing: shares the Wayland screen over VNC | ISC (separate program) |
 | GTK-VNC | The screen view in Porthole | LGPL-2.1-or-later |
@@ -382,6 +383,20 @@ focus. Wi-Fi passwords come through `known_networks.fetch_password`, the
 1.121 helper. The Security list compares passwords in memory: one used on
 more than one origin, or one that is short, all digits, from few characters
 or on a short list of the passwords people pick most.
+
+Verification codes (1.123, `codes.py`): Purser works out the six-digit codes
+for two-step sign-in itself, TOTP (RFC 6238) over HOTP (RFC 4226) with
+Python's hmac and hashlib (SHA-1, SHA-256 or SHA-512; 6 to 8 digits; the
+period from the setup address). Each setup key is a keychain item of
+freemac's own `org.freemac.Purser.Code` kind, with the login's origin and
+user name as attributes and the base32 key as the secret, so the login
+password opens codes and passwords alike, and changing or deleting a login
+moves or removes its code. Set Up takes a pasted key or an
+`otpauth://totp/` address; Scan QR Code makes Purser's windows see-through
+for half a second, takes the screen with grim into a file in
+`$XDG_RUNTIME_DIR` (deleted straight after, as the screen may show other
+secrets), and reads QR codes in it with ZBar through pyzbar. Counter-based
+(HOTP) setups are refused, as Purser can't keep their count in step.
 
 Screen reader (1.120, `screen_reader.py`): the reader is Orca (LGPL-2.1),
 which apps reach over the AT-SPI accessibility bus that at-spi2-core already

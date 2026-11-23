@@ -2,10 +2,10 @@
 Type=Application
 Name=Purser
 GenericName=Passwords
-Comment=See, copy and change the passwords this computer keeps for you
+Comment=See, copy and change the passwords and verification codes this computer keeps for you
 Exec=freemac-purser
 Icon=freemac-purser
 Categories=Utility;Security;
-Keywords=passwords;keychain;logins;website;wifi;wi-fi;security;password manager;
+Keywords=passwords;keychain;logins;website;wifi;wi-fi;security;password manager;verification code;two-step;two-factor;2fa;authenticator;
 StartupWMClass=org.freemac.Purser
 StartupNotify=true
