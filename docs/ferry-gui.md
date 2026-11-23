@@ -17,7 +17,7 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
 | M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
 | M5 | Nibs (compiled .nib) | **done**, merged (#37) |
-| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, pull request #136 open |
+| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, merged (#136) |
 | M7 | What the apps needed first (`NSImage`, exceptions, window and view controllers), then polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | **done** (see the M7 report below) |
 
 ## Ground rules
@@ -1017,4 +1017,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M3 merged (#33). M4 done: AppKit on GTK 3 (Wayland or X11), windows, views, events, controls, `make check` 41/41.
 - 2026-11-20: M4 merged (#35). M5 done: keyed archives, nib loading, `NSApplicationMain` with a main nib, `make check` 43/43.
 - 2026-11-22: M5 merged (#37). M6 done: real apps tried (docs/ferry-compat.md), NIBArchive nibs, missing frameworks tolerated, Grand Central Dispatch, pre-10.6 libraries, `make check` 48/48.
-- 2026-11-23: M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.
+- 2026-11-23: M6 merged (#136). M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.
