@@ -1,0 +1,177 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Screen Time for a family: a parent sets another person's limits in Logbook,
+and that person can't change them. Run as root through pkexec.
+
+  freemac-screen-time-helper set NAME        the settings, as JSON, on stdin
+  freemac-screen-time-helper off NAME        stop managing NAME's screen time
+  freemac-screen-time-helper grant NAME more APP-ID     15 more minutes today
+  freemac-screen-time-helper grant NAME downtime        15 minutes out of downtime
+
+set and off need an administrator (org.freemac.screen-time.manage); grant is
+reached through freemac-screen-time-grant (org.freemac.screen-time.grant),
+which asks for an administrator's password every time, so a parent types it
+on the child's screen.
+
+  /etc/freemac/screen-time/NAME.json          limits, Always Allowed, downtime
+  /var/lib/freemac/screen-time/NAME.grants.json   today's extra time
+  /var/lib/freemac/screen-time/NAME/          NAME's tracker copies each day
+                                              here, for administrators to read
+
+Original freemac code.
+"""
+import datetime
+import grp
+import json
+import os
+import pwd
+import re
+import shutil
+import sys
+import time
+
+NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
+APP = re.compile(r"^[A-Za-z0-9._+-]{1,200}$")
+SETTINGS = "/etc/freemac/screen-time"
+SHARED = "/var/lib/freemac/screen-time"
+ADMIN_GROUP = "sudo"
+MORE = 15   # minutes
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def person(name):
+    if not NAME.match(name or ""):
+        fail("That isn't a valid user name.")
+    try:
+        entry = pwd.getpwnam(name)
+    except KeyError:
+        fail(f"There's no account called {name}.")
+    if not 1000 <= entry.pw_uid < 60000:
+        fail("Screen Time can only be managed for people's accounts.")
+    return entry
+
+
+def write(path, data, mode=0o644):
+    os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=1)
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def clean(data):
+    """Only what Logbook keeps, each checked."""
+    limits = data.get("limits") if isinstance(data.get("limits"), dict) else {}
+    limits = {k: v for k, v in limits.items()
+              if isinstance(k, str) and APP.match(k) and isinstance(v, int) and 0 < v <= 24 * 60}
+    allowed = data.get("allowed") if isinstance(data.get("allowed"), list) else []
+    allowed = sorted({a for a in allowed if isinstance(a, str) and APP.match(a) and a.endswith(".desktop")})
+    down = data.get("downtime") if isinstance(data.get("downtime"), dict) else {}
+    clock = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    downtime = {"on": down.get("on") is True,
+                "start": down["start"] if clock.match(str(down.get("start", ""))) else "22:00",
+                "end": down["end"] if clock.match(str(down.get("end", ""))) else "07:00"}
+    return {"limits": dict(list(limits.items())[:500]), "allowed": allowed[:500], "downtime": downtime}
+
+
+def usage_folder(entry):
+    """NAME's own folder for copies of each day, readable by administrators."""
+    folder = os.path.join(SHARED, entry.pw_name)
+    os.makedirs(SHARED, mode=0o755, exist_ok=True)
+    os.chmod(SHARED, 0o755)
+    os.makedirs(folder, exist_ok=True)
+    try:
+        group = grp.getgrnam(ADMIN_GROUP).gr_gid
+    except KeyError:
+        group = entry.pw_gid
+    os.chown(folder, entry.pw_uid, group)
+    os.chmod(folder, 0o2750)
+
+
+def open_admins():
+    """Administrators whose account has no password: anyone at the computer
+    could give more time as them, so Logbook says so."""
+    members = set()
+    for group in ("sudo", "admin", "wheel"):
+        try:
+            entry = grp.getgrnam(group)
+        except KeyError:
+            continue
+        members.update(entry.gr_mem)
+        members.update(p.pw_name for p in pwd.getpwall() if p.pw_gid == entry.gr_gid)
+    found = []
+    try:
+        with open("/etc/shadow") as f:
+            for line in f:
+                fields = line.split(":")
+                if len(fields) > 1 and fields[0] in members and fields[1] == "":
+                    found.append(fields[0])
+    except OSError:
+        pass
+    return sorted(found)
+
+
+def main(args):
+    if os.geteuid() != 0:
+        fail("This needs to run as root (through pkexec).")
+    if len(args) < 2:
+        fail(__doc__)
+    what, entry = args[0], person(args[1])
+    settings = os.path.join(SETTINGS, entry.pw_name + ".json")
+    grants = os.path.join(SHARED, entry.pw_name + ".grants.json")
+    if what == "set":
+        raw = sys.stdin.read(256 * 1024)
+        try:
+            data = json.loads(raw or "{}")
+        except ValueError:
+            fail("The settings weren't readable.")
+        if not isinstance(data, dict):
+            fail("The settings weren't readable.")
+        write(settings, clean(data))
+        usage_folder(entry)
+        for name in open_admins():
+            print("no-password", name)
+    elif what == "off":
+        for path in (settings, grants):
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+        shutil.rmtree(os.path.join(SHARED, entry.pw_name), ignore_errors=True)
+    elif what == "grant":
+        if not os.path.exists(settings):
+            fail(f"{entry.pw_name}'s screen time isn't managed.")
+        given = read(grants)
+        today = datetime.date.today().isoformat()
+        if given.get("day") != today:
+            given = {"day": today, "apps": {}, "downtime_paused": given.get("downtime_paused", 0)}
+        if len(args) == 4 and args[2] == "more" and APP.match(args[3]):
+            apps = given.get("apps") if isinstance(given.get("apps"), dict) else {}
+            old = apps.get(args[3])
+            apps[args[3]] = (old if isinstance(old, int) else 0) + MORE
+            given["apps"] = apps
+        elif len(args) == 3 and args[2] == "downtime":
+            given["downtime_paused"] = int(time.time()) + MORE * 60
+        else:
+            fail(__doc__)
+        write(grants, given)
+    else:
+        fail(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

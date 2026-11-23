@@ -1171,6 +1171,22 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.138 "Screen Time for a family" (done)
+
+A parent sets a child's screen time from the parent's own account, and the child can't change it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An administrator picks a family member at the top of Logbook (Me, then everyone else) and sees their day and week | Logbook | done |
+| 2 | Manage Screen Time (the parent's password) keeps that person's limits, Downtime and Always Allowed in /etc, where only an administrator can change them; Add Limit… sets a limit on an app not used yet; Stop Managing… gives them back | Logbook, freemac-screen-time-helper, polkit | done |
+| 3 | The child's Logbook says a parent manages their screen time and shows the limits without letting them change anything | Logbook | done |
+| 4 | When time's up, More Time… asks for a parent's password on the child's screen and gives 15 more minutes (or 15 minutes out of Downtime) for that day | Logbook, freemac-screen-time-grant, polkit | done |
+| 5 | A warning when a parent's account has no password, since anyone could then give more time | Logbook, freemac-screen-time-helper | done |
+| 6 | Fix: with two people logged in, the second person's menu bar, Dock and Logbook talked to the first person's desktop; each session now has its own Wayfire socket in its runtime folder | freemac-session, wfipc.py, sounds.py | done |
+| 7 | Fix: the child's time didn't count while the parent's session was locked | Logbook | done |
+| 8 | Fix: a limit's pop-over no longer closes on its own when the list refreshes | Logbook | done |
+| 9 | Guide topic, README row, every README screenshot retaken | Guide, Docs | done |
+
 ## 1.137 "fast user switching" (done)
 
 A family computer where each person has their own account: someone else can log in while the first person's apps keep running.

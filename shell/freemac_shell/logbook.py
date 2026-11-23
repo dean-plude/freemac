@@ -16,14 +16,24 @@ five minutes before it starts; freemac's own Drawer, Dials, Guide and Logbook
 always work. Apps you always allow have no daily limit either. A passcode, if
 one is set, is needed to change any of this.
 
+Screen Time for a family (1.138): an administrator can pick another person in
+Logbook's toolbar and manage their screen time. Those settings are kept by
+root in /etc/freemac/screen-time/NAME.json, so the person can see them but
+not change them; a parent gives more time by typing their own password on
+the person's screen (freemac-screen-time-helper, through pkexec). The
+person's tracker copies each day to /var/lib/freemac/screen-time/NAME/, where
+administrators can read it.
+
 Original freemac code. Each day's times are kept in
 ~/.local/share/freemac/logbook/DATE.json (five weeks of them), limits and the
 passcode (salted and hashed) in ~/.config/freemac/logbook.json.
 """
 import datetime
+import grp
 import hashlib
 import json
 import os
+import pwd
 import secrets
 import shutil
 import signal
@@ -48,7 +58,61 @@ KEEP_DAYS = 35
 WARN_BEFORE = 300     # seconds
 
 
-def day_path(day):
+# Screen Time for a family (see the helper for who writes what).
+MANAGED = "/etc/freemac/screen-time"
+SHARED = "/var/lib/freemac/screen-time"
+HELPER = "/usr/libexec/freemac-screen-time-helper"
+GRANT = "/usr/libexec/freemac-screen-time-grant"
+ADMIN_GROUPS = {"sudo", "admin", "wheel"}
+
+
+def me():
+    return pwd.getpwuid(os.getuid()).pw_name
+
+
+def managed_path(user):
+    return os.path.join(MANAGED, user + ".json")
+
+
+def grants_path(user):
+    return os.path.join(SHARED, user + ".grants.json")
+
+
+def usage_folder(user):
+    return os.path.join(SHARED, user)
+
+
+def is_managed(user=None):
+    return os.path.exists(managed_path(user or me()))
+
+
+def is_admin(user=None):
+    """Whether the account is an administrator (in the sudo group)."""
+    user = user or me()
+    try:
+        entry = pwd.getpwnam(user)
+        groups = {g.gr_name for g in grp.getgrall() if user in g.gr_mem}
+        groups.add(grp.getgrgid(entry.pw_gid).gr_name)
+    except KeyError:
+        return False
+    return bool(groups & ADMIN_GROUPS)
+
+
+def config_stamp(user=None):
+    """Changes when any of the person's settings change."""
+    user = user or me()
+    stamp = []
+    for path in (CONFIG, managed_path(user), grants_path(user)):
+        try:
+            stamp.append(os.stat(path).st_mtime)
+        except OSError:
+            stamp.append(0)
+    return tuple(stamp)
+
+
+def day_path(day, user=None):
+    if user and user != me():
+        return os.path.join(usage_folder(user), day.isoformat() + ".json")
     return os.path.join(DATA, day.isoformat() + ".json")
 
 
@@ -69,8 +133,8 @@ def write_json(path, data):
     os.replace(tmp, path)
 
 
-def load_day(day):
-    data = read_json(day_path(day))
+def load_day(day, user=None):
+    data = read_json(day_path(day, user))
     used = data.get("apps") if isinstance(data.get("apps"), dict) else {}
     used = {k: float(v) for k, v in used.items() if isinstance(k, str) and isinstance(v, (int, float)) and v >= 0}
     hours = data.get("hours")
@@ -79,8 +143,19 @@ def load_day(day):
     return {"apps": used, "hours": [float(h) for h in hours]}
 
 
-def load_config():
-    data = read_json(CONFIG)
+def load_config(user=None):
+    """The person's settings: their own, or the ones a parent manages, with
+    any time given today."""
+    user = user or me()
+    if is_managed(user):
+        kept, given = read_json(managed_path(user)), read_json(grants_path(user))
+        down = kept.get("downtime") if isinstance(kept.get("downtime"), dict) else {}
+        data = {"limits": kept.get("limits"), "allowed": kept.get("allowed"),
+                "downtime": {**down, "paused": given.get("downtime_paused")},
+                "extra": {"day": given.get("day"), "apps": given.get("apps")}, "managed": True}
+    else:
+        data = read_json(CONFIG) if user == me() else {}
+        data.pop("managed", None)
     limits = data.get("limits") if isinstance(data.get("limits"), dict) else {}
     data["limits"] = {k: int(v) for k, v in limits.items() if isinstance(v, int) and v > 0}
     allowed = data.get("allowed") if isinstance(data.get("allowed"), list) else []
@@ -163,7 +238,7 @@ def desktop_id(app):
 def always_allowed(config, app):
     if app.lower() in ALWAYS_IDS:
         return True
-    found = desktop_id(app)
+    found = app if app.endswith(".desktop") else desktop_id(app)
     return bool(found) and (found in ALWAYS_DESKTOP or found in config["allowed"])
 
 
@@ -174,10 +249,39 @@ def extra_minutes(config, app, day=None):
     return extra["apps"].get(app, 0)
 
 
+def limit_key(config, app):
+    """Where the app's limit is kept: under its window's app id, or under its
+    desktop id when a parent added the limit before it was ever used."""
+    if app in config["limits"] or app.endswith(".desktop"):
+        return app
+    found = desktop_id(app)
+    return found if found and found in config["limits"] else app
+
+
+def app_info_any(app):
+    if app.endswith(".desktop"):
+        try:
+            return Gio.DesktopAppInfo.new(app)
+        except TypeError:
+            return None
+    return apps.app_info(app)
+
+
+def app_name(app):
+    info = app_info_any(app) if app.endswith(".desktop") else None
+    return apps.short_name(info) if info else apps.display_name(app)
+
+
+def app_icon(app):
+    info = app_info_any(app) if app.endswith(".desktop") else None
+    icon = info.get_icon() if info else None
+    return icon or apps.icon_for(app)
+
+
 def limit_for(config, app):
     """Minutes the app may be used today, counting any time given since; None
     for no limit."""
-    limit = config["limits"].get(app)
+    limit = config["limits"].get(limit_key(config, app))
     if not limit or always_allowed(config, app):
         return None
     return limit + extra_minutes(config, app)
@@ -246,7 +350,7 @@ class Tracker:
         self.today = datetime.date.today()
         self.day = load_day(self.today)
         self.config = load_config()
-        self.config_stamp = 0
+        self.config_stamp = ()
         self.warned = set()
         self.stopped_at = {}
         self.dirty = False
@@ -288,7 +392,10 @@ class Tracker:
 
     def _locked(self):
         try:
-            return subprocess.run(["pgrep", "-x", "gtklock"], capture_output=True, timeout=2).returncode == 0
+            # This person's lock screen: someone else's may be up behind a
+            # switch of user.
+            return subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "gtklock"],
+                                  capture_output=True, timeout=2).returncode == 0
         except (OSError, subprocess.SubprocessError):
             return False
 
@@ -340,10 +447,7 @@ class Tracker:
                "can be used.")
 
     def _reload_config(self):
-        try:
-            stamp = os.stat(CONFIG).st_mtime
-        except OSError:
-            stamp = 0
+        stamp = config_stamp()
         if stamp != self.config_stamp:
             self.config_stamp = stamp
             self.config = load_config()
@@ -377,7 +481,8 @@ class Tracker:
             if now - self.stopped_at.get(app, -999) > 20:
                 self.stopped_at[app] = now
                 notify(f"Time's up for {name}",
-                       f"{name} has had its {duration(limit * 60)} for today.")
+                       f"{name} has had its {duration(limit * 60)} for today."
+                       + (" A parent can give more time in Logbook." if self.config.get("managed") else ""))
             if self.wf:
                 try:
                     self.wf.quit(app)
@@ -391,22 +496,29 @@ class Tracker:
 
     def _save(self):
         if self.dirty:
-            write_json(day_path(self.today), {"apps": {k: round(v, 1) for k, v in self.day["apps"].items()},
-                                              "hours": [round(h, 1) for h in self.day["hours"]]})
+            day = {"apps": {k: round(v, 1) for k, v in self.day["apps"].items()},
+                   "hours": [round(h, 1) for h in self.day["hours"]]}
+            write_json(day_path(self.today), day)
+            if self.config.get("managed") and os.path.isdir(usage_folder(me())):
+                try:   # a copy for the parent to see
+                    write_json(os.path.join(usage_folder(me()), self.today.isoformat() + ".json"), day)
+                except OSError:
+                    pass
             self.dirty = False
         return True
 
     def _tidy(self):
         oldest = datetime.date.today() - datetime.timedelta(days=KEEP_DAYS)
-        try:
-            for name in os.listdir(DATA):
-                try:
-                    if datetime.date.fromisoformat(name[:10]) < oldest:
-                        os.remove(os.path.join(DATA, name))
-                except ValueError:
-                    continue
-        except OSError:
-            pass
+        for folder in (DATA, usage_folder(me())):
+            try:
+                for name in os.listdir(folder):
+                    try:
+                        if datetime.date.fromisoformat(name[:10]) < oldest:
+                            os.remove(os.path.join(folder, name))
+                    except ValueError:
+                        continue
+            except OSError:
+                pass
 
 
 def die_with_parent():
@@ -530,8 +642,10 @@ class Meter(Gtk.DrawingArea):
     def _draw(self, _w, cr):
         width, height = self.get_allocated_width(), self.get_allocated_height()
         dark = self.get_style_context().lookup_color("theme_bg_color")[1].red < 0.5
-        for fill, w in ((((1, 1, 1, 0.12) if dark else (0, 0, 0, 0.08)), width),
-                        ((0.04, 0.49, 1.0, 1), max(height, width * self.fraction))):
+        bars = [(((1, 1, 1, 0.12) if dark else (0, 0, 0, 0.08)), width)]
+        if self.fraction > 0:
+            bars.append(((0.04, 0.49, 1.0, 1), max(height, width * self.fraction)))
+        for fill, w in bars:
             r = height / 2
             cr.new_sub_path()
             cr.arc(r, r, r, 1.5708, 4.7124)
@@ -545,8 +659,12 @@ class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Logbook")
         self.set_default_size(720, 720)
+        self.person = me()
+        self.root_output = ""
+        self.stamp = ()
         self.config = load_config()
         self.span = "today"
+        self.list = None
         header = Gtk.HeaderBar(show_close_button=True, title="Logbook")
         self.header = header
         self.set_titlebar(header)
@@ -559,9 +677,210 @@ class Window(Gtk.ApplicationWindow):
             button.connect("toggled", self._span_toggled, span)
             switch.pack_start(button, False, False, 0)
         header.set_custom_title(switch)
+        self.people = self._people_combo()
+        if self.people:
+            header.pack_start(self.people)
+        self.scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.add(self.scroller)
+        menus.add_actions(self, {"close": self.close, "today": lambda: self.today_button.set_active(True),
+                                 "week": lambda: self.week_button.set_active(True),
+                                 "passcode": self.passcode_dialog})
+        if not tracker_running():
+            try:
+                subprocess.Popen(["freemac-logbook", "--track"], start_new_session=True,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                pass
+        self._build()
+        GLib.timeout_add_seconds(30, self._timer)
+        self.show_all()
 
+    # ---- Screen Time for a family -------------------------------------------------
+    def _people_combo(self):
+        """For an administrator: a pop-up button choosing whose screen time
+        the window shows."""
+        if not is_admin():
+            return None
+        from .switch_user import accounts, full_name
+        others = [e for e in accounts() if e.pw_name != me() and e.pw_name != "guest"]
+        if not others:
+            return None
+        button = Gtk.MenuButton(tooltip_text="Whose screen time to show")
+        inner = Gtk.Box(spacing=6)
+        self.people_label = Gtk.Label(label="Me")
+        inner.pack_start(self.people_label, False, False, 0)
+        inner.pack_start(Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        button.add(inner)
+        pop = Gtk.Popover()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_border_width(6)
+        self.people_rows = {}
+        for user, label in [(me(), "Me")] + [(e.pw_name, full_name(e)) for e in others]:
+            row = Gtk.ModelButton(text=label, role=Gtk.ButtonRole.RADIO, active=user == me())
+            row.connect("clicked", lambda _b, u=user, t=label: (pop.popdown(), self._person_changed(u, t)))
+            box.pack_start(row, False, False, 0)
+            self.people_rows[user] = row
+        box.show_all()
+        pop.add(box)
+        button.set_popover(pop)
+        return button
+
+    def _person_changed(self, person, label):
+        for user, row in self.people_rows.items():
+            row.set_property("active", user == person)
+        if person != self.person:
+            self.person = person
+            self.people_label.set_text(label)
+            self._build()
+
+    def name(self, user=None):
+        user = user or self.person
+        try:
+            entry = pwd.getpwnam(user)
+        except KeyError:
+            return user
+        return entry.pw_gecos.split(",")[0] or user
+
+    @property
+    def locked(self):
+        """The person's own window, when a parent manages their screen time."""
+        return bool(self.config.get("managed")) and self.person == me()
+
+    @property
+    def mine(self):
+        return self.person == me()
+
+    def _notice(self):
+        """What the top of the window says about who manages this."""
+        if self.mine and not self.locked:
+            return None
+        name = GLib.markup_escape_text(self.name())
+        box = Gtk.Box(spacing=14)
+        icon = Gtk.Image.new_from_icon_name("freemac-logbook", Gtk.IconSize.DIALOG)
+        icon.set_pixel_size(40)
+        box.pack_start(icon, False, False, 0)
+        words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        title = Gtk.Label(xalign=0, wrap=True)
+        note = Gtk.Label(xalign=0, wrap=True)
+        note.get_style_context().add_class("dim-label")
+        words.pack_start(title, False, False, 0)
+        words.pack_start(note, False, False, 0)
+        box.pack_start(words, True, True, 0)
+        if self.locked:
+            title.set_markup("<b>A parent manages your screen time</b>")
+            note.set_text("You can see your limits and downtime here. For more time, a parent enters "
+                          "their password on this computer.")
+            return box
+        if not self.config.get("managed"):
+            title.set_markup(f"<b>{name}’s screen time isn’t managed</b>")
+            note.set_text(f"Set daily limits, downtime and always allowed apps for {self.name()}. "
+                          f"{self.name()} can see them but can’t change them, and you can see how "
+                          f"{self.name()} spends time on this computer.")
+            button = Gtk.Button(label=f"Manage Screen Time for {self.name()}", valign=Gtk.Align.CENTER)
+            button.get_style_context().add_class("suggested-action")
+            button.connect("clicked", lambda _b: self._start_managing())
+            box.pack_end(button, False, False, 0)
+            return box
+        title.set_markup(f"<b>{name}’s screen time</b>")
+        text = (f"{self.name()} can see these settings but can’t change them. They take effect "
+                "within a minute, and the times below fill in while "
+                f"{self.name()} uses the computer.")
+        if is_admin(self.person):
+            text += f" {self.name()} is an administrator, so could turn this off."
+        note.set_text(text)
+        stop = Gtk.Button(label="Stop Managing…", valign=Gtk.Align.CENTER)
+        stop.connect("clicked", lambda _b: self._stop_managing())
+        box.pack_end(stop, False, False, 0)
+        return box
+
+    def _run_root(self, command, stdin=None):
+        """Run a Screen Time helper through pkexec, keeping the window drawn
+        while the password dialog is up. Returns whether it worked."""
+        try:
+            process = Gio.Subprocess.new(["pkexec", *command],
+                                         Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE
+                                         | Gio.SubprocessFlags.STDERR_PIPE)
+        except GLib.Error as error:
+            alert.tell(self, "Logbook couldn’t change this.", error.message)
+            return False
+        loop = GLib.MainLoop()
+        answer = {}
+
+        def finished(proc, result):
+            try:
+                _ok, out, err = proc.communicate_utf8_finish(result)
+            except GLib.Error:
+                out = err = ""
+            answer["status"], answer["err"] = proc.get_exit_status(), (err or "").strip()
+            self.root_output = out or ""
+            loop.quit()
+        self.set_sensitive(False)
+        process.communicate_utf8_async(stdin, None, finished)
+        loop.run()
+        self.set_sensitive(True)
+        # 126 and 127: the password dialog was cancelled or the password refused.
+        if answer["status"] not in (0, 126, 127):
+            alert.tell(self, "Logbook couldn’t change this.", answer["err"])
+        return answer["status"] == 0
+
+    @staticmethod
+    def _managed_settings(config):
+        down = config["downtime"]
+        return json.dumps({"limits": config["limits"], "allowed": config["allowed"],
+                           "downtime": {"on": down["on"], "start": hhmm(down["start"]),
+                                        "end": hhmm(down["end"])}})
+
+    def _start_managing(self):
+        if self._run_root([HELPER, "set", self.person], self._managed_settings(load_config(self.person))):
+            self._build()
+            self._warn_no_password()
+
+    def _warn_no_password(self):
+        """A parent's account with no password lets anyone give more time."""
+        names = [line.split()[1] for line in self.root_output.splitlines()
+                 if line.startswith("no-password ") and len(line.split()) == 2]
+        if not names:
+            return
+        who = ", ".join(self.name(n) for n in names)
+        alert.tell(self, "Give your account a password",
+                   f"{who} {'has' if len(names) == 1 else 'have'} no password, so anyone at this "
+                   f"computer could give {self.name()} more time. Set one in Dials › Users.")
+
+    def _stop_managing(self):
+        answer = alert.ask(self, f"Stop managing {self.name()}’s screen time?",
+                           f"{self.name()}’s limits, downtime and always allowed apps are removed, "
+                           "along with the times kept for you to see.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Stop Managing", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK)
+        if answer == Gtk.ResponseType.OK and self._run_root([HELPER, "off", self.person]):
+            self._build()
+
+    def _grant(self, *what):
+        """More time, from a parent: their password on this screen."""
+        return self._run_root([GRANT, self.person, *what])
+
+    # ---- the page ---------------------------------------------------------------
+    def _build(self):
+        """Lay the window out for the person it shows."""
+        old = self.scroller.get_child()
+        if old is not None:
+            self.scroller.remove(old)
+            old.destroy()
+        self.config = load_config(self.person)
+        self.stamp = config_stamp(self.person)
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         page.set_border_width(22)
+        notice = self._notice()
+        if notice is not None:
+            page.pack_start(notice, False, False, 0)
+            page.pack_start(Gtk.Separator(), False, False, 12)
+        self.list = None
+        showing = self.mine or bool(self.config.get("managed"))
+        self.header.get_custom_title().set_sensitive(showing)
+        if not showing:
+            self.scroller.add(page)
+            page.show_all()
+            return
         self.total = Gtk.Label(xalign=0)
         self.total_note = Gtk.Label(xalign=0)
         self.total_note.get_style_context().add_class("dim-label")
@@ -575,29 +894,25 @@ class Window(Gtk.ApplicationWindow):
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.list.get_style_context().add_class("frame")
         page.pack_start(self.list, False, False, 0)
-        self.empty = Gtk.Label(label="Nothing yet. Time spent in apps shows here.")
+        self.empty = Gtk.Label(label="Nothing yet. Time spent in apps shows here." if self.mine else
+                               f"Nothing yet. Time {self.name()} spends in apps shows here.")
         self.empty.get_style_context().add_class("dim-label")
         page.pack_start(self.empty, False, False, 12)
         self.empty.set_no_show_all(True)
         self.list.set_no_show_all(True)
+        if not self.locked:
+            add = Gtk.Button(label="Add Limit\u2026", halign=Gtk.Align.START,
+                             tooltip_text="A daily limit for an app, used yet or not")
+            add.connect("clicked", lambda _b: self._add_limit())
+            page.pack_start(add, False, False, 4)
         page.pack_start(self._downtime_box(), False, False, 18)
         page.pack_start(self._allowed_box(), False, False, 0)
-        page.pack_start(self._websites_box(), False, False, 18)
-        scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-        scroller.add(page)
-        self.add(scroller)
-        menus.add_actions(self, {"close": self.close, "today": lambda: self.today_button.set_active(True),
-                                 "week": lambda: self.week_button.set_active(True),
-                                 "passcode": self.passcode_dialog})
-        if not tracker_running():
-            try:
-                subprocess.Popen(["freemac-logbook", "--track"], start_new_session=True,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except OSError:
-                pass
+        if self.mine:   # a setting for the whole computer
+            page.pack_start(self._websites_box(), False, False, 18)
+        self.scroller.add(page)
+        page.show_all()
+        self._downtime_shown()
         self.refresh()
-        GLib.timeout_add_seconds(30, self._timer)
-        self.show_all()
 
     # ---- Downtime and Always Allowed ----------------------------------------------
     def _section(self, title):
@@ -662,7 +977,6 @@ class Window(Gtk.ApplicationWindow):
         self.downtime_now_row.add(now)
         self.downtime_now_row.set_no_show_all(True)
         frame.add(self.downtime_now_row)
-        self._downtime_shown()
         return box
 
     def _downtime_shown(self):
@@ -675,7 +989,8 @@ class Window(Gtk.ApplicationWindow):
             if not combo.set_active_id(hhmm(minutes)):
                 combo.append(hhmm(minutes), clock(minutes))
                 combo.set_active_id(hhmm(minutes))
-            combo.set_sensitive(down["on"])
+            combo.set_sensitive(down["on"] and not self.locked)
+        self.downtime_switch.set_sensitive(not self.locked)
         self.updating = False
         if in_downtime(self.config):
             self.downtime_now.set_text(f"Downtime until {clock(down['end'])}")
@@ -686,8 +1001,16 @@ class Window(Gtk.ApplicationWindow):
 
     def _change_config(self, change, ask):
         """Re-read the settings, ask for the passcode if there is one, then
-        change and keep them. Returns whether it was changed."""
-        self.config = load_config()
+        change and keep them. Returns whether it was changed. Settings a
+        parent manages are kept by root, after an administrator's password."""
+        self.config = load_config(self.person)
+        if self.config.get("managed"):
+            if self.locked:
+                return False
+            change(self.config)
+            done = self._run_root([HELPER, "set", self.person], self._managed_settings(self.config))
+            self.config = load_config(self.person)
+            return done
         if self.config.get("passcode") and not self.ask_passcode(ask):
             return False
         change(self.config)
@@ -710,6 +1033,11 @@ class Window(Gtk.ApplicationWindow):
         self._downtime_shown()
 
     def _pause_downtime(self):
+        if self.config.get("managed"):
+            if self._grant("downtime"):
+                self.config = load_config(self.person)
+                self._downtime_shown()
+            return
         until = time.time() + MORE_TIME * 60
         if self._change_config(lambda config: config["downtime"].update(paused=until),
                                f"Enter the passcode to give {MORE_TIME} more minutes."):
@@ -719,7 +1047,8 @@ class Window(Gtk.ApplicationWindow):
         box, self.allowed_list = self._section("Always Allowed")
         add = Gtk.Button(label="+", tooltip_text="Always allow an app", halign=Gtk.Align.START)
         add.connect("clicked", lambda _b: self._add_allowed())
-        box.pack_start(add, False, False, 0)
+        if not self.locked:
+            box.pack_start(add, False, False, 0)
         note = Gtk.Label(label="These apps can be used during downtime, and have no daily limit.",
                          xalign=0, wrap=True)
         note.get_style_context().add_class("dim-label")
@@ -754,7 +1083,8 @@ class Window(Gtk.ApplicationWindow):
             remove = Gtk.Button(label="\u2212", tooltip_text="Don't always allow it")
             remove.set_relief(Gtk.ReliefStyle.NONE)
             remove.connect("clicked", lambda _b, d=info.get_id(): self._remove_allowed(d))
-            line.pack_end(remove, False, False, 0)
+            if not self.locked:
+                line.pack_end(remove, False, False, 0)
             self.allowed_list.add(line)
         self.allowed_list.show_all()
 
@@ -774,6 +1104,11 @@ class Window(Gtk.ApplicationWindow):
             self.refresh()
 
     def give_more_time(self, app):
+        if self.config.get("managed"):
+            if self._grant("more", app):
+                self.config = load_config(self.person)
+                self.refresh()
+            return
         today = datetime.date.today().isoformat()
 
         def change(config):
@@ -843,10 +1178,44 @@ class Window(Gtk.ApplicationWindow):
     def _timer(self):
         if self.get_window() is None:
             return False
-        self.config = load_config()
-        self._downtime_shown()
-        self.refresh()
+        if self.list is not None and not self._popover_open():
+            if config_stamp(self.person) != self.stamp:
+                # A parent changed the settings (or this window did): lay it
+                # out again, keeping the place it was scrolled to.
+                place = self.scroller.get_vadjustment().get_value()
+                self._build()
+                adjustment = self.scroller.get_vadjustment()
+
+                def back(adj):
+                    # Once the new page is tall enough, scroll back.
+                    if handler and adj.get_upper() - adj.get_page_size() >= place:
+                        adj.set_value(place)
+                        adj.disconnect(handler.pop())
+
+                def give_up():
+                    if handler:
+                        adjustment.disconnect(handler.pop())
+                    return False
+                handler = [adjustment.connect("changed", back)]
+                GLib.timeout_add_seconds(2, give_up)
+                return True
+            self.config = load_config(self.person)
+            self._downtime_shown()
+            self.refresh()
         return True
+
+    def _popover_open(self):
+        """Whether a row's limit pop-over is showing; the rows aren't
+        rebuilt under it."""
+        for row in self.list.get_children():
+            stack = [row]
+            while stack:
+                widget = stack.pop()
+                if isinstance(widget, Gtk.MenuButton) and widget.get_active():
+                    return True
+                if isinstance(widget, Gtk.Container):
+                    stack.extend(widget.get_children())
+        return False
 
     def _span_toggled(self, button, span):
         if button.get_active():
@@ -854,9 +1223,11 @@ class Window(Gtk.ApplicationWindow):
             self.refresh()
 
     def refresh(self):
+        if self.list is None:
+            return
         today = datetime.date.today()
         if self.span == "today":
-            day = load_day(today)
+            day = load_day(today, self.person)
             used = day["apps"]
             self.chart.set([h / 60 for h in day["hours"]],
                            ["12 AM" if i == 0 else "6 AM" if i == 6 else "12 PM" if i == 12 else "6 PM" if i == 18
@@ -868,7 +1239,7 @@ class Window(Gtk.ApplicationWindow):
             values, labels = [], []
             for back in range(6, -1, -1):
                 date = today - datetime.timedelta(days=back)
-                day = load_day(date)
+                day = load_day(date, self.person)
                 for app, secs in day["apps"].items():
                     used[app] = used.get(app, 0.0) + secs
                 values.append(sum(day["apps"].values()) / 60)
@@ -879,11 +1250,15 @@ class Window(Gtk.ApplicationWindow):
         self.total.set_markup(f"<span size='26000' weight='700'>{GLib.markup_escape_text(duration(total))}</span>")
         for row in self.list.get_children():
             self.list.remove(row)
-        top = max(used.values()) if used else 1
+        top = max([*used.values(), 1.0])
+        shown = set()
         for app, secs in sorted(used.items(), key=lambda kv: -kv[1]):
             if secs < 30:
                 continue
             self.list.add(self._row(app, secs, top))
+            shown.add(limit_key(self.config, app))
+        for key in sorted(set(self.config["limits"]) - shown, key=lambda k: app_name(k).lower()):
+            self.list.add(self._row(key, used.get(key, 0.0), top))   # limited, not used yet
         for row in self.list.get_children():
             row.show_all()
         has = bool(self.list.get_children())
@@ -893,11 +1268,11 @@ class Window(Gtk.ApplicationWindow):
     def _row(self, app, secs, top):
         box = Gtk.Box(spacing=12)
         box.set_border_width(10)
-        icon = Gtk.Image.new_from_gicon(apps.icon_for(app), Gtk.IconSize.DND)
+        icon = Gtk.Image.new_from_gicon(app_icon(app), Gtk.IconSize.DND)
         icon.set_pixel_size(32)
         box.pack_start(icon, False, False, 0)
         middle = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        name = Gtk.Label(label=apps.display_name(app), xalign=0, ellipsize=Pango.EllipsizeMode.END)
+        name = Gtk.Label(label=app_name(app), xalign=0, ellipsize=Pango.EllipsizeMode.END)
         middle.pack_start(name, False, False, 0)
         middle.pack_start(Meter(secs / top), False, False, 0)
         box.pack_start(middle, True, True, 0)
@@ -905,7 +1280,10 @@ class Window(Gtk.ApplicationWindow):
         time_label.set_width_chars(10)
         time_label.set_xalign(1)
         box.pack_start(time_label, False, False, 0)
-        if app.lower() in OWN_IDS:   # Logbook itself is where limits are changed
+        key = limit_key(self.config, app)
+        if app.lower() in OWN_IDS or (self.locked and not self.config["limits"].get(key)):
+            # Logbook itself is where limits are changed; and there's nothing
+            # to press when a parent sets limits and this app has none.
             spacer = Gtk.Box()
             spacer.set_size_request(118, -1)
             box.pack_start(spacer, False, False, 0)
@@ -916,25 +1294,35 @@ class Window(Gtk.ApplicationWindow):
             allowed.set_size_request(118, -1)
             box.pack_start(allowed, False, False, 0)
             return finish_row(box)
-        limit = self.config["limits"].get(app)
+        limit = self.config["limits"].get(key)
         allowance = limit_for(self.config, app)
         if allowance and self.span == "today" and secs >= allowance * 60:
             label = "Time's Up"
         else:
             label = f"Limit {duration(limit * 60)}" if limit else "Set Limit"
+        if self.locked and label == "Time's Up":
+            # The child's one choice: ask a parent, who types their password
+            # right here.
+            button = Gtk.Button(label="More Time…")
+            button.set_tooltip_text(f"A parent enters their password to give {MORE_TIME} more minutes.")
+            button.connect("clicked", lambda _b: self.give_more_time(app))
+            button.set_size_request(118, -1)
+            box.pack_start(button, False, False, 0)
+            return finish_row(box)
         button = Gtk.MenuButton(label=label)
         button.set_relief(Gtk.ReliefStyle.NONE if not limit else Gtk.ReliefStyle.NORMAL)
         button.set_size_request(118, -1)
-        button.set_popover(self._limit_popover(button, app, limit))
+        button.set_popover(self._limit_popover(button, app, limit, key))
         box.pack_start(button, False, False, 0)
         return finish_row(box)
 
-    def _limit_popover(self, button, app, limit):
+    def _limit_popover(self, button, app, limit, key=None):
+        key = key or app
         pop = Gtk.Popover()
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         box.set_border_width(14)
         title = Gtk.Label(xalign=0)
-        title.set_markup(f"<b>A daily limit for {GLib.markup_escape_text(apps.display_name(app))}</b>")
+        title.set_markup(f"<b>A daily limit for {GLib.markup_escape_text(app_name(app))}</b>")
         box.pack_start(title, False, False, 0)
         line = Gtk.Box(spacing=6)
         hours = Gtk.SpinButton.new_with_range(0, 12, 1)
@@ -949,18 +1337,34 @@ class Window(Gtk.ApplicationWindow):
         box.pack_start(line, False, False, 0)
         buttons = Gtk.Box(spacing=6, halign=Gtk.Align.END)
         allowance = limit_for(self.config, app)
-        if allowance and load_day(datetime.date.today())["apps"].get(app, 0.0) >= allowance * 60:
+        if self.locked:
+            box.remove(line)
+            title.set_markup(f"<b>{GLib.markup_escape_text(app_name(app))}: "
+                             f"{GLib.markup_escape_text(duration(limit * 60))} a day</b>")
+            note = Gtk.Label(label="A parent sets this limit.", xalign=0)
+            note.get_style_context().add_class("dim-label")
+            box.pack_start(note, False, False, 0)
+            used = load_day(datetime.date.today())["apps"].get(app, 0.0)
+            if allowance and used >= allowance * 60:
+                more = Gtk.Button(label=f"{MORE_TIME} More Minutes", halign=Gtk.Align.END)
+                more.get_style_context().add_class("suggested-action")
+                more.connect("clicked", lambda _b: (pop.popdown(), self.give_more_time(app)))
+                box.pack_start(more, False, False, 0)
+            box.show_all()
+            pop.add(box)
+            return pop
+        if allowance and load_day(datetime.date.today(), self.person)["apps"].get(app, 0.0) >= allowance * 60:
             more = Gtk.Button(label=f"{MORE_TIME} More Minutes")
             more.connect("clicked", lambda _b: (pop.popdown(), self.give_more_time(app)))
             buttons.pack_start(more, False, False, 0)
         if limit:
             off = Gtk.Button(label="No Limit")
-            off.connect("clicked", lambda _b: (pop.popdown(), self.change_limit(app, 0)))
+            off.connect("clicked", lambda _b: (pop.popdown(), self.change_limit(key, 0)))
             buttons.pack_start(off, False, False, 0)
         save = Gtk.Button(label="Set Limit")
         save.get_style_context().add_class("suggested-action")
         save.connect("clicked", lambda _b: (pop.popdown(),
-                                            self.change_limit(app, int(hours.get_value()) * 60
+                                            self.change_limit(key, int(hours.get_value()) * 60
                                                               + int(minutes.get_value()))))
         buttons.pack_start(save, False, False, 0)
         box.pack_start(buttons, False, False, 0)
@@ -971,6 +1375,37 @@ class Window(Gtk.ApplicationWindow):
         box.show_all()
         pop.add(box)
         return pop
+
+    def _add_limit(self):
+        from .dials_login import choose_app
+        self.config = load_config(self.person)
+        taken = set(self.config["limits"]) | set(self.config["allowed"]) | ALWAYS_DESKTOP
+        desktop = choose_app(self, "Add a Limit", taken)
+        if not desktop:
+            return
+        dialog = Gtk.Dialog(title="Daily Limit", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Set Limit", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        area = dialog.get_content_area()
+        area.set_spacing(10)
+        area.set_border_width(16)
+        title = Gtk.Label(xalign=0)
+        title.set_markup(f"<b>A daily limit for {GLib.markup_escape_text(app_name(desktop))}</b>")
+        area.pack_start(title, False, False, 0)
+        line = Gtk.Box(spacing=6)
+        hours = Gtk.SpinButton.new_with_range(0, 12, 1)
+        minutes = Gtk.SpinButton.new_with_range(0, 55, 5)
+        hours.set_value(1)
+        for widget in (hours, Gtk.Label(label="h"), minutes, Gtk.Label(label="min a day")):
+            line.pack_start(widget, False, False, 0)
+        area.pack_start(line, False, False, 0)
+        area.show_all()
+        answer = dialog.run()
+        total = int(hours.get_value()) * 60 + int(minutes.get_value())
+        dialog.destroy()
+        if answer == Gtk.ResponseType.OK and total > 0:
+            self.change_limit(desktop, total)
 
     def change_limit(self, app, minutes):
         def change(config):
@@ -999,7 +1434,13 @@ class Window(Gtk.ApplicationWindow):
         return ok
 
     def passcode_dialog(self):
-        self.config = load_config()
+        self.config = load_config(self.person)
+        if self.config.get("managed") or not self.mine:
+            alert.tell(self, "No passcode is needed here.",
+                       "A parent manages this screen time, and changing it needs an administrator’s "
+                       "password." if self.config.get("managed") else
+                       "Choose Me in the toolbar to set a passcode for your own limits.")
+            return
         has = bool(self.config.get("passcode"))
         if has and not self.ask_passcode("Enter the current passcode."):
             return

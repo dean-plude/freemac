@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- freemac: Screen Time for a family. A parent manages another person's
+     limits in Logbook, and gives them more time on their own screen. -->
+<policyconfig>
+  <vendor>freemac</vendor>
+  <action id="org.freemac.screen-time.manage">
+    <description>Manage someone's screen time</description>
+    <message>Changing someone's screen time needs an administrator's password.</message>
+    <icon_name>freemac-logbook</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/freemac-screen-time-helper</annotate>
+  </action>
+  <action id="org.freemac.screen-time.grant">
+    <description>Give more screen time</description>
+    <message>A parent needs to enter their password to give more time.</message>
+    <icon_name>freemac-logbook</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/freemac-screen-time-grant</annotate>
+  </action>
+</policyconfig>

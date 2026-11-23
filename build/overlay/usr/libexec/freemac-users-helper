@@ -134,6 +134,10 @@ def main(args):
         run("userdel", *(["--remove"] if rest[1] == "remove" else []), entry.pw_name)
         if autologin_user() == entry.pw_name:
             set_autologin(None)
+        # Logbook's Screen Time for the family goes with the account.
+        if os.path.exists(f"/etc/freemac/screen-time/{entry.pw_name}.json"):
+            subprocess.run(["/usr/libexec/freemac-screen-time-helper", "off", entry.pw_name],
+                           capture_output=True)
     elif command == "password" and len(rest) == 1:
         entry = person(rest[0])
         run("chpasswd", stdin=f"{entry.pw_name}:{read_password()}\n")

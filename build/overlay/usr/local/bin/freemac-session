@@ -45,6 +45,13 @@ if is_guest; then
   cd / && empty_guest_home && cd /home/guest
 fi
 mkdir -p "$HOME/.cache"
+# Wayfire's IPC socket goes in this person's own runtime folder. With two
+# people logged in at once (fast user switching), /tmp/wayfire-wayland-1.socket
+# would be the first person's, and the second desktop's menu bar, Dock and
+# Logbook couldn't talk to their own Wayfire.
+if [ -n "$XDG_RUNTIME_DIR" ] && [ -d "$XDG_RUNTIME_DIR" ]; then
+  export _WAYFIRE_SOCKET="$XDG_RUNTIME_DIR/wayfire.socket"
+fi
 # Make Desktop, Documents, Downloads and the rest, and record them so apps
 # (and their icons) know which folder is which.
 command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update

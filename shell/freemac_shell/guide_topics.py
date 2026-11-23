@@ -349,7 +349,7 @@ TOPICS = {
         "At the end of a lesson you see your speed and accuracy and earn up to three stars. "
         "Press Return for the next lesson.",
     ]),
-    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids apps time downtime bedtime always allowed more minutes "
+    "screentime": ("See your screen time and set limits", "screen time logbook usage hours limit parental controls kids child family parent manage apps time downtime bedtime always allowed more minutes "
                    "adult websites content filter block sites family safe", [
         "Logbook shows how long each app was used. Press ⌘Space, type Logbook and press Return.",
         "Today shows each hour of the day, and Last 7 Days shows each day of the week, with the apps used most "
@@ -367,6 +367,11 @@ TOPICS = {
         "downtime or Always Allowed, or give more time.",
         "Turn on Limit adult websites, under Content, to keep websites for grown-ups from opening in any browser "
         "on the computer. It needs an administrator's password, and the passcode if there is one.",
+        "For a child with their own account, a parent opens Logbook in their own account, clicks Me at the top "
+        "and picks the child, then clicks Manage Screen Time and enters their password. Limits, Downtime and "
+        "Always Allowed set there apply to the child, who can see them but not change them.",
+        "When the child's time is up, they click More Time… in their Logbook, and a parent types their password "
+        "on that screen to give 15 more minutes. Stop Managing… gives the child their own settings back.",
     ]),
     "sudoku": ("Play a number puzzle", "sudoku nine number puzzle game logic grid", [
         "Nine is a number puzzle. Press ⌘Space, type Nine and press Return.",
