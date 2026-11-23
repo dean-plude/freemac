@@ -1,5 +1,6 @@
 # Keel, the installer, and Gangway, the login screen of installed systems:
-# partitioning, file systems, both boot loaders and the kiosk compositor.
+# partitioning, file systems, disk encryption, both boot loaders and the kiosk
+# compositor.
 gdisk
 parted
 dosfstools
@@ -11,3 +12,5 @@ efibootmgr
 cage
 tzdata
 e2fsprogs
+cryptsetup
+cryptsetup-initramfs

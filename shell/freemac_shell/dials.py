@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_security, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -168,6 +168,7 @@ CSS = b"""
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
+.dials-recovery-key { font-family: monospace; font-size: 20px; font-weight: 600; padding: 10px 14px; border-radius: 8px; background-color: rgba(120, 120, 150, 0.12); }
 .storage-key, .storage-key flowboxchild { background: none; padding: 0; }
 /* Sound > Input level: a row of round lights, as on a Mac. */
 levelbar.input-level trough { border: none; background: none; box-shadow: none; padding: 0; }
@@ -369,6 +370,8 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_more.power(self)),
             (3, "lifeboat", "Lifeboat", "document-open-recent-symbolic", "teal",
              lambda: dials_backup.BackupPanel(self, page)),
+            (4, "security", "Privacy & Security", "security-high-symbolic", "blue",
+             lambda: dials_security.security_page(self)),
             (4, "users", "Users", "system-users-symbolic", "indigo", lambda: dials_people.UsersPanel(self, page)),
             (4, "loginitems", "Login Items", "system-run-symbolic", "gray",
              lambda: dials_login.login_items_page(self)),
@@ -1059,7 +1062,8 @@ MENU_PANELS = (
      ("notifications", "Notifications"), ("focus", "Focus")),
     (("displays", "Displays"), ("pointing", "Trackpad and Mouse"), ("keyboard", "Keyboard"),
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
-    (("network", "Network"), ("sharing", "Sharing"), ("accessibility", "Accessibility"), ("users", "Users"),
+    (("network", "Network"), ("sharing", "Sharing"), ("accessibility", "Accessibility"),
+     ("security", "Privacy & Security"), ("users", "Users"),
      ("loginitems", "Login Items"), ("softwareupdate", "Software Update"), ("about", "About")),
 )
 

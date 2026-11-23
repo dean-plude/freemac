@@ -1,0 +1,170 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Disk encryption changes from Dials > Privacy & Security, run as root
+through pkexec (and by freemac-users-helper when you change your own login
+password, so the disk's password follows it, as FileVault's does).
+
+  freemac-disk-helper status              JSON: is the start-up disk encrypted
+  freemac-disk-helper password            stdin: current password, new password
+  freemac-disk-helper recovery            stdin: current password; prints a new key
+
+Keel, the installer, puts the password in LUKS key slot 0 and a recovery key
+in slot 1. "password" changes slot 0, and only when the current password
+opens it. "recovery" adds a new recovery key, then removes every other slot
+but the password's, so an old key that was written down stops working.
+
+Keys reach cryptsetup through files only root can read, in /run (RAM), which
+are removed straight away; nothing is kept.
+
+Original freemac code.
+"""
+import json
+import os
+import re
+import secrets
+import subprocess
+import sys
+
+KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # the installer's: no 0/O or 1/I
+PASSWORD_SLOT = 0
+PBKDF = ("--pbkdf", "argon2id", "--pbkdf-memory", "262144")
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def lsblk(*args):
+    out = subprocess.run(["lsblk", "-n", "-l", "-o", *args], capture_output=True, text=True).stdout
+    return [line.split() for line in out.splitlines() if line.strip()]
+
+
+def root_volume():
+    """(mapper path, LUKS partition) when / is on an encrypted volume, else None."""
+    source = subprocess.run(["findmnt", "-n", "-o", "SOURCE", "/"], capture_output=True, text=True).stdout.strip()
+    if not source.startswith("/dev/"):
+        return None
+    rows = lsblk("TYPE,PKNAME", source)
+    if not rows or rows[0][0] != "crypt" or len(rows[0]) < 2:
+        return None
+    return source, "/dev/" + rows[0][1]
+
+
+def status():
+    volume = root_volume()
+    info = {"encrypted": bool(volume)}
+    if volume:
+        info["volume"], info["partition"] = volume
+        if os.geteuid() == 0:
+            info["slots"] = sorted(slots(volume[1]))
+    return info
+
+
+def slots(device):
+    out = subprocess.run(["cryptsetup", "luksDump", "--dump-json-metadata", device],
+                         capture_output=True, text=True)
+    if out.returncode:
+        return set()
+    return {int(s) for s in json.loads(out.stdout).get("keyslots", {})}
+
+
+def secret_file(text):
+    folder = "/run/freemac-disk"
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    path = os.path.join(folder, secrets.token_hex(8))
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    return path
+
+
+def cryptsetup(*args, keys=()):
+    """Run cryptsetup with each key in keys as a file, filled in for {0}, {1}…"""
+    files = [secret_file(k) for k in keys]
+    try:
+        argv = ["cryptsetup", "--batch-mode", *[a.format(*files) for a in args]]
+        return subprocess.run(argv, capture_output=True, text=True)
+    finally:
+        for path in files:
+            os.remove(path)
+
+
+def opened_slot(device, key):
+    """The key slot key opens, or None."""
+    done = cryptsetup("open", "--test-passphrase", "--verbose", "--key-file", "{0}", device, keys=[key])
+    match = re.search(r"Key slot (\d+) unlocked", done.stdout + done.stderr)
+    return int(match.group(1)) if done.returncode == 0 and match else None
+
+
+def read_lines(count):
+    lines = [sys.stdin.readline().rstrip("\n") for _ in range(count)]
+    for line in lines:
+        if not line or len(line) > 512:
+            fail("A password is missing.")
+    return lines
+
+
+def recovery_key():
+    letters = "".join(secrets.choice(KEY_ALPHABET) for _ in range(24))
+    return "-".join(letters[i:i + 4] for i in range(0, 24, 4))
+
+
+def volume_or_fail():
+    volume = root_volume()
+    if not volume:
+        fail("The start-up disk isn't encrypted.")
+    return volume[1]
+
+
+def change_password():
+    device = volume_or_fail()
+    old, new = read_lines(2)
+    if len(new) < 4:
+        fail("Pick a password of at least 4 characters.")
+    if opened_slot(device, old) != PASSWORD_SLOT:
+        fail("That isn't the disk's current password.")
+    done = cryptsetup("luksChangeKey", *PBKDF, "--key-slot", str(PASSWORD_SLOT), "--key-file", "{0}",
+                      device, "{1}", keys=[old, new])
+    if done.returncode:
+        fail("The disk's password couldn't be changed: " + (done.stderr.strip() or "cryptsetup failed"))
+
+
+def new_recovery_key():
+    device = volume_or_fail()
+    (password,) = read_lines(1)
+    if opened_slot(device, password) != PASSWORD_SLOT:
+        fail("That isn't the disk's password. (A recovery key can't make another one.)")
+    before = slots(device)
+    key = recovery_key()
+    done = cryptsetup("luksAddKey", *PBKDF, "--key-file", "{0}", device, "{1}", keys=[password, key])
+    if done.returncode:
+        fail("A new recovery key couldn't be made: " + (done.stderr.strip() or "cryptsetup failed"))
+    added = slots(device) - before
+    for slot in sorted(before - {PASSWORD_SLOT}):
+        # The old recovery key, and anything else left over. The new key and
+        # the password stay, so the disk can always be opened.
+        cryptsetup("luksKillSlot", "--key-file", "{0}", device, str(slot), keys=[password])
+    print(key)
+    if not added:
+        fail("The new recovery key may not have been saved.")
+
+
+def main(argv):
+    command = argv[1] if len(argv) > 1 else ""
+    if command == "status":
+        print(json.dumps(status()))
+        return 0
+    if os.geteuid() != 0:
+        fail("This needs to run as root, through pkexec.")
+    if command == "password":
+        change_password()
+    elif command == "recovery":
+        new_recovery_key()
+    else:
+        fail(__doc__)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

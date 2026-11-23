@@ -79,6 +79,15 @@ def people():
     return sorted(found, key=lambda p: p[1].lower())
 
 
+def disk_encrypted():
+    try:
+        out = subprocess.run(["/usr/libexec/freemac-disk-helper", "status"], capture_output=True,
+                             text=True, timeout=5).stdout
+        return '"encrypted": true' in out
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def autologin_user():
     try:
         with open(GREETD) as f:
@@ -175,12 +184,13 @@ class UsersPanel(Gtk.Box):
                     "freemac's account helper isn't installed on this computer.")
             return
         self.status.set_text("Waiting for an administrator's password…")
-        flags = Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDERR_PIPE | Gio.SubprocessFlags.STDOUT_SILENCE
+        flags = Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDERR_PIPE | Gio.SubprocessFlags.STDOUT_PIPE
         proc = Gio.Subprocess.new(["pkexec", HELPER, *args], flags)
 
         def finished(p, result):
+            self.helper_output = ""
             try:
-                _out, err = p.communicate_utf8_finish(result)
+                self.helper_output, err = p.communicate_utf8_finish(result)
             except GLib.Error as e:
                 err = e.message
             self.status.set_text("")
@@ -274,6 +284,8 @@ class UsersPanel(Gtk.Box):
         if mine:
             note = ("Your keychain gets the new password too, so Web and Purser keep "
                     "your saved passwords.")
+            if disk_encrypted():
+                note += " So does the encrypted disk, if your old password unlocks it at start-up."
         else:
             note = (f"{full}'s keychain keeps the old password: the first time they log in, "
                     "they're asked for it once to open their saved passwords.")
@@ -291,9 +303,17 @@ class UsersPanel(Gtk.Box):
         if dialog.run() == Gtk.ResponseType.OK:
             old = current.get_text() if current else ""
             new = first.get_text()
-            done = (lambda changed: changed and self.update_keychain(old, new)) if mine else None
-            self.helper("password", name, stdin=new + "\n", done=done)
+            done = (lambda changed: changed and self.after_own_password(old, new)) if mine else None
+            self.helper("password", name, stdin=f"{new}\n{old}\n" if mine else new + "\n", done=done)
         dialog.destroy()
+
+    def after_own_password(self, old, new):
+        self.update_keychain(old, new)
+        if "disk-password-unchanged" in (self.helper_output or ""):
+            message(self.window, "Your disk still has its old password",
+                    "Your login password changed, but the old one didn't unlock the encrypted disk, so "
+                    "the start-up screen still wants the disk's own password. You can change it in "
+                    "Privacy & Security.")
 
     def update_keychain(self, old, new):
         """After your own password changed: give the login keychain the new one

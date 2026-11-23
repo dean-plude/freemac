@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.141 "Encrypted disk" (done)
+
+Keep everything on the disk unreadable without your password, as a Mac's disk encryption does, for a computer that's lost or stolen.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | "Encrypt your disk?" in the installer: the whole system and your files on an encrypted volume, unlocked with your password on the start-up screen | Keel, keel_backend.py | done |
+| 2 | A recovery key, shown once when installing finishes, opens the disk if the password is forgotten; Restart waits until you tick that you've written it down | Keel | done |
+| 3 | Dials > Privacy & Security: whether the disk is encrypted, Change Disk Password… and New Recovery Key… (the old key stops working) | Dials, freemac-disk-helper | done |
+| 4 | Changing your own login password in Users changes the disk's password too, when they were the same | Dials, freemac-users-helper | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.140 "Services" (done)
 
 Select words in any app and send them to another app to do something with them, as on a Mac.
