@@ -275,6 +275,21 @@ TOPICS = {
         "Click the dots on the strip to change its colour, or + for another note.",
         "Notes stay under your windows. To keep one in front, right-click its strip and choose Float on Top.",
         "Your notes are kept as you type and come back when you log in. To throw one away, click the × on its strip.",
+        "To make a note from words in another app, select them and press ⇧⌘Y.",
+    ]),
+    "services": ("Use selected words in another app", "services service selected text selection sticky note look up "
+                 "define dictionary words search seek jot speak read aloud open url link show in drawer terminal "
+                 "folder desktop picture wallpaper shift command y", [
+        "Services do small jobs with what you've selected, using another app. Select some words in any app, "
+        "then click the app's name in the menu bar and choose Services.",
+        "- Make New Sticky Note (⇧⌘Y) puts the words on a new sticky note.",
+        "- New Jot Note With Selection starts a Jot note with them.",
+        "- Look Up in Words shows a word's meaning, and Search With Seek searches for the words.",
+        "- Speak Text reads them aloud. Open URL opens a web address, and Show in Drawer shows a file "
+        "whose path you selected.",
+        "Only the services that fit what's selected can be chosen. In Drawer, right-click a folder for "
+        "New Terminal at Folder, or a picture for Set Desktop Picture.",
+        "To give a service its own keys, or take one off the menu, choose Dials > Keyboard and look under Services.",
     ]),
     "voice": ("Record your voice", "voice memo record recorder microphone audio echo trim", [
         "Echo records your voice. Press ⌘Space, type Echo and press Return.",

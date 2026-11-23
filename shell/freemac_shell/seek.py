@@ -511,6 +511,20 @@ class Seek(Gtk.Application):
         self.app_monitor = Gio.AppInfoMonitor.get()
         self.app_monitor.connect("changed", lambda *_: setattr(self, "_apps", None))
         self.index_soon(20 if self.background else 2)
+        # Services > Search With Seek: open with these words typed in.
+        service = Gio.SimpleAction.new("service", GLib.VariantType.new("s"))
+        service.connect("activate", lambda _a, words: self.search_for(words.get_string()))
+        self.add_action(service)
+
+    def search_for(self, words):
+        if self.window is None:
+            self.window = SeekWindow(self)
+            self.window.map_ready(self.window.box)
+        self.background = False
+        if not self.window.is_open:
+            self.window.opened()
+        self.window.entry.set_text(words)
+        self.window.entry.set_position(-1)
 
     def apps(self):
         if self._apps is None:

@@ -51,6 +51,19 @@ SHORTCUTS = (
     ("command", "binding_lens_toolbar", "Screenshot toolbar", "<super> <shift> KEY_5"),
 )
 
+# Services (services.py) that work on the selected words, each a command
+# binding that runs freemac-service; only Make New Sticky Note has keys at first.
+SERVICE_SHORTCUTS = (
+    ("command", "binding_service_sticky", "Make New Sticky Note", "<super> <shift> KEY_Y"),
+    ("command", "binding_service_jot", "New Jot Note With Selection", ""),
+    ("command", "binding_service_words", "Look Up in Words", ""),
+    ("command", "binding_service_seek", "Search With Seek", ""),
+    ("command", "binding_service_speak", "Speak Text", ""),
+    ("command", "binding_service_url", "Open URL", ""),
+    ("command", "binding_service_reveal", "Show in Drawer", ""),
+)
+EVERY_SHORTCUT = SHORTCUTS + SERVICE_SHORTCUTS
+
 # Shown as on a Mac keyboard, in its order: Control, Option, Shift, Command.
 # Command is Super (Strata's Command key); Option is Alt.
 MODIFIERS = (("<ctrl>", "\u2303"), ("<alt>", "\u2325"), ("<shift>", "\u21e7"), ("<super>", "\u2318"))
@@ -92,10 +105,10 @@ def describe(binding):
     return "".join(parts) + name
 
 
-def describe_all(value):
+def describe_all(value, none="Off"):
     keys = [d for d in (describe(b) for b in alternatives(value)) if d and "Keypad" not in d]
     swipes = [b for b in alternatives(value) if b.startswith("swipe")]
-    text = " or ".join(keys) if keys else "Off"
+    text = " or ".join(keys) if keys else none
     if swipes:
         fingers = swipes[0].split()[-1]
         text += f", or swipe {swipes[0].split()[1]} with {fingers} fingers"
@@ -152,12 +165,15 @@ def same(a, b):
 class Shortcuts:
     """The shortcut rows for the Keyboard panel."""
 
-    def __init__(self, window, ini_get, ini_set, group, row):
+    def __init__(self, window, ini_get, ini_set, group, row, items=SHORTCUTS, extra=None):
         self.window, self.ini_get, self.ini_set = window, ini_get, ini_set
+        self.items = items
+        # A service with no keys is still on (its switch says so): "None", as on a Mac.
+        self.none = "None" if items is SERVICE_SHORTCUTS else "Off"
         self.labels = {}
         rows = []
-        for section, option, title, default in SHORTCUTS:
-            label = Gtk.Label(label=describe_all(self.value(section, option, default)), xalign=1)
+        for section, option, title, default in items:
+            label = Gtk.Label(label=describe_all(self.value(section, option, default), self.none), xalign=1)
             label.get_style_context().add_class("dim-label")
             self.labels[(section, option)] = label
             change = Gtk.Button(label="Change…")
@@ -165,8 +181,10 @@ class Shortcuts:
             box = Gtk.Box(spacing=12)
             box.pack_start(label, False, False, 0)
             box.pack_start(change, False, False, 0)
+            if extra:   # such as a switch that shows the service in menus
+                box.pack_start(extra(option), False, False, 0)
             rows.append(row(title, box))
-        reset = Gtk.Button(label="Restore All Shortcuts")
+        reset = Gtk.Button(label="Restore All Shortcuts" if items is SHORTCUTS else "Restore These Shortcuts")
         reset.connect("clicked", lambda _b: self.reset_all())
         rows.append(row("Shortcuts as freemac ships them", reset))
         self.widget = group(*rows)
@@ -176,7 +194,7 @@ class Shortcuts:
         return default if current is None else current
 
     def owner(self, binding, skip):
-        for section, option, title, default in SHORTCUTS:
+        for section, option, title, default in EVERY_SHORTCUT:
             if (section, option) == skip:
                 continue
             if any(same(binding, b) for b in alternatives(self.value(section, option, default))):
@@ -234,10 +252,14 @@ class Shortcuts:
 
     def store(self, section, option, parts):
         value = " | ".join(parts)
+        if option.startswith("binding_service_"):   # a key needs its command beside it
+            command = "command_" + option[len("binding_"):]
+            if not self.ini_get(section, command, None):
+                self.ini_set(section, command, "freemac-service " + option[len("binding_service_"):])
         self.ini_set(section, option, value)
-        self.labels[(section, option)].set_text(describe_all(value))
+        self.labels[(section, option)].set_text(describe_all(value, self.none))
 
     def reset_all(self):
-        for section, option, _title, default in SHORTCUTS:
+        for section, option, _title, default in self.items:
             if self.ini_get(section, option, None) is not None:
                 self.store(section, option, alternatives(default))

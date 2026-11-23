@@ -56,7 +56,7 @@ SEARCH_WORDS = {
     "users": "accounts password login automatic log in people guest user visitor keychain",
     "loginitems": "startup start up open at login launch automatically apps autostart",
     "accounts": "icloud fastmail nextcloud yahoo caldav carddav sync online calendar contacts reminders",
-    "keyboard": "shortcuts command key layout input sources input menu language typing keyboard languages key repeat delay until repeat press and hold accents accented letters é ñ ü umlaut cedilla diacritics control space spelling spell check misspelled dictionary text input text replacements shortcuts abbreviations smart quotes curly apostrophe dash double space full stop period",
+    "keyboard": "services service sticky note look up selected words shortcuts command key layout input sources input menu language typing keyboard languages key repeat delay until repeat press and hold accents accented letters é ñ ü umlaut cedilla diacritics control space spelling spell check misspelled dictionary text input text replacements shortcuts abbreviations smart quotes curly apostrophe dash double space full stop period",
     "pointing": "trackpad mouse click scroll tap pointer speed",
     "printers": "print scanner",
 }

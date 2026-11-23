@@ -27,7 +27,7 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import spelling, style  # noqa: E402
 
@@ -336,6 +336,27 @@ class Stickies(Gtk.Application):
         self.hold()
         for data in load():
             self.notes.append(Note(self, data))
+        # Services > Make New Sticky Note (⇧⌘Y): a note holding the selected words.
+        service = Gio.SimpleAction.new("service", GLib.VariantType.new("s"))
+        service.connect("activate", lambda _a, text: self.note_with(text.get_string()))
+        self.add_action(service)
+
+    def note_with(self, text):
+        note = self.new_note()
+        note.text.get_buffer().set_text(text)   # kept as if typed
+        # It comes in front of the windows, so it's seen, and goes back among
+        # the other notes once something else is clicked.
+        note.set_float(True)
+
+        def settle(*_):
+            if handler[0]:
+                note.disconnect(handler[0])
+                handler[0] = 0
+                if note in self.notes:
+                    note.set_float(False)
+            return False
+        handler = [note.connect("focus-out-event", settle)]
+        GLib.timeout_add_seconds(30, settle)   # if it never had the keyboard
 
     def do_activate(self):
         if self.restore:          # started with the session: only bring back the notes
