@@ -17,6 +17,9 @@ run_one() {
         echo "FAIL $name (did not compile)"; sed 's/^/    /' "$build/$name.cc.log"
         fail=$((fail + 1)); return
     fi
+    if [ "$name" = hello_unixthread ]; then
+        python3 "$here/tools/unixthread.py" "$exe" "$(llvm-nm "$exe" | awk '/ T _old_start$/ {print $1}')"
+    fi
     case $name in
         hello*) FERRY_TEST_VALUE=tide "$top/ferry" "$exe" boat > "$build/$name.got" 2> "$build/$name.err" ;;
         system) "$top/ferry" "$exe" -a -b val file > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -56,6 +59,8 @@ run_one unsupported "$here/unsupported.c" "$here/unsupported.out" -Wl,-undefined
 for t in hello files; do
     run_one "${t}_chained" "$here/$t.c" "$here/$t.out" -Wl,-fixup_chains
 done
+# The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
+run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).

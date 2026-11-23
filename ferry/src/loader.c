@@ -59,6 +59,8 @@ struct image {
     struct macho_symtab *symtab;        /* for libraries from before 10.6 */
     struct macho_dysymtab *dysymtab;
     uint64_t entryoff;
+    uint64_t thread_pc;      /* LC_UNIXTHREAD: the start address, unslid */
+    int unixthread;
     int has_main;
     struct section sect[MAX_SECTIONS];
     int nsect;
@@ -272,8 +274,17 @@ static void parse_commands(struct image *im)
             im->entryoff = ((struct macho_entry_point *)lc)->entryoff;
             im->has_main = 1;
             break;
-        case LC_UNIXTHREAD:
-            die("%s uses an old start-up format (LC_UNIXTHREAD) that Ferry doesn't support", im->path);
+        case LC_UNIXTHREAD: {
+            /* Mac OS X 10.7 and earlier: the start address is the
+             * instruction pointer of the thread state (x86_THREAD_STATE64,
+             * flavor 4: rax ... r15, then rip) */
+            const uint32_t *t = (const uint32_t *)(lc + 1);
+            if (lc->cmdsize >= sizeof *lc + 8 + 17 * 8 && t[0] == 4) {
+                memcpy(&im->thread_pc, (const uint8_t *)(t + 2) + 16 * 8, 8);
+                im->has_main = im->unixthread = 1;
+            }
+            break;
+        }
         default:
             break;
         }
@@ -1178,6 +1189,44 @@ static void initialize_image(struct image *im, int argc, char **argv, char **env
 
 typedef int (*mac_main)(int, char **, char **, char **);
 
+/* A program with LC_UNIXTHREAD starts at its own start routine (the
+ * compiler's crt1), which expects the stack the kernel builds: argc, the
+ * argument pointers, NULL, the environment, NULL, the "apple" strings,
+ * NULL. It calls main and then exit itself, so this never returns. */
+__attribute__((noreturn)) void ferry_jump_to_start(uint64_t pc, uint64_t *sp);
+__asm__(".text\n"
+        ".globl ferry_jump_to_start\n"
+        "ferry_jump_to_start:\n"
+        "    movq %rsi, %rsp\n"
+        "    xorl %ebp, %ebp\n"
+        "    xorl %eax, %eax\n"
+        "    xorl %edx, %edx\n"
+        "    jmpq *%rdi\n");
+
+static __attribute__((noreturn)) void start_unixthread(uint64_t pc, int argc, char **argv, char **envp)
+{
+    int nenv = 0;
+    while (envp && envp[nenv])
+        nenv++;
+    size_t words = 1 + (size_t)argc + 1 + (size_t)nenv + 1 + 2;
+    size_t size = 1 << 20; /* the start routine's own stack, then main's */
+    uint8_t *stack = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (stack == MAP_FAILED)
+        die("can't make a stack for the program");
+    uint64_t *sp = (uint64_t *)(((uintptr_t)(stack + size) - words * 8) & ~(uintptr_t)15);
+    uint64_t *w = sp;
+    *w++ = (uint64_t)argc;
+    for (int i = 0; i < argc; i++)
+        *w++ = (uint64_t)argv[i];
+    *w++ = 0;
+    for (int i = 0; i < nenv; i++)
+        *w++ = (uint64_t)envp[i];
+    *w++ = 0;
+    *w++ = 0; /* no apple strings */
+    note("jumping to the start routine at %p", (void *)pc);
+    ferry_jump_to_start(pc, sp);
+}
+
 int ferry_run(const char *path, int argc, char **argv, char **envp)
 {
     struct image *im = load_image(path);
@@ -1190,6 +1239,8 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
     char *apple[] = {NULL};
     ferry_program_started(path, argc, argv);
     initialize_image(im, argc, argv, envp, apple);
+    if (im->unixthread)
+        start_unixthread(im->thread_pc + im->slide, argc, argv, envp);
     note("calling main at %p", (void *)entry);
     return entry(argc, argv, envp, apple);
 }
