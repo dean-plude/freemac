@@ -1,0 +1,10 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ x86_64-macos ]
+install-name:    '/System/Library/Frameworks/Imaginary.framework/Versions/A/Imaginary'
+current-version: 1.0.0
+exports:
+  - targets:     [ x86_64-macos ]
+    symbols:     [ '_IMDoSomething', '_NSImaginaryDidChangeNotification', '_kIMImaginaryKey' ]
+    objc-classes: [ IMThing ]
+...

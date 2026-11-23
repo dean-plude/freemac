@@ -190,6 +190,7 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
++ (NSColor *)colorWithPatternImage:(id)image; /* plain grey until Ferry has NSImage */
 + (NSColor *)colorWithCalibratedHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithDeviceHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithCGColor:(CGColorRef)color;
@@ -536,6 +537,7 @@ typedef NS_ENUM(NSInteger, NSControlStateValue) {
 @property SEL action;
 @property NSInteger tag;
 @property (getter=isEnabled) BOOL enabled;
+@property (retain) id formatter; /* kept, not applied yet */
 @property (copy) id objectValue;
 @property (copy) NSString *stringValue;
 @property (copy) NSAttributedString *attributedStringValue;
@@ -677,6 +679,7 @@ typedef NS_ENUM(NSUInteger, NSTextFieldBezelStyle) { NSTextFieldSquareBezel = 0,
 @property NSInteger maximumNumberOfLines;
 @property CGFloat preferredMaxLayoutWidth;
 @property BOOL usesSingleLineMode;
+@property BOOL allowsEditingTextAttributes, importsGraphics; /* kept; text is plain for now */
 - (void)selectText:(id)sender;
 @end
 /* An NSTextField that hides what is typed. */
@@ -1023,6 +1026,21 @@ typedef NSString *NSNibName;
 @interface NSObject (NSNibAwaking)
 - (void)awakeFromNib;
 - (void)prepareForInterfaceBuilder;
+@end
+
+/* Cocoa bindings: recorded, and the bound value set once (no observing yet). */
+APPKIT_EXTERN NSString *const NSObservedObjectKey, *const NSObservedKeyPathKey, *const NSOptionsKey;
+APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NSHiddenBinding, *const NSTitleBinding,
+    *const NSContentBinding, *const NSSelectedIndexBinding, *const NSToolTipBinding;
+@interface NSObject (NSKeyValueBindingCreation)
++ (void)exposeBinding:(NSString *)binding;
+@property (readonly, copy) NSArray<NSString *> *exposedBindings;
+- (Class)valueClassForBinding:(NSString *)binding;
+- (void)bind:(NSString *)binding toObject:(id)observable withKeyPath:(NSString *)keyPath
+     options:(NSDictionary *)options;
+- (void)unbind:(NSString *)binding;
+- (NSDictionary *)infoForBinding:(NSString *)binding;
+- (NSArray *)optionDescriptionsForBinding:(NSString *)binding;
 @end
 
 #endif

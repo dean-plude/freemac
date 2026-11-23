@@ -1,0 +1,13 @@
+valueForKeyPath: deep
+setValue:forKeyPath: changed
+negate YES: 0, is nil(nil): 1, is not nil(@1): 1
+by class name: LOUD
+through archived data: a 2
+nonretained object: same, objCType @
+initWithContentsOfFile: v, mutable 2 keys
+bound field: bound, box enabled no, title kept "Button"
+info: observed is the settings yes, key path name
+exposed: color
+after unbind: unbound
+defaults by key-value coding: kv
+exit=0

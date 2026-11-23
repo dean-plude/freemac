@@ -19,6 +19,18 @@ extern char _objc_empty_cache_storage[];
     X(objc_msgSendSuper2, ferry_objc_msgSendSuper2) \
     X(objc_msgSendSuper_stret, ferry_objc_msgSendSuper_stret) \
     X(objc_msgSendSuper2_stret, ferry_objc_msgSendSuper2_stret) \
+    X(objc_msgSend_fixup, ferry_objc_msgSend_fixup) \
+    X(objc_msgSend_fixedup, ferry_objc_msgSend_fixup) \
+    X(objc_msgSend_fpret_fixup, ferry_objc_msgSend_fpret_fixup) \
+    X(objc_msgSend_fpret_fixedup, ferry_objc_msgSend_fpret_fixup) \
+    X(objc_msgSend_fp2ret_fixup, ferry_objc_msgSend_fp2ret_fixup) \
+    X(objc_msgSend_fp2ret_fixedup, ferry_objc_msgSend_fp2ret_fixup) \
+    X(objc_msgSend_stret_fixup, ferry_objc_msgSend_stret_fixup) \
+    X(objc_msgSend_stret_fixedup, ferry_objc_msgSend_stret_fixup) \
+    X(objc_msgSendSuper2_fixup, ferry_objc_msgSendSuper2_fixup) \
+    X(objc_msgSendSuper2_fixedup, ferry_objc_msgSendSuper2_fixup) \
+    X(objc_msgSendSuper2_stret_fixup, ferry_objc_msgSendSuper2_stret_fixup) \
+    X(objc_msgSendSuper2_stret_fixedup, ferry_objc_msgSendSuper2_stret_fixup) \
     X(_objc_msgForward, ferry_objc_msgForward) \
     X(_objc_msgForward_stret, ferry_objc_msgForward_stret) \
     X(sel_registerName, sel_registerName) \

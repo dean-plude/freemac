@@ -241,13 +241,16 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"_Unwind_Resume", ferry_unwind_resume},
     /* clang lowers memset(p, 0, n) to this name on a Mac */
     {"__bzero", bzero},
+    /* not a symbol of this system's C library (it wraps __cxa_atexit) */
+    {"atexit", atexit},
     {"__sincos_stret", mac_sincos_stret},
     {"__sincosf_stret", mac_sincosf_stret},
     {NULL, NULL},
 };
 
 static const struct ferry_symbol *const tables[] = {
-    ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_blocks_symbols, ferry_objc_symbols,
+    ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_blocks_symbols, ferry_dispatch_symbols,
+    ferry_objc_symbols,
 };
 
 static void *find_own(const char *name)

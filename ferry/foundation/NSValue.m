@@ -53,6 +53,14 @@ CFBooleanRef ferry_true, ferry_false;
     v->_ptr = (void *)pointer;
     return [v autorelease];
 }
+/* A pointer to an object that the value doesn't retain. */
++ (NSValue *)valueWithNonretainedObject:(id)object
+{
+    FValue *v = [[FValue alloc] init];
+    v->_kind = 'o';
+    v->_ptr = object;
+    return [v autorelease];
+}
 static NSValue *geometry_value(char kind, NSRect rect)
 {
     FValue *v = [[FValue alloc] init];
@@ -73,6 +81,7 @@ static NSValue *geometry_value(char kind, NSRect rect)
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (NSRange)rangeValue { return NSMakeRange(0, 0); }
 - (void *)pointerValue { return NULL; }
+- (id)nonretainedObjectValue { return (id)[self pointerValue]; }
 - (NSPoint)pointValue { return NSZeroPoint; }
 - (NSSize)sizeValue { return NSZeroSize; }
 - (NSRect)rectValue { return NSZeroRect; }
@@ -88,6 +97,7 @@ static NSValue *geometry_value(char kind, NSRect rect)
     case 'S': return @encode(NSSize);
     case 'R': return @encode(NSRect);
     case 'E': return @encode(NSEdgeInsets);
+    case 'o': return @encode(id);
     }
     return @encode(void *);
 }
@@ -108,7 +118,8 @@ static NSValue *geometry_value(char kind, NSRect rect)
         return NO;
     switch (_kind) {
     case 'r': return NSEqualRanges(o->_range, _range);
-    case 'p': return o->_ptr == _ptr;
+    case 'p':
+    case 'o': return o->_ptr == _ptr;
     case 'E': return !memcmp(&o->_insets, &_insets, sizeof _insets);
     default: return NSEqualRects(o->_rect, _rect);
     }
@@ -117,7 +128,8 @@ static NSValue *geometry_value(char kind, NSRect rect)
 {
     switch (_kind) {
     case 'r': return _range.location * 31 + _range.length;
-    case 'p': return (NSUInteger)_ptr;
+    case 'p':
+    case 'o': return (NSUInteger)_ptr;
     case 'E': return (NSUInteger)(_insets.top * 31 + _insets.left);
     default: return (NSUInteger)(_rect.origin.x * 31 + _rect.origin.y * 17 + _rect.size.width);
     }

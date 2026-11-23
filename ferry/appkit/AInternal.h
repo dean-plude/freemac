@@ -89,6 +89,12 @@ void AWindowDidClose(NSWindow *window);
 @interface NSKeyedUnarchiver (FerryPrivate)
 - (NSArray *)_decodeArrayKeepingNullsForKey:(NSString *)key;
 @end
+/* Reads nibs in Xcode's "NIBArchive" form (ANibArchive.m). */
+@interface ANibArchive : NSCoder
++ (BOOL)isNibArchive:(NSData *)data;
+- (instancetype)initForReadingWithData:(NSData *)data;
+- (NSArray *)_decodeArrayKeepingNullsForKey:(NSString *)key;
+@end
 NSRect AViewFrameFromCoder(NSCoder *coder);
 void AViewDecode(NSView *view, NSCoder *coder);
 /* Image references in nibs, kept by name until Ferry has NSImage. */

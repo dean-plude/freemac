@@ -205,6 +205,26 @@ static id box(id self, SEL sel, char type)
                                      @"coding-compliant for the key %@.",
            object_getClassName(self), self, key);
 }
+
+/* "a.b.c": each key in turn, from the object the one before gave. */
+- (id)valueForKeyPath:(NSString *)path
+{
+    NSRange dot = [path rangeOfString:@"."];
+    if (dot.location == NSNotFound)
+        return [self valueForKey:path];
+    id first = [self valueForKey:[path substringToIndex:dot.location]];
+    return [first valueForKeyPath:[path substringFromIndex:dot.location + 1]];
+}
+- (void)setValue:(id)value forKeyPath:(NSString *)path
+{
+    NSRange dot = [path rangeOfString:@"." options:NSBackwardsSearch];
+    if (dot.location == NSNotFound) {
+        [self setValue:value forKey:path];
+        return;
+    }
+    [[self valueForKeyPath:[path substringToIndex:dot.location]] setValue:value
+                                                                   forKey:[path substringFromIndex:dot.location + 1]];
+}
 @end
 
 /* ---- NSError ----------------------------------------------------------------------- */

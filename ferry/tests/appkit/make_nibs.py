@@ -7,9 +7,117 @@
 # NSCustomObject, NSWindowTemplate, NSCustomView and NSClassSwapper
 # stand-ins and outlet and action connectors. They are made here with
 # Python's plistlib, not by Ferry and not by Apple's tools; nib.m loads
-# them. Run this again only to change the fixtures.
-import os, plistlib
+# them. PanelArchive.nib holds the panel nib again in the "NIBArchive"
+# form that current versions of Xcode write (see ferry/appkit/
+# ANibArchive.m), converted from the keyed archive here. Run this again
+# only to change the fixtures.
+import os, plistlib, struct
 from plistlib import UID
+
+
+def varint(n):
+    """Seven bits a byte, lowest first; the last byte has its top bit set."""
+    out = bytearray()
+    while True:
+        b = n & 0x7f
+        n >>= 7
+        if not n:
+            out.append(b | 0x80)
+            return bytes(out)
+        out.append(b)
+
+
+def nib_archive(objects, top):
+    """The NIBArchive form of a keyed archive's objects."""
+    nib = [("NSObject", [])]          # (class, [(key, type, data)]); object 0 is the top
+    index = {}                        # keyed-archive UID -> NIBArchive object
+
+    def new(cls):
+        nib.append((cls, []))
+        return len(nib) - 1
+
+    def string(text):
+        i = new("NSString")
+        nib[i][1].append(("NS.bytes", 8, text.encode()))
+        return i
+
+    for uid, o in enumerate(objects):
+        if isinstance(o, dict) and "$class" in o:
+            index[uid] = new(objects[o["$class"].data]["$classname"])
+        elif isinstance(o, str) and uid:
+            index[uid] = string(o)
+        elif isinstance(o, (int, float)):
+            index[uid] = new("NSNumber")
+
+    def value(key, v):
+        if isinstance(v, UID):
+            return (key, 9, None) if v.data == 0 else (key, 10, index[v.data])
+        if isinstance(v, bool):
+            return (key, 5 if v else 4, None)
+        if isinstance(v, int):
+            for t, fmt in ((0, "<b"), (1, "<h"), (2, "<i"), (3, "<q")):
+                try:
+                    return (key, t, struct.pack(fmt, v))
+                except struct.error:
+                    pass
+        if isinstance(v, float):
+            return (key, 7, struct.pack("<d", v))
+        if isinstance(v, bytes):
+            return (key, 8, v)
+        if isinstance(v, str):
+            return (key, 10, string(v))
+        raise ValueError("can't write %r" % (v,))
+
+    def fill(i, d):
+        cls = nib[i][0]
+        values = nib[i][1]
+        if cls.endswith(("Array", "Set", "Dictionary")):
+            values.append(("NSInlinedValue", 5, None))
+            items = d.get("NS.objects", [])
+            if cls.endswith("Dictionary"):
+                items = [x for pair in zip(d.get("NS.keys", []), items) for x in pair]
+            values.extend(value("UINibEncoderEmptyKey", v) for v in items)
+            return
+        for k in sorted(d):
+            if k != "$class":
+                values.append(value(k, d[k]))
+
+    fill(0, top)
+    for uid, o in enumerate(objects):
+        if uid in index and isinstance(o, dict):
+            fill(index[uid], o)
+        elif uid in index and isinstance(o, (int, float)):
+            nib[index[uid]][1].append(value("NS.dblval" if isinstance(o, float) else "NS.intval", o))
+
+    keys, classes = [], []
+    for cls, values in nib:
+        if cls not in classes:
+            classes.append(cls)
+        for k, _, _ in values:
+            if k not in keys:
+                keys.append(k)
+    objs, vals, first = b"", b"", 0
+    for cls, values in nib:
+        objs += varint(classes.index(cls)) + varint(first) + varint(len(values))
+        first += len(values)
+        for k, t, data in values:
+            vals += varint(keys.index(k)) + bytes([t])
+            if t == 8:
+                vals += varint(len(data)) + data
+            elif t == 10:
+                vals += struct.pack("<I", data)
+            elif data is not None:
+                vals += data
+    keytab = b"".join(varint(len(k.encode())) + k.encode() for k in keys)
+    clstab = b"".join(varint(len(c) + 1) + varint(0) + c.encode() + b"\0" for c in classes)
+    header_size = 10 + 40
+    tables = [(len(nib), objs), (len(keys), keytab), (first, vals), (len(classes), clstab)]
+    header, body, offset = [1, 10], b"", header_size
+    for count, data in tables:
+        header += [count, offset]
+        body += data
+        offset += len(data)
+    return b"NIBArchive" + struct.pack("<10i", *header) + body
 
 
 class Archive:
@@ -51,6 +159,11 @@ class Archive:
         data = {"$archiver": "NSKeyedArchiver", "$version": 100000, "$top": top, "$objects": self.objects}
         with open(path, "wb") as f:
             plistlib.dump(data, f, fmt=plistlib.FMT_BINARY, sort_keys=True)
+
+    def save_nib_archive(self, path, top):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(nib_archive(self.objects, top))
 
 
 VIEW = ("NSView", "NSResponder")
@@ -202,7 +315,7 @@ def main_menu_nib(path):
     a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
-def panel_nib(path):
+def panel_nib(path, nib_archive_form=False):
     a = Archive()
     owner = custom(a, "PanelController")
     first = custom(a, "FirstResponder")
@@ -223,13 +336,17 @@ def panel_nib(path):
     pairs = [(owner, owner), (first, owner), (app, owner), (helper, owner), (missing, owner), (panel, owner),
              (content, panel), (note, content)]
     data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
-    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+    if nib_archive_form:
+        a.save_nib_archive(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+    else:
+        a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
 panel_nib(os.path.join(resources, "Panel.nib", "keyedobjects.nib"))
+panel_nib(os.path.join(resources, "PanelArchive.nib"), nib_archive_form=True)
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

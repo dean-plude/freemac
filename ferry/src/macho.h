@@ -81,6 +81,30 @@ struct macho_linkedit_data { uint32_t cmd, cmdsize, dataoff, datasize; };
 
 struct macho_entry_point { uint32_t cmd, cmdsize; uint64_t entryoff, stacksize; };
 
+/* The symbol table, and how its entries are grouped (LC_SYMTAB, LC_DYSYMTAB).
+ * Libraries built before Mac OS X 10.6 have no LC_DYLD_INFO: they list
+ * their fixups as relocation entries and symbol-pointer sections instead. */
+struct macho_symtab { uint32_t cmd, cmdsize, symoff, nsyms, stroff, strsize; };
+struct macho_dysymtab {
+    uint32_t cmd, cmdsize;
+    uint32_t ilocalsym, nlocalsym, iextdefsym, nextdefsym, iundefsym, nundefsym;
+    uint32_t tocoff, ntoc, modtaboff, nmodtab, extrefsymoff, nextrefsyms;
+    uint32_t indirectsymoff, nindirectsyms, extreloff, nextrel, locreloff, nlocrel;
+};
+struct macho_nlist { uint32_t n_strx; uint8_t n_type, n_sect; uint16_t n_desc; uint64_t n_value; };
+struct macho_reloc { int32_t r_address; uint32_t r_info; };   /* symbolnum:24 pcrel:1 length:2 extern:1 type:4 */
+#define N_TYPE_MASK   0x0e
+#define N_ABS         0x2
+#define N_SECT        0xe
+#define N_EXT         0x01
+#define N_STAB_MASK   0xe0
+#define N_WEAK_REF    0x0040
+#define S_TYPE_MASK               0xff
+#define S_NON_LAZY_SYMBOL_POINTERS 0x6
+#define S_LAZY_SYMBOL_POINTERS     0x7
+#define INDIRECT_SYMBOL_LOCAL 0x80000000u
+#define INDIRECT_SYMBOL_ABS   0x40000000u
+
 /* Rebase and bind opcode streams (LC_DYLD_INFO). */
 #define OPCODE_MASK     0xf0
 #define IMMEDIATE_MASK  0x0f

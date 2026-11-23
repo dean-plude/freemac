@@ -1,0 +1,8 @@
+started
+IMThing is nil: yes
+a new IMThing is nil: yes
+MyThing is registered: no
+notification name: NSImaginaryDidChangeNotification
+constant as a key: value
+calling IMDoSomething
+exit=127

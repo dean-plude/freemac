@@ -254,6 +254,16 @@ static unsigned long never_mutated;
     va_end(ap);
     return [self initWithDictionary:m];
 }
+- (instancetype)initWithContentsOfFile:(NSString *)path
+{
+    NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:path];
+    if (!d) {
+        [self release];
+        return nil;
+    }
+    return [self initWithDictionary:d];
+}
+- (instancetype)initWithContentsOfURL:(NSURL *)url { return [self initWithContentsOfFile:[url path]]; }
 - (instancetype)initWithDictionary:(NSDictionary *)dict
 {
     NSUInteger n = [dict count];

@@ -16,8 +16,8 @@ Linux with clang and lld. GUI apps need four more layers, built in order:
 | M2 | Foundation core + CoreFoundation basics | **done**, merged (#28) |
 | M3 | Drawing: Core Graphics subset, Core Text basics (Cairo, Pango/HarfBuzz) | **done**, merged (#33) |
 | M4 | AppKit minimum on Wayland (through GTK 3) | **done**, merged (#35) |
-| M5 | Nibs (compiled .nib) | **done**, pull request open (see the M5 report below) |
-| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | planned |
+| M5 | Nibs (compiled .nib) | **done**, merged (#37) |
+| M6 | Real apps, with a compatibility table in `docs/ferry-compat.md` | **done**, pull request open (see the M6 report below) |
 | M7 | Polish: Dock icons, Open/Save panels, clipboard, drag and drop, scaling | planned |
 
 ## Ground rules
@@ -743,6 +743,129 @@ the AppKit classes they need most (likely `NSWindowController`,
 `NSViewController`, `NSImage`, `NSBox`, `NSPopUpButton`, `NSScrollView`
 and `NSTextView`).
 
+## M6: real apps
+
+Dean chose the apps to aim for: small open-source Objective-C apps with
+Intel builds. Seven were downloaded from their GitHub release pages and run
+here without being added to the repository (they are third-party code, and
+their nibs hold Apple colour profiles): Hex Fiend, Flycut, KeyCastr,
+ShiftIt, Spectacle, MacPass and Gas Mask. `docs/ferry-compat.md` has the
+table of how far each gets. Work went app by app: run it, find the first
+thing that stops it, fix that if it is general, run it again.
+
+### What stopped them first, and the fixes
+
+- **Every app links a framework Ferry doesn't have** (Carbon, IOKit,
+  Security, WebKit, Quartz, CloudKit...). Ferry stopped at load. Now
+  (`src/loader.c`) a missing `/System/Library` framework or `/usr/lib`
+  library is named once and skipped. Its functions become the usual stubs
+  that stop the program with their name if called. Its Objective-C classes
+  are bound to nil, as a Mac binds a weakly linked class an older system
+  lacks (a stub there would be read as a class and crash); the count is
+  printed, and `FERRY_VERBOSE=1` lists them. A class of the app's own built
+  on a missing one is left out with its name (`src/objc/runtime.c`), and a
+  message sent to it later stops the program with both names rather than
+  looping. A missing variable named like one of Apple's string constants
+  (`NS...Notification`, `NS...Key`, `kAX...`) gets a constant string
+  holding its own name, which is what most of them hold on a Mac.
+- **Nibs from current Xcode are `NIBArchive` files**, not keyed archives
+  (all of Hex Fiend's, KeyCastr's and MacPass's). `appkit/ANibArchive.m`
+  is an `NSCoder` that reads them: a header with four tables (objects,
+  keys, values, classes), seven-bit variable-length numbers whose last byte
+  has the top bit set, typed values (integers of four sizes, booleans,
+  float, double, bytes, nil, object references), strings and data under
+  `NS.bytes`, and arrays, sets and dictionaries as repeated
+  `UINibEncoderEmptyKey` values. It feeds the same `initWithCoder:`
+  methods as M5's keyed archives, so nothing else changed. The format was
+  worked out from developers' published notes and by reading the real
+  nibs' structure with a small script (kept outside the repository).
+- **Grand Central Dispatch** (`src/objc/dispatch.c`, header
+  `sdk/include/dispatch/dispatch.h`): every app calls `dispatch_once` or
+  `dispatch_async`. Ferry runs a program on one thread, so all queues run
+  their work on it, in order, from Foundation's run loop (or
+  `dispatch_main`). That keeps what programs rely on: a serial queue runs
+  one block at a time in order, `dispatch_sync` returns after its block
+  ran. A semaphore or group wait runs queued work until what it waits for
+  happens; if nothing could, Ferry says so and stops instead of hanging.
+  Dispatch objects are Objective-C objects, so ARC manages them. Covered:
+  queues (serial, concurrent, global, main, suspend and resume, labels,
+  specific values, target queues), `dispatch_async`/`sync`/`after`/`apply`/
+  `once` and the `_f` forms, groups, semaphores, timer sources and the
+  data-merging sources; other source types say they won't fire.
+- **Libraries built before Mac OS X 10.6** (ShiftIt's Sparkle, from 2011)
+  have no `LC_DYLD_INFO`: their fixups are relocation entries (local ones
+  slide, external ones bind a symbol, at offsets from the first writable
+  segment), their imports sit in symbol-pointer sections named by the
+  indirect symbol table, and their exports are only in the symbol table.
+  The loader now reads all three. Their compiler also sent messages
+  through `__objc_msgrefs` pairs (`objc_msgSend_fixup`); the runtime
+  registers those selectors and `msgsend.S` has the `_fixup` entry points.
+- **Smaller things the apps hit**, each fixed where the app hit it:
+  `valueForKeyPath:`/`setValue:forKeyPath:`; `NSValueTransformer` with the
+  named transformers (negate, is nil, is not nil, unarchive from data) and
+  transformers found by class name; Cocoa bindings
+  (`appkit/NSKeyValueBinding.m`: `bind:toObject:withKeyPath:options:`
+  records the binding and sets the bound value once, `infoForBinding:`,
+  `exposeBinding:`; Foundation has no key-value observing yet, so changes
+  aren't followed); `NSUserDefaults` through key-value coding;
+  `+[NSValue valueWithNonretainedObject:]`; `initWithContentsOfFile:` and
+  `initWithContentsOfURL:` for arrays and dictionaries; `atexit` (not a
+  symbol of glibc itself); `formatter`, `allowsEditingTextAttributes` and
+  `importsGraphics` kept on controls; `colorWithPatternImage:` giving plain
+  grey until there is `NSImage`.
+
+### M6 report (2026-11-22)
+
+**What works now.** Five of the seven apps start (Hex Fiend needs Swift
+and Gas Mask an older start-up format), and four of those get through
+`NSApplicationMain` and their main nib into their own launch code. All 53 nib files in them load (16 in Hex Fiend, 30 in MacPass,
+the rest one or two each), in both of Xcode's formats, with the windows,
+panels, menus, buttons, labels and text fields Ferry has, and a warning for
+each class it hasn't. No app runs all the way yet; `docs/ferry-compat.md`
+says what stops each one. `make check` runs 48 tests (43 before M6), all
+passing. The new ones:
+
+| Test | Proves |
+| --- | --- |
+| `dispatch` | Dispatch from plain C: queue labels, `dispatch_once` once only, `dispatch_async` and `_f` in order, `dispatch_sync` at once, a group of work on a global queue with a wait and a notify, a semaphore signalled from queued work and one timing out, a suspended queue holding its work until `dispatch_after` resumes it, `dispatch_apply`, queue-specific values, a repeating timer source cancelled after three firings with its cancel handler, `dispatch_main` |
+| `foundation_dispatch` | Dispatch with Foundation and ARC: work hopping from a queue back to the main queue on the run loop, a queue freed with its owner (a weak reference turns nil), `dispatch_after` waking `CFRunLoopRun` after the right time, dispatch and run-loop blocks sharing the loop |
+| `foundation_missing` (+ message check) | A program linked against a framework that doesn't exist (`Imaginary.framework`, only a `.tbd` for the linker): it starts, the framework's class is nil, the program's subclass of it is left out, its notification name and key constants hold their names and work as dictionary keys, and calling its function stops the program with the function's name; each step's message checked |
+| `appkit_bindings` | Key paths both ways; the named value transformers, one found by class name, and data through the unarchiving transformer and back; `valueWithNonretainedObject:`; arrays and dictionaries read from a file, mutable ones staying mutable; a text field's value and a button's enabled state bound to an object, a binding to a missing key leaving the property alone, `infoForBinding:`, `exposedBindings`, `unbind:`; `NSUserDefaults` by key-value coding |
+| `appkit_nib` | now also loads `PanelArchive.nib`, the M5 panel written in the `NIBArchive` form by `make_nibs.py`, and checks it gives the same objects, frames, outlets and `awakeFromNib` calls as the keyed-archive copy |
+
+**What isn't done yet (and why).**
+
+- **No real app is usable yet.** Each one stops at the next missing piece
+  (see `docs/ferry-compat.md`). The pieces that come up most: `NSImage`;
+  exceptions that can be caught (Ferry has no Mach-O unwinder, so the first
+  `@throw` stops the program); `NSWindowController`, `NSViewController` and
+  the document classes; `NSScrollView`, `NSTableView`, `NSTextView`,
+  `NSPopUpButton`, `NSBox` and the other views nibs use; `NSInvocation`;
+  `NSAlert`, `NSWorkspace`, `NSStatusBar`.
+- **Flycut crashes** on a bad object pointer during its launch code; not
+  traced yet. It is the only app here that crashes rather than stopping
+  with a message.
+- **Some apps' core features can't work on Wayland as written**: global
+  hotkeys (Carbon's `RegisterEventHotKey`), watching other apps' key
+  presses (KeyCastr) and moving other apps' windows through the
+  Accessibility API (ShiftIt, Spectacle). Those need a desktop-side
+  service, and are out of M6's scope.
+- **One thread.** Dispatch work never runs in parallel, and a program that
+  starts a thread (`pthread_create`, `NSThread`) still stops there. Programs
+  that wait for another thread without dispatch would stop too.
+- **Bindings don't follow changes**, because Foundation has no key-value
+  observing yet.
+- **Old start-up format.** Gas Mask's program uses `LC_UNIXTHREAD`
+  (Mac OS X 10.7 and earlier), which the loader doesn't run yet.
+- The old-relocation loading was tested on one real library (ShiftIt's
+  Sparkle) only, because current linkers can't produce that format for a
+  test.
+
+**What's next.** M7 was planned as polish (Dock icons, Open/Save panels,
+clipboard, drag and drop, scaling). Given what the apps need, I'd suggest
+starting it with `NSImage`, catchable exceptions and `NSWindowController`/
+`NSViewController`, which every app here reaches before any polish.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -771,3 +894,4 @@ bridge in the `ferry` binary.
 - 2026-11-20: M2 merged (#28). M3 done: Core Graphics and Core Text on Cairo, Pango and HarfBuzz, NSAttributedString, `make check` 38/38.
 - 2026-11-20: M3 merged (#33). M4 done: AppKit on GTK 3 (Wayland or X11), windows, views, events, controls, `make check` 41/41.
 - 2026-11-20: M4 merged (#35). M5 done: keyed archives, nib loading, `NSApplicationMain` with a main nib, `make check` 43/43.
+- 2026-11-22: M5 merged (#37). M6 done: real apps tried (docs/ferry-compat.md), NIBArchive nibs, missing frameworks tolerated, Grand Central Dispatch, pre-10.6 libraries, `make check` 48/48.

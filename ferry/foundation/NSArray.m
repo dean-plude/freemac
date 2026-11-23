@@ -147,6 +147,16 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
     va_end(ap);
     return [self initWithArray:tmp];
 }
+- (instancetype)initWithContentsOfFile:(NSString *)path
+{
+    NSArray *a = [NSArray arrayWithContentsOfFile:path];
+    if (!a) {
+        [self release];
+        return nil;
+    }
+    return [self initWithArray:a];
+}
+- (instancetype)initWithContentsOfURL:(NSURL *)url { return [self initWithContentsOfFile:[url path]]; }
 - (instancetype)initWithArray:(NSArray *)array
 {
     NSUInteger n = [array count];

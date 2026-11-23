@@ -1,6 +1,7 @@
 /* Nib loading (M5): an app bundle whose Info.plist names MainMenu as its
  * main nib, started with NSApplicationMain, and a second nib (Panel, in
- * the folder form) loaded by the program. The nibs are made by
+ * the folder form) loaded by the program, and the same panel again in
+ * Xcode's newer NIBArchive form (PanelArchive.nib). The nibs are made by
  * make_nibs.py in the layout Interface Builder's compiled nibs use. Runs
  * with no display, so windows are drawn off screen. Built with ARC. */
 #import <Cocoa/Cocoa.h>
@@ -164,6 +165,18 @@ static NSEvent *key(NSString *chars)
     printf("\npanel: %s \"%s\" visible %s; note \"%s\"; helper %s\n", object_getClassName(pc.panel),
            str(pc.panel.title), yes(pc.panel.isVisible), str(pc.note.stringValue), yes(pc.helper != nil));
     printf("missing nib: %s\n", yes([[NSBundle mainBundle] loadNibNamed:@"Nothing" owner:pc topLevelObjects:NULL]));
+
+    /* The same panel in the NIBArchive form current Xcode writes (M6). */
+    PanelController *pc2 = [[PanelController alloc] init];
+    top = nil;
+    ok = [[NSBundle mainBundle] loadNibNamed:@"PanelArchive" owner:pc2 topLevelObjects:&top];
+    printf("PanelArchive loaded: %s, %lu top-level objects:", yes(ok), (unsigned long)top.count);
+    for (id o in top)
+        printf(" %s", object_getClassName(o));
+    printf("\npanel: %s \"%s\" frame %s; note \"%s\" at %s; helper %s, its owner set %s\n",
+           object_getClassName(pc2.panel), str(pc2.panel.title), NSStringFromSize(pc2.panel.contentView.frame.size).UTF8String,
+           str(pc2.note.stringValue), NSStringFromRect(pc2.note.frame).UTF8String, yes(pc2.helper != nil),
+           yes(pc2.helper.owner == pc2));
 
     printf("cmd-q:\n");
     fflush(stdout);
