@@ -1171,6 +1171,35 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.140 "Services" (done)
+
+Select words in any app and send them to another app to do something with them, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Services in every app's menu in the menu bar: Make New Sticky Note, New Jot Note With Selection, Look Up in Words, Search With Seek, Speak Text, Open URL and Show in Drawer; only those that fit the selected words can be chosen | Topline, services.py, freemac-service | done |
+| 2 | ⇧⌘Y makes a sticky note from the selected words, in front of your windows until you click away | Stickies, Wayfire config | done |
+| 3 | Services in Drawer's right-click menu: New Terminal at Folder and Set Desktop Picture | Drawer | done |
+| 4 | Dials > Keyboard > Services: a shortcut for each service, and a switch to take it off the menu | Dials | done |
+| 5 | Jot, Words, Seek and Stickies take words from a service whether they're running or not | Jot, Words, Seek, Stickies | done |
+| 6 | New shortcuts and settings from a newer freemac now reach accounts made before it, without changing anything the person set | freemac-config-upgrade, freemac-session | done |
+| 7 | Show in Drawer picks out the file in its folder | services.py | done |
+| 8 | Fix: Dials sometimes opened on Appearance instead of the page it was asked for | Dials | done |
+| 9 | Guide topic, README row, every README screenshot retaken | Guide, Docs | done |
+
+## 1.139 "Screen Time schedules and categories" (done)
+
+Downtime can follow the week, and one limit can cover every app of a kind.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Downtime: Every Day or Custom; Custom gives each day its own hours or none, and a night's downtime runs into the next morning | Logbook | done |
+| 2 | The downtime notice and "can be used again at" use that day's hours | Logbook | done |
+| 3 | Categories: Logbook adds up each kind of app (Games, Social, Entertainment, Creativity, Education, Information & Reading, Productivity & Finance, Utilities, Other), from the Categories line of each app's .desktop file | Logbook | done |
+| 4 | A daily limit on a category counts all its apps together and closes them at the limit, with a notice five minutes before; Add Category Limit… lists the apps it counts | Logbook | done |
+| 5 | A parent sets a child's custom downtime and category limits too, and More Time… works for a category | Logbook, freemac-screen-time-helper | done |
+| 6 | The window no longer rebuilds itself after its own changes | Logbook | done |
+
 ## 1.138 "Screen Time for a family" (done)
 
 A parent sets a child's screen time from the parent's own account, and the child can't change it.
@@ -1430,16 +1459,3 @@ A family computer where each person has their own account: someone else can log 
   [ARCHITECTURE.md](ARCHITECTURE.md#mac-app-compatibility-optional-layer).
 - Signed images and update bundles, with a key kept outside the repository.
 - Testing on real laptops: Wi-Fi, batteries, trackpad gestures, suspend.
-
-## 1.139 "Screen Time schedules and categories" (done)
-
-Downtime can follow the week, and one limit can cover every app of a kind.
-
-| # | Item | Component | Status |
-| --- | --- | --- | --- |
-| 1 | Downtime: Every Day or Custom; Custom gives each day its own hours or none, and a night's downtime runs into the next morning | Logbook | done |
-| 2 | The downtime notice and "can be used again at" use that day's hours | Logbook | done |
-| 3 | Categories: Logbook adds up each kind of app (Games, Social, Entertainment, Creativity, Education, Information & Reading, Productivity & Finance, Utilities, Other), from the Categories line of each app's .desktop file | Logbook | done |
-| 4 | A daily limit on a category counts all its apps together and closes them at the limit, with a notice five minutes before; Add Category Limit… lists the apps it counts | Logbook | done |
-| 5 | A parent sets a child's custom downtime and category limits too, and More Time… works for a category | Logbook, freemac-screen-time-helper | done |
-| 6 | The window no longer rebuilds itself after its own changes | Logbook | done |

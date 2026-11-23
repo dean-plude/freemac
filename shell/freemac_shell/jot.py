@@ -291,12 +291,12 @@ class Window(Gtk.ApplicationWindow):
                     self.listbox.select_row(row)
         return False
 
-    def new_note(self):
+    def new_note(self, text=""):
         self.save_now()
         self.search.set_text("")
-        path = file_name_for("New Note", self.folder)
+        path = file_name_for(title_of(text) if text.strip() else "New Note", self.folder)
         with open(path, "w", encoding="utf-8") as f:
-            f.write("")
+            f.write(text)
         self.reload(keep=path)
         self.view.grab_focus()
 
@@ -365,8 +365,17 @@ class Jot(Gtk.Application):
         new_note = Gio.SimpleAction.new("new-note", None)
         new_note.connect("activate", lambda *_: self._new_note())
         self.add_action(new_note)
+        # Services > New Jot Note With Selection.
+        service = Gio.SimpleAction.new("service", GLib.VariantType.new("s"))
+        service.connect("activate", lambda _a, text: self._note_with(text.get_string()))
+        self.add_action(service)
         self.hold()
         self.set_menubar(menubar())
+
+    def _note_with(self, text):
+        window = self.get_active_window() or Window(self)
+        window.present()
+        window.new_note(text)
 
     def _new_note(self):
         window = self.get_active_window() or Window(self)

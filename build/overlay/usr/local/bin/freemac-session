@@ -52,6 +52,11 @@ mkdir -p "$HOME/.cache"
 if [ -n "$XDG_RUNTIME_DIR" ] && [ -d "$XDG_RUNTIME_DIR" ]; then
   export _WAYFIRE_SOCKET="$XDG_RUNTIME_DIR/wayfire.socket"
 fi
+# Settings that a newer freemac ships (a new shortcut, an app that starts
+# with the session) reach accounts made before it; nothing changed is touched.
+if ! is_guest && command -v freemac-config-upgrade >/dev/null; then
+  freemac-config-upgrade >/dev/null 2>&1
+fi
 # Make Desktop, Documents, Downloads and the rest, and record them so apps
 # (and their icons) know which folder is which.
 command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update

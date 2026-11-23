@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Topline: freemac's menu bar along the top of the screen."""
 import os
+import threading
 import shutil
 import signal
 import subprocess
@@ -15,7 +16,9 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import (announce, apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
-               notify_rules, quick, main_display, recent_items, status, style)
+               notify_rules, quick, main_display, recent_items, services, status, style)
+from . import dials_keys  # noqa: E402
+from .ini import ini_get  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
 
 MARK = "/usr/share/freemac/freemac-mark.svg"
@@ -25,6 +28,7 @@ DESKTOP_GO = (("Home", "", "⇧⌘H"), ("Desktop", "Desktop", "⇧⌘D"),
               ("Documents", "Documents", "⇧⌘O"), ("Downloads", "Downloads", "⌥⌘L"),
               ("Pictures", "Pictures", ""), ("Music", "Music", ""))
 HEIGHT = 28
+WAYFIRE_INI = os.path.expanduser("~/.config/wayfire.ini")
 HIDE_DELAY = 400     # ms after the pointer leaves a menu bar that hides itself
 SLIDE_MS = 180
 
@@ -1085,6 +1089,8 @@ class Topline(Gtk.Window):
                 self._item(menu, "Settings\u2026", lambda: settings[0].activate_action(settings[1], None),
                            shortcut="\u2318,")
             menu.append(Gtk.SeparatorMenuItem())
+            menu.append(self._services_item())
+            menu.append(Gtk.SeparatorMenuItem())
             self._item(menu, f"Hide {name}", (lambda: self._hide_app(view)) if view.get("id") else None,
                        shortcut="\u2318H")
             self._item(menu, "Hide Others", lambda: self._hide_others(view), shortcut="\u2325\u2318H")
@@ -1092,6 +1098,49 @@ class Topline(Gtk.Window):
             menu.append(Gtk.SeparatorMenuItem())
             self._item(menu, f"Quit {name}", lambda: self._quit(view), shortcut="\u2318Q")
         menu.show_all()
+
+    def _services_item(self):
+        """Services ›: what other apps can do with the words selected in this
+        one (services.py). The list is checked against the selection each
+        time it opens, so only the ones that suit it can be chosen."""
+        item = Gtk.MenuItem(label="Services")
+        sub = Gtk.Menu()
+        item.set_submenu(sub)
+        rows = []
+        for service_id, title, _kind, _suits, default in services.shown("text"):
+            keys = dials_keys.describe_all(self._service_keys(service_id, default), "")
+            row = self._item(sub, title, lambda s=service_id: self._run_service(s),
+                             shortcut=keys)
+            rows.append((service_id, row))
+        if not rows:
+            self._item(sub, "No Services Apply")
+        sub.append(Gtk.SeparatorMenuItem())
+        self._item(sub, "Services Settings\u2026", lambda: run("freemac-dials", "--panel", "keyboard"))
+        self._service_text = ""
+
+        def check(_menu):
+            def got(text):
+                self._service_text = text or ""
+                for service_id, row in rows:
+                    row.set_sensitive(services.suits(service_id, self._service_text))
+                return False
+            for _service_id, row in rows:
+                row.set_sensitive(False)
+            # wl-paste reads the selection; it may take a moment, so not here.
+            threading.Thread(target=lambda: GLib.idle_add(got, services.selection()), daemon=True).start()
+
+        sub.connect("show", check)
+        sub.show_all()
+        return item
+
+    def _service_keys(self, service_id, default):
+        value = ini_get(WAYFIRE_INI, "command", f"binding_service_{service_id}", None)
+        return default if value is None else value
+
+    def _run_service(self, service_id):
+        text = self._service_text
+        # The work may start an app, so it runs away from the menu bar.
+        run("freemac-service", service_id, text) if text else run("freemac-service", service_id)
 
     def _fill_window_menu(self, view):
         """Minimize, Zoom and Bring All to Front, then the app's windows with

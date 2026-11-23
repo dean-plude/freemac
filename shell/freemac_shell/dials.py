@@ -422,6 +422,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         except (OSError, GLib.Error):
             self.update_watch = None
         sidebar.select_row(self.rows["appearance"])
+        self.wanted = None   # the page freemac-dials --panel asked for
         # The stack can't show a page before the window is shown, so it
         # opened on the first one; show the selected page once it can.
         self.connect("map", lambda *_: GLib.idle_add(self._show_selected))
@@ -441,6 +442,11 @@ class DialsWindow(Gtk.ApplicationWindow):
         self.update_count.set_visible(count > 0)
 
     def _show_selected(self):
+        # GTK can move the sidebar's selection back to its first row as
+        # the window first takes focus, so the page asked for wins here.
+        if self.wanted in self.rows:
+            self.sidebar.select_row(self.rows[self.wanted])
+        self.wanted = None
         row = self.sidebar.get_selected_row()
         if row is not None:
             self._show_page(row.name)
@@ -505,6 +511,8 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     def show_panel(self, name):
         if name in self.rows:
+            if not self.get_mapped():
+                self.wanted = name
             self.sidebar.select_row(self.rows[name])
 
     # Appearance ---------------------------------------------------------------
@@ -933,6 +941,29 @@ class DialsWindow(Gtk.ApplicationWindow):
             lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row)
         heading = Gtk.Label(label="Shortcuts", xalign=0)
         heading.get_style_context().add_class("dials-section")
+        # Services: what other apps can do with the words selected in any app,
+        # from the app's menu (Services) or with a shortcut. The switch shows
+        # or hides each one in the menu.
+        from . import services
+
+        def in_menu(option):
+            service_id = option[len("binding_service_"):]
+            shown = Gtk.Switch(active=service_id not in services.turned_off(), valign=Gtk.Align.CENTER)
+            shown.set_tooltip_text("Show in the Services menu")
+            shown.connect("notify::active", lambda w, _p: services.set_on(service_id, w.get_active()))
+            return shown
+
+        self.service_keys = dials_keys.Shortcuts(
+            self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
+            lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row,
+            items=dials_keys.SERVICE_SHORTCUTS, extra=in_menu)
+        services_heading = Gtk.Label(label="Services", xalign=0)
+        services_heading.get_style_context().add_class("dials-section")
+        services_note = Gtk.Label(label="Select some words in any app, then choose a service from the app's menu "
+                                        "(Services) or press its keys. In Drawer, right-click files for "
+                                        "New Terminal at Folder and Set Desktop Picture.",
+                                  xalign=0, wrap=True, max_width_chars=70)
+        services_note.get_style_context().add_class("dim-label")
         from . import clips
 
         def history(on):
@@ -965,7 +996,8 @@ class DialsWindow(Gtk.ApplicationWindow):
                 "Passwords marked as secret by a password manager are never kept."),
             row("Forget what was copied", clear),
         ), sources_heading, sources, input_menu, text_heading,
-            dials_input.text_input_group(self, group, row, switch), heading, self.shortcuts.widget)
+            dials_input.text_input_group(self, group, row, switch), services_heading, services_note,
+            self.service_keys.widget, heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):

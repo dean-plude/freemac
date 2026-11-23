@@ -11,6 +11,7 @@ with another app (Open With), and puts things back from the Trash.
 """
 import json
 import os
+import subprocess
 import threading
 import time
 
@@ -20,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -2723,6 +2724,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Add to Sidebar", lambda *_: self.add_to_sidebar(), has_folder),
             ("Glance", lambda *_: self.toggle_glance(), has_selection),
             ("Quick Actions", None, not in_trash and quick_actions.can_make_pdf(selected)),
+            ("Services", None, not in_trash),
             (None, None, True),
             ("Tags", None, has_selection and not in_trash),
             (None, None, has_selection and not in_trash),
@@ -2745,6 +2747,11 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 if enabled:
                     menu.append(self._quick_actions_item(selected))
                 continue
+            if label == "Services":
+                item = self._services_item(selected) if enabled else None
+                if item is not None:
+                    menu.append(item)
+                continue
             if label == "Tags":
                 if enabled:
                     menu.append(tags.menu_item(selected, lambda err, keep=selected: self._tags_changed(err, keep)))
@@ -2759,6 +2766,30 @@ class DrawerWindow(Gtk.ApplicationWindow):
         menu.show_all()
         menu.attach_to_widget(self, None)
         menu.popup_at_pointer(event)
+
+    def _services_item(self, selected):
+        """Services ›: the file services (services.py) that suit what's
+        selected, or this folder when nothing is; None when none do."""
+        chosen = list(selected) or ([self.path] if self.path and os.path.isdir(self.path) else [])
+        fitting = [s for s in services.shown("files") if services.suits(s[0], chosen)]
+        if not fitting:
+            return None
+        item = Gtk.MenuItem(label="Services")
+        sub = Gtk.Menu()
+        for service_id, title, _kind, _suits, _keys in fitting:
+            entry = Gtk.MenuItem(label=title)
+            entry.connect("activate", lambda _i, s=service_id: self._run_service(s, chosen))
+            sub.append(entry)
+        sub.append(Gtk.SeparatorMenuItem())
+        settings = Gtk.MenuItem(label="Services Settings\u2026")
+        settings.connect("activate", lambda _i: subprocess.Popen(["freemac-dials", "--panel", "keyboard"],
+                                                                 start_new_session=True))
+        sub.append(settings)
+        item.set_submenu(sub)
+        return item
+
+    def _run_service(self, service_id, paths):
+        subprocess.Popen(["freemac-service", service_id, *paths], start_new_session=True)
 
     def _network_menu(self, event):
         """In Network, a computer can only be connected to."""

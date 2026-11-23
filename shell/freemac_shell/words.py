@@ -23,7 +23,7 @@ import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import menus, style  # noqa: E402
 
@@ -491,6 +491,24 @@ class Words(Gtk.Application):
                              ("win.today", "<Control>t")):
             self.set_accels_for_action(action, [keys])
         self.set_menubar(menubar())
+        # Services > Look Up in Words.
+        service = Gio.SimpleAction.new("service", GLib.VariantType.new("s"))
+        service.connect("activate", lambda _a, word: self.look_up(word.get_string()))
+        self.add_action(service)
+
+    def look_up(self, word):
+        if self.window is None:
+            self.first = word        # shown once the dictionary has loaded
+            self.activate()
+            return
+        self.window.present()
+        if self.window.wn is None:   # still loading, or not installed
+            if not WordNet.available():
+                return
+            GLib.timeout_add(200, lambda: self.look_up(word) and False)
+            return
+        self.window.search.set_text(word)
+        self.window.show_word(word)
 
     def do_activate(self):
         if self.window is None:

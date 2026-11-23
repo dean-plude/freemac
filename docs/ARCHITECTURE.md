@@ -823,6 +823,29 @@ new macOS:
 - The bundle's integrity rests on HTTPS to GitHub and its checksum; signing
   bundles with a key kept outside the repository is on the roadmap.
 
+## Services (1.140)
+
+Services hand what's selected in one app to another app, as on a Mac.
+`services.py` lists them (id, title, whether they take words or files, a
+test of whether they fit, and the shortcut freemac ships). The words come
+from Wayland's primary selection (`wl-paste --primary`), which every app
+keeps up to date as you select, so no app needs to do anything to offer
+them. Topline's app menu reads it when Services opens and greys out the
+services that don't fit; Drawer's right-click menu offers the ones for files.
+
+`freemac-service ID [TEXT|PATH...]` does the job. Stickies, Jot, Words and
+Seek each publish a `service` app action, which it calls over the session
+bus through `org.gtk.Actions.Activate`, starting the app first if its name
+isn't on the bus. Shortcuts are ordinary Wayfire command bindings
+(`binding_service_ID` / `command_service_ID`); Dials > Keyboard edits them,
+and which services show is kept in `~/.config/freemac/shell.json`
+(`services_off`).
+
+Because `wayfire.ini` and `wf-shell.ini` are copied from `/etc/skel` only
+when an account is made, `freemac-config-upgrade` runs at each login and adds
+every setting the shipped file has that the person's lacks, at the end of its
+section. Anything already there, even turned off, is left alone.
+
 ## Hard problems we know about
 
 - **Global menus on Wayland.** There is no single standard. GTK 3 apps with
