@@ -291,6 +291,17 @@ TOPICS = {
         "- New Recovery Key… makes a new key; the old one stops working.",
         "Without your password or the recovery key, nobody can unlock the disk, not even freemac.",
     ]),
+    "vpn": ("Connect to a VPN", "vpn virtual private network wireguard openvpn ovpn conf work office "
+            "provider tunnel secure connection menu bar", [
+        "A VPN sends your internet traffic through another network, such as your workplace's or a VPN "
+        "provider's. They give you a file to set it up: a WireGuard file (ending .conf) or an OpenVPN file "
+        "(ending .ovpn).",
+        "- Choose Dials > Network, click Add VPN Configuration… and choose the file.",
+        "- Turn the VPN's switch on to connect, and off to disconnect.",
+        "- While you have a VPN, a VPN icon in the menu bar shows whether it's connected; click it to "
+        "connect or disconnect. Show VPN status in menu bar in Dials > Network hides it.",
+        "A new VPN waits for you to turn it on. Once added, the file it came from can be deleted.",
+    ]),
     "services": ("Use selected words in another app", "services service selected text selection sticky note look up "
                  "define dictionary words search seek jot speak read aloud open url link show in drawer terminal "
                  "folder desktop picture wallpaper shift command y", [

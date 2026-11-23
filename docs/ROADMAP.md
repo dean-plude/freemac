@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.142 "VPN" (done)
+
+Connect to a workplace's or a VPN provider's network from Dials and the menu bar, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Network: Add VPN Configuration… from a WireGuard (.conf) or OpenVPN (.ovpn) file; a new VPN waits to be turned on | Dials, vpn.py | done |
+| 2 | Each VPN with a switch to connect it, its kind and state, and a button to remove it | Dials | done |
+| 3 | The VPN menu in the menu bar: filled while connected; connect or disconnect each VPN; Show VPN status in menu bar | Topline | done |
+| 4 | OpenVPN support in the image (WireGuard is built into NetworkManager) | packages | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.141 "Encrypted disk" (done)
 
 Keep everything on the disk unreadable without your password, as a Mac's disk encryption does, for a computer that's lost or stolen.

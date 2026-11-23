@@ -64,7 +64,8 @@ class NetworkPanel(Gtk.Box):
                 self.client = None
         if self.client:
             # Known Networks: a network joined, forgotten or changed elsewhere.
-            for signal in ("connection-added", "connection-removed"):
+            for signal in ("connection-added", "connection-removed",
+                           "active-connection-added", "active-connection-removed"):
                 self.client.connect(signal, lambda *_: self.schedule())
             for device in self.client.get_devices():
                 device.connect("state-changed", lambda *_: GLib.idle_add(self.rebuild))
@@ -88,8 +89,98 @@ class NetworkPanel(Gtk.Box):
 
     def sections(self):
         from .known_networks import KnownNetworks
-        return (self.network_sections() + KnownNetworks(self).sections()
+        return (self.network_sections() + self.vpn_sections() + KnownNetworks(self).sections()
                 + self.nearby_sections() + self.firewall_sections())
+
+    def vpn_sections(self):
+        """VPN, as on a Mac: each configuration with a switch to connect it,
+        Add VPN Configuration… from a WireGuard or OpenVPN file, and whether
+        the VPN menu shows in the menu bar."""
+        from . import vpn
+        if not self.client:
+            return []
+        rows = []
+        for connection in vpn.configurations(self.client):
+            now = vpn.state(self.client, connection)
+            ac = vpn.active(self.client, connection)
+            if ac:
+                ac.connect("notify::state", lambda *_: self.schedule())
+            switch = Gtk.Switch(active=now in ("connected", "connecting"), valign=Gtk.Align.CENTER)
+            switch.connect("notify::active", lambda s, _p, c=connection: self.vpn_switched(s, c))
+            remove = Gtk.Button.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.BUTTON)
+            remove.set_relief(Gtk.ReliefStyle.NONE)
+            remove.set_tooltip_text("Remove this VPN configuration")
+            remove.connect("clicked", lambda _b, c=connection: self.vpn_remove(c))
+            controls = Gtk.Box(spacing=6)
+            controls.pack_start(remove, False, False, 0)
+            controls.pack_start(switch, False, False, 0)
+            rows.append(self.row(connection.get_id(), controls,
+                                 f"{vpn.kind_name(connection)} \u00b7 {vpn.STATE_TEXT[now]}"))
+        add = Gtk.Button(label="Add VPN Configuration\u2026")
+        add.connect("clicked", lambda *_: self.vpn_add())
+        if not rows:
+            rows.append(self.row("VPN", add, "No VPN yet. Add the file your VPN provider or workplace gave you: "
+                                              "a WireGuard .conf or an OpenVPN .ovpn file."))
+        else:
+            rows.append(self.row("Add another VPN", add, None))
+            menu = Gtk.Switch(active=vpn.menu_bar_shown(), valign=Gtk.Align.CENTER)
+            menu.connect("notify::active", lambda s, _p: vpn.set_menu_bar_shown(s.get_active()))
+            rows.append(self.row("Show VPN status in menu bar", menu, None))
+        return [self.group(*rows)]
+
+    def vpn_switched(self, switch, connection):
+        from . import vpn
+        now = vpn.state(self.client, connection)
+        if switch.get_active() and now == "off":
+            def done(error):
+                if error:
+                    from . import alert
+                    alert.tell(self.get_toplevel(), f"\u201c{connection.get_id()}\u201d couldn\u2019t connect", error)
+                self.schedule()
+            vpn.turn_on(self.client, connection, done)
+        elif not switch.get_active() and now != "off":
+            vpn.turn_off(self.client, connection)
+        self.schedule()
+
+    def vpn_add(self):
+        from . import alert, vpn
+        chooser = Gtk.FileChooserNative.new("Add VPN Configuration", self.get_toplevel(),
+                                            Gtk.FileChooserAction.OPEN, "Add", "Cancel")
+        files = Gtk.FileFilter()
+        files.set_name("VPN configurations (.conf, .ovpn)")
+        files.add_pattern("*.conf")
+        files.add_pattern("*.ovpn")
+        chooser.add_filter(files)
+        chooser.set_current_folder(os.path.expanduser("~/Downloads"))
+        answer = chooser.run()
+        path = chooser.get_filename()
+        chooser.destroy()
+        if answer != Gtk.ResponseType.ACCEPT or not path:
+            return
+        import threading
+
+        def added(name, error):
+            if error:
+                alert.tell(self.get_toplevel(), "The VPN couldn\u2019t be added", error)
+            else:
+                alert.tell(self.get_toplevel(), f"\u201c{name}\u201d was added",
+                           "Turn it on here or from the VPN menu in the menu bar. The file it came from "
+                           "can now be deleted; its keys are kept safely by the system.")
+            self.schedule()
+            return False
+
+        # nmcli takes a few seconds; keep Dials answering meanwhile.
+        threading.Thread(target=lambda: GLib.idle_add(added, *vpn.import_file(path)), daemon=True).start()
+
+    def vpn_remove(self, connection):
+        from . import alert, vpn
+        answer = alert.ask(self.get_toplevel(), f"Remove \u201c{connection.get_id()}\u201d?",
+                           "You can add it again later from the file your VPN provider gave you.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Remove", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, destructive=Gtk.ResponseType.OK)
+        if answer == Gtk.ResponseType.OK:
+            vpn.remove(connection)
+            self.schedule()
 
     def nearby_sections(self):
         """Nearby sharing (Hail): whether other devices on this network may

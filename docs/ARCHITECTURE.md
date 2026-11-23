@@ -878,6 +878,23 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## VPN (1.142)
+
+VPN configurations are ordinary NetworkManager connections of type
+`wireguard` (built into NetworkManager and the kernel) or `vpn` with the
+OpenVPN plugin (`network-manager-openvpn`). `vpn.py` lists them, reads each
+one's state from its active connection, and turns them on and off through
+libnm. Add VPN Configuration… runs `nmcli connection import` on the file the
+person chose, then sets `connection.autoconnect no` and takes it down, so a
+new VPN waits to be turned on, as a Mac's does. NetworkManager keeps the keys;
+freemac never reads them.
+
+Topline's VPN menu (`status.VPN`) shows while there is at least one VPN and
+the `vpn_menu` pref is on. It refills its menu when connections change, and
+looks at their state every three seconds, since an active connection's state
+has no client-wide signal; the menu is never filled as it opens, because a
+menu that opens late is refused by the compositor.
+
 ## Hard problems we know about
 
 - **Global menus on Wayland.** There is no single standard. GTK 3 apps with

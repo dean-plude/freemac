@@ -30,6 +30,9 @@ dconf-gsettings-backend
 dconf-service
 # Networking (wired and Wi-Fi) and the permission service it uses.
 network-manager
+# VPN in Dials > Network: OpenVPN (.ovpn) files; WireGuard is built into
+# NetworkManager and the kernel.
+network-manager-openvpn
 polkitd
 # Runs freemac's small root helpers (Users, Restart in Recovery, Limit adult
 # websites, Firewall, Automatic updates) after an administrator's password;
