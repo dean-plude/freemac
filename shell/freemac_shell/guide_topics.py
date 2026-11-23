@@ -184,6 +184,16 @@ TOPICS = {
         "Input level, a row of lights that follow what the microphone hears.",
         "To hear everything in both ears, turn on Play stereo audio as mono in Dials > Accessibility.",
     ]),
+    "storage": ("See what's using space and free some up", "storage disk space full free up clean up available capacity hard drive ssd large big files trash empty review", [
+        "Choose Dials > Storage. The bar shows how much is used and how much is left, coloured by what fills it: "
+        "apps, documents, pictures, music, movies, downloads, the Trash and the system.",
+        "Click Empty Trash… to erase what's in the Trash for good, or turn on Empty Trash Automatically to erase "
+        "items after 30 days.",
+        "Click Review Files… to see the biggest files in your home folder. Select one and click Move to Trash, "
+        "or Show in Drawer to see where it is.",
+        "Under What's Using Space, click Show to open that folder in Drawer, or Manage… beside Applications to "
+        "remove apps in Harbor.",
+    ]),
     "install": ("Install apps", "install app store harbor download update software", [
         "Harbor lists free apps. Click Install beside one; it shows in the Dock and in F4 when it's ready.",
         "Harbor also installs updates for freemac itself. A red number on its Dock icon says how many are ready.",

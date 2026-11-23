@@ -1171,6 +1171,16 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.132 "storage" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Storage, as on a Mac: how much of the disk is used and how much is left, on a bar coloured by what fills it (Applications, Documents, Pictures, Music, Movies, Downloads, Trash and System) | Dials (dials_storage.py), storage.py | done |
+| 2 | Recommendations: Empty Trash Automatically (after 30 days), Empty Trash… with how much it frees, and Review Files… for the biggest files in the home folder, sortable by name, size and date, with Show in Drawer and Move to Trash | Dials | done |
+| 3 | What's Using Space: each kind with its size, a Show button that opens the folder in Drawer, and Manage… for apps in Harbor | Dials, Drawer, Harbor | done |
+| 4 | About's Storage row has Storage Settings… to open the page; Seek finds it by "disk space", "free up" and more | Dials | done |
+| 5 | Guide topic; README row; every README screenshot retaken, with one of the Storage page | Guide, Docs | done |
+
 ## 1.131 "sound menu" (done)
 
 | # | Item | Component | Status |
