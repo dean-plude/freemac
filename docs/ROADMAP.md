@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.122 "passwords" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A login keychain, as on a Mac: gnome-keyring's secret service, opened by the login password, so Web offers "Save Login?" and fills saved logins in; an account that logs in by itself gets a keychain with no password of its own at login, so saving the first password asks nothing | keychain.py, login items, gnome-keyring | done |
+| 2 | Purser, a Passwords app: every website login Web saved (or you added), with search, Copy for the user name and password, and a strong password suggested for a new one; edit or delete a login; saved Wi-Fi networks with their password and join code after an administrator's password | Purser (purser.py, logins.py) | done |
+| 3 | Purser opens only after your login password (its own polkit action), and locks again after 5 minutes in the background or with ⌘L | Purser | done |
+| 4 | A Security list in Purser: passwords used on more than one website, and ones easy to guess | Purser | done |
+| 5 | Changing your own password in Dials > Users gives the keychain the new password too, so saved passwords keep opening | Dials, keychain.py | done |
+| 6 | Guide topic; README row and screenshot; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.121 "known networks" (done)
 
 | # | Item | Component | Status |

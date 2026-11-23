@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Purser: a brass key in front of a ship's strongbox door. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b6fd6"/><stop offset="1" stop-color="#3546a8"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd978"/><stop offset="1" stop-color="#e5a52e"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="24" width="80" height="80" rx="14" fill="#ffffff" fill-opacity="0.14"/>
+  <g fill="#ffffff" fill-opacity="0.35">
+    <circle cx="34" cy="34" r="3"/><circle cx="94" cy="34" r="3"/>
+    <circle cx="34" cy="94" r="3"/><circle cx="94" cy="94" r="3"/>
+  </g>
+  <g transform="rotate(-45 64 64)">
+    <circle cx="64" cy="42" r="17" fill="url(#brass)"/>
+    <circle cx="64" cy="42" r="7" fill="#3f50b4"/>
+    <rect x="59" y="56" width="10" height="44" rx="3" fill="url(#brass)"/>
+    <rect x="69" y="80" width="11" height="7" rx="2" fill="url(#brass)"/>
+    <rect x="69" y="91" width="8" height="7" rx="2" fill="url(#brass)"/>
+  </g>
+</svg>
