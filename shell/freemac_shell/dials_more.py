@@ -383,7 +383,7 @@ def accessibility(window):
         row("Zoom", switch(zoom_on, zoom_switch),
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
-    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window),
+    ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window), screen_keyboard_group(window),
         audio(window), *spoken_content(window))
 
 
@@ -576,6 +576,20 @@ def slow_keys(window):
         row("Acceptance delay", acceptance),
         row("Use click key sounds", switch(on("slow_keys_click", "true"), setter("slow_keys_click")),
             "A soft click as a key goes down, and another once it counts."))
+
+
+def screen_keyboard_group(window):
+    """The Accessibility Keyboard, as on a Mac: a keyboard on the screen to
+    type with the pointer alone (screen_keyboard.py in Topline, which follows
+    shell.json "accessibility_keyboard")."""
+    group, row, _page, _slider, switch = window.helpers
+    prefs = style.prefs()
+    return group(
+        row("Accessibility Keyboard",
+            switch(bool(prefs.get("accessibility_keyboard", False)),
+                   lambda value: window.save_prefs(accessibility_keyboard=value)),
+            "A keyboard on the screen, to type with the mouse, a trackpad or a touch screen. "
+            "Shift, Control, Option and Command stay down for the next key you click."))
 
 
 def audio(window):

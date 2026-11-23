@@ -811,6 +811,13 @@ TOPICS = {
         "Shift, Control, Option and Command work at once, so a shortcut only waits for its last key.",
         "Turn off Use click key sounds if you'd rather not hear a click as each key goes down and counts.",
     ]),
+    "accessibility-keyboard": ("Type with a keyboard on the screen", "accessibility keyboard on screen onscreen virtual keyboard type with mouse pointer trackpad touch no keyboard broken keys accessibility", [
+        "Choose Dials > Accessibility and turn on Accessibility Keyboard.",
+        "Click the keys to type in the app you're using, just as if you'd pressed them.",
+        "Click \u21e7 Shift, \u2303 Control, \u2325 Option or \u2318 Command and it stays down for the next key: "
+        "\u2318 then A selects everything. Click it twice to lock it, and once more to let it go.",
+        "Drag the keyboard by its top edge to move it, or click its red button to close it.",
+    ]),
     "drawer-settings": ("Change Drawer's settings", "drawer settings preferences finder new window opens folder trash empty 30 days automatically warning folders on top sort", [
         "In Drawer, choose Drawer > Settings, or press \u2318,.",
         "General: pick the folder new Drawer windows open in.",

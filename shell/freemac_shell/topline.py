@@ -1294,6 +1294,9 @@ def main():
     # Slow Keys' clicks (slow_keys.py), as Strata holds back each key.
     from . import slow_keys
     win.slow_clicks = slow_keys.Clicks()
+    # The Accessibility Keyboard (screen_keyboard.py), while Dials has it on.
+    from . import screen_keyboard
+    win.screen_keyboard = screen_keyboard.ScreenKeyboard()
     # Mission Control's row of desktops (spaces.py), opened by Strata too.
     from . import spaces
     win.spaces = spaces.SpacesRow()

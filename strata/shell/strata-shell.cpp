@@ -47,6 +47,7 @@
 #include "press-hold.hpp"
 #include "sticky-keys.hpp"
 #include "slow-keys.hpp"
+#include "screen-keyboard.hpp"
 #include "hover-text.hpp"
 #include "colour-filters.hpp"
 #include "mission-control.hpp"
@@ -872,6 +873,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_locate::locate_t locate;
     strata_accents::hold_t accents;
     strata_slow::slow_t slow_keys;
+    strata_screen_keys::keys_t screen_keys;
     strata_sticky::sticky_t sticky;
     strata_hover::hover_t hover_text;
     strata_filters::filters_t colour_filters;
@@ -1002,6 +1004,10 @@ class strata_shell_impl : public wf::plugin_interface_t
             [=] (nlohmann::json data) { return spaces.assignments(data); });
         method_repository->register_method("strata/app-expose",
             [=] (nlohmann::json data) { return spaces.app_expose(data); });
+        method_repository->register_method("strata/press-key",
+            [=] (nlohmann::json data) { return screen_keys.press(data); });
+        method_repository->register_method("strata/release-keys",
+            [=] (nlohmann::json data) { return screen_keys.release_all(data); });
         method_repository->register_method("strata/attention",
             [=] (nlohmann::json data) { return attention.list(data); });
         attention.init();
@@ -1010,6 +1016,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         window_places.init();
         // Slow Keys first: it holds a key back before anything else sees it.
         slow_keys.init(&strata_accents::strata_tell_topline);
+        screen_keys.init(&slow_keys);
         command_key.init();
         accents.init();
         sticky.init(&strata_accents::strata_tell_topline);
