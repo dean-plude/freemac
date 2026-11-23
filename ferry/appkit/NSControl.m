@@ -237,8 +237,15 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     BOOL _mixed, _bordered, _transparent, _tracking, _inside;
     NSEventModifierFlags _keyMask;
     NSColor *_tint, *_bezelColor;
-    id _image;
+    id _image, _alternateImage;
+    NSCellImagePosition _imagePosition;
+    NSImageScaling _imageScaling;
+    BOOL _imagePositionSet;
 }
+
+/* An image a button can draw: nibs also hold stand-ins for the system's
+ * check box and radio button images, which aren't drawn as images. */
+static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]] ? image : nil; }
 
 + (instancetype)buttonWithTitle:(NSString *)title target:(id)target action:(SEL)action
 {
@@ -246,6 +253,22 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     [b setTitle:title];
     [b setTarget:target];
     [b setAction:action];
+    [b sizeToFit];
+    return b;
+}
++ (instancetype)buttonWithImage:(NSImage *)image target:(id)target action:(SEL)action
+{
+    NSButton *b = [self buttonWithTitle:@"" target:target action:action];
+    [b setImage:image];
+    [b setImagePosition:NSImageOnly];
+    [b sizeToFit];
+    return b;
+}
++ (instancetype)buttonWithTitle:(NSString *)title image:(NSImage *)image target:(id)target action:(SEL)action
+{
+    NSButton *b = [self buttonWithTitle:title target:target action:action];
+    [b setImage:image];
+    [b setImagePosition:NSImageLeading];
     [b sizeToFit];
     return b;
 }
@@ -293,6 +316,10 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
         _mixed = [b allowsMixedState];
         if ([b _hasButtonType])
             [self setButtonType:[b _buttonType]];
+        if (drawable([b image]))
+            [self setImage:[b image]];
+        if (drawable([b alternateImage]))
+            [self setAlternateImage:[b alternateImage]];
     }
     _state = [cell state];
 }
@@ -306,6 +333,7 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     [_tint release];
     [_bezelColor release];
     [_image release];
+    [_alternateImage release];
     [super dealloc];
 }
 
@@ -378,7 +406,40 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     [(id)image retain];
     [_image release];
     _image = image;
+    [self setNeedsDisplay:YES];
 }
+- (NSImage *)alternateImage { return _alternateImage; }
+- (void)setAlternateImage:(NSImage *)image
+{
+    [(id)image retain];
+    [_alternateImage release];
+    _alternateImage = image;
+    [self setNeedsDisplay:YES];
+}
+/* Unless set, a button with an image and no title shows only the image,
+ * and one with both shows the image before the title. */
+- (NSCellImagePosition)imagePosition
+{
+    if (_imagePositionSet)
+        return _imagePosition;
+    if (!drawable(_image))
+        return NSNoImage;
+    return [[self title] length] ? NSImageLeft : NSImageOnly;
+}
+- (void)setImagePosition:(NSCellImagePosition)p
+{
+    _imagePosition = p;
+    _imagePositionSet = YES;
+    [self setNeedsDisplay:YES];
+}
+- (NSImageScaling)imageScaling { return _imageScaling; }
+- (void)setImageScaling:(NSImageScaling)s
+{
+    _imageScaling = s;
+    [self setNeedsDisplay:YES];
+}
+- (BOOL)imageHugsTitle { return YES; }
+- (void)setImageHugsTitle:(BOOL)f {}
 - (void)setButtonType:(NSButtonType)type
 {
     _type = type;
@@ -515,14 +576,74 @@ static BOOL keeps_state(NSButtonType t)
     NSSize t = ALineSize([self attributedTitle], NULL, NULL);
     if (_type == NSButtonTypeSwitch || _type == NSButtonTypeRadio)
         return NSMakeSize(ceil(t.width) + 22, 18);
+    NSCellImagePosition pos = [self imagePosition];
+    NSSize im = pos != NSNoImage ? [drawable(_image) size] : NSZeroSize;
+    if (pos == NSImageOnly || pos == NSImageOverlaps || ![[self title] length])
+        t = im.width > 0 ? im : t;
+    else if (pos == NSImageAbove || pos == NSImageBelow)
+        t = NSMakeSize(fmax(t.width, im.width), t.height + im.height + 2);
+    else if (im.width > 0)
+        t = NSMakeSize(t.width + im.width + 4, fmax(t.height, im.height));
     if (!_bordered)
         return NSMakeSize(ceil(t.width) + 4, ceil(t.height) + 2);
-    return NSMakeSize(fmax(ceil(t.width) + 28, 60), 32);
+    if (pos == NSImageOnly)
+        return NSMakeSize(fmax(ceil(t.width) + 16, 32), fmax(32, ceil(t.height) + 10));
+    return NSMakeSize(fmax(ceil(t.width) + 28, 60), fmax(32, ceil(t.height) + 10));
 }
 
 /* ---- drawing ---------------------------------------------------------------------- */
 
 - (BOOL)_isDefault { return [_key isEqualToString:@"\r"] && _bordered; }
+
+/* The image (scaled down to fit if need be) and the title, placed as the
+ * image position says. */
+- (void)_drawContentIn:(NSRect)rect color:(NSColor *)color
+{
+    NSImage *image = drawable(_state == NSControlStateValueOn && drawable(_alternateImage) ? _alternateImage : _image);
+    NSCellImagePosition pos = image ? [self imagePosition] : NSNoImage;
+    if (pos == NSNoImage) {
+        [self _drawTitleIn:rect color:color];
+        return;
+    }
+    NSSize s = [image size];
+    BOOL titled = [[self title] length] && pos != NSImageOnly;
+    CGFloat maxW = rect.size.width, maxH = rect.size.height;
+    if (s.width > maxW || s.height > maxH || _imageScaling == NSImageScaleProportionallyUpOrDown) {
+        CGFloat k = fmin(maxW / s.width, maxH / s.height);
+        if (_imageScaling != NSImageScaleProportionallyUpOrDown)
+            k = fmin(k, 1);
+        s = NSMakeSize(s.width * k, s.height * k);
+    }
+    NSSize t = titled ? ALineSize([self attributedTitle], NULL, NULL) : NSZeroSize;
+    NSRect img = NSMakeRect(NSMidX(rect) - s.width / 2, NSMidY(rect) - s.height / 2, s.width, s.height);
+    NSRect text = rect;
+    if (titled && pos != NSImageOverlaps) {
+        BOOL flipped = [self isFlipped];
+        if (pos == NSImageAbove || pos == NSImageBelow) {
+            CGFloat total = s.height + 2 + t.height, top = NSMidY(rect) + total / 2;
+            BOOL imageTop = (pos == NSImageAbove) != flipped;
+            img.origin.y = imageTop ? top - s.height : top - total;
+            text.origin.y = imageTop ? top - total : top - t.height;
+            text.size.height = t.height;
+        } else {
+            BOOL imageFirst = pos != NSImageRight && pos != NSImageTrailing;
+            CGFloat total = s.width + 4 + ceil(t.width);
+            CGFloat x0 = _alignment == NSTextAlignmentLeft ? rect.origin.x : NSMidX(rect) - total / 2;
+            img.origin.x = imageFirst ? x0 : x0 + total - s.width;
+            text.origin.x = imageFirst ? x0 + s.width + 4 : x0;
+            text.size.width = ceil(t.width) + 1;
+        }
+    }
+    img = NSMakeRect(round(img.origin.x), round(img.origin.y), s.width, s.height);
+    [image _drawInControlRect:img color:_tint ?: color fraction:_enabled ? 1 : 0.5];
+    if (titled) {
+        NSTextAlignment saved = _alignment;
+        if (pos != NSImageOverlaps && pos != NSImageAbove && pos != NSImageBelow)
+            _alignment = NSTextAlignmentLeft;
+        [self _drawTitleIn:text color:color];
+        _alignment = saved;
+    }
+}
 
 - (void)_drawTitleIn:(NSRect)rect color:(NSColor *)color
 {
@@ -590,13 +711,15 @@ static BOOL keeps_state(NSButtonType t)
     }
 
     if (!_bordered) {
-        [self _drawTitleIn:b color:_highlighted ? [text shadowWithLevel:0.4] : text];
+        [self _drawContentIn:b color:_highlighted ? [text shadowWithLevel:0.4] : text];
         return;
     }
 
     /* a rounded push button, drawn in the middle of a taller frame as a Mac
      * does for the classic 32-point button frame */
     CGFloat h = fmin(b.size.height - 4, 22), inset = b.size.height >= 28 ? 6 : 2;
+    if (drawable(_image) && [drawable(_image) size].height > 16)   /* a tall image gets a tall bezel */
+        h = fmax(h, fmin(b.size.height - 4, [drawable(_image) size].height + 8));
     NSRect bezel = NSMakeRect(b.origin.x + inset, floor(NSMidY(b) - h / 2), b.size.width - 2 * inset, h);
     BOOL pressedOn = keeps_state(_type) && _state == NSControlStateValueOn;
     NSColor *fill, *edge;
@@ -613,7 +736,7 @@ static BOOL keeps_state(NSButtonType t)
     AFillRoundedRect(bezel, 5, [fill colorWithAlphaComponent:[fill alphaComponent] * dim], edge);
     if (focused)
         AFillRoundedRect(NSInsetRect(bezel, -2.5, -2.5), 7.5, nil, [NSColor keyboardFocusIndicatorColor]);
-    [self _drawTitleIn:NSInsetRect(bezel, 8, 0) color:text];
+    [self _drawContentIn:NSInsetRect(bezel, [self imagePosition] == NSImageOnly ? 4 : 8, 1) color:text];
 }
 @end
 

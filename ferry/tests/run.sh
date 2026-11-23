@@ -181,6 +181,25 @@ else
     echo "FAIL appkit_nib (did not compile)"; sed 's/^/    /' "$build/appkit_nib.cc.log"
     fail=$((fail + 1))
 fi
+# Images (M7), in an app bundle the test writes its image files into: it
+# runs from there, so imageNamed: finds them. No image files are kept here.
+app="$build/ImageApp.app"
+rm -rf "$app"; mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/ImageApp" "$here/appkit/image.m" -framework Cocoa \
+        -framework ImageIO 2> "$build/appkit_image.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$app/Contents/MacOS/ImageApp" \
+        > "$build/appkit_image.got" 2> "$build/appkit_image.err"
+    echo "exit=$?" >> "$build/appkit_image.got"
+    if diff -u "$here/appkit/image.out" "$build/appkit_image.got" > "$build/appkit_image.diff"; then
+        echo "ok   appkit_image"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_image"; sed 's/^/    /' "$build/appkit_image.diff"; sed 's/^/    stderr: /' "$build/appkit_image.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_image (did not compile)"; sed 's/^/    /' "$build/appkit_image.cc.log"
+    fail=$((fail + 1))
+fi
 # An exception nobody catches ends the program with the Mac's message.
 if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$build/foundation_exception.err" 2>/dev/null; then
     echo "ok   foundation_exception message"; pass=$((pass + 1))

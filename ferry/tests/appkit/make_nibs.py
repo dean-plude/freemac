@@ -9,7 +9,8 @@
 # Python's plistlib, not by Ferry and not by Apple's tools; nib.m loads
 # them. PanelArchive.nib holds the panel nib again in the "NIBArchive"
 # form that current versions of Xcode write (see ferry/appkit/
-# ANibArchive.m), converted from the keyed archive here. Run this again
+# ANibArchive.m), converted from the keyed archive here. dot.png is the
+# image the panel's image view names. Run this again
 # only to change the fixtures.
 import os, plistlib, struct
 from plistlib import UID
@@ -322,19 +323,24 @@ def panel_nib(path, nib_archive_form=False):
     app = custom(a, "NSApplication")
     helper = custom(a, "Helper")
     missing = custom(a, "NoSuchHelper")
-    content, note = a.reserve(), a.reserve()
+    content, note, badge = a.reserve(), a.reserve(), a.reserve()
     panel = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=3, NSWindowBacking=2,
                         NSWindowRect="{{100, 100}, {240, 120}}", NSWindowTitle=a.add("A Panel"),
                         NSWindowClass=a.add("NSPanel"), NSWindowView=content))
-    view(a, content, "NSView", VIEW, "{{0, 0}, {240, 120}}", 256 | 18, UID(0), NSSubviews=a.array([note]))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {240, 120}}", 256 | 18, UID(0), NSSubviews=a.array([note, badge]))
     view(a, note, "NSTextField", CONTROL, "{{20, 50}, {200, 20}}", 256, content,
          NSCell=text_cell(a, "NSTextFieldCell", "From the panel nib", 0x04000000, background=False))
+    dot = a.add(a.obj("NSCustomResource", (), NSClassName=a.add("NSImage"), NSResourceName=a.add("dot")))
+    badge_cell = a.add(a.obj("NSImageCell", ("NSCell",), NSCellFlags=0, NSCellFlags2=0x02000000, NSContents=dot,
+                             NSAlign=0, NSScale=3, NSStyle=0, NSAnimates=False))
+    view(a, badge, "NSImageView", CONTROL, "{{20, 80}, {16, 16}}", 256, content,
+         NSCell=badge_cell, NSEditable=False, NSEnabled=True)
     out = "NSNibOutletConnector"
     conns = [connector(a, out, owner, panel, "panel"), connector(a, out, owner, note, "note"),
              connector(a, out, owner, helper, "helper"), connector(a, out, helper, owner, "owner"),
-             connector(a, out, owner, note, "noSuchOutlet")]
+             connector(a, out, owner, note, "noSuchOutlet"), connector(a, out, owner, badge, "badge")]
     pairs = [(owner, owner), (first, owner), (app, owner), (helper, owner), (missing, owner), (panel, owner),
-             (content, panel), (note, content)]
+             (content, panel), (note, content), (badge, content)]
     data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
     if nib_archive_form:
         a.save_nib_archive(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
@@ -342,11 +348,30 @@ def panel_nib(path, nib_archive_form=False):
         a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def dot_png(path):
+    """An 8x8 blue disc on clear, as PNG, drawn here pixel by pixel."""
+    import zlib
+    rows = b""
+    for y in range(8):
+        rows += b"\x00"
+        for x in range(8):
+            inside = (x - 3.5) ** 2 + (y - 3.5) ** 2 <= 16
+            rows += bytes((0, 0, 255, 255)) if inside else bytes(4)
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 6, 0, 0, 0))
+    png += chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b"")
+    with open(path, "wb") as f:
+        f.write(png)
+
+
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
 panel_nib(os.path.join(resources, "Panel.nib", "keyedobjects.nib"))
 panel_nib(os.path.join(resources, "PanelArchive.nib"), nib_archive_form=True)
+dot_png(os.path.join(resources, "dot.png"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

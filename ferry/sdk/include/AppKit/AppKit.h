@@ -190,7 +190,8 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a;
 + (NSColor *)colorWithHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
-+ (NSColor *)colorWithPatternImage:(id)image; /* plain grey until Ferry has NSImage */
++ (NSColor *)colorWithPatternImage:(NSImage *)image;
+@property (readonly) NSImage *patternImage;
 + (NSColor *)colorWithCalibratedHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithDeviceHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithCGColor:(CGColorRef)color;
@@ -439,6 +440,107 @@ APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 - (NSData *)representationUsingType:(NSBitmapImageFileType)type properties:(NSDictionary *)properties;
 @end
 
+/* Vector images from PDF files, drawn by this system's Poppler. */
+@interface NSPDFImageRep : NSImageRep
++ (instancetype)imageRepWithData:(NSData *)data;
+- (instancetype)initWithData:(NSData *)data;
+@property (readonly) NSData *PDFRepresentation;
+@property (readonly) NSRect bounds;
+@property (readonly) NSInteger pageCount;
+@property NSInteger currentPage;
+@end
+
+/* An image drawn by a block each time it is drawn. */
+@interface NSCustomImageRep : NSImageRep
+- (instancetype)initWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
+@property (readonly) BOOL (^drawingHandler)(NSRect dstRect);
+@end
+
+typedef NSString *NSImageName;
+APPKIT_EXTERN NSImageName const NSImageNameAddTemplate, NSImageNameRemoveTemplate, NSImageNameStopProgressTemplate,
+    NSImageNameGoLeftTemplate, NSImageNameGoRightTemplate, NSImageNameGoBackTemplate,
+    NSImageNameGoForwardTemplate, NSImageNameMenuOnStateTemplate, NSImageNameMenuMixedStateTemplate,
+    NSImageNameRefreshTemplate, NSImageNameActionTemplate, NSImageNameApplicationIcon, NSImageNameCaution,
+    NSImageNameInfo, NSImageNameStatusAvailable, NSImageNameStatusUnavailable, NSImageNameStatusPartiallyAvailable,
+    NSImageNameStatusNone, NSImageNameFolder, NSImageNameTouchBarAddTemplate;
+typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
+    NSImageCacheDefault, NSImageCacheAlways, NSImageCacheBySize, NSImageCacheNever,
+};
+typedef NSString *NSImageHintKey;
+APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation;
+APPKIT_EXTERN NSString *const NSImageCompressionFactor;
+
+/* Images: read from PNG, JPEG, GIF, TIFF, BMP, ICO and ICNS files (by this
+ * system's GdkPixbuf) and from PDF files (vector, by Poppler), drawn by a
+ * block, or drawn into with lockFocus. Images named in an app's resources
+ * are found by imageNamed:, as are a few standard template images, which
+ * Ferry draws itself. */
+@interface NSImage : NSObject <NSCopying, NSCoding>
++ (NSImage *)imageNamed:(NSImageName)name;
++ (instancetype)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
++ (NSArray<NSString *> *)imageTypes;
++ (NSArray<NSString *> *)imageUnfilteredTypes;
++ (NSArray<NSString *> *)imageFileTypes;
+- (instancetype)initWithSize:(NSSize)size;
+- (instancetype)initWithContentsOfFile:(NSString *)path;
+- (instancetype)initWithContentsOfURL:(NSURL *)url;
+- (instancetype)initByReferencingFile:(NSString *)path;
+- (instancetype)initByReferencingURL:(NSURL *)url;
+- (instancetype)initWithData:(NSData *)data;
+- (instancetype)initWithCGImage:(CGImageRef)image size:(NSSize)size;
+- (BOOL)setName:(NSImageName)name;
+- (NSImageName)name;
+@property NSSize size;
+@property (getter=isTemplate) BOOL template;
+@property (readonly, getter=isValid) BOOL valid;
+@property (copy) NSString *accessibilityDescription;
+@property (copy) NSColor *backgroundColor;
+@property NSImageCacheMode cacheMode;
+@property BOOL matchesOnMultipleResolution, usesEPSOnResolutionMismatch, prefersColorMatch;
+@property NSRect alignmentRect;
+@property (getter=isFlipped) BOOL flipped; /* deprecated on a Mac; kept */
+@property BOOL scalesWhenResized;
+@property (readonly, copy) NSArray<NSImageRep *> *representations;
+- (void)addRepresentation:(NSImageRep *)rep;
+- (void)addRepresentations:(NSArray<NSImageRep *> *)reps;
+- (void)removeRepresentation:(NSImageRep *)rep;
+- (NSImageRep *)bestRepresentationForRect:(NSRect)rect context:(NSGraphicsContext *)context
+                                    hints:(NSDictionary *)hints;
+- (void)drawAtPoint:(NSPoint)point fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)drawInRect:(NSRect)rect fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)drawInRect:(NSRect)rect fromRect:(NSRect)from operation:(NSCompositingOperation)op fraction:(CGFloat)f
+    respectFlipped:(BOOL)respect hints:(NSDictionary *)hints;
+- (void)drawInRect:(NSRect)rect;
+- (void)compositeToPoint:(NSPoint)point operation:(NSCompositingOperation)op;
+- (void)compositeToPoint:(NSPoint)point operation:(NSCompositingOperation)op fraction:(CGFloat)f;
+- (void)dissolveToPoint:(NSPoint)point fraction:(CGFloat)f;
+- (void)lockFocus;
+- (void)lockFocusFlipped:(BOOL)flipped;
+- (void)unlockFocus;
+- (void)recache;
+- (CGImageRef)CGImageForProposedRect:(NSRect *)rect context:(NSGraphicsContext *)context hints:(NSDictionary *)hints;
+@property (readonly) NSData *TIFFRepresentation;
+@end
+
+@interface NSImageRep (FerryFiles)
++ (Class)imageRepClassForData:(NSData *)data;
++ (instancetype)imageRepWithContentsOfFile:(NSString *)path;
++ (NSArray<NSImageRep *> *)imageRepsWithContentsOfFile:(NSString *)path;
++ (NSArray<NSImageRep *> *)imageRepsWithData:(NSData *)data;
+@end
+
+@interface NSBitmapImageRep (FerryFiles)
++ (instancetype)imageRepWithData:(NSData *)data;
+- (instancetype)initWithData:(NSData *)data;
+@property (readonly) NSData *TIFFRepresentation;
+@end
+
+@interface NSBundle (NSBundleImageExtension)
+- (NSImage *)imageForResource:(NSImageName)name;
+- (NSString *)pathForImageResource:(NSImageName)name;
+- (NSURL *)URLForImageResource:(NSImageName)name;
+@end
+
 /* ---- views ----------------------------------------------------------------------- */
 
 typedef NS_OPTIONS(NSUInteger, NSAutoresizingMaskOptions) {
@@ -530,6 +632,23 @@ typedef NS_ENUM(NSInteger, NSControlStateValue) {
 #define NSOnState NSControlStateValueOn
 
 @class NSCell;
+typedef NS_ENUM(NSUInteger, NSImageScaling) {
+    NSImageScaleProportionallyDown = 0, NSImageScaleAxesIndependently = 1, NSImageScaleNone = 2,
+    NSImageScaleProportionallyUpOrDown = 3,
+};
+typedef NS_ENUM(NSUInteger, NSImageAlignment) {
+    NSImageAlignCenter = 0, NSImageAlignTop = 1, NSImageAlignTopLeft = 2, NSImageAlignTopRight = 3,
+    NSImageAlignLeft = 4, NSImageAlignBottom = 5, NSImageAlignBottomLeft = 6, NSImageAlignBottomRight = 7,
+    NSImageAlignRight = 8,
+};
+typedef NS_ENUM(NSUInteger, NSImageFrameStyle) {
+    NSImageFrameNone = 0, NSImageFramePhoto = 1, NSImageFrameGrayBezel = 2, NSImageFrameGroove = 3,
+    NSImageFrameButton = 4,
+};
+typedef NS_ENUM(NSUInteger, NSCellImagePosition) {
+    NSNoImage = 0, NSImageOnly = 1, NSImageLeft = 2, NSImageRight = 3, NSImageBelow = 4, NSImageAbove = 5,
+    NSImageOverlaps = 6, NSImageLeading = 7, NSImageTrailing = 8,
+};
 @interface NSControl : NSView
 @property (retain) __kindof NSCell *cell;
 @property (class) Class cellClass;
@@ -615,6 +734,7 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property (assign) id target;
 @property SEL action;
 @property (assign) NSView *controlView;
+@property (retain) NSImage *image;
 @end
 
 @interface NSActionCell : NSCell
@@ -626,6 +746,7 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property NSBezelStyle bezelStyle;
 @property (getter=isTransparent) BOOL transparent;
 @property BOOL allowsMixedState;
+@property (retain) NSImage *alternateImage;
 - (void)setButtonType:(NSButtonType)type;
 @end
 
@@ -653,7 +774,12 @@ typedef NS_ENUM(NSUInteger, NSBezelStyle) {
 @property (copy) NSString *keyEquivalent;
 @property NSEventModifierFlags keyEquivalentModifierMask;
 @property (retain) NSColor *contentTintColor, *bezelColor;
-@property (retain) NSImage *image;
+@property (retain) NSImage *image, *alternateImage;
+@property NSCellImagePosition imagePosition;
+@property NSImageScaling imageScaling;
+@property BOOL imageHugsTitle;
++ (instancetype)buttonWithImage:(NSImage *)image target:(id)target action:(SEL)action;
++ (instancetype)buttonWithTitle:(NSString *)title image:(NSImage *)image target:(id)target action:(SEL)action;
 - (void)setButtonType:(NSButtonType)type;
 - (void)setNextState;
 - (void)highlight:(BOOL)flag;
@@ -682,6 +808,25 @@ typedef NS_ENUM(NSUInteger, NSTextFieldBezelStyle) { NSTextFieldSquareBezel = 0,
 @property BOOL allowsEditingTextAttributes, importsGraphics; /* kept; text is plain for now */
 - (void)selectText:(id)sender;
 @end
+@interface NSImageCell : NSCell
+@property NSImageScaling imageScaling;
+@property NSImageAlignment imageAlignment;
+@property NSImageFrameStyle imageFrameStyle;
+@end
+
+/* Shows an image, scaled and placed as its settings say. Template images
+ * are drawn in the label colour, or the content tint colour if set. */
+@interface NSImageView : NSControl
++ (instancetype)imageViewWithImage:(NSImage *)image;
+@property (retain) NSImage *image;
+@property NSImageScaling imageScaling;
+@property NSImageAlignment imageAlignment;
+@property NSImageFrameStyle imageFrameStyle;
+@property (getter=isEditable) BOOL editable;
+@property BOOL animates, allowsCutCopyPaste;
+@property (retain) NSColor *contentTintColor;
+@end
+
 /* An NSTextField that hides what is typed. */
 @interface NSSecureTextField : NSTextField
 @end

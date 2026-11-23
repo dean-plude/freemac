@@ -243,4 +243,38 @@ hb_bool_t hb_font_get_glyph_extents(hb_font_t *font, hb_codepoint_t glyph, hb_gl
 hb_bool_t hb_font_get_h_extents(hb_font_t *font, hb_font_extents_t *extents);
 hb_bool_t hb_ot_metrics_get_position(hb_font_t *font, uint32_t tag, hb_position_t *position);
 
+/* ---- GdkPixbuf (decoding image files) and Poppler (PDF) ------------------------- */
+
+typedef struct { uint32_t domain; int code; char *message; } GError;
+void g_error_free(GError *error);
+typedef struct _GdkPixbuf GdkPixbuf;
+typedef struct _GdkPixbufLoader GdkPixbufLoader;
+typedef struct _GdkPixbufFormat GdkPixbufFormat;
+GdkPixbufLoader *gdk_pixbuf_loader_new(void);
+int gdk_pixbuf_loader_write(GdkPixbufLoader *loader, const unsigned char *buf, unsigned long count, GError **error);
+int gdk_pixbuf_loader_close(GdkPixbufLoader *loader, GError **error);
+GdkPixbuf *gdk_pixbuf_loader_get_pixbuf(GdkPixbufLoader *loader);
+GdkPixbufFormat *gdk_pixbuf_loader_get_format(GdkPixbufLoader *loader);
+char *gdk_pixbuf_format_get_name(GdkPixbufFormat *format);
+int gdk_pixbuf_get_width(const GdkPixbuf *pixbuf);
+int gdk_pixbuf_get_height(const GdkPixbuf *pixbuf);
+int gdk_pixbuf_get_rowstride(const GdkPixbuf *pixbuf);
+int gdk_pixbuf_get_n_channels(const GdkPixbuf *pixbuf);
+int gdk_pixbuf_get_has_alpha(const GdkPixbuf *pixbuf);
+unsigned char *gdk_pixbuf_get_pixels(const GdkPixbuf *pixbuf);
+GdkPixbuf *gdk_pixbuf_new_from_data(const unsigned char *data, int colorspace, int has_alpha, int bits_per_sample,
+                                    int width, int height, int rowstride, void (*destroy)(unsigned char *, void *),
+                                    void *destroy_data);
+int gdk_pixbuf_save_to_bufferv(GdkPixbuf *pixbuf, char **buffer, unsigned long *size, const char *type,
+                               char **option_keys, char **option_values, GError **error);
+void g_free(void *mem);
+
+typedef struct _PopplerDocument PopplerDocument;
+typedef struct _PopplerPage PopplerPage;
+PopplerDocument *poppler_document_new_from_data(char *data, int length, const char *password, GError **error);
+int poppler_document_get_n_pages(PopplerDocument *document);
+PopplerPage *poppler_document_get_page(PopplerDocument *document, int index);
+void poppler_page_get_size(PopplerPage *page, double *width, double *height);
+void poppler_page_render(PopplerPage *page, cairo_t *cairo);
+
 #endif

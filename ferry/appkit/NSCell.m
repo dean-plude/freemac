@@ -100,7 +100,7 @@ static id coder_value(NSCoder *c, NSString *key)
         return nil;
     id contents = coder_value(coder, @"NSContents");
     if ([contents isKindOfClass:[NSString class]] || [contents isKindOfClass:[NSAttributedString class]] ||
-        [contents isKindOfClass:[NSNumber class]])
+        [contents isKindOfClass:[NSNumber class]] || [contents isKindOfClass:[NSImage class]])
         [self setObjectValue:contents];
     NSFont *font = coder_value(coder, @"NSSupport");
     if ([font isKindOfClass:[NSFont class]])
@@ -169,7 +169,7 @@ static id coder_value(NSCoder *c, NSString *key)
 - (void)setObjectValue:(id)value
 {
     id old = _value;
-    _value = [value copy];
+    _value = [value isKindOfClass:[NSImage class]] ? [value retain] : [value copy]; /* images are shared */
     [old release];
 }
 - (NSString *)stringValue
@@ -237,6 +237,8 @@ static id coder_value(NSCoder *c, NSString *key)
 - (void)setTarget:(id)t { _target = t; }
 - (SEL)action { return _action; }
 - (void)setAction:(SEL)a { _action = a; }
+- (NSImage *)image { return [_value isKindOfClass:[NSImage class]] ? _value : nil; }
+- (void)setImage:(NSImage *)image { [self setObjectValue:image]; }
 - (NSView *)controlView { return _controlView; }
 - (void)setControlView:(NSView *)v { _controlView = v; }
 @end
@@ -252,6 +254,7 @@ static id coder_value(NSCoder *c, NSString *key)
     NSBezelStyle _bezel;
     NSButtonType _type;
     BOOL _typeKnown, _transparent, _mixed, _imageOnly;
+    id _image, _alternateImage;
 }
 - (instancetype)initTextCell:(NSString *)string
 {
@@ -266,6 +269,8 @@ static id coder_value(NSCoder *c, NSString *key)
 }
 - (void)dealloc
 {
+    [_image release];
+    [_alternateImage release];
     [_alternate release];
     [_key release];
     [super dealloc];
@@ -323,7 +328,24 @@ static id coder_value(NSCoder *c, NSString *key)
     }
     if ([coder containsValueForKey:@"NSAllowsMixedState"])
         _mixed = [coder decodeBoolForKey:@"NSAllowsMixedState"];
+    _image = [coder_value(coder, @"NSNormalImage") retain];
+    _alternateImage = [coder_value(coder, @"NSAlternateImage") retain];
     return self;
+}
+/* The button's own image, not its title (the cell's value) */
+- (NSImage *)image { return _image; }
+- (void)setImage:(NSImage *)image
+{
+    [(id)image retain];
+    [_image release];
+    _image = image;
+}
+- (NSImage *)alternateImage { return _alternateImage; }
+- (void)setAlternateImage:(NSImage *)image
+{
+    [(id)image retain];
+    [_alternateImage release];
+    _alternateImage = image;
 }
 - (void)encodeWithCoder:(NSCoder *)coder
 {

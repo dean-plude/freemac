@@ -162,6 +162,15 @@ typedef struct {
 
 /* ---- NSObject additions ------------------------------------------------------ */
 
+/* Moving objects between Core Foundation and Objective-C ownership. */
+#if __has_feature(objc_arc)
+static inline id CFBridgingRelease(CFTypeRef X) { return (__bridge_transfer id)X; }
+static inline CFTypeRef CFBridgingRetain(id X) { return (__bridge_retained CFTypeRef)X; }
+#else
+static inline id CFBridgingRelease(CFTypeRef X) { return [(id)X autorelease]; }
+static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
+#endif
+
 @interface NSObject (NSObjectFoundation)
 - (NSString *)description;
 - (NSString *)debugDescription;

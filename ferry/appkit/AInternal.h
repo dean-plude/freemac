@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <objc/message.h>
 #include "gtk.h"
+#include <ImageIO/ImageIO.h>
 
 #define A_EXPORT __attribute__((visibility("default")))
 
@@ -97,9 +98,13 @@ void AWindowDidClose(NSWindow *window);
 @end
 NSRect AViewFrameFromCoder(NSCoder *coder);
 void AViewDecode(NSView *view, NSCoder *coder);
-/* Image references in nibs, kept by name until Ferry has NSImage. */
+/* The name of an image, or of a nib's stand-in for one (NSSwitch...). */
 @interface NSObject (FerryNibImage)
 - (NSString *)_imageName;
+@end
+@interface NSImage (FerryPrivate)
+/* In rect, upright in flipped views; a template is filled with color. */
+- (void)_drawInControlRect:(NSRect)rect color:(NSColor *)color fraction:(CGFloat)fraction;
 @end
 /* Records a menu named in a nib ("_NSMainMenu", "_NSWindowsMenu"...). */
 void ANibNoteNamedMenu(NSMenu *menu, NSString *name);

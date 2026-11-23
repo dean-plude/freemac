@@ -572,7 +572,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 - (BOOL)isRunning { return _running; }
 - (BOOL)isActive { return _active; }
 - (NSEvent *)currentEvent { return _current; }
-- (id)applicationIconImage { return _icon; }
+- (id)applicationIconImage { return _icon ?: [NSImage imageNamed:NSImageNameApplicationIcon]; }
 - (void)setApplicationIconImage:(id)image
 {
     [image retain];
