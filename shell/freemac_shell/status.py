@@ -19,7 +19,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import audio, beacon, sounds, style  # noqa: E402
+from . import audio, battery, beacon, sounds, style  # noqa: E402
 
 SOUND_MENU_WIDTH = 260
 
@@ -385,6 +385,8 @@ class Battery(StatusButton):
         self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "power"))
         self.warned = set()      # levels already warned about on this charge
         self.sleeping = False
+        self.low_power = False
+        self.low_power_for = None   # (mode, plugged in) Low Power Mode was last set for
         self._prefs_monitor = style.watch_prefs(self.update)   # Show percentage
         GLib.timeout_add_seconds(30, lambda: self.update() or True)
         self.update()
@@ -406,8 +408,23 @@ class Battery(StatusButton):
             tooltip += f" (charging, {left} until full)" if left and status == "Charging" else " (charging)"
         elif left:
             tooltip += f" ({left} left)"
+        plugged = battery.on_adapter(batteries[0])
+        battery.record(capacity, plugged)
+        prefs = style.prefs()
+        mode = prefs.get("low_power_mode", "never")
+        if (mode, plugged) != self.low_power_for:
+            self.low_power_for = (mode, plugged)
+            self.low_power = battery.apply_low_power(mode, plugged)
+            if not self.low_power and battery.low_power_wanted(mode, plugged):
+                self.low_power_for = None    # couldn't yet: try again next time
+        context = self.get_style_context()
+        if self.low_power:
+            context.add_class("battery-low-power")
+            tooltip += ", Low Power Mode"
+        else:
+            context.remove_class("battery-low-power")
         self.show_icon(icon, tooltip)
-        label = f"{capacity}%" if style.prefs().get("battery_percent", True) else None
+        label = f"{capacity}%" if prefs.get("battery_percent", True) else None
         if self.get_label() != label:
             self.set_label(label or "")
         self._warn(capacity, status == "Discharging")

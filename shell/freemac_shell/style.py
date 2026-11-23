@@ -32,6 +32,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }
 .topline button.recording image { color: #e5484d; }
+.topline button.battery-low-power image { color: #e8a316; }
 
 .pier-shelf { padding: 6px 10px; }
 .pier-shelf-side { padding: 10px 6px; }

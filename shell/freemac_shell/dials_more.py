@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, announce, audio, awake, background_sounds, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, announce, audio, awake, background_sounds, battery as battery_info, dials_battery, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -332,6 +332,14 @@ def power(window):
                             row("Show percentage in the menu bar", percent),
                             row("Low battery", Gtk.Label(label="Warns at 10% and 5%"),
                                 "At 2% the computer goes to sleep so nothing is lost.")))
+        dials_battery.install_css()
+        groups.append(dials_battery.usage_group(group, row))
+        health = battery_info.health()
+        rows = [dials_battery.health_row(row, health)] if health and health.get("condition") else []
+        if shutil.which("powerprofilesctl"):
+            rows.append(dials_battery.low_power_row(window, row))
+        if rows:
+            groups.append(group(*rows))
     blank = Gtk.ComboBoxText()
     for value, label in BLANK_CHOICES:
         blank.append(value, label)
@@ -362,7 +370,8 @@ def power(window):
     groups.append(group(row("Lock the screen after", lock_after,
                             "You'll need your password to get back in. \u2303\u2318Q locks at once."),
                         row("Lock before sleeping", on_sleep)))
-    if shutil.which("powerprofilesctl"):
+    if shutil.which("powerprofilesctl") and not battery_state():
+        # A computer with a battery has Low Power Mode instead, as a Mac does.
         mode = Gtk.ComboBoxText()
         for value, label in (("power-saver", "Power Saver"), ("balanced", "Balanced"),
                              ("performance", "Performance")):
@@ -386,7 +395,7 @@ def power(window):
     else:
         groups.append(group(row("freemac Recovery", Gtk.Label(label="Hold Ctrl as it starts"),
                                 "Bring back files from a Lifeboat backup, reset a password or check a disk.")))
-    return page("Power", *groups)
+    return page("Battery" if battery else "Power", *groups)
 
 
 RECOVERY_HELPER = "/usr/libexec/freemac-recovery-helper"
