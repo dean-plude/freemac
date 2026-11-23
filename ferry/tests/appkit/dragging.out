@@ -1,0 +1,14 @@
+registered: public.file-url
+over files: operation 1
+over the text view: operation 1
+files: files entered at 10,10, files updated, files exited, plain entered, files entered at 20,30, files prepare, files perform (2), files conclude
+dropped: yes; /tmp/a.txt /tmp/b.png
+move refused: files entered at 10,10, files updated, files exited
+operation 0, dropped: no
+left: files entered at 10,10, files exited
+text: plain entered, plain perform: some words
+dropped: yes
+text over the files view: operation 0
+window: delegate entered, delegate perform
+dropped: yes
+exit=0

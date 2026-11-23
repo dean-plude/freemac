@@ -23,7 +23,26 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     NSFocusRingType _focusRing;
     BOOL _focusLocked;
     NSViewController *_viewController;   /* not retained */
+    NSArray *_draggedTypes;
 }
+
+/* Drag and drop: the types a view takes (NSDragging.m does the rest). */
+- (void)registerForDraggedTypes:(NSArray *)types
+{
+    NSMutableArray *all = [NSMutableArray arrayWithArray:_draggedTypes ?: @[]];
+    for (NSString *t in types)
+        if (![all containsObject:t])
+            [all addObject:t];
+    [_draggedTypes release];
+    _draggedTypes = [all copy];
+    [_window _enableDrops];
+}
+- (void)unregisterDraggedTypes
+{
+    [_draggedTypes release];
+    _draggedTypes = nil;
+}
+- (NSArray *)registeredDraggedTypes { return _draggedTypes ?: @[]; }
 
 /* A view controller comes between its view and whatever would follow the
  * view in the responder chain. */
@@ -126,6 +145,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     }
     [_subviews release];
     [_toolTip release];
+    [_draggedTypes release];
     [super dealloc];
 }
 
@@ -269,6 +289,8 @@ void AViewDecode(NSView *v, NSCoder *c)
         return;
     [self viewWillMoveToWindow:window];
     _window = window;
+    if ([_draggedTypes count])
+        [window _enableDrops];
     for (NSView *v in _subviews)
         [v _setWindow:window];
     [self viewDidMoveToWindow];

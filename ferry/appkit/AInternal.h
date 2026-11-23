@@ -69,7 +69,16 @@ void AWindowDidClose(NSWindow *window);
 - (BOOL)_needsDisplayAnywhere;
 @end
 
+/* Drag and drop (NSDragging.m): makes a window's GTK drawing area a drop
+ * target, and the steps of a drop, which GTK's signals call (and tests). */
+void ADragAttach(NSWindow *window, GtkWidget *area);
+
 @interface NSWindow (FerryPrivate)
+- (void)_enableDrops;
+- (NSArray *)_registeredDraggedTypes;
+- (NSDragOperation)_dragUpdateAt:(NSPoint)point pasteboard:(NSPasteboard *)pb operations:(NSDragOperation)mask;
+- (void)_dragExit;
+- (BOOL)_dragDropAt:(NSPoint)point pasteboard:(NSPasteboard *)pb operations:(NSDragOperation)mask;
 - (void)_noteNeedsDisplay;
 - (BOOL)_wantsMouseMoved;
 - (NSSize)_contentSize;

@@ -58,6 +58,32 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSInteger _lastButton, _clicks;
     NSTimeInterval _lastClickTime;
     NSPoint _lastClickPoint;
+    NSArray *_draggedTypes;
+    BOOL _dropsWanted, _dropsOn;
+}
+
+/* Drag and drop (NSDragging.m): the window's own types, whose drops go to
+ * its delegate, and the GTK drop target, set up once anything in the
+ * window takes drops. */
+- (void)registerForDraggedTypes:(NSArray *)types
+{
+    [_draggedTypes release];
+    _draggedTypes = [types copy];
+    [self _enableDrops];
+}
+- (void)unregisterDraggedTypes
+{
+    [_draggedTypes release];
+    _draggedTypes = nil;
+}
+- (NSArray *)_registeredDraggedTypes { return _draggedTypes ?: @[]; }
+- (void)_enableDrops
+{
+    _dropsWanted = YES;
+    if (_area && !_dropsOn) {
+        _dropsOn = YES;
+        ADragAttach(self, _area);
+    }
 }
 
 + (NSRect)frameRectForContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style { return rect; }
@@ -106,6 +132,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     if (_gtk) {
         GtkWidget *w = _gtk;
         _gtk = _area = NULL;
+        _dropsOn = NO;
         gtk_widget_destroy(w);
     }
 }
@@ -113,6 +140,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (void)dealloc
 {
     [self _destroyGtk];
+    [_draggedTypes release];
     [_contentView _setWindow:nil];
     [_contentView setNextResponder:nil];
     [_contentView release];
@@ -459,6 +487,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "delete-event", on_delete, self);
     connect(_gtk, "focus-in-event", on_focus_in, self);
     connect(_gtk, "focus-out-event", on_focus_out, self);
+    if (_dropsWanted)
+        [self _enableDrops];
     gtk_widget_show_all(_gtk);
     gtk_widget_grab_focus(_area);
 }
