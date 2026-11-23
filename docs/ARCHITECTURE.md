@@ -294,6 +294,15 @@ plugins stay in use.
   still held when the panel closes. The panel labels its keys from the
   keyboard layout in use (`Gdk.Keymap`), and is dragged with
   `strata/pointer`, since a Wayland window doesn't know where it is.
+  `mouse-keys.hpp` (1.128) is Mouse Keys: with `strata-shell/mouse_keys`
+  on it swallows the keypad keys (and, with `mouse_keys_letters`, the
+  letter keys a laptop uses instead) and drives a wlr_pointer of its own,
+  announced on the backend's `new_input` signal so the seat treats it like
+  any mouse, sending motion, button and frame events. A held key moves the
+  pointer every 16 ms, still for `mouse_keys_delay` and then speeding up
+  to `mouse_keys_speed`. Option tapped alone five times tells Topline
+  "mouse turned on" or "off"; Topline saves the setting, plays a sound
+  and shows a notice (`mouse_keys.py`).
   `colour-filters.hpp` (1.99) is Colour filters: greyscale, filters for
   red/green and blue/yellow colour blindness, or a colour tint, at a chosen
   intensity (`strata-shell/colour_filter`, `colour_filter_intensity`,

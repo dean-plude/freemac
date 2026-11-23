@@ -48,6 +48,7 @@
 #include "sticky-keys.hpp"
 #include "slow-keys.hpp"
 #include "screen-keyboard.hpp"
+#include "mouse-keys.hpp"
 #include "hover-text.hpp"
 #include "colour-filters.hpp"
 #include "mission-control.hpp"
@@ -874,6 +875,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_accents::hold_t accents;
     strata_slow::slow_t slow_keys;
     strata_screen_keys::keys_t screen_keys;
+    strata_mouse_keys::mouse_keys_t mouse_keys;
     strata_sticky::sticky_t sticky;
     strata_hover::hover_t hover_text;
     strata_filters::filters_t colour_filters;
@@ -1017,6 +1019,7 @@ class strata_shell_impl : public wf::plugin_interface_t
         // Slow Keys first: it holds a key back before anything else sees it.
         slow_keys.init(&strata_accents::strata_tell_topline);
         screen_keys.init(&slow_keys);
+        mouse_keys.init(&strata_accents::strata_tell_topline);
         command_key.init();
         accents.init();
         sticky.init(&strata_accents::strata_tell_topline);

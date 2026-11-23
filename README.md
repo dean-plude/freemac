@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.127 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.128 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -107,6 +107,7 @@ one of them will be reverted.
 | Hover Text: hold Command and point at some words to see that line large above the pointer, in any app (Dials > Accessibility) | **Strata**, **Topline**, Tesseract | 1.125 |
 | Slow Keys: a key counts only once it has been held for a moment, so keys brushed by accident aren't typed, with a click as each one goes down and counts (Dials > Accessibility) | **Strata**, **Topline**, Dials | 1.126 |
 | Accessibility Keyboard: a keyboard on the screen to type with the pointer alone, with Shift, Control, Option and Command held for the next key (Dials > Accessibility) | **Topline**, **Strata**, Dials | 1.127 |
+| Mouse Keys: move the pointer and click with the number keypad, or press Option five times to turn it on (Dials > Accessibility) | **Strata**, Topline, Dials | 1.128 |
 | Live Text: Frame finds the words in a picture or a scanned PDF, so you can select and copy them (⌘C), or light up all of them with the Live Text button | **Frame**, Tesseract | 1.124 |
 | Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |

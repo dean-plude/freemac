@@ -149,6 +149,10 @@ class StickyPanel(Gtk.Window):
             keys.append(label)
         self._panel(*keys)
 
+    def show_notice(self, text):
+        """A few words in the corner for a moment (Mouse Keys uses it too)."""
+        self._show_notice(text)
+
     def _show_notice(self, text):
         label = Gtk.Label(label=text)
         label.get_style_context().add_class("sticky-notice")
