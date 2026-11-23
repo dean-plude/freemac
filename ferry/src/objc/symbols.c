@@ -170,12 +170,15 @@ extern char _objc_empty_cache_storage[];
     X(objc_opt_respondsToSelector, objc_opt_respondsToSelector) \
     X(objc_enumerationMutation, objc_enumerationMutation) \
     X(objc_setEnumerationMutationHandler, objc_setEnumerationMutationHandler) \
-    X(objc_exception_throw, objc_exception_throw) \
-    X(objc_exception_rethrow, objc_exception_rethrow) \
+    X(objc_exception_throw, ferry_objc_exception_throw) \
+    X(objc_exception_rethrow, ferry_objc_exception_rethrow) \
     X(objc_begin_catch, objc_begin_catch) \
     X(objc_end_catch, objc_end_catch) \
     X(objc_terminate, objc_terminate) \
+    X(objc_setUncaughtExceptionHandler, objc_setUncaughtExceptionHandler) \
+    X(objc_setExceptionPreprocessor, objc_setExceptionPreprocessor) \
     X(__objc_personality_v0, ferry_objc_personality) \
+    X(__gxx_personality_v0, ferry_objc_personality) \
     X(imp_implementationWithBlock, imp_implementationWithBlock) \
     X(imp_getBlock, imp_getBlock) \
     X(imp_removeBlock, imp_removeBlock)
@@ -185,6 +188,8 @@ OBJC_FUNCTIONS(DECLARE)
 
 extern struct fobjc_class ferry_class_NSObject, ferry_meta_NSObject, ferry_class_Protocol, ferry_meta_Protocol;
 extern struct fobjc_class ferry_block_NSBlock, ferry_meta_NSBlock;
+extern const void *objc_ehtype_vtable[3];
+extern const struct ferry_ehtype OBJC_EHTYPE_id;
 
 #define ENTRY(name, impl) {#name, (void *)impl},
 const struct ferry_symbol ferry_objc_symbols[] = {
@@ -194,5 +199,7 @@ const struct ferry_symbol ferry_objc_symbols[] = {
     {"OBJC_CLASS_$_Protocol", &ferry_class_Protocol},
     {"OBJC_METACLASS_$_Protocol", &ferry_meta_Protocol},
     {"_objc_empty_cache", _objc_empty_cache_storage},
+    {"objc_ehtype_vtable", (void *)objc_ehtype_vtable},
+    {"OBJC_EHTYPE_id", (void *)&OBJC_EHTYPE_id},
     {NULL, NULL},
 };

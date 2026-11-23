@@ -208,7 +208,7 @@ static int32_t mac_toupper(int32_t c) { return c >= 0 && c < 256 ? default_rune.
 
 /* ---- tables ------------------------------------------------------------------- */
 
-void ferry_unwind_resume(void *exception); /* objc/nsobject.c */
+void ferry_unwind_resume(void *exception); /* objc/unwind.S */
 
 int *mac_error(void);
 char *mac_strerror(int);

@@ -669,44 +669,6 @@ void objc_enumerationMutation(id obj)
     abort();
 }
 
-/* Objective-C exceptions need a Mach-O stack unwinder, which Ferry doesn't
- * have yet: throwing reports the exception and stops the program. */
-void objc_exception_throw(id exception)
-{
-    fflush(stdout);
-    fprintf(stderr, "ferry: the program threw an Objective-C exception (%s) and Ferry can't "
-            "catch exceptions yet\n", exception ? object_getClassName(exception) : "nil");
-    abort();
-}
-
-void objc_exception_rethrow(void)
-{
-    fflush(stdout);
-    fputs("ferry: the program re-threw an Objective-C exception\n", stderr);
-    abort();
-}
-
-id objc_begin_catch(void *exc) { (void)exc; return nil; }
-void objc_end_catch(void) {}
-void objc_terminate(void)
-{
-    fflush(stdout);
-    abort();
-}
-
-int ferry_objc_personality(int version, int actions, uint64_t cls, void *exc, void *ctx)
-{
-    (void)version; (void)actions; (void)cls; (void)exc; (void)ctx;
-    fflush(stdout);
-    fputs("ferry: the program tried to unwind the stack for an exception, which Ferry can't do yet\n", stderr);
-    abort();
-}
-
-void ferry_unwind_resume(void *exc)
-{
-    ferry_objc_personality(0, 0, 0, exc, NULL);
-}
-
 /* ---- NSObject ------------------------------------------------------------------ */
 
 struct fobjc_class ferry_class_NSObject, ferry_meta_NSObject;

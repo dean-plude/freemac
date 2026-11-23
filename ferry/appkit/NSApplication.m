@@ -656,12 +656,25 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     _running = YES;
     while (_running) {
         @autoreleasepool {
-            NSEvent *e = [self nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantFuture]
-                                              inMode:NSDefaultRunLoopMode dequeue:YES];
-            if (e)
-                [self sendEvent:e];
+            /* As on a Mac, an exception the app's code raises while handling
+             * an event (or a timer) is reported, and the app carries on. */
+            @try {
+                NSEvent *e = [self nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantFuture]
+                                                  inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (e)
+                    [self sendEvent:e];
+            } @catch (NSException *x) {
+                [self reportException:x];
+            }
         }
     }
+}
+
+- (void)reportException:(NSException *)x
+{
+    fflush(stdout);
+    fprintf(stderr, "ferry: the app raised %s (%s) and didn't catch it; carrying on, as a Mac app does\n",
+            [[x name] UTF8String], [[x reason] UTF8String]);
 }
 
 /* Wakes nextEventMatchingMask: so that run notices. */
@@ -847,8 +860,12 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
                 continue;
             NSWindow *w = [e window];
             BOOL key = [e type] == NSEventTypeKeyDown || [e type] == NSEventTypeKeyUp;
-            if (!w || w == window || (key && AKeyWindow() == window))
-                [self sendEvent:e];
+            @try {
+                if (!w || w == window || (key && AKeyWindow() == window))
+                    [self sendEvent:e];
+            } @catch (NSException *x) {
+                [self reportException:x];
+            }
         }
     }
     _modal = outer;

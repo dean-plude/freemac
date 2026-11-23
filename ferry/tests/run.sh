@@ -87,6 +87,14 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
     -framework CoreFoundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
+# Exceptions a program catches (M7), unwound through frame-pointer and
+# frameless functions, and through Foundation's frames.
+run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \
+    -framework Foundation
+run_one foundation_trycatch_frameless "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -O2 \
+    -fomit-frame-pointer -fobjc-arc -framework Foundation
+run_one foundation_trycatch_mrc "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -O0 \
+    -framework Foundation -Wl,-fixup_chains
 # Linked against a system framework Ferry doesn't have (only its .tbd exists).
 run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missing.out" -framework Foundation \
     -F"$here/foundation" -framework Imaginary
@@ -158,6 +166,8 @@ else
 fi
 # Key paths, value transformers and bindings (M6).
 run_one appkit_bindings "$here/appkit/bindings.m" "$here/appkit/bindings.out" -fobjc-arc -framework Cocoa
+# An exception left uncaught in the event loop is reported, not fatal (M7).
+run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.
@@ -205,6 +215,12 @@ if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$buil
     echo "ok   foundation_exception message"; pass=$((pass + 1))
 else
     echo "FAIL foundation_exception message"; fail=$((fail + 1))
+fi
+if grep -q "raised NSInternalInconsistencyException (timer 2 went wrong) and didn't catch it" \
+        "$build/appkit_report.err" 2>/dev/null; then
+    echo "ok   appkit_report message"; pass=$((pass + 1))
+else
+    echo "FAIL appkit_report message"; sed 's/^/    stderr: /' "$build/appkit_report.err"; fail=$((fail + 1))
 fi
 # The missing framework, class and function are each named.
 if grep -q "uses Imaginary, which Ferry doesn't provide yet; carrying on" "$build/foundation_missing.err" 2>/dev/null &&

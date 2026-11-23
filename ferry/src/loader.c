@@ -459,6 +459,11 @@ static void *resolve(struct image *im, const char *raw, int weak, int ordinal)
             return NULL;
         if (looks_like_string_constant(raw) && (addr = missing_string_constant(im, raw)))
             return addr;
+        if (!strncmp(raw, "_OBJC_EHTYPE_$_", 15)) {
+            /* a @catch of a class Ferry doesn't have: one that never matches */
+            note("  missing %s (its @catch never matches)", raw);
+            return (void *)&ferry_ehtype_missing;
+        }
         if (is_class_symbol(raw)) {
             const char *name = raw[6] == 'C' ? raw + 14 : raw + 18;
             static const char *seen[1024];
@@ -746,6 +751,40 @@ static uint64_t image_base(struct image *im)
         if (im->seg[i].fileoff == 0 && im->seg[i].filesize)
             return im->seg[i].vmaddr + im->slide;
     return im->seg[0].vmaddr + im->slide;
+}
+
+/* ---- unwinding ----------------------------------------------------------------
+ * For the exception unwinder (src/objc/exception.c): which loaded image holds
+ * a code address, and where its unwind tables are. */
+
+int ferry_find_unwind(uint64_t pc, struct ferry_unwind_sections *out)
+{
+    for (int i = 0; i < nimages; i++) {
+        struct image *im = images[i];
+        int in_text = 0;
+        for (int s = 0; s < im->nseg && !in_text; s++)
+            if ((im->seg[s].prot & 4) && pc >= im->seg[s].vmaddr + im->slide &&
+                pc < im->seg[s].vmaddr + im->slide + im->seg[s].vmsize)
+                in_text = 1;
+        if (!in_text)
+            continue;
+        memset(out, 0, sizeof *out);
+        out->path = im->path;
+        out->base = image_base(im);
+        for (int s = 0; s < im->nsect; s++) {
+            if (strcmp(im->sect[s].segname, "__TEXT"))
+                continue;
+            if (!strcmp(im->sect[s].name, "__unwind_info")) {
+                out->unwind_info = (const uint8_t *)(im->sect[s].addr + im->slide);
+                out->unwind_size = im->sect[s].size;
+            } else if (!strcmp(im->sect[s].name, "__eh_frame")) {
+                out->eh_frame = (const uint8_t *)(im->sect[s].addr + im->slide);
+                out->eh_size = im->sect[s].size;
+            }
+        }
+        return 1;
+    }
+    return 0;
 }
 
 /* A library with no export trie (built before 10.6): its exported symbols

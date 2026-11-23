@@ -1,0 +1,17 @@
+caught NSInvalidArgumentException: bad 42
+caught MyError by its class: mine
+outer caught NSRangeException: deep 0
+registers kept: yes; caught a string, not an NSException
+  body ran to the end
+  finally (normal)
+  finally (after raise)
+after finally, caught in with_finally
+finally ran 2 times
+  inner caught first, rethrowing
+outer caught the rethrown first
+out of enumerateObjectsUsingBlock: at 1 after 2
+NSArray: NSRangeException
+lock free again after: inside @synchronized
+NS_HANDLER: old style
+caught 1000 of 1000
+exit=0

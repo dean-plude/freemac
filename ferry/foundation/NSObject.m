@@ -22,6 +22,19 @@ NSString *const NSGenericException = @"NSGenericException";
 NSString *const NSRangeException = @"NSRangeException";
 NSString *const NSInvalidArgumentException = @"NSInvalidArgumentException";
 NSString *const NSInternalInconsistencyException = @"NSInternalInconsistencyException";
+NSString *const NSMallocException = @"NSMallocException";
+NSString *const NSObjectInaccessibleException = @"NSObjectInaccessibleException";
+NSString *const NSObjectNotAvailableException = @"NSObjectNotAvailableException";
+NSString *const NSDestinationInvalidException = @"NSDestinationInvalidException";
+NSString *const NSPortTimeoutException = @"NSPortTimeoutException";
+NSString *const NSInvalidSendPortException = @"NSInvalidSendPortException";
+NSString *const NSInvalidReceivePortException = @"NSInvalidReceivePortException";
+NSString *const NSPortSendException = @"NSPortSendException";
+NSString *const NSPortReceiveException = @"NSPortReceiveException";
+NSString *const NSCharacterConversionException = @"NSCharacterConversionException";
+NSString *const NSFileHandleOperationException = @"NSFileHandleOperationException";
+NSString *const NSParseErrorException = @"NSParseErrorException";
+NSString *const NSUndefinedKeyException = @"NSUnknownKeyException";
 
 /* ---- descriptions ------------------------------------------------------------------- */
 
@@ -328,6 +341,22 @@ static NSUncaughtExceptionHandler *uncaught_handler;
 F_EXPORT void NSSetUncaughtExceptionHandler(NSUncaughtExceptionHandler *handler) { uncaught_handler = handler; }
 F_EXPORT NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void) { return uncaught_handler; }
 
+/* What the runtime calls when nothing catches an exception: the program's
+ * own handler, then the message a Mac prints before the program ends. */
+static void report_uncaught(id obj)
+{
+    BOOL isException = [obj isKindOfClass:[NSException class]];
+    if (uncaught_handler && isException)
+        uncaught_handler(obj);
+    fflush(stdout);
+    if (isException)
+        fprintf(stderr, "*** Terminating app due to uncaught exception '%s', reason: '%s'\n",
+                [[(NSException *)obj name] UTF8String], [[obj description] UTF8String]);
+    else
+        fprintf(stderr, "*** Terminating app due to uncaught exception of class '%s'\n", object_getClassName(obj));
+}
+__attribute__((constructor)) static void exceptions_init(void) { objc_setUncaughtExceptionHandler(report_uncaught); }
+
 @implementation NSException {
     NSString *_name, *_reason;
     NSDictionary *_userInfo;
@@ -335,6 +364,10 @@ F_EXPORT NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void) { retur
 + (NSException *)exceptionWithName:(NSExceptionName)name reason:(NSString *)reason userInfo:(NSDictionary *)userInfo
 {
     return [[[self alloc] initWithName:name reason:reason userInfo:userInfo] autorelease];
+}
++ (void)raise:(NSExceptionName)name format:(NSString *)format arguments:(va_list)args
+{
+    [[self exceptionWithName:name reason:FFormat(format, args) userInfo:nil] raise];
 }
 + (void)raise:(NSExceptionName)name format:(NSString *)format, ...
 {
@@ -365,16 +398,21 @@ F_EXPORT NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void) { retur
 - (NSString *)description { return _reason ?: _name; }
 - (void)raise
 {
-    /* Ferry can't unwind Mac stack frames yet (see docs/ferry-gui.md), so an
-     * exception always ends the program, with the message a Mac prints for
-     * one nobody catches. */
-    if (uncaught_handler)
-        uncaught_handler(self);
-    fflush(stdout);
-    fprintf(stderr, "*** Terminating app due to uncaught exception '%s', reason: '%s'\n", [_name UTF8String],
-            [[self description] UTF8String]);
     objc_exception_throw(self);
-    abort();
+}
+/* Ferry doesn't record where an exception was thrown from. */
+- (NSArray *)callStackReturnAddresses { return @[]; }
+- (NSArray *)callStackSymbols { return @[]; }
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    return [self initWithName:[coder decodeObjectForKey:@"NSName"] reason:[coder decodeObjectForKey:@"NSReason"]
+                     userInfo:[coder decodeObjectForKey:@"NSUserInfo"]];
+}
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeObject:_name forKey:@"NSName"];
+    [coder encodeObject:_reason forKey:@"NSReason"];
+    [coder encodeObject:_userInfo forKey:@"NSUserInfo"];
 }
 @end
 

@@ -1093,6 +1093,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @property (readonly, getter=isRunning) BOOL running;
 @property (readonly, getter=isActive) BOOL active;
 @property (readonly) NSEvent *currentEvent;
+- (void)reportException:(NSException *)exception;
 @property (retain) NSImage *applicationIconImage;
 @property (readonly) NSWindow *modalWindow;
 - (void)finishLaunching;
