@@ -13,7 +13,7 @@ run.
 
 ## Screenshots
 
-Taken from the 1.122 live ISO in a virtual machine (QEMU, 1280×800). The
+Taken from the 1.123 live ISO in a virtual machine (QEMU, 1280×800). The
 names, contacts and events in them are made-up examples.
 
 ![The freemac desktop with the Welcome window, menu bar and Dock](docs/screenshots/welcome.png)
@@ -26,7 +26,7 @@ names, contacts and events in them are made-up examples.
 <tr><td width="50%"><img src="docs/screenshots/dark-mode.png" alt="Dark mode, with the night wallpaper"><br><sub>Dark mode, with the night wallpaper</sub></td><td width="50%"><img src="docs/screenshots/dials-dark.png" alt="Dials, the settings app, in dark mode"><br><sub>Dials, the settings app, in dark mode</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/lock-screen.png" alt="The lock screen"><br><sub>The lock screen</sub></td><td width="50%"><img src="docs/screenshots/reel-pip.png" alt="Picture in Picture: a Reel video floating above Tide in the corner"><br><sub>Picture in Picture: a Reel video floating above Tide</sub></td></tr>
 <tr><td width="50%"><img src="docs/screenshots/dynamic-wallpaper.png" alt="Dynamic wallpaper: Tide turning golden at sunset, with the Dynamic switch in Dials"><br><sub>Dynamic wallpaper: the picture turns golden at sunset</sub></td><td width="50%"><img src="docs/screenshots/stage-manager.png" alt="Stage Manager: Crew in the middle, with Quill, Tide and Nudge as small pictures down the left"><br><sub>Stage Manager: one app in front, the others down the side</sub></td></tr>
-<tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control on Desktop 3, holding a Drawer window, with the row of desktops opened out along the top: the button to close Desktop 3 on its corner and + at the right end"><br><sub>Mission Control: add a desktop with +, close one from its corner, drag windows onto them</sub></td><td width="50%"><img src="docs/screenshots/passwords.png" alt="Purser, the Passwords app, showing a saved login with a warning that its password is used on another website"><br><sub>Purser keeps website and Wi-Fi passwords, and warns about reused ones</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/mission-control.png" alt="Mission Control on Desktop 3, holding a Drawer window, with the row of desktops opened out along the top: the button to close Desktop 3 on its corner and + at the right end"><br><sub>Mission Control: add a desktop with +, close one from its corner, drag windows onto them</sub></td><td width="50%"><img src="docs/screenshots/passwords.png" alt="Purser, the Passwords app, showing a saved login with its six-digit verification code and a warning that its password is used on another website"><br><sub>Purser keeps website and Wi-Fi passwords and verification codes, and warns about reused passwords</sub></td></tr>
 </table>
 
 ## Download
@@ -102,6 +102,7 @@ one of them will be reverted.
 | Dock > Options > Assign To: keep an app on All Desktops or on This Desktop (its windows open there and take you there) | **Pier**, **Strata** | 1.111 |
 | App Exposé: Ctrl+Down, a four-finger swipe down, or Dock > Show All Windows spreads out just the windows of one app | **Strata**, **Pier** | 1.112 |
 | Screen reader: Command+F5 (or Dials > Accessibility) speaks what's on the screen, the control you move to and what you type, and comes back at the next login | **Dials**, **Strata**, Orca | 1.120 |
+| Verification codes: Purser keeps the six-digit codes for two-step sign-in beside each login, set up from a website's setup key or its QR code read straight off the screen | **Purser** | 1.123 |
 | Passwords: Web saves and fills in website logins in a keychain opened by your login password, and Purser shows, copies, changes and checks them (reused or easy to guess), with Wi-Fi passwords too | **Purser**, **Dials**, gnome-keyring | 1.122 |
 | Known Wi-Fi networks in Dials > Network: show or copy a saved password after an administrator's password, a QR code a phone scans to join, join automatically, forget | **Dials** | 1.121 |
 | Dials shows a red count beside Software Update when updates are ready, and Dock badges come back if the Dock restarts | **Dials**, **Pier** | 1.118 |

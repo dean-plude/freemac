@@ -1171,6 +1171,15 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.123 "codes" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Verification codes, as the Passwords app on a Mac keeps them: Set Up Verification Code on a login takes a website's setup key, or reads its QR code straight off the screen, and the login then shows its six-digit code, changing every 30 seconds, with Copy and ⌘⌥C | Purser (codes.py) | done |
+| 2 | A Codes list of every login with a code; a code moves with its login when the site or user name is changed, and goes when the login is deleted; Remove Verification Code asks first | Purser | done |
+| 3 | Codes are kept in the keychain beside the passwords, so the login password opens them too | codes.py, gnome-keyring | done |
+| 4 | Guide topic; README row and screenshot; every README screenshot retaken | Guide, Docs | done |
+
 ## 1.122 "passwords" (done)
 
 | # | Item | Component | Status |

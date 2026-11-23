@@ -140,6 +140,16 @@ TOPICS = {
         "Wi-Fi lists the networks this computer has joined, with their passwords after an administrator's "
         "password.",
     ]),
+    "codes": ("Use verification codes for two-step sign-in", "verification code codes two-step two step two-factor 2fa mfa authenticator app otp totp six digit 6-digit qr setup key sign in login purser passwords", [
+        "When a website offers two-step sign-in with an authenticator app, Purser can be that app.",
+        "Open Purser, choose the website's login, then Set Up Verification Code.",
+        "Leave the website's QR code on the screen and choose Scan QR Code. Or copy the setup key the "
+        "website shows and paste it in.",
+        "Purser shows the code now. Type it into the website to finish, then choose Set Up.",
+        "From then on the login shows its code, which changes every 30 seconds, with Copy beside it. "
+        "Codes lists every login that has one.",
+        "Turn off two-step sign-in on the website before you remove a code, or you may be locked out.",
+    ]),
     "appearance": ("Change the look", "dark light mode auto automatic sunset sunrise day night wallpaper dynamic theme accent colour color highlight purple pink green favourite background appearance", [
         "Choose Dials > Appearance for Light, Dark or Auto, and Dials > Wallpaper for the picture on the desktop. "
         "Auto is light while the sun is up and dark after it sets, where you are.",
