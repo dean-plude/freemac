@@ -37,6 +37,16 @@ NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
 void AWarnOnce(const char *what);
 
+/* Code GTK calls back into (drawing, resizing, closing, focus, drops) runs
+ * the app's code under GTK's own frames, which Ferry can't unwind through,
+ * so an exception is caught here and reported, as the event loop does. */
+#define A_REPORTING(...)                                                                                        \
+    @try {                                                                                                      \
+        __VA_ARGS__                                                                                             \
+    } @catch (NSException * x_) {                                                                               \
+        [NSApp reportException:x_];                                                                             \
+    }
+
 /* ---- events -------------------------------------------------------------------------- */
 
 NSEvent *AMouseEvent(NSEventType type, NSPoint location, NSEventModifierFlags flags, NSWindow *window,

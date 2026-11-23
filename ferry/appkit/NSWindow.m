@@ -914,9 +914,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
     @autoreleasepool {
         NSWindow *win = data;
         int width = gtk_widget_get_allocated_width(w), height = gtk_widget_get_allocated_height(w);
-        [win _resizedTo:NSMakeSize(width, height)];
-        [win _ensureBacking];
-        [win displayIfNeeded];
+        A_REPORTING([win _resizedTo:NSMakeSize(width, height)]; [win _ensureBacking]; [win displayIfNeeded];)
         if (win->_backing) {
             cairo_set_source_surface(cr, win->_backing, 0, 0);
             cairo_paint(cr);
@@ -928,7 +926,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
 static void on_size(GtkWidget *w, GdkRectangle *r, void *data)
 {
     @autoreleasepool {
-        [(NSWindow *)data _resizedTo:NSMakeSize(r->width, r->height)];
+        A_REPORTING([(NSWindow *)data _resizedTo:NSMakeSize(r->width, r->height)];)
     }
 }
 
@@ -1090,7 +1088,7 @@ static int on_key(GtkWidget *w, GdkEvent *e, void *data)
 static int on_delete(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
-        [(NSWindow *)data performClose:nil];
+        A_REPORTING([(NSWindow *)data performClose:nil];)
     }
     return 1;   /* AppKit decides; GTK mustn't destroy the window itself */
 }
@@ -1099,8 +1097,7 @@ static int on_focus_in(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
-        [win makeKeyWindow];
-        [win makeMainWindow];
+        A_REPORTING([win makeKeyWindow]; [win makeMainWindow];)
     }
     return 0;
 }
@@ -1110,7 +1107,7 @@ static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
     @autoreleasepool {
         NSWindow *win = data;
         if (key_window == win)
-            [win resignKeyWindow];
+            A_REPORTING([win resignKeyWindow];)
     }
     return 0;
 }

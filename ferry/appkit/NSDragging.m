@@ -255,8 +255,9 @@ static NSPasteboard *drag_pasteboard(void) { return [NSPasteboard pasteboardWith
 
 static void finish_drop(GtkWidget *widget, GdkDragContext *ctx, uint32_t time)
 {
-    BOOL ok = [gtk_window _dragDropAt:gtk_point pasteboard:drag_pasteboard()
-                           operations:mask_from_gdk(gdk_drag_context_get_actions(ctx))];
+    BOOL ok = NO;
+    A_REPORTING(ok = [gtk_window _dragDropAt:gtk_point pasteboard:drag_pasteboard()
+                                  operations:mask_from_gdk(gdk_drag_context_get_actions(ctx))];)
     gtk_drag_finish(ctx, ok, 0, time);
     forget_gtk_drag();
 }
@@ -282,7 +283,8 @@ static int on_drag_motion(GtkWidget *widget, GdkDragContext *ctx, int x, int y, 
             return 1;
         }
         int allowed = gdk_drag_context_get_actions(ctx);
-        NSDragOperation op = [w _dragUpdateAt:gtk_point pasteboard:drag_pasteboard() operations:mask_from_gdk(allowed)];
+        NSDragOperation op = NSDragOperationNone;
+        A_REPORTING(op = [w _dragUpdateAt:gtk_point pasteboard:drag_pasteboard() operations:mask_from_gdk(allowed)];)
         gdk_drag_status(ctx, gdk_from_op(op, allowed), time);
         return 1;
     }
@@ -319,7 +321,8 @@ static void on_drag_data(GtkWidget *widget, GdkDragContext *ctx, int x, int y, G
             return;
         }
         int allowed = gdk_drag_context_get_actions(ctx);
-        NSDragOperation op = [w _dragUpdateAt:gtk_point pasteboard:pb operations:mask_from_gdk(allowed)];
+        NSDragOperation op = NSDragOperationNone;
+        A_REPORTING(op = [w _dragUpdateAt:gtk_point pasteboard:pb operations:mask_from_gdk(allowed)];)
         gdk_drag_status(ctx, gdk_from_op(op, allowed), time);
     }
 }
@@ -333,7 +336,7 @@ static void on_drag_leave(GtkWidget *widget, GdkDragContext *ctx, uint32_t time,
     left = YES;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (left && gtk_context == ctx) {
-            [gtk_window _dragExit];
+            A_REPORTING([gtk_window _dragExit];)
             forget_gtk_drag();
         }
     });

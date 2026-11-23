@@ -162,7 +162,7 @@ if command -v weston > /dev/null 2>&1; then
     run_one appkit_hidpi "$here/appkit/hidpi.m" "$here/appkit/hidpi.out" -fobjc-arc -framework Cocoa
     kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
 else
-    echo "skip appkit_window (needs weston, for a test display)"
+    echo "skip appkit_window, appkit_icon, appkit_hidpi (need weston, for a test display)"
 fi
 # Cairo is loaded only by programs that draw, and GTK only by AppKit's
 # (glibc's LD_DEBUG lists each library loaded).
