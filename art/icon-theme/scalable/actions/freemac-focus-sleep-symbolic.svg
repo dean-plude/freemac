@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- freemac's Sleep Focus icon: a bed with a pillow. Original artwork. -->
+  <path fill="#2e3436" d="M1 3.5h1.5v5.5H15v4.5h-1.5V11.5h-11v2H1z"/>
+  <rect fill="#2e3436" x="3.3" y="6" width="3.2" height="2.3" rx="1"/>
+  <path fill="#2e3436" d="M7.3 5.8h5.2c1.2 0 2.5.9 2.5 2.5h-7.7z"/>
+</svg>
