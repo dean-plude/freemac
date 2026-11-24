@@ -83,6 +83,11 @@ run_one() {
                 HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" second >> "$build/$name.got" \
                     2>> "$build/$name.err" ;;
         security_code) FERRY_VERBOSE=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        foundation_streams)
+            # an echo server of its own, and run.sh's TLS server with its certificate
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            url_env env FERRY_TEST_TLS_CERT="$build/tls.der" timeout 60 "$top/ferry" "$exe" > "$build/$name.got" \
+                2> "$build/$name.err" ;;
         security_trust)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env env FERRY_TEST_TLS_CERT="$build/tls.der" "$top/ferry" "$exe" > "$build/$name.got" \
@@ -91,7 +96,8 @@ run_one() {
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         # threads: a hang is a failure, not a stuck run
         tlv_*|cxx_thread_local) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        pthreads|dispatch_concurrent|foundation_threads|foundation_locks|cxx_threads)
+        pthreads|dispatch_concurrent|foundation_threads|foundation_locks|cxx_threads|libsystem_sockets|libsystem_kqueue|\
+        dispatch_sources|corefoundation_socket|foundation_netservice)
             timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
@@ -129,6 +135,8 @@ run_one dispatch "$here/dispatch.c" "$here/dispatch.out" -fblocks
 # worker threads, with stress cases.
 run_one pthreads "$here/pthreads.c" "$here/pthreads.out"
 run_one dispatch_concurrent "$here/dispatch_concurrent.c" "$here/dispatch_concurrent.out" -fblocks
+# read, write, signal and process sources on real descriptors, signals and a child
+run_one dispatch_sources "$here/dispatch_sources.c" "$here/dispatch_sources.out" -fblocks
 run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
 run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
 run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
@@ -153,6 +161,17 @@ done
 # The system's figures (sysctl, kinfo_proc, libproc, the Mach host and task
 # calls, getattrlist), checked against uname, sysconf and stat.
 run_one libsystem_sysctl "$here/libsystem_sysctl.c" "$here/libsystem_sysctl.out"
+# BSD sockets with the Mac's structures, on 127.0.0.1, ::1 and Unix-domain
+# sockets; where this system has no IPv6 loopback, the test says so instead.
+sockets_out="$here/libsystem_sockets.out"
+if ! grep -qs '^00000000000000000000000000000001 ' /proc/net/if_inet6; then
+    sed 's/^ipv6 loopback: .*/ipv6 loopback: not available on this system/' "$sockets_out" \
+        > "$build/libsystem_sockets.expected"
+    sockets_out="$build/libsystem_sockets.expected"
+fi
+run_one libsystem_sockets "$here/libsystem_sockets.c" "$sockets_out"
+# kqueue and kevent: descriptors, timers, signals, processes and user events.
+run_one libsystem_kqueue "$here/libsystem_kqueue.c" "$here/libsystem_kqueue.out"
 # dlopen, dlsym, dladdr and the _dyld calls: a library found through @rpath
 # and a bundle opened RTLD_LOCAL, both built here.
 mkdir -p "$build/dlfcn_lib"
@@ -203,6 +222,8 @@ done
 # CoreFoundation from plain C, linked under CoreFoundation's own Mac name.
 run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/foundation/corefoundation.out" \
     -framework CoreFoundation
+# Run loop sources and CFSockets on 127.0.0.1, from plain C.
+run_one corefoundation_socket "$here/foundation/cfsocket.c" "$here/foundation/cfsocket.out" -framework CoreFoundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
 # The macOS version, the same in the Mac's version file, uname, NSProcessInfo
@@ -239,6 +260,8 @@ else
     fail=$((fail + 1))
 fi
 run_one tlv_objc "$here/tlv/objc.m" "$here/tlv/objc.out" -fobjc-arc -framework Foundation
+# NSNetService and NSNetServiceBrowser without Bonjour: TXT records, and the failures a program hears.
+run_one foundation_netservice "$here/foundation/netservice.m" "$here/foundation/netservice.out" -framework Foundation
 # Exceptions a program catches (M7), unwound through frame-pointer and
 # frameless functions, and through Foundation's frames.
 run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \
@@ -355,12 +378,16 @@ if command -v python3 > /dev/null 2>&1; then
         openssl x509 -in "$build/tls.crt" -outform DER -out "$build/tls.der"
         run_one security_trust "$here/security/trust.m" "$here/security/trust.out" -framework Foundation \
             -framework Security
+        # NSStream and CFStream: memory, files, a bound pair, TCP to an echo server on 127.0.0.1,
+        # and TLS to the test server (CFNetwork's names, linked under CFNetwork's own Mac name)
+        run_one foundation_streams "$here/foundation/streams.m" "$here/foundation/streams.out" -framework Foundation \
+            -framework CFNetwork -framework Security
     else
-        echo "skip foundation_urltrust and security_trust (need openssl, to make the test server a certificate)"
+        echo "skip foundation_urltrust, security_trust and foundation_streams (need openssl, to make the test server a certificate)"
     fi
     kill "$http_pid" 2> /dev/null; wait "$http_pid" 2> /dev/null
 else
-    echo "skip foundation_urlsession, foundation_urlconnection and the other URL tests (need python3, for a test server)"
+    echo "skip foundation_urlsession, foundation_urlconnection, foundation_streams and the other URL tests (need python3, for a test server)"
 fi
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
 run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.out" \

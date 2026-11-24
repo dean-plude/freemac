@@ -1,0 +1,51 @@
+AF_INET 2 AF_INET6 30 AF_UNIX 1 AF_LINK 18 SOL_SOCKET 0xffff
+sizes: sockaddr 16 in 16 in6 28 un 106 storage 128 dl 20
+addrinfo 48: canonname at 24, addr at 32; msghdr 48, cmsghdr 12, ifaddrs 56, fd_set 128
+listener: len 16 family 2 addr 127.0.0.1 port nonzero 1
+accepted: len 16/16 family 2, matches the client 1, peer is the listener 1
+short buffer: length 16, first bytes 16 2
+SO_TYPE 1 (SOCK_STREAM 1)
+TCP_NODELAY 1
+SO_KEEPALIVE on, TCP_KEEPALIVE 30
+SO_REUSEADDR 1
+poll: revents POLLIN 1; SO_NREAD 5
+peeked he
+received hello
+recvmsg 7: one| two flags 0
+SO_RCVTIMEO about 0.15s 1 (len 16): recv -1 errno 35 (EAGAIN 35)
+select idle: 0, timeout left as 0.050000
+select ready: 1, set 1
+poll with POLLWRBAND asked too: POLLOUT 1, nothing unknown 1
+after shutdown: recv 0
+SO_NOSIGPIPE 1: writing to a closed peer fails with EPIPE or ECONNRESET 1, still running
+accept with nobody waiting: -1 errno 35
+accepted socket non-blocking 1
+bind to a port in use: -1 errno 48 (EADDRINUSE 48)
+connect refused: -1 errno 61 (ECONNREFUSED 61)
+non-blocking connect: -1 errno EINPROGRESS, then SO_ERROR 61
+udp: 4 bytes ping from family 2 len 16
+  IP_PKTINFO: length 24, to 127.0.0.1
+  IP_RECVTTL: length 13, ttl 64
+recvfrom 4 pong: len 16/16 family 2 127.0.0.1
+ipv6 loopback: v6only 1, peer len 28/28 family 30 ::1
+unix: bound, name family 1 path matches 1, sun_len counts the path 1
+unix: LOCAL_PEERPID is us 1, getpeereid uid matches 1, xucred uid matches 1 groups 1
+SCM_RIGHTS: controllen 16, cmsg_len 16, got a descriptor 1
+wrote through it: via
+datagram cut short: 2, MSG_TRUNC 1
+getaddrinfo 127.0.0.1: family 2 socktype 1 protocol 6 addrlen 16, sin_len 16 port 8080, next 0
+getnameinfo: 0 127.0.0.1 8080
+getaddrinfo ::1: family 30 addrlen 28 sin6_len 28 port 443, loopback 1
+getaddrinfo localhost http: 127.0.0.1 port 80, canonical name localhost
+getaddrinfo numeric failure: 8 (EAI_NONAME 8) "nodename nor servname provided, or not known"
+bad family: 5 (EAI_FAMILY 5) "ai_family not supported"
+inet_pton AF_INET6: 1, back ::ffff:1.2.3.4
+inet_pton AF_INET: 1 0a000001, inet_aton 1
+inet_pton unknown family: -1 errno 47 (EAFNOSUPPORT 47)
+gethostbyname: type 2 length 4 first 127.0.0.1
+loopback link: len 20 type IFT_LOOP 1 nlen matches 1 alen 0 index matches 1, if_data mtu nonzero 1
+loopback flags: up 1 loopback 1 running 1
+loopback inet: len 16 127.0.0.1 netmask 255.0.0.0
+loopback's link address comes first 1, link 1 inet 1
+if_indextoname round trip 1
+exit=0

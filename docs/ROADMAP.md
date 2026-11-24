@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.205 "Ferry: network connections and streams" (done)
+
+Ferry 0.32.0: Mac apps can open their own network connections, secure or not, and watch them the Mac way, beyond the web requests Ferry already handled.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | BSD sockets with the Mac's structures, flags, socket options and error numbers; name lookups; `select` and `poll` | Ferry | done |
+| 2 | `kqueue` and `kevent` on epoll (reads, writes, timers, signals, processes, user events), and libdispatch read, write, signal and process sources | Ferry | done |
+| 3 | `CFSocket` and run loop sources; `CFStream` and `NSStream` over data, files, memory, socket pairs and hosts, with delegates, callbacks, run loops or a queue | Ferry | done |
+| 4 | TLS on streams through this system's OpenSSL, with the server checked by Security.framework's trust | Ferry | done |
+| 5 | `NSNetService` TXT records (publishing and browsing fail cleanly until Bonjour arrives); six new tests; `make check` 144 of 144 | Ferry | done |
+
+Bonjour, TLS servers and client certificates, proxies, and file and Mach port events aren't there yet.
+
 ## 1.204 "Ferry: thread-local variables" (done)
 
 Ferry 0.31.0: Mac programs can keep a separate copy of a variable for each thread, which many C++ and newer apps rely on.

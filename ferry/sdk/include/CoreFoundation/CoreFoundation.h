@@ -38,6 +38,7 @@ typedef struct __CFDictionary *CFMutableDictionaryRef;
 typedef const struct __CFData *CFDataRef;
 typedef const struct __CFNumber *CFNumberRef;
 typedef const struct __CFBoolean *CFBooleanRef;
+typedef const struct __CFNull *CFNullRef;
 typedef const struct __CFDate *CFDateRef;
 typedef const struct __CFURL *CFURLRef;
 typedef const struct __CFError *CFErrorRef;
@@ -77,6 +78,7 @@ extern const CFAllocatorRef kCFAllocatorSystemDefault;
 extern const CFAllocatorRef kCFAllocatorNull;
 extern const CFBooleanRef kCFBooleanTrue;
 extern const CFBooleanRef kCFBooleanFalse;
+extern const CFNullRef kCFNull; /* NSNull's object */
 extern const CFRunLoopMode kCFRunLoopDefaultMode;
 extern const CFRunLoopMode kCFRunLoopCommonModes;
 
@@ -202,4 +204,7 @@ CFDictionaryRef CFPreferencesCopyMultiple(CFArrayRef keysToFetch, CFStringRef ap
 Boolean CFPreferencesSynchronize(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 CFArrayRef CFPreferencesCopyKeyList(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 __FERRY_END
+/* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */
+#include <CoreFoundation/CFSocket.h>
+#include <CoreFoundation/CFStream.h>
 #endif

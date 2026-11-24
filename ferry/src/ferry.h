@@ -128,4 +128,52 @@ void ferry_sync_errno(void);
 int ferry_signal_to_linux(int mac_signal);
 int ferry_signal_to_mac(int linux_signal);
 
+/* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
+extern const struct ferry_symbol ferry_socket_symbols[];
+int ferry_af_to_linux(int mac_af); /* -1 for a family Ferry doesn't know */
+int ferry_af_to_mac(int linux_af);
+int ferry_fd_nosigpipe(int fd);    /* SO_NOSIGPIPE is set on it */
+void ferry_socket_closed(int fd);
+
+/* kqueue.c: kqueue and kevent on epoll, select and poll with the Mac's
+ * structures, and the close that forgets a descriptor's events */
+extern const struct ferry_symbol ferry_kqueue_symbols[];
+struct sigaction;
+/* sigaction for posix.c: while a kqueue watches a signal, the program's
+ * handler is kept here and called from the watcher's. */
+int ferry_sigaction(int linux_signal, const struct sigaction *act, struct sigaction *old);
+/* Mac struct kevent64_s calls, for libdispatch's sources */
+struct kevent64_s {
+    uint64_t ident;
+    int16_t filter;
+    uint16_t flags;
+    uint32_t fflags;
+    int64_t data;
+    uint64_t udata;
+    uint64_t ext[2];
+};
+#define FERRY_EVFILT_READ (-1)
+#define FERRY_EVFILT_WRITE (-2)
+#define FERRY_EVFILT_PROC (-5)
+#define FERRY_EVFILT_SIGNAL (-6)
+#define FERRY_EVFILT_TIMER (-7)
+#define FERRY_EVFILT_USER (-10)
+#define FERRY_EV_ADD 0x0001
+#define FERRY_EV_DELETE 0x0002
+#define FERRY_EV_ENABLE 0x0004
+#define FERRY_EV_DISABLE 0x0008
+#define FERRY_EV_ONESHOT 0x0010
+#define FERRY_EV_CLEAR 0x0020
+#define FERRY_EV_RECEIPT 0x0040
+#define FERRY_EV_DISPATCH 0x0080
+#define FERRY_EV_ERROR 0x4000
+#define FERRY_EV_EOF 0x8000
+#define FERRY_NOTE_TRIGGER 0x01000000
+#define FERRY_NOTE_EXIT 0x80000000u
+#define FERRY_NOTE_EXITSTATUS 0x04000000u
+struct timespec;
+int ferry_kqueue(void);
+int ferry_kevent64(int kq, const struct kevent64_s *changes, int nchanges, struct kevent64_s *events, int nevents,
+                   unsigned int flags, const struct timespec *timeout);
+
 #endif

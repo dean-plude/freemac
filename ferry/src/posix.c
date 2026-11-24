@@ -519,7 +519,7 @@ static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_si
         }
     }
     void *previous = mac_handler[s];
-    int rc = sigaction(s, act ? &in : NULL, &out);
+    int rc = ferry_sigaction(s, act ? &in : NULL, &out);
     if (rc == 0 && old) {
         int f = out.sa_flags;
         old->handler = (out.sa_handler == trampoline || (void *)out.sa_sigaction == (void *)trampoline_info)
@@ -648,6 +648,7 @@ static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(
 
 #define MAC_TIOCGWINSZ 0x40087468ul
 #define MAC_FIONREAD   0x4004667ful
+#define MAC_FIONBIO    0x8004667eul
 
 static int mac_ioctl(int fd, unsigned long req, ...)
 {
@@ -659,6 +660,8 @@ static int mac_ioctl(int fd, unsigned long req, ...)
         return ioctl(fd, TIOCGWINSZ, arg);
     if (req == MAC_FIONREAD)
         return ioctl(fd, FIONREAD, arg);
+    if (req == MAC_FIONBIO) /* an int, nonzero for non-blocking */
+        return ioctl(fd, FIONBIO, arg);
     errno = ENOTTY;
     return -1;
 }

@@ -77,7 +77,7 @@ extern struct dispatch_queue_s _dispatch_main_q;
 extern struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent;
 extern const struct dispatch_source_type_s _dispatch_source_type_timer, _dispatch_source_type_data_add,
     _dispatch_source_type_data_or, _dispatch_source_type_data_replace, _dispatch_source_type_read,
-    _dispatch_source_type_write, _dispatch_source_type_signal;
+    _dispatch_source_type_write, _dispatch_source_type_signal, _dispatch_source_type_proc;
 __FERRY_END
 
 #ifdef __OBJC__
@@ -99,6 +99,12 @@ __FERRY_END
 #define DISPATCH_SOURCE_TYPE_READ (&_dispatch_source_type_read)
 #define DISPATCH_SOURCE_TYPE_WRITE (&_dispatch_source_type_write)
 #define DISPATCH_SOURCE_TYPE_SIGNAL (&_dispatch_source_type_signal)
+#define DISPATCH_SOURCE_TYPE_PROC (&_dispatch_source_type_proc)
+typedef unsigned long dispatch_source_proc_flags_t;
+#define DISPATCH_PROC_EXIT 0x80000000ul
+#define DISPATCH_PROC_FORK 0x40000000ul
+#define DISPATCH_PROC_EXEC 0x20000000ul
+#define DISPATCH_PROC_SIGNAL 0x08000000ul
 
 __FERRY_BEGIN
 dispatch_time_t dispatch_time(dispatch_time_t when, int64_t delta);

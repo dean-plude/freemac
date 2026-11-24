@@ -1,0 +1,10 @@
+TXT record: 25 bytes, first string 5 bytes "flag="
+  flag = ""
+  path = "a=b"
+  version = "1"
+a lone key, a repeated key, a cut string: 2 keys, lonek empty 1, a "1"
+service: Test _ferry._tcp. local. port 4242, TXT set 1
+nothing before the run loop runs: ""
+events: will-publish did-not-publish(-72000) will-resolve did-not-resolve(-72000) will-search did-not-search(-72000)
+resolved: host none, 0 addresses
+exit=0

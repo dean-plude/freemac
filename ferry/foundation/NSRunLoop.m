@@ -44,6 +44,8 @@ struct fsource {
     int fd;
     void (*callback)(int fd, void *ctx);
     void *ctx;
+    short events;                                    /* POLLIN unless a handler asked otherwise */
+    void (*handler)(int fd, short revents, void *ctx); /* the streams' and CFSocket's, given what is ready */
 };
 
 /* libSystem's dispatch queues (src/objc/dispatch.c): the main queue's work
@@ -63,6 +65,7 @@ extern void ferry_dispatch_set_main_wakeup(void (*fn)(void));
     NSString *_mode;
     os_unfair_lock _lock; /* other threads add blocks and timers, and stop it */
     int _wake[2];
+    int _keepAlive; /* sources with nothing to poll for yet (CFRunLoopSource, a stream being opened) */
 }
 
 /* NSThread.m keeps each thread's run loop. */
@@ -173,15 +176,60 @@ static void wake_main_loop(void) { [main_loop _wakeUp]; }
 {
     os_unfair_lock_lock(&_lock);
     _sources = realloc(_sources, (_nsources + 1) * sizeof *_sources);
-    _sources[_nsources++] = (struct fsource){fd, callback, ctx};
+    _sources[_nsources++] = (struct fsource){fd, callback, ctx, POLLIN, NULL};
     os_unfair_lock_unlock(&_lock);
     [self _wakeUp];
 }
+/* A descriptor watched for events, given to handler with what is ready; the
+ * same descriptor and context again changes the events (0 keeps it as a
+ * source, watching nothing). */
+- (void)_addDescriptor:(int)fd events:(short)events handler:(void (*)(int, short, void *))handler context:(void *)ctx
+{
+    os_unfair_lock_lock(&_lock);
+    int i = 0;
+    while (i < _nsources && !(_sources[i].fd == fd && _sources[i].ctx == ctx && _sources[i].handler))
+        i++;
+    if (i == _nsources) {
+        _sources = realloc(_sources, (_nsources + 1) * sizeof *_sources);
+        _nsources++;
+    }
+    _sources[i] = (struct fsource){fd, NULL, ctx, events, handler};
+    os_unfair_lock_unlock(&_lock);
+    [self _wakeUp];
+}
+- (void)_removeDescriptor:(int)fd context:(void *)ctx
+{
+    os_unfair_lock_lock(&_lock);
+    for (int i = 0; i < _nsources; i++) {
+        if (_sources[i].fd == fd && _sources[i].ctx == ctx && _sources[i].handler) {
+            memmove(_sources + i, _sources + i + 1, (_nsources - i - 1) * sizeof *_sources);
+            _nsources--;
+            break;
+        }
+    }
+    os_unfair_lock_unlock(&_lock);
+}
+- (BOOL)_stillWatching:(const struct fsource *)f
+{
+    BOOL found = NO;
+    os_unfair_lock_lock(&_lock);
+    for (int i = 0; i < _nsources && !found; i++)
+        found = _sources[i].fd == f->fd && _sources[i].ctx == f->ctx && _sources[i].handler == f->handler &&
+                (_sources[i].events & f->events);
+    os_unfair_lock_unlock(&_lock);
+    return found;
+}
+- (void)_addKeepAlive
+{
+    __atomic_add_fetch(&_keepAlive, 1, __ATOMIC_SEQ_CST);
+    [self _wakeUp];
+}
+- (void)_removeKeepAlive { __atomic_sub_fetch(&_keepAlive, 1, __ATOMIC_SEQ_CST); }
 - (void)removeDescriptor:(int)fd
 {
     os_unfair_lock_lock(&_lock);
     for (int i = 0; i < _nsources; i++) {
-        if (_sources[i].fd == fd) {
+        if (_sources[i].fd == fd && !_sources[i].handler) {
             memmove(_sources + i, _sources + i + 1, (_nsources - i - 1) * sizeof *_sources);
             _nsources--;
             break;
@@ -232,7 +280,8 @@ static BOOL pollers_active(void)
 - (BOOL)hasWork
 {
     os_unfair_lock_lock(&_lock);
-    BOOL own = [_timers count] || [_blocks count] || [_ports count] || _nsources;
+    BOOL own = [_timers count] || [_blocks count] || [_ports count] || _nsources ||
+               __atomic_load_n(&_keepAlive, __ATOMIC_SEQ_CST) > 0;
     os_unfair_lock_unlock(&_lock);
     if (own)
         return YES;
@@ -324,8 +373,8 @@ static void drain_wake(int fd)
     fds[0].fd = _wake[0];
     fds[0].events = POLLIN;
     for (int i = 0; i < count; i++) {
-        fds[1 + i].fd = snapshot[i].fd;
-        fds[1 + i].events = POLLIN;
+        fds[1 + i].fd = snapshot[i].events ? snapshot[i].fd : -1; /* poll skips a negative one */
+        fds[1 + i].events = snapshot[i].events;
     }
     int base = 1 + count, extra = 0;
     int pstart[MAX_POLLERS], pcount[MAX_POLLERS], np = _main ? npollers : 0;
@@ -352,7 +401,12 @@ static void drain_wake(int fd)
         for (int i = 0; i < count; i++) {
             if (fds[1 + i].revents) {
                 @autoreleasepool {
-                    snapshot[i].callback(snapshot[i].fd, snapshot[i].ctx);
+                    if (snapshot[i].handler) {
+                        /* an earlier handler may have removed it (and freed its context) */
+                        if ([self _stillWatching:&snapshot[i]])
+                            snapshot[i].handler(snapshot[i].fd, fds[1 + i].revents, snapshot[i].ctx);
+                    } else
+                        snapshot[i].callback(snapshot[i].fd, snapshot[i].ctx);
                 }
                 *handled = YES;
             }

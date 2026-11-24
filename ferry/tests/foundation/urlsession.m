@@ -225,9 +225,13 @@ static void errors(void)
 static void cancelling(void)
 {
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    // The handler may run before the line after cancel is printed, so it
+    // waits for that line to keep the output in order.
+    dispatch_semaphore_t printed = dispatch_semaphore_create(0);
     __block NSURLSessionDataTask *task;
     task = [[NSURLSession sharedSession] dataTaskWithURL:U(@"/slow?ms=2000")
                                        completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
+                                         dispatch_semaphore_wait(printed, DISPATCH_TIME_FOREVER);
                                          show_error("cancelled", e);
                                          printf("cancelled: data %s, state %ld in the handler\n",
                                                 d ? "kept" : "nil", (long)task.state);
@@ -242,6 +246,7 @@ static void cancelling(void)
            after == NSURLSessionTaskStateCanceling || after == NSURLSessionTaskStateCompleted
                ? "canceling (or completed already)"
                : "still running");
+    dispatch_semaphore_signal(printed);
     wait_for(sem);
     // cancelled before it was ever resumed
     NSURLSessionDataTask *never = [[NSURLSession sharedSession]
@@ -364,6 +369,10 @@ static void downloads(void)
             dispatch_semaphore_signal(sem);
           }] resume];
     wait_for(sem);
+    // The session removes the file once the handler has returned, on its own
+    // thread, so give it a moment rather than racing it.
+    for (int i = 0; i < 200 && access(path.fileSystemRepresentation, F_OK) == 0; i++)
+        usleep(10000);
     printf("download: the file is gone after the handler %s\n", access(path.fileSystemRepresentation, F_OK) ? "yes" : "no");
 
     NSMutableURLRequest *put = [NSMutableURLRequest requestWithURL:U(@"/echo")];

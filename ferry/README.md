@@ -168,6 +168,8 @@ first, when their thread ends, and the main thread's are destroyed when the
 program exits, before its static objects. A thread's copies are freed when
 it ends, and `ferry-cc` links programs that use them.
 
+From Ferry 0.32.0 (freemac 1.205), programs can use the network the BSD way: sockets with Mac layouts and errors, select, poll, kqueue and kevent, libdispatch READ, WRITE, SIGNAL and PROC sources, CFSocket with a run loop source, and CFStream and NSStream socket streams with delegates, client callbacks and TLS through the system's OpenSSL (libssl 3 or 1.1), with certificates checked by Security.framework's trust calls. NSNetService and NSNetServiceBrowser are there but have no Bonjour, so they always report that it can't be reached.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
