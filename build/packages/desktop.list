@@ -68,6 +68,10 @@ xdg-utils
 file
 xdg-user-dirs
 epiphany-browser
+# The desktop portal: GTK 4 apps' dark mode and file pickers, and the names
+# of websites added to the Dock (Web looks its web apps up through it).
+xdg-desktop-portal
+xdg-desktop-portal-gtk
 gir1.2-nm-1.0
 # The code a phone scans to join a known Wi-Fi network (Dials > Network).
 python3-qrcode

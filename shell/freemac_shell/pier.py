@@ -32,7 +32,8 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import alert, apps, held, launcher_badge, login_items, main_display, recents, stage, style, volumes  # noqa: E402
+from . import (alert, apps, held, launcher_badge, login_items, main_display, recents, stage, style,  # noqa: E402
+               volumes, webapps)
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -455,6 +456,8 @@ class Item(Gtk.Button):
                 info = Gio.DesktopAppInfo.new(desktop_id)
             except TypeError:
                 info = None
+            if not info:   # made a moment ago (Web's Add to Dock…)
+                info = apps.app_info(desktop_id[: -len(".desktop")] if desktop_id.endswith(".desktop") else desktop_id)
         if not info and app_id:
             info = apps.app_info(app_id)
         self.info = info
@@ -723,6 +726,19 @@ class Item(Gtk.Button):
             choice.connect("activate", lambda *_, on=on, turn=turn: turn(not on))
             sub.append(choice)
         self._assign_items(sub)
+        if webapps.is_web_app(desktop_id):
+            # A website added to the Dock (Web's File > Add to Dock…).
+            sub.append(Gtk.SeparatorMenuItem())
+            delete = Gtk.MenuItem()
+            box = Gtk.Box(spacing=0)
+            gap = Gtk.Label(label="")
+            gap.set_size_request(18, -1)
+            box.pack_start(gap, False, False, 0)
+            box.pack_start(Gtk.Label(label="Delete Web App…", xalign=0), True, True, 0)
+            delete.add(box)
+            delete.connect("activate", lambda *_: subprocess.Popen(["freemac-webapp", "--delete", desktop_id],
+                                                                   start_new_session=True))
+            sub.append(delete)
         if self.is_recent:
             sub.append(Gtk.SeparatorMenuItem())
             remove = Gtk.MenuItem()
