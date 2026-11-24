@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry's Core Data: shared internals (freemac 1.NEXT, Ferry 0.NEXT). Our
+ * Ferry's Core Data: shared internals (freemac 1.209, Ferry 0.35.0). Our
  * own code, written from Apple's public documentation of Core Data (the
  * Core Data Programming Guide and the class references); built as a
  * Mach-O library with ferry-cc, without ARC. No Apple code was used, and

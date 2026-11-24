@@ -1,0 +1,14 @@
+delivered before the run loop turns: 0
+by name and by object: any:org.freemac.test.self any:org.freemac.test.self/x any:org.freemac.test.self/y x:org.freemac.test.self/x
+a block observer's user info: count 3, words one,two, a date yes
+removed, the block not called: yes
+one observer removed: any:org.freemac.test.self/x
+-- suspended
+suspended at first: no
+three posts while suspended: immediate:org.freemac.test.held/a immediate:org.freemac.test.held/a immediate:org.freemac.test.held/b
+then resumed: coalesce:org.freemac.test.held/a coalesce:org.freemac.test.held/b hold:org.freemac.test.held/a hold:org.freemac.test.held/a hold:org.freemac.test.held/b
+one held, then one posted to deliver at once: coalesce:org.freemac.test.held/c coalesce:org.freemac.test.held/now drop:org.freemac.test.held/now hold:org.freemac.test.held/c hold:org.freemac.test.held/now immediate:org.freemac.test.held/c immediate:org.freemac.test.held/now
+resumed, nothing left: nothing
+an object that isn't a string: NSInvalidArgumentException
+the local type: the same center
+exit=0

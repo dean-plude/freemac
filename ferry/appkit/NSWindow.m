@@ -779,6 +779,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 static int on_draw(GtkWidget *w, cairo_t *cr, void *data);
 static int on_button(GtkWidget *w, GdkEvent *e, void *data);
 static int on_motion(GtkWidget *w, GdkEvent *e, void *data);
+static int on_leave(GtkWidget *w, GdkEvent *e, void *data);
 static int on_scroll(GtkWidget *w, GdkEvent *e, void *data);
 static int on_key(GtkWidget *w, GdkEvent *e, void *data);
 static int on_delete(GtkWidget *w, GdkEvent *e, void *data);
@@ -821,6 +822,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_area, "button-press-event", on_button, self);
     connect(_area, "button-release-event", on_button, self);
     connect(_area, "motion-notify-event", on_motion, self);
+    connect(_area, "leave-notify-event", on_leave, self);
     connect(_area, "scroll-event", on_scroll, self);
     connect(_area, "size-allocate", on_size, self);
     connect(_gtk, "key-press-event", on_key, self);
@@ -1288,6 +1290,8 @@ static int button_index(NSEventType t)
 {
     if (_closing && [e type] != NSEventTypeApplicationDefined)
         return;
+    if (ATrackEvent(self, e))      /* tracking areas and cursor rectangles (NSTrackingArea.m) */
+        return;
     NSEvent *saved = _current;
     _current = e;
     [self retain];
@@ -1511,11 +1515,21 @@ static int on_motion(GtkWidget *w, GdkEvent *e, void *data)
                            : state & GDK_BUTTON3_MASK ? NSEventTypeRightMouseDragged
                            : state & GDK_BUTTON2_MASK ? NSEventTypeOtherMouseDragged
                                                       : NSEventTypeMouseMoved;
-        if (type == NSEventTypeMouseMoved && !win->_acceptsMoved && !win->_overlay)
+        if (type == NSEventTypeMouseMoved && !win->_acceptsMoved && !win->_overlay && !ATrackingWantsMoves(win))
             return 1;
         AEnqueueEvent(AMouseEvent(type, p, AModifiersFromGdk(state), win, 0, type == NSEventTypeRightMouseDragged));
     }
     return 1;
+}
+
+/* The pointer leaving the window: what tracking areas it was in are left. */
+static int on_leave(GtkWidget *w, GdkEvent *e, void *data)
+{
+    @autoreleasepool {
+        NSWindow *win = data;
+        AEnqueueEvent(ATrackingWindowExitEvent(win, location(win, e, NULL)));
+    }
+    return 0;
 }
 
 static int on_scroll(GtkWidget *w, GdkEvent *e, void *data)

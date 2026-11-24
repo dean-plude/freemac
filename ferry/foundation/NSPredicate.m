@@ -82,7 +82,7 @@
 - (NSPredicate *)_substitute:(NSDictionary *)vars { return self; }
 - (void)_ferryAddKeyPathsTo:(NSMutableSet *)set {}
 /* The predicate's tree, for Core Data's SQLite store to read (freemac
- * 1.NEXT, Ferry 0.NEXT): nil for a predicate it can't describe. */
+ * 1.209, Ferry 0.35.0): nil for a predicate it can't describe. */
 - (id)_ferryStructure { return nil; }
 - (BOOL)evaluateWithObject:(id)object { return [self _evaluate:object vars:nil]; }
 - (BOOL)evaluateWithObject:(id)object substitutionVariables:(NSDictionary *)bindings

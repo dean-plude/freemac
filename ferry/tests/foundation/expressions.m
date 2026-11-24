@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * NSExpression in its forms, the built-in functions, NSComparisonPredicate,
- * MATCHES and predicateWithSubstitutionVariables: (freemac 1.NEXT, Ferry 0.NEXT). */
+ * MATCHES and predicateWithSubstitutionVariables: (freemac 1.211, Ferry 0.37.0). */
 #import <Foundation/Foundation.h>
 #include <stdio.h>
 

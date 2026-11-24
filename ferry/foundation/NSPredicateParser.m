@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: reading predicates and expressions from format
  * strings, as the "Predicate Format String Syntax" of Apple's Predicate
- * Programming Guide describes them (freemac 1.NEXT, Ferry 0.NEXT). Our own
+ * Programming Guide describes them (freemac 1.211, Ferry 0.37.0). Our own
  * code; no Apple code was used.
  *
  * Predicates: AND, OR and NOT (also &&, || and !) over comparisons, with

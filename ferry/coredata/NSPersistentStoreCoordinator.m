@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: the persistent store coordinator, the store base
  * class, and the in-memory and binary stores, as Apple's class
- * references describe them (freemac 1.NEXT, Ferry 0.NEXT). Our own code;
+ * references describe them (freemac 1.209, Ferry 0.35.0). Our own code;
  * no Apple code was used.
  *
  * The coordinator hands each fetch to the stores that hold the entity

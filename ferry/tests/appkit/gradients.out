@@ -48,8 +48,9 @@ archived shadow: offset 1,-1 blur 3, equal yes
 no colour: nil
 filled under a shadow with no colour (3,3): 1.0 0.0 0.0 1.0
 beside it (8,8): 0.0 0.0 0.0 0.0
-filled under a drop shadow (Ferry draws no shadow yet) (3,5): 1.0 0.0 0.0 1.0
+filled under a drop shadow (3,5): 1.0 0.0 0.0 1.0
+its shadow, below and right (6,3): 0.0 0.0 0.0 0.6
 shadow attribute name: NSShadow
 text attributes: 2, shadow kept: yes
-text with a shadow attribute drawn
+text with a shadow attribute drawn, more pixels inked than without: yes
 exit=0

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry's Core Data: the SQLite store (freemac 1.NEXT, Ferry 0.NEXT). Our
+ * Ferry's Core Data: the SQLite store (freemac 1.209, Ferry 0.35.0). Our
  * own code, on the host's sqlite3. The tables are Ferry's own, and a store
  * file written by a Mac's Core Data isn't read (nor one of ours by a Mac's):
  *
@@ -16,7 +16,7 @@
  *
  * Names are the model's in upper case. Dates are kept as seconds since the
  * reference date, UUIDs and URLs as text, Booleans as 0 and 1, and decimal
- * numbers as text, their digits exactly (freemac 1.NEXT, Ferry 0.NEXT; a
+ * numbers as text, their digits exactly (freemac 1.211, Ferry 0.37.0; a
  * store that kept them as doubles has those columns changed to text when
  * it is opened for writing).
  *

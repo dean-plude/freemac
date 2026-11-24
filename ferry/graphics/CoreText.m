@@ -21,6 +21,19 @@ const CFStringRef kCTStrokeColorAttributeName = (CFStringRef)@"CTStrokeColor";
 const CFStringRef kCTParagraphStyleAttributeName = (CFStringRef)@"NSParagraphStyle";
 const CFStringRef kCTLigatureAttributeName = (CFStringRef)@"NSLigature";
 
+/* AppKit's text attributes that Core Text draws too: a shadow (NSShadow,
+ * under the run's glyphs) and an attachment (NSTextAttachment, an image in
+ * the place of its U+FFFC character). AppKit's classes answer these. */
+static NSString *const shadow_key = @"NSShadow", *const attachment_key = @"NSAttachment";
+@interface NSObject (FerryTextDrawing)
+- (CGSize)shadowOffset;
+- (CGFloat)shadowBlurRadius;
+- (id)shadowColor;
+/* an attachment's box: x 0, y from the baseline (up), width and height */
+- (CGRect)_ferryAttachmentBounds;
+- (void)_ferryDrawAttachmentInRect:(CGRect)rect context:(CGContextRef)context;
+@end
+
 /* The Pango context everything is laid out in: 72 dots per inch, so a size
  * in points is a size in user-space units, and no hinting of metrics, so
  * widths scale exactly with the size. */
@@ -641,6 +654,23 @@ static GLayout *make_layout(NSAttributedString *as, NSRange range)
                             }
                             if ([attrs[(id)kCTStrokeWidthAttributeName] doubleValue] != 0)
                                 GWarnOnce("outlined text (kCTStrokeWidthAttributeName)");
+                            id att = attrs[attachment_key];
+                            if ([att respondsToSelector:@selector(_ferryAttachmentBounds)]) {
+                                CGRect b = [att _ferryAttachmentBounds];
+                                PangoRectangle box = {0, (int)lround(-(b.origin.y + b.size.height) * PANGO_SCALE),
+                                                      (int)lround(b.size.width * PANGO_SCALE),
+                                                      (int)lround(b.size.height * PANGO_SCALE)};
+                                /* the line keeps at least its font's ascent and descent */
+                                double top = fmax(b.origin.y + b.size.height, CTFontGetAscent((CTFontRef)font));
+                                double below = fmax(-b.origin.y, CTFontGetDescent((CTFontRef)font));
+                                PangoRectangle room = {0, (int)lround(-top * PANGO_SCALE), box.width,
+                                                       (int)lround((top + below) * PANGO_SCALE)};
+                                for (NSUInteger i = r.location; i < NSMaxRange(r); i++)
+                                    if ([as.string characterAtIndex:i] == 0xFFFC)
+                                        add_attr(list, pango_attr_shape_new(&box, &room),
+                                                 (unsigned)l->offsets[i - range.location],
+                                                 (unsigned)l->offsets[i + 1 - range.location]);
+                            }
                         }];
     pango_layout_set_attributes(l->layout, list);
     pango_attr_list_unref(list);
@@ -818,12 +848,99 @@ CFIndex CTLineGetStringIndexForPosition(CTLineRef line, CGPoint position)
     return (CFIndex)(l->range.location + i);
 }
 
+/* Each run of the line with an NSShadow attribute: its glyphs alone (the
+ * rest of the line made transparent in a copy of the layout) drawn for
+ * their shadow only, so that every shadow lies under the whole line. */
+static void draw_run_shadows(GLine *line, GContext *c, CGFloat x, CGFloat y)
+{
+    GLayout *l = line->layout;
+    CFRange lr = CTLineGetStringRange((CTLineRef)line);
+    if (lr.length <= 0)
+        return;
+    NSRange range = NSMakeRange((NSUInteger)lr.location, (NSUInteger)lr.length);
+    [l->source enumerateAttribute:shadow_key
+                          inRange:range
+                          options:0
+                       usingBlock:^(id shadow, NSRange r, BOOL *stop) {
+                           double rgba[4];
+                           if (![shadow respondsToSelector:@selector(shadowOffset)] ||
+                               ![shadow respondsToSelector:@selector(shadowColor)] ||
+                               !rgba_of([shadow shadowColor], rgba) || rgba[3] <= 0)
+                               return;
+                           unsigned s = (unsigned)l->offsets[r.location - l->range.location];
+                           unsigned e = (unsigned)l->offsets[NSMaxRange(r) - l->range.location];
+                           unsigned end = (unsigned)l->offsets[l->range.length];
+                           PangoLayout *copy = pango_layout_copy(l->layout);
+                           PangoAttrList *had = pango_layout_get_attributes(copy);
+                           PangoAttrList *list = had ? pango_attr_list_copy(had) : pango_attr_list_new();
+                           /* an alpha of 0 means "not set" to Pango; 1 is as good as clear */
+                           if (s > 0)
+                               add_attr(list, pango_attr_foreground_alpha_new(1), 0, s);
+                           if (e < end)
+                               add_attr(list, pango_attr_foreground_alpha_new(1), e, end);
+                           pango_layout_set_attributes(copy, list);
+                           pango_attr_list_unref(list);
+                           PangoLayoutLine *pl = pango_layout_get_line_readonly(copy, line->index);
+                           CGContextSaveGState((CGContextRef)c);
+                           struct gstate *st = GSTATE(c);
+                           st->shadowOffset = [shadow shadowOffset];
+                           st->shadowBlur = [shadow respondsToSelector:@selector(shadowBlurRadius)]
+                                                ? fmax(0, [shadow shadowBlurRadius])
+                                                : 0;
+                           memcpy(st->shadowColor, rgba, sizeof rgba);
+                           c->shadowOnly = YES;
+                           GContextDrawText(c, x, y, ^(BOOL path) {
+                               (path ? pango_cairo_layout_line_path : pango_cairo_show_layout_line)(c->cr, pl);
+                           });
+                           c->shadowOnly = NO;
+                           CGContextRestoreGState((CGContextRef)c);
+                           g_object_unref(copy);
+                       }];
+}
+
+/* The line's attachments, each drawn in the room its shape took. */
+static void draw_attachments(GLine *line, GContext *c, CGFloat x, CGFloat y)
+{
+    GLayout *l = line->layout;
+    CFRange lr = CTLineGetStringRange((CTLineRef)line);
+    if (lr.length <= 0 || GSTATE(c)->textMode == kCGTextInvisible)
+        return;
+    PangoLayoutLine *pl = pline(line);
+    NSString *string = l->source.string;
+    [l->source enumerateAttribute:attachment_key
+                          inRange:NSMakeRange((NSUInteger)lr.location, (NSUInteger)lr.length)
+                          options:0
+                       usingBlock:^(id att, NSRange r, BOOL *stop) {
+                           if (![att respondsToSelector:@selector(_ferryDrawAttachmentInRect:context:)])
+                               return;
+                           CGRect b = [att _ferryAttachmentBounds];
+                           for (NSUInteger i = r.location; i < NSMaxRange(r); i++) {
+                               if ([string characterAtIndex:i] != 0xFFFC)
+                                   continue;
+                               int xpos = 0;
+                               pango_layout_line_index_to_x(pl, (int)l->offsets[i - l->range.location], 0, &xpos);
+                               CGContextSaveGState((CGContextRef)c);
+                               CGContextConcatCTM((CGContextRef)c, c->textMatrix);
+                               CGContextTranslateCTM((CGContextRef)c, x, y);
+                               CGAffineTransform tm = c->textMatrix;
+                               c->textMatrix = CGAffineTransformIdentity;
+                               [att _ferryDrawAttachmentInRect:CGRectMake(xpos / (double)PANGO_SCALE, b.origin.y,
+                                                                          b.size.width, b.size.height)
+                                                       context:(CGContextRef)c];
+                               c->textMatrix = tm;
+                               CGContextRestoreGState((CGContextRef)c);
+                           }
+                       }];
+}
+
 static void draw_line(GLine *line, GContext *c, CGFloat x, CGFloat y)
 {
     PangoLayoutLine *pl = pline(line);
+    draw_run_shadows(line, c, x, y);
     GContextDrawText(c, x, y, ^(BOOL path) {
         (path ? pango_cairo_layout_line_path : pango_cairo_show_layout_line)(c->cr, pl);
     });
+    draw_attachments(line, c, x, y);
 }
 
 void CTLineDraw(CTLineRef line, CGContextRef context)

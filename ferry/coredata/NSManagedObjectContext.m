@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: NSManagedObjectContext, with merge policies and
  * conflicts, as Apple's class references and the Core Data Programming
- * Guide describe them (freemac 1.NEXT, Ferry 0.NEXT). Our own code; no
+ * Guide describe them (freemac 1.209, Ferry 0.35.0). Our own code; no
  * Apple code was used.
  *
  * A context keeps the objects it has registered, by object ID, and the

@@ -104,7 +104,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     [arrow closePath];
     NSBezierPath *outline = [[bubble copy] autorelease];
     [outline appendBezierPath:arrow];
-    /* a soft edge in place of a shadow (Ferry draws no shadows) */
+    /* a soft edge in place of a shadow, as before Ferry drew shadows */
     for (int i = 3; i >= 1; i--) {
         [outline setLineWidth:i * 2];
         [[NSColor colorWithWhite:0 alpha:0.03] setStroke];

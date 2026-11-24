@@ -5,9 +5,9 @@
  * a line with and without the areas before and after it, in a rectangle
  * at 0, 90, 180 and 45 degrees, in a path (nothing outside it), between
  * circles and from a rectangle's centre; NSShadow's defaults, copies,
- * equality, archives and set (Ferry's Core Graphics says once on stderr
- * that it draws no shadows yet), and a shadow as a text attribute, the way
- * Spectacle, KeyCastr and Sequel Pro make one. */
+ * equality, archives and set (drawn, with nothing said on stderr), and a
+ * shadow as a text attribute, the way Spectacle, KeyCastr and Sequel Pro
+ * make one, drawn under the text. */
 #import <Cocoa/Cocoa.h>
 
 static NSBitmapImageRep *canvas(int w, int h)
@@ -210,7 +210,8 @@ int main(void)
             NSRectFill(NSMakeRect(2, 4, 4, 4));
             NSRectFill(NSMakeRect(2, 4, 4, 4));
         });
-        pixel("filled under a drop shadow (Ferry draws no shadow yet)", real, 3, 5);
+        pixel("filled under a drop shadow", real, 3, 5);
+        pixel("its shadow, below and right", real, 6, 3);
         printf("shadow attribute name: %s\n", [NSShadowAttributeName UTF8String]);
         NSShadow *text = [NSShadow new];
         [text setShadowOffset:NSMakeSize(0, -1)];
@@ -224,7 +225,19 @@ int main(void)
         draw_into(drawn, ^{
             [label drawAtPoint:NSMakePoint(2, 2)];
         });
-        printf("text with a shadow attribute drawn\n");
+        NSBitmapImageRep *plain = canvas(80, 20);
+        draw_into(plain, ^{
+            [[[NSAttributedString alloc] initWithString:@"Spectacle" attributes:@{NSForegroundColorAttributeName : blue}]
+                drawAtPoint:NSMakePoint(2, 2)];
+        });
+        int inked = 0, inkedPlain = 0;
+        for (int y = 0; y < 20; y++)
+            for (int x = 0; x < 80; x++) {
+                inked += [[drawn colorAtX:x y:y] alphaComponent] > 0.05;
+                inkedPlain += [[plain colorAtX:x y:y] alphaComponent] > 0.05;
+            }
+        printf("text with a shadow attribute drawn, more pixels inked than without: %s\n",
+               inked > inkedPlain ? "yes" : "no");
     }
     return 0;
 }

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: NSExpression, as Apple's class reference and the
  * "Predicate Format String Syntax" of the Predicate Programming Guide
- * describe it (freemac 1.NEXT, Ferry 0.NEXT). Our own code; no Apple code
+ * describe it (freemac 1.211, Ferry 0.37.0). Our own code; no Apple code
  * was used.
  *
  * Every documented kind is here: constants, the evaluated object (SELF),

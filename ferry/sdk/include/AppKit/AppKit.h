@@ -1332,7 +1332,7 @@ typedef NSString *NSNibName;
 @property BOOL automaticallyPreparesContent;
 @property (getter=isEditable) BOOL editable;
 @property (readonly) BOOL canAdd, canRemove;
-/* Core Data's entity mode (Ferry 0.NEXT): with an entity name (kept from a
+/* Core Data's entity mode (Ferry 0.35.0): with an entity name (kept from a
  * nib since Ferry 0.20.0) and a managed object context, newObject inserts
  * an object of that entity, and a fetch makes the entity's objects that
  * match fetchPredicate the content. */
@@ -3820,7 +3820,7 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
 - (BOOL)validateMenuItem:(NSMenuItem *)item;
 @end
 
-/* ---- printing (freemac 1.NEXT, Ferry 0.NEXT) ------------------------------------------- */
+/* ---- printing (freemac 1.206, Ferry 0.33.0) ------------------------------------------- */
 
 @class NSPrinter, NSPrintPanel, NSPrintOperation, NSPrintInfo, NSFontPanel, NSFontManager;
 typedef NSString *NSPrintInfoAttributeKey;
@@ -4214,5 +4214,21 @@ typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
 
 #import <AppKit/NSCollectionView.h>
 #import <AppKit/NSRulerView.h>
+
+/* ---- tracking areas and cursors (NSTrackingArea.m, NSCursor.m) ---------------------- */
+
+#import <AppKit/NSTrackingArea.h>
+
+/* ---- animations (NSAnimation.m) ------------------------------------------------------- */
+
+#import <AppKit/NSAnimation.h>
+
+/* ---- running applications (NSRunningApplication.m) ----------------------------------- */
+
+#import <AppKit/NSRunningApplication.h>
+
+/* ---- text attachments (NSTextAttachment.m) -------------------------------------------- */
+
+#import <AppKit/NSTextAttachment.h>
 
 #endif

@@ -2116,10 +2116,16 @@ enum { NSFormattingError = 2048 };
 /* Ordered sets and UUIDs, which Core Data's ordered relationships and UUID attributes hold. */
 #include <Foundation/NSOrderedSet.h>
 #include <Foundation/NSUUID.h>
-/* Decimal numbers, expressions and comparison predicates (freemac 1.NEXT, Ferry 0.NEXT). */
+/* Decimal numbers, expressions and comparison predicates (freemac 1.211, Ferry 0.37.0). */
 #include <Foundation/NSDecimal.h>
 #include <Foundation/NSDecimalNumber.h>
 #include <Foundation/NSExpression.h>
 #include <Foundation/NSComparisonPredicate.h>
+/* Notifications between programs, carried on the D-Bus session bus. */
+#include <Foundation/NSDistributedNotificationCenter.h>
+/* NSMutableCharacterSet, the other character sets, and percent encoding. */
+#include <Foundation/NSCharacterSet.h>
+/* NSAppleScript, which keeps its source and runs nothing. */
+#include <Foundation/NSAppleScript.h>
 
 #endif

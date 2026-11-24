@@ -381,4 +381,11 @@ gboolean g_dbus_connection_flush_sync(GDBusConnection *connection, void *cancell
 GVariant *g_variant_new_int64(int64_t value);
 GVariant *g_variant_new_byte(unsigned char value);
 uint32_t g_variant_get_uint32(GVariant *value);
+/* Cursors (NSCursor.m): a named or drawn cursor set on a window. */
+typedef struct _GdkWindow GdkWindow;
+typedef struct _GdkCursor GdkCursor;
+GdkWindow *gtk_widget_get_window(GtkWidget *widget);
+GdkCursor *gdk_cursor_new_from_name(GdkDisplay *display, const char *name);
+GdkCursor *gdk_cursor_new_from_surface(GdkDisplay *display, cairo_surface_t *surface, double x, double y);
+void gdk_window_set_cursor(GdkWindow *window, GdkCursor *cursor);
 #endif

@@ -2,7 +2,7 @@
  * Ferry's Foundation: NSOrderedSet and NSMutableOrderedSet, as Apple's
  * NSOrderedSet reference describes them, and key-value coding's
  * mutableOrderedSetValueForKey:. Core Data's ordered relationships hold
- * ordered sets (freemac 1.NEXT, Ferry 0.NEXT). Our own code; no Apple code
+ * ordered sets (freemac 1.209, Ferry 0.35.0). Our own code; no Apple code
  * was used.
  *
  * As NSArray is, NSOrderedSet is a class cluster: the public classes

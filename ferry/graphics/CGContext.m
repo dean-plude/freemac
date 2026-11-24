@@ -359,15 +359,213 @@ void CGContextSetAllowsFontSubpixelPositioning(CGContextRef c, bool allows) {}
 void CGContextSetInterpolationQuality(CGContextRef c, CGInterpolationQuality q) { GSTATE(CTX)->interpolation = q; }
 CGInterpolationQuality CGContextGetInterpolationQuality(CGContextRef c) { return GSTATE(CTX)->interpolation; }
 
+/* ---- shadows ---------------------------------------------------------------------------
+ * A shadow is set in base space (its offset isn't changed by the current
+ * transform, and a positive height moves it up) and is kept with the rest of
+ * the graphics state. While one is set, each drawing call draws into a
+ * group of its own; the group's coverage, moved by the offset and blurred,
+ * is painted in the shadow's colour, then the group itself on top, and the
+ * two go onto the context together with the blend mode in force. The blur
+ * is close to a Gaussian whose standard deviation is half the blur value
+ * (three box blurs). Groups that aren't images (a PDF being printed) are
+ * painted without their shadow. */
+
 void CGContextSetShadowWithColor(CGContextRef c, CGSize offset, CGFloat blur, CGColorRef color)
 {
-    if ((offset.width || offset.height || blur) && (!color || CGColorGetAlpha(color) > 0))
-        GWarnOnce("drawing shadows");
+    struct gstate *s = GSTATE(CTX);
+    s->shadowOffset = offset;
+    s->shadowBlur = blur > 0 ? blur : 0;
+    if (color)
+        memcpy(s->shadowColor, ((GColor *)color)->rgba, sizeof s->shadowColor);
+    else
+        memset(s->shadowColor, 0, sizeof s->shadowColor);   /* NULL turns shadows off */
 }
 
+/* black at a third, as Apple documents */
 void CGContextSetShadow(CGContextRef c, CGSize offset, CGFloat blur)
 {
-    CGContextSetShadowWithColor(c, offset, blur, NULL);
+    GColor *black = GColorNew(GSpaceRGB(), (CGFloat[]){0, 0, 0, 1.0 / 3});
+    CGContextSetShadowWithColor(c, offset, blur, (CGColorRef)black);
+    [black release];
+}
+
+/* The sizes of three box blurs that together come close to a Gaussian of
+ * standard deviation sigma (each an odd width). */
+static void box_sizes(double sigma, int sizes[3])
+{
+    double ideal = sqrt(12 * sigma * sigma / 3 + 1);
+    int wl = (int)floor(ideal);
+    if (wl % 2 == 0)
+        wl--;
+    int wu = wl + 2;
+    double m = (12 * sigma * sigma - 3 * wl * wl - 12 * wl - 9) / (-4.0 * wl - 4);
+    int mm = (int)lround(m);
+    for (int i = 0; i < 3; i++)
+        sizes[i] = i < mm ? wl : wu;
+}
+
+/* One box blur of radius r along n values spaced step apart, from src to dst. */
+static void box_pass(const float *src, float *dst, int n, int step, int r)
+{
+    double sum = 0, w = 2 * r + 1;
+    for (int i = 0; i < r && i < n; i++)
+        sum += src[i * step];
+    for (int i = 0; i < n; i++) {
+        if (i + r < n)
+            sum += src[(i + r) * step];
+        if (i - r - 1 >= 0)
+            sum -= src[(i - r - 1) * step];
+        dst[i * step] = (float)(sum / w);
+    }
+}
+
+/* The shadow's coverage for a group's pixels: an alpha-only image of the
+ * group's size and place, or NULL when nothing in the group casts one. */
+static cairo_surface_t *shadow_mask(GContext *c, cairo_surface_t *group, const struct gstate *s)
+{
+    cairo_surface_flush(group);
+    int w = cairo_image_surface_get_width(group), h = cairo_image_surface_get_height(group);
+    int format = cairo_image_surface_get_format(group);
+    if (w <= 0 || h <= 0 || (format != CAIRO_FORMAT_ARGB32 && format != CAIRO_FORMAT_A8))
+        return NULL;
+    const uint8_t *px = cairo_image_surface_get_data(group);
+    int stride = cairo_image_surface_get_stride(group);
+#define ALPHA(x, y) (format == CAIRO_FORMAT_A8 ? px[(y) * stride + (x)] : ((const uint32_t *)(px + (y) * stride))[x] >> 24)
+    int x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            if (ALPHA(x, y)) {
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+            }
+    if (x1 < 0)
+        return NULL;
+    double sx = 1, sy = 1;
+    cairo_surface_get_device_scale(group, &sx, &sy);
+    /* the offset from base space to Cairo's device space, then to pixels */
+    double dx = (c->base.xx * s->shadowOffset.width + c->base.xy * s->shadowOffset.height) * sx;
+    double dy = (c->base.yx * s->shadowOffset.width + c->base.yy * s->shadowOffset.height) * sy;
+    int ox = (int)lround(dx), oy = (int)lround(dy);
+    int sizes[3] = {1, 1, 1};
+    int reach = 0;
+    double sigma = s->shadowBlur / 2 * fmax(sx, sy);
+    if (sigma > 0.2) {
+        box_sizes(sigma, sizes);
+        for (int i = 0; i < 3; i++)
+            reach += (sizes[i] - 1) / 2;
+    }
+    int tx0 = x0 + ox - reach, tx1 = x1 + ox + reach + 1, ty0 = y0 + oy - reach, ty1 = y1 + oy + reach + 1;
+    if (tx0 < 0) tx0 = 0;
+    if (ty0 < 0) ty0 = 0;
+    if (tx1 > w) tx1 = w;
+    if (ty1 > h) ty1 = h;
+    if (tx1 <= tx0 || ty1 <= ty0)
+        return NULL;
+    /* the coverage, moved, over the part of the mask it can reach, with
+     * room around it for the blur to spread into */
+    int bw = tx1 - tx0 + 2 * reach, bh = ty1 - ty0 + 2 * reach;
+    int bx0 = tx0 - reach, by0 = ty0 - reach;
+    float *a = calloc((size_t)bw * bh, sizeof *a), *t = calloc((size_t)bw * bh, sizeof *t);
+    for (int j = 0; j < bh; j++)
+        for (int i = 0; i < bw; i++) {
+            int gx = bx0 + i - ox, gy = by0 + j - oy;
+            if (gx >= 0 && gx < w && gy >= 0 && gy < h)
+                a[j * bw + i] = ALPHA(gx, gy) / 255.0f;
+        }
+#undef ALPHA
+    if (reach) {
+        for (int p = 0; p < 3; p++) {
+            int r = (sizes[p] - 1) / 2;
+            for (int j = 0; j < bh; j++)
+                box_pass(a + j * bw, t + j * bw, bw, 1, r);
+            for (int i = 0; i < bw; i++)
+                box_pass(t + i, a + i, bh, bw, r);
+        }
+    }
+    cairo_surface_t *mask = cairo_image_surface_create(CAIRO_FORMAT_A8, w, h);
+    uint8_t *m = cairo_image_surface_get_data(mask);
+    int mstride = cairo_image_surface_get_stride(mask);
+    for (int y = ty0; y < ty1; y++)
+        for (int x = tx0; x < tx1; x++) {
+            float v = a[(y - by0) * bw + (x - bx0)];
+            m[y * mstride + x] = (uint8_t)lrintf(fminf(fmaxf(v, 0), 1) * 255);
+        }
+    free(a);
+    free(t);
+    cairo_surface_mark_dirty(mask);
+    double gox = 0, goy = 0;
+    cairo_surface_get_device_offset(group, &gox, &goy);
+    cairo_surface_set_device_scale(mask, sx, sy);
+    cairo_surface_set_device_offset(mask, gox, goy);
+    return mask;
+}
+
+/* Paints a group (a pattern made by cairo_pop_group) with shadow s under it,
+ * both at alpha. */
+static void paint_with_shadow(GContext *c, cairo_pattern_t *shape, const struct gstate *s, double alpha)
+{
+    cairo_t *cr = c->cr;
+    cairo_surface_t *group = NULL;
+    cairo_surface_t *mask = NULL;
+    if (cairo_pattern_get_surface(shape, &group) == 0 && group &&
+        cairo_surface_get_type(group) == CAIRO_SURFACE_TYPE_IMAGE)
+        mask = shadow_mask(c, group, s);
+    cairo_push_group(cr);
+    cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+    if (mask) {
+        cairo_pattern_t *mp = cairo_pattern_create_for_surface(mask);
+        cairo_matrix_t m;
+        cairo_pattern_get_matrix(shape, &m);
+        cairo_pattern_set_matrix(mp, &m);
+        cairo_set_source_rgba(cr, s->shadowColor[0], s->shadowColor[1], s->shadowColor[2], s->shadowColor[3] * alpha);
+        cairo_mask(cr, mp);
+        cairo_pattern_destroy(mp);
+        cairo_surface_destroy(mask);
+    }
+    if (!c->shadowOnly) {
+        cairo_set_source(cr, shape);
+        cairo_paint_with_alpha(cr, alpha);
+    }
+    cairo_pop_group_to_source(cr);
+    cairo_paint(cr);
+}
+
+BOOL GContextBeginShadow(GContext *c)
+{
+    if (GSTATE(c)->shadowColor[3] <= 0 && !c->shadowOnly)
+        return NO;
+    /* the path is carried into the group by hand, in user space */
+    cairo_path_t *path = cairo_copy_path(c->cr);
+    cairo_push_group(c->cr);
+    cairo_set_operator(c->cr, CAIRO_OPERATOR_OVER);
+    cairo_new_path(c->cr);
+    if (path) {
+        cairo_append_path(c->cr, path);
+        cairo_path_destroy(path);
+    }
+    return YES;
+}
+
+void GContextEndShadow(GContext *c, BOOL began)
+{
+    if (!began)
+        return;
+    cairo_path_t *path = cairo_copy_path(c->cr);
+    cairo_pattern_t *shape = cairo_pop_group(c->cr);
+    if (GSTATE(c)->shadowColor[3] > 0)
+        paint_with_shadow(c, shape, GSTATE(c), 1);
+    else if (!c->shadowOnly) {
+        cairo_set_source(c->cr, shape);
+        cairo_paint(c->cr);
+    }
+    cairo_pattern_destroy(shape);
+    cairo_new_path(c->cr);
+    if (path) {
+        cairo_append_path(c->cr, path);
+        cairo_path_destroy(path);
+    }
 }
 
 /* Transparency layers: what is drawn between the two calls is gathered on
@@ -378,6 +576,7 @@ void CGContextBeginTransparencyLayerWithRect(CGContextRef c, CGRect rect, CFDict
 {
     CGContextSaveGState(c);
     GSTATE(CTX)->alpha = 1;
+    memset(GSTATE(CTX)->shadowColor, 0, sizeof GSTATE(CTX)->shadowColor);   /* the layer casts it, as a whole */
     cairo_push_group(CR);
 }
 
@@ -390,10 +589,17 @@ void CGContextEndTransparencyLayer(CGContextRef c)
 {
     if (!CTX->depth)
         return;
-    double alpha = CTX->states[CTX->depth - 1].alpha;
-    cairo_pop_group_to_source(CR);
+    const struct gstate *outer = &CTX->states[CTX->depth - 1];
+    double alpha = outer->alpha;
     GContextWillDraw(CTX);
-    cairo_paint_with_alpha(CR, alpha);
+    if (outer->shadowColor[3] > 0) {
+        cairo_pattern_t *layer = cairo_pop_group(CR);
+        paint_with_shadow(CTX, layer, outer, alpha);
+        cairo_pattern_destroy(layer);
+    } else {
+        cairo_pop_group_to_source(CR);
+        cairo_paint_with_alpha(CR, alpha);
+    }
     GContextDidDraw(CTX);
     CGContextRestoreGState(c);
 }
@@ -604,6 +810,7 @@ bool CGContextPathContainsPoint(CGContextRef c, CGPoint p, CGPathDrawingMode mod
 void CGContextDrawPath(CGContextRef c, CGPathDrawingMode mode)
 {
     GContextWillDraw(CTX);
+    BOOL shadowed = GContextBeginShadow(CTX);
     BOOL fill = mode != kCGPathStroke, stroke = mode == kCGPathStroke || mode == kCGPathFillStroke ||
                                                 mode == kCGPathEOFillStroke;
     if (fill) {
@@ -616,6 +823,7 @@ void CGContextDrawPath(CGContextRef c, CGPathDrawingMode mode)
         GContextSetSource(CTX, GSTATE(CTX)->stroke);
         cairo_stroke(CR);
     }
+    GContextEndShadow(CTX, shadowed);
     GContextDidDraw(CTX);
 }
 
@@ -755,6 +963,7 @@ void CGContextDrawImage(CGContextRef c, CGRect rect, CGImageRef image)
     rect = CGRectStandardize(rect);
     with_own_path(CTX, ^{
         GContextWillDraw(CTX);
+        BOOL shadowed = GContextBeginShadow(CTX);
         cairo_save(CR);
         /* The image's first row is its top, which goes at the top of rect. */
         CGContextTranslateCTM(c, rect.origin.x, rect.origin.y + rect.size.height);
@@ -768,6 +977,7 @@ void CGContextDrawImage(CGContextRef c, CGRect rect, CGImageRef image)
         cairo_paint_with_alpha(CR, GSTATE(CTX)->alpha);
         cairo_pattern_destroy(p);
         cairo_restore(CR);
+        GContextEndShadow(CTX, shadowed);
         GContextDidDraw(CTX);
     });
 }
@@ -780,6 +990,7 @@ void CGContextDrawTiledImage(CGContextRef c, CGRect rect, CGImageRef image)
         return;
     rect = CGRectStandardize(rect);
     GContextWillDraw(CTX);
+    BOOL shadowed = GContextBeginShadow(CTX);
     cairo_save(CR);
     CGContextTranslateCTM(c, rect.origin.x, rect.origin.y + rect.size.height);
     CGContextScaleCTM(c, rect.size.width / im->width, -rect.size.height / im->height);
@@ -790,6 +1001,7 @@ void CGContextDrawTiledImage(CGContextRef c, CGRect rect, CGImageRef image)
     cairo_paint_with_alpha(CR, GSTATE(CTX)->alpha);
     cairo_pattern_destroy(p);
     cairo_restore(CR);
+    GContextEndShadow(CTX, shadowed);
     GContextDidDraw(CTX);
 }
 
@@ -811,6 +1023,7 @@ void CGContextDrawLinearGradient(CGContextRef c, CGGradientRef gradient, CGPoint
         return;
     with_own_path(CTX, ^{
         GContextWillDraw(CTX);
+        BOOL shadowed = GContextBeginShadow(CTX);
         cairo_save(CR);
         /* Work along the gradient: start at the origin, end at (len, 0). Areas
          * before the start or after the end are painted only if asked for. */
@@ -829,6 +1042,7 @@ void CGContextDrawLinearGradient(CGContextRef c, CGGradientRef gradient, CGPoint
         cairo_paint_with_alpha(CR, GSTATE(CTX)->alpha);
         cairo_pattern_destroy(p);
         cairo_restore(CR);
+        GContextEndShadow(CTX, shadowed);
         GContextDidDraw(CTX);
     });
 }
@@ -840,6 +1054,7 @@ void CGContextDrawRadialGradient(CGContextRef c, CGGradientRef gradient, CGPoint
     if (!g)
         return;
     GContextWillDraw(CTX);
+    BOOL shadowed = GContextBeginShadow(CTX);
     cairo_pattern_t *p =
         cairo_pattern_create_radial(startCenter.x, startCenter.y, startRadius, endCenter.x, endCenter.y, endRadius);
     add_stops(p, g);
@@ -850,6 +1065,7 @@ void CGContextDrawRadialGradient(CGContextRef c, CGGradientRef gradient, CGPoint
     cairo_paint_with_alpha(CR, GSTATE(CTX)->alpha);
     cairo_restore(CR);
     cairo_pattern_destroy(p);
+    GContextEndShadow(CTX, shadowed);
     GContextDidDraw(CTX);
 }
 
@@ -874,6 +1090,7 @@ void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path)
     if (mode == kCGTextInvisible)
         return;
     GContextWillDraw(c);
+    BOOL shadowed = GContextBeginShadow(c);
     cairo_t *cr = c->cr;
     cairo_save(cr);
     CGAffineTransform tm = c->textMatrix;
@@ -911,5 +1128,6 @@ void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path)
         cairo_append_path(cr, saved);
         cairo_path_destroy(saved);
     }
+    GContextEndShadow(c, shadowed);
     GContextDidDraw(c);
 }

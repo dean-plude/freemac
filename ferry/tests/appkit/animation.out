@@ -1,0 +1,48 @@
+duration 2, curve 1, blocking mode 0, frame rate above 0: yes, progress 0, animating no
+ease in and out: at a quarter 0.146, at half 0.500, at the end 1.000
+ease in: at a quarter 0.076, at half 0.293, at the end 1.000
+ease out: at a quarter 0.383, at half 0.707, at the end 1.000
+linear: at a quarter 0.250, at half 0.500, at the end 1.000
+progress past the end: 1
+marks, in order and once each: (
+    0.25,
+    0.75
+)
+one removed: 1 left
+the delegate's value for half way: 0.250
+archived: duration 2, marks 1
+copied: duration 2, curve 3
+a duration below 0: NSInvalidArgumentException
+-- blocking
+a blocking animation: may start; mark 0.25; mark 0.5; mark 1; ended; 
+returned when it ended: yes, after its duration: yes, progress 1, more than three frames: yes, notifications 3
+one its delegate won't let start: refused; 
+progress after: 1
+-- non-blocking
+returned at once: yes
+stopped a third of the way: may start; stopped; 
+stopped part way: yes, still animating: no
+started again, it goes on from there: yes
+then to the end: may start; ended; 
+progress 1
+started after its end, it starts over: yes
+-- one animation starting and stopping others
+the first's marks: (
+    0.5,
+    0.75
+)
+the second started at half way: yes, the third stopped: yes
+cleared, the second not started again: yes
+-- view animations
+a view animation: duration 0.5, curve 0, 4 views
+it ran: may start; mark 0.5; ended; 
+half way, the box between its frames: yes
+the box: {{100, 0}, {30, 20}}
+faded out: hidden yes, alpha 1
+faded in: hidden no, alpha 1
+to an empty frame: hidden yes
+a window moved and resized: {{40, 30}, {260, 140}}
+-- the animator proxy and NSAnimationContext
+after the group: origin {50, 60}, alpha 0.5, completion ran yes
+outside a group, by the end: size {30, 40}
+exit=0

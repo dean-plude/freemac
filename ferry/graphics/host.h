@@ -278,4 +278,23 @@ PopplerPage *poppler_document_get_page(PopplerDocument *document, int index);
 void poppler_page_get_size(PopplerPage *page, double *width, double *height);
 void poppler_page_render(PopplerPage *page, cairo_t *cairo);
 
+/* Shadows (CGContext.m): what a call draws is gathered in a group, whose
+ * pixels are blurred into the shadow, and inline images in text, which
+ * take the room of a shape in Pango's layout (CoreText.m). */
+enum { CAIRO_SURFACE_TYPE_IMAGE = 0 };
+cairo_pattern_t *cairo_pop_group(cairo_t *cr);
+cairo_status_t cairo_pattern_get_surface(cairo_pattern_t *p, cairo_surface_t **surface);
+void cairo_pattern_get_matrix(cairo_pattern_t *p, cairo_matrix_t *matrix);
+void cairo_surface_get_device_offset(cairo_surface_t *surface, double *x, double *y);
+void cairo_surface_set_device_offset(cairo_surface_t *surface, double x, double y);
+void cairo_surface_get_device_scale(cairo_surface_t *surface, double *x, double *y);
+void cairo_surface_set_device_scale(cairo_surface_t *surface, double x, double y);
+int cairo_surface_get_type(cairo_surface_t *surface);
+int cairo_get_operator(cairo_t *cr);
+void cairo_mask(cairo_t *cr, cairo_pattern_t *pattern);
+PangoLayout *pango_layout_copy(PangoLayout *layout);
+PangoAttrList *pango_layout_get_attributes(PangoLayout *layout);
+PangoAttrList *pango_attr_list_copy(PangoAttrList *list);
+PangoAttribute *pango_attr_shape_new(const PangoRectangle *ink, const PangoRectangle *logical);
+
 #endif

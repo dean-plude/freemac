@@ -1,0 +1,19 @@
+the attachment's string: 1 character, U+FFFC, its attribute the attachment yes
+bounds when none are set: zero
+the line is wider by the image's width: yes
+unflipped, red: 10 by 5, where expected
+unflipped, blue: 10 by 5, where expected
+flipped, red: 10 by 5, where expected
+flipped, blue: 10 by 5, where expected
+given bounds 20 by 8, 4 below a baseline at y 10:
+  red: 20 by 4, where expected
+  blue: 20 by 4, where expected
+from data: contents 101 bytes, type public.png, image set no
+  drawn red: 10 by 5, where expected
+from a file wrapper: contents 101 bytes, the wrapper kept yes
+the cell's attachment: the one it is in
+a cell, green: 8 by 6, where expected
+a plain cell: size 10 by 10, baseline offset 0,0, tracks the mouse no
+in a text view: red drawn, blue drawn, red above blue yes
+archived and read back: contents the same, type public.png
+exit=0

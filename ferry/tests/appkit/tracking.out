@@ -1,0 +1,62 @@
+window takes mouse-moved events: no
+areas: 1, the same one: yes, its options 0x83, owner a: yes, user info kept: yes
+a copy: same rect yes, same owner yes, not the same object yes
+outside: nothing
+into a: a entered; a moved; 
+moving in a, though the window takes no mouse-moved events: a moved; 
+out of a: a exited; 
+an entered event made by hand: type 8, tracking number 7, user data kept yes, no area yes
+an owner that isn't a view: entered yes, the area yes, its number is the area yes, user data the user info yes, at 70,20, in our window yes
+then exited: yes
+-- overlapping views and the order of exits and entries
+into inner, inside a: a entered; inner entered; a moved; 
+out of inner, still in a: inner exited; a moved; 
+from a to the view beside it: a exited; next entered; 
+out of both: next exited; 
+-- when an area is live
+our window is key: no
+into an area live in the key window, in a window that isn't key: nothing
+the window made key, the mouse moved: key entered; 
+out: key exited; 
+into an area live while its view is first responder, it isn't: nothing
+-- assumed inside, the visible rect, hidden views
+the first move, outside an area assumed to have the mouse in it: assume exited; 
+beside an area in the visible rect, before the view grows: nothing
+the view grown under the mouse: visible entered; 
+into a hidden view: nothing
+-- drags
+dragged into an area not enabled during drags: nothing
+dragged on into one that is: dragToo entered; 
+the button up over the first: dragToo exited; drag entered; 
+out: drag exited; 
+-- updateTrackingAreas
+before it is in a window: 0
+put in the window, the run loop turned: 1
+resized twice, not yet told: 1
+a mouse event: 2
+its superview's bounds moved: 3
+nothing changed: 0
+-- tracking rectangles
+tags: above 0 yes, different yes; listed as tracking areas: 0
+into a tracking rectangle: rect entered #1; 
+its tag in the event: yes
+out of it, removed: nothing
+-- cursors
+one arrow: yes, current at first: the arrow
+pushed: the hand
+one popped: the hand
+both popped: the arrow
+an image cursor: hot spot 3,4, its image kept yes
+into an area with cursor updates: cu cursor; 
+the cursor: the I-beam
+out of it, the cursor: the arrow
+into a cursor rectangle: the open hand, its view asked for them: yes
+in the view, outside the rectangle: the arrow
+cursor rectangles off: enabled no, the cursor the arrow
+on again: the open hand
+its rectangles gone: the arrow
+-- an area removed while the mouse is in it
+into it: assume exited; gone entered; 
+out, after it was removed: nothing
+its areas: 0
+exit=0

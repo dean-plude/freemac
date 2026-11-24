@@ -1,0 +1,38 @@
+a filled rectangle, offset (5, -5), no blur, the default colour
+  inside the rectangle: 255 0 0 255
+  in the shadow, right of it: 170 170 170 255
+  in the shadow, below it: 170 170 170 255
+  left of the rectangle: 255 255 255 255
+  above the rectangle: 255 255 255 255
+  black at a third over white: ok
+a shadow turned off with no colour, and one kept by the graphics state
+  no colour, no shadow: 255 255 255 255
+  set before a save and restore: 170 170 170 255
+  after the restore that ends it: 255 255 255 255
+a shadow in a colour of its own, half transparent
+  under the rectangle: 127 191 127 (ok ok ok)
+the offset is in base space, whatever the transform
+  6 pixels right of the scaled rectangle: 170 170 170 255
+  9 pixels right of it: 255 255 255 255
+a blurred shadow falls off away from the shape
+  from the edge outwards:  lighter lighter lighter lighter lighter
+  just outside the edge is grey: yes, 12 pixels out is white: yes
+  inside the shape, still white: 255 255 255 255
+  the same on every side: yes
+strokes, images, gradients and text cast shadows too
+  under the stroke's bottom edge: 170 170 170 255
+  in the stroke's hollow middle, its top edge's shadow: 170 170 170 255
+  in the hollow middle, away from the edges: 255 255 255 255
+  the image: 0 255 0 255
+  its shadow: 170 170 170 255
+  a gradient's middle: 121 0 134 255
+  beside it, inside the clip it was drawn in: no room for a shadow: 255 255 255 255
+  the same gradient unclipped, a band from 10 to 30: its shadow: 170 170 170 255
+  past the shadow: 255 255 255 255
+  text: grey below the baseline without a shadow: little, with one: much
+a transparency layer casts one shadow for all it holds
+  under the overlap, one shadow's grey: ok
+  a shape in the layer: 255 0 0 255
+an alpha-only context
+  the shape: 255, its shadow: 85, outside: 0
+exit=0

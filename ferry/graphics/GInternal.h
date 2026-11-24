@@ -129,6 +129,10 @@ struct gstate {
     CGInterpolationQuality interpolation;
     CGTextDrawingMode textMode;
     CGFloat characterSpacing, fontSize;
+    /* the shadow, in base space: none when its colour's alpha is 0 */
+    CGSize shadowOffset;
+    CGFloat shadowBlur;
+    double shadowColor[4];
 };
 
 @interface GContext : NSObject {
@@ -148,6 +152,7 @@ struct gstate {
     uint32_t info;
     GColorSpace *space;
     struct gfmt fmt;
+    BOOL shadowOnly;    /* draw only the shadows of what is drawn (a text run's shadow, under the line) */
 }
 @end
 
@@ -155,6 +160,10 @@ struct gstate {
 void GContextWillDraw(GContext *c);    /* brings outside changes to the pixels in */
 void GContextDidDraw(GContext *c);     /* writes the drawing out to the caller's pixels */
 void GContextSetSource(GContext *c, const double rgba[4]);
+/* Around one drawing call: with a shadow set, what the call draws goes into
+ * a group, and GContextEndShadow paints its shadow and then the drawing. */
+BOOL GContextBeginShadow(GContext *c);
+void GContextEndShadow(GContext *c, BOOL began);
 
 /* Draws glyphs or a laid-out line in the context's text space, at (x, y)
  * there, following the text drawing mode. The body draws with Cairo's y

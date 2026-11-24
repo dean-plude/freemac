@@ -2,7 +2,7 @@
  * Ferry's Core Data: NSExpressionDescription, and the dictionary results
  * of a fetch that has expressions, propertiesToGroupBy or a
  * havingPredicate, as Apple's NSExpressionDescription and NSFetchRequest
- * class references describe them (freemac 1.NEXT, Ferry 0.NEXT). Our own
+ * class references describe them (freemac 1.211, Ferry 0.37.0). Our own
  * code; no Apple code was used.
  *
  * It is all done in memory, on the objects the fetch's predicate picks.

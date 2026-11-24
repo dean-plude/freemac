@@ -281,3 +281,26 @@ void *ferry_crypto_symbol(const char *name)
     }
     return NULL;
 }
+
+/* ---- the session bus ---------------------------------------------------------------
+ * Foundation's distributed notifications
+ * (foundation/NSDistributedNotificationCenter.m) travel on the D-Bus
+ * session bus through this system's GIO, opened the first time one of its
+ * calls is looked up, so a program that never uses them doesn't load it.
+ * Only GIO's and GLib's bus, variant, main-context and error calls are
+ * served. */
+static const char *const bus_libraries[] = {"libgio-2.0.so.0"};
+static const char *const bus_prefixes[] = {"g_bus_", "g_dbus_", "g_variant_", "g_main_context_", "g_error_free",
+                                           NULL};
+
+static void *bus_handle;
+static void open_bus(void) { bus_handle = open_first(bus_libraries, sizeof bus_libraries / sizeof bus_libraries[0]); }
+
+void *ferry_bus_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name || !has_prefix(name, bus_prefixes))
+        return NULL;
+    pthread_once(&once, open_bus);
+    return bus_handle ? dlsym(bus_handle, name) : NULL;
+}
