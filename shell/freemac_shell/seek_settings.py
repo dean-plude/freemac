@@ -24,6 +24,7 @@ CATEGORIES = (
     ("calculator", "Calculator and conversions"),
     ("settings", "Settings"),
     ("guide", "Guide topics"),
+    ("definitions", "Definitions"),
     ("menus", "Menu items"),
     ("contacts", "Contacts"),
     ("events", "Events"),

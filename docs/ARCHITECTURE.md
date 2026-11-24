@@ -878,6 +878,18 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Definitions in Seek (1.171)
+
+`words.meanings(text)` answers Seek without starting Words: it bisects
+WordNet's sorted `index.<pos>` files (open once and kept open) for the word,
+trying the `.exc` exception lists and the usual endings first so plurals and
+tenses find their lemma, then reads each sense's gloss from `data.<pos>` at
+its byte offset and drops the examples. Results are cached (lru_cache), so a
+lookup takes a few milliseconds and runs on each keystroke. Seek asks only
+for queries that look like one to three words, adds one Definition result
+after the Guide topics, and opens `freemac-service words <lemma>` on Return.
+"definitions" is a category in seek_settings.py, so Dials > Seek can hide it.
+
 ## Accessibility Shortcuts (1.169)
 
 `freemac-accessibility-shortcuts` (a11y_shortcuts.py) is a command binding
