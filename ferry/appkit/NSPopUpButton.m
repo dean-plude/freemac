@@ -827,6 +827,8 @@ static BOOL choosable(NSMenuItem *item)
     [self selectItem:item];
     if (!_pullsDown)
         [self synchronizeTitleAndSelectedItem];
+    if (view)
+        ABindingsPush(view, NO);   /* its selection bindings learn the choice */
     if ([item action])
         [NSApp sendAction:[item action] to:[item target] from:item];
     else if ([view isKindOfClass:[NSControl class]])

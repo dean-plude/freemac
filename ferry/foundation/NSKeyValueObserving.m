@@ -1,13 +1,33 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Key-value observing, as Apple's "Key-Value Observing Programming Guide"
- * describes it: observers registered for a key path of an object hear
- * observeValueForKeyPath:ofObject:change:context: when the object says a
- * value changed (willChangeValueForKey: / didChangeValueForKey:), and when
- * the value is set through key-value coding (setValue:forKey:). What Ferry
- * doesn't do yet: a property's own setter, called directly, notifies only
- * if the class calls will/didChange itself (a Mac also rewrites the setter),
- * and dependent keys (keyPathsForValuesAffecting...) aren't followed. A key
- * path's later keys are watched only on the first object. */
+ * and the NSKeyValueObserving reference describe it. Observers registered
+ * for a key path of an object hear observeValueForKeyPath:ofObject:change:
+ * context: when a value along the path changes.
+ *
+ * Automatic notification works the way the guide describes a Mac doing it:
+ * when an object first gets an observer for a key, its class gets a hidden
+ * subclass, "NSKVONotifying_<Class>", and the object becomes an instance of
+ * it. The subclass's setters (set<Key>: and _set<Key>:) and the indexed
+ * to-many mutators (insertObject:in<Key>AtIndex: and the rest) call
+ * willChangeValueForKey: and didChangeValueForKey: (or the indexed forms)
+ * around the class's own method. -class still answers the original class.
+ * A class keeps a key to itself with automaticallyNotifiesObserversForKey:
+ * or automaticallyNotifiesObserversOf<Key>. Once made, the subclass stays,
+ * even after the last observer goes.
+ *
+ * Key paths are followed: an observer of "owner.name" hears of a new owner
+ * and of the owner's name changing, the observation moving to the new
+ * owner as it comes. Dependent keys come from
+ * keyPathsForValuesAffectingValueForKey: (by default
+ * keyPathsForValuesAffecting<Key>), and may themselves be key paths
+ * through to-one relationships.
+ *
+ * Not done: to-many key paths ("people.name") aren't followed past the
+ * collection, sets (willChangeValueForKey:withSetMutation:) aren't
+ * notified, a setter whose argument is a struct other than a point, size,
+ * rect or range isn't rewritten, and removing an observer that isn't
+ * registered is quietly ignored where a Mac raises. Written from Apple's
+ * public documentation; no Apple code was used. */
 #import "FInternal.h"
 #include <os/lock.h>
 
@@ -17,79 +37,580 @@ NSString *const NSKeyValueChangeOldKey = @"old";
 NSString *const NSKeyValueChangeIndexesKey = @"indexes";
 NSString *const NSKeyValueChangeNotificationIsPriorKey = @"notificationIsPrior";
 
+static os_unfair_lock kvo_lock = OS_UNFAIR_LOCK_INIT;
+#define LOCK() os_unfair_lock_lock(&kvo_lock)
+#define UNLOCK() os_unfair_lock_unlock(&kvo_lock)
+
+@class FKVOForwarder, FKVODependency;
+
+/* One registration: an observer of a key path of an object. */
 @interface FKVOEntry : NSObject {
 @public
     id observer;   /* not retained, as on a Mac */
-    NSString *keyPath, *firstKey;
+    id object;     /* the observed object, not retained (it holds us) */
+    NSString *keyPath, *firstKey, *rest;
     NSKeyValueObservingOptions options;
     void *context;
+    NSMutableArray *olds;          /* old values kept between will and did (NSNull for nil) */
+    FKVOForwarder *forwarder;      /* watches `rest` on `subject` */
+    id subject;                    /* the first key's value, retained while watched */
+    BOOL removed;
 }
 @end
+
+/* Watches the rest of an entry's key path on the first key's value, and
+ * passes its changes on to the entry. */
+@interface FKVOForwarder : NSObject {
+@public
+    FKVOEntry *entry;   /* not retained: the entry owns us */
+}
+@end
+
+/* What an observed object keeps: its registrations, and the observers that
+ * turn changes of other key paths into changes of a dependent key. Hung on
+ * the object as an associated object, so that it goes when the object
+ * does. */
+@interface FKVOInfo : NSObject {
+@public
+    id object;
+    NSMutableArray *entries;
+    NSMutableDictionary *dependencies;   /* key -> FKVODependency */
+}
+@end
+
+@interface FKVODependency : NSObject {
+@public
+    id object;
+    NSString *key;
+    NSArray *paths;
+    NSUInteger count;
+    BOOL observing;
+}
+@end
+
+static char info_key;
+
+static void entry_detach(FKVOEntry *e);
+static void dependency_release(id object, NSString *key);
+
 @implementation FKVOEntry
 - (void)dealloc
 {
     [keyPath release];
     [firstKey release];
+    [rest release];
+    [olds release];
+    [forwarder release];
+    [subject release];
     [super dealloc];
 }
 @end
 
-static os_unfair_lock kvo_lock = OS_UNFAIR_LOCK_INIT;
-static NSMutableDictionary *kvo_entries;   /* object pointer -> NSMutableArray of FKVOEntry */
-static NSMutableDictionary *kvo_old;       /* "pointer key" -> stack of old values (or NSNull) */
-
-static NSValue *pointer_key(id object) { return [NSValue valueWithPointer:object]; }
-
-/* Hung on an observed object (as an associated object), so that when the
- * object goes away its registrations go with it, and a new object at the
- * same address doesn't inherit them. */
-@interface FKVOSentinel : NSObject {
-@public
-    void *object;
-}
-@end
-@implementation FKVOSentinel
+@implementation FKVOInfo
 - (void)dealloc
 {
-    os_unfair_lock_lock(&kvo_lock);
-    [kvo_entries removeObjectForKey:[NSValue valueWithPointer:object]];
-    os_unfair_lock_unlock(&kvo_lock);
+    /* the object is going: its observations of other objects go too */
+    for (FKVOEntry *e in entries) {
+        e->removed = YES;
+        entry_detach(e);
+    }
+    for (FKVODependency *d in [dependencies allValues])
+        d->observing = NO;   /* registered on the object itself, now gone */
+    [entries release];
+    [dependencies release];
     [super dealloc];
 }
 @end
-static char sentinel_key;
+
+static FKVOInfo *info_for(id object, BOOL create)
+{
+    FKVOInfo *info = objc_getAssociatedObject(object, &info_key);
+    if (!info && create) {
+        info = [[[FKVOInfo alloc] init] autorelease];
+        info->object = object;
+        info->entries = [[NSMutableArray alloc] init];
+        info->dependencies = [[NSMutableDictionary alloc] init];
+        objc_setAssociatedObject(object, &info_key, info, OBJC_ASSOCIATION_RETAIN);
+    }
+    return info;
+}
 
 BOOL FKVOIsObserved(id object)
 {
-    if (!kvo_entries)
-        return NO;
-    os_unfair_lock_lock(&kvo_lock);
-    BOOL yes = [kvo_entries objectForKey:pointer_key(object)] != nil;
-    os_unfair_lock_unlock(&kvo_lock);
-    return yes;
+    FKVOInfo *info = objc_getAssociatedObject(object, &info_key);
+    return info && [info->entries count];
 }
 
 /* The entries watching key on object, copied so observers may change them. */
 static NSArray *entries_for(id object, NSString *key)
 {
-    if (!kvo_entries)
+    FKVOInfo *info = objc_getAssociatedObject(object, &info_key);
+    if (!info)
         return nil;
     NSMutableArray *out = nil;
-    os_unfair_lock_lock(&kvo_lock);
-    for (FKVOEntry *e in [kvo_entries objectForKey:pointer_key(object)])
+    LOCK();
+    for (FKVOEntry *e in info->entries)
         if ([e->firstKey isEqualToString:key]) {
             if (!out)
                 out = [NSMutableArray array];
             [out addObject:e];
         }
-    os_unfair_lock_unlock(&kvo_lock);
+    UNLOCK();
     return out;
 }
 
-static void notify(FKVOEntry *e, id object, NSDictionary *change)
+/* ---- the hidden subclass ------------------------------------------------------------ */
+
+static struct kvo_pair {
+    Class original, kvo;
+} *kvo_classes;
+static size_t kvo_count;
+static NSMutableDictionary *mutator_keys;   /* selector name -> key */
+
+static Class original_of(Class kvo)
 {
-    [e->observer observeValueForKeyPath:e->keyPath ofObject:object change:change context:e->context];
+    for (size_t i = 0; i < kvo_count; i++)
+        if (kvo_classes[i].kvo == kvo)
+            return kvo_classes[i].original;
+    return Nil;
 }
+
+/* The class whose own method a rewritten method calls: the class the
+ * hidden subclass was made for. */
+static Class real_class(id self)
+{
+    for (Class c = object_getClass(self); c; c = class_getSuperclass(c)) {
+        LOCK();
+        Class o = original_of(c);
+        UNLOCK();
+        if (o)
+            return o;
+    }
+    return object_getClass(self);
+}
+
+static NSString *mutator_key(SEL sel)
+{
+    LOCK();
+    NSString *k = [[[mutator_keys objectForKey:NSStringFromSelector(sel)] retain] autorelease];
+    UNLOCK();
+    return k;
+}
+
+static Class kvo_class_answer(id self, SEL _cmd) { return real_class(self); }
+static void kvo_initialize(id self, SEL _cmd) {}
+static BOOL kvo_is_kvo(id self, SEL _cmd) { return YES; }
+
+/* Setters, by the kind of value they take. */
+#define ORIGINAL(type) ((type)class_getMethodImplementation(real_class(self), _cmd))
+static void set_object(id self, SEL _cmd, id v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, id))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_integer(id self, SEL _cmd, long v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, long))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_float(id self, SEL _cmd, float v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, float))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_double(id self, SEL _cmd, double v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, double))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_pair(id self, SEL _cmd, NSPoint v)   /* points and sizes: two doubles */
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, NSPoint))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_rect(id self, SEL _cmd, NSRect v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, NSRect))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+static void set_range(id self, SEL _cmd, NSRange v)
+{
+    NSString *key = mutator_key(_cmd);
+    [self willChangeValueForKey:key];
+    ORIGINAL(void (*)(id, SEL, NSRange))(self, _cmd, v);
+    [self didChangeValueForKey:key];
+}
+
+/* The indexed to-many mutators. */
+static void insert_one(id self, SEL _cmd, id obj, NSUInteger i)
+{
+    NSString *key = mutator_key(_cmd);
+    NSIndexSet *at = [NSIndexSet indexSetWithIndex:i];
+    [self willChange:NSKeyValueChangeInsertion valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, id, NSUInteger))(self, _cmd, obj, i);
+    [self didChange:NSKeyValueChangeInsertion valuesAtIndexes:at forKey:key];
+}
+static void remove_one(id self, SEL _cmd, NSUInteger i)
+{
+    NSString *key = mutator_key(_cmd);
+    NSIndexSet *at = [NSIndexSet indexSetWithIndex:i];
+    [self willChange:NSKeyValueChangeRemoval valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, NSUInteger))(self, _cmd, i);
+    [self didChange:NSKeyValueChangeRemoval valuesAtIndexes:at forKey:key];
+}
+static void replace_one(id self, SEL _cmd, NSUInteger i, id obj)
+{
+    NSString *key = mutator_key(_cmd);
+    NSIndexSet *at = [NSIndexSet indexSetWithIndex:i];
+    [self willChange:NSKeyValueChangeReplacement valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, NSUInteger, id))(self, _cmd, i, obj);
+    [self didChange:NSKeyValueChangeReplacement valuesAtIndexes:at forKey:key];
+}
+static void insert_many(id self, SEL _cmd, NSArray *objs, NSIndexSet *at)
+{
+    NSString *key = mutator_key(_cmd);
+    at = [[at copy] autorelease];
+    [self willChange:NSKeyValueChangeInsertion valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, NSArray *, NSIndexSet *))(self, _cmd, objs, at);
+    [self didChange:NSKeyValueChangeInsertion valuesAtIndexes:at forKey:key];
+}
+static void remove_many(id self, SEL _cmd, NSIndexSet *at)
+{
+    NSString *key = mutator_key(_cmd);
+    at = [[at copy] autorelease];
+    [self willChange:NSKeyValueChangeRemoval valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, NSIndexSet *))(self, _cmd, at);
+    [self didChange:NSKeyValueChangeRemoval valuesAtIndexes:at forKey:key];
+}
+static void replace_many(id self, SEL _cmd, NSIndexSet *at, NSArray *objs)
+{
+    NSString *key = mutator_key(_cmd);
+    at = [[at copy] autorelease];
+    [self willChange:NSKeyValueChangeReplacement valuesAtIndexes:at forKey:key];
+    ORIGINAL(void (*)(id, SEL, NSIndexSet *, NSArray *))(self, _cmd, at, objs);
+    [self didChange:NSKeyValueChangeReplacement valuesAtIndexes:at forKey:key];
+}
+
+/* The rewritten setter for a setter taking this type, or NULL. */
+static IMP setter_for_type(const char *t)
+{
+    while (*t == 'r' || *t == 'n' || *t == 'N' || *t == 'o' || *t == 'O' || *t == 'R' || *t == 'V')
+        t++;   /* qualifiers: const, in, out... */
+    switch (*t) {
+    case '@':
+    case '#': return (IMP)set_object;
+    case 'c': case 'C': case 'B': case 's': case 'S': case 'i': case 'I':
+    case 'l': case 'L': case 'q': case 'Q': case '*': case '^': case ':': return (IMP)set_integer;
+    case 'f': return (IMP)set_float;
+    case 'd': return (IMP)set_double;
+    case '{':
+        if (!strncmp(t, "{CGPoint=", 9) || !strncmp(t, "{CGSize=", 8) || !strncmp(t, "{_NSPoint=", 10) ||
+            !strncmp(t, "{_NSSize=", 9))
+            return (IMP)set_pair;
+        if (!strncmp(t, "{CGRect=", 8) || !strncmp(t, "{_NSRect=", 9))
+            return (IMP)set_rect;
+        if (!strncmp(t, "{_NSRange=", 10))
+            return (IMP)set_range;
+        return NULL;
+    }
+    return NULL;
+}
+
+/* The hidden subclass for an object's class, made the first time. */
+static Class kvo_class_for(Class original)
+{
+    LOCK();
+    for (size_t i = 0; i < kvo_count; i++)
+        if (kvo_classes[i].original == original || kvo_classes[i].kvo == original) {
+            Class k = kvo_classes[i].kvo;
+            UNLOCK();
+            return k;
+        }
+    UNLOCK();
+    char name[512];
+    snprintf(name, sizeof name, "NSKVONotifying_%s", class_getName(original));
+    Class kvo = objc_getClass(name);
+    if (!kvo) {
+        kvo = objc_allocateClassPair(original, name, 0);
+        if (!kvo)
+            return Nil;
+        class_addMethod(kvo, @selector(class), (IMP)kvo_class_answer, "#16@0:8");
+        class_addMethod(kvo, sel_registerName("_isKVOA"), (IMP)kvo_is_kvo, "c16@0:8");
+        /* the original class's +initialize has run already; it isn't run again */
+        class_addMethod(object_getClass(kvo), @selector(initialize), (IMP)kvo_initialize, "v16@0:8");
+        objc_registerClassPair(kvo);
+    }
+    LOCK();
+    kvo_classes = realloc(kvo_classes, (kvo_count + 1) * sizeof *kvo_classes);
+    kvo_classes[kvo_count++] = (struct kvo_pair){original, kvo};
+    UNLOCK();
+    return kvo;
+}
+
+static void add_mutator(Class kvo, Class original, NSString *name, NSString *key, IMP imp)
+{
+    SEL sel = NSSelectorFromString(name);
+    Method m = class_getInstanceMethod(original, sel);
+    if (!m || !imp)
+        return;
+    LOCK();
+    if (!mutator_keys)
+        mutator_keys = [[NSMutableDictionary alloc] init];
+    if (![mutator_keys objectForKey:name])
+        [mutator_keys setObject:key forKey:name];
+    UNLOCK();
+    class_addMethod(kvo, sel, imp, method_getTypeEncoding(m));   /* does nothing if already there */
+}
+
+/* Makes the object's setters for key announce their changes. */
+static void notify_automatically(id object, NSString *key)
+{
+    if (![key length] || object_isClass(object))
+        return;   /* a class object keeps its own class */
+    Class current = object_getClass(object);
+    LOCK();
+    Class known = original_of(current);
+    UNLOCK();
+    Class original = known ?: current;
+    if (![original automaticallyNotifiesObserversForKey:key])
+        return;
+    Class kvo = kvo_class_for(original);
+    if (!kvo)
+        return;
+    NSString *Key = [[[key substringToIndex:1] uppercaseString] stringByAppendingString:[key substringFromIndex:1]];
+    for (NSString *prefix in @[ @"set", @"_set" ]) {
+        NSString *name = [NSString stringWithFormat:@"%@%@:", prefix, Key];
+        Method m = class_getInstanceMethod(original, NSSelectorFromString(name));
+        if (m && method_getNumberOfArguments(m) == 3) {
+            char t[256];
+            method_getArgumentType(m, 2, t, sizeof t);
+            add_mutator(kvo, original, name, key, setter_for_type(t));
+        }
+    }
+    add_mutator(kvo, original, [NSString stringWithFormat:@"insertObject:in%@AtIndex:", Key], key, (IMP)insert_one);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"removeObjectFrom%@AtIndex:", Key], key, (IMP)remove_one);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"replaceObjectIn%@AtIndex:withObject:", Key], key,
+                (IMP)replace_one);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"insert%@:atIndexes:", Key], key, (IMP)insert_many);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"remove%@AtIndexes:", Key], key, (IMP)remove_many);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"replace%@AtIndexes:with%@:", Key, Key], key,
+                (IMP)replace_many);
+    if (!known)
+        object_setClass(object, kvo);
+}
+
+/* ---- notifying -------------------------------------------------------------------------- */
+
+static void notify(FKVOEntry *e, NSDictionary *change)
+{
+    if (!e->removed)
+        [e->observer observeValueForKeyPath:e->keyPath ofObject:e->object change:change context:e->context];
+}
+
+static id or_null(id v) { return v ?: [NSNull null]; }
+
+/* The value a collection change is about: the objects at the indexes. */
+static id values_at(FKVOEntry *e, NSIndexSet *indexes)
+{
+    id all = [e->object valueForKey:e->firstKey];
+    if (![all respondsToSelector:@selector(objectsAtIndexes:)])
+        return nil;
+    NSUInteger n = [all count];
+    if ([indexes count] && [indexes lastIndex] >= n)
+        return nil;
+    return [all objectsAtIndexes:indexes];
+}
+
+/* Watches the rest of the key path on the first key's current value. */
+static void entry_attach(FKVOEntry *e)
+{
+    if (!e->rest || e->removed)
+        return;
+    id subject = [e->object valueForKey:e->firstKey];
+    if (!subject || [subject isKindOfClass:[NSArray class]] || [subject isKindOfClass:[NSSet class]])
+        return;   /* to-many key paths aren't followed */
+    if (!e->forwarder) {
+        e->forwarder = [[FKVOForwarder alloc] init];
+        e->forwarder->entry = e;
+    }
+    e->subject = [subject retain];
+    [subject addObserver:e->forwarder forKeyPath:e->rest options:NSKeyValueObservingOptionPrior context:NULL];
+}
+static void entry_detach(FKVOEntry *e)
+{
+    if (!e->subject)
+        return;
+    id subject = e->subject;
+    e->subject = nil;
+    [subject removeObserver:e->forwarder forKeyPath:e->rest];
+    [subject release];
+}
+
+/* Before a change: the old value is kept and the prior notification sent.
+ * `first` says it is the first key that changes (not something along the
+ * rest of the path), so the rest is watched on its new value after. */
+static void entry_will(FKVOEntry *e, NSKeyValueChange kind, NSIndexSet *indexes, BOOL first)
+{
+    if (e->removed)
+        return;
+    if (e->rest || !first)
+        kind = NSKeyValueChangeSetting, indexes = nil;
+    id old = nil;
+    if (e->options & NSKeyValueObservingOptionOld) {
+        if (kind == NSKeyValueChangeSetting)
+            old = [e->object valueForKeyPath:e->keyPath];
+        else if (kind != NSKeyValueChangeInsertion)
+            old = values_at(e, indexes);
+    }
+    if (!e->olds)
+        e->olds = [[NSMutableArray alloc] init];
+    [e->olds addObject:or_null(old)];
+    if (first)
+        entry_detach(e);
+    if (e->options & NSKeyValueObservingOptionPrior) {
+        NSMutableDictionary *change = [NSMutableDictionary dictionary];
+        [change setObject:@(kind) forKey:NSKeyValueChangeKindKey];
+        [change setObject:@YES forKey:NSKeyValueChangeNotificationIsPriorKey];
+        if (indexes)
+            [change setObject:indexes forKey:NSKeyValueChangeIndexesKey];
+        if ((e->options & NSKeyValueObservingOptionOld) && (old || kind == NSKeyValueChangeSetting))
+            [change setObject:or_null(old) forKey:NSKeyValueChangeOldKey];
+        notify(e, change);
+    }
+}
+
+static void entry_did(FKVOEntry *e, NSKeyValueChange kind, NSIndexSet *indexes, BOOL first)
+{
+    if (e->removed)
+        return;
+    if (e->rest || !first)
+        kind = NSKeyValueChangeSetting, indexes = nil;
+    id old = nil;
+    BOOL hadOld = [e->olds count] > 0;
+    if (hadOld) {
+        old = [[[e->olds lastObject] retain] autorelease];
+        [e->olds removeLastObject];
+    }
+    if (first) {
+        entry_detach(e);
+        entry_attach(e);
+    }
+    NSMutableDictionary *change = [NSMutableDictionary dictionary];
+    [change setObject:@(kind) forKey:NSKeyValueChangeKindKey];
+    if (indexes)
+        [change setObject:indexes forKey:NSKeyValueChangeIndexesKey];
+    if (e->options & NSKeyValueObservingOptionNew) {
+        id v = nil;
+        if (kind == NSKeyValueChangeSetting)
+            v = or_null([e->object valueForKeyPath:e->keyPath]);
+        else if (kind != NSKeyValueChangeRemoval)
+            v = values_at(e, indexes);
+        if (v)
+            [change setObject:v forKey:NSKeyValueChangeNewKey];
+    }
+    if ((e->options & NSKeyValueObservingOptionOld) && hadOld &&
+        (kind == NSKeyValueChangeSetting || old != [NSNull null]))
+        [change setObject:old forKey:NSKeyValueChangeOldKey];
+    notify(e, change);
+}
+
+@implementation FKVOForwarder
+- (void)observeValueForKeyPath:(NSString *)path ofObject:(id)object change:(NSDictionary *)change
+                       context:(void *)context
+{
+    FKVOEntry *e = [[entry retain] autorelease];
+    if ([[change objectForKey:NSKeyValueChangeNotificationIsPriorKey] boolValue])
+        entry_will(e, NSKeyValueChangeSetting, nil, NO);
+    else
+        entry_did(e, NSKeyValueChangeSetting, nil, NO);
+}
+@end
+
+/* ---- dependent keys --------------------------------------------------------------------- */
+
+@implementation FKVODependency
+- (void)observeValueForKeyPath:(NSString *)path ofObject:(id)o change:(NSDictionary *)change context:(void *)context
+{
+    if ([[change objectForKey:NSKeyValueChangeNotificationIsPriorKey] boolValue])
+        [object willChangeValueForKey:key];
+    else
+        [object didChangeValueForKey:key];
+}
+- (void)dealloc
+{
+    [key release];
+    [paths release];
+    [super dealloc];
+}
+@end
+
+static int dependency_depth;
+
+/* An observer of key needs the key paths that affect it watched too: once
+ * for all of key's observers. */
+static void dependency_retain(id object, NSString *key)
+{
+    NSSet *affecting = [[object class] keyPathsForValuesAffectingValueForKey:key];
+    if (![affecting count] || dependency_depth > 16)
+        return;
+    FKVOInfo *info = info_for(object, YES);
+    LOCK();
+    FKVODependency *d = [info->dependencies objectForKey:key];
+    if (d) {
+        d->count++;
+        UNLOCK();
+        return;
+    }
+    d = [[[FKVODependency alloc] init] autorelease];
+    d->object = object;
+    d->key = [key copy];
+    d->count = 1;
+    NSMutableArray *paths = [NSMutableArray array];
+    for (NSString *p in affecting)
+        if (![p isEqualToString:key])
+            [paths addObject:p];
+    d->paths = [paths copy];
+    [info->dependencies setObject:d forKey:key];
+    UNLOCK();
+    dependency_depth++;
+    for (NSString *p in d->paths)
+        [object addObserver:d forKeyPath:p options:NSKeyValueObservingOptionPrior context:NULL];
+    d->observing = YES;
+    dependency_depth--;
+}
+
+static void dependency_release(id object, NSString *key)
+{
+    FKVOInfo *info = objc_getAssociatedObject(object, &info_key);
+    if (!info)
+        return;
+    LOCK();
+    FKVODependency *d = [[[info->dependencies objectForKey:key] retain] autorelease];
+    if (!d || --d->count > 0) {
+        UNLOCK();
+        return;
+    }
+    [info->dependencies removeObjectForKey:key];
+    UNLOCK();
+    if (d->observing)
+        for (NSString *p in d->paths)
+            [object removeObserver:d forKeyPath:p];
+    d->observing = NO;
+}
+
+/* ---- registration ----------------------------------------------------------------------- */
 
 @implementation NSObject (NSKeyValueObserverRegistration)
 - (void)addObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath
@@ -99,49 +620,51 @@ static void notify(FKVOEntry *e, id object, NSDictionary *change)
         return;
     FKVOEntry *e = [[[FKVOEntry alloc] init] autorelease];
     e->observer = observer;
+    e->object = self;
     e->keyPath = [keyPath copy];
     NSRange dot = [keyPath rangeOfString:@"."];
     e->firstKey = [(dot.location == NSNotFound ? keyPath : [keyPath substringToIndex:dot.location]) copy];
+    if (dot.location != NSNotFound)
+        e->rest = [[keyPath substringFromIndex:dot.location + 1] copy];
     e->options = options;
     e->context = context;
-    os_unfair_lock_lock(&kvo_lock);
-    if (!kvo_entries)
-        kvo_entries = [[NSMutableDictionary alloc] init];
-    NSMutableArray *list = [kvo_entries objectForKey:pointer_key(self)];
-    if (!list) {
-        list = [NSMutableArray array];
-        [kvo_entries setObject:list forKey:pointer_key(self)];
-    }
-    [list addObject:e];
-    os_unfair_lock_unlock(&kvo_lock);
-    if (!objc_getAssociatedObject(self, &sentinel_key)) {
-        FKVOSentinel *sentinel = [[[FKVOSentinel alloc] init] autorelease];
-        sentinel->object = self;
-        objc_setAssociatedObject(self, &sentinel_key, sentinel, OBJC_ASSOCIATION_RETAIN);
-    }
+    FKVOInfo *info = info_for(self, YES);
+    LOCK();
+    [info->entries addObject:e];
+    UNLOCK();
+    notify_automatically(self, e->firstKey);
+    dependency_retain(self, e->firstKey);
+    entry_attach(e);
     if (options & NSKeyValueObservingOptionInitial) {
         NSMutableDictionary *change = [NSMutableDictionary dictionaryWithObject:@(NSKeyValueChangeSetting)
                                                                          forKey:NSKeyValueChangeKindKey];
         if (options & NSKeyValueObservingOptionNew)
-            [change setObject:[self valueForKeyPath:keyPath] ?: [NSNull null] forKey:NSKeyValueChangeNewKey];
-        notify(e, self, change);
+            [change setObject:or_null([self valueForKeyPath:keyPath]) forKey:NSKeyValueChangeNewKey];
+        notify(e, change);
     }
 }
 - (void)_ferryRemoveObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath any:(BOOL)any context:(void *)context
 {
-    os_unfair_lock_lock(&kvo_lock);
-    NSMutableArray *list = [kvo_entries objectForKey:pointer_key(self)];
+    FKVOInfo *info = objc_getAssociatedObject(self, &info_key);
+    if (!info)
+        return;
+    FKVOEntry *found = nil;
+    LOCK();
     /* the most recent matching registration, as on a Mac */
-    for (NSInteger i = (NSInteger)[list count] - 1; i >= 0; i--) {
-        FKVOEntry *e = [list objectAtIndex:(NSUInteger)i];
+    for (NSInteger i = (NSInteger)[info->entries count] - 1; i >= 0; i--) {
+        FKVOEntry *e = [info->entries objectAtIndex:(NSUInteger)i];
         if (e->observer == observer && [e->keyPath isEqualToString:keyPath] && (any || e->context == context)) {
-            [list removeObjectAtIndex:(NSUInteger)i];
+            found = [[e retain] autorelease];
+            found->removed = YES;
+            [info->entries removeObjectAtIndex:(NSUInteger)i];
             break;
         }
     }
-    if (list && ![list count])
-        [kvo_entries removeObjectForKey:pointer_key(self)];
-    os_unfair_lock_unlock(&kvo_lock);
+    UNLOCK();
+    if (!found)
+        return;
+    entry_detach(found);
+    dependency_release(self, found->firstKey);
 }
 - (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath
 {
@@ -153,6 +676,8 @@ static void notify(FKVOEntry *e, id object, NSDictionary *change)
 }
 @end
 
+/* ---- announcing changes ----------------------------------------------------------------- */
+
 @implementation NSObject (NSKeyValueObserving)
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change
                        context:(void *)context
@@ -162,70 +687,52 @@ static void notify(FKVOEntry *e, id object, NSDictionary *change)
 }
 - (void)willChangeValueForKey:(NSString *)key
 {
-    NSArray *entries = entries_for(self, key);
-    if (![entries count])
-        return;
-    id old = nil;
-    BOOL wantOld = NO;
-    for (FKVOEntry *e in entries)
-        wantOld |= (e->options & NSKeyValueObservingOptionOld) != 0;
-    if (wantOld)
-        old = [self valueForKey:key];
-    NSString *k = [NSString stringWithFormat:@"%p.%@", self, key];
-    os_unfair_lock_lock(&kvo_lock);
-    if (!kvo_old)
-        kvo_old = [[NSMutableDictionary alloc] init];
-    NSMutableArray *stack = [kvo_old objectForKey:k];
-    if (!stack) {
-        stack = [NSMutableArray array];
-        [kvo_old setObject:stack forKey:k];
-    }
-    [stack addObject:old ?: [NSNull null]];
-    os_unfair_lock_unlock(&kvo_lock);
-    for (FKVOEntry *e in entries)
-        if (e->options & NSKeyValueObservingOptionPrior) {
-            NSMutableDictionary *change = [NSMutableDictionary dictionary];
-            [change setObject:@(NSKeyValueChangeSetting) forKey:NSKeyValueChangeKindKey];
-            [change setObject:@YES forKey:NSKeyValueChangeNotificationIsPriorKey];
-            if (e->options & NSKeyValueObservingOptionOld)
-                [change setObject:old ?: [NSNull null] forKey:NSKeyValueChangeOldKey];
-            notify(e, self, change);
-        }
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_will(e, NSKeyValueChangeSetting, nil, YES);
 }
 - (void)didChangeValueForKey:(NSString *)key
 {
-    NSArray *entries = entries_for(self, key);
-    id old = nil;
-    NSString *k = [NSString stringWithFormat:@"%p.%@", self, key];
-    os_unfair_lock_lock(&kvo_lock);
-    NSMutableArray *stack = [kvo_old objectForKey:k];
-    if ([stack count]) {
-        old = [[[stack lastObject] retain] autorelease];
-        [stack removeLastObject];
-        if (![stack count])
-            [kvo_old removeObjectForKey:k];
-    }
-    os_unfair_lock_unlock(&kvo_lock);
-    for (FKVOEntry *e in entries) {
-        NSMutableDictionary *change = [NSMutableDictionary dictionary];
-        [change setObject:@(NSKeyValueChangeSetting) forKey:NSKeyValueChangeKindKey];
-        if (e->options & NSKeyValueObservingOptionNew)
-            [change setObject:[self valueForKeyPath:e->keyPath] ?: [NSNull null] forKey:NSKeyValueChangeNewKey];
-        if ((e->options & NSKeyValueObservingOptionOld) && [e->keyPath isEqualToString:key])
-            [change setObject:old ?: [NSNull null] forKey:NSKeyValueChangeOldKey];
-        notify(e, self, change);
-    }
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_did(e, NSKeyValueChangeSetting, nil, YES);
 }
 - (void)willChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key
 {
-    [self willChangeValueForKey:key];
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_will(e, kind, indexes, YES);
 }
 - (void)didChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key
 {
-    [self didChangeValueForKey:key];
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_did(e, kind, indexes, YES);
 }
-+ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key { return YES; }
-+ (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key { return [NSSet set]; }
-- (void *)observationInfo { return NULL; }
+
+/* automaticallyNotifiesObserversOf<Key>, if the class has it; else YES. */
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key
+{
+    if ([key length]) {
+        NSString *name = [NSString stringWithFormat:@"automaticallyNotifiesObserversOf%@%@",
+                                                    [[key substringToIndex:1] uppercaseString], [key substringFromIndex:1]];
+        SEL sel = NSSelectorFromString(name);
+        if ([self respondsToSelector:sel])
+            return ((BOOL (*)(id, SEL))objc_msgSend)(self, sel);
+    }
+    return YES;
+}
+/* keyPathsForValuesAffecting<Key>, if the class has it; else none. */
++ (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key
+{
+    if ([key length]) {
+        NSString *name = [NSString stringWithFormat:@"keyPathsForValuesAffecting%@%@",
+                                                    [[key substringToIndex:1] uppercaseString], [key substringFromIndex:1]];
+        SEL sel = NSSelectorFromString(name);
+        if ([self respondsToSelector:sel]) {
+            id set = ((id (*)(id, SEL))objc_msgSend)(self, sel);
+            if ([set isKindOfClass:[NSSet class]])
+                return set;
+        }
+    }
+    return [NSSet set];
+}
+- (void *)observationInfo { return objc_getAssociatedObject(self, &info_key); }
 - (void)setObservationInfo:(void *)info {}
 @end

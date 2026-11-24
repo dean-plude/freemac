@@ -29,11 +29,13 @@
  * control. A cell-based cell is edited only when its column is editable,
  * its cell is a text cell and tableView:shouldEditTableColumn:row: agrees.
  * Tab and Shift-Tab move on to the next or previous editable cell, row by
- * row, and stop at the table's ends; Escape puts the old value back.
+ * row, and stop at the table's ends; Escape puts the old value back. A
+ * column cell's formatter shows the value being edited and reads what was
+ * typed, so the data source gets the value (Ferry 0.17.0).
  *
  * Not done yet: editing after a pause on a click in a selected row,
- * formatters on edited cells, dragging rows and columns, type-to-select,
- * and saving column widths under autosaveName. Animations run instantly.
+ * dragging rows and columns, type-to-select, and saving column widths
+ * under autosaveName. Animations run instantly.
  *
  * Nibs: the table's switches are "NSTvFlags", whose bits (column
  * reordering, column resizing, grid, empty and multiple selection, column
@@ -1013,6 +1015,24 @@ static void pass_background_style(NSView *v, NSBackgroundStyle style)
     id d = [_table delegate];
     return [d respondsToSelector:_cmd] && [d control:_table textView:textView doCommandBySelector:sel];
 }
+/* the column cell's formatter couldn't read what was typed */
+- (BOOL)control:(NSControl *)control didFailToFormatString:(NSString *)string errorDescription:(NSString *)error
+{
+    id d = [_table delegate];
+    return [d respondsToSelector:_cmd] && [d control:_table didFailToFormatString:string errorDescription:error];
+}
+- (void)control:(NSControl *)control didFailToValidatePartialString:(NSString *)string
+    errorDescription:(NSString *)error
+{
+    id d = [_table delegate];
+    if ([d respondsToSelector:_cmd])
+        [d control:_table didFailToValidatePartialString:string errorDescription:error];
+}
+- (BOOL)control:(NSControl *)control isValidObject:(id)obj
+{
+    id d = [_table delegate];
+    return ![d respondsToSelector:_cmd] || [d control:_table isValidObject:obj];
+}
 @end
 
 /* ---- NSTableView ---------------------------------------------------------------------- */
@@ -1945,7 +1965,14 @@ enum {
         [ed setBordered:YES];
         [ed setDrawsBackground:YES];
         [ed setEditable:YES];
-        [ed setStringValue:[cell stringValue] ?: @""];
+        /* the column cell's formatter shows the value and reads what is
+         * typed, so the data source gets the value, not the text */
+        if ([cell formatter]) {
+            [ed setFormatter:[cell formatter]];
+            [ed setObjectValue:[cell objectValue]];
+        } else {
+            [ed setStringValue:[cell stringValue] ?: @""];
+        }
         [self addSubview:ed];
         field = ed;
     }
@@ -1991,7 +2018,8 @@ enum {
         info = @{NSTextMovementUserInfoKey : @(movement)};
         if (movement != NSTextMovementCancel && _editor && _editedRow >= 0 && _editedColumn >= 0 &&
             _editedColumn < (NSInteger)[_columns count])
-            [self _setObjectValue:[_editor stringValue] forColumn:[_columns objectAtIndex:(NSUInteger)_editedColumn]
+            [self _setObjectValue:[_editor formatter] ? [_editor objectValue] : [_editor stringValue]
+                        forColumn:[_columns objectAtIndex:(NSUInteger)_editedColumn]
                               row:_editedRow];
     }
     NSNotification *n = [NSNotification notificationWithName:name object:self userInfo:info];
@@ -2044,11 +2072,13 @@ enum {
     [f _setTextMovement:movement];
     _endingEdit = YES;
     NSWindow *w = [self window];
+    NSUInteger beeps = ABeepCount();
     BOOL ended = w && [w firstResponder] == f ? [w makeFirstResponder:self] : [f resignFirstResponder];
     _endingEdit = NO;
     if (!ended || _editor == f) {
         [f _setTextMovement:NSTextMovementOther];
-        NSBeep();
+        if (ABeepCount() == beeps)   /* once: a formatter that refused the text beeped already */
+            NSBeep();
         return;
     }
     if (movement != NSTextMovementTab && movement != NSTextMovementBacktab)

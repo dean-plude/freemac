@@ -11,7 +11,8 @@
 # form that current versions of Xcode write (see ferry/appkit/
 # ANibArchive.m), converted from the keyed archive here. dot.png is the
 # image the panel's image view names. Tables.nib holds a view-based
-# table and an outline view. DocApp.app holds a document-based app's main
+# table and an outline view. Bindings.nib holds controls bound to an object
+# controller and the shared user defaults controller. DocApp.app holds a document-based app's main
 # nib, its document's window nib and an Info.plist with document types,
 # for documents.m. Run this again only to change the fixtures.
 import os, plistlib, struct
@@ -621,6 +622,57 @@ def controls_nib(path):
     a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def bindings_nib(path):
+    """A window nib with bindings: a text field bound to an object
+    controller's selection.name (with a null placeholder), a slider (0 to
+    10, eleven tick marks, tick values only) bound to selection.level, and
+    a check box bound to the shared user defaults controller's
+    values.FerryNibFlag. File's Owner has outlets to each."""
+    a = Archive()
+    owner = custom(a, "BindingsOwner")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    content, field, slider, check = (a.reserve() for _ in range(4))
+    window = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=15, NSWindowBacking=2,
+                         NSWindowRect="{{100, 100}, {300, 120}}", NSWindowTitle=a.add("Bindings"),
+                         NSWindowClass=a.add("NSWindow"), NSWindowView=content))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {300, 120}}", 256 | 18, UID(0),
+         NSSubviews=a.array([field, slider, check]))
+    view(a, field, "NSTextField", CONTROL, "{{20, 80}, {200, 22}}", 256, content,
+         NSCell=text_cell(a, "NSTextFieldCell", "", 0x14000000 | 0x00400000), NSEnabled=True)
+    slider_cell = a.add(a.obj("NSSliderCell", CELL, NSContents=a.add(""), NSCellFlags=0x04080000, NSCellFlags2=0,
+                              NSSupport=font(a), NSMinValue=0.0, NSMaxValue=10.0, NSValue=3.0, NSAltIncValue=0.0,
+                              NSNumberOfTickMarks=11, NSTickMarkPosition=0, NSAllowsTickMarkValuesOnly=True,
+                              NSVertical=False))
+    view(a, slider, "NSSlider", CONTROL, "{{20, 50}, {200, 27}}", 256, content, NSCell=slider_cell,
+         NSEnabled=True)
+    view(a, check, "NSButton", CONTROL, "{{20, 20}, {200, 18}}", 256, content,
+         NSCell=button_cell(a, "Flag", flags2=2, image="NSSwitch", flags=0x04000000), NSEnabled=True)
+    controller = a.add(a.obj("NSObjectController", ("NSController",), NSObjectClassName=a.add("NSMutableDictionary"),
+                             NSEditable=True, NSAutomaticallyPreparesContent=False))
+    defaults = a.add(a.obj("NSUserDefaultsController", ("NSController",), NSSharedInstance=True))
+
+    def binding(src, dst, name, path, options=None):
+        keys = dict(NSSource=src, NSDestination=dst, NSLabel=a.add("%s: %s" % (name, path)),
+                    NSBinding=a.add(name), NSKeyPath=a.add(path), NSNibBindingConnectorVersion=2)
+        if options:
+            keys["NSOptions"] = a.add(a.obj("NSDictionary", (), **{"NS.keys": [a.add(k) for k in options],
+                                                                   "NS.objects": [a.add(v) for v in options.values()]}))
+        return a.add(a.obj("NSNibBindingConnector", ("NSNibConnector",), **keys))
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, window, "window"), connector(a, out, owner, field, "field"),
+             connector(a, out, owner, slider, "slider"), connector(a, out, owner, check, "check"),
+             connector(a, out, owner, controller, "controller"),
+             binding(field, controller, "value", "selection.name", {"NSNullPlaceholder": "No name"}),
+             binding(slider, controller, "value", "selection.level"),
+             binding(check, defaults, "value", "values.FerryNibFlag")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (window, owner), (content, window), (field, content),
+             (slider, content), (check, content), (controller, owner), (defaults, owner)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner"), (controller, "Person Controller"),
+                                                    (defaults, "Shared User Defaults Controller")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 def doc_main_menu_nib(path):
     """DocApp's main nib: the application, File and Edit menus a
     document-based app has (Open Recent named _NSRecentDocumentsMenu, as
@@ -716,6 +768,7 @@ view_controller_nib(os.path.join(resources, "ListViewController.nib"))
 panes_nib(os.path.join(here, "Panes.nib"))
 tables_nib(os.path.join(here, "Tables.nib"))
 controls_nib(os.path.join(here, "Controls.nib"))
+bindings_nib(os.path.join(here, "Bindings.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

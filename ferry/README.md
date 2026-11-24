@@ -80,9 +80,17 @@ and simple HTML documents), progress indicators, boxes, tab and split
 views, table and outline views (cell-based or view-based, with
 selection, sorting from the header, resizable columns and, from freemac
 (1.178), text cells edited in place), pop-up
-buttons, segmented controls, search fields, stack views and toolbars are
-there too,
+buttons, segmented controls, search fields, stack views, toolbars and,
+from freemac (1.184), sliders are there too,
 and key-value observing, so bindings follow the values they are bound to.
+From freemac (1.184) observing is automatic (a hidden subclass's setters
+announce each change, and dependent keys are followed), bindings write
+the user's edits back to their key path (text fields, buttons, pop-up
+buttons and sliders, with `NSObjectController`'s `selection.*`,
+`NSUserDefaultsController`'s `values.*` and bindings made in nibs), and
+formatters on controls, cells and edited table cells show values, read
+what is typed and beep at what they can't read. Array and tree
+controllers aren't there yet.
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question

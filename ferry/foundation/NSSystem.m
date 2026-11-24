@@ -254,6 +254,7 @@ static NSArray *preferred_languages(void)
 
 /* ---- NSUserDefaults --------------------------------------------------------------------- */
 
+NSNotificationName const NSUserDefaultsDidChangeNotification = @"NSUserDefaultsDidChangeNotification";
 static NSUserDefaults *standard_defaults;
 
 @implementation NSUserDefaults {
@@ -334,15 +335,24 @@ static NSUserDefaults *standard_defaults;
     if (![NSPropertyListSerialization propertyList:value isValidForFormat:NSPropertyListXMLFormat_v1_0])
         FRaise(NSInvalidArgumentException, @"Attempt to insert non-property list object %@ for key %@", value, key);
     id copy = [value copy];
+    [self willChangeValueForKey:key];
     [_values setObject:copy forKey:key];
     [copy release];
     [self save];
+    [self didChangeValueForKey:key];
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSUserDefaultsDidChangeNotification object:self];
 }
 - (void)removeObjectForKey:(NSString *)key
 {
+    [self willChangeValueForKey:key];
     [_values removeObjectForKey:key];
     [self save];
+    [self didChangeValueForKey:key];
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSUserDefaultsDidChangeNotification object:self];
 }
+/* A default's observers hear of its changes from setObject:forKey: and
+ * removeObjectForKey:, which announce them themselves. */
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key { return NO; }
 - (NSString *)stringForKey:(NSString *)key
 {
     id v = [self objectForKey:key];

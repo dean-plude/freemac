@@ -1,6 +1,6 @@
 /* Key paths, value transformers and Cocoa bindings (M6), as the apps tried
- * in docs/ferry-compat.md use them. Bindings are recorded and set their
- * value once; they don't follow later changes yet. Runs with no display. */
+ * in docs/ferry-compat.md use them; appkit_binding_controls (Ferry 0.17.0)
+ * goes further. Runs with no display. */
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>
 

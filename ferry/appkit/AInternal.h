@@ -102,6 +102,23 @@ void ADragAttach(NSWindow *window, GtkWidget *area);
 - (void)_takeFromCell:(NSCell *)cell;
 @end
 
+/* ---- bindings (NSKeyValueBinding.m) --------------------------------------------------- */
+
+/* The user changed a bound view's value: each of its bindings that can be
+ * written back sets its key path (only those bound with
+ * NSContinuouslyUpdatesValueBindingOption when continuousOnly is YES). */
+void ABindingsPush(id view, BOOL continuousOnly);
+/* Whether a binding of the view asks for continuous updates. */
+BOOL ABindingsWantContinuous(id view);
+/* The number of times NSBeep was called (NSTableView.m beeps once). */
+NSUInteger ABeepCount(void);
+/* How a binding sets and reads a view's property; views and controllers
+ * with properties of their own kind override them. */
+@interface NSObject (FerryBindings)
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding;
+- (id)_ferryValueForBinding:(NSString *)binding;
+@end
+
 @interface NSButtonCell (FerryPrivate)
 - (BOOL)_hasButtonType;
 - (NSButtonType)_buttonType;

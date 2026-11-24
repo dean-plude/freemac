@@ -211,10 +211,16 @@ static NSString *format_double(double d, BOOL single)
         return @"nan";
     if (isinf(d))
         return d > 0 ? @"inf" : @"-inf";
-    for (int prec = 1; prec <= 17; prec++) {
+    int prec;
+    for (prec = 1; prec <= 17; prec++) {
         snprintf(buf, sizeof buf, "%.*g", prec, d);
         if (single ? (float)strtod(buf, NULL) == (float)d : strtod(buf, NULL) == d)
             break;
+    }
+    /* whole digits are written out, as with "%.16g": 30, not 3e+01 */
+    int exp = d != 0 ? (int)floor(log10(fabs(d))) : 0;
+    if (prec <= 17 && exp >= prec && exp + 1 <= 16) {
+        snprintf(buf, sizeof buf, "%.*g", exp + 1, d);
     }
     return [NSString stringWithUTF8String:buf];
 }

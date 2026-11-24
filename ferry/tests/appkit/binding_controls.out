@@ -1,0 +1,75 @@
+bound: Ada
+model changed: Grace
+  model: setName: Grace
+typing Lise: model Grace
+editing ended: model Lise
+  model: setName: Lise
+no typing: nothing written
+typed Mary, Return: model Mary
+  model: setName: Mary
+continuously, typed Jo: model Jo, field Jo
+  model: setName: J
+  model: setName: Jo
+nil nickname: value "", placeholder no nickname
+nickname Addie: value "Addie", placeholder its own
+emptied: model nil, placeholder no nickname
+  model: setNickname: Addie
+  model: setNickname: nil
+unbound: placeholder its own
+single (not married): state 1
+clicked: state 0, married 1
+model unmarried: state 1
+adult, unmarried, here, no nickname: enabled 0, hidden 0
+married: enabled 1
+not adult: enabled 0
+a nickname: hidden 1
+no nickname, away: hidden 1
+  model: setNickname: Ace
+  model: setNickname: nil
+no pet: "" (placeholder no pet)
+a pet: Rex
+renamed: Rex II
+another pet: Tom (the old one not followed)
+typed Felix: the pet is Felix
+pop-up: Small,Medium,Large, chosen "Large"
+model Small: chosen "Small"
+chose the second: model size Medium
+new content: Tiny,Small,Medium,Large,Huge, chosen "Medium"
+selectedIndex: chosen "Three"
+chose the first: model index 0
+selectedValue too: chosen "Two"
+chose the third: model size Three, index 2
+slider: 2.5
+model 40: slider 10 (kept in its range)
+clicked in the middle: model level 5
+no content: "", placeholder No Selection
+its own no-selection placeholder: "" (placeholder (none))
+content: "Jo", placeholder nil; selected objects 1
+model changed: Hedy and Hedy
+typed Emmy: model Emmy, the other field Emmy
+  model: setName: Hedy
+  model: setName: Emmy
+selection.name by key-value coding: Emmy
+set through the selection: Kurt
+new content: Alan; can remove 1, can add 0
+removed: "" (placeholder No Selection)
+added: content is a dictionary
+typed Dict: content name Dict
+defaults: state 0
+clicked: default 1
+default changed in the defaults: state 0
+through the controller: state 1
+text field exposes: value,editable,textColor,font,enabled,hidden,toolTip
+pop-up exposes: content,contentObjects,contentValues,selectedIndex,selectedObject,selectedTag,selectedValue,value,title,alternateTitle,image,enabled,hidden,toolTip
+slider exposes: value,minValue,maxValue,enabled,hidden,toolTip
+info: observed 1, key path nickname, transformer NSIsNotNil
+markers: <NSNoSelectionMarker> <NSMultipleValuesMarker> <NSNotApplicableMarker>, controller markers 1 0
+nib loaded: 1
+controller: NSObjectController, field "" (placeholder No Selection), slider 0, check 1
+the field's binding: selection.name of the controller
+the check box's: the shared controller
+content: field Nib, slider 7
+content changed: field Changed
+slider snaps to its tick marks: 3
+default removed: check 0
+exit=0

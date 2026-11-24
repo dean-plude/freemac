@@ -176,16 +176,32 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 - (NSString *)debugDescription;
 + (NSString *)description;
 @property (readonly, copy) NSString *className;
-/* Key-value coding, the simple part: getters, setters and ivars by name. */
+@end
+
+/* Key-value coding: getters, setters and instance variables by name, as
+ * Apple's guide orders the search; scalars and NSPoint, NSSize, NSRect and
+ * NSRange are boxed. Collection operators (@count, @sum...) aren't done. */
+@class NSIndexSet, NSSet, NSDictionary, NSMutableArray, NSError;
+@interface NSObject (NSKeyValueCoding)
+@property (class, readonly) BOOL accessInstanceVariablesDirectly;
 - (id)valueForKey:(NSString *)key;
 - (void)setValue:(id)value forKey:(NSString *)key;
 - (id)valueForKeyPath:(NSString *)keyPath;
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath;
+- (id)valueForUndefinedKey:(NSString *)key;
+- (void)setValue:(id)value forUndefinedKey:(NSString *)key;
+- (void)setNilValueForKey:(NSString *)key;
+- (BOOL)validateValue:(id *)value forKey:(NSString *)key error:(NSError **)error;
+- (BOOL)validateValue:(id *)value forKeyPath:(NSString *)keyPath error:(NSError **)error;
+- (NSMutableArray *)mutableArrayValueForKey:(NSString *)key;
+- (NSMutableArray *)mutableArrayValueForKeyPath:(NSString *)keyPath;
+- (NSDictionary *)dictionaryWithValuesForKeys:(NSArray *)keys;
+- (void)setValuesForKeysWithDictionary:(NSDictionary *)keyedValues;
 @end
 
 /* Key-value observing: observers hear of changes the object announces
- * (will/didChangeValueForKey:) or that setValue:forKey: makes. */
-@class NSIndexSet, NSSet, NSDictionary;
+ * (will/didChangeValueForKey:), that its setters make (through a hidden
+ * subclass, as on a Mac) and that setValue:forKey: makes. */
 typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
     NSKeyValueObservingOptionNew = 0x01, NSKeyValueObservingOptionOld = 0x02,
     NSKeyValueObservingOptionInitial = 0x04, NSKeyValueObservingOptionPrior = 0x08,
@@ -1439,6 +1455,7 @@ NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void);
 - (NSDictionary<NSString *, id> *)dictionaryRepresentation;
 - (BOOL)synchronize;
 @end
+FOUNDATION_EXPORT NSString *const NSUserDefaultsDidChangeNotification;
 
 typedef NSString *NSFileAttributeKey;
 FOUNDATION_EXPORT NSFileAttributeKey const NSFileSize;
