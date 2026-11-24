@@ -1183,6 +1183,14 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.166 "Unread counts on websites in the Dock" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A website in the Dock shows the count its title gives, such as Facebook's "(3) Facebook" or a mail site's "Inbox (12)", in a red badge on its icon, as a Mac shows on web apps | webapps.py, Dock | done |
+| 2 | It changes as the title does and goes when the site is closed; Show badges in Dials > Dock and Menu Bar turns it off with the others | Dock | done |
+| 3 | Guide lines, README row and screenshot | Guide, Docs | done |
+
 ## 1.165 "Add to Dock for websites" (done)
 
 A website such as Facebook can sit in the Dock and open like an app, as Safari's

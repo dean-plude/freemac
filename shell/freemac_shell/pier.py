@@ -506,6 +506,11 @@ class Item(Gtk.Button):
     def set_views(self, views, alive=False):
         self.views = views
         self.alive = alive
+        # A web app's unread count comes from its window's title.
+        count = webapps.views_count(views) if webapps.is_web_app(self.badge_id()) else 0
+        if count != getattr(self, "title_count", 0):
+            self.title_count = count
+            self.queue_draw()
         self.dot.set_opacity(1.0 if (views or alive) and self.pier.show_dots() else 0.0)
         if views and not self.attention:
             self.stop_bounce()
@@ -604,6 +609,7 @@ class Item(Gtk.Button):
         if badges is None or not self.pier.show_badges():
             return False
         count, progress = launcher_badge.shown(badges.get(self.badge_id()))
+        count = count or getattr(self, "title_count", 0)
         if not count and progress is None:
             return False
         alloc = self.image.get_allocation()
