@@ -22,7 +22,14 @@
  * Version (revertDocumentToSaved:) puts back; such a document with a file
  * closes without asking, after an autosave. Versions (preservesVersions,
  * Browse All Versions) are left out. Classes that don't autosave in place
- * are not autosaved at all. Built without ARC. */
+ * are not autosaved at all.
+ *
+ * Printing: each document keeps its own print info (a copy of the shared
+ * one until Page Setup changes it). Print… asks the subclass for a print
+ * operation (printOperationWithSettings:error:, which NSDocument itself
+ * answers with an error, as on a Mac) and runs it in a sheet on the
+ * document's window; Page Setup… runs the page layout there. Built without
+ * ARC. */
 #import "AInternal.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -81,6 +88,25 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
         ((void (*)(id, SEL, id, BOOL, void *))objc_msgSend)(c->delegate, c->selector, object, flag, c->context);
 }
 
+/* A print operation run in a sheet calls this back, which calls the
+ * document's delegate as document:didPrint:contextInfo: does. */
+@interface ADocumentPrinted : NSObject {
+@public
+    id document, delegate;
+    SEL selector;
+    void *context;
+}
+@end
+@implementation ADocumentPrinted
+- (void)printOperationDidRun:(NSPrintOperation *)op success:(BOOL)success contextInfo:(void *)unused
+{
+    if (delegate && selector)
+        ((void (*)(id, SEL, id, BOOL, void *))objc_msgSend)(delegate, selector, document, success, context);
+    [document release];
+    [self release];
+}
+@end
+
 @implementation NSDocument {
     NSURL *_fileURL, *_autosavedURL;
     NSString *_fileType, *_displayName, *_lastPanelType;
@@ -95,6 +121,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     NSTimer *_autosaveTimer;
     BOOL _autosaving, _autosaveCancellable;
     NSURL *_lastSaved;               /* the file as last saved, kept aside once autosaving writes over it */
+    NSPrintInfo *_printInfo;
 }
 
 /* ---- types ---- */
@@ -178,6 +205,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     [_autosaveTimer invalidate];
     [_autosaveTimer release];
     [_lastSaved release];
+    [_printInfo release];
     [super dealloc];
 }
 
@@ -758,8 +786,118 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
 - (IBAction)lockDocument:(id)sender { AWarnOnce("locking documents"); }
 - (IBAction)unlockDocument:(id)sender { AWarnOnce("locking documents"); }
 - (IBAction)browseDocumentVersions:(id)sender { AWarnOnce("document versions"); }
-- (IBAction)printDocument:(id)sender { AWarnOnce("printing documents"); }
-- (IBAction)runPageLayout:(id)sender { AWarnOnce("page setup for documents"); }
+
+/* ---- printing ---- */
+
+/* The document's own print info, a copy of the shared one until it is set. */
+- (NSPrintInfo *)printInfo
+{
+    if (!_printInfo)
+        _printInfo = [[NSPrintInfo sharedPrintInfo] copy];
+    return _printInfo;
+}
+- (void)setPrintInfo:(NSPrintInfo *)info
+{
+    if (!info || info == _printInfo)
+        return;
+    NSPrintInfo *copy = [info copy];
+    [_printInfo release];
+    _printInfo = copy;
+}
+- (BOOL)shouldChangePrintInfo:(NSPrintInfo *)info { return YES; }
+- (BOOL)preparePageLayout:(NSPageLayout *)layout { return YES; }
+
+/* Page Setup, in a sheet on the document's window when it has one; the
+ * print info, as changed, becomes the document's if the user accepts. */
+- (void)runModalPageLayoutWithPrintInfo:(NSPrintInfo *)info delegate:(id)delegate didRunSelector:(SEL)selector
+                            contextInfo:(void *)context
+{
+    NSPageLayout *layout = [NSPageLayout pageLayout];
+    [self retain];
+    void (^done)(NSInteger) = ^(NSInteger r) {
+      BOOL accepted = r == NSModalResponseOK;
+      if (accepted && [self shouldChangePrintInfo:info])
+          [self setPrintInfo:info];
+      if (delegate && selector)
+          ((void (*)(id, SEL, id, BOOL, void *))objc_msgSend)(delegate, selector, self, accepted, context);
+      [self release];
+    };
+    if (![self preparePageLayout:layout]) {
+        done(NSModalResponseCancel);
+        return;
+    }
+    NSWindow *w = [self windowForSheet];
+    if (w)
+        [layout beginSheetUsingPrintInfo:info onWindow:w completionHandler:done];
+    else
+        done([layout runModalWithPrintInfo:info]);
+}
+- (IBAction)runPageLayout:(id)sender
+{
+    [self runModalPageLayoutWithPrintInfo:[[[self printInfo] copy] autorelease] delegate:nil didRunSelector:NULL
+                              contextInfo:NULL];
+}
+
+/* A subclass makes the print operation: NSDocument itself has nothing to
+ * print, as on a Mac. */
+- (NSPrintOperation *)printOperationWithSettings:(NSDictionary *)settings error:(NSError **)error
+{
+    if (error)
+        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFeatureUnsupportedError
+                                 userInfo:@{NSLocalizedDescriptionKey : @"This document can't be printed."}];
+    return nil;
+}
+
+/* In a sheet on the document's window when it has one. */
+- (void)runModalPrintOperation:(NSPrintOperation *)op delegate:(id)delegate didRunSelector:(SEL)selector
+                   contextInfo:(void *)context
+{
+    NSWindow *w = [self windowForSheet];
+    if (!w) {
+        BOOL ok = [op runOperation];
+        if (delegate && selector)
+            ((void (*)(id, SEL, id, BOOL, void *))objc_msgSend)(delegate, selector, self, ok, context);
+        return;
+    }
+    ADocumentPrinted *done = [[ADocumentPrinted alloc] init];
+    done->document = [self retain];
+    done->delegate = delegate;
+    done->selector = selector;
+    done->context = context;
+    [op runOperationModalForWindow:w delegate:done didRunSelector:@selector(printOperationDidRun:success:contextInfo:)
+                       contextInfo:NULL];
+}
+
+- (void)printDocumentWithSettings:(NSDictionary *)settings showPrintPanel:(BOOL)show delegate:(id)delegate
+                 didPrintSelector:(SEL)selector contextInfo:(void *)context
+{
+    NSError *error = nil;
+    NSPrintOperation *op = [self printOperationWithSettings:settings ?: @{} error:&error];
+    if (!op) {
+        if (error)
+            [self presentError:error];
+        if (delegate && selector)
+            ((void (*)(id, SEL, id, BOOL, void *))objc_msgSend)(delegate, selector, self, NO, context);
+        return;
+    }
+    if ([settings count])
+        [[[op printInfo] dictionary] addEntriesFromDictionary:settings];
+    [op setShowsPrintPanel:show];
+    [self runModalPrintOperation:op delegate:delegate didRunSelector:selector contextInfo:context];
+}
+
+/* The call of Mac OS X 10.3 and before does nothing, unless the subclass
+ * prints there; printDocument: then calls it. */
+- (void)printShowingPrintPanel:(BOOL)show {}
+
+- (IBAction)printDocument:(id)sender
+{
+    if ([[self class] instanceMethodForSelector:@selector(printShowingPrintPanel:)] !=
+        [NSDocument instanceMethodForSelector:@selector(printShowingPrintPanel:)])
+        [self printShowingPrintPanel:YES];
+    else
+        [self printDocumentWithSettings:@{} showPrintPanel:YES delegate:nil didPrintSelector:NULL contextInfo:NULL];
+}
 
 /* ---- autosaving ---- */
 
@@ -1123,8 +1261,7 @@ static NSMenu *revert_to_menu(void)
     if (a == @selector(saveDocument:))
         return [self isDocumentEdited] || !_fileURL;
     if (a == @selector(renameDocument:) || a == @selector(moveDocument:) || a == @selector(lockDocument:) ||
-        a == @selector(unlockDocument:) || a == @selector(browseDocumentVersions:) || a == @selector(printDocument:) ||
-        a == @selector(runPageLayout:))
+        a == @selector(unlockDocument:) || a == @selector(browseDocumentVersions:))
         return NO;
     return YES;
 }

@@ -1,0 +1,55 @@
+automatic both ways: printed 1
+  page 1: 0 0 500 600 at 56 96
+  page 2: 500 0 200 600 at 56 96
+  page 3: 0 600 500 300 at 56 396
+  page 4: 500 600 200 300 at 56 396
+  sheet 1: r1c1r1c2r1c3r1c4r1c5 r2c1r2c2r2c3r2c4r2c5 r3c1r3c2r3c3r3c4r3c5 r4c1r4c2r4c3r4c4r4c5 r5c1r5c2r5c3r5c4r5c5 r6c1r6c2r6c3r6c4r6c5
+  sheet 2: r1c6r1c7 r2c6r2c7 r3c6r3c7 r4c6r4c7 r5c6r5c7 r6c6r6c7
+  sheet 3: r7c1r7c2r7c3r7c4r7c5 r8c1r8c2r8c3r8c4r8c5 r9c1r9c2r9c3r9c4r9c5
+  sheet 4: r7c6r7c7 r8c6r8c7 r9c6r9c7
+automatic down, clipped across (the default): printed 1
+  page 1: 0 0 500 600 at 56 96
+  page 2: 0 600 500 300 at 56 396
+  sheet 1: r1c1r1c2r1c3r1c4r1c5 r2c1r2c2r2c3r2c4r2c5 r3c1r3c2r3c3r3c4r3c5 r4c1r4c2r4c3r4c4r4c5 r5c1r5c2r5c3r5c4r5c5 r6c1r6c2r6c3r6c4r6c5
+  sheet 2: r7c1r7c2r7c3r7c4r7c5 r8c1r8c2r8c3r8c4r8c5 r9c1r9c2r9c3r9c4r9c5
+fit across: printed 1
+  page 1: 0 0 700 840 at 56 96
+  page 2: 0 840 700 60 at 56 653.143
+  sheet 1: r1c1r1c2r1c3r1c4r1c5r1c6r1c7 r2c1r2c2r2c3r2c4r2c5r2c6r2c7 r3c1r3c2r3c3r3c4r3c5r3c6r3c7 r4c1r4c2r4c3r4c4r4c5r4c6r4c7 r5c1r5c2r5c3r5c4r5c5r5c6r5c7 r6c1r6c2r6c3r6c4r6c5r6c6r6c7 r7c1r7c2r7c3r7c4r7c5r7c6r7c7 r8c1r8c2r8c3r8c4r8c5r8c6r8c7
+  sheet 2: r9c1 r9c2 r9c3 r9c4 r9c5 r9c6 r9c7
+fit both ways: printed 1
+  page 1: 0 0 700 900 at 72.6667 96
+  sheet 1: r1c1r1c2r1c3r1c4r1c5r1c6r1c7 r2c1r2c2r2c3r2c4r2c5r2c6r2c7 r3c1r3c2r3c3r3c4r3c5r3c6r3c7 r4c1r4c2r4c3r4c4r4c5r4c6r4c7 r5c1r5c2r5c3r5c4r5c5r5c6r5c7 r6c1r6c2r6c3r6c4r6c5r6c6r6c7 r7c1r7c2r7c3r7c4r7c5r7c6r7c7 r8c1r8c2r8c3r8c4r8c5r8c6r8c7 r9c1r9c2r9c3r9c4r9c5r9c6r9c7
+clipped both ways: printed 1
+  page 1: 0 0 500 600 at 56 96
+  sheet 1: r1c1r1c2r1c3r1c4r1c5 r2c1r2c2r2c3r2c4r2c5 r3c1r3c2r3c3r3c4r3c5 r4c1r4c2r4c3r4c4r4c5 r5c1r5c2r5c3r5c4r5c5 r6c1r6c2r6c3r6c4r6c5
+scaled to 125%: printed 1
+  page 1: 0 0 400 480 at 56 96
+  page 2: 0 480 400 420 at 56 171
+  sheet 1: r1c1r1c2r1c3r1c4 r2c1r2c2r2c3r2c4 r3c1r3c2r3c3r3c4 r4c1r4c2r4c3r4c4 r5c1r5c2r5c3r5c4
+  sheet 2: r6c1r6c2r6c3r6c4 r7c1r7c2r7c3r7c4 r8c1r8c2r8c3r8c4 r9c1r9c2r9c3r9c4
+not flipped: printed 1
+  page 1: 0 300 300 600 at 156 96
+  page 2: 0 0 300 300 at 156 396
+  sheet 1: r1c1r1c2r1c3 r2c1r2c2r2c3 r3c1r3c2r3c3 r4c1r4c2r4c3 r5c1r5c2r5c3 r6c1r6c2r6c3
+  sheet 2: r7c1r7c2r7c3 r8c1r8c2r8c3 r9c1r9c2r9c3
+pages that end between bands: printed 1
+  adjust 0-600 limit 480 -> 530
+  page 1: 0 0 300 530 at 156 166
+  page 2: 0 530 300 370 at 156 326
+  sheet 1: r1c1r1c2r1c3 r2c1r2c2r2c3 r3c1r3c2r3c3 r4c1r4c2r4c3 r5c1r5c2r5c3
+  sheet 2: r6c1r6c2r6c3 r7c1r7c2r7c3 r8c1r8c2r8c3 r9c1r9c2r9c3
+its own pages: printed 1
+  page 5: 0 0 200 150 at 206 321
+  page 6: 0 200 200 150 at 206 321
+  sheet 1: r1c1r1c2 r2c1r2c2
+  sheet 2: r3c1r3c2 r4c1r4c2
+page 6 alone: printed 1
+  page 6: 0 200 200 150 at 206 321
+  sheet 1: r3c1r3c2 r4c1r4c2
+pages 2 to 3 of 4, in reverse: printed 1
+  page 3: 0 600 500 300 at 56 396
+  page 2: 500 0 200 600 at 56 96
+  sheet 1: r7c1r7c2r7c3r7c4r7c5 r8c1r8c2r8c3r8c4r8c5 r9c1r9c2r9c3r9c4r9c5
+  sheet 2: r1c6r1c7 r2c6r2c7 r3c6r3c7 r4c6r4c7 r5c6r5c7 r6c6r6c7
+exit=0

@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.206 "Ferry: printing and the font panel" (done)
+
+Ferry 0.33.0: Mac apps can print and save as PDF, set up the page, and pick fonts, from their File and Format menus as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSPrintInfo`: paper, margins, orientation, scaling and pagination, kept with a document | Ferry | done |
+| 2 | `NSPrintOperation`: a view's pages drawn to PDF with Cairo and sent to a file, Preview or a printer; automatic, fit and clip pagination, page headers and footers | Ferry | done |
+| 3 | The print and page setup dialogs, as this system's GTK dialogs or sheets; NSDocument's Print… and Page Setup… turned on | Ferry | done |
+| 4 | `NSFontManager` and the font panel, with this system's fonts; Bold and Italic in text views | Ferry | done |
+| 5 | Text views split across pages; eight new tests; `make check` 151 of 151 | Ferry | done |
+
+Accessory views in the panels, printing only the selection, and font collections aren't there yet.
+
 ## 1.205 "Ferry: network connections and streams" (done)
 
 Ferry 0.32.0: Mac apps can open their own network connections, secure or not, and watch them the Mac way, beyond the web requests Ferry already handled.

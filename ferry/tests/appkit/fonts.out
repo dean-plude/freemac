@@ -1,0 +1,37 @@
+one manager: 1 1, action changeFont:
+families: DejaVu Serif 1, DejaVu Sans Mono 1, sorted 1, no generic Sans 1
+DejaVu Serif members: regular 1, bold 1, italic 0, four fields 1
+unknown family: 0 members
+fonts: DejaVuSerif-Bold 1; bold fonts include it 1, unbold fonts don't 1
+fixed pitch: mono 1, serif 0
+DejaVu Serif, weight 5: DejaVu Serif 12,  weight 5
+bold italic: DejaVu Serif 14, bold italic  weight 9
+weight 9: DejaVu Serif 12, bold  weight 9
+no such family: 0; a Mac family (Menlo) 1
+to bold: DejaVu Serif 12, bold  weight 9
+to italic: DejaVu Serif 12, bold italic  weight 9
+bold taken off: DejaVu Serif 12,  weight 5
+unbold: DejaVu Serif 12,  weight 5
+to 20 points: DejaVu Serif 20,  weight 5
+to DejaVu Sans Mono: DejaVu Sans Mono 12, bold fixed  weight 9
+to the Bold face: DejaVu Serif 12, bold  weight 9
+heavier: DejaVu Serif 12, bold  weight 9
+lighter than bold: DejaVu Serif 12,  weight 5
+with no action, convertFont: gives the same font 1
+localized name: DejaVu Serif Bold
+text view uses the font panel 1
+font menu: 6 items, Bold tag 2, Italic tag 1
+selected font: DejaVu Serif 12,  weight 5
+Bold checked 0
+Bold: [one |12] [two|B12] [ three|12]
+Bold checked 1, action now 0
+Italic over two runs: [one |I12] [two|BI12] [ three|12]
+Bold again: off: [one two|I12] [ three|12]
+Bigger: [one two|I12] [ |12] [three|13]
+typed after Bold: [one two|I12] [ |12] [three|13] [ four|B13]
+panel shared 1, exists 1, visible 1
+chosen in the panel: [one two|18] [ |12] [three|13] [ four|B13]
+visible after 0
+only the size chosen: [one two|9] [ three|9] [ four|B9]
+families kept: DejaVu Sans Mono, DejaVu Serif
+exit=0

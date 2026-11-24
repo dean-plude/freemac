@@ -564,6 +564,9 @@ static NSArray *identifiers_of(NSArray *items)
             [item setLabel:table[i].label];
             [item setPaletteLabel:table[i].label];
             [item setAction:table[i].action];
+            /* Show Fonts goes to the font manager, as on a Mac */
+            if ([ident isEqualToString:NSToolbarShowFontsItemIdentifier])
+                [item setTarget:[NSFontManager sharedFontManager]];
             [item setImage:standard_icon(ident)];
             return item;
         }

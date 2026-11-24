@@ -1158,6 +1158,14 @@ The new or extended ones:
 | `corefoundation_socket` | (freemac (1.205), Ferry 0.32.0) CFRunLoopSource version 0 (schedule, perform, cancel, signal) and CFSocket with a run loop source: a TCP listener with the accept callback, a client with the connect and data callbacks, an echo, a refused connection, datagrams, the read callback re-enabled automatically and the write callback once |
 | `foundation_streams` | (freemac (1.205), Ferry 0.32.0) NSInputStream and NSOutputStream over data, files and memory with delegate events; a bound pair; socket streams from getStreamsToHostWithName and CFStreamCreatePairWithSocketToHost with delegates, a dispatch queue and blocking use; a refused connection (ECONNREFUSED 61); a native socket; and TLS through the system's OpenSSL against a local server: an untrusted server fails with -9807, without validation the page arrives, and the peer trust holds the server's certificate |
 | `foundation_netservice` | (freemac (1.205), Ferry 0.32.0) NSNetService TXT records made and read as RFC 6763 says; publish, resolve and search say "will" and then fail in the run loop with NSNetServicesUnknownError (-72000), as on a Mac where Bonjour can't be reached |
+| `appkit_print_info` | (freemac (1.206), Ferry 0.33.0) `NSPrintInfo`: the shared print info's defaults (the paper this system's locale uses, the margins, scaling, pagination and centring), paper sizes and names, orientation turning the paper, the dictionary behind the properties, a copy that doesn't share changes, archiving with `NSCoding`, the print panel and page layout answering from `FERRY_PRINT_ANSWER` and `FERRY_PAGE_LAYOUT_ANSWER` with no display, and the printing calls a document now answers to |
+| `appkit_print_view` | (freemac (1.206), Ferry 0.33.0) a tall view printed to a PDF file: laid out on several pages of the print info's paper, each page drawn by the view's own `drawRect:` (not to the screen, with the print operation current), and the file read back with Poppler (the number of pages, their size and the text on each); the same view on A4 in landscape at half size with a header and footer; a print operation run for a window, finishing after the call returns; and a print job that is cancelled |
+| `appkit_print_pagination` | (freemac (1.206), Ferry 0.33.0) a view wider and taller than the page printed with automatic pagination (tiled row by row from the top), fit pagination (shrunk onto one page) and clip pagination (one page, cut off); a view that isn't flipped; a view that moves each page's bottom edge with `adjustPageHeightNew:top:bottom:limit:` so that a band isn't cut; a view that knows its own pages (`knowsPageRange:` and `rectForPage:`); and a range of pages printed in reverse order, with each page's rect, its place on the paper and the text on it |
+| `appkit_print_text` | (freemac (1.206), Ferry 0.33.0) a text view printed across pages: eighty numbered lines on US Letter, every line printed once, whole and in order, each page ending at the edge of a line, and the selection not printed; the same text at a larger size on A5, fitted to the page's width, through the view's `print:` action with the panel answered; and rich text with a bold run, all of whose words print |
+| `appkit_print_pdfdata` | (freemac (1.206), Ferry 0.33.0) `dataWithPDFInsideRect:` making one page the size of the rect, holding the view's drawing and its subviews' inside the rect and nothing outside it; `PDFOperationWithView:insideRect:toData:` and `toPath:` never showing the print panel, even when one is asked for; `writePDFInsideRect:toPasteboard:`; a window's `dataWithPDFInsideRect:` drawing its content view; and `dataWithEPSInsideRect:` giving Encapsulated PostScript |
+| `appkit_print_document` | (freemac (1.206), Ferry 0.33.0) an `NSDocument` subclass making its print operation in `printOperationWithSettings:error:` from its own print info; `printDocumentWithSettings:showPrintPanel:delegate:didPrintSelector:contextInfo:` running it with the settings given (saving to a file) and calling the delegate back; Print… (`printDocument:`) through the print panel, answered from the environment, and cancelled; Page Setup… (`runPageLayout:`) changing the document's own print info only, after asking `shouldChangePrintInfo:`, refused and cancelled; and the print info kept when it is archived |
+| `appkit_fonts` | (freemac (1.206), Ferry 0.33.0) one shared `NSFontManager`, which a program's own `alloc` gives too; the installed families and their members, from fontconfig; fonts made by family, traits and weight, and a Mac family name (Menlo) matched; conversions to and from bold and italic, to another size, family and face, and heavier and lighter; the Bold and Italic menu items (`addFontTrait:`) turning the trait on and off in a text view's selection through `changeFont:`, and the items' checks following the selected font; Bigger (`modifyFont:`); typing after Bold; and the font panel, answered from `FERRY_FONT_ANSWER` with no display, changing only what was chosen |
+| `appkit_window_print` | (freemac (1.206), Ferry 0.33.0) printing on a display: Page Setup as GTK's page setup dialog in a sheet on the window, keeping the paper; the print dialog as GTK's print dialog in a sheet, printing to the file the answer names (GTK's Print to File), and the PDF's pages read back; the dialog cancelled; and the font panel (GTK's font chooser) shown and closed. It needs Weston and is skipped without it |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -1201,8 +1209,8 @@ The new or extended ones:
   its menu the first time it is validated for such a document, and stays
   so. Whether an autosave keeps the "Edited" title exactly as a Mac does,
   and the names of the files in Autosave Information, weren't compared
-  with a real Mac. Renaming, moving and locking from the title bar,
-  printing and Page Setup are disabled. (`NSUndoManager`'s
+  with a real Mac. Renaming, moving and locking from the title bar are
+  disabled. Print… and Page Setup… work from freemac (1.206). (`NSUndoManager`'s
   `prepareWithInvocationTarget:` works from freemac (1.170), so undo
   registered that way is kept, as the selector and block forms were.)
 - **`NSInvocation` and forwarding: x86-64 only, and a few edge cases**
@@ -2270,6 +2278,74 @@ The new or extended ones:
   - The key order in TXT records made by NSNetService, "key=" for an empty value, and the order of NSNetService's failure events.
   - kqueue: the data field of EVFILT_WRITE (Ferry reports Linux's send buffer size, which Linux doubles, less what is queued), kevent failing with EINVAL for an unknown filter rather than reporting it as an EV_ERROR result, and the data counts of signal events.
 
+- **Printing and fonts, not done yet** (freemac (1.206), Ferry 0.33.0).
+  - Accessory views and controllers in the print panel, the page layout
+    and the font panel aren't shown. Ferry prints a one-time warning when
+    an app adds one.
+  - There is no progress panel. `showsProgressPanel` is kept but changes
+    nothing, and pages are drawn on the main thread whatever
+    `canSpawnSeparateThread` says.
+  - Printing to a real printer hands the finished PDF to GTK's print job
+    when the print dialog chose the printer, and otherwise to `lp`. This
+    system has no `lp` or `lpstat`, so `NSPrinter` lists no printers and a
+    job sent to a printer without the dialog fails with "AppKit (Ferry):
+    printing failed: …".
+  - Every printer's imageable area is the whole sheet; a printer's own
+    margins aren't read. `printerTypes` is empty, and `NSPrinter`'s device
+    description says only that it is a printer.
+  - `pagesAcross`, `pagesDown`, printing only the selection and the
+    "Selection" range in the print dialog aren't supported.
+  - When the print dialog is given several page ranges, they are joined
+    into one range, from the first page to the last.
+  - `dataWithEPSInsideRect:` and `EPSOperationWithView:...` make one page
+    only.
+  - With no display, the print panel and Page Setup answer Cancel unless
+    `FERRY_PRINT_ANSWER` or `FERRY_PAGE_LAYOUT_ANSWER` gives an answer, and
+    Ferry prints a one-time warning. On a display, only those two dialogs
+    can answer themselves for the tests; the font panel can't.
+  - `printOperationWithSettings:error:` in `NSDocument` itself fails with
+    `NSFeatureUnsupportedError`, as Apple documents. A document class that
+    prints must make its own operation, as on a Mac.
+  - The font panel is GTK's font chooser. It has no font collections, no
+    Styles panel (`orderFrontStylesPanel:` prints a one-time warning), no
+    live preview in the text, and no colour, underline or shadow controls.
+  - Changes of fonts and of the print info aren't registered with the undo
+    manager.
+
+- **Printing and fonts, not compared with a Mac** (freemac (1.206), Ferry 0.33.0).
+  - The shared print info's paper comes from the locale (`LC_ALL`, then
+    `LC_PAPER`, then `LANG`). The C locale and the countries that use US
+    Letter give US Letter, and any other gives A4. A Mac takes it from the
+    chosen printer and the region settings.
+  - The defaults that Apple's documentation doesn't spell out: margins of
+    72 points on the left and right and 90 points at the top and bottom,
+    horizontal and vertical centring on, horizontal pagination Clip and
+    vertical pagination Auto.
+  - When a page is centred. Ferry centres the view only in a direction
+    where it fits on one page, and puts it at the top left otherwise.
+  - Fit pagination only shrinks a view; a view smaller than the page isn't
+    enlarged.
+  - The header and footer's layout: the job title and the date at the top,
+    and "Page n of m" at the bottom, in the system font at 10 points.
+  - A print operation works on a copy of the print info it is given, so
+    the panel's changes reach `[op printInfo]` and not the caller's object.
+  - `NSWindow`'s `print:` and `dataWithPDFInsideRect:` print the content
+    view, without the title bar.
+  - `NSTextView` doesn't draw the selection or the insertion point
+    whenever it draws to something other than the screen. That includes
+    `cacheDisplayInRect:toBitmapImageRep:`, not only printing.
+  - `addFontTrait:` takes the trait off when the selected font already has
+    it, so Bold and Italic toggle as the menu items' checks say.
+  - Bigger and Smaller change the size by one point.
+  - The font that a family name with no installed match gives. Mac names
+    such as Menlo or Helvetica go to the matching kind of system font, and
+    any other unknown family gives nil.
+  - The text that Poppler reads back from Ferry's PDFs, which the tests
+    print, and whether a Mac's PDFs would give the same line breaks.
+  - `usesFontPanel` is YES for a new text view, and a text view tells the
+    font manager about its selection's font only while it is the first
+    responder.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2348,3 +2424,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.30.0 (freemac (1.203)): C++ and Objective-C++ programs on this system's LLVM libc++ and libc++abi, loaded only when a program needs them: the standard library, exceptions across images and mixed with Objective-C's, and C++ threads on a Mac's layouts, `make check` 131/131.
 - 2026-11-24: Ferry 0.31.0 (freemac (1.204)): Mac thread-local variables (`__thread`, `_Thread_local`, C++ `thread_local`) through Ferry's own `_tlv_bootstrap` and `_tlv_atexit`, per thread and per image, in libraries opened with `dlopen` too, with destructors at thread exit, `make check` 138/138.
 - 2026-11-24: Ferry 0.32.0 (freemac (1.205)): BSD sockets with the Mac's layouts, kqueue and kevent on epoll, dispatch read, write, signal and process sources, CFSocket and run loop sources, CFStream and NSStream with TLS checked by SecTrust, and NSNetService's TXT records (no Bonjour yet), `make check` 144/144.
+- 2026-11-24: Ferry 0.33.0 (freemac (1.206)): printing (NSPrintInfo, NSPrintOperation, pagination, PDF output, GTK's print and page setup dialogs), NSDocument's Print… and Page Setup…, and NSFontManager with the font panel (Bold and Italic in text views), `make check` 151/151.
