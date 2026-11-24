@@ -1346,6 +1346,14 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "tint": ("Find the colour of anything on the screen", "tint colour color meter picker eyedropper pixel hex rgb value what colour is this digital color meter", [
+        "Open Tint from Applications > Utilities, or search for it with Seek.",
+        "Point at anything on the screen. Tint shows the pixels under the pointer enlarged, and the colour's red, green and blue values.",
+        "Choose how the values look from the View menu: numbers from 0 to 255, percentages or hex.",
+        "Drag Aperture size to average a bigger square of pixels.",
+        "Choose Color > Hold Color (⇧⌘H) to keep the values while you move away, or Lock Position (⌘L) to keep reading one spot.",
+        "Choose Color > Copy Color as Text (⇧⌘C) to paste the values somewhere else.",
+    ]),
     "view-background": ("Put a colour or picture behind a folder's icons", "background folder colour color picture wallpaper behind icons view options icon view white", [
         "Open the folder in Drawer and choose icon view.",
         "Choose View > Show View Options, or press ⌘J.",

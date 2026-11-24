@@ -946,6 +946,8 @@ class strata_shell_impl : public wf::plugin_interface_t
         out["x"]    = (int)at.x;
         out["y"]    = (int)at.y;
         out["view"] = 0;
+        // Whether a picture of the screen there has the arrow in it (Tint).
+        out["software"] = strata_hover::software_cursor_at(at.x, at.y);
         if (auto view = wf::get_core().get_cursor_focus_view())
         {
             view = wf::find_topmost_parent(view);
