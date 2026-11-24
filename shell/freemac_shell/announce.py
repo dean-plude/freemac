@@ -61,7 +61,7 @@ class Clock:
         self.last = key
         if notify_rules.active_focus(prefs) or not speak.available():
             return None
-        words = time_words(moment, prefs.get("clock") == "24")
+        words = time_words(moment, style.h24(prefs))
         speak.say(words)
         return words
 

@@ -91,7 +91,7 @@ class BatteryChart(Gtk.DrawingArea):
                 cr.fill()
         # Every 6 hours along the bottom, at the start of an hour.
         ink = self._ink()
-        h24 = style.prefs().get("clock") == "24"
+        h24 = style.h24()
         start = self.now - n * 15 * 60
         first = start - (start % 3600) + 3600
         t = first
@@ -138,7 +138,7 @@ class BatteryChart(Gtk.DrawingArea):
         plot = widget.get_allocated_width() - AXIS
         if x > plot:
             return False
-        h24 = style.prefs().get("clock") == "24"
+        h24 = style.h24()
         if self.mode == "day":
             slots = battery.levels(self.samples, self.now)
             i = int(x / (plot / len(slots)))
@@ -159,7 +159,7 @@ class BatteryChart(Gtk.DrawingArea):
 
 def _when(t):
     """'Today, 10:42 AM', 'Yesterday, 18:05', 'Sat 21 Nov, 9:10 AM'."""
-    h24 = style.prefs().get("clock") == "24"
+    h24 = style.h24()
     clock = time.strftime("%H:%M" if h24 else "%-I:%M %p", time.localtime(t))
     days = (time.localtime().tm_yday - time.localtime(t).tm_yday) % 366
     if days == 0:

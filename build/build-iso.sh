@@ -237,6 +237,15 @@ for app in kvantummanager qt5ct qt6ct system-config-printer; do
     sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$file"
   fi
 done
+# Language & Region: generate every region Dials offers (the table is in
+# freemac_shell/region.py) and write in US English unless the person picks
+# another region. Before 1.189 only C.UTF-8 existed, so dates and numbers
+# came out in the bare C style everywhere.
+log "Generating the regions' locales"
+python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from freemac_shell import region; print("\n".join(region.build_list()))' "$REPO/shell" \
+  > "$ROOTFS/etc/locale.gen"
+in_chroot locale-gen
+printf 'LANG=en_US.UTF-8\n' > "$ROOTFS/etc/default/locale"
 # Strata's own Wayfire plugins (C++), compiled against the image's Wayfire:
 # strata-decor (title bars and rounded window corners) and strata-shell
 # (gtk-shell that hands app menus to Topline), plus Latch's lock screen

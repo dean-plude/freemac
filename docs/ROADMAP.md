@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.189 "Language & Region" (done)
+
+Dates, times, numbers and money can be written the way the person's own
+country writes them, chosen in Dials as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The image generates 48 regions' locales and writes in US English by default (it was C.UTF-8) | Build | done |
+| 2 | Dials > Language & Region: region, first day of week, temperature and measurement system, with live date, time, number and currency examples and a Log Out button | Dials | done |
+| 3 | The session gives every app the region's formats (LC_TIME, LC_NUMERIC, LC_MONETARY and the rest, checked before use), while menus stay in English | Session | done |
+| 4 | freemac's calendars, the menu bar clock, the other clocks and Sky follow the region at once; day and month names stay English in freemac's own apps | Shell | done |
+| 5 | Computers installed before 1.189 get a region made the first time it is chosen, after an administrator's password (`freemac-system-helper region`) | System helper | done |
+| 6 | Guide topic, README row and screenshot | Docs | done |
+
 ## 1.188 "Ferry: array controllers and table bindings" (done)
 
 Mac programs that keep a list in an array controller and show it in a

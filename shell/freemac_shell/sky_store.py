@@ -123,10 +123,15 @@ def zone_country(zone):
 
 
 def default_unit():
-    """F where the computer's region uses Fahrenheit, else C. The region is
-    the locale's country, or the time zone's when the locale has none."""
+    """F where the person's region uses Fahrenheit, else C: the choice in
+    Dials > Language & Region, or else the locale's country, or the time
+    zone's when the locale has none. (LANG is left out: every freemac from
+    1.189 writes in en_US, wherever it is.)"""
+    from . import region
+    if os.path.exists(region.FILE):
+        return "F" if region.fahrenheit() else "C"
     country = None
-    for name in ("LC_MEASUREMENT", "LC_ALL", "LANG"):
+    for name in ("LC_MEASUREMENT", "LC_ALL"):
         value = os.environ.get(name, "")
         if "_" in value:
             country = value.split("_", 1)[1][:2].upper()
@@ -172,6 +177,21 @@ class Place:
     def from_json(cls, data):
         return cls(data["name"], data.get("region"), data.get("country"), data["latitude"],
                    data["longitude"], data.get("timezone"), data.get("country_code"))
+
+
+def set_unit(unit):
+    """Dials > Language & Region changed the temperature: Sky follows."""
+    try:
+        with open(config_path()) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return
+    if isinstance(data, dict) and unit in ("F", "C"):
+        data["unit"] = unit
+        try:
+            _write_json(config_path(), data)
+        except OSError:
+            pass
 
 
 class Settings:

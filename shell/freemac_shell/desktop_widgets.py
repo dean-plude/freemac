@@ -37,6 +37,8 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
+from . import region  # noqa: E402
+
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "widgets.json")
 SMALL = 164           # a small widget is SMALL x SMALL; a wide one is twice as wide
 GAP = 16
@@ -226,10 +228,11 @@ def draw_calendar(cr, width, height, today, events):
     left = half + GAP
     text(cr, today.strftime("%B").upper(), left, 14, 11, RED, Pango.Weight.BOLD)
     cell_w, cell_h = (width - left - 12) / 7, 17
-    for i, letter in enumerate("SMTWTFS"):
+    week_from = region.first_weekday()
+    for i, letter in enumerate(region.week_letters(week_from)):
         text(cr, letter, left + i * cell_w, 32, 10, DIM, Pango.Weight.BOLD, cell_w, "center")
     first = today.replace(day=1)
-    lead = (first.weekday() + 1) % 7   # Sunday first
+    lead = (first.weekday() - week_from) % 7   # the region's first day first
     day, row = first, 0
     while day.month == today.month:
         col = (lead + day.day - 1) % 7

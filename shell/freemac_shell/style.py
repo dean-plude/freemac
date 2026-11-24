@@ -11,6 +11,14 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 
 from gi.repository import Gio  # noqa: E402
 
+# GTK has just taken the region's formats from the session (LC_TIME and the
+# rest, Dials > Language & Region). freemac's own apps are in English and
+# build their dates themselves, so the day and month names they write stay
+# English, as on a Mac whose language is English, in any region; mail dates
+# need them in English too.
+from . import region as _region  # noqa: E402
+_region.english_names()
+
 # Colours are freemac's own: a pale frosted glass in light mode and a smoky
 # glass in dark mode (Strata blurs what's behind the menu bar), with a blue accent.
 TEMPLATE = """
@@ -143,6 +151,16 @@ def prefs():
             return json.load(f)
     except (OSError, ValueError):
         return {}
+
+
+def h24(values=None):
+    """Whether times are shown on a 24-hour clock: the choice in Dials >
+    Date & Time, or else the region's own (Language & Region)."""
+    values = prefs() if values is None else values
+    if values.get("clock") in ("12", "24"):
+        return values["clock"] == "24"
+    from . import region
+    return region.uses_24_hour()
 
 
 def save_prefs(**changes):

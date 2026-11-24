@@ -78,7 +78,7 @@ def days_combo(current):
 
 def edit(window, changed):
     """The Schedule… sheet. changed() is called once a new schedule is saved."""
-    h24 = style.prefs().get("clock") == "24"
+    h24 = style.h24()
     schedule = ps.load()
     wake = schedule["wake"] or {"days": "weekdays", "time": "07:00"}
     action = schedule["action"] or {"days": "everyday", "time": "22:00", "what": "shutdown"}
@@ -170,7 +170,7 @@ def save(window, schedule, changed):
 
 
 def summary():
-    text = ps.describe(ps.load(), style.prefs().get("clock") == "24")
+    text = ps.describe(ps.load(), style.h24())
     return text if text != "Off" else "Start up, wake, sleep, restart or shut down at set times."
 
 

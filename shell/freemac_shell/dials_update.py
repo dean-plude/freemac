@@ -27,7 +27,7 @@ LOOK_AGAIN = 3600     # opening the page looks again after an hour
 
 
 def _when(t):
-    h24 = style.prefs().get("clock") == "24"
+    h24 = style.h24()
     clock = time.strftime("%H:%M" if h24 else "%-I:%M %p", time.localtime(t))
     days = (time.localtime().tm_yday - time.localtime(t).tm_yday) % 366
     if days == 0:

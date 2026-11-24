@@ -90,7 +90,7 @@ def time_words(when):
 
 def uses_24_hours():
     """The same clock as the menu bar's (Dials > Date & Time)."""
-    return style.prefs().get("clock") == "24"
+    return style.h24()
 
 
 def day_words(date, today):
