@@ -6,7 +6,9 @@ each with the volumes on it. Choosing one shows how much of it is used,
 what kind of disk or file system it is and where it's connected. The
 buttons at the top mount or unmount a volume, erase a volume or a whole
 drive (asking for a name and a format first), and eject a drive. Double-
-click a volume, or choose Edit > Rename, to give it a new name. Restore
+click a volume, or choose Edit > Rename, to give it a new name. First Aid
+checks a volume, or every volume on a drive, for errors and repairs them.
+Restore
 copies a disk image onto a drive that's plugged in, to make a USB stick
 that starts up freemac or another system.
 
@@ -184,8 +186,9 @@ class Window(Gtk.ApplicationWindow):
         self.eject_button = self._tool("media-eject-symbolic", "Eject", self.eject)
         self.info_button = self._tool("document-edit-symbolic", "Rename", self.rename)
         self.restore_button = self._tool("document-revert-symbolic", "Restore", self.restore)
+        self.aid_button = self._tool("emblem-ok-symbolic", "First Aid", self.first_aid)
         for button in (self.eject_button, self.info_button, self.restore_button, self.erase_button,
-                       self.mount_button):
+                       self.mount_button, self.aid_button):
             header.pack_end(button)
         self.spinner = Gtk.Spinner()
         header.pack_start(self.spinner)
@@ -255,7 +258,8 @@ class Window(Gtk.ApplicationWindow):
 
         menus.add_actions(self, {"close": self.close, "mount": self.toggle_mount, "erase": self.erase,
                                  "eject": self.eject, "rename": self.rename, "open-image": self.open_image,
-                                 "new-image": self.new_image, "restore": self.restore})
+                                 "new-image": self.new_image, "restore": self.restore,
+                                 "first-aid": self.first_aid})
         self.bus, self._watch = hull_store.watch(self._changed)
         self.connect("destroy", lambda *_: [self.bus.signal_unsubscribe(i) for i in self._watch])
         header.show_all()
@@ -496,8 +500,9 @@ class Window(Gtk.ApplicationWindow):
         self.info_button.set_sensitive(free and not locked and bool(vol and vol.has_fs))
         self.eject_button.set_sensitive(free and bool(drive and (drive.external or drive.ejectable)))
         self.restore_button.set_sensitive(free and self._restorable(drive))
+        self.aid_button.set_sensitive(free and not locked and bool(self._aid_volumes(kind, item)))
         for name, on in (("mount", self.mount_button), ("erase", self.erase_button),
-                         ("restore", self.restore_button),
+                         ("restore", self.restore_button), ("first-aid", self.aid_button),
                          ("rename", self.info_button), ("eject", self.eject_button)):
             action = self.lookup_action(name)
             if action:
@@ -579,6 +584,65 @@ class Window(Gtk.ApplicationWindow):
         else:
             self.actions.erase_volume(item, fstype, label, done)
 
+
+    # -- first aid --
+
+    @staticmethod
+    def _aid_volumes(kind, item):
+        """The volumes First Aid would check: the one chosen, or every one on
+        the drive chosen, leaving out the system's and those with no file system."""
+        if item is None or item.system or getattr(item, "optical", False):
+            return []
+        volumes = [item] if kind == "volume" else item.volumes
+        return [v for v in volumes if v.has_fs and not v.drive.optical and v.fstype not in ("iso9660", "udf")]
+
+    def first_aid(self):
+        kind, item = self._current()
+        volumes = self._aid_volumes(kind, item)
+        if self.busy or not volumes:
+            return
+        whole = kind == "drive"
+        name = item.name
+        icon = self._gicon(drive_icon(item) if whole else volume_icon(item))
+        mounted = any(v.mounts for v in volumes)
+        text = ("First Aid checks it for errors and repairs them if it can." if len(volumes) == 1 else
+                f"First Aid checks the {len(volumes)} volume{'s' if len(volumes) != 1 else ''} on it for errors "
+                "and repairs them if it can.")
+        if mounted:
+            text += " It’s unmounted while it’s checked, so close any files on it first."
+        answer = alert.ask(self, f"Run First Aid on “{name}”?", text,
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Run", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK, icon=icon)
+        if answer != Gtk.ResponseType.OK:
+            return
+        self._working(True)
+        sheet = Checking(self, name, icon)
+        sheet.show_all()
+        jobs = [(v.path, v.fstype, bool(v.mounts), v.name, v.kind) for v in volumes]
+
+        def finished(results, error):
+            sheet.destroy()
+            self._working(False)
+            self.reload()
+            if error is not None:
+                words = hull_store.Actions.words(error)
+                if words:
+                    alert.tell(self, f"First Aid couldn’t check “{name}”.", words, icon=icon)
+                return False
+            title, text = first_aid_words(name, results)
+            alert.tell(self, title, text, icon=icon)
+            return False
+
+        def work():
+            results, error = [], None
+            try:
+                for path, fstype, was_mounted, vol_name, vol_kind in jobs:
+                    GLib.idle_add(sheet.checking, vol_name)
+                    results.append((vol_name, vol_kind, hull_store.first_aid(path, fstype, was_mounted)))
+            except GLib.Error as e:
+                error = e
+            GLib.idle_add(finished, results, error)
+        threading.Thread(target=work, daemon=True).start()
 
     # -- restore --
 
@@ -750,6 +814,66 @@ class Window(Gtk.ApplicationWindow):
         threading.Thread(target=work, daemon=True).start()
 
 
+def first_aid_words(name, results):
+    """The title and text of First Aid's report, from [(volume, format, result)]."""
+    broken = [v for v, _k, r in results if r == hull_store.BROKEN]
+    repaired = [v for v, _k, r in results if r == hull_store.REPAIRED]
+    unchecked = [(v, k) for v, k, r in results if r == hull_store.UNSUPPORTED]
+
+    def listed(names):
+        names = [f"“{n}”" for n in names]
+        return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    if broken:
+        title = f"First Aid found problems on “{name}” it couldn’t repair."
+        text = (f"Copy what you need off {listed(broken)} while you still can, then erase it to use it again.")
+    elif repaired:
+        title = f"First Aid repaired “{name}”."
+        text = f"It found problems on {listed(repaired)} and fixed them."
+    elif unchecked and len(unchecked) == len(results):
+        title = f"First Aid can’t check “{name}”."
+        text = f"freemac can’t check {unchecked[0][1]} volumes for errors."
+    else:
+        title = f"First Aid found no problems on “{name}”."
+        text = "It looks healthy."
+    if unchecked and len(unchecked) < len(results):
+        text += f" {listed([v for v, _k in unchecked])} couldn’t be checked, because of the way it’s formatted."
+    return title, text
+
+
+class Checking(Gtk.Window):
+    """First Aid at work: which volume is being checked."""
+
+    def __init__(self, parent, name, icon):
+        super().__init__(title="First Aid", transient_for=parent, modal=True, resizable=False,
+                         type_hint=Gdk.WindowTypeHint.DIALOG, deletable=False)
+        self.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+        box = Gtk.Box(spacing=14)
+        for side in ("start", "end", "top", "bottom"):
+            getattr(box, "set_margin_" + side)(20)
+        image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
+        image.set_pixel_size(48)
+        box.pack_start(image, False, False, 0)
+        words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        title = Gtk.Label(label=f"Running First Aid on “{name}”…", xalign=0, max_width_chars=44, wrap=True)
+        title.get_style_context().add_class("hull-drive-name")
+        words.pack_start(title, False, False, 0)
+        self.bar = Gtk.ProgressBar()
+        self.bar.set_size_request(340, -1)
+        words.pack_start(self.bar, False, False, 0)
+        self.now = Gtk.Label(label="", xalign=0)
+        self.now.get_style_context().add_class("hull-what")
+        words.pack_start(self.now, False, False, 0)
+        box.pack_start(words, True, True, 0)
+        self.add(box)
+        self.connect("delete-event", lambda *_: True)
+        self.timer = GLib.timeout_add(120, lambda: self.bar.pulse() or True)
+        self.connect("destroy", lambda *_: GLib.source_remove(self.timer))
+
+    def checking(self, volume):
+        self.now.set_text(f"Checking “{volume}”…")
+        return False
+
+
 class Restoring(Gtk.Window):
     """The sheet-like window that shows a restore going, with Stop."""
 
@@ -799,7 +923,8 @@ def menubar():
                     ("New Image from Folder…", "win.new-image", "<Shift><Ctrl>n")],
                    [("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
                    [("Close", "win.close", "<Ctrl>w")]]),
-        ("_Edit", [[("Rename…", "win.rename", None), ("Erase…", "win.erase", "<Shift><Ctrl>e"),
+        ("_Edit", [[("First Aid…", "win.first-aid", None), ("Rename…", "win.rename", None),
+                    ("Erase…", "win.erase", "<Shift><Ctrl>e"),
                     ("Restore…", "win.restore", "<Shift><Ctrl>r")]]),
     ])
 
