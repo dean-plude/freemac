@@ -220,6 +220,7 @@ void AViewDecode(NSView *v, NSCoder *c)
 
 - (void)_postFrameChanged
 {
+    ATrackingGeometryChanged(self);
     if (_postsFrame)
         [[NSNotificationCenter defaultCenter] postNotificationName:NSViewFrameDidChangeNotification object:self];
 }
@@ -267,6 +268,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     _bounds = bounds;
     [self _syncLayer];
     [self setNeedsDisplay:YES];
+    ATrackingGeometryChanged(self);
     if (_postsBounds)
         [[NSNotificationCenter defaultCenter] postNotificationName:NSViewBoundsDidChangeNotification object:self];
 }
@@ -501,6 +503,7 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
     if (_window == window)
         return;
     [self viewWillMoveToWindow:window];
+    ATrackingViewMoving(self, _window, window);
     _window = window;
     if ([_draggedTypes count])
         [window _enableDrops];

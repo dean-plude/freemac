@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: NSFetchedResultsController, as Apple's class reference
- * describes it (freemac 1.NEXT, Ferry 0.NEXT). Our own code; no Apple code
+ * describes it (freemac 1.209, Ferry 0.35.0). Our own code; no Apple code
  * was used.
  *
  * With a delegate, the controller fetches again each time its context says

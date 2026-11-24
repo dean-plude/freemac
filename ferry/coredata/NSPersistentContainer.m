@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: NSPersistentStoreDescription and NSPersistentContainer,
- * as Apple's class references describe them (freemac 1.NEXT, Ferry
- * 0.NEXT). Our own code; no Apple code was used.
+ * as Apple's class references describe them (freemac 1.209, Ferry
+ * 0.35.0). Our own code; no Apple code was used.
  *
  * A container made with a name and no model looks in the main bundle for
  * the model's source (<name>.xcdatamodeld or <name>.xcdatamodel), which

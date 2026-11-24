@@ -2,7 +2,7 @@
  * Ferry's Core Data: the model (NSManagedObjectModel, NSEntityDescription
  * and the property descriptions), as Apple's class references describe
  * them, and a reader for the XML source of a model that Xcode keeps in a
- * .xcdatamodeld folder (freemac 1.NEXT, Ferry 0.NEXT). Compiled models
+ * .xcdatamodeld folder (freemac 1.209, Ferry 0.35.0). Compiled models
  * (.mom and .momd) aren't read: their format isn't published, so asking
  * for one says so once on stderr and answers nil, as Core Data answers
  * when it finds no model. Our own code; no Apple code was used.
@@ -294,7 +294,7 @@ static BOOL transformer_is_archiving(NSString *name)
 }
 /* The stored form: transformable values become data through the attribute's transformer. */
 /* A decimal number as it is kept in a file: its digits as text, exactly
- * (freemac 1.NEXT, Ferry 0.NEXT); one read from a file kept it as a
+ * (freemac 1.211, Ferry 0.37.0); one read from a file kept it as a
  * double is the shortest decimal that reads back as that double. */
 static NSDecimalNumber *as_decimal_number(id value)
 {

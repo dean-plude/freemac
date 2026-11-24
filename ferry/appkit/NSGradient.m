@@ -5,8 +5,8 @@
  * graphics context: along a line, between two circles, or filling a
  * rectangle or a path at an angle or from a centre. A shadow is an offset,
  * a blur radius and a colour that, once set, apply to what is drawn next;
- * Ferry's Core Graphics doesn't draw shadows yet, so it says so once, and
- * a shadow given as a text attribute is kept but not drawn. Six of the
+ * Ferry's Core Graphics draws it under each shape, image and line of text,
+ * and a shadow given as a text attribute is drawn under its run. Six of the
  * nine apps docs/ferry-compat.md follows draw with these classes. Built
  * without ARC. */
 #import "AInternal.h"

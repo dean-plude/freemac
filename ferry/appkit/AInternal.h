@@ -483,4 +483,26 @@ NSFontManager *AExistingFontManager(void);
 - (void)_ferryTakeFetched:(NSArray *)found merge:(BOOL)merge;
 @end
 
+/* ---- tracking areas and cursors (NSTrackingArea.m, NSCursor.m) ------------------------ */
+
+/* An entered, exited or cursor-update event for a tracking area or
+ * tracking rectangle, caused by the mouse event given (NSEvent.m). */
+NSEvent *ATrackingEvent(NSEventType type, NSPoint location, NSEvent *cause, NSWindow *window,
+                        NSInteger number, void *userData, NSTrackingArea *area);
+/* The window's tracking for an event it is sent: YES when the event was
+ * one of tracking's own and nothing more is to be done with it. */
+BOOL ATrackEvent(NSWindow *window, NSEvent *event);
+/* Whether moving the mouse matters to a window's tracking even when the
+ * window doesn't take mouse-moved events, and the event GTK's pointer
+ * leaving the window becomes. */
+BOOL ATrackingWantsMoves(NSWindow *window);
+NSEvent *ATrackingWindowExitEvent(NSWindow *window, NSPoint location);
+/* A view's geometry changed, or it moves between windows: its tracking
+ * areas are updated and its window's cursor rectangles built again. */
+void ATrackingGeometryChanged(NSView *view);
+void ATrackingViewMoving(NSView *view, NSWindow *from, NSWindow *to);
+/* Shows the current cursor (hidden or not) on a window that has a display. */
+void ACursorApply(NSWindow *window);
+BOOL ACursorMouseMoved(void);
+
 #endif

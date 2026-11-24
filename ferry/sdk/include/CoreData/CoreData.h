@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: Core Data (coredata/), Ferry's own, written for freemac from
  * Apple's public documentation (the Core Data Programming Guide and the
- * class references); not Apple's header (freemac 1.NEXT, Ferry 0.NEXT).
+ * class references); not Apple's header (freemac 1.209, Ferry 0.35.0).
  *
  * Models are built in code, or read from the XML source of an Xcode
  * model (a .xcdatamodeld or .xcdatamodel folder); compiled .mom and .momd
@@ -663,7 +663,7 @@ typedef NS_ENUM(NSUInteger, NSFetchedResultsChangeType) {
 - (void)performBackgroundTask:(void (^)(NSManagedObjectContext *))block;
 @end
 
-/* ---- expression descriptions (freemac 1.NEXT, Ferry 0.NEXT) ---------------------------- */
+/* ---- expression descriptions (freemac 1.211, Ferry 0.37.0) ---------------------------- */
 
 @interface NSExpressionDescription : NSPropertyDescription
 @property (strong) NSExpression *expression;

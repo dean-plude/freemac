@@ -887,7 +887,7 @@ else
 fi
 # gradients, shadows and the split view and tab view controllers
 run_one appkit_gradients "$here/appkit/gradients.m" "$here/appkit/gradients.out" -fobjc-arc -fblocks -framework Cocoa
-if [ "$(grep -c "drawing shadows isn't supported yet" "$build/appkit_gradients.err" 2>/dev/null)" = 1 ]
+if [ -f "$build/appkit_gradients.err" ] && [ "$(grep -c "shadow" "$build/appkit_gradients.err")" = 0 ]
 then
     echo "ok   appkit_gradients message"; pass=$((pass + 1))
 else
@@ -908,8 +908,8 @@ run_one coredata_aggregates "$here/coredata/aggregates.m" "$here/coredata/aggreg
     -fobjc-arc -fblocks -framework Foundation -framework CoreData -lsqlite3
 # NSCollectionView, with the item-based API, the flow and grid layouts and
 # the older content-array API, and loaded from a nib in both forms; and
-# NSRulerView and NSRulerMarker on a scroll view (freemac 1.NEXT, Ferry
-# 0.NEXT).
+# NSRulerView and NSRulerMarker on a scroll view (freemac 1.212, Ferry
+# 0.38.0).
 run_one appkit_collections "$here/appkit/collections.m" "$here/appkit/collections.out" -fobjc-arc -fblocks -framework Cocoa
 run_one appkit_collections_legacy "$here/appkit/collections_legacy.m" "$here/appkit/collections_legacy.out" \
     -fobjc-arc -fblocks -framework Cocoa
@@ -917,5 +917,70 @@ export FERRY_TEST_DATA="$here/appkit"
 run_one appkit_collections_nib "$here/appkit/collections_nib.m" "$here/appkit/collections_nib.out" -fobjc-arc -fblocks -framework Cocoa
 unset FERRY_TEST_DATA
 run_one appkit_rulers "$here/appkit/rulers.m" "$here/appkit/rulers.out" -fobjc-arc -fblocks -framework Cocoa
+# Shadows drawn by Core Graphics (freemac 1.213, Ferry 0.39.0): shapes,
+# strokes, images, gradients, text and transparency layers, in bitmaps.
+run_one graphics_shadows "$here/graphics/shadows.m" "$here/graphics/shadows.out" -fobjc-arc -framework CoreText \
+    -framework CoreGraphics -framework Foundation
+# Tracking areas, tracking rectangles, cursor rectangles and cursors
+# (freemac 1.213, Ferry 0.39.0), by mouse events sent to a window.
+run_one appkit_tracking "$here/appkit/tracking.m" "$here/appkit/tracking.out" -fobjc-arc -fblocks -framework Cocoa
+# NSAnimation and NSViewAnimation on the run loop, blocking and not, and the
+# animator proxy (freemac 1.213, Ferry 0.39.0).
+run_one appkit_animation "$here/appkit/animation.m" "$here/appkit/animation.out" -fobjc-arc -fblocks -framework Cocoa
+# Distributed notifications (freemac 1.213, Ferry 0.39.0): within one
+# program with no session bus, saying nothing on stderr, and between two
+# programs on a private session bus.
+distnote_env() { env -u DBUS_SESSION_BUS_ADDRESS -u XDG_RUNTIME_DIR -u WAYLAND_DISPLAY -u DISPLAY "$@"; }
+distnote_diff() {
+    if diff -u "$2" "$build/$1.got" > "$build/$1.diff"; then
+        echo "ok   $1"; pass=$((pass + 1))
+    else
+        echo "FAIL $1"; sed 's/^/    /' "$build/$1.diff"; sed 's/^/    stderr: /' "$build/$1.err"; fail=$((fail + 1))
+    fi
+}
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/foundation_distnote" "$here/foundation/distnote.m" \
+    -framework Foundation 2> "$build/foundation_distnote.cc.log"; then
+    distnote_env timeout 60 "$top/ferry" "$build/foundation_distnote" alone > "$build/foundation_distnote_alone.got" \
+        2> "$build/foundation_distnote_alone.err"
+    echo "exit=$?" >> "$build/foundation_distnote_alone.got"
+    distnote_diff foundation_distnote_alone "$here/foundation/distnote_alone.out"
+    if [ ! -s "$build/foundation_distnote_alone.err" ]; then
+        echo "ok   foundation_distnote_alone quiet"; pass=$((pass + 1))
+    else
+        echo "FAIL foundation_distnote_alone quiet"; sed 's/^/    stderr: /' "$build/foundation_distnote_alone.err"
+        fail=$((fail + 1))
+    fi
+    if command -v dbus-run-session > /dev/null; then
+        distnote_env timeout 60 dbus-run-session --config-file="$here/appkit/session-bus.conf" -- \
+            "$top/ferry" "$build/foundation_distnote" > "$build/foundation_distnote.got" 2> "$build/foundation_distnote.err"
+        echo "exit=$?" >> "$build/foundation_distnote.got"
+        distnote_diff foundation_distnote "$here/foundation/distnote.out"
+    else
+        echo "skip foundation_distnote (it needs dbus-run-session)"
+    fi
+else
+    echo "FAIL foundation_distnote (did not compile)"; sed 's/^/    /' "$build/foundation_distnote.cc.log"
+    fail=$((fail + 1))
+fi
+# NSRunningApplication (freemac 1.213, Ferry 0.39.0): the current
+# application, and an .app the test makes and starts, found and ended.
+run_one appkit_running "$here/appkit/running.m" "$here/appkit/running.out" -fobjc-arc -fblocks -framework Cocoa
+# NSMutableCharacterSet, the further NSCharacterSet methods and percent
+# encoding (freemac 1.213, Ferry 0.39.0).
+run_one foundation_charset "$here/foundation/charset.m" "$here/foundation/charset.out" -fobjc-arc -fblocks \
+    -framework Foundation
+# NSTextAttachment (freemac 1.213, Ferry 0.39.0): images drawn inline in
+# text, into bitmaps and in a text view.
+run_one appkit_attachment "$here/appkit/attachment.m" "$here/appkit/attachment.out" -fobjc-arc -fblocks -framework Cocoa
+# NSAppleScript (freemac 1.213, Ferry 0.39.0): it runs nothing and answers
+# an error, and says so on stderr once.
+run_one foundation_applescript "$here/foundation/applescript.m" "$here/foundation/applescript.out" -fobjc-arc \
+    -framework Foundation
+if [ -f "$build/foundation_applescript.err" ] && [ "$(grep -c "AppleScript isn't supported" "$build/foundation_applescript.err")" = 1 ]
+then
+    echo "ok   foundation_applescript message"; pass=$((pass + 1))
+else
+    echo "FAIL foundation_applescript message"; sed 's/^/    stderr: /' "$build/foundation_applescript.err"; fail=$((fail + 1))
+fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -1,0 +1,20 @@
+current: the same each time yes, our process yes, a name yes, no bundle identifier yes
+its program: this one, launched in the last minute: yes, terminated no, finished launching yes
+by process: the current one, process 0: none
+among the workspace's running applications: yes
+frontmost while inactive: none
+activated: active yes, frontmost the current one
+architecture: 0x1000007
+the app made: yes
+before it starts: 0 running
+started: 1 found, its process the task's, name Runner, bundle Runner.app, program Runner
+launched in the last minute: yes, terminated no, a regular app yes, not active yes
+by its process: org.freemac.test.runner, equal yes; in the workspace's list: yes
+hidden or activated from here: no
+terminate: sent
+it ended by signal 15 (SIGTERM yes), terminated now yes
+again: found yes
+force terminate: sent
+it ended by signal 9 (SIGKILL yes)
+after: 0 running
+exit=0

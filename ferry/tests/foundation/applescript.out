@@ -1,0 +1,12 @@
+made: yes, source kept yes, compiled no
+compile: no
+  its error: number -1750, a message yes, a brief message yes, app name ours yes, range 0,53
+execute: nil
+  its error: number -1750, a message yes, a brief message yes, app name ours yes, range 0,53
+execute with no place for the error: nil
+a copy keeps the source: yes
+from a file: source beep, error none
+run from a file: nil
+  its error: number -1750, a message yes, a brief message yes, app name ours yes, range 0,4
+from a missing file: nil, error number -43
+exit=0

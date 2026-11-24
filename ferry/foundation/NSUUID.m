@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: NSUUID, as Apple's NSUUID reference describes it,
- * with RFC 4122's layout and string form (freemac 1.NEXT, Ferry 0.NEXT,
+ * with RFC 4122's layout and string form (freemac 1.209, Ferry 0.35.0,
  * for Core Data's UUID attributes). A new UUID is version 4: random bytes
  * from arc4random_buf with the version and variant bits set. Strings are
  * written in upper case, as on a Mac, and read in either case. Our own

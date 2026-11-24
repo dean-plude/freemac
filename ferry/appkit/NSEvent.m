@@ -25,6 +25,9 @@
     unsigned short _keyCode;
     short _subtype;
     NSInteger _data1, _data2;
+    NSInteger _trackingNumber;  /* entered, exited and cursor-update events (NSTrackingArea.m) */
+    void *_userData;
+    NSTrackingArea *_trackingArea;
 }
 
 static NSPoint mouse_location;
@@ -100,8 +103,23 @@ static NSEvent *new_event(NSEventType type, NSPoint location, NSEventModifierFla
 {
     [_chars release];
     [_unmodified release];
+    [_trackingArea release];
     [super dealloc];
 }
+
++ (NSEvent *)enterExitEventWithType:(NSEventType)type location:(NSPoint)location
+                      modifierFlags:(NSEventModifierFlags)flags timestamp:(NSTimeInterval)time
+                       windowNumber:(NSInteger)windowNumber context:(id)context eventNumber:(NSInteger)eventNumber
+                     trackingNumber:(NSInteger)trackingNumber userData:(void *)userData
+{
+    NSEvent *e = new_event(type, location, flags, time, windowNumber);
+    e->_trackingNumber = trackingNumber;
+    e->_userData = userData;
+    return e;
+}
+- (NSInteger)trackingNumber { return _trackingNumber; }
+- (void *)userData { return _userData; }
+- (NSTrackingArea *)trackingArea { return _trackingArea; }
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 
 - (NSEventType)type { return _type; }
@@ -177,6 +195,17 @@ NSEvent *AScrollEvent(NSPoint location, NSEventModifierFlags flags, NSWindow *wi
     e->_dx = dx;
     e->_dy = dy;
     e->_precise = precise;
+    return e;
+}
+
+NSEvent *ATrackingEvent(NSEventType type, NSPoint location, NSEvent *cause, NSWindow *window,
+                        NSInteger number, void *userData, NSTrackingArea *area)
+{
+    NSEvent *e = new_event(type, location, [cause modifierFlags], [cause timestamp], [window windowNumber]);
+    e->_window = window;
+    e->_trackingNumber = number;
+    e->_userData = userData;
+    e->_trackingArea = [area retain];
     return e;
 }
 

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: fetch requests and the batch requests, as Apple's
- * class references describe them (freemac 1.NEXT, Ferry 0.NEXT). Our own
+ * class references describe them (freemac 1.209, Ferry 0.35.0). Our own
  * code; no Apple code was used.
  *
  * fetchBatchSize and relationshipKeyPathsForPrefetching are kept and

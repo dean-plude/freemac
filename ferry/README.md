@@ -197,8 +197,7 @@ once when an app asks for one. Store files made on a Mac aren't read either.
 From Ferry 0.36.0 (freemac 1.210), Mac apps can draw gradients with
 `NSGradient`: along a line, in a rectangle or a path at an angle, and
 between circles, with stops at any locations. `NSShadow` is there with
-its settings, archives and the `NSShadow` text attribute, though shadows
-aren't drawn yet. `NSSplitViewController` and `NSSplitViewItem` lay out
+its settings, archives and the `NSShadow` text attribute, and from Ferry 0.39.0 (freemac 1.213) shadows are drawn. `NSSplitViewController` and `NSSplitViewItem` lay out
 panes in a split view, with sidebars and inspectors that collapse by
 code, by `toggleSidebar:` or by dragging, holding priorities and
 thickness limits. `NSTabViewController` shows its tabs as a segmented
@@ -229,6 +228,18 @@ prototype in a nib is copied with its outlets, actions and bindings.
 measurement units, markers the user can drag, and subclasses that draw
 their own marks, such as line numbers. Nothing in a collection view is
 animated, and items can't be dragged yet.
+
+From Ferry 0.39.0 (freemac 1.213), views can track the mouse with
+`NSTrackingArea`, tracking rectangles and cursor rectangles, and set the
+cursor with `NSCursor`. Core Graphics draws shadows, so `NSShadow` and the
+shadow text attribute are drawn. `NSAnimation` and `NSViewAnimation` run
+on the run loop, blocking or not. `NSDistributedNotificationCenter` passes
+notifications between Ferry programs on the D-Bus session bus, and
+`NSRunningApplication` finds this program and the other Ferry programs.
+Foundation has `NSMutableCharacterSet`, the rest of `NSCharacterSet` and
+percent encoding, and AppKit has `NSTextAttachment`, an image drawn inline
+in text. `NSAppleScript` is there but runs no scripts: it answers an
+error, and Ferry says so once.
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
@@ -265,15 +276,15 @@ views, table and outline views (cell-based or view-based, with
 selection, sorting from the header, resizable columns and, from freemac
 (1.178), text cells edited in place), pop-up
 buttons, segmented controls, search fields, stack views, toolbars and,
-from freemac (1.184), sliders are there too,
+from freemac 1.184, sliders are there too,
 and key-value observing, so bindings follow the values they are bound to.
-From freemac (1.184) observing is automatic (a hidden subclass's setters
+From freemac 1.184 observing is automatic (a hidden subclass's setters
 announce each change, and dependent keys are followed), bindings write
 the user's edits back to their key path (text fields, buttons, pop-up
 buttons and sliders, with `NSObjectController`'s `selection.*`,
 `NSUserDefaultsController`'s `values.*` and bindings made in nibs), and
 formatters on controls, cells and edited table cells show values, read
-what is typed and beep at what they can't read. From freemac (1.188)
+what is typed and beep at what they can't read. From freemac 1.188
 `NSArrayController` is there too (bound content, sorted and filtered
 `arrangedObjects`, a selection that answers `NSMultipleValuesMarker`, and
 adding, inserting and removing), with table columns bound to
@@ -290,7 +301,7 @@ the selection goes both ways, a column's title sorts the tree, and an
 edited cell writes back. Columns' per-row `editable` and `enabled`
 bindings are followed, an edited cell isn't written back when its
 controller isn't editable, and `NSDictionaryController` shows a
-dictionary as key-value pairs. From freemac (1.191) the four controllers
+dictionary as key-value pairs. From freemac 1.191 the four controllers
 load from nibs with their settings and the binding connectors that join
 them, so a nib that binds a table or an outline to a controller works with
 no code; view-based tables and outlines make their cell views from the
@@ -303,7 +314,7 @@ conditionally, and the array controller takes `NSDeletesObjectsOnRemove`,
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question
-on closing and quitting, and the Open Recent menu; from freemac (1.178) a
+on closing and quitting, and the Open Recent menu; from freemac 1.178 a
 document class that autosaves in place is autosaved after each change,
 closes without asking and gets Revert To > Last Saved Version (versions
 are left out). `NSAlert` shows alerts, run modally or as sheets hanging in

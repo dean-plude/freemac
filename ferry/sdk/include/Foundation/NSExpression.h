@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: NSExpression (foundation/NSExpression.m, freemac 1.NEXT,
- * Ferry 0.NEXT). Written for freemac from Apple's public API documentation
+ * Ferry SDK: NSExpression (foundation/NSExpression.m, freemac 1.211,
+ * Ferry 0.37.0). Written for freemac from Apple's public API documentation
  * and the "Predicate Format String Syntax" of the Predicate Programming
  * Guide; not Apple's header. */
 #ifndef _FERRY_FOUNDATION_NSEXPRESSION_H_

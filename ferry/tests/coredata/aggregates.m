@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Core Data with expressions and decimals (freemac 1.NEXT, Ferry 0.NEXT):
+ * Core Data with expressions and decimals (freemac 1.211, Ferry 0.37.0):
  * decimal attributes kept exactly in the SQLite, binary and in-memory
  * stores, older SQLite and binary stores that kept them as doubles,
  * NSExpressionDescription in propertiesToFetch with aggregates,

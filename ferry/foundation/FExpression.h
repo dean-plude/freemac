@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: what NSPredicate.m, NSComparisonPredicate.m,
- * NSExpression.m and NSPredicateParser.m share (freemac 1.NEXT, Ferry
- * 0.NEXT). Our own code. */
+ * NSExpression.m and NSPredicateParser.m share (freemac 1.211, Ferry
+ * 0.37.0). Our own code. */
 #ifndef FERRY_FOUNDATION_EXPRESSION_H
 #define FERRY_FOUNDATION_EXPRESSION_H
 #import "FInternal.h"

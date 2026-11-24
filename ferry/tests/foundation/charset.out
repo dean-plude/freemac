@@ -1,0 +1,38 @@
+new: mutable yes, a character set yes, holds 'a' no
+a to z, 0 to 3, less m to o, z and 0: U+0061 U+006C U+0070 U+0079 U+0031 U+0033
+with the whitespace: U+0061 U+0020 U+0009 U+0078
+cut to abc, space and newline: U+0061 U+0062 U+0063 U+0020
+inverted: U+0064 U+0078 U+0009 U+000A
+inverted holds U+1F600 yes
+from a string with an emoji: mutable yes, U+1F600 yes, U+1F601 no, x yes, plane 1 yes, plane 2 no
+a range in plane 1: U+10000 yes, U+100FF yes, U+10100 no, plane 0 no
+control: U+0007 U+00AD
+uppercase: U+0041 U+00C9 U+01C5
+lowercase: U+0061 U+00E9
+capitalized: U+01C5
+non-base: U+0301
+decomposable: U+00E9 U+00C9
+illegal: U+FFFF
+symbol: U+002B U+0024
+the same set each time: yes
+the mutable digits with a point: U+0030 U+0039 U+002E
+the shared digits keep no point: yes
+the emoji set's bitmap: 16385 bytes
+read back: U+1F600 yes, x yes, y no, equal yes
+the letters' bitmap: 8192 bytes
+from a file: U+1F600 yes; from no file: nil
+a to z holds abc: yes; abc holds a to z: no
+the whitespace and newlines hold the newlines: yes
+abc from a string and from a range equal: yes
+a mutable copy: mutable yes, d yes; its copy: mutable no, d yes, e no; abc unchanged yes
+the mutable set inverted: a no, f yes, U+1F600 yes
+an older set inverted holds U+1F600: yes; the older set does: no
+trimmed with a mutable set: hello
+query: a%20b/c?d=e&f%23g%C3%A9%F0%9F%98%80
+path: a%20b/c%3Fd=e&f%23g%C3%A9%F0%9F%98%80
+user: a%20b%2Fc%3Fd=e&f%23g%C3%A9%F0%9F%98%80
+host: [::1]:80%20x
+decoded again the same: yes
+bad escapes: nil, nil, nil
+mixed: café au+lait
+exit=0

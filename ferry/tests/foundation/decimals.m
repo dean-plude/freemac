@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * NSDecimal and its functions, NSDecimalNumber, NSDecimalNumberHandler,
  * and decimal numbers with NSNumber, NSNumberFormatter, NSScanner, keyed
- * archiving and NSJSONSerialization (freemac 1.NEXT, Ferry 0.NEXT). */
+ * archiving and NSJSONSerialization (freemac 1.211, Ferry 0.37.0). */
 #import <Foundation/Foundation.h>
 #include <stdio.h>
 

@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.213 "Ferry: tracking areas, shadows and other programs" (done)
+
+Ferry 0.39.0: views that follow the mouse, shadows that are drawn, animations, and Mac apps that talk to their other copies.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSTrackingArea`, tracking and cursor rectangles, and `NSCursor` on GTK's cursors | Ferry AppKit | done |
+| 2 | Shadows drawn by Core Graphics under shapes, images, gradients, text and layers, so `NSShadow` shows | Ferry Core Graphics | done |
+| 3 | `NSAnimation` and `NSViewAnimation`, blocking and not, with curves and progress marks | Ferry AppKit | done |
+| 4 | `NSDistributedNotificationCenter` between Ferry programs on the D-Bus session bus, and `NSRunningApplication` | Ferry Foundation, AppKit | done |
+| 5 | `NSMutableCharacterSet`, the rest of `NSCharacterSet` and percent encoding; `NSTextAttachment`; `NSAppleScript`, which answers an error | Ferry Foundation, AppKit | done |
+| 6 | Eleven new tests, and the notification test's order made fixed; `make check` 190 of 190 | Ferry | done |
+
+AppleScript itself, the notifications a Mac's system posts, and layer shadows aren't done.
+
 ## 1.212 "Ferry: collection views and rulers" (done)
 
 Ferry 0.38.0: grids of items, as in MacPass's icon picker, and rulers such as Sequel Pro's line numbers.

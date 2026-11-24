@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Core Data: NSManagedObject and NSManagedObjectID, as Apple's
  * class references and the Core Data Programming Guide describe them
- * (freemac 1.NEXT, Ferry 0.NEXT). Our own code; no Apple code was used.
+ * (freemac 1.209, Ferry 0.35.0). Our own code; no Apple code was used.
  *
  * An object keeps its values in a dictionary; a fault keeps none until a
  * value is asked for, when its context finds its row. Accessors for

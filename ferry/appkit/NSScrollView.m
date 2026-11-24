@@ -646,7 +646,7 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 - (void)setFindBarVisible:(BOOL)f { _findBar = f; }
 - (NSInteger)findBarPosition { return _findBarPosition; }
 - (void)setFindBarPosition:(NSInteger)p { _findBarPosition = p; }
-/* Rulers (Ferry 0.NEXT, NSRulerView.m): made of rulerViewClass when asked
+/* Rulers (Ferry 0.38.0, NSRulerView.m): made of rulerViewClass when asked
  * for, laid out by tile while rulersVisible is YES. */
 static Class ruler_class;
 + (void)setRulerViewClass:(Class)cls { ruler_class = cls; }

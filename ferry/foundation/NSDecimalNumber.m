@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: NSDecimal and its functions, NSDecimalNumber and
  * NSDecimalNumberHandler, as Apple's class references and the "Number and
- * Value Programming Topics" describe them (freemac 1.NEXT, Ferry 0.NEXT).
+ * Value Programming Topics" describe them (freemac 1.211, Ferry 0.37.0).
  * Our own code; no Apple code was used.
  *
  * The arithmetic is done on decimal digits, exactly, and the result is

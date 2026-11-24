@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's Foundation: NSComparisonPredicate, as Apple's class reference and
- * the "Predicate Programming Guide" describe it (freemac 1.NEXT, Ferry
- * 0.NEXT). Our own code; no Apple code was used.
+ * the "Predicate Programming Guide" describe it (freemac 1.211, Ferry
+ * 0.37.0). Our own code; no Apple code was used.
  *
  * A comparison has two NSExpressions, an operator (==, !=, <, <=, >, >=,
  * BETWEEN, IN, CONTAINS, BEGINSWITH, ENDSWITH, LIKE, MATCHES or a custom

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: NSDecimalNumber and NSDecimalNumberHandler
- * (foundation/NSDecimalNumber.m, freemac 1.NEXT, Ferry 0.NEXT). Written for
+ * (foundation/NSDecimalNumber.m, freemac 1.211, Ferry 0.37.0). Written for
  * freemac from Apple's public API documentation; not Apple's header. */
 #ifndef _FERRY_FOUNDATION_NSDECIMALNUMBER_H_
 #define _FERRY_FOUNDATION_NSDECIMALNUMBER_H_

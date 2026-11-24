@@ -607,6 +607,7 @@ static void later(void (^block)(void))
     NSSet *_categories;
     NSMutableArray *_pending;           /* UNNotificationRequest, in the order added */
     NSMutableDictionary *_timers;       /* identifier -> NSTimer */
+    NSMutableDictionary *_addHandlers;  /* identifier -> add handler of a request with no trigger */
     NSMutableArray *_delivered;         /* UNNotification */
     NSMutableDictionary *_shown;        /* identifier -> FUNShown */
 }
@@ -627,6 +628,7 @@ static void later(void (^block)(void))
         _categories = [[NSSet alloc] init];
         _pending = [[NSMutableArray alloc] init];
         _timers = [[NSMutableDictionary alloc] init];
+        _addHandlers = [[NSMutableDictionary alloc] init];
         _delivered = [[NSMutableArray alloc] init];
         _shown = [[NSMutableDictionary alloc] init];
     }
@@ -695,6 +697,7 @@ static void later(void (^block)(void))
 {
     [[_timers objectForKey:ident] invalidate];
     [_timers removeObjectForKey:ident];
+    [self _added:ident];        /* replaced or removed before it was delivered */
     for (UNNotificationRequest *r in [[_pending copy] autorelease])
         if ([[r identifier] isEqualToString:ident]) {
             @synchronized(self) {
@@ -741,10 +744,29 @@ static void later(void (^block)(void))
         }
         [self _arm:request at:when];
     }
-    if (handler)
+    if (handler && !error && !trigger) {
+        /* A request with no trigger is delivered on the next turn of the main
+           run loop; its handler is called once that has happened, so the app
+           always hears of the delivery (and is asked about presenting it)
+           before it hears that the request was added. */
+        void (^copy)(NSError *) = [[handler copy] autorelease];
+        [_addHandlers setObject:copy forKey:ident];
+    } else if (handler)
         later(^{
             handler(error);
         });
+}
+
+/* Calls the waiting add handler of an immediate request, if there is one. */
+- (void)_added:(NSString *)ident
+{
+    void (^handler)(NSError *) = [[[_addHandlers objectForKey:ident] retain] autorelease];
+    if (!handler)
+        return;
+    [_addHandlers removeObjectForKey:ident];
+    later(^{
+        handler(nil);
+    });
 }
 
 - (void)_due:(NSTimer *)timer
@@ -770,6 +792,7 @@ static void later(void (^block)(void))
         }
     }
     [self _deliver:request];
+    [self _added:ident];
 }
 
 - (void)getPendingNotificationRequestsWithCompletionHandler:(void (^)(NSArray<UNNotificationRequest *> *requests))handler
