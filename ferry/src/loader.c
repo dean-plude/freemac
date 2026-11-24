@@ -12,6 +12,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -75,19 +76,32 @@ struct image {
     struct ferry_objc_image objc;
     int has_objc;
     int initialized;
+    int is_bundle;
+    int complete;                       /* loaded, fixed up and protected */
     char *real;                         /* real path, to load each file once */
 };
 
-static struct image *images[64];
+#define MAX_IMAGES 512
+static struct image *images[MAX_IMAGES];
 static int nimages;
 static struct image *main_image;
 
 int ferry_verbose;
 
+/* While dlopen loads a library, a problem that would stop the program at
+ * start-up is that dlopen's failure instead: die() jumps back to it. */
+static __thread jmp_buf *load_failed;
+static __thread char load_error[1024];
+
 __attribute__((noreturn, format(printf, 1, 2))) static void die(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+    if (load_failed) {
+        vsnprintf(load_error, sizeof load_error, fmt, ap);
+        va_end(ap);
+        longjmp(*load_failed, 1);
+    }
     fputs("ferry: ", stderr);
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
@@ -186,8 +200,14 @@ static void read_file(struct image *im, const char *path)
         die("%s is built for Apple silicon (arm64), not for a PC's Intel/AMD processor", path);
     if (im->header->filetype == MACHO_DYLIB)
         im->is_dylib = 1;
+    else if (im->header->filetype == MACHO_BUNDLE && main_image)
+        im->is_dylib = im->is_bundle = 1; /* a plug-in: a library, as far as loading goes */
+    else if (im->header->filetype == MACHO_BUNDLE)
+        die("%s is a plug-in (a bundle), which an app loads; it isn't a program", path);
     else if (im->header->filetype != MACHO_EXECUTE)
         die("%s is not a program or a library", path);
+    else if (main_image)
+        die("%s is a program, which can't be loaded into another one", path);
 }
 
 static void parse_commands(struct image *im)
@@ -1157,6 +1177,7 @@ static struct image *load_image(const char *path)
         ferry_objc_map_image(&im->objc);
     }
     protect_segments(im);
+    im->complete = 1;
     return im;
 }
 
@@ -1187,6 +1208,156 @@ static void initialize_image(struct image *im, int argc, char **argv, char **env
                 ((initializer)(image_base(im) + off[k]))(argc, argv, envp, apple);
         }
     }
+}
+
+/* ---- loading while the program runs ---------------------------------------------
+ * dlopen, NSBundle and CFBundle (src/dyld.c, Foundation) load libraries and
+ * plug-in bundles once the program has started, the same way as the ones it
+ * links, and set them up (+load, then C and C++ initializers) before they
+ * are handed back. A library that can't be loaded is a failure for the
+ * caller to report, not the end of the program. Images are never unloaded,
+ * as on a Mac for anything with Objective-C in it. */
+
+static int start_argc;
+static char **start_argv, **start_envp;
+
+int ferry_image_count(void) { return nimages; }
+struct image *ferry_image_at(int index) { return index >= 0 && index < nimages ? images[index] : NULL; }
+struct image *ferry_main_image(void) { return main_image; }
+const char *ferry_image_path(struct image *im) { return im ? im->path : NULL; }
+void *ferry_image_header(struct image *im) { return im ? (void *)image_base(im) : NULL; }
+intptr_t ferry_image_slide(struct image *im) { return im ? (intptr_t)im->slide : 0; }
+int ferry_image_is_bundle(struct image *im) { return im && im->is_bundle; }
+
+struct image *ferry_image_containing(const void *addr)
+{
+    uint64_t a = (uint64_t)addr;
+    for (int i = 0; i < nimages; i++) {
+        struct image *im = images[i];
+        for (int s = 0; s < im->nseg; s++)
+            if (a >= im->seg[s].vmaddr + im->slide && a < im->seg[s].vmaddr + im->slide + im->seg[s].vmsize)
+                return im;
+    }
+    return NULL;
+}
+
+/* A symbol the image exports, by its Mach-O name ("_main"). */
+void *ferry_image_symbol(struct image *im, const char *macho_name)
+{
+    return im && macho_name ? trie_lookup(im, macho_name, 0) : NULL;
+}
+
+/* The libraries it links that are files Ferry loaded; *builtin says whether
+ * it also links one of Ferry's built-in ones (libSystem, libobjc). */
+int ferry_image_dependencies(struct image *im, struct image **out, int max, int *builtin)
+{
+    int n = 0;
+    *builtin = 0;
+    for (int i = 0; i < im->ndylibs; i++) {
+        if (!im->deps[i])
+            *builtin = 1;
+        else if (n < max)
+            out[n++] = im->deps[i];
+    }
+    return n;
+}
+
+/* The symbol at or just below an address, from the image's symbol table,
+ * without Mach-O's leading underscore. */
+const char *ferry_image_nearest(struct image *im, const void *addr, void **symbol_addr)
+{
+    *symbol_addr = NULL;
+    if (!im || !im->symtab)
+        return NULL;
+    const struct macho_nlist *syms = (const void *)(im->file + im->symtab->symoff);
+    const char *strs = (const char *)im->file + im->symtab->stroff;
+    const char *best = NULL;
+    uint64_t best_value = 0, a = (uint64_t)addr;
+    for (uint32_t i = 0; i < im->symtab->nsyms; i++) {
+        const struct macho_nlist *sym = &syms[i];
+        if ((sym->n_type & N_STAB_MASK) || (sym->n_type & N_TYPE_MASK) != N_SECT || sym->n_strx >= im->symtab->strsize)
+            continue;
+        uint64_t value = sym->n_value + im->slide;
+        const char *name = strs + sym->n_strx;
+        if (value > a || !*name || (best && value < best_value))
+            continue;
+        /* of two names for one address, the exported one */
+        if (best && value == best_value && !(sym->n_type & N_EXT))
+            continue;
+        best = name;
+        best_value = value;
+    }
+    if (!best)
+        return NULL;
+    *symbol_addr = (void *)best_value;
+    return best[0] == '_' ? best + 1 : best;
+}
+
+/* NSBundle's principal class when Info.plist names none: the first class
+ * the bundle defines that the runtime kept. */
+void *ferry_image_first_class(struct image *im)
+{
+    if (!im || !im->has_objc)
+        return NULL;
+    for (size_t i = 0; i < im->objc.nclasses; i++) {
+        Class cls = im->objc.classlist[i];
+        if (!cls)
+            continue;
+        const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
+        if (cls->superclass || (ro && (ro->flags & RO_ROOT)))
+            return cls;
+    }
+    return NULL;
+}
+
+/* @executable_path, @loader_path and @rpath, as for a library the caller
+ * (or the program, if the caller isn't one of its images) links. */
+int ferry_image_resolve(struct image *caller, const char *name, char *out, size_t size)
+{
+    struct image *from = caller ? caller : main_image;
+    if (!from) {
+        snprintf(out, size, "%s", name);
+        return name[0] != '@';
+    }
+    return expand_path(from, name, out, size);
+}
+
+/* Where Ferry keeps its own version of a system framework, by the
+ * framework's Mac path. */
+int ferry_find_system_framework(const char *install_name, char *out, size_t size)
+{
+    if (strncmp(install_name, "/System/Library/", 16) && strncmp(install_name, "/usr/lib/", 9))
+        return 0;
+    if (!strstr(install_name, ".framework/"))
+        return 0;
+    return find_framework(short_name(install_name), out, size);
+}
+
+struct image *ferry_image_load(const char *path, char *err, size_t errsize)
+{
+    int before = nimages;
+    jmp_buf jb;
+    jmp_buf *outer = load_failed;
+    load_failed = &jb;
+    if (setjmp(jb)) {
+        load_failed = outer;
+        snprintf(err, errsize, "%s", load_error);
+        /* Forget the images that didn't finish loading (their memory stays
+         * mapped); the ones that did are kept, set up when first used. */
+        int n = before;
+        for (int i = before; i < nimages; i++)
+            if (images[i]->complete)
+                images[n++] = images[i];
+        nimages = n;
+        ferry_seal_stubs();
+        return NULL;
+    }
+    struct image *im = load_image(path);
+    load_failed = outer;
+    ferry_seal_stubs();
+    char *apple[] = {NULL};
+    initialize_image(im, start_argc, start_argv, start_envp, apple);
+    return im;
 }
 
 /* ---- running ------------------------------------------------------------------- */
@@ -1233,6 +1404,9 @@ static __attribute__((noreturn)) void start_unixthread(uint64_t pc, int argc, ch
 
 int ferry_run(const char *path, int argc, char **argv, char **envp)
 {
+    start_argc = argc;
+    start_argv = argv;
+    start_envp = envp;
     struct image *im = load_image(path);
     ferry_seal_stubs();
     if (missing_classes)

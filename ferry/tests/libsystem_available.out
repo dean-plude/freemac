@@ -1,0 +1,13 @@
+macOS 10.15    available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 14       available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 14.7     available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 14.7.1   not available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 14.8     not available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 15       not available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+macOS 13.5     available; __isOSVersionAtLeast agrees: yes, __isPlatformVersionAtLeast agrees: yes, NSProcessInfo agrees: yes
+an iOS version, asked of macOS: not available
+operatingSystemVersion is kern.osproductversion: yes
+processorCount is hw.ncpu: yes
+activeProcessorCount is hw.activecpu: yes
+physicalMemory is hw.memsize: yes
+exit=0

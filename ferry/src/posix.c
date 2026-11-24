@@ -590,11 +590,12 @@ static int mac_uname(struct mac_utsname *u)
         return -1;
     memset(u, 0, sizeof *u);
     /* Programs check these names to pick Mac behaviour. Report the macOS
-     * family Ferry imitates, and say in the version where it really runs. */
+     * family Ferry imitates, and say in the version where it really runs
+     * (sysversion.c; sysctl's kern.version is the same text). */
     snprintf(u->sysname, sizeof u->sysname, "Darwin");
     snprintf(u->nodename, sizeof u->nodename, "%s", l.nodename);
     snprintf(u->release, sizeof u->release, "%s", FERRY_DARWIN_RELEASE);
-    snprintf(u->version, sizeof u->version, "Ferry on Linux %s", l.release);
+    snprintf(u->version, sizeof u->version, "%s", ferry_kernel_version());
     snprintf(u->machine, sizeof u->machine, "x86_64");
     return 0;
 }

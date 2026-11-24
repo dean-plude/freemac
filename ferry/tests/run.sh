@@ -142,6 +142,52 @@ for fmt in classic chained; do
         fail=$((fail + 1))
     fi
 done
+# The system's figures (sysctl, kinfo_proc, libproc, the Mach host and task
+# calls, getattrlist), checked against uname, sysconf and stat.
+run_one libsystem_sysctl "$here/libsystem_sysctl.c" "$here/libsystem_sysctl.out"
+# dlopen, dlsym, dladdr and the _dyld calls: a library found through @rpath
+# and a bundle opened RTLD_LOCAL, both built here.
+mkdir -p "$build/dlfcn_lib"
+if "$top/sdk/ferry-cc" -O1 -dynamiclib -install_name @rpath/libplug.dylib -o "$build/dlfcn_lib/libplug.dylib" \
+        "$here/dlfcn/plug.c" 2> "$build/dlfcn_lib.cc.log" &&
+    "$top/sdk/ferry-cc" -O1 -bundle -undefined dynamic_lookup -o "$build/dlfcn_lib/extra.bundle" \
+        "$here/dlfcn/extra.c" 2>> "$build/dlfcn_lib.cc.log"; then
+    run_one libsystem_dlsym "$here/libsystem_dlsym.c" "$here/libsystem_dlsym.out" \
+        -Wl,-rpath,@executable_path/dlfcn_lib
+else
+    echo "FAIL libsystem_dlsym (library or bundle did not compile)"; sed 's/^/    /' "$build/dlfcn_lib.cc.log"
+    fail=$((fail + 1))
+fi
+# @available compiled the normal way, answered for macOS 14.7.
+run_one libsystem_available "$here/libsystem_available.m" "$here/libsystem_available.out" -framework Foundation
+# Plug-in bundles through NSBundle and CFBundle: one naming its principal
+# class, one not, and one whose program is missing.
+plugins="$build/plugin_bundles"
+rm -rf "$plugins" "$build/plugin_bundles.cc.log"; mkdir -p "$plugins"
+plugins_ok=1
+for b in Greeter Plain Broken; do
+    mkdir -p "$plugins/$b.bundle/Contents/MacOS"
+    principal=; [ $b = Greeter ] && principal='<key>NSPrincipalClass</key><string>Greeter</string>'
+    exe=$b; [ $b = Broken ] && exe=Missing
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+        "<key>CFBundleExecutable</key><string>$exe</string>" \
+        "<key>CFBundleIdentifier</key><string>org.freemac.ferry.$(echo $b | tr A-Z a-z)</string>" \
+        "<key>CFBundleName</key><string>$b</string>" \
+        '<key>CFBundlePackageType</key><string>BNDL</string>' $principal '</dict></plist>' \
+        > "$plugins/$b.bundle/Contents/Info.plist"
+done
+for b in Greeter Plain; do
+    src="$here/dlfcn/$(echo $b | tr A-Z a-z).m"
+    "$top/sdk/ferry-cc" -O1 -bundle -o "$plugins/$b.bundle/Contents/MacOS/$b" "$src" -framework Foundation \
+        2>> "$build/plugin_bundles.cc.log" || plugins_ok=0
+done
+if [ $plugins_ok = 1 ]; then
+    run_one libsystem_plugin "$here/libsystem_plugin.m" "$here/libsystem_plugin.out" -framework Foundation \
+        -framework CoreFoundation
+else
+    echo "FAIL libsystem_plugin (a bundle did not compile)"; sed 's/^/    /' "$build/plugin_bundles.cc.log"
+    fail=$((fail + 1))
+fi
 # Foundation (M2), Ferry's own, loaded as a Mac framework.
 for t in strings collections system runloop exception; do
     run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -framework Foundation

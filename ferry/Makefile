@@ -7,7 +7,7 @@ PREFIX ?= /usr
 DESTDIR ?=
 
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/passthrough.c src/host.c \
-      src/commoncrypto.c src/sysversion.c src/servercerts.c \
+      src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
       src/objc/symbols.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o

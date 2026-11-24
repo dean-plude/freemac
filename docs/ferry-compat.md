@@ -595,6 +595,29 @@ and SHA-2 digests, HMAC, PBKDF2 and random bytes of its own, and AES
 now one answer everywhere: 14.7 in `SystemVersion.plist`, `NSProcessInfo`,
 `Gestalt` and `uname` (Darwin 23.6.0).
 
+### System queries and loading code (freemac 1.201, Ferry 0.28.0)
+
+Apps that ask the system about itself, or load code while they run, now
+get answers. `sysctl`, `sysctlbyname` and `sysctlnametomib` serve the
+kernel and hardware names apps read most (`kern.osproductversion` 14.7,
+`kern.osversion` 23H124, `kern.osrelease` 23.6.0, `hw.ncpu`, `hw.memsize`,
+`hw.model`, `machdep.cpu.brand_string` and others), with the documented
+size, `ENOMEM` and `ENOENT` rules, and `kinfo_proc` for a process,
+including `P_TRACED`, which apps check to see whether they are being
+debugged. `proc_pidpath`, `host_statistics64`, `host_info`, `task_info` and
+`getattrlist` (common, folder and file attributes) answer from Linux, and
+`NSProcessInfo`'s processor and memory figures are `sysctl`'s. `dlopen`,
+`dlsym`, `dlclose`, `dlerror` and `dladdr` work on Mac libraries and
+bundles found by path, `@rpath`, `@executable_path` or `@loader_path`, on
+the system frameworks Ferry provides by their Mac paths, and with the
+special handles `RTLD_DEFAULT`, `RTLD_SELF`, `RTLD_NEXT` and
+`RTLD_MAIN_ONLY`. `NSBundle`'s `load` and `principalClass` and CFBundle's
+`CFBundleGetFunctionPointerForName` load plug-in bundles, and a plug-in's
+classes find their own bundle. `@available` checks, and compiler-rt's
+`_availability_version_check`, answer for macOS 14.7, as `NSProcessInfo`
+does. Code loaded with `dlopen` stays loaded, and process listings,
+volume attributes and most Mach statistics flavors are left out.
+
 ## What the apps need most
 
 Counted over the nine apps:

@@ -260,7 +260,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
 
 static const struct ferry_symbol *const tables[] = {
     ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_blocks_symbols, ferry_dispatch_symbols,
-    ferry_objc_symbols, ferry_commoncrypto_symbols,
+    ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols, ferry_sysctl_symbols,
+    ferry_attrlist_symbols, ferry_dyld_symbols,
 };
 
 static void *find_own(const char *name)
@@ -303,13 +304,64 @@ void *ferry_lookup(const char *name)
     return ferry_twin_lookup(base);
 }
 
+/* For dlsym: what a Mac's libSystem and libobjc would answer, and the Linux
+ * twins a program linked (host.c). Not the drawing libraries Ferry's own
+ * frameworks reach through libFerryHost, which no Mac has. */
+void *ferry_lookup_libsystem(const char *name)
+{
+    void *addr = find_own(name);
+    if (addr)
+        return addr;
+    char base[256];
+    snprintf(base, sizeof base, "%s", name);
+    char *dollar = strchr(base, '$');
+    if (dollar) {
+        *dollar = 0;
+        if ((addr = find_own(base)))
+            return addr;
+    }
+    if ((addr = find_passthrough(base)))
+        return addr;
+    return ferry_twin_lookup(base);
+}
+
+/* For dladdr: the name under which Ferry's tables serve an address. */
+const char *ferry_symbol_name(const void *addr)
+{
+    if (!addr)
+        return NULL;
+    for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
+        for (const struct ferry_symbol *s = tables[t]; s->name; s++)
+            if (s->addr == addr)
+                return s->name;
+    /* the calls passed through to this system's C library, some of which
+     * (strlen, memcpy...) the C library picks a version of at run time */
+    for (const char *const *p = ferry_passthrough; *p; p++)
+        if (dlsym(RTLD_DEFAULT, *p) == addr)
+            return *p;
+    return NULL;
+}
+
+const char *ferry_program_path(void) { return program_path; }
+
+void ferry_program_args(int *argc, char ***argv)
+{
+    *argc = program_argc;
+    *argv = program_argv;
+}
+
 /* ---- stubs for what Ferry doesn't have ---------------------------------------- */
 
 #define STUB_SIZE 22
 #define STUB_PAGES 16
 
+/* Stubs are written into an area that is sealed (made executable, no longer
+ * writable) once the program is loaded. A library loaded later with dlopen
+ * gets a fresh area for its own, sealed in turn: code may be running in the
+ * old one. */
 static uint8_t *stub_area;
 static size_t stub_used;
+static int stub_sealed;
 
 static void unsupported(const char *raw_name)
 {
@@ -324,12 +376,14 @@ static void unsupported(const char *raw_name)
 
 void *ferry_missing_stub(const char *raw_name)
 {
-    if (!stub_area) {
+    if (!stub_area || stub_sealed) {
         stub_area = mmap(NULL, STUB_PAGES * 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (stub_area == MAP_FAILED) {
             perror("ferry: mmap");
             exit(126);
         }
+        stub_used = 0;
+        stub_sealed = 0;
     }
     if (stub_used + STUB_SIZE > STUB_PAGES * 4096) {
         fputs("ferry: the program imports too many unsupported calls\n", stderr);
@@ -347,8 +401,11 @@ void *ferry_missing_stub(const char *raw_name)
 
 void ferry_seal_stubs(void)
 {
-    if (stub_area && mprotect(stub_area, STUB_PAGES * 4096, PROT_READ | PROT_EXEC) < 0) {
+    if (!stub_area || stub_sealed)
+        return;
+    if (mprotect(stub_area, STUB_PAGES * 4096, PROT_READ | PROT_EXEC) < 0) {
         perror("ferry: mprotect");
         exit(126);
     }
+    stub_sealed = 1;
 }

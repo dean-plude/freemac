@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.201 "Ferry: asking about the system and loading plug-ins" (done)
+
+Ferry 0.28.0: Mac apps can check which macOS version they're on, ask about the computer, and load plug-ins.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `sysctl`, `sysctlbyname` and `sysctlnametomib` for the version, CPU, memory and own-process names apps read, agreeing with macOS 14.7 and the real machine | Ferry | done |
+| 2 | `dlopen`, `dlsym`, `dladdr` and friends for Mac programs, with libraries and bundles loaded after start-up | Ferry | done |
+| 3 | `@available` checks (`__isPlatformVersionAtLeast` and the older calls) answering for 14.7 | Ferry | done |
+| 4 | NSBundle and CFBundle plug-ins that really load, with their principal class and function lookup | Ferry | done |
+| 5 | `getattrlist`, `proc_pidpath` and the Mach host and task statistics; four new tests; `make check` 121 of 121 | Ferry | done |
+
 ## 1.200 "Ferry: keychain, encryption and the updater checks" (done)
 
 Ferry 0.27.0: Mac apps can keep passwords in a keychain, encrypt and hash data, and get past the start-up checks that their updaters make.

@@ -1,0 +1,33 @@
+Greeter.bundle
+  found: yes, identifier org.freemac.ferry.greeter
+  loaded before load: no, description says so: yes
+  program: Greeter, plug-ins folder: Contents/PlugIns
+  the same path gives the same bundle: yes
+  Greeter before load: nil
+  preflight: yes
+  load: yes, loaded now: yes
+  load again: yes
+  principal class: Greeter, is Greeter: yes
+  its greeting: hello from Greeter
+  bundleForClass: Greeter is the bundle: yes, NSString is the main bundle: yes, NSObject too: yes
+  classNamed: GreeterHelper found, NSString nil
+  bundleWithIdentifier: finds it: yes
+  unload: no, still loaded: yes
+through CFBundle
+  CFBundleCreate is the same bundle: yes
+  CFBundleIsExecutableLoaded: yes
+  CFBundleGetFunctionPointerForName greeter_answer(): 42
+  CFBundleGetDataPointerForName greeter_word: plug-in
+  a name it lacks: NULL
+  CFBundleCopyExecutableURL: Greeter
+  CFBundleGetBundleWithIdentifier: yes
+Plain.bundle, with no NSPrincipalClass
+  loaded before: no
+  CFBundleLoadExecutable: yes
+  principal class, the first it defines: PlainThing
+Broken.bundle, whose program is missing
+  load: no, error NSCocoaErrorDomain 4
+  principal class: Nil
+  a folder that isn't there: nil
+main bundle loaded: yes
+exit=0

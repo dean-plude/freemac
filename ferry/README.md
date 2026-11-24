@@ -113,6 +113,18 @@ the macOS version is one answer everywhere: 14.7 in
 `/System/Library/CoreServices/SystemVersion.plist`, `NSProcessInfo`,
 `Gestalt` and `uname`.
 
+From Ferry 0.28.0 (freemac 1.201), programs can ask the system about
+itself and load code while they run: `sysctl` and `sysctlbyname` answer
+the common kernel and hardware names (macOS 14.7, the processors, memory,
+model and CPU name) and `kinfo_proc` for a process, `proc_pidpath`,
+`host_statistics64`, `task_info` and `getattrlist` answer from Linux, and
+`dlopen`, `dlsym` and `dladdr` load Mac libraries and plug-in bundles by
+path, `@rpath`, `@executable_path` or `@loader_path`, and Ferry's own
+frameworks by their `/System/Library/Frameworks` paths. `NSBundle`'s
+`load` and `principalClass` and `CFBundleGetFunctionPointerForName` work on
+plug-ins, and `@available` checks answer for macOS 14.7. Code loaded this
+way is never unloaded.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

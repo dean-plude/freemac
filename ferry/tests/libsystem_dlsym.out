@@ -1,0 +1,56 @@
+dlerror at the start: none
+special handles
+  RTLD_DEFAULT finds printf as the program has it: yes
+  RTLD_DEFAULT finds the program's own main_helper: yes
+  RTLD_MAIN_ONLY finds main_helper: yes, but not printf: yes
+  dlerror after a name the program lacks: set, mentions "printf": yes, cleared after: yes
+  RTLD_DEFAULT of a name nobody has: NULL
+  dlerror after that: set, mentions "no_such_symbol_anywhere": yes, cleared after: yes
+  dlopen(NULL) finds main_helper: yes
+  _availability_version_check: found, 14.7: true, 15.0: false, an iOS version: false
+the _dyld calls
+  image 0 is the program: yes, has a header: yes
+  add-image callback ran for each image already loaded: yes
+  _NSGetExecutablePath with too little room: -1, size needed is right: yes
+  _NSGetExecutablePath names this program: yes
+a library through @rpath
+  dlopen: ok, a new image: yes, callback ran for it: yes
+  last image is libplug.dylib: yes
+  its initializer ran: yes
+  plug_value(): 42, through RTLD_DEFAULT too: yes
+  @executable_path gives the same handle: yes
+  @loader_path from inside it gives the same handle: yes
+  RTLD_NOLOAD of it: yes
+RTLD_NEXT and RTLD_SELF
+  RTLD_DEFAULT shared_name: 1
+  RTLD_NEXT from the program: 2
+  RTLD_SELF from the program: 1
+  RTLD_SELF from the library: 2
+  RTLD_NEXT from the library finds one: no
+dladdr
+  library function: 1, file libplug.dylib, symbol plug_value, exact: yes, base is its header: yes
+  inside the program's main_helper: 1, file is the program: yes, symbol main_helper, start: yes
+  libSystem's strlen: 1, file /usr/lib/libSystem.B.dylib, symbol strlen
+  an address in nothing: 0
+a bundle, RTLD_LOCAL
+  dlopen: ok
+  bundle_value(), through the program's main_helper: 42
+  hidden from RTLD_DEFAULT: yes
+libSystem and the frameworks
+  /usr/lib/libSystem.B.dylib: ok, printf: yes
+  libSystem.dylib by leaf name is the same: yes
+  Foundation by its Mac path: ok, NSLog: yes, CFStringCreateWithCString: yes
+  CoreFoundation by its Mac path: ok, CFRelease: yes
+  a framework Ferry doesn't have: NULL
+  dlerror after it: set, mentions "doesn't provide": yes, cleared after: yes
+  a library that isn't there: NULL
+  dlerror after it: set, mentions "libnothing.dylib": yes, cleared after: yes
+  a file that isn't a Mac library: NULL
+  dlerror after it: set, mentions "/dev/null": yes, cleared after: yes
+  still loading after that: yes
+  dlopen_preflight: the library yes, a missing one no
+dlclose
+  each open closed: 0 0 0
+  a handle that isn't one: -1
+  dlerror after it: set, mentions "invalid": yes, cleared after: yes
+exit=0
