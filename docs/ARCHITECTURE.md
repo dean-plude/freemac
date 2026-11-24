@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Folder backgrounds (1.186)
+
+`drawer_background` keeps each folder's choice in
+`~/.config/freemac/drawer-backgrounds.json`, keyed by path; White has no
+entry. `styles()` turns a choice into two CSS rules: one on the scrolled
+window behind the icon view (a colour, or a `cover` picture, so it stays
+put while the icons scroll) and one making the icon view itself
+transparent. How light the colour or a 24×24 copy of the picture is
+decides whether the names are drawn white. `Drawer._apply_background()`
+runs whenever the icon view is placed, so it changes with the folder and
+the view; the CSS is only reloaded when the choice or the picture's
+modification time changes. A rename in Drawer moves the entry with
+`drawer_background.moved()`.
+
 ## Show Clipboard (1.185)
 
 `drawer_clipboard.ClipboardWindow` listens for the clipboard's

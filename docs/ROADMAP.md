@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.186 "Folder backgrounds" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | View Options > Background in icon view: White, Color (with a colour well) or Picture (Choose… a picture), as on a Mac | drawer.py, drawer_background.py | done |
+| 2 | Each folder keeps its own background, and it follows the folder when it's renamed; the Trash, searches and other views stay plain | drawer_background.py | done |
+| 3 | A picture fills the window and stays put while the icons scroll; on a dark colour or picture the names turn white | drawer_background.py | done |
+| 4 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.185 "Show Clipboard" (done)
 
 | # | Item | Component | Status |

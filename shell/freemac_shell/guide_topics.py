@@ -1346,6 +1346,13 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "view-background": ("Put a colour or picture behind a folder's icons", "background folder colour color picture wallpaper behind icons view options icon view white", [
+        "Open the folder in Drawer and choose icon view.",
+        "Choose View > Show View Options, or press ⌘J.",
+        "Under Background, choose White, Color or Picture.",
+        "For a colour, click the swatch beside Color. For a picture, click Choose… and pick one.",
+        "Each folder keeps its own background. Other folders stay white.",
+    ]),
     "show-clipboard": ("See what's on the clipboard", "show clipboard copied what did I copy pasteboard contents edit menu drawer", [
         "In Drawer, choose Edit > Show Clipboard.",
         "A window shows what you copied last: words, a picture or files.",

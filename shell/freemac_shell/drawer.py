@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_clipboard, drawer_settings, drawer_info, drawer_summary, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_background, drawer_clipboard, drawer_settings, drawer_info, drawer_summary, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -671,6 +671,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.hidden_columns = {c for c in config.get("hidden_columns", []) if isinstance(c, str)}
         self.view_options = None
         self.text_css = Gtk.CssProvider()
+        # View Options > Background: one provider behind the icons, one on them.
+        self.bg_css, self.bg_icon_css, self.bg_shown = Gtk.CssProvider(), Gtk.CssProvider(), None
+        self.bg_widgets = None
 
         header = Gtk.HeaderBar(show_close_button=True)
         self.set_titlebar(header)
@@ -1577,7 +1580,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
                                                 Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
         self._drag_source(self.icon_view)
         self._accept_drops(self.icon_view, self._find_in_icons)
+        self.icon_view.get_style_context().add_provider(self.bg_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         scroll = Gtk.ScrolledWindow()
+        scroll.get_style_context().add_provider(self.bg_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         scroll.add(self.icon_view)
         self.content.add_named(scroll, "icons")
 
@@ -1739,6 +1744,128 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.icon_view.set_column_spacing(self.grid_spacing)
             self.icon_view.set_row_spacing(self.grid_spacing)
             self.icon_view.set_columns(-1)
+        self._apply_background()
+
+    # ---- View Options > Background ---------------------------------------
+    def _background_folder(self):
+        """The folder whose background shows, or None where there is none:
+        other views, the Trash, searches, tags and the like."""
+        if self.view_mode != "icons" or not self.path or self.in_virtual() or self.in_trash():
+            return None
+        return self.path
+
+    def _apply_background(self):
+        folder = self._background_folder()
+        setting = drawer_background.of(folder) if folder else dict(drawer_background.WHITE)
+        picture = setting.get("picture")
+        try:
+            stamp = os.stat(picture).st_mtime if picture else None
+        except OSError:
+            stamp = None
+        key = (repr(sorted(setting.items())), stamp)
+        if key != self.bg_shown:
+            self.bg_shown = key
+            behind, icons = drawer_background.styles(setting)
+            self.bg_css.load_from_data(behind.encode())
+            self.bg_icon_css.load_from_data(icons.encode())
+        self._sync_background_panel(folder, setting)
+
+    def _set_background(self, setting):
+        folder = self._background_folder()
+        if folder is None:
+            return
+        drawer_background.put(folder, setting)
+        self._apply_background()
+
+    def _sync_background_panel(self, folder, setting):
+        """Keep the open View Options panel showing this folder's background."""
+        if not self.bg_widgets:
+            return
+        radios, colour, chooser, label = self.bg_widgets
+        self.bg_widgets = None   # setting the controls below mustn't save
+        for kind, radio in radios.items():
+            radio.set_sensitive(folder is not None)
+            if kind == setting["kind"]:
+                radio.set_active(True)
+        colour.set_rgba(drawer_background.parse(setting.get("color") or drawer_background.DEFAULT_COLOR))
+        colour.set_sensitive(folder is not None and setting["kind"] == "color")
+        chooser.set_sensitive(folder is not None and setting["kind"] == "picture")
+        picture = setting.get("picture") if setting["kind"] == "picture" else None
+        label.set_text(os.path.basename(picture) if picture else "")
+        self.bg_widgets = (radios, colour, chooser, label)
+
+    def _background_row(self, box):
+        """The Background choices at the foot of View Options, as on a Mac."""
+        heading = Gtk.Label(label="Background:", xalign=0)
+        heading.get_style_context().add_class("drawer-preview-heading")
+        box.pack_start(heading, False, False, 0)
+        radios, group = {}, None
+        colour = Gtk.ColorButton(use_alpha=False, title="Background Color")
+        chooser = Gtk.Button(label="Choose…")
+        label = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=16)
+        label.get_style_context().add_class("dim-label")
+        for kind, title in drawer_background.KINDS:
+            radio = Gtk.RadioButton.new_with_label_from_widget(group, title)
+            group = group or radio
+            radios[kind] = radio
+            row = Gtk.Box(spacing=8, margin_start=8)
+            row.pack_start(radio, False, False, 0)
+            if kind == "color":
+                row.pack_end(colour, False, False, 0)
+            elif kind == "picture":
+                row.pack_end(chooser, False, False, 0)
+            box.pack_start(row, False, False, 0)
+            if kind == "picture":
+                label.set_margin_start(32)
+                box.pack_start(label, False, False, 0)
+
+        def current():
+            return drawer_background.of(self._background_folder()) if self._background_folder() else {}
+
+        def picked(radio, kind):
+            if self.bg_widgets is None or not radio.get_active():
+                return
+            if kind == "white":
+                self._set_background({"kind": "white"})
+            elif kind == "color":
+                self._set_background({"kind": "color", "color": drawer_background.hex_of(colour.get_rgba())})
+            elif current().get("picture"):
+                self._set_background(dict(current(), kind="picture"))
+            else:
+                GLib.idle_add(choose)   # after the click, so the chooser opens in front
+
+        def coloured(button):
+            if self.bg_widgets is not None:
+                self._set_background({"kind": "color", "color": drawer_background.hex_of(button.get_rgba())})
+
+        def choose(*_):
+            if self.bg_widgets is None:
+                return
+            dialog = Gtk.FileChooserDialog(title="Choose a Picture", transient_for=self.view_options or self,
+                                           modal=True, action=Gtk.FileChooserAction.OPEN)
+            dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Choose", Gtk.ResponseType.ACCEPT)
+            dialog.set_default_response(Gtk.ResponseType.ACCEPT)
+            pictures = Gtk.FileFilter()
+            pictures.set_name("Pictures")
+            pictures.add_pixbuf_formats()
+            dialog.add_filter(pictures)
+            start = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
+            if start and os.path.isdir(start):
+                dialog.set_current_folder(start)
+            if dialog.run() == Gtk.ResponseType.ACCEPT and dialog.get_filename():
+                self._set_background({"kind": "picture", "picture": dialog.get_filename()})
+            else:
+                self._apply_background()   # nothing chosen: the panel shows what's kept
+            dialog.destroy()
+            return False
+
+        for kind, radio in radios.items():
+            radio.connect("toggled", picked, kind)
+        colour.connect("color-set", coloured)
+        chooser.connect("clicked", choose)
+        self.bg_widgets = (radios, colour, chooser, label)
+        folder = self._background_folder()
+        self._sync_background_panel(folder, drawer_background.of(folder) if folder else dict(drawer_background.WHITE))
 
     def _show_gallery(self):
         if self.view_mode != "gallery":
@@ -2227,6 +2354,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 else:
                     try:
                         os.rename(path, target)
+                        if os.path.isdir(target):
+                            drawer_background.moved(path, target)   # its background goes with it
                         transfer.note_done({"kind": "rename", "old": path, "new": target})
                     except OSError as err:
                         self.notify(f"Couldn’t rename: {err.strerror}.")
@@ -2389,6 +2518,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             info = Gtk.CheckButton(label="Show item info", active=self.item_info_shown)
             info.connect("toggled", lambda b: self._set_item_info(b.get_active()))
             box.pack_start(info, False, False, 0)
+        background = not listing and self.view_mode == "icons"
         row = Gtk.Box(spacing=8)
         row.pack_start(Gtk.Label(label="Sort By:", xalign=0), False, False, 0)
         sorts = Gtk.ComboBoxText()
@@ -2398,9 +2528,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
         sorts.connect("changed", lambda c: self.set_sort(c.get_active_id()))
         row.pack_end(sorts, False, False, 0)
         box.pack_start(row, False, False, 4)
+        if background:
+            self._background_row(box)
 
         def closed(*_):
             self.view_options = None
+            self.bg_widgets = None
         panel.connect("destroy", closed)
         panel.connect("key-press-event", lambda w, e: e.keyval == Gdk.KEY_Escape and (w.destroy() or True))
         self.view_options = panel
