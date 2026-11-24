@@ -12,6 +12,7 @@
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -212,18 +213,21 @@ void *ferry_twin_symbol(const char *install_name, const char *name)
  * served. */
 static const char *const network_libraries[] = {"libcurl.so.4", "libcurl-gnutls.so.4"};
 
+/* Each library is opened once, whichever of the program's threads asks first. */
+static void *network_handle;
+static void open_network(void)
+{
+    for (size_t i = 0; i < sizeof network_libraries / sizeof network_libraries[0] && !network_handle; i++)
+        network_handle = dlopen(network_libraries[i], RTLD_NOW | RTLD_LOCAL);
+}
+
 void *ferry_network_symbol(const char *name)
 {
-    static void *handle;
-    static int tried;
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
     if (!name || strncmp(name, "curl_", 5))
         return NULL;
-    if (!tried) {
-        tried = 1;
-        for (size_t i = 0; i < sizeof network_libraries / sizeof network_libraries[0] && !handle; i++)
-            handle = dlopen(network_libraries[i], RTLD_NOW | RTLD_LOCAL);
-    }
-    return handle ? dlsym(handle, name) : NULL;
+    pthread_once(&once, open_network);
+    return network_handle ? dlsym(network_handle, name) : NULL;
 }
 
 /* ---- cryptography ----------------------------------------------------------------
@@ -255,25 +259,25 @@ static void *open_first(const char *const *names, size_t count)
     return h;
 }
 
+static void *crypto_handle, *ssl_handle;
+static void open_crypto(void)
+{
+    crypto_handle = open_first(crypto_libraries, sizeof crypto_libraries / sizeof crypto_libraries[0]);
+}
+static void open_ssl(void) { ssl_handle = open_first(ssl_libraries, sizeof ssl_libraries / sizeof ssl_libraries[0]); }
+
 void *ferry_crypto_symbol(const char *name)
 {
-    static void *crypto, *ssl;
-    static int tried_crypto, tried_ssl;
+    static pthread_once_t crypto_once = PTHREAD_ONCE_INIT, ssl_once = PTHREAD_ONCE_INIT;
     if (!name)
         return NULL;
     if (has_prefix(name, crypto_prefixes)) {
-        if (!tried_crypto) {
-            tried_crypto = 1;
-            crypto = open_first(crypto_libraries, sizeof crypto_libraries / sizeof crypto_libraries[0]);
-        }
-        return crypto ? dlsym(crypto, name) : NULL;
+        pthread_once(&crypto_once, open_crypto);
+        return crypto_handle ? dlsym(crypto_handle, name) : NULL;
     }
     if (has_prefix(name, ssl_prefixes)) {
-        if (!tried_ssl) {
-            tried_ssl = 1;
-            ssl = open_first(ssl_libraries, sizeof ssl_libraries / sizeof ssl_libraries[0]);
-        }
-        return ssl ? dlsym(ssl, name) : NULL;
+        pthread_once(&ssl_once, open_ssl);
+        return ssl_handle ? dlsym(ssl_handle, name) : NULL;
     }
     return NULL;
 }

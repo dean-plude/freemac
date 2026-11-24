@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.202 "Ferry: real threads" (done)
+
+Ferry 0.29.0: Mac apps run on real threads, so they can do several things at once, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSThread`, each thread with its own run loop and autorelease pools, and the perform-on-thread calls | Ferry | done |
+| 2 | Real `NSLock`, `NSRecursiveLock`, `NSCondition`, `NSConditionLock` and `@synchronized`; the pthread, `os_unfair_lock` and `OSSpinLock` calls Mac programs import | Ferry | done |
+| 3 | libdispatch's global queues on a worker pool, and NSOperationQueue running operations at the same time; the main queue stays on the main thread | Ferry | done |
+| 4 | The Objective-C runtime and Foundation's shared tables made safe across threads; URL loading on a network thread of its own, with its cookies, cache and sign-ins locked | Ferry | done |
+| 5 | Four new tests and three rewritten so their output doesn't depend on timing; `make check` 125 of 125, three runs in a row | Ferry | done |
+
+AppKit stays main-thread only, as on a Mac; Ferry warns once when an app draws from another thread. A wait that can never end now stops the app with a message instead of hanging.
+
 ## 1.201 "Ferry: asking about the system and loading plug-ins" (done)
 
 Ferry 0.28.0: Mac apps can check which macOS version they're on, ask about the computer, and load plug-ins.

@@ -6,14 +6,15 @@
  * name, run as it is. A Mac program (a Mach-O file, such as a helper tool
  * inside an app bundle) is run through Ferry itself.
  *
- * Ferry runs a program on one thread, so nothing happens behind the
- * program's back: a child's exit is noticed, and a file handle's background
- * reads and readability handler are served, from the run loop (which waits
- * on the handles' descriptors) and from a small dispatch timer that runs
- * while any task is running, so that dispatch_semaphore_wait and the like,
- * which run dispatch's work but not the run loop, see them too.
- * terminationHandler, NSTaskDidTerminateNotification and the handles'
- * notifications all arrive on that one thread.
+ * A child's exit is noticed, and file handles' readability handlers are
+ * served, by a small dispatch timer on a serial queue of Foundation's own
+ * (the task monitor), which runs on a worker thread while any task runs or
+ * any handle has a readability handler. As on a Mac, terminationHandler,
+ * readabilityHandler and writeabilityHandler are called on that background
+ * thread; NSTaskDidTerminateNotification is posted on the run loop of the
+ * thread that launched the task, and a file handle's background reads
+ * (readInBackgroundAndNotify and the like) are served, and their
+ * notifications posted, by the main run loop.
  *
  * Written from Apple's public documentation of these classes; no Apple code
  * was used. */
@@ -25,6 +26,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <pthread.h>
 #include <unistd.h>
 
 extern char ***_NSGetEnviron(void);
@@ -54,33 +56,55 @@ enum { BG_NONE, BG_READ, BG_READ_TO_END, BG_WAIT };
     void (^_writeabilityHandler)(NSFileHandle *);
 }
 - (void)_serve;
+- (void)_serveHandler;
 @end
 
 static void start_pump(void);
 
+/* The task monitor's state: running tasks, handles with a readability
+ * handler, and the pump's timer. */
+static pthread_mutex_t task_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+
 /* ---- watching descriptors --------------------------------------------------------- */
 
-static NSMutableArray *watched_handles; /* retained while watched */
+static NSMutableArray *watched_handles; /* retained while watched by the main run loop */
+static NSMutableArray *handler_handles; /* retained while they have a readability handler */
 
 static void handle_ready(int fd, void *ctx) { [(NSFileHandle *)ctx _serve]; }
 
 static void update_watch(NSFileHandle *h)
 {
-    BOOL want = h->_fd >= 0 && (h->_background != BG_NONE || h->_readabilityHandler);
-    if (want == h->_watched)
-        return;
-    h->_watched = want;
-    if (!watched_handles)
-        watched_handles = [[NSMutableArray alloc] init];
-    if (want) {
-        [watched_handles addObject:h];
-        FerryRunLoopAddDescriptor(h->_fd, handle_ready, h);
-    } else {
-        FerryRunLoopRemoveDescriptor(h->_fd);
+    pthread_mutex_lock(&task_lock);
+    /* background reads: the main run loop */
+    BOOL want = h->_fd >= 0 && h->_background != BG_NONE;
+    if (want != h->_watched) {
+        h->_watched = want;
+        if (!watched_handles)
+            watched_handles = [[NSMutableArray alloc] init];
+        if (want) {
+            [watched_handles addObject:h];
+            FerryRunLoopAddDescriptor(h->_fd, handle_ready, h);
+        } else {
+            FerryRunLoopRemoveDescriptor(h->_fd);
+            [h retain];
+            [watched_handles removeObjectIdenticalTo:h];
+            [h autorelease];
+        }
+    }
+    /* a readability handler: the task monitor */
+    BOOL handler = h->_fd >= 0 && h->_readabilityHandler;
+    if (!handler_handles)
+        handler_handles = [[NSMutableArray alloc] init];
+    NSUInteger i = [handler_handles indexOfObjectIdenticalTo:h];
+    if (handler && i == NSNotFound) {
+        [handler_handles addObject:h];
+        start_pump();
+    } else if (!handler && i != NSNotFound) {
         [h retain];
-        [watched_handles removeObjectIdenticalTo:h];
+        [handler_handles removeObjectAtIndex:i];
         [h autorelease];
     }
+    pthread_mutex_unlock(&task_lock);
 }
 
 static BOOL readable_now(int fd)
@@ -100,9 +124,9 @@ static NSError *posix_error(int err)
 
 static NSFileHandle *standard_handle(int fd, NSFileHandle **slot)
 {
-    if (!*slot)
-        *slot = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:NO];
-    return *slot;
+    return FSharedObject(slot, ^id {
+      return [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:NO];
+    });
 }
 + (NSFileHandle *)fileHandleWithStandardInput
 {
@@ -122,10 +146,11 @@ static NSFileHandle *standard_handle(int fd, NSFileHandle **slot)
 + (NSFileHandle *)fileHandleWithNullDevice
 {
     static NSFileHandle *h;
-    if (!h) {
+    static dispatch_once_t h_once;
+    dispatch_once(&h_once, ^{
         int fd = open("/dev/null", O_RDWR | O_CLOEXEC);
         h = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
-    }
+    });
     return h;
 }
 
@@ -388,13 +413,16 @@ static BOOL answer(int rc, NSError **error)
 - (void)setReadabilityHandler:(void (^)(NSFileHandle *))handler
 {
     id copy = [handler copy];
-    [_readabilityHandler release];
+    pthread_mutex_lock(&task_lock);
+    id old = _readabilityHandler;
     _readabilityHandler = copy;
+    pthread_mutex_unlock(&task_lock);
+    [old release];
     update_watch(self);
 }
-/* Kept; Ferry's run loop waits only for descriptors to become readable, so
- * it is called once, when set, and after each write the program makes
- * through the handle isn't followed. */
+/* Kept; Ferry waits only for descriptors to become readable, so it is
+ * called once, on a background thread, when set, and after each write the
+ * program makes through the handle isn't followed. */
 - (void (^)(NSFileHandle *))writeabilityHandler { return _writeabilityHandler; }
 - (void)setWriteabilityHandler:(void (^)(NSFileHandle *))handler
 {
@@ -403,7 +431,7 @@ static BOOL answer(int rc, NSError **error)
     _writeabilityHandler = copy;
     if (copy) {
         [self retain];
-        dispatch_async(dispatch_get_main_queue(), ^{
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           if (self->_writeabilityHandler && self->_fd >= 0)
               self->_writeabilityHandler(self);
           [self release];
@@ -468,14 +496,25 @@ static BOOL answer(int rc, NSError **error)
             update_watch(self);
             [self post:NSFileHandleReadToEndOfFileCompletionNotification data:all];
         }
-    } else if (_readabilityHandler) {
-        void (^h)(NSFileHandle *) = [_readabilityHandler retain];
+    }
+    [self release];
+}
+
+/* The task monitor: the descriptor is (or may be) readable and the handle
+ * has a readability handler. */
+- (void)_serveHandler
+{
+    pthread_mutex_lock(&task_lock);
+    void (^h)(NSFileHandle *) = nil;
+    if (_fd >= 0)
+        h = [_readabilityHandler retain];
+    pthread_mutex_unlock(&task_lock);
+    if (h) {
         @autoreleasepool {
             h(self);
         }
         [h release];
     }
-    [self release];
 }
 @end
 
@@ -525,20 +564,79 @@ static BOOL answer(int rc, NSError **error)
     NSTaskTerminationReason _reason;
     void (^_terminationHandler)(NSTask *);
     NSInteger _qos;
+    NSRunLoop *_launchLoop; /* the launching thread's: NSTaskDidTerminateNotification is posted there */
 }
 @end
 
 static NSMutableArray *running_tasks; /* retained while running */
 
-/* Notes an exited child; YES if it had. */
-static BOOL reap(NSTask *t)
+static dispatch_queue_t monitor_queue(void)
 {
-    if (!t->_running)
+    static dispatch_queue_t q;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      q = dispatch_queue_create("com.apple.NSConcreteTask.monitor", NULL);
+    });
+    return q;
+}
+
+/* Says an exited child has: the termination handler, on the task monitor
+ * (now, when that is where this runs), and the notification, on the
+ * launching thread's run loop. */
+static void tell_exit(NSTask *t, BOOL on_monitor)
+{
+    void (^h)(NSTask *) = [t->_terminationHandler retain];
+    NSRunLoop *loop = [t->_launchLoop retain];
+    [t retain];
+    void (^handler)(void) = ^{
+      @autoreleasepool {
+          if (h)
+              h(t);
+      }
+    };
+    if (on_monitor)
+        handler();
+    else if (h) {
+        [t retain];
+        dispatch_async(monitor_queue(), ^{
+          handler();
+          [t release];
+        });
+    }
+    void (^post)(void) = ^{
+      @autoreleasepool {
+          [[NSNotificationCenter defaultCenter] postNotificationName:NSTaskDidTerminateNotification object:t];
+      }
+    };
+    if (!loop || loop == [NSRunLoop currentRunLoop])
+        post();
+    else {
+        [t retain];
+        [loop performBlock:^{
+          post();
+          [t release];
+        }];
+    }
+    [loop release];
+    [h release];
+    [t release];
+}
+
+/* Notes an exited child; YES if it had. The caller says whether it is the
+ * task monitor. */
+static BOOL reap_from(NSTask *t, BOOL on_monitor)
+{
+    pthread_mutex_lock(&task_lock);
+    if (!t->_running) {
+        pthread_mutex_unlock(&task_lock);
         return NO;
+    }
     int st = 0;
     pid_t r = waitpid(t->_pid, &st, WNOHANG);
-    if (r == 0 || (r < 0 && errno == EINTR))
+    if (r == 0 || (r < 0 && errno == EINTR)) {
+        pthread_mutex_unlock(&task_lock);
         return NO;
+    }
     t->_running = NO;
     if (r < 0) { /* reaped by someone else: its status is lost */
         t->_status = 0;
@@ -552,50 +650,54 @@ static BOOL reap(NSTask *t)
     }
     [t retain];
     [running_tasks removeObjectIdenticalTo:t];
-    void (^h)(NSTask *) = [t->_terminationHandler retain];
-    @autoreleasepool {
-        if (h)
-            h(t);
-        [[NSNotificationCenter defaultCenter] postNotificationName:NSTaskDidTerminateNotification object:t];
-    }
-    [h release];
+    pthread_mutex_unlock(&task_lock);
+    tell_exit(t, on_monitor);
     [t autorelease];
     return YES;
 }
+static BOOL reap(NSTask *t) { return reap_from(t, NO); }
 
-/* While tasks run: look for their exits, and serve watched handles, on
- * dispatch's main queue, every few milliseconds (sooner after something
- * happened). */
+/* While tasks run or handles have readability handlers: look for exits,
+ * and serve those handles, on the task monitor, every few milliseconds
+ * (sooner after something happened). */
 static BOOL pump_armed;
 static unsigned pump_ms = 1;
 
 static void pump(void *ctx)
 {
+    pthread_mutex_lock(&task_lock);
     pump_armed = NO;
+    NSArray *handles = [handler_handles copy];
+    NSArray *tasks = [running_tasks copy];
+    pthread_mutex_unlock(&task_lock);
     BOOL happened = NO;
     @autoreleasepool {
-        NSArray *handles = [[watched_handles copy] autorelease];
         for (NSFileHandle *h in handles)
-            if (h->_watched && h->_fd >= 0 && readable_now(h->_fd)) {
-                [h _serve];
+            if (h->_fd >= 0 && readable_now(h->_fd)) {
+                [h _serveHandler];
                 happened = YES;
             }
-        NSArray *tasks = [[running_tasks copy] autorelease];
         for (NSTask *t in tasks)
-            happened |= reap(t);
+            happened |= reap_from(t, YES);
     }
+    [handles release];
+    [tasks release];
+    pthread_mutex_lock(&task_lock);
     pump_ms = happened ? 1 : pump_ms * 2 > 25 ? 25 : pump_ms * 2;
-    if ([running_tasks count])
+    if ([running_tasks count] || [handler_handles count])
         start_pump();
+    pthread_mutex_unlock(&task_lock);
 }
 
 static void start_pump(void)
 {
-    if (pump_armed)
-        return;
-    pump_armed = YES;
-    dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, (int64_t)pump_ms * NSEC_PER_MSEC), dispatch_get_main_queue(),
-                     NULL, pump);
+    pthread_mutex_lock(&task_lock);
+    if (!pump_armed) {
+        pump_armed = YES;
+        dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, (int64_t)pump_ms * NSEC_PER_MSEC), monitor_queue(), NULL,
+                         pump);
+    }
+    pthread_mutex_unlock(&task_lock);
 }
 
 @implementation NSTask
@@ -616,6 +718,7 @@ static void start_pump(void)
     [_stdout release];
     [_stderr release];
     [_terminationHandler release];
+    [_launchLoop release];
     [super dealloc];
 }
 
@@ -851,14 +954,17 @@ static NSError *launch_error(NSInteger code, NSString *path, int err)
     if ([_stderr isKindOfClass:[NSPipe class]])
         [[_stderr fileHandleForWriting] closeFile];
 
+    pthread_mutex_lock(&task_lock);
     _pid = pid;
     _launched = YES;
     _running = YES;
+    _launchLoop = [[NSRunLoop currentRunLoop] retain];
     if (!running_tasks)
         running_tasks = [[NSMutableArray alloc] init];
     [running_tasks addObject:self];
     pump_ms = 1;
     start_pump();
+    pthread_mutex_unlock(&task_lock);
     return YES;
 }
 - (void)launch
@@ -909,7 +1015,7 @@ static void must_have_launched(NSTask *t, SEL sel)
         return NO;
     return YES;
 }
-/* Runs the run loop (and so dispatch's work) until the child has exited. */
+/* Runs the calling thread's run loop until the child has exited. */
 - (void)waitUntilExit
 {
     if (!_launched)

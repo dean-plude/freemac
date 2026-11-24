@@ -6,8 +6,9 @@
  * shared cache keeps its disk part in ~/.cache/<app id>/URLCache, as a
  * Mac keeps it in ~/Library/Caches/<app id>. Which responses are stored,
  * and when a stored one is used, is decided by the loads themselves
- * (NSURLSession.m). Written from Apple's public API documentation; the
- * files are Ferry's own format. */
+ * (NSURLSession.m). A cache may be used from any thread: each keeps its
+ * parts under a lock of its own. Written from Apple's public API
+ * documentation; the files are Ferry's own format. */
 #import "FURLInternal.h"
 #include <sys/stat.h>
 #include <unistd.h>
@@ -50,12 +51,13 @@
 - (NSData *)data { return _data; }
 - (NSDictionary *)userInfo { return _userInfo; }
 - (NSURLCacheStoragePolicy)storagePolicy { return _policy; }
-- (NSDate *)_storedAt { return _storedAt; }
+- (NSDate *)_storedAt { return [[(id)__atomic_load_n((void **)&_storedAt, __ATOMIC_ACQUIRE) retain] autorelease]; }
 - (void)_setStoredAt:(NSDate *)date
 {
-    [date retain];
-    [_storedAt release];
-    _storedAt = date;
+    /* stored responses are shared between threads; the old date goes
+     * with the next autorelease pool, in case another thread just read it */
+    id old = (id)__atomic_exchange_n((void **)&_storedAt, (void *)[date retain], __ATOMIC_ACQ_REL);
+    [old autorelease];
 }
 - (NSString *)description
 {
@@ -71,6 +73,7 @@
     NSString *_dir;                /* nil: nothing on disk */
     NSMutableDictionary *_memory;  /* key -> NSCachedURLResponse */
     NSMutableArray *_order;        /* keys, the least recently used first */
+    pthread_mutex_t _lock;         /* guards all of the above, and the files */
 }
 @end
 
@@ -144,19 +147,29 @@ static NSCachedURLResponse *decode(NSDictionary *d)
 
 @implementation NSURLCache
 static NSURLCache *shared_cache;
+static pthread_mutex_t shared_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#define LOCK() pthread_mutex_lock(&_lock)
+#define UNLOCK() pthread_mutex_unlock(&_lock)
 
 + (NSURLCache *)sharedURLCache
 {
+    pthread_mutex_lock(&shared_lock);
     if (!shared_cache)
         shared_cache = [[NSURLCache alloc] initWithMemoryCapacity:512 * 1024 diskCapacity:10 * 1024 * 1024
                                                          diskPath:nil];
-    return shared_cache;
+    NSURLCache *c = [[shared_cache retain] autorelease];
+    pthread_mutex_unlock(&shared_lock);
+    return c;
 }
 + (void)setSharedURLCache:(NSURLCache *)cache
 {
     [cache retain];
-    [shared_cache release];
+    pthread_mutex_lock(&shared_lock);
+    NSURLCache *old = shared_cache;
     shared_cache = cache;
+    pthread_mutex_unlock(&shared_lock);
+    [old release];
 }
 + (instancetype)_memoryOnlyCache
 {
@@ -176,6 +189,7 @@ static NSURLCache *shared_cache;
     _dir = [([path isAbsolutePath] ? path : [cache_home() stringByAppendingPathComponent:path]) copy];
     _memory = [[NSMutableDictionary alloc] init];
     _order = [[NSMutableArray alloc] init];
+    FRecursiveMutexInit(&_lock);
     return self;
 }
 - (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
@@ -188,6 +202,7 @@ static NSURLCache *shared_cache;
     [_dir release];
     [_memory release];
     [_order release];
+    pthread_mutex_destroy(&_lock);
     [super dealloc];
 }
 
@@ -276,16 +291,17 @@ static NSInteger oldest_first(id a, id b, void *ctx)
     NSString *key = key_for(request);
     if (!key)
         return nil;
-    NSCachedURLResponse *c = [_memory objectForKey:key];
+    LOCK();
+    NSCachedURLResponse *c = [[[_memory objectForKey:key] retain] autorelease];
     if (c) {
-        [[c retain] autorelease];
         [_order removeObject:key];
         [_order addObject:key];
-        return c;
+    } else {
+        c = [self _read:key];
+        if (c && [c storagePolicy] == NSURLCacheStorageAllowed)
+            [self _remember:c key:key];
     }
-    c = [self _read:key];
-    if (c && [c storagePolicy] == NSURLCacheStorageAllowed)
-        [self _remember:c key:key];
+    UNLOCK();
     return c;
 }
 - (void)storeCachedResponse:(NSCachedURLResponse *)c forRequest:(NSURLRequest *)request
@@ -295,6 +311,12 @@ static NSInteger oldest_first(id a, id b, void *ctx)
         return;
     if (![c _storedAt])
         [c _setStoredAt:[NSDate date]];
+    LOCK();
+    [self _store:c key:key];
+    UNLOCK();
+}
+- (void)_store:(NSCachedURLResponse *)c key:(NSString *)key
+{
     [self _remember:c key:key];
     NSString *file = _dir ? [_dir stringByAppendingPathComponent:file_name(key)] : nil;
     if (file)
@@ -317,21 +339,26 @@ static NSInteger oldest_first(id a, id b, void *ctx)
     NSString *key = key_for(request);
     if (!key)
         return;
+    LOCK();
     [self _forget:key];
     if (_dir)
         unlink([[_dir stringByAppendingPathComponent:file_name(key)] fileSystemRepresentation]);
+    UNLOCK();
 }
 - (void)removeAllCachedResponses
 {
+    LOCK();
     [_memory removeAllObjects];
     [_order removeAllObjects];
     _memoryUsage = 0;
     if (_dir)
         for (NSString *f in [self _files])
             unlink([f fileSystemRepresentation]);
+    UNLOCK();
 }
 - (void)removeCachedResponsesSinceDate:(NSDate *)date
 {
+    LOCK();
     for (NSString *key in [[_order copy] autorelease])
         if ([[[_memory objectForKey:key] _storedAt] compare:date] != NSOrderedAscending)
             [self _forget:key];
@@ -341,26 +368,39 @@ static NSInteger oldest_first(id a, id b, void *ctx)
             if (!stored || [stored compare:date] != NSOrderedAscending)
                 unlink([f fileSystemRepresentation]);
         }
+    UNLOCK();
 }
 - (NSUInteger)memoryCapacity { return _memoryCapacity; }
 - (void)setMemoryCapacity:(NSUInteger)n
 {
+    LOCK();
     _memoryCapacity = n;
     [self _trimMemory];
+    UNLOCK();
 }
 - (NSUInteger)diskCapacity { return _diskCapacity; }
 - (void)setDiskCapacity:(NSUInteger)n
 {
+    LOCK();
     _diskCapacity = n;
     [self _trimDisk];
+    UNLOCK();
 }
-- (NSUInteger)currentMemoryUsage { return _memoryUsage; }
+- (NSUInteger)currentMemoryUsage
+{
+    LOCK();
+    NSUInteger n = _memoryUsage;
+    UNLOCK();
+    return n;
+}
 - (NSUInteger)currentDiskUsage
 {
     unsigned long long total = 0;
+    LOCK();
     if (_dir)
         for (NSString *f in [self _files])
             total += (unsigned long long)MAX(file_size(f, NULL), 0);
+    UNLOCK();
     return (NSUInteger)total;
 }
 - (void)storeCachedResponse:(NSCachedURLResponse *)c forDataTask:(NSURLSessionDataTask *)task

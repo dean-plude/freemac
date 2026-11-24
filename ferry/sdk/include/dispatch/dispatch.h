@@ -88,6 +88,10 @@ __FERRY_END
 #define DISPATCH_QUEUE_CONCURRENT (&_dispatch_queue_attr_concurrent)
 #endif
 #define DISPATCH_QUEUE_SERIAL NULL
+#define DISPATCH_QUEUE_SERIAL_INACTIVE dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_SERIAL)
+#define DISPATCH_QUEUE_CONCURRENT_INACTIVE dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_CONCURRENT)
+#define DISPATCH_APPLY_AUTO NULL
+#define DISPATCH_TARGET_QUEUE_DEFAULT NULL
 #define DISPATCH_SOURCE_TYPE_TIMER (&_dispatch_source_type_timer)
 #define DISPATCH_SOURCE_TYPE_DATA_ADD (&_dispatch_source_type_data_add)
 #define DISPATCH_SOURCE_TYPE_DATA_OR (&_dispatch_source_type_data_or)
@@ -107,7 +111,9 @@ DISPATCH_RETURNS_RETAINED dispatch_queue_t dispatch_queue_create_with_target(con
                                                                              dispatch_queue_t target);
 dispatch_queue_attr_t dispatch_queue_attr_make_with_qos_class(dispatch_queue_attr_t attr,
                                                               dispatch_qos_class_t qos, int priority);
+dispatch_queue_attr_t dispatch_queue_attr_make_initially_inactive(dispatch_queue_attr_t attr);
 const char *dispatch_queue_get_label(dispatch_queue_t queue);
+dispatch_queue_t dispatch_get_current_queue(void);
 #define DISPATCH_CURRENT_QUEUE_LABEL NULL
 void dispatch_set_target_queue(dispatch_object_t object, dispatch_queue_t queue);
 void dispatch_suspend(dispatch_object_t object);

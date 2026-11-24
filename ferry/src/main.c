@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.28.0"
+#define FERRY_VERSION "0.29.0"
 
 static void usage(FILE *out)
 {
@@ -157,10 +157,10 @@ int main(int argc, char **argv, char **envp)
             /* Everything Ferry provides, spelled as in Mach-O; the SDK's
              * description of libSystem is generated from this. */
             const struct ferry_symbol *tables[] = {ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols,
-                                                   ferry_blocks_symbols, ferry_dispatch_symbols,
-                                                   ferry_commoncrypto_symbols, ferry_sysversion_symbols,
-                                                   ferry_sysctl_symbols, ferry_attrlist_symbols,
-                                                   ferry_dyld_symbols};
+                                                   ferry_pthread_symbols, ferry_blocks_symbols,
+                                                   ferry_dispatch_symbols, ferry_commoncrypto_symbols,
+                                                   ferry_sysversion_symbols, ferry_sysctl_symbols,
+                                                   ferry_attrlist_symbols, ferry_dyld_symbols};
             for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);

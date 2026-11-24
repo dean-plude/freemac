@@ -1,6 +1,7 @@
-/* Dispatch with Foundation and ARC (M6): blocks sent to the main queue run
- * on the run loop, timers and dispatch_after wake it, and ARC retains and
- * releases dispatch objects like any other object. */
+/* Dispatch with Foundation and ARC (M6): a serial queue's work runs on a
+ * worker thread, blocks it sends to the main queue run on the main run
+ * loop, timers and dispatch_after wake it, and ARC retains and releases
+ * dispatch objects like any other object. */
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
@@ -22,11 +23,13 @@ int main(void)
             weakQueue = w.queue;
             dispatch_async(w.queue, ^{
                 w.done++;
+                BOOL off = ![NSThread isMainThread];
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    printf("back on the main queue: done %ld\n", (long)w.done);
+                    printf("back on the main queue: done %ld, worked off the main thread %d, now on it %d\n",
+                           (long)w.done, off, [NSThread isMainThread]);
                 });
             });
-            printf("queued; done %ld\n", (long)w.done);
+            printf("queued\n");
         }
         [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
         printf("the queue was released with its worker: %s\n", weakQueue == nil ? "yes" : "no");

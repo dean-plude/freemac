@@ -618,6 +618,52 @@ classes find their own bundle. `@available` checks, and compiler-rt's
 does. Code loaded with `dlopen` stays loaded, and process listings,
 volume attributes and most Mach statistics flavors are left out.
 
+### Threads (freemac 1.202, Ferry 0.29.0)
+
+Mac programs now run on real threads. `NSThread` starts them
+(`detachNewThreadSelector:toTarget:withObject:`,
+`detachNewThreadWithBlock:`, `initWithTarget:selector:object:` and
+`initWithBlock:` with `start`) and answers about them (`currentThread`,
+`mainThread`, `isMainThread`, a thread's dictionary, name, stack size and
+quality of service, whether it is executing, finished or cancelled). A
+thread can sleep, exit and be cancelled, and the will-exit and
+will-become-multithreaded notifications are posted. Each thread has its
+own run loop and autorelease pools, so `performSelectorOnMainThread:`,
+`performSelector:onThread:`, `performSelectorInBackground:` and a run
+loop's `performBlock:` deliver work to the thread named. `NSLock`,
+`NSRecursiveLock`, `NSCondition`, `NSConditionLock`, `@synchronized`,
+`OSSpinLock` and `os_unfair_lock` are real locks on this system's
+pthreads, and the pthread calls Mac programs import are there, keeping
+the Mac's static initialisers and numbers. Dispatch's global queues run on
+a pool of worker threads; serial queues keep their order, and
+`dispatch_sync`, groups, semaphores, barriers, `dispatch_after` and
+`dispatch_apply` work between threads. The main queue runs only on the
+main thread, from its run loop. `NSOperationQueue` runs operations at the
+same time, up to its `maxConcurrentOperationCount`; its main queue stays on
+the main thread. The Objective-C runtime (method caches, class set-up,
+retain and release, weak references, associated objects, `+initialize`)
+and Foundation's shared tables are safe to use from many threads. URL
+transfers move on a thread of their own, and so does the rest of URL
+loading: redirects, authentication challenges and server trust, cookies
+and the URL cache are handled there under the network's lock, and a
+delegate's answers to them may come later and from any thread. The shared
+cookie storage (and its file), each credential storage and each URL cache
+(its memory part and its files) keep their contents under a lock of their
+own, so programs may use them from any thread too, and the libraries Ferry
+opens for the network and for cryptography (libcurl, libcrypto, libssl)
+are opened once whichever thread asks first. A task's exit and its file
+handles' handlers are watched from a dispatch queue, so completion
+handlers, termination handlers and readability handlers run on background
+threads as on a Mac. AppKit is still for the main thread only; Ferry warns
+once if it is used from another. Where a Mac would hang for ever (a lock
+taken twice, `dispatch_sync` onto the current queue, the main thread
+waiting for something nothing can do) Ferry stops the program with a
+message instead. This was written from Apple's documentation and not
+compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
+Left out: `NSDistributedLock`, call stack symbols, dispatch sources for
+descriptors, signals and processes, and priorities that change how threads
+are scheduled.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -638,7 +684,7 @@ Counted over the nine apps:
    `NSXMLDocument`** (each used by five or more of the apps). `NSTask`,
    `NSPipe` and `NSFileHandle` came in (1.194), with `NSXMLParser`, which
    some apps use instead of `NSXMLDocument`; `NSXMLDocument` came in
-   (1.197); `NSThread` is still missing. `NSIndexSet`
+   1.197 and `NSThread` in 1.202. `NSIndexSet`
    came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`
    with message forwarding, `NSJSONSerialization` and `NSDateFormatter`
    (English only, with `NSTimeZone` and a minimal `NSLocale`) in
@@ -651,8 +697,10 @@ Counted over the nine apps:
    own signature passes, and the Security framework's keychain and trust
    calls are there for what comes after. Next is running the three apps
    again to see what Sparkle asks for next.
-6. **Threads**: Ferry runs a program on one thread; dispatch queues run
-   there too.
+6. **Threads**: done in 1.202. Programs run on real threads (`NSThread`,
+   pthreads, dispatch's worker threads and concurrent operation queues),
+   with AppKit kept to the main thread. Next is running the apps again to
+   see whether any of them relied on Ferry having one thread.
 
 Things that are out of reach by design on Wayland, and so will need
 another approach: global hotkeys, reading other apps' key presses, and

@@ -51,8 +51,10 @@ static NSOperatingSystemVersion FSystemVersion(const char **build)
 + (NSProcessInfo *)processInfo
 {
     static NSProcessInfo *shared;
-    if (!shared)
-        shared = [[NSProcessInfo alloc] init];
+    static dispatch_once_t shared_once;
+    dispatch_once(&shared_once, ^{
+      shared = [[NSProcessInfo alloc] init];
+    });
     return shared;
 }
 - (NSArray *)arguments
@@ -234,7 +236,8 @@ static NSMutableDictionary *bundles_by_path;
 + (NSBundle *)mainBundle
 {
     static NSBundle *main;
-    if (!main) {
+    static dispatch_once_t main_once;
+    dispatch_once(&main_once, ^{
         char buf[4096];
         uint32_t size = sizeof buf;
         NSString *exe = nil;
@@ -252,7 +255,7 @@ static NSMutableDictionary *bundles_by_path;
             main->_executable = [exe copy];
         if (main)
             main->_main = YES;
-    }
+    });
     return main;
 }
 + (NSBundle *)bundleWithPath:(NSString *)path { return [[[self alloc] initWithPath:path] autorelease]; }
@@ -513,14 +516,13 @@ static NSUserDefaults *standard_defaults;
 }
 + (NSUserDefaults *)standardUserDefaults
 {
-    if (!standard_defaults)
-        standard_defaults = [[NSUserDefaults alloc] initWithSuiteName:nil];
-    return standard_defaults;
+    return FSharedObject(&standard_defaults, ^id {
+      return [[NSUserDefaults alloc] initWithSuiteName:nil];
+    });
 }
 + (void)resetStandardUserDefaults
 {
-    [standard_defaults release];
-    standard_defaults = nil;
+    [(id)__atomic_exchange_n((void **)&standard_defaults, NULL, __ATOMIC_ACQ_REL) release];
 }
 - (instancetype)init { return [self initWithSuiteName:nil]; }
 - (instancetype)initWithSuiteName:(NSString *)name
@@ -697,8 +699,10 @@ static NSUserDefaults *standard_defaults;
 + (NSFileManager *)defaultManager
 {
     static NSFileManager *shared;
-    if (!shared)
-        shared = [[NSFileManager alloc] init];
+    static dispatch_once_t shared_once;
+    dispatch_once(&shared_once, ^{
+      shared = [[NSFileManager alloc] init];
+    });
     return shared;
 }
 - (NSString *)currentDirectoryPath

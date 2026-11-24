@@ -2,7 +2,8 @@
  * Ferry's Core Animation: the animation clock. Animations added to layers,
  * and properties AppKit's animator proxies drive, are stepped by a timer
  * on the main run loop, sixty times a second while any is running, on the
- * program's one thread. Each step tells delegates when an animation starts
+ * main thread (like AppKit, Core Animation's layers here are used from the
+ * main thread only). Each step tells delegates when an animation starts
  * and stops, removes finished animations (unless removedOnCompletion is
  * NO), settles the transactions they were counted against, and asks the
  * layers' hosts to draw again. A layer's animations are applied when it is

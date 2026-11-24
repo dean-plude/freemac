@@ -23,7 +23,8 @@
  * reaches code that isn't in a Mach-O image (a callback from this system's
  * libraries, say) before a handler, the exception is uncaught, and the
  * program ends as a Mac program does, through the uncaught-exception
- * handler. Ferry runs a program on one thread, so the state here is global.
+ * handler. The exceptions being caught are kept per thread: each thread
+ * unwinds only its own stack.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +59,7 @@ struct exc {
 };
 #define FERRY_EXC_CLASS 0x464552524f424a43ull   /* "FERROBJC" */
 
-static struct exc *caught;   /* exceptions whose @catch is running, innermost first */
+static __thread struct exc *caught;   /* exceptions whose @catch is running, innermost first */
 
 /* ---- @catch types ------------------------------------------------------------------ */
 

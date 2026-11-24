@@ -7,6 +7,8 @@
 #define FERRY_FOUNDATION_INTERNAL_H
 #include <Foundation/Foundation.h>
 #include <objc/message.h>
+#include <dispatch/dispatch.h>
+#include <os/lock.h>
 #include <ctype.h>
 #include <limits.h>
 #include <time.h>
@@ -48,6 +50,41 @@ struct pollfd;
 void FRunLoopAddPoller(int (*prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max),
                        BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count), BOOL (*active)(void *ctx),
                        void *ctx);
+
+/* Blocks the calling thread on a pthread condition until it is signalled
+ * or limit (seconds since the reference date) passes; returns 0 or
+ * ETIMEDOUT. On the main thread a wait with no limit wakes every 250 ms
+ * (so it may end early) and stops the program, naming what it waits for,
+ * when nothing left could end it (NSOperation.m). */
+#include <pthread.h>
+int FCondWait(pthread_cond_t *c, pthread_mutex_t *m, NSTimeInterval limit, const char *what);
+
+/* A shared object made on first use: the first thread to finish making
+ * one publishes it, and any other lets its own go. */
+static inline id FSharedObject(void *slot, id (^make)(void))
+{
+    void **s = (void **)slot;
+    void *have = __atomic_load_n(s, __ATOMIC_ACQUIRE);
+    if (have)
+        return (id)have;
+    id made = make();
+    void *expected = NULL;
+    if (__atomic_compare_exchange_n(s, &expected, (void *)made, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+        return made;
+    [made release];
+    return (id)expected;
+}
+
+/* A mutex that the thread holding it may take again, for an object's own
+ * state (the URL cache, the cookie and credential storages). */
+static inline void FRecursiveMutexInit(pthread_mutex_t *m)
+{
+    pthread_mutexattr_t a;
+    pthread_mutexattr_init(&a);
+    pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(m, &a);
+    pthread_mutexattr_destroy(&a);
+}
 
 /* Property lists */
 id FParsePlist(NSData *data, NSPropertyListMutabilityOptions opt, NSPropertyListFormat *format);

@@ -19,6 +19,16 @@ void AWarnOnce(const char *what)
     fprintf(stderr, "AppKit (Ferry): %s isn't supported yet\n", what);
 }
 
+void AMainThreadOnly(const char *what)
+{
+    static int said;
+    if (pthread_main_np() || __atomic_exchange_n(&said, 1, __ATOMIC_ACQ_REL))
+        return;
+    fprintf(stderr, "AppKit (Ferry): %s was called off the main thread; AppKit is for the main thread only, and "
+                    "Ferry doesn't make it safe on others\n",
+            what);
+}
+
 /* ---- NSGraphicsContext ---------------------------------------------------------- */
 
 @implementation NSGraphicsContext {

@@ -1,13 +1,25 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry's Foundation: NSRunLoop, NSTimer, NSNotification and
- * NSNotificationCenter. There is one run loop, on the main thread (Ferry
- * doesn't run Mac threads yet). It waits with poll(), so file descriptors
- * can be added as input sources; AppKit (M4) adds its Wayland connection that
- * way. */
+ * Ferry's Foundation: NSRunLoop, NSTimer, NSPort, the delayed and
+ * cross-thread performs, NSNotification and NSNotificationCenter.
+ *
+ * Each thread has a run loop of its own, made the first time the thread
+ * asks for it (or another thread performs a selector on it), and run only
+ * by that thread. A run loop waits with poll(), so file descriptors can be
+ * added as input sources (AppKit adds its Wayland connection to the main
+ * run loop that way), and on a pipe of its own that other threads write to
+ * when they give it work (performBlock:, performSelector:onThread:...,
+ * CFRunLoopWakeUp) so that it wakes at once. The main run loop also runs
+ * the main dispatch queue's work, which wakes it the same way. A run loop
+ * with nothing to wait for (no timer, port, descriptor or block) returns
+ * at once from run, as on a Mac. */
 #import "FInternal.h"
+#include <dispatch/dispatch.h>
+#include <fcntl.h>
 #include <os/lock.h>
 #include <poll.h>
+#include <pthread.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 NSString *const NSDefaultRunLoopMode = @"kCFRunLoopDefaultMode";
 NSString *const NSRunLoopCommonModes = @"kCFRunLoopCommonModes";
@@ -20,7 +32,12 @@ NSString *const NSRunLoopCommonModes = @"kCFRunLoopCommonModes";
     id _info;
     void (^_block)(NSTimer *);
     BOOL _repeats, _valid, _scheduled;
+    NSRunLoop *_loop; /* not retained: the run loop it was added to */
 }
+@end
+
+@interface NSRunLoop ()
+- (void)_wakeUp;
 @end
 
 struct fsource {
@@ -29,46 +46,107 @@ struct fsource {
     void *ctx;
 };
 
+/* libSystem's dispatch queues (src/objc/dispatch.c): the main queue's work
+ * runs on the main run loop. */
+extern int ferry_dispatch_drain(void);
+extern int ferry_dispatch_timeout_ms(void);
+extern int ferry_dispatch_busy(void);
+extern void ferry_dispatch_set_main_wakeup(void (*fn)(void));
+
 @implementation NSRunLoop {
     NSMutableArray *_timers;
     NSMutableArray *_blocks;
+    NSMutableArray *_ports;
     struct fsource *_sources;
     int _nsources;
-    BOOL _stopped;
+    BOOL _stopped, _main;
     NSString *_mode;
+    os_unfair_lock _lock; /* other threads add blocks and timers, and stop it */
+    int _wake[2];
 }
+
+/* NSThread.m keeps each thread's run loop. */
+NSRunLoop *FRunLoopOfThread(NSThread *thread, BOOL create);
 
 static NSRunLoop *main_loop;
 
-+ (NSRunLoop *)currentRunLoop { return [self mainRunLoop]; }
-+ (NSRunLoop *)mainRunLoop
-{
-    if (!main_loop)
-        main_loop = [[NSRunLoop alloc] init];
-    return main_loop;
-}
-- (instancetype)init
+static void wake_main_loop(void) { [main_loop _wakeUp]; }
+
++ (NSRunLoop *)currentRunLoop { return FRunLoopOfThread([NSThread currentThread], YES); }
++ (NSRunLoop *)mainRunLoop { return FRunLoopOfThread([NSThread mainThread], YES); }
+
+/* Made by NSThread.m, for the thread that will run it. */
+- (instancetype)_initForMainThread:(BOOL)isMain
 {
     _timers = [[NSMutableArray alloc] init];
     _blocks = [[NSMutableArray alloc] init];
+    _ports = [[NSMutableArray alloc] init];
+    _lock = OS_UNFAIR_LOCK_INIT;
+    _main = isMain;
+    if (pipe(_wake) == 0) {
+        fcntl(_wake[0], F_SETFL, O_NONBLOCK);
+        fcntl(_wake[1], F_SETFL, O_NONBLOCK);
+        fcntl(_wake[0], F_SETFD, FD_CLOEXEC);
+        fcntl(_wake[1], F_SETFD, FD_CLOEXEC);
+    } else {
+        _wake[0] = _wake[1] = -1;
+    }
+    if (isMain) {
+        main_loop = self;
+        ferry_dispatch_set_main_wakeup(wake_main_loop);
+    }
     return self;
+}
+- (instancetype)init { return [self _initForMainThread:NO]; }
+- (void)dealloc
+{
+    [_timers release];
+    [_blocks release];
+    [_ports release];
+    free(_sources);
+    if (_wake[0] >= 0) {
+        close(_wake[0]);
+        close(_wake[1]);
+    }
+    [super dealloc];
+}
+/* Wakes the loop from its wait, from any thread. */
+- (void)_wakeUp
+{
+    if (_wake[1] >= 0) {
+        char c = 1;
+        (void)write(_wake[1], &c, 1);
+    }
 }
 - (NSRunLoopMode)currentMode { return _mode; }
 - (CFRunLoopRef)getCFRunLoop { return (CFRunLoopRef)self; }
 - (void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode
 {
-    if (!timer->_valid || [_timers indexOfObjectIdenticalTo:timer] != NSNotFound)
-        return;
-    timer->_scheduled = YES;
-    [_timers addObject:timer];
+    os_unfair_lock_lock(&_lock);
+    if (timer->_valid && [_timers indexOfObjectIdenticalTo:timer] == NSNotFound) {
+        timer->_scheduled = YES;
+        timer->_loop = self;
+        [_timers addObject:timer];
+    }
+    os_unfair_lock_unlock(&_lock);
+    [self _wakeUp];
 }
-- (void)removeTimer:(NSTimer *)timer { [_timers removeObjectIdenticalTo:timer]; }
+- (void)removeTimer:(NSTimer *)timer
+{
+    os_unfair_lock_lock(&_lock);
+    [_timers removeObjectIdenticalTo:timer];
+    os_unfair_lock_unlock(&_lock);
+}
 - (void)performBlock:(void (^)(void))block
 {
     id copy = [block copy];
+    os_unfair_lock_lock(&_lock);
     [_blocks addObject:copy];
+    os_unfair_lock_unlock(&_lock);
     [copy release];
+    [self _wakeUp];
 }
+- (void)performInModes:(NSArray *)modes block:(void (^)(void))block { [self performBlock:block]; }
 - (void)performBlock:(void (^)(void))block afterDelay:(NSTimeInterval)delay
 {
     [self addTimer:[NSTimer timerWithTimeInterval:delay
@@ -78,33 +156,54 @@ static NSRunLoop *main_loop;
                                             }]
            forMode:NSDefaultRunLoopMode];
 }
+- (void)addPort:(NSPort *)port forMode:(NSRunLoopMode)mode
+{
+    os_unfair_lock_lock(&_lock);
+    if (port && [_ports indexOfObjectIdenticalTo:port] == NSNotFound)
+        [_ports addObject:port];
+    os_unfair_lock_unlock(&_lock);
+}
+- (void)removePort:(NSPort *)port forMode:(NSRunLoopMode)mode
+{
+    os_unfair_lock_lock(&_lock);
+    [_ports removeObjectIdenticalTo:port];
+    os_unfair_lock_unlock(&_lock);
+}
 - (void)addDescriptor:(int)fd callback:(void (*)(int, void *))callback context:(void *)ctx
 {
+    os_unfair_lock_lock(&_lock);
     _sources = realloc(_sources, (_nsources + 1) * sizeof *_sources);
     _sources[_nsources++] = (struct fsource){fd, callback, ctx};
+    os_unfair_lock_unlock(&_lock);
+    [self _wakeUp];
 }
 - (void)removeDescriptor:(int)fd
 {
+    os_unfair_lock_lock(&_lock);
     for (int i = 0; i < _nsources; i++) {
         if (_sources[i].fd == fd) {
             memmove(_sources + i, _sources + i + 1, (_nsources - i - 1) * sizeof *_sources);
             _nsources--;
-            return;
+            break;
         }
     }
+    os_unfair_lock_unlock(&_lock);
 }
-- (void)stop { _stopped = YES; }
-/* Another event loop waited on together with this one (AppKit's GLib main
- * context): before each wait it adds its descriptors and may shorten the
- * wait; after it, it handles what is ready. */
+- (void)stop
+{
+    _stopped = YES;
+    [self _wakeUp];
+}
+/* Another event loop waited on together with the main one (AppKit's GLib
+ * main context): before each wait it adds its descriptors and may shorten
+ * the wait; after it, it handles what is ready. */
 static int (*hook_prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max);
 static BOOL (*hook_dispatch)(void *ctx, struct pollfd *fds, int count);
 static void *hook_ctx;
 #define HOOK_FDS 64
 
-/* Foundation's own pollers, waited on with the rest while active: the
- * network transfers of NSURLSession and NSURLConnection (NSURLSession.m),
- * which may wait to write as well as to read. */
+/* Foundation's own pollers, waited on by the main run loop with the rest
+ * while active. */
 struct fpoller {
     int (*prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max);
     BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count);
@@ -130,14 +229,22 @@ static BOOL pollers_active(void)
     return NO;
 }
 
-/* libSystem's dispatch queues (src/objc/dispatch.c) run on this loop. */
-extern int ferry_dispatch_drain(void);
-extern int ferry_dispatch_timeout_ms(void);
-
 - (BOOL)hasWork
 {
-    return [_timers count] || [_blocks count] || _nsources || hook_prepare || ferry_dispatch_timeout_ms() >= 0 ||
-           pollers_active();
+    os_unfair_lock_lock(&_lock);
+    BOOL own = [_timers count] || [_blocks count] || [_ports count] || _nsources;
+    os_unfair_lock_unlock(&_lock);
+    if (own)
+        return YES;
+    /* the main run loop also runs the main queue, which work on other threads may still add to */
+    return _main && (hook_prepare || ferry_dispatch_busy() || pollers_active());
+}
+
+static void drain_wake(int fd)
+{
+    char buf[64];
+    while (read(fd, buf, sizeof buf) > 0)
+        ;
 }
 
 /* One pass: run queued blocks, fire due timers, then wait for a descriptor
@@ -148,9 +255,11 @@ extern int ferry_dispatch_timeout_ms(void);
     *handled = NO;
     if (![self hasWork])
         return NO;
-    if ([_blocks count]) {
-        NSArray *now = [_blocks copy];
-        [_blocks removeAllObjects];
+    os_unfair_lock_lock(&_lock);
+    NSArray *now = [_blocks count] ? [_blocks copy] : nil;
+    [_blocks removeAllObjects];
+    os_unfair_lock_unlock(&_lock);
+    if (now) {
         for (void (^b)(void) in now) {
             @autoreleasepool {
                 b();
@@ -160,13 +269,14 @@ extern int ferry_dispatch_timeout_ms(void);
         *handled = YES;
         return YES;
     }
-    if (ferry_dispatch_drain()) {
+    if (_main && ferry_dispatch_drain()) {
         *handled = YES;
         return YES;
     }
     NSTimeInterval t = [NSDate timeIntervalSinceReferenceDate];
     NSTimer *due = nil;
     NSTimeInterval next = limit;
+    os_unfair_lock_lock(&_lock);
     for (NSTimer *timer in _timers) {
         if (timer->_fire <= t && (!due || timer->_fire < due->_fire))
             due = timer;
@@ -183,6 +293,9 @@ extern int ferry_dispatch_timeout_ms(void);
         } else {
             [_timers removeObjectIdenticalTo:due];
         }
+    }
+    os_unfair_lock_unlock(&_lock);
+    if (due) {
         @autoreleasepool {
             [due fire];
         }
@@ -194,18 +307,31 @@ extern int ferry_dispatch_timeout_ms(void);
     }
     double wait = next - t;
     int ms = wait <= 0 ? 0 : wait > 2e6 ? 2000000000 : (int)ceil(wait * 1000);
-    int dms = ferry_dispatch_timeout_ms();
-    if (dms >= 0 && dms < ms)
-        ms = dms;
-    struct pollfd *fds = calloc(_nsources + HOOK_FDS * (1 + MAX_POLLERS) + 1, sizeof *fds);
-    for (int i = 0; i < _nsources; i++) {
-        fds[i].fd = _sources[i].fd;
-        fds[i].events = POLLIN;
+    if (_main) {
+        int dms = ferry_dispatch_timeout_ms();
+        if (dms >= 0 && dms < ms)
+            ms = dms;
+        /* work on other threads may end without sending anything here: look again now and then */
+        if (ms > 100 && ferry_dispatch_busy())
+            ms = 100;
     }
-    int count = _nsources, extra = 0;
-    if (hook_prepare)
-        extra = hook_prepare(hook_ctx, &ms, fds + count, HOOK_FDS);
-    int pstart[MAX_POLLERS], pcount[MAX_POLLERS], np = npollers, all = count + extra;
+    os_unfair_lock_lock(&_lock);
+    int count = _nsources;
+    struct fsource *snapshot = malloc((count ? count : 1) * sizeof *snapshot);
+    memcpy(snapshot, _sources, count * sizeof *snapshot);
+    os_unfair_lock_unlock(&_lock);
+    struct pollfd *fds = calloc(1 + count + HOOK_FDS * (1 + MAX_POLLERS) + 1, sizeof *fds);
+    fds[0].fd = _wake[0];
+    fds[0].events = POLLIN;
+    for (int i = 0; i < count; i++) {
+        fds[1 + i].fd = snapshot[i].fd;
+        fds[1 + i].events = POLLIN;
+    }
+    int base = 1 + count, extra = 0;
+    int pstart[MAX_POLLERS], pcount[MAX_POLLERS], np = _main ? npollers : 0;
+    if (_main && hook_prepare)
+        extra = hook_prepare(hook_ctx, &ms, fds + base, HOOK_FDS);
+    int all = base + extra;
     for (int i = 0; i < np; i++) {
         pstart[i] = all;
         pcount[i] = -1;
@@ -214,17 +340,17 @@ extern int ferry_dispatch_timeout_ms(void);
             all += pcount[i];
         }
     }
-    struct fsource *snapshot = malloc((count ? count : 1) * sizeof *snapshot);
-    memcpy(snapshot, _sources, count * sizeof *snapshot);
     int ready = poll(fds, all, ms);
-    if (hook_dispatch && hook_dispatch(hook_ctx, fds + count, extra))
+    if (ready > 0 && fds[0].revents)
+        drain_wake(_wake[0]);
+    if (_main && hook_dispatch && hook_dispatch(hook_ctx, fds + base, extra))
         *handled = YES;
     for (int i = 0; i < np; i++)
         if (pcount[i] >= 0 && pollers[i].dispatch(pollers[i].ctx, fds + pstart[i], pcount[i]))
             *handled = YES;
     if (ready > 0) {
         for (int i = 0; i < count; i++) {
-            if (fds[i].revents) {
+            if (fds[1 + i].revents) {
                 @autoreleasepool {
                     snapshot[i].callback(snapshot[i].fd, snapshot[i].ctx);
                 }
@@ -255,6 +381,22 @@ extern int ferry_dispatch_timeout_ms(void);
     _stopped = NO;
 }
 - (void)run { [self runUntilDate:[NSDate distantFuture]]; }
+- (void)acceptInputForMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limit
+{
+    [self runMode:mode beforeDate:limit];
+}
+- (NSDate *)limitDateForMode:(NSRunLoopMode)mode
+{
+    if (![self hasWork])
+        return nil;
+    NSTimeInterval next = 1e15;
+    os_unfair_lock_lock(&_lock);
+    for (NSTimer *timer in _timers)
+        if (timer->_fire < next)
+            next = timer->_fire;
+    os_unfair_lock_unlock(&_lock);
+    return next < 1e15 ? [NSDate dateWithTimeIntervalSinceReferenceDate:next] : [NSDate distantFuture];
+}
 
 /* For CFRunLoopRunInMode. */
 - (SInt32)runFor:(CFTimeInterval)seconds returnAfterSource:(BOOL)once
@@ -292,6 +434,20 @@ F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollf
     hook_dispatch = dispatch;
     hook_ctx = ctx;
 }
+
+/* ---- NSPort ------------------------------------------------------------------------- */
+
+@implementation NSPort {
+    BOOL _invalid;
+}
++ (NSPort *)port { return [[[NSMachPort alloc] init] autorelease]; }
+- (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+- (void)invalidate { _invalid = YES; }
+- (BOOL)isValid { return !_invalid; }
+@end
+
+@implementation NSMachPort
+@end
 
 /* ---- NSTimer ------------------------------------------------------------------------- */
 
@@ -359,7 +515,7 @@ F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollf
     _valid = NO;
     [self retain];
     if (_scheduled)
-        [[NSRunLoop mainRunLoop] removeTimer:self];
+        [_loop ?: [NSRunLoop mainRunLoop] removeTimer:self];
     [_target release];
     _target = nil;
     [_info release];
@@ -371,16 +527,21 @@ F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollf
 - (BOOL)isValid { return _valid; }
 - (NSTimeInterval)timeInterval { return _repeats ? _interval : 0; }
 - (NSDate *)fireDate { return [NSDate dateWithTimeIntervalSinceReferenceDate:_fire]; }
-- (void)setFireDate:(NSDate *)date { _fire = [date timeIntervalSinceReferenceDate]; }
+- (void)setFireDate:(NSDate *)date
+{
+    _fire = [date timeIntervalSinceReferenceDate];
+    [_loop _wakeUp];
+}
 - (id)userInfo { return _info; }
 - (NSTimeInterval)tolerance { return _tolerance; }
 - (void)setTolerance:(NSTimeInterval)t { _tolerance = t; }
 @end
 
-/* ---- delayed and main-thread performs ------------------------------------------------- */
+/* ---- delayed performs ---------------------------------------------------------------- */
 
 /* Each delayed perform waiting to happen, so that
- * cancelPreviousPerformRequestsWithTarget: can find it. */
+ * cancelPreviousPerformRequestsWithTarget: can find it. A delayed perform
+ * runs on the run loop of the thread that asked for it. */
 @interface FDelayedPerform : NSObject {
 @public
     id target, arg;
@@ -419,7 +580,7 @@ static os_unfair_lock delayed_lock = OS_UNFAIR_LOCK_INIT;
     [delayed_performs addObject:p];
     os_unfair_lock_unlock(&delayed_lock);
     [p release];
-    [[NSRunLoop mainRunLoop] addTimer:p->timer forMode:NSDefaultRunLoopMode];
+    [[NSRunLoop currentRunLoop] addTimer:p->timer forMode:NSDefaultRunLoopMode];
 }
 static void cancel_performs(id target, BOOL any, SEL sel, id arg)
 {
@@ -450,20 +611,6 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
                 inModes:(NSArray *)modes
 {
     [self performSelector:aSelector withObject:arg afterDelay:delay];
-}
-- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(id)arg waitUntilDone:(BOOL)wait
-{
-    if (wait) {
-        ((void (*)(id, SEL, id))objc_msgSend)(self, aSelector, arg);
-        return;
-    }
-    [self retain];
-    [arg retain];
-    [[NSRunLoop mainRunLoop] performBlock:^{
-      ((void (*)(id, SEL, id))objc_msgSend)(self, aSelector, arg);
-      [self release];
-      [arg release];
-    }];
 }
 @end
 
@@ -524,19 +671,25 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
 }
 @end
 
+/* Observers may be added, removed and notified from any thread; a
+ * notification is delivered on the thread that posts it. */
 @implementation NSNotificationCenter {
     NSMutableArray *_observations;
+    os_unfair_lock _lock;
 }
 + (NSNotificationCenter *)defaultCenter
 {
     static NSNotificationCenter *shared;
-    if (!shared)
-        shared = [[NSNotificationCenter alloc] init];
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      shared = [[NSNotificationCenter alloc] init];
+    });
     return shared;
 }
 - (instancetype)init
 {
     _observations = [[NSMutableArray alloc] init];
+    _lock = OS_UNFAIR_LOCK_INIT;
     return self;
 }
 - (void)addObserver:(id)observer selector:(SEL)sel name:(NSNotificationName)name object:(id)object
@@ -546,7 +699,9 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
     o->_sel = sel;
     o->_name = [name copy];
     o->_object = object;
+    os_unfair_lock_lock(&_lock);
     [_observations addObject:o];
+    os_unfair_lock_unlock(&_lock);
     [o release];
 }
 - (id)addObserverForName:(NSNotificationName)name object:(id)obj queue:(NSOperationQueue *)queue
@@ -557,12 +712,16 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
     o->_name = [name copy];
     o->_object = obj;
     o->_block = [block copy];
+    os_unfair_lock_lock(&_lock);
     [_observations addObject:o];
+    os_unfair_lock_unlock(&_lock);
     return [o autorelease];
 }
 - (void)postNotification:(NSNotification *)note
 {
+    os_unfair_lock_lock(&_lock);
     NSArray *now = [_observations copy];
+    os_unfair_lock_unlock(&_lock);
     NSString *name = [note name];
     id object = [note object];
     for (FObservation *o in now) {
@@ -589,6 +748,8 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
 }
 - (void)removeObserver:(id)observer name:(NSNotificationName)name object:(id)object
 {
+    NSMutableArray *gone = [[NSMutableArray alloc] init];
+    os_unfair_lock_lock(&_lock);
     for (NSUInteger i = [_observations count]; i-- > 0;) {
         FObservation *o = [_observations objectAtIndex:i];
         if (o->_observer != observer)
@@ -598,8 +759,11 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
         if (object && o->_object != object)
             continue;
         o->_removed = YES;
+        [gone addObject:o];
         [_observations removeObjectAtIndex:i];
     }
+    os_unfair_lock_unlock(&_lock);
+    [gone release]; /* outside the lock: an observer's block may hold the last reference to anything */
 }
 - (void)removeObserver:(id)observer { [self removeObserver:observer name:nil object:nil]; }
 @end

@@ -2,24 +2,36 @@
  *
  * Grand Central Dispatch (libdispatch), the part of libSystem that Mac
  * programs use to run blocks later or elsewhere: queues, dispatch_async and
- * dispatch_sync, dispatch_once, dispatch_after, groups, semaphores and timer
- * sources.
+ * dispatch_sync, dispatch_once, dispatch_after, dispatch_apply, groups,
+ * semaphores and timer and data sources.
  *
- * Ferry runs a Mac program on one thread, so every queue's work runs on the
- * main thread, in the order it was queued: Foundation's run loop (and
- * dispatch_main) asks for it on each pass. That keeps the guarantees a
- * program can rely on (a serial queue runs one block at a time, in order;
- * dispatch_sync returns after its block has run) but nothing runs at the
- * same time as anything else. A wait (dispatch_semaphore_wait,
- * dispatch_group_wait) runs queued work until what it waits for happens;
- * if nothing queued could make it happen, Ferry says so and stops rather
- * than hang.
+ * Work runs on real threads, as on a Mac. The global queues are concurrent:
+ * their blocks run on a pool of worker threads that grows when every
+ * worker is busy (or stuck waiting) and work is waiting, and shrinks again
+ * when workers have been idle a while. A serial queue runs one block at a
+ * time, in the order they were queued, on whichever worker is free; a
+ * concurrent queue of the program's own runs its blocks together, except
+ * that a barrier block waits for the blocks before it and runs alone.
+ * Queues that target other queues share their target's ordering. The main
+ * queue (and anything that targets it) runs only on the main thread:
+ * Foundation's run loop asks for its work on each pass (and dispatch_main
+ * runs it for ever), and is woken when some arrives.
+ *
+ * dispatch_sync runs its block on the calling thread once the queue is
+ * free, as on a Mac; on the main queue, from another thread, the main
+ * thread runs it. A dispatch_sync that could never return (onto the queue
+ * whose block is calling it, or onto the main queue from the main thread)
+ * stops the program with a message instead of hanging. A wait on the main
+ * thread for something nothing could ever do (no other thread running, no
+ * work queued or due) also stops with a message rather than hang.
  *
  * Dispatch objects are Objective-C objects, as on a Mac, so that code built
  * with ARC can retain and release them. Written from Apple's public
  * documentation of libdispatch's calls; no Apple code was used.
  */
 #define _GNU_SOURCE
+#include <errno.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,19 +65,24 @@ struct dobj {
     /* queues */
     char label[64];
     int suspended;
+    int concurrent, inactive, global;
     struct specific *specifics;
+    struct dobj *target;
+    /* a queue that orders work itself (see domain_of): what waits, what runs */
+    struct work *head, *tail;
+    int running, barrier, listed;
+    struct dobj *next_listed;
     /* groups */
     long pending;
     struct work *notify;
     /* semaphores */
-    long value;
+    long value, wakeups;
     /* sources */
     int source_type;
-    struct dobj *target;
     uint64_t start, interval;
     void *handler, *cancel_handler; /* blocks */
     int cancelled, armed;
-    unsigned long data;
+    unsigned long data, fired_data;
 };
 
 struct specific {
@@ -74,13 +91,20 @@ struct specific {
     struct specific *next;
 };
 
+/* a dispatch_sync waiting for its turn */
+struct syncwait {
+    int granted, done;
+};
+
 struct work {
-    struct dobj *queue;
+    struct dobj *queue;      /* where it was sent (retained) */
     void *block;             /* a copied block, or NULL */
     void (*fn)(void *);
     void *ctx;
     struct dobj *group;      /* left when the work is done */
     uint64_t when;           /* for dispatch_after */
+    int barrier;
+    struct syncwait *sync;
     struct work *next;
 };
 
@@ -93,11 +117,30 @@ static struct fobjc_class dispatch_class, dispatch_meta, static_class, static_me
  * for its address); the global queues are returned by a call. */
 struct dobj ferry_dispatch_main_q;
 static struct dobj global_queues[4];
+#define MAIN_Q (&ferry_dispatch_main_q)
+#define DEFAULT_Q (&global_queues[1])
 
-/* What the program has asked to run, oldest first, and dispatch_after's
- * work, soonest first. */
-static struct work *ready_head, *ready_tail, *later;
-static struct dobj *current_queue;
+/* Everything here is guarded by one lock. Workers sleep on work_cond; the
+ * manager thread (timers, and adding workers) on manager_cond; anyone
+ * waiting for something to happen (a dispatch_sync's turn, a group, a
+ * semaphore, a dispatch_once, the main queue's work) on event_cond. */
+static pthread_mutex_t dq = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t work_cond, manager_cond, event_cond;
+static struct dobj *listed_head, *listed_tail;  /* worker queues with work waiting */
+static struct work *later;                       /* dispatch_after's, soonest first */
+static int workers, idle_workers, busy_workers, manager_started;
+static unsigned long progress;                   /* work started so far, to see when the pool is stuck */
+static int soft_max_workers, hard_max_workers = 64;
+static pthread_t main_thread;
+static void (*main_wakeup)(void);
+
+static __thread struct dobj *current_queue;
+/* the queues whose turn this thread holds (running one of their blocks) */
+struct held {
+    struct dobj *domain;
+    struct held *prev;
+};
+static __thread struct held *held_top;
 
 static uint64_t now_ns(void)
 {
@@ -111,6 +154,17 @@ static void stop(const char *why)
     fflush(stdout);
     fprintf(stderr, "ferry: %s\n", why);
     _exit(70);
+}
+
+static int on_main_thread(void) { return pthread_equal(pthread_self(), main_thread); }
+
+/* a wait on one of the conditions until a point on the monotonic clock */
+static int wait_until(pthread_cond_t *c, uint64_t deadline)
+{
+    if (deadline == ~0ull)
+        return pthread_cond_wait(c, &dq);
+    struct timespec ts = {(time_t)(deadline / 1000000000ull), (long)(deadline % 1000000000ull)};
+    return pthread_cond_timedwait(c, &dq, &ts);
 }
 
 /* ---- objects ------------------------------------------------------------------ */
@@ -135,10 +189,10 @@ static void d_dealloc(struct dobj *self, SEL _cmd)
         n = s->next;
         free(s);
     }
+    if (self->target)
+        objc_release((id)self->target);
     object_dispose((id)self);
 }
-
-static const char *d_description_label(struct dobj *self) { return self->label; }
 
 void *dispatch_retain(void *o) { return objc_retain(o); }
 void dispatch_release(void *o) { objc_release(o); }
@@ -154,12 +208,190 @@ void dispatch_set_finalizer_f(struct dobj *o, void (*fn)(void *))
         o->finalizer = fn;
 }
 
-/* ---- running work ------------------------------------------------------------- */
+/* ---- where work runs ---------------------------------------------------------
+ * Each queue's work is kept, in order, by the queue that decides when it may
+ * run (its domain): the outermost serial queue on its chain of targets, or
+ * else the first concurrent queue of the program's own, or else the global
+ * queue at the end of the chain. Anything that ends at the main queue is
+ * the main queue's, run by the main thread. */
 
-static void run_work(struct work *w)
+static int is_serial(struct dobj *d) { return d == MAIN_Q || (!d->global && !d->concurrent); }
+
+static struct dobj *domain_of(struct dobj *q)
+{
+    struct dobj *serial = NULL, *concurrent = NULL;
+    for (struct dobj *p = q; p; p = p->target) {
+        if (p == MAIN_Q)
+            return MAIN_Q;
+        if (p->global)
+            return serial ? serial : concurrent ? concurrent : p;
+        if (!p->concurrent)
+            serial = p;
+        else if (!concurrent && !serial)
+            concurrent = p;
+    }
+    return serial ? serial : concurrent ? concurrent : DEFAULT_Q;
+}
+
+static int chain_suspended(struct dobj *q)
+{
+    for (; q; q = q->target)
+        if (q->suspended > 0 && !q->global)
+            return 1;
+    return 0;
+}
+
+static void wake_main(void)
+{
+    pthread_cond_broadcast(&event_cond);
+    if (main_wakeup)
+        main_wakeup();
+}
+
+static void spawn_worker(void);
+static void start_manager(void);
+
+/* A worker queue now may have work to start: put it on the list and get a
+ * worker to it. */
+static void kick(struct dobj *d)
+{
+    if (d == MAIN_Q) {
+        wake_main();
+        return;
+    }
+    if (!d->listed) {
+        d->listed = 1;
+        d->next_listed = NULL;
+        if (listed_tail)
+            listed_tail->next_listed = d;
+        else
+            listed_head = d;
+        listed_tail = d;
+    }
+    if (idle_workers > 0)
+        pthread_cond_signal(&work_cond);
+    else if (workers < soft_max_workers)
+        spawn_worker();
+    else
+        start_manager();
+}
+
+static void append(struct dobj *d, struct work *w)
+{
+    w->next = NULL;
+    if (d->tail)
+        d->tail->next = w;
+    else
+        d->head = w;
+    d->tail = w;
+}
+
+/* Called with the lock held. */
+static void enqueue_locked(struct work *w)
+{
+    struct dobj *d = domain_of(w->queue);
+    append(d, w);
+    kick(d);
+}
+
+/* The next piece of work that may start on domain d, taken off it and
+ * counted as running; NULL if none may start now. */
+static struct work *take(struct dobj *d)
+{
+    if (d->barrier || (is_serial(d) && d->running && d != MAIN_Q))
+        return NULL;
+    struct work *prev = NULL;
+    for (struct work *w = d->head; w; prev = w, w = w->next) {
+        if (chain_suspended(w->queue))
+            continue;
+        int barrier = w->barrier && !is_serial(d) && !d->global;
+        if (barrier && d->running)
+            return NULL;
+        if (prev)
+            prev->next = w->next;
+        else
+            d->head = w->next;
+        if (d->tail == w)
+            d->tail = prev;
+        d->running++;
+        if (barrier)
+            d->barrier = 1;
+        return w;
+    }
+    return NULL;
+}
+
+/* For workers: the next piece of work from any worker queue, round robin. */
+static struct work *take_any(struct dobj **domain)
+{
+    struct dobj *prev = NULL;
+    for (struct dobj *d = listed_head; d;) {
+        struct dobj *next = d->next_listed;
+        if (!d->head) {
+            /* nothing waits there any more: off the list */
+            if (prev)
+                prev->next_listed = next;
+            else
+                listed_head = next;
+            if (listed_tail == d)
+                listed_tail = prev;
+            d->listed = 0;
+            d = next;
+            continue;
+        }
+        struct work *w = take(d);
+        if (w) {
+            /* to the back of the list, so other queues get their turn */
+            if (d->head && next) {
+                if (prev)
+                    prev->next_listed = next;
+                else
+                    listed_head = next;
+                d->next_listed = NULL;
+                listed_tail->next_listed = d;
+                listed_tail = d;
+            }
+            *domain = d;
+            return w;
+        }
+        prev = d;
+        d = next;
+    }
+    return NULL;
+}
+
+static int startable_work(void)
+{
+    for (struct dobj *d = listed_head; d; d = d->next_listed) {
+        if (!d->head || d->barrier || (is_serial(d) && d->running))
+            continue;
+        for (struct work *w = d->head; w; w = w->next)
+            if (!chain_suspended(w->queue))
+                return 1;
+    }
+    return 0;
+}
+
+/* A block of domain d has finished (or a dispatch_sync has given back its turn). */
+static void finished_locked(struct dobj *d, struct work *w)
+{
+    d->running--;
+    if (w && w->barrier && d->barrier)
+        d->barrier = 0;
+    if (d->head)
+        kick(d);
+}
+
+struct apply_state;
+static void group_leave_locked(struct dobj *g);
+
+/* Runs a piece of work on this thread, with domain d's turn held. */
+static void execute(struct work *w, struct dobj *d)
 {
     struct dobj *saved = current_queue;
+    struct held h = {d, held_top};
     current_queue = w->queue;
+    held_top = &h;
     void *pool = objc_autoreleasePoolPush();
     if (w->block) {
         struct block_header *b = w->block;
@@ -169,12 +401,19 @@ static void run_work(struct work *w)
         w->fn(w->ctx);
     }
     objc_autoreleasePoolPop(pool);
+    held_top = h.prev;
     current_queue = saved;
-    if (w->group) {
-        void dispatch_group_leave(struct dobj *);
-        dispatch_group_leave(w->group);
-        objc_release((id)w->group);
+    pthread_mutex_lock(&dq);
+    finished_locked(d, w);
+    if (w->sync) {
+        w->sync->done = 1;
+        pthread_cond_broadcast(&event_cond);
     }
+    if (w->group)
+        group_leave_locked(w->group);
+    pthread_mutex_unlock(&dq);
+    if (w->group)
+        objc_release((id)w->group);
     if (w->queue)
         objc_release((id)w->queue);
     free(w);
@@ -183,7 +422,9 @@ static void run_work(struct work *w)
 static struct work *make_work(struct dobj *q, void *block, void (*fn)(void *), void *ctx)
 {
     struct work *w = calloc(1, sizeof *w);
-    w->queue = q ? (struct dobj *)objc_retain((id)q) : NULL;
+    if (!q)
+        q = DEFAULT_Q;
+    w->queue = (struct dobj *)objc_retain((id)q);
     w->block = block ? _Block_copy(block) : NULL;
     w->fn = fn;
     w->ctx = ctx;
@@ -192,118 +433,203 @@ static struct work *make_work(struct dobj *q, void *block, void (*fn)(void *), v
 
 static void enqueue(struct work *w)
 {
-    w->next = NULL;
-    if (ready_tail)
-        ready_tail->next = w;
-    else
-        ready_head = w;
-    ready_tail = w;
+    pthread_mutex_lock(&dq);
+    enqueue_locked(w);
+    pthread_mutex_unlock(&dq);
 }
 
-static int suspended(struct dobj *q)
+/* ---- the worker threads -------------------------------------------------------- */
+
+#define IDLE_EXIT_NS (10 * 1000000000ull)
+
+static void *worker_main(void *unused)
 {
-    for (; q; q = q->target)
-        if (q->suspended > 0)
-            return 1;
-    return 0;
+    (void)unused;
+    pthread_setname_np(pthread_self(), "dispatch-worker");
+    pthread_mutex_lock(&dq);
+    for (;;) {
+        struct dobj *d;
+        struct work *w = take_any(&d);
+        if (w) {
+            progress++;
+            if (w->sync) {
+                /* a dispatch_sync's turn: its own thread runs the block */
+                w->sync->granted = 1;
+                pthread_cond_broadcast(&event_cond);
+                continue;
+            }
+            busy_workers++;
+            pthread_mutex_unlock(&dq);
+            execute(w, d);
+            pthread_mutex_lock(&dq);
+            busy_workers--;
+            continue;
+        }
+        idle_workers++;
+        int rc = wait_until(&work_cond, now_ns() + IDLE_EXIT_NS);
+        idle_workers--;
+        if (rc == ETIMEDOUT && !startable_work() && workers > 1)
+            break;
+    }
+    workers--;
+    pthread_mutex_unlock(&dq);
+    return NULL;
 }
 
-/* Moves dispatch_after's due work and fires due timers. */
-static void move_due(void)
+static void spawn_worker(void)
+{
+    pthread_t t;
+    pthread_attr_t a;
+    pthread_attr_init(&a);
+    pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&t, &a, worker_main, NULL) == 0)
+        workers++;
+    pthread_attr_destroy(&a);
+}
+
+/* Moves dispatch_after's due work to its queue. */
+static void move_due_locked(void)
 {
     uint64_t t = now_ns();
     while (later && later->when <= t) {
         struct work *w = later;
         later = w->next;
-        enqueue(w);
+        enqueue_locked(w);
     }
 }
 
-/* Runs one piece of ready work. Returns 0 when there was none. */
-static int run_one(void)
+/* The manager: fires dispatch_after's work when it is due, and adds a
+ * worker when work is waiting and every worker has been busy without
+ * starting anything new for a while (they may all be waiting for work
+ * that is still queued, which more threads let run). */
+#define STALL_NS (20 * 1000000ull)
+
+static void *manager_main(void *unused)
 {
-    move_due();
-    for (struct work **p = &ready_head, *prev = NULL; *p; prev = *p, p = &(*p)->next) {
-        struct work *w = *p;
-        if (suspended(w->queue))
-            continue;
-        *p = w->next;
-        if (ready_tail == w)
-            ready_tail = prev;
-        run_work(w);
-        return 1;
+    (void)unused;
+    pthread_setname_np(pthread_self(), "dispatch-manager");
+    pthread_mutex_lock(&dq);
+    unsigned long seen = progress;
+    for (;;) {
+        move_due_locked();
+        uint64_t until = later ? later->when : ~0ull;
+        if (idle_workers == 0 && startable_work()) {
+            if (progress == seen && workers < hard_max_workers)
+                spawn_worker();
+            seen = progress;
+            uint64_t check = now_ns() + STALL_NS;
+            if (check < until)
+                until = check;
+        } else {
+            seen = progress;
+        }
+        wait_until(&manager_cond, until);
     }
-    return 0;
+    return NULL;
 }
 
-/* For Foundation's run loop: run everything that is ready now. Returns how
- * many blocks ran. */
+static void start_manager(void)
+{
+    if (manager_started) {
+        pthread_cond_signal(&manager_cond);
+        return;
+    }
+    pthread_t t;
+    pthread_attr_t a;
+    pthread_attr_init(&a);
+    pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&t, &a, manager_main, NULL) == 0)
+        manager_started = 1;
+    pthread_attr_destroy(&a);
+}
+
+/* ---- the main queue -------------------------------------------------------------- */
+
+/* For Foundation's run loop, on the main thread: run what the main queue has
+ * ready now. Returns how many blocks ran. */
 int ferry_dispatch_drain(void)
 {
+    if (!on_main_thread())
+        return 0;
     int n = 0;
-    while (n < 10000 && run_one())
+    pthread_mutex_lock(&dq);
+    struct work *w;
+    while (n < 10000 && (w = take(MAIN_Q))) {
+        pthread_mutex_unlock(&dq);
+        execute(w, MAIN_Q);
         n++;
+        pthread_mutex_lock(&dq);
+    }
+    pthread_mutex_unlock(&dq);
     return n;
 }
 
-/* For Foundation's run loop: how long it may wait before dispatch has work,
- * in milliseconds; -1 for as long as it likes. */
+/* For Foundation's run loop: 0 when the main queue has work ready, else -1
+ * (work that arrives later wakes the run loop through main_wakeup). */
 int ferry_dispatch_timeout_ms(void)
 {
-    for (struct work *w = ready_head; w; w = w->next)
-        if (!suspended(w->queue))
-            return 0;
-    if (!later)
-        return -1;
-    uint64_t t = now_ns();
-    if (later->when <= t)
-        return 0;
-    uint64_t ms = (later->when - t + 999999) / 1000000;
-    return ms > 2000000000 ? 2000000000 : (int)ms;
+    pthread_mutex_lock(&dq);
+    int ready = 0;
+    for (struct work *w = MAIN_Q->head; w && !ready; w = w->next)
+        ready = !chain_suspended(w->queue);
+    pthread_mutex_unlock(&dq);
+    return ready ? 0 : -1;
 }
 
-/* Work that comes from outside dispatch: Foundation's network transfers
- * (NSURLSession and the like), which queue their completion handlers here
- * when a transfer ends. While one is in flight a wait also waits on the
- * network, so a program can wait on a semaphore that a completion handler
- * signals, as Mac command-line programs often do. */
-static int (*io_pending)(void);
-static void (*io_wait)(int timeout_ms);
-
-void ferry_dispatch_set_io(int (*pending)(void), void (*wait)(int timeout_ms))
+/* For Foundation's run loop: is dispatch doing anything, or due to (work
+ * queued or running anywhere, or dispatch_after's still to come)? Work that
+ * isn't the main queue's may still send some there. */
+int ferry_dispatch_busy(void)
 {
-    io_pending = pending;
-    io_wait = wait;
+    pthread_mutex_lock(&dq);
+    int busy = busy_workers > 0 || later || MAIN_Q->head || listed_head;
+    pthread_mutex_unlock(&dq);
+    return busy;
 }
 
-/* Waits for dispatch's next piece of work, running it. Returns 0 if there
- * is nothing that could ever become ready. */
-static int wait_one(uint64_t deadline)
+/* Foundation's main run loop gives the call that wakes it. */
+void ferry_dispatch_set_main_wakeup(void (*fn)(void))
 {
-    if (run_one())
-        return 1;
-    int ms = ferry_dispatch_timeout_ms();
-    if (io_pending && io_pending()) {
-        uint64_t t = now_ns();
-        int64_t limit = ms;
-        if (deadline != ~0ull) {
-            int64_t left = deadline > t ? (int64_t)((deadline - t + 999999) / 1000000) : 0;
-            if (limit < 0 || left < limit)
-                limit = left;
-        }
-        io_wait(limit > 2000000000 ? 2000000000 : (int)limit);
-        run_one();
-        return 1;
+    pthread_mutex_lock(&dq);
+    main_wakeup = fn;
+    pthread_mutex_unlock(&dq);
+}
+
+/* Nothing could ever end a wait of the main thread: no other thread of the
+ * program's is running, no worker is busy, nothing is queued or due. */
+static int nothing_can_happen(void)
+{
+    return busy_workers == 0 && !later && !startable_work() && ferry_pthread_live_threads() == 0;
+}
+
+/* For Foundation's waits that block a thread (its locks and NSOperation's
+ * waits): could anything still wake the main thread? And the way such a
+ * wait stops the program when nothing can. */
+int ferry_dispatch_main_can_wake(void)
+{
+    pthread_mutex_lock(&dq);
+    int r = !nothing_can_happen();
+    pthread_mutex_unlock(&dq);
+    return r;
+}
+void ferry_dispatch_stop(const char *why) { stop(why); }
+
+/* Waits on event_cond until the deadline. On the main thread a wait for
+ * ever looks now and then whether anything could still end it, and stops
+ * the program if not. Returns ETIMEDOUT when the deadline passed. */
+static int wait_event(uint64_t deadline, const char *what)
+{
+    if (deadline != ~0ull || !on_main_thread())
+        return wait_until(&event_cond, deadline);
+    if (nothing_can_happen()) {
+        char msg[300];
+        snprintf(msg, sizeof msg, "the program waits on the main thread for %s that nothing will %s%s", what,
+                 strstr(what, "group") ? "finish" : strstr(what, "semaphore") ? "signal" : "do",
+                 MAIN_Q->head ? " (what would is queued for the main queue, which only the main thread runs)" : "");
+        stop(msg);
     }
-    if (ms < 0)
-        return 0;
-    uint64_t t = now_ns();
-    uint64_t until = later->when < deadline ? later->when : deadline;
-    if (until > t) {
-        struct timespec ts = {(time_t)((until - t) / 1000000000ull), (long)((until - t) % 1000000000ull)};
-        nanosleep(&ts, NULL);
-    }
-    return run_one() || now_ns() < deadline;
+    wait_until(&event_cond, now_ns() + 250 * 1000000ull);
+    return 0;
 }
 
 /* ---- time --------------------------------------------------------------------- */
@@ -365,8 +691,15 @@ struct dobj *dispatch_get_global_queue(long priority, unsigned long flags)
     return &global_queues[i];
 }
 
-/* DISPATCH_QUEUE_CONCURRENT is the address of this variable. */
+/* DISPATCH_QUEUE_CONCURRENT is the address of this variable; the others
+ * are what dispatch_queue_attr_make_initially_inactive returns. */
 char ferry_dispatch_queue_attr_concurrent[16];
+static char attr_serial_inactive[16], attr_concurrent_inactive[16];
+
+static int attr_concurrent(void *attr)
+{
+    return attr == ferry_dispatch_queue_attr_concurrent || attr == attr_concurrent_inactive;
+}
 
 void *dispatch_queue_attr_make_with_qos_class(void *attr, int qos, int prio)
 {
@@ -374,7 +707,10 @@ void *dispatch_queue_attr_make_with_qos_class(void *attr, int qos, int prio)
     (void)prio;
     return attr;
 }
-void *dispatch_queue_attr_make_initially_inactive(void *attr) { return attr; }
+void *dispatch_queue_attr_make_initially_inactive(void *attr)
+{
+    return attr_concurrent(attr) ? attr_concurrent_inactive : attr_serial_inactive;
+}
 void *dispatch_queue_attr_make_with_autorelease_frequency(void *attr, unsigned long f)
 {
     (void)f;
@@ -383,99 +719,322 @@ void *dispatch_queue_attr_make_with_autorelease_frequency(void *attr, unsigned l
 
 struct dobj *dispatch_queue_create(const char *label, void *attr)
 {
-    (void)attr;
     struct dobj *q = new_object(K_QUEUE);
     if (label)
         snprintf(q->label, sizeof q->label, "%s", label);
+    q->concurrent = attr_concurrent(attr);
+    if (attr == attr_serial_inactive || attr == attr_concurrent_inactive) {
+        q->inactive = 1;
+        q->suspended = 1;
+    }
     return q;
 }
 struct dobj *dispatch_queue_create_with_target(const char *label, void *attr, struct dobj *target)
 {
     struct dobj *q = dispatch_queue_create(label, attr);
+    if (target && target->isa == &dispatch_class)
+        objc_retain((id)target);
     q->target = target;
     return q;
+}
+
+static struct dobj *current_or_default(void)
+{
+    if (current_queue)
+        return current_queue;
+    return on_main_thread() ? MAIN_Q : DEFAULT_Q;
 }
 
 const char *dispatch_queue_get_label(struct dobj *q)
 {
     if (!q)
-        q = current_queue ? current_queue : &ferry_dispatch_main_q;
-    return d_description_label(q);
+        q = current_or_default();
+    return q->label;
 }
 
-struct dobj *dispatch_get_current_queue(void) { return current_queue ? current_queue : &ferry_dispatch_main_q; }
+struct dobj *dispatch_get_current_queue(void) { return current_or_default(); }
 
 void dispatch_set_target_queue(struct dobj *o, struct dobj *target)
 {
-    if (o && o != target && o->isa == &dispatch_class)
-        o->target = target;
+    if (!o || o == target || o->isa != &dispatch_class)
+        return;
+    if (target && target->isa == &dispatch_class)
+        objc_retain((id)target);
+    pthread_mutex_lock(&dq);
+    struct dobj *old = o->target;
+    o->target = target;
+    pthread_mutex_unlock(&dq);
+    if (old && old->isa == &dispatch_class)
+        objc_release((id)old);
 }
 
 void dispatch_suspend(struct dobj *o)
 {
-    if (o)
-        o->suspended++;
+    if (!o || o->isa != &dispatch_class)
+        return;
+    pthread_mutex_lock(&dq);
+    o->suspended++;
+    pthread_mutex_unlock(&dq);
 }
 
-static void arm_timer(struct dobj *s);
+static void arm_timer_locked(struct dobj *s);
+
+/* After a resume, any queue's work may be free to run again. */
+static void kick_all_locked(void)
+{
+    for (int i = 0; i < 4; i++)
+        if (global_queues[i].head)
+            kick(&global_queues[i]);
+    if (MAIN_Q->head)
+        wake_main();
+    if (listed_head) {
+        if (idle_workers > 0)
+            pthread_cond_broadcast(&work_cond);
+        else if (workers < soft_max_workers)
+            spawn_worker();
+    }
+}
+
+static void resume_locked(struct dobj *o, struct dobj *domain)
+{
+    if (o->kind == K_SOURCE) {
+        if (o->suspended > 0 && --o->suspended == 0)
+            arm_timer_locked(o);
+        return;
+    }
+    if (o->suspended > 0 && --o->suspended == 0) {
+        if (domain->head)
+            kick(domain);
+        kick_all_locked();
+    }
+}
 
 void dispatch_resume(struct dobj *o)
 {
-    if (!o)
+    if (!o || o->isa != &dispatch_class)
         return;
-    if (o->kind == K_SOURCE) {
-        if (o->suspended > 0 && --o->suspended == 0)
-            arm_timer(o);
-        return;
-    }
-    if (o->suspended > 0)
-        o->suspended--;
+    pthread_mutex_lock(&dq);
+    resume_locked(o, o->kind == K_QUEUE ? domain_of(o) : DEFAULT_Q);
+    pthread_mutex_unlock(&dq);
 }
+
 void dispatch_activate(struct dobj *o)
 {
-    if (o && o->kind == K_SOURCE && o->suspended > 0)
-        dispatch_resume(o);
+    if (!o || o->isa != &dispatch_class)
+        return;
+    pthread_mutex_lock(&dq);
+    if (o->kind == K_SOURCE && o->suspended > 0 && !o->armed)
+        resume_locked(o, NULL);
+    else if (o->kind == K_QUEUE && o->inactive) {
+        o->inactive = 0;
+        resume_locked(o, domain_of(o));
+    }
+    pthread_mutex_unlock(&dq);
 }
 
 void dispatch_async(struct dobj *q, void *block) { enqueue(make_work(q, block, NULL, NULL)); }
 void dispatch_async_f(struct dobj *q, void *ctx, void (*fn)(void *)) { enqueue(make_work(q, NULL, fn, ctx)); }
-void dispatch_barrier_async(struct dobj *q, void *block) { dispatch_async(q, block); }
-void dispatch_barrier_async_f(struct dobj *q, void *ctx, void (*fn)(void *)) { dispatch_async_f(q, ctx, fn); }
+void dispatch_barrier_async(struct dobj *q, void *block)
+{
+    struct work *w = make_work(q, block, NULL, NULL);
+    w->barrier = 1;
+    enqueue(w);
+}
+void dispatch_barrier_async_f(struct dobj *q, void *ctx, void (*fn)(void *))
+{
+    struct work *w = make_work(q, NULL, fn, ctx);
+    w->barrier = 1;
+    enqueue(w);
+}
 
-/* There is only one thread, so a block sent with dispatch_sync runs at once. */
-void dispatch_sync_f(struct dobj *q, void *ctx, void (*fn)(void *))
+static int holds(struct dobj *d)
+{
+    if (d == MAIN_Q && on_main_thread())
+        return 1;
+    for (struct held *h = held_top; h; h = h->prev)
+        if (h->domain == d)
+            return 1;
+    return 0;
+}
+
+/* dispatch_sync: the block runs on this thread once the queue gives it a
+ * turn (at once when nothing is ahead of it); the main queue's on the main
+ * thread. */
+static void sync_run(struct dobj *q, void *block, void (*fn)(void *), void *ctx, int barrier)
+{
+    if (!q)
+        q = DEFAULT_Q;
+    pthread_mutex_lock(&dq);
+    struct dobj *d = domain_of(q);
+    if (holds(d)) {
+        pthread_mutex_unlock(&dq);
+        if (d == MAIN_Q)
+            stop("dispatch_sync onto the main queue from the main thread would never return "
+                 "(a Mac stops the program there too)");
+        char msg[200];
+        snprintf(msg, sizeof msg,
+                 "dispatch_sync onto queue \"%s\" from a block that queue is running would never return "
+                 "(a Mac stops the program there too)",
+                 q->label);
+        stop(msg);
+    }
+    struct syncwait sw = {0, 0};
+    if (d == MAIN_Q) {
+        /* the main thread runs it, among the main queue's other work */
+        struct work *w = make_work(q, block, fn, ctx);
+        w->sync = &sw;
+        append(d, w);
+        wake_main();
+        while (!sw.done)
+            wait_event(~0ull, "a dispatch_sync onto the main queue");
+        pthread_mutex_unlock(&dq);
+        return;
+    }
+    int bar = barrier && !is_serial(d) && !d->global;
+    int free_now = !d->head && !d->barrier && !chain_suspended(q) &&
+                   (d->global || (is_serial(d) ? !d->running : !(bar && d->running)));
+    if (free_now) {
+        d->running++;
+        if (bar)
+            d->barrier = 1;
+    } else {
+        struct work *w = make_work(q, NULL, NULL, NULL);
+        w->barrier = barrier;
+        w->sync = &sw;
+        append(d, w);
+        kick(d);
+        while (!sw.granted)
+            wait_event(~0ull, "a dispatch_sync's turn");
+        objc_release((id)w->queue);
+        free(w);
+    }
+    pthread_mutex_unlock(&dq);
+
+    struct dobj *saved = current_queue;
+    struct held h = {d, held_top};
+    current_queue = q;
+    held_top = &h;
+    if (block) {
+        struct block_header *b = block;
+        ((void (*)(void *))b->invoke)(b);
+    } else {
+        fn(ctx);
+    }
+    held_top = h.prev;
+    current_queue = saved;
+
+    pthread_mutex_lock(&dq);
+    d->running--;
+    if (bar)
+        d->barrier = 0;
+    if (d->head)
+        kick(d);
+    pthread_mutex_unlock(&dq);
+}
+
+void dispatch_sync_f(struct dobj *q, void *ctx, void (*fn)(void *)) { sync_run(q, NULL, fn, ctx, 0); }
+void dispatch_sync(struct dobj *q, void *block) { sync_run(q, block, NULL, NULL, 0); }
+void dispatch_barrier_sync(struct dobj *q, void *block) { sync_run(q, block, NULL, NULL, 1); }
+void dispatch_barrier_sync_f(struct dobj *q, void *ctx, void (*fn)(void *)) { sync_run(q, NULL, fn, ctx, 1); }
+
+/* dispatch_apply: the iterations are shared out between the calling thread
+ * and workers when the queue is concurrent; a serial queue runs them one
+ * after another on the calling thread. */
+struct apply_state {
+    size_t n, next, done;
+    int refs;
+    void *block, *ctx;
+    void (*fn)(void *, size_t);
+    struct dobj *queue;
+};
+
+static void apply_unref(struct apply_state *a)
+{
+    if (__atomic_sub_fetch(&a->refs, 1, __ATOMIC_ACQ_REL) == 0)
+        free(a);
+}
+
+static void apply_iterate(struct apply_state *a)
 {
     struct dobj *saved = current_queue;
-    current_queue = q;
-    fn(ctx);
+    current_queue = a->queue;
+    for (;;) {
+        size_t i = __atomic_fetch_add(&a->next, 1, __ATOMIC_RELAXED);
+        if (i >= a->n)
+            break;
+        if (a->block) {
+            struct block_header *b = a->block;
+            ((void (*)(void *, size_t))b->invoke)(b, i);
+        } else {
+            a->fn(a->ctx, i);
+        }
+        if (__atomic_add_fetch(&a->done, 1, __ATOMIC_ACQ_REL) == a->n) {
+            pthread_mutex_lock(&dq);
+            pthread_cond_broadcast(&event_cond);
+            pthread_mutex_unlock(&dq);
+        }
+    }
     current_queue = saved;
 }
-void dispatch_sync(struct dobj *q, void *block)
-{
-    struct dobj *saved = current_queue;
-    current_queue = q;
-    struct block_header *b = block;
-    ((void (*)(void *))b->invoke)(b);
-    current_queue = saved;
-}
-void dispatch_barrier_sync(struct dobj *q, void *block) { dispatch_sync(q, block); }
-void dispatch_barrier_sync_f(struct dobj *q, void *ctx, void (*fn)(void *)) { dispatch_sync_f(q, ctx, fn); }
 
-void dispatch_apply(size_t n, struct dobj *q, void *block)
+static void apply_helper(void *p)
 {
-    (void)q;
-    struct block_header *b = block;
-    for (size_t i = 0; i < n; i++)
-        ((void (*)(void *, size_t))b->invoke)(b, i);
+    apply_iterate(p);
+    apply_unref(p);
 }
+
+static void apply_run(size_t n, struct dobj *q, void *block, void *ctx, void (*fn)(void *, size_t))
+{
+    if (!n)
+        return;
+    if (!q)
+        q = DEFAULT_Q;
+    pthread_mutex_lock(&dq);
+    struct dobj *d = domain_of(q);
+    int parallel = !is_serial(d) && n > 1;
+    pthread_mutex_unlock(&dq);
+    if (!parallel) {
+        struct dobj *saved = current_queue;
+        current_queue = q;
+        for (size_t i = 0; i < n; i++) {
+            if (block) {
+                struct block_header *b = block;
+                ((void (*)(void *, size_t))b->invoke)(b, i);
+            } else {
+                fn(ctx, i);
+            }
+        }
+        current_queue = saved;
+        return;
+    }
+    struct apply_state *a = calloc(1, sizeof *a);
+    a->n = n;
+    a->block = block;
+    a->ctx = ctx;
+    a->fn = fn;
+    a->queue = q;
+    long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    size_t helpers = (size_t)(cpus > 1 ? cpus - 1 : 1);
+    if (helpers > n - 1)
+        helpers = n - 1;
+    a->refs = (int)helpers + 1;
+    for (size_t i = 0; i < helpers; i++)
+        dispatch_async_f(q, a, apply_helper);
+    apply_iterate(a);
+    pthread_mutex_lock(&dq);
+    while (__atomic_load_n(&a->done, __ATOMIC_ACQUIRE) < n)
+        wait_until(&event_cond, ~0ull);
+    pthread_mutex_unlock(&dq);
+    apply_unref(a);
+}
+
+void dispatch_apply(size_t n, struct dobj *q, void *block) { apply_run(n, q, block, NULL, NULL); }
 void dispatch_apply_f(size_t n, struct dobj *q, void *ctx, void (*fn)(void *, size_t))
 {
-    (void)q;
-    for (size_t i = 0; i < n; i++)
-        fn(ctx, i);
+    apply_run(n, q, NULL, ctx, fn);
 }
 
-static void add_later(struct work *w, uint64_t when)
+static void add_later_locked(struct work *w, uint64_t when)
 {
     w->when = deadline_of(when);
     struct work **p = &later;
@@ -483,19 +1042,26 @@ static void add_later(struct work *w, uint64_t when)
         p = &(*p)->next;
     w->next = *p;
     *p = w;
+    start_manager();
 }
 
 void dispatch_after(uint64_t when, struct dobj *q, void *block)
 {
     if (when == TIME_FOREVER)
         return;
-    add_later(make_work(q, block, NULL, NULL), when);
+    struct work *w = make_work(q, block, NULL, NULL);
+    pthread_mutex_lock(&dq);
+    add_later_locked(w, when);
+    pthread_mutex_unlock(&dq);
 }
 void dispatch_after_f(uint64_t when, struct dobj *q, void *ctx, void (*fn)(void *))
 {
     if (when == TIME_FOREVER)
         return;
-    add_later(make_work(q, NULL, fn, ctx), when);
+    struct work *w = make_work(q, NULL, fn, ctx);
+    pthread_mutex_lock(&dq);
+    add_later_locked(w, when);
+    pthread_mutex_unlock(&dq);
 }
 
 void dispatch_queue_set_specific(struct dobj *q, const void *key, void *value, void (*destructor)(void *))
@@ -503,67 +1069,100 @@ void dispatch_queue_set_specific(struct dobj *q, const void *key, void *value, v
     (void)destructor;
     if (!q || !key)
         return;
-    for (struct specific *s = q->specifics; s; s = s->next)
-        if (s->key == key) {
-            s->value = value;
-            return;
-        }
-    struct specific *s = calloc(1, sizeof *s);
-    s->key = key;
+    pthread_mutex_lock(&dq);
+    struct specific *s;
+    for (s = q->specifics; s && s->key != key; s = s->next)
+        ;
+    if (!s) {
+        s = calloc(1, sizeof *s);
+        s->key = key;
+        s->next = q->specifics;
+        q->specifics = s;
+    }
     s->value = value;
-    s->next = q->specifics;
-    q->specifics = s;
+    pthread_mutex_unlock(&dq);
 }
 void *dispatch_queue_get_specific(struct dobj *q, const void *key)
 {
-    for (; q; q = q->target)
+    void *value = NULL;
+    pthread_mutex_lock(&dq);
+    for (; q && !value; q = q->target)
         for (struct specific *s = q->specifics; s; s = s->next)
-            if (s->key == key)
-                return s->value;
-    return NULL;
+            if (s->key == key) {
+                value = s->value;
+                break;
+            }
+    pthread_mutex_unlock(&dq);
+    return value;
 }
-void *dispatch_get_specific(const void *key)
-{
-    return dispatch_queue_get_specific(current_queue ? current_queue : &ferry_dispatch_main_q, key);
-}
+void *dispatch_get_specific(const void *key) { return dispatch_queue_get_specific(current_or_default(), key); }
 
-/* Runs the main queue (and every other queue) for ever. */
+/* The main thread runs the main queue's work for ever. */
 void dispatch_main(void)
 {
-    for (;;)
-        if (!wait_one(TIME_FOREVER))
-            pause();
+    if (!on_main_thread())
+        stop("dispatch_main was called on a thread other than the main thread");
+    pthread_mutex_lock(&dq);
+    for (;;) {
+        struct work *w = take(MAIN_Q);
+        if (w) {
+            pthread_mutex_unlock(&dq);
+            execute(w, MAIN_Q);
+            pthread_mutex_lock(&dq);
+            continue;
+        }
+        wait_until(&event_cond, ~0ull);
+    }
 }
 
 /* dispatch_once: the predicate becomes ~0 once the block has run, which is
- * what the inline version in Apple's header checks for. */
-void dispatch_once(long *predicate, void *block)
+ * what the inline version in Apple's header checks for. While it runs, the
+ * predicate holds an address that is the running thread's own, so other
+ * threads wait and the same thread calling again is caught. */
+static __thread char once_mark;
+
+static void once_run(long *predicate, void *block, void *ctx, void (*fn)(void *))
 {
-    if (*predicate == ~0l)
+    long mine = (long)(uintptr_t)&once_mark;
+    long seen = __atomic_load_n(predicate, __ATOMIC_ACQUIRE);
+    if (seen == ~0l)
         return;
-    if (*predicate == 1)
+    if (seen == 0 && __atomic_compare_exchange_n(predicate, &seen, mine, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        if (block) {
+            struct block_header *b = block;
+            ((void (*)(void *))b->invoke)(b);
+        } else {
+            fn(ctx);
+        }
+        pthread_mutex_lock(&dq);
+        __atomic_store_n(predicate, ~0l, __ATOMIC_RELEASE);
+        pthread_cond_broadcast(&event_cond);
+        pthread_mutex_unlock(&dq);
+        return;
+    }
+    if (seen == mine)
         stop("dispatch_once was called again from inside its own block");
-    *predicate = 1;
-    struct block_header *b = block;
-    ((void (*)(void *))b->invoke)(b);
-    *predicate = ~0l;
+    pthread_mutex_lock(&dq);
+    while (__atomic_load_n(predicate, __ATOMIC_ACQUIRE) != ~0l)
+        wait_event(~0ull, "a dispatch_once block running on another thread");
+    pthread_mutex_unlock(&dq);
 }
-void dispatch_once_f(long *predicate, void *ctx, void (*fn)(void *))
-{
-    if (*predicate == ~0l)
-        return;
-    *predicate = 1;
-    fn(ctx);
-    *predicate = ~0l;
-}
+
+void dispatch_once(long *predicate, void *block) { once_run(predicate, block, NULL, NULL); }
+void dispatch_once_f(long *predicate, void *ctx, void (*fn)(void *)) { once_run(predicate, NULL, ctx, fn); }
 
 /* ---- groups -------------------------------------------------------------------- */
 
 struct dobj *dispatch_group_create(void) { return new_object(K_GROUP); }
 
-void dispatch_group_enter(struct dobj *g) { g->pending++; }
+void dispatch_group_enter(struct dobj *g)
+{
+    pthread_mutex_lock(&dq);
+    g->pending++;
+    pthread_mutex_unlock(&dq);
+}
 
-void dispatch_group_leave(struct dobj *g)
+static void group_leave_locked(struct dobj *g)
 {
     if (--g->pending > 0)
         return;
@@ -572,36 +1171,55 @@ void dispatch_group_leave(struct dobj *g)
     g->notify = NULL;
     while (n) {
         struct work *next = n->next;
-        enqueue(n);
+        enqueue_locked(n);
         n = next;
     }
+    pthread_cond_broadcast(&event_cond);
 }
 
+void dispatch_group_leave(struct dobj *g)
+{
+    pthread_mutex_lock(&dq);
+    group_leave_locked(g);
+    pthread_mutex_unlock(&dq);
+}
+
+static void group_async(struct dobj *g, struct work *w)
+{
+    w->group = (struct dobj *)objc_retain((id)g);
+    pthread_mutex_lock(&dq);
+    g->pending++;
+    enqueue_locked(w);
+    pthread_mutex_unlock(&dq);
+}
 void dispatch_group_async(struct dobj *g, struct dobj *q, void *block)
 {
-    struct work *w = make_work(q, block, NULL, NULL);
-    w->group = (struct dobj *)objc_retain((id)g);
-    g->pending++;
-    enqueue(w);
+    group_async(g, make_work(q, block, NULL, NULL));
 }
 void dispatch_group_async_f(struct dobj *g, struct dobj *q, void *ctx, void (*fn)(void *))
 {
-    struct work *w = make_work(q, NULL, fn, ctx);
-    w->group = (struct dobj *)objc_retain((id)g);
-    g->pending++;
-    enqueue(w);
+    group_async(g, make_work(q, NULL, fn, ctx));
 }
 
 static void add_notify(struct dobj *g, struct work *w)
 {
+    pthread_mutex_lock(&dq);
     if (g->pending <= 0) {
-        enqueue(w);
-        return;
+        enqueue_locked(w);
+    } else {
+        /* run in the order they were asked for */
+        w->next = NULL;
+        struct work **p = &g->notify;
+        while (*p)
+            p = &(*p)->next;
+        *p = w;
     }
-    w->next = g->notify;
-    g->notify = w;
+    pthread_mutex_unlock(&dq);
 }
-void dispatch_group_notify(struct dobj *g, struct dobj *q, void *block) { add_notify(g, make_work(q, block, NULL, NULL)); }
+void dispatch_group_notify(struct dobj *g, struct dobj *q, void *block)
+{
+    add_notify(g, make_work(q, block, NULL, NULL));
+}
 void dispatch_group_notify_f(struct dobj *g, struct dobj *q, void *ctx, void (*fn)(void *))
 {
     add_notify(g, make_work(q, NULL, fn, ctx));
@@ -610,17 +1228,16 @@ void dispatch_group_notify_f(struct dobj *g, struct dobj *q, void *ctx, void (*f
 long dispatch_group_wait(struct dobj *g, uint64_t timeout)
 {
     uint64_t deadline = deadline_of(timeout);
+    long result = 0;
+    pthread_mutex_lock(&dq);
     while (g->pending > 0) {
-        if (!wait_one(deadline)) {
-            if (timeout == TIME_FOREVER)
-                stop("the program waits for a dispatch group that nothing will finish "
-                     "(Ferry runs Mac programs on one thread)");
-            return 1;
+        if (timeout == TIME_NOW || wait_event(deadline, "a dispatch group") == ETIMEDOUT) {
+            result = g->pending > 0;
+            break;
         }
-        if (now_ns() >= deadline && g->pending > 0)
-            return 1;
     }
-    return 0;
+    pthread_mutex_unlock(&dq);
+    return result;
 }
 
 /* ---- semaphores ------------------------------------------------------------- */
@@ -634,29 +1251,42 @@ struct dobj *dispatch_semaphore_create(long value)
     return s;
 }
 
+/* Returns non-zero when it woke a waiting thread, as on a Mac. */
 long dispatch_semaphore_signal(struct dobj *s)
 {
-    s->value++;
-    return 0;
+    long woke = 0;
+    pthread_mutex_lock(&dq);
+    if (++s->value <= 0) {
+        s->wakeups++;
+        woke = 1;
+        pthread_cond_broadcast(&event_cond);
+    }
+    pthread_mutex_unlock(&dq);
+    return woke;
 }
 
 long dispatch_semaphore_wait(struct dobj *s, uint64_t timeout)
 {
     uint64_t deadline = deadline_of(timeout);
-    while (s->value <= 0) {
-        if (timeout == TIME_NOW)
-            return 1;
-        if (!wait_one(deadline)) {
-            if (timeout == TIME_FOREVER)
-                stop("the program waits on a dispatch semaphore that nothing will signal "
-                     "(Ferry runs Mac programs on one thread)");
+    pthread_mutex_lock(&dq);
+    if (--s->value >= 0) {
+        pthread_mutex_unlock(&dq);
+        return 0;
+    }
+    for (;;) {
+        if (s->wakeups > 0) {
+            s->wakeups--;
+            pthread_mutex_unlock(&dq);
+            return 0;
+        }
+        if (timeout == TIME_NOW || wait_event(deadline, "a dispatch semaphore") == ETIMEDOUT) {
+            if (s->wakeups > 0)
+                continue;
+            s->value++; /* no longer waiting */
+            pthread_mutex_unlock(&dq);
             return 1;
         }
-        if (now_ns() >= deadline && s->value <= 0)
-            return 1;
     }
-    s->value--;
-    return 0;
 }
 
 /* ---- sources ---------------------------------------------------------------- */
@@ -689,6 +1319,8 @@ static const struct {
     {"memorypressure", ferry_dispatch_source_type_memorypressure, S_OTHER},
 };
 
+/* A source's handler runs on its queue, but never twice at once: it runs
+ * on a serial queue of the source's own that targets that queue. */
 struct dobj *dispatch_source_create(const void *type, uintptr_t handle, unsigned long mask, struct dobj *q)
 {
     (void)handle;
@@ -702,129 +1334,158 @@ struct dobj *dispatch_source_create(const void *type, uintptr_t handle, unsigned
                 fprintf(stderr, "ferry: dispatch sources of type %s aren't supported yet; this one won't fire\n",
                         source_types[i].name);
         }
-    s->target = q ? q : &global_queues[1];
+    s->target = dispatch_queue_create_with_target("source", NULL, q ? q : DEFAULT_Q);
     s->suspended = 1; /* a new source starts suspended */
     return s;
+}
+
+static void call_handler(struct dobj *s, unsigned long data)
+{
+    s->fired_data = data;
+    if (s->handler) {
+        struct block_header *b = s->handler;
+        ((void (*)(void *))b->invoke)(b);
+    }
 }
 
 static void fire_source(void *ctx)
 {
     struct dobj *s = ctx;
+    pthread_mutex_lock(&dq);
     if (s->cancelled || s->suspended > 0) {
         s->armed = 0;
+        pthread_mutex_unlock(&dq);
         objc_release((id)s);
         return;
     }
-    if (s->source_type == S_TIMER)
-        s->data = 1;
-    if (s->handler) {
-        struct block_header *b = s->handler;
-        struct dobj *saved = current_queue;
-        current_queue = s->target;
-        ((void (*)(void *))b->invoke)(b);
-        current_queue = saved;
-    }
-    s->data = 0;
-    if (s->source_type == S_TIMER && s->interval && s->interval != TIME_FOREVER && !s->cancelled) {
+    pthread_mutex_unlock(&dq);
+    call_handler(s, 1);
+    pthread_mutex_lock(&dq);
+    if (s->interval && s->interval != TIME_FOREVER && !s->cancelled && s->armed) {
         s->start += s->interval;
         uint64_t t = now_ns();
         if (s->start < t) /* missed firings are merged into one, as on a Mac */
             s->start = t;
-        struct work *w = make_work(s->target, NULL, fire_source, s);
-        add_later(w, s->start);
+        add_later_locked(make_work(s->target, NULL, fire_source, s), s->start);
+        pthread_mutex_unlock(&dq);
         return; /* the reference stays with the next firing */
     }
     s->armed = 0;
+    pthread_mutex_unlock(&dq);
     objc_release((id)s);
 }
 
-static void arm_timer(struct dobj *s)
+static void arm_timer_locked(struct dobj *s)
 {
     if (s->source_type != S_TIMER || s->armed || s->cancelled || s->start == TIME_FOREVER || !s->start)
         return;
     s->armed = 1;
     objc_retain((id)s);
-    add_later(make_work(s->target, NULL, fire_source, s), s->start);
+    add_later_locked(make_work(s->target, NULL, fire_source, s), s->start);
 }
 
 void dispatch_source_set_timer(struct dobj *s, uint64_t start, uint64_t interval, uint64_t leeway)
 {
     (void)leeway;
+    struct work *gone = NULL;
+    pthread_mutex_lock(&dq);
     s->start = deadline_of(start);
     s->interval = interval;
     if (s->armed) {
         /* Take the old firing out and put a new one in. */
         for (struct work **p = &later; *p; p = &(*p)->next)
             if ((*p)->fn == fire_source && (*p)->ctx == s) {
-                struct work *w = *p;
-                *p = w->next;
-                objc_release((id)w->queue);
-                free(w);
+                gone = *p;
+                *p = gone->next;
+                s->armed = 0;
                 break;
             }
-        s->armed = 0;
-        objc_release((id)s);
     }
     if (s->suspended <= 0)
-        arm_timer(s);
+        arm_timer_locked(s);
+    pthread_mutex_unlock(&dq);
+    if (gone) {
+        objc_release((id)gone->queue);
+        free(gone);
+        objc_release((id)s);
+    }
 }
 
 void dispatch_source_set_event_handler(struct dobj *s, void *block)
 {
-    if (s->handler)
-        _Block_release(s->handler);
-    s->handler = block ? _Block_copy(block) : NULL;
+    void *copy = block ? _Block_copy(block) : NULL;
+    pthread_mutex_lock(&dq);
+    void *old = s->handler;
+    s->handler = copy;
+    pthread_mutex_unlock(&dq);
+    if (old)
+        _Block_release(old);
 }
 void dispatch_source_set_cancel_handler(struct dobj *s, void *block)
 {
-    if (s->cancel_handler)
-        _Block_release(s->cancel_handler);
-    s->cancel_handler = block ? _Block_copy(block) : NULL;
+    void *copy = block ? _Block_copy(block) : NULL;
+    pthread_mutex_lock(&dq);
+    void *old = s->cancel_handler;
+    s->cancel_handler = copy;
+    pthread_mutex_unlock(&dq);
+    if (old)
+        _Block_release(old);
 }
 
 void dispatch_source_cancel(struct dobj *s)
 {
-    if (s->cancelled)
+    pthread_mutex_lock(&dq);
+    if (s->cancelled) {
+        pthread_mutex_unlock(&dq);
         return;
-    s->cancelled = 1;
-    if (s->cancel_handler) {
-        dispatch_async(s->target, s->cancel_handler);
-        _Block_release(s->cancel_handler);
-        s->cancel_handler = NULL;
+    }
+    __atomic_store_n(&s->cancelled, 1, __ATOMIC_RELEASE);
+    void *handler = s->cancel_handler;
+    s->cancel_handler = NULL;
+    pthread_mutex_unlock(&dq);
+    if (handler) {
+        dispatch_async(s->target, handler);
+        _Block_release(handler);
     }
 }
-long dispatch_source_testcancel(struct dobj *s) { return s->cancelled; }
-unsigned long dispatch_source_get_data(struct dobj *s) { return s->data; }
+long dispatch_source_testcancel(struct dobj *s) { return __atomic_load_n(&s->cancelled, __ATOMIC_ACQUIRE); }
+unsigned long dispatch_source_get_data(struct dobj *s) { return s->fired_data; }
 unsigned long dispatch_source_get_mask(struct dobj *s) { (void)s; return 0; }
 uintptr_t dispatch_source_get_handle(struct dobj *s) { (void)s; return 0; }
 
 static void fire_data(void *ctx)
 {
     struct dobj *s = ctx;
-    if (!s->cancelled && s->handler && s->data) {
-        struct block_header *b = s->handler;
-        ((void (*)(void *))b->invoke)(b);
-    }
+    pthread_mutex_lock(&dq);
+    unsigned long data = s->data;
     s->data = 0;
     s->armed = 0;
+    int run = !s->cancelled && data;
+    pthread_mutex_unlock(&dq);
+    if (run)
+        call_handler(s, data);
     objc_release((id)s);
 }
 
 void dispatch_source_merge_data(struct dobj *s, unsigned long value)
 {
+    pthread_mutex_lock(&dq);
     if (s->source_type == S_DATA_ADD)
         s->data += value;
     else if (s->source_type == S_DATA_OR)
         s->data |= value;
     else if (s->source_type == S_DATA_REPLACE)
         s->data = value;
-    else
+    else {
+        pthread_mutex_unlock(&dq);
         return;
+    }
     if (!s->armed) {
         s->armed = 1;
         objc_retain((id)s);
-        enqueue(make_work(s->target, NULL, fire_data, s));
+        enqueue_locked(make_work(s->target, NULL, fire_data, s));
     }
+    pthread_mutex_unlock(&dq);
 }
 
 /* ---- setup ------------------------------------------------------------------ */
@@ -845,8 +1506,20 @@ void ferry_dispatch_init(void)
     snprintf(ferry_dispatch_main_q.label, sizeof ferry_dispatch_main_q.label, "com.apple.main-thread");
     for (int i = 0; i < 4; i++) {
         global_queues[i].isa = &static_class;
+        global_queues[i].global = 1;
+        global_queues[i].concurrent = 1;
         snprintf(global_queues[i].label, sizeof global_queues[i].label, "%s", names[i]);
     }
+    main_thread = pthread_self();
+    pthread_condattr_t a;
+    pthread_condattr_init(&a);
+    pthread_condattr_setclock(&a, CLOCK_MONOTONIC);
+    pthread_cond_init(&work_cond, &a);
+    pthread_cond_init(&manager_cond, &a);
+    pthread_cond_init(&event_cond, &a);
+    pthread_condattr_destroy(&a);
+    long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    soft_max_workers = cpus > 4 ? (int)cpus : 4;
 }
 
 /* What libSystem exports for dispatch. */
@@ -883,6 +1556,7 @@ const struct ferry_symbol ferry_dispatch_symbols[] = {
     F(dispatch_source_set_timer), F(dispatch_source_set_event_handler), F(dispatch_source_set_cancel_handler),
     F(dispatch_source_cancel), F(dispatch_source_testcancel), F(dispatch_source_get_data),
     F(dispatch_source_get_mask), F(dispatch_source_get_handle), F(dispatch_source_merge_data),
-    F(ferry_dispatch_drain), F(ferry_dispatch_timeout_ms), F(ferry_dispatch_set_io),
+    F(ferry_dispatch_drain), F(ferry_dispatch_timeout_ms), F(ferry_dispatch_busy),
+    F(ferry_dispatch_set_main_wakeup), F(ferry_dispatch_main_can_wake), F(ferry_dispatch_stop),
     {NULL, NULL},
 };

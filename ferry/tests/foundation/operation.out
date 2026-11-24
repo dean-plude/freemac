@@ -3,9 +3,9 @@ main queue: NSOperationQueue Main Queue, max 1
 a ready 0, b ready 1, priority of 3: 4
 suspended, 4 operations, nothing ran: 0
 c runs on the test queue: 1
-ran: c d d2 b a a done
+ran: c d d2 b a
 a finished 1 executing 0, queue has 0
-then: c d d2 b a a done
+a's completion block ran off the main thread: 1
 adding a finished operation: NSInvalidArgumentException
 f cancelled 1, ready 1
 ran: e; f finished 1
@@ -23,8 +23,9 @@ started twice: NSInvalidArgumentException
 results: HEY 42
 void result: NSInvocationOperationVoidResultException
 NSLock: try while locked 0, after unlock 1, before a date while locked 0
-NSLock: taken after the other unlocked it
-NSRecursiveLock: twice, try 1
+NSLock: try while another thread holds it 0
+NSLock: taken after the other unlocked it, other still inside 0
+NSRecursiveLock: twice, try 1, another thread's try 1
 NSCondition: signalled, ready 1
 NSCondition: a wait with no signal times out: 0
 NSConditionLock: condition 1, try when 2: 0, got it when 2, condition 2

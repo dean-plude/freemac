@@ -102,10 +102,28 @@ static int has_header(id obj)
 
 /* ---- retain and release ----------------------------------------------------- */
 
+/* extra_rc counts the references beyond the first. When the last one goes,
+ * the count is marked (its top bit) in the same atomic step, before dealloc
+ * is sent, so that a weak reference being read on another thread at that
+ * moment can tell the object is going and doesn't take it back. */
+#define RC_GONE ((uintptr_t)1 << 63)
+
 static id rr_retain(id obj)
 {
     __atomic_fetch_add(&OBJ_HEADER(obj)->extra_rc, 1, __ATOMIC_RELAXED);
     return obj;
+}
+
+/* a retain that fails once the last release has begun (for weak references) */
+static int rr_try_retain(id obj)
+{
+    struct fobj_header *h = OBJ_HEADER(obj);
+    uintptr_t rc = __atomic_load_n(&h->extra_rc, __ATOMIC_RELAXED);
+    do {
+        if (rc & RC_GONE)
+            return 0;
+    } while (!__atomic_compare_exchange_n(&h->extra_rc, &rc, rc + 1, 1, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+    return 1;
 }
 
 static void rr_release(id obj)
@@ -114,11 +132,16 @@ static void rr_release(id obj)
     uintptr_t rc = __atomic_load_n(&h->extra_rc, __ATOMIC_RELAXED);
     for (;;) {
         if (rc == 0) {
+            if (!__atomic_compare_exchange_n(&h->extra_rc, &rc, RC_GONE, 1, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED))
+                continue;
             uint32_t old = __atomic_fetch_or(&h->flags, OBJ_DEALLOCATING, __ATOMIC_ACQ_REL);
             if (!(old & OBJ_DEALLOCATING))
                 SEND0(void, obj, SEL_dealloc);
             return;
         }
+        /* retains and releases while dealloc runs balance out; the last one does nothing more */
+        if (rc == RC_GONE)
+            return;
         if (__atomic_compare_exchange_n(&h->extra_rc, &rc, rc - 1, 1, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
             return;
     }
@@ -126,18 +149,40 @@ static void rr_release(id obj)
 
 static uintptr_t rr_count(id obj)
 {
-    return __atomic_load_n(&OBJ_HEADER(obj)->extra_rc, __ATOMIC_RELAXED) + 1;
+    return (__atomic_load_n(&OBJ_HEADER(obj)->extra_rc, __ATOMIC_RELAXED) & ~RC_GONE) + 1;
 }
 
 /* Autorelease pools: one stack of objects per thread; NULL marks where each
  * pool begins (nil is never autoreleased). The token a push returns is the
- * marker's index plus one. */
+ * marker's index plus one. What is left on a thread's stack when the thread
+ * ends is released then, as a Mac does. */
 static __thread id *pool;
 static __thread size_t pool_len, pool_cap;
+static pthread_key_t pool_key;
+static pthread_once_t pool_key_once = PTHREAD_ONCE_INIT;
+
+static void pool_drain_at_exit(void *unused)
+{
+    (void)unused;
+    while (pool_len) {
+        id obj = pool[--pool_len];
+        if (obj)
+            objc_release(obj);
+    }
+    free(pool);
+    pool = NULL;
+    pool_cap = 0;
+}
+
+static void pool_key_make(void) { pthread_key_create(&pool_key, pool_drain_at_exit); }
 
 static void pool_add(id obj)
 {
     if (pool_len == pool_cap) {
+        if (!pool) {
+            pthread_once(&pool_key_once, pool_key_make);
+            pthread_setspecific(pool_key, (void *)1);
+        }
         pool_cap = pool_cap ? pool_cap * 2 : 256;
         pool = realloc(pool, pool_cap * sizeof *pool);
     }
@@ -305,7 +350,8 @@ static int is_deallocating(id obj)
     if (!has_header(obj))
         return 0;
     if (ferry_objc_has_default_rr(obj->isa))
-        return !!(__atomic_load_n(&OBJ_HEADER(obj)->flags, __ATOMIC_ACQUIRE) & OBJ_DEALLOCATING);
+        return (__atomic_load_n(&OBJ_HEADER(obj)->extra_rc, __ATOMIC_ACQUIRE) & RC_GONE) ||
+               (__atomic_load_n(&OBJ_HEADER(obj)->flags, __ATOMIC_ACQUIRE) & OBJ_DEALLOCATING);
     /* a class with its own retain/release (perhaps static objects) */
     return SEND0(BOOL, obj, SEL_isDeallocating);
 }
@@ -370,9 +416,14 @@ id objc_loadWeakRetained(id *location)
 {
     LOCK();
     id obj = *location;
-    if (obj && is_deallocating(obj))
-        obj = nil;
-    obj = objc_retain(obj);
+    if (obj && has_header(obj) && ferry_objc_has_default_rr(obj->isa)) {
+        if (!rr_try_retain(obj))
+            obj = nil;
+    } else {
+        if (obj && is_deallocating(obj))
+            obj = nil;
+        obj = objc_retain(obj);
+    }
     UNLOCK();
     return obj;
 }

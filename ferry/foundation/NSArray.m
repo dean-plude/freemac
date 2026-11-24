@@ -636,8 +636,10 @@ __attribute__((constructor)) static void empty_array_init(void) { __NSArray0__ =
 + (NSNull *)null
 {
     static NSNull *shared;
-    if (!shared)
-        shared = [[NSNull alloc] init];
+    static dispatch_once_t shared_once;
+    dispatch_once(&shared_once, ^{
+      shared = [[NSNull alloc] init];
+    });
     return shared;
 }
 - (id)retain { return self; }

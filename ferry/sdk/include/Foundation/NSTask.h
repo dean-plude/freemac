@@ -53,7 +53,8 @@ FOUNDATION_EXPORT NSString *const NSFileHandleNotificationMonitorModes;
 - (BOOL)synchronizeAndReturnError:(NSError **)error;
 - (BOOL)closeAndReturnError:(NSError **)error;
 
-/* Delivered from the run loop (and from dispatch waits), on the one thread. */
+/* readabilityHandler and writeabilityHandler are called on a background
+ * thread; background reads are served, and notify, from the main run loop. */
 @property (copy) void (^readabilityHandler)(NSFileHandle *handle);
 @property (copy) void (^writeabilityHandler)(NSFileHandle *handle);
 - (void)readInBackgroundAndNotify;

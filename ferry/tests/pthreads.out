@@ -1,0 +1,21 @@
+main thread: 1, threaded before: 0
+counter 160000 (expected 160000), results 28, threaded after: 1
+unfair lock 160000, spin lock 160000
+both threads met: 2
+consumed total 5050
+once ran 1 time(s)
+keys read back 10, destructors got 10
+pthread_exit value 77
+read-write lock value 20000
+thread name worker-thread, main 0
+default detach state joinable
+detach state now detached
+tiny stack refused: yes
+stack size 1048576
+recursive: 0 0 0 0
+error-checking (type 1): relock EDEADLK, trylock EBUSY
+relative wait: ETIMEDOUT
+absolute wait: ETIMEDOUT
+thread id known: yes, stack size known: yes
+equal self: 1, qos known
+exit=0

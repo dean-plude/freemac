@@ -431,11 +431,17 @@ static NSUInteger *ptrmap_find(struct ptrmap *m, const void *key, BOOL add)
     }
 }
 
+/* The class-wide name tables of NSKeyedArchiver and NSKeyedUnarchiver,
+ * which any thread may use. */
+static os_unfair_lock tables_lock = OS_UNFAIR_LOCK_INIT;
+
 static NSMutableDictionary *global_class_names(void)
 {
     static NSMutableDictionary *names;
-    if (!names)
-        names = [[NSMutableDictionary alloc] init];
+    static dispatch_once_t names_once;
+    dispatch_once(&names_once, ^{
+      names = [[NSMutableDictionary alloc] init];
+    });
     return names;
 }
 
@@ -512,12 +518,22 @@ static NSMutableDictionary *global_class_names(void)
 
 + (void)setClassName:(NSString *)name forClass:(Class)cls
 {
+    NSString *key = NSStringFromClass(cls);
+    os_unfair_lock_lock(&tables_lock);
     if (name)
-        [global_class_names() setObject:name forKey:NSStringFromClass(cls)];
+        [global_class_names() setObject:name forKey:key];
     else
-        [global_class_names() removeObjectForKey:NSStringFromClass(cls)];
+        [global_class_names() removeObjectForKey:key];
+    os_unfair_lock_unlock(&tables_lock);
 }
-+ (NSString *)classNameForClass:(Class)cls { return [global_class_names() objectForKey:NSStringFromClass(cls)]; }
++ (NSString *)classNameForClass:(Class)cls
+{
+    NSString *key = NSStringFromClass(cls);
+    os_unfair_lock_lock(&tables_lock);
+    NSString *name = [[[global_class_names() objectForKey:key] retain] autorelease];
+    os_unfair_lock_unlock(&tables_lock);
+    return name;
+}
 - (void)setClassName:(NSString *)name forClass:(Class)cls
 {
     if (name)
@@ -660,8 +676,10 @@ static NSMutableDictionary *global_class_names(void)
 static NSMutableDictionary *global_classes(void)
 {
     static NSMutableDictionary *classes;
-    if (!classes)
-        classes = [[NSMutableDictionary alloc] init];
+    static dispatch_once_t classes_once;
+    dispatch_once(&classes_once, ^{
+      classes = [[NSMutableDictionary alloc] init];
+    });
     return classes;
 }
 
@@ -796,12 +814,20 @@ enum { UNSEEN, DECODING, DONE };
 
 + (void)setClass:(Class)cls forClassName:(NSString *)name
 {
+    os_unfair_lock_lock(&tables_lock);
     if (cls)
         [global_classes() setObject:cls forKey:name];
     else
         [global_classes() removeObjectForKey:name];
+    os_unfair_lock_unlock(&tables_lock);
 }
-+ (Class)classForClassName:(NSString *)name { return [global_classes() objectForKey:name]; }
++ (Class)classForClassName:(NSString *)name
+{
+    os_unfair_lock_lock(&tables_lock);
+    Class cls = [global_classes() objectForKey:name];
+    os_unfair_lock_unlock(&tables_lock);
+    return cls;
+}
 - (void)setClass:(Class)cls forClassName:(NSString *)name
 {
     if (cls)
@@ -843,11 +869,17 @@ enum { UNSEEN, DECODING, DONE };
         cls = [self classForClassName:n] ?: NSClassFromString(n);
         if (cls) {
             static NSMutableSet *warned;
-            if (!warned)
-                warned = [[NSMutableSet alloc] init];
-            if ([warned containsObject:name])
+            static dispatch_once_t warned_once;
+            dispatch_once(&warned_once, ^{
+              warned = [[NSMutableSet alloc] init];
+            });
+            os_unfair_lock_lock(&tables_lock);
+            BOOL told = [warned containsObject:name];
+            if (!told)
+                [warned addObject:name];
+            os_unfair_lock_unlock(&tables_lock);
+            if (told)
                 return cls;
-            [warned addObject:name];
             fprintf(stderr, "ferry: an archive has an object of class %s, which this program doesn't have; using %s\n",
                     [name UTF8String], [n UTF8String]);
             return cls;

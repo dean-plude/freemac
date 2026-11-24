@@ -4,7 +4,9 @@
  * NSURLCredentialStorage (kept in memory: Ferry has no keychain), and the
  * MD5 digest that HTTP Digest authentication uses. Written from Apple's
  * public API documentation and RFC 1321; the challenges themselves are
- * made and answered in NSURLSession.m. */
+ * made and answered in NSURLSession.m. A credential storage is used from
+ * the network thread and the program's own, so it keeps its credentials
+ * under a lock of its own. */
 #import "FURLInternal.h"
 #include <math.h>
 #include <stdlib.h>
@@ -42,9 +44,11 @@ void FMD5(const void *data, size_t length, unsigned char digest[16])
 {
     static uint32_t K[64];
     static const int shift[16] = {7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21};
-    if (!K[0])
-        for (int i = 0; i < 64; i++)
-            K[i] = (uint32_t)(fabs(sin(i + 1.0)) * 4294967296.0);
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      for (int i = 0; i < 64; i++)
+          K[i] = (uint32_t)(fabs(sin(i + 1.0)) * 4294967296.0);
+    });
     uint32_t h[4] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476};
     size_t total = ((length + 8) / 64 + 1) * 64;
     unsigned char *msg = calloc(total, 1);
@@ -354,15 +358,21 @@ static NSString *plain_method(NSString *m)
 @interface NSURLCredentialStorage () {
     NSMutableDictionary *_all;      /* space -> user -> credential */
     NSMutableDictionary *_defaults; /* space -> credential */
+    pthread_mutex_t _lock;          /* guards both */
 }
 @end
+
+#define LOCK() pthread_mutex_lock(&_lock)
+#define UNLOCK() pthread_mutex_unlock(&_lock)
 
 @implementation NSURLCredentialStorage
 + (NSURLCredentialStorage *)sharedCredentialStorage
 {
     static NSURLCredentialStorage *shared;
-    if (!shared)
-        shared = [[self alloc] init];
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      shared = [[self alloc] init];
+    });
     return shared;
 }
 + (instancetype)_privateStorage { return [[[self alloc] init] autorelease]; }
@@ -370,12 +380,14 @@ static NSString *plain_method(NSString *m)
 {
     _all = [[NSMutableDictionary alloc] init];
     _defaults = [[NSMutableDictionary alloc] init];
+    FRecursiveMutexInit(&_lock);
     return self;
 }
 - (void)dealloc
 {
     [_all release];
     [_defaults release];
+    pthread_mutex_destroy(&_lock);
     [super dealloc];
 }
 - (void)_changed
@@ -384,15 +396,20 @@ static NSString *plain_method(NSString *m)
 }
 - (NSDictionary *)credentialsForProtectionSpace:(NSURLProtectionSpace *)space
 {
+    LOCK();
     NSDictionary *d = space ? [_all objectForKey:space] : nil;
-    return [d count] ? [[d copy] autorelease] : nil;
+    d = [d count] ? [[d copy] autorelease] : nil;
+    UNLOCK();
+    return d;
 }
 - (NSDictionary *)allCredentials
 {
     NSMutableDictionary *out = [NSMutableDictionary dictionary];
+    LOCK();
     for (id space in _all)
         if ([[_all objectForKey:space] count])
             [out setObject:[[[_all objectForKey:space] copy] autorelease] forKey:space];
+    UNLOCK();
     return out;
 }
 - (void)setCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
@@ -400,12 +417,14 @@ static NSString *plain_method(NSString *m)
     /* A credential that keeps for no time at all isn't kept. */
     if (!credential || !space || [credential persistence] == NSURLCredentialPersistenceNone)
         return;
+    LOCK();
     NSMutableDictionary *d = [_all objectForKey:space];
     if (!d) {
         d = [NSMutableDictionary dictionary];
         [_all setObject:d forKey:space];
     }
     [d setObject:credential forKey:[credential user] ?: @""];
+    UNLOCK();
     [self _changed];
 }
 - (void)removeCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
@@ -417,33 +436,47 @@ static NSString *plain_method(NSString *m)
 {
     if (!credential || !space)
         return;
+    LOCK();
     NSMutableDictionary *d = [_all objectForKey:space];
     NSString *user = [credential user] ?: @"";
-    if (![d objectForKey:user])
-        return;
-    [d removeObjectForKey:user];
-    if ([[_defaults objectForKey:space] isEqual:credential])
-        [_defaults removeObjectForKey:space];
-    [self _changed];
+    BOOL there = [d objectForKey:user] != nil;
+    if (there) {
+        [d removeObjectForKey:user];
+        if ([[_defaults objectForKey:space] isEqual:credential])
+            [_defaults removeObjectForKey:space];
+    }
+    UNLOCK();
+    if (there)
+        [self _changed];
 }
 - (NSURLCredential *)defaultCredentialForProtectionSpace:(NSURLProtectionSpace *)space
 {
-    return space ? [_defaults objectForKey:space] : nil;
+    if (!space)
+        return nil;
+    LOCK();
+    NSURLCredential *c = [[[_defaults objectForKey:space] retain] autorelease];
+    UNLOCK();
+    return c;
 }
 - (void)setDefaultCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
 {
     if (!credential || !space || [credential persistence] == NSURLCredentialPersistenceNone)
         return;
     [self setCredential:credential forProtectionSpace:space];
+    LOCK();
     [_defaults setObject:credential forKey:space];
+    UNLOCK();
 }
 - (NSURLCredential *)_credentialForSpace:(NSURLProtectionSpace *)space
 {
     NSURLCredential *c = [self defaultCredentialForProtectionSpace:space];
     if (c)
         return c;
+    LOCK();
     NSDictionary *d = [_all objectForKey:space];
-    return [d count] == 1 ? [[d allValues] lastObject] : nil;
+    c = [d count] == 1 ? [[[[d allValues] lastObject] retain] autorelease] : nil;
+    UNLOCK();
+    return c;
 }
 - (void)getCredentialsForProtectionSpace:(NSURLProtectionSpace *)space task:(NSURLSessionTask *)task
                        completionHandler:(void (^)(NSDictionary<NSString *, NSURLCredential *> *))handler

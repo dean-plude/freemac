@@ -137,6 +137,7 @@ struct fclass_rt {
     uint32_t nprotos;
     struct fclass_rt *next_all;
     const char *image;
+    pthread_t init_thread;          /* running +initialize, while RT_INITIALIZING */
 };
 
 /* The bucket array is preceded by one header bucket whose first word points

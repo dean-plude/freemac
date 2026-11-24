@@ -1136,6 +1136,10 @@ The new or extended ones:
 | `libsystem_dlsym` | (freemac (1.201), Ferry 0.28.0) `RTLD_DEFAULT`, `RTLD_MAIN_ONLY`, `RTLD_NEXT` and `RTLD_SELF` from the program and from a library; `dlopen(NULL)`; a library built here opened through `@rpath`, `@executable_path` and (from inside it) `@loader_path` as one handle, its initializer run, `RTLD_NOLOAD`, `dlopen_preflight`; a bundle built with `-bundle -undefined dynamic_lookup` opened `RTLD_LOCAL`, calling back into the program and hidden from `RTLD_DEFAULT`; libSystem by path and by leaf name, Foundation and CoreFoundation by their `/System/Library/Frameworks` paths; `dlerror` after each failure (a missing name, a missing library, a framework Ferry doesn't have, a file that isn't a Mac library, a handle that isn't one) and cleared after reading; `dladdr` in a library, inside a program's function and on libSystem's `strlen`; `_dyld_image_count`, `_dyld_get_image_name` and `_dyld_get_image_header`, the add-image callback, `_NSGetExecutablePath`; `_availability_version_check` found with `dlsym` |
 | `libsystem_available` | (freemac (1.201), Ferry 0.28.0) `@available` and `__builtin_available` compiled the normal way (macOS 10.15, 14, 14.7 and 13.5 available; 14.7.1, 14.8 and 15 not), `__isOSVersionAtLeast`, `__isPlatformVersionAtLeast` and `NSProcessInfo`'s `isOperatingSystemAtLeastVersion:` agreeing on each, an iOS version not available; `operatingSystemVersion` matching `kern.osproductversion`, `processorCount`, `activeProcessorCount` and `physicalMemory` matching `hw.ncpu`, `hw.activecpu` and `hw.memsize` |
 | `libsystem_plugin` | (freemac (1.201), Ferry 0.28.0) Plug-in bundles built here: `NSBundle` not loaded until `load` (its description says so), one bundle per path, `preflightAndReturnError:`, `loadAndReturnError:`, `principalClass` from `NSPrincipalClass`, the plug-in's class finding its own bundle with `bundleForClass:` (Foundation's classes give the main bundle), `classNamed:`, `bundleWithIdentifier:`, `unload` refused; the same bundle through `CFBundleCreate`, `CFBundleIsExecutableLoaded`, `CFBundleGetFunctionPointerForName`, `CFBundleGetDataPointerForName`, `CFBundleCopyExecutableURL` and `CFBundleGetBundleWithIdentifier`; a bundle with no `NSPrincipalClass` (the first class it defines) loaded with `CFBundleLoadExecutable`; a bundle whose program is missing (`NSCocoaErrorDomain` 4, no principal class); a folder that isn't there |
+| `pthreads` | (freemac (1.202), Ferry 0.29.0) the pthread calls of a Mac's libSystem on this system's threads: eight threads adding to one counter under a mutex, an `os_unfair_lock` and an `OSSpinLock` (160000 each), threads joined with their results, `pthread_main_np` before and after, a condition variable between a producer and a consumer, `pthread_once` from many threads, keys with destructors, `pthread_exit`'s value, a read-write lock, thread names, detach states, a stack too small refused and the stack size kept, recursive and error-checking mutexes (`EDEADLK`, `EBUSY`), timed waits returning `ETIMEDOUT`, thread ids and stack addresses, `pthread_equal`, Mac static initialisers |
+| `dispatch_concurrent` | (freemac (1.202), Ferry 0.29.0) libdispatch across threads: four blocks on a global queue all running at once and none on the main thread, a serial queue running 4000 blocks one at a time in order, `dispatch_sync` from 16 threads, a barrier waiting for the blocks before it and running alone, `dispatch_apply` on more than one thread, semaphore ping-pong between threads and a counting semaphore's limit, `dispatch_once` from eight threads, `dispatch_after` on a global queue, a group's notify after 100 blocks, a stress run of 10000 global and four serial queues' blocks, and the main queue running only on the main thread |
+| `foundation_threads` | (freemac (1.202), Ferry 0.29.0) `NSThread`: the main thread's answers (`isMainThread`, name, `threadDictionary`), a thread made with `initWithTarget:selector:object:` and started (executing and finished, the argument, its name, `NSWillBecomeMultiThreadedNotification` once and `NSThreadWillExitNotification`), starting it twice refused, `initWithBlock:` with cancel, its own dictionary, `sleepForTimeInterval:`, its autorelease pool, `+exit` and its quality of service, `detachNewThreadSelector:...` and `detachNewThreadWithBlock:`, `performSelectorOnMainThread:` (with and without waiting, and from the main thread itself), a thread's own run loop, `performSelector:onThread:` waited for and not, `performBlock:` on that thread's run loop, `performSelectorInBackground:`, an operation queue running two operations at once and keeping to a limit of four, main-queue operations from a worker running on the main thread, and 16 threads at once |
+| `foundation_locks` | (freemac (1.202), Ferry 0.29.0) Foundation's locks and the runtime under many threads: `NSLock` (counting, its name, `tryLock` and `lockBeforeDate:` against a lock held elsewhere), `NSRecursiveLock`, `NSCondition` between producers and consumers and a wait that times out, `NSConditionLock` handing over in order and a condition never set timing out, `@synchronized`, `+initialize` run once with no thread getting in before it ends, messages sent while a method is added, retain and release, weak references loaded while the object goes away, associated objects, autorelease pools on eight threads, and notifications posted from eight threads |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -2099,6 +2103,51 @@ The new or extended ones:
     or "(not yet loaded)"; a bundle with no `CFBundleExecutable` uses its
     folder's name for the program, when that file is there.
 
+- **Threads** (freemac (1.202), Ferry 0.29.0).
+  - `NSBlockOperation` runs its blocks one after another, in the order
+    they were added; a Mac may run them at the same time.
+  - A file handle's `writeabilityHandler` is called once, not each time
+    the descriptor can take more.
+  - A file handle's background reads (`readInBackgroundAndNotify` and the
+    like) are served by the main run loop only, and their notifications
+    are posted on the main thread, whichever thread asked.
+  - Dispatch sources for reads, writes, signals, processes, files and
+    Mach ports still never fire (timer and data sources do).
+  - `NSDistributedLock` is missing.
+  - `callStackSymbols` is empty, for a thread and for an exception.
+  - Threads' priorities and qualities of service are kept and read back,
+    but don't change how this system schedules them.
+  - AppKit isn't made safe to use off the main thread. The first time a
+    view is marked for display, a view is added or a window is drawn or
+    ordered front from another thread, Ferry says so once on stderr.
+  - `pthread_cancel` isn't provided; `pthread_setcancelstate`,
+    `pthread_setcanceltype` and `pthread_testcancel` are accepted and do
+    nothing.
+- **Threads** (freemac (1.202), Ferry 0.29.0).
+  - The wording of the message an `NSLock` prints when a thread locks it
+    twice, or unlocks it without holding it.
+  - Where a Mac hangs for ever (a lock taken twice by the same thread,
+    `dispatch_sync` onto its own queue, or the main thread waiting for
+    something nothing can do), Ferry stops the program with a message.
+  - Which thread `NSTaskDidTerminateNotification` is posted on (here the
+    run loop of the thread that launched the task), and which thread an
+    operation's `completionBlock` runs on (here a worker thread).
+  - The default number of operations an `NSOperationQueue` runs at once
+    (64 here) and the width of the global queues' worker pool.
+  - `+[NSOperationQueue currentQueue]` on a thread that isn't running an
+    operation: nil here, unless it is the main thread.
+  - The name of the thread that moves URL transfers, and that a session's
+    delegate queue is a background queue unless the app gives one.
+  - A task's state just after `cancel`: canceling, or already completed
+    when the session's queue has run the completion handler in the
+    meantime (the `foundation_urlsession` test now accepts either).
+  - Which thread `NSHTTPCookieManagerCookiesChangedNotification` is posted
+    on when a response sets cookies (here the network thread), and the
+    same for `NSURLCredentialStorageChangedNotification` when a credential
+    a delegate gave is kept.
+  - The default stack size of a new `NSThread` (1 MiB here) and the
+    smallest one `pthread_attr_setstacksize` accepts.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2173,3 +2222,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.26.0 (freemac (1.199)): redirects decided by the delegate, HTTP Basic and Digest authentication, server trust, `NSHTTPCookieStorage` saved to disk, `NSURLCache` in memory and on disk, and `data:` URLs, `make check` 107/107.
 - 2026-11-24: Ferry 0.27.0 (freemac (1.200)): Security.framework (keychain passwords, code-signing answers, certificate trust), CommonCrypto (digests, HMAC, PBKDF2, AES), and one macOS version (14.7) everywhere an app asks, `make check` 117/117.
 - 2026-11-24: Ferry 0.28.0 (freemac (1.201)): `sysctl`, `dlopen`/`dlsym` and loading code after start-up, `@available` checks, `getattrlist`, the Mach host and task statistics, and NSBundle plug-ins that really load, `make check` 121/121.
+- 2026-11-24: Ferry 0.29.0 (freemac (1.202)): real threads: NSThread, per-thread run loops and autorelease pools, real locks and `@synchronized`, pthreads, libdispatch on a worker pool, concurrent NSOperationQueue, a thread-safe runtime, and URL loading on a network thread of its own, `make check` 125/125.

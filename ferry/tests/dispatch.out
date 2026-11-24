@@ -1,20 +1,18 @@
 label: org.freemac.test
 main label: com.apple.main-thread
 once
-sync runs at once (order 0)
-after sync
-async 1 (order 1)
+async 1 (order 0)
 add 5 -> 5
-group item 0
-group item 1
-group item 2
-group wait: 0
-group notify
+sync runs after them (order 1)
+after sync
+group wait: 0, items done 0x7
+group notify: 0
 signalling
 semaphore wait: 0
 semaphore timeout: 1
 apply sum 6
 specific: value
+held for 20 ms: 1
 resuming the held queue
 held work ran
 tick 1

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * libkern's atomics and spin locks and os_unfair_lock, which older and
  * newer apps use for their own locking, from dispatch_apply's iterations
- * (Ferry runs a program on one thread, so this checks the calls' results,
- * not contention). Also
+ * (which run on several threads; this checks the calls' results, and the
+ * contention cases are in pthreads and dispatch_concurrent). Also
  * a program that sends its stderr to a file it can't open (Gas Mask does):
  * Ferry's own messages must still reach the terminal. */
 #include <libkern/OSAtomic.h>

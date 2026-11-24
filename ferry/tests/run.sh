@@ -89,6 +89,9 @@ run_one() {
                 2> "$build/$name.err" ;;
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
+        # threads: a hang is a failure, not a stuck run
+        pthreads|dispatch_concurrent|foundation_threads|foundation_locks)
+            timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -121,6 +124,10 @@ run_one commoncrypto_cryptor "$here/commoncrypto_cryptor.c" "$here/commoncrypto_
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).
 run_one dispatch "$here/dispatch.c" "$here/dispatch.out" -fblocks
+# Real threads: POSIX threads and their locks, and dispatch's queues on
+# worker threads, with stress cases.
+run_one pthreads "$here/pthreads.c" "$here/pthreads.out"
+run_one dispatch_concurrent "$here/dispatch_concurrent.c" "$here/dispatch_concurrent.out" -fblocks
 run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
 run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
 run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
@@ -208,6 +215,10 @@ run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foun
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
     -framework Security
 run_one security_code "$here/security/code.m" "$here/security/code.out" -framework Foundation -framework Security
+# NSThread, cross-thread performs and run loops, and the locks and the
+# runtime under real threads.
+run_one foundation_threads "$here/foundation/threads.m" "$here/foundation/threads.out" -framework Foundation
+run_one foundation_locks "$here/foundation/locks.m" "$here/foundation/locks.out" -framework Foundation
 # Exceptions a program catches (M7), unwound through frame-pointer and
 # frameless functions, and through Foundation's frames.
 run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \

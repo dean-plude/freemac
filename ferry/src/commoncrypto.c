@@ -18,6 +18,7 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -735,7 +736,7 @@ static struct {
     const EVP_CIPHER *(*ciphers[3][3])(void); /* [ECB, CBC, CTR][128, 192, 256] */
 } E;
 
-static int load_evp(void)
+static int load_evp_locked(void)
 {
     if (E.loaded)
         return E.ok;
@@ -757,6 +758,16 @@ static int load_evp(void)
 #undef GET
     E.ok = 1;
     return 1;
+}
+
+/* Loaded once; a thread that asks while another loads waits for it. */
+static int load_evp(void)
+{
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+    int ok = load_evp_locked();
+    pthread_mutex_unlock(&lock);
+    return ok;
 }
 
 struct cryptor {

@@ -38,7 +38,7 @@ other scheme: NSURLErrorDomain -1002 "unsupported URL" (with the failing URL)
 no URL: NSURLErrorDomain -1002 "unsupported URL"
 redirect loop: NSURLErrorDomain -1007 "too many HTTP redirects" (with the failing URL)
 server hung up: NSURLErrorDomain -1005 "The network connection was lost." (with the failing URL)
-cancelled: state 2 after cancel
+cancelled: after cancel canceling (or completed already)
 cancelled: NSURLErrorDomain -999 "cancelled" (with the failing URL)
 cancelled: data nil, state 3 in the handler
 never resumed: NSURLErrorDomain -999 "cancelled" (with the failing URL)
