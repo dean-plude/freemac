@@ -662,6 +662,7 @@ WK_CODING
     NSURLRequest *_request;
     NSEventModifierFlags _modifiers;
     NSInteger _button;
+    NSString *_frameName;
 }
 + (WKNavigationAction *)_actionFrom:(WebKitNavigationAction *)action view:(WKWebView *)view newWindow:(BOOL)newWindow
 {
@@ -677,8 +678,11 @@ WK_CODING
     a->_button = button == 3 ? 1 : button == 2 ? 2 : 0;
     a->_source = [[WKFrameInfo _mainFrameOf:view request:nil] retain];
     a->_target = newWindow ? nil : [[WKFrameInfo _mainFrameOf:view request:a->_request] retain];
+    a->_frameName = [WKString(WK(webkit_navigation_action_get_frame_name)(action)) copy];
     return a;
 }
+/* the name of the window it opens (freemac 1.217, Ferry 0.42.0) */
+- (NSString *)_targetFrameName { return _frameName; }
 - (WKFrameInfo *)sourceFrame { return _source; }
 - (WKFrameInfo *)targetFrame { return _target; }
 - (WKNavigationType)navigationType { return _type; }
@@ -691,6 +695,7 @@ WK_CODING
     [_source release];
     [_target release];
     [_request release];
+    [_frameName release];
     [super dealloc];
 }
 @end

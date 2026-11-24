@@ -13,6 +13,7 @@
 #endif
 
 @class WebView, WebFrame, WebDataSource, WebPreferences, WebScriptObject;
+@class WebFrameView, DOMDocument, DOMHTMLElement;   /* WebFrameView.h, DOM.h (freemac 1.217, Ferry 0.42.0) */
 
 /* ---- preferences -------------------------------------------------------------------- */
 
@@ -98,8 +99,9 @@ WEBKIT_EXTERN NSString *const WebPreferencesChangedNotification;
 @property (readonly) WebFrame *parentFrame;
 @property (readonly, copy) NSArray *childFrames;
 @property (readonly) WebScriptObject *windowObject;
-@property (readonly) id DOMDocument;
-@property (readonly) id frameElement;
+@property (readonly) DOMDocument *DOMDocument;
+@property (readonly) DOMHTMLElement *frameElement;
+@property (readonly) WebFrameView *frameView;
 - (void)loadRequest:(NSURLRequest *)request;
 - (void)loadData:(NSData *)data MIMEType:(NSString *)MIMEType textEncodingName:(NSString *)encodingName
          baseURL:(NSURL *)URL;
@@ -222,6 +224,7 @@ WEBKIT_EXTERN NSString *const WebViewProgressFinishedNotification;
 @property (retain) NSWindow *hostWindow;
 @property (copy) NSString *groupName;
 @property (readonly, retain) WebScriptObject *windowScriptObject;
+@property (readonly) DOMDocument *mainFrameDocument;
 - (NSString *)stringByEvaluatingJavaScriptFromString:(NSString *)script;
 
 - (IBAction)takeStringURLFrom:(id)sender;

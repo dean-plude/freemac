@@ -141,6 +141,52 @@ NSImage *WKImageFromSurface(cairo_surface_t *surface);
 @end
 @interface WKNavigationAction (FerryPrivate)
 + (WKNavigationAction *)_actionFrom:(WebKitNavigationAction *)action view:(WKWebView *)view newWindow:(BOOL)newWindow;
+- (NSString *)_targetFrameName;
+@end
+
+/* ---- the older WebView's pages, frames and DOM (freemac 1.217, Ferry 0.42.0) -------- */
+
+/* WebView.m: a script's body run in the older web view's page, waited for,
+ * with W, the page's table of the values handed out. Its result comes back
+ * as the older WebKit's objects: NSString, NSNumber, NSNull, WebUndefined,
+ * a WebScriptObject or a DOM object (one object for each value of the page
+ * while it is kept). With WSRaise an exception in the page raises
+ * DOMException; with WSGeometry the page's size and scroll position come
+ * back too, for the frame view (the script may have changed them). */
+enum { WSRaise = 1, WSGeometry = 2 };
+id WSRun(GtkWidget *web, NSString *body, int flags);
+/* an Objective-C value as a JavaScript expression */
+NSString *WSLiteral(id value);
+/* the WebView whose page this GTK view shows */
+WebView *WSWebViewOf(GtkWidget *web);
+/* WebDOM.m: the class of the DOM object for a value of the page, from its
+ * JavaScript class name and what kind of node it is (-1 for no node) */
+Class WSClassFor(NSString *jsClass, int kind);
+
+@interface WebScriptObject (FerryPrivate)
+- (instancetype)_initWithWeb:(GtkWidget *)web handle:(long)handle generation:(NSString *)generation;
+- (GtkWidget *)_web;
+- (NSString *)_expression;            /* the value, as an expression of the page */
+- (id)_run:(NSString *)body flags:(int)flags;   /* a body with o, the value */
+@end
+
+@interface WebFrame (FerryPrivate)
+- (NSString *)_windowExpression;      /* this frame's window, from the main frame's */
+- (NSArray *)_path;                   /* the indexes of window.frames from the main frame */
+@end
+
+@interface WebView (FerryPrivate)
+- (WKWebView *)_wk;
+- (WebFrame *)_frameAtPath:(NSArray *)path create:(BOOL)create;
+- (void)_scrollFrame:(WebFrame *)frame to:(NSPoint)point;
+- (CGFloat)_zoom;
+@end
+
+@interface WebFrameView (FerryPrivate)
+- (instancetype)_initWithFrame:(NSRect)rect webFrame:(WebFrame *)frame;
+/* the page's scroll position and size {x, y, width, height}, in CSS pixels */
+- (void)_setPageGeometry:(NSArray *)geometry;
+- (void)_forget;   /* its frame is going */
 @end
 
 #endif

@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.217 "Ferry: frames and the DOM in web views" (done)
+
+Ferry 0.42.0: the rest of the older `WebView` that Markdown editors like MacDown build their previews on.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `WebFrameView` and its document view, with the page's size and scroll position, and scrolling from the app | Ferry WebKit | done |
+| 2 | Over forty DOM classes (`DOMDocument`, `DOMElement`, `DOMHTMLElement`, `DOMNodeList` and their kin), kept in step with the page | Ferry WebKit | done |
+| 3 | Subframes: `childFrames`, names, `findFrameNamed:` and each subframe's loads reported | Ferry WebKit | done |
+| 4 | The resource load delegate, user style sheets, and `window.open` asked of the policy delegate and given a real window | Ferry WebKit | done |
+| 5 | Two new tests; `make check` 206 of 206 | Ferry | done |
+| 6 | A rare stall fixed in Ferry's dispatch worker pool: when several blocks were queued at once while one worker sat idle, only that worker was woken, and if its block waited on a later one nothing else ever ran (`foundation_locks` hung about once in sixty runs) | Ferry | done |
+
+Downloads, the cookie store, POST requests and DOM events aren't done yet.
+
 ## 1.216 "Messages" (done)
 
 Messages: conversations in bubbles, with real iMessage through BlueBubbles on a Mac you own and an Android phone's texts through KDE Connect.

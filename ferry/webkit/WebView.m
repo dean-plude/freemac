@@ -9,7 +9,16 @@
  * The older calls that answer at once on a Mac (a script's result, a script
  * object's properties) wait for WebKitGTK's answer, running GLib's main
  * context meanwhile (WKWaitFor). Script objects are JavaScript values kept
- * in the page by number, in a table of Ferry's own (window.__ferryWS). */
+ * in the page by number, in a table of Ferry's own (window.__ferryWS).
+ *
+ * From freemac 1.217 (Ferry 0.42.0): the DOM objects (WebDOM.m) are script
+ * objects too, each value of the page has one object while it is kept, and
+ * an agent of Ferry's own, a script in a world of its own in every frame,
+ * tells the web view about subframes' loads and the page's scrolling and
+ * size (for WebFrameView.m), since WebKitGTK reports neither. The resource
+ * load delegate hears WebKitGTK's resources, user style sheets are WebKitGTK's,
+ * and a window opened by window.open is a web view related to its opener,
+ * so the page gets the window. */
 #import "WKInternal.h"
 
 NSString *const WebPreferencesChangedNotification = @"WebPreferencesChangedNotification";
@@ -22,9 +31,6 @@ NSString *const WebViewProgressStartedNotification = @"WebViewProgressStartedNot
 NSString *const WebViewProgressEstimateChangedNotification = @"WebViewProgressEstimateChangedNotification";
 NSString *const WebViewProgressFinishedNotification = @"WebViewProgressFinishedNotification";
 
-@interface WebView (FerryPrivate)
-- (WKWebView *)_wk;
-@end
 
 /* ---- preferences -------------------------------------------------------------------- */
 
@@ -216,11 +222,10 @@ WEB_PREF_INT(minimumLogicalFontSize, setMinimumLogicalFontSize, @"minimumLogical
 WEB_PREF_OBJECT(defaultTextEncodingName, setDefaultTextEncodingName, @"defaultTextEncodingName")
 WEB_PREF_BOOL(userStyleSheetEnabled, setUserStyleSheetEnabled, @"userStyleSheetEnabled")
 - (NSURL *)userStyleSheetLocation { return _values[@"userStyleSheetLocation"]; }
+/* each web view with these preferences reads the sheet again (WebView's _applyUserStyleSheet) */
 - (void)setUserStyleSheetLocation:(NSURL *)url
 {
-    if (url)
-        WKWarnOnce("WebPreferences' user style sheets");
-    [self _set:url forKey:@"userStyleSheetLocation"];
+    [self _set:[[url copy] autorelease] forKey:@"userStyleSheetLocation"];
 }
 WEB_PREF_BOOL(isJavaEnabled, setJavaEnabled, @"javaEnabled")
 WEB_PREF_BOOL(isJavaScriptEnabled, setJavaScriptEnabled, @"javaScriptEnabled")
@@ -261,46 +266,100 @@ WEB_PREF_BOOL(usesPageCache, setUsesPageCache, @"usesPageCache")
 
 /* The page's half: a table of the values handed out, and the turning of a
  * value into what comes back (undefined, null, a plain value or a number
- * in the table). Put in front of every script, so a new page has it too. */
+ * in the table). Put in front of every script, so a new page has it too.
+ * A value keeps its number while the page lasts (ids), so it has one
+ * object here; g tells this page's numbers from an earlier page's. For a
+ * value, c is its JavaScript class and k what kind of node it is (twice
+ * the node type, plus one for an HTML element), for the DOM class here.
+ * force makes the next value a list of the kind the Mac's call gives.
+ * (freemac 1.217, Ferry 0.42.0: ids, g, c, k, force, geo and path) */
 static NSString *const script_table =
-    @"var W=window.__ferryWS||(window.__ferryWS={n:1,o:{0:window},"
-    @"tag:function(v){if(v===undefined)return{t:'u'};if(v===null)return{t:'n'};var y=typeof v;"
-    @"if(y==='string'||y==='number'||y==='boolean')return{t:'p',v:v};"
-    @"var i=this.n++;this.o[i]=v;return{t:'o',i:i};}});";
+    @"var W=window.__ferryWS;if(!W)W=window.__ferryWS={n:1,o:{0:window},ids:new WeakMap(),force:null,"
+    @"g:Date.now().toString(36)+Math.random().toString(36).slice(2),"
+    @"tag:function(v){var f=this.force;this.force=null;if(v===undefined)return{t:'u'};if(v===null)return{t:'n'};"
+    @"var y=typeof v;if(y==='string'||y==='number'||y==='boolean')return{t:'p',v:v};"
+    @"if(v===window)return{t:'o',i:0,g:this.g,c:'Window',k:-1};"
+    @"var i=this.ids.get(v);if(i===undefined){i=this.n++;this.ids.set(v,i);}this.o[i]=v;"
+    @"return{t:'o',i:i,g:this.g,c:f||this.cls(v),k:this.kind(v)};},"
+    @"cls:function(v){try{return Object.prototype.toString.call(v).slice(8,-1);}catch(e){return '';}},"
+    @"kind:function(v){try{var t=v.nodeType;if(typeof t==='number'&&typeof v.nodeName==='string')"
+    @"return t*2+(v.namespaceURI==='http://www.w3.org/1999/xhtml'?1:0);}catch(e){}return -1;},"
+    @"geo:function(){var s=document.scrollingElement||document.documentElement;"
+    @"return s?[scrollX,scrollY,s.scrollWidth,s.scrollHeight]:[scrollX,scrollY,0,0];},"
+    @"path:function(w){var p=[];try{while(w&&w!==window){var u=w.parent;if(!u||u===w)return null;"
+    @"var n=u.frames.length,i=0;for(;i<n;i++)if(u.frames[i]===w)break;if(i===n)return null;p.unshift(i);w=u;}}"
+    @"catch(e){return null;}return w===window?p:null;}};";
 
-@interface WebScriptObject ()
-- (instancetype)_initWithWeb:(GtkWidget *)web handle:(long)handle;
-- (NSString *)_expression;
-@end
+/* the objects handed out, by web view, page and number (not retained) */
+static NSMutableDictionary *wrappers;
+
+static NSString *wrapper_key(GtkWidget *web, NSString *generation, long handle)
+{
+    return [NSString stringWithFormat:@"%p %@ %ld", web, generation, handle];
+}
+
+/* the page's size and scroll position, for the main frame's view */
+static void page_geometry(GtkWidget *web, id geometry)
+{
+    if ([geometry isKindOfClass:[NSArray class]])
+        [[[WSWebViewOf(web) mainFrame] frameView] _setPageGeometry:geometry];
+}
+
+static id wrapper_for(GtkWidget *web, NSDictionary *tag)
+{
+    long handle = [tag[@"i"] longValue];
+    if (!handle) {
+        WebView *view = WSWebViewOf(web);
+        if (view)
+            return [view windowScriptObject];
+        return [[[WebScriptObject alloc] _initWithWeb:web handle:0 generation:nil] autorelease];
+    }
+    NSString *generation = [tag[@"g"] description] ?: @"";
+    WebScriptObject *o = [wrappers[wrapper_key(web, generation, handle)] nonretainedObjectValue];
+    if (o)
+        return [[o retain] autorelease];
+    Class c = WSClassFor([tag[@"c"] description], tag[@"k"] ? [tag[@"k"] intValue] : -1);
+    return [[[c alloc] _initWithWeb:web handle:handle generation:generation] autorelease];
+}
 
 /* What a script gave back, as the older WebKit's objects: NSString,
  * NSNumber, NSNull for null, WebUndefined, or a WebScriptObject. */
-static id script_result(GtkWidget *web, NSString *json)
+static id script_result(GtkWidget *web, NSString *json, int flags)
 {
     NSDictionary *tag = json ? WKObjectFromJSON([json UTF8String]) : nil;
-    NSString *t = [tag isKindOfClass:[NSDictionary class]] ? tag[@"t"] : nil;
+    if (![tag isKindOfClass:[NSDictionary class]])
+        return [WebUndefined undefined];
+    if (tag[@"geo"])
+        page_geometry(web, tag[@"geo"]);
+    NSString *t = tag[@"t"];
     if ([t isEqualToString:@"p"])
         return tag[@"v"];
     if ([t isEqualToString:@"n"])
         return [NSNull null];
     if ([t isEqualToString:@"o"])
-        return [[[WebScriptObject alloc] _initWithWeb:web handle:[tag[@"i"] longValue]] autorelease];
+        return wrapper_for(web, tag);
+    if ([t isEqualToString:@"x"] && (flags & WSRaise))
+        [NSException raise:DOMException format:@"%@", tag[@"m"] ?: @"An exception occurred in the page"];
     return [WebUndefined undefined];
 }
 
 /* runs a script's body (which uses W, the table) and waits for its tagged result */
-static id run_tagged(GtkWidget *web, NSString *body)
+id WSRun(GtkWidget *web, NSString *body, int flags)
 {
     if (!web)
         return [WebUndefined undefined];
-    NSString *script = [NSString stringWithFormat:@"(function(){%@try{return W.tag((function(){%@})());}"
-                                                  @"catch(e){return{t:'x',m:String(e)};}})()",
-                                                  script_table, body];
-    return script_result(web, WKEvaluateJSONSync(web, script));
+    NSString *script = [NSString
+        stringWithFormat:@"(function(){%@var r;try{r=W.tag((function(){%@})());}"
+                         @"catch(e){W.force=null;r={t:'x',m:String(e&&e.message!==undefined?e.message:e)};}"
+                         @"%@return r;})()",
+                         script_table, body, (flags & WSGeometry) ? @"try{r.geo=W.geo();}catch(e){}" : @""];
+    return script_result(web, WKEvaluateJSONSync(web, script), flags);
 }
 
+static id run_tagged(GtkWidget *web, NSString *body) { return WSRun(web, body, 0); }
+
 /* an Objective-C value as a JavaScript expression, for a script's arguments */
-static NSString *script_literal(id value)
+NSString *WSLiteral(id value)
 {
     if (!value || value == [NSNull null])
         return @"null";
@@ -319,51 +378,81 @@ static NSString *script_literal(id value)
     if ([value isKindOfClass:[NSArray class]]) {
         NSMutableArray *parts = [NSMutableArray array];
         for (id v in value)
-            [parts addObject:script_literal(v)];
+            [parts addObject:WSLiteral(v)];
         return [NSString stringWithFormat:@"[%@]", [parts componentsJoinedByString:@","]];
     }
     if ([value isKindOfClass:[NSDictionary class]]) {
         NSMutableArray *parts = [NSMutableArray array];
         for (id k in value)
-            [parts addObject:[NSString stringWithFormat:@"%@:%@", WKQuote([k description]), script_literal(value[k])]];
+            [parts addObject:[NSString stringWithFormat:@"%@:%@", WKQuote([k description]), WSLiteral(value[k])]];
         return [NSString stringWithFormat:@"({%@})", [parts componentsJoinedByString:@","]];
     }
     return WKQuote([value description]);
 }
 
+WebView *WSWebViewOf(GtkWidget *web) { return web ? (WebView *)g_object_get_data(web, "ferry-webview") : nil; }
+
 @implementation WebScriptObject {
     GtkWidget *_web;
     long _handle;
+    NSString *_generation;   /* the page's, for its values; nil for the window */
 }
 
-- (instancetype)_initWithWeb:(GtkWidget *)web handle:(long)handle
+- (instancetype)_initWithWeb:(GtkWidget *)web handle:(long)handle generation:(NSString *)generation
 {
     self = [super init];
     _web = web ? g_object_ref(web) : NULL;
     _handle = handle;
+    _generation = [generation copy];
+    if (_web && _handle && _generation) {
+        if (!wrappers)
+            wrappers = [NSMutableDictionary new];
+        wrappers[wrapper_key(_web, _generation, _handle)] = [NSValue valueWithNonretainedObject:self];
+    }
     return self;
 }
 
 - (void)dealloc
 {
     if (_web) {
-        if (_handle)   /* the page may let go of the value now */
+        if (_handle && _generation) {
+            [wrappers removeObjectForKey:wrapper_key(_web, _generation, _handle)];
+            /* the page may let go of the value now */
             WK(webkit_web_view_evaluate_javascript)(
                 _web,
-                [[NSString stringWithFormat:@"if(window.__ferryWS)delete window.__ferryWS.o[%ld]", _handle] UTF8String],
+                [[NSString stringWithFormat:@"if(window.__ferryWS&&window.__ferryWS.g===%@)"
+                                            @"delete window.__ferryWS.o[%ld]",
+                                            WKQuote(_generation), _handle] UTF8String],
                 -1, NULL, NULL, NULL, NULL, NULL);
+        }
         g_object_unref(_web);
     }
+    [_generation release];
     [super dealloc];
 }
 
-/* the value, in the page; window itself when the table is gone (a new page) */
+- (GtkWidget *)_web { return _web; }
+
+/* the value, in the page; window itself for the window object */
 - (NSString *)_expression
 {
-    return _handle ? [NSString stringWithFormat:@"window.__ferryWS.o[%ld]", _handle] : @"window";
+    if (!_handle)
+        return @"window";
+    return [NSString stringWithFormat:@"(window.__ferryWS&&window.__ferryWS.g===%@?window.__ferryWS.o[%ld]:undefined)",
+                                      WKQuote(_generation ?: @""), _handle];
 }
 
-- (NSString *)_object { return [NSString stringWithFormat:@"var o=W.o[%ld];", _handle]; }
+- (NSString *)_object
+{
+    if (!_handle)
+        return @"var o=window;";
+    return [NSString stringWithFormat:@"var o=W.g===%@?W.o[%ld]:undefined;", WKQuote(_generation ?: @""), _handle];
+}
+
+- (id)_run:(NSString *)body flags:(int)flags
+{
+    return WSRun(_web, [[self _object] stringByAppendingString:body], flags);
+}
 
 + (BOOL)throwException:(NSString *)message
 {
@@ -376,6 +465,12 @@ static NSString *script_literal(id value)
 /* run in the page's global scope, as a Mac does */
 - (id)evaluateWebScript:(NSString *)script
 {
+    /* a subframe's window evaluates in that frame */
+    if (_handle)
+        return [self _run:[NSString stringWithFormat:@"var s=%@;if(o&&o.window===o&&o!==window)return o.eval(s);"
+                                                     @"return (0,eval)(s);",
+                                                     WKQuote(script ?: @"")]
+                    flags:0];
     return run_tagged(_web, [NSString stringWithFormat:@"return (0,eval)(%@);", WKQuote(script ?: @"")]);
 }
 
@@ -383,16 +478,16 @@ static NSString *script_literal(id value)
 {
     NSMutableArray *args = [NSMutableArray array];
     for (id a in arguments)
-        [args addObject:script_literal(a)];
-    return run_tagged(_web, [NSString stringWithFormat:@"%@var f=o[%@];if(typeof f!=='function')return undefined;"
-                                                       @"return f.apply(o,[%@]);",
-                                                       [self _object], WKQuote(name ?: @""),
-                                                       [args componentsJoinedByString:@","]]);
+        [args addObject:WSLiteral(a)];
+    return [self _run:[NSString stringWithFormat:@"var f=o[%@];if(typeof f!=='function')return undefined;"
+                                                 @"return f.apply(o,[%@]);",
+                                                 WKQuote(name ?: @""), [args componentsJoinedByString:@","]]
+                flags:0];
 }
 
 - (id)valueForKey:(NSString *)key
 {
-    return run_tagged(_web, [NSString stringWithFormat:@"%@return o[%@];", [self _object], WKQuote(key ?: @"")]);
+    return [self _run:[NSString stringWithFormat:@"return o[%@];", WKQuote(key ?: @"")] flags:0];
 }
 
 - (void)setValue:(id)value forKey:(NSString *)key
@@ -402,36 +497,34 @@ static NSString *script_literal(id value)
         ![value isKindOfClass:[WebUndefined class]] && ![value isKindOfClass:[WebScriptObject class]] &&
         ![value isKindOfClass:[NSArray class]] && ![value isKindOfClass:[NSDictionary class]])
         WKWarnOnce("giving a page an Objective-C object of a program's own (its description is given instead)");
-    run_tagged(_web, [NSString stringWithFormat:@"%@o[%@]=%@;return undefined;", [self _object], WKQuote(key ?: @""),
-                                                script_literal(value)]);
+    [self _run:[NSString stringWithFormat:@"o[%@]=%@;return undefined;", WKQuote(key ?: @""), WSLiteral(value)]
+         flags:0];
 }
 
 - (void)removeWebScriptKey:(NSString *)name
 {
-    run_tagged(_web, [NSString stringWithFormat:@"%@delete o[%@];return undefined;", [self _object],
-                                                WKQuote(name ?: @"")]);
+    [self _run:[NSString stringWithFormat:@"delete o[%@];return undefined;", WKQuote(name ?: @"")] flags:0];
 }
 
 - (NSString *)stringRepresentation
 {
-    id s = run_tagged(_web, [NSString stringWithFormat:@"%@return String(o);", [self _object]]);
+    id s = [self _run:@"return String(o);" flags:0];
     return [s isKindOfClass:[NSString class]] ? s : @"";
 }
 
 - (id)webScriptValueAtIndex:(unsigned)index
 {
-    return run_tagged(_web, [NSString stringWithFormat:@"%@return o[%u];", [self _object], index]);
+    return [self _run:[NSString stringWithFormat:@"return o[%u];", index] flags:0];
 }
 
 - (void)setWebScriptValueAtIndex:(unsigned)index value:(id)value
 {
-    run_tagged(_web, [NSString stringWithFormat:@"%@o[%u]=%@;return undefined;", [self _object], index,
-                                                script_literal(value)]);
+    [self _run:[NSString stringWithFormat:@"o[%u]=%@;return undefined;", index, WSLiteral(value)] flags:0];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<WebScriptObject %@>", [self stringRepresentation]];
+    return [NSString stringWithFormat:@"<%s %@>", class_getName([self class]), [self stringRepresentation]];
 }
 @end
 
@@ -441,6 +534,25 @@ static NSString *script_literal(id value)
 - (void)_setFrame:(WebFrame *)frame;
 - (void)_setResponse:(NSURLResponse *)response;
 - (void)_setLoading:(BOOL)loading;
+@end
+
+@interface WebFrame () {
+@public
+    NSString *_announced;   /* a link the agent saw clicked in this frame, to be loaded here */
+    NSString *_title;
+    BOOL _started;          /* its load has been reported as started */
+}
+- (instancetype)_initWithWebView:(WebView *)view parent:(WebFrame *)parent index:(NSUInteger)index;
+- (void)_setFrameView:(WebFrameView *)view;
+- (void)_start:(NSURLRequest *)request;
+- (void)_commit;
+- (void)_finish;
+- (void)_setResponse:(NSURLResponse *)response;
+- (void)_setName:(NSString *)name;
+- (NSMutableArray *)_children;
+- (void)_setChildren:(NSArray *)tree;
+- (void)_removeChildren;
+- (void)_forget;
 @end
 
 @implementation WebDataSource {
@@ -486,7 +598,7 @@ static NSString *script_literal(id value)
 - (NSString *)textEncodingName { return [_response textEncodingName]; }
 - (NSString *)pageTitle
 {
-    NSString *t = [[[_frame webView] _wk] title];
+    NSString *t = [_frame parentFrame] ? _frame->_title : [[[_frame webView] _wk] title];
     return [t length] ? t : nil;
 }
 
@@ -507,11 +619,11 @@ static void resource_read(void *source, GAsyncResult *result, void *data)
     r->done = YES;
 }
 
-/* the page's source as loaded, waited for */
+/* the page's source as loaded, waited for (WebKitGTK gives the main frame's alone) */
 - (NSData *)data
 {
     GtkWidget *web = [[[_frame webView] _wk] _gtkWebView];
-    WebKitWebResource *resource = web ? WK(webkit_web_view_get_main_resource)(web) : NULL;
+    WebKitWebResource *resource = web && ![_frame parentFrame] ? WK(webkit_web_view_get_main_resource)(web) : NULL;
     if (!resource)
         return nil;
     struct resource_data *r = calloc(1, sizeof *r);
@@ -524,31 +636,128 @@ static void resource_read(void *source, GAsyncResult *result, void *data)
 }
 @end
 
-@interface WebFrame ()
-- (instancetype)_initWithWebView:(WebView *)view;
-- (void)_start:(NSURLRequest *)request;
-- (void)_commit;
-- (void)_finish;
-- (void)_setResponse:(NSURLResponse *)response;
-@end
+/* the page's frames, from the main frame's window: their names and URLs,
+ * and theirs (a frame of another origin shows its count, not its insides) */
+static NSString *const frame_tree_script =
+    @"(function(){var f=function(w){var a=[],n=0;try{n=w.frames.length;}catch(e){}"
+    @"for(var i=0;i<n;i++){var c=w.frames[i],nm='',u='';try{nm=c.name;u=c.location.href;}catch(e){"
+    @"try{var l=w.document.querySelectorAll('iframe,frame');if(l[i])nm=l[i].name||'';}catch(e2){}}"
+    @"a.push({n:nm,u:u,c:f(c)});}return a;};return f(window);})()";
 
 @implementation WebFrame {
     WebView *_webView;   /* not retained: it owns this */
+    WebFrame *_parent;   /* not retained: it owns this */
+    NSUInteger _index;   /* in its parent's window.frames */
+    NSString *_name;
     WebDataSource *_dataSource, *_provisional;
+    WebFrameView *_frameView;
+    NSMutableArray *_children;
 }
 
-- (instancetype)_initWithWebView:(WebView *)view
+- (instancetype)_initWithWebView:(WebView *)view parent:(WebFrame *)parent index:(NSUInteger)index
 {
     self = [super init];
     _webView = view;
+    _parent = parent;
+    _index = index;
+    _children = [NSMutableArray new];
     return self;
 }
 
+- (instancetype)_initWithWebView:(WebView *)view { return [self _initWithWebView:view parent:nil index:0]; }
+
 - (void)dealloc
 {
+    [self _removeChildren];
+    [_frameView _forget];
+    [_frameView release];
+    [_children release];
     [_dataSource release];
     [_provisional release];
+    [_name release];
+    [_title release];
+    [_announced release];
     [super dealloc];
+}
+
+/* the web view is going: this frame and its children stay, if a program
+ * keeps them, but lead nowhere */
+- (void)_forget
+{
+    for (WebFrame *child in _children)
+        [child _forget];
+    _webView = nil;
+}
+
+- (void)_setFrameView:(WebFrameView *)view
+{
+    [view retain];
+    [_frameView release];
+    _frameView = view;
+}
+
+- (void)_setName:(NSString *)name
+{
+    if ([name isEqualToString:_name])
+        return;
+    [_name release];
+    _name = [name copy];
+}
+
+- (GtkWidget *)_web { return [[_webView _wk] _gtkWebView]; }
+
+- (NSString *)_windowExpression
+{
+    return _parent ? [NSString stringWithFormat:@"%@.frames[%lu]", [_parent _windowExpression], (unsigned long)_index]
+                   : @"window";
+}
+
+- (NSArray *)_path
+{
+    NSMutableArray *path = [NSMutableArray array];
+    for (WebFrame *f = self; f->_parent; f = f->_parent)
+        [path insertObject:@(f->_index) atIndex:0];
+    return path;
+}
+
+- (NSMutableArray *)_children { return _children; }
+
+- (void)_removeChildren
+{
+    for (WebFrame *child in _children)
+        [child _forget];
+    [_children removeAllObjects];
+}
+
+/* the frames the page has now: those at the same place are kept */
+- (void)_setChildren:(NSArray *)tree
+{
+    if (![tree isKindOfClass:[NSArray class]])
+        tree = @[];
+    while ([_children count] > [tree count]) {
+        [[_children lastObject] _forget];
+        [_children removeLastObject];
+    }
+    for (NSUInteger i = 0; i < [tree count]; i++) {
+        NSDictionary *t = [tree[i] isKindOfClass:[NSDictionary class]] ? tree[i] : @{};
+        if (i == [_children count]) {
+            WebFrame *child = [[[WebFrame alloc] _initWithWebView:_webView parent:self index:i] autorelease];
+            [_children addObject:child];
+        }
+        WebFrame *child = _children[i];
+        if ([t[@"n"] isKindOfClass:[NSString class]])
+            [child _setName:t[@"n"]];
+        NSString *u = [t[@"u"] isKindOfClass:[NSString class]] ? t[@"u"] : nil;
+        if ([u length] && !child->_dataSource && !child->_provisional) {
+            NSURL *url = [NSURL URLWithString:u];
+            if (url) {
+                [child _start:[NSURLRequest requestWithURL:url]];
+                [child _commit];
+                [child _finish];
+            }
+        }
+        [child _setChildren:t[@"c"]];
+    }
 }
 
 - (void)_start:(NSURLRequest *)request
@@ -567,6 +776,8 @@ static void resource_read(void *source, GAsyncResult *result, void *data)
     [_dataSource release];
     _dataSource = _provisional;
     _provisional = nil;
+    [_title release];
+    _title = nil;
 }
 
 - (void)_finish
@@ -574,45 +785,188 @@ static void resource_read(void *source, GAsyncResult *result, void *data)
     [_dataSource _setLoading:NO];
     [_provisional release];
     _provisional = nil;
+    _started = NO;
 }
 
-- (NSString *)name { return @""; }
+- (NSString *)name { return _name ?: @""; }
 - (WebView *)webView { return _webView; }
 - (WebDataSource *)dataSource { return _dataSource; }
 - (WebDataSource *)provisionalDataSource { return _provisional; }
-- (WebFrame *)parentFrame { return nil; }
+- (WebFrame *)parentFrame { return _parent; }
+
 - (NSArray *)childFrames
 {
-    WKWarnOnce("a WebFrame's child frames (each web view has its main frame alone)");
-    return @[];
+    GtkWidget *web = [self _web];
+    if (web) {
+        id tree = WKObjectFromJSON([WKEvaluateJSONSync(web, frame_tree_script) UTF8String]);
+        [[_webView mainFrame] _setChildren:tree];
+    }
+    return [[_children copy] autorelease];
 }
-- (WebScriptObject *)windowObject { return [_webView windowScriptObject]; }
-- (id)DOMDocument
+
+/* A subframe's view isn't in a window (WebKitGTK draws the subframe in
+ * its page); its size and scroll position are read when it is asked for. */
+- (WebFrameView *)frameView
 {
-    WKWarnOnce("WebKit's DOM classes (DOMDocument and the others; use scripts instead)");
-    return nil;
+    if (!_parent)
+        return _frameView;
+    if (!_frameView)
+        _frameView = [[WebFrameView alloc] _initWithFrame:NSMakeRect(0, 0, 0, 0) webFrame:self];
+    GtkWidget *web = [self _web];
+    if (web) {
+        NSString *script = [NSString
+            stringWithFormat:@"(function(){try{var w=%@,d=w.document,s=d.scrollingElement||d.documentElement;"
+                             @"return [w.scrollX,w.scrollY,s.scrollWidth,s.scrollHeight,w.innerWidth,w.innerHeight];}"
+                             @"catch(e){return null;}})()",
+                             [self _windowExpression]];
+        NSArray *g = WKObjectFromJSON([WKEvaluateJSONSync(web, script) UTF8String]);
+        if ([g isKindOfClass:[NSArray class]] && [g count] == 6) {
+            CGFloat zoom = [_webView _zoom];
+            [_frameView setFrameSize:NSMakeSize([g[4] doubleValue] * zoom, [g[5] doubleValue] * zoom)];
+            [_frameView _setPageGeometry:[g subarrayWithRange:NSMakeRange(0, 4)]];
+        }
+    }
+    return _frameView;
 }
-- (id)frameElement { return nil; }
-- (void)loadRequest:(NSURLRequest *)request { [[_webView _wk] loadRequest:request]; }
+
+- (WebScriptObject *)windowObject
+{
+    if (!_parent)
+        return [_webView windowScriptObject];
+    id w = WSRun([self _web], [NSString stringWithFormat:@"return %@;", [self _windowExpression]], 0);
+    return [w isKindOfClass:[WebScriptObject class]] ? w : nil;
+}
+
+- (DOMDocument *)DOMDocument
+{
+    id d = WSRun([self _web], [NSString stringWithFormat:@"return %@.document;", [self _windowExpression]], 0);
+    return [d isKindOfClass:[DOMDocument class]] ? d : nil;
+}
+
+- (DOMHTMLElement *)frameElement
+{
+    if (!_parent)
+        return nil;
+    id e = WSRun([self _web], [NSString stringWithFormat:@"return %@.frameElement;", [self _windowExpression]], 0);
+    if (![e isKindOfClass:[DOMHTMLElement class]])   /* another origin: the parent's list of frames */
+        e = WSRun([self _web],
+                  [NSString stringWithFormat:@"var w=%@,l=w.document.querySelectorAll('iframe,frame');"
+                                             @"for(var i=0;i<l.length;i++)"
+                                             @"if(l[i].contentWindow===w.frames[%lu])return l[i];"
+                                             @"return null;",
+                                             [_parent _windowExpression], (unsigned long)_index],
+                  0);
+    return [e isKindOfClass:[DOMHTMLElement class]] ? e : nil;
+}
+
+/* a subframe's loads are asked of its window */
+/* the navigation this frame is about to ask about is its own */
+- (void)_announce:(NSString *)url
+{
+    [_announced release];
+    _announced = [url copy];
+}
+
+- (void)_inFrame:(NSString *)body
+{
+    WSRun([self _web], [NSString stringWithFormat:@"var w=%@;%@return undefined;", [self _windowExpression], body], 0);
+}
+
+- (void)loadRequest:(NSURLRequest *)request
+{
+    if (!_parent) {
+        [[_webView _wk] loadRequest:request];
+        return;
+    }
+    NSString *url = [[request URL] absoluteString];
+    if (url) {
+        [self _announce:url];
+        [self _inFrame:[NSString stringWithFormat:@"w.location.href=%@;", WKQuote(url)]];
+    }
+}
+
 - (void)loadData:(NSData *)data MIMEType:(NSString *)MIMEType textEncodingName:(NSString *)encodingName
          baseURL:(NSURL *)URL
 {
-    [[_webView _wk] loadData:data ?: [NSData data] MIMEType:MIMEType characterEncodingName:encodingName baseURL:URL];
+    if (!_parent) {
+        [[_webView _wk] loadData:data ?: [NSData data] MIMEType:MIMEType characterEncodingName:encodingName
+                         baseURL:URL];
+        return;
+    }
+    NSString *type = MIMEType ?: @"text/html";
+    NSString *url = [NSString stringWithFormat:@"data:%@;base64,%@", type,
+                                               [data ?: [NSData data] base64EncodedStringWithOptions:0]];
+    [self _announce:url];
+    [self _inFrame:[NSString stringWithFormat:@"w.location.href=%@;", WKQuote(url)]];
 }
-- (void)loadHTMLString:(NSString *)string baseURL:(NSURL *)URL { [[_webView _wk] loadHTMLString:string baseURL:URL]; }
+
+- (void)loadHTMLString:(NSString *)string baseURL:(NSURL *)URL
+{
+    if (!_parent) {
+        [[_webView _wk] loadHTMLString:string baseURL:URL];
+        return;
+    }
+    /* written into the frame's document, which keeps its URL */
+    [self _inFrame:[NSString stringWithFormat:@"var d=w.document;d.open();d.write(%@);d.close();",
+                                              WKQuote(string ?: @"")]];
+}
+
 - (void)loadAlternateHTMLString:(NSString *)string baseURL:(NSURL *)baseURL forUnreachableURL:(NSURL *)unreachableURL
 {
-    [[_webView _wk] loadHTMLString:string baseURL:baseURL];
+    [self loadHTMLString:string baseURL:baseURL];
 }
-- (void)stopLoading { [[_webView _wk] stopLoading]; }
-- (void)reload { [[_webView _wk] reload]; }
-- (void)reloadFromOrigin { [[_webView _wk] reloadFromOrigin]; }
+
+- (void)stopLoading
+{
+    if (_parent)
+        [self _inFrame:@"w.stop();"];
+    else
+        [[_webView _wk] stopLoading];
+}
+
+- (void)reload
+{
+    if (_parent) {
+        [self _announce:[[[_dataSource request] URL] absoluteString]];
+        [self _inFrame:@"w.location.reload();"];
+    } else
+        [[_webView _wk] reload];
+}
+
+- (void)reloadFromOrigin
+{
+    if (_parent) {
+        [self _announce:[[[_dataSource request] URL] absoluteString]];
+        [self _inFrame:@"w.location.reload();"];
+    } else
+        [[_webView _wk] reloadFromOrigin];
+}
+
+- (WebFrame *)_findNamed:(NSString *)name
+{
+    if ([[self name] isEqualToString:name])
+        return self;
+    for (WebFrame *child in _children) {
+        WebFrame *f = [child _findNamed:name];
+        if (f)
+            return f;
+    }
+    return nil;
+}
+
 - (WebFrame *)findFrameNamed:(NSString *)name
 {
-    if (![name length] || [name isEqualToString:@"_self"] || [name isEqualToString:@"_top"] ||
-        [name isEqualToString:@"_current"] || [name isEqualToString:@"_parent"])
+    if (![name length] || [name isEqualToString:@"_self"] || [name isEqualToString:@"_current"])
         return self;
-    return nil;
+    WebFrame *main = [_webView mainFrame] ?: self;
+    if ([name isEqualToString:@"_top"])
+        return main;
+    if ([name isEqualToString:@"_parent"])
+        return _parent ?: self;
+    if ([name isEqualToString:@"_blank"])
+        return nil;
+    [main childFrames];   /* brought up to date */
+    return [self _findNamed:name] ?: [main _findNamed:name];
 }
 @end
 
@@ -659,14 +1013,165 @@ static NSDictionary *action_information(WKNavigationAction *action)
     return info;
 }
 
-/* The WKWebView's delegate, on the WebView's behalf. */
-@interface WebViewAdapter : NSObject <WKNavigationDelegate, WKUIDelegate> {
+/* Ferry's agent in each frame of the older web view's pages, in a world
+ * of its own (freemac 1.217, Ferry 0.42.0). WebKitGTK reports the main
+ * frame's loads alone, so a subframe's agent says when its document is
+ * committed, has its title and has finished loading, and which link
+ * clicked in it is to load there; the main frame's says when the page
+ * scrolls or changes size. Each message names its frame by its path in
+ * window.frames, and its web view by the number the web view gives the
+ * main frame's agent when the page is committed (the views a page opens
+ * share their opener's scripts): until then the messages wait. */
+static const char agent_world[] = "ferry-webview";
+static NSString *const agent_script =
+    @"(function(){if(window.__ferryAgent)return;var A=window.__ferryAgent={v:0,q:[]};"
+    @"var H=function(){try{return window.webkit.messageHandlers.ferryWebView;}catch(e){return null;}};"
+    @"var root=function(){if(window===window.top)return A;"
+    @"try{return window.top.__ferryAgent||null;}catch(e){return null;}};"
+    @"var path=function(){var p=[],w=window;try{while(w!==w.parent){var u=w.parent,n=u.frames.length,i=0;"
+    @"for(;i<n;i++)if(u.frames[i]===w)break;p.unshift(i);w=u;}}catch(e){}return p;};"
+    @"A.post=function(m){var h=H();if(h)h.postMessage(m);};"
+    @"A.send=function(m){m.p=path();var r=root();if(r&&!r.v){r.q.push(m);return;}m.v=r?r.v:0;A.post(m);};"
+    @"A.setView=function(v){A.v=v;var q=A.q;A.q=[];for(var i=0;i<q.length;i++){q[i].v=v;A.post(q[i]);}};"
+    @"if(window!==window.top){A.send({e:'commit',u:location.href,n:window.name});"
+    @"document.addEventListener('DOMContentLoaded',function(){"
+    @"if(document.title)A.send({e:'title',t:document.title});});"
+    @"window.addEventListener('load',function(){A.send({e:'finish',t:document.title});});"
+    @"document.addEventListener('click',function(ev){var t=ev.target,a=t&&t.closest?t.closest('a[href]'):null;"
+    @"if(a&&(!a.target||a.target==='_self'))A.send({e:'will',u:a.href});},true);"
+    @"}else{var due=0,last='';var geo=function(){due=0;var s=document.scrollingElement||document.documentElement;"
+    @"if(!s)return;var g=[scrollX,scrollY,s.scrollWidth,s.scrollHeight],k=g.join();if(k===last)return;last=k;"
+    @"A.send({e:'geom',g:g});};var soon=function(){if(!due)due=setTimeout(geo,10);};"
+    @"window.addEventListener('scroll',soon,true);window.addEventListener('resize',soon);"
+    @"window.addEventListener('load',soon);document.addEventListener('DOMContentLoaded',function(){soon();"
+    @"try{new ResizeObserver(soon).observe(document.documentElement);}catch(e){}});}})();";
+
+/* the older web views, by number, and the numbers of those on each user
+ * content manager (not retained) */
+static NSMutableDictionary *views_by_id, *views_by_manager;
+
+@interface WebView ()
+- (void)_agent:(NSDictionary *)message;
+- (long)_number;
+- (BOOL)_madeForOpener;
+- (id)_adapter;
+@end
+
+static void on_agent_message(WebKitUserContentManager *manager, WebKitJavascriptResult *result, void *data)
+{
+    @autoreleasepool {
+        BOOL unsupported = NO;
+        NSDictionary *m = WKObjectFromJSC(WK(webkit_javascript_result_get_js_value)(result), &unsupported);
+        if (![m isKindOfClass:[NSDictionary class]])
+            return;
+        WebView *view = [views_by_id[m[@"v"]] nonretainedObjectValue];
+        if (!view) {   /* not yet told its view: the first on its manager */
+            NSArray *ids = views_by_manager[[NSValue valueWithPointer:manager]];
+            view = [ids count] ? [views_by_id[ids[0]] nonretainedObjectValue] : nil;
+        }
+        [[view retain] autorelease];
+        [view _agent:m];
+    }
+}
+
+/* One resource a page loads, for the resource load delegate. */
+@interface WebResourceRecord : NSObject {
 @public
-    WebView *_view;   /* not retained: it owns this */
+    id _identifier;
+    WebDataSource *_dataSource;
+    WebKitWebResource *_resource;
+    WebView *_view;   /* not retained */
+    BOOL _failed;
+}
+@end
+@implementation WebResourceRecord
+- (void)dealloc
+{
+    [_identifier release];
+    [_dataSource release];
+    [super dealloc];
 }
 @end
 
+/* The WKWebView's delegate, on the WebView's behalf. */
+@interface WebViewAdapter : NSObject <WKNavigationDelegate, WKUIDelegate> {
+@public
+    WebView *_view;            /* not retained: it owns this */
+    NSURLRequest *_pendingMain;   /* allowed for the main frame, until its load starts */
+    NSURL *_newWindowAllowed;     /* a new window's navigation the policy delegate allowed */
+    NSMutableArray *_resources;   /* WebResourceRecords loading */
+    long _lastResource;
+    BOOL _committed;              /* the main frame has a page, which may have frames */
+}
+- (void)_endResources;
+@end
+
+/* the WebView made while a UI delegate is asked for a new window's view
+ * takes this configuration, which relates it to the opener */
+static WKWebViewConfiguration *opener_configuration;
+
 @implementation WebViewAdapter
+
+- (void)dealloc
+{
+    [self _endResources];
+    [_resources release];
+    [_pendingMain release];
+    [_newWindowAllowed release];
+    [super dealloc];
+}
+
+/* every frame of the page, the main frame first */
+static void all_frames(WebFrame *frame, NSMutableArray *out)
+{
+    [out addObject:frame];
+    for (WebFrame *child in [frame _children])
+        all_frames(child, out);
+}
+
+/* WebKitGTK asks about subframes' navigations too, without saying whose.
+ * A link the agent saw clicked in a subframe is that frame's; otherwise a
+ * URL a frame element of the page is loading is that frame's; the rest
+ * are the main frame's. */
+- (WebFrame *)_frameFor:(NSURLRequest *)request
+{
+    WebFrame *main = [_view mainFrame];
+    NSString *url = [[request URL] absoluteString];
+    if (!_committed || !url)
+        return main;
+    NSMutableArray *frames = [NSMutableArray array];
+    all_frames(main, frames);
+    for (WebFrame *f in frames)
+        if (f != main && [f->_announced isEqualToString:url]) {
+            [f->_announced release];
+            f->_announced = nil;
+            return f;
+        }
+    GtkWidget *web = [[_view _wk] _gtkWebView];
+    NSString *script =
+        @"(function(){var out=[];var walk=function(w,p){var l,n=0;try{l=w.document.querySelectorAll('iframe,frame');"
+        @"n=w.frames.length;}catch(e){return;}for(var i=0;i<l.length;i++){var el=l[i],c=el.contentWindow,x=-1;"
+        @"for(var j=0;j<n;j++)if(w.frames[j]===c){x=j;break;}if(x<0)continue;var q=p.concat([x]);"
+        @"out.push({p:q,n:el.name||'',s:el.hasAttribute('srcdoc')?'about:srcdoc':(el.src||'about:blank')});"
+        @"walk(c,q);}};"
+        @"walk(window,[]);return out;})()";
+    NSArray *list = web ? WKObjectFromJSON([WKEvaluateJSONSync(web, script) UTF8String]) : nil;
+    if (![list isKindOfClass:[NSArray class]])
+        return main;
+    WebFrame *found = nil;
+    for (NSDictionary *e in list) {
+        if (![e isKindOfClass:[NSDictionary class]] || ![e[@"s"] isEqual:url])
+            continue;
+        WebFrame *f = [_view _frameAtPath:e[@"p"] create:YES];
+        if (f && !f->_started && [e[@"n"] isKindOfClass:[NSString class]])
+            [f _setName:e[@"n"]];
+        if (f && !f->_started)
+            return f;
+        if (!found)
+            found = f;
+    }
+    return found ?: main;
+}
 
 - (void)webView:(WKWebView *)wk decidePolicyForNavigationAction:(WKNavigationAction *)action
     decisionHandler:(void (^)(WKNavigationActionPolicy))handler
@@ -674,24 +1179,38 @@ static NSDictionary *action_information(WKNavigationAction *action)
     WebView *view = _view;
     id d = [view policyDelegate];
     BOOL newWindow = action.targetFrame == nil;
+    NSURLRequest *request = action.request;
+    WebFrame *frame = newWindow ? nil : [self _frameFor:request];
     WebPolicyListener *listener = [[[WebPolicyListener alloc] init] autorelease];
     void (^h)(WKNavigationActionPolicy) = [[handler copy] autorelease];
-    NSURLRequest *request = action.request;
+    WebViewAdapter *adapter = self;
     listener->_decide = [^(int how) {
         if (how == 2)
             WKWarnOnce("downloads from a web view (the navigation was cancelled)");
-        if (how == 1 && !newWindow)
-            [[view mainFrame] _start:request];
+        if (how == 1 && newWindow) {
+            [adapter->_newWindowAllowed release];
+            adapter->_newWindowAllowed = [[request URL] retain];
+        } else if (how == 1 && frame == [view mainFrame]) {
+            [adapter->_pendingMain release];
+            adapter->_pendingMain = [request retain];
+        } else if (how == 1 && frame) {
+            [frame _start:request];
+            frame->_started = YES;
+            id fd = [view frameLoadDelegate];
+            if ([fd respondsToSelector:@selector(webView:didStartProvisionalLoadForFrame:)])
+                [fd webView:view didStartProvisionalLoadForFrame:frame];
+        }
         h(how == 1 ? WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel);
     } copy];
     if (newWindow && [d respondsToSelector:@selector(webView:decidePolicyForNewWindowAction:request:newFrameName:
                                                         decisionListener:)])
-        [d webView:view decidePolicyForNewWindowAction:action_information(action) request:request newFrameName:@""
+        [d webView:view decidePolicyForNewWindowAction:action_information(action) request:request
+                newFrameName:[action _targetFrameName] ?: @""
             decisionListener:listener];
     else if (!newWindow && [d respondsToSelector:@selector(webView:decidePolicyForNavigationAction:request:frame:
                                                               decisionListener:)])
         [d webView:view decidePolicyForNavigationAction:action_information(action) request:request
-                     frame:[view mainFrame]
+                     frame:frame
           decisionListener:listener];
     else
         [listener use];
@@ -702,8 +1221,19 @@ static NSDictionary *action_information(WKNavigationAction *action)
 {
     WebView *view = _view;
     id d = [view policyDelegate];
-    if (response.forMainFrame)
-        [[view mainFrame] _setResponse:response.response];
+    WebFrame *frame = [view mainFrame];
+    if (!response.forMainFrame) {   /* a subframe's page: the frame loading its URL */
+        NSMutableArray *frames = [NSMutableArray array];
+        all_frames([view mainFrame], frames);
+        for (WebFrame *f in frames)
+            if (f != [view mainFrame] &&
+                [[[[f provisionalDataSource] request] URL] isEqual:response.response.URL]) {
+                frame = f;
+                break;
+            }
+    }
+    if (response.forMainFrame || frame != [view mainFrame])
+        [frame _setResponse:response.response];
     WebPolicyListener *listener = [[[WebPolicyListener alloc] init] autorelease];
     void (^h)(WKNavigationResponsePolicy) = [[handler copy] autorelease];
     BOOL canShow = response.canShowMIMEType;
@@ -713,10 +1243,11 @@ static NSDictionary *action_information(WKNavigationAction *action)
         h(how == 1 ? WKNavigationResponsePolicyAllow : WKNavigationResponsePolicyCancel);
     } copy];
     NSString *type = response.response.MIMEType ?: @"";
+    NSURL *url = response.response.URL ?: [NSURL URLWithString:@"about:blank"];
     if ([d respondsToSelector:@selector(webView:decidePolicyForMIMEType:request:frame:decisionListener:)])
         [d webView:view decidePolicyForMIMEType:type
-                       request:[NSURLRequest requestWithURL:response.response.URL ?: [NSURL URLWithString:@"about:blank"]]
-                         frame:[view mainFrame]
+                       request:[NSURLRequest requestWithURL:url]
+                         frame:frame
               decisionListener:listener];
     else if (canShow)
         [listener use];
@@ -724,12 +1255,29 @@ static NSDictionary *action_information(WKNavigationAction *action)
         [listener ignore];
 }
 
+/* the main frame's provisional data source: the request allowed for it,
+ * or one for the URL WebKitGTK is loading */
+- (void)_startMain
+{
+    WebFrame *frame = [_view mainFrame];
+    NSURLRequest *request = _pendingMain;
+    if (!request) {
+        GtkWidget *web = [[_view _wk] _gtkWebView];
+        const char *uri = web ? WK(webkit_web_view_get_uri)(web) : NULL;
+        NSURL *url = uri ? [NSURL URLWithString:WKString(uri)] : nil;
+        request = [NSURLRequest requestWithURL:url ?: [NSURL URLWithString:@"about:blank"]];
+    }
+    [frame _start:request];
+    [_pendingMain release];
+    _pendingMain = nil;
+}
+
 - (void)webView:(WKWebView *)wk didStartProvisionalNavigation:(WKNavigation *)navigation
 {
     WebView *view = _view;
     WebFrame *frame = [view mainFrame];
-    if (![frame provisionalDataSource])   /* a load that didn't ask for a policy, as for loadHTMLString: */
-        [frame _start:[NSURLRequest requestWithURL:wk.URL ?: [NSURL URLWithString:@"about:blank"]]];
+    if (![frame provisionalDataSource] || _pendingMain)
+        [self _startMain];
     [[NSNotificationCenter defaultCenter] postNotificationName:WebViewProgressStartedNotification object:view];
     id d = [view frameLoadDelegate];
     if ([d respondsToSelector:@selector(webView:didStartProvisionalLoadForFrame:)])
@@ -759,6 +1307,17 @@ static NSDictionary *action_information(WKNavigationAction *action)
     WebView *view = _view;
     WebFrame *frame = [view mainFrame];
     [frame _commit];
+    [frame _removeChildren];   /* a new page: its frames are new */
+    _committed = YES;
+    [[frame frameView] _setPageGeometry:@[ @0, @0, @0, @0 ]];
+    /* the page's agent may send its messages now */
+    GtkWidget *web = [wk _gtkWebView];
+    long number = [view _number];
+    if (web)
+        WK(webkit_web_view_evaluate_javascript)(
+            web,
+            [[NSString stringWithFormat:@"if(window.__ferryAgent)window.__ferryAgent.setView(%ld)", number] UTF8String],
+            -1, agent_world, NULL, NULL, NULL, NULL);
     id d = [view frameLoadDelegate];
     if ([d respondsToSelector:@selector(webView:didCommitLoadForFrame:)])
         [d webView:view didCommitLoadForFrame:frame];
@@ -774,6 +1333,9 @@ static NSDictionary *action_information(WKNavigationAction *action)
 {
     WebView *view = _view;
     WebFrame *frame = [view mainFrame];
+    /* the page's size, read now; the agent's messages sent before this
+     * (its subframes' loads) come in while it is read */
+    WSRun([wk _gtkWebView], @"return null;", WSGeometry);
     [frame _finish];
     id d = [view frameLoadDelegate];
     if ([d respondsToSelector:@selector(webView:didFinishLoadForFrame:)])
@@ -846,25 +1408,57 @@ static NSDictionary *action_information(WKNavigationAction *action)
     handler(result);
 }
 
-/* A new window: the UI delegate makes a WebView, and the request is loaded
- * in it (the page that opened it gets null from window.open) */
+/* A new window (freemac 1.217, Ferry 0.42.0): the policy delegate is
+ * asked first (unless it was for this navigation already), then the UI
+ * delegate makes a WebView. The WebView made then is related to this one,
+ * so WebKitGTK loads the page in it and the page that opened it gets its
+ * window; a WebView made some other way is only loaded, and the page gets
+ * null. */
 - (WKWebView *)webView:(WKWebView *)wk createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration
     forNavigationAction:(WKNavigationAction *)action
          windowFeatures:(WKWindowFeatures *)features
 {
-    id d = [_view UIDelegate];
+    WebView *view = _view;
+    id d = [view UIDelegate], pd = [view policyDelegate];
+    NSURLRequest *request = action.request;
+    BOOL asked = _newWindowAllowed && [_newWindowAllowed isEqual:[request URL]];
+    [_newWindowAllowed release];
+    _newWindowAllowed = nil;
+    if (!asked && [pd respondsToSelector:@selector(webView:decidePolicyForNewWindowAction:request:newFrameName:
+                                                       decisionListener:)]) {
+        __block int answer = -1;
+        WebPolicyListener *listener = [[[WebPolicyListener alloc] init] autorelease];
+        listener->_decide = [^(int how) { answer = how; } copy];
+        [pd webView:view decidePolicyForNewWindowAction:action_information(action) request:request
+                newFrameName:[action _targetFrameName] ?: @""
+            decisionListener:listener];
+        if (answer < 0) {
+            WKWarnOnce("a policy delegate's answer for a new window given later (the window isn't opened)");
+            listener->_decide = [^(int how) {} copy];
+            return nil;
+        }
+        if (answer == 2)
+            WKWarnOnce("downloads from a web view (the navigation was cancelled)");
+        if (answer != 1)
+            return nil;
+    }
     if (![d respondsToSelector:@selector(webView:createWebViewWithRequest:)])
         return nil;
-    NSURLRequest *request = action.request;
-    WebView *opened = [d webView:_view createWebViewWithRequest:request];
-    if (opened) {
-        if (request.URL && ![request.URL.absoluteString isEqualToString:@""])
-            [[opened mainFrame] loadRequest:request];
-        id od = [opened UIDelegate];
-        if ([od respondsToSelector:@selector(webViewShow:)])
-            [od webViewShow:opened];
-    }
-    return nil;
+    WKWebViewConfiguration *previous = opener_configuration;
+    opener_configuration = [configuration retain];
+    WebView *opened = [d webView:view createWebViewWithRequest:request];
+    [opener_configuration release];   /* if no WebView took it */
+    opener_configuration = previous;
+    if (!opened)
+        return nil;
+    WKWebView *made = [opened _wk];
+    BOOL related = [opened _madeForOpener] && [made _gtkWebView];
+    if (!related && request.URL && ![request.URL.absoluteString isEqualToString:@""])
+        [[opened mainFrame] loadRequest:request];
+    id od = [opened UIDelegate];
+    if ([od respondsToSelector:@selector(webViewShow:)])
+        [od webViewShow:opened];
+    return related ? made : nil;
 }
 
 - (void)webViewDidClose:(WKWebView *)wk
@@ -872,6 +1466,125 @@ static NSDictionary *action_information(WKNavigationAction *action)
     id d = [_view UIDelegate];
     if ([d respondsToSelector:@selector(webViewClose:)])
         [d webViewClose:_view];
+}
+
+/* ---- the resource load delegate (freemac 1.217, Ferry 0.42.0) ---- */
+
+- (void)_endResource:(WebResourceRecord *)r
+{
+    WKDisconnect(r->_resource, r);
+    g_object_unref(r->_resource);
+    [_resources removeObjectIdenticalTo:r];
+}
+
+- (void)_endResources
+{
+    while ([_resources count])
+        [self _endResource:[_resources lastObject]];
+}
+
+static void on_resource_sent(WebKitWebResource *resource, WebKitURIRequest *request, WebKitURIResponse *redirect,
+                             void *data)
+{
+    @autoreleasepool {
+        WebResourceRecord *r = [[(WebResourceRecord *)data retain] autorelease];
+        id d = [r->_view resourceLoadDelegate];
+        if (![d respondsToSelector:@selector(webView:resource:willSendRequest:redirectResponse:fromDataSource:)])
+            return;
+        NSURLRequest *sent = WKRequest(request);
+        NSURLRequest *answer = [d webView:r->_view resource:r->_identifier willSendRequest:sent
+                         redirectResponse:WKResponse(redirect)
+                           fromDataSource:r->_dataSource];
+        if (answer != sent && ![[answer URL] isEqual:[sent URL]])
+            WKWarnOnce("a resource load delegate's changed or refused requests (the request is sent as it was)");
+    }
+}
+
+static void on_resource_response(void *object, GParamSpec *pspec, void *data)
+{
+    @autoreleasepool {
+        WebResourceRecord *r = [[(WebResourceRecord *)data retain] autorelease];
+        id d = [r->_view resourceLoadDelegate];
+        WebKitURIResponse *response = WK(webkit_web_resource_get_response)(r->_resource);
+        if (response && [d respondsToSelector:@selector(webView:resource:didReceiveResponse:fromDataSource:)])
+            [d webView:r->_view resource:r->_identifier didReceiveResponse:WKResponse(response)
+                fromDataSource:r->_dataSource];
+    }
+}
+
+static void on_resource_data(WebKitWebResource *resource, uint64_t length, void *data)
+{
+    @autoreleasepool {
+        WebResourceRecord *r = [[(WebResourceRecord *)data retain] autorelease];
+        id d = [r->_view resourceLoadDelegate];
+        if ([d respondsToSelector:@selector(webView:resource:didReceiveContentLength:fromDataSource:)])
+            [d webView:r->_view resource:r->_identifier didReceiveContentLength:(NSInteger)length
+                fromDataSource:r->_dataSource];
+    }
+}
+
+static void on_resource_failed(WebKitWebResource *resource, GError *error, void *data)
+{
+    @autoreleasepool {
+        WebResourceRecord *r = [[(WebResourceRecord *)data retain] autorelease];
+        r->_failed = YES;
+        id d = [r->_view resourceLoadDelegate];
+        if ([d respondsToSelector:@selector(webView:resource:didFailLoadingWithError:fromDataSource:)])
+            [d webView:r->_view resource:r->_identifier
+                didFailLoadingWithError:WKLoadError(error, WK(webkit_web_resource_get_uri)(resource))
+                         fromDataSource:r->_dataSource];
+    }
+}
+
+static void on_resource_finished(WebKitWebResource *resource, void *data)
+{
+    @autoreleasepool {
+        WebResourceRecord *r = [[(WebResourceRecord *)data retain] autorelease];
+        WebView *view = r->_view;
+        id d = [view resourceLoadDelegate];
+        if (!r->_failed && [d respondsToSelector:@selector(webView:resource:didFinishLoadingFromDataSource:)])
+            [d webView:view resource:r->_identifier didFinishLoadingFromDataSource:r->_dataSource];
+        WebViewAdapter *adapter = [view _adapter];
+        [adapter _endResource:r];
+    }
+}
+
+static void on_resource_started(GtkWidget *web, WebKitWebResource *resource, WebKitURIRequest *request, void *data)
+{
+    @autoreleasepool {
+        WebViewAdapter *self = data;
+        WebView *view = [[self->_view retain] autorelease];
+        id d = [view resourceLoadDelegate];
+        if (!d)
+            return;
+        WebFrame *main = [view mainFrame];
+        /* the page itself: its provisional data source may not be made yet */
+        if (resource == WK(webkit_web_view_get_main_resource)(web) && ![main provisionalDataSource] &&
+            [view isLoading])
+            [self _startMain];
+        WebResourceRecord *r = [[[WebResourceRecord alloc] init] autorelease];
+        r->_view = view;
+        r->_resource = g_object_ref(resource);
+        r->_dataSource = [[main provisionalDataSource] ?: [main dataSource] retain];
+        NSURLRequest *initial = WKRequest(request);
+        if ([d respondsToSelector:@selector(webView:identifierForInitialRequest:fromDataSource:)])
+            r->_identifier =
+                [[d webView:view identifierForInitialRequest:initial fromDataSource:r->_dataSource] retain];
+        if (!r->_identifier)
+            r->_identifier = [@(++self->_lastResource) retain];
+        if (!self->_resources)
+            self->_resources = [NSMutableArray new];
+        [self->_resources addObject:r];
+        WKConnect(resource, "sent-request", on_resource_sent, r);
+        WKConnect(resource, "notify::response", on_resource_response, r);
+        static int has_data = -1;   /* "received-data" is gone from newer WebKitGTKs */
+        if (has_data < 0)
+            has_data = g_signal_lookup("received-data", WK(webkit_web_resource_get_type)()) != 0;
+        if (has_data)
+            WKConnect(resource, "received-data", on_resource_data, r);
+        WKConnect(resource, "failed", on_resource_failed, r);
+        WKConnect(resource, "finished", on_resource_finished, r);
+    }
 }
 @end
 
@@ -881,14 +1594,20 @@ static NSDictionary *action_information(WKNavigationAction *action)
     WKWebView *_wk;
     WebViewAdapter *_adapter;
     WebFrame *_mainFrame;
+    WebFrameView *_mainFrameView;
     WebPreferences *_preferences;
     WebScriptObject *_windowScriptObject;
     id _frameLoadDelegate, _policyDelegate, _UIDelegate, _resourceLoadDelegate, _downloadDelegate, _editingDelegate;
-    NSString *_applicationName, *_groupName;
+    NSString *_applicationName, *_groupName, *_frameName;
     NSWindow *_hostWindow;
     float _textSizeMultiplier;
     BOOL _editable, _drawsBackground, _shouldUpdateWhileOffscreen, _maintainsBackForwardList,
         _continuousSpellChecking, _closed;
+    /* freemac 1.217, Ferry 0.42.0 */
+    long _number;                      /* for the agent's messages */
+    WebKitUserContentManager *_manager;   /* its page's scripts (its opener's, for a new window) */
+    WebKitUserStyleSheet *_styleSheet; /* the preferences' user style sheet */
+    BOOL _madeForOpener;
 }
 
 + (NSArray *)MIMETypesShownAsHTML
@@ -908,29 +1627,85 @@ static NSDictionary *action_information(WKNavigationAction *action)
            [type isEqualToString:@"application/json"] || [type isEqualToString:@"application/javascript"];
 }
 
+/* the agent's script and messages, once for each user content manager */
+- (void)_startAgent
+{
+    WebKitUserContentManager *m = _manager;
+    if (!m)
+        return;
+    if (!views_by_manager)
+        views_by_manager = [NSMutableDictionary new];
+    NSValue *key = [NSValue valueWithPointer:m];
+    NSMutableArray *ids = views_by_manager[key];
+    if (!ids)
+        views_by_manager[key] = ids = [NSMutableArray array];
+    [ids addObject:@(_number)];
+    if (g_object_get_data(m, "ferry-webview-agent"))
+        return;
+    g_object_set_data(m, "ferry-webview-agent", (void *)1);
+    WebKitUserScript *s = WK(webkit_user_script_new_for_world)([agent_script UTF8String],
+                                                               WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES,
+                                                               WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, agent_world,
+                                                               NULL, NULL);
+    WK(webkit_user_content_manager_add_script)(m, s);
+    WK(webkit_user_script_unref)(s);
+    WKConnect(m, "script-message-received::ferryWebView", on_agent_message, [WebView class]);
+    WK(webkit_user_content_manager_register_script_message_handler_in_world)(m, "ferryWebView", agent_world);
+}
+
 - (void)_setUp
 {
+    static long last_number;
+    _number = ++last_number;
     _textSizeMultiplier = 1;
     _drawsBackground = YES;
     _maintainsBackForwardList = YES;
     _mainFrame = [[WebFrame alloc] _initWithWebView:self];
+    [_mainFrame _setName:_frameName];
+    /* the main frame's view fills this; the WKWebView fills it, over its scroll view */
+    _mainFrameView = [[WebFrameView alloc] _initWithFrame:[self bounds] webFrame:_mainFrame];
+    [_mainFrameView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+    [_mainFrame _setFrameView:_mainFrameView];
+    [self addSubview:_mainFrameView];
     _adapter = [[WebViewAdapter alloc] init];
     _adapter->_view = self;
-    _wk = [[WKWebView alloc] initWithFrame:[self bounds] configuration:nil];
+    WKWebViewConfiguration *configuration = nil;
+    if (opener_configuration) {   /* made for a new window: related to its opener */
+        configuration = [opener_configuration autorelease];
+        opener_configuration = nil;
+        _madeForOpener = YES;
+    }
+    _wk = [[WKWebView alloc] initWithFrame:[_mainFrameView bounds] configuration:configuration];
     [_wk setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
     _wk.navigationDelegate = _adapter;
     _wk.UIDelegate = _adapter;
     [_wk addObserver:_adapter forKeyPath:@"title" options:0 context:NULL];
     [_wk addObserver:_adapter forKeyPath:@"estimatedProgress" options:0 context:NULL];
-    [self addSubview:_wk];
+    [_mainFrameView addSubview:_wk];
+    GtkWidget *web = [_wk _gtkWebView];
+    if (web) {
+        g_object_set_data(web, "ferry-webview", self);
+        if (!views_by_id)
+            views_by_id = [NSMutableDictionary new];
+        views_by_id[@(_number)] = [NSValue valueWithNonretainedObject:self];
+        _manager = [[[_wk configuration] userContentController] _manager];
+        if (_manager)
+            g_object_ref(_manager);
+        [self _startAgent];
+        WKConnect(web, "resource-load-started", on_resource_started, _adapter);
+    }
     [self setPreferences:[WebPreferences standardPreferences]];
-    _windowScriptObject = [[WebScriptObject alloc] _initWithWeb:[_wk _gtkWebView] handle:0];
+    /* as a Mac's WebView, a page from a file may reach the other files' (its frames') */
+    if ([_wk _gtkSettings])
+        WK(webkit_settings_set_allow_file_access_from_file_urls)([_wk _gtkSettings], 1);
+    _windowScriptObject = [[WebScriptObject alloc] _initWithWeb:web handle:0 generation:nil];
 }
 
 - (instancetype)initWithFrame:(NSRect)frame frameName:(NSString *)frameName groupName:(NSString *)groupName
 {
     self = [super initWithFrame:frame];
     _groupName = [groupName copy];
+    _frameName = [frameName copy];
     [self _setUp];
     return self;
 }
@@ -944,26 +1719,56 @@ static NSDictionary *action_information(WKNavigationAction *action)
     return self;
 }
 
+- (void)_removeUserStyleSheet
+{
+    if (_styleSheet) {
+        WK(webkit_user_content_manager_remove_style_sheet)(_manager, _styleSheet);
+        WK(webkit_user_style_sheet_unref)(_styleSheet);
+        _styleSheet = NULL;
+    }
+}
+
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [_adapter _endResources];
+    GtkWidget *web = [_wk _gtkWebView];
+    if (web) {
+        WKDisconnect(web, _adapter);
+        g_object_set_data(web, "ferry-webview", NULL);
+    }
+    [views_by_id removeObjectForKey:@(_number)];
+    if (_manager) {
+        [self _removeUserStyleSheet];
+        [views_by_manager[[NSValue valueWithPointer:_manager]] removeObject:@(_number)];
+        g_object_unref(_manager);
+    }
     [_wk removeObserver:_adapter forKeyPath:@"title"];
     [_wk removeObserver:_adapter forKeyPath:@"estimatedProgress"];
     _wk.navigationDelegate = nil;
     _wk.UIDelegate = nil;
     if ([_wk _gtkSettings])
         [_preferences _removeSettings:[_wk _gtkSettings]];
+    [_mainFrame _forget];
     [_wk release];
     [_adapter release];
     [_mainFrame release];
+    [_mainFrameView release];
     [_preferences release];
     [_windowScriptObject release];
     [_applicationName release];
     [_groupName release];
+    [_frameName release];
     [_hostWindow release];
     [super dealloc];
 }
 
 - (WKWebView *)_wk { return _wk; }
+- (CGFloat)_zoom { return _textSizeMultiplier; }
+/* for the adapter */
+- (long)_number { return _number; }
+- (BOOL)_madeForOpener { return _madeForOpener; }
+- (id)_adapter { return _adapter; }
 
 - (void)close
 {
@@ -974,6 +1779,93 @@ static NSDictionary *action_information(WKNavigationAction *action)
 }
 
 - (WebFrame *)mainFrame { return _mainFrame; }
+- (DOMDocument *)mainFrameDocument { return [_mainFrame DOMDocument]; }
+
+- (WebFrame *)_frameAtPath:(NSArray *)path create:(BOOL)create
+{
+    WebFrame *f = _mainFrame;
+    for (id step in path) {
+        if (![step isKindOfClass:[NSNumber class]])
+            return nil;
+        NSUInteger i = [step unsignedIntegerValue];
+        NSMutableArray *children = [f _children];
+        if (i >= [children count]) {
+            if (!create || i > 64)
+                return nil;
+            while ([children count] <= i)
+                [children addObject:[[[WebFrame alloc] _initWithWebView:self parent:f index:[children count]]
+                                        autorelease]];
+        }
+        f = children[i];
+    }
+    return f;
+}
+
+/* what the agent says of a subframe's loads, or of the page's geometry */
+- (void)_agent:(NSDictionary *)m
+{
+    NSString *e = m[@"e"];
+    NSArray *path = [m[@"p"] isKindOfClass:[NSArray class]] ? m[@"p"] : @[];
+    if ([e isEqual:@"geom"]) {
+        if (![path count])
+            [_mainFrameView _setPageGeometry:m[@"g"]];
+        return;
+    }
+    if (![path count])
+        return;   /* the main frame's loads come from WebKitGTK */
+    WebFrame *frame = [self _frameAtPath:path create:YES];
+    if (!frame)
+        return;
+    id d = _frameLoadDelegate;
+    if ([e isEqual:@"will"]) {
+        [frame->_announced release];
+        frame->_announced = [[m[@"u"] description] copy];
+    } else if ([e isEqual:@"commit"]) {
+        if ([m[@"n"] isKindOfClass:[NSString class]])
+            [frame _setName:m[@"n"]];
+        NSURL *url = [NSURL URLWithString:[m[@"u"] description] ?: @""] ?: [NSURL URLWithString:@"about:blank"];
+        if (!frame->_started || ![frame provisionalDataSource]) {
+            [frame _start:[NSURLRequest requestWithURL:url]];
+            frame->_started = YES;
+            if ([d respondsToSelector:@selector(webView:didStartProvisionalLoadForFrame:)])
+                [d webView:self didStartProvisionalLoadForFrame:frame];
+        }
+        [frame _commit];
+        [frame _removeChildren];
+        if ([d respondsToSelector:@selector(webView:didCommitLoadForFrame:)])
+            [d webView:self didCommitLoadForFrame:frame];
+        if ([d respondsToSelector:@selector(webView:didClearWindowObject:forFrame:)]) {
+            WebScriptObject *window = [frame windowObject];
+            if (window)
+                [d webView:self didClearWindowObject:window forFrame:frame];
+        }
+    } else if ([e isEqual:@"title"] || [e isEqual:@"finish"]) {
+        NSString *title = [m[@"t"] isKindOfClass:[NSString class]] ? m[@"t"] : nil;
+        if ([title length] && ![title isEqualToString:frame->_title]) {
+            [frame->_title release];
+            frame->_title = [title copy];
+            if ([d respondsToSelector:@selector(webView:didReceiveTitle:forFrame:)])
+                [d webView:self didReceiveTitle:title forFrame:frame];
+        }
+        if ([e isEqual:@"finish"]) {
+            [frame _finish];
+            if ([d respondsToSelector:@selector(webView:didFinishLoadForFrame:)])
+                [d webView:self didFinishLoadForFrame:frame];
+        }
+    }
+}
+
+/* the page scrolled where a program scrolled the frame's view, in CSS pixels */
+- (void)_scrollFrame:(WebFrame *)frame to:(NSPoint)point
+{
+    GtkWidget *web = [_wk _gtkWebView];
+    if (!web || !frame)
+        return;
+    CGFloat zoom = [self _zoom];
+    NSString *script = [NSString stringWithFormat:@"try{%@.scrollTo(%g,%g)}catch(e){}", [frame _windowExpression],
+                                                  point.x / zoom, point.y / zoom];
+    WK(webkit_web_view_evaluate_javascript)(web, [script UTF8String], -1, NULL, NULL, NULL, NULL, NULL);
+}
 
 /* the delegates aren't retained, as on a Mac */
 - (id<WebFrameLoadDelegate>)frameLoadDelegate { return _frameLoadDelegate; }
@@ -983,22 +1875,43 @@ static NSDictionary *action_information(WKNavigationAction *action)
 - (id<WebUIDelegate>)UIDelegate { return _UIDelegate; }
 - (void)setUIDelegate:(id<WebUIDelegate>)d { _UIDelegate = d; }
 - (id)resourceLoadDelegate { return _resourceLoadDelegate; }
-- (void)setResourceLoadDelegate:(id)d
-{
-    if (d)
-        WKWarnOnce("WebView's resource load delegate (it is kept and not called)");
-    _resourceLoadDelegate = d;
-}
+- (void)setResourceLoadDelegate:(id)d { _resourceLoadDelegate = d; }
 - (id)downloadDelegate { return _downloadDelegate; }
 - (void)setDownloadDelegate:(id)d { _downloadDelegate = d; }
 - (id)editingDelegate { return _editingDelegate; }
 - (void)setEditingDelegate:(id)d { _editingDelegate = d; }
+
+/* The preferences' user style sheet, read again whenever they change, as
+ * a user style sheet of WebKitGTK's in every frame (freemac 1.217, Ferry 0.42.0) */
+- (void)_applyUserStyleSheet
+{
+    if (!_manager)
+        return;
+    [self _removeUserStyleSheet];
+    NSURL *location = [_preferences userStyleSheetLocation];
+    if (![_preferences userStyleSheetEnabled] || !location)
+        return;
+    NSData *data = [NSData dataWithContentsOfURL:location];
+    NSString *css = data ? [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease] : nil;
+    if (!css && data)
+        css = [[[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding] autorelease];
+    if (!css)
+        return;
+    _styleSheet = WK(webkit_user_style_sheet_new)([css UTF8String], WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES,
+                                                  WEBKIT_USER_STYLE_LEVEL_USER, NULL, NULL);
+    WK(webkit_user_content_manager_add_style_sheet)(_manager, _styleSheet);
+}
+
+- (void)_preferencesChanged:(NSNotification *)n { [self _applyUserStyleSheet]; }
 
 - (WebPreferences *)preferences { return _preferences; }
 - (void)setPreferences:(WebPreferences *)preferences
 {
     preferences = preferences ?: [WebPreferences standardPreferences];
     WebKitSettings *settings = [_wk _gtkSettings];
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    if (_preferences)
+        [center removeObserver:self name:WebPreferencesChangedNotification object:_preferences];
     if (settings && _preferences)
         [_preferences _removeSettings:settings];
     [preferences retain];
@@ -1006,6 +1919,9 @@ static NSDictionary *action_information(WKNavigationAction *action)
     _preferences = preferences;
     if (settings)
         [_preferences _addSettings:settings];
+    [center addObserver:self selector:@selector(_preferencesChanged:) name:WebPreferencesChangedNotification
+                 object:_preferences];
+    [self _applyUserStyleSheet];
 }
 - (NSString *)preferencesIdentifier { return [_preferences identifier]; }
 - (void)setPreferencesIdentifier:(NSString *)identifier
@@ -1052,6 +1968,8 @@ static NSDictionary *action_information(WKNavigationAction *action)
 {
     _textSizeMultiplier = m > 0 ? m : 1;
     [_wk setPageZoom:_textSizeMultiplier];
+    /* the page's size in the frame view's points changes with it */
+    WSRun([_wk _gtkWebView], @"return null;", WSGeometry);
 }
 - (BOOL)canMakeTextLarger { return _textSizeMultiplier < 3; }
 - (BOOL)canMakeTextSmaller { return _textSizeMultiplier > 0.5; }
