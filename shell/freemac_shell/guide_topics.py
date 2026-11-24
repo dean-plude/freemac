@@ -1334,6 +1334,18 @@ TOPICS = {
         "everyone means the other people who use this computer.",
         "For a folder, Apply to Enclosed Items gives everything inside the same privileges.",
     ]),
+    "inspector": ("Keep one Info window that follows what you choose", "inspector get info option command i floating info window follows selection one window", [
+        "In Drawer, press ⌥⌘I, or hold Option and choose File > Show Inspector.",
+        "One Info window opens at the right of the screen and stays above the others.",
+        "Click another file or folder, and it shows that item instead.",
+        "Press ⌥⌘I again, or close it, when you're done.",
+    ]),
+    "copy-pathname": ("Copy where a file is, as text", "copy as pathname path location full path text option command c paste terminal", [
+        "Choose the file or folder in Drawer.",
+        "Press ⌥⌘C, or choose Edit > Copy as Pathname.",
+        "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
+        "Paste it anywhere: for a few items, each path is on its own line.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",

@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.180 "Inspector and Copy as Pathname" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > Show Inspector (⌥⌘I): one Info window that changes with the selection in Drawer, kept at the right of the screen above other windows, scrolling when it's long; ⌥⌘I again closes it | drawer.py, drawer_info.py | done |
+| 2 | Edit > Copy as Pathname (⌥⌘C): the chosen items' full paths on the clipboard, one a line | drawer.py | done |
+| 3 | Holding Option turns the shortcut menu's Get Info into Show Inspector and Copy into Copy “item” as Pathname | drawer.py | done |
+| 4 | Guide topics, README rows and screenshots | Guide, Docs | done |
+
 ## 1.179 "Sharing and permissions" (done)
 
 | # | Item | Component | Status |

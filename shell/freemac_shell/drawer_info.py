@@ -102,14 +102,59 @@ OTHER = "other…"   # the pop-up's last row, which asks for any app
 
 
 class InfoWindow(Gtk.Window):
-    def __init__(self, path, parent=None):
+    def __init__(self, path, parent=None, inspector=False):
         super().__init__(title=f"{os.path.basename(path.rstrip('/')) or path} Info")
         self.set_default_size(300, -1)
         self.set_resizable(False)
         if parent is not None:
             self.set_transient_for(None)  # its own window, as on a Mac
+        self.inspector = inspector
         self.stop = threading.Event()
         self.connect("destroy", lambda *_: self.stop.set())
+        self._keep_comment = None
+        self.connect("delete-event", self._keep_now)
+        self.connect("destroy", self._keep_now)
+        self.connect("key-press-event", self._key)
+        # Nothing chosen when it opens: GTK would otherwise focus the Kind
+        # line and highlight it.
+        self.connect("map", lambda *_: GLib.idle_add(self._unfocus))
+        self.path = None
+        self._build(path)
+
+    def show_path(self, path):
+        """The Inspector (⌥⌘I): show another item in the same window."""
+        if path == self.path:
+            return
+        if getattr(self, "_keep_comment", None) is not None:
+            self._keep_comment()
+            self._keep_comment = None
+        self.stop.set()
+        self.stop = threading.Event()
+        self.comment_view = None
+        self.perm_combos = {}
+        child = self.get_child()
+        if child is not None:
+            self.remove(child)
+            child.destroy()
+        self._build(path)
+        self.get_child().show_all()
+        self.resize(1, 1)   # as small as the new item's facts allow
+        self._unfocus()
+
+    def _screen_height(self):
+        from gi.repository import Gdk
+        display = Gdk.Display.get_default()
+        monitor = display.get_primary_monitor() or display.get_monitor(0) if display else None
+        return monitor.get_workarea().height if monitor is not None else 700
+
+    def _keep_now(self, *_):
+        if self._keep_comment is not None:
+            self._keep_comment()
+        return False
+
+    def _build(self, path):
+        self.path = path
+        self.set_title(f"{os.path.basename(path.rstrip('/')) or path} Info")
         gfile = Gio.File.new_for_path(path)
         try:
             info = gfile.query_info(ATTRS, Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, None)
@@ -184,7 +229,7 @@ class InfoWindow(Gtk.Window):
         elif is_dir or is_bundle:
             self.size_value.set_text("Adding up…")
             self.size_line.set_text("Adding up…")
-            threading.Thread(target=self._add_up, args=(path, is_bundle), daemon=True).start()
+            threading.Thread(target=self._add_up, args=(path, is_bundle, self.stop), daemon=True).start()
         else:
             size = info.get_size()
             self.size_value.set_text(f"{size:,} bytes" if size < 1000 else f"{nice_size(size)} ({size:,} bytes)")
@@ -238,11 +283,17 @@ class InfoWindow(Gtk.Window):
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
         box.pack_start(self._permissions(path, is_dir and not is_alias, info), False, False, 0)
-        self.add(box)
-        self.connect("key-press-event", self._key)
-        # Nothing chosen when it opens: GTK would otherwise focus the Kind
-        # line and highlight it.
-        self.connect("map", lambda *_: GLib.idle_add(self._unfocus))
+        if self.inspector:
+            # The Inspector stays on screen: a long one scrolls.
+            scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                          propagate_natural_height=True, propagate_natural_width=True)
+            # (On Wayland GTK only knows the whole screen, so leave room
+            # for the menu bar, the Dock and the title bar.)
+            scroller.set_max_content_height(self._screen_height() - 230)
+            scroller.add(box)
+            self.add(scroller)
+        else:
+            self.add(box)
 
     def _app_package(self, path):
         """An app's size and version are its package's."""
@@ -388,9 +439,9 @@ class InfoWindow(Gtk.Window):
             value = Gtk.Label(label=value, xalign=0, selectable=True, wrap=True, max_width_chars=30)
         grid.attach(value, 1, row, 1, 1)
 
-    def _add_up(self, path, is_bundle):
-        result = folder_total(path, self.stop)
-        if result is None:
+    def _add_up(self, path, is_bundle, stop):
+        result = folder_total(path, stop)
+        if result is None or stop.is_set():
             return
 
         def show():
@@ -401,8 +452,9 @@ class InfoWindow(Gtk.Window):
                 count = f"{items:,} item" + ("" if items == 1 else "s")
                 text = ("Empty" if not items else f"{nice_size(total)} for {count}" if total >= 1000
                         else f"{total:,} bytes for {count}")
-            self.size_value.set_text(text)
-            self.size_line.set_text(text)
+            if not stop.is_set():
+                self.size_value.set_text(text)
+                self.size_line.set_text(text)
             return False
 
         GLib.idle_add(show)
@@ -674,8 +726,6 @@ class InfoWindow(Gtk.Window):
             return False
         self._keep_comment = keep
         view.connect("focus-out-event", keep)
-        self.connect("delete-event", keep)
-        self.connect("destroy", keep)
         return section
 
     def _key(self, _w, event):
@@ -687,6 +737,60 @@ class InfoWindow(Gtk.Window):
             self.destroy()
             return True
         return False
+
+
+INSPECTOR = [None]   # the one Inspector window, while it is open
+
+
+def inspector(path, parent=None):
+    """The Inspector (⌥⌘I), as on a Mac: one Info window that changes as the
+    selection does. Choosing it again closes it."""
+    if INSPECTOR[0] is not None:
+        INSPECTOR[0].destroy()
+        return
+    window = InfoWindow(path, parent, inspector=True)
+    INSPECTOR[0] = window
+    window.connect("map", lambda *_: GLib.timeout_add(200, _float, window))
+    window.connect("destroy", lambda *_: INSPECTOR.__setitem__(0, None))
+    if parent is not None and parent.get_application() is not None:
+        parent.get_application().add_window(window)
+    window.show_all()
+
+
+def _float(window):
+    """Keep the Inspector over the other windows, at the right of the screen,
+    as a Mac's floating panel is (through Wayfire, as Picture in Picture)."""
+    from . import wfipc
+    try:
+        wf = wfipc.Wayfire()
+        known = getattr(window, "view_id", None)
+        views = [v for v in wf.req.call("window-rules/list-views")
+                 if isinstance(v, dict) and v.get("role") == "toplevel"
+                 and (v.get("id") == known if known is not None
+                      else v.get("title") == window.get_title())]
+        if not views:
+            window.float_tries = getattr(window, "float_tries", 0) + 1
+            return window.float_tries < 10     # not there yet: look again
+        view = max(views, key=lambda v: v.get("id", 0))
+        window.view_id = view["id"]
+        outputs = wf.req.call("window-rules/list-outputs")
+        area = next((o.get("workarea") for o in outputs if isinstance(o, dict) and o.get("workarea")), None)
+        geometry = view.get("geometry") or {}
+        if area and geometry:
+            wf.req.call("window-rules/configure-view", id=view["id"], geometry={
+                "x": int(area["x"] + area["width"] - geometry.get("width", 340) - 24),
+                "y": int(area["y"] + 24),
+                "width": int(geometry.get("width", 340)), "height": int(geometry.get("height", 600))})
+        wf.req.call("wm-actions/set-always-on-top", view_id=view["id"], state=True)
+    except (ConnectionError, OSError, ValueError, AttributeError, KeyError, TypeError) as err:
+        print("drawer_info: couldn't float the Inspector:", err, file=sys.stderr)
+    return False
+
+
+def inspect(path):
+    """Show path in the Inspector, if it is open."""
+    if INSPECTOR[0] is not None and path and os.path.lexists(path):
+        INSPECTOR[0].show_path(path)
 
 
 def show(paths, parent=None):
