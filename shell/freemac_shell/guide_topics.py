@@ -1346,6 +1346,12 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "back-list": ("Jump back several folders at once", "back forward history list hold press and hold right-click folders visited earlier jump drawer", [
+        "In Drawer, press and hold the Back button (‹), or right-click it.",
+        "The folders you came through are listed, the nearest first.",
+        "Choose one to go straight there. Forward (›) does the same for the folders ahead.",
+        "A quick click still goes back or forward one folder.",
+    ]),
     "recent-folders": ("Go back to a folder you used lately", "recent folders go menu last folders lately visited history clear menu drawer", [
         "In Drawer, choose Go > Recent Folders.",
         "The last ten folders you opened are listed, newest first. Choose one to open it in this window.",

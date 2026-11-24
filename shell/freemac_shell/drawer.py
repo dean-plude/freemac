@@ -676,8 +676,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.set_titlebar(header)
         nav = Gtk.Box(spacing=0)
         nav.get_style_context().add_class("linked")
-        self.back = self._button("go-previous-symbolic", "Back", self.go_back)
-        self.forward = self._button("go-next-symbolic", "Forward", self.go_forward)
+        self.back = self._button("go-previous-symbolic", "Back", lambda *_: self._history_click(True))
+        self.forward = self._button("go-next-symbolic", "Forward", lambda *_: self._history_click(False))
+        # Hold the button down, or right-click it, for the folders it goes
+        # back (or forward) through, as on a Mac.
+        self._history_popped, self._history_hold = False, None
+        for button, back in ((self.back, True), (self.forward, False)):
+            button.connect("button-press-event", self._history_press, back)
+            button.connect("button-release-event", self._history_release)
         nav.add(self.back)
         nav.add(self.forward)
         header.pack_start(nav)
@@ -1771,6 +1777,93 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.history.append(self.path)
             self.future.clear()
         self.path = path
+        self.refresh()
+
+    # ---- Back and Forward's lists ---------------------------------------
+    def _history_click(self, back):
+        if self._history_popped:
+            self._history_popped = False   # the list was shown instead
+            return
+        self.go_back() if back else self.go_forward()
+
+    def _history_press(self, button, event, back):
+        if event.type != Gdk.EventType.BUTTON_PRESS:
+            return False
+        if event.button == 3:
+            self._history_menu(button, back, event)
+            return True
+        if event.button == 1:
+            # A new press: the list shown last time (whose release may never
+            # have reached the button) no longer stands in for a click.
+            self._history_popped = False
+            self._history_stop()
+            self._history_hold = GLib.timeout_add(450, self._history_held, button, back, event.copy())
+        return False
+
+    def _history_release(self, *_):
+        self._history_stop()
+        return False
+
+    def _history_stop(self):
+        if self._history_hold:
+            GLib.source_remove(self._history_hold)
+            self._history_hold = None
+
+    def _history_held(self, button, back, event):
+        self._history_hold = None
+        if self._history_menu(button, back, event):
+            self._history_popped = True
+        return False
+
+    def _history_menu(self, button, back, event):
+        """The folders Back (or Forward) goes through, nearest first; choosing
+        one goes straight there. Returns True if there was a list to show."""
+        stack = self.history if back else self.future
+        if not stack:
+            return False
+        # A popover under the button, kept inside the window: a menu popped
+        # from the header bar comes out above the window on Wayland.
+        popover = Gtk.Popover(relative_to=button, position=Gtk.PositionType.BOTTOM)
+        popover.get_style_context().add_class("menu")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=6)
+        for count, path in enumerate(list(reversed(stack))[:20], 1):
+            row = Gtk.Box(spacing=8)
+            row.pack_start(Gtk.Image.new_from_icon_name(self._history_icon(path), Gtk.IconSize.MENU),
+                           False, False, 0)
+            row.pack_start(Gtk.Label(label=self._label(path), xalign=0), True, True, 0)
+            item = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+            item.get_style_context().add_class("flat")
+            item.add(row)
+            item.connect("clicked", lambda _b, n=count: (popover.popdown(), self._history_jump(back, n)))
+            box.pack_start(item, False, False, 0)
+        popover.add(box)
+        popover.connect("closed", lambda p: GLib.idle_add(p.destroy))
+        box.show_all()
+        popover.popup()
+        return True
+
+    def _history_icon(self, path):
+        if path == recents.PLACE:
+            return "document-open-recent-symbolic"
+        if path and path.startswith(tags.PREFIX):
+            return "tag-symbolic"
+        if neighbours.is_place(path):
+            return "network-workgroup-symbolic"
+        if smart_folders.is_place(path):
+            return "folder-saved-search-symbolic"
+        if path == GLib.get_home_dir():
+            return "user-home-symbolic"
+        return "folder-symbolic"
+
+    def _history_jump(self, back, steps):
+        """Go back (or forward) steps folders at once."""
+        source, target = (self.history, self.future) if back else (self.future, self.history)
+        steps = min(steps, len(source))
+        if not steps:
+            return
+        for _n in range(steps):
+            target.append(self.path)
+            self.path = source.pop()
         self.refresh()
 
     def go_back(self, *_):
