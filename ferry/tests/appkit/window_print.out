@@ -1,0 +1,10 @@
+page layout: ended at once 0
+page layout: ended 1, OK 1, paper iso-a5 420x595
+print dialog: ran 1, success 1, 3 pages, disposition NSPrintSaveJob
+  page 1: Part 1
+  page 2: Part 2
+  page 3: Part 3
+cancelled in the dialog: 0
+font panel visible 1
+font panel visible after closing 0
+exit=0

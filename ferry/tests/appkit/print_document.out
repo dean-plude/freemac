@@ -1,0 +1,22 @@
+operation 1, job title Shopping, its print info a copy of the document's 1
+ran 1
+from printOperationWithSettings:error:: 2 pages
+  page 1, 612x792: Apples / Bread
+  page 2, 612x792: Cheese / Dates
+did print: 1, context note
+settings passed on: 1
+printDocumentWithSettings:: 2 pages
+  page 1, 612x792: Apples / Bread
+  page 2, 612x792: Cheese / Dates
+did run page layout: accepted 1
+document paper iso-a5 595x420, shared paper na-letter
+refused by shouldChangePrintInfo: paper iso-a5
+cancelled: paper iso-a5
+Print…: 4 pages
+  page 1, 595x420: Apples
+  page 2, 595x420: Bread
+  page 3, 595x420: Cheese
+  page 4, 595x420: Dates
+cancelled Print…: file 0
+kept: iso-a5 landscape
+exit=0

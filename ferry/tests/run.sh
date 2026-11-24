@@ -761,5 +761,31 @@ if grep -q "pthread_yield_np" "$build/unsupported.err" 2>/dev/null; then
 else
     echo "FAIL unsupported message"; fail=$((fail + 1))
 fi
+# Printing, Page Setup and the font panel (freemac 1.NEXT, Ferry 0.NEXT):
+# print info, views printed to PDF files and read back with Poppler,
+# pagination, a text view across pages, PDF data, a document, and the font
+# manager, with no display; then GTK's dialogs on a headless Weston.
+run_one appkit_print_info "$here/appkit/print_info.m" "$here/appkit/print_info.out" -fobjc-arc -framework Cocoa
+run_one appkit_print_view "$here/appkit/print_view.m" "$here/appkit/print_view.out" -fobjc-arc -framework Cocoa
+run_one appkit_print_pagination "$here/appkit/print_pagination.m" "$here/appkit/print_pagination.out" -fobjc-arc \
+    -fblocks -framework Cocoa
+run_one appkit_print_text "$here/appkit/print_text.m" "$here/appkit/print_text.out" -fobjc-arc -framework Cocoa
+run_one appkit_print_pdfdata "$here/appkit/print_pdfdata.m" "$here/appkit/print_pdfdata.out" -fobjc-arc \
+    -framework Cocoa
+run_one appkit_print_document "$here/appkit/print_document.m" "$here/appkit/print_document.out" -fobjc-arc \
+    -framework Cocoa
+run_one appkit_fonts "$here/appkit/fonts.m" "$here/appkit/fonts.out" -fobjc-arc -framework Cocoa
+if command -v weston > /dev/null 2>&1; then
+    xdg="$build/xdg"
+    rm -rf "$xdg"; mkdir -p "$xdg"; chmod 700 "$xdg"
+    XDG_RUNTIME_DIR="$xdg" weston --backend=headless --socket=ferry-test > "$build/weston-print.log" 2>&1 &
+    weston_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -S "$xdg/ferry-test" ] && break; sleep 0.5; done
+    run_one appkit_window_print "$here/appkit/window_print.m" "$here/appkit/window_print.out" -fobjc-arc -fblocks \
+        -framework Cocoa
+    kill "$weston_pid" 2> /dev/null; wait "$weston_pid" 2> /dev/null
+else
+    echo "skip appkit_window_print (needs weston, for a test display)"
+fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

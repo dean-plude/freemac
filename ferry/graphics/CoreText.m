@@ -195,6 +195,31 @@ CTFontRef CTFontCreateWithName(CFStringRef name, CGFloat size, const CGAffineTra
     return (CTFontRef)load_font(family, weight, style, size, matrix);
 }
 
+/* For AppKit's font manager: a font of an installed family, as named
+ * (not mapped from a Mac name), with a Pango weight and style. */
+GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size) __attribute__((visibility("default")));
+GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size)
+{
+    return load_font(family, weight, style, size, NULL);
+}
+
+/* For AppKit's font manager: the family that stands for a Mac family
+ * (Helvetica, Times, Menlo...), or nil for a name that isn't one. */
+NSString *GFontMacFamily(NSString *name) __attribute__((visibility("default")));
+NSString *GFontMacFamily(NSString *name)
+{
+    char key[128];
+    size_t k = 0;
+    for (const char *p = name.UTF8String ?: ""; *p && k + 1 < sizeof key; p++)
+        if (*p != ' ' && *p != '.')
+            key[k++] = (char)tolower((unsigned char)*p);
+    key[k] = 0;
+    for (size_t i = 0; i < sizeof families / sizeof families[0]; i++)
+        if (!strcmp(key, families[i].mac))
+            return @(families[i].family);
+    return nil;
+}
+
 CTFontRef CTFontCreateUIFontForLanguage(CTFontUIFontType type, CGFloat size, CFStringRef language)
 {
     static const struct { CGFloat size; BOOL bold, mono; } ui[] = {

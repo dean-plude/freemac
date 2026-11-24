@@ -263,4 +263,112 @@ GtkWidget *gtk_color_chooser_dialog_new(const char *title, GtkWidget *parent);
 void gtk_color_chooser_set_rgba(void *chooser, const GdkRGBA *color);
 void gtk_color_chooser_get_rgba(void *chooser, GdkRGBA *color);
 void gtk_color_chooser_set_use_alpha(void *chooser, gboolean use_alpha);
+
+/* Printing and fonts (NSPrintOperation.m, NSPrintInfo.m, NSFontManager.m).
+ * Pages are drawn by Cairo into PDF (or PostScript) files; GTK's print
+ * and page setup dialogs stand for the Mac's print panel and page layout,
+ * and a GtkPrintJob hands the PDF to the printer the user chose. The font
+ * panel is GTK's font chooser, and the font manager lists the system's
+ * families and faces through Pango (which asks fontconfig). Poppler reads
+ * a printed file's text back, for tests. */
+typedef struct _GtkPrintSettings GtkPrintSettings;
+typedef struct _GtkPageSetup GtkPageSetup;
+typedef struct _GtkPaperSize GtkPaperSize;
+typedef struct _GtkPrinter GtkPrinter;
+typedef struct _GtkPrintJob GtkPrintJob;
+typedef struct { int start, end; } GtkPageRange;
+typedef struct _PangoFontFamily PangoFontFamily;
+typedef struct _PangoFontFace PangoFontFace;
+typedef void (*GtkPrintJobCompleteFunc)(GtkPrintJob *job, void *data, const GError *error);
+typedef int (*GSourceFunc)(void *data);
+enum { GTK_UNIT_NONE = 0, GTK_UNIT_POINTS = 1, GTK_UNIT_INCH = 2, GTK_UNIT_MM = 3 };
+enum { GTK_PAGE_ORIENTATION_PORTRAIT = 0, GTK_PAGE_ORIENTATION_LANDSCAPE = 1 };
+enum { GTK_PRINT_PAGES_ALL = 0, GTK_PRINT_PAGES_CURRENT = 1, GTK_PRINT_PAGES_RANGES = 2 };
+enum { GTK_PRINT_CAPABILITY_PAGE_SET = 1 << 0, GTK_PRINT_CAPABILITY_COPIES = 1 << 1,
+       GTK_PRINT_CAPABILITY_COLLATE = 1 << 2, GTK_PRINT_CAPABILITY_REVERSE = 1 << 3,
+       GTK_PRINT_CAPABILITY_SCALE = 1 << 4, GTK_PRINT_CAPABILITY_GENERATE_PDF = 1 << 5 };
+enum { CAIRO_PDF_VERSION_1_4 = 0 };
+cairo_surface_t *cairo_pdf_surface_create_for_stream(cairo_write_func_t write, void *closure, double width,
+                                                     double height);
+void cairo_pdf_surface_set_size(cairo_surface_t *surface, double width, double height);
+cairo_surface_t *cairo_ps_surface_create_for_stream(cairo_write_func_t write, void *closure, double width,
+                                                    double height);
+void cairo_ps_surface_set_eps(cairo_surface_t *surface, cairo_bool_t eps);
+void cairo_ps_surface_set_size(cairo_surface_t *surface, double width, double height);
+void cairo_show_page(cairo_t *cr);
+void cairo_surface_finish(cairo_surface_t *surface);
+unsigned g_timeout_add(unsigned interval_ms, GSourceFunc function, void *data);
+GtkPrintSettings *gtk_print_settings_new(void);
+void gtk_print_settings_set_n_copies(GtkPrintSettings *settings, int copies);
+int gtk_print_settings_get_n_copies(GtkPrintSettings *settings);
+void gtk_print_settings_set_collate(GtkPrintSettings *settings, gboolean collate);
+gboolean gtk_print_settings_get_collate(GtkPrintSettings *settings);
+void gtk_print_settings_set_reverse(GtkPrintSettings *settings, gboolean reverse);
+gboolean gtk_print_settings_get_reverse(GtkPrintSettings *settings);
+void gtk_print_settings_set_scale(GtkPrintSettings *settings, double scale);
+double gtk_print_settings_get_scale(GtkPrintSettings *settings);
+void gtk_print_settings_set_print_pages(GtkPrintSettings *settings, int pages);
+int gtk_print_settings_get_print_pages(GtkPrintSettings *settings);
+void gtk_print_settings_set_page_ranges(GtkPrintSettings *settings, GtkPageRange *ranges, int count);
+GtkPageRange *gtk_print_settings_get_page_ranges(GtkPrintSettings *settings, int *count);
+void gtk_print_settings_set_printer(GtkPrintSettings *settings, const char *printer);
+const char *gtk_print_settings_get_printer(GtkPrintSettings *settings);
+void gtk_print_settings_set(GtkPrintSettings *settings, const char *key, const char *value);
+const char *gtk_print_settings_get(GtkPrintSettings *settings, const char *key);
+GtkPageSetup *gtk_page_setup_new(void);
+void gtk_page_setup_set_orientation(GtkPageSetup *setup, int orientation);
+int gtk_page_setup_get_orientation(GtkPageSetup *setup);
+void gtk_page_setup_set_paper_size(GtkPageSetup *setup, GtkPaperSize *size);
+GtkPaperSize *gtk_page_setup_get_paper_size(GtkPageSetup *setup);
+void gtk_page_setup_set_top_margin(GtkPageSetup *setup, double margin, int unit);
+void gtk_page_setup_set_bottom_margin(GtkPageSetup *setup, double margin, int unit);
+void gtk_page_setup_set_left_margin(GtkPageSetup *setup, double margin, int unit);
+void gtk_page_setup_set_right_margin(GtkPageSetup *setup, double margin, int unit);
+double gtk_page_setup_get_top_margin(GtkPageSetup *setup, int unit);
+double gtk_page_setup_get_bottom_margin(GtkPageSetup *setup, int unit);
+double gtk_page_setup_get_left_margin(GtkPageSetup *setup, int unit);
+double gtk_page_setup_get_right_margin(GtkPageSetup *setup, int unit);
+GtkPaperSize *gtk_paper_size_new(const char *name);
+GtkPaperSize *gtk_paper_size_new_custom(const char *name, const char *display_name, double width, double height,
+                                        int unit);
+void gtk_paper_size_free(GtkPaperSize *size);
+const char *gtk_paper_size_get_name(GtkPaperSize *size);
+double gtk_paper_size_get_width(GtkPaperSize *size, int unit);
+double gtk_paper_size_get_height(GtkPaperSize *size, int unit);
+gboolean gtk_paper_size_is_custom(GtkPaperSize *size);
+GtkWidget *gtk_print_unix_dialog_new(const char *title, GtkWidget *parent);
+void gtk_print_unix_dialog_set_page_setup(GtkWidget *dialog, GtkPageSetup *setup);
+GtkPageSetup *gtk_print_unix_dialog_get_page_setup(GtkWidget *dialog);
+void gtk_print_unix_dialog_set_settings(GtkWidget *dialog, GtkPrintSettings *settings);
+GtkPrintSettings *gtk_print_unix_dialog_get_settings(GtkWidget *dialog);
+GtkPrinter *gtk_print_unix_dialog_get_selected_printer(GtkWidget *dialog);
+void gtk_print_unix_dialog_set_manual_capabilities(GtkWidget *dialog, int capabilities);
+void gtk_print_unix_dialog_set_embed_page_setup(GtkWidget *dialog, gboolean embed);
+GtkWidget *gtk_page_setup_unix_dialog_new(const char *title, GtkWidget *parent);
+void gtk_page_setup_unix_dialog_set_page_setup(GtkWidget *dialog, GtkPageSetup *setup);
+GtkPageSetup *gtk_page_setup_unix_dialog_get_page_setup(GtkWidget *dialog);
+int gtk_dialog_run(GtkWidget *dialog);
+void gtk_dialog_response(GtkWidget *dialog, int response);
+const char *gtk_printer_get_name(GtkPrinter *printer);
+gboolean gtk_printer_is_virtual(GtkPrinter *printer);
+GtkPrintJob *gtk_print_job_new(const char *title, GtkPrinter *printer, GtkPrintSettings *settings,
+                               GtkPageSetup *setup);
+gboolean gtk_print_job_set_source_file(GtkPrintJob *job, const char *filename, GError **error);
+void gtk_print_job_send(GtkPrintJob *job, GtkPrintJobCompleteFunc callback, void *data, void *destroy);
+GtkWidget *gtk_font_chooser_dialog_new(const char *title, GtkWidget *parent);
+PangoFontDescription *gtk_font_chooser_get_font_desc(void *chooser);
+void gtk_font_chooser_set_font_desc(void *chooser, const PangoFontDescription *desc);
+PangoFontDescription *pango_font_description_from_string(const char *string);
+char *pango_font_description_to_string(const PangoFontDescription *desc);
+int pango_font_description_get_size(const PangoFontDescription *desc);
+gboolean pango_font_description_get_size_is_absolute(const PangoFontDescription *desc);
+void pango_font_description_set_size(PangoFontDescription *desc, int size);
+void pango_font_map_list_families(PangoFontMap *fontmap, PangoFontFamily ***families, int *count);
+const char *pango_font_family_get_name(PangoFontFamily *family);
+gboolean pango_font_family_is_monospace(PangoFontFamily *family);
+void pango_font_family_list_faces(PangoFontFamily *family, PangoFontFace ***faces, int *count);
+const char *pango_font_face_get_face_name(PangoFontFace *face);
+PangoFontDescription *pango_font_face_describe(PangoFontFace *face);
+gboolean pango_font_face_is_synthesized(PangoFontFace *face);
+char *poppler_page_get_text(PopplerPage *page);
 #endif

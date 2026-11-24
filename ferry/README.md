@@ -170,6 +170,17 @@ it ends, and `ferry-cc` links programs that use them.
 
 From Ferry 0.32.0 (freemac 1.205), programs can use the network the BSD way: sockets with Mac layouts and errors, select, poll, kqueue and kevent, libdispatch READ, WRITE, SIGNAL and PROC sources, CFSocket with a run loop source, and CFStream and NSStream socket streams with delegates, client callbacks and TLS through the system's OpenSSL (libssl 3 or 1.1), with certificates checked by Security.framework's trust calls. NSNetService and NSNetServiceBrowser are there but have no Bonjour, so they always report that it can't be reached.
 
+From Ferry 0.33.0 (freemac 1.206), Mac apps can print. A view, a window,
+a text view or a document prints through GTK's print dialog and Page
+Setup, shown as sheets, on pages laid out from `NSPrintInfo` (paper,
+margins, orientation, scaling and pagination) and drawn by the app's own
+code into a PDF with Cairo, which goes to a file, a viewer or a printer.
+`dataWithPDFInsideRect:` and the PDF operations make PDF data without a
+panel. `NSFontManager` and `NSFontPanel` (GTK's font chooser) list the
+installed fonts and change them, so the font menu's Bold, Italic, Bigger
+and Smaller and the font panel work in text views. Accessory views in the
+panels, the progress panel and font collections are left out.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

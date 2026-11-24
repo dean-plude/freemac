@@ -1,0 +1,12 @@
+text view 468 wide, taller than a page 1
+printed 1
+  page 1: lines 1 to 42
+  page 2: lines 43 to 80
+letter: 2 pages, every line once and in order 1, whole 1
+selection printed: 0
+  page 1: lines 1 to 36
+  page 2: lines 37 to 72
+  page 3: lines 73 to 80
+A5 at 16 points: 3 pages, every line once and in order 1, whole 1
+rich text: Plain, then bold, then red.
+exit=0

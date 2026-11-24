@@ -1,0 +1,29 @@
+shared: na-letter (US Letter) 612x792, portrait, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+same shared one: 1
+disposition NSPrintSpoolJob, copies 1, all pages 1, header and footer 0
+imageable 0 0 612 792
+German locale: iso-a4 (A4) 595x842, portrait, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+A5 is 420x595; an unknown paper is 0x0
+legal: na-legal (US Legal) 612x1008, portrait, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+landscape: na-legal (US Legal) 1008x612, landscape, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+A4 by size: iso-a4 (A4) 842x595, landscape, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+a size of no paper: name (none), 300 by 400 points
+changed: iso-a4 (A4) 595x842, portrait, margins 36 72 18 90, scale 0.5, pagination 1 0, centred 1 0
+dictionary: margin 36, scale 0.5, pagination 1
+set through the dictionary: right margin 54
+copy: left 1, original left 36
+archived: 1 bytes
+unarchived: iso-a4 (A4) 595x842, portrait, margins 36 54 18 90, scale 0.5, pagination 1 0, centred 1 0
+unarchived: NSPrintSaveJob, copies 3, saved to /tmp/out.pdf
+print panel, no answer: 0
+print panel, answered: 1
+  copies 2, all pages 0, pages 2-3, landscape
+print panel, cancelled: 0
+page layout: 1
+  laid out: iso-a5 (A5) 595x420, landscape, margins 10 20 30 40, scale 0.8, pagination 2 0, centred 1 1
+  the layout's print info is the one given: 1
+document menu: Print… 1, Page Setup… 1
+document's print info is its own: 1, na-letter
+document after Page Setup: iso-a3 (A3) 1191x842, landscape, margins 72 72 90 90, scale 1, pagination 2 0, centred 1 1
+NSDocument itself: operation 0, error 3328
+exit=0

@@ -210,9 +210,9 @@ in the user defaults (and given to the desktop's recent files) and fills
 the Open Recent menu. The first document controller made is the shared
 one, so an app's own subclass in its main nib (MacPass has one) is used.
 Files named on the command line open at launch, else an untitled document
-when the app wants one. Left out: versions, renaming, moving and locking
-from the title bar, and
-printing. (`prepareWithInvocationTarget:` answered nil until Ferry had
+when the app wants one. Left out: versions, and renaming, moving and
+locking from the title bar. Printing came in
+(1.206). (`prepareWithInvocationTarget:` answered nil until Ferry had
 `NSInvocation`; it works from (1.170). Autosaving came in (1.178).)
 
 `NSAlert` draws as a current Mac's alert: the app's icon (the caution sign
@@ -759,6 +759,46 @@ of Foundation.
 NSNetService and NSNetServiceBrowser are there, but without Bonjour: they
 say they will start and then fail with NSNetServicesUnknownError, as a Mac
 does when mDNSResponder can't be reached. TXT records are made and read.
+
+### Printing and fonts (freemac 1.206, Ferry 0.33.0)
+
+Mac apps can now print. `NSPrintInfo` holds the paper, margins,
+orientation, scaling, pagination and centring in its dictionary, as on a
+Mac, and is copied and archived with `NSCoding`; the shared one starts on
+the paper this system's locale uses. `NSPrintOperation` prints a view on
+pages of that paper, by automatic, fit or clip pagination or by the view's
+own `knowsPageRange:` and `rectForPage:`, calling `beginDocument`,
+`endDocument`, `beginPageInRect:atPlacement:`, `adjustPageHeightNew:...`,
+`drawPageBorderWithSize:` and `pageHeader` and `pageFooter` as Apple's
+documentation describes. The pages are drawn by the view's own
+`drawRect:` into a PDF with Cairo. The print panel and Page Setup are
+GTK's print and page setup dialogs, run modally or as sheets, and what is
+chosen in them is written back into the print info; a PDF goes to a file
+(Print to File and `NSPrintSaveJob`), to the default PDF viewer (Preview),
+or to a printer through GTK or `lp`. `PDFOperationWithView:...` and
+`dataWithPDFInsideRect:` make PDF data without a panel, and views and
+windows have `print:`, `printJobTitle` and `writePDFInsideRect:toPasteboard:`.
+A text view breaks its pages at the edges of lines. `NSDocument`'s Print…
+and Page Setup… menu items are enabled and work through
+`printOperationWithSettings:error:`, `printDocumentWithSettings:...` and
+the document's own print info.
+
+`NSFontManager` lists the installed families and their members from
+Pango and fontconfig, makes fonts by family, traits, weight and size, and
+converts fonts to and from bold and italic and to other sizes, families,
+faces and weights. Its font menu's Bold, Italic, Bigger and Smaller items
+work, and the Show Fonts toolbar item opens the font panel. `NSFontPanel`
+is GTK's font chooser. What is chosen in it, or in the menu, goes to
+`changeFont:` down the responder chain, so a text view changes the
+selection's fonts run by run, keeping what wasn't chosen, or the typing
+font when nothing is selected.
+
+Left out: accessory views in the panels, the progress panel, printing the
+selection, a printer's own margins, multi-page EPS, font collections, the
+Styles panel and undo of font changes. This system has no `lp`, so a job
+for a printer that the print dialog didn't choose fails here. The work
+was written from Apple's documentation and not compared with a Mac;
+`docs/ferry-gui.md` lists what a Mac would settle.
 
 ## What the apps need most
 

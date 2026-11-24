@@ -1,0 +1,13 @@
+whole view: PDF 1, 1 page, 400x200: UpperSubview LowerRight
+lower left: PDF 1, 1 page, 200x100: Lower
+upper half: PDF 1, 1 page, 400x100: Upper Subview
+PDF operation: copying 1, shows the panel 0
+ran 1
+right half: PDF 1, 1 page, 200x200: Subview Right
+to a file: 1
+on A5: PDF 1, 1 page, 420x595: UpperSubview LowerRight
+pasteboard types: com.adobe.pdf
+from the pasteboard: PDF 1, 1 page, 200x100: Lower
+window: PDF 1, 1 page, 400x200: UpperSubview LowerRight
+EPS: %!PS-Adobe-3.0 EPSF-3.0, the drawing's bounding box inside the rect 1
+exit=0

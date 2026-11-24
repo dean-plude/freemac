@@ -391,6 +391,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (void)setWindowController:(NSWindowController *)wc { [wc setWindow:self]; }
 - (NSWindowController *)_windowController { return _windowController; }
 - (void)_setWindowController:(NSWindowController *)wc { _windowController = wc; }
+- (GtkWidget *)_gtkWindow { return _gtk; }
 - (NSViewController *)contentViewController { return _contentViewController; }
 - (void)setContentViewController:(NSViewController *)vc
 {

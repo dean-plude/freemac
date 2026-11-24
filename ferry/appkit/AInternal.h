@@ -436,4 +436,33 @@ BOOL ADismissPopover(NSViewController *vc);
 - (NSRange)_selectedTextRange;
 @end
 
+/* ---- printing and fonts (NSPrintInfo.m, NSPrintOperation.m, NSFontManager.m) ---------- */
+
+/* From Ferry's Core Text: a font of an installed family, as named, with a
+ * Pango weight and style. */
+GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size);
+/* The family that stands for a Mac family (Helvetica, Times, Menlo...),
+ * or nil for a name that isn't one. */
+NSString *GFontMacFamily(NSString *name);
+@interface NSWindow (FerryPrinting)
+/* the GTK window shown for this one, or NULL (a dialog's parent) */
+- (GtkWidget *)_gtkWindow;
+@end
+@interface NSPrintInfo (FerryPrivate)
+/* GTK's page setup and print settings made from the print info, and the
+ * print info changed to what they say (after GTK's dialogs) */
+- (GtkPageSetup *)_gtkPageSetup;
+- (GtkPrintSettings *)_gtkPrintSettings;
+- (void)_takeGtkPageSetup:(GtkPageSetup *)setup;
+- (void)_takeGtkPrintSettings:(GtkPrintSettings *)settings;
+/* the words of FERRY_PRINT_ANSWER or FERRY_PAGE_LAYOUT_ANSWER, applied */
+- (void)_takeAnswerWords:(NSArray *)words;
+@end
+@interface NSPrintPanel (FerryPrivate)
+/* the printer GTK's dialog chose, if one did */
+- (GtkPrinter *)_chosenPrinter;
+@end
+/* The shared font manager if one has been made, without making one. */
+NSFontManager *AExistingFontManager(void);
+
 #endif

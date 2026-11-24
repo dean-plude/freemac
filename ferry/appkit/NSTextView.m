@@ -257,6 +257,7 @@ typedef struct {
     NSSize _inset, _minSize, _maxSize;
     NSRange _selection;
     NSUInteger _anchor;
+    NSUInteger _typingAt;    /* where the typing attributes were last set, or NSNotFound */
     CGFloat _wantX;          /* the column up and down keep to, or -1 */
     BOOL _editable, _selectable, _rich, _graphics, _fieldEditor, _fontPanel, _drawsBackground;
     BOOL _horizontal, _vertical, _undo, _began, _dragging;
@@ -287,6 +288,8 @@ typedef struct {
     if (!c)
         [_container setWidthTracksTextView:YES];
     _editable = _selectable = _rich = _drawsBackground = _vertical = YES;
+    _fontPanel = YES;
+    _typingAt = NSNotFound;
     _inset = NSZeroSize;
     _minSize = [self frame].size;
     _maxSize = NSMakeSize(1e7, 1e7);
@@ -788,7 +791,10 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     }
     CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
     BOOL focused = [[self window] firstResponder] == self && [[self window] isKeyWindow];
-    if (_selection.length) {
+    /* printed (or drawn into an image), the text has no selection or caret */
+    BOOL screen = [NSGraphicsContext currentContextDrawingToScreen];
+    focused = focused && screen;
+    if (_selection.length && screen) {
         [(focused ? [NSColor selectedTextBackgroundColor] : [NSColor colorWithCalibratedWhite:0.86 alpha:1]) setFill];
         NSUInteger end = NSMaxRange(_selection);
         for (NSUInteger i = 0; i < _lineCount; i++) {
@@ -823,6 +829,90 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     }
 }
 
+/* ---- printing ---- */
+
+/* A page ends above a line that its bottom would cut through, so each
+ * line is printed whole on one page (unless that would move the bottom
+ * past the limit). */
+- (void)adjustPageHeightNew:(CGFloat *)newBottom top:(CGFloat)top bottom:(CGFloat)bottom limit:(CGFloat)limit
+{
+    [self _layout];
+    *newBottom = bottom;
+    for (NSUInteger i = 0; i < _lineCount; i++) {
+        CGFloat lineTop = _lines[i].top + _inset.height, lineBottom = lineTop + _lines[i].height;
+        if (lineTop < bottom && lineBottom > bottom) {
+            if (lineTop >= limit && lineTop > top)
+                *newBottom = lineTop;
+            return;
+        }
+    }
+}
+
+/* ---- fonts ---- */
+
+/* The font of the selection (or of what typing would insert), told to the
+ * font manager, with whether the selection has more than one. */
+- (void)_tellFontManager
+{
+    NSFontManager *fm = AExistingFontManager();
+    if (!fm || !_fontPanel || ([self window] && [[self window] firstResponder] != self))
+        return;
+    NSFont *font = nil;
+    BOOL multiple = NO;
+    NSUInteger n = [_storage length];
+    if (_selection.length && _selection.location < n) {
+        NSRange run;
+        font = [_storage attribute:NSFontAttributeName atIndex:_selection.location longestEffectiveRange:&run
+                           inRange:_selection];
+        multiple = NSMaxRange(run) < NSMaxRange(_selection);
+    } else if (_typingAt != _selection.location && _selection.location > 0 && _selection.location <= n) {
+        font = [_storage attribute:NSFontAttributeName atIndex:_selection.location - 1 effectiveRange:NULL];
+    }
+    [fm setSelectedFont:font ?: [_typing objectForKey:NSFontAttributeName] ?: ADefaultFont() isMultiple:multiple];
+}
+
+/* The font manager's changeFont: converts each font in the selection (all
+ * of plain text), or the font typing will use. */
+- (void)changeFont:(id)sender
+{
+    if (!_fontPanel || ![sender respondsToSelector:@selector(convertFont:)])
+        return;
+    NSUInteger n = [_storage length];
+    NSRange r = _rich ? _selection : NSMakeRange(0, n);
+    if (r.length && NSMaxRange(r) <= n) {
+        if (![self shouldChangeTextInRange:r replacementString:nil])
+            return;
+        NSFont *fallback = [_typing objectForKey:NSFontAttributeName] ?: ADefaultFont();
+        [_storage beginEditing];
+        for (NSUInteger i = r.location; i < NSMaxRange(r);) {
+            NSRange run;
+            NSFont *f = [_storage attribute:NSFontAttributeName atIndex:i longestEffectiveRange:&run inRange:r];
+            NSFont *converted = [sender convertFont:f ?: fallback];
+            if (converted)
+                [_storage addAttribute:NSFontAttributeName value:converted range:run];
+            i = MAX(NSMaxRange(run), i + 1);
+        }
+        [_storage endEditing];
+        [self didChangeText];
+    }
+    if (!_selection.length || !_rich) {
+        /* an empty selection: the next text typed here takes the new font */
+        NSFont *now = nil;
+        if (_typingAt != _selection.location && _selection.location > 0 && _selection.location <= n)
+            now = [_storage attribute:NSFontAttributeName atIndex:_selection.location - 1 effectiveRange:NULL];
+        NSMutableDictionary *t = [[_typing mutableCopy] autorelease];
+        if (_typingAt != _selection.location && _selection.location > 0 && _selection.location <= n)
+            [t addEntriesFromDictionary:[_storage attributesAtIndex:_selection.location - 1 effectiveRange:NULL]];
+        NSFont *converted = [sender convertFont:now ?: [_typing objectForKey:NSFontAttributeName] ?: ADefaultFont()];
+        if (converted)
+            [t setObject:converted forKey:NSFontAttributeName];
+        [self setTypingAttributes:t];
+        _typingAt = _selection.location;
+    }
+    [self _tellFontManager];
+    [self setNeedsDisplay:YES];
+}
+
 /* ---- selection ---- */
 
 - (NSRange)selectedRange { return _selection; }
@@ -833,8 +923,12 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     r.location = MIN(r.location, n);
     r.length = MIN(r.length, n - r.location);
     BOOL changed = !NSEqualRanges(r, _selection);
+    if (r.location != _typingAt || r.length)
+        _typingAt = NSNotFound; /* typing attributes set for another place */
     _selection = r;
     [self setNeedsDisplay:YES];
+    if (changed && !still)
+        [self _tellFontManager];
     if (changed && !still) {
         NSNotification *note = [NSNotification notificationWithName:NSTextViewDidChangeSelectionNotification object:self];
         if ([_delegate respondsToSelector:@selector(textViewDidChangeSelection:)])
@@ -982,7 +1076,7 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     NSRange r = _selection;
     /* text typed after a run takes that run's look, as on a Mac */
     NSDictionary *look = _typing;
-    if (r.location > 0 && r.location <= [_storage length] && [_storage length])
+    if (r.location > 0 && r.location <= [_storage length] && [_storage length] && _typingAt != r.location)
         look = [_storage attributesAtIndex:r.location - 1 effectiveRange:NULL];
     NSAttributedString *a = [[[NSAttributedString alloc] initWithString:s attributes:look] autorelease];
     [_storage replaceCharactersInRange:r withAttributedString:a];

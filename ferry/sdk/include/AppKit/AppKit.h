@@ -3812,4 +3812,274 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
 - (BOOL)validateMenuItem:(NSMenuItem *)item;
 @end
 
+/* ---- printing (freemac 1.NEXT, Ferry 0.NEXT) ------------------------------------------- */
+
+@class NSPrinter, NSPrintPanel, NSPrintOperation, NSPrintInfo, NSFontPanel, NSFontManager;
+typedef NSString *NSPrintInfoAttributeKey;
+typedef NSString *NSPrintJobDispositionValue;
+typedef NSString *NSPrinterPaperName;
+typedef NSString *NSPrintInfoSettingKey;
+typedef NS_ENUM(NSInteger, NSPaperOrientation) { NSPaperOrientationPortrait = 0, NSPaperOrientationLandscape = 1 };
+typedef NS_ENUM(NSUInteger, NSPrintingOrientation) { NSPortraitOrientation = 0, NSLandscapeOrientation = 1 };
+typedef NS_ENUM(NSUInteger, NSPrintingPaginationMode) {
+    NSPrintingPaginationModeAutomatic = 0, NSPrintingPaginationModeFit = 1, NSPrintingPaginationModeClip = 2,
+    NSAutoPagination = 0, NSFitPagination = 1, NSClipPagination = 2
+};
+typedef NS_ENUM(NSInteger, NSPrintingPageOrder) {
+    NSDescendingPageOrder = -1, NSSpecialPageOrder = 0, NSAscendingPageOrder = 1, NSUnknownPageOrder = 2
+};
+typedef NS_ENUM(NSInteger, NSPrintRenderingQuality) {
+    NSPrintRenderingQualityBest = 0, NSPrintRenderingQualityResponsive = 1
+};
+typedef NS_OPTIONS(NSInteger, NSPrintPanelOptions) {
+    NSPrintPanelShowsCopies = 1 << 0, NSPrintPanelShowsPageRange = 1 << 1, NSPrintPanelShowsPaperSize = 1 << 2,
+    NSPrintPanelShowsOrientation = 1 << 3, NSPrintPanelShowsScaling = 1 << 4,
+    NSPrintPanelShowsPrintSelection = 1 << 5, NSPrintPanelShowsPageSetupAccessory = 1 << 8,
+    NSPrintPanelShowsPreview = 1 << 17
+};
+typedef NSString *NSPrintPanelJobStyleHint;
+APPKIT_EXTERN NSPrintPanelJobStyleHint const NSPrintPhotoJobStyleHint, NSPrintAllPresetsJobStyleHint,
+    NSPrintNoPresetsJobStyleHint;
+
+APPKIT_EXTERN NSPrintInfoAttributeKey const NSPrintPaperName, NSPrintPaperSize, NSPrintOrientation,
+    NSPrintScalingFactor, NSPrintLeftMargin, NSPrintRightMargin, NSPrintTopMargin, NSPrintBottomMargin,
+    NSPrintHorizontallyCentered, NSPrintVerticallyCentered, NSPrintHorizontalPagination, NSPrintVerticalPagination,
+    NSPrintPrinter, NSPrintCopies, NSPrintAllPages, NSPrintFirstPage, NSPrintLastPage, NSPrintMustCollate,
+    NSPrintReversePageOrder, NSPrintJobDisposition, NSPrintJobSavingURL, NSPrintJobSavingFileNameExtensionHidden,
+    NSPrintHeaderAndFooter, NSPrintSelectionOnly, NSPrintPagesAcross, NSPrintPagesDown, NSPrintTime,
+    NSPrintDetailedErrorReporting, NSPrintPrinterName, NSPrintSavePath;
+APPKIT_EXTERN NSPrintJobDispositionValue const NSPrintSpoolJob, NSPrintPreviewJob, NSPrintSaveJob, NSPrintCancelJob;
+
+/* The printers this system's print service (CUPS) knows, asked with
+ * lpstat when the program first wants them. */
+@interface NSPrinter : NSObject <NSCopying, NSCoding>
+@property (class, readonly, copy) NSArray<NSString *> *printerNames;
+@property (class, readonly, copy) NSArray<NSString *> *printerTypes;
++ (NSPrinter *)printerWithName:(NSString *)name;
++ (NSPrinter *)printerWithType:(NSString *)type;
+@property (readonly, copy) NSString *name;
+@property (readonly, copy) NSString *type;
+@property (readonly) NSInteger languageLevel;
+@property (readonly, copy) NSDictionary *deviceDescription;
+- (NSSize)pageSizeForPaper:(NSPrinterPaperName)paperName;
+@end
+
+@interface NSPrintInfo : NSObject <NSCopying, NSCoding>
+@property (class, retain) NSPrintInfo *sharedPrintInfo;
+@property (class, readonly) NSPrinter *defaultPrinter;
++ (NSSize)sizeForPaperName:(NSPrinterPaperName)name;
+- (instancetype)initWithDictionary:(NSDictionary<NSPrintInfoAttributeKey, id> *)attributes;
+@property (readonly, retain) NSMutableDictionary<NSPrintInfoAttributeKey, id> *dictionary;
+@property (copy) NSPrinterPaperName paperName;
+@property (readonly, copy) NSString *localizedPaperName;
+@property NSSize paperSize;
+@property NSPaperOrientation orientation;
+@property CGFloat scalingFactor;
+@property CGFloat leftMargin, rightMargin, topMargin, bottomMargin;
+@property (getter=isHorizontallyCentered) BOOL horizontallyCentered;
+@property (getter=isVerticallyCentered) BOOL verticallyCentered;
+@property NSPrintingPaginationMode horizontalPagination, verticalPagination;
+@property (copy) NSPrintJobDispositionValue jobDisposition;
+@property (copy) NSPrinter *printer;
+@property (getter=isSelectionOnly) BOOL selectionOnly;
+@property (readonly) NSRect imageablePageBounds;
+@property (readonly) NSMutableDictionary<NSPrintInfoSettingKey, id> *printSettings;
+- (void)setUpPrintOperationDefaultValues;
+- (void)updateFromPMPrintSettings;
+- (void)updateFromPMPageFormat;
+@end
+
+@interface NSPrintPanel : NSObject
++ (NSPrintPanel *)printPanel;
+@property NSPrintPanelOptions options;
+@property (copy) NSPrintPanelJobStyleHint jobStyleHint;
+@property (copy) NSString *helpAnchor, *defaultButtonTitle;
+@property (readonly) NSPrintInfo *printInfo;
+- (void)addAccessoryController:(NSViewController *)controller;
+- (void)removeAccessoryController:(NSViewController *)controller;
+@property (readonly, copy) NSArray<NSViewController *> *accessoryControllers;
+- (NSInteger)runModal;
+- (NSInteger)runModalWithPrintInfo:(NSPrintInfo *)printInfo;
+- (void)beginSheetWithPrintInfo:(NSPrintInfo *)printInfo modalForWindow:(NSWindow *)window delegate:(id)delegate
+                 didEndSelector:(SEL)selector contextInfo:(void *)context;
+- (void)beginSheetUsingPrintInfo:(NSPrintInfo *)printInfo onWindow:(NSWindow *)window
+               completionHandler:(void (^)(NSInteger result))handler;
+@end
+
+@interface NSPageLayout : NSObject
++ (NSPageLayout *)pageLayout;
+@property (readonly) NSPrintInfo *printInfo;
+- (void)addAccessoryController:(NSViewController *)controller;
+- (void)removeAccessoryController:(NSViewController *)controller;
+@property (readonly, copy) NSArray<NSViewController *> *accessoryControllers;
+- (NSInteger)runModal;
+- (NSInteger)runModalWithPrintInfo:(NSPrintInfo *)printInfo;
+- (void)beginSheetWithPrintInfo:(NSPrintInfo *)printInfo modalForWindow:(NSWindow *)window delegate:(id)delegate
+                 didEndSelector:(SEL)selector contextInfo:(void *)context;
+- (void)beginSheetUsingPrintInfo:(NSPrintInfo *)printInfo onWindow:(NSWindow *)window
+               completionHandler:(void (^)(NSInteger result))handler;
+@end
+
+@interface NSPrintOperation : NSObject
++ (NSPrintOperation *)printOperationWithView:(NSView *)view;
++ (NSPrintOperation *)printOperationWithView:(NSView *)view printInfo:(NSPrintInfo *)printInfo;
++ (NSPrintOperation *)PDFOperationWithView:(NSView *)view insideRect:(NSRect)rect toData:(NSMutableData *)data;
++ (NSPrintOperation *)PDFOperationWithView:(NSView *)view insideRect:(NSRect)rect toData:(NSMutableData *)data
+                                 printInfo:(NSPrintInfo *)printInfo;
++ (NSPrintOperation *)PDFOperationWithView:(NSView *)view insideRect:(NSRect)rect toPath:(NSString *)path
+                                 printInfo:(NSPrintInfo *)printInfo;
++ (NSPrintOperation *)EPSOperationWithView:(NSView *)view insideRect:(NSRect)rect toData:(NSMutableData *)data;
++ (NSPrintOperation *)EPSOperationWithView:(NSView *)view insideRect:(NSRect)rect toData:(NSMutableData *)data
+                                 printInfo:(NSPrintInfo *)printInfo;
++ (NSPrintOperation *)EPSOperationWithView:(NSView *)view insideRect:(NSRect)rect toPath:(NSString *)path
+                                 printInfo:(NSPrintInfo *)printInfo;
+@property (class, retain) NSPrintOperation *currentOperation;
+@property (readonly, getter=isCopyingOperation) BOOL copyingOperation;
+@property (readonly) NSPrintRenderingQuality preferredRenderingQuality;
+@property (copy) NSString *jobTitle;
+@property BOOL showsPrintPanel, showsProgressPanel, canSpawnSeparateThread;
+@property (retain) NSPrintPanel *printPanel;
+@property NSPrintingPageOrder pageOrder;
+@property (retain) NSPrintInfo *printInfo;
+@property (readonly, retain) NSView *view;
+@property (readonly) NSInteger currentPage;
+@property (readonly) NSRange pageRange;
+@property (readonly, retain) NSGraphicsContext *context;
+- (BOOL)runOperation;
+- (void)runOperationModalForWindow:(NSWindow *)window delegate:(id)delegate didRunSelector:(SEL)selector
+                       contextInfo:(void *)context;
+- (NSGraphicsContext *)createContext;
+- (void)destroyContext;
+- (BOOL)deliverResult;
+- (void)cleanUpOperation;
+@end
+
+@interface NSView (NSPrinting)
+- (IBAction)print:(id)sender;
+- (NSData *)dataWithPDFInsideRect:(NSRect)rect;
+- (NSData *)dataWithEPSInsideRect:(NSRect)rect;
+- (void)writePDFInsideRect:(NSRect)rect toPasteboard:(NSPasteboard *)pasteboard;
+- (void)writeEPSInsideRect:(NSRect)rect toPasteboard:(NSPasteboard *)pasteboard;
+@property (readonly, copy) NSString *printJobTitle;
+- (BOOL)knowsPageRange:(NSRangePointer)range;
+- (NSRect)rectForPage:(NSInteger)page;
+- (NSPoint)locationOfPrintRect:(NSRect)rect;
+- (void)adjustPageWidthNew:(CGFloat *)newRight left:(CGFloat)left right:(CGFloat)right limit:(CGFloat)limit;
+- (void)adjustPageHeightNew:(CGFloat *)newBottom top:(CGFloat)top bottom:(CGFloat)bottom limit:(CGFloat)limit;
+@property (readonly) CGFloat heightAdjustLimit, widthAdjustLimit;
+- (void)beginDocument;
+- (void)endDocument;
+- (void)beginPageInRect:(NSRect)rect atPlacement:(NSPoint)location;
+- (void)endPage;
+- (void)drawPageBorderWithSize:(NSSize)borderSize;
+- (void)drawSheetBorderWithSize:(NSSize)borderSize;
+@property (readonly, copy) NSAttributedString *pageHeader, *pageFooter;
+@end
+
+@interface NSWindow (NSPrinting)
+- (IBAction)print:(id)sender;
+- (NSData *)dataWithPDFInsideRect:(NSRect)rect;
+- (NSData *)dataWithEPSInsideRect:(NSRect)rect;
+@end
+
+@interface NSApplication (NSPrinting)
+- (IBAction)runPageLayout:(id)sender;
+@end
+
+@interface NSDocument (NSPrinting)
+@property (copy) NSPrintInfo *printInfo;
+- (BOOL)shouldChangePrintInfo:(NSPrintInfo *)printInfo;
+- (BOOL)preparePageLayout:(NSPageLayout *)pageLayout;
+- (void)runModalPageLayoutWithPrintInfo:(NSPrintInfo *)printInfo delegate:(id)delegate
+                         didRunSelector:(SEL)selector contextInfo:(void *)context;
+- (NSPrintOperation *)printOperationWithSettings:(NSDictionary<NSPrintInfoAttributeKey, id> *)settings
+                                           error:(NSError **)error;
+- (void)printDocumentWithSettings:(NSDictionary<NSPrintInfoAttributeKey, id> *)settings
+                   showPrintPanel:(BOOL)show delegate:(id)delegate didPrintSelector:(SEL)selector
+                      contextInfo:(void *)context;
+- (void)runModalPrintOperation:(NSPrintOperation *)operation delegate:(id)delegate didRunSelector:(SEL)selector
+                   contextInfo:(void *)context;
+- (void)printShowingPrintPanel:(BOOL)show;
+@end
+
+/* ---- the font manager and the font panel ---------------------------------------------- */
+
+typedef NS_OPTIONS(NSUInteger, NSFontTraitMask) {
+    NSItalicFontMask = 0x00000001, NSBoldFontMask = 0x00000002, NSUnboldFontMask = 0x00000004,
+    NSNonStandardCharacterSetFontMask = 0x00000008, NSNarrowFontMask = 0x00000010,
+    NSExpandedFontMask = 0x00000020, NSCondensedFontMask = 0x00000040, NSSmallCapsFontMask = 0x00000080,
+    NSPosterFontMask = 0x00000100, NSCompressedFontMask = 0x00000200, NSFixedPitchFontMask = 0x00000400,
+    NSUnitalicFontMask = 0x01000000
+};
+typedef NS_ENUM(NSUInteger, NSFontAction) {
+    NSNoFontChangeAction = 0, NSViaPanelFontAction = 1, NSAddTraitFontAction = 2, NSSizeUpFontAction = 3,
+    NSSizeDownFontAction = 4, NSHeavierFontAction = 5, NSLighterFontAction = 6, NSRemoveTraitFontAction = 7
+};
+typedef NS_OPTIONS(NSUInteger, NSFontPanelModeMask) {
+    NSFontPanelModeMaskFace = 1 << 0, NSFontPanelModeMaskSize = 1 << 1, NSFontPanelModeMaskCollection = 1 << 2,
+    NSFontPanelModesMaskStandardModes = 0xFFFF, NSFontPanelModesMaskAllModes = 0xFFFFFFFF
+};
+
+@protocol NSFontChanging <NSObject>
+@optional
+- (void)changeFont:(NSFontManager *)sender;
+- (NSFontPanelModeMask)validModesForFontPanel:(NSFontPanel *)fontPanel;
+@end
+
+@interface NSFontManager : NSObject <NSMenuItemValidation>
+@property (class, readonly) NSFontManager *sharedFontManager;
++ (void)setFontManagerFactory:(Class)factoryClass;
++ (void)setFontPanelFactory:(Class)factoryClass;
+@property (readonly, copy) NSArray<NSString *> *availableFonts;
+@property (readonly, copy) NSArray<NSString *> *availableFontFamilies;
+- (NSArray<NSArray *> *)availableMembersOfFontFamily:(NSString *)family;
+- (NSArray<NSString *> *)availableFontNamesWithTraits:(NSFontTraitMask)traits;
+- (NSFont *)fontWithFamily:(NSString *)family traits:(NSFontTraitMask)traits weight:(NSInteger)weight
+                      size:(CGFloat)size;
+- (NSFont *)convertFont:(NSFont *)font;
+- (NSFont *)convertFont:(NSFont *)font toFamily:(NSString *)family;
+- (NSFont *)convertFont:(NSFont *)font toFace:(NSString *)typeface;
+- (NSFont *)convertFont:(NSFont *)font toHaveTrait:(NSFontTraitMask)trait;
+- (NSFont *)convertFont:(NSFont *)font toNotHaveTrait:(NSFontTraitMask)trait;
+- (NSFont *)convertFont:(NSFont *)font toSize:(CGFloat)size;
+- (NSFont *)convertWeight:(BOOL)upFlag ofFont:(NSFont *)font;
+- (NSFontTraitMask)traitsOfFont:(NSFont *)font;
+- (NSInteger)weightOfFont:(NSFont *)font;
+- (BOOL)fontNamed:(NSString *)name hasTraits:(NSFontTraitMask)traits;
+- (NSString *)localizedNameForFamily:(NSString *)family face:(NSString *)face;
+@property (readonly, retain) NSFont *selectedFont;
+- (void)setSelectedFont:(NSFont *)font isMultiple:(BOOL)flag;
+@property (readonly, getter=isMultiple) BOOL multiple;
+@property (readonly) NSFontAction currentFontAction;
+@property SEL action;
+@property (assign) id target;
+@property (assign) id delegate;
+@property (getter=isEnabled) BOOL enabled;
+@property (retain) NSMenu *fontMenu;
+- (NSMenu *)fontMenu:(BOOL)create;
+- (NSFontPanel *)fontPanel:(BOOL)create;
+- (BOOL)sendAction;
+- (IBAction)addFontTrait:(id)sender;
+- (IBAction)removeFontTrait:(id)sender;
+- (IBAction)modifyFont:(id)sender;
+- (IBAction)modifyFontViaPanel:(id)sender;
+- (IBAction)orderFrontFontPanel:(id)sender;
+- (IBAction)orderFrontStylesPanel:(id)sender;
+- (BOOL)validateMenuItem:(NSMenuItem *)item;
+@end
+
+@interface NSFontPanel : NSPanel
+@property (class, readonly) NSFontPanel *sharedFontPanel;
+@property (class, readonly) BOOL sharedFontPanelExists;
+- (void)setPanelFont:(NSFont *)font isMultiple:(BOOL)flag;
+- (NSFont *)panelConvertFont:(NSFont *)font;
+@property (getter=isEnabled) BOOL enabled;
+@property (retain) NSView *accessoryView;
+- (void)reloadDefaultFontFamilies;
+@end
+
+@interface NSTextView (NSFontChanging) <NSFontChanging>
+- (void)changeFont:(id)sender;
+@end
+
 #endif
