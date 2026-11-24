@@ -191,7 +191,9 @@ class Topline(Gtk.Window):
         bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
         # computer has nothing to show (no battery, no sound server).
-        for indicator in (battery_menu.BatteryMenu(), status.Sound(), wifi_menu.WifiMenu(), status.VPN(), bluetooth_menu.BluetoothMenu(),
+        wifi, bluetooth = wifi_menu.WifiMenu(), bluetooth_menu.BluetoothMenu()
+        quick_settings.menus.update(wifi=wifi, bluetooth=bluetooth)
+        for indicator in (battery_menu.BatteryMenu(), status.Sound(), wifi, status.VPN(), bluetooth,
                           status.Printing(), status.Recording(), status.ScreenShared(), status.InUse(), status.InputMenu(),
                           status.UserMenu()):
             indicator.get_style_context().add_class("status")

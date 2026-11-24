@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.160 "Quick Settings drawn as a Mac's Control Centre" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Each module is a round symbol, blue while it's on, beside its name and how it stands, on a light tile, as in a Mac's Control Centre; a click on the symbol switches it | quick.py | done |
+| 2 | Wi-Fi and Bluetooth show a chevron; a click on their words opens the Wi-Fi menu (1.153) or the Bluetooth menu (1.158) from the menu bar, or Dials when that symbol is hidden | quick.py, topline.py | done |
+| 3 | A click on the words of the other modules switches them, as before | quick.py | done |
+| 4 | Guide topic, README screenshot retaken | Guide, Docs | done |
+
 ## 1.159 "Ferry: tables and outlines" (done)
 
 Mac programs run through Ferry can show lists, tables and outlines, the views

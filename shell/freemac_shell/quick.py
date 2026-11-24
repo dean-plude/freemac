@@ -22,9 +22,13 @@ from .status import NM, StatusButton, launch  # noqa: E402
 CSS = b"""
 .quick-panel { padding: 12px; }
 .quick-panel flowbox, .quick-panel flowboxchild { background: none; }
-.quick-tile { padding: 8px 10px; border-radius: 12px; min-width: 150px; }
-.quick-tile:checked { background-image: none; background-color: @theme_selected_bg_color; color: white; }
-.quick-tile:checked .dim-label { color: rgba(255, 255, 255, 0.8); }
+.quick-tile { padding: 6px 4px 6px 10px; border-radius: 12px; min-width: 150px;
+              background-color: alpha(currentColor, 0.06); }
+.quick-tile-symbol { min-width: 28px; min-height: 28px; padding: 0; border-radius: 50%;
+                     border: none; box-shadow: none; background-image: none;
+                     background-color: alpha(currentColor, 0.12); }
+.quick-tile-symbol:checked { background-color: @theme_selected_bg_color; color: white; }
+.quick-tile-words { padding: 2px 6px 2px 0; border: none; box-shadow: none; background: none; }
 .quick-tile-title { font-weight: bold; }
 .now-playing { padding: 6px 4px; border-top: 1px solid alpha(currentColor, 0.12); }
 .focus-list { padding: 4px; border-radius: 12px; background-color: alpha(currentColor, 0.06); }
@@ -40,28 +44,51 @@ def run(*cmd):
         return ""
 
 
-class Tile(Gtk.ToggleButton):
-    def __init__(self, icon, title, on_toggle):
-        super().__init__()
+class Tile(Gtk.Box):
+    """A Control Centre module, drawn as a Mac draws one: a round symbol that
+    turns blue when the thing is on (a click on it switches it), and its name
+    with how it stands. A click on the name opens more (the Wi-Fi networks,
+    the Bluetooth devices) when the tile has more to show, and otherwise
+    switches it too."""
+
+    def __init__(self, icon, title, on_toggle, more=None):
+        super().__init__(spacing=10)
         self.get_style_context().add_class("quick-tile")
-        box = Gtk.Box(spacing=10)
-        self.image = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR)
-        box.pack_start(self.image, False, False, 0)
+        self.switch = Gtk.ToggleButton(valign=Gtk.Align.CENTER)
+        self.switch.get_style_context().add_class("quick-tile-symbol")
+        self.switch.set_can_focus(False)
+        self.image = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU)
+        self.image.set_pixel_size(16)
+        self.switch.add(self.image)
+        self.pack_start(self.switch, False, False, 0)
+        words = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
+        words.get_style_context().add_class("quick-tile-words")
+        words.set_can_focus(False)
+        line = Gtk.Box(spacing=4)
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        heading = Gtk.Label(label=title, xalign=0, ellipsize=3, max_width_chars=14)
+        heading = Gtk.Label(label=title, xalign=0, ellipsize=3, max_width_chars=12)
         heading.get_style_context().add_class("quick-tile-title")
         self.heading = heading
-        self.detail = Gtk.Label(xalign=0, ellipsize=3, max_width_chars=14)
+        self.detail = Gtk.Label(xalign=0, ellipsize=3, max_width_chars=12)
         self.detail.get_style_context().add_class("dim-label")
         text.pack_start(heading, False, False, 0)
         text.pack_start(self.detail, False, False, 0)
-        box.pack_start(text, True, True, 0)
-        self.add(box)
-        self.handler = self.connect("toggled", lambda b: on_toggle(b.get_active()))
+        line.pack_start(text, True, True, 0)
+        if more is not None:
+            chevron = Gtk.Image.new_from_icon_name("go-next-symbolic", Gtk.IconSize.MENU)
+            chevron.get_style_context().add_class("dim-label")
+            line.pack_end(chevron, False, False, 0)
+        words.add(line)
+        self.pack_start(words, True, True, 0)
+        self.handler = self.switch.connect("toggled", lambda b: on_toggle(b.get_active()))
+        words.connect("clicked", lambda *_: more() if more else self.switch.set_active(not self.switch.get_active()))
+
+    def get_active(self):
+        return self.switch.get_active()
 
     def show_state(self, on, detail=None):
-        with self.handler_block(self.handler):
-            self.set_active(on)
+        with self.switch.handler_block(self.handler):
+            self.switch.set_active(on)
         self.detail.set_text(detail or ("On" if on else "Off"))
 
 
@@ -172,8 +199,10 @@ class QuickSettings(StatusButton):
         panel.get_style_context().add_class("quick-panel")
         self.popup.add(panel)
 
-        self.wifi = Tile("network-wireless-symbolic", "Wi-Fi", self._set_wifi)
-        self.bluetooth = Tile("bluetooth-active-symbolic", "Bluetooth", self._set_bluetooth)
+        self.menus = {}       # Topline's Wi-Fi and Bluetooth menus, which a tile can open
+        self.wifi = Tile("network-wireless-symbolic", "Wi-Fi", self._set_wifi, lambda: self._open_menu("wifi"))
+        self.bluetooth = Tile("bluetooth-active-symbolic", "Bluetooth", self._set_bluetooth,
+                              lambda: self._open_menu("bluetooth"))
         self.dnd = Tile("freemac-focus-dnd-symbolic", "Focus", self._focus_clicked)
         self.dark = Tile("weather-clear-night-symbolic", "Dark Mode", self._set_dark)
         self.night = Tile("night-light-symbolic", "Night Light", self._set_night)
@@ -368,6 +397,16 @@ class QuickSettings(StatusButton):
 
     def _set_volume(self, value):
         audio.set_level(int(value))   # keeps the balance
+
+    def _open_menu(self, name):
+        """The Wi-Fi or Bluetooth tile's name: that menu, from its own symbol
+        in the menu bar, with its networks or devices."""
+        menu = self.menus.get(name)
+        self.popup.hide()
+        if menu is not None and menu.get_visible():
+            menu._clicked()
+        else:
+            launch("freemac-dials", "--panel", "network" if name == "wifi" else "bluetooth")
 
     # -- the panel -------------------------------------------------------------
     def _toggle(self, *_args):

@@ -893,6 +893,14 @@ TOPICS = {
         "To pair a new device, choose Bluetooth Settings… and put the device in pairing mode. Dials lists "
         "it under Nearby Devices: click Pair.",
     ]),
+    "quick-settings": ("Use Quick Settings in the menu bar", "quick settings control centre center wifi bluetooth focus dark mode night light stage manager volume switch menu bar", [
+        "Click the Quick Settings symbol in the menu bar, next to the clock, for Wi-Fi, Bluetooth, Focus, "
+        "Dark Mode, Night Light, Stage Manager and the volume in one place.",
+        "Each one has a round symbol that's blue while it's on. Click the symbol to turn it on or off.",
+        "Click the words Wi-Fi or Bluetooth for their menus, with the networks to join or the devices to "
+        "connect. Clicking the words of the others turns them on or off too.",
+        "Settings… at the bottom opens Dials.",
+    ]),
     "menu-extras": ("Use apps' icons in the menu bar", "menu bar extras icons tray status icon system tray app indicator notification area background running chat cloud sync", [
         "Some apps put an icon of their own in the menu bar while they run, such as chat, cloud storage "
         "and password apps. They sit left of freemac's own icons, newest furthest left.",
