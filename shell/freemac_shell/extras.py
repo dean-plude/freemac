@@ -21,6 +21,8 @@ WATCHER_PATH = "/StatusNotifierWatcher"
 ITEM = "org.kde.StatusNotifierItem"
 DBUSMENU = "com.canonical.dbusmenu"
 SIZE = 16
+WIDE = 22                       # a picture of words, as a Mac app's title item
+MAX_WIDTH = 400
 
 WATCHER_XML = """
 <node>
@@ -65,25 +67,31 @@ def plain_text(markup):
 
 
 def pixmap_to_pixbuf(pixmaps, size=SIZE):
-    """IconPixmap is a list of (width, height, ARGB32 bytes, big-endian):
-    the smallest one at least as big as needed, scaled to the bar."""
-    best = None
-    for width, height, data in pixmaps or []:
-        if width <= 0 or height <= 0 or len(data) < width * height * 4:
-            continue
-        if best is None or (best[0] < size <= width) or (width >= size and width < best[0]) \
-                or (best[0] < size and width > best[0]):
-            best = (width, height, bytes(data))
-    if best is None:
+    """IconPixmap is a list of (width, height, ARGB32 bytes, big-endian),
+    picked and scaled by height: the smallest at least as tall as needed. An
+    icon is shown SIZE high; a wide picture, like an app's title drawn as
+    text, is shown WIDE high so its words stay the size of the bar's."""
+    found = [(w, h, bytes(d)) for w, h, d in pixmaps or [] if w > 0 and h > 0 and len(d) >= w * h * 4]
+    if not found:
         return None
+
+    def pick(tall):
+        bigger = [p for p in found if p[1] >= tall]
+        return min(bigger, key=lambda p: p[1]) if bigger else max(found, key=lambda p: p[1])
+
+    best = pick(size)
+    if best[0] > best[1] * 1.2 and size == SIZE:
+        size = WIDE
+        best = pick(size)
     width, height, data = best
-    rgba = bytearray(len(data))
+    rgba = bytearray(width * height * 4)
+    data = data[:len(rgba)]
     rgba[0::4], rgba[1::4], rgba[2::4], rgba[3::4] = data[1::4], data[2::4], data[3::4], data[0::4]
     pixbuf = GdkPixbuf.Pixbuf.new_from_bytes(GLib.Bytes.new(bytes(rgba)), GdkPixbuf.Colorspace.RGB,
                                              True, 8, width, height, width * 4)
-    if width != size or height != size:
-        scale = size / max(width, height)
-        pixbuf = pixbuf.scale_simple(max(1, round(width * scale)), max(1, round(height * scale)),
+    if height != size:
+        scale = size / height
+        pixbuf = pixbuf.scale_simple(max(1, min(MAX_WIDTH, round(width * scale))), size,
                                      GdkPixbuf.InterpType.BILINEAR)
     return pixbuf
 

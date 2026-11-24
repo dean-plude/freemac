@@ -878,6 +878,25 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Ferry's menu bar items (1.157)
+
+`ferry/appkit/NSStatusBar.m`. Each `NSStatusItem` registers two objects on the
+program's own session-bus connection (GIO's D-Bus calls, served to Mac code
+through `src/host.c` like GTK's): `org.kde.StatusNotifierItem` at
+`/StatusNotifierItem/N` and `com.canonical.dbusmenu` at `/MenuBar/N`, and
+registers the item path with `org.kde.StatusNotifierWatcher` (Topline, see
+below), again whenever the watcher's owner changes. GLib's default main
+context is attached to Ferry's run loop (`AGlibAttach`) so the calls arrive on
+the app's main thread with or without a window. `IconPixmap` is drawn with
+Ferry's Core Graphics at 16, 22 and 32 pixels high, as the item would be drawn
+in a Mac's 22-point bar, and converted from premultiplied RGBA to straight
+ARGB. The menu is numbered when the menu bar reads it from the top;
+`AboutToShow` tells the menu's delegate, and each item's enabled state comes
+from the app's own `validateMenuItem:`. Setters coalesce `NewIcon`,
+`NewToolTip` and `NewStatus` until the run loop's next turn. A removed item
+first says it is `Passive`. Topline shows a wide picture (a title) 22 pixels
+high and an icon 16.
+
 ## Menu bar extras (1.156)
 
 `shell/freemac_shell/extras.py`. Topline owns `org.kde.StatusNotifierWatcher`

@@ -22,9 +22,10 @@ const char *const ferry_host_names[] = {
     NULL,
 };
 
-/* Four groups: the drawing libraries Core Graphics and Core Text use, GTK,
- * which AppKit uses for windows, and GdkPixbuf and Poppler, which read image
- * and PDF files. Each is opened the first time one of its calls is looked
+/* Five groups: the drawing libraries Core Graphics and Core Text use, GTK,
+ * which AppKit uses for windows, GdkPixbuf and Poppler, which read image
+ * and PDF files, and GIO, whose D-Bus calls put menu bar items in the
+ * desktop's menu bar. Each is opened the first time one of its calls is looked
  * up. */
 struct group {
     const char *what;
@@ -41,10 +42,12 @@ static const char *const drawing_libraries[] = {
 static const char *const window_libraries[] = {"libgtk-3.so.0", "libgdk-3.so.0"};
 static const char *const image_libraries[] = {"libgdk_pixbuf-2.0.so.0"};
 static const char *const pdf_libraries[] = {"libpoppler-glib.so.8"};
+static const char *const dbus_libraries[] = {"libgio-2.0.so.0"};
 static struct group drawing = {"drawing", drawing_libraries, 6, {0}, 0, 0};
 static struct group windows = {"windows", window_libraries, 2, {0}, 0, 0};
 static struct group images = {"reading image files", image_libraries, 1, {0}, 0, 1};
 static struct group pdf = {"reading PDF files", pdf_libraries, 1, {0}, 0, 1};
+static struct group dbus = {"menu bar items", dbus_libraries, 1, {0}, 0, 1};
 
 static void open_group(struct group *g)
 {
@@ -67,6 +70,7 @@ void *ferry_host_lookup(const char *name)
         return NULL;
     struct group *g = !strncmp(name, "gdk_pixbuf_", 11)                  ? &images
                       : !strncmp(name, "poppler_", 8)                   ? &pdf
+                      : !strncmp(name, "g_bus_", 6) || !strncmp(name, "g_dbus_", 7) ? &dbus
                       : !strncmp(name, "gtk_", 4) || !strncmp(name, "gdk_", 4) ? &windows
                                                                          : &drawing;
     if (!g->opened)

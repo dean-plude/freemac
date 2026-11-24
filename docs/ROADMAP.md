@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.157 "Ferry: menu bar items" (done)
+
+Mac programs run through Ferry put their own items in freemac's menu bar.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Menu bar items (`NSStatusBar`, `NSStatusItem`, `NSStatusBarButton`): each one is offered to the menu bar over StatusNotifierItem, drawn by Ferry from its image (template images in the menu bar's ink), its title or both, at three sizes, or from a custom view | Ferry AppKit | done |
+| 2 | An item's menu is read by the menu bar as it opens (dbusmenu): ticks, dimmed items from the app's own menu validation, separators, submenus and hidden items, the menu delegate told before it opens; choosing an item sends its action | Ferry AppKit | done |
+| 3 | Clicking an item without a menu sends its button's action; hiding it or removing it takes it out of the menu bar, and a restarted menu bar gets every item again | Ferry AppKit | done |
+| 4 | Topline shows an app's picture of words (a title item) at the menu bar's text size rather than shrunk to an icon | extras.py | done |
+| 5 | Ferry says why when the processor lacks SSSE3, which Mac programs expect (older PCs and virtual machines on a plain processor), before a program stops with "Illegal instruction" | Ferry | done |
+| 6 | A test that reads, opens and clicks two items over a private session bus (66 tests) | Ferry tests | done |
+
 ## 1.156 "Menu bar extras" (done)
 
 Apps' own icons in the menu bar, as on a Mac.

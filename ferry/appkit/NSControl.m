@@ -116,6 +116,9 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
 - (void)setTarget:(id)target { _target = target; }
 - (SEL)action { return _action; }
 - (void)setAction:(SEL)action { _action = action; }
+/* Which mouse events send the action. A Ferry control sends it on mouse-up
+ * whatever the mask, so that is what it says it did before. */
+- (NSInteger)sendActionOn:(NSInteger)mask { return 1 << 2; /* NSEventMaskLeftMouseUp */ }
 - (NSInteger)tag { return _tag; }
 - (void)setTag:(NSInteger)tag { _tag = tag; }
 - (BOOL)isEnabled { return _enabled; }

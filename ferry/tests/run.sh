@@ -226,6 +226,28 @@ run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.o
 run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
 # Drag and drop into a window: the steps GTK's drop signals take (M7).
 run_one appkit_dragging "$here/appkit/dragging.m" "$here/appkit/dragging.out" -fobjc-arc -framework Cocoa
+# Menu bar items (after M7): read, opened and clicked over D-Bus as the
+# desktop's menu bar does, on a private session bus.
+if command -v dbus-run-session > /dev/null && command -v gdbus > /dev/null; then
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$build/appkit_statusbar" "$here/appkit/statusbar.m" -framework Cocoa \
+            2> "$build/appkit_statusbar.cc.log"; then
+        env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS timeout 60 dbus-run-session -- \
+            sh "$here/appkit/statusbar.sh" "$top/ferry" "$build/appkit_statusbar" "$build/appkit_statusbar.log" \
+            > "$build/appkit_statusbar.got" 2> "$build/appkit_statusbar.err"
+        echo "exit=$?" >> "$build/appkit_statusbar.got"
+        if diff -u "$here/appkit/statusbar.out" "$build/appkit_statusbar.got" > "$build/appkit_statusbar.diff"; then
+            echo "ok   appkit_statusbar"; pass=$((pass + 1))
+        else
+            echo "FAIL appkit_statusbar"; sed 's/^/    /' "$build/appkit_statusbar.diff"
+            sed 's/^/    stderr: /' "$build/appkit_statusbar.log.err"; fail=$((fail + 1))
+        fi
+    else
+        echo "FAIL appkit_statusbar (did not compile)"; sed 's/^/    /' "$build/appkit_statusbar.cc.log"
+        fail=$((fail + 1))
+    fi
+else
+    echo "skip appkit_statusbar (needs dbus-run-session and gdbus)"
+fi
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.

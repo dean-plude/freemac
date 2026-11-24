@@ -447,6 +447,7 @@ static NSFont *named(const char *name, CGFloat size)
 + (NSFont *)labelFontOfSize:(CGFloat)size { return [self systemFontOfSize:size > 0 ? size : 10]; }
 + (NSFont *)messageFontOfSize:(CGFloat)size { return [self systemFontOfSize:size]; }
 + (NSFont *)menuFontOfSize:(CGFloat)size { return [self systemFontOfSize:size > 0 ? size : 14]; }
++ (NSFont *)menuBarFontOfSize:(CGFloat)size { return [self systemFontOfSize:size > 0 ? size : 14]; }
 + (NSFont *)titleBarFontOfSize:(CGFloat)size { return [self boldSystemFontOfSize:size]; }
 + (NSFont *)controlContentFontOfSize:(CGFloat)size { return [self systemFontOfSize:size]; }
 + (NSFont *)toolTipsFontOfSize:(CGFloat)size { return [self systemFontOfSize:size > 0 ? size : 11]; }

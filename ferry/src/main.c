@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.10.0"
+#define FERRY_VERSION "0.11.0"
 
 static void usage(FILE *out)
 {
@@ -189,6 +189,15 @@ int main(int argc, char **argv, char **envp)
     }
     if (getenv("FERRY_VERBOSE"))
         ferry_verbose = 1;
+    /* Every Intel Mac had at least a Core 2 processor, and Mac programs are
+     * built to use its instructions (SSSE3). Some older PCs, and virtual
+     * machines set to a plain processor, lack them; such a program stops
+     * with "Illegal instruction" the first time it uses one, so say why
+     * before it does. */
+    __builtin_cpu_init();
+    if (!__builtin_cpu_supports("ssse3"))
+        fprintf(stderr, "ferry: this processor lacks SSSE3, which every Intel Mac had; a Mac program may stop "
+                        "with \"Illegal instruction\" (in a virtual machine, give it the host's processor)\n");
     static char program[PATH_MAX];
     if (is_dir(argv[i]) && !has_suffix(argv[i], ".pkg") && !has_suffix(argv[i], ".mpkg")) {
         if (!bundle_program(argv[i], program, sizeof program)) {

@@ -65,8 +65,9 @@ JPEG, GIF, TIFF, BMP, ICO, `.icns` and PDF images, read with this system's
 GdkPixbuf and Poppler), window and view controllers that load their own
 nibs, the clipboard (`NSPasteboard`, shared with other apps for text, with
 cut, copy and paste in text fields), Open and Save panels (the system's
-file chooser), files and text dropped onto views from other apps, and the
-app's icon in the dock. Exceptions work as on a Mac: `@try`/`@catch`/
+file chooser), files and text dropped onto views from other apps, the
+app's icon in the dock, and menu bar items (`NSStatusItem`, shown in the
+desktop's menu bar over StatusNotifierItem, with their menus). Exceptions work as on a Mac: `@try`/`@catch`/
 `@finally` catch them, and one a program leaves uncaught in its event loop
 is reported and the app carries on. Scroll views, text views (with RTF
 and simple HTML documents), progress indicators and boxes are there too,
@@ -98,8 +99,7 @@ without a window.
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, outline views, pop-up buttons, toolbars, status bar
-  items, alerts) and the document classes are missing, and
+  views (tables, outline views, pop-up buttons, toolbars, alerts) and the document classes are missing, and
   storyboards aren't read. Real apps' nibs (made by Xcode, in both its
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
@@ -167,6 +167,8 @@ without a window.
    are keyed archives or, from current Xcode, `NIBArchive` files
    (`appkit/ANibArchive.m` reads those); `appkit/NSNib.m` turns Interface
    Builder's stand-in objects into the real ones and makes the connections.
+   Menu bar items (`appkit/NSStatusBar.m`) are D-Bus objects on the
+   session bus, through GIO's calls in `appkit/gtk.h`.
    The few Carbon calls Cocoa apps still make (global hotkeys, keyboard
    layouts, Accessibility) are answered here too (`appkit/Carbon.m`), the
    way a Mac answers when the thing isn't available.
@@ -218,7 +220,8 @@ formats, runs it through Ferry and compares the output. It needs `clang`,
 `lld` and `llvm` (for `llvm-nm`), and `python3` for the Installer's test; the drawing tests also need Cairo, Pango
 and HarfBuzz (the runtime libraries, not their `-dev` packages) and some
 fonts, and the AppKit tests need GTK 3 (and GdkPixbuf and Poppler for
-images). The on-screen tests (a window, the dock icon, a screen at scale 2)
+images), and the menu bar test needs `dbus-run-session` and `gdbus` (it is
+skipped without them). The on-screen tests (a window, the dock icon, a screen at scale 2)
 also need `weston`, which they start headless; without it they are
 skipped.
 
