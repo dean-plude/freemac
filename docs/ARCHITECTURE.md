@@ -878,6 +878,22 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Aliases (1.172)
+
+An alias is a symbolic link to the original's absolute path (aliases.py), so
+it keeps working when the alias itself moves, and the rest of the system (a
+file dialog, Terminal, an app opening it) follows it like any link. `make()`
+names it as a Mac does ("Notes alias", "Notes alias 2"), and an alias of an
+alias points at the same original. `badge()` draws the arrow onto the
+original's icon with cairo, so no artwork is borrowed; Drawer caches the
+badged icons. A broken alias (its link leads nowhere) gets a plain document
+icon and, when opened, `ask_broken()`: Delete Alias moves it to the Trash and
+Fix Alias… repoints it through a temporary link and `os.replace`, so it is
+never missing. Show Original on the Desktop runs `freemac-drawer --select
+PATH`, which opens PATH's folder with PATH chosen even when PATH is a folder.
+Make Alias has no ⌃⌘A shortcut: Strata turns ⌘ into Ctrl for apps, so ⌃⌘A
+reaches them as Ctrl+A, the same as Select All.
+
 ## Definitions in Seek (1.171)
 
 `words.meanings(text)` answers Seek without starting Words: it bisects

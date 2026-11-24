@@ -18,7 +18,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import alert, app_list, default_apps, macapps, tags  # noqa: E402
+from . import aliases, alert, app_list, default_apps, macapps, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -118,6 +118,9 @@ class InfoWindow(Gtk.Window):
                 else Gio.content_type_get_description(info.get_content_type() or "") or "Document")
         # An app in Applications is shown as the app, not as its .desktop file.
         app = Gio.DesktopAppInfo.new_from_filename(path) if app_list.is_installed_app(path) else None
+        is_alias = aliases.is_alias(path)
+        if is_alias:
+            kind = "Alias"
         if app is not None:
             name, kind = app.get_display_name() or name, "Application"
             self.set_title(f"{name} Info")
@@ -131,6 +134,17 @@ class InfoWindow(Gtk.Window):
         elif app is not None and app.get_icon() is not None:
             image.set_from_gicon(app.get_icon(), Gtk.IconSize.DIALOG)
             image.set_pixel_size(64)
+        elif is_alias:
+            # The original's icon, with the alias's arrow.
+            theme = Gtk.IconTheme.get_default()
+            try:
+                real = Gio.File.new_for_path(path).query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
+                found = theme.lookup_by_gicon(real.get_icon(), 64, Gtk.IconLookupFlags.FORCE_SIZE)
+            except GLib.Error:
+                found = None
+            found = found or theme.lookup_icon("text-x-generic", 64, Gtk.IconLookupFlags.FORCE_SIZE)
+            if found is not None:
+                image.set_from_pixbuf(aliases.badge(found.load_icon()))
         elif info.get_icon() is not None:
             image.set_from_gicon(info.get_icon(), Gtk.IconSize.DIALOG)
             image.set_pixel_size(64)
@@ -163,6 +177,8 @@ class InfoWindow(Gtk.Window):
             self.size_value.set_text(f"{size:,} bytes" if size < 1000 else f"{nice_size(size)} ({size:,} bytes)")
             self.size_line.set_text(nice_size(size))
         rows.append(("Size", self.size_value))
+        if is_alias:
+            rows.append(("Original", self._original_row(path)))
         where = os.path.dirname(os.path.abspath(path))
         home = GLib.get_home_dir()
         if app is not None:
@@ -319,6 +335,26 @@ class InfoWindow(Gtk.Window):
         if error is not None:
             self.tag_note.set_text("This disk can’t keep tags.")
             self.tag_note.show()
+
+    def _original_row(self, path):
+        """Where the alias's original is, or that it can't be found, with
+        Select New Original… to point it elsewhere."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        where = Gtk.Label(xalign=0, selectable=True, wrap=True, max_width_chars=30)
+
+        def show():
+            found = aliases.original(path)
+            home = GLib.get_home_dir()
+            if found:
+                where.set_text("Home" + found[len(home):] if found.startswith(home + "/") else found)
+            else:
+                where.set_text("Can’t be found")
+        show()
+        box.pack_start(where, False, False, 0)
+        button = Gtk.Button(label="Select New Original…", halign=Gtk.Align.START)
+        button.connect("clicked", lambda _b: aliases.choose_original(self, path) and show())
+        box.pack_start(button, False, False, 0)
+        return box
 
     @staticmethod
     def _row(grid, row, label, value):

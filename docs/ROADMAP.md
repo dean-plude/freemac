@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.172 "Aliases" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > Make Alias in Drawer and on the Desktop, and the right-click menus, make "name alias" beside the item; holding ⌥⌘ while dragging makes the alias where you drop it | aliases.py, drawer.py, desktop_icons.py | done |
+| 2 | An alias shows the original's icon with a small curved arrow, its Kind is Alias, and double-clicking opens the original, even a folder in the same window | aliases.py, drawer.py, desktop_icons.py | done |
+| 3 | Show Original (⌘R) opens the original's folder with it chosen, from Drawer or the Desktop | drawer.py, desktop_icons.py | done |
+| 4 | An alias whose original is gone says so when opened, with Delete Alias and Fix Alias… to choose a new original | aliases.py | done |
+| 5 | Get Info on an alias says where its original is, with Select New Original… | drawer_info.py | done |
+| 6 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.171 "Definitions in Seek" (done)
 
 | # | Item | Component | Status |

@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import app_list, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -231,6 +231,7 @@ class Folder:
     """Reads one folder into a Gtk.ListStore."""
 
     icon_cache = {}
+    badged = {}        # an icon -> the same icon with an alias's arrow
     thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
     def __init__(self, path, show_hidden=False, sort="name", icon_size=48, item_info=False):
@@ -368,10 +369,19 @@ class Folder:
             is_dir, kind = False, MAC_APP
             name = macapps.display_name(full)
             big, small = self.app_icon(full, self.icon_size), self.app_icon(full, 20)
+        alias = aliases.is_alias(full)
+        if alias:
+            # An alias shows its original's icon with a small arrow; a broken
+            # one, a plain document's.
+            kind = "Alias"
+            if info.get_file_type() == Gio.FileType.SYMBOLIC_LINK:
+                plain = Gio.ThemedIcon.new("text-x-generic")
+                big, small = self.icon(plain, self.icon_size), self.icon(plain, 20)
+            big, small = self.with_arrow(big), self.with_arrow(small)
         names = tags.get(full)
         it = self.store.append([
             big, name, full, is_dir,
-            "" if is_dir or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
+            "" if is_dir or alias or kind == MAC_APP else human_size(info.get_size()), when(stamp), kind,
             ("0" if is_dir else "1") + name.lower(), small,
             float(stamp), 0.0 if is_dir or kind == MAC_APP else float(info.get_size()),
             self._markup(name, names, full, is_dir, info),
@@ -418,8 +428,11 @@ class Folder:
                 continue
             big = self.thumbnail(path, stamp, self.icon_size)
             if big is not None:
+                small = self.thumbnail(path, stamp, 20)
+                if aliases.is_alias(path):
+                    big, small = self.with_arrow(big), self.with_arrow(small)
                 it = self.store.get_iter(ref.get_path())
-                self.store.set(it, {C_ICON: big, C_SMALL: self.thumbnail(path, stamp, 20)})
+                self.store.set(it, {C_ICON: big, C_SMALL: small})
         return bool(waiting)
 
     @classmethod
@@ -456,6 +469,16 @@ class Folder:
     def app_icon(cls, path, size):
         pixbuf = macapps.cached_icon(path, size)
         return pixbuf or cls.icon(Gio.ThemedIcon.new(macapps.GENERIC_ICON), size)
+
+    @classmethod
+    def with_arrow(cls, pixbuf):
+        if pixbuf is None:
+            return None
+        if pixbuf not in cls.badged:
+            if len(cls.badged) > 500:
+                cls.badged.clear()
+            cls.badged[pixbuf] = aliases.badge(pixbuf)
+        return cls.badged[pixbuf]
 
     @classmethod
     def icon(cls, gicon, size):
@@ -897,6 +920,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
         mask = window.get_device_position(seat.get_pointer())[3]
         return bool(mask & Gdk.ModifierType.MOD1_MASK)
 
+    def _alias_held(self):
+        """⌥⌘ held while dragging: the drop makes aliases, as on a Mac."""
+        window, seat = self.get_window(), Gdk.Display.get_default().get_default_seat()
+        if window is None or seat is None:
+            return False
+        mask = window.get_device_position(seat.get_pointer())[3]
+        both = Gdk.ModifierType.MOD1_MASK | Gdk.ModifierType.CONTROL_MASK
+        return mask & both == both
+
     def _drop_action(self, folder):
         paths = DrawerWindow.dragging or []
         if folder.startswith(tags.PREFIX):
@@ -907,6 +939,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             return Gdk.DragAction.MOVE
         if paths and (folder in paths or all(os.path.dirname(p) == folder for p in paths)):
             return 0     # where they are already
+        if paths and self._alias_held():
+            return Gdk.DragAction.LINK
         if self._alt_held():
             return Gdk.DragAction.COPY
         if paths and not all(transfer.same_disk(p, folder) for p in paths):
@@ -920,6 +954,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.add_to_sidebar(paths)
         elif folder == TO_TRASH:
             self.trash(paths)
+        elif self._alias_held() and os.path.isdir(folder) and not self.in_trash():
+            try:
+                made = aliases.make(paths, folder)
+            except OSError as err:
+                self.notify(f"The alias couldn’t be made ({err.strerror}).")
+                return
+            if folder == self.path:
+                self.refresh()
+                GLib.idle_add(lambda: self.select_paths(made) and False)
         elif not all(os.path.dirname(p) == folder for p in paths):
             # A move on the same disk, a copy onto another one; ⌥ copies.
             move = not self._alt_held() and all(transfer.same_disk(p, folder) for p in paths)
@@ -1000,6 +1043,32 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if paths:
             self.run_job(paths, os.path.dirname(paths[0]) if len(set(map(os.path.dirname, paths))) == 1
                          else self.path, duplicate=True)
+
+    def make_alias(self):
+        """File > Make Alias: an alias of each selected item, beside it."""
+        paths = [p for p in self.selected_paths() if os.path.lexists(p)]
+        if not paths or self.in_trash():
+            return
+        try:
+            made = aliases.make(paths)
+        except OSError as err:
+            self.notify(f"The alias couldn’t be made ({err.strerror}).")
+            return
+        self.refresh()
+        GLib.idle_add(lambda: self.select_paths(made) and False)
+
+    def show_original(self):
+        """File > Show Original: the folder the alias's original is in, with
+        it chosen."""
+        alias = next((p for p in self.selected_paths() if aliases.is_alias(p)), None)
+        if alias is None:
+            return
+        found = aliases.original(alias) or aliases.ask_broken(self, alias)
+        if not found:
+            self.refresh()
+            return
+        self.navigate(os.path.dirname(found))
+        GLib.idle_add(lambda: self.select_paths([found]) and False)
 
     def undo(self):
         def told(text):
@@ -1102,6 +1171,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "paste": self.paste,
             "move-here": lambda: self.paste(move=True),
             "duplicate": self.duplicate,
+            "make-alias": self.make_alias,
+            "show-original": self.show_original,
             "undo": self.undo,
             "browse-backups": self.browse_backups,
             "put-back": self.put_back,
@@ -1779,6 +1850,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         path, is_dir = model[it][C_PATH], model[it][C_IS_DIR]
         if neighbours.address_of(path):
             self.connect_to(neighbours.address_of(path), model[it][C_NAME])
+        elif aliases.is_alias(path):
+            self.open_or_enter(path)
         elif is_dir:
             self.navigate(path)
         else:
@@ -2765,6 +2838,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             (None, None, True),
         ) + extra + (
             ("Duplicate", lambda *_: self.duplicate(), has_selection),
+            ("Make Alias", lambda *_: self.make_alias(), has_selection and not in_trash and not self.in_virtual()),
+            ("Show Original", lambda *_: self.show_original(), len(selected) == 1 and aliases.is_alias(selected[0])),
             ("Copy", lambda *_: self.copy(), has_selection),
             ("Paste Item", lambda *_: self.paste(), True),
             (None, None, True),
@@ -2808,7 +2883,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 if enabled:
                     menu.append(tags.menu_item(selected, lambda err, keep=selected: self._tags_changed(err, keep)))
                 continue
-            if label is None and not enabled:
+            if (label is None or label == "Show Original") and not enabled:
                 continue
             item = Gtk.SeparatorMenuItem() if label is None else Gtk.MenuItem(label=label)
             if handler:
@@ -2858,6 +2933,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
         menu.popup_at_pointer(event)
 
     def open_or_enter(self, path):
+        if aliases.is_alias(path):
+            # An alias opens its original; a folder's opens where it really is.
+            found = aliases.original(path)
+            if not found:
+                aliases.ask_broken(self, path)   # Fix Alias… points it again, without opening
+                self.refresh()
+                return
+            path = found
         if neighbours.address_of(path):
             self.connect_to(neighbours.address_of(path))
         elif os.path.isdir(path) and not macapps.is_bundle(path):
@@ -2973,7 +3056,8 @@ def menubar():
              ("New Smart Folder", "win.new-smart-folder", "<Ctrl><Alt>n")],
             [("Open", "win.open", "<Ctrl>o"), ("Glance", "win.glance", "space")],
             [("Show in Enclosing Folder", "win.show-enclosing", None)],
-            [("Duplicate", "win.duplicate", "<Ctrl>d")],
+            [("Duplicate", "win.duplicate", "<Ctrl>d"), ("Make Alias", "win.make-alias", None),
+             ("Show Original", "win.show-original", "<Ctrl>r")],
             [("Get Info", "win.get-info", "<Ctrl>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace"), ("Put Back", "win.put-back", None)],
@@ -3011,6 +3095,9 @@ def menubar():
             [("Browse Backups", "win.browse-backups", None)],
         ]),
     ])
+
+
+SELECT_ONLY = [False]   # set by --select
 
 
 class Drawer(Gtk.Application):
@@ -3061,7 +3148,7 @@ class Drawer(Gtk.Application):
         for file in files:
             path = file.get_path()
             chosen = None
-            if path and os.path.isfile(path):
+            if path and (os.path.isfile(path) or (SELECT_ONLY[0] and os.path.lexists(path))):
                 path, chosen = os.path.dirname(path), path
             window = DrawerWindow(self, path or GLib.get_home_dir())
             window.show_all()
@@ -3100,4 +3187,10 @@ def main():
     import sys
 
     GLib.set_prgname("freemac-drawer")
-    Drawer().run(sys.argv)
+    argv = list(sys.argv)
+    if "--select" in argv:
+        # freemac-drawer --select PATH: PATH's folder, with PATH chosen,
+        # even when PATH is a folder (Show Original on the Desktop).
+        argv.remove("--select")
+        SELECT_ONLY[0] = True
+    Drawer().run(argv)

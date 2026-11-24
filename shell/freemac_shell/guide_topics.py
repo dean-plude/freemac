@@ -1286,6 +1286,16 @@ TOPICS = {
         "From a Lifeboat backup you can also bring Settings and app data. They replace this account's own, "
         "which are kept in a hidden folder, .local/share/freemac-tender. Log out and back in afterwards.",
     ]),
+    "aliases": ("Make an alias", "alias shortcut link stand-in original make arrow broken fix find", [
+        "An alias is a small stand-in for a file, folder or app. Opening it opens the original, wherever "
+        "the original is, so you can keep one on the Desktop or in any folder.",
+        "Choose the item in Drawer or on the Desktop and choose File > Make Alias, or right-click it. "
+        "Or hold Option and Command while you drag it to make the alias where you drop it.",
+        "An alias has a small curved arrow on its icon. Choose File > Show Original (⌘R) to find the "
+        "original, or Get Info to see where it is.",
+        "If the original is deleted or moved away, opening the alias says so. Click Fix Alias… to choose "
+        "a new original, or Delete Alias to move the alias to the Trash; the original is never touched.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",
