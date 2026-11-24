@@ -17,7 +17,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import (announce, apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
                notify_rules, quick, main_display, recent_items, services, status, style, wifi_menu,
-               battery_menu)
+               battery_menu, extras)
 from . import dials_keys  # noqa: E402
 from .ini import ini_get  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
@@ -196,6 +196,9 @@ class Topline(Gtk.Window):
                           status.UserMenu()):
             indicator.get_style_context().add_class("status")
             bar.pack_end(indicator, False, False, 0)
+        # Apps' own menu bar icons (menu bar extras), left of freemac's.
+        self.extras = extras.Extras()
+        bar.pack_end(self.extras, False, False, 0)
         self._seconds, self._tick_source = None, None
         self.announcer = announce.Clock()
         self._tick()

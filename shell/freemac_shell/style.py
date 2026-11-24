@@ -31,6 +31,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .topline .clock { font-feature-settings: "tnum"; padding: 0 12px; }
 .topline .clock label { font-feature-settings: "tnum"; }
 .topline button.status { padding: 0 6px; min-width: 0; }
+.topline button.menu-extra.open { background-color: @hover; border-radius: 6px; }
 .topline button.recording image { color: #e5484d; }
 .topline button.battery-low-power image { color: #e8a316; }
 

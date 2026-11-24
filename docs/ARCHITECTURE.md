@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Menu bar extras (1.156)
+
+`shell/freemac_shell/extras.py`. Topline owns `org.kde.StatusNotifierWatcher`
+on the session bus (replaceable, so a restarted Topline takes it back; apps
+register again when the watcher's owner changes). Items register with a bus
+name, or with an object path on their own connection; a `NameOwnerChanged`
+subscription per name drops an item when its app goes. If another program
+already owns the watcher, Topline registers as a host with it and follows its
+signals. Each item is a `Gtk.Button` packed at the end of a box left of the
+status icons; it reads `org.kde.StatusNotifierItem` with `GetAll` and again
+after any of the item's signals (batched for 80 ms). Its menu is read with
+`com.canonical.dbusmenu` `AboutToShow` and `GetLayout` each time it opens and
+built as a `Gtk.Menu`; a chosen item sends `Event(id, "clicked")`.
+
 ## Ferry in releases (1.155)
 
 Ferry stays off the ISO, but the release workflow now builds its package
