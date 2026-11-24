@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Startup Disk (1.145)
+
+Dials > Startup Disk (`dials_startup.py`) lists the firmware's UEFI boot
+entries, read with `efibootmgr` by `startup_disk.py` (reading needs no
+password). Each active entry gets a kind from its name and device path:
+freemac (Keel installs GRUB as `freemac`), Windows, Linux, USB, disc or disk;
+network boot (`MAC(`, `IPv4(`, `Uri(`) and the firmware's own tools
+(`FvFile(`, UiApp, the shell) are left out, and the entry running now is kept
+whatever it is. The first shown entry in `BootOrder` is the one it starts up
+from. Changes go through `pkexec /usr/libexec/freemac-startup-disk`:
+`always NUM` moves NUM to the front of `BootOrder` and clears `BootNext`;
+`once NUM` sets `BootNext` and restarts; `cancel-once` clears `BootNext`.
+The helper takes only an entry the page itself would show. Without
+`/sys/firmware/efi` the page explains that a BIOS PC chooses in its firmware.
+
 ## Power schedule (1.144)
 
 Dials > Battery (or Power) > Schedule… (`dials_schedule.py`) writes the
