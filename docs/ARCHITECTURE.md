@@ -878,6 +878,16 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Summary Info (1.183)
+
+`drawer_summary.SummaryWindow` is a small window of its own beside
+`drawer_info.InfoWindow`, using its `folder_total` and `nice_size`. The
+total is added up in a thread that the window's `stop` event ends. The
+tag picker already takes several paths. Locked is a check button that is
+inconsistent when only some items are locked, and sets every item that
+`locks.can_lock` allows and that isn't an alias. ⌃⌘I reaches Drawer as Ctrl
+with Super, so the key handler looks for both before ⌘I.
+
 ## Back and Forward lists (1.182)
 
 Drawer's Back and Forward buttons start a 450 ms timer on a left press and
