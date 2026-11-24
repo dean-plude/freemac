@@ -1183,6 +1183,14 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.182 "Back and Forward lists" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Press and hold Back or Forward in Drawer, or right-click it, for the folders it goes through, nearest first; choosing one jumps straight there and keeps the rest to go back or forward to | drawer.py | done |
+| 2 | A quick click still goes one folder; holding shows the list instead of going | drawer.py | done |
+| 3 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.181 "Recent Folders" (done)
 
 | # | Item | Component | Status |

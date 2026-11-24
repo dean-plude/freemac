@@ -878,6 +878,16 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Back and Forward lists (1.182)
+
+Drawer's Back and Forward buttons start a 450 ms timer on a left press and
+show the list on a right press. The list is a `Gtk.Popover` under the
+button, not a `Gtk.Menu`: a menu popped from a header bar button is placed
+above the window on Wayland. Choosing an entry moves that many folders
+between `history` and `future` and refreshes once. A held press that showed
+the list sets `_history_popped`, so the click that may follow is ignored;
+the next press clears it, as the popover's grab can keep that click away.
+
 ## Recent Folders (1.181)
 
 `recent_folders.py` keeps the last ten real folders Drawer has shown in
