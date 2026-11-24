@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.181 "Recent Folders" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Go > Recent Folders: the last ten folders opened in Drawer, newest first, shared by every Drawer window; choosing one opens it in the window | drawer.py, recent_folders.py | done |
+| 2 | Folders that have gone are left out; the Trash, Recents, tags, searches and Network never go in; two folders with one name show the folder each is in | recent_folders.py | done |
+| 3 | Clear Menu empties the list; menu bars take submenus | drawer.py, menus.py | done |
+| 4 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.180 "Inspector and Copy as Pathname" (done)
 
 | # | Item | Component | Status |

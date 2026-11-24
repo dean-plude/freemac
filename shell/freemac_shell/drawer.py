@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, locks, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -1264,6 +1264,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "show-enclosing": self.show_enclosing,
             "view-options": self.show_view_options,
         })
+        # Go > Recent Folders: each item opens its folder in this window.
+        recent = Gio.SimpleAction.new("go-recent", GLib.VariantType.new("s"))
+        recent.connect("activate", lambda _a, value: self.navigate(value.get_string()))
+        self.add_action(recent)
         for name, path in (("go-home", GLib.get_home_dir()),
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
                            ("go-downloads", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)),
@@ -1828,6 +1832,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.lookup_action("show-enclosing").set_enabled(self.in_virtual() and not neighbours.is_place(self.path))
         self._draw_path_bar()
         self._watch()
+        if not self.in_virtual() and not in_trash and recent_folders.note(self.path):
+            app = self.get_application()
+            if app is not None and hasattr(app, "show_recent_folders"):
+                app.show_recent_folders()
 
     # ---- column (Miller) view ------------------------------------------
     def _reset_columns(self):
@@ -3208,6 +3216,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         return True
 
 
+# Go > Recent Folders, kept up to date by the app (see Drawer.show_recent_folders).
+RECENT_MENU = Gio.Menu()
+
+
 def menubar():
     return menus.menubar([
         ("_File", [
@@ -3252,6 +3264,7 @@ def menubar():
              ("Desktop", "win.go-desktop", None), ("Downloads", "win.go-downloads", "<Ctrl><Alt>l"),
              ("Home", "win.go-home", "<Ctrl><Shift>h"), ("Computer", "win.go-computer", "<Ctrl><Shift>c"),
              ("Network", "win.go-network", "<Ctrl><Shift>k"), ("Applications", "win.go-applications", "<Ctrl><Shift>a")],
+            [("Recent Folders", RECENT_MENU, None)],
             [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g"),
              ("Connect to Server…", "win.connect-to-server", "<Ctrl>k")],
             [("Browse Backups", "win.browse-backups", None)],
@@ -3270,7 +3283,13 @@ class Drawer(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
         menus.add_actions(self, {"new-window": lambda: DrawerWindow(self, self.start_folder()).show_all(),
-                                 "settings": self.show_settings})
+                                 "settings": self.show_settings,
+                                 "clear-recent-folders": self.clear_recent_folders})
+        self.show_recent_folders()
+        # Another Drawer may have opened folders meanwhile: look again when
+        # a window of this one comes to the front.
+        self.connect("window-added", lambda _app, window: window.connect(
+            "notify::is-active", lambda w, _p: w.is_active() and self.show_recent_folders()))
         self.set_accels_for_action("app.settings", ["<Control>comma"])
         self.set_menubar(menubar())
         provider = Gtk.CssProvider()
@@ -3281,6 +3300,30 @@ class Drawer(Gtk.Application):
     @staticmethod
     def start_folder():
         return drawer_settings.start_folder(recents.PLACE)
+
+    def show_recent_folders(self):
+        """Fill Go > Recent Folders: the folders, then Clear Menu."""
+        folders = recent_folders.labels(recent_folders.listed())
+        shown = getattr(self, "_recent_shown", None)
+        if shown == folders:
+            return
+        self._recent_shown = folders
+        RECENT_MENU.remove_all()
+        items = Gio.Menu()
+        for folder, words in folders:
+            item = Gio.MenuItem.new(words, None)
+            item.set_action_and_target_value("win.go-recent", GLib.Variant("s", folder))
+            item.set_icon(Gio.ThemedIcon.new("folder"))
+            items.append_item(item)
+        RECENT_MENU.append_section(None, items)
+        RECENT_MENU.append_section(None, menus.section([("Clear Menu", "app.clear-recent-folders", None)]))
+        action = self.lookup_action("clear-recent-folders")
+        if action is not None:
+            action.set_enabled(bool(folders))
+
+    def clear_recent_folders(self):
+        recent_folders.clear()
+        self.show_recent_folders()
 
     def show_settings(self):
         window = getattr(self, "settings_window", None)

@@ -878,6 +878,17 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Recent Folders (1.181)
+
+`recent_folders.py` keeps the last ten real folders Drawer has shown in
+`~/.local/share/freemac/recent-folders`, one a line, written whole and
+renamed into place. `DrawerWindow.refresh()` notes each folder it shows.
+The app's Go menu holds one `Gio.Menu` (`RECENT_MENU`) that the app fills
+again when the list changes or one of its windows comes to the front (each
+Drawer is its own process, so another may have added folders). Items use
+the window action `go-recent` with the folder as a string target; Topline
+builds its menus from the exported model, so changes show at once.
+
 ## Inspector (1.180)
 
 `drawer_info.InfoWindow` builds its contents in `_build(path)`, so the
