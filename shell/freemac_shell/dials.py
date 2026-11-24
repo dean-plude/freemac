@@ -773,7 +773,7 @@ class DialsWindow(Gtk.ApplicationWindow):
                 switch(bool(style.prefs().get("click_reveal")), lambda on: self.save_prefs(click_reveal=on)),
                 "Click the desktop picture and your windows step aside, so you can use the files on the "
                 "desktop. Click it again to bring them back."),
-        ), group(
+        ), self.menu_bar_choices(), group(
             row("Default web browser", default_apps.chooser(default_apps.BROWSER),
                 "Opens the links you click in other apps."),
             row("Default email app", default_apps.chooser(default_apps.MAIL),
@@ -783,6 +783,25 @@ class DialsWindow(Gtk.ApplicationWindow):
                      switch(config.get("minimize_into_app", False), lambda on: save_pier(minimize_into_app=on)),
                      "Off: a minimized window gets its own picture at the right end of the dock.")),
             self.hot_corners())
+
+    # Which of freemac's own icons the menu bar shows, as a Mac's Control
+    # Centre settings choose (Topline reads shell.json's "menubar_hide").
+    MENU_BAR_CHOICES = (
+        ("wifi", "Wi-Fi", "Join a network from the menu bar. Wi-Fi stays in Quick Settings either way."),
+        ("bluetooth", "Bluetooth", "Connect headphones and other devices from the menu bar."),
+        ("sound", "Sound", "Change the volume and where sound plays."),
+        ("battery", "Battery", "Only on a computer with a battery."),
+        ("focus", "Focus", "Its symbol shows while a Focus is on. Click it to change or turn off the Focus."),
+    )
+
+    def menu_bar_choices(self):
+        def choose(name, on):
+            hidden = [n for n in style.prefs().get("menubar_hide") or [] if n != name]
+            self.save_prefs(menubar_hide=hidden if on else hidden + [name])
+
+        hidden = style.prefs().get("menubar_hide") or []
+        return group(*(row(f"Show {title} in menu bar", switch(name not in hidden, lambda on, name=name: choose(name, on)),
+                           caption) for name, title, caption in self.MENU_BAR_CHOICES))
 
     # What a double-click on a title bar does: freemac's own title bars read
     # it from wayfire.ini, apps that draw their own read GNOME's setting.
