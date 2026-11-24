@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.169 "Accessibility Shortcuts" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Option-Command-F5 anywhere opens a small panel listing the accessibility features, with a tick by each one that's on; a click, or the arrow keys and Space, turns one on or off, and Done or Escape closes it | a11y_shortcuts.py (new), wayfire.ini | done |
+| 2 | It covers the screen reader, Zoom, Sticky Keys, Slow Keys, Mouse Keys, the Accessibility Keyboard, Hover Text, Invert Colours, Colour Filters (the filter chosen last), Increase Contrast and Reduce Transparency, each the same setting Dials changes, and follows changes made while it's open | a11y_shortcuts.py | done |
+| 3 | Dials > Accessibility > Accessibility Shortcuts ticks which features the panel lists; with only one ticked, the keys turn it on or off at once, with no panel, as on a Mac | dials_more.py | done |
+| 4 | The shortcut is in Dials > Keyboard, reaches accounts made before it, and the panel stays out of the Dock | dials_keys.py, Dock | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.168 "Open in Web" (done)
 
 | # | Item | Component | Status |

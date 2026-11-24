@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Accessibility Shortcuts (1.169)
+
+`freemac-accessibility-shortcuts` (a11y_shortcuts.py) is a command binding
+on ⌥⌘F5 in wayfire.ini. It lists the accessibility features this computer
+has (the screen reader only where Orca is installed, Hover Text only where
+Tesseract is), each as a pair of functions that read and change the very
+setting Dials does: a `strata-shell` switch, a Wayfire plugin in `core/plugins`
+(Zoom, and Invert with its key written first), a shell.json key, or the GTK
+theme. So the panel, Dials and the features' own keys never disagree, and the
+panel re-reads them every second while it's open. Colour Filters turns on the
+filter last chosen (shell.json `colour_filter_last`, kept by Dials and by the
+panel when it turns the filter off). shell.json `accessibility_shortcuts` is
+the list Dials ticks; with exactly one, the command flips it and exits without
+a window.
+
 ## Add to Dock for websites (1.165)
 
 Web (Epiphany) makes web apps itself: a profile folder

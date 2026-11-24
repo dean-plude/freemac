@@ -55,7 +55,8 @@ CONFIG = os.path.expanduser("~/.config/freemac/pier.json")
 # Strata says here when an app asks for attention ("attention APP-ID on|off").
 SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "freemac-pier.sock")
 # The desktop's own dialogs (like "Empty the Trash?") are not apps of their own.
-SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit", "freemac-power"}
+SHELL_APP_IDS = {"freemac-pier", "freemac-topline", "freemac-force-quit", "freemac-power",
+                 "freemac-accessibility-shortcuts"}
 DEFAULT_PINNED = ["freemac-drawer.desktop", "freemac-marina.desktop", "freemac-seek.desktop", "org.gnome.Epiphany.desktop", "freemac-post.desktop", "freemac-cove.desktop", "freemac-shanty.desktop", "org.codeberg.dnkl.foot.desktop",
                   "freemac-tide.desktop", "freemac-crew.desktop", "freemac-nudge.desktop", "freemac-jot.desktop",
                   "freemac-harbor.desktop", "freemac-dials.desktop", "freemac-welcome.desktop"]
