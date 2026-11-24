@@ -2,8 +2,17 @@
  * Ferry's Foundation: URL loading. NSURLRequest and NSMutableURLRequest,
  * NSURLResponse and NSHTTPURLResponse, NSURLSession with its configuration
  * and its data, upload and download tasks, NSURLConnection, the
- * NSURLErrorDomain errors, and reading http and https URLs into NSData and
- * NSString. Written from Apple's public API documentation.
+ * NSURLErrorDomain errors, and reading http, https and data URLs into NSData
+ * and NSString. Written from Apple's public API documentation and RFCs
+ * 9110, 9111, 7616, 7617 and 2397.
+ *
+ * Each request is seen through by an exchange (FURLExchange, below): it
+ * follows redirects itself, asking the delegate about each; answers 401s
+ * with HTTP Basic or Digest, asking the delegate or using the URL's or the
+ * credential storage's credential; asks about an https server's certificate
+ * before connecting; sends and keeps cookies (NSHTTPCookie.m); and answers
+ * from, revalidates against and fills the URL cache (NSURLCache.m), as the
+ * request's cache policy says.
  *
  * The transfers themselves are done by this system's libcurl (FCurl.h),
  * through its "multi" interface: every transfer of the program shares one
@@ -22,8 +31,9 @@
  * loop or from a dispatch wait. The synchronous calls
  * (sendSynchronousRequest:..., dataWithContentsOfURL:) wait on the network
  * alone, as a Mac's block their thread, and run nothing else meanwhile. */
-#import "FInternal.h"
+#import "FURLInternal.h"
 #include "FCurl.h"
+#include <ctype.h>
 #include <dispatch/dispatch.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -70,6 +80,9 @@ static NSString *url_error_text(NSInteger code)
     case NSURLErrorServerCertificateUntrusted: return @"The certificate for this server is invalid.";
     case NSURLErrorCannotWriteToFile: return @"cannot write to file";
     case NSURLErrorCannotCreateFile: return @"cannot create file";
+    case NSURLErrorResourceUnavailable: return @"resource unavailable";
+    case NSURLErrorUserCancelledAuthentication: return @"The operation couldn’t be completed. (NSURLErrorDomain error -1012.)";
+    case NSURLErrorCannotDecodeRawData: return @"cannot decode raw data";
     default: return @"unknown error";
     }
 }
@@ -483,10 +496,10 @@ static NSString *trimmed(NSString *s)
  * repeat: the response once its header fields are in, the body as it
  * comes, the upload's progress, and the end (nil when it went well). */
 @protocol FURLLoadClient <NSObject>
-- (void)_load:(FURLLoad *)load receivedResponse:(NSURLResponse *)response;
-- (void)_load:(FURLLoad *)load receivedBytes:(const void *)bytes length:(size_t)length;
-- (void)_load:(FURLLoad *)load sent:(int64_t)sent of:(int64_t)total;
-- (void)_load:(FURLLoad *)load finishedWithError:(NSError *)error;
+- (void)_load:(id)load receivedResponse:(NSURLResponse *)response;
+- (void)_load:(id)load receivedBytes:(const void *)bytes length:(size_t)length;
+- (void)_load:(id)load sent:(int64_t)sent of:(int64_t)total;
+- (void)_load:(id)load finishedWithError:(NSError *)error;
 @end
 
 @interface FURLLoad : NSObject {
@@ -777,14 +790,41 @@ static void finish(FURLLoad *l, NSError *error)
     [l release];
 }
 
+/* A URL as libcurl is given it: without the user name and password,
+ * which are answers to challenges (see the exchanges below), never sent
+ * unasked, and without the fragment. */
+static NSString *wire_url(NSURL *url)
+{
+    NSString *s = [[url absoluteURL] absoluteString];
+    NSRange hash = [s rangeOfString:@"#"];
+    if (hash.location != NSNotFound)
+        s = [s substringToIndex:hash.location];
+    NSRange r = [s rangeOfString:@"://"];
+    if (r.location == NSNotFound || ![url user])
+        return s;
+    NSUInteger start = NSMaxRange(r);
+    NSRange end = [[s substringFromIndex:start]
+        rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"/?"]];
+    NSUInteger stop = end.location == NSNotFound ? [s length] : start + end.location;
+    NSRange at = [s rangeOfString:@"@" options:NSBackwardsSearch range:NSMakeRange(start, stop - start)];
+    if (at.location == NSNotFound)
+        return s;
+    return [[s substringToIndex:start] stringByAppendingString:[s substringFromIndex:at.location + 1]];
+}
+
 /* Starts a transfer for a request. Returns nil, with *error set, when the
  * request can't be sent at all (an unsupported or bad URL, or no libcurl);
  * the caller tells its program later, as a Mac does. extra holds the
- * session's own header fields; idle is how long the transfer may wait for
- * data before it times out, total how long it may take in all (0: no
- * limit). body, when not nil, replaces the request's body. */
-static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSTimeInterval idle, NSTimeInterval total,
-                            NSData *body, id<FURLLoadClient> client, NSError **error)
+ * session's own header fields, and added the fields the exchange adds
+ * (cookies, credentials, revalidation) unless the request has its own;
+ * idle is how long the transfer may wait for data before it times out,
+ * total how long it may take in all (0: no limit). body, when not nil,
+ * replaces the request's body. insecure leaves the server's certificate
+ * unchecked (the delegate accepted it). Redirects aren't followed here:
+ * each is a response of its own, for the exchange to decide about. */
+static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSDictionary *added, NSTimeInterval idle,
+                            NSTimeInterval total, NSData *body, BOOL insecure, id<FURLLoadClient> client,
+                            NSError **error)
 {
     NSURL *url = [request URL];
     NSString *scheme = [[url scheme] lowercaseString];
@@ -816,7 +856,7 @@ static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSTimeIn
     l->values = [[NSMutableArray alloc] init];
     l->client = [(id)client retain];
     CURL *e = l->easy;
-    C.easy_setopt(e, CURLOPT_URL, [[url absoluteString] UTF8String]);
+    C.easy_setopt(e, CURLOPT_URL, [wire_url(url) UTF8String]);
     C.easy_setopt(e, CURLOPT_PROTOCOLS_STR, "http,https,file");
     C.easy_setopt(e, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
     C.easy_setopt(e, CURLOPT_NOSIGNAL, 1L);
@@ -829,8 +869,11 @@ static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSTimeIn
     C.easy_setopt(e, CURLOPT_NOPROGRESS, 0L);
     C.easy_setopt(e, CURLOPT_XFERINFOFUNCTION, on_progress);
     C.easy_setopt(e, CURLOPT_XFERINFODATA, l);
-    C.easy_setopt(e, CURLOPT_FOLLOWLOCATION, 1L);
-    C.easy_setopt(e, CURLOPT_MAXREDIRS, 16L);
+    C.easy_setopt(e, CURLOPT_FOLLOWLOCATION, 0L);
+    if (insecure) {
+        C.easy_setopt(e, CURLOPT_SSL_VERIFYPEER, 0L);
+        C.easy_setopt(e, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
     C.easy_setopt(e, CURLOPT_ACCEPT_ENCODING, ""); /* every encoding libcurl can decode, decoded */
     C.easy_setopt(e, CURLOPT_CONNECTTIMEOUT_MS, (long)(l->idle * 1000));
     if (total > 0 && total < 1e7)
@@ -867,6 +910,9 @@ static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSTimeIn
                     [all removeObjectForKey:old];
                 [all setObject:v forKey:k];
             }
+        for (NSString *k in added)
+            if (!field_key(all, k))
+                [all setObject:[added objectForKey:k] forKey:k];
         if (!field_key(all, @"User-Agent"))
             [all setObject:user_agent() forKey:@"User-Agent"];
         if (!field_key(all, @"Accept"))
@@ -974,12 +1020,912 @@ static BOOL engine_dispatch(void *ctx, struct pollfd *fds, int count)
     return events != before;
 }
 
-static void run_until_done(FURLLoad *l)
+/* ---- exchanges: one request seen through, from the first transfer to the last -------------- */
+
+/* An exchange is what a task or a connection asks for: a request answered.
+ * It may take several transfers: a redirect is followed with a new
+ * request, a 401 is answered with a credential and the request sent
+ * again, and a stored response may answer without the network at all or
+ * be revalidated. Its owner hears what it would of a single transfer (the
+ * FURLLoadClient messages: the last response, its body, the end) and is
+ * asked the questions a delegate answers: whether to follow a redirect,
+ * how to answer a challenge (the server's certificate before connecting
+ * to an https server, a 401 after one) and what to store in the cache.
+ * The owner may answer later, from its delegate's queue; until it does,
+ * nothing moves. Cookies are sent with each request and kept from each
+ * response, redirects and challenges included. */
+
+@class FURLExchange;
+@protocol FURLExchangeOwner <FURLLoadClient>
+@optional
+- (void)_exchange:(FURLExchange *)x redirectedBy:(NSHTTPURLResponse *)response to:(NSURLRequest *)request
+           answer:(void (^)(NSURLRequest *))answer;
+- (BOOL)_exchangeAsksAboutTrust:(FURLExchange *)x;
+- (void)_exchange:(FURLExchange *)x challenged:(NSURLAuthenticationChallenge *)challenge
+           answer:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))answer;
+- (void)_exchange:(FURLExchange *)x willCache:(NSCachedURLResponse *)proposed
+           answer:(void (^)(NSCachedURLResponse *))answer;
+@end
+
+enum { HOLD_NONE, HOLD_REDIRECT, HOLD_AUTH, HOLD_NOT_MODIFIED };
+enum { MAX_REDIRECTS = 16 };
+
+@interface FURLExchange : NSObject <FURLLoadClient> {
+@public
+    id owner;
+    NSURLRequest *request;          /* the request being sent now */
+    NSDictionary *extra;            /* the session's own header fields */
+    NSTimeInterval idle, total;
+    NSData *body;                   /* an upload task's body, in place of the request's */
+    NSHTTPCookieStorage *cookies;   /* nil: cookies are neither sent nor kept */
+    NSHTTPCookieAcceptPolicy acceptPolicy;
+    NSURLCache *cache;              /* nil: nothing is looked up or stored */
+    NSURLRequestCachePolicy cachePolicy;
+    BOOL mayStore;                  /* the response may be stored (not a download's) */
+    NSURLCredentialStorage *credentials; /* nil: none are used unasked, or kept */
+    NSInteger cancelCode;           /* the error of a challenge cancelled */
+
+    FURLLoad *load;
+    BOOL done, paused;
+    int redirects, hold;
+    NSURLResponse *held, *delivered; /* a response being decided about; the one given to the owner */
+    NSMutableData *heldBody, *keep;  /* its body; the delivered body, for the cache */
+    NSCachedURLResponse *cached;     /* a stored response being revalidated */
+
+    NSURLProtectionSpace *space;     /* the protection space credentials are for */
+    NSURLCredential *credential;     /* sent with each request into it */
+    NSDictionary *digest;            /* the Digest challenge's parameters */
+    NSString *pendingMethod, *pendingRealm;
+    NSDictionary *pendingParams;
+    unsigned nonceCount;
+    BOOL sentCredential, triedURLCredential, triedStoredCredential, retriedStale;
+    NSInteger failures;
+    NSMutableSet *checked, *trusted; /* "host:port" asked about, and accepted by the delegate */
+}
+- (void)start;
+- (void)cancel;
+- (void)pause:(BOOL)pause;
+@end
+
+static NSString *lower_scheme(NSURL *url) { return [[url scheme] lowercaseString]; }
+static BOOL is_http(NSURL *url)
 {
-    [l retain];
-    while (!l->done)
-        engine_wait(-1);
-    [l release];
+    NSString *s = lower_scheme(url);
+    return [s isEqualToString:@"http"] || [s isEqualToString:@"https"];
+}
+static NSInteger port_of(NSURL *url)
+{
+    if ([url port])
+        return [[url port] integerValue];
+    return [lower_scheme(url) isEqualToString:@"https"] ? 443 : 80;
+}
+static NSString *host_port(NSURL *url)
+{
+    return [NSString stringWithFormat:@"%@:%ld", [[url host] lowercaseString], (long)port_of(url)];
+}
+
+/* The request target, as Digest authentication quotes it: the path and query as written. */
+static NSString *request_target(NSURL *url)
+{
+    NSString *s = wire_url(url);
+    NSRange r = [s rangeOfString:@"://"];
+    if (r.location == NSNotFound)
+        return @"/";
+    s = [s substringFromIndex:NSMaxRange(r)];
+    NSRange slash = [s rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"/?"]];
+    if (slash.location == NSNotFound)
+        return @"/";
+    s = [s substringFromIndex:slash.location];
+    return [s hasPrefix:@"/"] ? s : [@"/" stringByAppendingString:s];
+}
+
+/* ---- the parts of header fields: Cache-Control's directives and WWW-Authenticate's challenges */
+
+/* Cache-Control (and Pragma): directive -> value ("" for none), names in lower case. */
+static NSDictionary *directives(NSString *field)
+{
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    for (NSString *part in [field componentsSeparatedByString:@","]) {
+        NSString *p = trimmed(part);
+        NSRange eq = [p rangeOfString:@"="];
+        NSString *k = [trimmed(eq.location == NSNotFound ? p : [p substringToIndex:eq.location]) lowercaseString];
+        NSString *v = eq.location == NSNotFound ? @"" : trimmed([p substringFromIndex:eq.location + 1]);
+        if ([v hasPrefix:@"\""] && [v hasSuffix:@"\""] && [v length] >= 2)
+            v = [v substringWithRange:NSMakeRange(1, [v length] - 2)];
+        if ([k length])
+            [d setObject:v forKey:k];
+    }
+    return d;
+}
+
+/* WWW-Authenticate's challenges (RFC 9110, 11.6.1): an array of
+ * [scheme, parameters], the scheme in lower case. */
+static NSArray *challenges_in(NSString *field)
+{
+    NSMutableArray *out = [NSMutableArray array];
+    const char *s = [field UTF8String];
+    size_t i = 0, n = s ? strlen(s) : 0;
+    NSMutableDictionary *params = nil;
+    while (i < n) {
+        while (i < n && (s[i] == ' ' || s[i] == '\t' || s[i] == ','))
+            i++;
+        size_t t = i;
+        while (i < n && s[i] != ' ' && s[i] != '\t' && s[i] != ',' && s[i] != '=')
+            i++;
+        if (i == t)
+            break;
+        NSString *token = [[[NSString alloc] initWithBytes:s + t length:i - t encoding:NSUTF8StringEncoding] autorelease];
+        size_t j = i;
+        while (j < n && (s[j] == ' ' || s[j] == '\t'))
+            j++;
+        if (j < n && s[j] == '=' && params) {
+            /* a parameter of the challenge being read */
+            i = j + 1;
+            while (i < n && (s[i] == ' ' || s[i] == '\t'))
+                i++;
+            NSMutableString *value = [NSMutableString string];
+            if (i < n && s[i] == '"') {
+                i++;
+                size_t v = i;
+                NSMutableData *raw = [NSMutableData data];
+                while (i < n && s[i] != '"') {
+                    if (s[i] == '\\' && i + 1 < n)
+                        i++;
+                    [raw appendBytes:s + i length:1];
+                    i++;
+                }
+                (void)v;
+                i++;
+                [value appendString:[[[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding] autorelease]
+                                        ?: @""];
+            } else {
+                size_t v = i;
+                while (i < n && s[i] != ',' && s[i] != ' ' && s[i] != '\t')
+                    i++;
+                [value appendString:[[[NSString alloc] initWithBytes:s + v length:i - v
+                                                            encoding:NSUTF8StringEncoding] autorelease]];
+            }
+            [params setObject:value forKey:[token lowercaseString]];
+        } else if (j < n && s[j] == '=' && !params) {
+            break; /* not a challenge */
+        } else {
+            params = [NSMutableDictionary dictionary];
+            [out addObject:[NSArray arrayWithObjects:[token lowercaseString], params, nil]];
+            /* token68 (Basic realm-less forms) is skipped */
+        }
+    }
+    return out;
+}
+
+static NSString *base64(NSString *text)
+{
+    return [[text dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
+}
+
+/* ---- freshness (RFC 9111, 4.2) */
+
+static NSTimeInterval freshness_lifetime(NSHTTPURLResponse *r, NSDate *stored)
+{
+    NSDictionary *cc = directives([r valueForHTTPHeaderField:@"Cache-Control"]);
+    if ([cc objectForKey:@"no-cache"])
+        return 0;
+    NSString *max = [cc objectForKey:@"max-age"];
+    if (max)
+        return [max doubleValue];
+    NSDate *date = FParseHTTPDate([r valueForHTTPHeaderField:@"Date"]) ?: stored;
+    NSString *expires = [r valueForHTTPHeaderField:@"Expires"];
+    if (expires) {
+        NSDate *e = FParseHTTPDate(expires);
+        return e ? MAX([e timeIntervalSinceDate:date], 0) : 0;
+    }
+    NSDate *modified = FParseHTTPDate([r valueForHTTPHeaderField:@"Last-Modified"]);
+    if (modified)
+        return MAX([date timeIntervalSinceDate:modified], 0) / 10; /* the usual heuristic: a tenth of its age */
+    return 0;
+}
+
+static BOOL is_fresh(NSCachedURLResponse *c, NSURLRequest *request)
+{
+    NSHTTPURLResponse *r = (NSHTTPURLResponse *)[c response];
+    if (![r isKindOfClass:[NSHTTPURLResponse class]])
+        return YES;
+    NSDictionary *rcc = directives([request valueForHTTPHeaderField:@"Cache-Control"]);
+    if ([rcc objectForKey:@"no-cache"] || [[rcc objectForKey:@"max-age"] isEqualToString:@"0"] ||
+        [directives([request valueForHTTPHeaderField:@"Pragma"]) objectForKey:@"no-cache"])
+        return NO;
+    NSDate *stored = [c _storedAt] ?: [NSDate distantPast];
+    NSTimeInterval age = -[stored timeIntervalSinceNow] + [[r valueForHTTPHeaderField:@"Age"] doubleValue];
+    return age < freshness_lifetime(r, stored);
+}
+
+static BOOL has_validators(NSCachedURLResponse *c)
+{
+    NSHTTPURLResponse *r = (NSHTTPURLResponse *)[c response];
+    return [r isKindOfClass:[NSHTTPURLResponse class]] &&
+           ([r valueForHTTPHeaderField:@"ETag"] || [r valueForHTTPHeaderField:@"Last-Modified"]);
+}
+
+/* ---- data URLs (RFC 2397) */
+
+static NSData *percent_decoded_bytes(NSString *s)
+{
+    const char *in = [s UTF8String];
+    size_t n = strlen(in);
+    NSMutableData *out = [NSMutableData dataWithCapacity:n];
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)in[i];
+        if (c == '%' && i + 2 < n + 0 && isxdigit((unsigned char)in[i + 1]) && isxdigit((unsigned char)in[i + 2])) {
+            char hex[3] = {in[i + 1], in[i + 2], 0};
+            c = (unsigned char)strtol(hex, NULL, 16);
+            i += 2;
+        }
+        [out appendBytes:&c length:1];
+    }
+    return out;
+}
+
+@implementation FURLExchange
+- (void)dealloc
+{
+    [owner release];
+    [request release];
+    [extra release];
+    [body release];
+    [cookies release];
+    [cache release];
+    [credentials release];
+    [load release];
+    [held release];
+    [delivered release];
+    [heldBody release];
+    [keep release];
+    [cached release];
+    [space release];
+    [credential release];
+    [digest release];
+    [pendingMethod release];
+    [pendingRealm release];
+    [pendingParams release];
+    [checked release];
+    [trusted release];
+    [super dealloc];
+}
+
+- (void)start
+{
+    [[self retain] autorelease];
+    if (!checked) {
+        checked = [[NSMutableSet alloc] init];
+        trusted = [[NSMutableSet alloc] init];
+    }
+    [self _begin];
+}
+
+- (void)cancel
+{
+    if (done)
+        return;
+    done = YES;
+    [[self retain] autorelease];
+    cancel_load(load);
+    [load release];
+    load = nil;
+    [owner autorelease];
+    owner = nil;
+}
+
+- (void)pause:(BOOL)p
+{
+    paused = p;
+    pause_load(load, p);
+}
+
+/* ---- the end, and what the owner hears */
+
+- (void)_finish:(NSError *)error
+{
+    if (done)
+        return;
+    done = YES;
+    [[self retain] autorelease];
+    id o = [owner autorelease];
+    owner = nil;
+    [o _load:self finishedWithError:error];
+}
+
+- (void)_give:(NSURLResponse *)response data:(NSData *)data
+{
+    [delivered release];
+    delivered = [response retain];
+    [owner _load:self receivedResponse:response];
+    if ([data length] && !done)
+        [owner _load:self receivedBytes:[data bytes] length:[data length]];
+}
+
+/* A stored response, as the answer. */
+- (void)_serve:(NSCachedURLResponse *)c
+{
+    [self _give:[c response] data:[c data]];
+    [self _finish:nil];
+}
+
+/* The response held back, given as it is after all: a redirect not
+ * followed or a challenge not answered. */
+- (void)_giveHeld
+{
+    NSURLResponse *r = [[held retain] autorelease];
+    NSData *d = [[heldBody retain] autorelease];
+    [held release];
+    held = nil;
+    [heldBody release];
+    heldBody = nil;
+    hold = HOLD_NONE;
+    [self _give:r data:d];
+    [self _finish:nil];
+}
+
+/* ---- sending */
+
+- (void)_begin
+{
+    if (done)
+        return;
+    NSURL *url = [request URL];
+    if ([lower_scheme(url) isEqualToString:@"data"]) {
+        [self _loadData];
+        return;
+    }
+    [cached release];
+    cached = nil;
+    BOOL get = [[[request HTTPMethod] uppercaseString] isEqualToString:@"GET"];
+    if (is_http(url) && get) {
+        NSURLRequestCachePolicy p = cachePolicy;
+        BOOL look = p == NSURLRequestUseProtocolCachePolicy || p == NSURLRequestReturnCacheDataElseLoad ||
+                    p == NSURLRequestReturnCacheDataDontLoad || p == NSURLRequestReloadRevalidatingCacheData;
+        NSCachedURLResponse *c = look ? [cache cachedResponseForRequest:request] : nil;
+        if (p == NSURLRequestReturnCacheDataDontLoad) {
+            if (c)
+                [self _serve:c];
+            else
+                [self _finish:url_error(NSURLErrorResourceUnavailable, url, @"resource unavailable")];
+            return;
+        }
+        if (c && (p == NSURLRequestReturnCacheDataElseLoad ||
+                  (p == NSURLRequestUseProtocolCachePolicy && is_fresh(c, request)))) {
+            [self _serve:c];
+            return;
+        }
+        if (c && has_validators(c))
+            cached = [c retain];
+    } else if (cachePolicy == NSURLRequestReturnCacheDataDontLoad && is_http(url)) {
+        [self _finish:url_error(NSURLErrorResourceUnavailable, url, @"resource unavailable")];
+        return;
+    }
+    if ([lower_scheme(url) isEqualToString:@"https"] && [url host] && ![checked containsObject:host_port(url)] &&
+        [owner respondsToSelector:@selector(_exchangeAsksAboutTrust:)] && [owner _exchangeAsksAboutTrust:self]) {
+        [self _askAboutTrust];
+        return;
+    }
+    [self _send];
+}
+
+/* Before connecting to an https server, the delegate may judge its
+ * certificate. Default handling leaves that to libcurl, which checks it
+ * against this system's certificate authorities. */
+- (void)_askAboutTrust
+{
+    NSURL *url = [request URL];
+    NSString *hp = host_port(url);
+    [checked addObject:hp];
+    NSURLProtectionSpace *s = [[[NSURLProtectionSpace alloc] initWithHost:[url host]
+                                                                     port:port_of(url)
+                                                                 protocol:NSURLProtectionSpaceHTTPS
+                                                                    realm:nil
+                                                     authenticationMethod:NSURLAuthenticationMethodServerTrust]
+        autorelease];
+    FURLServerTrust *trust = [[[FURLServerTrust alloc] init] autorelease];
+    trust->host = [[url host] copy];
+    trust->port = port_of(url);
+    [s _setServerTrust:trust];
+    NSURLAuthenticationChallenge *c = [[[NSURLAuthenticationChallenge alloc] initWithProtectionSpace:s
+                                                                                  proposedCredential:nil
+                                                                                previousFailureCount:0
+                                                                                     failureResponse:nil
+                                                                                               error:nil
+                                                                                              sender:nil] autorelease];
+    [owner _exchange:self
+          challenged:c
+              answer:^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *cred) {
+                if (done)
+                    return;
+                if (disposition == NSURLSessionAuthChallengeCancelAuthenticationChallenge) {
+                    [self _finish:url_error(cancelCode, [request URL], nil)];
+                    return;
+                }
+                if (disposition == NSURLSessionAuthChallengeUseCredential && [cred _isForTrust])
+                    [trusted addObject:hp];
+                [self _send];
+              }];
+}
+
+- (NSString *)_authorizationFor:(NSURL *)url
+{
+    if (!credential || !space || ![credential user] || [[space host] caseInsensitiveCompare:[url host] ?: @""] ||
+        [space port] != port_of(url) || ![[space protocol] isEqualToString:lower_scheme(url)])
+        return nil;
+    NSString *user = [credential user], *password = [credential password] ?: @"";
+    if (![[space authenticationMethod] isEqualToString:NSURLAuthenticationMethodHTTPDigest])
+        return [@"Basic " stringByAppendingString:base64([NSString stringWithFormat:@"%@:%@", user, password])];
+    NSString *realm = [digest objectForKey:@"realm"] ?: @"", *nonce = [digest objectForKey:@"nonce"] ?: @"";
+    NSString *algorithm = [digest objectForKey:@"algorithm"], *opaque = [digest objectForKey:@"opaque"];
+    NSString *qop = nil;
+    for (NSString *q in [[digest objectForKey:@"qop"] componentsSeparatedByString:@","])
+        if ([trimmed(q) caseInsensitiveCompare:@"auth"] == NSOrderedSame)
+            qop = @"auth";
+    NSString *uri = request_target(url);
+    NSString *nc = [NSString stringWithFormat:@"%08x", ++nonceCount];
+    NSString *cnonce = [FMD5Hex([NSString stringWithFormat:@"%f %p %u", now(), self, nonceCount]) substringToIndex:16];
+    NSString *ha1 = FMD5Hex([NSString stringWithFormat:@"%@:%@:%@", user, realm, password]);
+    if (algorithm && [algorithm caseInsensitiveCompare:@"MD5-sess"] == NSOrderedSame)
+        ha1 = FMD5Hex([NSString stringWithFormat:@"%@:%@:%@", ha1, nonce, cnonce]);
+    NSString *ha2 = FMD5Hex([NSString stringWithFormat:@"%@:%@", [[request HTTPMethod] uppercaseString], uri]);
+    NSString *response =
+        qop ? FMD5Hex([NSString stringWithFormat:@"%@:%@:%@:%@:%@:%@", ha1, nonce, nc, cnonce, qop, ha2])
+            : FMD5Hex([NSString stringWithFormat:@"%@:%@:%@", ha1, nonce, ha2]);
+    NSMutableString *h = [NSMutableString stringWithFormat:@"Digest username=\"%@\", realm=\"%@\", nonce=\"%@\", "
+                                                           @"uri=\"%@\", response=\"%@\"",
+                                                           user, realm, nonce, uri, response];
+    if (algorithm)
+        [h appendFormat:@", algorithm=%@", algorithm];
+    if (opaque)
+        [h appendFormat:@", opaque=\"%@\"", opaque];
+    if (qop)
+        [h appendFormat:@", qop=%@, nc=%@, cnonce=\"%@\"", qop, nc, cnonce];
+    return h;
+}
+
+- (void)_send
+{
+    if (done)
+        return;
+    NSURL *url = [request URL];
+    NSMutableDictionary *added = [NSMutableDictionary dictionary];
+    if (cookies && is_http(url)) {
+        NSArray *list = [cookies cookiesForURL:url];
+        if ([list count])
+            [added addEntriesFromDictionary:[NSHTTPCookie requestHeaderFieldsWithCookies:list]];
+    }
+    NSString *auth = is_http(url) ? [self _authorizationFor:url] : nil;
+    sentCredential = auth != nil;
+    if (auth)
+        [added setObject:auth forKey:@"Authorization"];
+    if (cached) {
+        NSHTTPURLResponse *r = (NSHTTPURLResponse *)[cached response];
+        if ([r valueForHTTPHeaderField:@"ETag"])
+            [added setObject:[r valueForHTTPHeaderField:@"ETag"] forKey:@"If-None-Match"];
+        if ([r valueForHTTPHeaderField:@"Last-Modified"])
+            [added setObject:[r valueForHTTPHeaderField:@"Last-Modified"] forKey:@"If-Modified-Since"];
+    }
+    hold = HOLD_NONE;
+    [held release];
+    held = nil;
+    [heldBody release];
+    heldBody = nil;
+    [keep release];
+    keep = nil;
+    NSError *e = nil;
+    BOOL insecure = is_http(url) && [url host] && [trusted containsObject:host_port(url)];
+    FURLLoad *l = start_load(request, extra, added, idle, total, body, insecure, self, &e);
+    if (!l) {
+        [self _finish:e];
+        return;
+    }
+    [load release];
+    load = [l retain];
+    if (paused)
+        pause_load(l, YES);
+}
+
+/* ---- what the transfer says */
+
+- (void)_load:(id)l receivedResponse:(NSURLResponse *)response
+{
+    if (l != load || done)
+        return;
+    NSHTTPURLResponse *h = [response isKindOfClass:[NSHTTPURLResponse class]] ? (NSHTTPURLResponse *)response : nil;
+    NSURL *url = [request URL];
+    FURLLoad *fl = l;
+    if (h && cookies) {
+        NSMutableArray *values = [NSMutableArray array];
+        for (NSUInteger i = 0; i < [fl->names count]; i++)
+            if ([[fl->names objectAtIndex:i] caseInsensitiveCompare:@"Set-Cookie"] == NSOrderedSame)
+                [values addObject:[fl->values objectAtIndex:i]];
+        if ([values count])
+            [cookies _setCookies:[NSHTTPCookie _cookiesFromValues:values forURL:url]
+                          forURL:url
+                 mainDocumentURL:[request mainDocumentURL]
+                          policy:acceptPolicy];
+    }
+    NSInteger status = [h statusCode];
+    hold = HOLD_NONE;
+    if (h && (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) &&
+        [h valueForHTTPHeaderField:@"Location"])
+        hold = HOLD_REDIRECT;
+    else if (h && status == 401 && [self _readChallenge:h])
+        hold = HOLD_AUTH;
+    else if (h && status == 304 && cached)
+        hold = HOLD_NOT_MODIFIED;
+    if (hold != HOLD_NONE) {
+        [held release];
+        held = [response retain];
+        [heldBody release];
+        heldBody = [[NSMutableData alloc] init];
+        return;
+    }
+    NSString *method = [[request HTTPMethod] uppercaseString];
+    if (mayStore && cache && h && status >= 200 && status < 300 && status != 206 && [method isEqualToString:@"GET"] &&
+        ![directives([h valueForHTTPHeaderField:@"Cache-Control"]) objectForKey:@"no-store"] &&
+        ![directives([request valueForHTTPHeaderField:@"Cache-Control"]) objectForKey:@"no-store"])
+        keep = [[NSMutableData alloc] init];
+    [self _give:response data:nil];
+}
+
+- (void)_load:(id)l receivedBytes:(const void *)bytes length:(size_t)length
+{
+    if (l != load || done)
+        return;
+    if (hold != HOLD_NONE) {
+        [heldBody appendBytes:bytes length:length];
+        return;
+    }
+    if (keep) {
+        /* a response much larger than the cache isn't stored (Apple's documentation: about a twentieth) */
+        NSUInteger limit = MAX([cache diskCapacity], [cache memoryCapacity]) / 20;
+        if ([keep length] + length > limit) {
+            [keep release];
+            keep = nil;
+        } else
+            [keep appendBytes:bytes length:length];
+    }
+    [owner _load:self receivedBytes:bytes length:length];
+}
+
+- (void)_load:(id)l sent:(int64_t)sent of:(int64_t)all
+{
+    if (l == load && !done)
+        [owner _load:self sent:sent of:all];
+}
+
+- (void)_load:(id)l finishedWithError:(NSError *)error
+{
+    if (l != load || done)
+        return;
+    [[self retain] autorelease];
+    [load autorelease];
+    load = nil;
+    if (error) {
+        [self _finish:error];
+        return;
+    }
+    switch (hold) {
+    case HOLD_REDIRECT: [self _redirect]; return;
+    case HOLD_AUTH: [self _challenge]; return;
+    case HOLD_NOT_MODIFIED: [self _notModified]; return;
+    }
+    if (keep && delivered) {
+        NSCachedURLResponse *c = [[[NSCachedURLResponse alloc] initWithResponse:delivered data:keep] autorelease];
+        [c _setStoredAt:[NSDate date]];
+        NSURLRequest *r = [[request retain] autorelease];
+        NSURLCache *store = [[cache retain] autorelease];
+        void (^then)(NSCachedURLResponse *) = ^(NSCachedURLResponse *answer) {
+          if (done)
+              return;
+          if (answer) {
+              if (![answer _storedAt])
+                  [answer _setStoredAt:[NSDate date]];
+              [store storeCachedResponse:answer forRequest:r];
+          }
+          [self _finish:nil];
+        };
+        if ([owner respondsToSelector:@selector(_exchange:willCache:answer:)])
+            [owner _exchange:self willCache:c answer:then];
+        else
+            then(c);
+        return;
+    }
+    [self _finish:nil];
+}
+
+/* ---- redirects */
+
+- (void)_redirect
+{
+    NSHTTPURLResponse *r = (NSHTTPURLResponse *)held;
+    NSURL *target = [[NSURL URLWithString:[r valueForHTTPHeaderField:@"Location"] relativeToURL:[request URL]]
+        absoluteURL];
+    if (!target || !is_http(target) || ![[target host] length]) {
+        [self _giveHeld]; /* a Location that can't be followed: the redirect is the answer */
+        return;
+    }
+    if (++redirects > MAX_REDIRECTS) {
+        [self _finish:url_error(NSURLErrorHTTPTooManyRedirects, [request URL], nil)];
+        return;
+    }
+    NSMutableURLRequest *next = [[request mutableCopy] autorelease];
+    [next setURL:target];
+    NSString *method = [[request HTTPMethod] uppercaseString];
+    NSInteger status = [r statusCode];
+    if ((status == 303 && ![method isEqualToString:@"HEAD"]) ||
+        ((status == 301 || status == 302) && [method isEqualToString:@"POST"])) {
+        /* RFC 9110, 15.4: a 303, and a POST moved by a 301 or 302, become a GET without a body */
+        [next setHTTPMethod:@"GET"];
+        [next setHTTPBody:nil];
+        [next setValue:nil forHTTPHeaderField:@"Content-Type"];
+        [next setValue:nil forHTTPHeaderField:@"Content-Length"];
+        [body release];
+        body = nil;
+    }
+    if ([[[request mainDocumentURL] absoluteString] isEqualToString:[[request URL] absoluteString]])
+        [next setMainDocumentURL:target];
+    void (^answer)(NSURLRequest *) = ^(NSURLRequest *chosen) {
+      if (done)
+          return;
+      if (!chosen) {
+          [self _giveHeld];
+          return;
+      }
+      [request release];
+      request = [chosen copy];
+      [self _begin];
+    };
+    if ([owner respondsToSelector:@selector(_exchange:redirectedBy:to:answer:)])
+        [owner _exchange:self redirectedBy:r to:next answer:answer];
+    else
+        answer(next);
+}
+
+/* ---- authentication: HTTP Basic and Digest (RFC 7617, RFC 7616) */
+
+/* Reads the challenge of a 401 into the pending fields; NO if there is
+ * none that Ferry can answer. Digest (MD5) is taken before Basic. */
+- (BOOL)_readChallenge:(NSHTTPURLResponse *)r
+{
+    FURLLoad *fl = load;
+    NSArray *found = nil, *basic = nil, *dig = nil;
+    for (NSUInteger i = 0; i < [fl->names count]; i++)
+        if ([[fl->names objectAtIndex:i] caseInsensitiveCompare:@"WWW-Authenticate"] == NSOrderedSame)
+            for (NSArray *c in challenges_in([fl->values objectAtIndex:i])) {
+                NSString *scheme = [c objectAtIndex:0];
+                NSString *alg = [[c objectAtIndex:1] objectForKey:@"algorithm"];
+                if ([scheme isEqualToString:@"digest"] && !dig &&
+                    (!alg || [alg caseInsensitiveCompare:@"MD5"] == NSOrderedSame ||
+                     [alg caseInsensitiveCompare:@"MD5-sess"] == NSOrderedSame))
+                    dig = c;
+                else if ([scheme isEqualToString:@"basic"] && !basic)
+                    basic = c;
+            }
+    found = dig ?: basic;
+    if (!found)
+        return NO;
+    [pendingMethod release];
+    pendingMethod = [(found == dig ? NSURLAuthenticationMethodHTTPDigest : NSURLAuthenticationMethodHTTPBasic) retain];
+    [pendingParams release];
+    pendingParams = [[found objectAtIndex:1] copy];
+    [pendingRealm release];
+    pendingRealm = [[pendingParams objectForKey:@"realm"] copy];
+    return YES;
+}
+
+- (void)_useCredential:(NSURLCredential *)c
+{
+    if (credentials && [c persistence] != NSURLCredentialPersistenceNone) {
+        [credentials setCredential:c forProtectionSpace:space];
+        if (![credentials defaultCredentialForProtectionSpace:space])
+            [credentials setDefaultCredential:c forProtectionSpace:space];
+    }
+    [c retain];
+    [credential release];
+    credential = c;
+    [self _begin];
+}
+
+/* The credential default handling uses: the URL's own user and password,
+ * then the storage's, each tried once. */
+- (NSURLCredential *)_defaultCredential
+{
+    NSURL *url = [request URL];
+    if (!triedURLCredential) {
+        triedURLCredential = YES;
+        if ([[url user] length])
+            return [NSURLCredential credentialWithUser:[url user] password:[url password] ?: @""
+                                           persistence:NSURLCredentialPersistenceNone];
+    }
+    if (!triedStoredCredential) {
+        triedStoredCredential = YES;
+        NSURLCredential *c = [credentials _credentialForSpace:space];
+        if (c && ![c isEqual:credential])
+            return c;
+    }
+    return nil;
+}
+
+- (void)_challenge
+{
+    NSURL *url = [request URL];
+    NSURLProtectionSpace *s = [[[NSURLProtectionSpace alloc] initWithHost:[url host]
+                                                                     port:port_of(url)
+                                                                 protocol:lower_scheme(url)
+                                                                    realm:pendingRealm
+                                                     authenticationMethod:pendingMethod] autorelease];
+    BOOL same = space && [space isEqual:s];
+    /* a stale Digest nonce is answered again with the same credential, unasked */
+    if (same && sentCredential && !retriedStale && [pendingMethod isEqualToString:NSURLAuthenticationMethodHTTPDigest] &&
+        [[[pendingParams objectForKey:@"stale"] lowercaseString] isEqualToString:@"true"]) {
+        retriedStale = YES;
+        [digest release];
+        digest = [pendingParams retain];
+        nonceCount = 0;
+        [self _begin];
+        return;
+    }
+    if (same && sentCredential)
+        failures++;
+    else if (!same)
+        failures = 0;
+    [space release];
+    space = [s retain];
+    [digest release];
+    digest = [pendingParams retain];
+    nonceCount = 0;
+    NSURLCredential *proposed = failures && credential ? credential : nil;
+    if (!proposed && !triedURLCredential && [[url user] length])
+        proposed = [NSURLCredential credentialWithUser:[url user] password:[url password] ?: @""
+                                           persistence:NSURLCredentialPersistenceNone];
+    if (!proposed)
+        proposed = [credentials _credentialForSpace:s];
+    NSURLAuthenticationChallenge *c = [[[NSURLAuthenticationChallenge alloc] initWithProtectionSpace:s
+                                                                                  proposedCredential:proposed
+                                                                                previousFailureCount:failures
+                                                                                     failureResponse:held
+                                                                                               error:nil
+                                                                                              sender:nil] autorelease];
+    void (^answer)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) =
+        ^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *cred) {
+          if (done)
+              return;
+          switch (disposition) {
+          case NSURLSessionAuthChallengeUseCredential:
+              if ([cred user])
+                  [self _useCredential:cred];
+              else
+                  [self _giveHeld];
+              return;
+          case NSURLSessionAuthChallengeCancelAuthenticationChallenge:
+              [self _finish:url_error(cancelCode, [request URL], nil)];
+              return;
+          case NSURLSessionAuthChallengePerformDefaultHandling: {
+              NSURLCredential *d = [self _defaultCredential];
+              if (d)
+                  [self _useCredential:d];
+              else
+                  [self _giveHeld];
+              return;
+          }
+          default: /* rejecting the only protection space there is */
+              [self _giveHeld];
+              return;
+          }
+        };
+    if ([owner respondsToSelector:@selector(_exchange:challenged:answer:)])
+        [owner _exchange:self challenged:c answer:answer];
+    else
+        answer(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+}
+
+/* ---- revalidation: a 304 answers with the stored response, its fields brought up to date */
+
+- (void)_notModified
+{
+    NSHTTPURLResponse *old = (NSHTTPURLResponse *)[cached response], *fresh = (NSHTTPURLResponse *)held;
+    NSMutableDictionary *fields = [[[old allHeaderFields] mutableCopy] autorelease];
+    NSDictionary *newer = [fresh allHeaderFields];
+    for (NSString *k in newer) {
+        if ([k caseInsensitiveCompare:@"Content-Length"] == NSOrderedSame ||
+            [k caseInsensitiveCompare:@"Content-Type"] == NSOrderedSame ||
+            [k caseInsensitiveCompare:@"Content-Encoding"] == NSOrderedSame)
+            continue;
+        NSString *existing = field_key(fields, k);
+        if (existing)
+            [fields removeObjectForKey:existing];
+        [fields setObject:[newer objectForKey:k] forKey:k];
+    }
+    NSHTTPURLResponse *r = [[[NSHTTPURLResponse alloc] initWithURL:[old URL] statusCode:[old statusCode]
+                                                        HTTPVersion:@"HTTP/1.1"
+                                                       headerFields:fields] autorelease];
+    NSCachedURLResponse *c = [[[NSCachedURLResponse alloc] initWithResponse:r data:[cached data]
+                                                                   userInfo:[cached userInfo]
+                                                              storagePolicy:[cached storagePolicy]] autorelease];
+    [c _setStoredAt:[NSDate date]];
+    if (mayStore)
+        [cache storeCachedResponse:c forRequest:request];
+    [held release];
+    held = nil;
+    hold = HOLD_NONE;
+    [self _serve:c];
+}
+
+/* ---- data URLs */
+
+- (void)_loadData
+{
+    NSURL *url = [request URL];
+    NSString *s = [url absoluteString];
+    NSRange hash = [s rangeOfString:@"#"];
+    if (hash.location != NSNotFound)
+        s = [s substringToIndex:hash.location];
+    s = [s substringFromIndex:5]; /* "data:" */
+    NSRange comma = [s rangeOfString:@","];
+    if (comma.location == NSNotFound) {
+        [self _finish:url_error(NSURLErrorBadURL, url, nil)];
+        return;
+    }
+    NSArray *meta = [[s substringToIndex:comma.location] componentsSeparatedByString:@";"];
+    NSString *payload = [s substringFromIndex:comma.location + 1];
+    NSString *type = [trimmed([meta objectAtIndex:0]) lowercaseString], *charset = nil;
+    BOOL b64 = NO;
+    for (NSUInteger i = 1; i < [meta count]; i++) {
+        NSString *p = trimmed([meta objectAtIndex:i]);
+        if ([p caseInsensitiveCompare:@"base64"] == NSOrderedSame && i == [meta count] - 1)
+            b64 = YES;
+        else if ([[p lowercaseString] hasPrefix:@"charset="])
+            charset = [p substringFromIndex:8];
+    }
+    if (![type length]) {
+        type = @"text/plain";
+        if (!charset)
+            charset = @"US-ASCII";
+    }
+    NSData *data = percent_decoded_bytes(payload);
+    if (b64) {
+        NSString *text = [[[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding] autorelease];
+        text = [[text componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+            componentsJoinedByString:@""];
+        data = text ? [[[NSData alloc] initWithBase64EncodedString:text options:0] autorelease] : nil;
+        if (!data) {
+            [self _finish:url_error(NSURLErrorCannotDecodeRawData, url, @"cannot decode raw data")];
+            return;
+        }
+    }
+    NSURLResponse *r = [[[NSURLResponse alloc] initWithURL:url MIMEType:type
+                                     expectedContentLength:(NSInteger)[data length]
+                                          textEncodingName:charset] autorelease];
+    [self _give:r data:data];
+    [self _finish:nil];
+}
+@end
+
+/* An exchange with what the shared objects give: the shared cookie
+ * storage, URL cache and credential storage (NSURLConnection and the
+ * ...ContentsOfURL: calls). A session sets its own. */
+static FURLExchange *new_exchange(NSURLRequest *request, id owner)
+{
+    FURLExchange *x = [[[FURLExchange alloc] init] autorelease];
+    x->owner = [owner retain];
+    x->request = [request copy] ?: [[NSURLRequest alloc] initWithURL:nil];
+    x->idle = [request timeoutInterval];
+    BOOL web = is_http([request URL]);
+    if (web && [request HTTPShouldHandleCookies]) {
+        x->cookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage] retain];
+        x->acceptPolicy = [x->cookies cookieAcceptPolicy];
+    }
+    if (web) {
+        x->cache = [[NSURLCache sharedURLCache] retain];
+        x->credentials = [[NSURLCredentialStorage sharedCredentialStorage] retain];
+    }
+    x->cachePolicy = [request cachePolicy];
+    x->mayStore = YES;
+    x->cancelCode = NSURLErrorCancelled;
+    return x;
 }
 
 /* ---- a client that gathers everything, for the calls that wait or answer once ------------- */
@@ -1008,13 +1954,18 @@ static void run_until_done(FURLLoad *l)
     [then release];
     [super dealloc];
 }
-- (void)_load:(FURLLoad *)load receivedResponse:(NSURLResponse *)r { response = [r retain]; }
-- (void)_load:(FURLLoad *)load receivedBytes:(const void *)bytes length:(size_t)length
+- (void)_load:(id)load receivedResponse:(NSURLResponse *)r
+{
+    [response release];
+    response = [r retain];
+    [data setLength:0];
+}
+- (void)_load:(id)load receivedBytes:(const void *)bytes length:(size_t)length
 {
     [data appendBytes:bytes length:length];
 }
-- (void)_load:(FURLLoad *)load sent:(int64_t)sent of:(int64_t)total {}
-- (void)_load:(FURLLoad *)load finishedWithError:(NSError *)e
+- (void)_load:(id)load sent:(int64_t)sent of:(int64_t)total {}
+- (void)_load:(id)load finishedWithError:(NSError *)e
 {
     error = [e retain];
     done = YES;
@@ -1027,12 +1978,11 @@ static void run_until_done(FURLLoad *l)
 static NSData *load_and_wait(NSURLRequest *request, NSURLResponse **response, NSError **error)
 {
     FURLGather *g = [[[FURLGather alloc] init] autorelease];
-    NSError *e = nil;
-    FURLLoad *l = start_load(request, nil, [request timeoutInterval], 0, nil, g, &e);
-    if (l)
-        run_until_done(l);
-    else
-        g->error = [e retain];
+    FURLExchange *x = [new_exchange(request, g) retain];
+    [x start];
+    while (!g->done)
+        engine_wait(-1);
+    [x release];
     if (response)
         *response = [[g->response retain] autorelease];
     if (g->error) {
@@ -1064,12 +2014,28 @@ static void run_on(id opqueue, dispatch_queue_t queue, void (^block)(void))
     BOOL _cellular, _waits, _pipelining, _cookies, _launch, _discretionary;
     NSInteger _perHost;
     NSDictionary *_headers, *_proxy;
+    NSHTTPCookieAcceptPolicy _acceptPolicy;
+    /* the stores a session uses; until one is set (nil included), the shared one */
+    NSHTTPCookieStorage *_cookieStorage;
+    NSURLCache *_urlCache;
+    NSURLCredentialStorage *_credentialStorage;
+    BOOL _ownCookieStorage, _ownCache, _ownCredentialStorage;
 }
 @end
 
 @implementation NSURLSessionConfiguration
 + (NSURLSessionConfiguration *)defaultSessionConfiguration { return [[[self alloc] init] autorelease]; }
-+ (NSURLSessionConfiguration *)ephemeralSessionConfiguration { return [[[self alloc] init] autorelease]; }
+/* An ephemeral session keeps cookies, credentials and responses in memory
+ * of its own, and none of them outlives it. */
++ (NSURLSessionConfiguration *)ephemeralSessionConfiguration
+{
+    NSURLSessionConfiguration *c = [[[self alloc] init] autorelease];
+    c->_cookieStorage = [[NSHTTPCookieStorage _privateStorage] retain];
+    c->_urlCache = [[NSURLCache _memoryOnlyCache] retain];
+    c->_credentialStorage = [[NSURLCredentialStorage _privateStorage] retain];
+    c->_ownCookieStorage = c->_ownCache = c->_ownCredentialStorage = YES;
+    return c;
+}
 + (NSURLSessionConfiguration *)backgroundSessionConfigurationWithIdentifier:(NSString *)identifier
 {
     NSURLSessionConfiguration *c = [[[self alloc] init] autorelease];
@@ -1082,6 +2048,7 @@ static void run_on(id opqueue, dispatch_queue_t queue, void (^block)(void))
     _resourceTimeout = 7 * 24 * 3600;
     _cellular = _cookies = YES;
     _perHost = 6;
+    _acceptPolicy = NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain;
     return self;
 }
 - (void)dealloc
@@ -1090,6 +2057,9 @@ static void run_on(id opqueue, dispatch_queue_t queue, void (^block)(void))
     [_container release];
     [_headers release];
     [_proxy release];
+    [_cookieStorage release];
+    [_urlCache release];
+    [_credentialStorage release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone
@@ -1110,7 +2080,46 @@ static void run_on(id opqueue, dispatch_queue_t queue, void (^block)(void))
     c->_perHost = _perHost;
     c->_headers = [_headers copy];
     c->_proxy = [_proxy copy];
+    c->_acceptPolicy = _acceptPolicy;
+    c->_cookieStorage = [_cookieStorage retain];
+    c->_urlCache = [_urlCache retain];
+    c->_credentialStorage = [_credentialStorage retain];
+    c->_ownCookieStorage = _ownCookieStorage;
+    c->_ownCache = _ownCache;
+    c->_ownCredentialStorage = _ownCredentialStorage;
     return c;
+}
+- (NSHTTPCookieAcceptPolicy)HTTPCookieAcceptPolicy { return _acceptPolicy; }
+- (void)setHTTPCookieAcceptPolicy:(NSHTTPCookieAcceptPolicy)p { _acceptPolicy = p; }
+- (NSHTTPCookieStorage *)HTTPCookieStorage
+{
+    return _ownCookieStorage ? _cookieStorage : [NSHTTPCookieStorage sharedHTTPCookieStorage];
+}
+- (void)setHTTPCookieStorage:(NSHTTPCookieStorage *)s
+{
+    [s retain];
+    [_cookieStorage release];
+    _cookieStorage = s;
+    _ownCookieStorage = YES;
+}
+- (NSURLCache *)URLCache { return _ownCache ? _urlCache : [NSURLCache sharedURLCache]; }
+- (void)setURLCache:(NSURLCache *)cache
+{
+    [cache retain];
+    [_urlCache release];
+    _urlCache = cache;
+    _ownCache = YES;
+}
+- (NSURLCredentialStorage *)URLCredentialStorage
+{
+    return _ownCredentialStorage ? _credentialStorage : [NSURLCredentialStorage sharedCredentialStorage];
+}
+- (void)setURLCredentialStorage:(NSURLCredentialStorage *)s
+{
+    [s retain];
+    [_credentialStorage release];
+    _credentialStorage = s;
+    _ownCredentialStorage = YES;
 }
 - (NSString *)identifier { return _identifier; }
 - (NSURLRequestCachePolicy)requestCachePolicy { return _cachePolicy; }
@@ -1178,7 +2187,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 - (void)_taskEnded:(NSURLSessionTask *)task;
 @end
 
-@interface NSURLSessionTask () <FURLLoadClient> {
+@interface NSURLSessionTask () <FURLExchangeOwner> {
 @package
     NSURLSession *_session;
     NSUInteger _id;
@@ -1194,7 +2203,8 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     id _handler;          /* the completion handler, if any */
     NSData *_upload;      /* an upload task's body */
     NSMutableData *_data; /* the body, for a data task's completion handler */
-    FURLLoad *_load;
+    FURLExchange *_exchange; /* the request seen through */
+    NSURLRequest *_current; /* the request sent last, redirects followed */
     BOOL _started, _ended;
     BOOL _awaiting;       /* the delegate hasn't said yet whether to go on after the response */
     NSMutableArray *_held; /* messages that wait for it to */
@@ -1233,7 +2243,8 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     [_handler release];
     [_upload release];
     [_data release];
-    [_load release];
+    [_exchange release];
+    [_current release];
     [_held release];
     [_path release];
     [super dealloc];
@@ -1241,7 +2252,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (NSUInteger)taskIdentifier { return _id; }
 - (NSURLRequest *)originalRequest { return _original; }
-- (NSURLRequest *)currentRequest { return _original; }
+- (NSURLRequest *)currentRequest { return _current ?: _original; }
 - (NSURLResponse *)response { return _response; }
 - (NSURLSessionTaskState)state { return _state; }
 - (NSError *)error { return _error; }
@@ -1297,7 +2308,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     if (_started) {
         if (_state == NSURLSessionTaskStateSuspended) {
             _state = NSURLSessionTaskStateRunning;
-            pause_load(_load, NO);
+            [_exchange pause:NO];
         }
         return;
     }
@@ -1311,32 +2322,147 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
         _expectSend = [_upload length];
     else if ([_original HTTPBody])
         _expectSend = [[_original HTTPBody] length];
-    NSError *e = nil;
-    _load = [start_load(_original, c->_headers, idle, c->_resourceTimeout, _upload, self, &e) retain];
-    if (!_load)
-        [self _endWithError:e];
+    FURLExchange *x = [[FURLExchange alloc] init];
+    x->owner = [self retain];
+    x->request = [_original copy] ?: [[NSURLRequest alloc] initWithURL:nil];
+    x->extra = [c->_headers copy];
+    x->idle = idle;
+    x->total = c->_resourceTimeout;
+    x->body = [_upload retain];
+    NSURL *url = [_original URL];
+    BOOL web = is_http(url);
+    if (web && c->_cookies && [_original HTTPShouldHandleCookies]) {
+        x->cookies = [[c HTTPCookieStorage] retain];
+        x->acceptPolicy = c->_acceptPolicy;
+    }
+    if (web) {
+        x->cache = [[c URLCache] retain];
+        x->credentials = [[c URLCredentialStorage] retain];
+    }
+    x->cachePolicy = [_original cachePolicy] == NSURLRequestUseProtocolCachePolicy ? c->_cachePolicy
+                                                                                    : [_original cachePolicy];
+    x->mayStore = _kind != KIND_DOWNLOAD;
+    x->cancelCode = NSURLErrorCancelled;
+    _exchange = x;
+    [x start];
 }
 - (void)suspend
 {
     if (_state != NSURLSessionTaskStateRunning)
         return;
     _state = NSURLSessionTaskStateSuspended;
-    pause_load(_load, YES);
+    [_exchange pause:YES];
 }
 - (void)cancel
 {
     if (_ended || _state == NSURLSessionTaskStateCanceling || _state == NSURLSessionTaskStateCompleted)
         return;
     _state = NSURLSessionTaskStateCanceling;
-    cancel_load(_load);
+    [_exchange cancel];
     _awaiting = NO;
     [_held removeAllObjects];
-    [self _endWithError:url_error(NSURLErrorCancelled, [_original URL], nil)];
+    [self _endWithError:url_error(NSURLErrorCancelled, [[self currentRequest] URL], nil)];
+}
+
+/* ---- what the exchange asks: the delegate's answers */
+
+- (void)_exchange:(FURLExchange *)x redirectedBy:(NSHTTPURLResponse *)response to:(NSURLRequest *)request
+           answer:(void (^)(NSURLRequest *))answer
+{
+    id d = [self _hearer];
+    void (^go)(NSURLRequest *) = ^(NSURLRequest *chosen) {
+      if (chosen) {
+          [chosen retain];
+          [_current release];
+          _current = chosen;
+      }
+      answer(chosen);
+    };
+    if (![d respondsToSelector:@selector(URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:)]) {
+        go(request);
+        return;
+    }
+    NSURLSession *s = _session;
+    __block BOOL answered = NO;
+    void (^once)(NSURLRequest *) = [[go copy] autorelease];
+    [self _post:^{
+      [d URLSession:s
+                                task:self
+          willPerformHTTPRedirection:response
+                          newRequest:request
+                   completionHandler:^(NSURLRequest *chosen) {
+                     if (answered)
+                         return;
+                     answered = YES;
+                     once(chosen);
+                   }];
+    }];
+}
+
+- (BOOL)_exchangeAsksAboutTrust:(FURLExchange *)x
+{
+    return [_session->_delegate respondsToSelector:@selector(URLSession:didReceiveChallenge:completionHandler:)] ||
+           [[self _hearer] respondsToSelector:@selector(URLSession:task:didReceiveChallenge:completionHandler:)];
+}
+
+/* A server's certificate is asked about at the session's level first (as
+ * other challenges for the whole session are), and else at the task's; a
+ * password only at the task's. */
+- (void)_exchange:(FURLExchange *)x challenged:(NSURLAuthenticationChallenge *)challenge
+           answer:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))answer
+{
+    NSURLSession *s = _session;
+    id sd = s->_delegate, d = [self _hearer];
+    BOOL trust = [[[challenge protectionSpace] authenticationMethod]
+        isEqualToString:NSURLAuthenticationMethodServerTrust];
+    __block BOOL answered = NO;
+    void (^once)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) =
+        [[^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential) {
+          if (answered)
+              return;
+          answered = YES;
+          answer(disposition, credential);
+        } copy] autorelease];
+    if (trust && [sd respondsToSelector:@selector(URLSession:didReceiveChallenge:completionHandler:)])
+        [self _post:^{
+          [sd URLSession:s didReceiveChallenge:challenge completionHandler:once];
+        }];
+    else if ([d respondsToSelector:@selector(URLSession:task:didReceiveChallenge:completionHandler:)])
+        [self _post:^{
+          [d URLSession:s task:self didReceiveChallenge:challenge completionHandler:once];
+        }];
+    else
+        answer(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+}
+
+- (void)_exchange:(FURLExchange *)x willCache:(NSCachedURLResponse *)proposed
+           answer:(void (^)(NSCachedURLResponse *))answer
+{
+    id d = [self _hearer];
+    if (_handler || _kind == KIND_DOWNLOAD ||
+        ![d respondsToSelector:@selector(URLSession:dataTask:willCacheResponse:completionHandler:)]) {
+        answer(proposed);
+        return;
+    }
+    NSURLSession *s = _session;
+    __block BOOL answered = NO;
+    void (^then)(NSCachedURLResponse *) = [[answer copy] autorelease];
+    [self _post:^{
+      [d URLSession:s
+                   dataTask:(NSURLSessionDataTask *)self
+          willCacheResponse:proposed
+          completionHandler:^(NSCachedURLResponse *chosen) {
+            if (answered)
+                return;
+            answered = YES;
+            then(chosen);
+          }];
+    }];
 }
 
 /* ---- what the transfer says */
 
-- (void)_load:(FURLLoad *)load receivedResponse:(NSURLResponse *)response
+- (void)_load:(id)load receivedResponse:(NSURLResponse *)response
 {
     [_response release];
     _response = [response retain];
@@ -1394,7 +2520,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
         _writeFailed = YES;
     free(tmpl);
 }
-- (void)_load:(FURLLoad *)load receivedBytes:(const void *)bytes length:(size_t)length
+- (void)_load:(id)load receivedBytes:(const void *)bytes length:(size_t)length
 {
     _received += length;
     if (_kind == KIND_DOWNLOAD) {
@@ -1439,7 +2565,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
         }];
     }
 }
-- (void)_load:(FURLLoad *)load sent:(int64_t)sent of:(int64_t)total
+- (void)_load:(id)load sent:(int64_t)sent of:(int64_t)total
 {
     int64_t step = sent - _sent;
     _sent = sent;
@@ -1452,7 +2578,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
         }];
     }
 }
-- (void)_load:(FURLLoad *)load finishedWithError:(NSError *)error
+- (void)_load:(id)load finishedWithError:(NSError *)error
 {
     if (!error && _writeFailed)
         error = url_error(NSURLErrorCannotWriteToFile, [_original URL], nil);
@@ -1467,8 +2593,8 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     _ended = YES;
     [_error release];
     _error = [error retain];
-    [_load release];
-    _load = nil;
+    [_exchange autorelease];
+    _exchange = nil;
     if (_kind == KIND_DOWNLOAD && !error)
         [self _openFile];
     if (_fd >= 0) {
@@ -1737,11 +2863,54 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 
 /* ---- NSURLConnection ------------------------------------------------------------------------ */
 
-@interface NSURLConnection () <FURLLoadClient> {
-    NSURLRequest *_request;
+/* The sender of a connection's challenges: each of its messages is an
+ * answer, as a session's disposition is. */
+@interface FURLChallengeSender : NSObject <NSURLAuthenticationChallengeSender> {
+@public
+    void (^answer)(NSURLSessionAuthChallengeDisposition, NSURLCredential *);
+}
+@end
+
+@implementation FURLChallengeSender
+- (void)dealloc
+{
+    [answer release];
+    [super dealloc];
+}
+- (void)_answer:(NSURLSessionAuthChallengeDisposition)d credential:(NSURLCredential *)c
+{
+    void (^a)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) = [answer autorelease];
+    answer = nil;
+    if (a)
+        a(d, c);
+}
+- (void)useCredential:(NSURLCredential *)credential forAuthenticationChallenge:(NSURLAuthenticationChallenge *)c
+{
+    [self _answer:NSURLSessionAuthChallengeUseCredential credential:credential];
+}
+- (void)continueWithoutCredentialForAuthenticationChallenge:(NSURLAuthenticationChallenge *)c
+{
+    [self _answer:NSURLSessionAuthChallengeUseCredential credential:nil];
+}
+- (void)cancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)c
+{
+    [self _answer:NSURLSessionAuthChallengeCancelAuthenticationChallenge credential:nil];
+}
+- (void)performDefaultHandlingForAuthenticationChallenge:(NSURLAuthenticationChallenge *)c
+{
+    [self _answer:NSURLSessionAuthChallengePerformDefaultHandling credential:nil];
+}
+- (void)rejectProtectionSpaceAndContinueWithChallenge:(NSURLAuthenticationChallenge *)c
+{
+    [self _answer:NSURLSessionAuthChallengeRejectProtectionSpace credential:nil];
+}
+@end
+
+@interface NSURLConnection () <FURLExchangeOwner> {
+    NSURLRequest *_request, *_current;
     id _delegate;
     id _opqueue;
-    FURLLoad *_load;
+    FURLExchange *_exchange;
     BOOL _started, _over;
 }
 @end
@@ -1750,7 +2919,8 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 + (BOOL)canHandleRequest:(NSURLRequest *)request
 {
     NSString *scheme = [[[request URL] scheme] lowercaseString];
-    return [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"file"];
+    return [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"file"] ||
+           [scheme isEqualToString:@"data"];
 }
 + (NSURLConnection *)connectionWithRequest:(NSURLRequest *)request delegate:(id)delegate
 {
@@ -1773,11 +2943,12 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
     [_request release];
     [_delegate release];
     [_opqueue release];
-    [_load release];
+    [_exchange release];
+    [_current release];
     [super dealloc];
 }
 - (NSURLRequest *)originalRequest { return _request; }
-- (NSURLRequest *)currentRequest { return _request; }
+- (NSURLRequest *)currentRequest { return _current ?: _request; }
 - (void)scheduleInRunLoop:(NSRunLoop *)runLoop forMode:(NSRunLoopMode)mode {}
 - (void)unscheduleFromRunLoop:(NSRunLoop *)runLoop forMode:(NSRunLoopMode)mode {}
 - (void)setDelegateQueue:(NSOperationQueue *)queue
@@ -1794,26 +2965,144 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
       [self release];
     });
 }
+/* The delegate sees the request first (connection:willSendRequest:
+ * redirectResponse: with no response) and may change it, or refuse it
+ * with nil, which ends the connection without another message. */
 - (void)start
 {
     if (_started)
         return;
     _started = YES;
-    NSError *e = nil;
-    _load = [start_load(_request, nil, [_request timeoutInterval], 0, nil, self, &e) retain];
-    if (!_load)
-        [self _load:nil finishedWithError:e];
+    id d = _delegate;
+    if ([d respondsToSelector:@selector(connection:willSendRequest:redirectResponse:)])
+        [self _tell:^{
+          if (_over)
+              return;
+          NSURLRequest *r = [d connection:self willSendRequest:_request redirectResponse:nil];
+          if (!r) {
+              [self cancel];
+              return;
+          }
+          [self _send:r];
+        }];
+    else
+        [self _send:_request];
+}
+- (void)_send:(NSURLRequest *)request
+{
+    if (request != _request) {
+        [_current release];
+        _current = [request copy];
+    }
+    FURLExchange *x = [new_exchange(request, self) retain];
+    x->cancelCode = NSURLErrorUserCancelledAuthentication;
+    id d = _delegate;
+    if ([d respondsToSelector:@selector(connectionShouldUseCredentialStorage:)] &&
+        ![d connectionShouldUseCredentialStorage:self]) {
+        [x->credentials release];
+        x->credentials = nil;
+    }
+    _exchange = x;
+    [x start];
 }
 - (void)cancel
 {
     if (_over)
         return;
     _over = YES;
-    cancel_load(_load);
+    [_exchange cancel];
     [_delegate autorelease];
     _delegate = nil;
 }
-- (void)_load:(FURLLoad *)load receivedResponse:(NSURLResponse *)response
+
+/* ---- what the exchange asks: the delegate's answers */
+
+- (void)_exchange:(FURLExchange *)x redirectedBy:(NSHTTPURLResponse *)response to:(NSURLRequest *)request
+           answer:(void (^)(NSURLRequest *))answer
+{
+    id d = _delegate;
+    void (^go)(NSURLRequest *) = [[^(NSURLRequest *chosen) {
+      if (chosen) {
+          [chosen retain];
+          [_current release];
+          _current = chosen;
+      }
+      answer(chosen);
+    } copy] autorelease];
+    if (![d respondsToSelector:@selector(connection:willSendRequest:redirectResponse:)]) {
+        go(request);
+        return;
+    }
+    [self _tell:^{
+      if (!_over)
+          go([d connection:self willSendRequest:request redirectResponse:response]);
+    }];
+}
+
+- (BOOL)_exchangeAsksAboutTrust:(FURLExchange *)x
+{
+    id d = _delegate;
+    return [d respondsToSelector:@selector(connection:willSendRequestForAuthenticationChallenge:)] ||
+           ([d respondsToSelector:@selector(connection:canAuthenticateAgainstProtectionSpace:)] &&
+            [d respondsToSelector:@selector(connection:didReceiveAuthenticationChallenge:)]);
+}
+
+/* connection:willSendRequestForAuthenticationChallenge: is asked if the
+ * delegate has it; else the older pair, connection:
+ * canAuthenticateAgainstProtectionSpace: (which, unimplemented, means yes
+ * to anything but a server's certificate or a client's) and connection:
+ * didReceiveAuthenticationChallenge:; else default handling. */
+- (void)_exchange:(FURLExchange *)x challenged:(NSURLAuthenticationChallenge *)challenge
+           answer:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))answer
+{
+    id d = _delegate;
+    FURLChallengeSender *sender = [[[FURLChallengeSender alloc] init] autorelease];
+    sender->answer = [answer copy];
+    NSURLAuthenticationChallenge *c = [[[NSURLAuthenticationChallenge alloc] initWithAuthenticationChallenge:challenge
+                                                                                                      sender:sender]
+        autorelease];
+    if ([d respondsToSelector:@selector(connection:willSendRequestForAuthenticationChallenge:)]) {
+        [self _tell:^{
+          if (!_over)
+              [d connection:self willSendRequestForAuthenticationChallenge:c];
+        }];
+        return;
+    }
+    if ([d respondsToSelector:@selector(connection:didReceiveAuthenticationChallenge:)]) {
+        [self _tell:^{
+          if (_over)
+              return;
+          NSURLProtectionSpace *space = [c protectionSpace];
+          NSString *m = [space authenticationMethod];
+          BOOL can = [d respondsToSelector:@selector(connection:canAuthenticateAgainstProtectionSpace:)]
+                         ? [d connection:self canAuthenticateAgainstProtectionSpace:space]
+                         : !([m isEqualToString:NSURLAuthenticationMethodServerTrust] ||
+                             [m isEqualToString:NSURLAuthenticationMethodClientCertificate]);
+          if (can)
+              [d connection:self didReceiveAuthenticationChallenge:c];
+          else
+              [sender performDefaultHandlingForAuthenticationChallenge:c];
+        }];
+        return;
+    }
+    [sender performDefaultHandlingForAuthenticationChallenge:c];
+}
+
+- (void)_exchange:(FURLExchange *)x willCache:(NSCachedURLResponse *)proposed
+           answer:(void (^)(NSCachedURLResponse *))answer
+{
+    id d = _delegate;
+    if (![d respondsToSelector:@selector(connection:willCacheResponse:)]) {
+        answer(proposed);
+        return;
+    }
+    void (^then)(NSCachedURLResponse *) = [[answer copy] autorelease];
+    [self _tell:^{
+      if (!_over)
+          then([d connection:self willCacheResponse:proposed]);
+    }];
+}
+- (void)_load:(id)load receivedResponse:(NSURLResponse *)response
 {
     id d = _delegate;
     if ([d respondsToSelector:@selector(connection:didReceiveResponse:)])
@@ -1822,7 +3111,7 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
               [d connection:self didReceiveResponse:response];
         }];
 }
-- (void)_load:(FURLLoad *)load receivedBytes:(const void *)bytes length:(size_t)length
+- (void)_load:(id)load receivedBytes:(const void *)bytes length:(size_t)length
 {
     id d = _delegate;
     if ([d respondsToSelector:@selector(connection:didReceiveData:)]) {
@@ -1833,7 +3122,7 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
         }];
     }
 }
-- (void)_load:(FURLLoad *)load sent:(int64_t)sent of:(int64_t)total
+- (void)_load:(id)load sent:(int64_t)sent of:(int64_t)total
 {
     id d = _delegate;
     if ([d respondsToSelector:@selector(connection:didSendBodyData:totalBytesWritten:totalBytesExpectedToWrite:)])
@@ -1845,7 +3134,7 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
                   totalBytesExpectedToWrite:(NSInteger)total];
         }];
 }
-- (void)_load:(FURLLoad *)load finishedWithError:(NSError *)error
+- (void)_load:(id)load finishedWithError:(NSError *)error
 {
     id d = [_delegate retain];
     [self _tell:^{
@@ -1886,14 +3175,7 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
       [h release];
       [q release];
     } copy];
-    NSError *e = nil;
-    if (!start_load(request, nil, [request timeoutInterval], 0, nil, g, &e)) {
-        [g retain];
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [g _load:nil finishedWithError:e];
-          [g release];
-        });
-    }
+    [new_exchange(request, g) start];
 }
 @end
 
@@ -1902,11 +3184,11 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 static BOOL is_web(NSURL *url)
 {
     NSString *scheme = [[url scheme] lowercaseString];
-    return [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"];
+    return [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"data"];
 }
 
-/* For dataWithContentsOfURL: and the like: the body of an http or https
- * URL (whatever the status), or nil with a Cocoa error that holds the URL
+/* For dataWithContentsOfURL: and the like: the body of an http, https or
+ * data URL (whatever the status), or nil with a Cocoa error that holds the URL
  * error as its underlying error, as a Mac reports it. */
 NSData *FDataWithContentsOfNetworkURL(NSURL *url, NSString **charset, NSError **error)
 {
@@ -1920,8 +3202,9 @@ NSData *FDataWithContentsOfNetworkURL(NSURL *url, NSString **charset, NSError **
         if (e)
             [info setObject:e forKey:NSUnderlyingErrorKey];
         NSString *name = [[url path] lastPathComponent];
-        [info setObject:[NSString stringWithFormat:@"The file “%@” couldn’t be opened.",
-                                                   [name length] && ![name isEqualToString:@"/"] ? name : [url host]]
+        if (![name length] || [name isEqualToString:@"/"])
+            name = [url host] ?: [url absoluteString];
+        [info setObject:[NSString stringWithFormat:@"The file “%@” couldn’t be opened.", name]
                  forKey:NSLocalizedDescriptionKey];
         FSetError(error, [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError userInfo:info]);
         return nil;

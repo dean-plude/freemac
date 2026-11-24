@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: URL loading (NSURLRequest, NSURLResponse, NSURLSession,
- * NSURLConnection and the NSURLErrorDomain codes), as far as Ferry's own
+ * NSURLConnection, the NSURLErrorDomain codes, credentials and
+ * authentication challenges, cookies and the URL cache), as far as Ferry's own
  * Foundation provides it. Written for freemac from Apple's public API
  * documentation; not Apple's header. Foundation.h includes this file, and
- * NSURLRequest.h, NSURLResponse.h, NSURLConnection.h and NSURLError.h are
- * other names for it. Implemented in ferry/foundation/NSURLSession.m. */
+ * NSURLRequest.h, NSURLResponse.h, NSURLConnection.h, NSURLError.h,
+ * NSURLCredential.h, NSURLCredentialStorage.h, NSURLProtectionSpace.h,
+ * NSURLAuthenticationChallenge.h, NSHTTPCookie.h, NSHTTPCookieStorage.h
+ * and NSURLCache.h are other names for it. Implemented in
+ * ferry/foundation/NSURLSession.m, NSURLAuth.m, NSHTTPCookie.m and
+ * NSURLCache.m. */
 #ifndef _FERRY_FOUNDATION_NSURLSESSION_H_
 #define _FERRY_FOUNDATION_NSURLSESSION_H_
 #include <Foundation/Foundation.h>
@@ -136,6 +141,244 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 + (NSString *)localizedStringForStatusCode:(NSInteger)statusCode;
 @end
 
+/* ---- authentication: credentials, protection spaces and challenges ---------------- */
+
+@class NSURLSessionTask, NSURLAuthenticationChallenge;
+
+/* The Security framework's trust and identity objects. Ferry has no
+ * Security framework: a protection space's serverTrust is an object of
+ * Ferry's own that only NSURLCredential's credentialForTrust: reads. */
+#ifndef _FERRY_SECURITY_TYPES_
+#define _FERRY_SECURITY_TYPES_
+typedef struct __SecTrust *SecTrustRef;
+typedef struct __SecIdentity *SecIdentityRef;
+#endif
+
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTP;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTPS;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceFTP;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTPProxy;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTPSProxy;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceFTPProxy;
+FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceSOCKSProxy;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodDefault;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodHTTPBasic;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodHTTPDigest;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodHTMLForm;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodNTLM;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodNegotiate;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodClientCertificate;
+FOUNDATION_EXPORT NSString *const NSURLAuthenticationMethodServerTrust;
+
+typedef NS_ENUM(NSUInteger, NSURLCredentialPersistence) {
+    NSURLCredentialPersistenceNone = 0,
+    NSURLCredentialPersistenceForSession = 1,
+    NSURLCredentialPersistencePermanent = 2,
+    NSURLCredentialPersistenceSynchronizable = 3,
+};
+
+@interface NSURLCredential : NSObject <NSCopying>
++ (NSURLCredential *)credentialWithUser:(NSString *)user password:(NSString *)password
+                            persistence:(NSURLCredentialPersistence)persistence;
+- (instancetype)initWithUser:(NSString *)user password:(NSString *)password
+                 persistence:(NSURLCredentialPersistence)persistence;
++ (NSURLCredential *)credentialForTrust:(SecTrustRef)trust;
+- (instancetype)initWithTrust:(SecTrustRef)trust;
++ (NSURLCredential *)credentialWithIdentity:(SecIdentityRef)identity certificates:(NSArray *)certArray
+                                persistence:(NSURLCredentialPersistence)persistence;
+- (instancetype)initWithIdentity:(SecIdentityRef)identity certificates:(NSArray *)certArray
+                     persistence:(NSURLCredentialPersistence)persistence;
+@property (readonly, copy) NSString *user;
+@property (readonly, copy) NSString *password;
+@property (readonly) BOOL hasPassword;
+@property (readonly) NSURLCredentialPersistence persistence;
+@property (readonly) SecIdentityRef identity;
+@property (readonly, copy) NSArray *certificates;
+@end
+
+@interface NSURLProtectionSpace : NSObject <NSCopying>
+- (instancetype)initWithHost:(NSString *)host port:(NSInteger)port protocol:(NSString *)protocol
+                       realm:(NSString *)realm authenticationMethod:(NSString *)authenticationMethod;
+- (instancetype)initWithProxyHost:(NSString *)host port:(NSInteger)port type:(NSString *)type
+                            realm:(NSString *)realm authenticationMethod:(NSString *)authenticationMethod;
+@property (readonly, copy) NSString *host;
+@property (readonly) NSInteger port;
+@property (readonly, copy) NSString *protocol;
+@property (readonly, copy) NSString *realm;
+@property (readonly, copy) NSString *authenticationMethod;
+@property (readonly) BOOL isProxy;
+@property (readonly, copy) NSString *proxyType;
+@property (readonly) BOOL receivesCredentialSecurely;
+@property (readonly) SecTrustRef serverTrust;
+@property (readonly, copy) NSArray<NSData *> *distinguishedNames;
+@end
+
+@protocol NSURLAuthenticationChallengeSender <NSObject>
+- (void)useCredential:(NSURLCredential *)credential forAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (void)continueWithoutCredentialForAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (void)cancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+@optional
+- (void)performDefaultHandlingForAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (void)rejectProtectionSpaceAndContinueWithChallenge:(NSURLAuthenticationChallenge *)challenge;
+@end
+
+@interface NSURLAuthenticationChallenge : NSObject
+- (instancetype)initWithProtectionSpace:(NSURLProtectionSpace *)space
+                     proposedCredential:(NSURLCredential *)credential
+                   previousFailureCount:(NSInteger)previousFailureCount
+                        failureResponse:(NSURLResponse *)response
+                                  error:(NSError *)error
+                                 sender:(id<NSURLAuthenticationChallengeSender>)sender;
+- (instancetype)initWithAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
+                                         sender:(id<NSURLAuthenticationChallengeSender>)sender;
+@property (readonly, copy) NSURLProtectionSpace *protectionSpace;
+@property (readonly, copy) NSURLCredential *proposedCredential;
+@property (readonly) NSInteger previousFailureCount;
+@property (readonly, copy) NSURLResponse *failureResponse;
+@property (readonly, copy) NSError *error;
+@property (readonly, retain) id<NSURLAuthenticationChallengeSender> sender;
+@end
+
+/* Kept in memory for as long as the program runs: Ferry has no keychain,
+ * so permanent and synchronizable credentials last no longer than
+ * credentials for the session. */
+FOUNDATION_EXPORT NSNotificationName const NSURLCredentialStorageChangedNotification;
+FOUNDATION_EXPORT NSString *const NSURLCredentialStorageRemoveSynchronizableCredentials;
+
+@interface NSURLCredentialStorage : NSObject
+@property (class, readonly, strong) NSURLCredentialStorage *sharedCredentialStorage;
+- (NSDictionary<NSString *, NSURLCredential *> *)credentialsForProtectionSpace:(NSURLProtectionSpace *)space;
+@property (readonly, copy)
+    NSDictionary<NSURLProtectionSpace *, NSDictionary<NSString *, NSURLCredential *> *> *allCredentials;
+- (void)setCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space;
+- (void)removeCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space;
+- (void)removeCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
+                 options:(NSDictionary<NSString *, id> *)options;
+- (NSURLCredential *)defaultCredentialForProtectionSpace:(NSURLProtectionSpace *)space;
+- (void)setDefaultCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space;
+- (void)getCredentialsForProtectionSpace:(NSURLProtectionSpace *)space task:(NSURLSessionTask *)task
+                       completionHandler:(void (^)(NSDictionary<NSString *, NSURLCredential *> *credentials))handler;
+- (void)setCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
+                 task:(NSURLSessionTask *)task;
+- (void)removeCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
+                 options:(NSDictionary<NSString *, id> *)options task:(NSURLSessionTask *)task;
+- (void)getDefaultCredentialForProtectionSpace:(NSURLProtectionSpace *)space task:(NSURLSessionTask *)task
+                             completionHandler:(void (^)(NSURLCredential *credential))handler;
+- (void)setDefaultCredential:(NSURLCredential *)credential forProtectionSpace:(NSURLProtectionSpace *)space
+                        task:(NSURLSessionTask *)task;
+@end
+
+/* ---- cookies ------------------------------------------------------------------------ */
+
+typedef NSString *NSHTTPCookiePropertyKey;
+typedef NSString *NSHTTPCookieStringPolicy;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieName;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieValue;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieOriginURL;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieVersion;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieDomain;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookiePath;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieSecure;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieExpires;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieComment;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieCommentURL;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieDiscard;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieMaximumAge;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookiePort;
+FOUNDATION_EXPORT NSHTTPCookiePropertyKey const NSHTTPCookieSameSitePolicy;
+FOUNDATION_EXPORT NSHTTPCookieStringPolicy const NSHTTPCookieSameSiteLax;
+FOUNDATION_EXPORT NSHTTPCookieStringPolicy const NSHTTPCookieSameSiteStrict;
+
+@interface NSHTTPCookie : NSObject
++ (NSHTTPCookie *)cookieWithProperties:(NSDictionary<NSHTTPCookiePropertyKey, id> *)properties;
+- (instancetype)initWithProperties:(NSDictionary<NSHTTPCookiePropertyKey, id> *)properties;
++ (NSArray<NSHTTPCookie *> *)cookiesWithResponseHeaderFields:(NSDictionary<NSString *, NSString *> *)headerFields
+                                                      forURL:(NSURL *)URL;
++ (NSDictionary<NSString *, NSString *> *)requestHeaderFieldsWithCookies:(NSArray<NSHTTPCookie *> *)cookies;
+@property (readonly, copy) NSDictionary<NSHTTPCookiePropertyKey, id> *properties;
+@property (readonly) NSUInteger version;
+@property (readonly, copy) NSString *name;
+@property (readonly, copy) NSString *value;
+@property (readonly, copy) NSDate *expiresDate;
+@property (readonly, getter=isSessionOnly) BOOL sessionOnly;
+@property (readonly, copy) NSString *domain;
+@property (readonly, copy) NSString *path;
+@property (readonly, getter=isSecure) BOOL secure;
+@property (readonly, getter=isHTTPOnly) BOOL HTTPOnly;
+@property (readonly, copy) NSString *comment;
+@property (readonly, copy) NSURL *commentURL;
+@property (readonly, copy) NSArray<NSNumber *> *portList;
+@property (readonly, copy) NSHTTPCookieStringPolicy sameSitePolicy;
+@end
+
+typedef NS_ENUM(NSUInteger, NSHTTPCookieAcceptPolicy) {
+    NSHTTPCookieAcceptPolicyAlways = 0,
+    NSHTTPCookieAcceptPolicyNever = 1,
+    NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain = 2,
+};
+FOUNDATION_EXPORT NSNotificationName const NSHTTPCookieManagerAcceptPolicyChangedNotification;
+FOUNDATION_EXPORT NSNotificationName const NSHTTPCookieManagerCookiesChangedNotification;
+
+/* The shared storage is kept in memory, and its cookies that outlive the
+ * session are saved in ~/.config/ferry/cookies/<app id>.plist. */
+@interface NSHTTPCookieStorage : NSObject
+@property (class, readonly, strong) NSHTTPCookieStorage *sharedHTTPCookieStorage;
++ (NSHTTPCookieStorage *)sharedCookieStorageForGroupContainerIdentifier:(NSString *)identifier;
+@property (readonly, copy) NSArray<NSHTTPCookie *> *cookies;
+- (void)setCookie:(NSHTTPCookie *)cookie;
+- (void)deleteCookie:(NSHTTPCookie *)cookie;
+- (void)removeCookiesSinceDate:(NSDate *)date;
+- (NSArray<NSHTTPCookie *> *)cookiesForURL:(NSURL *)URL;
+- (void)setCookies:(NSArray<NSHTTPCookie *> *)cookies forURL:(NSURL *)URL mainDocumentURL:(NSURL *)mainDocumentURL;
+@property NSHTTPCookieAcceptPolicy cookieAcceptPolicy;
+- (NSArray<NSHTTPCookie *> *)sortedCookiesUsingDescriptors:(NSArray *)sortOrder;
+- (void)storeCookies:(NSArray<NSHTTPCookie *> *)cookies forTask:(NSURLSessionTask *)task;
+- (void)getCookiesForTask:(NSURLSessionTask *)task
+        completionHandler:(void (^)(NSArray<NSHTTPCookie *> *cookies))completionHandler;
+@end
+
+/* ---- the URL cache ------------------------------------------------------------------ */
+
+typedef NS_ENUM(NSUInteger, NSURLCacheStoragePolicy) {
+    NSURLCacheStorageAllowed = 0,
+    NSURLCacheStorageAllowedInMemoryOnly = 1,
+    NSURLCacheStorageNotAllowed = 2,
+};
+
+@interface NSCachedURLResponse : NSObject <NSCopying>
+- (instancetype)initWithResponse:(NSURLResponse *)response data:(NSData *)data;
+- (instancetype)initWithResponse:(NSURLResponse *)response data:(NSData *)data userInfo:(NSDictionary *)userInfo
+                   storagePolicy:(NSURLCacheStoragePolicy)storagePolicy;
+@property (readonly, copy) NSURLResponse *response;
+@property (readonly, copy) NSData *data;
+@property (readonly, copy) NSDictionary *userInfo;
+@property (readonly) NSURLCacheStoragePolicy storagePolicy;
+@end
+
+@class NSURLSessionDataTask;
+
+/* The shared cache keeps its disk part in ~/.cache/<app id>/URLCache. */
+@interface NSURLCache : NSObject
+@property (class, strong) NSURLCache *sharedURLCache;
+- (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
+                              diskPath:(NSString *)path;
+- (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
+                          directoryURL:(NSURL *)directoryURL;
+- (NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request;
+- (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request;
+- (void)removeCachedResponseForRequest:(NSURLRequest *)request;
+- (void)removeAllCachedResponses;
+- (void)removeCachedResponsesSinceDate:(NSDate *)date;
+@property NSUInteger memoryCapacity;
+@property NSUInteger diskCapacity;
+@property (readonly) NSUInteger currentMemoryUsage;
+@property (readonly) NSUInteger currentDiskUsage;
+- (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forDataTask:(NSURLSessionDataTask *)dataTask;
+- (void)getCachedResponseForDataTask:(NSURLSessionDataTask *)dataTask
+                   completionHandler:(void (^)(NSCachedURLResponse *cachedResponse))completionHandler;
+- (void)removeCachedResponseForDataTask:(NSURLSessionDataTask *)dataTask;
+@end
+
 /* ---- sessions ---------------------------------------------------------------------- */
 
 @class NSURLSession, NSURLSessionTask, NSURLSessionDataTask, NSURLSessionDownloadTask;
@@ -147,6 +390,12 @@ typedef NS_ENUM(NSInteger, NSURLSessionTaskState) {
     NSURLSessionTaskStateSuspended = 1,
     NSURLSessionTaskStateCanceling = 2,
     NSURLSessionTaskStateCompleted = 3,
+};
+typedef NS_ENUM(NSInteger, NSURLSessionAuthChallengeDisposition) {
+    NSURLSessionAuthChallengeUseCredential = 0,
+    NSURLSessionAuthChallengePerformDefaultHandling = 1,
+    NSURLSessionAuthChallengeCancelAuthenticationChallenge = 2,
+    NSURLSessionAuthChallengeRejectProtectionSpace = 3,
 };
 typedef NS_ENUM(NSInteger, NSURLSessionResponseDisposition) {
     NSURLSessionResponseCancel = 0,
@@ -175,6 +424,10 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 @property (copy) NSDictionary *HTTPAdditionalHeaders;
 @property (copy) NSDictionary *connectionProxyDictionary;
 @property (copy) NSString *sharedContainerIdentifier;
+@property NSHTTPCookieAcceptPolicy HTTPCookieAcceptPolicy;
+@property (retain) NSHTTPCookieStorage *HTTPCookieStorage;
+@property (retain) NSURLCredentialStorage *URLCredentialStorage;
+@property (retain) NSURLCache *URLCache;
 @property BOOL sessionSendsLaunchEvents;
 @property (getter=isDiscretionary) BOOL discretionary;
 @end
@@ -182,6 +435,9 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 @protocol NSURLSessionDelegate <NSObject>
 @optional
 - (void)URLSession:(NSURLSession *)session didBecomeInvalidWithError:(NSError *)error;
+- (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+    completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition,
+                                NSURLCredential *credential))completionHandler;
 @end
 
 @protocol NSURLSessionTaskDelegate <NSURLSessionDelegate>
@@ -189,6 +445,14 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error;
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent
     totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend;
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+    willPerformHTTPRedirection:(NSHTTPURLResponse *)response
+                    newRequest:(NSURLRequest *)request
+             completionHandler:(void (^)(NSURLRequest *request))completionHandler;
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+    didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+      completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition,
+                                  NSURLCredential *credential))completionHandler;
 @end
 
 @protocol NSURLSessionDataDelegate <NSURLSessionTaskDelegate>
@@ -197,6 +461,9 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
     didReceiveResponse:(NSURLResponse *)response
      completionHandler:(void (^)(NSURLSessionResponseDisposition disposition))completionHandler;
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data;
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask
+    willCacheResponse:(NSCachedURLResponse *)proposedResponse
+    completionHandler:(void (^)(NSCachedURLResponse *cachedResponse))completionHandler;
 @end
 
 @protocol NSURLSessionDownloadDelegate <NSURLSessionTaskDelegate>
@@ -285,10 +552,23 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 @protocol NSURLConnectionDelegate <NSObject>
 @optional
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error;
+- (BOOL)connectionShouldUseCredentialStorage:(NSURLConnection *)connection;
+- (void)connection:(NSURLConnection *)connection
+    willSendRequestForAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (BOOL)connection:(NSURLConnection *)connection
+    canAuthenticateAgainstProtectionSpace:(NSURLProtectionSpace *)protectionSpace;
+- (void)connection:(NSURLConnection *)connection
+    didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (void)connection:(NSURLConnection *)connection
+    didCancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
 @end
 
 @protocol NSURLConnectionDataDelegate <NSURLConnectionDelegate>
 @optional
+- (NSURLRequest *)connection:(NSURLConnection *)connection willSendRequest:(NSURLRequest *)request
+            redirectResponse:(NSURLResponse *)response;
+- (NSCachedURLResponse *)connection:(NSURLConnection *)connection
+                  willCacheResponse:(NSCachedURLResponse *)cachedResponse;
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response;
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data;
 - (void)connection:(NSURLConnection *)connection didSendBodyData:(NSInteger)bytesWritten

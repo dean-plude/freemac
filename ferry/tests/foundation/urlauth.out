@@ -1,0 +1,84 @@
+credential: ann/pw, has password yes, persistence 1
+equal to the same: yes, to another password: no
+space: example.com:443 https realm Users NSURLAuthenticationMethodHTTPBasic, proxy no, secure yes
+same space: yes, other realm: no
+proxy space: proxy yes, type http
+URL user ann@home, password p:w
+stored for the space: ann bob
+default: (nil)
+default now: bob
+spaces: 1
+after removing ann: bob
+after removing bob: 0 spaces, default (nil)
+changes posted: yes
+Basic, no delegate, no credential
+  status 401: need basic
+Basic, the URL's user and password
+  status 200: basic ok ann
+Basic, a wrong password in the URL
+  status 401: need basic
+Basic, answered by the delegate
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 200: basic ok ann
+Basic, answered later
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 200: basic ok ann
+Basic, a wrong password, then cancelled
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 1, proposed ann, failure response 401
+  error NSURLErrorDomain -999
+Basic, no credential given
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 401: need basic
+Basic, the protection space rejected
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 401: need basic
+Basic, default handling, nothing stored
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 401: need basic
+Basic, a credential kept for the session
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 200: basic ok kim
+  stored: kim
+Basic, the stored credential, no delegate
+  status 200: basic ok kim
+Basic, the stored credential, proposed to the delegate
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed kim, failure response 401
+  status 200: basic ok kim
+Digest, answered by the delegate
+  challenge: NSURLAuthenticationMethodHTTPDigest, realm ferry-digest, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  status 200: digest ok bob
+Digest, a wrong password, then the right one
+  challenge: NSURLAuthenticationMethodHTTPDigest, realm ferry-digest, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  challenge: NSURLAuthenticationMethodHTTPDigest, realm ferry-digest, http, on the test server: yes, failures 1, proposed bob, failure response 401
+  status 200: digest ok bob
+Basic, a delegate with only the session-level method
+  status 401: need basic
+ephemeral storage is the shared one: no
+default storage is the shared one: yes
+connection, a credential
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  response 200
+  data: basic ok ann
+  finished
+connection, cancelled
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  failed NSURLErrorDomain -1012
+connection, without a credential
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  response 401
+  data: need basic
+  finished
+connection, default handling
+  challenge: NSURLAuthenticationMethodHTTPBasic, realm ferry, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  response 401
+  data: need basic
+  finished
+connection, the older methods, Digest
+  can authenticate against NSURLAuthenticationMethodHTTPDigest: yes
+  challenge: NSURLAuthenticationMethodHTTPDigest, realm ferry-digest, http, on the test server: yes, failures 0, proposed (nil), failure response 401
+  data: digest ok bob
+  finished
+synchronous, no credential: 401 need basic
+contents with the URL's user: basic ok ann
+exit=0

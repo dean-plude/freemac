@@ -90,6 +90,16 @@ drawn. The tests step animations with a test clock of Ferry's own
 (`FerryCASetManualClock` and `FerryCAAdvanceTime`), so each run gives the
 same results.
 
+From Ferry 0.26.0 (freemac 1.199), URL loading also follows redirects as the
+delegate decides, answers HTTP Basic and Digest challenges (from the
+delegate, the URL's user and password or `NSURLCredentialStorage`), lets a
+delegate accept an https certificate the system doesn't trust, keeps
+cookies in `NSHTTPCookieStorage` (saved to
+`~/.config/ferry/cookies/<program>.plist`) and responses in `NSURLCache`
+(in memory and under `~/.cache/<program>/URLCache`), honouring the
+request cache policies and revalidating stale responses, and loads
+`data:` URLs.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

@@ -1117,6 +1117,12 @@ The new or extended ones:
 | `quartzcore_layers` | (freemac (1.198), Ferry 0.25.0) Layer geometry (frame from bounds, position, anchor point and transform, through scaling and a quarter turn), key-value coding of layer properties and of keys of the caller's own, a subclass's `@dynamic` properties with `defaultValueForKey:` and `needsDisplayForKey:`, sublayer order and replacing, point conversion and hit-testing; drawing checked pixel by pixel: background, border, rounded corners and `maskedCorners`, opacity per layer and as a group, hidden, `masksToBounds`, transforms, `sublayerTransform`, `geometryFlipped`, `zPosition`, an image's contents with the gravities, the delegate's `drawLayer:inContext:` and `displayLayer:`, `needsDisplayOnBoundsChange`, shape layers (fill, stroke, stroke start and end, dashes, even-odd), axial and radial gradients, and text layers |
 | `quartzcore_animations` | (freemac (1.198), Ferry 0.25.0) One animation on the real run-loop clock, then everything on the test clock: the transform functions, the named timing functions, implicit animations and when they start, transactions (duration, disabling actions, nesting, the completion block), actions from the `actions` dictionary and the delegate, `onOrderIn`; basic animations (fill modes, replacing, `byValue`, additive, autoreverse, cumulative repeats, a later begin time, speed, a key path into the transform); keyframe animations in every calculation mode, with key times, timing functions and a path; groups; springs; the delegate's start and stop messages; a layer drawn while a property animates |
 | `appkit_layers` | (freemac (1.198), Ferry 0.25.0) A view's backing layer and its geometry, `makeBackingLayer`, a layer-backed view drawn with its layer's background, border, corner radius, opacity and sublayers (in plain and flipped views), `wantsUpdateLayer`/`updateLayer`, a hosted layer; `NSAnimationContext` groups with the view's `animator` for `frame` and `alphaValue`, the completion handler, the default duration outside a group, a duration of 0, a new animation taking over, the `animations` dictionary; implicit layer animations only with `allowsImplicitAnimation`; an explicit animation of a view's layer moving where the view is drawn; a window drawing a layer-backed content view |
+| `foundation_urlredirects` (ARC) | (freemac (1.199), Ferry 0.26.0) Redirects decided by the delegate, against the server on 127.0.0.1: `URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:` following (also answered later, from the run loop), changing (another URL and header) and refusing a redirect (the 3xx response and its body come back), two redirects in a row, a relative `Location`, what 301, 302, 303, 307 and 308 do to a POST and 303 to a PUT, `currentRequest` before and after; `NSURLConnection`'s `connection:willSendRequest:redirectResponse:` (first with no response, then per redirect; refusing the redirect; refusing the first request); synchronous calls and `stringWithContentsOfURL:` following redirects |
+| `foundation_urlauth` (ARC) | (freemac (1.199), Ferry 0.26.0) `NSURLCredential`, `NSURLProtectionSpace` (equality, proxies), `NSURL`'s `user` and `password`, `NSURLCredentialStorage` (credentials per space, the default one, persistence None not kept, removal, its notification); HTTP Basic and Digest (MD5, qop=auth) challenges answered by the task delegate with each disposition (a credential, one given later, a wrong one then cancel, none, reject the space, default handling), previous failure counts and proposed credentials, the URL's user and password, a credential kept for the session and used afterwards by default handling, a session-level method not asked about a password, an ephemeral session's own storage; `NSURLConnection`'s `connection:willSendRequestForAuthenticationChallenge:` with each sender message (cancel gives -1012) and the older `canAuthenticateAgainstProtectionSpace:` and `didReceiveAuthenticationChallenge:` pair |
+| `foundation_urlcookies` (ARC, run twice) | (freemac (1.199), Ferry 0.26.0) `NSHTTPCookie` from properties (and without a name or domain, from an origin URL) and from `Set-Cookie` fields (Domain, Path and its default, Expires, Max-Age, Secure, HttpOnly, a foreign domain refused, several in one field), `requestHeaderFieldsWithCookies:`; the shared `NSHTTPCookieStorage` (matching by domain, path and scheme, replacing, deleting, sorting, the accept policy with and without a main document, its notification, the file it saves); sessions sending and keeping cookies (paths, a cookie the server expires, a request that turns cookies off or has its own Cookie field, a cookie set by a redirect, `dataWithContentsOfURL:` and `NSURLConnection` sharing them, `HTTPShouldSetCookies` off, the policy Never, no storage, an ephemeral session's own); a second run reading the lasting cookies back, and the file going when the last is deleted |
+| `foundation_urlcache` (ARC, run twice) | (freemac (1.199), Ferry 0.26.0) `NSURLCache` by hand (memory and disk, a second cache on the same files, memory-only and not-allowed entries, the fragment ignored, removal) and through sessions, counted by the server: `max-age`, `max-age=0`, `Expires`, `ETag` and `Last-Modified` revalidated with a 304, `no-store`, a POST; each request cache policy, the configuration's policy, the request's `Cache-Control: no-cache`; the twentieth-of-the-cache size rule; no cache; `URLSession:dataTask:willCacheResponse:completionHandler:` keeping, refusing and changing the entry; downloads not kept; the shared cache through `dataWithContentsOfURL:` and `NSURLConnection`, and its files; a second run answered from disk without the network |
+| `foundation_urldata` (ARC) | (freemac (1.199), Ferry 0.26.0) `data:` URLs (RFC 2397) through `NSURLSession`, `NSURLConnection`, `NSData` and `NSString`: plain and percent-encoded, base64, a charset, a MIME type, a fragment, bad base64 (-1015) and no comma (-1000), `canHandleRequest:` |
+| `foundation_urltrust` (ARC; needs openssl) | (freemac (1.199), Ferry 0.26.0) An https server whose certificate run.sh made, which the system doesn't trust: no delegate (-1202), the session-level challenge with default handling (-1202), cancel (-999) and a trust credential (the page loads), a password challenge after it, the task-level method alone, `NSURLConnection` accepting it, `dataWithContentsOfURL:` refusing it |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1819,6 +1825,79 @@ The new or extended ones:
     duration. Here each group starts at a quarter of a second.
   - Where an animation of a flipped view's layer position shows the view.
 
+- **Redirects, authentication, cookies and the URL cache, not done yet** (freemac (1.199), Ferry 0.26.0).
+  - Proxy authentication (407) is not answered: a proxy's challenge isn't
+    passed to the delegate, and `NSURLProtectionSpace`'s proxy spaces are
+    only objects to store credentials under.
+  - NTLM, Negotiate (Kerberos) and client certificates are not offered: a
+    401 that asks only for them comes back as it is. Digest is MD5 and
+    MD5-sess with `qop=auth` only (not SHA-256, not `auth-int`).
+  - Credentials are kept in memory for as long as the program runs: there
+    is no keychain, so `NSURLCredentialPersistencePermanent` and
+    `...Synchronizable` last no longer than `...ForSession`.
+  - `NSURLProtectionSpace`'s `serverTrust` is Ferry's own object that names
+    the server; there is no Security framework, so nothing can look inside
+    it (no `SecTrustEvaluate`, no certificate chain). A delegate can only
+    accept it (`credentialForTrust:`), refuse it or leave it to libcurl's
+    own check against the system's certificate authorities. Accepting it
+    turns libcurl's check off for that host and port for the rest of that
+    task. The question is asked once per task and host, before connecting.
+  - The shared cookie storage saves to one file per program and reads it
+    once; two programs, or two copies of one, don't see each other's
+    changes while running. `sharedCookieStorageForGroupContainerIdentifier:`
+    returns the shared storage. SameSite is kept but not acted on.
+  - The URL cache keeps one entry per URL (no `Vary`), stores only GET
+    responses with a 2xx status other than 206, and never serves part of a
+    response. The disk store is one property list per entry, trimmed oldest
+    first; its size is counted by reading the folder.
+  - Cookies, credentials and the cache are not used for `file:` URLs, and
+    `data:` URLs never touch them.
+  - Background sessions, WebSockets and resume data are still not done.
+- **Redirects, authentication, cookies and the URL cache, not compared with a Mac** (freemac (1.199), Ferry 0.26.0).
+  - The constants' string values (`NSURLAuthenticationMethodHTTPBasic` and
+    the others are their own names, `NSURLProtectionSpaceHTTPProxy` is
+    "http", the cookie property keys are "Name", "Value", "Domain" and so
+    on, HttpOnly is kept under "HttpOnly"), and which keys a cookie's
+    `properties` holds.
+  - The default path of a cookie made from properties without one ("/", or
+    the origin URL's directory) and from a `Set-Cookie` field (RFC 6265's
+    default path); a cookie with `Max-Age=0` read from a field comes back
+    already expired rather than left out.
+  - Whether `NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain` accepts
+    cookies when a request has no main document URL (Ferry accepts them, as
+    session requests rarely have one), and how a request's own `Cookie`
+    field combines with the storage's (Ferry sends the request's alone).
+  - The shared URL cache's sizes (512 KB in memory, 10 MB on disk) and
+    where its files go (`~/.cache/<program>/URLCache`, or a relative
+    `diskPath` under `~/.cache/<program>`); the cookie file's place and
+    format (`~/.config/ferry/cookies/<program>.plist`, an XML property
+    list).
+  - Freshness without `max-age` or `Expires`: a tenth of the time since
+    `Last-Modified`, as RFC 9111 suggests. Which fields of a 304 replace
+    the stored ones (all but the length, type and encoding).
+  - The error codes and texts chosen: -1008 for
+    `NSURLRequestReturnCacheDataDontLoad` with nothing stored, -1012 for a
+    connection whose challenge is cancelled (a session's is -999), -1015
+    for bad base64 in a data URL, -1000 for a data URL without a comma, and
+    the descriptions of -1008, -1012 and -1015.
+  - NSURLConnection's first `connection:willSendRequest:redirectResponse:`
+    (with no response): returning nil ends the connection with no further
+    message.
+  - Default handling's choice of credential: the URL's user and password
+    first, then the storage's default credential for the space, or its only
+    one, each tried once. When a delegate's credential is kept (persistence
+    other than None), it becomes the space's default if there was none.
+  - Whether a redirect to another host keeps a request's own
+    `Authorization` field (Ferry copies the request's fields to the new
+    request; its own credentials go only to the space they were given for).
+  - The order of the delegate's messages around a 304 and around
+    `willCacheResponse:` (it comes after the last data and before the task
+    completes), and whether a task with a completion handler is asked
+    about redirects and challenges (Ferry asks the session's delegate).
+  - A `data:` URL's response: a plain `NSURLResponse`, text/plain and
+    US-ASCII when no type is given, no encoding name when a type is given
+    without a charset.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -1890,3 +1969,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.23.0 (freemac (1.196)): loading http and https URLs through this system's libcurl, opened only when a program first loads one: `NSURLSession` (data, upload and download tasks, handlers and delegates, a serial operation queue of its own when none is given), `NSURLConnection`, `NSURLRequest`, `NSHTTPURLResponse`, `NSURLErrorDomain` and `NSData`'s and `NSString`'s `...ContentsOfURL:` for web addresses; a new core call, `ferry_network_symbol`, `make check` 97/97.
 - 2026-11-24: Ferry 0.24.0 (freemac (1.197)): `NSXMLDocument`, `NSXMLNode`, `NSXMLElement`, `NSXMLDTD` and `NSXMLDTDNode` on libxml2 (a tree of objects that can be walked, changed, searched with XPath and written out again, pretty printed or canonical); `dataUsingEncoding:` with ASCII and ISO Latin 1 converting for real, and `dataUsingEncoding:allowLossyConversion:`, `make check` 98/98.
 - 2026-11-24: Ferry 0.25.0 (freemac (1.198)): QuartzCore.framework with Core Animation basics (layers, shape, gradient and text layers, transactions, implicit and explicit animations, springs and groups), layer-backed and layer-hosting NSViews, NSAnimationContext and the views' animator, `make check` 101/101.
+- 2026-11-24: Ferry 0.26.0 (freemac (1.199)): redirects decided by the delegate, HTTP Basic and Digest authentication, server trust, `NSHTTPCookieStorage` saved to disk, `NSURLCache` in memory and on disk, and `data:` URLs, `make check` 107/107.

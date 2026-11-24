@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.199 "Ferry: redirects, sign-ins, cookies and caching" (done)
+
+Ferry 0.26.0: Mac apps' web requests behave like a browser's, remembering cookies, answering password prompts and reusing pages they already fetched.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Redirects followed one at a time, with the app's delegate able to follow, change or refuse each; what 301 to 308 do to a POST; `currentRequest` | Ferry | done |
+| 2 | HTTP Basic and Digest sign-ins through `NSURLCredential`, `NSURLProtectionSpace`, `NSURLAuthenticationChallenge` and `NSURLCredentialStorage`; a delegate can accept an https certificate the system doesn't trust | Ferry | done |
+| 3 | `NSHTTPCookie` and `NSHTTPCookieStorage`, with lasting cookies saved per program | Ferry | done |
+| 4 | `NSURLCache` in memory and on disk, every request cache policy, revalidation with `ETag` and `Last-Modified` | Ferry | done |
+| 5 | `data:` URLs; six new tests; `make check` 107 of 107 | Ferry | done |
+
 ## 1.198 "Ferry: Core Animation" (done)
 
 Ferry 0.25.0: Mac apps get layers and animation, so views can fade, slide and round their corners.

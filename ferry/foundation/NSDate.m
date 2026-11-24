@@ -301,7 +301,19 @@ static NSString *percent_encode_path(NSString *s)
 - (NSString *)scheme { return _scheme; }
 - (NSString *)host { return _host; }
 - (NSNumber *)port { return _port; }
-- (NSString *)user { return _user; }
+/* The user information is "user:password"; each part comes back decoded. */
+- (NSString *)user
+{
+    if (!_user)
+        return nil;
+    NSRange colon = [_user rangeOfString:@":"];
+    return percent_decode(colon.location == NSNotFound ? _user : [_user substringToIndex:colon.location]);
+}
+- (NSString *)password
+{
+    NSRange colon = _user ? [_user rangeOfString:@":"] : NSMakeRange(NSNotFound, 0);
+    return colon.location == NSNotFound ? nil : percent_decode([_user substringFromIndex:colon.location + 1]);
+}
 - (NSString *)query { return _query; }
 - (NSString *)fragment { return _fragment; }
 - (NSString *)path

@@ -549,6 +549,30 @@ sublayers above. A layer set with `setLayer:` first is hosted.
 `bounds` and `alphaValue`. Left out: shadows, masks, filters, transitions,
 3D perspective, and views' layers joined into one tree.
 
+### Redirects, authentication, cookies and the URL cache (freemac 1.199, Ferry 0.26.0)
+
+URL loading now does what a Mac does between the request and the answer.
+Redirects are followed one at a time, and a delegate can follow, change
+or refuse each one (`URLSession:task:willPerformHTTPRedirection:...` and
+`connection:willSendRequest:redirectResponse:`); `currentRequest` follows
+them. A 401 is answered with HTTP Basic or Digest: the delegate is asked
+(`URLSession:task:didReceiveChallenge:...`,
+`connection:willSendRequestForAuthenticationChallenge:` and the older
+pair), and otherwise the URL's own user and password or a credential in
+`NSURLCredentialStorage` is used. Before connecting to an https server,
+a delegate can accept a certificate the system doesn't trust; otherwise
+libcurl checks it as before. Cookies are kept in `NSHTTPCookieStorage`,
+sent with each request and saved, the lasting ones, to a file beside the
+program's preferences. Responses are kept in `NSURLCache`, in memory and
+on disk, reused while fresh, revalidated with `ETag` and
+`Last-Modified`, and the request cache policies are honoured. `data:`
+URLs load too. Ephemeral sessions keep their cookies, credentials and
+cache to themselves. Not yet supported:
+- proxy authentication, NTLM, Kerberos and client certificates;
+- a keychain: credentials last only while the program runs;
+- looking inside a server's certificate (there is no Security framework);
+- background sessions, WebSockets and resume data.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -568,8 +592,8 @@ Counted over the nine apps:
 4. **Foundation's `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle` and
    `NSXMLDocument`** (each used by five or more of the apps). `NSTask`,
    `NSPipe` and `NSFileHandle` came in (1.194), with `NSXMLParser`, which
-   some apps use instead of `NSXMLDocument`; `NSThread` and
-   `NSXMLDocument` are still missing. `NSIndexSet`
+   some apps use instead of `NSXMLDocument`; `NSXMLDocument` came in
+   (1.197); `NSThread` is still missing. `NSIndexSet`
    came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`
    with message forwarding, `NSJSONSerialization` and `NSDateFormatter`
    (English only, with `NSTimeZone` and a minimal `NSLocale`) in
