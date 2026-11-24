@@ -5,7 +5,9 @@ it. A document also shows the app that opens it, and Change All… makes that
 app open every document of its kind. Click the icon and paste a picture
 (⌘V), or drop one on it, to give the item its own icon; Delete takes it off
 again. Comments are kept with the item and Seek finds them. Locked keeps the
-item from being changed, renamed or thrown away. A folder's size is added up in the
+item from being changed, renamed or thrown away. Sharing and permissions sets
+who may read or change it, and a folder can pass its privileges to everything
+inside. A folder's size is added up in the
 background, so the window opens at once. Original freemac code.
 """
 import os
@@ -21,7 +23,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import aliases, alert, app_list, comments, custom_icons, default_apps, locks, macapps, tags  # noqa: E402
+from . import aliases, alert, app_list, comments, custom_icons, default_apps, locks, macapps, permissions, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -235,10 +237,7 @@ class InfoWindow(Gtk.Window):
         heading = Gtk.Label(label="Sharing and permissions", xalign=0)
         heading.get_style_context().add_class("drawer-heading")
         box.pack_start(heading, False, False, 0)
-        perms = Gtk.Grid(column_spacing=10, row_spacing=6)
-        for row, (label, value) in enumerate(who_can_open(info, path)):
-            self._row(perms, row, label, value)
-        box.pack_start(perms, False, False, 0)
+        box.pack_start(self._permissions(path, is_dir and not is_alias, info), False, False, 0)
         self.add(box)
         self.connect("key-press-event", self._key)
         # Nothing chosen when it opens: GTK would otherwise focus the Kind
@@ -485,6 +484,110 @@ class InfoWindow(Gtk.Window):
             return
         if getattr(self, "comment_view", None) is not None:
             self.comment_view.set_editable(not on)
+        self._refresh_permissions()
+
+    # ---- Sharing and permissions ---------------------------------------------
+
+    def _permissions(self, path, is_dir, info):
+        """The Name and Privilege table, as on a Mac: a pop-up for each when
+        the item is yours, words otherwise."""
+        self.perm_combos = {}
+        self.perm_apply = None
+        self.perm_dir = is_dir
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        try:
+            found = permissions.rows(path)
+        except OSError:
+            for row, (label, value) in enumerate(who_can_open(info, path)):
+                grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+                self._row(grid, row, label, value)
+                box.pack_start(grid, False, False, 0)
+            return box
+        self.perm_note = Gtk.Label(xalign=0)
+        self.perm_note.get_style_context().add_class("dim-label")
+        box.pack_start(self.perm_note, False, False, 0)
+        grid = Gtk.Grid(column_spacing=16, row_spacing=4)
+        for col, title in enumerate(("Name", "Privilege")):
+            head = Gtk.Label(label=title, xalign=0)
+            head.get_style_context().add_class("dim-label")
+            grid.attach(head, col, 0, 1, 1)
+        for row, (who, name, level) in enumerate(found, start=1):
+            grid.attach(Gtk.Label(label=name, xalign=0, ellipsize=3, max_width_chars=18), 0, row, 1, 1)
+            combo = Gtk.ComboBoxText()
+            for key, words in permissions.LEVELS:
+                combo.append(key, words)
+            if level == "w":
+                combo.append(*permissions.WRITE_ONLY)
+            combo.set_active_id(level)
+            combo.connect("changed", self._level_changed, who)
+            self.perm_combos[who] = combo
+            grid.attach(combo, 1, row, 1, 1)
+        box.pack_start(grid, False, False, 0)
+        if is_dir:
+            self.perm_apply = Gtk.Button(label="Apply to Enclosed Items…", halign=Gtk.Align.START)
+            self.perm_apply.connect("clicked", self._apply_enclosed)
+            box.pack_start(self.perm_apply, False, False, 0)
+        self._refresh_permissions()
+        return box
+
+    def _refresh_permissions(self):
+        combos = getattr(self, "perm_combos", None)
+        if not combos:
+            return
+        mine = permissions.can_change(self.path)
+        self.perm_note.set_text("You can read and change it" if os.access(self.path, os.W_OK)
+                                else "You can read it, not change it" if os.access(self.path, os.R_OK)
+                                else "You can’t open it")
+        try:
+            found = {who: level for who, _n, level in permissions.rows(self.path)}
+        except OSError:
+            found = {}
+        for who, combo in combos.items():
+            combo.handler_block_by_func(self._level_changed)
+            if who in found:
+                combo.set_active_id(found[who])
+            combo.handler_unblock_by_func(self._level_changed)
+            combo.set_sensitive(mine)
+        if self.perm_apply is not None:
+            self.perm_apply.set_sensitive(mine)
+
+    def _level_changed(self, combo, who):
+        level = combo.get_active_id()
+        if not level:
+            return
+        try:
+            permissions.set_level(self.path, who, level)
+        except OSError as err:
+            alert.tell(self, f"The privileges of “{os.path.basename(self.path)}” couldn’t be changed.",
+                       err.strerror or "")
+        self._refresh_permissions()
+
+    def _apply_enclosed(self, _button):
+        name = os.path.basename(self.path.rstrip("/")) or self.path
+        answer = alert.ask(self, f"Are you sure you want to apply the privileges of “{name}” to all enclosed items?",
+                           "You can’t undo this action.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("OK", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.OK)
+        if answer != Gtk.ResponseType.OK:
+            return
+        self.perm_apply.set_sensitive(False)
+        path, stop = self.path, self.stop
+
+        def work():
+            result = permissions.apply_to_enclosed(path, stop)
+            GLib.idle_add(done, result)
+
+        def done(result):
+            if stop.is_set():
+                return False
+            self._refresh_permissions()
+            _changed, skipped = result
+            if skipped:
+                alert.tell(self, f"{skipped} item{'s' if skipped != 1 else ''} in “{name}” couldn’t be changed.",
+                           "They belong to someone else, are locked, or can’t be opened.")
+            return False
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _set_icon(self, picture):
         if self._locked_say():

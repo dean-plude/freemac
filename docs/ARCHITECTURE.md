@@ -878,6 +878,18 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Sharing and permissions (1.179)
+
+permissions.py maps a Mac's three privileges onto each permission class:
+Read & Write is rw, Read only r, No Access nothing, and a lone w is shown as
+Write only (Drop Box). A folder's x bit follows its r bit so Read only still
+opens it; a file keeps its own x bit. A locked item's privileges are read
+from the mode saved in `user.freemac.locked`, and only the owner of an
+unlocked item gets the pop-ups. `apply_to_enclosed()` walks bottom-up so a
+folder that loses its owner's access is changed after its contents, skips
+symbolic links, locked items and items owned by others, and reports what it
+skipped.
+
 ## Change picture (1.177)
 
 wallpaper_rotate.py keeps its settings in the `[background]` section of
