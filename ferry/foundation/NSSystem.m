@@ -26,6 +26,22 @@ NSString *const NSFileTypeSymbolicLink = @"NSFileTypeSymbolicLink";
 
 /* ---- NSProcessInfo --------------------------------------------------------------------- */
 
+const char *ferry_macos_version(const char **build); /* src/sysversion.c */
+
+/* "14.7" as numbers, and the build ("23H124"). */
+static NSOperatingSystemVersion FSystemVersion(const char **build)
+{
+    NSOperatingSystemVersion v = {0, 0, 0};
+    const char *s = ferry_macos_version(build);
+    char *end;
+    v.majorVersion = strtol(s, &end, 10);
+    if (*end == '.')
+        v.minorVersion = strtol(end + 1, &end, 10);
+    if (*end == '.')
+        v.patchVersion = strtol(end + 1, &end, 10);
+    return v;
+}
+
 @implementation NSProcessInfo {
     NSString *_name;
 }
@@ -97,8 +113,69 @@ NSString *const NSFileTypeSymbolicLink = @"NSFileTypeSymbolicLink";
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
-- (NSString *)operatingSystemVersionString { return @"Version 11.0 (freemac, Ferry)"; }
+/* The version comes from Ferry itself (src/sysversion.c), which answers
+ * uname and serves the Mac's version file from the same numbers. */
+- (NSOperatingSystemVersion)operatingSystemVersion { return FSystemVersion(NULL); }
+- (BOOL)isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion)v
+{
+    NSOperatingSystemVersion me = FSystemVersion(NULL);
+    if (me.majorVersion != v.majorVersion)
+        return me.majorVersion > v.majorVersion;
+    if (me.minorVersion != v.minorVersion)
+        return me.minorVersion > v.minorVersion;
+    return me.patchVersion >= v.patchVersion;
+}
+- (NSString *)operatingSystemVersionString
+{
+    const char *build;
+    NSOperatingSystemVersion v = FSystemVersion(&build);
+    if (v.patchVersion)
+        return [NSString stringWithFormat:@"Version %ld.%ld.%ld (Build %s)", (long)v.majorVersion,
+                                          (long)v.minorVersion, (long)v.patchVersion, build];
+    return [NSString stringWithFormat:@"Version %ld.%ld (Build %s)", (long)v.majorVersion, (long)v.minorVersion,
+                                      build];
+}
 @end
+
+/* ---- Gestalt ------------------------------------------------------------------------------
+ * The one Carbon (CoreServices) call that is still about the system's
+ * version, served from here, next to NSProcessInfo, so that it answers the
+ * same; the loader serves CoreServices from Foundation's file, and Carbon's
+ * link stub lists it too. Written from Apple's documentation of the
+ * selectors. */
+
+typedef int16_t OSErr;
+typedef uint32_t OSType;
+enum {
+    gestaltSystemVersion = 'sysv',
+    gestaltSystemVersionMajor = 'sys1',
+    gestaltSystemVersionMinor = 'sys2',
+    gestaltSystemVersionBugFix = 'sys3',
+    gestaltUndefSelectorErr = -5551,
+};
+
+F_EXPORT OSErr Gestalt(OSType selector, int32_t *response)
+{
+    NSOperatingSystemVersion v = FSystemVersion(NULL);
+    int32_t value;
+    switch (selector) {
+    case gestaltSystemVersionMajor: value = (int32_t)v.majorVersion; break;
+    case gestaltSystemVersionMinor: value = (int32_t)v.minorVersion; break;
+    case gestaltSystemVersionBugFix: value = (int32_t)v.patchVersion; break;
+    case gestaltSystemVersion: {
+        /* binary-coded decimal, 0xMMmb, with a minor or bug fix number above
+         * 9 shown as 9, as documented */
+        int major = (int)(v.majorVersion % 100), minor = v.minorVersion > 9 ? 9 : (int)v.minorVersion,
+            fix = v.patchVersion > 9 ? 9 : (int)v.patchVersion;
+        value = (major / 10) << 12 | (major % 10) << 8 | minor << 4 | fix;
+        break;
+    }
+    default: return gestaltUndefSelectorErr;
+    }
+    if (response)
+        *response = value;
+    return 0;
+}
 
 /* ---- NSBundle ---------------------------------------------------------------------------- */
 

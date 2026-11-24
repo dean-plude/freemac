@@ -250,12 +250,17 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_twin_symbol", ferry_twin_symbol},
     /* Ferry's own: this system's libcurl, for Foundation (host.c) */
     {"ferry_network_symbol", ferry_network_symbol},
+    /* Ferry's own: this system's OpenSSL, for the Security framework (host.c) */
+    {"ferry_crypto_symbol", ferry_crypto_symbol},
+    {"ferry_server_certificates", ferry_server_certificates},
+    /* Ferry's own: the macOS version it presents, for Foundation (sysversion.c) */
+    {"ferry_macos_version", ferry_macos_version},
     {NULL, NULL},
 };
 
 static const struct ferry_symbol *const tables[] = {
     ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_blocks_symbols, ferry_dispatch_symbols,
-    ferry_objc_symbols,
+    ferry_objc_symbols, ferry_commoncrypto_symbols,
 };
 
 static void *find_own(const char *name)

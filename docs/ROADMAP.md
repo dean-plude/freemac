@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.200 "Ferry: keychain, encryption and the updater checks" (done)
+
+Ferry 0.27.0: Mac apps can keep passwords in a keychain, encrypt and hash data, and get past the start-up checks that their updaters make.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | CommonCrypto: MD5, SHA-1 and SHA-2 digests, HMAC, PBKDF2 and random bytes of Ferry's own, AES (ECB, CBC, CTR) through OpenSSL, checked against published test vectors | Ferry | done |
+| 2 | Security.framework keychain: `SecItem` and the older `SecKeychain` calls for generic and internet passwords, kept per user in `~/.local/share/ferry/keychain` (readable only by you, encrypted against casual reading, not against someone with your account) | Ferry | done |
+| 3 | Code signing: an app's check of its own signature passes; all other code reads as unsigned, since Ferry can't check Apple's signatures | Ferry | done |
+| 4 | Certificate trust (`SecCertificate`, `SecPolicy`, `SecTrust`) against the system's certificate store, and in NSURLSession's server-trust challenges | Ferry | done |
+| 5 | One macOS version, 14.7, in `SystemVersion.plist`, `NSProcessInfo`, `Gestalt` and `uname`; ten new tests; `make check` 117 of 117 | Ferry | done |
+
 ## 1.199 "Ferry: redirects, sign-ins, cookies and caching" (done)
 
 Ferry 0.26.0: Mac apps' web requests behave like a browser's, remembering cookies, answering password prompts and reusing pages they already fetched.

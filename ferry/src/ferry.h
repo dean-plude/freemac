@@ -51,6 +51,25 @@ int ferry_twin_library(const char *install_name);   /* zlib and the like: this s
 void *ferry_twin_lookup(const char *name);
 void *ferry_twin_symbol(const char *install_name, const char *name); /* lazily, for Foundation */
 void *ferry_network_symbol(const char *name);       /* libcurl, for Foundation's URL loading */
+void *ferry_crypto_symbol(const char *name);        /* OpenSSL, for CommonCrypto and Security */
+
+/* servercerts.c: the certificates an https server presents, for Security */
+int ferry_server_certificates(const char *host, int port, int timeout_ms,
+                              void (*each)(void *ctx, const unsigned char *der, size_t len), void *ctx);
+
+/* commoncrypto.c: libSystem's CommonCrypto */
+extern const struct ferry_symbol ferry_commoncrypto_symbols[];
+
+/* sysversion.c: the macOS version Ferry presents, the same in uname, the
+ * Mac's version file, NSProcessInfo and Gestalt. Darwin 23 is macOS 14. */
+#define FERRY_MACOS_VERSION "14.7"
+#define FERRY_MACOS_BUILD "23H124"
+#define FERRY_DARWIN_RELEASE "23.6.0"
+struct stat;
+const char *ferry_macos_version(const char **build);
+int ferry_is_virtual(const char *path);                    /* /System/Library/CoreServices/SystemVersion.plist */
+int ferry_virtual_open(const char *path, int linux_flags); /* -1 and errno if it can't be */
+int ferry_virtual_stat(const char *path, struct stat *s);  /* 1 if it was one of Ferry's files */
 
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);

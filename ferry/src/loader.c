@@ -890,13 +890,14 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
  * documentation), installed as <dir>/<Name>.framework/<Name> in the
  * directory named by $FERRY_FRAMEWORKS, next to the ferry program
  * (frameworks/), or in /usr/lib/ferry/frameworks. A few Apple libraries are
- * served by one of Ferry's: CoreFoundation and SystemConfiguration live inside Foundation, and
- * CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
+ * served by one of Ferry's: CoreFoundation, SystemConfiguration and
+ * CoreServices (for Gestalt) live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
  * (the few calls Cocoa apps still make, appkit/Carbon.m) inside AppKit. */
 
 static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreFoundation", "Foundation"},
     {"SystemConfiguration", "Foundation"},
+    {"CoreServices", "Foundation"}, /* Gestalt only, next to NSProcessInfo */
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},
     {"ImageIO", "CoreGraphics"},

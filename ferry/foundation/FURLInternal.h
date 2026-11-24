@@ -17,13 +17,21 @@ NSDate *FParseHTTPDate(NSString *text);
 void FMD5(const void *data, size_t length, unsigned char digest[16]);
 NSString *FMD5Hex(NSString *text);
 
-/* A server's certificate, as a protection space's serverTrust: Ferry has
- * no Security framework, so this only says which server it was. */
+/* A server's certificate, as a protection space's serverTrust. It is asked
+ * for before connecting, so it only says which server it is; the Security
+ * framework's SecTrust calls fetch and check the certificates themselves
+ * when a delegate asks (security/SecTrust.m), through the methods below,
+ * and keep what they found in it. */
 @interface FURLServerTrust : NSObject {
 @public
     NSString *host;
     NSInteger port;
+    id security;
 }
+- (NSString *)_ferryTrustHost;
+- (NSInteger)_ferryTrustPort;
+- (id)_ferrySecurityTrust;
+- (void)_setFerrySecurityTrust:(id)trust;
 @end
 
 @interface NSURLProtectionSpace (FerryInternal)

@@ -8,6 +8,7 @@
 /frameworks/
 /graphics/build/
 /quartzcore/build/
+/security/build/
 /appkit/build/
 /src/host_names.h
 /installer/Installer.app/

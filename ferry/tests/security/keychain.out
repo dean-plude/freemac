@@ -1,0 +1,95 @@
+before anything is added
+  find: -25300
+  delete: -25300
+  keychain: absent
+  keychain/key: absent
+  keychain/items.plist: absent
+  keychain/lock: absent
+generic passwords
+  add ann: 0
+  add ann again: -25299
+  add bob: 0
+  add with only a service: 0
+  keychain: folder 700
+  keychain/key: file 600
+  keychain/items.plist: file 600
+  keychain/lock: file 600
+  a secret in the clear on disk: no
+  ann's password: made-up-1
+  the first one's password: made-up-1
+  ANN's, case-insensitively: made-up-1
+  ANN's: status -25300
+  found, nothing returned: 0
+  all attributes: 0, an array of 2
+    ann: class generic password, label Notes (ann), sync 0, generic (none), dates yes
+    bob: class generic password, label (none), sync 0, generic extra, dates yes
+  bob, everything: 0, a dictionary 1, password made-up-2, account bob, a ref 1, a persistent ref 1
+  bob by ref: made-up-2
+  bob by persistent ref: made-up-2
+changes
+  update ann: 0
+  ann now: made-up-3, label Notes, changed after made 1
+  bob renamed ann: -25299
+  update nobody: -25300
+  update with a class in the changes: -50
+mistakes
+  no class: -50
+  an account that isn't text: -50
+  a password that isn't data: -50
+  a server on a generic password: -25303
+  a match limit when adding: -50
+  a bad match limit: -50
+  a certificate: add -4, find -25300, delete -25300
+  an unknown class: -50
+internet passwords
+  add: 0, again -25299
+  another path: 0
+  by server and protocol: made-up-4
+  on port 80: status -25300
+  a service on an internet password: -25303
+  through the older call: 0, made-up-4 (9 bytes), a ref 1
+synchronizable
+  add: 0
+  found by default: status -25300
+  with any: made-up-6
+  with true: made-up-6
+the older calls
+  default keychain: 0, 1
+  add: 0, a ref 1
+  add again: -25299
+  find: 0, made-up-7
+  find by service alone, nothing returned: 0
+  SecItem sees it: made-up-7, label org.example.old
+  change: 0
+  now dave's: made-up-8; carol's: status -25300
+  delete: 0, again -25304
+  find: -25300
+  user interaction allowed: 0
+a secret tampered with
+  password: status -26275
+  its attributes still: 0
+  delete it: 0
+delete
+  bob: 0
+  bob again: -25300
+  find bob: -25300
+kept from the first run
+  keychain: folder 700
+  keychain/key: file 600
+  keychain/items.plist: file 600
+  keychain/lock: file 600
+  generic passwords: 0, org.example.empty/- org.example.notes/ann org.example.sync/-
+  ann's: made-up-3
+  the web login: made-up-4
+  delete every generic password: 0
+  delete every internet password: 0
+  find any: -25300
+messages
+  0: No error.
+  -25300: The specified item could not be found in the keychain.
+  -25299: The specified item already exists in the keychain.
+  -50: One or more parameters passed to a function were not valid.
+  -26275: Unable to decode the provided data.
+  12345: (none)
+random: 0, all zero 0
+exit=0

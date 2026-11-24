@@ -225,3 +225,55 @@ void *ferry_network_symbol(const char *name)
     }
     return handle ? dlsym(handle, name) : NULL;
 }
+
+/* ---- cryptography ----------------------------------------------------------------
+ * CommonCrypto's encryption (src/commoncrypto.c) and the Security
+ * framework's certificates and trust are done by this system's OpenSSL:
+ * libcrypto, and libssl to fetch a server's certificates. Each is opened
+ * the first time one of its calls is looked up, so programs that never
+ * encrypt or look at a certificate don't load them, and Ferry still starts
+ * on a system without them. Only OpenSSL's own calls are served. */
+static const char *const crypto_libraries[] = {"libcrypto.so.3", "libcrypto.so.1.1"};
+static const char *const ssl_libraries[] = {"libssl.so.3", "libssl.so.1.1"};
+static const char *const crypto_prefixes[] = {"EVP_", "X509", "d2i_", "i2d_", "PEM_", "BIO_", "OPENSSL_",
+                                              "ERR_", "ASN1_", "OBJ_", "CRYPTO_", NULL};
+static const char *const ssl_prefixes[] = {"SSL_", "TLS_", NULL};
+
+static int has_prefix(const char *name, const char *const *prefixes)
+{
+    for (; *prefixes; prefixes++)
+        if (!strncmp(name, *prefixes, strlen(*prefixes)))
+            return 1;
+    return 0;
+}
+
+static void *open_first(const char *const *names, size_t count)
+{
+    void *h = NULL;
+    for (size_t i = 0; i < count && !h; i++)
+        h = dlopen(names[i], RTLD_NOW | RTLD_LOCAL);
+    return h;
+}
+
+void *ferry_crypto_symbol(const char *name)
+{
+    static void *crypto, *ssl;
+    static int tried_crypto, tried_ssl;
+    if (!name)
+        return NULL;
+    if (has_prefix(name, crypto_prefixes)) {
+        if (!tried_crypto) {
+            tried_crypto = 1;
+            crypto = open_first(crypto_libraries, sizeof crypto_libraries / sizeof crypto_libraries[0]);
+        }
+        return crypto ? dlsym(crypto, name) : NULL;
+    }
+    if (has_prefix(name, ssl_prefixes)) {
+        if (!tried_ssl) {
+            tried_ssl = 1;
+            ssl = open_first(ssl_libraries, sizeof ssl_libraries / sizeof ssl_libraries[0]);
+        }
+        return ssl ? dlsym(ssl, name) : NULL;
+    }
+    return NULL;
+}

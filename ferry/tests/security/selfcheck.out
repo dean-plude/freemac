@@ -1,0 +1,6 @@
+running code: SelfCheck.app
+bundle: 0, check 0
+executable: 0, check 0
+running code, checked: 0
+Info.plist: org.freemac.ferry.selfcheck; main executable: SelfCheck; identifier: (none)
+exit=0

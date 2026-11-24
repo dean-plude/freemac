@@ -75,6 +75,8 @@ static int mac_open(const char *path, int flags, ...)
         mode = va_arg(ap, int);
         va_end(ap);
     }
+    if (ferry_is_virtual(path))
+        return ferry_virtual_open(path, open_to_linux(flags));
     return open(path, open_to_linux(flags), mode);
 }
 
@@ -87,6 +89,8 @@ static int mac_openat(int fd, const char *path, int flags, ...)
         mode = va_arg(ap, int);
         va_end(ap);
     }
+    if (ferry_is_virtual(path))
+        return ferry_virtual_open(path, open_to_linux(flags));
     return openat(at_fd(fd), path, open_to_linux(flags), mode);
 }
 
@@ -205,11 +209,26 @@ static void to_mac_stat(const struct stat *s, struct mac_stat *m)
         return rc;                                                 \
     }
 
-STAT_WRAPPER(mac_stat64(const char *path, struct mac_stat *out), stat(path, &s))
-STAT_WRAPPER(mac_lstat64(const char *path, struct mac_stat *out), lstat(path, &s))
+/* The Mac's version file is one Ferry makes (sysversion.c). */
+#define VIRTUAL_OR(path, call) (ferry_virtual_stat(path, &s) ? 0 : (call))
+STAT_WRAPPER(mac_stat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, stat(path, &s)))
+STAT_WRAPPER(mac_lstat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, lstat(path, &s)))
 STAT_WRAPPER(mac_fstat64(int fd, struct mac_stat *out), fstat(fd, &s))
 STAT_WRAPPER(mac_fstatat64(int fd, const char *path, struct mac_stat *out, int flags),
-             fstatat(at_fd(fd), path, &s, (flags & MAC_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0))
+             VIRTUAL_OR(path, fstatat(at_fd(fd), path, &s, (flags & MAC_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0)))
+
+/* access's mode bits are the same on both systems (R_OK 4, W_OK 2, X_OK 1). */
+static int mac_access(const char *path, int mode)
+{
+    if (ferry_is_virtual(path)) {
+        if (mode & (W_OK | X_OK)) {
+            errno = EACCES;
+            return -1;
+        }
+        return 0;
+    }
+    return access(path, mode);
+}
 
 /* ---- directories ------------------------------------------------------------------- */
 
@@ -574,7 +593,7 @@ static int mac_uname(struct mac_utsname *u)
      * family Ferry imitates, and say in the version where it really runs. */
     snprintf(u->sysname, sizeof u->sysname, "Darwin");
     snprintf(u->nodename, sizeof u->nodename, "%s", l.nodename);
-    snprintf(u->release, sizeof u->release, "20.0.0");
+    snprintf(u->release, sizeof u->release, "%s", FERRY_DARWIN_RELEASE);
     snprintf(u->version, sizeof u->version, "Ferry on Linux %s", l.release);
     snprintf(u->machine, sizeof u->machine, "x86_64");
     return 0;
@@ -834,6 +853,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"open", mac_open},
     {"openat", mac_openat},
     {"creat", mac_creat},
+    {"access", mac_access},
     {"unlinkat", mac_unlinkat},
     {"mkdirat", mac_mkdirat},
     {"fcntl", mac_fcntl},

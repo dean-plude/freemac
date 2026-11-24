@@ -145,9 +145,10 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 
 @class NSURLSessionTask, NSURLAuthenticationChallenge;
 
-/* The Security framework's trust and identity objects. Ferry has no
- * Security framework: a protection space's serverTrust is an object of
- * Ferry's own that only NSURLCredential's credentialForTrust: reads. */
+/* The Security framework's trust and identity objects (also declared by
+ * <Security/Security.h>). A protection space's serverTrust works with the
+ * Security framework's SecTrust calls and NSURLCredential's
+ * credentialForTrust:. */
 #ifndef _FERRY_SECURITY_TYPES_
 #define _FERRY_SECURITY_TYPES_
 typedef struct __SecTrust *SecTrustRef;

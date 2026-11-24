@@ -100,6 +100,19 @@ cookies in `NSHTTPCookieStorage` (saved to
 request cache policies and revalidating stale responses, and loads
 `data:` URLs.
 
+From Ferry 0.27.0 (freemac 1.200), programs can link the Security
+framework: `SecItem` and the older `SecKeychain` password calls keep
+generic and internet passwords in `~/.local/share/ferry/keychain` (mode
+0700; the secrets are encrypted with a key kept beside them, which stops
+casual reading only, not anyone who can read your files), an app's check of
+its own code signature passes while any other code reads as unsigned, and
+`SecTrust` checks certificates with this system's OpenSSL. libSystem now
+has CommonCrypto's digests, HMAC, PBKDF2, random bytes and AES (AES needs
+OpenSSL's libcrypto, which Ferry loads only when a program uses it), and
+the macOS version is one answer everywhere: 14.7 in
+`/System/Library/CoreServices/SystemVersion.plist`, `NSProcessInfo`,
+`Gestalt` and `uname`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
