@@ -1346,6 +1346,12 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "recent-folders": ("Go back to a folder you used lately", "recent folders go menu last folders lately visited history clear menu drawer", [
+        "In Drawer, choose Go > Recent Folders.",
+        "The last ten folders you opened are listed, newest first. Choose one to open it in this window.",
+        "Two folders with the same name show the folder each one is in.",
+        "To empty the list, choose Clear Menu at the bottom.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",

@@ -7,7 +7,7 @@ find it); elsewhere GTK shows it inside the window.
 
 A menu bar is written as a list of (title, sections), each section a list of
 (label, action, keys) where keys is shown next to the item ("<Ctrl>s") or
-None. The keys are only shown: each app handles its own keys, so typing in a
+None; an action that is a Gio.Menu makes the item a submenu. The keys are only shown: each app handles its own keys, so typing in a
 text field keeps working as usual.
 """
 from gi.repository import Gio, GLib
@@ -16,6 +16,10 @@ from gi.repository import Gio, GLib
 def section(entries):
     menu = Gio.Menu()
     for label, action, keys in entries:
+        if isinstance(action, Gio.MenuModel):
+            # A submenu, such as Go > Recent Folders.
+            menu.append_submenu(label, action)
+            continue
         item = Gio.MenuItem.new(label, action)
         if keys:
             item.set_attribute_value("accel", GLib.Variant("s", keys))
