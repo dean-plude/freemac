@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- freemac: lets Dials' Startup Disk choose the system the computer starts
+     up from, for good or just once, after an administrator's password. -->
+<policyconfig>
+  <vendor>freemac</vendor>
+  <action id="org.freemac.startup-disk">
+    <description>Change the start-up disk</description>
+    <message>Changing the disk the computer starts up from needs an administrator's password.</message>
+    <icon_name>freemac-dials</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/freemac-startup-disk</annotate>
+  </action>
+</policyconfig>

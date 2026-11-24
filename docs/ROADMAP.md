@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.145 "Startup Disk" (done)
+
+Choose which system the computer starts up from, as a Mac's Startup Disk settings do, for PCs with Windows (or another system) beside freemac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Startup Disk shows each system and disk the firmware can start up from (freemac, Windows, another Linux, a USB stick, a disc), which it starts up from and which one is in use; network boot and the firmware's own tools are left out | Dials, startup_disk.py | done |
+| 2 | Restart in… starts up from the chosen one just once (the firmware's BootNext), then the computer goes back to its usual one; Always Start Up from This puts it first in BootOrder; a start-up set for next time only can be cancelled | freemac-startup-disk, polkit | done |
+| 3 | The changes go through a root helper after an administrator's password, which only takes entries the page shows | freemac-startup-disk | done |
+| 4 | On a PC that starts up the BIOS way the page says where to choose instead; the page names the start-up menu keys PCs use | Dials | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.144 "Power schedule" (done)
 
 Start up or wake the computer at a set time, and sleep, restart or shut it down at another, as a Mac's Energy settings have it.

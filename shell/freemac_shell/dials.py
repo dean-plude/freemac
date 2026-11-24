@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_security, dials_seek, dials_sharing, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_security, dials_seek, dials_sharing, dials_startup, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -355,6 +355,8 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_storage.storage_page(self)),
             (2, "softwareupdate", "Software Update", "freemac-software-update-symbolic", "gray",
              lambda: dials_update.software_update_page(self)),
+            (2, "startupdisk", "Startup Disk", "drive-harddisk-system-symbolic", "gray",
+             lambda: dials_startup.startup_disk_page(self)),
             (2, "datetime", "Date & Time", "preferences-system-time-symbolic", "blue",
              lambda: dials_time.DateTimePanel(self, page)),
             (2, "appearance", "Appearance", "preferences-desktop-appearance-symbolic", "dark", self.appearance),
@@ -1064,7 +1066,8 @@ MENU_PANELS = (
      ("sound", "Sound"), ("power", "Power"), ("bluetooth", "Bluetooth"), ("printers", "Printers")),
     (("network", "Network"), ("sharing", "Sharing"), ("accessibility", "Accessibility"),
      ("security", "Privacy & Security"), ("users", "Users"),
-     ("loginitems", "Login Items"), ("softwareupdate", "Software Update"), ("about", "About")),
+     ("loginitems", "Login Items"), ("softwareupdate", "Software Update"), ("startupdisk", "Startup Disk"),
+     ("about", "About")),
 )
 
 

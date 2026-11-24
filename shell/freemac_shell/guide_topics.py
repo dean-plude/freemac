@@ -1118,6 +1118,19 @@ TOPICS = {
         "Waking from sleep works on every PC. Starting up from off works on most; if yours doesn't, turn on the "
         "wake alarm (sometimes called RTC Alarm or Resume by Alarm) in its firmware settings.",
     ]),
+    "startup-disk": ("Start up from Windows or another disk", "startup disk boot windows dual boot restart in "
+                     "other system linux usb stick disc efi uefi bios firmware boot menu", [
+        "If your computer has Windows or another system as well as freemac, choose which one it starts up from "
+        "in Dials > Startup Disk. It shows each system and disk the computer can start up from, and which one "
+        "you're using now.",
+        "Click one, then Restart in it to start up from it just this once; after that the computer goes back to "
+        "the one it always starts up from. Click Always Start Up from This to change that for good. Either asks "
+        "for an administrator's password.",
+        "To come back to freemac from Windows, hold the key for your PC's own start-up menu as it starts (often "
+        "F12, F11, F10, F9, F8 or Esc) and choose freemac, or choose it in Windows' own settings.",
+        "An older PC that starts up the BIOS way chooses its start-up disk only in its firmware settings or that "
+        "start-up menu.",
+    ]),
     "bring-over": ("Bring your files from another computer", "migrate migration move transfer old computer new "
                    "windows pc tender copy files settings bring over onedrive", [
         "Tender copies your documents, pictures, music, videos, desktop and downloads from your old computer. "
