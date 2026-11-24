@@ -1346,6 +1346,14 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "quick-note": ("Jot something down from anywhere with Quick Note", "quick note jot notes hot corner corner bottom right floating note small window write down idea remember shopping list notepad", [
+        "Choose Dials > Dock and Menu Bar > Hot Corners, and pick Quick Note for a corner. Move the pointer into that corner and a small note opens in the bottom right of the screen, over whatever you're doing.",
+        "You can also choose File > New Quick Note in Jot.",
+        "Just type. The first line is the title, and the note is saved as you type, in Jot's Quick Notes folder.",
+        "Click the Jot button at the top of the note to open it in Jot, or the + button to start another quick note. Press Esc to put it away.",
+        "Quick Note opens your last quick note again. To start a new one each time instead, untick File > Always Resume to Last Quick Note in Jot; the last note then comes back only if you closed it in the last five minutes.",
+        "In Jot, quick notes are listed with your other notes and marked Quick Note.",
+    ]),
     "bosun": ("Make a shortcut that does several things in one go", "bosun shortcuts automation automate workflow action steps script run gallery services keyboard shortcut quick action routine batch resize pictures pdf zip dark mode speak", [
         "Open Bosun from Applications, or search for it with Seek.",
         "To start from a ready-made shortcut, click Gallery, then Add Shortcut under the one you want. To start from nothing, click +.",

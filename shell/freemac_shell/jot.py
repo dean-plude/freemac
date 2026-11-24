@@ -3,7 +3,8 @@
 
 Each note is a plain text file in ~/Documents/Notes, so notes are ordinary
 files: Drawer shows them, Seek finds the words in them, and any editor opens
-them. The first line is the note's title. The list on the left shows the
+them. Quick notes (quick_note.py) live in its Quick Notes folder and are
+listed with the rest. The first line is the note's title. The list on the left shows the
 newest first and narrows as you type in the search field; the note on the
 right saves itself a moment after you stop typing.
 """
@@ -18,7 +19,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import menus, spelling, style  # noqa: E402
+from . import menus, quick_note, spelling, style  # noqa: E402
 
 APP_ID = "org.freemac.Jot"
 SAVE_DELAY = 800   # ms after the last key press
@@ -57,19 +58,24 @@ def read(path):
 
 
 def list_notes(folder):
-    """[(path, mtime, text)] newest first."""
-    try:
-        names = [n for n in os.listdir(folder) if n.endswith((".txt", ".md")) and not n.startswith(".")]
-    except OSError:
-        return []
+    """[(path, mtime, text)] newest first, quick notes included."""
     found = []
-    for name in names:
-        path = os.path.join(folder, name)
+    for where in (folder, quick_note.folder(folder)):
         try:
-            found.append((path, os.stat(path).st_mtime, read(path)))
+            names = [n for n in os.listdir(where) if n.endswith((".txt", ".md")) and not n.startswith(".")]
         except OSError:
-            pass
+            continue
+        for name in names:
+            path = os.path.join(where, name)
+            try:
+                found.append((path, os.stat(path).st_mtime, read(path)))
+            except OSError:
+                pass
     return sorted(found, key=lambda n: n[1], reverse=True)
+
+
+def is_quick(path):
+    return os.path.basename(os.path.dirname(path)) == quick_note.FOLDER_NAME
 
 
 def when(stamp):
@@ -96,6 +102,10 @@ class Row(Gtk.ListBoxRow):
         self.title = Gtk.Label(label=title_of(text), xalign=0, ellipsize=Pango.EllipsizeMode.END)
         self.title.get_style_context().add_class("jot-title")
         line = Gtk.Box(spacing=6)
+        if is_quick(path):
+            tag = Gtk.Label(label="Quick Note")
+            tag.get_style_context().add_class("jot-quick")
+            line.pack_start(tag, False, False, 0)
         self.stamp = Gtk.Label(label=when(mtime), xalign=0)
         self.snippet = Gtk.Label(label=preview(text), xalign=0, ellipsize=Pango.EllipsizeMode.END)
         for label in (self.stamp, self.snippet):
@@ -117,6 +127,8 @@ CSS = b"""
 .jot-title { font-weight: bold; }
 .jot-sidebar { border-right: 1px solid alpha(currentColor, 0.12); }
 .jot-page { font-size: 15px; }
+.jot-quick { font-size: 0.8em; font-weight: bold; color: #c98a00; }
+row:selected .jot-quick { color: rgba(255, 255, 255, 0.85); }
 """
 
 
@@ -182,8 +194,13 @@ class Window(Gtk.ApplicationWindow):
         })
         self.connect("key-press-event", self._key)
         self.connect("delete-event", lambda *_: self.save_now() and False)
-        self.monitor = Gio.File.new_for_path(self.folder).monitor_directory(Gio.FileMonitorFlags.NONE, None)
-        self.monitor.connect("changed", self._folder_changed)
+        self.monitors = []
+        quick = quick_note.folder(self.folder)
+        os.makedirs(quick, exist_ok=True)
+        for where in (self.folder, quick):
+            monitor = Gio.File.new_for_path(where).monitor_directory(Gio.FileMonitorFlags.NONE, None)
+            monitor.connect("changed", self._folder_changed)
+            self.monitors.append(monitor)
         self.reload()
         self.show_all()
         if self.current is None:
@@ -272,14 +289,14 @@ class Window(Gtk.ApplicationWindow):
                 path = row.path
                 # The file follows the title, as long as it isn't the user's own name for it.
                 if os.path.basename(path).startswith(re.sub(r"[^\w\- ]+", "", title_of(row.text))[:60] or "Note"):
-                    wanted = file_name_for(text, self.folder, current=path)
+                    wanted = file_name_for(text, os.path.dirname(path), current=path)
                     if wanted != path:
                         try:
                             os.rename(path, wanted)
                             path = row.path = wanted
                         except OSError:
                             pass
-                tmp = os.path.join(self.folder, "." + os.path.basename(path) + ".tmp")
+                tmp = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".tmp")
                 with open(tmp, "w", encoding="utf-8") as f:
                     f.write(text)
                 os.replace(tmp, path)
@@ -338,7 +355,8 @@ class Window(Gtk.ApplicationWindow):
 
 def menubar():
     return menus.menubar([
-        ("_File", [[("New Note", "app.new-note", "<Ctrl>n")],
+        ("_File", [[("New Note", "app.new-note", "<Ctrl>n"), ("New Quick Note", "app.quick-note", None)],
+                   [("Always Resume to Last Quick Note", "app.quick-resume", None)],
                    [("Show Notes Folder", "win.show-folder", None)],
                    [("Move Note to Trash", "win.delete-note", "<Ctrl>Delete")],
                    [("Close Window", "win.close", "<Ctrl>w")]]),
@@ -349,6 +367,22 @@ def menubar():
 class Jot(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.quick = None
+        self.quick_only = False
+        self.add_main_option("quick", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE,
+                             "Open Quick Note", None)
+
+    def do_handle_local_options(self, options):
+        if not options.contains("quick"):
+            return -1
+        # freemac-jot --quick: open Quick Note in the Jot that is running, or
+        # start one that opens only Quick Note.
+        self.register(None)
+        self.activate_action("quick-note", None)
+        if self.get_is_remote():
+            return 0
+        self.quick_only = True
+        return -1
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
@@ -369,21 +403,45 @@ class Jot(Gtk.Application):
         service = Gio.SimpleAction.new("service", GLib.VariantType.new("s"))
         service.connect("activate", lambda _a, text: self._note_with(text.get_string()))
         self.add_action(service)
+        quick = Gio.SimpleAction.new("quick-note", None)
+        quick.connect("activate", lambda *_: self.quick_note())
+        self.add_action(quick)
+        menus.add_toggle(self, "quick-resume", quick_note.always_resume(),
+                         lambda on: quick_note.write_prefs(quick_resume=on))
         self.hold()
         self.set_menubar(menubar())
 
+    def main_window(self):
+        return next((w for w in self.get_windows() if isinstance(w, Window)), None) or Window(self)
+
     def _note_with(self, text):
-        window = self.get_active_window() or Window(self)
+        window = self.main_window()
         window.present()
         window.new_note(text)
 
     def _new_note(self):
-        window = self.get_active_window() or Window(self)
+        window = self.main_window()
         window.present()
         window.activate_action("new-note", None)
 
+    def quick_note(self):
+        if self.quick is None:
+            self.quick = quick_note.QuickNote(self, sys.modules[__name__], self.open_note)
+            self.quick.connect("destroy", lambda _w: setattr(self, "quick", None))
+            self.quick.start(quick_note.note_to_open(self.quick.folder))
+        self.quick.show_up()
+
+    def open_note(self, path):
+        window = self.main_window()
+        if path:
+            window.reload(keep=path)
+        window.present()
+
     def do_activate(self):
-        (self.get_active_window() or Window(self)).present()
+        if self.quick_only:
+            self.quick_only = False
+            return
+        self.main_window().present()
 
 
 def main():

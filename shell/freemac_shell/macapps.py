@@ -21,7 +21,9 @@ generic app icon instead.
     freemac-mac-app scan                         add apps found in Applications to the app grid
 
 Ferry runs Mac apps built only on the frameworks it has so far; when it can't
-run one, opening it says so plainly instead of failing silently.
+run one, opening it says so plainly instead of failing silently. What Ferry
+said the last time an app was opened is kept in
+~/.cache/freemac/ferry/<app name>.log.
 """
 import hashlib
 import os
@@ -395,18 +397,44 @@ def open_app(path):
         return 1
     # Ferry stops at once, with a message naming the reason, when a program
     # needs something it doesn't have yet (a Mac framework such as AppKit).
-    child = subprocess.Popen(["ferry", program], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                             start_new_session=True, cwd=os.path.dirname(program))
+    # What it says goes to a log file rather than a pipe: an app that keeps
+    # running and keeps writing would otherwise fill the pipe and freeze.
+    log = log_path(name)
+    with open(log, "wb") as sink:
+        child = subprocess.Popen(["ferry", program], stdout=sink, stderr=subprocess.STDOUT,
+                                 start_new_session=True, cwd=os.path.dirname(program))
     try:
         status = child.wait(timeout=3)
     except subprocess.TimeoutExpired:
         return 0
     if status != 0:
-        reason = child.stderr.read().decode("utf-8", "replace").strip().splitlines()
+        reason = last_line(log)
         notify(f"“{name}” can't open yet",
-               ((reason[-1] + " ") if reason else "") + "Ferry can't run this app yet.")
+               ((reason + " ") if reason else "") + "Ferry can't run this app yet.")
         return 1
     return 0
+
+
+LOG_DIR = os.path.join(GLib.get_user_cache_dir(), "freemac", "ferry")
+
+
+def log_path(name):
+    """~/.cache/freemac/ferry/<name>.log: what Ferry said the last time this
+    app was opened, for anyone who wants to see why it stopped."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    safe = re.sub(r"[^\w .-]", "_", name).strip(" .") or "app"
+    return os.path.join(LOG_DIR, safe[:80] + ".log")
+
+
+def last_line(path):
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - 4096))
+            lines = handle.read().decode("utf-8", "replace").strip().splitlines()
+    except OSError:
+        return ""
+    return lines[-1].strip() if lines else ""
 
 
 def main(argv=None):
