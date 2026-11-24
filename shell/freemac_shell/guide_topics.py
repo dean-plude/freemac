@@ -883,6 +883,14 @@ TOPICS = {
         "Adapter. The switch in the Battery menu turns it on or off at once. The battery in the menu bar "
         "turns yellow while it's on.",
     ]),
+    "menu-extras": ("Use apps' icons in the menu bar", "menu bar extras icons tray status icon system tray app indicator notification area background running chat cloud sync", [
+        "Some apps put an icon of their own in the menu bar while they run, such as chat, cloud storage "
+        "and password apps. They sit left of freemac's own icons, newest furthest left.",
+        "Click an app's icon for its menu, or to bring up its window when it has no menu. Right-click "
+        "always opens the menu when there is one. Scroll over an icon if the app reacts to that.",
+        "An icon goes away when its app quits. To quit an app that has no window, choose Quit from its "
+        "icon's menu.",
+    ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "
         "become solid, so what's behind them no longer shows through.",

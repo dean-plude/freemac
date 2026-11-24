@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.156 "Menu bar extras" (done)
+
+Apps' own icons in the menu bar, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Topline keeps the StatusNotifierWatcher registry that Linux apps announce their icons to (or reads another program's, if one already runs), and drops an icon when its app quits or crashes | Topline, extras.py | done |
+| 2 | Each icon sits left of freemac's own, newest furthest left, from the app's icon name, its own icon folder or its pixel data; Passive icons are hidden and NeedsAttention ones show the app's attention icon; the tooltip shows the app's title and text | extras.py | done |
+| 3 | Click opens the app's menu (read through dbusmenu as it opens, with ticks for check and radio items, submenus and dimmed items), or asks an app without one to open its window; right-click always opens the menu; middle-click and scrolling go to the app | extras.py | done |
+| 4 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.155 "Ferry: tabs and split views" (done)
 
 Ferry, freemac's own layer for simple Intel Mac programs, now comes with every
