@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.212 "Ferry: collection views and rulers" (done)
+
+Ferry 0.38.0: grids of items, as in MacPass's icon picker, and rulers such as Sequel Pro's line numbers.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSCollectionView` with a data source, reused items, the flow and grid layouts, and selection by mouse and keys | Ferry AppKit | done |
+| 2 | Inserting, deleting, moving and reloading items and sections, alone or in batch updates | Ferry AppKit | done |
+| 3 | The older collection view with a content array, an item prototype copied from a nib, and bindings | Ferry AppKit | done |
+| 4 | `NSRulerView` and `NSRulerMarker` on scroll views, with units, markers and subclasses that draw their own marks | Ferry AppKit | done |
+| 5 | Four new tests; `make check` 179 of 179 | Ferry | done |
+
+Nothing in a collection view is animated, and items can't be dragged yet.
+
 ## 1.211 "Ferry: expressions and exact decimals" (done)
 
 Ferry 0.37.0: Mac apps can do sums, averages and grouping over their data, and keep money-style numbers exact.

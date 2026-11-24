@@ -61,7 +61,8 @@ APPKIT_SRC = $(wildcard appkit/*.m)
 APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
 APPKIT = frameworks/AppKit.framework/AppKit
 APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(QUARTZCORE_HEADERS) \
-                 appkit/ANotify.h sdk/include/AppKit/NSDockTile.h sdk/include/UserNotifications/UserNotifications.h
+                 appkit/ANotify.h sdk/include/AppKit/NSDockTile.h sdk/include/UserNotifications/UserNotifications.h \
+                 sdk/include/AppKit/NSCollectionView.h sdk/include/AppKit/NSRulerView.h
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m

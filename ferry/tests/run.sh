@@ -906,5 +906,16 @@ run_one foundation_decimals "$here/foundation/decimals.m" "$here/foundation/deci
     -fobjc-arc -fblocks -framework Foundation
 run_one coredata_aggregates "$here/coredata/aggregates.m" "$here/coredata/aggregates.out" \
     -fobjc-arc -fblocks -framework Foundation -framework CoreData -lsqlite3
+# NSCollectionView, with the item-based API, the flow and grid layouts and
+# the older content-array API, and loaded from a nib in both forms; and
+# NSRulerView and NSRulerMarker on a scroll view (freemac 1.NEXT, Ferry
+# 0.NEXT).
+run_one appkit_collections "$here/appkit/collections.m" "$here/appkit/collections.out" -fobjc-arc -fblocks -framework Cocoa
+run_one appkit_collections_legacy "$here/appkit/collections_legacy.m" "$here/appkit/collections_legacy.out" \
+    -fobjc-arc -fblocks -framework Cocoa
+export FERRY_TEST_DATA="$here/appkit"
+run_one appkit_collections_nib "$here/appkit/collections_nib.m" "$here/appkit/collections_nib.out" -fobjc-arc -fblocks -framework Cocoa
+unset FERRY_TEST_DATA
+run_one appkit_rulers "$here/appkit/rulers.m" "$here/appkit/rulers.out" -fobjc-arc -fblocks -framework Cocoa
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

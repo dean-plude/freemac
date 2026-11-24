@@ -1,0 +1,51 @@
+ruler class NSRulerView; rulers none, none; visible 0
+vertical ruler a NSRulerView, orientation 1, its scroll view 1, client none, flipped 1
+thickness: rule 16, markers 15, required 31, baseline 15, units Inches
+content, rulers hidden: 0,0 200x150
+ruler in the scroll view 0, hidden 1
+content, ruler shown: 31,0 169x150
+vertical ruler: 0,0 31x150
+thicker rule: content: 35,0 165x150
+both: content: 35,31 165x119
+horizontal ruler: 35,0 165x31
+vertical ruler: 0,31 35x119
+vertical only again: content: 35,0 165x150
+horizontal ruler kept 1, hidden 1
+no markers' room: vertical ruler: 0,0 20x150
+background (5,7): 0.97 0.97 0.97
+edge next to the content (19,50): 0.75 0.75 0.75
+the 1-inch mark (18,72): 0.45 0.45 0.45
+between marks (18,60): 0.97 0.97 0.97
+units now Lines
+Furlongs refused: NSInvalidArgumentException, still Lines
+origin offset 10
+marker: movable 1, removable 0, location 100, thickness 8
+markers 1, required 28
+ruler with a marker: 0,0 28x150
+marker's image: 0,97 8x6
+marker drawn (4,100): 1.00 0.00 0.00
+dragging 1
+dragged 23 down: location 125, dragging 0
+client: should move; will move to 112; will move to 123; did move to 125
+dragged off, kept by the client: markers 1
+client: should move; will move to 125; should remove; did move to 125
+dragged off: markers 0, its ruler none
+client: should move; will move to 125; should remove; did remove
+a click off the markers: mouse down
+track to add: 1, location 30, markers 1
+client: should add; will add at 30; did add
+a copy: location 30, image the same 1
+client gone: markers 0
+client: losing the ruler
+line ruler a Numbers, thickness 24
+line ruler: 0,0 24x100
+its content: 24,0 136x100
+lines drawn 5
+line 0's mark (8,1): 0.00 0.00 1.00
+line 1's mark (8,21): 0.00 0.00 1.00
+between (8,11): 0.97 0.97 0.97
+scrolled 30 down: lines drawn 6
+line 2's mark (8,11): 0.00 0.00 1.00
+between (8,1): 0.97 0.97 0.97
+ruler class again NSRulerView
+exit=0

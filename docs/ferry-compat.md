@@ -46,10 +46,10 @@ Sequel Pro disk image (`.dmg`). See "Installers" below.
 | [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | At the last run: starts, loads its main nib (`NIBArchive`) | At the last run, `NSInvocation` and `NSMethodSignature` (forwarding), which came in (1.170). Its source also uses `NSAnimation` and `NSAppleScript`, which Ferry doesn't have. Its key labels' shadow is in Ferry now, so their text attributes are whole. It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
 | [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (Ferry answers no, as a Mac does before the user allows it), and waits in its event loop | At the last run, nothing visible, because its only window was a status bar item. `NSStatusBar` is in Ferry now (1.157). Moving other apps' windows can't work as such on Wayland. (Not re-run since M7) |
 | [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | At the last run: starts, loads its nibs, registers its shortcuts (accepted, never pressed) | At the last run, its Sparkle updater's check of its own code signature (`SecStaticCodeCreateWithPath`), which passes since (1.200). It also couldn't save its shortcuts file. From its source, its shortcut recorders now draw their gradient and keep their text shadow, and it also uses `NSTrackingArea` and `NSAppleScript`, which Ferry doesn't have. Then the Accessibility API, as for ShiftIt. (Not re-run since M7) |
-| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | At the last run: starts; all 30 of its nibs (`NIBArchive`) load on their own | At the last run, the document classes, which came in 1.167. From its source, the next stop was its document window's split view controller (`MPDocumentSplitViewController`, built on `NSSplitViewController`), which was left out, and its preferences' tab view controller (`MPTabViewController`, on `NSTabViewController`). Both are in Ferry now, with `NSGradient` and `NSShadow`. Its source also uses `NSCollectionView`, `NSTrackingArea` and `NSMutableCharacterSet`, which Ferry doesn't have. (Not re-run since M7) |
+| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | At the last run: starts; all 30 of its nibs (`NIBArchive`) load on their own | At the last run, the document classes, which came in 1.167. From its source, the next stop was its document window's split view controller (`MPDocumentSplitViewController`, built on `NSSplitViewController`), which was left out, and its preferences' tab view controller (`MPTabViewController`, on `NSTabViewController`). Both are in Ferry now, with `NSGradient` and `NSShadow`. Its source also uses `NSCollectionView`, which is in Ferry now, and `NSTrackingArea` and `NSMutableCharacterSet`, which Ferry doesn't have. (Not re-run since M7) |
 | [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | At the last run: starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | At the last run, `NSSplitView` in its main window (`positionOfDividerAtIndex:`). `NSSplitView` and `NSOutlineView`, its hosts list, are in Ferry now (1.155 and 1.159), as are its gradients and shadows. Its source also uses `NSTrackingArea` and `NSTextAttachment`, which Ferry doesn't have. (Not re-run since M7) |
 | [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument`, which is in Ferry now, and on WebKit, a known limit. (Not re-run since M7) |
-| [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; at the last run it started and loaded its main nib | At the last run, an array made with a nil object (`initWithObjects:count:`), most likely one of the classes it uses that Ferry didn't have being nil. Tables, outline and split views, the document classes, gradients and shadows are in Ferry now. From its source, what it still uses that Ferry doesn't have includes `NSRulerView`, `NSAnimation`, `NSTrackingArea`, `NSDistributedNotificationCenter` and WebKit. (Not re-run since M7) |
+| [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; at the last run it started and loaded its main nib | At the last run, an array made with a nil object (`initWithObjects:count:`), most likely one of the classes it uses that Ferry didn't have being nil. Tables, outline and split views, the document classes, gradients and shadows are in Ferry now. From its source, what it still uses that Ferry doesn't have includes `NSAnimation`, `NSTrackingArea`, `NSDistributedNotificationCenter` and WebKit; `NSRulerView`, which its line-number ruler is built on, is in Ferry now. (Not re-run since M7) |
 
 ## Installers
 
@@ -929,6 +929,43 @@ aggregates done in SQL, and derived attributes. The work was written from
 Apple's documentation and not compared with a Mac; `docs/ferry-gui.md` lists
 what a Mac would settle.
 
+### Collection views and rulers (freemac 1.212, Ferry 0.38.0)
+
+Ferry's AppKit now has `NSCollectionView`, in both of its kinds. The
+item-based kind takes a data source with sections and items, and makes
+`NSCollectionViewItem`s and supplementary views of registered classes or
+nibs with `makeItemWithIdentifier:forIndexPath:`, reusing the ones that
+scroll out of sight. `NSCollectionViewFlowLayout` lays them out in lines
+across or down, with item sizes, spacing, insets, headers and footers
+(pinned if asked) and a delegate's own sizes, and
+`NSCollectionViewGridLayout` lays them out in rows and columns. Items are
+found by point and index path and scrolled to, and selected by code, by
+the mouse and by the arrow keys, with the delegate's should and did calls
+and single, multiple and empty selection. Items and sections are
+inserted, deleted, moved and reloaded, alone or in
+`performBatchUpdates:completionHandler:`. The older kind takes a
+`content` array and an `itemPrototype`, which is copied for each object,
+and binds `content` and `selectionIndexes`. A collection view and its
+prototype load from nibs in both forms: the prototype is copied from the
+nib, with its own view, outlets, actions and bindings.
+
+`NSRulerView` and `NSRulerMarker` are there too. A scroll view makes its
+rulers of the class `rulerViewClass` names when `hasHorizontalRuler` or
+`hasVerticalRuler` is set, and lays them out beside the content while
+`rulersVisible` is set. Rulers have their thicknesses, a client view,
+measurement units (the four built in and any registered by the app), an
+origin offset, an accessory view and a ruler line, and they draw their
+marks and labels in `drawHashMarksAndLabelsInRect:`, which an app's own
+subclass can override, as Sequel Pro's line-number ruler does. Markers
+are added, drawn, dragged and dragged off with the client's say, and
+added with `trackMarker:withMouseEvent:`.
+
+Left out: animation, dragging items, drawn decoration views, the
+compositional layout and diffable data sources, and reading rulers' and
+the layouts' settings from nibs. The nib keys of the collection view are
+a guess, and the work was written from Apple's documentation and not
+compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -939,8 +976,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Next is running the apps again to
-   see which views they still miss.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Next is running the apps again to see which views they still miss.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

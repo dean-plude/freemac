@@ -4210,4 +4210,9 @@ typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
 - (NSArray<NSToolbarItemIdentifier> *)toolbarSelectableItemIdentifiers:(NSToolbar *)toolbar;
 @end
 
+/* ---- collection views and rulers (NSCollectionView.m, NSRulerView.m) ------------------ */
+
+#import <AppKit/NSCollectionView.h>
+#import <AppKit/NSRulerView.h>
+
 #endif

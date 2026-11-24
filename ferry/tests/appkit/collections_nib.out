@@ -1,0 +1,31 @@
+---- Collections.nib
+loaded 1
+collection view NSCollectionView, in the view 1
+selectable 1, multiple 1, empty 1, columns 2, rows 0
+smallest item 80x40, 1 background colour, white 0.9
+prototype a PetItem, view set, label is in it, text field the label 1
+item 0: a PetItem, a copy, label "Rex" in its view, text field the label 1, button to File's Owner
+  frame: 0,0 100x40
+item 1: a PetItem, a copy, label "Tib" in its view, text field the label 1, button to File's Owner
+  frame: 100,0 100x40
+item 2: a PetItem, a copy, label "Ozzy" in its view, text field the label 1, button to File's Owner
+  frame: 0,40 100x40
+views: 4, all different
+pressed: Rex Tib Ozzy
+renamed: label "Tibbles"; prototype's label ""
+---- CollectionsArchive.nib
+loaded 1
+collection view NSCollectionView, in the view 1
+selectable 1, multiple 1, empty 1, columns 2, rows 0
+smallest item 80x40, 1 background colour, white 0.9
+prototype a PetItem, view set, label is in it, text field the label 1
+item 0: a PetItem, a copy, label "Rex" in its view, text field the label 1, button to File's Owner
+  frame: 0,0 100x40
+item 1: a PetItem, a copy, label "Tib" in its view, text field the label 1, button to File's Owner
+  frame: 100,0 100x40
+item 2: a PetItem, a copy, label "Ozzy" in its view, text field the label 1, button to File's Owner
+  frame: 0,40 100x40
+views: 4, all different
+pressed: Rex Tib Ozzy
+renamed: label "Tibbles"; prototype's label ""
+exit=0

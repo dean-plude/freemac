@@ -533,4 +533,20 @@ static void warn_missing(NSString *name)
 
 /* Geometry is kept as strings ("{{x, y}, {w, h}}"), as in a keyed archive;
  * NSCoder's own decodeRectForKey: and its kin read those. */
+
+/* For copying a collection view's item prototype (NSNib.m), as
+ * NSKeyedUnarchiver has them. */
+- (NSUInteger)_ferryObjectCount { return _nobjects; }
+- (id)_ferryDecodedObjectAtIndex:(NSUInteger)index
+{
+    return index < _nobjects && _state[index] == DONE ? _decoded[index] : nil;
+}
+- (void)_ferrySeedObject:(id)object atIndex:(NSUInteger)index
+{
+    if (index >= _nobjects || _state[index] != UNSEEN || !object)
+        return;
+    _decoded[index] = [object retain];
+    _state[index] = DONE;
+}
+- (id)_ferryDecodeObjectAtIndex:(NSUInteger)index { return [self objectAt:(uint32_t)index]; }
 @end
