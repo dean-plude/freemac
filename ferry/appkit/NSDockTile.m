@@ -16,8 +16,12 @@
  * when freemac's Dock says it started (org.freemac.Dock Started), since it
  * forgets badges sent before it ran.
  *
- * The LauncherEntry badge is a number, so a badge label that isn't a
- * whole number above 0 can't be shown and is sent as no badge. A tile's
+ * The LauncherEntry badge is a number: a badge label that is a plain
+ * number goes as "count". Any other label ("New", "!", "99+") goes as
+ * "x-freemac-badge-label", which freemac's Dock shows in the badge in place
+ * of the number, with "count" 1 and "count-visible" true, so other docks
+ * still show that there is a badge; when it goes, an empty label is sent
+ * once to take it away. A label of "0" shows no badge. A tile's
  * contentView is drawn by display, and the picture is given to GTK as the
  * windows' icon, which X11 window managers show; no dock takes a picture
  * from LauncherEntry.
@@ -30,12 +34,14 @@ static const char *const DOCK_MENU_PATH = "/com/canonical/unity/launcherentry/fe
 
 static NSDockTile *app_tile;
 static BOOL urgent, have_menu, sent, watching;
+static BOOL label_sent;                 /* the dock was last sent a text label */
 static NSInteger attention;             /* the standing attention request, 0 for none */
 static id menu_server;                  /* the Dock menu, served over dbusmenu (NSStatusBar.m) */
 
 @interface NSDockTile (FerryPrivate)
 - (instancetype)_initWithOwner:(id)owner;
 - (NSInteger)_count;
+- (NSString *)_textLabel;
 @end
 
 static void send_update(void);
@@ -66,7 +72,10 @@ static void send_update(void)
                                            dock_started, NULL, NULL);
     }
     sent = YES;
-    NSInteger count = [app_tile _count];
+    NSString *label = [app_tile _textLabel];
+    NSInteger count = label ? 1 : [app_tile _count];
+    BOOL clear_label = !label && label_sent;
+    label_sent = label != nil;
     for (NSString *ident in ANotifyDesktopIDs()) {
         NSMutableArray *pairs = [NSMutableArray array];
         entry(pairs, "count", g_variant_new_int64(count));
@@ -74,6 +83,8 @@ static void send_update(void)
         entry(pairs, "urgent", g_variant_new_boolean(urgent));
         if (have_menu)
             entry(pairs, "quicklist", g_variant_new_string(DOCK_MENU_PATH));
+        if (label || clear_label)
+            entry(pairs, "x-freemac-badge-label", g_variant_new_string(label ? [label UTF8String] : ""));
         size_t n = [pairs count];
         GVariant **items = calloc(n, sizeof *items);
         for (size_t i = 0; i < n; i++)
@@ -223,16 +234,35 @@ NSInteger ADockRequestAttention(NSInteger type)
         send_update();
 }
 
-/* The number the dock can show: the label when it is a whole number above 0. */
+/* Whether the label is a plain number: 1 to 18 ASCII digits. */
+- (BOOL)_labelIsNumber
+{
+    NSUInteger n = [_badgeLabel length];
+    if (!n || n > 18)
+        return NO;
+    for (NSUInteger i = 0; i < n; i++) {
+        unichar c = [_badgeLabel characterAtIndex:i];
+        if (c < '0' || c > '9')
+            return NO;
+    }
+    return YES;
+}
+
+/* The number the dock can show: the label when it is a plain number. */
 - (NSInteger)_count
 {
-    if (!_showsApplicationBadge || ![_badgeLabel length] || [_badgeLabel length] > 18)
+    if (!_showsApplicationBadge || ![self _labelIsNumber])
         return 0;
-    NSCharacterSet *digits = [NSCharacterSet decimalDigitCharacterSet];
-    for (NSUInteger i = 0; i < [_badgeLabel length]; i++)
-        if (![digits characterIsMember:[_badgeLabel characterAtIndex:i]])
-            return 0;
     return [_badgeLabel integerValue];
+}
+
+/* The label as words, for a label that isn't a plain number; nil otherwise. */
+- (NSString *)_textLabel
+{
+    if (!_showsApplicationBadge || ![_badgeLabel length] || [self _labelIsNumber])
+        return nil;
+    NSString *trimmed = [_badgeLabel stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return [trimmed length] ? trimmed : nil;
 }
 
 /* The content view drawn as the tile, at the tile's size; the picture

@@ -515,6 +515,25 @@ its own count and progress bar after its icon. Post sends the unread count of
 every Inbox, Nudge the reminders due today or late; `"badges": false` in
 pier.json (Dials) hides them.
 
+Text badges and app Dock menus (`launcher_badge.py`, `dock_menu.py`):
+`launcher_badge.merge` folds each Update into the app's badge. A string
+`"x-freemac-badge-label"` (Ferry sends it for a Mac badge label that isn't a
+plain number, with `"count"` 1 and `"count-visible"` true for other docks)
+is drawn in the red badge in place of the count, cut to eight characters with
+an ellipsis and held to about the icon's width by Pango; an empty one takes
+it away. `"quicklist"` (an object path, sent as `o` or `s`) and the sender's
+bus name name the app's dbusmenu menu. When the Dock menu opens, `dock_menu.fetch`
+calls `AboutToShow(0)` and `GetLayout(0, -1, [])` asynchronously with a
+350 ms deadline; the rows (separators, disabled items, ticks and the mixed
+dash, submenus, hidden items left out) go below the app's windows and above
+the Dock's own items, each set between separators as on a Mac, and a
+choice sends `Event(id, "clicked", 0, time)`. A failure or a timeout opens
+the Dock's usual menu, and an app that timed out isn't asked again for 30
+seconds. An `"urgent"` app hops until it stops asking or one of its windows
+is activated (`launcher_badge.still_urgent`), and a hop that is in the air
+when the request ends lands first, so Ferry's informational request (urgent
+for one second) hops once. Tests: `python3 -m unittest discover -s shell/tests`.
+
 Stage Manager (1.107, `stage.py`, hosted by Pier because the Dock is always
 running): with `"stage": true` in pier.json it follows Wayfire's focus events.
 When a window of another app comes forward, every visible window of the

@@ -32,8 +32,8 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-from . import (alert, apps, held, launcher_badge, login_items, main_display, recents, stage, style,  # noqa: E402
-               volumes, webapps)
+from . import (alert, apps, dock_menu, held, launcher_badge, login_items, main_display, recents, stage,  # noqa: E402
+               style, volumes, webapps)
 from .wfipc import Wayfire, is_minimized, snapshot_dir  # noqa: E402
 
 BASE = 48          # icon size at rest
@@ -388,14 +388,18 @@ class TrashCan(Place):
 
 
 def draw_count(widget, cr, right, top, size, text, room):
-    """A red rounded badge with a white number, its top right corner a little
-    outside the icon's, as far as the item has room (room: its width)."""
+    """A red rounded badge with a white number (or an app's short label, such
+    as "New"), its top right corner a little outside the icon's, as far as
+    the item has room (room: its width). A label too long for the badge
+    ends in an ellipsis, so the badge is never much wider than the icon."""
     height = max(16.0, size * 0.36)
     layout = PangoCairo.create_layout(cr)
     font = Pango.FontDescription.from_string("Sans Bold")
     font.set_absolute_size(height * 0.62 * Pango.SCALE)
     layout.set_font_description(font)
     layout.set_text(text, -1)
+    layout.set_width(int(max(height, size * 1.1 - height * 0.55) * Pango.SCALE))
+    layout.set_ellipsize(Pango.EllipsizeMode.END)
     ink, logical = layout.get_pixel_extents()
     width = max(height, logical.width + height * 0.55)
     x = min(right + height * 0.22, room - 1) - width
@@ -435,6 +439,16 @@ def draw_progress(cr, x, y, width, height, fraction):
     cr.set_source_rgba(0.95, 0.95, 0.97, 0.95)
     cr.fill()
     cr.restore()
+
+
+def attention_hop(elapsed):
+    """Where an icon asking for attention is, elapsed seconds after it began:
+    (its height as a share of a full hop, whether it's resting on the Dock
+    between hops). Each hop takes BOUNCE_PERIOD, then ATTENTION_REST still."""
+    phase = (elapsed % (BOUNCE_PERIOD + ATTENTION_REST)) / BOUNCE_PERIOD
+    if phase >= 1:
+        return 0.0, True
+    return math.sin(math.pi * phase), False
 
 
 class Item(Gtk.Button):
@@ -513,7 +527,7 @@ class Item(Gtk.Button):
             self.title_count = count
             self.queue_draw()
         self.dot.set_opacity(1.0 if (views or alive) and self.pier.show_dots() else 0.0)
-        if views and not self.attention:
+        if views and not self.attention and not self.landing:
             self.stop_bounce()
 
     def running_app_id(self):
@@ -523,7 +537,7 @@ class Item(Gtk.Button):
         return self.alive or ""
 
     def _clicked(self, _button):
-        if self.menu and self.menu.get_visible():
+        if self.menu_coming or (self.menu and self.menu.get_visible()):
             return
         if self.views:
             hidden = self.pier.wf.hidden() if self.pier.wf else set()
@@ -562,7 +576,7 @@ class Item(Gtk.Button):
         if self.hold:
             GLib.source_remove(self.hold)
             self.hold = 0
-        elif self.menu and self.menu.get_visible():
+        elif self.menu_coming or (self.menu and self.menu.get_visible()):
             return True   # the hold opened the menu; don't also click
         return False
 
@@ -604,14 +618,18 @@ class Item(Gtk.Button):
         return self.info.get_id() if self.info is not None else None
 
     def _draw_badge(self, _widget, cr):
-        """A red count at the icon's top right, and a progress bar along its
-        foot, as an app asks for (see launcher_badge)."""
+        """A red count (or the app's own short label) at the icon's top right,
+        and a progress bar along its foot, as an app asks for (see
+        launcher_badge)."""
         badges = getattr(self.pier, "badges", None)
         if badges is None or not self.pier.show_badges():
             return False
-        count, progress = launcher_badge.shown(badges.get(self.badge_id()))
-        count = count or getattr(self, "title_count", 0)
-        if not count and progress is None:
+        badge = badges.get(self.badge_id())
+        text = launcher_badge.text_of(badge)
+        _count, progress = launcher_badge.shown(badge)
+        if text is None and getattr(self, "title_count", 0):
+            text = launcher_badge.badge_text(self.title_count)
+        if text is None and progress is None:
             return False
         alloc = self.image.get_allocation()
         origin = self.image.translate_coordinates(self, 0, 0)
@@ -622,9 +640,8 @@ class Item(Gtk.Button):
         y = origin[1] + (alloc.height - size) / 2
         if progress is not None:
             draw_progress(cr, x + size * 0.12, y + size * 0.78, size * 0.76, max(4, size * 0.1), progress)
-        if count:
-            draw_count(self, cr, x + size, y, size, launcher_badge.badge_text(count),
-                       self.get_allocated_width())
+        if text is not None:
+            draw_count(self, cr, x + size, y, size, text, self.get_allocated_width())
         return False
 
     @property
@@ -669,7 +686,29 @@ class Item(Gtk.Button):
         self.show()
         self.pier.end_drag()
 
+    # The app's own Dock menu items (dock_menu) are on their way.
+    menu_coming = False
+
     def show_menu(self):
+        """Open the app's Dock menu: its windows, then the app's own items when
+        it serves some (its LauncherEntry "quicklist"), then the Dock's, as on
+        a Mac. The app is asked without waiting on it; if it's slow or fails,
+        the menu opens with the Dock's items alone."""
+        if self.menu_coming:
+            return
+        badges = getattr(self.pier, "badges", None)
+        where = launcher_badge.menu_of(badges.get(self.badge_id())) if badges else None
+        if not where:
+            self._show_menu()
+            return
+        self.menu_coming = True
+
+        def arrived(rows):
+            self.menu_coming = False
+            self._show_menu(rows or (), where)
+        dock_menu.fetch(badges.bus, where[0], where[1], arrived)
+
+    def _show_menu(self, app_rows=(), where=None):
         name = apps.short_name(self.info) if self.info else apps.display_name(self.app_id)
         self.menu = Gtk.Menu()
 
@@ -703,6 +742,22 @@ class Item(Gtk.Button):
             item.connect("activate", lambda *_, view=view: self.show_window(view))
             self.menu.append(item)
         if views:
+            self.menu.append(Gtk.SeparatorMenuItem())
+        if app_rows:
+            # The app's own items, below its windows, as a Mac's Dock shows them.
+            def app_item(label, mark, ticks):
+                item = Gtk.MenuItem()
+                box = Gtk.Box(spacing=0)
+                tick = Gtk.Label(label=mark, xalign=0)
+                tick.set_size_request(18 if ticks or self.views else 0, -1)
+                box.pack_start(tick, False, False, 0)
+                box.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+                item.add(box)
+                return item
+            bus = self.pier.badges.bus
+            dock_menu.add_rows(self.menu, app_rows, app_item,
+                               lambda ident: dock_menu.click(bus, where[0], where[1], ident,
+                                                             Gtk.get_current_event_time()))
             self.menu.append(Gtk.SeparatorMenuItem())
         # The files this app had open lately, as a Mac's Dock lists them.
         recent = recents.for_app(self.info) if self.info else []
@@ -831,19 +886,32 @@ class Item(Gtk.Button):
     # hops, until you go to it (Strata's word, or the app's own "urgent").
     attention = False
 
+    # Asked to stop while in the air: this hop lands first, so a short
+    # request (a Mac app's informational one) always hops once, whole.
+    landing = False
+
     def set_attention(self, on):
         on = bool(on)
         if on == self.attention:
             return
         self.attention = on
         if not on:
-            self.stop_bounce()
+            if self.bouncing and not attention_hop(self._bounce_time())[1]:
+                self.landing = True
+            else:
+                self.stop_bounce()
+            return
+        if self.landing and self.bouncing:
+            self.landing = False   # asked again before it landed: it keeps hopping
             return
         settings = Gtk.Settings.get_default()
         if settings and not settings.props.gtk_enable_animations:
             return   # Reduce motion: no hopping
         self.stop_bounce()
         self.bouncing = (GLib.get_monotonic_time(), GLib.timeout_add(16, self._bounce_step))
+
+    def _bounce_time(self):
+        return (GLib.get_monotonic_time() - self.bouncing[0]) / 1e6 if self.bouncing else 0.0
 
     def bounce(self):
         settings = Gtk.Settings.get_default()
@@ -855,13 +923,15 @@ class Item(Gtk.Button):
         self.bouncing = (GLib.get_monotonic_time(), GLib.timeout_add(16, self._bounce_step))
 
     def _bounce_step(self):
-        started, _source = self.bouncing
-        elapsed = (GLib.get_monotonic_time() - started) / 1e6
-        if self.attention:
-            cycle = BOUNCE_PERIOD + ATTENTION_REST
-            phase = (elapsed % cycle) / BOUNCE_PERIOD
-            height = 0 if phase >= 1 else int(round(self.pier.base * BOUNCE_HEIGHT * math.sin(math.pi * phase)))
-            self.pier.lift(self.image, height)
+        elapsed = self._bounce_time()
+        if self.attention or self.landing:
+            lift, resting = attention_hop(elapsed)
+            if self.landing and resting:
+                self.landing = False
+                self.bouncing = None
+                self.pier.lift(self.image, 0)
+                return False
+            self.pier.lift(self.image, int(round(self.pier.base * BOUNCE_HEIGHT * lift)))
             return True
         if elapsed > BOUNCE_LIMIT:
             self.bouncing = None
@@ -875,6 +945,7 @@ class Item(Gtk.Button):
         return True
 
     def stop_bounce(self):
+        self.landing = False
         if self.bouncing:
             GLib.source_remove(self.bouncing[1])
             self.bouncing = None
@@ -1094,6 +1165,7 @@ class Pier(Gtk.Window):
         self.held = held.Watcher(on_change=lambda: GLib.idle_add(self.refresh))
         # Red counts on icons, from apps that send them (Post, Nudge, others).
         self.badges = launcher_badge.Listener(self._badges_changed)
+        self.urgent_seen = set()   # apps you went to since they last asked for you
         self._ask_for_badges()
         # Apps asking for attention: Strata tells the Dock over its socket.
         self.asking = set()
@@ -1373,7 +1445,11 @@ class Pier(Gtk.Window):
                 app_ids.add(item.app_id.lower())
             if isinstance(item.alive, str):
                 app_ids.add(item.alive.lower())
-            urgent = bool(badges and (badges.get(item.badge_id()) or {}).get("urgent"))
+            # An app's own "urgent" hops it until you go to it, as on a Mac.
+            desktop_id = item.badge_id()
+            active = any(v.get("activated") for v in item.views)
+            urgent = bool(badges) and launcher_badge.still_urgent(desktop_id, badges.get(desktop_id), active,
+                                                                   self.urgent_seen)
             item.set_attention(urgent or bool(app_ids & asking) or any(item.matches({"app-id": a}) for a in asking))
 
     def _listen(self):

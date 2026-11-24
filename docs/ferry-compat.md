@@ -824,11 +824,18 @@ why.
 
 The Dock is told about the app with the
 `com.canonical.Unity.LauncherEntry` signal, which freemac's Dock reads.
-NSApp's dockTile sends a badge label that is a number as the Dock's badge,
-`requestUserAttention:` makes the app's Dock icon ask for attention (for a
-second, or until the app becomes active for a critical request), and the
-delegate's `applicationDockMenu:` is served as a dbusmenu menu for docks that
-read one. The tile is sent again when freemac's Dock starts.
+NSApp's dockTile sends a badge label that is a plain number as the Dock's
+count, and any other label, such as "New" or "!", as words that freemac's
+Dock shows in the badge (`x-freemac-badge-label`, with a count of 1 for
+other docks). `requestUserAttention:` makes the app's Dock icon ask for
+attention (one bounce, or until the app becomes active for a critical
+request), and the delegate's `applicationDockMenu:` is served as a dbusmenu
+menu, which freemac's Dock shows in the app's right-click menu, below its
+windows. The tile is sent again when freemac's Dock starts.
+
+From freemac 1.208, a badge label that isn't a number, such as "New" or "!",
+shows as words in freemac's Dock badge, and the menu from the delegate's
+`applicationDockMenu:` shows in the app's right-click menu in freemac's Dock.
 
 ## What the apps need most
 

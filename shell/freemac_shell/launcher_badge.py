@@ -8,6 +8,13 @@ Update(app_uri, properties) on the session bus, where app_uri is
 "count-visible", "progress" (0 to 1) with "progress-visible", and "urgent",
 which makes the icon hop until you go to the app. The Dock
 listens for it and draws the badge; when the app quits, its badge goes.
+
+Two more properties give a Mac's Dock the rest of what it shows:
+"x-freemac-badge-label", a short text such as "New" or "!" shown in the
+red badge in place of the number (Ferry sends it for a Mac app's badge
+label that isn't a number), and "quicklist", the object path of a menu the
+app serves over dbusmenu, whose items go at the top of the app's
+right-click menu in the Dock (see dock_menu).
 """
 
 import gi
@@ -20,6 +27,11 @@ PATH = "/com/canonical/unity/launcherentry/freemac"
 # The Dock says when it starts, so apps already open send their badges again.
 DOCK_INTERFACE = "org.freemac.Dock"
 DOCK_PATH = "/org/freemac/Dock"
+
+# The badge's own text, for apps that send words rather than a number.
+LABEL_KEY = "x-freemac-badge-label"
+# Longer labels are cut, with an ellipsis, so the badge stays a badge.
+LABEL_LIMIT = 8
 
 _last = {}
 _watching = False
@@ -73,6 +85,17 @@ def badge_text(count):
     return str(count)
 
 
+def label_text(label):
+    """A badge label as the badge shows it: on one line, and cut with an
+    ellipsis past LABEL_LIMIT characters. None when there's nothing to show."""
+    text = " ".join(str(label or "").split())
+    if not text:
+        return None
+    if len(text) > LABEL_LIMIT:
+        text = text[:LABEL_LIMIT - 1].rstrip() + "\u2026"
+    return text
+
+
 def desktop_id_of(app_uri):
     """'application://name.desktop' to 'name.desktop'; None for anything else."""
     if not app_uri.startswith("application://"):
@@ -87,7 +110,7 @@ class Listener:
 
     def __init__(self, changed):
         self.changed = changed
-        self.badges = {}    # desktop id -> {"count", "progress"}
+        self.badges = {}    # desktop id -> its badge (see merge)
         self.senders = {}   # bus name -> set of desktop ids
         self.watches = {}   # bus name -> watch id
         try:
@@ -107,20 +130,9 @@ class Listener:
         except (TypeError, ValueError):
             return
         desktop_id = desktop_id_of(uri or "")
-        if not desktop_id:
+        if not desktop_id or not isinstance(props, dict):
             return
-        badge = dict(self.badges.get(desktop_id) or {})
-        if "count" in props:
-            badge["count"] = max(0, int(props["count"]))
-        if "count-visible" in props:
-            badge["count-visible"] = bool(props["count-visible"])
-        if "progress" in props:
-            badge["progress"] = min(1.0, max(0.0, float(props["progress"])))
-        if "progress-visible" in props:
-            badge["progress-visible"] = bool(props["progress-visible"])
-        if "urgent" in props:
-            badge["urgent"] = bool(props["urgent"])
-        self.badges[desktop_id] = badge
+        self.badges[desktop_id] = merge(self.badges.get(desktop_id), props, sender)
         if sender:
             self.senders.setdefault(sender, set()).add(desktop_id)
             if sender not in self.watches:
@@ -135,6 +147,79 @@ class Listener:
         for desktop_id in self.senders.pop(sender, ()):
             self.badges.pop(desktop_id, None)
         self.changed()
+
+
+def merge(badge, props, sender=None):
+    """The badge an app has after an Update with these properties: each one
+    sent replaces the one before, and the rest stay as they were. A value
+    of the wrong type is passed over, as other docks do."""
+    badge = dict(badge or {})
+
+    def take(key, convert):
+        if key in props:
+            try:
+                return convert(props[key])
+            except (TypeError, ValueError, OverflowError):
+                pass
+        return None
+
+    count = take("count", lambda v: max(0, int(v)))
+    if count is not None:
+        badge["count"] = count
+    for key in ("count-visible", "progress-visible", "urgent"):
+        if key in props and isinstance(props[key], (bool, int)):
+            badge[key] = bool(props[key])
+    progress = take("progress", lambda v: min(1.0, max(0.0, float(v))))
+    if progress is not None and progress == progress:   # not NaN
+        badge["progress"] = progress
+    if LABEL_KEY in props and isinstance(props[LABEL_KEY], str):
+        if props[LABEL_KEY].strip():
+            badge["label"] = props[LABEL_KEY]
+        else:
+            badge.pop("label", None)
+    if "quicklist" in props and isinstance(props["quicklist"], str):
+        # An object path ("o", as the spec has it, or "s", as libunity sends it);
+        # empty or "/" takes the menu away.
+        path = props["quicklist"]
+        if path and path != "/" and path.startswith("/"):
+            badge["quicklist"] = path
+        else:
+            badge.pop("quicklist", None)
+    if sender:
+        badge["sender"] = sender
+    return badge
+
+
+def text_of(badge):
+    """The words or number the red badge shows, or None for no badge: the
+    app's label when it sent one, else its count."""
+    if not badge or not badge.get("count-visible", True):
+        return None
+    label = label_text(badge.get("label"))
+    if label:
+        return label
+    count = badge.get("count", 0)
+    return badge_text(count) if count else None
+
+
+def menu_of(badge):
+    """(bus name, object path) of the app's Dock menu, or None."""
+    if not badge or not badge.get("quicklist") or not badge.get("sender"):
+        return None
+    return badge["sender"], badge["quicklist"]
+
+
+def still_urgent(desktop_id, badge, active, seen):
+    """Whether an app's icon should still hop for its "urgent": as on a Mac,
+    until you go to the app. seen holds the apps you went to since they
+    asked; it is kept up to date here, and an app that asks again after
+    it stopped asking hops again."""
+    if not (badge or {}).get("urgent"):
+        seen.discard(desktop_id)
+        return False
+    if active:
+        seen.add(desktop_id)
+    return desktop_id not in seen
 
 
 def shown(badge):
