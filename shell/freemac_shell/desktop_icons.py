@@ -41,7 +41,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
+from . import aliases, custom_icons, desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 from . import desktop_view  # noqa: E402
 from .drawer_info import item_info  # noqa: E402
@@ -224,7 +224,12 @@ def stack_picture(cards):
 
 
 def picture_for(path, info, icon=None):
-    """A small picture of the file: a thumbnail for pictures, else its icon."""
+    """A small picture of the file: its own icon from Get Info, a thumbnail
+    for pictures, else its kind's icon."""
+    if path:
+        own = custom_icons.pixbuf(aliases.original(path) or path, ICON)
+        if own is not None:
+            return own
     kind = info.get_content_type() if info else ""
     if kind and kind.startswith("image/") and info.get_size() < 40_000_000:
         try:

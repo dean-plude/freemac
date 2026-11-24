@@ -7,7 +7,8 @@ they say, it keeps a small full-text index in ~/.cache/freemac/seek.db
 Each time Seek opens, a background thread brings the index up to date:
 new and changed files are read again, deleted ones are dropped. Only text
 files, OpenDocument and Word documents are read, and only up to a size
-limit; hidden folders are skipped, as they are for names.
+limit; hidden folders are skipped, as they are for names. A file's comment
+from Get Info (1.173) is indexed with it, whatever kind of file it is.
 """
 import html
 import os
@@ -17,7 +18,7 @@ import zipfile
 
 from gi.repository import GLib
 
-from . import seek_settings
+from . import comments, seek_settings
 
 DB = os.path.join(GLib.get_user_cache_dir(), "freemac", "seek.db")
 MAX_BYTES = 2 * 1024 * 1024      # files bigger than this are left out
@@ -51,17 +52,21 @@ def candidates(home):
         if root.count(os.sep) - base_depth >= MAX_DEPTH:
             dirs[:] = []
         for name in files:
-            ext = os.path.splitext(name)[1].lower()
-            if name.startswith(".") or (ext not in TEXT and ext not in DOCUMENTS):
+            if name.startswith("."):
                 continue
+            ext = os.path.splitext(name)[1].lower()
             path = os.path.join(root, name)
+            readable = ext in TEXT or ext in DOCUMENTS
+            if not readable and not comments.get(path):
+                continue
             try:
                 st = os.stat(path)
             except OSError:
                 continue
-            if st.st_size > MAX_BYTES:
+            if st.st_size > MAX_BYTES and not comments.get(path):
                 continue
-            yield path, st.st_mtime, st.st_size
+            # The later of the two times: a new comment changes only ctime.
+            yield path, max(st.st_mtime, st.st_ctime), st.st_size
             count += 1
             if count >= MAX_FILES:
                 return
@@ -105,7 +110,11 @@ def update(home=None, stop=None):
         seen.add(path)
         if known.get(path) == mtime:
             continue
-        text = read_text(path)
+        ext = os.path.splitext(path)[1].lower()
+        text = read_text(path) if (ext in TEXT or ext in DOCUMENTS) and size <= MAX_BYTES else None
+        comment = comments.get(path)
+        if comment:
+            text = comment + "\n" + (text or "")
         db.execute("DELETE FROM words WHERE path = ?", (path,))
         if text:
             db.execute("INSERT INTO words (path, body) VALUES (?, ?)", (path, text))
