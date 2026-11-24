@@ -1346,6 +1346,15 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "bosun": ("Make a shortcut that does several things in one go", "bosun shortcuts automation automate workflow action steps script run gallery services keyboard shortcut quick action routine batch resize pictures pdf zip dark mode speak", [
+        "Open Bosun from Applications, or search for it with Seek.",
+        "To start from a ready-made shortcut, click Gallery, then Add Shortcut under the one you want. To start from nothing, click +.",
+        "Add steps by double-clicking them in the list on the right. Each step gets what the step before it made: words, files or a number.",
+        "Use the arrows on a step to move it, and × to take it out. Type {input} in a step's text to put in what the step before it made, or click Input.",
+        "Under Takes, choose Selected words or Files if the shortcut works on something you choose. Tick Show in Services to see it in every app's Services menu, or in Drawer's menu when you right-click files.",
+        "Click the play button on a shortcut to run it. Each step shows what it made, and a step that goes wrong turns red and says why.",
+        "To give a shortcut its own keys, click Keyboard Shortcut… and choose them under Bosun Shortcuts.",
+    ]),
     "language-region": ("Change how dates, times, numbers and money are written", "language region country locale format date time number decimal comma currency money first day of week monday sunday temperature celsius fahrenheit metric measurement uk britain europe", [
         "Choose Dials > Language & Region.",
         "Choose your country from Region. Every app then writes dates, times, numbers and money the way it's done there, for example 24/11/2026 and £1,234.56 in the United Kingdom.",

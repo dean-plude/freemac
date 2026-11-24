@@ -144,7 +144,10 @@ static void set_date(GtkWidget *label)
 	time_t now = time(NULL);
 	struct tm tm;
 	localtime_r(&now, &tm);
-	if(strftime(text, sizeof(text), "%A, %B %-d", &tm) > 0) gtk_label_set_text(GTK_LABEL(label), text);
+	/* freemac-lock gives the region's order (Language & Region). */
+	const char *format = g_getenv("FREEMAC_DATE_FORMAT");
+	if(format == NULL || *format == '\0' || strlen(format) > 32 || strchr(format, '%') == NULL) format = "%A, %B %-d";
+	if(strftime(text, sizeof(text), format, &tm) > 0) gtk_label_set_text(GTK_LABEL(label), text);
 }
 
 static gboolean tick(gpointer data)

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Bosun
+Comment=Put steps together into shortcuts that do a job in one go
+Exec=freemac-bosun
+Icon=freemac-bosun
+Categories=Utility;
+Keywords=shortcuts;automation;automator;workflow;script;steps;macro;quick action;services;
+StartupWMClass=org.freemac.Bosun
+StartupNotify=true

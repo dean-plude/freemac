@@ -65,6 +65,16 @@ SERVICE_SHORTCUTS = (
 )
 EVERY_SHORTCUT = SHORTCUTS + SERVICE_SHORTCUTS
 
+
+def bosun_shortcuts():
+    """A row for each of Bosun's shortcuts: keys that run it with
+    freemac-bosun (bosun_store). None at first."""
+    try:
+        from . import bosun_store
+        return tuple(("command", f"binding_bosun_{s['id']}", s["name"], "") for s in bosun_store.load())
+    except (ImportError, OSError):
+        return ()
+
 # Shown as on a Mac keyboard, in its order: Control, Option, Shift, Command.
 # Command is Super (Strata's Command key); Option is Alt.
 MODIFIERS = (("<ctrl>", "\u2303"), ("<alt>", "\u2325"), ("<shift>", "\u21e7"), ("<super>", "\u2318"))
@@ -166,11 +176,11 @@ def same(a, b):
 class Shortcuts:
     """The shortcut rows for the Keyboard panel."""
 
-    def __init__(self, window, ini_get, ini_set, group, row, items=SHORTCUTS, extra=None):
+    def __init__(self, window, ini_get, ini_set, group, row, items=SHORTCUTS, extra=None, restore=True):
         self.window, self.ini_get, self.ini_set = window, ini_get, ini_set
         self.items = items
         # A service with no keys is still on (its switch says so): "None", as on a Mac.
-        self.none = "None" if items is SERVICE_SHORTCUTS else "Off"
+        self.none = "Off" if items is SHORTCUTS else "None"
         self.labels = {}
         rows = []
         for section, option, title, default in items:
@@ -185,9 +195,10 @@ class Shortcuts:
             if extra:   # such as a switch that shows the service in menus
                 box.pack_start(extra(option), False, False, 0)
             rows.append(row(title, box))
-        reset = Gtk.Button(label="Restore All Shortcuts" if items is SHORTCUTS else "Restore These Shortcuts")
-        reset.connect("clicked", lambda _b: self.reset_all())
-        rows.append(row("Shortcuts as freemac ships them", reset))
+        if restore:   # Bosun's own shortcuts ship with no keys, so they have nothing to restore
+            reset = Gtk.Button(label="Restore All Shortcuts" if items is SHORTCUTS else "Restore These Shortcuts")
+            reset.connect("clicked", lambda _b: self.reset_all())
+            rows.append(row("Shortcuts as freemac ships them", reset))
         self.widget = group(*rows)
 
     def value(self, section, option, default):
@@ -195,7 +206,7 @@ class Shortcuts:
         return default if current is None else current
 
     def owner(self, binding, skip):
-        for section, option, title, default in EVERY_SHORTCUT:
+        for section, option, title, default in EVERY_SHORTCUT + bosun_shortcuts():
             if (section, option) == skip:
                 continue
             if any(same(binding, b) for b in alternatives(self.value(section, option, default))):
@@ -257,6 +268,10 @@ class Shortcuts:
             command = "command_" + option[len("binding_"):]
             if not self.ini_get(section, command, None):
                 self.ini_set(section, command, "freemac-service " + option[len("binding_service_"):])
+        if option.startswith("binding_bosun_"):
+            command = "command_" + option[len("binding_"):]
+            if not self.ini_get(section, command, None):
+                self.ini_set(section, command, "freemac-bosun --run " + option[len("binding_bosun_"):])
         self.ini_set(section, option, value)
         self.labels[(section, option)].set_text(describe_all(value, self.none))
 

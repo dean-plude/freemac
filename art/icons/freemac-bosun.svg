@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Bosun: three steps joined in a chain, ending in a play arrow. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5a8cf7"/><stop offset="0.55" stop-color="#8a5ae6"/><stop offset="1" stop-color="#e2558d"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="26" width="52" height="20" rx="8" fill="#ffffff" fill-opacity="0.95"/>
+  <rect x="36" y="54" width="52" height="20" rx="8" fill="#ffffff" fill-opacity="0.8"/>
+  <rect x="48" y="82" width="34" height="20" rx="8" fill="#ffffff" fill-opacity="0.65"/>
+  <path d="M40 46 v8 M52 74 v8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.8"/>
+  <circle cx="92" cy="92" r="16" fill="#ffffff"/>
+  <path d="M87 83.5 L100 92 L87 100.5 Z" fill="#8a5ae6"/>
+  <circle cx="32" cy="36" r="4" fill="#5a8cf7"/>
+  <circle cx="44" cy="64" r="4" fill="#8a5ae6"/>
+</svg>
