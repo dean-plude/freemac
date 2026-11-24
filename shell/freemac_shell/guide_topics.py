@@ -868,8 +868,11 @@ TOPICS = {
         "camera off.",
     ]),
     "battery": ("Keep an eye on the battery", "battery low charge charging power percentage time left plug in sleep reserve laptop health capacity cycle count low power mode saver usage history level", [
-        "The battery icon in the menu bar shows how much charge is left. Point at it to see how long it "
-        "will last, or how long until it's full while it charges. Click it for Dials > Battery.",
+        "The battery icon in the menu bar shows how much charge is left. Click it for the Battery menu: "
+        "the charge, whether it's on the battery or the power adapter, and how long it will last, or how "
+        "long until it's full while it charges.",
+        "The Battery menu also lists the apps using significant energy, which run the battery down "
+        "fastest. Click one to open Gauge. Battery Settings… opens Dials > Battery.",
         "When the battery runs down to 10%, and again at 5%, a notice asks you to plug in. At 2% the "
         "computer goes to sleep, so nothing you're working on is lost. Plug it in, then wake it.",
         "To hide the number next to the icon, turn off Show percentage in the menu bar in Dials > Battery.",
@@ -877,7 +880,8 @@ TOPICS = {
         "battery each of the last 10 days. Battery Health says Normal, or Service Recommended once it holds "
         "much less than it did new.",
         "Low Power Mode makes the battery last longer: choose Always, Only on Battery or Only on Power "
-        "Adapter. The battery in the menu bar turns yellow while it's on.",
+        "Adapter. The switch in the Battery menu turns it on or off at once. The battery in the menu bar "
+        "turns yellow while it's on.",
     ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "

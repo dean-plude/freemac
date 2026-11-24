@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.154 "Battery menu" (done)
+
+The menu bar's Battery menu, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Click the battery in the menu bar for its menu: the charge, Power Source (Battery or Power Adapter), and the time remaining, or Charging with the time until full, Not Charging or Battery Is Charged | Topline, battery_menu.py | done |
+| 2 | A Low Power Mode switch that turns it on or off at once; Dials > Battery keeps the finer choices | battery_menu.py, style.py | done |
+| 3 | Using Significant Energy: the apps whose processes (and the processes they started) used at least 15% of a processor core over the last half minute, busiest first; click one to open Gauge | energy.py, battery_menu.py | done |
+| 4 | A shared menu-bar popup that the Battery menu, and later ones, are built from | menubar_popup.py | done |
+| 5 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.153 "Wi-Fi menu" (done)
 
 The menu bar's Wi-Fi menu, as on a Mac, and a fix that lets every download join Wi-Fi.

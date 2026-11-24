@@ -452,7 +452,8 @@ class Battery(StatusButton):
     def __init__(self):
         super().__init__()
         self.set_always_show_image(True)
-        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "power"))
+        self.connect("clicked", lambda *_: self._clicked())
+        self.facts = None          # what update() last read, for the Battery menu
         self.warned = set()      # levels already warned about on this charge
         self.sleeping = False
         self.low_power = False
@@ -480,6 +481,7 @@ class Battery(StatusButton):
             tooltip += f" ({left} left)"
         plugged = battery.on_adapter(batteries[0])
         battery.record(capacity, plugged)
+        self.facts = {"capacity": capacity, "status": status, "left": left, "plugged": plugged}
         prefs = style.prefs()
         mode = prefs.get("low_power_mode", "never")
         if (mode, plugged) != self.low_power_for:
@@ -498,6 +500,9 @@ class Battery(StatusButton):
         if self.get_label() != label:
             self.set_label(label or "")
         self._warn(capacity, status == "Discharging")
+
+    def _clicked(self):
+        launch("freemac-dials", "--panel", "power")
 
     def _warn(self, capacity, discharging):
         if not discharging:
