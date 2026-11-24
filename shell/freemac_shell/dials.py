@@ -167,6 +167,7 @@ CSS = b"""
 .dials-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
 .dials-group { border-radius: 12px; background-color: rgba(120, 120, 150, 0.08); padding: 4px 0; }
 .dials-group row { padding: 10px 16px; }
+.dials-group flowbox, .dials-group flowboxchild { background-color: transparent; }
 .dials-caption { opacity: 0.65; font-size: 12px; }
 .dials-recovery-key { font-family: monospace; font-size: 20px; font-weight: 600; padding: 10px 14px; border-radius: 8px; background-color: rgba(120, 120, 150, 0.12); }
 .storage-key, .storage-key flowboxchild { background: none; padding: 0; }

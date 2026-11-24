@@ -561,7 +561,35 @@ def accessibility(window):
             "Hold a key and scroll to zoom in on the part of the screen under the pointer."),
         row("Zoom with", zoom_keys, "Apps also zoom their own pages with \u2303 Control and scrolling."),
     ), *hover_text_group(window), *reader_group(window), colour_filters(window), sticky_keys(window), slow_keys(window), mouse_keys(window), screen_keyboard_group(window),
-        audio_group(window), *spoken_content(window))
+        audio_group(window), *spoken_content(window), shortcut_group(window))
+
+
+def shortcut_group(window):
+    """Which features Option-Command-F5 lists in Accessibility Shortcuts
+    (shell.json "accessibility_shortcuts"; with one, the keys turn it on or
+    off at once)."""
+    group, row, _page, _slider, _switch = window.helpers
+    from . import a11y_shortcuts
+    every = a11y_shortcuts.features()
+    picked = {f[0] for f in a11y_shortcuts.chosen(every)}
+    flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=2,
+                       min_children_per_line=1, column_spacing=12, row_spacing=2, homogeneous=True)
+    boxes = []
+
+    def changed(_box):
+        window.save_prefs(accessibility_shortcuts=[ident for ident, box in boxes if box.get_active()])
+    for ident, name, _is_on, _turn in every:
+        box = Gtk.CheckButton(label=name, active=ident in picked)
+        box.connect("toggled", changed)
+        boxes.append((ident, box))
+        flow.add(box)
+    ticks = Gtk.ListBoxRow(activatable=False)
+    ticks.add(flow)
+    return group(
+        row("Accessibility Shortcuts", Gtk.Label(label="\u2325\u2318F5", valign=Gtk.Align.CENTER),
+            "Press Option-Command-F5 anywhere for a panel to turn these on or off. "
+            "With only one ticked, the keys turn it on or off straight away."),
+        ticks)
 
 
 HOVER_KEYS = (("command", "\u2318 Command"), ("option", "\u2325 Option"), ("control", "\u2303 Control"))
@@ -687,6 +715,9 @@ def colour_filters(window):
 
     def kind_set(combo):
         window.ini_set("strata-shell", "colour_filter", combo.get_active_id() or "none")
+        if combo.get_active_id() not in (None, "none"):
+            # Accessibility Shortcuts turns this filter back on (a11y_shortcuts.py).
+            window.save_prefs(colour_filter_last=combo.get_active_id())
         sensitive()
 
     kind.connect("changed", kind_set)

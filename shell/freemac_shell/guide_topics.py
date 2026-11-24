@@ -958,6 +958,13 @@ TOPICS = {
         "Drag Intensity to make the filter stronger or weaker. With Colour tint, click Tint colour to pick its colour.",
         "To see the screen's own colours again, set Colour filters to Off.",
     ]),
+    "accessibility-shortcuts": ("Turn accessibility features on or off quickly", "accessibility shortcuts option command f5 panel quick turn on off toggle screen reader zoom sticky keys slow keys mouse keys invert colour filters contrast transparency hover text keyboard", [
+        "Press \u2325\u2318F5 (Option-Command-F5) anywhere. A small panel lists the accessibility features, "
+        "with a tick by each one that's on.",
+        "Click a feature to turn it on or off, or move with the arrow keys and press Space. Click Done, or press Escape, when you're finished.",
+        "To choose which features the panel lists, choose Dials > Accessibility and tick them under Accessibility Shortcuts.",
+        "With only one feature ticked there, \u2325\u2318F5 turns that one on or off straight away, without the panel.",
+    ]),
     "sticky-keys": ("Press keyboard shortcuts one key at a time", "sticky keys modifier one hand one finger shift control option command shortcut hold two keys at once latch lock accessibility", [
         "Choose Dials > Accessibility and turn on Sticky Keys, or press Shift five times in a row.",
         "Now tap a modifier key such as \u2318 Command, then the key that goes with it: \u2318 then C copies. "

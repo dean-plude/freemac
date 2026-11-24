@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Accessibility Shortcuts
+Comment=Turn accessibility features on or off
+Exec=freemac-accessibility-shortcuts
+Icon=preferences-desktop-accessibility
+Categories=System;
+NoDisplay=true
+StartupWMClass=freemac-accessibility-shortcuts
