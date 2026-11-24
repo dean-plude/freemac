@@ -96,6 +96,13 @@ int main(void)
         NSData *d = [@"bytesé" dataUsingEncoding:NSUTF8StringEncoding];
         NSString *back2 = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
         printf("data %lu bytes, back equal %d\n", (unsigned long)[d length], [back2 isEqualToString:@"bytesé"]);
+        /* one-byte encodings: nil for a character the encoding lacks, '?' when lossy */
+        NSData *latin = [@"café" dataUsingEncoding:NSISOLatin1StringEncoding];
+        printf("latin1 %lu bytes, last %02x, euro %s, ascii %s, lossy %.*s\n",
+               (unsigned long)[latin length], ((const unsigned char *)[latin bytes])[3],
+               [@"5 €" dataUsingEncoding:NSISOLatin1StringEncoding] ? "data" : "nil",
+               [@"café" dataUsingEncoding:NSASCIIStringEncoding] ? "data" : "nil",
+               4, (const char *)[[@"café" dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes]);
     }
     return 0;
 }

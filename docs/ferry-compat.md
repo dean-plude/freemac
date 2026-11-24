@@ -505,6 +505,24 @@ downloading a file. Not yet supported:
 - background sessions, WebSockets and resume data;
 - Mac programs that bundle or link libcurl themselves.
 
+### XML documents (freemac 1.197, Ferry 0.24.0)
+
+`NSXMLDocument` reads a document into a tree of `NSXMLNode`s
+(`NSXMLElement`, attributes, namespaces, text, comments, processing
+instructions, and an `NSXMLDTD` with its declarations), with this
+system's libxml2 as a Mac's does. The tree is made of Objective-C objects,
+so an app can walk it, change it (insert, remove and replace children,
+attributes and namespaces, set values, detach and copy nodes), search it
+with `nodesForXPath:error:` (libxml2's XPath, on a copy of the tree made
+again after each change) and write it out again with `XMLString`,
+`XMLData` (UTF-8, UTF-16, ISO-8859-1 or US-ASCII) or pretty printed, or as
+canonical XML. Documents come from strings, data or files; errors come
+with libxml2's codes and line numbers, and `NSXMLDocumentValidate`
+checks a document against its DTD. XQuery, XSLT and HTML documents are
+left out. This was written from Apple's documentation and not compared
+with a Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of
+the apps that use `NSXMLDocument` has been run again with it.
+
 ## What the apps need most
 
 Counted over the nine apps:

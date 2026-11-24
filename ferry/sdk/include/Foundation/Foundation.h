@@ -301,6 +301,7 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (BOOL)getCString:(char *)buffer maxLength:(NSUInteger)max encoding:(NSStringEncoding)enc;
 - (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)enc;
 - (NSData *)dataUsingEncoding:(NSStringEncoding)enc;
+- (NSData *)dataUsingEncoding:(NSStringEncoding)encoding allowLossyConversion:(BOOL)lossy;
 - (BOOL)isEqualToString:(NSString *)other;
 - (NSComparisonResult)compare:(NSString *)other;
 - (NSComparisonResult)compare:(NSString *)other options:(NSStringCompareOptions)mask;
@@ -2066,6 +2067,7 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSRegularExpression.h>
 #include <Foundation/NSScanner.h>
 #include <Foundation/NSXMLParser.h>
+#include <Foundation/NSXMLDocument.h>
 #include <Foundation/NSProgress.h>
 #include <Foundation/NSOperation.h>
 #include <Foundation/NSCache.h>

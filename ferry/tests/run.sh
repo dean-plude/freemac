@@ -162,8 +162,8 @@ run_one foundation_dates "$here/foundation/dates.m" "$here/foundation/dates.out"
 run_one foundation_calendar "$here/foundation/calendar.m" "$here/foundation/calendar.out" -framework Foundation -fblocks
 run_one foundation_numbers "$here/foundation/numbers.m" "$here/foundation/numbers.out" -framework Foundation
 run_one foundation_iso8601 "$here/foundation/iso8601.m" "$here/foundation/iso8601.out" -framework Foundation
-# Tasks and pipes, regular expressions (ICU), scanners, XML (libxml2), operations, locks, caches, progress.
-for t in task regex scanner xmlparser operation cache; do
+# Tasks and pipes, regular expressions (ICU), scanners, XML (libxml2: events and trees), operations, locks, caches, progress.
+for t in task regex scanner xmlparser xmldocument operation cache; do
     run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -fblocks -framework Foundation
 done
 # Keyed archives (M5), the format of nib files.

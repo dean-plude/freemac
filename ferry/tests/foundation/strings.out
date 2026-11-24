@@ -55,4 +55,5 @@ line <first>
 line <second>
 line <third>
 data 7 bytes, back equal 1
+latin1 4 bytes, last e9, euro nil, ascii nil, lossy caf?
 exit=0

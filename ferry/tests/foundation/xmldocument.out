@@ -1,0 +1,175 @@
+== parse
+error: (null)
+version: 1.0
+encoding: UTF-8
+standalone: 1, kind document, children 2
+document index=0
+  comment value=" a catalogue " index=0
+  element name=catalog local=catalog prefix="" uri=urn:books ns[]=urn:books ns[p]=urn:prices @version=2 index=1
+    element name=book local=book prefix="" uri=urn:books @id=b1 @p:currency=EUR in urn:prices index=0
+      element name=title local=title prefix="" uri=urn:books index=0
+        text value="Dune & more" index=0
+      element name=p:price local=price prefix="p" uri=urn:prices index=1
+        text value="9.50" index=0
+    pi name=render value="fast" index=1
+    element name=book local=book prefix="" uri=urn:books @id=b2 index=2
+      element name=title local=title prefix="" uri=urn:books index=0
+        text value="Emma" index=0
+      element name=note local=note prefix="" uri=urn:books index=1
+        text value="A " index=0
+        element name=b local=b prefix="" uri=urn:books index=1
+          text value="fine" index=0
+        text value=" novel" index=2
+root string value: Dune & more9.50EmmaA fine novel
+root document is doc: 1
+next sibling: <?render fast?>
+previous sibling: (null)
+next node: <title>Dune &amp; more</title>
+previous node of the price: Dune &amp; more
+attribute id: b1
+attribute by local name and URI: p:currency="EUR"
+elementsForName p:price: <p:price>9.50</p:price>
+elementsForLocalName: 1
+resolve p: urn:prices
+resolve default: urn:books
+prefix for urn:prices: p
+prefix for the xml namespace: xml
+localName of p:price: price
+prefix of p:price: p
+== writing
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!-- a catalogue --><catalog xmlns="urn:books" xmlns:p="urn:prices" version="2"><book id="b1" p:currency="EUR"><title>Dune &amp; more</title><p:price>9.50</p:price></book><?render fast?><book id="b2"><title>Emma</title><note>A <b>fine</b> novel</note></book></catalog>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- a catalogue -->
+<catalog xmlns="urn:books" xmlns:p="urn:prices" version="2">
+    <book id="b1" p:currency="EUR">
+        <title>Dune &amp; more</title>
+        <p:price>9.50</p:price>
+    </book>
+    <?render fast?>
+    <book id="b2">
+        <title>Emma</title>
+        <note>A <b>fine</b> novel</note>
+    </book>
+</catalog>
+<book id='b1' p:currency='EUR'><title>Dune &amp; more</title><p:price>9.50</p:price></book>
+== xpath
+xpath //*[local-name()='title']: 2
+  element /catalog[1]/book[1]/title[1] = <title>Dune &amp; more</title>
+  element /catalog[1]/book[2]/title[1] = <title>Emma</title>
+xpath //p:price: 1
+  element /catalog[1]/book[1]/p:price[1] = <p:price>9.50</p:price>
+xpath //@id: 2
+  attribute /catalog[1]/book[1]/@id = id="b1"
+  attribute /catalog[1]/book[2]/@id = id="b2"
+xpath @p:currency: 1
+  attribute /catalog[1]/book[1]/@p:currency = p:currency="EUR"
+xpath processing-instruction(): 1
+  pi /catalog[1]/processing-instruction()[1] = <?render fast?>
+xpath /comment(): 1
+  comment /comment()[1] = <!-- a catalogue -->
+xpath /: 1
+  document / = <?xml version="1.0" encoding="UTF-8" standalone="yes"?><!-- a catalogue --><catalog xmlns="urn:books" xmlns:p="urn:prices" version="2"><book id="b1" p:currency="EUR"><title>Dune &amp; more</title><p:price>9.50</p:price></book><?render fast?><book id="b2"><title>Emma</title><note>A <b>fine</b> novel</note></book></catalog>
+xpath namespace::*: 3
+  namespace namespace::xml = xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  namespace /catalog[1]/namespace::p = xmlns:p="urn:prices"
+  namespace /catalog[1]/namespace:: = xmlns="urn:books"
+xpath count(//*): error 1
+xpath //[: error 1207
+== changing the tree
+added: <book id="b3" lang="fr &amp; &quot;en&quot;&#10;"><title>Les &lt;Misérables&gt;</title><!-- new --></book>
+xpath //*[local-name()='book']/@id: 3
+  attribute /catalog[1]/book[1]/@id = id="b3"
+  attribute /catalog[1]/book[2]/@id = id="b1"
+  attribute /catalog[1]/book[3]/@id = id="b2"
+removed book has no parent: 1
+xpath //*[local-name()='book']/@id: 2
+  attribute /catalog[1]/book[1]/@id = id="b3"
+  attribute /catalog[1]/book[2]/@id = id="b2"
+xpath //*[local-name()='title'][.='Germinal']/../@id: 1
+  attribute /catalog[1]/book[1]/@id = id="b3!"
+two text nodes: 2
+after normalizing: <book id="b3!">ab</book>
+replaced and inserted: <book id="b3!"><?go?><x></x><y></y></book>
+q:w resolves its URI: urn:q
+xpath //q:*: 2
+  element /catalog[1]/book[1]/x[1]/q:z[1] = <q:z></q:z>
+  element /catalog[1]/book[1]/x[1]/q:w[1] = <q:w></q:w>
+xpath //q:*: 1
+  element /catalog[1]/book[1]/x[1]/q:w[1] = <q:w></q:w>
+exception NSInternalInconsistencyException
+exception NSInvalidArgumentException
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- a catalogue -->
+<catalog xmlns="urn:books" xmlns:p="urn:prices" version="2">
+    <book id="b3!">
+        <?go?>
+        <x xmlns:q="urn:q">
+            <q:w></q:w>
+        </x>
+        <y></y>
+    </book>
+    <?render fast?>
+    <book id="b2">
+        <title>Emma</title>
+        <note>A <b>fine</b> novel</note>
+    </book>
+</catalog>
+== building
+<list n="2"><item>1</item><empty></empty></list>
+latin-1 data: 103 bytes, <?xml version="1.0" encoding="ISO-8859-1"?><list n="2"><item>café &#x20AC;</item><empty></empty></list>
+ascii: <?xml version="1.0" encoding="US-ASCII"?><list n="2"><item>caf&#xE9; &#x20AC;</item><empty></empty></list>
+utf-16: 186 bytes, read back as UTF-16: <list n="2"><item>café €</item><empty></empty></list>
+new root: <?xml version="1.0" encoding="UTF-16"?><other></other>, list parent nil
+object values: count="42" 1971-01-01T00:00:00Z ok="true"
+resolved: a < b ☺ &c
+cdata: <![CDATA[x]]]]><![CDATA[>y]]>
+element from NSXMLNode: NSXMLElement
+== element from a string
+<a k="v"><b></b>t</a> parent=nil
+copy <a k="w"><b></b>t</a>, original <a k="v"><b></b>t</a>
+xpath b: 1
+  element a[1]/b[1] = <b></b>
+xpath /a/text(): 1
+  text a[1]/text()[1] = t
+== options
+default:  <r><a>  x  </a><b> </b>
+  &lt;c&gt;
+</r>
+preserve: <r>
+  <a>  x  </a>
+  <b> </b>
+  <![CDATA[<c>]]>
+</r>
+version without a declaration: (null)
+broken: nil, error 76: Line 1: Opening and ending tag mismatch: b line 1 and a
+tidied: <a><b>text</b></a>
+empty: nil, error 4
+not validated: parsed, validated: nil (error 534)
+== DTD
+dtd note public -//Ferry//Note//EN system note.dtd, 3 declarations
+  entity-decl who kind 1 value "the world": <!ENTITY who "the world">
+  element-decl note kind 19 value "(#PCDATA)": <!ELEMENT note (#PCDATA)>
+  attribute-decl kind kind 6 value "CDATA "plain"": <!ATTLIST note kind CDATA "plain">
+entity: the world
+attribute declaration: <!ATTLIST note kind CDATA "plain">
+text: Hello the world
+<!DOCTYPE note PUBLIC "-//Ferry//Note//EN" "note.dtd" [
+<!ENTITY who "the world">
+<!ELEMENT note (#PCDATA)>
+<!ATTLIST note kind CDATA "plain">
+]><note>Hello the world</note>
+made: <!ENTITY logo SYSTEM "logo.png" NDATA png> kind 3 notation png external 1
+changed entity: <!ENTITY who "everyone">
+predefined: &
+== canonical
+<r xmlns:z="urn:z" a="1" b="2"><!--c--><z:e></z:e></r>
+<r xmlns:z="urn:z" a="1" b="2"><z:e></z:e></r>
+<z:e xmlns:z="urn:z"></z:e>
+== data and files
+latin-1 in: naïve (ISO-8859-1)
+from the file: parsed, same text 1
+file URI is a file URL: 1
+from the web: nil, NSCocoaErrorDomain 262
+== replacement classes
+Library Book Book
+exit=0

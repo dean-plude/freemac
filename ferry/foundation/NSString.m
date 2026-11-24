@@ -345,6 +345,31 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
 }
 - (NSData *)dataUsingEncoding:(NSStringEncoding)enc
 {
+    return [self dataUsingEncoding:enc allowLossyConversion:NO];
+}
+/* ASCII and ISO Latin 1 give one byte a character; a character either lacks
+ * gives nil, or '?' when a lossy conversion is allowed, as on a Mac. Every
+ * other encoding but UTF-16 is written as UTF-8. */
+- (NSData *)dataUsingEncoding:(NSStringEncoding)enc allowLossyConversion:(BOOL)lossy
+{
+    if (enc == NSASCIIStringEncoding || enc == NSISOLatin1StringEncoding) {
+        unichar top = enc == NSASCIIStringEncoding ? 0x7f : 0xff;
+        WITH_CHARS(self, c, n);
+        NSMutableData *d = [NSMutableData dataWithLength:n];
+        unsigned char *out = [d mutableBytes];
+        for (NSUInteger i = 0; i < n; i++) {
+            if (c[i] <= top) {
+                out[i] = (unsigned char)c[i];
+            } else if (lossy) {
+                out[i] = '?';
+            } else {
+                d = nil;
+                break;
+            }
+        }
+        DONE_CHARS(c);
+        return d;
+    }
     if (enc == NSUnicodeStringEncoding) {
         WITH_CHARS(self, c, n);
         NSData *d = [NSData dataWithBytes:c length:n * 2];

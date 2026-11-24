@@ -1113,6 +1113,7 @@ The new or extended ones:
 | `foundation_urlsession` (ARC, dispatch) | (freemac (1.196), Ferry 0.23.0) `NSURLSession` against a server on 127.0.0.1: data tasks with handlers (task state before and after `resume`, handler run after `resume` returns), `NSHTTPURLResponse` (status, MIME type, charset, length, headers in any case, suggested name), POST/PUT/DELETE/HEAD with bodies and headers, 404 and 204 not being errors, redirects, gzip, the URL errors (can't connect -1004, timeouts -1001 while connecting and mid-body, no host -1000, unsupported URL -1002, redirect loop -1007, connection lost -1005, cancel -999), cancelling before and after `resume`, tasks together in a dispatch group, the configuration and session headers, delegates (data, refused response, upload progress, download progress, invalidation), download tasks to a temp file removed after the handler, upload tasks, and a handler under `dispatch_main()` |
 | `foundation_urlconnection` (manual retain/release) | (freemac (1.196), Ferry 0.23.0) `NSURLConnection`: synchronous (200, 404, closed port), asynchronous (on the main queue or a private one; a redirect; a bad URL), with a delegate (PATCH with a body, a closed port, `startImmediately:NO`, cancel), `canHandleRequest:`; `NSData` and `NSString` `...ContentsOfURL:` over http (charset from the response, Cocoa error 256 with the URL error underneath); requests and responses made by hand (header case, `addValue:`, copies, Content-Type parsing, status texts) |
 | `libcurl loaded only when loading URLs` (check in `run.sh`) | (freemac (1.196), Ferry 0.23.0) a Foundation program that loads no URL never opens libcurl (`LD_DEBUG`) |
+| `foundation_xmldocument` | (freemac (1.197), Ferry 0.24.0) `NSXMLDocument` on libxml2: a document with a declaration, a comment, a processing instruction, a default and a prefixed namespace and an entity read into objects (kinds, names, local names, prefixes, URIs, namespaces, attributes, string values, indexes and levels, siblings, next and previous nodes, `elementsForName:` with a prefix, `elementsForLocalName:URI:`, `attributeForLocalName:URI:`, resolving namespaces and prefixes); written out compact, pretty printed, with compact empty elements and single quotes; XPath (by local name, with a prefix, attributes, a relative path, processing instructions, comments, the document, the namespace axis, a result that isn't nodes and a bad expression); the tree changed (inserting, removing, replacing, `setChildren:`, `insertChildren:atIndex:`, a duplicate attribute ignored, removing an attribute, setting string values, normalizing text nodes, a namespace added and a node detached) and XPath and `XMLString` seeing every change; a node that has a parent and an attribute added as children (exceptions); documents built in code, written as ISO-8859-1, US-ASCII (character references) and UTF-16 data and read back; `setRootElement:`; object values (a number, a date, a boolean); resolving entities; CDATA with `]]>` in it; `NSXMLNode` making an `NSXMLElement` for its kind; an element from a string, copied deeply; whitespace and CDATA with and without the preserve options; a document that isn't well formed (error 76 and its line), tidied, empty (error 4) and invalid with `NSXMLDocumentValidate`; a DTD with public and system ids, an entity, an element and an attribute declaration (kinds, values, written back, changed), a declaration made from a string, a predefined entity; canonical XML with and without comments, and of an element; data in ISO-8859-1, a file URL, a web URL refused; a document class whose `replacementClassForClass:` makes its own elements |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1658,6 +1659,120 @@ The new or extended ones:
   - The order of `didReceiveData:` chunks against `didSendBodyData:` for an
     upload with a large response.
 
+- **NSXMLDocument and its tree** (freemac (1.197), Ferry 0.24.0).
+  - **Missing**: `objectsForXQuery:error:` and
+    `objectsForXQuery:constants:error:`, XSLT
+    (`objectByApplyingXSLT:arguments:error:` and the others),
+    `validateAndReturnError:` (a document is only validated as it is
+    read, with `NSXMLDocumentValidate`), and NSCoding for the nodes.
+  - **HTML**: `NSXMLDocumentTidyHTML` is refused with an error, and
+    `documentContentKind` (HTML, XHTML, text) and `MIMEType` are kept but
+    change nothing in what is written.
+    `NSXMLDocumentIncludeContentTypeDeclaration` is ignored.
+  - **Options read but not kept**: libxml2's tree doesn't record how the
+    text was written, so `NSXMLNodePreserveEntities`,
+    `NSXMLNodePreserveCharacterReferences`, `NSXMLNodePreservePrefixes`,
+    `NSXMLNodePreserveEmptyElements`, `NSXMLNodePreserveQuotes` and
+    `NSXMLNodePromoteSignificantWhitespace` have no effect on parsing;
+    entities are always written out as their text, empty elements as
+    `<a></a>` (unless `NSXMLNodeCompactEmptyElement` is given when
+    writing) and attributes in double quotes. Attributes and namespaces
+    always keep the order they were read or added in.
+  - **Entities**: external entities and an external DTD are only read
+    with `NSXMLNodeLoadExternalEntitiesAlways` (or
+    `NSXMLDocumentValidate`), and then only from files, never the
+    network; `NSXMLNodeLoadExternalEntitiesSameOriginOnly` loads nothing.
+    A reference to an entity that wasn't read is dropped from the text.
+  - **URLs**: `initWithContentsOfURL:options:error:` (and `NSXMLDTD`'s)
+    read files only; any other URL gives `NSCocoaErrorDomain` 262.
+  - **XPath**: a result that isn't a set of nodes (`count(...)`,
+    `string(...)`) is an error rather than an answer; there is no XQuery
+    to give it.
+  - **DTDs**: only as far as reading a document needs. Notation
+    declarations in a document's DTD aren't read (libxml2 keeps them
+    apart from the others); `NSXMLDTD`'s `initWithData:options:error:`
+    reads the declarations as a document's internal subset would, so a
+    DTD file with conditional sections or parameter entities used between
+    declarations may be refused. Declarations aren't checked or used once
+    the document has been read.
+  - **Encodings for `XMLData`**: UTF-8, UTF-16 (little-endian, with a byte
+    order mark), ISO-8859-1 and US-ASCII; a document whose
+    `characterEncoding` names another encoding is written in UTF-8 under
+    that name.
+  - **XInclude**: `NSXMLDocumentXInclude` is passed to libxml2 and not tested.
+- **Strings in one-byte encodings** (freemac (1.197), Ferry 0.24.0).
+  `dataUsingEncoding:` with ASCII or ISO Latin 1 now gives one byte a
+  character, and nil (or `?` with `allowLossyConversion:YES`) for a
+  character the encoding lacks; before, it gave UTF-8. Other encodings
+  but UTF-16 are still written as UTF-8.
+- **NSXMLDocument and its tree** (freemac (1.197), Ferry 0.24.0). Chosen
+  from the documentation, without a Mac to check:
+  - **Writing**: no line break after the XML declaration or between a
+    document's top-level nodes unless pretty printing, and none at the
+    end; pretty printing indents by four spaces, puts each child of an
+    element that holds no text on its own line and leaves an element with
+    text (mixed content) on one line; empty elements as `<a></a>` by
+    default; `>` written as `&gt;`, a carriage return as `&#13;`, and in
+    attributes `"`, a line break and a tab as `&quot;`, `&#10;` and
+    `&#9;`; `]]>` inside CDATA split into two sections. The XML
+    declaration is written only when the document has a version, an
+    encoding or is standalone, with version "1.0" if none was set, and
+    `standalone="yes"` only (never `"no"`). `description` is `XMLString`.
+  - **Reading**: whitespace-only text is dropped where an element has
+    other children (elements, comments, processing instructions) and kept
+    where it is the element's only content; without
+    `NSXMLNodePreserveCDATA` a CDATA section becomes text and joins the
+    text next to it; an entity's text joins the text around it.
+    `version` is nil when there was no XML declaration, and
+    `characterEncoding` is the encoding the declaration names (nil when
+    it names none). `NSXMLDocumentTidyXML` is libxml2's recovery mode.
+  - **Errors**: `NSXMLParserErrorDomain` with libxml2's codes (76 for a
+    mismatched tag, 534 and the like for an invalid document, 1207 for a
+    bad XPath expression), error 4 for an empty string or empty data,
+    `NSLocalizedDescriptionKey` as "Line N: libxml2's message", and
+    `NSXMLParserErrorLineNumber`, `NSXMLParserErrorColumn` and
+    `NSXMLParserErrorMessage` in `userInfo`; a non-node XPath result is
+    code 1.
+  - **Trees**: `children`, `attributes` and `namespaces` are nil (not
+    empty arrays) when there are none; `addAttribute:` and
+    `addNamespace:` ignore a node whose name (prefix) the element already
+    has; `setRootElement:` replaces the old root element where it was and
+    keeps the document's comments and processing instructions (nil removes
+    it); `setStringValue:` on an element replaces its children with one
+    text node (none for an empty string) and does nothing on a document;
+    adding a node that has a parent raises
+    `NSInternalInconsistencyException`, a node of the wrong kind
+    `NSInvalidArgumentException` (with Ferry's own wording);
+    `setVersion:` refuses anything but "1.0" and "1.1";
+    `-[NSXMLNode initWithKind:]` gives an `NSXMLElement`, `NSXMLDocument`,
+    `NSXMLDTD` or `NSXMLDTDNode` for those kinds.
+  - **Names and namespaces**: `prefix` is the empty string when there is
+    none; an element made without a URI takes the one its prefix (or the
+    default namespace) has where it is in the tree; `resolveNamespaceForName:`
+    for a name without a prefix answers the default namespace;
+    `predefinedNamespaceForPrefix:` knows `xml`, `xs`, `xsi` and `fn`.
+  - **Places**: `level` counts ancestors (a document's root element is at
+    level 1); `XPath` gives every step a position (`/catalog[1]/book[2]`,
+    `text()[1]`, `@id`, `namespace::p`), with no leading `/` for a node
+    outside a document.
+  - **XPath**: prefixes in an expression are those declared anywhere in
+    the tree, those in scope where the search starts taking precedence;
+    names without a prefix match only elements in no namespace (XPath
+    1.0, as libxml2 does it); a namespace node in a result that no element
+    declares (the `xml` one) is a new node with no parent.
+  - **Values**: an object value is written as XML Schema writes it: a
+    boolean `NSNumber` as `true`/`false`, an `NSDate` as
+    `1971-01-01T00:00:00Z` (UTC), `NSData` as upper-case hexadecimal;
+    `setStringValue:resolvingEntities:` knows the five predefined entities
+    and character references.
+  - **Canonical XML**: C14N 1.0 (inclusive); an element's canonical form
+    carries the namespaces in scope from its ancestors.
+  - **DTD nodes**: an element or attribute declaration's `stringValue` is
+    the rest of the declaration after its name (`(#PCDATA)`,
+    `CDATA "plain"`), an entity's is its replacement text; a declaration
+    is written as libxml2 read it until it is changed, then as Ferry
+    writes it.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -1727,3 +1842,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.21.0 (freemac (1.194)): `NSTask`, `NSPipe` and `NSFileHandle`, `NSRegularExpression` on ICU, `NSScanner`, `NSXMLParser` on libxml2, `NSOperationQueue` and its operations, the locks, `NSCache` and `NSProgress`; ICU and libxml2 reached through a new core call, `ferry_twin_symbol`, only when first used; the desktop's notice for an app Ferry can't run now says "Ferry can't run this app yet" and keeps the app's output in `~/.cache/freemac/ferry/<app>.log` (1.193), `make check` 93/93.
 - 2026-11-24: Ferry 0.22.0 (freemac (1.195)): `NSStepper`, `NSLevelIndicator`, `NSColorWell` with a basic `NSColorPanel`, `NSDatePicker` (text with a stepper, or a calendar and a clock), `NSComboBox`, `NSPopover` (and view controllers presented as popovers), `NSPathControl`, `NSSound` (through `pw-play`, `paplay` or `aplay`) and `NSTokenField`, each with its cell and read from nibs, `make check` 94/94.
 - 2026-11-24: Ferry 0.23.0 (freemac (1.196)): loading http and https URLs through this system's libcurl, opened only when a program first loads one: `NSURLSession` (data, upload and download tasks, handlers and delegates, a serial operation queue of its own when none is given), `NSURLConnection`, `NSURLRequest`, `NSHTTPURLResponse`, `NSURLErrorDomain` and `NSData`'s and `NSString`'s `...ContentsOfURL:` for web addresses; a new core call, `ferry_network_symbol`, `make check` 97/97.
+- 2026-11-24: Ferry 0.24.0 (freemac (1.197)): `NSXMLDocument`, `NSXMLNode`, `NSXMLElement`, `NSXMLDTD` and `NSXMLDTDNode` on libxml2 (a tree of objects that can be walked, changed, searched with XPath and written out again, pretty printed or canonical); `dataUsingEncoding:` with ASCII and ISO Latin 1 converting for real, and `dataUsingEncoding:allowLossyConversion:`, `make check` 98/98.
