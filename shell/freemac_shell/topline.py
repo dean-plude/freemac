@@ -15,8 +15,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import (announce, apps, focus_menu, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
-               quick, main_display, recent_items, services, status, style, wifi_menu,
+from . import (announce, apps, beacon, dials_time, fallback_menus, focus_menu, held, helpsearch,  # noqa: E402
+               mac_accel, now_playing_menu, quick, main_display, recent_items, services, status, style, wifi_menu,
                battery_menu, bluetooth_menu, extras)
 from . import dials_keys  # noqa: E402
 from .ini import ini_get  # noqa: E402
@@ -194,9 +194,11 @@ class Topline(Gtk.Window):
         wifi, bluetooth = wifi_menu.WifiMenu(), bluetooth_menu.BluetoothMenu()
         quick_settings.menus.update(wifi=wifi, bluetooth=bluetooth)
         self.holders = {}
-        for name, indicator in (("focus", self.dnd), ("battery", battery_menu.BatteryMenu()),
+        for name, indicator in (("seek", now_playing_menu.Seek()), ("focus", self.dnd),
+                                ("battery", battery_menu.BatteryMenu()),
                                 ("sound", status.Sound()), ("wifi", wifi), (None, status.VPN()),
-                                ("bluetooth", bluetooth), (None, status.Printing()), (None, status.Recording()),
+                                ("bluetooth", bluetooth), ("nowplaying", now_playing_menu.NowPlayingMenu()),
+                                (None, status.Printing()), (None, status.Recording()),
                                 (None, status.ScreenShared()), (None, status.InUse()), (None, status.InputMenu()),
                                 (None, status.UserMenu())):
             indicator.get_style_context().add_class("status")

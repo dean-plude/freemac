@@ -792,6 +792,8 @@ class DialsWindow(Gtk.ApplicationWindow):
         ("sound", "Sound", "Change the volume and where sound plays."),
         ("battery", "Battery", "Only on a computer with a battery."),
         ("focus", "Focus", "Its symbol shows while a Focus is on. Click it to change or turn off the Focus."),
+        ("nowplaying", "Now Playing", "Shows while music or a video plays, with the track and its controls."),
+        ("seek", "Seek", "A magnifying glass that opens Seek, as \u2318Space does."),
     )
 
     def menu_bar_choices(self):

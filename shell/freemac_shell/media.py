@@ -61,6 +61,10 @@ def describe(bus, name):
         "title": meta.get("xesam:title") or "",
         "artist": ", ".join(a for a in artist if a),
         "art": meta.get("mpris:artUrl") or "",
+        "album": meta.get("xesam:album") or "",
+        # Microseconds; 0 when the player doesn't say.
+        "length": int(meta.get("mpris:length") or 0),
+        "position": int(props.get("Position") or 0),
         "status": props.get("PlaybackStatus") or "Stopped",
         "can_play": bool(props.get("CanPlay", True)) or bool(props.get("CanPause", True)),
         "can_next": bool(props.get("CanGoNext", False)),

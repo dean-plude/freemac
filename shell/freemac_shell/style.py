@@ -63,6 +63,13 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .sound-menu-item:hover { background-color: alpha(currentColor, 0.08); }
 .sound-device { border-radius: 50%; padding: 5px; background-color: alpha(currentColor, 0.12); }
 .sound-device-on { background-color: @theme_selected_bg_color; color: white; }
+/* Now Playing in the menu bar (now_playing_menu.py). */
+.now-playing-blank { border-radius: 8px; background-color: alpha(currentColor, 0.1); color: @dim; }
+.now-playing-progress trough { min-height: 4px; border-radius: 2px; background-color: alpha(currentColor, 0.15); }
+.now-playing-progress progress { min-height: 4px; border-radius: 2px; background-color: @dim; }
+.now-playing-time { font-feature-settings: "tnum"; }
+.now-playing-control { padding: 4px; border-radius: 50%; color: @ink; }
+.now-playing-control:hover { background-color: alpha(currentColor, 0.08); }
 .sound-mute, .sound-mute:checked { background: none; border: none; box-shadow: none; padding: 2px 4px; color: @ink; }
 .sound-mute:checked { color: @dim; }
 .pier-sep { background-color: @edge; min-width: 1px; margin: 8px 6px; }

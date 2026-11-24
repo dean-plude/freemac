@@ -81,8 +81,8 @@ TOPICS = {
     ]),
     "seek": ("Search with Seek", "seek search find spotlight calculate sum file convert conversion units "
              "miles kilometres celsius fahrenheit pounds kilograms cups", [
-        "Press ⌘Space, type, and press Return to open the first result. The arrow keys move "
-        "down the list.",
+        "Press ⌘Space, or click the magnifying glass in the menu bar, type, and press Return to open the "
+        "first result. The arrow keys move down the list.",
         "Seek finds apps, settings, the menu items of the app in front, files by their names "
         "and by the words inside them.",
         "Type a sum such as 12*7 to see the answer; Return copies it.",
@@ -704,8 +704,8 @@ TOPICS = {
         "- Space plays and pauses, ⌘→ and ⌘← go to the next and previous song.",
         "- The buttons at the top turn shuffle and repeat on and off. Click repeat again to repeat one song.",
         "- Type in the search field to find a song, an artist or an album.",
-        "The song playing shows in the menu bar's quick settings, and the media keys on your keyboard work "
-        "even when Shanty is behind other windows.",
+        "The song playing shows under the music note in the menu bar, with its buttons, and the media keys "
+        "on your keyboard work even when Shanty is behind other windows.",
     ]),
     "videos": ("Watch a video", "video movie film play watch mp4 mov quicktime player reel full screen", [
         "Reel plays videos. Double-click a video in Drawer. Or press ⌘Space, type Reel, and double-click "
@@ -901,11 +901,17 @@ TOPICS = {
         "connect. Clicking the words of the others turns them on or off too.",
         "Settings… at the bottom opens Dials.",
     ]),
-    "menu-bar-icons": ("Choose which icons show in the menu bar", "menu bar icons hide show remove wifi wi-fi bluetooth sound volume battery focus control centre center clutter", [
+    "menu-bar-icons": ("Choose which icons show in the menu bar", "menu bar icons hide show remove wifi wi-fi bluetooth sound volume battery focus now playing seek search control centre center clutter", [
         "Open Dials > Dock and Menu Bar. Under the menu bar settings, turn Show Wi-Fi, Bluetooth, Sound, "
-        "Battery or Focus in menu bar on or off.",
+        "Battery, Focus, Now Playing or Seek in menu bar on or off.",
         "An icon you turn off leaves the menu bar at once. Wi-Fi, Bluetooth, Focus and the volume are still "
         "in Quick Settings, the symbol beside the clock.",
+    ]),
+    "now-playing": ("Control music and videos from the menu bar", "now playing music song track video play pause skip next previous album cover menu bar controls media", [
+        "While an app plays music or a video, a music note shows in the menu bar. Click it to see the album "
+        "cover, the song, the artist and how far it has got.",
+        "The buttons under it go back, play or pause, and skip forward. The note goes away when the app stops.",
+        "To hide it, turn off Show Now Playing in menu bar in Dials > Dock and Menu Bar.",
     ]),
     "menu-extras": ("Use apps' icons in the menu bar", "menu bar extras icons tray status icon system tray app indicator notification area background running chat cloud sync", [
         "Some apps put an icon of their own in the menu bar while they run, such as chat, cloud storage "
