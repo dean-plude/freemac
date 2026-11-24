@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- freemac: lets Dials' Schedule… set when the computer starts up, sleeps,
+     restarts or shuts down, after an administrator's password. -->
+<policyconfig>
+  <vendor>freemac</vendor>
+  <action id="org.freemac.power-schedule">
+    <description>Change the power schedule</description>
+    <message>Changing when the computer starts up or shuts down needs an administrator's password.</message>
+    <icon_name>freemac-dials</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/freemac-power-schedule</annotate>
+  </action>
+</policyconfig>

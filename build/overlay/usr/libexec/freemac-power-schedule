@@ -1,0 +1,173 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""The power schedule from Dials > Battery (or Power) > Schedule…, run as root.
+
+  freemac-power-schedule set     stdin: the schedule as JSON (through pkexec)
+  freemac-power-schedule arm     set the clock alarm for the next start-up;
+                                 at boot, and after waking from sleep
+  freemac-power-schedule run     the timer's job: sleep, restart or shut down,
+                                 after a ten-minute countdown if anyone is
+                                 logged in to the desktop, unless they cancel
+
+The schedule is /etc/freemac/power-schedule.json. Starting up uses the
+computer's real-time clock alarm (rtcwake), which wakes it from sleep and,
+on most PCs, from off. The sleep, restart or shut down is the timer
+freemac-power-action.timer, written here from the schedule.
+
+Original freemac code.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+
+from freemac_shell import power_schedule as ps
+
+TIMER = "/etc/systemd/system/freemac-power-action.timer"
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def systemctl(*args):
+    subprocess.run(["systemctl", *args], capture_output=True)
+
+
+def arm():
+    """Set the RTC alarm to the next start-up, or clear it."""
+    rule = ps.load()["wake"]
+    when = ps.next_time(rule, time.time() + 60) if rule else None
+    if not os.path.exists("/sys/class/rtc/rtc0"):
+        return
+    if when:
+        subprocess.run(["rtcwake", "-m", "no", "-t", str(int(when))], capture_output=True)
+    else:
+        subprocess.run(["rtcwake", "-m", "disable"], capture_output=True)
+
+
+def set_schedule():
+    try:
+        data = json.loads(sys.stdin.read(4096) or "{}")
+    except ValueError:
+        fail("The schedule couldn't be read.")
+    schedule = {"wake": ps.valid(data.get("wake"), wake=True), "action": ps.valid(data.get("action"), wake=False)}
+    os.makedirs(os.path.dirname(ps.PATH), exist_ok=True)
+    tmp = ps.PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(schedule, f, indent=2)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, ps.PATH)
+    if schedule["action"]:
+        with open(TIMER + ".tmp", "w") as f:
+            f.write("[Unit]\nDescription=freemac's scheduled sleep, restart or shut down\n\n"
+                    f"[Timer]\nOnCalendar={ps.on_calendar(schedule['action'])}\nAccuracySec=1s\n\n"
+                    "[Install]\nWantedBy=timers.target\n")
+        os.replace(TIMER + ".tmp", TIMER)
+        systemctl("daemon-reload")
+        systemctl("enable", "freemac-power-action.timer")
+        systemctl("restart", "freemac-power-action.timer")
+    elif os.path.exists(TIMER):
+        systemctl("disable", "--now", "freemac-power-action.timer")
+        os.remove(TIMER)
+        systemctl("daemon-reload")
+    arm()
+
+
+def desktop_sessions():
+    """How many people are logged in to the desktop (not the login screen)."""
+    out = subprocess.run(["loginctl", "list-sessions", "--no-legend"], capture_output=True, text=True).stdout
+    count = 0
+    for line in out.splitlines():
+        session = line.split()[0] if line.split() else ""
+        if not session:
+            continue
+        props = subprocess.run(["loginctl", "show-session", session, "-p", "Class", "-p", "Type", "-p", "State"],
+                               capture_output=True, text=True).stdout
+        info = dict(p.split("=", 1) for p in props.splitlines() if "=" in p)
+        if info.get("Class") == "user" and info.get("Type") in ("wayland", "x11") and info.get("State") != "closing":
+            count += 1
+    return count
+
+
+def clear_answers():
+    try:
+        names = os.listdir(ps.ANSWERS)
+    except OSError:
+        return
+    for name in names:
+        try:
+            os.unlink(os.path.join(ps.ANSWERS, name))
+        except OSError:
+            pass
+
+
+def answer():
+    """'cancel', 'now' or None, from whatever someone logged in clicked."""
+    try:
+        names = os.listdir(ps.ANSWERS)
+    except OSError:
+        return None
+    if any(n.startswith("cancel") for n in names):
+        return "cancel"
+    if any(n.startswith("now") for n in names):
+        return "now"
+    return None
+
+
+def run():
+    rule = ps.load()["action"]
+    if not rule:
+        return
+    what = rule["what"]
+    os.makedirs(ps.RUN_DIR, mode=0o755, exist_ok=True)
+    os.chmod(ps.RUN_DIR, 0o755)
+    os.makedirs(ps.ANSWERS, exist_ok=True)
+    os.chmod(ps.ANSWERS, 0o1777)
+    clear_answers()
+    deadline = time.time() + (ps.WARNING if desktop_sessions() else 0)
+    try:
+        os.unlink(ps.PENDING)
+    except FileNotFoundError:
+        pass
+    fd = os.open(ps.PENDING, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"what": what, "deadline": deadline}, f)
+    try:
+        while time.time() < deadline:
+            said = answer()
+            if said == "cancel":
+                return
+            if said == "now":
+                break
+            time.sleep(1)
+    finally:
+        try:
+            os.unlink(ps.PENDING)
+        except FileNotFoundError:
+            pass
+        clear_answers()
+    arm()
+    command = {"sleep": "suspend", "restart": "reboot", "shutdown": "poweroff"}[what]
+    systemctl(command)
+
+
+def main(argv):
+    command = argv[1] if len(argv) > 1 else ""
+    if os.geteuid() != 0:
+        fail("This needs to run as root.")
+    if command == "set":
+        set_schedule()
+    elif command == "arm":
+        arm()
+    elif command == "run":
+        run()
+    else:
+        fail(__doc__)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

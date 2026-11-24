@@ -16,7 +16,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import alert, announce, audio, awake, background_sounds, battery as battery_info, dials_battery, dials_pointer, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
+from . import alert, announce, audio, awake, background_sounds, battery as battery_info, dials_battery, dials_pointer, dials_schedule, notify_rules, screen_reader, sounds, speak, startup_sound, style  # noqa: E402
 
 
 def run(*cmd):
@@ -395,6 +395,7 @@ def power(window):
         mode.set_active_id(current.stdout.strip() if current and current.returncode == 0 else "balanced")
         mode.connect("changed", lambda c: run("powerprofilesctl", "set", c.get_active_id()))
         groups.append(group(row("Power mode", mode, "Power Saver makes a battery last longer.")))
+    groups.append(group(dials_schedule.schedule_row(window, row)))
     buttons = Gtk.Box(spacing=8)
     for label, action in (("Sleep", "suspend"), ("Restart…", "reboot"), ("Shut Down…", "poweroff")):
         button = Gtk.Button(label=label)

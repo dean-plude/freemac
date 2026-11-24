@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.144 "Power schedule" (done)
+
+Start up or wake the computer at a set time, and sleep, restart or shut it down at another, as a Mac's Energy settings have it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dials > Battery (or Power) > Schedule…: Start up or wake, and Sleep, Restart or Shut Down, each every day, weekdays, weekends or one day of the week, at a time; the row says what's set | Dials | done |
+| 2 | The schedule is the whole computer's, kept in /etc/freemac by a root helper after an administrator's password; it holds at the login screen and for every account | freemac-power-schedule, polkit | done |
+| 3 | Starting up uses the computer's clock alarm (RTC), set again at each start-up and after each wake, so it wakes the computer from sleep and, on most PCs, from off | systemd, rtcwake | done |
+| 4 | Anyone logged in gets a ten-minute countdown before a scheduled sleep, restart or shut down, with Cancel and a button to do it now; with nobody logged in it happens at once | Topline, power_countdown.py | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+| 6 | Fixed: after an administrator's password, Users and Privacy & Security kept saying "Waiting for an administrator's password…" and didn't show the change or an error; a Software Update now turns on services added since a computer was installed | Dials, freemac-update-helper | done |
+
 ## 1.143 "Tender" (done)
 
 Bring your files over from your old computer, as a Mac's Migration Assistant does.

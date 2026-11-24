@@ -1,0 +1,10 @@
+[Unit]
+Description=Set the clock alarm for freemac's scheduled start-up
+ConditionPathExists=/etc/freemac/power-schedule.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/freemac-power-schedule arm
+
+[Install]
+WantedBy=multi-user.target

@@ -205,6 +205,8 @@ in_chroot systemctl disable smbd.service nmbd.service samba-ad-dc.service wsdd-s
 in_chroot systemctl set-default graphical.target
 # Installs a new freemac that Software Update downloaded, while the computer restarts.
 in_chroot systemctl enable freemac-update-install.service
+# Sets the clock alarm for a scheduled start-up (Dials > Battery > Schedule…).
+in_chroot systemctl enable freemac-power-wake.service
 in_chroot glib-compile-schemas /usr/share/glib-2.0/schemas
 # freemac's own app icons (art/icons), then refresh the cache so apps and the
 # dock find them.

@@ -190,7 +190,7 @@ class UsersPanel(Gtk.Box):
         def finished(p, result):
             self.helper_output = ""
             try:
-                self.helper_output, err = p.communicate_utf8_finish(result)
+                _ok, self.helper_output, err = p.communicate_utf8_finish(result)
             except GLib.Error as e:
                 err = e.message
             self.status.set_text("")

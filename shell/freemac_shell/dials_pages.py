@@ -52,7 +52,7 @@ SEARCH_WORDS = {
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light schedule sunset sunrise warm scale monitor",
     "wallpaper": "background desktop picture dynamic sun sunset",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
-    "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep low power mode saver health capacity cycle count usage level history",
+    "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep low power mode saver health capacity cycle count usage level history schedule start up wake timer automatic shut down at set time bedtime",
     "lifeboat": "backup back up time machine restore drive disk copy",
     "security": "privacy security disk encryption encrypt encrypted lock locked filevault recovery key start-up password lost stolen protect",
     "users": "accounts password login automatic log in people guest user visitor keychain",
