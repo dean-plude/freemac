@@ -241,6 +241,17 @@ percent encoding, and AppKit has `NSTextAttachment`, an image drawn inline
 in text. `NSAppleScript` is there but runs no scripts: it answers an
 error, and Ferry says so once.
 
+From Ferry 0.40.0 (freemac 1.214), Mac apps can show web pages with
+`WKWebView` and with the older `WebView`, drawn by this system's WebKitGTK
+(libwebkit2gtk-4.1) inside the app's own windows. Pages are loaded from
+requests, strings and data, scripts run and give their results as
+Foundation objects, user scripts and message handlers pass values between
+the page and the app, and the navigation and UI delegates are asked and
+told what a Mac asks and tells them, with alerts, new windows and
+snapshots. WebKitGTK is opened only when an app makes its first web view;
+where it isn't installed, web views stay empty and the app goes on.
+Downloads and the DOM classes aren't there yet.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

@@ -30,8 +30,7 @@ Security framework's answers for the Sparkle updaters, the Mac's version
 file, threads, gradients, shadows, and split view and tab view
 controllers. MacPass's document window is built on a split view
 controller and its preferences on a tab view controller, so it should now
-get past both. Hex Fiend still needs Swift, and MacDown still needs
-WebKit. Running all nine again is the next step.
+get past both. Hex Fiend still needs Swift. MacDown's web views can be made now (Ferry 0.40.0), but its preview was not tried, and from its source it also uses `WebFrameView` and the DOM classes, which aren't there yet. Running all nine again is the next step.
 
 Ferry also has its own **Installer**. Three real installers were tried,
 and all three install: the MacPorts and XQuartz packages (`.pkg`) and the
@@ -48,8 +47,8 @@ Sequel Pro disk image (`.dmg`). See "Installers" below.
 | [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | At the last run: starts, loads its nibs, registers its shortcuts (accepted, never pressed) | At the last run, its Sparkle updater's check of its own code signature (`SecStaticCodeCreateWithPath`), which passes since (1.200). It also couldn't save its shortcuts file. From its source, its shortcut recorders now draw their gradient and their text shadow, and it also uses `NSTrackingArea`, which is in Ferry now (1.213), and `NSAppleScript`, which is there but runs no scripts and answers an error. Then the Accessibility API, as for ShiftIt. (Not re-run since M7) |
 | [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | At the last run: starts; all 30 of its nibs (`NIBArchive`) load on their own | At the last run, the document classes, which came in 1.167. From its source, the next stop was its document window's split view controller (`MPDocumentSplitViewController`, built on `NSSplitViewController`), which was left out, and its preferences' tab view controller (`MPTabViewController`, on `NSTabViewController`). Both are in Ferry now, with `NSGradient` and `NSShadow`. Its source also uses `NSCollectionView`, `NSTrackingArea` and `NSMutableCharacterSet`, which are all in Ferry now (1.212 and 1.213). (Not re-run since M7) |
 | [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | At the last run: starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | At the last run, `NSSplitView` in its main window (`positionOfDividerAtIndex:`). `NSSplitView` and `NSOutlineView`, its hosts list, are in Ferry now (1.155 and 1.159), as are its gradients and shadows. Its source also uses `NSTrackingArea` and `NSTextAttachment`, which are in Ferry now (1.213). (Not re-run since M7) |
-| [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument`, which is in Ferry now, and on WebKit, a known limit. (Not re-run since M7) |
-| [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; at the last run it started and loaded its main nib | At the last run, an array made with a nil object (`initWithObjects:count:`), most likely one of the classes it uses that Ferry didn't have being nil. Tables, outline and split views, the document classes, gradients and shadows are in Ferry now. From its source, what it still uses that Ferry doesn't have is WebKit. `NSRulerView`, which its line-number ruler is built on, came in 1.212, and `NSAnimation`, `NSTrackingArea` and `NSDistributedNotificationCenter` in 1.213. (Not re-run since M7) |
+| [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument` and on WebKit's older `WebView`, which are both in Ferry now (1.214); `WebFrameView` and the DOM classes, which it also uses, aren't. (Not re-run since M7) |
+| [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; at the last run it started and loaded its main nib | At the last run, an array made with a nil object (`initWithObjects:count:`), most likely one of the classes it uses that Ferry didn't have being nil. Tables, outline and split views, the document classes, gradients and shadows are in Ferry now. From its source, the classes it was known to miss are all in Ferry now: WebKit's `WebView` came in 1.214. `NSRulerView`, which its line-number ruler is built on, came in 1.212, and `NSAnimation`, `NSTrackingArea` and `NSDistributedNotificationCenter` in 1.213. (Not re-run since M7) |
 
 ## Installers
 
@@ -1010,6 +1009,47 @@ Left out: AppleScript itself, the notifications a Mac's system posts,
 programs this system runs without Ferry, layer shadows and shadows in PDF
 contexts. The work was written from Apple's documentation and not
 compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
+
+### WebKit (freemac 1.214, Ferry 0.40.0)
+
+Mac programs can now show web pages with `WebKit.framework`, which Ferry
+draws with this system's WebKitGTK (libwebkit2gtk-4.1). The library is
+opened only when a program makes its first web view, so programs that
+link WebKit and never show a page don't need it, and where it isn't
+installed, or there is no display, a web view stays empty, Ferry says so
+once, and the program goes on.
+
+`WKWebView` takes a `WKWebViewConfiguration` with its preferences, a
+user content controller and a website data store, the default one or one
+of its own that keeps nothing. It loads requests for files, HTML strings
+and data, goes back, forward and to an item of its back-forward list,
+reloads and stops, and its title, URL, progress, loading state and back
+and forward state can be observed with key-value observing.
+`evaluateJavaScript:completionHandler:` gives the result as Foundation
+objects, in the page's world or in a content world of its own, and user
+scripts and script message handlers work in both. The navigation
+delegate is asked about each navigation and each response and told when
+one starts, is committed, finishes or fails, and the UI delegate shows
+the page's alerts, confirms and prompts and makes the new windows a page
+opens. `takeSnapshotWithConfiguration:completionHandler:` gives an
+`NSImage` of the page.
+
+The older `WebView` is there too, with `WebFrame`, `WebDataSource`,
+`WebPreferences`, its frame load, policy and UI delegates and its
+progress notifications. `stringByEvaluatingJavaScriptFromString:` answers
+at once, and `WebScriptObject` reads, sets and calls the page's objects.
+
+The web view is GTK's own, placed over the `NSView` in its window and
+clipped to what its superviews show. It follows the view when it moves,
+is resized or hidden, takes the keyboard when it becomes the first
+responder, and keeps its page when its window is closed or it moves to
+another window.
+
+Left out: downloads, the cookie store, scheme handlers, the DOM classes
+and `WebFrameView`, and subframes in the older `WebView`. Requests are
+loaded as GETs. The work was written from Apple's documentation and
+WebKitGTK's, tried on X11 and not on Wayland, and not compared with a
+Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 
 ## What the apps need most
 

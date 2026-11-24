@@ -388,4 +388,5 @@ GdkWindow *gtk_widget_get_window(GtkWidget *widget);
 GdkCursor *gdk_cursor_new_from_name(GdkDisplay *display, const char *name);
 GdkCursor *gdk_cursor_new_from_surface(GdkDisplay *display, cairo_surface_t *surface, double x, double y);
 void gdk_window_set_cursor(GdkWindow *window, GdkCursor *cursor);
+GtkWidget *gtk_window_get_focus(GtkWidget *window);
 #endif

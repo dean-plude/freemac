@@ -1,0 +1,105 @@
+defaults: JavaScript 1, open windows 1, content JavaScript 1, store persistent 1
+user scripts: 3, the first at document start: 1, main frame only: 1
+a second handler of the same name: NSInvalidArgumentException
+the view's store is the one given: 1 (persistent 0)
+before loading: title nil, URL (none), loading 0, back 0, forward 0
+an HTML string:
+  action about:blank type -1 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+title From a string, URL about:blank, loading 0, progress 1
+messages:
+  ferry: {
+    a = (
+        1,
+        2
+    );
+    n = 1;
+    s = hi;
+} (from the view: 1, main frame: 1)
+observed: URL estimatedProgress loading title
+scripts:
+  1 + 2 -> NSNumber 3
+  'a' + 'b' -> NSString ab
+  true -> NSNumber 1
+  [1, 'two', null] -> NSArray (     1,     two,     <null> )
+  ({x: 1}) -> NSDictionary {     x = 1; }
+  null -> NSNull <null>
+  undefined -> nil
+  new Date(86400000) -> NSDate 1970-01-02 00:00:00 +0000
+  (function () {}) -> error WKErrorDomain 5
+  document.getElementById('p').textContent -> NSString hello
+  throw new Error('broken') -> error WKErrorDomain 4: Error: broken
+  window.startedEarly + ', ' + window.endBody -> NSString object, there
+  typeof window.secret -> NSString undefined
+  window.secret in the world 'tools' -> kept apart
+data:
+  action data-page type -1 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+  document.body.textContent -> NSString café
+a file:
+  action a.html type -1 main 1
+  start
+  response a.html text/html main 1 can show 1
+  commit
+  finish (the navigation the load gave: 1)
+title Page A, URL a.html
+a link clicked in the page:
+  action b.html type 0 main 1
+  start
+  response b.html text/html main 1 can show 1
+  commit
+  finish (the navigation the load gave: 0)
+title Page B, back 1, forward 0
+back-forward list: current b.html, back a.html, back list 1 (the last: a.html), forward list 0
+back:
+  action a.html type 2 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+title Page A, back 0, forward 1, forward item b.html
+forward:
+  action b.html type 2 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+title Page B
+reload:
+  action b.html type 3 main 1
+  start
+  response b.html text/html main 1 can show 1
+  commit
+  finish (the navigation the load gave: 1)
+a request for a file:
+  action a.html type -1 main 1
+  start
+  response a.html text/html main 1 can show 1
+  commit
+  finish (the navigation the load gave: 1)
+observed: URL canGoBack canGoForward estimatedProgress loading title
+a file that isn't there:
+  action none.html type -1 main 1
+  start
+  failed provisionally: NSURLErrorDomain -1100, for none.html
+a navigation the delegate cancels:
+  action blocked.html type -1 main 1
+still showing a.html
+goForward with nothing ahead: nil
+after the handler is removed:
+  action about:blank type -1 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+  typeof (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ferry) -> NSString undefined
+data removed: 1 (types 10)
+a page to snapshot:
+  action about:blank type -1 main 1
+  start
+  commit
+  finish (the navigation the load gave: 1)
+snapshot: an image, 100x50, blue at (10, 10): 1
+done
+exit=0

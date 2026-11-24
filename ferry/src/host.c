@@ -14,6 +14,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ferry.h"
@@ -303,4 +304,42 @@ void *ferry_bus_symbol(const char *name)
         return NULL;
     pthread_once(&once, open_bus);
     return bus_handle ? dlsym(bus_handle, name) : NULL;
+}
+
+/* ---- web views -------------------------------------------------------------------
+ * Ferry's WebKit framework (webkit/) shows web content with this system's
+ * WebKitGTK (webkit2gtk-4.1) and reads what a page hands back with
+ * JavaScriptCore's GLib API. It asks for each call by name the first time
+ * it makes one, so a program that links WebKit but never makes a web view
+ * doesn't open WebKitGTK, and Ferry runs on a system without it. Only the
+ * calls declared in webkit/WKHost.h are served. FERRY_WEBKITGTK names
+ * another library to open in WebKitGTK's place (the tests use it to stand
+ * for a system without WebKitGTK). */
+static const char *const webkit_names[] = {
+#include "webkit_names.h"
+    NULL,
+};
+static void *webkit_handle, *jsc_handle;
+static void open_webkit(void)
+{
+    const char *other = getenv("FERRY_WEBKITGTK");
+    webkit_handle = dlopen(other && *other ? other : "libwebkit2gtk-4.1.so.0", RTLD_NOW | RTLD_LOCAL);
+    if (webkit_handle)
+        jsc_handle = dlopen("libjavascriptcoregtk-4.1.so.0", RTLD_NOW | RTLD_LOCAL);
+}
+
+void *ferry_webkit_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    const char *const *p;
+    if (!name)
+        return NULL;
+    for (p = webkit_names; *p; p++)
+        if (!strcmp(*p, name))
+            break;
+    if (!*p)
+        return NULL;
+    pthread_once(&once, open_webkit);
+    void *handle = !strncmp(name, "jsc_", 4) ? jsc_handle : webkit_handle;
+    return handle ? dlsym(handle, name) : NULL;
 }

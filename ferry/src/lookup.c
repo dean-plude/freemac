@@ -259,6 +259,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_macos_version", ferry_macos_version},
     /* Ferry's own: this system's GIO, for distributed notifications (host.c) */
     {"ferry_bus_symbol", ferry_bus_symbol},
+    /* Ferry's own: this system's WebKitGTK, for Ferry's WebKit (host.c) */
+    {"ferry_webkit_symbol", ferry_webkit_symbol},
     {NULL, NULL},
 };
 

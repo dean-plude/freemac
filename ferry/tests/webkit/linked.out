@@ -1,0 +1,18 @@
+configuration: preferences 1, controller 1, store 1 (the default 1, persistent 1), pool 1
+a copy shares the controller 1 and the preferences 1
+preferences: JavaScript 1, open windows 1, minimum font size 0, tabs to links 0, fullscreen 0
+non-persistent stores: persistent 0, each its own 1; 10 data types
+user script: 1, at the end 1, all frames 1
+worlds: the page's is one object 1, a named one 1, its name x
+snapshot configuration: rect empty 1, width nil, after screen updates 1
+schemes: http 1, file 1, about 1, ferry 0
+constants: WKErrorDomain, WebViewProgressFinishedNotification, WebActionNavigationTypeKey
+WebPreferences: Helvetica, Courier, 16, JavaScript 1, page cache 1
+WebUndefined: undefined, one object 1
+a web view that can't be shown: load nil, title nil, URL nil, loading 0, back-forward list 1
+its script: WKErrorDomain 1; its snapshot: WKErrorDomain 1
+data removed: 1
+an older WebView: script "", window object's value undefined, title "", URL ""
+in a window, drawn: 1
+the program goes on
+exit=0

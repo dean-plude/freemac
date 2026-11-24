@@ -26,6 +26,7 @@ NSNotificationName const NSWindowDidMiniaturizeNotification = @"NSWindowDidMinia
 NSNotificationName const NSWindowDidDeminiaturizeNotification = @"NSWindowDidDeminiaturizeNotification";
 NSNotificationName const NSWindowWillBeginSheetNotification = @"NSWindowWillBeginSheetNotification";
 NSNotificationName const NSWindowDidEndSheetNotification = @"NSWindowDidEndSheetNotification";
+NSNotificationName const NSWindowDidUpdateNotification = @"NSWindowDidUpdateNotification";
 
 static NSMutableArray *all_windows;
 static NSInteger next_number = 1;
@@ -484,6 +485,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 {
     if (_toolbar && _toolbarHeight > 0)
         [_toolbar validateVisibleItems];
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowDidUpdateNotification object:self];
 }
 - (void)invalidateShadow {}
 
@@ -1577,6 +1579,11 @@ static int on_key(GtkWidget *w, GdkEvent *e, void *data)
         gdk_event_get_keyval(e, &keyval);
         gdk_event_get_keycode(e, &hardware);
         gdk_event_get_state(e, &state);
+        /* a GTK view inside the window (a web view) that has the keyboard
+         * takes its keys, all but the menus' Command keys */
+        GtkWidget *focus = gtk_window_get_focus(w);
+        if (focus && focus != win->_area && !(AModifiersFromGdk(state) & NSEventModifierFlagCommand))
+            return 0;
         BOOL down = gdk_event_get_event_type(e) == 8;    /* GDK_KEY_PRESS */
         unsigned short code = AMacKeyCode(hardware);
         unsigned bit = modifier_bit(keyval);

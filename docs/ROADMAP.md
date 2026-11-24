@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.214 "Ferry: web pages in Mac apps" (done)
+
+Ferry 0.40.0: Mac apps can show web pages, drawn by this system's WebKitGTK inside their own windows.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `WKWebView` with its configuration, data stores, loading, back and forward, and key-value observing | Ferry WebKit | done |
+| 2 | Scripts with results as Foundation objects, content worlds, user scripts and message handlers | Ferry WebKit | done |
+| 3 | The navigation and UI delegates: policies, alerts, confirms, prompts, new windows and snapshots | Ferry WebKit | done |
+| 4 | The older `WebView` with `WebFrame`, `WebDataSource`, `WebPreferences` and `WebScriptObject` | Ferry WebKit | done |
+| 5 | GTK's web view placed over its `NSView`, clipped, following moves and taking the keyboard; WebKitGTK opened only on first use | Ferry AppKit, host | done |
+| 6 | Ten new tests on a display of their own; `make check` 200 of 200 | Ferry | done |
+
+Downloads, the cookie store, the DOM classes and `WebFrameView` aren't done yet.
+
 ## 1.213 "Ferry: tracking areas, shadows and other programs" (done)
 
 Ferry 0.39.0: views that follow the mouse, shadows that are drawn, animations, and Mac apps that talk to their other copies.
