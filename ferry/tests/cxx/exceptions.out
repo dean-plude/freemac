@@ -1,0 +1,18 @@
+caught logic_error: bottom reached
+destructors: even odd even odd even odd 
+caught long 604
+caught string: unlucky number met in qsort
+square area 9, typeid Square, same type 1
+dynamic_cast Square
+caught BadShape 7: no shape called hexagon
+caught invalid_argument: no shape
+rethrown: first
+from exception_ptr: first
+nested: outer <- inner
+caught Both as Base2: two=2
+caught bad_cast
+caught out_of_range from at()
+caught ... with 0 uncaught
+unwinding, uncaught_exceptions 1
+terminate handler: with an exception
+exit=3

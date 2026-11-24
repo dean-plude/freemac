@@ -1,0 +1,21 @@
+mutex counter 160000
+condition_variable total 50005000
+wait_for timeout
+wait_until woken
+recursive_mutex held elsewhere no
+timed_mutex try_lock_for timed out, then got it
+recursive_timed_mutex again yes
+shared_mutex writes 8000 reads 8000
+shared_timed_mutex write while read no, read while read yes
+call_once 1
+promise<int> 42
+promise<void> ready
+async 42 deferred
+async exception: from a thread
+broken promise: yes
+set twice: already satisfied
+shared_future valid 1
+ids differ yes, hardware_concurrency known
+join of no thread: invalid argument
+detached joinable 0
+exit=0

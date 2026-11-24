@@ -25,6 +25,7 @@
 #include "ferry.h"
 #include "macho.h"
 #include "objc/objc-private.h"
+#include "cxx.h"
 
 #define PAGE 4096ul
 #define ALIGN_DOWN(x) ((x) & ~(PAGE - 1))
@@ -1170,6 +1171,7 @@ static struct image *load_image(const char *path)
     for (int i = 0; i < im->ndylibs; i++)
         im->deps[i] = load_library(im, im->dylibs[i], im->dep_weak[i]);
     apply_fixups(im);
+    ferry_cxx_image_loaded(im);   /* its unwind tables, once a program uses C++ */
     im->has_objc = objc_find(im, &im->objc);
     if (im->has_objc) {
         note("setting up Objective-C in %s: %zu classes, %zu categories, %zu selectors", im->path,

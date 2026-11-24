@@ -108,6 +108,7 @@ extern const struct ferry_symbol ferry_sysctl_symbols[];
 extern const struct ferry_symbol ferry_attrlist_symbols[];
 /* dyld.c: dlopen and the rest of <dlfcn.h>, and the _dyld_ image calls */
 extern const struct ferry_symbol ferry_dyld_symbols[];
+extern const struct ferry_symbol ferry_wchar_symbols[]; /* wchar.c: wide characters, xlocale, __cxa_atexit */
 int ferry_is_virtual(const char *path);                    /* /System/Library/CoreServices/SystemVersion.plist */
 int ferry_virtual_open(const char *path, int linux_flags); /* -1 and errno if it can't be */
 int ferry_virtual_stat(const char *path, struct stat *s);  /* 1 if it was one of Ferry's files */

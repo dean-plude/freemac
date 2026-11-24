@@ -90,7 +90,7 @@ run_one() {
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         # threads: a hang is a failure, not a stuck run
-        pthreads|dispatch_concurrent|foundation_threads|foundation_locks)
+        pthreads|dispatch_concurrent|foundation_threads|foundation_locks|cxx_threads)
             timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
@@ -227,6 +227,45 @@ run_one foundation_trycatch_frameless "$here/foundation/trycatch.m" "$here/found
     -fomit-frame-pointer -fobjc-arc -framework Foundation
 run_one foundation_trycatch_mrc "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -O0 \
     -framework Foundation -Wl,-fixup_chains
+# C++ and Objective-C++ programs, linked with -lc++ as on a Mac and run on
+# this system's LLVM libc++ (src/cxx.c): the library, exceptions (with a
+# Mac library of the program's own throwing its own types), threads, and
+# the two languages' exceptions and objects mixed. Building them needs
+# libc++'s headers (libc++-dev) and running them its libraries (libc++1,
+# libc++abi1); without them the tests are skipped.
+if [ -s "$top/sdk/lib/libc++.tbd" ] &&
+        echo '#include <vector>' | "$top/sdk/ferry-cc" -x c++ -E -o /dev/null - 2> /dev/null; then
+    run_one cxx_basics "$here/cxx/basics.cpp" "$here/cxx/basics.out" -std=c++17 -lc++
+    mkdir -p "$build/cxx_lib"
+    if "$top/sdk/ferry-cc" -O1 -std=c++17 -dynamiclib -install_name @rpath/libshapes.dylib \
+            -o "$build/cxx_lib/libshapes.dylib" "$here/cxx/shapes.cpp" -lc++ 2> "$build/cxx_lib.cc.log"; then
+        run_one cxx_exceptions "$here/cxx/exceptions.cpp" "$here/cxx/exceptions.out" -std=c++17 \
+            -L"$build/cxx_lib" -lshapes -Wl,-rpath,@executable_path/cxx_lib -lc++
+    else
+        echo "FAIL cxx_exceptions (library did not compile)"; sed 's/^/    /' "$build/cxx_lib.cc.log"
+        fail=$((fail + 1))
+    fi
+    run_one cxx_threads "$here/cxx/threads.cpp" "$here/cxx/threads.out" -std=c++17 -lc++
+    run_one objcxx_mixed "$here/cxx/objcxx_mixed.mm" "$here/cxx/objcxx_mixed.out" -std=c++17 -fobjc-arc \
+        -framework Foundation -lc++
+    # Without this system's libc++, a C++ program stops and says what to install.
+    FERRY_LIBCXX=/nonexistent/libc++.so.1 "$top/ferry" "$build/cxx_basics" > /dev/null 2> "$build/cxx_missing.err"
+    status=$?
+    if [ "$status" = 127 ] && grep -q "needs this system's libc++ and libc++abi (packages libc++1 and libc++abi1)" \
+            "$build/cxx_missing.err"; then
+        echo "ok   cxx_missing"; pass=$((pass + 1))
+    else
+        echo "FAIL cxx_missing (exit $status)"; sed 's/^/    stderr: /' "$build/cxx_missing.err"; fail=$((fail + 1))
+    fi
+    # A program without C++ never loads it.
+    if FERRY_VERBOSE=1 "$top/ferry" "$build/objc_basic" 2>&1 > /dev/null | grep -q "libc++"; then
+        echo "FAIL cxx_not_loaded (an Objective-C program loaded libc++)"; fail=$((fail + 1))
+    else
+        echo "ok   cxx_not_loaded"; pass=$((pass + 1))
+    fi
+else
+    echo "skip cxx_basics, cxx_exceptions, cxx_threads, objcxx_mixed (need LLVM's libc++: libc++-dev, libc++1, libc++abi1)"
+fi
 # Linked against a system framework Ferry doesn't have (only its .tbd exists).
 run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missing.out" -framework Foundation \
     -F"$here/foundation" -framework Imaginary

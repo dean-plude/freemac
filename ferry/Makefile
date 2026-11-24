@@ -9,12 +9,12 @@ DESTDIR ?=
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/pthread.c src/passthrough.c src/host.c \
       src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
-      src/objc/symbols.c
+      src/objc/symbols.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
-           sdk/lib/libicucore.tbd
+           sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
 # and lld, as the tests do). CoreFoundation is served from the same file.
@@ -72,6 +72,9 @@ ferry: $(OBJ)
 src/%.o: src/%.c src/ferry.h src/macho.h src/objc/objc-private.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# C++ programs (src/cxx.c): this system's libc++, opened when a program links it.
+src/cxx.o src/cxx_unwind.o src/cxx_threads.o src/lookup.o src/loader.o src/objc/exception.o: src/cxx.h
+
 # The Cairo, Pango, HarfBuzz, GTK, GdkPixbuf and Poppler calls Ferry's frameworks may make:
 # exactly the ones graphics/host.h and appkit/gtk.h declare.
 src/host_names.h: graphics/host.h appkit/gtk.h
@@ -104,6 +107,15 @@ sdk/lib/libsqlite3.tbd: sdk/gen-twin-tbd.sh
 sdk/lib/libicucore.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-twin-tbd.sh /usr/lib/libicucore.A.dylib icu > $@
+
+# A Mac's libc++ and libc++abi, served by this system's LLVM libc++ (empty
+# when it isn't installed: C++ programs can't be built then).
+sdk/lib/libc++.tbd: sdk/gen-cxx-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-cxx-tbd.sh libc++ > $@
+sdk/lib/libc++abi.tbd: sdk/gen-cxx-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-cxx-tbd.sh libc++abi > $@
 
 sdk/lib/libobjc.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib

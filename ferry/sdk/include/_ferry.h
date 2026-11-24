@@ -14,6 +14,7 @@
 #endif
 /* Calls whose Intel symbol carries the 64-bit-inode variant suffix. */
 #define __FERRY_INODE64(name) __asm("_" #name "$INODE64")
+typedef uint32_t __uint32_t;
 typedef long ssize_t;
 typedef int64_t off_t;
 typedef uint16_t mode_t;

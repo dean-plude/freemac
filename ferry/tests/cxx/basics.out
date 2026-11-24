@@ -1,0 +1,24 @@
+construct global
+vector 6 7 8 9 10 5 4 3 2 1
+sum 55
+apple=1 fig=2 pear=3 
+unordered 100 144
+set 3 a
+Hello, world! length 13 find 7
+stod 5 stoll -1234567890123
+3.142 ff ****42
+printf one
+cout two
+printf three
+cout four
+classes ASADPSP upper Q 1
+words the,quick,brown,fox
+regex someone at example
+seekg 4 tellg 5 tellp 10
+function 81 unique 3 7 shared 1 shared
+operator new used yes
+chrono ok ok
+files a.txt sub/ size 10 line 'some text' ext ".gz"
+removed 1 missing 0
+destroy global
+exit=0

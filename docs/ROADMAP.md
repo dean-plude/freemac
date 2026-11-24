@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.203 "Ferry: C++ programs" (done)
+
+Ferry 0.30.0: Mac programs written in C++ and Objective-C++ run, on the same open-source C++ library a Mac uses.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Mac's libc++ and libc++abi served by this system's LLVM libc++ and libc++abi, opened only when a program needs them; a clear message naming the packages when they're missing | Ferry | done |
+| 2 | C++ exceptions across the program, its own libraries and this system's code, with each Mac image's unwind tables handed to the unwinder | Ferry | done |
+| 3 | Objective-C and C++ exceptions passing through each other's frames; ARC objects with C++ ivars and blocks capturing C++ objects | Ferry | done |
+| 4 | `std::thread`, mutexes, condition variables, futures and promises, streams and `ctype` on a Mac's layouts, and the wide-character and locale calls libc++ needs | Ferry | done |
+| 5 | `ferry-cc` builds `.cpp` and `.mm`; six new tests; `make check` 131 of 131 | Ferry | done |
+
+`thread_local` variables and wide file streams aren't supported yet. The libc++ packages are recommended by Ferry's package, so a normal install has them.
+
 ## 1.202 "Ferry: real threads" (done)
 
 Ferry 0.29.0: Mac apps run on real threads, so they can do several things at once, as on a Mac.

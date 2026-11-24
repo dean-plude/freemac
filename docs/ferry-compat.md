@@ -664,6 +664,40 @@ Left out: `NSDistributedLock`, call stack symbols, dispatch sources for
 descriptors, signals and processes, and priorities that change how threads
 are scheduled.
 
+### C++ programs (freemac 1.203, Ferry 0.30.0)
+
+Mac programs written in C++ and Objective-C++ now run. They link a Mac's
+libc++ and libc++abi, and Ferry serves both from this system's LLVM
+libc++ and libc++abi (packages libc++1 and libc++abi1). Ferry opens them
+only when a program needs them. Without them, a C++ program stops and
+says what to install, and everything else runs as before.
+
+- **The standard library.** Containers, strings, streams (`cout` keeping
+  its order with `printf`), string and file streams with their positions,
+  locales and `ctype`, regular expressions, `chrono`, `filesystem`,
+  `function` and the smart pointers.
+- **Exceptions.** They are thrown and caught by this system's libc++abi
+  and unwound by its libunwind. They pass through the program, its own
+  libraries and this system's code, with typeinfo and `dynamic_cast`
+  working across images. `exception_ptr`, nested exceptions and
+  `std::terminate`'s handler work too.
+- **Threads.** `std::thread`, `mutex`, `condition_variable`, the timed,
+  recursive and shared mutexes, `call_once`, futures, promises and `async`
+  work on a Mac's layouts.
+- **Objective-C++.** Under ARC, C++ ivars are built and destroyed with
+  their object, and blocks copy and destroy the C++ objects they capture.
+  Objective-C and C++ exceptions cross each other's frames: `@finally`
+  and destructors run, `@catch (NSException *)` lets a C++ exception go
+  on, and `catch (...)` and `@catch (...)` take either.
+
+`ferry-cc` builds `.cpp` and `.mm` sources with LLVM's libc++ headers
+(package libc++-dev) when given `-lc++`. Not yet:
+
+- `thread_local` variables;
+- wide file streams;
+- Mac error numbers in error codes from the library (above 34);
+- an `operator new` of the program's own used inside the library.
+
 ## What the apps need most
 
 Counted over the nine apps:
