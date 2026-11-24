@@ -26,6 +26,18 @@ void FerryRunLoopSetPollHook(int (*prepare)(void *ctx, int *timeout_ms, struct p
                              BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count), void *ctx);
 /* From Ferry's Core Graphics: a context drawing on a Cairo surface. */
 CGContextRef GContextCreateWithSurface(cairo_surface_t *surface, double height);
+/* From Ferry's Core Animation (quartzcore/QInternal.h): drawing a layer
+ * tree as it is shown now, with a view's own drawing standing for its
+ * backing layer's content; where an animation has moved a root layer from
+ * where its model puts it; the object told when a tree is to be drawn
+ * again; and a property animated on any object (the animator proxies). */
+void FerryCALayerRender(CALayer *layer, CGContextRef ctx, BOOL presentation, BOOL flipped,
+                        void (^content)(CGContextRef ctx));
+CGAffineTransform FerryCALayerPresentationOffset(CALayer *layer);
+void FerryCALayerSetHost(CALayer *layer, id host);
+void FerryCADriveValue(id target, NSString *key, id from, id to, CAAnimation *animation);
+/* The animator proxy of an object that animates its properties (NSAnimationContext.m). */
+id AAnimatorFor(id target);
 
 /* ---- the display ------------------------------------------------------------------ */
 

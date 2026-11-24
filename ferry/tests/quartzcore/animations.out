@@ -1,0 +1,91 @@
+real clock: completed yes, animation gone yes
+  events: start realtime, stop realtime finished
+media time goes on: yes
+rotated (1,0): 0 1
+scaled then moved (1,1): 12 2
+CATransform3DTranslate of a scale, (0,0): 20 0
+CATransform3DRotate of a move, (1,0): 4 0
+inverse undoes it: yes
+identity: yes, equal: yes, affine: yes, about x affine: no
+affine round trip: 1 2 3 4 5 6
+in an NSValue: yes, equal yes
+perspective is not affine: yes
+ease in, first control point: 0.42 0
+default, second control point: 0.25 1
+manual clock: 1000
+not animated before the layer is committed: yes
+linear: at a quarter 25.0, at a half 50.0
+easeIn: at a quarter 9.3, at a half 31.5
+easeOut: at a quarter 37.8, at a half 68.5
+easeInEaseOut: at a quarter 12.9, at a half 50.0
+default: at a quarter 40.9, at a half 80.2
+control points (0,1) (0,1) at a half: 99.1
+implicit: keys (
+    position
+), shown x 0, model x 100
+  a basic animation yes, duration 0.25, from NSPoint: {0, 0}
+  halfway (default timing): 80.2
+  at the end: 100, keys none
+actions disabled: keys none, shown 50
+transaction of a second: duration 1, completions 0
+  at a half: opacity 0.5, background from nothing 1.00 0.00 0.00 alpha 0.50, completions 0
+  at the end: opacity 0, completions 1
+colour halfway: 0.50 0.00 0.50, width 60, turned 0.785
+a transaction with nothing to wait for completes at once: 2
+nested: duration from outside 2
+outside: default duration 0.25
+NSNull in actions: keys none
+delegate's action: position duration 2, opacity animated no
+on order in: (
+    onOrderIn
+)
+  events: stop in cut short
+added: model x 100, shown 0
+  events: start move
+a quarter in: 50
+over: 100, keys none
+  events: stop move finished
+kept with fill forwards: 300, keys (
+    keep
+)
+removed: 100
+  events: start keep, stop keep finished
+replaced and removed:
+  events: start early, stop early cut short, start second, stop second cut short
+by 50 from the model's 100, at a half: 125
+to 0 (from the value beneath), at a half, after an additive 0 to 10: 52.5
+autoreversing twice: 0 50 100 50 0 50 100 50 100
+  events: start by, stop by cut short, start add, start to, stop add cut short, stop to cut short, start rev, stop rev finished
+cumulative, three times: 0 5 10 15 20 25
+before a later start: x 100 (the model's), opacity 0 (filled backwards)
+  events: start cum, stop cum finished
+half way through it: x 5, opacity 0.5
+  events: start late, start lateb
+  events: stop late cut short, stop lateb cut short
+at twice the speed, a quarter second in: 50
+a full turn, a quarter in: 1.5708
+  events: start fast, stop fast cut short, start spin, stop spin cut short
+keyframes, linear: 5 10 20 100
+keyframes, discrete: 0 10 30 100
+keyframes, paced: 7.5 15 22.5 100
+keyframes, cubic: 3.75 10 20.63 100
+key times 0, 0.8, 1, at 0.4: 5
+eased first segment, at a quarter: 3.15
+along a path, a segment each half, at a quarter: 50 0
+paced along it, at a half: 100 100
+group at 0.5: opacity 0.5, x 25
+group at 1.25: opacity 1 (the fade is over), x 62.5
+group over: x 100, keys none
+  events: start group, stop group finished
+spring defaults: mass 1, stiffness 100, damping 10, velocity 0
+settling duration: 1.28
+spring every quarter second: 102.3 107.5 97.4 100.2
+spring settled: 100, keys none
+critically damped settles in 0.93
+a property drawn while it animates, at a quarter: 16 of 64 columns
+  at three quarters: 48
+  renderInContext: draws the model: 0
+  events: start level, stop level finished
+a moving layer, halfway with the default timing: shown at 48.9, drawn there yes, 8 columns wide, not at the start yes
+presentation's model is the layer: yes; a presentation's presentation is itself: yes
+exit=0

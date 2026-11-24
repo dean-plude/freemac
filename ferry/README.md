@@ -79,6 +79,17 @@ tree of objects that can be walked, changed, searched with XPath
 (`nodesForXPath:error:`) and written out again (`XMLString`, `XMLData`,
 pretty printed or canonical). XQuery, XSLT and HTML documents are left out.
 
+From Ferry 0.25.0 (freemac 1.198), QuartzCore.framework is Ferry's Core Animation: layers and their tree,
+drawn with Ferry's Core Graphics (backgrounds, borders, rounded corners,
+opacity, contents, shape, gradient and text layers), and implicit and
+explicit animations stepped by a timer on the main run loop. AppKit's
+layer-backed and layer-hosting views draw their layers, and
+NSAnimationContext with the views' animator proxies animates frames and
+alpha. Shadows, masks, filters, transitions and 3D perspective aren't
+drawn. The tests step animations with a test clock of Ferry's own
+(`FerryCASetManualClock` and `FerryCAAdvanceTime`), so each run gives the
+same results.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

@@ -36,19 +36,26 @@ GRAPHICS_HEADERS = graphics/GInternal.h graphics/host.h sdk/include/CoreGraphics
                    sdk/include/CoreText/CoreText.h sdk/include/ImageIO/ImageIO.h $(FOUNDATION_HEADERS)
 HOST_TBD = graphics/build/libFerryHost.tbd
 
+# Core Animation (QuartzCore): layers drawn with the library above and
+# animated on the main run loop.
+QUARTZCORE_SRC = $(wildcard quartzcore/*.m)
+QUARTZCORE_OBJ = $(QUARTZCORE_SRC:quartzcore/%.m=quartzcore/build/%.o)
+QUARTZCORE = frameworks/QuartzCore.framework/QuartzCore
+QUARTZCORE_HEADERS = quartzcore/QInternal.h $(wildcard sdk/include/QuartzCore/*.h) $(GRAPHICS_HEADERS)
+
 # AppKit (M4): windows through this system's GTK, drawn with the library
 # above. Cocoa is served from it.
 APPKIT_SRC = $(wildcard appkit/*.m)
 APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
 APPKIT = frameworks/AppKit.framework/AppKit
-APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(GRAPHICS_HEADERS)
+APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(QUARTZCORE_HEADERS)
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
 INSTALLER_APP = installer/Installer.app
 INSTALLER = $(INSTALLER_APP)/Contents/MacOS/Installer
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLER)
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(APPKIT) $(INSTALLER)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -123,14 +130,23 @@ $(GRAPHICS): $(GRAPHICS_OBJ) $(FOUNDATION) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh ImageIO $@ > frameworks/ImageIO.framework/ImageIO.tbd
 	sdk/gen-alias-tbd.sh ApplicationServices $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
 
+quartzcore/build/%.o: quartzcore/%.m $(QUARTZCORE_HEADERS) sdk/ferry-cc
+	@mkdir -p quartzcore/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(QUARTZCORE): $(QUARTZCORE_OBJ) $(GRAPHICS)
+	@mkdir -p frameworks/QuartzCore.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore \
+	    -o $@ $(QUARTZCORE_OBJ) -framework Foundation -framework CoreGraphics
+
 appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
 	@mkdir -p appkit/build
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
-$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(HOST_TBD)
+$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	@mkdir -p frameworks/AppKit.framework frameworks/Cocoa.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
-	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics $(HOST_TBD)
+	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 	@mkdir -p frameworks/Carbon.framework
 	sdk/gen-alias-tbd.sh Carbon $@ > frameworks/Carbon.framework/Carbon.tbd
@@ -143,7 +159,7 @@ $(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKI
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLER)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(APPKIT) $(INSTALLER)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -155,6 +171,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLE
 	install -Dm644 frameworks/CoreFoundation.framework/CoreFoundation.tbd \
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
 	install -Dm755 $(GRAPHICS) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreGraphics.framework/CoreGraphics
+	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
 	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
@@ -163,6 +180,6 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(APPKIT) $(INSTALLE
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h
-	rm -rf tests/build foundation/build graphics/build appkit/build frameworks installer/Installer.app
+	rm -rf tests/build foundation/build graphics/build quartzcore/build appkit/build frameworks installer/Installer.app
 
 .PHONY: all check install clean

@@ -24,6 +24,10 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     BOOL _focusLocked;
     NSViewController *_viewController;   /* not retained */
     NSArray *_draggedTypes;
+    CALayer *_layer;                /* the backing or hosted layer */
+    BOOL _hostsLayer, _drawsSubviewsIntoLayer;
+    NSViewLayerContentsRedrawPolicy _redrawPolicy;
+    NSDictionary *_animations;
 }
 
 /* Drag and drop: the types a view takes (NSDragging.m does the rest). */
@@ -122,6 +126,7 @@ static void view_setup(NSView *v, NSRect frame)
     v->_translates = YES;
     v->_alpha = 1;
     v->_needsDisplay = YES;
+    v->_redrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -196,6 +201,8 @@ void AViewDecode(NSView *v, NSCoder *c)
     [_toolTip release];
     [_identifier release];
     [_draggedTypes release];
+    [self _dropLayer];
+    [_animations release];
     [super dealloc];
 }
 
@@ -223,6 +230,7 @@ void AViewDecode(NSView *v, NSCoder *c)
         return;
     [_superview setNeedsDisplay:YES];
     _frame.origin = origin;
+    [self _syncLayer];
     [self setNeedsDisplay:YES];
     [self _postFrameChanged];
 }
@@ -236,6 +244,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     _bounds.size.width = old.width ? _bounds.size.width * size.width / old.width : size.width;
     _bounds.size.height = old.height ? _bounds.size.height * size.height / old.height : size.height;
     _frame.size = size;
+    [self _syncLayer];
     if (_autoresizes)
         [self resizeSubviewsWithOldSize:old];
     [_superview setNeedsDisplay:YES];
@@ -256,6 +265,7 @@ void AViewDecode(NSView *v, NSCoder *c)
 - (void)setBounds:(NSRect)bounds
 {
     _bounds = bounds;
+    [self _syncLayer];
     [self setNeedsDisplay:YES];
     if (_postsBounds)
         [[NSNotificationCenter defaultCenter] postNotificationName:NSViewBoundsDidChangeNotification object:self];
@@ -271,6 +281,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     if (hidden == _hidden)
         return;
     _hidden = hidden;
+    [self _syncLayer];
     if (hidden && _window) {
         NSResponder *first = [_window firstResponder];
         if ([first isKindOfClass:[NSView class]] && [(NSView *)first isDescendantOf:self])
@@ -293,13 +304,144 @@ void AViewDecode(NSView *v, NSCoder *c)
 - (NSAutoresizingMaskOptions)autoresizingMask { return _mask; }
 - (void)setAutoresizingMask:(NSAutoresizingMaskOptions)mask { _mask = mask; }
 - (NSInteger)tag { return -1; }
-- (BOOL)wantsLayer { return _wantsLayer; }
-- (void)setWantsLayer:(BOOL)flag { _wantsLayer = flag; }
 - (CGFloat)alphaValue { return _alpha; }
 - (void)setAlphaValue:(CGFloat)alpha
 {
     _alpha = alpha;
+    [self _syncLayer];
     [self setNeedsDisplay:YES];
+}
+
+/* ---- layers --------------------------------------------------------------------------
+ * A view that wants a layer is given one by makeBackingLayer, with the view
+ * as its delegate; a layer set with setLayer: before wantsLayer is a hosted
+ * layer, which the view shows but doesn't draw into. Either way the view
+ * keeps the layer's geometry, opacity and hidden flag in step with its own
+ * (the layer's bounds are the view's bounds, its anchor point stays where
+ * it was, (0, 0) for a backing layer), and draws the layer tree in its own
+ * coordinates when it draws: the layer's background, contents and border,
+ * the view's drawRect: (or updateLayer) and subviews as the layer's
+ * content, and the sublayers above them. A view's layer isn't a sublayer
+ * of its superview's: each view's layer is drawn from the view. */
+
+- (BOOL)wantsLayer { return _wantsLayer; }
+- (void)setWantsLayer:(BOOL)flag
+{
+    if (flag == _wantsLayer)
+        return;
+    _wantsLayer = flag;
+    if (flag && !_layer)
+        [self _adoptLayer:[self makeBackingLayer] hosting:NO];
+    else if (!flag && _layer && !_hostsLayer)
+        [self _dropLayer];
+    [self setNeedsDisplay:YES];
+}
+- (CALayer *)makeBackingLayer { return [CALayer layer]; }
+- (CALayer *)layer { return _layer; }
+- (void)setLayer:(CALayer *)layer
+{
+    if (layer == _layer)
+        return;
+    [self _dropLayer];
+    if (layer)
+        [self _adoptLayer:layer hosting:!_wantsLayer];
+    [self setNeedsDisplay:YES];
+}
+- (BOOL)wantsUpdateLayer { return NO; }
+- (void)updateLayer {}
+- (NSViewLayerContentsRedrawPolicy)layerContentsRedrawPolicy { return _redrawPolicy; }
+- (void)setLayerContentsRedrawPolicy:(NSViewLayerContentsRedrawPolicy)policy { _redrawPolicy = policy; }
+- (BOOL)canDrawSubviewsIntoLayer { return _drawsSubviewsIntoLayer; }
+- (void)setCanDrawSubviewsIntoLayer:(BOOL)flag { _drawsSubviewsIntoLayer = flag; }
+
+- (void)_adoptLayer:(CALayer *)layer hosting:(BOOL)hosting
+{
+    if (!layer)
+        return;
+    _layer = [layer retain];
+    _hostsLayer = hosting;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (!hosting) {
+        [layer setDelegate:(id)self];
+        [layer setAnchorPoint:CGPointZero];
+    }
+    [CATransaction commit];
+    FerryCALayerSetHost(layer, self);
+    [self _syncLayer];
+}
+
+- (void)_dropLayer
+{
+    if (!_layer)
+        return;
+    if ([_layer delegate] == (id)self)
+        [_layer setDelegate:nil];
+    FerryCALayerSetHost(_layer, nil);
+    [_layer release];
+    _layer = nil;
+    _hostsLayer = NO;
+}
+
+/* The layer follows the view. Its changes animate only when the current
+ * animation context allows implicit animation. */
+- (void)_syncLayer
+{
+    if (!_layer)
+        return;
+    [CATransaction begin];
+    if (![[NSAnimationContext currentContext] allowsImplicitAnimation])
+        [CATransaction setDisableActions:YES];
+    CGPoint ap = [_layer anchorPoint];
+    [_layer setBounds:_bounds];
+    [_layer setPosition:CGPointMake(_frame.origin.x + ap.x * _frame.size.width,
+                                    _frame.origin.y + ap.y * _frame.size.height)];
+    [_layer setOpacity:(float)_alpha];
+    [_layer setHidden:_hidden];
+    [CATransaction commit];
+}
+
+/* As the backing layer's delegate: no implicit animations unless the
+ * current animation context allows them. */
+- (id<CAAction>)actionForLayer:(CALayer *)layer forKey:(NSString *)event
+{
+    if (layer == _layer && ![[NSAnimationContext currentContext] allowsImplicitAnimation])
+        return (id<CAAction>)[NSNull null];
+    return nil;
+}
+
+static int layers_drawing;   /* changes made while a view draws its layer don't ask for another draw */
+
+/* The layer tree changed or is animating: the window draws again. */
+- (void)_ferryLayerTreeChanged
+{
+    if (!layers_drawing)
+        [_window _noteNeedsDisplay];
+}
+
+/* ---- animator proxies (NSAnimationContext.m) ---- */
+
+- (instancetype)animator { return AAnimatorFor(self); }
+- (NSDictionary *)animations { return _animations ?: @{}; }
+- (void)setAnimations:(NSDictionary *)animations
+{
+    [_animations release];
+    _animations = [animations copy];
+}
+- (id)animationForKey:(NSString *)key
+{
+    id a = _animations[key];
+    if (a)
+        return a == [NSNull null] ? nil : a;
+    return [[self class] defaultAnimationForKey:key];
+}
++ (id)defaultAnimationForKey:(NSString *)key
+{
+    static NSSet *keys;
+    if (!keys)
+        keys = [[NSSet setWithArray:@[ @"frame", @"frameOrigin", @"frameSize", @"bounds", @"boundsOrigin",
+                                       @"boundsSize", @"alphaValue" ]] retain];
+    return [keys containsObject:key] ? [CABasicAnimation animation] : nil;
 }
 - (NSString *)toolTip { return _toolTip; }
 - (void)setToolTip:(NSString *)tip
@@ -637,7 +779,12 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 - (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen
 {
     dirty = NSIntersectionRect(dirty, _bounds);
+    BOOL wanted = _needsDisplay;
     _needsDisplay = NO;
+    if (_layer) {
+        [self _drawLayerInContext:ctx dirty:dirty screen:screen update:wanted];
+        return;
+    }
     if (NSIsEmptyRect(dirty))
         return;
     CGContextSaveGState(ctx);
@@ -658,6 +805,35 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     CGContextRestoreGState(ctx);
 }
 
+/* A view with a layer draws the layer tree, its own drawing being the
+ * layer's content. updateLayer stands for drawRect: when the view wants
+ * it; a hosted layer has no drawing of the view's. */
+- (void)_drawLayerInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen update:(BOOL)update
+{
+    BOOL updates = !_hostsLayer && [self wantsUpdateLayer];
+    layers_drawing++;
+    if (updates && update)
+        [self updateLayer];
+    NSRect b = _bounds;
+    FerryCALayerRender(_layer, ctx, YES, [self isFlipped], ^(CGContextRef c) {
+      CGContextClipToRect(c, b);
+      NSGraphicsContext *saved = [[NSGraphicsContext currentContext] retain];
+      NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithCGContext:c flipped:[self isFlipped]];
+      [gc _setDrawingToScreen:screen];
+      [NSGraphicsContext setCurrentContext:gc];
+      if (!_hostsLayer && !updates && !NSIsEmptyRect(dirty)) {
+          @autoreleasepool {
+              [self drawRect:dirty];
+          }
+      }
+      for (NSView *v in [[_subviews copy] autorelease])
+          [v _drawInContext:c dirty:dirty screen:screen];
+      [NSGraphicsContext setCurrentContext:saved];
+      [saved release];
+    });
+    layers_drawing--;
+}
+
 /* dirty is in the superview's coordinates. */
 - (void)_drawInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen
 {
@@ -669,6 +845,12 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     NSRect local = CGRectApplyAffineTransform(dirty, CGAffineTransformInvert(t));
     CGContextSaveGState(ctx);
     CGContextConcatCTM(ctx, t);
+    if (_layer) {
+        /* where an animation of the layer shows it */
+        CGAffineTransform shown = FerryCALayerPresentationOffset(_layer);
+        CGContextConcatCTM(ctx, shown);
+        local = CGRectApplyAffineTransform(local, CGAffineTransformInvert(shown));
+    }
     [self _drawContentInContext:ctx dirty:local screen:screen];
     CGContextRestoreGState(ctx);
 }
