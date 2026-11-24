@@ -25,6 +25,7 @@ import hashlib
 import html.parser
 import json
 import os
+import re
 import shutil
 import sys
 import threading
@@ -161,6 +162,28 @@ def as_desktop_id(name):
 
 def is_web_app(desktop_id):
     return bool(desktop_id) and desktop_id.startswith(PREFIX) and desktop_id.endswith(".desktop")
+
+
+# What a site's title says it has waiting: Facebook's "(3) Facebook", or a
+# mail site's "Inbox (12) - …". Web apps can't send the Dock a badge
+# themselves, so the Dock reads the number from their windows' titles.
+_LEADING = re.compile(r"^\s*\((\d[\d,.]*)\+?\)\s")
+_INBOX = re.compile(r"\b(?:Inbox|Messages|Chats|Notifications)\s*\((\d[\d,.]*)\+?\)", re.I)
+
+
+def title_count(title):
+    """The unread count a page's title shows, or 0."""
+    for pattern in (_LEADING, _INBOX):
+        found = pattern.search(title or "")
+        if found:
+            digits = re.sub(r"[,.]", "", found.group(1))
+            return int(digits) if digits.isdigit() else 0
+    return 0
+
+
+def views_count(views):
+    """The largest count among a web app's windows."""
+    return max((title_count(v.get("title")) for v in views), default=0)
 
 
 def write_app(name, url, icon_png):

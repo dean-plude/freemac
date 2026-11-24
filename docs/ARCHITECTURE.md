@@ -908,6 +908,13 @@ App… asks first, stops the app's own Epiphany (matched by its `--profile`
 argument, waiting for it to exit so it can't rewrite the folder), then
 removes the link, launcher, profile and pin.
 
+Epiphany has no Badging API, so a web app can't send a LauncherEntry badge
+(1.166). Instead `Item.set_views` in the Dock passes the windows of a web
+app's launcher to `webapps.views_count`, which reads a leading "(3)" or an
+"Inbox (12)" from each title and keeps the largest; `_draw_badge` uses it
+when no LauncherEntry count was sent. The Dock reads views on each Wayfire
+event and every five seconds, so the badge follows the title.
+
 ## Lifeboat in the menu bar (1.163)
 
 `lifeboat_menu.LifeboatMenu` watches `lifeboat-status.json` and

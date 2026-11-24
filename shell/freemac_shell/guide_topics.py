@@ -134,12 +134,14 @@ TOPICS = {
         "Turn off Join Automatically for a network you only want to join by hand, or choose Forget This "
         "Network to remove it and its password.",
     ]),
-    "web-apps": ("Put a website in the Dock", "website web app dock add to dock pin facebook site shortcut icon own window app web apps delete remove", [
+    "web-apps": ("Put a website in the Dock", "website web app dock add to dock pin facebook site shortcut icon own window app web apps delete remove badge unread count number messages notifications", [
         "Open the website in Web, then choose File > Add to Dock…. Web shows the site's own icon and name; "
         "change the name if you like, then click Add.",
         "The website is now in the Dock and in Applications. Click it and it opens in its own window, without "
         "Web's address bar or tabs, and its name shows in the menu bar like any other app.",
         "It keeps its own sign-in, so you stay logged in to it even after you sign out of the same site in Web.",
+        "When the site has something new for you, such as unread messages, its Dock icon shows the number "
+        "in a red badge. Turn badges off in Dials > Dock and Menu Bar.",
         "To delete it, right-click its icon in the Dock and choose Options > Delete Web App…. It leaves the "
         "Dock and Applications and its sign-in is forgotten. The website itself isn't changed.",
     ]),
