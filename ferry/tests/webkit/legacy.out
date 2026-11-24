@@ -81,6 +81,7 @@ a file that isn't there:
   start none.html (main frame 1)
   failed provisionally: NSURLErrorDomain -1100
 a new window:
+  policy for a new window: first.html
   create a web view for first.html
   show the new view (made here: 1)
   start first.html (main frame 1)

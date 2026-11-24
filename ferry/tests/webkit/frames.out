@@ -1,0 +1,38 @@
+frame view WebFrameView of the main frame 1, in the web view 1, allows scrolling 1
+document view WebHTMLView, a WebDocumentView 1, text 1, flipped 1, in a scroll view 1
+a tall page: the document view 3040 high, at 0; its text starts "top"
+the page scrolled by a script: the clip view at 1200 (followed 1, told 1)
+scrollPoint: on the document view: the page at 500
+the clip view scrolled: the page at 2000
+scrolled past the end: the clip view at the bottom 1, the page too 1
+zoomed twice: the document view 6078 high
+a page with frames:
+  "one": policy child.html, start child.html, commit child.html, title Child, finish
+  "two": policy about:srcdoc, start about:srcdoc, commit about:srcdoc, title Inline, finish
+  main: policy frames.html, start frames.html, commit frames.html, title Frames, finish
+child frames: 2, "one" (child.html, parent the main frame 1, in the view 1), "two" (about:srcdoc, parent the main frame 1, in the view 1)
+found by name: one 1, two 1, none nil; _top 1, _parent 1
+one: document DOMHTMLDocument, body "child other", title Child, frame element DOMHTMLIFrameElement name=one, its contentFrame the frame 1
+two: body "inline", window WebScriptObject, the same frame after another look 1
+one's frame view: WebFrameView of the frame 1, its document view 300 wide
+the page's documents: main DOMHTMLDocument, one's owner is not the main frame's 1
+resource about:srcdoc: data source frames.html, will send, response text/html, finished
+resource child.html: data source frames.html, will send, response text/html, finished
+resource frames.html: data source frames.html, will send, response text/html, finished
+resource missing.png: data source frames.html, will send, failed NSURLErrorDomain -1100
+resource script.js: data source frames.html, will send, response text/javascript, finished
+resource style.css: data source frames.html, will send, response text/css, finished
+a link clicked in frame one:
+  "one": policy other.html, start other.html, commit other.html, title Other, finish
+one now: other.html, "other"
+frame two loaded by the program:
+  "two": policy child.html, start child.html, commit child.html, title Child, finish
+two now: Child
+the user style sheet: background rgb(4, 5, 6)
+turned off: background rgba(0, 0, 0, 0)
+window.open:
+  policy for a new window: child.html
+  create a web view
+  the page got a window true; the new view shows Child
+  the new window from the opener: closed false, its title Child
+exit=0

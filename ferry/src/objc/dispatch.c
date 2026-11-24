@@ -466,6 +466,16 @@ static void *worker_main(void *unused)
                 continue;
             }
             busy_workers++;
+            /* More work still waiting and nobody idle to take it: a kick
+             * that only signalled an idle worker (this one) counted on it
+             * for all of it, so get the next piece a thread now, or tell
+             * the manager, which adds one if this block blocks. */
+            if (idle_workers == 0 && startable_work()) {
+                if (workers < soft_max_workers)
+                    spawn_worker();
+                else
+                    start_manager();
+            }
             pthread_mutex_unlock(&dq);
             execute(w, d);
             pthread_mutex_lock(&dq);

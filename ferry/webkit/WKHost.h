@@ -51,6 +51,7 @@ void g_list_free(GList *list);
 const char *g_param_spec_get_name(GParamSpec *pspec);
 const char *g_quark_to_string(uint32_t quark);
 gboolean g_source_remove(unsigned tag);
+unsigned g_signal_lookup(const char *name, GType itype);
 
 GtkWidget *gtk_overlay_new(void);
 void gtk_overlay_add_overlay(GtkWidget *overlay, GtkWidget *widget);
@@ -293,6 +294,18 @@ GList *webkit_back_forward_list_get_forward_list(WebKitBackForwardList *list);
 const char *webkit_back_forward_list_item_get_uri(WebKitBackForwardListItem *item);
 const char *webkit_back_forward_list_item_get_title(WebKitBackForwardListItem *item);
 const char *webkit_back_forward_list_item_get_original_uri(WebKitBackForwardListItem *item);
+
+/* The older WebView's resources, user style sheets and frames (freemac 1.217, Ferry 0.42.0) */
+typedef struct _WebKitUserStyleSheet WebKitUserStyleSheet;
+enum { WEBKIT_USER_STYLE_LEVEL_USER = 0, WEBKIT_USER_STYLE_LEVEL_AUTHOR = 1 };
+WebKitUserStyleSheet *webkit_user_style_sheet_new(const char *source, int injected_frames, int level,
+                                                  const char *const *allow_list, const char *const *block_list);
+void webkit_user_style_sheet_unref(WebKitUserStyleSheet *sheet);
+void webkit_user_content_manager_add_style_sheet(WebKitUserContentManager *manager, WebKitUserStyleSheet *sheet);
+void webkit_user_content_manager_remove_style_sheet(WebKitUserContentManager *manager, WebKitUserStyleSheet *sheet);
+GType webkit_web_resource_get_type(void);
+const char *webkit_web_resource_get_uri(WebKitWebResource *resource);
+const char *webkit_navigation_action_get_frame_name(WebKitNavigationAction *action);
 
 uint32_t webkit_javascript_error_quark(void);
 uint32_t webkit_network_error_quark(void);

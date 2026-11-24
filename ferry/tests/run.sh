@@ -1036,6 +1036,10 @@ if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
     run_one webkit_ui "$here/webkit/ui.m" "$here/webkit/ui.out" $webkit_flags
     run_one webkit_legacy "$here/webkit/legacy.m" "$here/webkit/legacy.out" $webkit_flags
     run_one webkit_embed "$here/webkit/embed.m" "$here/webkit/embed.out" $webkit_flags
+    # the older WebView's DOM classes, frame views, subframes, resource load
+    # delegate, user style sheet and new windows (freemac 1.217, Ferry 0.42.0)
+    run_one webkit_dom "$here/webkit/dom.m" "$here/webkit/dom.out" $webkit_flags
+    run_one webkit_frames "$here/webkit/frames.m" "$here/webkit/frames.out" $webkit_flags
     if grep -q "Gtk-CRITICAL\|Gtk-WARNING\|GLib-GObject-CRITICAL" "$build/webkit_embed.err" 2>/dev/null; then
         echo "FAIL webkit_embed warnings from GTK"; sed 's/^/    stderr: /' "$build/webkit_embed.err"; fail=$((fail + 1))
     else
@@ -1043,7 +1047,7 @@ if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
     fi
     kill "$xvfb_pid" 2> /dev/null; wait "$xvfb_pid" 2> /dev/null
 else
-    echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
+    echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed, webkit_dom, webkit_frames (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
 fi
 # Global hotkeys and the Accessibility API (freemac 1.215, Ferry 0.41.0),
 # against a stand-in Wayfire with Strata's calls (tests/tools/

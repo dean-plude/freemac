@@ -30,7 +30,7 @@ Security framework's answers for the Sparkle updaters, the Mac's version
 file, threads, gradients, shadows, and split view and tab view
 controllers. MacPass's document window is built on a split view
 controller and its preferences on a tab view controller, so it should now
-get past both. Hex Fiend still needs Swift. MacDown's web views can be made now (Ferry 0.40.0), but its preview was not tried, and from its source it also uses `WebFrameView` and the DOM classes, which aren't there yet. Running all nine again is the next step.
+get past both. Hex Fiend still needs Swift. MacDown's web views can be made now (Ferry 0.40.0), and the `WebFrameView` and DOM classes it also uses came in Ferry 0.42.0, but its preview was not tried. Running all nine again is the next step.
 
 Ferry also has its own **Installer**. Three real installers were tried,
 and all three install: the MacPorts and XQuartz packages (`.pkg`) and the
@@ -47,7 +47,7 @@ Sequel Pro disk image (`.dmg`). See "Installers" below.
 | [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | At the last run: starts, loads its nibs, registers its shortcuts (pressed on freemac's desktop from freemac 1.215) | At the last run, its Sparkle updater's check of its own code signature (`SecStaticCodeCreateWithPath`), which passes since (1.200). It also couldn't save its shortcuts file. From its source, its shortcut recorders now draw their gradient and their text shadow, and it also uses `NSTrackingArea`, which is in Ferry now (1.213), and `NSAppleScript`, which is there but runs no scripts and answers an error. Its shortcuts are pressed on freemac's desktop from freemac 1.215, and the Accessibility API is there too, once the user allows it, as for ShiftIt. (Not re-run since M7) |
 | [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | At the last run: starts; all 30 of its nibs (`NIBArchive`) load on their own | At the last run, the document classes, which came in 1.167. From its source, the next stop was its document window's split view controller (`MPDocumentSplitViewController`, built on `NSSplitViewController`), which was left out, and its preferences' tab view controller (`MPTabViewController`, on `NSTabViewController`). Both are in Ferry now, with `NSGradient` and `NSShadow`. Its source also uses `NSCollectionView`, `NSTrackingArea` and `NSMutableCharacterSet`, which are all in Ferry now (1.212 and 1.213). (Not re-run since M7) |
 | [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | At the last run: starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | At the last run, `NSSplitView` in its main window (`positionOfDividerAtIndex:`). `NSSplitView` and `NSOutlineView`, its hosts list, are in Ferry now (1.155 and 1.159), as are its gradients and shadows. Its source also uses `NSTrackingArea` and `NSTextAttachment`, which are in Ferry now (1.213). (Not re-run since M7) |
-| [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument` and on WebKit's older `WebView`, which are both in Ferry now (1.214); `WebFrameView` and the DOM classes, which it also uses, aren't. (Not re-run since M7) |
+| [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument` and on WebKit's older `WebView`, which are both in Ferry now (1.214), with the `WebFrameView` and DOM classes it also uses (1.217). (Not re-run since M7) |
 | [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; at the last run it started and loaded its main nib | At the last run, an array made with a nil object (`initWithObjects:count:`), most likely one of the classes it uses that Ferry didn't have being nil. Tables, outline and split views, the document classes, gradients and shadows are in Ferry now. From its source, the classes it was known to miss are all in Ferry now: WebKit's `WebView` came in 1.214. `NSRulerView`, which its line-number ruler is built on, came in 1.212, and `NSAnimation`, `NSTrackingArea` and `NSDistributedNotificationCenter` in 1.213. (Not re-run since M7) |
 
 ## Installers
@@ -1042,9 +1042,7 @@ is resized or hidden, takes the keyboard when it becomes the first
 responder, and keeps its page when its window is closed or it moves to
 another window.
 
-Left out: downloads, the cookie store, scheme handlers, the DOM classes
-and `WebFrameView`, and subframes in the older `WebView`. Requests are
-loaded as GETs. The work was written from Apple's documentation and
+Left out: downloads, the cookie store and scheme handlers. Requests are loaded as GETs. The DOM classes, `WebFrameView` and subframes in the older `WebView` came in freemac 1.217 (Ferry 0.42.0), in the section below. The work was written from Apple's documentation and
 WebKitGTK's, tried on X11 and not on Wayland, and not compared with a
 Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 
@@ -1081,6 +1079,37 @@ observers, reading other apps' key presses in general (KeyCastr), and
 plain keys as hotkeys. None of the apps was run again. The work was written
 from Apple's documentation and not compared with a Mac; `docs/ferry-gui.md`
 lists what a Mac would settle.
+
+### WebKit's frames and DOM (freemac 1.217, Ferry 0.42.0)
+
+The older `WebView` now has its frame views and the DOM classes, which
+Markdown editors like MacDown use to keep the preview where the text is.
+Each frame has a `WebFrameView` whose document view is as large as the
+page and sits in a scroll view scrolled where the page is: a program can
+read the page's height, watch the clip view's bounds as the page scrolls,
+and scroll the page with `scrollPoint:` or `scrollToPoint:`.
+
+`DOMDocument`, `DOMElement`, `DOMHTMLElement` and some thirty of its
+subclasses, `DOMText`, `DOMAttr`, `DOMNodeList`, `DOMHTMLCollection` and
+`DOMCSSStyleDeclaration` read and change the page as a Mac's do: finding
+nodes by id, tag, class and selector, making and moving them, their
+attributes, HTML, text, style, sizes and scroll positions. Each call
+waits for the page, as `stringByEvaluatingJavaScriptFromString:` does,
+one object stands for each node while it is kept, and an exception in
+the page raises `DOMException`.
+
+The older `WebView` also knows its subframes now: `childFrames`, their
+names and documents, and their loads told to the frame load and policy
+delegates for the right frame. The resource load delegate is told of
+each resource a page loads, the preferences' user style sheet is
+applied, and `window.open` asks the policy delegate first and gives the
+page the new window.
+
+Left out: events, ranges and the other DOM classes, the cookie store,
+downloads, and requests' methods, headers and bodies. A subframe's
+failed loads aren't told. The work was written from Apple's
+documentation, WebKitGTK's and the DOM standards, and not compared with
+a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 
 ## What the apps need most
 

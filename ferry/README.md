@@ -250,7 +250,7 @@ the page and the app, and the navigation and UI delegates are asked and
 told what a Mac asks and tells them, with alerts, new windows and
 snapshots. WebKitGTK is opened only when an app makes its first web view;
 where it isn't installed, web views stay empty and the app goes on.
-Downloads and the DOM classes aren't there yet.
+Downloads aren't there yet; the DOM classes came in Ferry 0.42.0.
 
 From Ferry 0.41.0 (freemac 1.215), Mac apps' global shortcuts work on
 freemac's desktop: `RegisterEventHotKey` asks Strata to bind the
@@ -262,6 +262,14 @@ resize other apps' windows through Wayfire's IPC, once the user has allowed
 the app (asked once by `freemac-allow-control`, kept in
 `~/.config/freemac/window-control.json`, and changed in Dials). `NSScreen`
 lists every display from Wayfire.
+
+From Ferry 0.42.0 (freemac 1.217), the older `WebView` has its frame
+views and the DOM classes: an app can read and change the page through
+`DOMDocument`, `DOMElement` and their kin, read the page's size and
+scroll position from the frame view and scroll it, and see its subframes
+and their loads, the resources a page loads and the user style sheet.
+`window.open` gives the page the new window. Downloads and the cookie
+store aren't there yet.
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and

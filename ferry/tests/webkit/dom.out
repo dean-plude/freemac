@@ -1,0 +1,28 @@
+document DOMHTMLDocument, the main frame's 1, title "The page", URL file:///tmp/dom/
+documentElement DOMHTMLHtmlElement <HTML lang=en>, head DOMHTMLHeadElement, body DOMHTMLBodyElement, doctype DOMDocumentType html
+one object for each node: body 1, documentElement 1, equal 1
+h1: DOMHTMLHeadingElement, text "Hello", className "big title", id "top", nodeType 1, nodeName H1
+p1: DOMHTMLParagraphElement, innerHTML "One <b>bold</b> word", data-x 1, has data-y 0
+its children: 3 nodes (DOMText, DOMHTMLElement, DOMText), first DOMText "One ", parent DOMHTMLBodyElement
+its attributes: DOMNamedNodeMap, 2, the first DOMAttr id=p1
+li: DOMNodeList of 3, the second DOMHTMLLIElement "b"
+querySelectorAll p: DOMNodeList of 2; querySelector ul > li:last-child "c"; none: nil
+by class: 1; webkitMatchesSelector .big 1
+made: DOMHTMLDivElement and DOMText, in the page 0
+inserted: first child now #made, found 1, same object 1
+removed: found 0, parent nil
+innerHTML set: "new text", outerHTML "<p id="p1" data-x="1"><i>new</i> text</p>"
+outerHTML set: p2 nil, p3 "Three"
+title set: "Changed", the frame's data source says "Changed"
+style: DOMCSSStyleDeclaration, color rgb(1, 2, 3), cssText "color: rgb(1, 2, 3);"
+a: DOMHTMLAnchorElement, href file:///tmp/dom/next.html#part, hash #part, absoluteLinkURL file:///tmp/dom/next.html#part
+links DOMHTMLCollection of 1
+box: offsetTop > 0 1, clientHeight 50, scrollHeight 400, scrollTop 100
+scrolled into view: the page scrolled down 1
+the frame view follows at once: 1
+bad selector: DOMException
+a node into its own child: DOMException
+document.body from a script: DOMHTMLBodyElement, the same 1
+a plain object from a script: WebScriptObject
+after a new page: old p1 text "", new p1 "Again", different 1
+exit=0
