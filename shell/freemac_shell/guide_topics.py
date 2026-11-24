@@ -1118,6 +1118,18 @@ TOPICS = {
         "Waking from sleep works on every PC. Starting up from off works on most; if yours doesn't, turn on the "
         "wake alarm (sometimes called RTC Alarm or Resume by Alarm) in its firmware settings.",
     ]),
+    "disk-images": ("Open a disk image (.iso or .img)", "disk image iso img dmg raw mount open eject hatch "
+                    "virtual disk cd dvd burn make image from folder hull", [
+        "Double-click an .iso or .img file, in Downloads for example: it opens as a disk, on the Desktop and in "
+        "Drawer's sidebar, and its window opens. Its files are there to open or copy, as on a USB drive.",
+        "When you're done, click the Eject button beside it in Drawer's sidebar, or in Hull. The image file "
+        "itself stays where it is.",
+        "An .iso, like a disc's, opens read-only. An .img that's yours opens so you can change what's on it.",
+        "To make one, open Hull and choose File > New Image from Folder…: pick a folder and where to save it, and "
+        "you get an .img holding a copy of that folder. Hull also lists the disk images you have open.",
+        "A Mac's .dmg files are for installing Mac apps; freemac can't open them. Look for the app in Harbor, or a "
+        "download made for Linux.",
+    ]),
     "install-download": ("Install an app you downloaded", "install installer deb package download app software "
                          "setup slipway website", [
         "Most apps are in Harbor, freemac's app centre. If a website offers its app for Linux as a .deb file "

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Hatch: a ship's deck hatch, its lid swung open, with a disc rising out of the hold. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="deck" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c99a64"/><stop offset="1" stop-color="#a7763f"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5d7d99"/><stop offset="1" stop-color="#3f5a73"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="#dfe8f2"/>
+      <stop offset="0.7" stop-color="#c9d9f0"/><stop offset="1" stop-color="#e9d4f2"/>
+    </radialGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#deck)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <!-- deck planks -->
+    <path d="M8 34 H120 M8 60 H120 M8 86 H120 M8 112 H120" stroke="#8a5f30" stroke-width="2" stroke-opacity="0.45"/>
+    <!-- the opening in the deck, dark below -->
+    <rect x="30" y="62" width="68" height="42" rx="5" fill="#2a2018"/>
+    <rect x="30" y="62" width="68" height="42" rx="5" fill="none" stroke="#5c4128" stroke-width="5"/>
+    <!-- the lid, swung up and back -->
+    <path d="M30 62 L40 26 L108 26 L98 62 Z" fill="url(#lid)" stroke="#2f4558" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M47 33 L97 33 M45 41 L95 41 M43 49 L93 49" stroke="#9db6cb" stroke-width="2" stroke-opacity="0.5"/>
+    <!-- the disc coming up out of the hold -->
+    <circle cx="64" cy="80" r="22" fill="url(#disc)" stroke="#8fa3b8" stroke-width="1.5"/>
+    <circle cx="64" cy="80" r="6" fill="#2a2018" stroke="#8fa3b8" stroke-width="1.5"/>
+    <path d="M50 70 A17 17 0 0 1 60 64" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-opacity="0.9"/>
+    <!-- the deck's front edge, in front of the disc's lower half -->
+    <rect x="8" y="98" width="112" height="22" fill="url(#deck)"/>
+    <path d="M27 98 H101" stroke="#5c4128" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

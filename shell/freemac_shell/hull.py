@@ -12,7 +12,9 @@ The disk freemac is running from can be looked at but not changed.
 
 Original freemac code; the udisks2 side is in hull_store.
 """
+import os
 import sys
+import threading
 
 import gi
 
@@ -20,7 +22,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import alert, hull_store, menus, style  # noqa: E402
+from . import alert, disk_images, hull_store, menus, style  # noqa: E402
 from .hull_store import size_words  # noqa: E402
 
 APP_ID = "org.freemac.Hull"
@@ -51,6 +53,9 @@ ERASE, RENAME = 10, 11
 
 
 def drive_icon(drive):
+    image = getattr(drive, "image", None)
+    if image:
+        return "media-optical" if image.lower().endswith(".iso") else "drive-removable-media"
     if drive.optical:
         return "media-optical"
     if drive.bus == "sdio":
@@ -245,7 +250,8 @@ class Window(Gtk.ApplicationWindow):
         self.add(paned)
 
         menus.add_actions(self, {"close": self.close, "mount": self.toggle_mount, "erase": self.erase,
-                                 "eject": self.eject, "rename": self.rename})
+                                 "eject": self.eject, "rename": self.rename, "open-image": self.open_image,
+                                 "new-image": self.new_image})
         self.bus, self._watch = hull_store.watch(self._changed)
         self.connect("destroy", lambda *_: [self.bus.signal_unsubscribe(i) for i in self._watch])
         header.show_all()
@@ -326,7 +332,8 @@ class Window(Gtk.ApplicationWindow):
             self.sidebar.remove(row)
         rows = []
         for drive in self.drives:
-            section = "External" if drive.external else ("Disc" if drive.optical else "Internal")
+            section = "Disk Images" if getattr(drive, "image", None) else \
+                ("External" if drive.external else ("Disc" if drive.optical else "Internal"))
             rows.append(self._row("drive", drive, drive.name, drive_icon(drive), section, 0))
             for vol in drive.volumes:
                 rows.append(self._row("volume", vol, vol.name, volume_icon(vol), section, 18))
@@ -387,8 +394,10 @@ class Window(Gtk.ApplicationWindow):
         self.big_icon.set_from_icon_name(drive_icon(drive), Gtk.IconSize.DIALOG)
         self.big_icon.set_pixel_size(64)
         self.name_label.set_text(drive.name)
-        where = "External" if drive.external else "Internal"
-        what = " ".join(p for p in (drive.connection, where, "Physical Disk") if p)
+        image = getattr(drive, "image", None)
+        where = "Disk image" if image else ("External" if drive.external else "Internal")
+        what = "Disk Image" + (" (read-only)" if image and drive.read_only else "") if image else \
+            " ".join(p for p in (drive.connection, where, "Physical Disk") if p)
         if drive.whole is not None and drive.whole.is_table:
             what += f" • {drive.scheme}"
         self.what_label.set_text(what)
@@ -399,6 +408,14 @@ class Window(Gtk.ApplicationWindow):
         used = sum(s[1] for s in spaces)
         self._show_space(used if drive.mounted else None, drive.size)
         self._note(drive)
+        if image:
+            self._fill_facts([
+                ("Location:", where), ("Capacity:", size_words(drive.size)),
+                ("Image:", image), ("Child count:", str(count)),
+                ("Partition Map:", drive.scheme), ("Writable:", "No" if drive.read_only else "Yes"),
+                ("Device:", drive.whole.device if drive.whole else "—"), ("Removable:", "Yes"),
+            ])
+            return
         self._fill_facts([
             ("Location:", where), ("Capacity:", size_words(drive.size)),
             ("Connection:", drive.connection or "—"), ("Child count:", str(count)),
@@ -412,8 +429,10 @@ class Window(Gtk.ApplicationWindow):
         self.big_icon.set_from_icon_name(volume_icon(vol), Gtk.IconSize.DIALOG)
         self.big_icon.set_pixel_size(64)
         self.name_label.set_text(vol.name)
-        where = "External" if drive.external else "Internal"
-        self.what_label.set_text(" ".join(p for p in (drive.connection, where, "Physical Volume") if p)
+        image = getattr(drive, "image", None)
+        where = "Disk image" if image else ("External" if drive.external else "Internal")
+        self.what_label.set_text(("Disk Image Volume" if image else
+                                  " ".join(p for p in (drive.connection, where, "Physical Volume") if p))
                                  + f" • {vol.kind}")
         space = vol.space()
         self.size_label.set_text(size_words(space[0] if space else vol.size))
@@ -462,14 +481,15 @@ class Window(Gtk.ApplicationWindow):
         kind, item = self._current()
         free = item is not None and not self.busy and not item.system
         vol = item if kind == "volume" else None
+        drive = item if kind == "drive" else (vol.drive if vol else None)
+        locked = bool(drive and getattr(drive, "read_only", False))
         can_mount = bool(vol and vol.has_fs)
         self.mount_button.set_sensitive(free and can_mount)
         self.mount_button.text.set_text("Unmount" if vol and vol.mounts else "Mount")
         self.mount_button.set_tooltip_text("Unmount" if vol and vol.mounts else "Mount")
-        self.erase_button.set_sensitive(free and not (item and getattr(item, "optical", False))
+        self.erase_button.set_sensitive(free and not locked and not (item and getattr(item, "optical", False))
                                         and not (vol and vol.drive.optical))
-        self.info_button.set_sensitive(free and bool(vol and vol.has_fs))
-        drive = item if kind == "drive" else (vol.drive if vol else None)
+        self.info_button.set_sensitive(free and not locked and bool(vol and vol.has_fs))
         self.eject_button.set_sensitive(free and bool(drive and (drive.external or drive.ejectable)))
         for name, on in (("mount", self.mount_button), ("erase", self.erase_button),
                          ("rename", self.info_button), ("eject", self.eject_button)):
@@ -554,9 +574,85 @@ class Window(Gtk.ApplicationWindow):
             self.actions.erase_volume(item, fstype, label, done)
 
 
+    # -- disk images --
+
+    def open_image(self):
+        dialog = Gtk.FileChooserNative(title="Open Disk Image", transient_for=self,
+                                       action=Gtk.FileChooserAction.OPEN, accept_label="Open")
+        only = Gtk.FileFilter()
+        only.set_name("Disk images (.iso, .img)")
+        for suffix in disk_images.TYPES:
+            only.add_pattern("*" + suffix)
+        for mime in disk_images.MIME_TYPES:
+            only.add_mime_type(mime)
+        dialog.add_filter(only)
+        if dialog.run() == Gtk.ResponseType.ACCEPT:
+            try:
+                Gio.Subprocess.new(["freemac-hatch", dialog.get_filename()], Gio.SubprocessFlags.NONE)
+            except GLib.Error as e:
+                alert.tell(self, "The disk image couldn’t be opened.", e.message)
+
+    def new_image(self):
+        chooser = Gtk.FileChooserNative(title="Choose a Folder to Make an Image Of", transient_for=self,
+                                        action=Gtk.FileChooserAction.SELECT_FOLDER, accept_label="Choose")
+        chooser.set_current_folder(GLib.get_home_dir())
+        if chooser.run() != Gtk.ResponseType.ACCEPT:
+            return
+        folder = chooser.get_filename()
+        name = os.path.basename(folder.rstrip("/")) or "Untitled"
+        saver = Gtk.FileChooserNative(title="Save Disk Image As", transient_for=self,
+                                      action=Gtk.FileChooserAction.SAVE, accept_label="Save")
+        saver.set_do_overwrite_confirmation(True)
+        saver.set_current_folder(os.path.dirname(folder.rstrip("/")) or GLib.get_home_dir())
+        saver.set_current_name(name + ".img")
+        if saver.run() != Gtk.ResponseType.ACCEPT:
+            return
+        image = saver.get_filename()
+        if not image.lower().endswith(disk_images.TYPES):
+            image += ".img"
+        if os.path.exists(image):
+            try:
+                os.unlink(image)      # the save dialog has asked to replace it
+            except OSError as e:
+                alert.tell(self, f"“{os.path.basename(image)}” couldn’t be replaced.", e.strerror or "")
+                return
+        self._working(True)
+
+        def finished(why):
+            self._working(False)
+            if why is not None:
+                alert.tell(self, f"The disk image of “{name}” couldn’t be made.", why,
+                           icon=self._gicon("drive-removable-media"))
+            else:
+                answer = alert.ask(self, f"“{os.path.basename(image)}” is ready.",
+                                   f"It holds a copy of “{name}”. Double-click it to open it as a disk.",
+                                   [("Show in Drawer", Gtk.ResponseType.APPLY), ("Open", Gtk.ResponseType.OK)],
+                                   default=Gtk.ResponseType.OK, icon=self._gicon("drive-removable-media"))
+                if answer == Gtk.ResponseType.OK:
+                    Gio.Subprocess.new(["freemac-hatch", image], Gio.SubprocessFlags.NONE)
+                elif answer == Gtk.ResponseType.APPLY:
+                    try:
+                        Gio.AppInfo.launch_default_for_uri(
+                            Gio.File.new_for_path(os.path.dirname(image)).get_uri(), None)
+                    except GLib.Error:
+                        pass
+            return False
+
+        def work():
+            try:
+                disk_images.make_from_folder(folder, image)
+                why = None
+            except disk_images.Failed as e:
+                why = str(e) or "Something went wrong while it was being made."
+            GLib.idle_add(finished, why)
+        threading.Thread(target=work, daemon=True).start()
+
+
 def menubar():
     return menus.menubar([
-        ("_File", [[("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
+        ("_File", [[("Open Disk Image…", "win.open-image", "<Shift><Ctrl>o"),
+                    ("New Image from Folder…", "win.new-image", "<Shift><Ctrl>n")],
+                   [("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
                    [("Close", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("Rename…", "win.rename", None), ("Erase…", "win.erase", "<Shift><Ctrl>e")]]),
     ])
@@ -577,7 +673,8 @@ class Hull(Gtk.Application):
         menus.add_actions(self, {"quit": lambda: self.window and self.window.close()})
         self.set_accels_for_action("app.quit", ["<Control>q"])
         for action, keys in (("win.close", ["<Control>w"]), ("win.eject", ["<Control>e"]),
-                             ("win.erase", ["<Shift><Control>e"])):
+                             ("win.erase", ["<Shift><Control>e"]),
+                             ("win.open-image", ["<Shift><Control>o"]), ("win.new-image", ["<Shift><Control>n"])):
             self.set_accels_for_action(action, keys)
         self.set_menubar(menubar())
 

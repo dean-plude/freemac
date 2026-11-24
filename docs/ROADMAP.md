@@ -1171,6 +1171,21 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.147 "Hatch" (done)
+
+Open a disk image you double-click, as a Mac mounts a .dmg: an .iso or .img becomes a disk on the Desktop and in Drawer, and ejects like a USB drive.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Double-clicking an .iso, .img or .raw opens it as a disk through udisks2 (no password for the person at the computer) and opens its window in front; an .iso, or an image you can't write to, opens read-only; opening it again just shows its window | Hatch, disk_images.py, mimeapps | done |
+| 2 | A small "Opening…" window only when opening takes a moment; an image with nothing freemac can read is closed again and says so in plain words | Hatch | done |
+| 3 | Ejecting the disk closes the image (the loop device goes away by itself) | disk_images.py | done |
+| 4 | Hull: a Disk Images section with the image's file, whether it's writable, and Eject; Erase and Rename are off for read-only images; File > Open Disk Image… (⇧⌘O) | Hull | done |
+| 5 | Hull: File > New Image from Folder… (⇧⌘N) makes an .img holding a copy of a folder (ext4, owned by you), then offers to open it or show it in Drawer; system folders and a disk without room are refused | Hull, disk_images.py | done |
+| 6 | Drawer brings a window opened by another app to the front, rather than leaving it behind the window you were in | Drawer | done |
+| 7 | Apps that hide from the menus, like Hatch, stay out of the Dock's recent apps | Pier | done |
+| 8 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.146 "Slipway" (done)
 
 Install an app you downloaded, as opening an installer package on a Mac opens Installer.

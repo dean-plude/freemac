@@ -196,6 +196,41 @@ class Drive:
         return [v for v in self.volumes if v.mounts]
 
 
+class ImageDrive(Drive):
+    """A disk image this account has open (disk_images): shown as a drive of
+    its own, ejected by closing it."""
+
+    def __init__(self, path, props, backing):
+        block = props[P + "Block"]
+        self.path = path
+        self.image = backing
+        self.size = block.get("Size", 0)
+        self.removable = True
+        self.ejectable = True
+        self.can_power_off = False
+        self.bus = ""
+        self.optical = False
+        self.media = True
+        self.rotation = -1
+        self.model = os.path.basename(backing)
+        self.read_only = bool(block.get("ReadOnly"))
+        self.whole = None
+        self.volumes = []
+        self.system = False
+
+    @property
+    def external(self):
+        return False
+
+    @property
+    def name(self):
+        return self.model
+
+    @property
+    def medium(self):
+        return "Disk image"
+
+
 def read(bus=None):
     """The drives udisks knows, internal first, then external, each with its
     volumes. Disks the system hides (and loop and RAM disks) are left out."""
@@ -204,15 +239,26 @@ def read(bus=None):
                           None, GLib.VariantType.new("(a{oa{sa{sv}}})"), Gio.DBusCallFlags.NONE, 5000, None)
     objects = reply.unpack()[0]
     drives = {path: Drive(path, props) for path, props in objects.items() if P + "Drive" in props}
+    for path, props in objects.items():
+        loop = props.get(P + "Loop")
+        if loop and P + "Block" in props and loop.get("SetupByUID") == os.getuid() and loop.get("BackingFile"):
+            drives[path] = ImageDrive(path, props, _bytes(loop["BackingFile"]))
     system = _system_disks()
     for path, props in sorted(objects.items()):
         if P + "Block" not in props:
             continue
         block = props[P + "Block"]
-        if block.get("HintIgnore") or block.get("Drive", "/") not in drives:
+        owner = block.get("Drive", "/")
+        if path in drives:
+            owner = path                       # an open disk image's own block
+        elif props.get(P + "Partition", {}).get("Table") in drives and \
+                isinstance(drives[props[P + "Partition"]["Table"]], ImageDrive):
+            owner = props[P + "Partition"]["Table"]
+        if block.get("HintIgnore") or owner not in drives:
             continue
         vol = Volume(path, props)
-        drive = drives[vol.drive_path]
+        vol.drive_path = owner
+        drive = drives[owner]
         vol.drive = drive
         if not vol.is_partition:
             drive.whole = vol
@@ -223,13 +269,13 @@ def read(bus=None):
         drive.volumes.append(vol)
     for drive in drives.values():
         name = os.path.basename(drive.whole.device) if drive.whole else ""
-        drive.system = name in system
+        drive.system = name in system and not isinstance(drive, ImageDrive)
         for vol in drive.volumes:
             vol.system = drive.system
         drive.volumes.sort(key=lambda v: (v.offset, v.number))
     # An empty card reader, disc drive or floppy drive has nothing to show.
     shown = [d for d in drives.values() if d.size and (d.whole is not None or d.volumes)]
-    return sorted(shown, key=lambda d: (d.optical, d.external, d.model))
+    return sorted(shown, key=lambda d: (isinstance(d, ImageDrive), d.optical, d.external, d.model))
 
 
 class Actions:
@@ -304,6 +350,18 @@ class Actions:
         """Unmount everything on it, then power it off (a USB drive) or open
         the tray (a disc)."""
         steps = self._unmount_all(drive.volumes)
+        if isinstance(drive, ImageDrive):
+            def close(next_step):
+                # An image opened by Hatch closes by itself once unmounted.
+                def closed(_value, error):
+                    if error is not None and ("No such" in error.message or "UnknownObject" in error.message
+                                              or "UnknownMethod" in error.message):
+                        error = None
+                    next_step(None, error)
+                self._call(drive.path, "Loop", "Delete", self._none(), closed)
+            steps.append(close)
+            self._steps(steps, done)
+            return
         if drive.ejectable and drive.optical:
             steps.append((drive.path, "Drive", "Eject", self._none()))
         elif drive.can_power_off:

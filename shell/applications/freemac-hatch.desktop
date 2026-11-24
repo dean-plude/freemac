@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Hatch
+GenericName=Disk Image Opener
+Comment=Open a disk image (.iso or .img) as a disk
+Exec=freemac-hatch %f
+Icon=freemac-hatch
+Categories=System;Utility;
+Keywords=disk image;iso;img;mount;open;cd;dvd;
+MimeType=application/x-cd-image;application/x-iso9660-image;application/x-raw-disk-image;
+NoDisplay=true
+StartupWMClass=org.freemac.Hatch
+StartupNotify=false

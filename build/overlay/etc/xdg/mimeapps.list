@@ -49,3 +49,6 @@ application/vnd.ms-opentype=freemac-typecase.desktop
 application/vnd.debian.binary-package=freemac-slipway.desktop
 application/x-deb=freemac-slipway.desktop
 application/x-debian-package=freemac-slipway.desktop
+application/x-cd-image=freemac-hatch.desktop
+application/x-iso9660-image=freemac-hatch.desktop
+application/x-raw-disk-image=freemac-hatch.desktop
