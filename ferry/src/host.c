@@ -202,3 +202,26 @@ void *ferry_twin_symbol(const char *install_name, const char *name)
         }
     return NULL;
 }
+
+/* ---- networking ------------------------------------------------------------------
+ * Foundation's URL loading (NSURLSession, NSURLConnection, and reading http
+ * and https URLs into NSData and NSString) is done by this system's libcurl.
+ * Foundation asks for libcurl's calls by name the first time a program
+ * loads a URL from the network, so programs that never do don't open
+ * libcurl (or the TLS library it brings). Only libcurl's own calls are
+ * served. */
+static const char *const network_libraries[] = {"libcurl.so.4", "libcurl-gnutls.so.4"};
+
+void *ferry_network_symbol(const char *name)
+{
+    static void *handle;
+    static int tried;
+    if (!name || strncmp(name, "curl_", 5))
+        return NULL;
+    if (!tried) {
+        tried = 1;
+        for (size_t i = 0; i < sizeof network_libraries / sizeof network_libraries[0] && !handle; i++)
+            handle = dlopen(network_libraries[i], RTLD_NOW | RTLD_LOCAL);
+    }
+    return handle ? dlsym(handle, name) : NULL;
+}

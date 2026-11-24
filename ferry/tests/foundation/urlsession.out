@@ -1,0 +1,82 @@
+task: state 1 before resume, identifier set yes
+task: state 0 after resume
+hello: called after resume returned yes, task completed yes
+hello: NSHTTPURLResponse, status 200, MIME text/plain, encoding utf-8, expected length 14, path /hello
+hello: X-Ferry-Test yes, x-ferry-test yes, Content-Length field 14, suggested name hello
+hello: body: Hello, Ferry!
+hello: no error
+task: state 3 at the end, 14 bytes received, response kept
+POST: method=POST
+path=/echo?x=1
+content-type=application/json
+x-custom=second
+accept=*/*
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body={"a":1}
+PUT: method=PUT
+path=/echo
+content-type=text/plain
+accept=*/*
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body=new contents
+DELETE: method=DELETE
+path=/echo
+accept=text/plain
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body=
+HEAD: status 200, 0 bytes of body, expected length 14
+404: status 404 (not found), an error: no error
+204: status 204, 0 bytes, data empty, not nil
+redirect: status 200, ended at /hello, body: Hello, Ferry!
+gzip: Content-Encoding gzip, decoded: squeezed and unsqueezed
+closed port: NSURLErrorDomain -1004 "Could not connect to the server." (with the failing URL)
+slow server: NSURLErrorDomain -1001 "The request timed out." (with the failing URL)
+stalled body: NSURLErrorDomain -1001 "The request timed out." (with the failing URL)
+stalled body: response kept, data nil
+no host: NSURLErrorDomain -1000 "bad URL" (with the failing URL)
+other scheme: NSURLErrorDomain -1002 "unsupported URL" (with the failing URL)
+no URL: NSURLErrorDomain -1002 "unsupported URL"
+redirect loop: NSURLErrorDomain -1007 "too many HTTP redirects" (with the failing URL)
+server hung up: NSURLErrorDomain -1005 "The network connection was lost." (with the failing URL)
+cancelled: state 2 after cancel
+cancelled: NSURLErrorDomain -999 "cancelled" (with the failing URL)
+cancelled: data nil, state 3 in the handler
+never resumed: NSURLErrorDomain -999 "cancelled" (with the failing URL)
+together: /slow?ms=300 -> 200, 5 bytes
+together: /hello -> 200, 14 bytes
+together: /status/500 -> 500, 11 bytes
+configuration: request timeout 60, resource timeout 7 days, 6 connections a host
+session: timeout 30, delegate kept yes, configuration headers 2
+delegate: response 200, data, complete
+delegate body: method=GET
+path=/echo
+x-session=from the session
+x-both=request
+accept=*/*
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body=
+refused: response 200, complete with error -999, 0 bytes
+upload: sent 14 of 14, response 200, data, complete; the task sent 14 of 14
+upload body: method=POST
+path=/echo
+content-type=application/x-www-form-urlencoded
+x-session=from the session
+x-both=session
+accept=*/*
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body=uploaded words
+download: downloaded 100000 bytes, complete, written 100000 of 100000
+invalidated: session invalid, delegate let go yes
+a task from an invalidated session: NSGenericException
+download: a file URL yes, named CFNetworkDownload_..., 100000 bytes, sum 12492401, suggested name big.bin
+download: no error
+download: the file is gone after the handler yes
+upload with a handler: method=PUT
+path=/echo
+content-type=application/x-www-form-urlencoded
+accept=*/*
+user-agent=foundation_urlsession/1 Ferry (freemac)
+body=a body
+dispatch_main: slow
+done
+exit=0

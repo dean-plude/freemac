@@ -1110,6 +1110,9 @@ The new or extended ones:
 | `foundation_operation` | (freemac (1.194), Ferry 0.21.0) `NSOperationQueue` with block, invocation and an app's own operations: dependencies, priorities, cancelling, completion blocks, suspending, barriers, key-value notifications, waits; the locks |
 | `foundation_cache` | (freemac (1.194), Ferry 0.21.0) `NSCache` (count and cost limits, least recently used first, the delegate) and `NSProgress` (trees of progress, fraction completed with key-value notifications, cancel and pause) |
 | `appkit_more_controls` | (freemac (1.195), Ferry 0.22.0) Steppers by click, keys and holding the mouse down (autorepeat, wrapping or stopping at the ends, the value kept within the limits); level indicators in each style (tick marks and their rectangles, a click or drag setting the level when editable, continuous actions, the arrow keys, rating stars); colour wells taking turns with the shared colour panel (one active well, `changeColor:` sent to the active well and down the responder chain, a second click letting go, closing the panel letting go); date pickers in text-and-stepper style (each part stepped by the arrows without carrying into the next, typed digits moving on to the next part, a year typed short, AM and PM, the stepper, the minimum and maximum, the delegate's validation) and graphical style (days clicked, months turned, a range dragged, the clock beside the calendar); combo boxes with their own items and with a data source (the list opened by the button or the keys, chosen by Return or a click, closed by Escape or a click outside, the four notifications in order, completion keeping what was typed, the arrows stepping through the items with the list closed); popovers in each behaviour (shown beside a rectangle on any edge, moved to the other side when there is no room, kept in the window, closed by Escape, a click outside, `performClose:` or the delegate's refusal, the four notifications) and view controllers presented as popovers; path controls (components from a file URL and a web address, clicks and double clicks, own items, a placeholder, long paths cut in the middle, the pop-up style's menu); `NSSound` played through a stand-in player (named sounds, a sound from data, the volume, pause and resume, stop, looping, the delegate told whether it finished); token fields (tokens made at commas or at a character set, Return and end of editing, Backspace selecting then removing a token, the delegate's represented objects, display strings and refusals); and all of them loaded from a nib with their targets and actions |
+| `foundation_urlsession` (ARC, dispatch) | (freemac (1.196), Ferry 0.23.0) `NSURLSession` against a server on 127.0.0.1: data tasks with handlers (task state before and after `resume`, handler run after `resume` returns), `NSHTTPURLResponse` (status, MIME type, charset, length, headers in any case, suggested name), POST/PUT/DELETE/HEAD with bodies and headers, 404 and 204 not being errors, redirects, gzip, the URL errors (can't connect -1004, timeouts -1001 while connecting and mid-body, no host -1000, unsupported URL -1002, redirect loop -1007, connection lost -1005, cancel -999), cancelling before and after `resume`, tasks together in a dispatch group, the configuration and session headers, delegates (data, refused response, upload progress, download progress, invalidation), download tasks to a temp file removed after the handler, upload tasks, and a handler under `dispatch_main()` |
+| `foundation_urlconnection` (manual retain/release) | (freemac (1.196), Ferry 0.23.0) `NSURLConnection`: synchronous (200, 404, closed port), asynchronous (on the main queue or a private one; a redirect; a bad URL), with a delegate (PATCH with a body, a closed port, `startImmediately:NO`, cancel), `canHandleRequest:`; `NSData` and `NSString` `...ContentsOfURL:` over http (charset from the response, Cocoa error 256 with the URL error underneath); requests and responses made by hand (header case, `addValue:`, copies, Content-Type parsing, status texts) |
+| `libcurl loaded only when loading URLs` (check in `run.sh`) | (freemac (1.196), Ferry 0.23.0) a Foundation program that loads no URL never opens libcurl (`LD_DEBUG`) |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1591,6 +1594,69 @@ The new or extended ones:
     differently loads with the default.
   - How each control looks next to the real one: they are drawn by Ferry's
     own code in freemac's look, not compared side by side.
+- **Loading URLs: what is left** (freemac (1.196), Ferry 0.23.0).
+  - **Delegate queues.** With no delegate queue given, a session makes a
+    serial `NSOperationQueue` of its own, as on a Mac.
+    `sendAsynchronousRequest:queue:` with a nil queue uses the main dispatch
+    queue.
+  - **Redirects are followed silently.** `URLSession:task:willPerformHTTPRed
+    irection:newRequest:completionHandler:` and
+    `connection:willSendRequest:redirectResponse:` aren't asked.
+    `currentRequest` stays the original request, though the response's URL
+    is the final one.
+  - **Authentication challenges aren't sent to the delegate.** This covers
+    both server trust and HTTP auth. TLS is checked against this system's CA
+    certificates by libcurl, and a failure gives -1200 or -1202.
+  - No cookies (`NSHTTPCookieStorage`, `HTTPShouldHandleCookies` is stored
+    but not used).
+  - No URL cache (`NSURLCache`, cache policies are stored but not used).
+  - No `connectionProxyDictionary`, since only the environment's proxies are
+    used.
+  - No background sessions.
+  - No resume data (`cancelByProducingResumeData:` gives nil).
+  - No stream tasks, `HTTPBodyStream`, upload from a stream,
+    `NSURLSessionTaskMetrics`, `NSURLSessionWebSocketTask`, `NSURLProtocol`,
+    data URLs or ftp. The schemes are http and https only. File URLs go
+    through Foundation's usual file reading.
+  - The `NSURLSessionResponseBecomeDownload` and `BecomeStream` dispositions
+    are treated as Allow.
+  - `HTTPMaximumConnectionsPerHost` and `allowsCellularAccess` are stored
+    but not used. libcurl's own connection limits apply.
+  - **Progress happens only while the program runs its run loop or waits in
+    dispatch.** A program that sleeps or busy-waits without doing either
+    sees no progress. With one thread there is no network thread to move the
+    transfers along.
+  - **Mac programs that link libcurl themselves**
+    (`/usr/lib/libcurl.4.dylib`) aren't served. Only Foundation's own use of
+    libcurl is.
+  - `NSURLSession` with a delegate retains it until it is invalidated, as on
+    a Mac. Nothing in Ferry warns about a session that is never invalidated.
+- **Loading URLs: written from the documentation, not compared with a Mac**
+  (freemac (1.196), Ferry 0.23.0).
+  - The wording of the `localizedDescription` of each URL error ("Could not
+    connect to the server.", "The request timed out.", "bad URL", and so
+    on). It follows wording that is publicly quoted. It wasn't compared with
+    a Mac for every code.
+  - The default `User-Agent`. A Mac sends `<app>/<version> CFNetwork/...
+    Darwin/...`, and Ferry sends `... Ferry (freemac)`.
+  - **The case of names in `allHeaderFields`.** Ferry keeps the server's
+    case. Newer Macs may change the case of some names.
+  - **Which timeout wins when the request and the configuration both set
+    one.** Ferry uses the request's unless it is the default 60 seconds.
+  - The Content-Type added to a body without one: libcurl's
+    `application/x-www-form-urlencoded`. A Mac is thought to do the same for
+    `NSURLConnection`, but this wasn't checked for `NSURLSession`.
+  - Whether a task made with a completion handler also sends
+    `didCompleteWithError:` to the session's delegate. Ferry calls only the
+    handler.
+  - `suggestedFilename` falling back to "Unknown".
+  - The text of `NSCocoaErrorDomain` 256 from
+    `dataWithContentsOfURL:options:error:` ("The file “X” couldn’t be
+    opened.", with X the URL's last component or host).
+  - A body on a GET request is dropped. A Mac may also drop it, or may send
+    it.
+  - The order of `didReceiveData:` chunks against `didSendBodyData:` for an
+    upload with a large response.
 
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -1660,3 +1726,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.20.0 (freemac (1.191)): `NSArrayController`, `NSTreeController`, `NSObjectController` and `NSDictionaryController` loaded from keyed nib archives with their settings and the binding connectors that join them, so a nib that binds a table or an outline to a controller works with no code; view-based tables and outlines from a nib making their cell views from the table's prototypes, with controls in a cell view bound to `objectValue.key` both ways; `NSValidatesImmediately` (`validateValue:forKeyPath:error:` and `validate<Key>:error:` before a bound value is written, a refused value presented and the control put back), `NSRaisesForNotApplicableKeys`, `NSConditionallySetsEnabled` and `...Editable` on controls, `NSAllowsEditingMultipleValuesSelection`, `NSDeletesObjectsOnRemove`, `NSSelectsAllWhenSettingContent` and `NSHandlesContentAsCompoundValue`, `make check` 87/87.
 - 2026-11-24: Ferry 0.21.0 (freemac (1.194)): `NSTask`, `NSPipe` and `NSFileHandle`, `NSRegularExpression` on ICU, `NSScanner`, `NSXMLParser` on libxml2, `NSOperationQueue` and its operations, the locks, `NSCache` and `NSProgress`; ICU and libxml2 reached through a new core call, `ferry_twin_symbol`, only when first used; the desktop's notice for an app Ferry can't run now says "Ferry can't run this app yet" and keeps the app's output in `~/.cache/freemac/ferry/<app>.log` (1.193), `make check` 93/93.
 - 2026-11-24: Ferry 0.22.0 (freemac (1.195)): `NSStepper`, `NSLevelIndicator`, `NSColorWell` with a basic `NSColorPanel`, `NSDatePicker` (text with a stepper, or a calendar and a clock), `NSComboBox`, `NSPopover` (and view controllers presented as popovers), `NSPathControl`, `NSSound` (through `pw-play`, `paplay` or `aplay`) and `NSTokenField`, each with its cell and read from nibs, `make check` 94/94.
+- 2026-11-24: Ferry 0.23.0 (freemac (1.196)): loading http and https URLs through this system's libcurl, opened only when a program first loads one: `NSURLSession` (data, upload and download tasks, handlers and delegates, a serial operation queue of its own when none is given), `NSURLConnection`, `NSURLRequest`, `NSHTTPURLResponse`, `NSURLErrorDomain` and `NSData`'s and `NSString`'s `...ContentsOfURL:` for web addresses; a new core call, `ferry_network_symbol`, `make check` 97/97.

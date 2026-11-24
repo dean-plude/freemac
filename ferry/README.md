@@ -64,6 +64,14 @@ fields are there too, with their cells and read from nibs, and `NSSound`
 plays sounds through PipeWire's `pw-play` (or `paplay` or `aplay`),
 finding the Mac's alert sounds by name among freemac's own.
 
+From Ferry 0.23.0 (freemac 1.196), programs can also load URLs over http
+and https: `NSURLSession` (data, upload and download tasks),
+`NSURLConnection`, `NSURLRequest` and `NSHTTPURLResponse`, errors in
+`NSURLErrorDomain`, and `NSData`'s and `NSString`'s `...ContentsOfURL:`
+for web addresses, through this system's libcurl, opened only when a
+program first loads a URL. Transfers move, and handlers run, while the
+program runs its run loop or waits in dispatch.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

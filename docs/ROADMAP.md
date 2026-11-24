@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.196 "Ferry: loading web addresses" (done)
+
+Ferry 0.23.0: Mac apps can fetch from the web, for update checks, feeds and downloads.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSURLSession` data, upload and download tasks, with completion handlers or delegates, cancel and invalidation | Ferry | done |
+| 2 | `NSURLConnection`, `NSURLRequest`, `NSHTTPURLResponse` and the usual `NSURLErrorDomain` errors; redirects and gzip handled | Ferry | done |
+| 3 | `NSData` and `NSString` read straight from web addresses | Ferry | done |
+| 4 | Done by this system's libcurl, opened only when an app first loads a URL; Ferry's package recommends it | Ferry | done |
+| 5 | Two new tests against a local test server, and a check that libcurl stays unopened otherwise; `make check` 97 of 97 | Ferry | done |
+
 ## 1.195 "Ferry: the rest of the everyday controls" (done)
 
 Ferry 0.22.0: the controls Mac apps' windows use that Ferry lacked.
