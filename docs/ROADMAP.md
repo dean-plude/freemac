@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.193 "Quick Note" (done)
+
+A small note that opens over whatever you're doing, like Quick Note on a
+Mac, and a clearer message when Ferry can't run a Mac app.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Quick Note: a small floating note in the bottom right of the screen, kept on top, saved as you type in Jot's Quick Notes folder, with buttons to open it in Jot or start another | Jot | done |
+| 2 | Quick Note from a hot corner (Dials > Dock and Menu Bar > Hot Corners), from File > New Quick Note in Jot, or with `freemac-jot --quick` | Hot Corners, Jot | done |
+| 3 | Opens the last quick note again, or with File > Always Resume to Last Quick Note off, only one closed in the last five minutes | Jot | done |
+| 4 | Jot lists quick notes with the others, marked Quick Note | Jot | done |
+| 5 | A Mac app that Ferry can't run keeps its output in `~/.cache/freemac/ferry/<app>.log`, and the notice says what went wrong from its last line | Ferry | done |
+
 ## 1.192 "Bosun" (done)
 
 An app for shortcuts, like Shortcuts on a Mac: steps put together and run

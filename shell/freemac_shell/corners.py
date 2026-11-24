@@ -22,10 +22,12 @@ ACTIONS = {
     "show-desktop": ("Show the desktop", "wm-actions", "toggle_showdesktop", None),
     "notifications": ("Notifications", "command", "binding_corner_notifications", "freemac-beacon --center"),
     "note": ("New note in Jot", "command", "binding_corner_note", "freemac-jot"),
+    "quick-note": ("Quick Note", "command", "binding_corner_quick_note", "freemac-jot --quick"),
     "lock": ("Lock the screen", "command", "binding_lock", None),
     "saver": ("Start the screen saver", "command", "binding_corner_saver", "freemac-screensaver"),
 }
-ORDER = ("none", "overview", "desktops", "apps", "show-desktop", "notifications", "note", "saver", "lock")
+ORDER = ("none", "overview", "desktops", "apps", "show-desktop", "notifications", "quick-note", "note", "saver",
+         "lock")
 
 
 def parts(value):
