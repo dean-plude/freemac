@@ -324,6 +324,8 @@ static NSString *format_double(double d, BOOL single)
 }
 - (NSComparisonResult)compare:(NSNumber *)other
 {
+    if ([other isKindOfClass:[NSDecimalNumber class]])   /* exactly, in base 10 */
+        return (NSComparisonResult) - [other compare:self];
     if (![other isKindOfClass:[FNumber class]])
         FRaise(NSInvalidArgumentException, @"-[NSNumber compare:]: nil argument");
     FNumber *o = (FNumber *)other;
@@ -344,6 +346,8 @@ static NSString *format_double(double d, BOOL single)
 {
     if (other == self)
         return YES;
+    if ([other isKindOfClass:[NSDecimalNumber class]])
+        return [other isEqual:self];
     if (![other isKindOfClass:[FNumber class]])
         return NO;
     return [self compare:other] == NSOrderedSame;

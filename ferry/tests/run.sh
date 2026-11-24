@@ -895,5 +895,16 @@ else
 fi
 run_one appkit_split_controller "$here/appkit/split_controller.m" "$here/appkit/split_controller.out" -fobjc-arc -fblocks -framework Cocoa
 run_one appkit_tab_controller "$here/appkit/tab_controller.m" "$here/appkit/tab_controller.out" -fobjc-arc -fblocks -framework Cocoa
+# NSExpression, NSComparisonPredicate, MATCHES and substitution variables;
+# NSDecimalNumber and the NSDecimal functions; and in Core Data, decimal
+# attributes kept exactly, expression descriptions with aggregates,
+# grouping and having predicates, and MATCHES in fetches (freemac 1.211,
+# Ferry 0.37.0).
+run_one foundation_expressions "$here/foundation/expressions.m" "$here/foundation/expressions.out" \
+    -fobjc-arc -fblocks -framework Foundation
+run_one foundation_decimals "$here/foundation/decimals.m" "$here/foundation/decimals.out" \
+    -fobjc-arc -fblocks -framework Foundation
+run_one coredata_aggregates "$here/coredata/aggregates.m" "$here/coredata/aggregates.out" \
+    -fobjc-arc -fblocks -framework Foundation -framework CoreData -lsqlite3
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

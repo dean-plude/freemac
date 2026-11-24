@@ -854,6 +854,23 @@ static id collection_operator(id collection, NSString *path)
         [values addObject:v ?: [NSNull null]];
     }
     if ([op isEqualToString:@"@sum"] || [op isEqualToString:@"@avg"]) {
+        BOOL decimals = NO;   /* with a decimal number among them, in base 10 */
+        for (id v in values)
+            decimals |= [v isKindOfClass:[NSDecimalNumber class]];
+        if (decimals) {
+            NSDecimalNumber *total = [NSDecimalNumber zero];
+            for (id v in values) {
+                if (v == [NSNull null])
+                    continue;
+                NSNumber *n = [v isKindOfClass:[NSNumber class]] ? v : @([v doubleValue]);
+                total = [total decimalNumberByAdding:[NSDecimalNumber decimalNumberWithDecimal:[n decimalValue]]];
+            }
+            if ([op isEqualToString:@"@sum"])
+                return total;
+            return [total decimalNumberByDividingBy:[NSDecimalNumber decimalNumberWithMantissa:[values count]
+                                                                                       exponent:0
+                                                                                     isNegative:NO]];
+        }
         BOOL integers = YES;
         long long isum = 0;
         double dsum = 0;

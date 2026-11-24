@@ -275,4 +275,12 @@ NSArray *CDFilterSortLimit(NSArray *objects, NSFetchRequest *request, BOOL limit
 - (id)_ferryStructure;
 @end
 
+/* Dictionary results with expressions, grouping and a having predicate
+ * (NSExpressionDescription.m). CDGroupsResults says whether the objects
+ * must be fetched without sort, offset and limit, which
+ * CDExpressionResults then applies to the dictionaries. */
+BOOL CDFetchesExpressions(NSFetchRequest *request);
+BOOL CDGroupsResults(NSFetchRequest *request);
+NSArray *CDExpressionResults(NSArray *objects, NSFetchRequest *request, NSEntityDescription *entity);
+
 #endif

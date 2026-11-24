@@ -206,6 +206,18 @@ control or as the window's toolbar, loading each tab's view when it is
 first shown. These are what MacPass's document window and preferences
 are built on.
 
+From Ferry 0.37.0 (freemac 1.211), Foundation has `NSExpression` and
+`NSComparisonPredicate`, and `NSPredicate` reads the rest of Apple's format
+strings: arithmetic, the built-in functions such as `sum:`, `average:` and
+`uppercase:`, `FUNCTION`, `TERNARY`, `CAST`, `SUBQUERY`, and `MATCHES` with
+regular expressions. `predicateWithSubstitutionVariables:` fills in
+variables. `NSDecimalNumber` and the `NSDecimal` functions do exact base-10
+arithmetic with Apple's rounding modes and exceptions, and work with
+`NSNumber`, `NSScanner`, `NSNumberFormatter`, keyed archiving and JSON.
+Core Data keeps decimal attributes exactly in its SQLite and binary stores,
+and a dictionary fetch takes expression descriptions with aggregates,
+`propertiesToGroupBy` and `havingPredicate`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
@@ -257,7 +269,7 @@ adding, inserting and removing), with table columns bound to
 column's title sorts it, and an edited cell writes back. Key-value
 coding has `mutableSetValueForKey:` and the collection operators
 (`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and
-`NSPredicate` reads a subset of Apple's format strings. From freemac
+`NSPredicate` reads Apple's format strings (most of them from Ferry 0.37.0; see below). From freemac
 (1.190) `NSTreeController` is there (children, count and leaf key paths,
 `arrangedObjects` as a tree of `NSTreeNode`s, a selection of
 `NSIndexPath`s, and adding, inserting, removing and moving nodes), with
