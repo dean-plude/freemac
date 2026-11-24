@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.149 "Restore" (done)
+
+Hull's Restore, as in a Mac's Disk Utility: copy a disk image onto a drive, the way to make a USB stick that starts up a system.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Edit > Restore… (⇧⌘R) and a Restore button for a drive that's plugged in: choose an .iso or .img (the chooser opens in Downloads), confirm, and it's copied byte for byte onto the whole drive | Hull, disk_images.py | done |
+| 2 | Refused for the system's disks, discs and open disk images; an image bigger than the drive says so before anything is touched | Hull | done |
+| 3 | Its volumes are unmounted first (hidden ones too); something still using them is named in plain words | disk_images.py | done |
+| 4 | A window with a progress bar, how much is copied, and Stop; a stopped restore explains that the drive holds only part of the image | Hull | done |
+| 5 | No password for an administrator at the computer, as for erasing (polkit open-device for drives that aren't the system's) | polkit rules | done |
+| 6 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.148 "Applications" (done)
 
 Drawer gets the Mac's Applications folder: the apps on the computer, side by side with your own folders.

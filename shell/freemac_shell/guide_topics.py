@@ -1139,6 +1139,17 @@ TOPICS = {
         "To remove an app, open Harbor, find it and click Remove; dragging it to the Trash doesn't remove it. "
         "The apps that come with freemac can't be removed.",
     ]),
+    "restore-usb": ("Copy a disk image onto a USB drive", "restore usb stick drive bootable startup start up "
+                    "installer iso img write flash burn copy image onto hull", [
+        "To make a USB drive that starts up freemac, or another system, from its .iso: plug the drive in, open "
+        "Hull, choose the drive in the sidebar and click Restore (⇧⌘R).",
+        "Choose the disk image, then click Restore. Everything on the drive is replaced by what's in the image, "
+        "and that can't be undone, so copy off anything you want to keep first.",
+        "A window shows how far it has got. Stop halts it, but then the drive holds only part of the image: "
+        "restore it again, or erase it to use it for files.",
+        "To start up from it, choose it in Dials > Startup Disk.",
+        "Only drives that are plugged in can be restored, never the disk freemac is running from.",
+    ]),
     "install-download": ("Install an app you downloaded", "install installer deb package download app software "
                          "setup slipway website", [
         "Most apps are in Harbor, freemac's app centre. If a website offers its app for Linux as a .deb file "
