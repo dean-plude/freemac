@@ -9,6 +9,7 @@ __FERRY_BEGIN
 #define MB_CUR_MAX 1
 typedef struct { int quot, rem; } div_t;
 typedef struct { long quot, rem; } ldiv_t;
+typedef struct { long long quot, rem; } lldiv_t;
 void *malloc(size_t);
 void *calloc(size_t, size_t);
 void *realloc(void *, size_t);
@@ -43,6 +44,13 @@ long labs(long);
 long long llabs(long long);
 div_t div(int, int);
 ldiv_t ldiv(long, long);
+lldiv_t lldiv(long long, long long);
+long double strtold(const char *, char **);
+int mblen(const char *, size_t);
+int mbtowc(wchar_t *, const char *, size_t);
+int wctomb(char *, wchar_t);
+size_t mbstowcs(wchar_t *, const char *, size_t);
+size_t wcstombs(char *, const wchar_t *, size_t);
 int rand(void);
 void srand(unsigned);
 long random(void);

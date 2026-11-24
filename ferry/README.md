@@ -141,6 +141,23 @@ the main thread only, and Ferry warns once when it
 is used elsewhere. Where a Mac would hang for ever on a deadlock, Ferry
 stops the program with a message.
 
+From Ferry 0.30.0 (freemac 1.203), Mac programs written in C++ and
+Objective-C++ run on this system's LLVM libc++ and libc++abi (packages
+libc++1 and libc++abi1), which Ferry opens only when a program links them.
+That covers:
+
+- the standard library, streams in step with `printf`, locales, `chrono`
+  and `filesystem`;
+- exceptions across the program, its libraries and this system's code;
+- `std::thread`, mutexes, condition variables and futures on a Mac's
+  layouts;
+- ARC objects with C++ ivars, and blocks capturing C++ objects;
+- Objective-C and C++ exceptions passing through each other's frames.
+
+Without those libraries, a C++ program stops and names them, and other
+programs are unaffected. `thread_local` and wide file streams are not
+supported yet.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

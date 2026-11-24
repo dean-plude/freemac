@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "ferry.h"
+#include "cxx.h"
 
 /* ---- libraries ---------------------------------------------------------------- */
 
@@ -37,7 +38,8 @@ int ferry_library_supported(const char *name)
         || !strncmp(name, "/usr/lib/system/", 16)
         || !strcmp(name, "/usr/lib/libobjc.A.dylib")
         || !strcmp(name, FERRY_HOST_LIBRARY)
-        || ferry_twin_library(name);
+        || ferry_twin_library(name)
+        || ferry_cxx_library(name);
 }
 
 /* ---- the program's own details ------------------------------------------------- */
@@ -261,7 +263,7 @@ const struct ferry_symbol ferry_core_symbols[] = {
 static const struct ferry_symbol *const tables[] = {
     ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_pthread_symbols, ferry_blocks_symbols,
     ferry_dispatch_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
-    ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols,
+    ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
 };
 
 static void *find_own(const char *name)
@@ -283,7 +285,12 @@ static void *find_passthrough(const char *name)
 
 void *ferry_lookup(const char *name)
 {
-    void *addr = find_own(name);
+    /* C++ names, once a program has brought in libc++ (cxx.c): ahead of
+     * libobjc's own personality routine for C++ */
+    void *addr = ferry_cxx_active ? ferry_cxx_lookup(name) : NULL;
+    if (addr)
+        return addr;
+    addr = find_own(name);
     if (addr)
         return addr;
     /* Variant suffixes such as "$UNIX2003" or "$INODE64": Ferry lists the

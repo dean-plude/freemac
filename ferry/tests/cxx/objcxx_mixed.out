@@ -1,0 +1,19 @@
+constructed: name default, alive 1
+sum 10, greeting hello 1
+after release: alive 0
+vector of NSString: item0,item1,item2
+block 11, copy 12, alive 3
+after blocks: alive 0
+  destroyed C++ object in a frame an NSException passes
+@catch FerryTest: raised 7
+  @finally ran
+catch: C++ exception through @finally
+C++ exception past @catch (NSException *): 5
+catch (...) took an NSException, rethrowing
+@catch after rethrow: through catch (...)
+@catch (...) took a C++ exception, rethrowing
+catch after @throw: for @catch (...)
+plain @try: Objective-C only
+plain @finally
+alive at the end 0
+exit=0

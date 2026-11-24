@@ -1140,6 +1140,12 @@ The new or extended ones:
 | `dispatch_concurrent` | (freemac (1.202), Ferry 0.29.0) libdispatch across threads: four blocks on a global queue all running at once and none on the main thread, a serial queue running 4000 blocks one at a time in order, `dispatch_sync` from 16 threads, a barrier waiting for the blocks before it and running alone, `dispatch_apply` on more than one thread, semaphore ping-pong between threads and a counting semaphore's limit, `dispatch_once` from eight threads, `dispatch_after` on a global queue, a group's notify after 100 blocks, a stress run of 10000 global and four serial queues' blocks, and the main queue running only on the main thread |
 | `foundation_threads` | (freemac (1.202), Ferry 0.29.0) `NSThread`: the main thread's answers (`isMainThread`, name, `threadDictionary`), a thread made with `initWithTarget:selector:object:` and started (executing and finished, the argument, its name, `NSWillBecomeMultiThreadedNotification` once and `NSThreadWillExitNotification`), starting it twice refused, `initWithBlock:` with cancel, its own dictionary, `sleepForTimeInterval:`, its autorelease pool, `+exit` and its quality of service, `detachNewThreadSelector:...` and `detachNewThreadWithBlock:`, `performSelectorOnMainThread:` (with and without waiting, and from the main thread itself), a thread's own run loop, `performSelector:onThread:` waited for and not, `performBlock:` on that thread's run loop, `performSelectorInBackground:`, an operation queue running two operations at once and keeping to a limit of four, main-queue operations from a worker running on the main thread, and 16 threads at once |
 | `foundation_locks` | (freemac (1.202), Ferry 0.29.0) Foundation's locks and the runtime under many threads: `NSLock` (counting, its name, `tryLock` and `lockBeforeDate:` against a lock held elsewhere), `NSRecursiveLock`, `NSCondition` between producers and consumers and a wait that times out, `NSConditionLock` handing over in order and a condition never set timing out, `@synchronized`, `+initialize` run once with no thread getting in before it ends, messages sent while a method is added, retain and release, weak references loaded while the object goes away, associated objects, autorelease pools on eight threads, and notifications posted from eight threads |
+| `cxx_basics` | (freemac (1.203), Ferry 0.30.0) a C++ program on this system's libc++: a global object constructed before `main` and destroyed after it, a replaced `operator new` used by containers, `vector`, `map`, `unordered_map`, `set`, algorithms and `accumulate`, `string` (find, `stod`, `stoll`), `iomanip` (precision, hex, fill), `printf` and `cout` alternating in order, `ctype` classes and `toupper`, words read with `>>`, `regex`, `stringstream` with `seekg`, `tellg` and `tellp`, `function`, `unique_ptr` and `shared_ptr`, `chrono` clocks and durations, and `filesystem` (directories, files, sizes, `ifstream` and `ofstream`, iteration, extensions, removal) in a temporary folder |
+| `cxx_exceptions` | (freemac (1.203), Ferry 0.30.0) C++ exceptions thrown and caught by this system's libc++abi in a Mac program: through six recursive frames running their destructors, out of a function with no frame pointer, through this system's `qsort`, out of a Mac library of the program's own with its own exception class (`BadShape`), typeinfo compared and `dynamic_cast` across the two images, rethrown, kept in an `exception_ptr`, nested, caught by a second base class, `bad_cast` and `out_of_range` from the library, `uncaught_exceptions` during unwinding, and `std::terminate`'s handler for an exception leaving a `noexcept` function |
+| `cxx_threads` | (freemac (1.203), Ferry 0.30.0) C++ threads on the Mac's layouts: a counter under `std::mutex` from eight threads, a queue under a `condition_variable`, `wait_for` timing out and `wait_until` woken, `recursive_mutex`, `timed_mutex`, `recursive_timed_mutex`, `shared_mutex` and `shared_timed_mutex`, `call_once`, `promise<int>` and `promise<void>`, `async` (on a thread, deferred, with an exception), a broken promise, a promise set twice, `shared_future`, thread ids and `hardware_concurrency`, joining no thread, and `detach` |
+| `objcxx_mixed` | (freemac (1.203), Ferry 0.30.0) Objective-C++ under ARC: an object whose C++ ivars (a class, a `vector` and a `map` holding `NSString`s) are built and destroyed by `.cxx_construct` and `.cxx_destruct`, `NSString`s in a `vector`, a block capturing a C++ object (copied once on the stack and again on the heap, all destroyed), an `NSException` through a C++ frame running its destructor, a C++ exception through `@finally`, `@catch (NSException *)` letting a C++ exception through, `catch (...)` taking an `NSException` and rethrowing it, `@catch (...)` taking a C++ exception and rethrowing it with `@throw`, and a plain `@try` with `@finally` |
+| `cxx_missing` | (freemac (1.203), Ferry 0.30.0) a C++ program without this system's libc++ (`FERRY_LIBCXX` naming a file that isn't there) stopping with exit status 127 and naming the packages libc++1 and libc++abi1 |
+| `cxx_not_loaded` | (freemac (1.203), Ferry 0.30.0) an Objective-C program with no C++ never loading libc++ |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -2148,6 +2154,49 @@ The new or extended ones:
   - The default stack size of a new `NSThread` (1 MiB here) and the
     smallest one `pthread_attr_setstacksize` accepts.
 
+- **C++ programs, not done yet** (freemac (1.203), Ferry 0.30.0).
+  - `thread_local` variables are missing, as all Mac thread-local
+    variables are (`_tlv_bootstrap`). A program that uses them can't be
+    linked by `ferry-cc` and isn't run.
+  - A Mac `operator new` or `operator delete` that the program defines
+    replaces the one its own code calls, but not the one this system's
+    libc++ calls from inside the library.
+  - `std::ctype<wchar_t>` keeps this system's class bits. Wide character
+    classes asked through `is` on that facet may differ from a Mac's.
+  - Wide file streams (`wifstream`, `wofstream`) keep this system's
+    layout. A Mac program that opens one may crash.
+  - `seekoff` and `seekpos` overridden in a Mac program's own stream
+    buffer, and called by this system's library, get Linux's calling form.
+    The same goes for seeking on the standard streams' own buffers.
+  - Error codes from this system's library (`filesystem`, and the
+    `system_error`s it throws) carry Linux error numbers. They match a
+    Mac's only up to 34 (`ERANGE`); `ENOTEMPTY` and `EAGAIN`, for example,
+    don't. Ferry's own thread calls give Mac numbers, but their messages
+    come from this system's `strerror`.
+  - `notify_all_at_thread_exit` and `set_value_at_thread_exit` are not
+    provided.
+  - Ferry writes the unwind tables of all Mac images when C++ first loads.
+    A program with very many functions takes longer to start and to
+    throw. The unwinder looks up dynamic tables one by one.
+  - An exceptional `future<void>::get` keeps one reference to the
+    exception too many, so it is never freed.
+  - The Mac-layout corrections assume that a Mac's libc++ lays out its
+    classes as LLVM libc++ 18 does, the version they were tested on.
+
+- **C++ programs, not compared with a Mac** (freemac (1.203), Ferry 0.30.0).
+  - The tests' output was written from the C++ standard, not from a Mac
+    run. These are the lines a Mac might print differently:
+    - `std::terminate`'s message for an uncaught exception;
+    - the text of `what()` for library errors;
+    - `hardware_concurrency`;
+    - the order of `unordered_map` iteration, which the tests don't print.
+  - The classes a Mac's `ctype<char>` gives the characters above 127 in
+    the "C" locale.
+  - Whether a Mac runs `@finally` and C++ destructors in the same order
+    when an `NSException` and a C++ exception meet in one frame.
+  - Stream positions after `seekg` and `tellp` on a `stringstream` opened
+    for both reading and writing.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2223,3 +2272,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.27.0 (freemac (1.200)): Security.framework (keychain passwords, code-signing answers, certificate trust), CommonCrypto (digests, HMAC, PBKDF2, AES), and one macOS version (14.7) everywhere an app asks, `make check` 117/117.
 - 2026-11-24: Ferry 0.28.0 (freemac (1.201)): `sysctl`, `dlopen`/`dlsym` and loading code after start-up, `@available` checks, `getattrlist`, the Mach host and task statistics, and NSBundle plug-ins that really load, `make check` 121/121.
 - 2026-11-24: Ferry 0.29.0 (freemac (1.202)): real threads: NSThread, per-thread run loops and autorelease pools, real locks and `@synchronized`, pthreads, libdispatch on a worker pool, concurrent NSOperationQueue, a thread-safe runtime, and URL loading on a network thread of its own, `make check` 125/125.
+- 2026-11-24: Ferry 0.30.0 (freemac (1.203)): C++ and Objective-C++ programs on this system's LLVM libc++ and libc++abi, loaded only when a program needs them: the standard library, exceptions across images and mixed with Objective-C's, and C++ threads on a Mac's layouts, `make check` 131/131.

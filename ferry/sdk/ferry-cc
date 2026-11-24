@@ -33,6 +33,30 @@ objc=
 for arg in "$@"; do
     if [ "$arg" = -framework ]; then objc=-lobjc; fi
 done
-exec clang -target x86_64-apple-macos11 -nostdlibinc -isystem "$sdk/include" \
+# C++ and Objective-C++ sources get LLVM's libc++ headers (package
+# libc++-dev, or libc++-18-dev and the like), ahead of the SDK's C headers,
+# as a Mac's clang++ finds its libc++ headers. Programs link -lc++ as on a
+# Mac; Ferry serves that library from this system's libc++ (src/cxx.c).
+cxx=
+for arg in "$@"; do
+    case $arg in
+        *.cpp|*.cc|*.cxx|*.c++|*.C|*.mm|c++|objective-c++) cxx=1 ;;
+    esac
+done
+cxxinc=
+if [ -n "$cxx" ]; then
+    if [ -n "${FERRY_LIBCXX_INCLUDE:-}" ]; then cxxinc=$FERRY_LIBCXX_INCLUDE
+    else
+        ver=$(clang -dumpversion 2>/dev/null | cut -d. -f1)
+        for candidate in "/usr/lib/llvm-$ver/include/c++/v1" /usr/include/c++/v1 /usr/lib/llvm-*/include/c++/v1; do
+            if [ -f "$candidate/__config" ]; then cxxinc=$candidate; break; fi
+        done
+    fi
+    if [ -z "$cxxinc" ]; then
+        echo "ferry-cc: LLVM's libc++ headers (package libc++-dev) aren't installed, so C++ can't be built" >&2
+        exit 1
+    fi
+fi
+exec clang -target x86_64-apple-macos11 -nostdlibinc ${cxxinc:+-nostdinc++ -isystem "$cxxinc"} -isystem "$sdk/include" \
     -fno-stack-protector -Wno-unused-command-line-argument \
     -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -F"$fw" -lSystem "$@" $objc

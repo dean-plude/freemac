@@ -25,12 +25,22 @@
  * program ends as a Mac program does, through the uncaught-exception
  * handler. The exceptions being caught are kept per thread: each thread
  * unwinds only its own stack.
+ *
+ * A program that uses C++ (src/cxx.c) brings in this system's C++ runtime
+ * and its unwinder, which then unwinds every exception, Objective-C ones
+ * too, through Mac and Linux frames alike: @throw raises the exception
+ * through it, and the Objective-C personality routine below answers for
+ * each frame from its LSDA, as the Itanium C++ ABI lays down. A C++
+ * exception passing an Objective-C frame is left to the C++ personality
+ * where the frame catches nothing Objective-C; @catch (...) and catch (...)
+ * catch either kind.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "../cxx.h"
 #include "../ferry.h"
 #include "objc-private.h"
 
@@ -64,15 +74,34 @@ static __thread struct exc *caught;   /* exceptions whose @catch is running, inn
 /* ---- @catch types ------------------------------------------------------------------ */
 
 /* A @catch (Foo *e) names Foo's "EH type": {objc_ehtype_vtable + 2, "Foo",
- * Foo's class}. @catch (id e) names OBJC_EHTYPE_id, whose class is nil. */
-const void *objc_ehtype_vtable[3];
+ * Foo's class}. @catch (id e) names OBJC_EHTYPE_id, whose class is nil.
+ *
+ * Once a program uses C++, this system's C++ personality reads the catch
+ * clauses of a frame a C++ exception passes, Objective-C ones included, and
+ * asks each clause's type whether it takes the exception through the type's
+ * vtable, as for a std::type_info. So past the two words before it, the
+ * vtable here answers as a type that takes nothing: in LLVM's libc++abi the
+ * slots are two destructors, two empty hooks, can_catch, two searches for
+ * dynamic_cast and a base-class check, and each of them here does nothing
+ * and returns 0 (can_catch's false). */
+static long ehtype_nothing(void)
+{
+    return 0;
+}
+const void *objc_ehtype_vtable[10] = {
+    NULL, NULL, (void *)ehtype_nothing, (void *)ehtype_nothing, (void *)ehtype_nothing, (void *)ehtype_nothing,
+    (void *)ehtype_nothing, (void *)ehtype_nothing, (void *)ehtype_nothing, (void *)ehtype_nothing,
+};
 const struct ferry_ehtype OBJC_EHTYPE_id = {&objc_ehtype_vtable[2], "id", NULL};
 const struct ferry_ehtype ferry_ehtype_missing = {&objc_ehtype_vtable[2], "(missing)", NULL};
 
-static int catches(const struct ferry_ehtype *t, id obj)
+/* foreign: a C++ exception, which only a catch-all catches */
+static int catches(const struct ferry_ehtype *t, id obj, int foreign)
 {
     if (!t)
         return 1;   /* catch-all: @catch (...) or C++ catch (...) */
+    if (foreign)
+        return 0;
     if (t->vtable != &objc_ehtype_vtable[2] || t == &ferry_ehtype_missing)
         return 0;   /* a C++ type, or a class Ferry left out */
     if (!t->cls)
@@ -579,7 +608,7 @@ enum { ACT_NONE, ACT_CLEANUP, ACT_CATCH };
 
 /* What the function at fi does for an exception passing the call at pc:
  * nothing, a cleanup, or a @catch that matches (with its selector). */
-static int scan_lsda(const struct finfo *fi, uint64_t pc, id obj, int search, uint64_t *lp, int64_t *selector)
+static int scan_lsda(const struct finfo *fi, uint64_t pc, id obj, int foreign, uint64_t *lp, int64_t *selector)
 {
     if (!fi->lsda)
         return ACT_NONE;
@@ -619,7 +648,7 @@ static int scan_lsda(const struct finfo *fi, uint64_t pc, id obj, int search, ui
             if (filter > 0 && ttype_base) {
                 const uint8_t *tp = ttype_base - filter * (int64_t)ptr_size(ttype_enc);
                 const struct ferry_ehtype *t = (const struct ferry_ehtype *)read_ptr(&tp, ttype_enc);
-                if (catches(t, obj)) {
+                if (catches(t, obj, foreign)) {
                     *selector = filter;
                     return ACT_CATCH;
                 }
@@ -631,20 +660,44 @@ static int scan_lsda(const struct finfo *fi, uint64_t pc, id obj, int search, ui
                 break;
             a = next_at + next;
         }
-        (void)search;
         *selector = 0;
         return cleanup ? ACT_CLEANUP : ACT_NONE;
     }
     return ACT_NONE;
 }
 
-/* The routine the compiler names for Objective-C (and C++) code. Ferry's
- * unwinder reads the LSDA itself, so this is only called by programs that
- * drive an unwinder of their own, which Ferry doesn't offer. */
+/* The routine the compiler names for Objective-C (and Objective-C++) code.
+ * Ferry's own unwinder reads the LSDA itself; this system's unwinder, in
+ * use once a program uses C++, calls this for each frame. */
 int ferry_objc_personality(int version, int actions, uint64_t cls, void *exc, void *ctx)
 {
-    (void)version; (void)actions; (void)cls; (void)exc; (void)ctx;
-    return 3; /* _URC_FATAL_PHASE1_ERROR */
+    if (!ferry_cxx_active || version != 1)
+        return FERRY_URC_FATAL_PHASE1_ERROR;
+    struct _Unwind_Context *c = ctx;
+    struct finfo fi = {0};
+    fi.lsda = ferry_cxx_unwind.get_lsda(c);
+    if (!fi.lsda)
+        return FERRY_URC_CONTINUE_UNWIND;
+    fi.start = ferry_cxx_unwind.get_region_start(c);
+    uint64_t pc = ferry_cxx_unwind.get_ip(c) - 1;
+    /* a C++ exception: the C++ rules, under which an Objective-C clause
+     * takes nothing (see objc_ehtype_vtable) and catch (...) takes it */
+    if (cls != FERRY_EXC_CLASS)
+        return ferry_cxx_unwind.gxx_personality(version, actions, cls, exc, c);
+    uint64_t lp = 0;
+    int64_t sel = 0;
+    int what = scan_lsda(&fi, pc, ((struct exc *)exc)->obj, 0, &lp, &sel);
+    if (actions & FERRY_UA_SEARCH_PHASE)
+        return what == ACT_CATCH && !(actions & FERRY_UA_FORCE_UNWIND) ? FERRY_URC_HANDLER_FOUND
+                                                                        : FERRY_URC_CONTINUE_UNWIND;
+    if (what == ACT_NONE)
+        return FERRY_URC_CONTINUE_UNWIND;
+    if (what == ACT_CATCH && !(actions & FERRY_UA_HANDLER_FRAME))
+        sel = 0;   /* not the frame the search chose: its cleanups only */
+    ferry_cxx_unwind.set_gr(c, 0, (uintptr_t)exc);
+    ferry_cxx_unwind.set_gr(c, 1, (uintptr_t)sel);
+    ferry_cxx_unwind.set_ip(c, lp);
+    return FERRY_URC_INSTALL_CONTEXT;
 }
 
 /* ---- throwing ------------------------------------------------------------------------- */
@@ -724,7 +777,7 @@ __attribute__((noreturn)) static void raise_from(struct exc *e, const struct uct
         if (fi.lsda && known_personality(fi.personality)) {
             uint64_t lp;
             int64_t sel;
-            if (scan_lsda(&fi, pc, e->obj, 1, &lp, &sel) == ACT_CATCH) {
+            if (scan_lsda(&fi, pc, e->obj, 0, &lp, &sel) == ACT_CATCH) {
                 e->handler_sp = c.r[R_RSP];
                 unwind_to_handler(e, *start);
             }
@@ -741,6 +794,61 @@ static struct exc *new_exception(id obj)
     e->exception_class = FERRY_EXC_CLASS;
     e->obj = obj;
     return e;
+}
+
+/* ---- throwing through this system's unwinder, once a program uses C++ ---- */
+
+void *ferry_objc_throw_host, *ferry_objc_rethrow_host, *ferry_unwind_resume_host;   /* unwind.S */
+static void (*cxa_rethrow)(void);
+
+/* what the unwinder calls once nothing needs the exception (a C++ catch
+ * (...) of an Objective-C exception ends) */
+static void exc_cleanup(int reason, struct exc *e)
+{
+    (void)reason;
+    objc_release(e->obj);
+    free(e);
+}
+
+__attribute__((noreturn)) static void raise_host(id obj)
+{
+    struct exc *e = new_exception(obj);
+    e->cleanup = exc_cleanup;
+    ferry_cxx_unwind.raise(e);
+    /* the end of the stack, or a frame the unwinder couldn't read, before a handler */
+    uncaught(e);
+}
+
+__attribute__((noreturn)) static void throw_host(id obj)
+{
+    if (preprocessor)
+        obj = preprocessor(obj);
+    objc_retain(obj);
+    raise_host(obj);
+}
+
+__attribute__((noreturn)) static void rethrow_host(void)
+{
+    if (caught && caught->exception_class != FERRY_EXC_CLASS && cxa_rethrow) {
+        cxa_rethrow();   /* a C++ exception, caught by @catch (...) */
+        abort();
+    }
+    if (!caught) {
+        fflush(stdout);
+        fputs("ferry: the program re-threw an exception outside any @catch\n", stderr);
+        abort();
+    }
+    id obj = caught->obj;
+    objc_retain(obj);
+    raise_host(obj);
+}
+
+void ferry_objc_exceptions_to_host(void)
+{
+    *(void **)&cxa_rethrow = ferry_cxx_symbol("__cxa_rethrow");
+    ferry_objc_throw_host = (void *)throw_host;
+    ferry_objc_rethrow_host = (void *)rethrow_host;
+    ferry_unwind_resume_host = (void *)ferry_cxx_unwind.resume;
 }
 
 /* unwind.S calls these with the thrower's registers. */
@@ -780,6 +888,15 @@ __attribute__((noreturn)) void ferry_resume_with(struct exc *e, const struct uct
 id objc_begin_catch(void *exc)
 {
     struct exc *e = exc;
+    if (e && e->exception_class != FERRY_EXC_CLASS && ferry_cxx_active) {
+        /* a C++ exception in @catch (...): the C++ runtime keeps it, and a
+         * mark here says so until the @catch ends */
+        struct exc *mark = calloc(1, sizeof *mark);
+        ferry_cxx_unwind.begin_catch(exc);
+        mark->next_caught = caught;
+        caught = mark;
+        return nil;
+    }
     if (!e || e->exception_class != FERRY_EXC_CLASS)
         return nil;
     e->next_caught = caught;
@@ -793,6 +910,11 @@ void objc_end_catch(void)
     if (!e)
         return;
     caught = e->next_caught;
+    if (e->exception_class != FERRY_EXC_CLASS) {
+        free(e);
+        ferry_cxx_unwind.end_catch();
+        return;
+    }
     objc_autorelease(e->obj);   /* the @catch body may still be using it */
     free(e);
 }

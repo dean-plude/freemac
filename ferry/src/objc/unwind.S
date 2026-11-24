@@ -6,12 +6,22 @@
  * a block on the stack (struct uctx: DWARF register numbers, 16 is the
  * return address), and hand that block to C. ferry_unwind_jump loads such
  * a block and jumps into a landing pad.
+ *
+ * Once a program has brought in C++ (src/cxx.c), every exception is unwound
+ * by this system's unwinder instead, which reads the caller's frame itself:
+ * the entry points then jump straight to the calls set in the three
+ * pointers named below, leaving the stack as the program left it.
  */
 
-.macro CAPTURE name, target
+.macro CAPTURE name, target, host
     .globl  \name
     .type   \name, @function
 \name:
+    movq    \host(%rip), %r11       /* once a program uses C++, this system's unwinder (exception.c) */
+    testq   %r11, %r11
+    jz      1f
+    jmp     *%r11
+1:
     movq    %rsp, %rax              /* (%rax) is the return address */
     subq    $152, %rsp              /* 17 registers, keeping %rsp 16-byte aligned for the call */
     movq    %rbx, 24(%rsp)
@@ -31,9 +41,9 @@
 .endm
 
     .text
-CAPTURE ferry_objc_exception_throw, ferry_throw_with
-CAPTURE ferry_objc_exception_rethrow, ferry_rethrow_with
-CAPTURE ferry_unwind_resume, ferry_resume_with
+CAPTURE ferry_objc_exception_throw, ferry_throw_with, ferry_objc_throw_host
+CAPTURE ferry_objc_exception_rethrow, ferry_rethrow_with, ferry_objc_rethrow_host
+CAPTURE ferry_unwind_resume, ferry_resume_with, ferry_unwind_resume_host
 
     .globl  ferry_unwind_jump
     .type   ferry_unwind_jump, @function

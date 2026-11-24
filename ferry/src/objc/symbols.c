@@ -197,7 +197,7 @@ OBJC_FUNCTIONS(DECLARE)
 
 extern struct fobjc_class ferry_class_NSObject, ferry_meta_NSObject, ferry_class_Protocol, ferry_meta_Protocol;
 extern struct fobjc_class ferry_block_NSBlock, ferry_meta_NSBlock;
-extern const void *objc_ehtype_vtable[3];
+extern const void *objc_ehtype_vtable[10];
 extern const struct ferry_ehtype OBJC_EHTYPE_id;
 
 #define ENTRY(name, impl) {#name, (void *)impl},
