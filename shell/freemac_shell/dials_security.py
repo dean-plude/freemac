@@ -98,7 +98,7 @@ def run_helper(window, args, stdin, done, status):
     def finished(p, result):
         out, err = "", ""
         try:
-            out, err = p.communicate_utf8_finish(result)
+            _ok, out, err = p.communicate_utf8_finish(result)
         except GLib.Error as e:
             err = e.message
         status.set_text("")

@@ -1106,6 +1106,18 @@ TOPICS = {
         "- Get Help Online opens these pages on the web. Join a Wi-Fi network first, from the top right.",
         "When you're done, click the power button at the top right and choose Restart.",
     ]),
+    "power-schedule": ("Start up or shut down at set times", "schedule energy start up wake shut down sleep "
+                       "restart timer automatic every day bedtime night", [
+        "Your computer can start up or wake at a set time, and go to sleep, restart or shut down at another. "
+        "Open Dials > Battery (Power on a computer with no battery) and click Schedule….",
+        "Tick Start up or wake, choose the days (every day, weekdays, weekends or one day) and set the time. "
+        "Tick the second line and choose Sleep, Restart or Shut Down, with its days and time. Click Apply and "
+        "give an administrator's password; the schedule is for the whole computer.",
+        "When it's time to sleep, restart or shut down, anyone who's logged in gets ten minutes' warning. Click "
+        "Cancel to stop it this time, or the other button to do it now. Save your work first.",
+        "Waking from sleep works on every PC. Starting up from off works on most; if yours doesn't, turn on the "
+        "wake alarm (sometimes called RTC Alarm or Resume by Alarm) in its firmware settings.",
+    ]),
     "bring-over": ("Bring your files from another computer", "migrate migration move transfer old computer new "
                    "windows pc tender copy files settings bring over onedrive", [
         "Tender copies your documents, pictures, music, videos, desktop and downloads from your old computer. "

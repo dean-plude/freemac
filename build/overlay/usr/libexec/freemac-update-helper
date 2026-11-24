@@ -378,6 +378,9 @@ def _backup(root, path, into, modes=None):
     return True
 
 
+ENABLED_UNITS = ("freemac-update-install.service", "freemac-power-wake.service")
+
+
 def _in_root(root, *command):
     if root != "/":
         command = ("chroot", root) + command
@@ -400,7 +403,11 @@ def after(root, paths):
         _in_root(root, "python3", "-m", "compileall", "-q", "/usr/lib/python3/dist-packages/freemac_shell")
     if any(p.startswith("etc/systemd/") for p in paths):
         _in_root(root, "systemctl", "daemon-reload")
-        _in_root(root, "systemctl", "enable", "freemac-update-install.service")
+        # The services the image enables, so that a computer installed from
+        # an older version gets the ones added since (1.144's power schedule).
+        for unit in ENABLED_UNITS:
+            if os.path.exists(os.path.join(root, "etc/systemd/system", unit)):
+                _in_root(root, "systemctl", "enable", unit)
     if any(p.startswith("etc/grub.d/") for p in paths) and os.path.exists(os.path.join(root, "boot/grub/grub.cfg")):
         _in_root(root, "update-grub")
 

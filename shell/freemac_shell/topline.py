@@ -1380,6 +1380,9 @@ def main():
     from . import auto_mode
     win.auto_mode = auto_mode.Follower()
     win.auto_mode.start()
+    # The countdown before a scheduled sleep, restart or shut down (power_countdown.py).
+    from . import power_countdown
+    win.power_countdown = power_countdown.Watcher()
     # Remove items from the Trash after 30 days, if Drawer's settings say so.
     from . import drawer_settings, transfer
 

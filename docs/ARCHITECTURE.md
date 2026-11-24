@@ -878,6 +878,25 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Power schedule (1.144)
+
+Dials > Battery (or Power) > Schedule… (`dials_schedule.py`) writes the
+schedule through `pkexec /usr/libexec/freemac-power-schedule set`, which
+keeps it in `/etc/freemac/power-schedule.json` (`power_schedule.py` reads and
+checks it). A sleep, restart or shut down is the systemd timer
+`freemac-power-action.timer`, which the helper writes from the schedule; its
+service runs `freemac-power-schedule run`. Starting up is the real-time
+clock's wake alarm, set with `rtcwake -m no` for the next start-up time;
+`freemac-power-wake.service` sets it again at every boot and the
+`system-sleep` hook after every wake, since an alarm goes off once.
+
+When the timer fires and someone is logged in to the desktop (loginctl),
+`run` writes `/run/freemac-power-schedule/pending` with what it will do and
+when, ten minutes on, and waits. Topline's `power_countdown.Watcher` looks
+for that file every three seconds and shows the countdown; Cancel or the
+button to do it now leaves a file in the world-writable `answers` folder,
+which `run` reads each second. With nobody logged in it acts at once.
+
 ## Tender (1.143)
 
 Tender (`tender.py`, with the copying in `tender_store.py`) looks on every

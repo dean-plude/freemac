@@ -1,0 +1,6 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# After waking from sleep, set the clock alarm for the next scheduled start-up
+# (Dials > Battery > Schedule…), since waking used up the last one.
+[ "$1" = post ] && [ -e /etc/freemac/power-schedule.json ] && /usr/libexec/freemac-power-schedule arm
+exit 0

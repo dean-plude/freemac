@@ -1,0 +1,8 @@
+[Unit]
+Description=freemac's scheduled sleep, restart or shut down
+# Started by freemac-power-action.timer, which Dials writes from the schedule.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/freemac-power-schedule run
+TimeoutStartSec=20min
