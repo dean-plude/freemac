@@ -18,9 +18,22 @@
  * colour while the table has the keyboard (grey otherwise), inset from the
  * table's sides, with a run of selected rows drawn as one block.
  *
- * Not done yet: editing a cell in place (editColumn:row:withEvent:select:
- * only remembers the cell), dragging rows and columns, type-to-select, and
- * saving column widths under autosaveName. Animations run instantly.
+ * Editing in place: a double click on an editable cell of a selected row,
+ * Return on a single selected row, or editColumn:row:withEvent:select:
+ * edits a text cell. In a view-based table the cell's own text field is
+ * edited, and its action goes to its target as editing ends with a change
+ * (or by Return); in a cell-based table a text field is laid over the
+ * cell, the data source gets the new string through
+ * tableView:setObjectValue:forTableColumn:row:, and the table posts
+ * NSControlTextDidEndEditingNotification (with "NSTextMovement") as the
+ * control. A cell-based cell is edited only when its column is editable,
+ * its cell is a text cell and tableView:shouldEditTableColumn:row: agrees.
+ * Tab and Shift-Tab move on to the next or previous editable cell, row by
+ * row, and stop at the table's ends; Escape puts the old value back.
+ *
+ * Not done yet: editing after a pause on a click in a selected row,
+ * formatters on edited cells, dragging rows and columns, type-to-select,
+ * and saving column widths under autosaveName. Animations run instantly.
  *
  * Nibs: the table's switches are "NSTvFlags", whose bits (column
  * reordering, column resizing, grid, empty and multiple selection, column
@@ -964,6 +977,44 @@ static void pass_background_style(NSView *v, NSBackgroundStyle style)
 }
 @end
 
+/* ---- the field a cell-based table edits a cell in ------------------------------------- */
+
+/* A cell-based table edits a text cell with one of these laid over the
+ * cell. What the field would tell its delegate goes to the table instead,
+ * which gives the new value to its data source and tells its own delegate,
+ * as the control whose text was edited. */
+@interface NSTableView ()
+- (void)_cellEditorPosted:(NSNotificationName)name selector:(SEL)sel movement:(NSInteger)movement;
+@end
+
+@interface ATableCellEditor : NSTextField {
+@public
+    NSTableView *_table; /* not retained */
+}
+@end
+@implementation ATableCellEditor
+- (void)_post:(NSNotificationName)name selector:(SEL)sel
+{
+    [_table _cellEditorPosted:name selector:sel movement:[self _textMovement]];
+}
+/* the field is its own delegate, and asks the table's */
+- (BOOL)control:(NSControl *)control textShouldBeginEditing:(id)fieldEditor
+{
+    id d = [_table delegate];
+    return ![d respondsToSelector:_cmd] || [d control:_table textShouldBeginEditing:fieldEditor];
+}
+- (BOOL)control:(NSControl *)control textShouldEndEditing:(id)fieldEditor
+{
+    id d = [_table delegate];
+    return ![d respondsToSelector:_cmd] || [d control:_table textShouldEndEditing:fieldEditor];
+}
+- (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)sel
+{
+    id d = [_table delegate];
+    return [d respondsToSelector:_cmd] && [d control:_table textView:textView doCommandBySelector:sel];
+}
+@end
+
 /* ---- NSTableView ---------------------------------------------------------------------- */
 
 enum {
@@ -1018,6 +1069,10 @@ enum {
     BOOL _tiling, _updatingViews, _sizing;
     CGFloat _fittedWidth;
     NSView *_observedClip;
+    /* editing a cell in place */
+    NSTextField *_editor;    /* the field being edited: a cell view's, or ATableCellEditor */
+    id _editOriginal;        /* its value when editing began */
+    BOOL _endingEdit, _editedOnClick;
 }
 
 - (void)_setUp
@@ -1123,6 +1178,8 @@ enum {
     [_rowViews release];
     [_nibs release];
     [_reusable release];
+    [_editor release];
+    [_editOriginal release];
     free(_offsets);
     [super dealloc];
 }
@@ -1184,6 +1241,15 @@ enum {
 {
     if ([_dataSource respondsToSelector:@selector(tableView:setObjectValue:forTableColumn:row:)])
         [_dataSource tableView:self setObjectValue:v forTableColumn:c row:row];
+}
+- (BOOL)_dataSourceTakesValues
+{
+    return [_dataSource respondsToSelector:@selector(tableView:setObjectValue:forTableColumn:row:)];
+}
+- (BOOL)_shouldEditColumn:(NSTableColumn *)c row:(NSInteger)row
+{
+    return ![_delegate respondsToSelector:@selector(tableView:shouldEditTableColumn:row:)] ||
+           [_delegate tableView:self shouldEditTableColumn:c row:row];
 }
 - (BOOL)_delegateMakesViews { return [_delegate respondsToSelector:@selector(tableView:viewForTableColumn:row:)]; }
 - (NSView *)_delegateViewForColumn:(NSTableColumn *)c row:(NSInteger)row
@@ -1795,9 +1861,226 @@ enum {
 - (NSInteger)clickedColumn { return _clickedColumn; }
 - (NSInteger)editedRow { return _editedRow; }
 - (NSInteger)editedColumn { return _editedColumn; }
+
+/* ---- editing a cell in place ---- */
+
+/* The text field a view-based table edits in a cell: the cell view, when
+ * it is an editable text field, or the cell view's textField. */
+- (NSTextField *)_editableFieldAtColumn:(NSInteger)column row:(NSInteger)row
+{
+    NSView *v = [self viewAtColumn:column row:row makeIfNecessary:YES];
+    NSTextField *f = nil;
+    if ([v isKindOfClass:[NSTextField class]])
+        f = (NSTextField *)v;
+    else if ([v isKindOfClass:[NSTableCellView class]])
+        f = [(NSTableCellView *)v textField];
+    return [f isKindOfClass:[NSTextField class]] && [f isEditable] && [f isEnabled] && ![f isHiddenOrHasHiddenAncestor]
+               ? f
+               : nil;
+}
+/* The text cell a cell-based table would edit, or nil. */
+- (NSCell *)_editableCellAtColumn:(NSInteger)column row:(NSInteger)row
+{
+    NSTableColumn *c = [_columns objectAtIndex:(NSUInteger)column];
+    NSCell *cell = [self _delegateCellForColumn:c row:row] ?: [c dataCellForRow:row];
+    return [cell isKindOfClass:[NSTextFieldCell class]] && [cell isEnabled] ? cell : nil;
+}
+/* Whether a double click (or Return, or Tab from the cell before) edits
+ * this cell: in a view-based table, when it holds an editable text field;
+ * in a cell-based one, when its column is editable, its cell is a text
+ * cell, the data source can take the new value and the delegate agrees. */
+- (BOOL)_canEditColumn:(NSInteger)column row:(NSInteger)row
+{
+    if (column < 0 || column >= (NSInteger)[_columns count] || row < 0 || row >= [self numberOfRows])
+        return NO;
+    NSTableColumn *c = [_columns objectAtIndex:(NSUInteger)column];
+    if ([c isHidden])
+        return NO;
+    if ([self _delegateMakesViews])
+        return [self _editableFieldAtColumn:column row:row] != nil;
+    if ([self _isGroupRow:row] || ![c isEditable] || ![self _dataSourceTakesValues] ||
+        ![self _editableCellAtColumn:column row:row])
+        return NO;
+    return [self _shouldEditColumn:c row:row];
+}
+- (BOOL)_isEditingField:(NSTextField *)f { return f && f == _editor; }
+
+/* Edits a cell: the row must be selected, as Apple documents. It doesn't
+ * ask the column or the delegate (a double click does), but the cell has
+ * to be one that takes text. */
 - (void)editColumn:(NSInteger)column row:(NSInteger)row withEvent:(NSEvent *)e select:(BOOL)select
 {
-    AWarnOnce("NSTableView: editing a cell in place isn't supported yet");
+    if (row < 0 || row >= [self numberOfRows] || column < 0 || column >= (NSInteger)[_columns count])
+        return;
+    if (![self isRowSelected:row])
+        [NSException raise:NSInternalInconsistencyException
+                    format:@"-[NSTableView editColumn:row:withEvent:select:]: row %ld isn't selected", (long)row];
+    if (_editor) {
+        [self _endEditingWithMovement:NSTextMovementOther];
+        if (_editor)
+            return;
+    }
+    NSWindow *w = [self window];
+    if (!w)
+        return;
+    [self scrollRowToVisible:row];
+    [self scrollColumnToVisible:column];
+    NSTextField *field;
+    if ([self _delegateMakesViews]) {
+        field = [self _editableFieldAtColumn:column row:row];
+        if (!field)
+            return;
+    } else {
+        NSCell *cell = [self _editableCellAtColumn:column row:row];
+        if (!cell)
+            return;
+        cell = [self preparedCellAtColumn:column row:row];
+        ATableCellEditor *ed = [[[ATableCellEditor alloc] initWithFrame:[self frameOfCellAtColumn:column row:row]] autorelease];
+        ed->_table = self;
+        [ed setDelegate:ed];
+        if ([cell font])
+            [ed setFont:[cell font]];
+        [ed setAlignment:[cell alignment]];
+        [ed setBezeled:NO];
+        [ed setBordered:YES];
+        [ed setDrawsBackground:YES];
+        [ed setEditable:YES];
+        [ed setStringValue:[cell stringValue] ?: @""];
+        [self addSubview:ed];
+        field = ed;
+    }
+    _editor = [field retain];
+    _editOriginal = [[field objectValue] retain];
+    _editedRow = row;
+    _editedColumn = column;
+    [self setNeedsDisplayInRect:[self rectOfRow:row]];
+    if (![w makeFirstResponder:field]) {
+        if (_editor == field)
+            [self _editingFieldDidResign:field];
+        return;
+    }
+    if (!select)
+        [field _placeCaretAtEnd];
+}
+
+/* The field is no longer being edited: forget it, and take the cell-based
+ * table's field away. */
+- (void)_editingFieldDidResign:(NSTextField *)f
+{
+    if (!f || f != _editor)
+        return;
+    NSInteger row = _editedRow;
+    [_editor autorelease];
+    _editor = nil;
+    [_editOriginal release];
+    _editOriginal = nil;
+    _editedRow = _editedColumn = -1;
+    if ([f isKindOfClass:[ATableCellEditor class]])
+        [f removeFromSuperview];
+    if (row >= 0 && row < [self numberOfRows])
+        [self setNeedsDisplayInRect:[self rectOfRow:row]];
+}
+
+/* What the cell-based table's field would have posted: the table posts it,
+ * as the control, and the data source gets the new value as editing ends
+ * (unless it was cancelled). */
+- (void)_cellEditorPosted:(NSNotificationName)name selector:(SEL)sel movement:(NSInteger)movement
+{
+    NSDictionary *info = nil;
+    if ([name isEqualToString:NSControlTextDidEndEditingNotification]) {
+        info = @{NSTextMovementUserInfoKey : @(movement)};
+        if (movement != NSTextMovementCancel && _editor && _editedRow >= 0 && _editedColumn >= 0 &&
+            _editedColumn < (NSInteger)[_columns count])
+            [self _setObjectValue:[_editor stringValue] forColumn:[_columns objectAtIndex:(NSUInteger)_editedColumn]
+                              row:_editedRow];
+    }
+    NSNotification *n = [NSNotification notificationWithName:name object:self userInfo:info];
+    if ([_delegate respondsToSelector:sel])
+        ((void (*)(id, SEL, id))objc_msgSend)(_delegate, sel, n);
+    [[NSNotificationCenter defaultCenter] postNotification:n];
+}
+
+/* The next (or previous) cell that can be edited after column, row: along
+ * the row, then on to the next rows. -1 in *column when there is none. */
+- (NSInteger)_editableCellFrom:(NSInteger)column row:(NSInteger)row forward:(BOOL)forward column:(NSInteger *)outColumn
+{
+    NSInteger nc = (NSInteger)[_columns count], nr = [self numberOfRows], c = column, r = row;
+    *outColumn = -1;
+    if (nc == 0)
+        return -1;
+    for (;;) {
+        if (forward) {
+            if (++c >= nc) {
+                c = 0;
+                if (++r >= nr)
+                    return -1;
+            }
+        } else {
+            if (--c < 0) {
+                c = nc - 1;
+                if (--r < 0)
+                    return -1;
+            }
+        }
+        if ([self _canEditColumn:c row:r]) {
+            *outColumn = c;
+            return r;
+        }
+    }
+}
+
+/* Ends the editing as Return, Tab, Shift-Tab or Escape asks. Tab and
+ * Shift-Tab go on to edit the next or previous editable cell, selecting
+ * its row; past the last (or before the first) the table keeps the
+ * keyboard. If the delegate won't let the editing end, it goes on. */
+- (void)_endEditingWithMovement:(NSInteger)movement
+{
+    if (!_editor || _endingEdit)
+        return;
+    NSTextField *f = [[_editor retain] autorelease];
+    NSInteger row = _editedRow, column = _editedColumn;
+    if (movement == NSTextMovementCancel)
+        [f _discardEditsTo:_editOriginal];
+    [f _setTextMovement:movement];
+    _endingEdit = YES;
+    NSWindow *w = [self window];
+    BOOL ended = w && [w firstResponder] == f ? [w makeFirstResponder:self] : [f resignFirstResponder];
+    _endingEdit = NO;
+    if (!ended || _editor == f) {
+        [f _setTextMovement:NSTextMovementOther];
+        NSBeep();
+        return;
+    }
+    if (movement != NSTextMovementTab && movement != NSTextMovementBacktab)
+        return;
+    NSInteger nextColumn;
+    NSInteger nextRow = [self _editableCellFrom:column row:row forward:movement == NSTextMovementTab column:&nextColumn];
+    if (nextRow < 0)
+        return;
+    if (![self isRowSelected:nextRow] || [self numberOfSelectedRows] != 1) {
+        if (![self _userSelect:[NSIndexSet indexSetWithIndex:(NSUInteger)nextRow]] || ![self isRowSelected:nextRow])
+            return;
+        [self _setAnchor:nextRow];
+    }
+    [self editColumn:nextColumn row:nextRow withEvent:nil select:YES];
+}
+
+/* Ends any editing and gives up what was typed. */
+- (BOOL)abortEditing
+{
+    if (!_editor)
+        return NO;
+    if (!_endingEdit)
+        [self _endEditingWithMovement:NSTextMovementCancel];
+    return YES;
+}
+/* Where editing a cell starts when Return is pressed on the table. */
+- (NSInteger)_firstEditableColumnInRow:(NSInteger)row
+{
+    for (NSInteger c = 0; c < (NSInteger)[_columns count]; c++)
+        if ([self _canEditColumn:c row:row])
+            return c;
+    return -1;
 }
 - (NSTableColumn *)highlightedTableColumn { return _highlightedColumn; }
 - (void)setHighlightedTableColumn:(NSTableColumn *)c
@@ -1862,6 +2145,10 @@ enum {
 
 - (void)reloadData
 {
+    /* reloading gives up a cell being edited, unless the reload comes from
+     * the data source taking the cell's new value */
+    if (_editor && !_endingEdit)
+        [self abortEditing];
     [self _dropAllRowViews];
     [self _computeRows];
     NSRange beyond = NSMakeRange((NSUInteger)_rows, NSNotFound - (NSUInteger)_rows);
@@ -1944,6 +2231,8 @@ enum {
 {
     if (![indexes count])
         return;
+    if (_editor && !_endingEdit)
+        [self abortEditing];
     [self numberOfRows];
     __block BOOL selectionMoved = NO;
     [indexes enumerateIndexesUsingBlock:^(NSUInteger i, BOOL *stop) {
@@ -1965,6 +2254,8 @@ enum {
 {
     if (![indexes count])
         return;
+    if (_editor && !_endingEdit)
+        [self abortEditing];
     [self numberOfRows];
     __block BOOL selectionMoved = NO;
     [indexes enumerateIndexesWithOptions:NSEnumerationReverse usingBlock:^(NSUInteger i, BOOL *stop) {
@@ -2272,8 +2563,18 @@ enum {
 }
 - (void)scrollToBeginningOfDocument:(id)sender { [self scrollRowToVisible:0]; }
 - (void)scrollToEndOfDocument:(id)sender { [self scrollRowToVisible:[self numberOfRows] - 1]; }
+/* Return edits the selected row's first editable cell, as in the Finder's
+ * lists; with no cell to edit it sends the double action. */
 - (void)insertNewline:(id)sender
 {
+    NSInteger row = [self selectedRow];
+    if (row >= 0 && [self numberOfSelectedRows] == 1) {
+        NSInteger column = [self _firstEditableColumnInRow:row];
+        if (column >= 0) {
+            [self editColumn:column row:row withEvent:nil select:YES];
+            return;
+        }
+    }
     if (_doubleAction && [self selectedRow] >= 0) {
         _clickedRow = [self selectedRow];
         _clickedColumn = -1;
@@ -2284,8 +2585,10 @@ enum {
 
 /* ---- the mouse ---- */
 
-/* Clicks on a cell view's labels and images are the table's; buttons,
- * editable fields and other controls inside keep theirs. */
+/* Clicks on a cell view's labels and images are the table's, and so are
+ * clicks on its editable text fields until a double click (or Return)
+ * starts editing one; buttons, selectable fields, the field being edited
+ * and other controls inside keep theirs. */
 - (NSView *)hitTest:(NSPoint)p
 {
     NSView *hit = [super hitTest:p];
@@ -2294,8 +2597,10 @@ enum {
     for (NSView *v = hit; v && v != self; v = [v superview]) {
         if ([v isKindOfClass:[NSTextField class]]) {
             NSTextField *f = (NSTextField *)v;
-            if ([f isEditable] || [f isSelectable])
+            if (f == _editor || (![f isEditable] && [f isSelectable]))
                 return hit;
+            if ([f isEditable])
+                return self;
         } else if ([v isKindOfClass:[NSControl class]] && ![v isKindOfClass:[NSImageView class]]) {
             return hit;
         }
@@ -2327,8 +2632,16 @@ enum {
     _clickChangedSelection = NO;
     if ([[self window] firstResponder] != self)
         [[self window] makeFirstResponder:self];
+    _editedOnClick = NO;
     if ([self _handleMouseDown:e row:row column:column point:p])
         return;
+    /* a double click on an editable cell of a selected row edits it, and
+     * sends neither the double action nor the action */
+    if ([e clickCount] == 2 && [self isRowSelected:row] && [self _canEditColumn:column row:row]) {
+        _editedOnClick = YES;
+        [self editColumn:column row:row withEvent:e select:YES];
+        return;
+    }
     if (![self _delegateMakesViews] && [e clickCount] == 1 && [self _toggleCheckAt:row column:column point:p])
         return;
     if ([e clickCount] == 1) {
@@ -2355,6 +2668,10 @@ enum {
 }
 - (void)mouseUp:(NSEvent *)e
 {
+    if (_editedOnClick) {
+        _editedOnClick = NO;
+        return;
+    }
     if ([e clickCount] >= 2 && _doubleAction) {
         if (_clickedRow >= 0 || _clickedColumn >= 0)
             [self sendAction:_doubleAction to:[self target]];
@@ -2575,6 +2892,8 @@ enum {
                 [v setFrame:[self _cellFrameForColumn:i row:r]];
         }
     }
+    if ([_editor isKindOfClass:[ATableCellEditor class]] && _editedRow >= 0 && _editedColumn >= 0)
+        [_editor setFrame:[self frameOfCellAtColumn:_editedColumn row:_editedRow]];
 }
 /* The part of the table in sight: the clip view's, or all of it. */
 - (NSRect)_shownRect
@@ -2595,7 +2914,8 @@ enum {
     NSRange rows = [self rowsInRect:[self _shownRect]];
     for (NSNumber *key in [_rowViews allKeys]) {
         NSUInteger r = (NSUInteger)[key integerValue];
-        if (!NSLocationInRange(r, rows))
+        /* the row being edited stays, in sight or not */
+        if (!NSLocationInRange(r, rows) && !(_editor && (NSInteger)r == _editedRow))
             [self _removeRowView:(NSInteger)r];
     }
     for (NSUInteger r = rows.location; r < NSMaxRange(rows); r++)
@@ -2714,6 +3034,8 @@ enum {
     for (NSUInteger i = 0; i < [_columns count]; i++) {
         if ([[_columns objectAtIndex:i] isHidden])
             continue;
+        if (_editor && row == _editedRow && (NSInteger)i == _editedColumn)
+            continue; /* the field editing it is drawn instead */
         NSRect f = [self frameOfCellAtColumn:(NSInteger)i row:row];
         if (NSIsEmptyRect(f) || !NSIntersectsRect(NSInsetRect(f, -_spacing.width, -_spacing.height), clip))
             continue;

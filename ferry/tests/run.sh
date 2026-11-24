@@ -46,6 +46,11 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_autosave)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY -u FERRY_ALERT_ANSWER HOME="$build/home_$name" XDG_CONFIG_HOME= \
+                XDG_DATA_HOME= TMPDIR="$build/home_$name" \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
@@ -237,6 +242,10 @@ run_one appkit_scrolling "$here/appkit/scrolling.m" "$here/appkit/scrolling.out"
 # Split views and tab views, built in code and from a nib (after M7).
 run_one appkit_panes "$here/appkit/panes.m" "$here/appkit/panes.out" -fobjc-arc -framework Cocoa
 run_one appkit_tables "$here/appkit/tables.m" "$here/appkit/tables.out" -fobjc-arc -framework Cocoa
+# Editing table and outline cells in place (Ferry 0.16.0).
+run_one appkit_editing "$here/appkit/editing.m" "$here/appkit/editing.out" -fobjc-arc -framework Cocoa
+# NSDocument autosaving, in a home of its own (Ferry 0.16.0).
+run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -fobjc-arc -framework Cocoa
 # Pop-up buttons, segmented controls, search fields, stack views and
 # toolbars, built in code and from a nib (1.161).
 run_one appkit_controls "$here/appkit/controls.m" "$here/appkit/controls.out" -fobjc-arc -framework Cocoa

@@ -8,9 +8,21 @@
  * place), keeps a change count that its undo manager's notifications move
  * and its windows show with the edited dot, runs the Save panel for an
  * untitled document or Save As, and asks before closing with unsaved
- * changes (Save, Cancel, Don't Save, in a sheet on its window). Autosaving
- * and versions are left out: autosavesInPlace answers NO and the autosave
- * calls save nothing. Built without ARC. */
+ * changes (Save, Cancel, Don't Save, in a sheet on its window).
+ *
+ * Autosaving, for a class whose autosavesInPlace answers YES: each change
+ * starts a one-shot timer of the document controller's autosavingDelay,
+ * and when it fires the document is saved over its own file
+ * (NSAutosaveInPlaceOperation) or, while untitled, into the Autosave
+ * Information folder (NSAutosaveElsewhereOperation, its URL kept as
+ * autosavedContentsFileURL). An autosave leaves the document edited (the
+ * title keeps "Edited" until a real save) and only hasUnautosavedChanges
+ * goes back to NO. Before its file is first written over, the file as it
+ * was last saved is copied aside, which is what Revert To > Last Saved
+ * Version (revertDocumentToSaved:) puts back; such a document with a file
+ * closes without asking, after an autosave. Versions (preservesVersions,
+ * Browse All Versions) are left out. Classes that don't autosave in place
+ * are not autosaved at all. Built without ARC. */
 #import "AInternal.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -78,6 +90,11 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     NSInteger _changes;        /* changes since the last save; 0 is clean */
     NSUInteger _untitled;      /* "Untitled n", once shown */
     NSMutableArray *_controllers;
+    /* autosaving */
+    NSInteger _autosavedChanges;     /* _changes as it was last autosaved (or saved) */
+    NSTimer *_autosaveTimer;
+    BOOL _autosaving, _autosaveCancellable;
+    NSURL *_lastSaved;               /* the file as last saved, kept aside once autosaving writes over it */
 }
 
 /* ---- types ---- */
@@ -138,7 +155,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     }
     [self _noteFileDate:contents];
     [_undo removeAllActions];
-    _changes = 0;
+    _changes = _autosavedChanges = 0;
     if (url && ![[url path] isEqualToString:[contents path]])
         [self updateChangeCount:NSChangeReadOtherContents];
     return self;
@@ -158,6 +175,9 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     [_modified release];
     [_undo release];
     [_controllers release];
+    [_autosaveTimer invalidate];
+    [_autosaveTimer release];
+    [_lastSaved release];
     [super dealloc];
 }
 
@@ -228,12 +248,13 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
 /* ---- the change count and the undo manager ---- */
 
 - (BOOL)isDocumentEdited { return _changes != 0; }
-- (BOOL)hasUnautosavedChanges { return [self isDocumentEdited]; }
+- (BOOL)hasUnautosavedChanges { return _changes != _autosavedChanges; }
 
 - (void)updateChangeCount:(NSDocumentChangeType)change
 {
     BOOL was = [self isDocumentEdited];
-    switch (change & ~(NSDocumentChangeType)NSChangeDiscardable) {
+    NSDocumentChangeType kind = change & ~(NSDocumentChangeType)NSChangeDiscardable;
+    switch (kind) {
     case NSChangeDone:
     case NSChangeRedone:
         _changes++;
@@ -242,29 +263,39 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
         _changes--;
         break;
     case NSChangeCleared:
-        _changes = 0;
+        _changes = _autosavedChanges = 0;
         break;
     case NSChangeReadOtherContents:
         _changes = NSIntegerMax / 2;   /* edited until it's saved */
         break;
-    default:   /* NSChangeAutosaved */
+    case NSChangeAutosaved:
+        _autosavedChanges = _changes;
+        break;
+    default:
         break;
     }
     if (was != [self isDocumentEdited] || change == NSChangeCleared)
         for (NSWindowController *wc in _controllers)
             [wc setDocumentEdited:[self isDocumentEdited]];
+    if (kind != NSChangeCleared && kind != NSChangeAutosaved)
+        [self scheduleAutosaving];
 }
 
 - (id)changeCountTokenForSaveOperation:(NSSaveOperationType)operation { return @(_changes); }
 - (void)updateChangeCountWithToken:(id)token forSaveOperation:(NSSaveOperationType)operation
 {
-    if (operation == NSSaveToOperation || operation == NSAutosaveElsewhereOperation)
-        return;
     NSInteger was = [token integerValue];
+    if (operation == NSSaveToOperation)
+        return;
+    if (operation == NSAutosaveElsewhereOperation || operation == NSAutosaveInPlaceOperation) {
+        _autosavedChanges = was;   /* still edited: only a save makes it clean */
+        return;
+    }
     if (_changes == was) {
         [self updateChangeCount:NSChangeCleared];
     } else {
         _changes -= was;   /* what was changed while it saved stays a change */
+        _autosavedChanges = 0;
         for (NSWindowController *wc in _controllers)
             [wc setDocumentEdited:[self isDocumentEdited]];
     }
@@ -531,15 +562,38 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
             error:(NSError **)error
 {
     id token = [self changeCountTokenForSaveOperation:operation];
+    if (operation == NSAutosaveInPlaceOperation && ![self _keepLastSavedVersionOf:url error:error])
+        return NO;
+    if (operation == NSAutosaveElsewhereOperation &&
+        ![[NSFileManager defaultManager] createDirectoryAtPath:[[url path] stringByDeletingLastPathComponent]
+                                   withIntermediateDirectories:YES attributes:nil error:error])
+        return NO;
     if (![self writeSafelyToURL:url ofType:type forSaveOperation:operation error:error])
         return NO;
-    if (operation == NSSaveOperation || operation == NSSaveAsOperation || operation == NSAutosaveInPlaceOperation) {
+    switch (operation) {
+    case NSSaveOperation:
+    case NSSaveAsOperation:
+    case NSAutosaveAsOperation:
         [self setFileType:type];
         [self setFileURL:url];
         [self _noteFileDate:url];
         _draft = NO;
         [self updateChangeCountWithToken:token forSaveOperation:operation];
         [[NSDocumentController sharedDocumentController] noteNewRecentDocument:self];
+        /* the file is now the last saved version, and the autosaved copy of an untitled one is done with */
+        [self _forgetLastSavedVersion];
+        [self _removeAutosavedContents];
+        break;
+    case NSAutosaveInPlaceOperation:
+        [self _noteFileDate:url];
+        [self updateChangeCountWithToken:token forSaveOperation:operation];
+        break;
+    case NSAutosaveElsewhereOperation:
+        [self setAutosavedContentsFileURL:url];
+        [self updateChangeCountWithToken:token forSaveOperation:operation];
+        break;
+    default:
+        break;
     }
     return YES;
 }
@@ -661,8 +715,12 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
         if (r != NSAlertFirstButtonReturn)
             return;
         NSError *error = nil;
-        if (![self revertToContentsOfURL:_fileURL ofType:_fileType error:&error] && error)
-            [self presentError:error];
+        /* an autosaved file is put back as it was last saved first */
+        if (![self _putBackLastSavedVersion:&error] ||
+            ![self revertToContentsOfURL:_fileURL ofType:_fileType error:&error]) {
+            if (error)
+                [self presentError:error];
+        }
     };
     NSWindow *w = [self windowForSheet];
     if (w)
@@ -703,7 +761,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
 - (IBAction)printDocument:(id)sender { AWarnOnce("printing documents"); }
 - (IBAction)runPageLayout:(id)sender { AWarnOnce("page setup for documents"); }
 
-/* ---- autosaving: left out ---- */
+/* ---- autosaving ---- */
 
 - (NSURL *)autosavedContentsFileURL { return _autosavedURL; }
 - (void)setAutosavedContentsFileURL:(NSURL *)url
@@ -712,19 +770,173 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     [_autosavedURL release];
     _autosavedURL = url;
 }
-- (NSString *)autosavingFileType { return _fileType; }
-- (BOOL)autosavingIsImplicitlyCancellable { return YES; }
+- (NSString *)autosavingFileType { return _fileType ?: [[NSDocumentController sharedDocumentController] defaultType]; }
+- (BOOL)autosavingIsImplicitlyCancellable { return _autosaving && _autosaveCancellable; }
+- (BOOL)checkAutosavingSafetyAndReturnError:(NSError **)error { return YES; }
+
+/* Where autosaved copies of untitled documents, and the last saved
+ * versions of autosaved ones, are kept: the Mac's Library/Autosave
+ * Information, in freemac's place for the Library. */
+static NSString *autosave_folder(void)
+{
+    NSString *lib = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) firstObject];
+    return [lib ?: NSTemporaryDirectory() stringByAppendingPathComponent:@"Autosave Information"];
+}
+/* A name in that folder no file has yet: "name (what).ext", or with a number. */
+static NSURL *autosave_url(NSString *name, NSString *what, NSString *ext)
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *dir = autosave_folder();
+    name = [[name stringByReplacingOccurrencesOfString:@"/" withString:@"-"] stringByDeletingPathExtension];
+    for (NSUInteger n = 1;; n++) {
+        NSString *file = n == 1 ? [NSString stringWithFormat:@"%@ (%@)", name, what]
+                                : [NSString stringWithFormat:@"%@ (%@ %lu)", name, what, (unsigned long)n];
+        if ([ext length])
+            file = [file stringByAppendingPathExtension:ext];
+        NSString *path = [dir stringByAppendingPathComponent:file];
+        if (![fm fileExistsAtPath:path] && ![fm fileExistsAtPath:[path stringByAppendingString:@"~"]])
+            return [NSURL fileURLWithPath:path];
+    }
+}
+
+/* Before autosaving first writes over the file, the file as last saved is
+ * copied aside, for Revert To > Last Saved Version. */
+- (BOOL)_keepLastSavedVersionOf:(NSURL *)url error:(NSError **)error
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if ((_lastSaved && [fm fileExistsAtPath:[_lastSaved path]]) || ![url isFileURL] || ![fm fileExistsAtPath:[url path]])
+        return YES;
+    [fm createDirectoryAtPath:autosave_folder() withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSURL *copy = autosave_url([[url path] lastPathComponent], @"Last Saved", [[url path] pathExtension]);
+    if (![fm copyItemAtPath:[url path] toPath:[copy path] error:error])
+        return NO;
+    [_lastSaved release];
+    _lastSaved = [copy retain];
+    return YES;
+}
+- (void)_forgetLastSavedVersion
+{
+    if (_lastSaved)
+        [[NSFileManager defaultManager] removeItemAtPath:[_lastSaved path] error:NULL];
+    [_lastSaved release];
+    _lastSaved = nil;
+}
+/* Puts the last saved version back over the file, if autosaving wrote over it. */
+- (BOOL)_putBackLastSavedVersion:(NSError **)error
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (!_lastSaved || ![_fileURL isFileURL] || ![fm fileExistsAtPath:[_lastSaved path]])
+        return YES;
+    NSString *path = [_fileURL path];
+    NSString *temp = [[path stringByDeletingLastPathComponent]
+        stringByAppendingPathComponent:[NSString stringWithFormat:@".%@.ferry-revert-%d", [path lastPathComponent],
+                                                                  (int)getpid()]];
+    [fm removeItemAtPath:temp error:NULL];
+    if (![fm copyItemAtPath:[_lastSaved path] toPath:temp error:error])
+        return NO;
+    BOOL dir = NO;
+    if ([fm fileExistsAtPath:path isDirectory:&dir] && dir)
+        [fm removeItemAtPath:path error:NULL];
+    if (rename([temp fileSystemRepresentation], [path fileSystemRepresentation]) != 0) {
+        [fm removeItemAtPath:temp error:NULL];
+        if (error)
+            *error = doc_error(NSFileWriteUnknownError,
+                               [NSString stringWithFormat:@"The document “%@” couldn’t be reverted.", [self displayName]],
+                               _fileURL);
+        return NO;
+    }
+    [self _forgetLastSavedVersion];
+    return YES;
+}
+- (void)_removeAutosavedContents
+{
+    if (_autosavedURL && ![[[_autosavedURL path] stringByStandardizingPath]
+                             isEqualToString:[[_fileURL path] stringByStandardizingPath]])
+        [[NSFileManager defaultManager] removeItemAtPath:[_autosavedURL path] error:NULL];
+    [self setAutosavedContentsFileURL:nil];
+}
+
+/* Saves the changes not yet autosaved: over the document's file, or, for
+ * an untitled document, into the Autosave Information folder. *saved says
+ * whether anything was written. */
+- (NSError *)_autosaveCancellable:(BOOL)cancellable saved:(BOOL *)saved
+{
+    *saved = NO;
+    if (![[self class] autosavesInPlace] || ![self hasUnautosavedChanges] || _autosaving)
+        return nil;
+    NSError *error = nil;
+    if (![self checkAutosavingSafetyAndReturnError:&error])
+        return error ?: doc_error(NSFileWriteUnknownError, nil, _fileURL);
+    NSString *type = [self autosavingFileType];
+    NSURL *url;
+    NSSaveOperationType op;
+    if (_fileURL && !_draft) {
+        url = _fileURL;
+        op = NSAutosaveInPlaceOperation;
+    } else {
+        NSString *ext = [self fileNameExtensionForType:type saveOperation:NSAutosaveElsewhereOperation];
+        url = _autosavedURL ?: autosave_url([self displayName], @"Autosaved", ext);
+        op = NSAutosaveElsewhereOperation;
+    }
+    [self retain];
+    _autosaving = YES;
+    _autosaveCancellable = cancellable;
+    BOOL ok = [self saveToURL:url ofType:type forSaveOperation:op error:&error];
+    _autosaving = NO;
+    [self autorelease];
+    if (!ok)
+        return error ?: doc_error(NSFileWriteUnknownError, nil, url);
+    *saved = YES;
+    return nil;
+}
 - (void)autosaveWithImplicitCancellability:(BOOL)cancellable completionHandler:(void (^)(NSError *))handler
 {
+    BOOL saved;
+    NSError *error = [self _autosaveCancellable:cancellable saved:&saved];
     if (handler)
-        handler(nil);
+        handler(error);
 }
 - (void)autosaveDocumentWithDelegate:(id)delegate didAutosaveSelector:(SEL)selector contextInfo:(void *)context
 {
-    call_back(callback(delegate, selector, context), self, NO);
+    BOOL saved;
+    NSError *error = [self _autosaveCancellable:NO saved:&saved];
+    call_back(callback(delegate, selector, context), self, error == nil && (saved || ![self hasUnautosavedChanges]));
 }
-- (BOOL)checkAutosavingSafetyAndReturnError:(NSError **)error { return YES; }
-- (void)scheduleAutosaving {}
+
+/* After a change, an autosave in autosavingDelay seconds (none while one
+ * is due, and none when the delay is 0). */
+- (void)scheduleAutosaving
+{
+    if (![[self class] autosavesInPlace] || _autosaveTimer || _closing || ![self hasUnautosavedChanges])
+        return;
+    NSTimeInterval delay = [[NSDocumentController sharedDocumentController] autosavingDelay];
+    if (delay <= 0)
+        return;
+    _autosaveTimer = [[NSTimer scheduledTimerWithTimeInterval:delay target:self
+                                                     selector:@selector(_autosaveTimerFired:) userInfo:nil
+                                                      repeats:NO] retain];
+}
+- (void)_autosaveTimerFired:(NSTimer *)timer
+{
+    [[self retain] autorelease];
+    [_autosaveTimer release];
+    _autosaveTimer = nil;
+    [self autosaveWithImplicitCancellability:YES completionHandler:^(NSError *error) {
+        if (error)
+            fprintf(stderr, "ferry: autosaving the document “%s” failed: %s\n", [[self displayName] UTF8String],
+                    [[error localizedDescription] UTF8String]);
+    }];
+    [self scheduleAutosaving];   /* for what changed while it saved */
+}
+- (void)_stopAutosaving
+{
+    [_autosaveTimer invalidate];
+    [_autosaveTimer release];
+    _autosaveTimer = nil;
+}
+
+/* Revert To > Last Saved Version, for a document that autosaves in place. */
+- (IBAction)_revertToLastSavedVersion:(id)sender { [self revertDocumentToSaved:sender]; }
 
 /* ---- closing ---- */
 
@@ -734,6 +946,18 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     if (![self isDocumentEdited]) {
         call_back(cb, self, YES);
         return;
+    }
+    /* a document that autosaves in place, with a file, is autosaved and
+     * closes without asking; if that fails, it asks */
+    if ([self _closesWithoutAsking]) {
+        BOOL saved;
+        NSError *error = [self _autosaveCancellable:NO saved:&saved];
+        if (!error) {
+            call_back(cb, self, YES);
+            return;
+        }
+        fprintf(stderr, "ferry: autosaving the document “%s” failed: %s\n", [[self displayName] UTF8String],
+                [[error localizedDescription] UTF8String]);
     }
     [cb retain];
     [self retain];
@@ -760,6 +984,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     else
         done([a runModal]);
 }
+- (BOOL)_closesWithoutAsking { return [[self class] autosavesInPlace] && _fileURL && !_draft; }
 - (void)_document:(NSDocument *)doc didSaveToClose:(BOOL)saved contextInfo:(void *)context
 {
     ADocumentCallback *cb = context;
@@ -786,6 +1011,10 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
         return;
     _closing = YES;
     [self retain];
+    /* no more autosaves; what was kept for them goes */
+    [self _stopAutosaving];
+    [self _forgetLastSavedVersion];
+    [self _removeAutosavedContents];
     for (NSWindowController *wc in [[_controllers copy] autorelease]) {
         [wc close];
         [self removeWindowController:wc];
@@ -867,11 +1096,30 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
 
 /* ---- validation ---- */
 
+/* The menu of a Revert To item: Last Saved Version, and Browse All
+ * Versions (dimmed: versions aren't kept). */
+static NSMenu *revert_to_menu(void)
+{
+    NSMenu *m = [[[NSMenu alloc] initWithTitle:@"Revert To"] autorelease];
+    [m addItemWithTitle:@"Last Saved Version" action:@selector(_revertToLastSavedVersion:) keyEquivalent:@""];
+    [m addItemWithTitle:@"Browse All Versions…" action:@selector(browseDocumentVersions:) keyEquivalent:@""];
+    return m;
+}
+
 - (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item
 {
     SEL a = [item action];
-    if (a == @selector(revertDocumentToSaved:))
+    if (a == @selector(revertDocumentToSaved:) || a == @selector(_revertToLastSavedVersion:)) {
+        /* for a document that autosaves in place, the File menu's Revert to
+         * Saved becomes Revert To, with its menu, as on a Mac */
+        if (a == @selector(revertDocumentToSaved:) && [[self class] autosavesInPlace] &&
+            [(id)item isKindOfClass:[NSMenuItem class]] && ![(NSMenuItem *)item hasSubmenu]) {
+            [(NSMenuItem *)item setTitle:@"Revert To"];
+            [(NSMenuItem *)item setSubmenu:revert_to_menu()];
+            return YES;   /* an item with a menu stays enabled; its items are validated */
+        }
         return _fileURL != nil && [self isDocumentEdited];
+    }
     if (a == @selector(saveDocument:))
         return [self isDocumentEdited] || !_fileURL;
     if (a == @selector(renameDocument:) || a == @selector(moveDocument:) || a == @selector(lockDocument:) ||

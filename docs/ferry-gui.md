@@ -1081,8 +1081,8 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 77 tests (60 at M7, 69 before freemac (1.170), 74 before
-freemac (1.173)), all passing.
+check` runs 79 tests (60 at M7, 69 before freemac (1.170), 74 before
+freemac (1.173), 77 before freemac (1.178)), all passing.
 The new or extended ones:
 
 | Test | Proves |
@@ -1107,6 +1107,8 @@ The new or extended ones:
 | `foundation_calendar` | (freemac (1.173), Ferry 0.15.0) `NSCalendar` (Gregorian and ISO 8601) and `NSDateComponents`: every component of dates in New York, Paris and Tokyo, before 1970 and before the common era; week numbers and week-based years (en_US, en_GB and ISO 8601 weeks, week 53); dates from components, with a skipped and a repeated local time, values that carry, the components' own zone, week dates, the fourth Thursday and the last Monday of a month, a day of the year; copies, equality and `isValidDateInCalendar:`; adding months and years at month ends and leap days, days across a daylight saving change against 24 hours, mixed signs, wrapping; differences in years to seconds, weeks, backwards and between components; starts of days (New York, and Havana where midnight is skipped), the span of a day, week, month, year and hour; ranges and ordinals of units; today, yesterday and tomorrow, the weekend, comparing to a unit; the next date matching components (a time, a 31st, 29 February, Friday the 13th, a skipped time with each option, backwards), enumerating dates and setting a unit |
 | `foundation_numbers` | (freemac (1.173), Ferry 0.15.0) `NSNumberFormatter` in every style (no style, decimal, percent, currency, accounting, ISO code, plural, scientific, spell-out, ordinal) with their patterns and digits; fraction, integer and significant digits; all seven rounding modes on halves and negatives, 2.675 and 1.005 rounded as decimals, a rounding increment; grouping sizes, separators, multipliers, padding in each position, prefixes and suffixes; patterns with exponents, quotes, negative parts and a zero part; NaN, infinities, negative zero, the zero and nil symbols; euros, pounds, yen, rupees, francs and an unknown code; locales' currencies and the currency keyword; reading strictly and leniently (grouping, exponents, affixes, percent, accounting, limits, integers only, symbols), errors and part of a string; copies; `NSByteCountFormatter` in its four count styles and with its options |
 | `foundation_iso8601` | (freemac (1.173), Ferry 0.15.0) `NSISO8601DateFormatter` writing with each option in four zones (fractional seconds, the basic format, week and ordinal dates, a time alone, before 1970) and reading strings of the same shape only (offsets in each form, fractional seconds only with that option, no zone read in the formatter's, week and ordinal dates, a time alone); `NSDateFormatter`'s relative formatting ("Yesterday", "Today", "Tomorrow", with a time, read back) and its calendar; `NSDateComponentsFormatter` in its six styles, padded, without dropping zeros, with days, a limit of units, fractional hours, years and months on the calendar, the approximation and time remaining phrases |
+| `appkit_editing` | (freemac (1.178), Ferry 0.16.0) editing cells in place: in a cell-based table, a double click on an editable cell of a selected row, Return on the row and `editColumn:row:withEvent:select:` (with and without selecting the text) start it, `editedRow` and `editedColumn` follow it; the data source gets the typed string, the delegate is asked `tableView:shouldEditTableColumn:row:` and `control:textShouldEndEditing:` (keeping the editing going once) and hears `controlTextDidBeginEditing:` and `controlTextDidEndEditing:` from the table with the `NSTextMovement` (Return, Tab, Shift-Tab, Escape, a click elsewhere); Tab and Shift-Tab across columns and rows, past a column that isn't editable, selecting the new row, and stopping after the last cell; Escape keeping the old value; a refused cell and a column that isn't editable sending the double action instead; the exception for a row that isn't selected; `reloadData` giving the editing up, a data source that reloads as it takes the value, `abortEditing`; in a view-based table, clicks on an editable field going to the table until it's edited, the cell's own text field edited and its action sent (found with `rowForView:`), Escape, Tab to the next row's field; in an outline view, an item the delegate keeps and one edited, the value going back by item |
+| `appkit_autosave` | (freemac (1.178), Ferry 0.16.0) `NSDocument` autosaving, in a home of its own: a class that autosaves in place autosaved by the timer `autosavingDelay` after a change (nothing before it, nothing without a change) and by `autosaveWithImplicitCancellability:completionHandler:` and `autosaveDocumentWithDelegate:...`, over its own file with `NSAutosaveInPlaceOperation`, staying edited (and its window too) with no unautosaved changes, `autosavingIsImplicitlyCancellable` during the write; the file as last saved kept aside in Autosave Information and put back by Revert To > Last Saved Version (the File menu's Revert to Saved item becoming Revert To, with Last Saved Version and a dimmed Browse All Versions); Save making it clean and dropping the copy; closing without asking, after an autosave; an untitled document autosaved into Autosave Information (`autosavedContentsFileURL`, the same file each time), still asking, its file removed on closing; a class that doesn't autosave in place not autosaved, its Revert item unchanged, `NSChangeAutosaved` and `NSChangeCleared`; a delay of 0; quitting with two such documents (no review alert, each autosaved and closed) |
 
 **What isn't done yet (and why).**
 
@@ -1117,11 +1119,24 @@ The new or extended ones:
   stop at now is still to be checked. The Sparkle updaters' checks of the
   Mac's version file and code signatures are still missing.
   `docs/ferry-compat.md` has the list.
-- **Documents: no autosaving or versions** (1.167). `autosavesInPlace`
-  answers NO, so a document is saved only when the user saves it, as on
-  Mac OS X 10.6; the autosave calls save nothing and Browse All Versions is
-  disabled. Renaming, moving and locking from the title bar, printing and
-  Page Setup are disabled too. (`NSUndoManager`'s
+- **Documents: autosaving without versions** (1.167, autosaving from
+  freemac (1.178)). Only a class whose `autosavesInPlace` answers YES is
+  autosaved; others are saved only when the user saves them, as on Mac OS
+  X 10.6 (a Mac autosaves those elsewhere for crash recovery). There is one
+  version kept aside, the file as last saved, for Revert To > Last Saved
+  Version; it lives in `~/.local/share/Autosave Information` (freemac's
+  place for the Mac's Library) only while the document is open, and is
+  gone after a save or a close. `preservesVersions` is ignored and Browse
+  All Versions is disabled. `autosavesDrafts` is honoured only in that an
+  untitled document still asks on closing; an autosave is done on the main
+  thread and never cancelled, whatever `autosavingIsImplicitlyCancellable`
+  says. Untitled documents' autosaved files aren't offered again after a
+  crash. The File menu's Revert to Saved item turns into Revert To with
+  its menu the first time it is validated for such a document, and stays
+  so. Whether an autosave keeps the "Edited" title exactly as a Mac does,
+  and the names of the files in Autosave Information, weren't compared
+  with a real Mac. Renaming, moving and locking from the title bar,
+  printing and Page Setup are disabled. (`NSUndoManager`'s
   `prepareWithInvocationTarget:` works from freemac (1.170), so undo
   registered that way is kept, as the selector and block forms were.)
 - **`NSInvocation` and forwarding: x86-64 only, and a few edge cases**
@@ -1193,6 +1208,19 @@ The new or extended ones:
   `NSByteCountFormatter` counts files in thousands and memory in 1,024s
   (still written KB), with Apple's adaptive digits (none for KB, one for
   MB, two above). Neither was compared with a real Mac.
+- **Editing in tables: text cells only** (freemac (1.178)). Only text
+  cells (an `NSTextFieldCell`, or an editable `NSTextField` in a cell view)
+  are edited in place, by Ferry's own text field rather than a shared field
+  editor (`currentEditor` and `fieldEditor:forObject:` aren't involved, so
+  the delegate's `fieldEditor` argument is nil). A click on a selected
+  row's cell doesn't start editing after a pause, as a Mac's does; a
+  double click or Return does. Formatters aren't applied: a cell-based
+  data source gets the string as typed. Return on a table edits the
+  selected row's first editable cell and only falls back to the double
+  action when there is none. Tab stops after the last editable cell and
+  Shift-Tab before the first, leaving the table first responder, and
+  cell-based editing posts `controlTextDidEndEditing:` only when the text
+  was changed. These choices weren't compared with a real Mac.
 - **Alerts and sheets are drawn inside Ferry** (1.167): a sheet hangs
   inside its window; one taller or wider than the window gets a window of
   its own, set modal for its parent. The alert's help button asks the
@@ -1233,8 +1261,9 @@ document classes, `NSAlert` and `NSWorkspace` in 1.167, see
 `foundation_json` and `foundation_dates`; `NSCalendar`, `NSNumberFormatter`,
 `NSISO8601DateFormatter` and the components and byte count formatters in
 (1.173), see `foundation_calendar`, `foundation_numbers` and
-`foundation_iso8601`), then editing in tables' cells, autosaving, and
-other calendars and locales' own number and date data.
+`foundation_iso8601`; editing in tables' cells and autosaving in (1.178),
+see `appkit_editing` and `appkit_autosave`), then other calendars, locales'
+own number and date data, and document versions.
 
 ## Known limits (for every milestone)
 
@@ -1269,3 +1298,4 @@ bridge in the `ferry` binary.
 - 2026-11-23: M7 merged (#171). More apps and installers: Ferry's Installer (.pkg, .dmg), scroll and text views, key-value observing, ICU, Carbon and Accessibility answers; ShiftIt runs into its event loop; MacPorts, XQuartz and Sequel Pro install, `make check` 67/67.
 - 2026-11-24: Ferry 0.14.0 (freemac (1.170)): `NSInvocation`, `NSMethodSignature`, `NSProxy` and message forwarding, `prepareWithInvocationTarget:`, `NSJSONSerialization`, `NSTimeZone`, `NSLocale` and `NSDateFormatter`, `make check` 74/74.
 - 2026-11-24: Ferry 0.15.0 (freemac (1.173)): `NSCalendar` (Gregorian and ISO 8601), `NSDateComponents`, `NSNumberFormatter`, `NSByteCountFormatter`, `NSISO8601DateFormatter`, `NSDateComponentsFormatter`, relative date formatting, locales' currencies, `make check` 77/77.
+- 2026-11-24: Ferry 0.16.0 (freemac (1.178)): editing text cells in place in table and outline views (double click, Return, Tab and Shift-Tab, Escape, `editColumn:row:withEvent:select:`, the data source's and delegate's calls, the text field's action), `NSDocument` autosaving in place with its timer, Revert To > Last Saved Version and closing without asking, `make check` 79/79.

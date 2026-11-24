@@ -155,9 +155,9 @@ close items by their chevrons, the arrow keys or code. Scroll views now
 keep a table's header above its rows. Both are read from nibs. They were Gas
 Mask's next known need and are most likely Sequel Pro's; the apps haven't
 been run again here, for the reason above. Foundation gained `NSIndexSet`
-and `NSSortDescriptor` for them. Not done yet: editing text in a table's
-cells, dragging rows and columns, type-to-select, saved column widths, and
-animations (rows change at once).
+and `NSSortDescriptor` for them. Not done yet: dragging rows and columns,
+type-to-select, saved column widths, and animations (rows change at once).
+(Editing text in a table's cells came in (1.178).)
 
 ### Pop-up buttons, segmented controls, search fields, stack views and toolbars (1.164)
 
@@ -209,11 +209,10 @@ in the user defaults (and given to the desktop's recent files) and fills
 the Open Recent menu. The first document controller made is the shared
 one, so an app's own subclass in its main nib (MacPass has one) is used.
 Files named on the command line open at launch, else an untitled document
-when the app wants one. Left out: autosaving and versions
-(`autosavesInPlace` answers NO, as on Mac OS X 10.6, and the autosave calls
-save nothing), renaming, moving and locking from the title bar, and
+when the app wants one. Left out: versions, renaming, moving and locking
+from the title bar, and
 printing. (`prepareWithInvocationTarget:` answered nil until Ferry had
-`NSInvocation`; it works from (1.170).)
+`NSInvocation`; it works from (1.170). Autosaving came in (1.178).)
 
 `NSAlert` draws as a current Mac's alert: the app's icon (the caution sign
 for a critical alert), the message in bold, the informative text, an
@@ -272,6 +271,27 @@ durations and file sizes. All of it is English (United States) for every
 locale; a locale's country only picks the default currency. None of the
 nine apps has been run again since.
 
+### Editing in tables and autosaving ((1.178), Ferry 0.16.0)
+
+Table and outline views edit text cells in place: a double click on an
+editable cell of a selected row, Return on the selected row, or
+`editColumn:row:withEvent:select:` starts it, Tab and Shift-Tab move to
+the next or previous editable cell (selecting its row), Return or a click
+elsewhere ends it and Escape gives it up. In a cell-based table a field is
+laid over the cell, the delegate's `tableView:shouldEditTableColumn:row:`
+(or the outline's `outlineView:shouldEditTableColumn:item:`) is asked
+first, the data source gets the new string through
+`tableView:setObjectValue:forTableColumn:row:` (or by item), and the
+delegate hears `controlTextDidEndEditing:` with the `NSTextMovement`; in a
+view-based table the cell view's own text field is edited and its action
+sent to its target. `editedRow` and `editedColumn` say which cell is being
+edited. A document class whose `autosavesInPlace` answers YES is now
+autosaved `autosavingDelay` seconds after a change, over its own file (or,
+untitled, into Autosave Information), stays edited until it's saved, closes
+without asking, and gets Revert To > Last Saved Version, which puts back
+the file as it was last saved. Versions (Browse All Versions) are still
+left out. None of the nine apps has been run again since.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -286,8 +306,8 @@ Counted over the nine apps:
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.
 3. **The document classes** (`NSDocument`, `NSDocumentController`):
-   MacPass, MacDown, Sequel Pro. Done in 1.167, without autosaving and
-   versions.
+   MacPass, MacDown, Sequel Pro. Done in 1.167, and autosaving in
+   (1.178); versions are still left out.
 4. **Foundation's `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle` and
    `NSXMLDocument`** (each used by five or more of the apps). `NSIndexSet`
    came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`

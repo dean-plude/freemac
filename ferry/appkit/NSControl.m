@@ -4,12 +4,16 @@
  * radio buttons, labels and editable text fields), in a plain light style
  * of its own. Controls keep their state themselves rather than in NSCell
  * objects; a text field edits its own text, without a separate field
- * editor. */
+ * editor. A text field being edited in a table's cell (NSTableView.m)
+ * hands Return, Tab, Shift-Tab and Escape to its table, which moves the
+ * editing on; the end-of-editing notification says how editing ended,
+ * under "NSTextMovement", as Apple documents. */
 #import "AInternal.h"
 
 NSNotificationName const NSControlTextDidBeginEditingNotification = @"NSControlTextDidBeginEditingNotification";
 NSNotificationName const NSControlTextDidChangeNotification = @"NSControlTextDidChangeNotification";
 NSNotificationName const NSControlTextDidEndEditingNotification = @"NSControlTextDidEndEditingNotification";
+NSString *const NSTextMovementUserInfoKey = @"NSTextMovement";
 
 static NSColor *accent(void) { return [NSColor controlAccentColor]; }
 static BOOL is_low_surrogate(unichar c) { return c >= 0xDC00 && c <= 0xDFFF; }
@@ -205,6 +209,10 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
 - (void)takeStringValueFrom:(id)sender { [self setStringValue:[sender stringValue]]; }
 - (void)takeIntValueFrom:(id)sender { [self setIntValue:[sender intValue]]; }
 - (void)takeDoubleValueFrom:(id)sender { [self setDoubleValue:[sender doubleValue]]; }
+
+/* Editing, for the controls that edit text (NSTextField and NSTableView). */
+- (BOOL)abortEditing { return NO; }
+- (void)validateEditing {}
 
 - (BOOL)sendAction:(SEL)action to:(id)target
 {
@@ -756,6 +764,7 @@ static BOOL keeps_state(NSButtonType t)
     CGFloat _preferredWidth;
     /* editing */
     BOOL _editing, _began;
+    NSInteger _movement;            /* how the editing is ending: an NSTextMovement */
     NSMutableString *_text;
     NSUInteger _caret, _anchor;     /* the selection runs between them */
     CGFloat _scroll;                /* how far the text is scrolled left */
@@ -961,25 +970,97 @@ static BOOL keeps_state(NSButtonType t)
 
 - (void)_post:(NSNotificationName)name selector:(SEL)sel
 {
-    NSNotification *n = [NSNotification notificationWithName:name object:self];
+    NSDictionary *info = [name isEqualToString:NSControlTextDidEndEditingNotification]
+                             ? @{NSTextMovementUserInfoKey : @(_movement)}
+                             : nil;
+    NSNotification *n = [NSNotification notificationWithName:name object:self userInfo:info];
     if ([_delegate respondsToSelector:sel])
         ((void (*)(id, SEL, id))objc_msgSend)(_delegate, sel, n);
     [[NSNotificationCenter defaultCenter] postNotification:n];
 }
 
+/* The table whose cell this field is being edited in, if any. */
+- (NSTableView *)_editingTable
+{
+    for (NSView *v = [self superview]; v; v = [v superview])
+        if ([v isKindOfClass:[NSTableView class]])
+            return [(NSTableView *)v _isEditingField:self] ? (NSTableView *)v : nil;
+    return nil;
+}
+- (NSInteger)_textMovement { return _movement; }
+- (void)_setTextMovement:(NSInteger)m { _movement = m; }
+/* Puts back the value editing started with (Escape in a table's cell). */
+- (void)_discardEditsTo:(id)value
+{
+    if (!_editing)
+        return;
+    [super setObjectValue:value];
+    [_text setString:[super stringValue]];
+    _caret = _anchor = [_text length];
+    [self setNeedsDisplay:YES];
+}
+- (void)_placeCaretAtEnd
+{
+    if (_editing)
+        _caret = _anchor = [_text length];
+    [self setNeedsDisplay:YES];
+}
+
 - (BOOL)resignFirstResponder
 {
+    NSTableView *table = [[[self _editingTable] retain] autorelease];
     if (_editing) {
+        /* the delegate may keep the editing going, unless it is cancelled */
+        if (_began && _movement != NSTextMovementCancel &&
+            [_delegate respondsToSelector:@selector(control:textShouldEndEditing:)] &&
+            ![_delegate control:self textShouldEndEditing:nil]) {
+            _movement = NSTextMovementOther;
+            return NO;
+        }
+        [[self retain] autorelease];
         NSString *s = [[_text copy] autorelease];
         _editing = NO;
         [super setObjectValue:s];
+        /* in a table, the field's action is sent when editing ends with a
+         * change, or by Return, so that its target can find the row with
+         * rowForView: */
+        if (table && _action && _movement != NSTextMovementCancel && (_began || _movement == NSTextMovementReturn))
+            [self sendAction:_action to:_target];
         if (_began)
             [self _post:NSControlTextDidEndEditingNotification selector:@selector(controlTextDidEndEditing:)];
+        _began = NO;
         [_text release];
         _text = nil;
     }
+    _movement = NSTextMovementOther;
+    if (table)
+        [table _editingFieldDidResign:self];
     [self setNeedsDisplay:YES];
     return YES;
+}
+
+/* Ends the editing and gives up what was typed. */
+- (BOOL)abortEditing
+{
+    if (!_editing)
+        return NO;
+    NSTableView *table = [self _editingTable];
+    if (table)
+        return [table abortEditing];
+    _began = NO;
+    [_text setString:[super stringValue]];
+    _movement = NSTextMovementCancel;
+    if ([[self window] firstResponder] == self)
+        [[self window] makeFirstResponder:nil];
+    else
+        [self resignFirstResponder];
+    return YES;
+}
+/* What has been typed becomes the field's value; the editing goes on. */
+- (void)validateEditing
+{
+    if (_editing)
+        [super setObjectValue:[[_text copy] autorelease]];
 }
 
 - (void)selectText:(id)sender
@@ -1012,6 +1093,12 @@ static BOOL keeps_state(NSButtonType t)
 - (void)_replaceSelectionWith:(NSString *)s
 {
     if (!_editable) {
+        NSBeep();
+        return;
+    }
+    /* the first change asks the delegate whether editing may begin */
+    if (!_began && [_delegate respondsToSelector:@selector(control:textShouldBeginEditing:)] &&
+        ![_delegate control:self textShouldBeginEditing:nil]) {
         NSBeep();
         return;
     }
@@ -1199,6 +1286,11 @@ static BOOL keeps_state(NSButtonType t)
  * button gets the key too. */
 - (void)insertNewline:(id)sender
 {
+    NSTableView *table = [self _editingTable];
+    if (table) {
+        [table _endEditingWithMovement:NSTextMovementReturn];
+        return;
+    }
     if (_maxLines != 1 && !_singleLine) {
         [self _replaceSelectionWith:@"\n"];
         return;
@@ -1215,11 +1307,36 @@ static BOOL keeps_state(NSButtonType t)
     [self setNeedsDisplay:YES];
 }
 - (void)insertNewlineIgnoringFieldEditor:(id)sender { [self _replaceSelectionWith:@"\n"]; }
-- (void)insertTab:(id)sender { [[self window] selectKeyViewFollowingView:self]; }
-- (void)insertBacktab:(id)sender { [[self window] selectKeyViewPrecedingView:self]; }
+- (void)insertTab:(id)sender
+{
+    NSTableView *table = [self _editingTable];
+    if (table) {
+        [table _endEditingWithMovement:NSTextMovementTab];
+        return;
+    }
+    _movement = NSTextMovementTab;
+    [[self window] selectKeyViewFollowingView:self];
+    _movement = NSTextMovementOther;
+}
+- (void)insertBacktab:(id)sender
+{
+    NSTableView *table = [self _editingTable];
+    if (table) {
+        [table _endEditingWithMovement:NSTextMovementBacktab];
+        return;
+    }
+    _movement = NSTextMovementBacktab;
+    [[self window] selectKeyViewPrecedingView:self];
+    _movement = NSTextMovementOther;
+}
 - (void)insertTabIgnoringFieldEditor:(id)sender { [self _replaceSelectionWith:@"\t"]; }
 - (void)cancelOperation:(id)sender
 {
+    NSTableView *table = [self _editingTable];
+    if (table) {
+        [table _endEditingWithMovement:NSTextMovementCancel];
+        return;
+    }
     NSEvent *e = [[self window] currentEvent];
     if (e && [e type] == NSEventTypeKeyDown)
         [[self window] performKeyEquivalent:e];

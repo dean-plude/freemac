@@ -1,0 +1,76 @@
+cell-based: edited row -1 column -1
+double click on Ada: edited row 0 column 1, first responder a text field holding "Ada", in the table 1
+  the field lies over the cell: 1
+  may edit name of row 0? yes
+typed Ann, Return: edited row -1, first responder the table, name Ann
+  began editing (object is a table: 1)
+  may end editing? yes (control is the table: 1)
+  set name of row 0 to Ann (a string)
+  ended editing by return, edited row 0 column 1
+Return on the row: edited row 0 column 1, first responder a text field holding "Ann"
+Tab: edited row 0 column 2, first responder a text field holding "36"
+typed 37, Tab: edited row 1 column 1, selected row 1, first responder a text field holding "Bob"
+Shift-Tab: edited row 0 column 2, selected row 0
+typed 99, Escape: edited row -1, age 37, first responder the table
+  may edit name of row 0? yes
+  may edit age of row 0? yes
+  began editing (object is a table: 1)
+  may end editing? yes (control is the table: 1)
+  set age of row 0 to 37 (a string)
+  ended editing by tab, edited row 0 column 2
+  may edit name of row 1? yes
+  may edit age of row 0? yes
+  began editing (object is a table: 1)
+  ended editing by cancel, edited row 0 column 2
+double click on an age the delegate keeps: edited row -1
+double click on a column that isn't editable: edited row -1
+  may edit age of row 2? no
+  double click on row 2 column 2
+  double click on row 3 column 0
+emptied, Return: edited row 1 column 1, first responder a text field holding ""
+typed Bo, Return: edited row -1, name Bo
+  may edit name of row 1? yes
+  began editing (object is a table: 1)
+  may end editing? no (control is the table: 1)
+  may end editing? yes (control is the table: 1)
+  set name of row 1 to Bo (a string)
+  ended editing by return, edited row 1 column 1
+editing a row that isn't selected: NSInternalInconsistencyException
+editColumn:1 row:1 select:NO, typed !: field holds Bo!
+clicked row 3: edited row -1, name Bo!, selected row 3
+  began editing (object is a table: 1)
+  may end editing? yes (control is the table: 1)
+  set name of row 1 to Bo! (a string)
+  ended editing by other, edited row 1 column 1
+reloadData while editing: edited row -1, age 52, first responder the table
+Tab from the last cell: edited row -1, age 61, first responder the table
+a data source that reloads as it takes the value: edited row -1, name Dot
+abortEditing: 1, then 0; edited row -1
+  began editing (object is a table: 1)
+  ended editing by cancel, edited row 3 column 2
+  began editing (object is a table: 1)
+  may end editing? yes (control is the table: 1)
+  set age of row 3 to 61 (a string)
+  ended editing by tab, edited row 3 column 2
+  may edit name of row 3? yes
+  began editing (object is a table: 1)
+  may end editing? yes (control is the table: 1)
+  set name of row 3 to Dot (a string)
+  ended editing by return, edited row 3 column 1
+view-based: a click on the note field goes to the table
+double click on eggs: edited row 1 column 1, first responder is the cell's field 1
+  and a click on it now goes to the field
+typed ham, Return: edited row -1, field ham, first responder the table
+  action: row 1 is now "ham"
+  the field ended editing by return (object is the field: 1)
+Return, typed jam, Escape: field ham, edited row -1
+  the field ended editing by cancel (object is the field: 1)
+Return, Tab: edited row 2 column 1, selected row 2, first responder a text field holding "tea"
+Shift-Tab: edited row 1, selected row 1
+outline: double click on Europe: edited row -1
+double click on Rome: edited row 2, first responder a text field holding "Rome"
+typed Roma, Return: edited row -1
+  may edit item Europe? no
+  may edit item Rome? yes
+  set item Rome to Roma
+exit=0

@@ -78,14 +78,17 @@ desktop's menu bar over StatusNotifierItem, with their menus). Exceptions work a
 is reported and the app carries on. Scroll views, text views (with RTF
 and simple HTML documents), progress indicators, boxes, tab and split
 views, table and outline views (cell-based or view-based, with
-selection, sorting from the header and resizable columns), pop-up
+selection, sorting from the header, resizable columns and, from freemac
+(1.178), text cells edited in place), pop-up
 buttons, segmented controls, search fields, stack views and toolbars are
 there too,
 and key-value observing, so bindings follow the values they are bound to.
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question
-on closing and quitting, and the Open Recent menu (autosaving and versions
+on closing and quitting, and the Open Recent menu; from freemac (1.178) a
+document class that autosaves in place is autosaved after each change,
+closes without asking and gets Revert To > Last Saved Version (versions
 are left out). `NSAlert` shows alerts, run modally or as sheets hanging in
 their window, and `NSWorkspace` opens web addresses, files and folders
 through the desktop's own launcher (`gio open` or `xdg-open`, never a Mac

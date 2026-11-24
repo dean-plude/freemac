@@ -284,6 +284,22 @@ typedef NS_ENUM(NSInteger, NSTextAlignment) {
 #define NSCenterTextAlignment NSTextAlignmentCenter
 #define NSJustifiedTextAlignment NSTextAlignmentJustified
 #define NSNaturalTextAlignment NSTextAlignmentNatural
+/* How editing ended, in an end-of-editing notification's user info. */
+typedef NS_ENUM(NSInteger, NSTextMovement) {
+    NSTextMovementReturn = 0x10, NSTextMovementTab = 0x11, NSTextMovementBacktab = 0x12,
+    NSTextMovementLeft = 0x13, NSTextMovementRight = 0x14, NSTextMovementUp = 0x15, NSTextMovementDown = 0x16,
+    NSTextMovementCancel = 0x17, NSTextMovementOther = 0,
+};
+#define NSIllegalTextMovement 0
+#define NSReturnTextMovement NSTextMovementReturn
+#define NSTabTextMovement NSTextMovementTab
+#define NSBacktabTextMovement NSTextMovementBacktab
+#define NSLeftTextMovement NSTextMovementLeft
+#define NSRightTextMovement NSTextMovementRight
+#define NSUpTextMovement NSTextMovementUp
+#define NSDownTextMovement NSTextMovementDown
+#define NSCancelTextMovement NSTextMovementCancel
+#define NSOtherTextMovement NSTextMovementOther
 typedef NS_ENUM(NSUInteger, NSLineBreakMode) {
     NSLineBreakByWordWrapping = 0, NSLineBreakByCharWrapping = 1, NSLineBreakByClipping = 2,
     NSLineBreakByTruncatingHead = 3, NSLineBreakByTruncatingTail = 4, NSLineBreakByTruncatingMiddle = 5,
@@ -683,6 +699,8 @@ typedef NS_ENUM(NSUInteger, NSCellImagePosition) {
 - (void)performClick:(id)sender;
 - (void)sizeToFit;
 @property (readonly) NSSize intrinsicContentSize;
+- (BOOL)abortEditing;
+- (void)validateEditing;
 @end
 
 typedef NS_ENUM(NSUInteger, NSButtonType) {
@@ -849,12 +867,17 @@ typedef NS_ENUM(NSUInteger, NSTextFieldBezelStyle) { NSTextFieldSquareBezel = 0,
 - (void)controlTextDidChange:(NSNotification *)notification;
 - (void)controlTextDidEndEditing:(NSNotification *)notification;
 - (BOOL)control:(NSControl *)control textView:(id)textView doCommandBySelector:(SEL)selector;
+/* fieldEditor is nil in Ferry: a text field edits its own text */
+- (BOOL)control:(NSControl *)control textShouldBeginEditing:(id)fieldEditor;
+- (BOOL)control:(NSControl *)control textShouldEndEditing:(id)fieldEditor;
 @end
 @protocol NSTextFieldDelegate <NSControlTextEditingDelegate>
 @end
 APPKIT_EXTERN NSNotificationName const NSControlTextDidBeginEditingNotification;
 APPKIT_EXTERN NSNotificationName const NSControlTextDidChangeNotification;
 APPKIT_EXTERN NSNotificationName const NSControlTextDidEndEditingNotification;
+/* the key of an end-of-editing notification's NSTextMovement */
+APPKIT_EXTERN NSString *const NSTextMovementUserInfoKey;
 
 /* ---- windows ------------------------------------------------------------------------ */
 
@@ -2205,7 +2228,9 @@ APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSTableViewRowViewKey;
 
 /* A table of rows and columns. Cell-based tables draw each column's data
  * cell with the data source's values; view-based tables show the views
- * the delegate makes. Editing a cell in place isn't done yet. */
+ * the delegate makes. A double click (or Return) edits a text cell in
+ * place: in a cell-based table the value goes back through the data
+ * source, in a view-based one through the text field's action. */
 @interface NSTableView : NSControl
 @property (assign) id<NSTableViewDataSource> dataSource;
 @property (assign) id<NSTableViewDelegate> delegate;
@@ -2979,8 +3004,11 @@ APPKIT_EXTERN NSString *const NSWorkspaceApplicationKey;
  * NSDocument subclass holds each; NSDocumentController (or the app's own
  * subclass, if one is made first) makes and opens documents and keeps the
  * Recent Documents list; each document reads and writes its file and keeps
- * its change count, which its windows show. Autosaving and versions are
- * left out: autosavesInPlace answers NO and those calls do nothing. */
+ * its change count, which its windows show. A class whose autosavesInPlace
+ * answers YES is autosaved autosavingDelay seconds after a change (over its
+ * file, or into Autosave Information while untitled), closes without
+ * asking, and gets Revert To > Last Saved Version; versions (Browse All
+ * Versions) are left out. */
 typedef NS_ENUM(NSUInteger, NSDocumentChangeType) {
     NSChangeDone = 0, NSChangeUndone = 1, NSChangeCleared = 2, NSChangeReadOtherContents = 3,
     NSChangeAutosaved = 4, NSChangeRedone = 5, NSChangeDiscardable = 256,
@@ -3072,7 +3100,7 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
     completionHandler:(void (^)(NSError *error))handler;
 - (BOOL)saveToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
             error:(NSError **)error;
-/* autosaving and versions: not in Ferry; these do nothing */
+/* autosaving (versions aren't kept: preservesVersions has no effect) */
 @property (class, readonly) BOOL autosavesInPlace, autosavesDrafts, preservesVersions;
 @property (copy) NSURL *autosavedContentsFileURL;
 @property (readonly, copy) NSString *autosavingFileType;
