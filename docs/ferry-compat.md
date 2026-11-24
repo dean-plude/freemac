@@ -485,6 +485,26 @@ commas. Not done yet: detaching popovers, dragging files onto path
 controls, the token field's completion list, setting the clock by its
 hands, and time zones read from nibs.
 
+### URL loading (freemac 1.196, Ferry 0.23.0)
+
+Programs can now load http and https URLs. They can use `NSURLSession`
+(data, upload and download tasks, with completion handlers or delegates),
+`NSURLConnection` (synchronous, asynchronous and with a delegate),
+`NSURLRequest`, `NSMutableURLRequest` and `NSHTTPURLResponse`, and
+`NSData`'s and `NSString`'s `...ContentsOfURL:` for web addresses.
+Failures come back as `NSError`s in `NSURLErrorDomain` with the usual
+codes. The transfers use this system's libcurl (`libcurl4`). It is opened
+only when a program first loads a URL, so programs that don't use the
+network are unaffected. Ferry has one thread. Transfers progress, and
+handlers and delegate messages run, while the program runs its run loop
+(as any AppKit app does) or waits in dispatch. That covers the usual
+patterns: an update check at launch, fetching a feed or JSON, and
+downloading a file. Not yet supported:
+- cookies, the URL cache, authentication challenges and redirect
+  callbacks;
+- background sessions, WebSockets and resume data;
+- Mac programs that bundle or link libcurl themselves.
+
 ## What the apps need most
 
 Counted over the nine apps:

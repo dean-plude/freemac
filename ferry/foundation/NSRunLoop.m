@@ -102,13 +102,42 @@ static BOOL (*hook_dispatch)(void *ctx, struct pollfd *fds, int count);
 static void *hook_ctx;
 #define HOOK_FDS 64
 
+/* Foundation's own pollers, waited on with the rest while active: the
+ * network transfers of NSURLSession and NSURLConnection (NSURLSession.m),
+ * which may wait to write as well as to read. */
+struct fpoller {
+    int (*prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max);
+    BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count);
+    BOOL (*active)(void *ctx);
+    void *ctx;
+};
+#define MAX_POLLERS 4
+static struct fpoller pollers[MAX_POLLERS];
+static int npollers;
+
+void FRunLoopAddPoller(int (*prepare)(void *, int *, struct pollfd *, int), BOOL (*dispatch)(void *, struct pollfd *, int),
+                       BOOL (*active)(void *), void *ctx)
+{
+    if (npollers < MAX_POLLERS)
+        pollers[npollers++] = (struct fpoller){prepare, dispatch, active, ctx};
+}
+
+static BOOL pollers_active(void)
+{
+    for (int i = 0; i < npollers; i++)
+        if (pollers[i].active(pollers[i].ctx))
+            return YES;
+    return NO;
+}
+
 /* libSystem's dispatch queues (src/objc/dispatch.c) run on this loop. */
 extern int ferry_dispatch_drain(void);
 extern int ferry_dispatch_timeout_ms(void);
 
 - (BOOL)hasWork
 {
-    return [_timers count] || [_blocks count] || _nsources || hook_prepare || ferry_dispatch_timeout_ms() >= 0;
+    return [_timers count] || [_blocks count] || _nsources || hook_prepare || ferry_dispatch_timeout_ms() >= 0 ||
+           pollers_active();
 }
 
 /* One pass: run queued blocks, fire due timers, then wait for a descriptor
@@ -168,7 +197,7 @@ extern int ferry_dispatch_timeout_ms(void);
     int dms = ferry_dispatch_timeout_ms();
     if (dms >= 0 && dms < ms)
         ms = dms;
-    struct pollfd *fds = calloc(_nsources + HOOK_FDS + 1, sizeof *fds);
+    struct pollfd *fds = calloc(_nsources + HOOK_FDS * (1 + MAX_POLLERS) + 1, sizeof *fds);
     for (int i = 0; i < _nsources; i++) {
         fds[i].fd = _sources[i].fd;
         fds[i].events = POLLIN;
@@ -176,11 +205,23 @@ extern int ferry_dispatch_timeout_ms(void);
     int count = _nsources, extra = 0;
     if (hook_prepare)
         extra = hook_prepare(hook_ctx, &ms, fds + count, HOOK_FDS);
+    int pstart[MAX_POLLERS], pcount[MAX_POLLERS], np = npollers, all = count + extra;
+    for (int i = 0; i < np; i++) {
+        pstart[i] = all;
+        pcount[i] = -1;
+        if (pollers[i].active(pollers[i].ctx)) {
+            pcount[i] = pollers[i].prepare(pollers[i].ctx, &ms, fds + all, HOOK_FDS);
+            all += pcount[i];
+        }
+    }
     struct fsource *snapshot = malloc((count ? count : 1) * sizeof *snapshot);
     memcpy(snapshot, _sources, count * sizeof *snapshot);
-    int ready = poll(fds, count + extra, ms);
+    int ready = poll(fds, all, ms);
     if (hook_dispatch && hook_dispatch(hook_ctx, fds + count, extra))
         *handled = YES;
+    for (int i = 0; i < np; i++)
+        if (pcount[i] >= 0 && pollers[i].dispatch(pollers[i].ctx, fds + pstart[i], pcount[i]))
+            *handled = YES;
     if (ready > 0) {
         for (int i = 0; i < count; i++) {
             if (fds[i].revents) {

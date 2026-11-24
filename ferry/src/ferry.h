@@ -50,6 +50,7 @@ void *ferry_host_lookup(const char *name);
 int ferry_twin_library(const char *install_name);   /* zlib and the like: this system's copy */
 void *ferry_twin_lookup(const char *name);
 void *ferry_twin_symbol(const char *install_name, const char *name); /* lazily, for Foundation */
+void *ferry_network_symbol(const char *name);       /* libcurl, for Foundation's URL loading */
 
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);

@@ -49,7 +49,9 @@
 }
 + (instancetype)dataWithContentsOfURL:(NSURL *)url
 {
-    return [url isFileURL] ? [self dataWithContentsOfFile:[url path]] : nil;
+    if ([url isFileURL])
+        return [self dataWithContentsOfFile:[url path]];
+    return [self dataWithContentsOfURL:url options:0 error:NULL]; /* http and https: NSURLSession.m */
 }
 + (instancetype)dataWithData:(NSData *)data { return [[[self alloc] initWithData:data] autorelease]; }
 - (instancetype)init { return [self initWithBytes:NULL length:0]; }

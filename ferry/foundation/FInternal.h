@@ -38,6 +38,17 @@ NSError *FPosixError(int err, NSString *path);
 void FSetError(NSError **out, NSError *e);
 __attribute__((noreturn)) void FRaise(NSString *name, NSString *format, ...);
 
+/* URL loading (NSURLSession.m): an http or https URL's body or text, for
+ * NSData's and NSString's ...ContentsOfURL: calls, waiting for it; nil and
+ * a Cocoa error holding the URL error otherwise. */
+NSData *FDataWithContentsOfNetworkURL(NSURL *url, NSString **charset, NSError **error);
+NSString *FStringWithContentsOfNetworkURL(NSURL *url, NSStringEncoding enc, NSStringEncoding *used, NSError **error);
+/* Another poller for the run loop to wait on while active (NSRunLoop.m). */
+struct pollfd;
+void FRunLoopAddPoller(int (*prepare)(void *ctx, int *timeout_ms, struct pollfd *fds, int max),
+                       BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count), BOOL (*active)(void *ctx),
+                       void *ctx);
+
 /* Property lists */
 id FParsePlist(NSData *data, NSPropertyListMutabilityOptions opt, NSPropertyListFormat *format);
 NSData *FWriteXMLPlist(id plist);

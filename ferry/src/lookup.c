@@ -248,6 +248,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"__sincosf_stret", mac_sincosf_stret},
     /* Ferry's Foundation reaches ICU and libxml2 through this (src/host.c) */
     {"ferry_twin_symbol", ferry_twin_symbol},
+    /* Ferry's own: this system's libcurl, for Foundation (host.c) */
+    {"ferry_network_symbol", ferry_network_symbol},
     {NULL, NULL},
 };
 

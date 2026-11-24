@@ -2069,5 +2069,7 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSProgress.h>
 #include <Foundation/NSOperation.h>
 #include <Foundation/NSCache.h>
+/* URL loading: NSURLSession, NSURLConnection, requests and responses. */
+#include <Foundation/NSURLSession.h>
 
 #endif

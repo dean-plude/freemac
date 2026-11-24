@@ -32,6 +32,13 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        foundation_url*)
+            # the test server on 127.0.0.1, reached directly, never through a proxy
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy -u ALL_PROXY \
+                NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 TMPDIR="$build/home_$name" \
+                FERRY_TEST_HTTP="127.0.0.1:$http_port" FERRY_TEST_CLOSED_PORT="$closed_port" \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
@@ -161,6 +168,23 @@ for t in task regex scanner xmlparser operation cache; do
 done
 # Keyed archives (M5), the format of nib files.
 run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archive.out" -framework Foundation
+# URL loading through this system's libcurl: NSURLSession, NSURLConnection and
+# NSData's and NSString's ...ContentsOfURL:, against a small HTTP server
+# started here on 127.0.0.1 (nothing goes past the loopback address).
+if command -v python3 > /dev/null 2>&1; then
+    rm -f "$build/http.port"
+    python3 -I "$here/tools/http_server.py" "$build/http.port" > "$build/http_server.log" 2>&1 &
+    http_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do [ -s "$build/http.port" ] && break; sleep 0.25; done
+    read http_port closed_port < "$build/http.port"
+    run_one foundation_urlsession "$here/foundation/urlsession.m" "$here/foundation/urlsession.out" -fobjc-arc \
+        -framework Foundation
+    run_one foundation_urlconnection "$here/foundation/urlconnection.m" "$here/foundation/urlconnection.out" \
+        -framework Foundation
+    kill "$http_pid" 2> /dev/null; wait "$http_pid" 2> /dev/null
+else
+    echo "skip foundation_urlsession, foundation_urlconnection (need python3, for a test server)"
+fi
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
 run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
     -framework CoreGraphics -framework CoreFoundation
@@ -229,6 +253,12 @@ elif LD_DEBUG=libs "$top/ferry" "$build/graphics_drawing" 2>&1 >/dev/null | grep
     echo "FAIL graphics_drawing loads GTK"; fail=$((fail + 1))
 else
     echo "ok   Cairo loaded only when drawing, GTK only for AppKit"; pass=$((pass + 1))
+fi
+# libcurl only by programs that load URLs from the network.
+if LD_DEBUG=libs "$top/ferry" "$build/foundation_strings" 2>&1 >/dev/null | grep -q "libcurl"; then
+    echo "FAIL foundation_strings loads libcurl"; fail=$((fail + 1))
+else
+    echo "ok   libcurl loaded only when loading URLs"; pass=$((pass + 1))
 fi
 # A program inside a Mac app bundle: Info.plist, resources, localized strings.
 app="$build/Hello.app"

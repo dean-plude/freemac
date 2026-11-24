@@ -262,6 +262,20 @@ int ferry_dispatch_timeout_ms(void)
     return ms > 2000000000 ? 2000000000 : (int)ms;
 }
 
+/* Work that comes from outside dispatch: Foundation's network transfers
+ * (NSURLSession and the like), which queue their completion handlers here
+ * when a transfer ends. While one is in flight a wait also waits on the
+ * network, so a program can wait on a semaphore that a completion handler
+ * signals, as Mac command-line programs often do. */
+static int (*io_pending)(void);
+static void (*io_wait)(int timeout_ms);
+
+void ferry_dispatch_set_io(int (*pending)(void), void (*wait)(int timeout_ms))
+{
+    io_pending = pending;
+    io_wait = wait;
+}
+
 /* Waits for dispatch's next piece of work, running it. Returns 0 if there
  * is nothing that could ever become ready. */
 static int wait_one(uint64_t deadline)
@@ -269,6 +283,18 @@ static int wait_one(uint64_t deadline)
     if (run_one())
         return 1;
     int ms = ferry_dispatch_timeout_ms();
+    if (io_pending && io_pending()) {
+        uint64_t t = now_ns();
+        int64_t limit = ms;
+        if (deadline != ~0ull) {
+            int64_t left = deadline > t ? (int64_t)((deadline - t + 999999) / 1000000) : 0;
+            if (limit < 0 || left < limit)
+                limit = left;
+        }
+        io_wait(limit > 2000000000 ? 2000000000 : (int)limit);
+        run_one();
+        return 1;
+    }
     if (ms < 0)
         return 0;
     uint64_t t = now_ns();
@@ -857,6 +883,6 @@ const struct ferry_symbol ferry_dispatch_symbols[] = {
     F(dispatch_source_set_timer), F(dispatch_source_set_event_handler), F(dispatch_source_set_cancel_handler),
     F(dispatch_source_cancel), F(dispatch_source_testcancel), F(dispatch_source_get_data),
     F(dispatch_source_get_mask), F(dispatch_source_get_handle), F(dispatch_source_merge_data),
-    F(ferry_dispatch_drain), F(ferry_dispatch_timeout_ms),
+    F(ferry_dispatch_drain), F(ferry_dispatch_timeout_ms), F(ferry_dispatch_set_io),
     {NULL, NULL},
 };

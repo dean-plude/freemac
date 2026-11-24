@@ -1,0 +1,31 @@
+synchronous: status 200, Hello, Ferry!
+synchronous: no error
+synchronous 404: status 404, status 404
+synchronous, closed port: data nil, error: NSURLErrorDomain -1004 "Could not connect to the server."
+asynchronous: after the call returned yes, status 200 at /hello, Hello, Ferry!
+asynchronous: no error
+asynchronous, bad URL: response nil, data nil, error: NSURLErrorDomain -1000 "bad URL"
+delegate: response 200, data, finished
+method=PATCH
+path=/echo
+content-type=application/x-www-form-urlencoded
+accept=*/*
+user-agent=foundation_urlconnection/1 Ferry (freemac)
+body=x=1&y=2
+not started: nothing yet
+delegate, closed port: failed -1004
+cancelled: nothing
+can handle: http 1, file 1, other 0
+NSData: Hello, Ferry!
+NSData, closed port: data nil, error: NSCocoaErrorDomain 256 "The file “127.0.0.1” couldn’t be opened."
+underlying: NSURLErrorDomain -1004 "Could not connect to the server."
+NSData init: 1000 bytes
+NSString: Hello, Ferry!
+NSString, used encoding 5: café (5 characters)
+NSString init: method=GET
+request: method GET, timeout 60, cache policy 0, fields none, body none, cookies 1
+request: X-THING changed, in the copy one,two, fields 1, copy mutable 0, equal 0
+response: 201 (created), MIME text/html, encoding ISO-8859-1, length 321, name report.html, Content-Type text/html; charset="ISO-8859-1"
+plain response: name Unknown, length -1; status texts: internal server error, success, client error
+done
+exit=0
