@@ -1,0 +1,70 @@
+kern.ostype: Darwin, matches uname: yes
+kern.osrelease: 23.6.0, matches uname: yes
+kern.version matches uname: yes, starts "Darwin Kernel Version 23.6.0:": yes
+kern.osproductversion: 14.7
+kern.osversion: 23H124
+hw.machine: x86_64, matches uname: yes
+hw.model: Macmini8,1
+kern.hostname matches gethostname and uname: yes
+hw.ncpu matches sysconf: yes
+hw.activecpu matches sysconf: yes
+hw.logicalcpu is hw.activecpu: yes, hw.logicalcpu_max is hw.ncpu: yes
+hw.physicalcpu between 1 and hw.ncpu: yes
+machdep.cpu.core_count is hw.physicalcpu: yes, thread_count is hw.ncpu: yes
+hw.memsize matches sysconf: yes
+hw.pagesize matches getpagesize: yes
+hw.pagesize read into an int: yes
+hw.cachelinesize is a power of two: yes
+hw.byteorder: 1234
+hw.cpu64bit_capable: 1, hw.optional.x86_64: 1, hw.optional.sse2: 1
+sysctl.proc_translated: 0
+machdep.cpu.brand_string matches cpuid: yes
+machdep.cpu.vendor matches cpuid: yes
+kern.boottime: 16 bytes, in the past: yes
+NULL buffer gives the size: yes
+buffer too small: ENOMEM, the start copied: yes
+unknown name: ENOENT
+setting a value: EPERM
+sysctlnametomib kern.osrelease: 1.2 (2 numbers)
+sysctlnametomib hw.memsize: 6.24 (2 numbers)
+sysctlnametomib with too little room: ENOMEM
+sysctlnametomib of an unknown name: ENOENT
+by the numbers from sysctlnametomib, the same answer: yes
+CTL_KERN.KERN_OSRELEASE is kern.osrelease: yes
+CTL_HW.HW_MEMSIZE is hw.memsize: yes
+unknown number: ENOENT
+kinfo_proc: found, 648 bytes
+p_pid is getpid: yes, e_ppid is getppid: yes
+p_comm is the program's name: yes
+P_TRACED: clear, P_LP64: set
+cr_uid is getuid: yes, p_ruid is getuid: yes
+p_starttime in the past: yes
+parent's kinfo_proc: found, p_pid is getppid: yes
+a pid that doesn't exist: returns 0, 0 bytes
+size of kinfo_proc asked with a NULL buffer: 648
+KERN_PROCARGS2: argc matches: yes, program path matches: yes, argv[0] matches: yes
+proc_pidpath is _NSGetExecutablePath, links resolved: yes
+proc_pidpath with a small buffer: 0, EINVAL
+proc_pidpath of the parent: found
+proc_name is the program's name: yes
+host_page_size matches getpagesize: yes
+host_statistics64: ok, count 38, pages within hw.memsize: yes
+host_statistics64 with too little room: refused
+host_statistics HOST_VM_INFO: ok, count 15
+host_statistics HOST_CPU_LOAD_INFO: ok, count 4, some ticks: yes
+host_info HOST_BASIC_INFO: ok, count 12, max_cpus is hw.ncpu: yes, max_mem is hw.memsize: yes
+task_info MACH_TASK_BASIC_INFO: ok, count 12, resident within virtual: yes
+mach_port_deallocate: ok
+getattrlist: ok
+returned attributes are the ones asked: yes
+name matches: yes, length counts the NUL: yes
+type is VREG: yes
+modification time matches stat: yes
+full path is the real path: yes
+total size matches stat: yes
+length covers the names: yes
+a 4-byte buffer: ok, length of what fits: 4
+with FSOPT_REPORT_FULLSIZE, the full length: yes
+folder: ok, type is VDIR: yes, entry count matches readdir: yes
+a missing file: ENOENT
+exit=0

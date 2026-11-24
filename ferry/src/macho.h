@@ -14,6 +14,7 @@
 #define MACHO_CPU_X86_64    0x01000007
 #define MACHO_EXECUTE       0x2
 #define MACHO_DYLIB         0x6
+#define MACHO_BUNDLE        0x8   /* a plug-in, loaded with dlopen or NSBundle */
 #define MACHO_FLAG_PIE      0x00200000u
 
 #define LC_REQ_DYLD              0x80000000u

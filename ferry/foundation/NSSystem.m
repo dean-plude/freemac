@@ -9,6 +9,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <dlfcn.h>
+#include <objc/runtime.h>
 
 int *_NSGetArgc(void);
 char ***_NSGetArgv(void);
@@ -101,12 +104,19 @@ static NSOperatingSystemVersion FSystemVersion(const char **build)
                                       b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13],
                                       b[14], b[15]];
 }
-- (NSUInteger)processorCount { return (NSUInteger)sysconf(_SC_NPROCESSORS_CONF); }
-- (NSUInteger)activeProcessorCount { return (NSUInteger)sysconf(_SC_NPROCESSORS_ONLN); }
-- (unsigned long long)physicalMemory
+/* The processor and memory figures are sysctl's (src/sysctl.c), so the two
+ * always agree, as on a Mac. */
+static uint64_t FSysctlNumber(const char *name)
 {
-    return (unsigned long long)sysconf(_SC_PHYS_PAGES) * (unsigned long long)sysconf(_SC_PAGESIZE);
+    uint64_t v = 0;
+    size_t len = sizeof v;
+    if (sysctlbyname(name, &v, &len, NULL, 0) != 0)
+        return 0;
+    return len == sizeof(uint32_t) ? (uint32_t)v : v;
 }
+- (NSUInteger)processorCount { return (NSUInteger)FSysctlNumber("hw.ncpu"); }
+- (NSUInteger)activeProcessorCount { return (NSUInteger)FSysctlNumber("hw.activecpu"); }
+- (unsigned long long)physicalMemory { return FSysctlNumber("hw.memsize"); }
 - (NSTimeInterval)systemUptime
 {
     struct timespec ts;
@@ -199,10 +209,27 @@ static NSArray *preferred_languages(void)
     return langs;
 }
 
+void *ferry_dl_first_class(void *handle); /* src/dyld.c */
+
+/* A file's path with links resolved, to tell whether two paths are one file. */
+static NSString *FResolvedPath(NSString *path)
+{
+    char real[4096];
+    if (!path || !realpath([path fileSystemRepresentation], real))
+        return path;
+    return [NSString stringWithUTF8String:real];
+}
+
+/* Bundles are made once for each folder and kept, as on a Mac, so the same
+ * path always gives the same bundle and what it has loaded. */
+static NSMutableDictionary *bundles_by_path;
+
 @implementation NSBundle {
-    NSString *_path, *_resources, *_executable;
+    NSString *_path, *_resources, *_executable, *_plugins;
     NSDictionary *_info;
     NSMutableDictionary *_tables;
+    void *_handle;
+    BOOL _main;
 }
 + (NSBundle *)mainBundle
 {
@@ -221,35 +248,106 @@ static NSArray *preferred_languages(void)
             [[[dir stringByDeletingLastPathComponent] lastPathComponent] isEqualToString:@"Contents"])
             path = [[dir stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
         main = [[NSBundle alloc] initWithPath:path];
-        if (!main->_executable)
+        if (main && !main->_executable)
             main->_executable = [exe copy];
+        if (main)
+            main->_main = YES;
     }
     return main;
 }
 + (NSBundle *)bundleWithPath:(NSString *)path { return [[[self alloc] initWithPath:path] autorelease]; }
++ (NSBundle *)bundleWithURL:(NSURL *)url { return [[[self alloc] initWithURL:url] autorelease]; }
+/* The bundle whose program defines the class: the image the class came
+ * from, when that image is a bundle's program and the bundle has an
+ * Info.plist. Classes of the program itself, and of libraries and of Ferry's
+ * own frameworks (which have no Info.plist), give the main bundle. */
 + (NSBundle *)bundleForClass:(Class)cls
 {
-    /* Ferry doesn't yet track which loaded image defines a class. */
-    return [self mainBundle];
+    NSBundle *main = [self mainBundle];
+    const char *image = cls ? class_getImageName(cls) : NULL;
+    if (!image)
+        return main;
+    NSString *exe = FResolvedPath([NSString stringWithUTF8String:image]);
+    if ([exe isEqualToString:FResolvedPath([main executablePath])])
+        return main;
+    for (NSString *dir = [exe stringByDeletingLastPathComponent]; [dir length] > 1;
+         dir = [dir stringByDeletingLastPathComponent]) {
+        if (![[dir pathExtension] length])
+            continue;
+        NSBundle *b = [self bundleWithPath:dir];
+        if (b && b->_info && [exe isEqualToString:FResolvedPath(b->_executable)])
+            return b;
+        break;
+    }
+    return main;
 }
++ (NSBundle *)bundleWithIdentifier:(NSString *)identifier
+{
+    if (!identifier)
+        return nil;
+    if ([identifier isEqualToString:[[self mainBundle] bundleIdentifier]])
+        return [self mainBundle];
+    @synchronized([NSBundle class]) {
+        for (NSBundle *b in [bundles_by_path allValues])
+            if ([identifier isEqualToString:[b bundleIdentifier]])
+                return b;
+    }
+    return nil;
+}
+- (instancetype)initWithURL:(NSURL *)url
+{
+    return [self initWithPath:[url isFileURL] ? [url path] : nil];
+}
+/* The three layouts: an app or plug-in (Contents/Info.plist, its program in
+ * Contents/MacOS), a framework (Resources/Info.plist, its program at the
+ * top) and a flat folder (Info.plist and the program at the top). */
 - (instancetype)initWithPath:(NSString *)path
 {
     BOOL dir = NO;
-    if (!path || ![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&dir] || !dir) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (!path || ![fm fileExistsAtPath:path isDirectory:&dir] || !dir) {
         [self release];
         return nil;
     }
-    _path = [[path stringByStandardizingPath] copy];
-    NSString *contents = [_path stringByAppendingPathComponent:@"Contents"];
-    BOOL app = [[NSFileManager defaultManager] fileExistsAtPath:[contents stringByAppendingPathComponent:@"Info.plist"]];
-    NSString *infoPath = app ? [contents stringByAppendingPathComponent:@"Info.plist"]
-                             : [_path stringByAppendingPathComponent:@"Info.plist"];
-    _resources = [(app ? [contents stringByAppendingPathComponent:@"Resources"] : _path) copy];
-    _info = [[NSDictionary dictionaryWithContentsOfFile:infoPath] retain];
-    NSString *exeName = [_info objectForKey:@"CFBundleExecutable"];
-    if (exeName)
-        _executable = [[[contents stringByAppendingPathComponent:@"MacOS"] stringByAppendingPathComponent:exeName] copy];
-    _tables = [[NSMutableDictionary alloc] init];
+    if (![path isAbsolutePath])
+        path = [[fm currentDirectoryPath] stringByAppendingPathComponent:path];
+    path = [path stringByStandardizingPath];
+    @synchronized([NSBundle class]) {
+        NSBundle *known = [bundles_by_path objectForKey:path];
+        if (known) {
+            [self release];
+            return [known retain];
+        }
+        _path = [path copy];
+        NSString *contents = [_path stringByAppendingPathComponent:@"Contents"];
+        NSString *frameworkInfo = [[_path stringByAppendingPathComponent:@"Resources"]
+            stringByAppendingPathComponent:@"Info.plist"];
+        BOOL app = [fm fileExistsAtPath:[contents stringByAppendingPathComponent:@"Info.plist"]];
+        BOOL framework = !app && [fm fileExistsAtPath:frameworkInfo];
+        NSString *infoPath = app ? [contents stringByAppendingPathComponent:@"Info.plist"]
+                             : framework ? frameworkInfo
+                                         : [_path stringByAppendingPathComponent:@"Info.plist"];
+        _resources = [(app ? [contents stringByAppendingPathComponent:@"Resources"]
+                       : framework ? [_path stringByAppendingPathComponent:@"Resources"]
+                                   : _path) copy];
+        _plugins = [[(app ? contents : _path) stringByAppendingPathComponent:@"PlugIns"] copy];
+        _info = [[NSDictionary dictionaryWithContentsOfFile:infoPath] retain];
+        NSString *exeName = [_info objectForKey:@"CFBundleExecutable"];
+        NSString *exeDir = app ? [contents stringByAppendingPathComponent:@"MacOS"] : _path;
+        if (exeName)
+            _executable = [[exeDir stringByAppendingPathComponent:exeName] copy];
+        else if (_info) {
+            /* with no CFBundleExecutable, the bundle's own name, when that file is there */
+            NSString *guess = [exeDir stringByAppendingPathComponent:[[_path lastPathComponent]
+                                                                         stringByDeletingPathExtension]];
+            if ([fm fileExistsAtPath:guess])
+                _executable = [guess copy];
+        }
+        _tables = [[NSMutableDictionary alloc] init];
+        if (!bundles_by_path)
+            bundles_by_path = [[NSMutableDictionary alloc] init];
+        [bundles_by_path setObject:self forKey:_path];
+    }
     return self;
 }
 - (void)dealloc
@@ -257,9 +355,82 @@ static NSArray *preferred_languages(void)
     [_path release];
     [_resources release];
     [_executable release];
+    [_plugins release];
     [_info release];
     [_tables release];
     [super dealloc];
+}
+- (NSString *)builtInPlugInsPath { return _plugins; }
+- (NSURL *)builtInPlugInsURL { return _plugins ? [NSURL fileURLWithPath:_plugins isDirectory:YES] : nil; }
+- (NSURL *)executableURL { return _executable ? [NSURL fileURLWithPath:_executable] : nil; }
+/* Loading a bundle's program is dlopen's (src/dyld.c): its classes join
+ * the runtime and its initializers run. A program, once loaded, stays. */
+- (BOOL)loadAndReturnError:(NSError **)error
+{
+    @synchronized(self) {
+        if (_main || _handle)
+            return YES;
+        if (!_executable || ![[NSFileManager defaultManager] fileExistsAtPath:_executable]) {
+            if (error)
+                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:4 /* NSFileNoSuchFileError */
+                                         userInfo:[NSDictionary dictionaryWithObject:@"The bundle's program couldn't be found."
+                                                                              forKey:NSLocalizedDescriptionKey]];
+            return NO;
+        }
+        _handle = dlopen([_executable fileSystemRepresentation], RTLD_LAZY | RTLD_GLOBAL);
+        if (!_handle) {
+            const char *why = dlerror();
+            if (error)
+                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:3587 /* NSExecutableLoadError */
+                                         userInfo:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                    [NSString stringWithUTF8String:why ?: "dlopen failed"],
+                                                                    NSLocalizedDescriptionKey, _executable,
+                                                                    NSFilePathErrorKey, nil]];
+            return NO;
+        }
+    }
+    return YES;
+}
+- (BOOL)load { return [self loadAndReturnError:NULL]; }
+- (BOOL)isLoaded { return _main || _handle; }
+- (BOOL)unload { return NO; }
+- (BOOL)preflightAndReturnError:(NSError **)error
+{
+    if (_main || _handle)
+        return YES;
+    if (_executable && dlopen_preflight([_executable fileSystemRepresentation]))
+        return YES;
+    if (error)
+        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:3584 /* NSExecutableNotLoadableError */
+                                 userInfo:nil];
+    return NO;
+}
+/* Ferry's own: the dlopen handle of the bundle's program, loading it first. */
+- (void *)_ferryHandle
+{
+    if (_main)
+        return dlopen(NULL, RTLD_LAZY);
+    return [self load] ? _handle : NULL;
+}
+/* NSPrincipalClass from Info.plist, or else the first class the program defines. */
+- (Class)principalClass
+{
+    if (![self load])
+        return Nil;
+    NSString *name = [_info objectForKey:@"NSPrincipalClass"];
+    if ([name isKindOfClass:[NSString class]]) {
+        Class cls = NSClassFromString(name);
+        if (cls)
+            return cls;
+    }
+    return (Class)ferry_dl_first_class([self _ferryHandle]);
+}
+- (Class)classNamed:(NSString *)name
+{
+    if (![self load])
+        return Nil;
+    Class cls = NSClassFromString(name);
+    return cls && [NSBundle bundleForClass:cls] == self ? cls : Nil;
 }
 - (NSString *)bundlePath { return _path; }
 - (NSString *)resourcePath { return _resources; }
@@ -270,7 +441,10 @@ static NSArray *preferred_languages(void)
 - (NSDictionary *)infoDictionary { return _info ?: [NSDictionary dictionary]; }
 - (NSDictionary *)localizedInfoDictionary { return [self infoDictionary]; }
 - (id)objectForInfoDictionaryKey:(NSString *)key { return [_info objectForKey:key]; }
-- (NSString *)description { return [NSString stringWithFormat:@"NSBundle <%@> (loaded)", _path]; }
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"NSBundle <%@> (%@)", _path, [self isLoaded] ? @"loaded" : @"not yet loaded"];
+}
 - (NSString *)pathForResource:(NSString *)name ofType:(NSString *)ext inDirectory:(NSString *)subpath
 {
     NSString *file = name;
@@ -325,8 +499,6 @@ static NSArray *preferred_languages(void)
         return s;
     return [value length] ? value : key;
 }
-- (BOOL)load { return YES; }
-- (BOOL)isLoaded { return YES; }
 @end
 
 /* ---- NSUserDefaults --------------------------------------------------------------------- */

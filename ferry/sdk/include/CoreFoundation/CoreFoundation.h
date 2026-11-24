@@ -169,6 +169,20 @@ void CFAttributedStringEndEditing(CFMutableAttributedStringRef str);
 CFBundleRef CFBundleGetMainBundle(void);
 CFTypeRef CFBundleGetValueForInfoDictionaryKey(CFBundleRef bundle, CFStringRef key);
 CFStringRef CFBundleGetIdentifier(CFBundleRef bundle);
+CFBundleRef CFBundleCreate(CFAllocatorRef allocator, CFURLRef bundleURL);
+CFBundleRef CFBundleGetBundleWithIdentifier(CFStringRef bundleID);
+CFURLRef CFBundleCopyBundleURL(CFBundleRef bundle);
+CFURLRef CFBundleCopyExecutableURL(CFBundleRef bundle);
+CFURLRef CFBundleCopyResourcesDirectoryURL(CFBundleRef bundle);
+CFURLRef CFBundleCopyBuiltInPlugInsURL(CFBundleRef bundle);
+CFDictionaryRef CFBundleGetInfoDictionary(CFBundleRef bundle);
+Boolean CFBundleLoadExecutable(CFBundleRef bundle);
+Boolean CFBundleLoadExecutableAndReturnError(CFBundleRef bundle, CFErrorRef *error);
+Boolean CFBundleIsExecutableLoaded(CFBundleRef bundle);
+void CFBundleUnloadExecutable(CFBundleRef bundle);
+void *CFBundleGetFunctionPointerForName(CFBundleRef bundle, CFStringRef functionName);
+void *CFBundleGetDataPointerForName(CFBundleRef bundle, CFStringRef symbolName);
+void CFBundleGetFunctionPointersForNames(CFBundleRef bundle, CFArrayRef functionNames, void *ftbl[]);
 
 /* Preferences: the same store as NSUserDefaults; the user and host arguments are ignored */
 extern const CFStringRef kCFPreferencesAnyApplication, kCFPreferencesCurrentApplication, kCFPreferencesAnyHost,

@@ -1515,6 +1515,17 @@ typedef struct {
 - (BOOL)load;
 @property (readonly, getter=isLoaded) BOOL loaded;
 - (NSString *)localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)tableName;
++ (NSBundle *)bundleWithURL:(NSURL *)url;
++ (NSBundle *)bundleWithIdentifier:(NSString *)identifier;
+- (instancetype)initWithURL:(NSURL *)url;
+@property (readonly, copy) NSURL *executableURL;
+@property (readonly, copy) NSString *builtInPlugInsPath;
+@property (readonly, copy) NSURL *builtInPlugInsURL;
+- (BOOL)loadAndReturnError:(NSError **)error;
+- (BOOL)preflightAndReturnError:(NSError **)error;
+- (BOOL)unload;
+@property (readonly) Class principalClass;
+- (Class)classNamed:(NSString *)className;
 @end
 #define NSLocalizedString(key, comment) [[NSBundle mainBundle] localizedStringForKey:(key) value:@"" table:nil]
 

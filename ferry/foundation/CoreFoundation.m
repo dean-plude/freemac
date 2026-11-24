@@ -6,6 +6,7 @@
  * CoreFoundation.framework from Foundation's file. */
 #import "FInternal.h"
 #include <sys/time.h>
+#include <dlfcn.h>
 
 const CFAllocatorRef kCFAllocatorDefault = NULL;
 const CFAllocatorRef kCFAllocatorSystemDefault = NULL;
@@ -210,6 +211,54 @@ CFTypeRef CFBundleGetValueForInfoDictionaryKey(CFBundleRef bundle, CFStringRef k
     return [OBJ(bundle) objectForInfoDictionaryKey:OBJ(key)];
 }
 CFStringRef CFBundleGetIdentifier(CFBundleRef bundle) { return (CFStringRef)[OBJ(bundle) bundleIdentifier]; }
+
+/* A CFBundle is the NSBundle for the same folder; its program is loaded
+ * with dlopen and its functions found with dlsym (src/dyld.c). */
+@interface NSBundle (FerryHandle)
+- (void *)_ferryHandle;
+@end
+CFBundleRef CFBundleCreate(CFAllocatorRef alloc, CFURLRef url)
+{
+    return (CFBundleRef)[[NSBundle alloc] initWithURL:OBJ(url)];
+}
+CFBundleRef CFBundleGetBundleWithIdentifier(CFStringRef identifier)
+{
+    return (CFBundleRef)[NSBundle bundleWithIdentifier:OBJ(identifier)];
+}
+CFURLRef CFBundleCopyBundleURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) bundleURL] retain]; }
+CFURLRef CFBundleCopyExecutableURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) executableURL] retain]; }
+CFURLRef CFBundleCopyResourcesDirectoryURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) resourceURL] retain]; }
+CFURLRef CFBundleCopyBuiltInPlugInsURL(CFBundleRef bundle)
+{
+    return (CFURLRef)[[OBJ(bundle) builtInPlugInsURL] retain];
+}
+CFDictionaryRef CFBundleGetInfoDictionary(CFBundleRef bundle) { return (CFDictionaryRef)[OBJ(bundle) infoDictionary]; }
+Boolean CFBundleLoadExecutable(CFBundleRef bundle) { return [OBJ(bundle) load]; }
+Boolean CFBundleLoadExecutableAndReturnError(CFBundleRef bundle, CFErrorRef *error)
+{
+    NSError *e = nil;
+    BOOL ok = [OBJ(bundle) loadAndReturnError:error ? &e : NULL];
+    if (error)
+        *error = ok ? NULL : (CFErrorRef)[e retain];
+    return ok;
+}
+Boolean CFBundleIsExecutableLoaded(CFBundleRef bundle) { return [OBJ(bundle) isLoaded]; }
+void CFBundleUnloadExecutable(CFBundleRef bundle) {}
+void *CFBundleGetFunctionPointerForName(CFBundleRef bundle, CFStringRef name)
+{
+    void *handle = [OBJ(bundle) _ferryHandle];
+    return handle && name ? dlsym(handle, [OBJ(name) UTF8String]) : NULL;
+}
+void *CFBundleGetDataPointerForName(CFBundleRef bundle, CFStringRef name)
+{
+    return CFBundleGetFunctionPointerForName(bundle, name);
+}
+void CFBundleGetFunctionPointersForNames(CFBundleRef bundle, CFArrayRef names, void *pointers[])
+{
+    CFIndex n = [OBJ(names) count];
+    for (CFIndex i = 0; i < n; i++)
+        pointers[i] = CFBundleGetFunctionPointerForName(bundle, (CFStringRef)[OBJ(names) objectAtIndex:i]);
+}
 
 /* ---- preferences: the NSUserDefaults store, by application id -------------------------- */
 

@@ -1132,6 +1132,10 @@ The new or extended ones:
 | `security_code message` | (freemac (1.200), Ferry 0.27.0) With `FERRY_VERBOSE` set, each of the two code-signing answers is said once on stderr, however often it is given |
 | `security_selfcheck` | (freemac (1.200), Ferry 0.27.0) An app's check of its own signature from inside its bundle: the running code is the bundle, static codes made for the bundle's and the executable's paths pass, the signing information carries the bundle's Info.plist and main executable but no identifier |
 | `security_trust` (needs openssl) | (freemac (1.200), Ferry 0.27.0) The test server's own certificate: read from DER (garbage refused), its subject summary and common name, its data back, `CFEqual`; a trust refused against the system's authorities (`errSecNotTrusted`), accepted with it as the anchor (alone and with the system's), refused in 2000 and 2100 (not yet valid, expired) and for another host name; basic X.509; `SecTrustEvaluate`, `SecTrustGetTrustResult`, the policies, the chain, `SecTrustEvaluateAsyncWithError`; and in an `NSURLSession` challenge, the server trust's certificates read from the server, refused as received and accepted once given its own certificate as the anchor, after which the page loads |
+| `libsystem_sysctl` | (freemac (1.201), Ferry 0.28.0) `sysctlbyname` and `sysctl` by number: `kern.ostype`, `kern.osrelease` and `kern.version` matching `uname`, `kern.osproductversion` 14.7 and `kern.osversion` 23H124, `hw.machine`, `hw.model`, `kern.hostname` matching `gethostname`, `hw.ncpu`, `hw.activecpu`, `hw.logicalcpu(_max)`, `hw.physicalcpu` and `machdep.cpu.core_count`/`thread_count` agreeing with `sysconf` and each other, `hw.memsize`, `hw.pagesize` (also read into an int), `hw.cachelinesize`, `hw.byteorder`, `hw.optional.*`, `machdep.cpu.brand_string` and `vendor` matching `cpuid`, `kern.boottime`, `sysctl.proc_translated` 0; the documented rules (a NULL buffer gives the size, a small buffer `ENOMEM` with the start copied, an unknown name `ENOENT`, a write `EPERM`); `sysctlnametomib` and the numbers it gives; `kinfo_proc` for this process (648 bytes, pid, parent, `p_comm`, `P_TRACED` clear, `P_LP64`, user, start time), for the parent and for a pid that doesn't exist; `KERN_PROCARGS2`; `proc_pidpath` and `proc_name`; `host_page_size`, `host_statistics64`, `host_statistics`, `host_info` and `task_info`; `getattrlist` on the program (name, type, modification time, full path, size, returned attributes, `FSOPT_REPORT_FULLSIZE`) and on its folder (entry count) |
+| `libsystem_dlsym` | (freemac (1.201), Ferry 0.28.0) `RTLD_DEFAULT`, `RTLD_MAIN_ONLY`, `RTLD_NEXT` and `RTLD_SELF` from the program and from a library; `dlopen(NULL)`; a library built here opened through `@rpath`, `@executable_path` and (from inside it) `@loader_path` as one handle, its initializer run, `RTLD_NOLOAD`, `dlopen_preflight`; a bundle built with `-bundle -undefined dynamic_lookup` opened `RTLD_LOCAL`, calling back into the program and hidden from `RTLD_DEFAULT`; libSystem by path and by leaf name, Foundation and CoreFoundation by their `/System/Library/Frameworks` paths; `dlerror` after each failure (a missing name, a missing library, a framework Ferry doesn't have, a file that isn't a Mac library, a handle that isn't one) and cleared after reading; `dladdr` in a library, inside a program's function and on libSystem's `strlen`; `_dyld_image_count`, `_dyld_get_image_name` and `_dyld_get_image_header`, the add-image callback, `_NSGetExecutablePath`; `_availability_version_check` found with `dlsym` |
+| `libsystem_available` | (freemac (1.201), Ferry 0.28.0) `@available` and `__builtin_available` compiled the normal way (macOS 10.15, 14, 14.7 and 13.5 available; 14.7.1, 14.8 and 15 not), `__isOSVersionAtLeast`, `__isPlatformVersionAtLeast` and `NSProcessInfo`'s `isOperatingSystemAtLeastVersion:` agreeing on each, an iOS version not available; `operatingSystemVersion` matching `kern.osproductversion`, `processorCount`, `activeProcessorCount` and `physicalMemory` matching `hw.ncpu`, `hw.activecpu` and `hw.memsize` |
+| `libsystem_plugin` | (freemac (1.201), Ferry 0.28.0) Plug-in bundles built here: `NSBundle` not loaded until `load` (its description says so), one bundle per path, `preflightAndReturnError:`, `loadAndReturnError:`, `principalClass` from `NSPrincipalClass`, the plug-in's class finding its own bundle with `bundleForClass:` (Foundation's classes give the main bundle), `classNamed:`, `bundleWithIdentifier:`, `unload` refused; the same bundle through `CFBundleCreate`, `CFBundleIsExecutableLoaded`, `CFBundleGetFunctionPointerForName`, `CFBundleGetDataPointerForName`, `CFBundleCopyExecutableURL` and `CFBundleGetBundleWithIdentifier`; a bundle with no `NSPrincipalClass` (the first class it defines) loaded with `CFBundleLoadExecutable`; a bundle whose program is missing (`NSCocoaErrorDomain` 4, no principal class); a folder that isn't there |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -2003,6 +2007,98 @@ The new or extended ones:
     the build number is the one of a released 14.7. A real Mac's version
     file has more keys (`iOSSupportVersion`, `ProductCopyright`).
 
+- **System queries and loading code** (freemac (1.201), Ferry 0.28.0).
+  - `sysctl` serves only the names listed in the test row and the
+    `hw.optional` features (`sse` to `avx512vl`, `aes`, `fma`, `bmi1`/`bmi2`
+    and the others named in `src/sysctl.c`); nothing can be set (`EPERM`).
+    Names such as `kern.uuid`, `hw.cpufamily`, `machdep.cpu.features`,
+    `vm.swapusage`, `kern.osvariant_status` and the `net` tree answer
+    `ENOENT`. `hw.cpufrequency` answers `ENOENT` where Linux has no cpufreq.
+  - `KERN_PROC` answers only `KERN_PROC_PID`; listing processes
+    (`KERN_PROC_ALL`, by group, terminal or user) answers `ENOTSUP`.
+    `KERN_PROCARGS2` answers only for the program's own process (`EINVAL`
+    for others). In `kinfo_proc`, the scheduling and memory fields
+    (`p_wchan`, `p_wmesg`, `p_estcpu`, `p_pctcpu`, `e_vm`, `e_login` and the
+    like) are zero; `p_comm` is the Mac program's name for this process and
+    Linux's name for others.
+  - `proc_pidinfo`, `proc_listpids` and the other libproc calls are not
+    there; only `proc_pidpath` and `proc_name`.
+  - Mach: `host_statistics64` and `host_statistics` answer only
+    `HOST_VM_INFO64`, `HOST_VM_INFO` and `HOST_CPU_LOAD_INFO`, `host_info`
+    only `HOST_BASIC_INFO`, `task_info` only `MACH_TASK_BASIC_INFO` for the
+    program's own task (not `TASK_BASIC_INFO`, `TASK_VM_INFO` or thread
+    times). The memory figures come from `/proc/meminfo` and `/proc/vmstat`;
+    the compressor fields and purgeable counts are zero.
+  - `getattrlist` and `fgetattrlist` serve the common attributes, the
+    folder's link count, entry count and mount status, and the file's sizes
+    (the resource fork's are zero), link count, block size and device type.
+    Volume and fork attributes,
+    `getattrlistbulk`, `getattrlistat` and `setattrlist` are not done. The
+    Finder information is 32 zero bytes, the backup time zero, and the
+    creation time is the modification time where the file system keeps no
+    birth time.
+  - Libraries and bundles loaded with `dlopen` are never unloaded:
+    `dlclose` only counts, `RTLD_NODELETE` changes nothing and the
+    remove-image callbacks never run. A load that fails part way leaves its
+    memory mapped (it is taken off the list of images).
+  - `RTLD_LOCAL` hides an image only from `dlsym`'s special handles; a
+    library loaded later that binds by flat lookup (`-undefined
+    dynamic_lookup`) can still find its names.
+  - Only the system frameworks Ferry provides open by their
+    `/System/Library/Frameworks` paths; others fail with a `dlerror` that
+    says Ferry doesn't provide the framework yet. Linux libraries can't be
+    opened by their own paths (the Mac names of the libraries Ferry passes
+    to Linux's, such as `/usr/lib/libz.1.dylib`, do open).
+  - `dladdr` on a libSystem call gives `/usr/lib/libSystem.B.dylib` as the
+    file but the base of this system's C library or of Ferry, not a Mach-O
+    header.
+  - `dlerror` is kept per thread, but this isn't tested across threads
+    (Ferry's SDK has no `pthread.h` for a test to start one).
+  - `NSBundle`: `unload` returns NO, `allBundles` and `allFrameworks` are
+    not there, `NSBundleDidLoadNotification` is not posted,
+    `bundleWithIdentifier:` finds only bundles already made, and
+    `bundleForClass:` gives the main bundle for classes of Ferry's own
+    frameworks (which have no Info.plist), so AppKit's classes don't
+    find an AppKit bundle. `CFBundleUnloadExecutable` does nothing.
+- **System queries and loading code** (freemac (1.201), Ferry 0.28.0).
+  - `sysctl.proc_translated` answers 0, as asked; a real Intel Mac may
+    answer `ENOENT` instead.
+  - `kern.version` (and `uname`'s version, now the same string) reads
+    "Darwin Kernel Version 23.6.0: Ferry on Linux <release>;
+    root:ferry/RELEASE_X86_64"; only its start follows a Mac's form. The
+    numbers given to names that have no fixed number in the man page
+    (`kern.osproductversion`, `hw.physicalcpu`, `machdep.cpu.*`,
+    `hw.optional.*`, `sysctl.proc_translated`) are Ferry's own, from 100
+    up; a Mac picks its own when it starts.
+  - `hw.model` is `Macmini8,1`, chosen for an Intel Mac that runs 14.7.
+    `hw.pagesize` and `hw.memsize` are 64-bit and may also be read into 4
+    bytes when the value fits.
+  - The layout of `struct kinfo_proc` (648 bytes, `p_flag` at 32, `p_pid`
+    at 40, `p_comm` at 243, `e_ppid` at 560) is rebuilt from the documented
+    field names and types, not checked against a Mac. A pid that doesn't
+    exist gives success with a length of 0.
+  - `proc_pidpath` with a buffer under `PROC_PIDPATHINFO_SIZE` returns 0
+    with `EINVAL`; for this process it gives the program's path with links
+    resolved.
+  - `getattrlist` without `FSOPT_REPORT_FULLSIZE` puts the length of what
+    fit in the buffer's first word; a buffer under 4 bytes is `ERANGE`;
+    `ATTR_CMN_USERACCESS` comes from `access()`.
+  - `dlerror`'s wording ("dlopen(path, 0x0002): tried: 'path' (no such
+    file)", "dlsym(RTLD_DEFAULT, name): symbol not found", "invalid
+    handle"), `dladdr`'s choice between symbols at one address (the
+    external one), `RTLD_NEXT` and `RTLD_SELF` searching libSystem after
+    the images, and opening an image again with `RTLD_GLOBAL` after
+    `RTLD_LOCAL` making it global.
+  - `_availability_version_check` with a platform other than macOS (an
+    iOS version asked of macOS) answers false; 14.7.1 is not available on
+    14.7.
+  - `NSBundle`: `loadAndReturnError:` gives `NSCocoaErrorDomain` 4 for a
+    missing program and 3587 when `dlopen` fails, with `dlerror`'s text as
+    the description; with no `NSPrincipalClass`, `principalClass` is the
+    first class in the program's class list; `description` ends "(loaded)"
+    or "(not yet loaded)"; a bundle with no `CFBundleExecutable` uses its
+    folder's name for the program, when that file is there.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2076,3 +2172,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.25.0 (freemac (1.198)): QuartzCore.framework with Core Animation basics (layers, shape, gradient and text layers, transactions, implicit and explicit animations, springs and groups), layer-backed and layer-hosting NSViews, NSAnimationContext and the views' animator, `make check` 101/101.
 - 2026-11-24: Ferry 0.26.0 (freemac (1.199)): redirects decided by the delegate, HTTP Basic and Digest authentication, server trust, `NSHTTPCookieStorage` saved to disk, `NSURLCache` in memory and on disk, and `data:` URLs, `make check` 107/107.
 - 2026-11-24: Ferry 0.27.0 (freemac (1.200)): Security.framework (keychain passwords, code-signing answers, certificate trust), CommonCrypto (digests, HMAC, PBKDF2, AES), and one macOS version (14.7) everywhere an app asks, `make check` 117/117.
+- 2026-11-24: Ferry 0.28.0 (freemac (1.201)): `sysctl`, `dlopen`/`dlsym` and loading code after start-up, `@available` checks, `getattrlist`, the Mach host and task statistics, and NSBundle plug-ins that really load, `make check` 121/121.
