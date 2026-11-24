@@ -1,0 +1,44 @@
+install 0
+install 0
+register command-option-left: 0, ref yes
+register shift-command-v: 0, ref yes
+register f5: 0, ref yes
+register command-option-left again: -9878, ref no
+register a: -9879, ref no
+register shift-a: -9879, ref no
+global monitor yes
+press 105 command+option: sent 1
+  outer: pressed, 'Spct' 1 (0)
+  outer: released, 'Spct' 1 (0)
+  global monitor: key 123 'fn' command option
+press 47 command+shift: sent 1
+  outer: pressed, 'Spct' 2 (0)
+  inner: pressed, 'Spct' 2 (0)
+  outer: released, 'Spct' 2 (0)
+  inner: released, 'Spct' 2 (0)
+  global monitor: key 9 'v' command shift
+press 63 : sent 1
+  outer: pressed, 'Spct' 3 (0)
+  inner: pressed, 'Spct' 3 (0)
+  outer: next handler answered 0
+  outer: released, 'Spct' 3 (0)
+  inner: released, 'Spct' 3 (0)
+  outer: next handler answered 0
+  global monitor: key 96 'fn'
+press 30 : sent 0
+global monitor saw 3
+unregister left 0
+press 105 command+option: sent 0
+remove outer 0
+press 47 command+shift: sent 1
+  inner: pressed, 'Spct' 2 (0)
+  inner: released, 'Spct' 2 (0)
+global monitor saw 3
+local monitor saw 2
+wayfire: register 1 key 105 command+option
+wayfire: register 2 key 47 command+shift
+wayfire: register 3 key 63 -
+wayfire: unregister 1
+wayfire: unregister 2
+wayfire: unregister 3
+exit=0

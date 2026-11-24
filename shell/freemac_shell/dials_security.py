@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Dials > Privacy & Security: whether the start-up disk is encrypted, as a
 Mac's FileVault shows it, with Change Disk Password… and New Recovery Key….
+Below it, Control Other Windows: the Mac apps that asked to move and resize
+other apps' windows (window_control.py), each with a switch, and Forget to
+have it asked again (freemac 1.215, Ferry 0.41.0).
 
 Keel, the installer, encrypts the disk when "Encrypt the disk" is on. The
 changes go through /usr/libexec/freemac-disk-helper with pkexec, so an
@@ -18,7 +21,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import alert  # noqa: E402
+from . import alert, window_control  # noqa: E402
 
 HELPER = "/usr/libexec/freemac-disk-helper"
 
@@ -188,4 +191,36 @@ def security_page(window):
         children = [listbox, caption(
             "The disk is encrypted when freemac is installed. To turn it on, back up with Lifeboat, then "
             "install freemac again from its USB stick and turn on “Encrypt the disk”.")]
+    children += control_section(window)
     return page("Privacy & Security", *children, status)
+
+
+def control_section(window):
+    """Control Other Windows: a heading, a group with a row for each app that
+    asked (or a line saying none has), and a caption."""
+    group, row, _page, _slider, switch = window.helpers
+    heading = Gtk.Label(label="Control Other Windows", xalign=0)
+    heading.get_style_context().add_class("dials-caption")
+    listbox = group()
+
+    def fill():
+        for child in listbox.get_children():
+            listbox.remove(child)
+        rows = window_control.apps()
+        if not rows:
+            listbox.add(row("No Mac app has asked yet"))
+        for app_id, name, allowed in rows:
+            box = Gtk.Box(spacing=8)
+            forget = Gtk.Button(label="Forget")
+            forget.connect("clicked", lambda _b, a=app_id: (window_control.forget(a), fill()))
+            box.pack_start(forget, False, False, 0)
+            box.pack_start(switch(allowed, lambda on, a=app_id, n=name: window_control.set_allowed(a, on, n)),
+                           False, False, 0)
+            listbox.add(row(name, box, app_id))
+        listbox.show_all()
+
+    fill()
+    return [heading, listbox, caption(
+        "These Mac apps asked to move and resize the windows of other apps, as window managers such as "
+        "Spectacle do. An app that is off can't. Forget takes an app off the list, and it asks again "
+        "the next time.")]

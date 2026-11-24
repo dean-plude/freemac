@@ -11,6 +11,7 @@
 // It also plays freemac's alert sound (freemac-sound alert) for gtk_shell1's
 // system bell, which GTK apps ring when something can't be done.
 // strata/outputs lists the displays and the modes each can show, for Dials.
+// strata/hotkeys/... are Mac apps' global shortcuts, for Ferry (app-hotkeys.hpp).
 #include "gtk-shell-protocol.h"
 #include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
@@ -53,6 +54,7 @@
 #include "colour-filters.hpp"
 #include "mission-control.hpp"
 #include "attention.hpp"
+#include "app-hotkeys.hpp"
 
 #define GTK_SHELL_VERSION 3
 
@@ -432,6 +434,7 @@ class strata_shell_impl : public wf::plugin_interface_t
     strata_command_key command_key;
     strata_glide::glides_t glides;
     strata_sheets::sheets_t sheets;
+    strata_app_hotkeys app_hotkeys;
 
     /* strata/app-menus {id}: where the app behind a window publishes its
      * menus on the session bus (org.gtk.Menus / org.gtk.Actions). */
@@ -1014,6 +1017,12 @@ class strata_shell_impl : public wf::plugin_interface_t
             [=] (nlohmann::json data) { return screen_keys.release_all(data); });
         method_repository->register_method("strata/attention",
             [=] (nlohmann::json data) { return attention.list(data); });
+        method_repository->register_method("strata/hotkeys/register",
+            [=] (nlohmann::json data) { return app_hotkeys.register_hotkey(data); });
+        method_repository->register_method("strata/hotkeys/unregister",
+            [=] (nlohmann::json data) { return app_hotkeys.unregister_hotkey(data); });
+        method_repository->register_method("strata/hotkeys/clear",
+            [=] (nlohmann::json data) { return app_hotkeys.clear(data); });
         attention.init();
         flashes.init();
         locate.init();

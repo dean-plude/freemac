@@ -1045,5 +1045,50 @@ if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
 else
     echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
 fi
+# Global hotkeys and the Accessibility API (freemac 1.215, Ferry 0.41.0),
+# against a stand-in Wayfire with Strata's calls (tests/tools/
+# fake_wayfire.py), each in a home and runtime folder of its own
+# (appkit/wayfire_test.sh): RegisterEventHotKey's presses reaching Carbon
+# event handlers and global monitors, and, once the stand-in user has
+# allowed it (appkit/fake_asker.sh, freemac's own freemac-allow-control
+# answering Allow), Spectacle's moves and resizes through configure-view.
+# appkit_hotkeys_plain is a Wayfire without Strata: kept, never pressed.
+wayfire_test() {
+    name=$1; exe=$2; expected=$3; shift 3
+    sh "$here/appkit/wayfire_test.sh" "$top/ferry" "$exe" "$build/home_$name" "$@" > "$build/$name.got" \
+        2> "$build/$name.err"
+    echo "exit=$?" >> "$build/$name.got"
+    if diff -u "$expected" "$build/$name.got" > "$build/$name.diff"; then
+        echo "ok   $name"; pass=$((pass + 1))
+    else
+        echo "FAIL $name"; sed 's/^/    /' "$build/$name.diff"; sed 's/^/    stderr: /' "$build/$name.err"
+        fail=$((fail + 1))
+    fi
+}
+if command -v python3 > /dev/null 2>&1; then
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/appkit_hotkeys" "$here/appkit/hotkeys.m" \
+            -framework Cocoa -framework Carbon 2> "$build/appkit_hotkeys.cc.log"; then
+        wayfire_test appkit_hotkeys "$build/appkit_hotkeys" "$here/appkit/hotkeys.out"
+        if [ -s "$build/appkit_hotkeys.err" ]; then
+            echo "FAIL appkit_hotkeys quiet"; sed 's/^/    stderr: /' "$build/appkit_hotkeys.err"; fail=$((fail + 1))
+        else
+            echo "ok   appkit_hotkeys quiet"; pass=$((pass + 1))
+        fi
+        wayfire_test appkit_hotkeys_plain "$build/appkit_hotkeys" "$here/appkit/hotkeys_plain.out" --no-strata -- plain
+    else
+        echo "FAIL appkit_hotkeys (did not compile)"; sed 's/^/    /' "$build/appkit_hotkeys.cc.log"
+        fail=$((fail + 1))
+    fi
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/appkit_accessibility" "$here/appkit/accessibility.m" \
+            -framework Cocoa -framework Carbon -framework ApplicationServices 2> "$build/appkit_accessibility.cc.log"
+    then
+        wayfire_test appkit_accessibility "$build/appkit_accessibility" "$here/appkit/accessibility.out"
+    else
+        echo "FAIL appkit_accessibility (did not compile)"; sed 's/^/    /' "$build/appkit_accessibility.cc.log"
+        fail=$((fail + 1))
+    fi
+else
+    echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility (they need python3)"
+fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

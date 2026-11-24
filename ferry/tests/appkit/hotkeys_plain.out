@@ -1,0 +1,3 @@
+register command-option-left: 0, ref yes
+unregister 0
+exit=0

@@ -252,6 +252,17 @@ snapshots. WebKitGTK is opened only when an app makes its first web view;
 where it isn't installed, web views stay empty and the app goes on.
 Downloads and the DOM classes aren't there yet.
 
+From Ferry 0.41.0 (freemac 1.215), Mac apps' global shortcuts work on
+freemac's desktop: `RegisterEventHotKey` asks Strata to bind the
+combination, and each press reaches the app's Carbon event handlers and
+global monitors (`appkit/Carbon.m`, `appkit/AWayfire.m`); only the
+combinations it registered ever reach an app. Enough of the Accessibility
+API is there for window managers such as Spectacle and ShiftIt to move and
+resize other apps' windows through Wayfire's IPC, once the user has allowed
+the app (asked once by `freemac-allow-control`, kept in
+`~/.config/freemac/window-control.json`, and changed in Dials). `NSScreen`
+lists every display from Wayfire.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
@@ -431,9 +442,7 @@ without a window.
    Builder's stand-in objects into the real ones and makes the connections.
    Menu bar items (`appkit/NSStatusBar.m`) are D-Bus objects on the
    session bus, through GIO's calls in `appkit/gtk.h`.
-   The few Carbon calls Cocoa apps still make (global hotkeys, keyboard
-   layouts, Accessibility) are answered here too (`appkit/Carbon.m`), the
-   way a Mac answers when the thing isn't available.
+   The few Carbon calls Cocoa apps still make are here too (`appkit/Carbon.m`): global hotkeys, pressed through Strata on freemac's desktop, and the Accessibility API, through Wayfire's IPC once the user allows the app (`appkit/AWayfire.m`); keyboard layouts are answered the way a Mac answers when they aren't available.
 8. **The Installer** (`installer/`), a Mac app built with the frameworks
    above, which `ferry` starts for a `.pkg` or `.dmg`. Its package reader
    (`installer/IPackage.m`) is written from the public descriptions of the

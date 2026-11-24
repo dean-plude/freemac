@@ -207,4 +207,10 @@ __FERRY_END
 /* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */
 #include <CoreFoundation/CFSocket.h>
 #include <CoreFoundation/CFStream.h>
+/* an object's type (freemac 1.215, Ferry 0.41.0) */
+#ifdef __cplusplus
+extern "C" CFTypeID CFGetTypeID(CFTypeRef cf);
+#else
+CFTypeID CFGetTypeID(CFTypeRef cf);
+#endif
 #endif

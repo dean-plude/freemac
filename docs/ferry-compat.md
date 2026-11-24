@@ -41,10 +41,10 @@ Sequel Pro disk image (`.dmg`). See "Installers" below.
 | App (version) | What it is | How far it gets | What stops it |
 | --- | --- | --- | --- |
 | [Hex Fiend](https://github.com/HexFiend/HexFiend) 2.18.1 | Hex editor | Doesn't start | Part of it is written in Swift (`libswiftCore.dylib`), a known limit. All 16 of its nibs (`NIBArchive`) load when tried on their own. Its gradients are in Ferry now, but that doesn't help while Swift is missing |
-| [Flycut](https://github.com/TermiT/Flycut) 1.9.6 | Clipboard history (menu bar) | At the last run: starts, loads its main nib, sets up its defaults and bindings, registers its global hotkey (accepted, never pressed), and opens its preferences nib | At the last run, `NSTabView` in its preferences nib, then `NSStatusBar` for its menu bar item. Both are in Ferry now (1.155 and 1.157). Its source also uses `NSDistributedNotificationCenter` and `NSRunningApplication`, which are in Ferry now (1.213): its notifications pass between Ferry programs on the session bus, and its other copies are found by bundle identifier. Its shortcut recorder's gradients and shadows are in Ferry now. (Not re-run since M7) |
+| [Flycut](https://github.com/TermiT/Flycut) 1.9.6 | Clipboard history (menu bar) | At the last run: starts, loads its main nib, sets up its defaults and bindings, registers its global hotkey (pressed on freemac's desktop from freemac 1.215), and opens its preferences nib | At the last run, `NSTabView` in its preferences nib, then `NSStatusBar` for its menu bar item. Both are in Ferry now (1.155 and 1.157). Its source also uses `NSDistributedNotificationCenter` and `NSRunningApplication`, which are in Ferry now (1.213): its notifications pass between Ferry programs on the session bus, and its other copies are found by bundle identifier. Its shortcut recorder's gradients and shadows are in Ferry now. (Not re-run since M7) |
 | [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | At the last run: starts, loads its main nib (`NIBArchive`) | At the last run, `NSInvocation` and `NSMethodSignature` (forwarding), which came in (1.170). Its source also uses `NSAnimation`, which is in Ferry now (1.213), and `NSAppleScript`, which is there but runs no scripts and answers an error. Its key labels' shadow is in Ferry now and is drawn (1.213). It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
-| [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (Ferry answers no, as a Mac does before the user allows it), and waits in its event loop | At the last run, nothing visible, because its only window was a status bar item. `NSStatusBar` is in Ferry now (1.157). Moving other apps' windows can't work as such on Wayland. (Not re-run since M7) |
-| [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | At the last run: starts, loads its nibs, registers its shortcuts (accepted, never pressed) | At the last run, its Sparkle updater's check of its own code signature (`SecStaticCodeCreateWithPath`), which passes since (1.200). It also couldn't save its shortcuts file. From its source, its shortcut recorders now draw their gradient and their text shadow, and it also uses `NSTrackingArea`, which is in Ferry now (1.213), and `NSAppleScript`, which is there but runs no scripts and answers an error. Then the Accessibility API, as for ShiftIt. (Not re-run since M7) |
+| [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (freemac asks the user once, as a Mac does), and waits in its event loop | At the last run, nothing visible, because its only window was a status bar item. `NSStatusBar` is in Ferry now (1.157). Moving other apps' windows works on freemac's desktop from freemac 1.215 (Ferry 0.41.0), once the user allows it, through the Accessibility API and Wayfire's IPC. (Not re-run since M7) |
+| [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | At the last run: starts, loads its nibs, registers its shortcuts (pressed on freemac's desktop from freemac 1.215) | At the last run, its Sparkle updater's check of its own code signature (`SecStaticCodeCreateWithPath`), which passes since (1.200). It also couldn't save its shortcuts file. From its source, its shortcut recorders now draw their gradient and their text shadow, and it also uses `NSTrackingArea`, which is in Ferry now (1.213), and `NSAppleScript`, which is there but runs no scripts and answers an error. Its shortcuts are pressed on freemac's desktop from freemac 1.215, and the Accessibility API is there too, once the user allows it, as for ShiftIt. (Not re-run since M7) |
 | [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | At the last run: starts; all 30 of its nibs (`NIBArchive`) load on their own | At the last run, the document classes, which came in 1.167. From its source, the next stop was its document window's split view controller (`MPDocumentSplitViewController`, built on `NSSplitViewController`), which was left out, and its preferences' tab view controller (`MPTabViewController`, on `NSTabViewController`). Both are in Ferry now, with `NSGradient` and `NSShadow`. Its source also uses `NSCollectionView`, `NSTrackingArea` and `NSMutableCharacterSet`, which are all in Ferry now (1.212 and 1.213). (Not re-run since M7) |
 | [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | At the last run: starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | At the last run, `NSSplitView` in its main window (`positionOfDividerAtIndex:`). `NSSplitView` and `NSOutlineView`, its hosts list, are in Ferry now (1.155 and 1.159), as are its gradients and shadows. Its source also uses `NSTrackingArea` and `NSTextAttachment`, which are in Ferry now (1.213). (Not re-run since M7) |
 | [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | At the last run: starts, loads its main nib | At the last run, its Sparkle updater's assertion that the Mac's version file (`/System/Library/CoreServices/SystemVersion.plist`) exists. Ferry serves one since (1.200). It is built on `NSDocument` and on WebKit's older `WebView`, which are both in Ferry now (1.214); `WebFrameView` and the DOM classes, which it also uses, aren't. (Not re-run since M7) |
@@ -116,10 +116,7 @@ Trying more apps, and an installer, filled these gaps:
   are bound to; `NSUserDefaultsController`; cancelling delayed performs.
 - **Libraries from this system**: zlib, bzip2, xz, libxml2, SQLite and ICU
   (Gas Mask's regular expressions).
-- **Carbon and Accessibility answers**: global hotkeys are accepted but
-  never pressed, keyboard layouts have no Mac layout data, and the
-  Accessibility API is "not trusted", which is how a Mac answers when
-  these aren't available. SystemConfiguration's network reachability
+- **Carbon and Accessibility answers**: keyboard layouts have no Mac layout data, which is how a Mac answers when it isn't available. From freemac 1.215, global hotkeys are pressed on freemac's desktop (accepted but never pressed elsewhere), and the Accessibility API is trusted once the user allows the app. SystemConfiguration's network reachability
   (always reachable). This let Flycut, Spectacle, ShiftIt and Gas Mask go on.
 - **Smaller pieces**: `CFPreferences`, `OSSpinLock` and `OSAtomic`,
   `os_unfair_lock`, the old garbage collector's write barriers, the
@@ -1051,6 +1048,40 @@ loaded as GETs. The work was written from Apple's documentation and
 WebKitGTK's, tried on X11 and not on Wayland, and not compared with a
 Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 
+### Global hotkeys and other apps' windows (freemac 1.215, Ferry 0.41.0)
+
+Mac apps' global shortcuts now work on freemac's desktop. Carbon's
+`RegisterEventHotKey` asks Strata, freemac's Wayfire plugin, to bind the
+combination; when the user presses it anywhere, Strata sends the press to
+that app alone, and it reaches the app's Carbon event handlers
+(`InstallEventHandler`, `GetEventParameter` with the hot-key ID,
+`CallNextEventHandler`) and its global key-down monitors. Only the
+combinations an app registered ever reach it, and each needs Command,
+Option or Control (or is a function key), so no app can read other keys
+this way. Spectacle's and ShiftIt's window shortcuts and Flycut's
+clipboard key use this. On another desktop, a hotkey is still accepted
+but never pressed.
+
+Window managers can move and resize other apps' windows, as on a Mac,
+through enough of the Accessibility API: the system-wide and application
+elements, the focused app and its focused window, every window's title,
+position, size and minimized and full-screen state, and `AXRaise`, with
+`AXValue` for points and sizes. Each move goes to Wayfire as a
+configure-view call, onto another display when the window is moved there.
+`NSScreen` lists every display, with its visible frame, from Wayfire.
+
+As on a Mac, the user decides. Until an app is allowed, every call answers
+that the API is disabled. The first time the app asks with the prompt
+option, freemac asks "Allow “Spectacle” to control other windows?", keeps
+the answer, and never asks again; Dials > Privacy & Security > Control
+Other Windows can turn an app off or forget it.
+
+Left out: what is inside other apps' windows (their buttons and text),
+observers, reading other apps' key presses in general (KeyCastr), and
+plain keys as hotkeys. None of the apps was run again. The work was written
+from Apple's documentation and not compared with a Mac; `docs/ferry-gui.md`
+lists what a Mac would settle.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1091,9 +1122,7 @@ Counted over the nine apps:
    see whether any of them relied on Ferry having one thread.
 7. **Other programs**: `NSDistributedNotificationCenter` and `NSRunningApplication` (Flycut, Sequel Pro) came in 1.213, between Ferry programs. `NSAppleScript` (KeyCastr, Spectacle) is there but runs nothing, since there is no AppleScript here.
 
-Things that are out of reach by design on Wayland, and so will need
-another approach: global hotkeys, reading other apps' key presses, and
-moving other apps' windows (the Accessibility API).
+Global hotkeys and moving other apps' windows came in freemac 1.215 (Ferry 0.41.0), through Strata and Wayfire's IPC. Reading other apps' key presses in general (KeyCastr) stays out of reach by design on Wayland.
 
 ## Trying an app yourself
 
