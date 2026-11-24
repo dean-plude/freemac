@@ -65,6 +65,7 @@ int cairo_format_stride_for_width(int format, int width);
 void cairo_surface_flush(cairo_surface_t *surface);
 void cairo_surface_mark_dirty(cairo_surface_t *surface);
 void cairo_surface_destroy(cairo_surface_t *surface);
+cairo_surface_t *cairo_surface_reference(cairo_surface_t *surface);
 cairo_status_t cairo_surface_status(cairo_surface_t *surface);
 
 cairo_t *cairo_create(cairo_surface_t *target);

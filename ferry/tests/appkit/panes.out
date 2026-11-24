@@ -1,0 +1,52 @@
+flipped 1, divider 1, arranged 2
+left: 0,0 99x200
+right: 100,0 300x200
+divider at 99, can go 0 to 399
+moved: left: 0,0 150x200
+moved: right: 151,0 249x200
+kept inside: 399
+window wider: left: 0,0 250x200
+window wider: right: 251,0 249x200
+narrower, equal priorities: left: 0,0 200x200
+narrower, equal priorities: right: 201,0 199x200
+hit on the divider is the split view: 1
+dragged to 190
+held at the delegate's minimum: 60
+held at the delegate's maximum: 319
+dragged past halfway: left collapsed 1, hidden 1
+right takes the room: 0,0 400x200
+opened again: collapsed 0, left width 120
+delegate heard: resized, resized, resized, resized, resized
+stacked: top: 0,0 400x95
+stacked: bottom: 0,104 400x96
+no tabs: selected 0, count 0
+three tabs, first selected: Look
+content rect: 7,31 286x162
+its view fills it: 7,31 286x162
+its view is shown: 1, the others aren't: 1
+delegate heard: resized, resized, resized, count, count, count
+by identifier: Keys (index 2)
+delegate heard: should Keys, will Keys, did Keys
+refused: still Keys
+delegate heard: should Look
+tab at the top edge: 1
+clicked: Sound, tab state 0
+delegate heard: should Sound, will Sound, did Sound
+next twice: Keys
+removed the selected one: now Sound, 2 left
+delegate heard: should Keys, will Keys, did Keys, count
+no tabs, no border: content: 0,0 300x200
+bottom tabs: type 2
+past the end: NSRangeException
+nib loaded: 1
+classes: NSSplitView, NSTabView
+split: vertical 1, thin 1, autosave PanesSplit, delegate set 1
+split divider at 100
+tabs: 2, selected advanced, truncates 1, delegate set 1
+one subview, the selected tab's: 1 1
+its label: Advanced settings
+first tab: General settings, in place of the other 1
+nib's delegate heard: should General, will General, did General
+kept: 0, 0, 170, 200, NO, NO | 171, 0, 149, 200, NO, NO
+restored at 170
+exit=0

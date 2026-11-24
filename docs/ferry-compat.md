@@ -119,16 +119,28 @@ Trying more apps, and an installer, filled these gaps:
   class's cache words), and a program that redirected its stderr to a file
   it couldn't open closed the stream Ferry reports on.
 
+### Tab views and split views (1.155)
+
+`NSTabView` (with `NSTabViewItem`) and `NSSplitView` are in Ferry now, read
+from nibs in both formats, with their delegates, drawing, mouse and keyboard
+handling, and split views' saved positions. They are what stopped Flycut and
+Gas Mask. The apps have not been run again since (running downloaded apps
+isn't done on the machine that builds freemac), so the table above still
+shows where they stopped before; Flycut's next known need is `NSStatusBar`,
+and Gas Mask's is `NSOutlineView`.
+
+Ferry's package is now attached to every freemac release.
+
 ## What the apps need most
 
 Counted over the nine apps:
 
 1. **More views**: `NSTableView` and `NSOutlineView` (with
-   `NSTableColumn` and `NSTableHeaderView`), `NSSplitView`,
-   `NSTabView`, `NSPopUpButton`, `NSToolbar`, `NSSegmentedControl`,
+   `NSTableColumn` and `NSTableHeaderView`), `NSPopUpButton`,
+   `NSToolbar`, `NSSegmentedControl`,
    `NSSearchField` and `NSStackView`. Every app's nibs use some of them,
-   and they are now what stops Flycut, Gas Mask and (most likely) Sequel
-   Pro.
+   and they are now what stops Gas Mask and (most likely) Sequel Pro.
+   (Split views and tab views came in 1.155.)
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). On freemac this would become a
    tray icon (StatusNotifierItem), which needs the desktop's support.

@@ -408,6 +408,45 @@ def dot_png(path):
         f.write(png)
 
 
+def panes_nib(path):
+    """A view nib in the NIBArchive form with a split view (two panes side by
+    side, an autosave name) and, in the right pane, a tab view of two tabs,
+    the second selected: its view is a subview of the tab view, as Xcode
+    writes it."""
+    a = Archive()
+    owner = custom(a, "PanesOwner")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    top, split, left, right, tabs, general, advanced, g_label, a_label = (a.reserve() for _ in range(9))
+    view(a, top, "NSView", VIEW, "{{0, 0}, {320, 200}}", 256 | 18, UID(0), NSSubviews=a.array([split]))
+    view(a, split, "NSSplitView", VIEW, "{{0, 0}, {320, 200}}", 256 | 18, top, NSSubviews=a.array([left, right]),
+         NSIsVertical=True, NSDividerStyle=2, NSAutosaveName=a.add("PanesSplit"))
+    view(a, left, "NSView", VIEW, "{{0, 0}, {100, 200}}", 256, split)
+    view(a, right, "NSView", VIEW, "{{101, 0}, {219, 200}}", 256 | 18, split, NSSubviews=a.array([tabs]))
+    view(a, general, "NSView", VIEW, "{{10, 33}, {199, 154}}", 256 | 18, UID(0), NSSubviews=a.array([g_label]))
+    view(a, advanced, "NSView", VIEW, "{{10, 33}, {199, 154}}", 256 | 18, tabs, NSSubviews=a.array([a_label]))
+    view(a, g_label, "NSTextField", CONTROL, "{{10, 100}, {180, 20}}", 256, general,
+         NSCell=text_cell(a, "NSTextFieldCell", "General settings", 0x04000000, background=False))
+    view(a, a_label, "NSTextField", CONTROL, "{{10, 100}, {180, 20}}", 256, advanced,
+         NSCell=text_cell(a, "NSTextFieldCell", "Advanced settings", 0x04000000, background=False))
+    item_g = a.add(a.obj("NSTabViewItem", (), NSIdentifier=a.add("general"), NSLabel=a.add("General"),
+                         NSView=general, NSTabView=tabs))
+    item_a = a.add(a.obj("NSTabViewItem", (), NSIdentifier=a.add("advanced"), NSLabel=a.add("Advanced"),
+                         NSView=advanced, NSTabView=tabs))
+    view(a, tabs, "NSTabView", VIEW, "{{0, 0}, {219, 200}}", 256 | 18, right, NSSubviews=a.array([advanced]),
+         NSTabViewItems=a.array([item_g, item_a]), NSSelectedTabViewItem=item_a, NSTvFlags=0,
+         NSDrawsBackground=True, NSAllowTruncatedLabels=True, NSFont=font(a))
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, top, "view"), connector(a, out, owner, split, "split"),
+             connector(a, out, owner, tabs, "tabs"), connector(a, out, split, owner, "delegate"),
+             connector(a, out, tabs, owner, "delegate")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (top, owner), (split, top), (left, split),
+             (right, split), (tabs, right), (general, tabs), (advanced, tabs), (g_label, general),
+             (a_label, advanced)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save_nib_archive(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
@@ -416,6 +455,7 @@ panel_nib(os.path.join(resources, "PanelArchive.nib"), nib_archive_form=True)
 dot_png(os.path.join(resources, "dot.png"))
 window_controller_nib(os.path.join(resources, "Controlled.nib"))
 view_controller_nib(os.path.join(resources, "ListViewController.nib"))
+panes_nib(os.path.join(here, "Panes.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

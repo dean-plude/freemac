@@ -58,7 +58,7 @@ GContext *GContextCreateWithSurface(cairo_surface_t *surface, double height) __a
 GContext *GContextCreateWithSurface(cairo_surface_t *surface, double height)
 {
     GContext *c = [[GContext alloc] init];
-    c->surface = surface;
+    c->surface = cairo_surface_reference(surface); /* the caller keeps its own reference */
     c->cr = cairo_create(surface);
     init_state(c, height);
     return c;

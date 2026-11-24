@@ -54,6 +54,16 @@ jobs:
             sudo udevadm trigger --name-match=kvm
           fi
 
+      - name: Build Ferry, the optional Mac layer
+        # A package of its own, published beside the ISO. It isn't on the
+        # ISO, and a failure here doesn't stop the release.
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          sudo apt-get install -y clang lld llvm
+          OUTDIR="$PWD/out-ferry" sh ferry/packaging/build-deb.sh
+          ls -la out-ferry
+
       - name: Build the ISO
         # A build takes about 20 minutes; one that stalls stops here.
         timeout-minutes: 70
@@ -81,11 +91,14 @@ jobs:
           SIZE=$(du -m "$ISO" | cut -f1)
           # The update bundle installed computers download from Software Update.
           UPDATE=$(ls out/freemac-update-*.tar.xz)
-          python3 scripts/release-notes.py "$VERSION" "$SIZE" "$(cut -d' ' -f1 "$ISO.sha256")" > notes.md
+          # Ferry's package, if it built.
+          FERRY=$(ls out-ferry/freemac-ferry_*_amd64.deb 2>/dev/null | head -1 || true)
+          python3 scripts/release-notes.py "$VERSION" "$SIZE" "$(cut -d' ' -f1 "$ISO.sha256")" \
+            "$(basename "${FERRY:-}")" > notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" --clobber
+            gh release upload "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" $FERRY --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" --target "$(git rev-parse HEAD)" \
+            gh release create "$TAG" "$ISO" "$ISO.sha256" "$UPDATE" "$UPDATE.sha256" $FERRY --target "$(git rev-parse HEAD)" \
               --title "freemac $VERSION" --notes-file notes.md --prerelease
           fi

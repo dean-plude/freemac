@@ -265,9 +265,13 @@ its limits are real:
   DRM and Apple ID, and freemac will not try to work around that.
 - Only apps built for Intel (x86-64), or universal apps, can run on a PC. Apps
   built only for Apple silicon cannot.
-- Ferry today runs simple command-line programs only. Graphical apps need
-  Mac frameworks Ferry doesn't have; most everyday Mac apps will not work for
-  a long time, if ever. See [ferry/README.md](ferry/README.md).
+- Ferry runs simple command-line programs, and simple windowed ones built
+  with AppKit. Real Mac apps start and load their windows but none runs all
+  the way yet; most everyday Mac apps will not work for a long time, if ever.
+  See [ferry/README.md](ferry/README.md) and
+  [docs/ferry-compat.md](docs/ferry-compat.md).
+- Ferry isn't on the ISO. Each release has its package beside the ISO
+  (`freemac-ferry_*_amd64.deb`); double-click it in freemac to install it.
 
 Mac apps still look like themselves on freemac: put a `.app` in the
 Applications folder (or use Add to Applications in Drawer) and it appears in

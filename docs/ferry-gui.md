@@ -1093,6 +1093,7 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
 | `appkit_bindings` | now also bindings following changes, and `NSUserDefaultsController` (applied at once, held until saved, reverted) |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
+| `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
 
 **What isn't done yet (and why).**
 
@@ -1122,7 +1123,8 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
   desktop side to reword.
 
 **What's next.** The views every app's nibs use (`NSTableView`,
-`NSOutlineView`, `NSSplitView`, `NSTabView`, `NSPopUpButton`), then
+`NSOutlineView`, `NSPopUpButton`; `NSSplitView` and `NSTabView` came in
+freemac 1.155, see `appkit_panes`), then
 `NSStatusBar` as a tray icon, the document classes, `NSAlert` and
 `NSWorkspace`.
 
