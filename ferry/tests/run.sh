@@ -27,7 +27,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
-        foundation_dates)
+        foundation_dates|foundation_calendar|foundation_numbers|foundation_iso8601)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -132,6 +132,11 @@ run_one foundation_invocation_O0 "$here/foundation/invocation.m" "$here/foundati
 # formatting (Ferry 0.14.0).
 run_one foundation_json "$here/foundation/json.m" "$here/foundation/json.out" -framework Foundation
 run_one foundation_dates "$here/foundation/dates.m" "$here/foundation/dates.out" -framework Foundation
+# Calendars and date components, number and byte count formatters, ISO 8601
+# dates, relative dates and date components formatters (Ferry 0.15.0).
+run_one foundation_calendar "$here/foundation/calendar.m" "$here/foundation/calendar.out" -framework Foundation -fblocks
+run_one foundation_numbers "$here/foundation/numbers.m" "$here/foundation/numbers.out" -framework Foundation
+run_one foundation_iso8601 "$here/foundation/iso8601.m" "$here/foundation/iso8601.out" -framework Foundation
 # Keyed archives (M5), the format of nib files.
 run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archive.out" -framework Foundation
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.

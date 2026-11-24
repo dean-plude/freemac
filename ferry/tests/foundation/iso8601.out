@@ -1,0 +1,135 @@
+writing
+  defaults: options 0x773, zone GMT: 2024-07-04T15:05:09Z
+  internet date and time, Paris      2024-07-04T17:05:09+02:00
+  internet date and time, New York   2024-07-04T11:05:09-04:00
+  internet date and time, Kolkata    2024-07-04T20:35:09+05:30
+  with fractional seconds            2024-07-04T15:05:09.789Z
+  no colon in the zone               2024-07-04T11:05:09-0400
+  basic format                       20240704T170509+0200
+  space between date and time        2024-07-04 15:05:09Z
+  full date                          2024-07-04
+  full time                          11:05:09-04:00
+  time only                          15:05:09
+  year and month                     2024-07
+  ordinal date                       2024-186
+  week date                          2024-W27-4
+  week date, 29 December 2024        2024-W52-7
+  week date, 30 December 2024        2025-W01-1
+  week date, 1 January 2021          2020-W53-5
+  week date, basic                   2024W274
+  before 1970                        1938-04-24T22:13:19.750Z
+  no options                         
+  nil date: (nil)
+reading
+  internet date and time
+    "2024-07-04T15:05:09Z" -> 2024-07-04 15:05:09.000 UTC
+    "2024-07-04T17:05:09+02:00" -> 2024-07-04 15:05:09.000 UTC
+    "2024-07-04T10:05:09-0500" -> 2024-07-04 15:05:09.000 UTC
+    "2024-07-04T20:35:09+05:30" -> 2024-07-04 15:05:09.000 UTC
+    "2024-07-04T15:05:09.789Z" -> (nil)
+    "2024-07-04 15:05:09Z" -> (nil)
+    "2024-07-04T15:05:09" -> (nil)
+    "2024-07-04" -> (nil)
+    "20240704T150509Z" -> (nil)
+    "2024-13-04T15:05:09Z" -> (nil)
+    "2024-07-04T15:05:09Zjunk" -> (nil)
+  with fractional seconds
+    "2024-07-04T15:05:09.789Z" -> 2024-07-04 15:05:09.789 UTC
+    "2024-07-04T15:05:09.5Z" -> 2024-07-04 15:05:09.500 UTC
+    "2024-07-04T15:05:09Z" -> (nil)
+  no zone in the string, read in New York
+    "2024-07-04T11:05:09" -> 2024-07-04 15:05:09.000 UTC
+    "2024-01-15T08:00:00" -> 2024-01-15 13:00:00.000 UTC
+    "2024-07-04T11:05:09Z" -> (nil)
+  week dates
+    "2024-W27-4" -> 2024-07-04 00:00:00.000 UTC
+    "2020-W53-5" -> 2021-01-01 00:00:00.000 UTC
+    "2025-W01-1" -> 2024-12-30 00:00:00.000 UTC
+  ordinal dates
+    "2024-186" -> 2024-07-04 00:00:00.000 UTC
+    "2024-060" -> 2024-02-29 00:00:00.000 UTC
+  a time alone
+    "12:30:00Z" -> 2000-01-01 12:30:00.000 UTC
+  a copy: 2024-07-04T15:05:09Z
+  round trip: 2024-07-04T15:05:09.789Z -> 2024-07-04 15:05:09.789 UTC
+relative dates
+  medium date: Yesterday, Today, Tomorrow, (a date three days on, as usual)
+  first second of today: Today, last second of yesterday: Yesterday
+  with a short time: Today at 12:00 PM, Tomorrow at 12:00 PM
+  read back: yesterday at noon
+  read back, any case: tomorrow at noon
+  no date style: 12:00 PM
+  full date: Today; read back: the start of today
+  not relative: a full date
+  calendar: gregorian; set to ISO 8601: iso8601
+components formatter
+  positional
+    34890 -> "9:41:30"
+    3723 -> "1:02:03"
+    63 -> "1:03"
+    3 -> "0:03"
+    0 -> "0:00"
+    3600 -> "1:00:00"
+    86461 -> "24:01:01"
+  abbreviated
+    34890 -> "9h 41m 30s"
+    3723 -> "1h 2m 3s"
+    63 -> "1m 3s"
+    3 -> "3s"
+    0 -> "0s"
+    3600 -> "1h"
+    86461 -> "24h 1m 1s"
+  short
+    34890 -> "9 hr, 41 min, 30 sec"
+    3723 -> "1 hr, 2 min, 3 sec"
+    63 -> "1 min, 3 sec"
+    3 -> "3 sec"
+    0 -> "0 sec"
+    3600 -> "1 hr"
+    86461 -> "24 hr, 1 min, 1 sec"
+  full
+    34890 -> "9 hours, 41 minutes, 30 seconds"
+    3723 -> "1 hour, 2 minutes, 3 seconds"
+    63 -> "1 minute, 3 seconds"
+    3 -> "3 seconds"
+    0 -> "0 seconds"
+    3600 -> "1 hour"
+    86461 -> "24 hours, 1 minute, 1 second"
+  spell-out
+    34890 -> "nine hours, forty-one minutes, thirty seconds"
+    3723 -> "one hour, two minutes, three seconds"
+    63 -> "one minute, three seconds"
+    3 -> "three seconds"
+    0 -> "zero seconds"
+    3600 -> "one hour"
+    86461 -> "twenty-four hours, one minute, one second"
+  brief
+    34890 -> "9hr 41min 30sec"
+    3723 -> "1hr 2min 3sec"
+    63 -> "1min 3sec"
+    3 -> "3sec"
+    0 -> "0sec"
+    3600 -> "1hr"
+    86461 -> "24hr 1min 1sec"
+  positional, padded
+    63 -> "00:01:03"
+    3723 -> "01:02:03"
+  positional, no zeros dropped
+    63 -> "0:01:03"
+  abbreviated, no zeros dropped
+    3603 -> "1h 0m 3s"
+  days, hours and minutes
+    200000 -> "2d 7h 33m"
+    -5400 -> "-1h 30m"
+  one unit at most
+    200000 -> "2d"
+  fractional hours
+    5400 -> "1.5h"
+  years, months and days from 1 January 2024
+    3.456e+07 -> "1 year, 1 month, 3 days"
+    between two dates: 2 months
+    components (14 months, 3 days): 1 year, 2 months, 3 days
+    with phrases: About 1 year, 2 months, 3 days remaining
+  class method: a string
+  era refused: NSInvalidArgumentException
+exit=0

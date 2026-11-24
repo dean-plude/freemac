@@ -6,8 +6,11 @@
  * Dates are written and read with Unicode date patterns ("yyyy-MM-dd
  * HH:mm:ss Z" and the like) or the four standard styles. Every locale gets
  * English (United States) month and day names and styles, and the calendar
- * is always Gregorian. Time zone names come from a short table of the
- * common zones; others are written as GMT offsets. Built without ARC. */
+ * is always Gregorian (a calendar can be set, but it doesn't change the
+ * fields). Time zone names come from a short table of the common zones;
+ * others are written as GMT offsets. With relative formatting, a date
+ * style's date is "Today", "Yesterday" or "Tomorrow" when it can be, joined
+ * to the time with " at ". Built without ARC. */
 #import "FInternal.h"
 #include <math.h>
 
@@ -321,6 +324,7 @@ static NSString *time_style(NSDateFormatterStyle s)
     NSLocale *_locale;
     NSTimeZone *_timeZone;
     NSDate *_defaultDate, *_twoDigitStartDate;
+    NSCalendar *_calendar;
     NSMutableDictionary *_symbols;
     BOOL _lenient, _generatesCalendarDates, _relative;
     NSDateFormatterBehavior _behavior;
@@ -346,6 +350,7 @@ static NSString *time_style(NSDateFormatterStyle s)
     [_timeZone release];
     [_defaultDate release];
     [_twoDigitStartDate release];
+    [_calendar release];
     [_symbols release];
     [super dealloc];
 }
@@ -361,6 +366,7 @@ static NSString *time_style(NSDateFormatterStyle s)
     f->_timeZone = [_timeZone retain];
     f->_defaultDate = [_defaultDate retain];
     f->_twoDigitStartDate = [_twoDigitStartDate retain];
+    f->_calendar = [_calendar copy];
     [f->_symbols addEntriesFromDictionary:_symbols];
     f->_lenient = _lenient;
     f->_generatesCalendarDates = _generatesCalendarDates;
@@ -428,6 +434,21 @@ static NSString *time_style(NSDateFormatterStyle s)
 - (void)setLenient:(BOOL)lenient { _lenient = lenient; }
 - (BOOL)generatesCalendarDates { return _generatesCalendarDates; }
 - (void)setGeneratesCalendarDates:(BOOL)b { _generatesCalendarDates = b; }
+- (NSCalendar *)calendar
+{
+    if (_calendar)
+        return _calendar;
+    NSCalendar *c = [[[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease];
+    [c setTimeZone:[self timeZone]];
+    [c setLocale:[self locale]];
+    return c;
+}
+- (void)setCalendar:(NSCalendar *)calendar
+{
+    NSCalendar *c = [calendar copy];
+    [_calendar release];
+    _calendar = c;
+}
 - (BOOL)doesRelativeDateFormatting { return _relative; }
 - (void)setDoesRelativeDateFormatting:(BOOL)b { _relative = b; }
 - (NSDateFormatterBehavior)formatterBehavior { return _behavior; }
@@ -631,11 +652,40 @@ static void pick(NSMutableString *out, NSArray *list, NSUInteger i)
     }
 }
 
+/* The relative name of the day of a date, if it is yesterday, today or tomorrow
+ * where the formatter's zone is. */
+static NSString *const relative_days[] = {@"Yesterday", @"Today", @"Tomorrow"};
+
+static int64_t local_day(NSDate *date, NSTimeZone *tz)
+{
+    struct parts p;
+    split(date, tz, &p);
+    return p.days;
+}
+
+- (NSString *)_relativeDay:(NSDate *)date
+{
+    int64_t diff = local_day(date, [self timeZone]) - local_day([NSDate date], [self timeZone]);
+    return diff >= -1 && diff <= 1 ? relative_days[diff + 1] : nil;
+}
+
 - (NSString *)stringFromDate:(NSDate *)date
 {
     if (!date)
         return nil;
-    NSString *pattern = [self dateFormat];
+    if (_relative && _dateStyle != NSDateFormatterNoStyle) {
+        NSString *day = [self _relativeDay:date];
+        if (day) {
+            if (_timeStyle == NSDateFormatterNoStyle)
+                return day;
+            return [NSString stringWithFormat:@"%@ at %@", day, [self _string:date pattern:time_style(_timeStyle)]];
+        }
+    }
+    return [self _string:date pattern:[self dateFormat]];
+}
+
+- (NSString *)_string:(NSDate *)date pattern:(NSString *)pattern
+{
     if (![pattern length])
         return @"";
     NSTimeZone *tz = [self timeZone];
@@ -1047,8 +1097,36 @@ static NSUInteger read_zone(NSString *s, const unichar *c, NSUInteger len, NSUIn
     return [NSDate dateWithTimeIntervalSince1970:(double)t + g->frac];
 }
 
+/* "Today at 3:05 PM" read as the date of today written in the date style. */
+- (NSString *)_unrelative:(NSString *)string
+{
+    if (!_relative || _dateStyle == NSDateFormatterNoStyle || !string)
+        return string;
+    for (int i = 0; i < 3; i++) {
+        NSString *word = relative_days[i];
+        NSUInteger n = [word length];
+        if ([string length] < n || [[string substringToIndex:n] caseInsensitiveCompare:word] != NSOrderedSame)
+            continue;
+        NSString *rest = [string substringFromIndex:n];
+        NSDate *day = [[self calendar] dateByAddingUnit:NSCalendarUnitDay value:i - 1 toDate:[NSDate date] options:0];
+        NSString *date = [self _string:day pattern:date_style(_dateStyle)];
+        if (_timeStyle == NSDateFormatterNoStyle)
+            return [date stringByAppendingString:rest];
+        NSString *join = _dateStyle >= NSDateFormatterLongStyle ? @" at " : @", ";
+        if ([rest hasPrefix:@" at "])
+            rest = [rest substringFromIndex:4];
+        else if ([rest hasPrefix:@", "])
+            rest = [rest substringFromIndex:2];
+        else
+            return string;
+        return [NSString stringWithFormat:@"%@%@%@", date, join, rest];
+    }
+    return string;
+}
+
 - (NSDate *)dateFromString:(NSString *)string
 {
+    string = [self _unrelative:string];
     if (!string || ![[self dateFormat] length])
         return nil;
     struct got g;
@@ -1068,13 +1146,14 @@ static NSUInteger read_zone(NSString *s, const unichar *c, NSUInteger len, NSUIn
 - (BOOL)getObjectValue:(id *)obj forString:(NSString *)string range:(NSRange *)range error:(NSError **)error
 {
     NSRange r = range ? *range : NSMakeRange(0, [string length]);
-    NSString *sub = [string substringWithRange:r];
+    NSString *sub = [string substringWithRange:r], *plain = [self _unrelative:sub];
+    BOOL relative = plain != sub;
     struct got g;
     memset(&g, 0, sizeof g);
     g.ampm = g.era = -1;
     NSUInteger pos = 0;
     NSDate *date = nil;
-    if ([[self dateFormat] length] && [self _read:sub at:&pos into:&g])
+    if ([[self dateFormat] length] && [self _read:plain at:&pos into:&g])
         date = [self _dateFrom:&g];
     if (!date) {
         if (error)
@@ -1087,7 +1166,7 @@ static NSUInteger read_zone(NSString *s, const unichar *c, NSUInteger len, NSUIn
         return NO;
     }
     if (range)
-        *range = NSMakeRange(r.location, pos);
+        *range = NSMakeRange(r.location, relative ? r.length : pos);   /* a relative day is read whole */
     if (obj)
         *obj = date;
     return YES;

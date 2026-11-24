@@ -739,6 +739,9 @@ FOUNDATION_EXPORT NSLocaleKey const NSLocaleVariantCode;
 FOUNDATION_EXPORT NSLocaleKey const NSLocaleDecimalSeparator;
 FOUNDATION_EXPORT NSLocaleKey const NSLocaleGroupingSeparator;
 FOUNDATION_EXPORT NSLocaleKey const NSLocaleUsesMetricSystem;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleCalendar;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleCurrencyCode;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleCurrencySymbol;
 FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
 
 @interface NSLocale : NSObject <NSCopying>
@@ -763,9 +766,14 @@ FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
 @property (readonly, copy) NSString *decimalSeparator;
 @property (readonly, copy) NSString *groupingSeparator;
 @property (readonly) BOOL usesMetricSystem;
+@property (readonly, copy) NSString *currencyCode;
+@property (readonly, copy) NSString *currencySymbol;
+@property (readonly, copy) NSString *calendarIdentifier;
 @end
 
 /* ---- NSFormatter, NSDateFormatter (NSDateFormatter.m) ------------------------------- */
+
+@class NSCalendar;
 
 @interface NSFormatter : NSObject <NSCopying>
 - (NSString *)stringForObjectValue:(id)obj;
@@ -831,6 +839,400 @@ typedef NS_ENUM(NSUInteger, NSDateFormatterBehavior) {
 @property (copy) NSArray *shortQuarterSymbols;
 @property (copy) NSArray *standaloneQuarterSymbols;
 @property (copy) NSArray *shortStandaloneQuarterSymbols;
+@property (copy) NSCalendar *calendar;
+@end
+
+/* ---- NSCalendar, NSDateComponents (NSCalendar.m) ------------------------------------ */
+
+/* The Gregorian calendar (proleptic: no Julian dates before 1582) and the
+ * ISO 8601 one; other calendar identifiers give nil. */
+typedef NSString *NSCalendarIdentifier;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierGregorian;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierISO8601;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierBuddhist;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierChinese;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierCoptic;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierEthiopicAmeteMihret;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierEthiopicAmeteAlem;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierHebrew;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierIndian;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierIslamic;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierIslamicCivil;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierIslamicTabular;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierIslamicUmmAlQura;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierJapanese;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierPersian;
+FOUNDATION_EXPORT NSCalendarIdentifier const NSCalendarIdentifierRepublicOfChina;
+FOUNDATION_EXPORT NSString *const NSGregorianCalendar;
+FOUNDATION_EXPORT NSString *const NSISO8601Calendar;
+FOUNDATION_EXPORT NSString *const NSCalendarDayChangedNotification;
+
+typedef NS_OPTIONS(NSUInteger, NSCalendarUnit) {
+    NSCalendarUnitEra = 1UL << 1,
+    NSCalendarUnitYear = 1UL << 2,
+    NSCalendarUnitMonth = 1UL << 3,
+    NSCalendarUnitDay = 1UL << 4,
+    NSCalendarUnitHour = 1UL << 5,
+    NSCalendarUnitMinute = 1UL << 6,
+    NSCalendarUnitSecond = 1UL << 7,
+    NSCalendarUnitWeekday = 1UL << 9,
+    NSCalendarUnitWeekdayOrdinal = 1UL << 10,
+    NSCalendarUnitQuarter = 1UL << 11,
+    NSCalendarUnitWeekOfMonth = 1UL << 12,
+    NSCalendarUnitWeekOfYear = 1UL << 13,
+    NSCalendarUnitYearForWeekOfYear = 1UL << 14,
+    NSCalendarUnitNanosecond = 1UL << 15,
+    NSCalendarUnitDayOfYear = 1UL << 16,
+    NSCalendarUnitCalendar = 1UL << 20,
+    NSCalendarUnitTimeZone = 1UL << 21,
+    /* the names of Mac OS X 10.4 to 10.9 */
+    NSEraCalendarUnit = NSCalendarUnitEra,
+    NSYearCalendarUnit = NSCalendarUnitYear,
+    NSMonthCalendarUnit = NSCalendarUnitMonth,
+    NSDayCalendarUnit = NSCalendarUnitDay,
+    NSHourCalendarUnit = NSCalendarUnitHour,
+    NSMinuteCalendarUnit = NSCalendarUnitMinute,
+    NSSecondCalendarUnit = NSCalendarUnitSecond,
+    NSWeekCalendarUnit = 1UL << 8,
+    NSWeekdayCalendarUnit = NSCalendarUnitWeekday,
+    NSWeekdayOrdinalCalendarUnit = NSCalendarUnitWeekdayOrdinal,
+    NSQuarterCalendarUnit = NSCalendarUnitQuarter,
+    NSWeekOfMonthCalendarUnit = NSCalendarUnitWeekOfMonth,
+    NSWeekOfYearCalendarUnit = NSCalendarUnitWeekOfYear,
+    NSYearForWeekOfYearCalendarUnit = NSCalendarUnitYearForWeekOfYear,
+    NSCalendarCalendarUnit = NSCalendarUnitCalendar,
+    NSTimeZoneCalendarUnit = NSCalendarUnitTimeZone,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSCalendarOptions) {
+    NSCalendarWrapComponents = 1UL << 0,
+    NSCalendarMatchStrictly = 1UL << 1,
+    NSCalendarSearchBackwards = 1UL << 2,
+    NSCalendarMatchPreviousTimePreservingSmallerUnits = 1UL << 8,
+    NSCalendarMatchNextTimePreservingSmallerUnits = 1UL << 9,
+    NSCalendarMatchNextTime = 1UL << 10,
+    NSCalendarMatchFirst = 1UL << 12,
+    NSCalendarMatchLast = 1UL << 13,
+};
+enum { NSWrapCalendarComponents = NSCalendarWrapComponents };
+enum { NSDateComponentUndefined = NSIntegerMax, NSUndefinedDateComponent = NSIntegerMax };
+
+@class NSDateComponents;
+
+/* Weeks start on the locale's first weekday (Sunday in the United States),
+ * with the weekend on Saturday and Sunday everywhere. */
+@interface NSCalendar : NSObject <NSCopying>
++ (NSCalendar *)currentCalendar;
++ (NSCalendar *)autoupdatingCurrentCalendar;
++ (NSCalendar *)calendarWithIdentifier:(NSCalendarIdentifier)ident;
+- (instancetype)initWithCalendarIdentifier:(NSCalendarIdentifier)ident;
+@property (readonly, copy) NSCalendarIdentifier calendarIdentifier;
+@property (copy) NSLocale *locale;
+@property (copy) NSTimeZone *timeZone;
+@property NSUInteger firstWeekday;
+@property NSUInteger minimumDaysInFirstWeek;
+@property (readonly, copy) NSArray *eraSymbols;
+@property (readonly, copy) NSArray *longEraSymbols;
+@property (readonly, copy) NSArray *monthSymbols;
+@property (readonly, copy) NSArray *shortMonthSymbols;
+@property (readonly, copy) NSArray *veryShortMonthSymbols;
+@property (readonly, copy) NSArray *standaloneMonthSymbols;
+@property (readonly, copy) NSArray *shortStandaloneMonthSymbols;
+@property (readonly, copy) NSArray *veryShortStandaloneMonthSymbols;
+@property (readonly, copy) NSArray *weekdaySymbols;
+@property (readonly, copy) NSArray *shortWeekdaySymbols;
+@property (readonly, copy) NSArray *veryShortWeekdaySymbols;
+@property (readonly, copy) NSArray *standaloneWeekdaySymbols;
+@property (readonly, copy) NSArray *shortStandaloneWeekdaySymbols;
+@property (readonly, copy) NSArray *veryShortStandaloneWeekdaySymbols;
+@property (readonly, copy) NSArray *quarterSymbols;
+@property (readonly, copy) NSArray *shortQuarterSymbols;
+@property (readonly, copy) NSArray *standaloneQuarterSymbols;
+@property (readonly, copy) NSArray *shortStandaloneQuarterSymbols;
+@property (readonly, copy) NSString *AMSymbol;
+@property (readonly, copy) NSString *PMSymbol;
+- (NSRange)minimumRangeOfUnit:(NSCalendarUnit)unit;
+- (NSRange)maximumRangeOfUnit:(NSCalendarUnit)unit;
+- (NSRange)rangeOfUnit:(NSCalendarUnit)smaller inUnit:(NSCalendarUnit)larger forDate:(NSDate *)date;
+- (NSUInteger)ordinalityOfUnit:(NSCalendarUnit)smaller inUnit:(NSCalendarUnit)larger forDate:(NSDate *)date;
+- (BOOL)rangeOfUnit:(NSCalendarUnit)unit startDate:(NSDate **)start interval:(NSTimeInterval *)interval
+            forDate:(NSDate *)date;
+- (NSDate *)dateFromComponents:(NSDateComponents *)comps;
+- (NSDateComponents *)components:(NSCalendarUnit)units fromDate:(NSDate *)date;
+- (NSInteger)component:(NSCalendarUnit)unit fromDate:(NSDate *)date;
+- (NSDateComponents *)componentsInTimeZone:(NSTimeZone *)zone fromDate:(NSDate *)date;
+- (NSDateComponents *)components:(NSCalendarUnit)units fromDate:(NSDate *)start toDate:(NSDate *)end
+                         options:(NSCalendarOptions)opts;
+- (NSDateComponents *)components:(NSCalendarUnit)units fromDateComponents:(NSDateComponents *)start
+                toDateComponents:(NSDateComponents *)end
+                         options:(NSCalendarOptions)opts;
+- (NSDate *)dateByAddingComponents:(NSDateComponents *)comps toDate:(NSDate *)date options:(NSCalendarOptions)opts;
+- (NSDate *)dateByAddingUnit:(NSCalendarUnit)unit value:(NSInteger)value toDate:(NSDate *)date
+                     options:(NSCalendarOptions)opts;
+- (NSDate *)dateWithEra:(NSInteger)era year:(NSInteger)year month:(NSInteger)month day:(NSInteger)day
+                   hour:(NSInteger)hour minute:(NSInteger)minute second:(NSInteger)second
+             nanosecond:(NSInteger)ns;
+- (NSDate *)dateWithEra:(NSInteger)era yearForWeekOfYear:(NSInteger)year weekOfYear:(NSInteger)week
+                weekday:(NSInteger)weekday hour:(NSInteger)hour minute:(NSInteger)minute
+                 second:(NSInteger)second nanosecond:(NSInteger)ns;
+- (void)getEra:(NSInteger *)era year:(NSInteger *)year month:(NSInteger *)month day:(NSInteger *)day
+      fromDate:(NSDate *)date;
+- (void)getEra:(NSInteger *)era yearForWeekOfYear:(NSInteger *)year weekOfYear:(NSInteger *)week
+       weekday:(NSInteger *)weekday fromDate:(NSDate *)date;
+- (void)getHour:(NSInteger *)hour minute:(NSInteger *)minute second:(NSInteger *)second
+     nanosecond:(NSInteger *)ns fromDate:(NSDate *)date;
+- (NSDate *)startOfDayForDate:(NSDate *)date;
+- (BOOL)isDateInToday:(NSDate *)date;
+- (BOOL)isDateInYesterday:(NSDate *)date;
+- (BOOL)isDateInTomorrow:(NSDate *)date;
+- (BOOL)isDateInWeekend:(NSDate *)date;
+- (BOOL)isDate:(NSDate *)date1 inSameDayAsDate:(NSDate *)date2;
+- (BOOL)isDate:(NSDate *)date1 equalToDate:(NSDate *)date2 toUnitGranularity:(NSCalendarUnit)unit;
+- (NSComparisonResult)compareDate:(NSDate *)date1 toDate:(NSDate *)date2 toUnitGranularity:(NSCalendarUnit)unit;
+- (BOOL)rangeOfWeekendStartDate:(NSDate **)start interval:(NSTimeInterval *)interval containingDate:(NSDate *)date;
+- (BOOL)nextWeekendStartDate:(NSDate **)start interval:(NSTimeInterval *)interval options:(NSCalendarOptions)opts
+                   afterDate:(NSDate *)date;
+- (NSDate *)dateBySettingUnit:(NSCalendarUnit)unit value:(NSInteger)v ofDate:(NSDate *)date
+                      options:(NSCalendarOptions)opts;
+- (NSDate *)dateBySettingHour:(NSInteger)h minute:(NSInteger)m second:(NSInteger)s ofDate:(NSDate *)date
+                      options:(NSCalendarOptions)opts;
+- (NSDate *)nextDateAfterDate:(NSDate *)date matchingComponents:(NSDateComponents *)comps
+                      options:(NSCalendarOptions)opts;
+- (NSDate *)nextDateAfterDate:(NSDate *)date matchingUnit:(NSCalendarUnit)unit value:(NSInteger)value
+                      options:(NSCalendarOptions)opts;
+- (NSDate *)nextDateAfterDate:(NSDate *)date matchingHour:(NSInteger)h minute:(NSInteger)m second:(NSInteger)s
+                      options:(NSCalendarOptions)opts;
+- (BOOL)date:(NSDate *)date matchesComponents:(NSDateComponents *)comps;
+- (void)enumerateDatesStartingAfterDate:(NSDate *)start matchingComponents:(NSDateComponents *)comps
+                                options:(NSCalendarOptions)opts
+                             usingBlock:(void (^)(NSDate *date, BOOL exactMatch, BOOL *stop))block;
+@end
+
+@interface NSDateComponents : NSObject <NSCopying>
+@property (copy) NSCalendar *calendar;
+@property (copy) NSTimeZone *timeZone;
+@property NSInteger era;
+@property NSInteger year;
+@property NSInteger month;
+@property NSInteger day;
+@property NSInteger hour;
+@property NSInteger minute;
+@property NSInteger second;
+@property NSInteger nanosecond;
+@property NSInteger weekday;
+@property NSInteger weekdayOrdinal;
+@property NSInteger quarter;
+@property NSInteger weekOfMonth;
+@property NSInteger weekOfYear;
+@property NSInteger yearForWeekOfYear;
+@property NSInteger dayOfYear;
+@property NSInteger week;   /* the unit of Mac OS X 10.4 to 10.9 */
+@property (getter=isLeapMonth) BOOL leapMonth;
+@property (readonly, copy) NSDate *date;
+@property (readonly, getter=isValidDate) BOOL validDate;
+- (BOOL)isValidDateInCalendar:(NSCalendar *)calendar;
+- (void)setValue:(NSInteger)value forComponent:(NSCalendarUnit)unit;
+- (NSInteger)valueForComponent:(NSCalendarUnit)unit;
+@end
+
+/* ---- NSNumberFormatter, NSByteCountFormatter (NSNumberFormatter.m) ------------------ */
+
+/* Numbers are written and read in English (United States), whatever the
+ * locale; a locale's country only picks the default currency. */
+typedef NS_ENUM(NSUInteger, NSNumberFormatterStyle) {
+    NSNumberFormatterNoStyle = 0,
+    NSNumberFormatterDecimalStyle = 1,
+    NSNumberFormatterCurrencyStyle = 2,
+    NSNumberFormatterPercentStyle = 3,
+    NSNumberFormatterScientificStyle = 4,
+    NSNumberFormatterSpellOutStyle = 5,
+    NSNumberFormatterOrdinalStyle = 6,
+    NSNumberFormatterCurrencyISOCodeStyle = 8,
+    NSNumberFormatterCurrencyPluralStyle = 9,
+    NSNumberFormatterCurrencyAccountingStyle = 10,
+};
+typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
+    NSNumberFormatterBehaviorDefault = 0,
+    NSNumberFormatterBehavior10_0 = 1000,
+    NSNumberFormatterBehavior10_4 = 1040,
+};
+typedef NS_ENUM(NSUInteger, NSNumberFormatterPadPosition) {
+    NSNumberFormatterPadBeforePrefix = 0,
+    NSNumberFormatterPadAfterPrefix = 1,
+    NSNumberFormatterPadBeforeSuffix = 2,
+    NSNumberFormatterPadAfterSuffix = 3,
+};
+typedef NS_ENUM(NSUInteger, NSNumberFormatterRoundingMode) {
+    NSNumberFormatterRoundCeiling = 0,
+    NSNumberFormatterRoundFloor = 1,
+    NSNumberFormatterRoundDown = 2,
+    NSNumberFormatterRoundUp = 3,
+    NSNumberFormatterRoundHalfEven = 4,
+    NSNumberFormatterRoundHalfDown = 5,
+    NSNumberFormatterRoundHalfUp = 6,
+};
+
+@interface NSNumberFormatter : NSFormatter
++ (NSString *)localizedStringFromNumber:(NSNumber *)num numberStyle:(NSNumberFormatterStyle)style;
++ (NSNumberFormatterBehavior)defaultFormatterBehavior;
++ (void)setDefaultFormatterBehavior:(NSNumberFormatterBehavior)behavior;
+- (NSString *)stringFromNumber:(NSNumber *)number;
+- (NSNumber *)numberFromString:(NSString *)string;
+- (BOOL)getObjectValue:(id *)obj forString:(NSString *)string range:(NSRange *)range error:(NSError **)error;
+@property NSNumberFormatterStyle numberStyle;
+@property NSNumberFormatterBehavior formatterBehavior;
+@property (copy) NSLocale *locale;
+@property BOOL generatesDecimalNumbers;
+@property NSNumberFormatterRoundingMode roundingMode;
+@property (copy) NSNumber *roundingIncrement;
+@property NSUInteger minimumIntegerDigits;
+@property NSUInteger maximumIntegerDigits;
+@property NSUInteger minimumFractionDigits;
+@property NSUInteger maximumFractionDigits;
+@property BOOL usesSignificantDigits;
+@property NSUInteger minimumSignificantDigits;
+@property NSUInteger maximumSignificantDigits;
+@property NSUInteger formatWidth;
+@property (copy) NSString *paddingCharacter;
+@property NSNumberFormatterPadPosition paddingPosition;
+@property (copy) NSNumber *multiplier;
+@property (copy) NSString *positiveFormat;
+@property (copy) NSString *negativeFormat;
+@property (copy) NSString *positivePrefix;
+@property (copy) NSString *positiveSuffix;
+@property (copy) NSString *negativePrefix;
+@property (copy) NSString *negativeSuffix;
+@property (copy) NSString *currencyCode;
+@property (copy) NSString *currencySymbol;
+@property (copy) NSString *internationalCurrencySymbol;
+@property (copy) NSString *currencyDecimalSeparator;
+@property (copy) NSString *currencyGroupingSeparator;
+@property (copy) NSString *percentSymbol;
+@property (copy) NSString *perMillSymbol;
+@property (copy) NSString *minusSign;
+@property (copy) NSString *plusSign;
+@property (copy) NSString *exponentSymbol;
+@property (copy) NSString *zeroSymbol;
+@property (copy) NSString *nilSymbol;
+@property (copy) NSString *notANumberSymbol;
+@property (copy) NSString *positiveInfinitySymbol;
+@property (copy) NSString *negativeInfinitySymbol;
+@property (copy) NSString *decimalSeparator;
+@property BOOL alwaysShowsDecimalSeparator;
+@property (copy) NSString *groupingSeparator;
+@property BOOL usesGroupingSeparator;
+@property NSUInteger groupingSize;
+@property NSUInteger secondaryGroupingSize;
+@property (getter=isLenient) BOOL lenient;
+@property (getter=isPartialStringValidationEnabled) BOOL partialStringValidationEnabled;
+@property (copy) NSNumber *minimum;
+@property (copy) NSNumber *maximum;
+@property BOOL allowsFloats;
+/* the names of the Mac OS X 10.0 behaviour */
+@property (copy) NSString *format;
+@property BOOL hasThousandSeparators;
+@property (copy) NSString *thousandSeparator;
+@property BOOL localizesFormat;
+@end
+
+typedef NS_OPTIONS(NSUInteger, NSByteCountFormatterUnits) {
+    NSByteCountFormatterUseDefault = 0,
+    NSByteCountFormatterUseBytes = 1UL << 0,
+    NSByteCountFormatterUseKB = 1UL << 1,
+    NSByteCountFormatterUseMB = 1UL << 2,
+    NSByteCountFormatterUseGB = 1UL << 3,
+    NSByteCountFormatterUseTB = 1UL << 4,
+    NSByteCountFormatterUsePB = 1UL << 5,
+    NSByteCountFormatterUseEB = 1UL << 6,
+    NSByteCountFormatterUseZB = 1UL << 7,
+    NSByteCountFormatterUseYBOrHigher = 0x0FFUL << 8,
+    NSByteCountFormatterUseAll = 0x0FFFFUL,
+};
+typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
+    NSByteCountFormatterCountStyleFile = 0,
+    NSByteCountFormatterCountStyleMemory = 1,
+    NSByteCountFormatterCountStyleDecimal = 2,
+    NSByteCountFormatterCountStyleBinary = 3,
+};
+
+@interface NSByteCountFormatter : NSFormatter
++ (NSString *)stringFromByteCount:(long long)count countStyle:(NSByteCountFormatterCountStyle)style;
+- (NSString *)stringFromByteCount:(long long)count;
+@property NSByteCountFormatterUnits allowedUnits;
+@property NSByteCountFormatterCountStyle countStyle;
+@property BOOL allowsNonnumericFormatting;
+@property BOOL includesUnit;
+@property BOOL includesCount;
+@property BOOL includesActualByteCount;
+@property (getter=isAdaptive) BOOL adaptive;
+@property BOOL zeroPadsFractionDigits;
+@end
+
+/* ---- NSISO8601DateFormatter, NSDateComponentsFormatter (NSISO8601DateFormatter.m) ---- */
+
+typedef NS_OPTIONS(NSUInteger, NSISO8601DateFormatOptions) {
+    NSISO8601DateFormatWithYear = 1UL << 0,
+    NSISO8601DateFormatWithMonth = 1UL << 1,
+    NSISO8601DateFormatWithWeekOfYear = 1UL << 2,
+    NSISO8601DateFormatWithDay = 1UL << 4,
+    NSISO8601DateFormatWithTime = 1UL << 5,
+    NSISO8601DateFormatWithTimeZone = 1UL << 6,
+    NSISO8601DateFormatWithSpaceBetweenDateAndTime = 1UL << 7,
+    NSISO8601DateFormatWithDashSeparatorInDate = 1UL << 8,
+    NSISO8601DateFormatWithColonSeparatorInTime = 1UL << 9,
+    NSISO8601DateFormatWithColonSeparatorInTimeZone = 1UL << 10,
+    NSISO8601DateFormatWithFractionalSeconds = 1UL << 11,
+    NSISO8601DateFormatWithFullDate = NSISO8601DateFormatWithYear | NSISO8601DateFormatWithMonth |
+                                      NSISO8601DateFormatWithDay | NSISO8601DateFormatWithDashSeparatorInDate,
+    NSISO8601DateFormatWithFullTime = NSISO8601DateFormatWithTime | NSISO8601DateFormatWithColonSeparatorInTime |
+                                      NSISO8601DateFormatWithTimeZone |
+                                      NSISO8601DateFormatWithColonSeparatorInTimeZone,
+    NSISO8601DateFormatWithInternetDateTime = NSISO8601DateFormatWithFullDate | NSISO8601DateFormatWithFullTime,
+};
+
+@interface NSISO8601DateFormatter : NSFormatter
++ (NSString *)stringFromDate:(NSDate *)date timeZone:(NSTimeZone *)zone
+                formatOptions:(NSISO8601DateFormatOptions)opts;
+- (NSString *)stringFromDate:(NSDate *)date;
+- (NSDate *)dateFromString:(NSString *)string;
+@property (copy) NSTimeZone *timeZone;
+@property NSISO8601DateFormatOptions formatOptions;
+@end
+
+typedef NS_ENUM(NSInteger, NSDateComponentsFormatterUnitsStyle) {
+    NSDateComponentsFormatterUnitsStylePositional = 0,
+    NSDateComponentsFormatterUnitsStyleAbbreviated = 1,
+    NSDateComponentsFormatterUnitsStyleShort = 2,
+    NSDateComponentsFormatterUnitsStyleFull = 3,
+    NSDateComponentsFormatterUnitsStyleSpellOut = 4,
+    NSDateComponentsFormatterUnitsStyleBrief = 5,
+};
+typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) {
+    NSDateComponentsFormatterZeroFormattingBehaviorNone = 0,
+    NSDateComponentsFormatterZeroFormattingBehaviorDefault = 1UL << 0,
+    NSDateComponentsFormatterZeroFormattingBehaviorDropLeading = 1UL << 1,
+    NSDateComponentsFormatterZeroFormattingBehaviorDropMiddle = 1UL << 2,
+    NSDateComponentsFormatterZeroFormattingBehaviorDropTrailing = 1UL << 3,
+    NSDateComponentsFormatterZeroFormattingBehaviorDropAll = (1UL << 1) | (1UL << 2) | (1UL << 3),
+    NSDateComponentsFormatterZeroFormattingBehaviorPad = 1UL << 16,
+};
+
+@interface NSDateComponentsFormatter : NSFormatter
++ (NSString *)localizedStringFromDateComponents:(NSDateComponents *)comps
+                                     unitsStyle:(NSDateComponentsFormatterUnitsStyle)style;
+- (NSString *)stringFromDateComponents:(NSDateComponents *)comps;
+- (NSString *)stringFromDate:(NSDate *)start toDate:(NSDate *)end;
+- (NSString *)stringFromTimeInterval:(NSTimeInterval)interval;
+@property NSDateComponentsFormatterUnitsStyle unitsStyle;
+@property NSCalendarUnit allowedUnits;
+@property NSDateComponentsFormatterZeroFormattingBehavior zeroFormattingBehavior;
+@property (copy) NSCalendar *calendar;
+@property (copy) NSDate *referenceDate;
+@property BOOL allowsFractionalUnits;
+@property NSInteger maximumUnitCount;
+@property BOOL collapsesLargestUnit;
+@property BOOL includesApproximationPhrase;
+@property BOOL includesTimeRemainingPhrase;
 @end
 
 /* ---- NSURL ------------------------------------------------------------------------- */

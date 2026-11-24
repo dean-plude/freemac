@@ -11,9 +11,11 @@
  * zone is $TZ, else the one /etc/localtime names. A zone made from an offset
  * has that offset always.
  *
- * NSLocale knows identifiers and their parts only: Ferry formats everything
- * in English (United States), whatever the locale. The current locale comes
- * from the AppleLocale default or the usual LC_ALL, LC_MESSAGES and LANG.
+ * NSLocale knows identifiers and their parts, the default currency of a
+ * country and the calendar and currency keywords ("en_US@currency=EUR"):
+ * Ferry formats everything in English (United States), whatever the locale.
+ * The current locale comes from the AppleLocale default or the usual
+ * LC_ALL, LC_MESSAGES and LANG.
  * Built without ARC. */
 #import "FInternal.h"
 #include <fcntl.h>
@@ -652,6 +654,9 @@ NSLocaleKey const NSLocaleVariantCode = @"locale:variant code";
 NSLocaleKey const NSLocaleDecimalSeparator = @"locale:decimal separator";
 NSLocaleKey const NSLocaleGroupingSeparator = @"locale:grouping separator";
 NSLocaleKey const NSLocaleUsesMetricSystem = @"locale:uses metric";
+NSLocaleKey const NSLocaleCalendar = @"locale:calendar";
+NSLocaleKey const NSLocaleCurrencyCode = @"locale:currency code";
+NSLocaleKey const NSLocaleCurrencySymbol = @"locale:currency symbol";
 NSNotificationName const NSCurrentLocaleDidChangeNotification = @"kCFLocaleCurrentLocaleDidChangeNotification";
 
 static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
@@ -787,6 +792,15 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
         return [self groupingSeparator];
     if ([key isEqualToString:NSLocaleUsesMetricSystem])
         return [NSNumber numberWithBool:[self usesMetricSystem]];
+    if ([key isEqualToString:NSLocaleCurrencyCode])
+        return [self currencyCode];
+    if ([key isEqualToString:NSLocaleCurrencySymbol])
+        return [self currencySymbol];
+    if ([key isEqualToString:NSLocaleCalendar]) {
+        NSCalendar *c = [NSCalendar calendarWithIdentifier:[self calendarIdentifier]];
+        [c setLocale:self];
+        return c;
+    }
     return [_parts objectForKey:key];
 }
 
@@ -808,6 +822,31 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
 - (NSString *)variantCode { return [_parts objectForKey:NSLocaleVariantCode]; }
 - (NSString *)decimalSeparator { return @"."; }
 - (NSString *)groupingSeparator { return @","; }
+/* A keyword after the identifier's "@" ("@calendar=iso8601;currency=EUR"). */
+- (NSString *)_keyword:(NSString *)name
+{
+    NSRange at = [_id rangeOfString:@"@"];
+    if (at.location == NSNotFound)
+        return nil;
+    for (NSString *kv in [[_id substringFromIndex:at.location + 1] componentsSeparatedByString:@";"]) {
+        NSArray *p = [kv componentsSeparatedByString:@"="];
+        if ([p count] == 2 && [[[p objectAtIndex:0] lowercaseString] isEqualToString:name])
+            return [[p objectAtIndex:1] lowercaseString];
+    }
+    return nil;
+}
+/* The country's currency (none without a country), unless "@currency=" says. */
+- (NSString *)currencyCode
+{
+    NSString *k = [self _keyword:@"currency"];
+    return k ? [k uppercaseString] : FCurrencyOfCountry([self countryCode]);
+}
+- (NSString *)currencySymbol
+{
+    NSString *c = [self currencyCode];
+    return c ? FCurrencySymbol(c, NULL) : @"¤";
+}
+- (NSString *)calendarIdentifier { return [self _keyword:@"calendar"] ?: @"gregorian"; }
 - (BOOL)usesMetricSystem
 {
     NSString *c = [self countryCode];

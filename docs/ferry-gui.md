@@ -1081,7 +1081,8 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 74 tests (60 at M7, 69 before freemac (1.170)), all passing.
+check` runs 77 tests (60 at M7, 69 before freemac (1.170), 74 before
+freemac (1.173)), all passing.
 The new or extended ones:
 
 | Test | Proves |
@@ -1103,6 +1104,9 @@ The new or extended ones:
 | `foundation_invocation_O0` | (freemac (1.170)) the same program unoptimized and linked with chained fixups |
 | `foundation_json` | (freemac (1.170)) `NSJSONSerialization` reading objects, arrays, every escape, surrogate pairs, integers, large integers and doubles, `true`, `false` and `null`; the mutability options and fragments; UTF-16 and UTF-32 input; mistakes as errors in the Cocoa domain (3840) with their line, column and index; nesting too deep; writing compactly, pretty-printed and with sorted keys, slashes escaped or not, fragments; `isValidJSONObject:`; what raises (other classes, infinite numbers, non-string keys, a bad top level) |
 | `foundation_dates` | (freemac (1.170)) `NSTimeZone` from the system's time zone database (offsets, abbreviations, daylight saving time, the next change, a year past the database's list, local mean time), from offsets and abbreviations, `$TZ` as the system zone; `NSLocale` identifiers and their parts; `NSDateFormatter` writing every pattern letter of Unicode date patterns, in four zones, and the standard styles; reading ISO 8601, RFC 2822 and other strings with offsets, zone names and abbreviations, abutting fields, two-digit years, missing fields, day of year, eras, strict and lenient; part of a string, errors; templates; changed symbols and copies |
+| `foundation_calendar` | (freemac (1.173), Ferry 0.15.0) `NSCalendar` (Gregorian and ISO 8601) and `NSDateComponents`: every component of dates in New York, Paris and Tokyo, before 1970 and before the common era; week numbers and week-based years (en_US, en_GB and ISO 8601 weeks, week 53); dates from components, with a skipped and a repeated local time, values that carry, the components' own zone, week dates, the fourth Thursday and the last Monday of a month, a day of the year; copies, equality and `isValidDateInCalendar:`; adding months and years at month ends and leap days, days across a daylight saving change against 24 hours, mixed signs, wrapping; differences in years to seconds, weeks, backwards and between components; starts of days (New York, and Havana where midnight is skipped), the span of a day, week, month, year and hour; ranges and ordinals of units; today, yesterday and tomorrow, the weekend, comparing to a unit; the next date matching components (a time, a 31st, 29 February, Friday the 13th, a skipped time with each option, backwards), enumerating dates and setting a unit |
+| `foundation_numbers` | (freemac (1.173), Ferry 0.15.0) `NSNumberFormatter` in every style (no style, decimal, percent, currency, accounting, ISO code, plural, scientific, spell-out, ordinal) with their patterns and digits; fraction, integer and significant digits; all seven rounding modes on halves and negatives, 2.675 and 1.005 rounded as decimals, a rounding increment; grouping sizes, separators, multipliers, padding in each position, prefixes and suffixes; patterns with exponents, quotes, negative parts and a zero part; NaN, infinities, negative zero, the zero and nil symbols; euros, pounds, yen, rupees, francs and an unknown code; locales' currencies and the currency keyword; reading strictly and leniently (grouping, exponents, affixes, percent, accounting, limits, integers only, symbols), errors and part of a string; copies; `NSByteCountFormatter` in its four count styles and with its options |
+| `foundation_iso8601` | (freemac (1.173), Ferry 0.15.0) `NSISO8601DateFormatter` writing with each option in four zones (fractional seconds, the basic format, week and ordinal dates, a time alone, before 1970) and reading strings of the same shape only (offsets in each form, fractional seconds only with that option, no zone read in the formatter's, week and ordinal dates, a time alone); `NSDateFormatter`'s relative formatting ("Yesterday", "Today", "Tomorrow", with a time, read back) and its calendar; `NSDateComponentsFormatter` in its six styles, padded, without dropping zeros, with days, a limit of units, fractional hours, years and months on the calendar, the approximation and time remaining phrases |
 
 **What isn't done yet (and why).**
 
@@ -1137,13 +1141,58 @@ The new or extended ones:
   knows identifiers and their parts, but every locale writes and reads
   dates in English (United States): its month and day names and its
   standard styles (with a plain space before AM and PM, where newer Macs
-  put a narrow one). There's no `NSCalendar`, `NSDateComponents`,
-  `NSNumberFormatter`, `NSISO8601DateFormatter` or relative formatting
-  ("Today"); `doesRelativeDateFormatting` is kept and ignored. Time zone
+  put a narrow one). Since (1.173) there are `NSCalendar`,
+  `NSDateComponents`, `NSISO8601DateFormatter` and relative formatting
+  (see the next items). Time zone
   names (`zzzz`, `vvvv`) come from a table of the common zones, and others
   are written as GMT offsets. Fields a string leaves out come from
   `defaultDate`, or else from 1 January 2000 at midnight. `dateFormatFromTemplate:` handles
   the usual templates by rule, not from the Unicode locale data.
+- **Calendars: Gregorian and ISO 8601 only** (freemac (1.173)). Other
+  identifiers (Buddhist, Hebrew, Japanese and the rest) give nil. The
+  Gregorian calendar is proleptic: dates before 15 October 1582 are
+  Gregorian too, where a Mac switches to the Julian calendar. A local time
+  the clocks pass twice is the first of the two, and one they skip is moved
+  forward by the jump; ICU's documented default for a repeated time is the
+  later one, so this may differ on a Mac (not checked on one). The first
+  weekday and minimum days of the first week come from a subset of CLDR's
+  week data (Sunday first in the United States and the other countries CLDR
+  lists so, Saturday or Friday in a few, Monday elsewhere; four days in the
+  first week for most of Europe, one elsewhere); the weekend is always
+  Saturday and Sunday. The quarter is worked out, where older Macs returned
+  0. `dateBySettingUnit:` looks forward, as Apple documents, keeping the
+  smaller units; the range of weeks in a year counts the weeks of the
+  calendar year's own week-based year. Leap months (`isLeapMonth`) never
+  happen. None of these was compared with a real Mac.
+- **Numbers: English (United States) only** (freemac (1.173)). Every
+  locale writes and reads numbers with a point and commas; a locale's
+  country only picks the default currency, from a table of about 60
+  countries (a language alone, "en", has none). Currency symbols, digits
+  and plural names come from a table of 31 currencies; an unknown code is
+  written as itself. Doubles are rounded as the shortest decimal that
+  reads back as the same double (2.675 to two places is 2.68). Scientific
+  style shows every significant digit until fraction digits are set;
+  negative numbers that round to zero show "-0", and the infinities are
+  "+∞" and "-∞", as ICU writes them. Reading is strict unless lenient:
+  the affixes must be there and the whole string must be a number, though
+  grouping may be anywhere (ICU's default). Spelling out covers whole
+  numbers up to the quintillions and digits after "point"; spell-out
+  strings aren't read back. Partial string validation only checks the
+  characters. These choices weren't compared with a real Mac.
+- **ISO 8601 and relative dates** (freemac (1.173)). Week dates are
+  written as the standard writes them ("2024-W27-4"); with the week option
+  the month option is ignored. Fractional seconds are milliseconds, cut,
+  not rounded. Relative formatting joins the day to the time with " at "
+  ("Today at 3:05 PM") for every date style, as newer CLDR data does; older
+  Macs used ", " for the short and medium styles. A calendar set on a date
+  formatter is kept but its fields are still Gregorian.
+- **Durations and sizes** (freemac (1.173)). `NSDateComponentsFormatter`
+  writes English units in the six styles; positional days are written
+  "1d" before the clock, `maximumUnitCount` cuts rather than rounds, and
+  `collapsesLargestUnit` and reading strings aren't done.
+  `NSByteCountFormatter` counts files in thousands and memory in 1,024s
+  (still written KB), with Apple's adaptive digits (none for KB, one for
+  MB, two above). Neither was compared with a real Mac.
 - **Alerts and sheets are drawn inside Ferry** (1.167): a sheet hangs
   inside its window; one taller or wider than the window gets a window of
   its own, set modal for its parent. The alert's help button asks the
@@ -1181,9 +1230,11 @@ came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
 document classes, `NSAlert` and `NSWorkspace` in 1.167, see
 `appkit_documents`; `NSInvocation`, forwarding, `NSJSONSerialization` and
 `NSDateFormatter` in (1.170), see `foundation_invocation`,
-`foundation_json` and `foundation_dates`), then editing in tables' cells,
-autosaving, and `NSCalendar` and `NSNumberFormatter` on top of the new
-time zones and locales.
+`foundation_json` and `foundation_dates`; `NSCalendar`, `NSNumberFormatter`,
+`NSISO8601DateFormatter` and the components and byte count formatters in
+(1.173), see `foundation_calendar`, `foundation_numbers` and
+`foundation_iso8601`), then editing in tables' cells, autosaving, and
+other calendars and locales' own number and date data.
 
 ## Known limits (for every milestone)
 
@@ -1217,3 +1268,4 @@ bridge in the `ferry` binary.
 - 2026-11-23: M6 merged (#136). M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.
 - 2026-11-23: M7 merged (#171). More apps and installers: Ferry's Installer (.pkg, .dmg), scroll and text views, key-value observing, ICU, Carbon and Accessibility answers; ShiftIt runs into its event loop; MacPorts, XQuartz and Sequel Pro install, `make check` 67/67.
 - 2026-11-24: Ferry 0.14.0 (freemac (1.170)): `NSInvocation`, `NSMethodSignature`, `NSProxy` and message forwarding, `prepareWithInvocationTarget:`, `NSJSONSerialization`, `NSTimeZone`, `NSLocale` and `NSDateFormatter`, `make check` 74/74.
+- 2026-11-24: Ferry 0.15.0 (freemac (1.173)): `NSCalendar` (Gregorian and ISO 8601), `NSDateComponents`, `NSNumberFormatter`, `NSByteCountFormatter`, `NSISO8601DateFormatter`, `NSDateComponentsFormatter`, relative date formatting, locales' currencies, `make check` 77/77.

@@ -54,6 +54,20 @@ void FSortObjects(id *items, NSUInteger n, SEL selector);
 int64_t FDaysFromCivil(int64_t year, int month, int day);
 void FCivilFromDays(int64_t days, int64_t *year, int *month, int *day);
 
+/* The UTC time (*t, whole seconds since 1970) of a local wall-clock time in a
+ * zone (seconds since 1970 as if the zone were UTC). A time the clocks pass
+ * twice is the first of the two, or the later one if `later`. Returns 1 for a
+ * time the clocks skip: *t is then the time moved forward by the jump (gap
+ * 0), the moment of the jump (1), or the time moved back by it (2). Returns 0
+ * otherwise (NSCalendar.m). */
+int FLocalToUTC(NSTimeZone *tz, int64_t local, BOOL later, int gap, int64_t *t);
+
+/* The default currency of a country (ISO 3166 code), and the symbol English
+ * (United States) writes for a currency, with its usual fraction digits
+ * (NSNumberFormatter.m). */
+NSString *FCurrencyOfCountry(NSString *country);
+NSString *FCurrencySymbol(NSString *code, int *digits);
+
 @interface NSTimeZone (FerryInternal)
 /* The offset (seconds east of UTC), daylight saving flag and abbreviation in
  * effect at t, in whole seconds since 1970. */

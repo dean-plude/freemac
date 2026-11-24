@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.173 "Ferry: calendars and number formats" (done)
+
+Mac programs that show dates by week or month, money, percentages, file
+sizes or how long something takes lean on Foundation's calendar and
+formatter classes; Ferry now has them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSCalendar` (Gregorian and ISO 8601) and `NSDateComponents`: a date's parts in any time zone, dates from parts, adding months and days across month ends and daylight saving changes, differences, starts of days and weeks, weekends and the next matching date | Ferry Foundation | done |
+| 2 | `NSNumberFormatter` in every style (decimal, percent, currency, accounting, scientific, spelled out, ordinal), with rounding, grouping and patterns, reading numbers back; `NSByteCountFormatter` for file sizes | Ferry Foundation | done |
+| 3 | `NSISO8601DateFormatter`, "Yesterday", "Today" and "Tomorrow" in `NSDateFormatter`, and `NSDateComponentsFormatter` for durations such as "1 hr, 5 min" | Ferry Foundation | done |
+| 4 | `NSLocale` knows each country's currency; Ferry 0.15.0, tests `foundation_calendar`, `foundation_numbers` and `foundation_iso8601` (77 tests) | Ferry, Docs | done |
+
 ## 1.172 "Aliases" (done)
 
 | # | Item | Component | Status |

@@ -1,0 +1,103 @@
+calendars
+  identifiers: gregorian, iso8601
+  first weekday 1, minimum days in first week 1 (en_US)
+  first weekday 2, minimum days in first week 4 (ISO 8601)
+  first weekday 2, minimum days in first week 4 (en_GB)
+  unknown identifier: (nil)
+  current: gregorian in Europe/Paris
+  month symbols: January ... Dec, weekdays Sunday ... S
+components
+  New York: era 1 year 2024 quarter 3 month 7 day 4 hour 11 minute 5 second 9 nanosecond 250000000 weekday 5 ordinal 1 weekOfMonth 1 weekOfYear 27 yearForWeekOfYear 2024 dayOfYear 186
+  Paris: era 1 year 2024 quarter 3 month 7 day 4 hour 17 minute 5 second 9 nanosecond 250000000 weekday 5 ordinal 1 weekOfMonth 1 weekOfYear 27 yearForWeekOfYear 2024 dayOfYear 186
+  in Tokyo: era 1 year 2024 quarter 3 month 7 day 5 hour 0 minute 5 second 9 nanosecond 250000000 weekday 6 ordinal 1 weekOfMonth 1 weekOfYear 27 yearForWeekOfYear 2024 dayOfYear 187 zone Asia/Tokyo
+  1 January 2025, UTC (week 1 of 2025): era 1 year 2025 quarter 1 month 1 day 1 hour 0 minute 0 second 0 nanosecond 0 weekday 4 ordinal 1 weekOfMonth 1 weekOfYear 1 yearForWeekOfYear 2025 dayOfYear 1
+  29 December 2024, ISO 8601 (week 52 of 2024): weekday 1 weekOfYear 52 yearForWeekOfYear 2024
+  30 December 2024, ISO 8601 (week 1 of 2025): weekday 2 weekOfYear 1 yearForWeekOfYear 2025
+  1 January 2021, ISO 8601 (week 53 of 2020): weekOfYear 53 yearForWeekOfYear 2020
+  before 1970: era 1 year 1938 quarter 2 month 4 day 24 hour 22 minute 13 second 20 nanosecond 0 weekday 1 ordinal 4 weekOfMonth 5 weekOfYear 18 yearForWeekOfYear 1938 dayOfYear 114
+  1 BC: era 0 year 1 month 12 day 31
+  hour: 11, weekday of 4 July 2024: 5
+  getters: era 1 2024-07-04 11:05:09 + 250000000ns
+dates from components
+  2024-03-10 02:30 in New York (skipped): 2024-03-10 07:30:00 UTC
+  2024-11-03 01:30 in New York (repeated): 2024-11-03 05:30:00 UTC
+  2024-02-30 12:30 (carries): 2024-03-01 17:30:00 UTC
+  month 14 of 2024: 2025-02-01 17:30:00 UTC
+  with the components' own zone (Tokyo): 2025-02-01 03:30:00 UTC
+  Monday of ISO week 1 of 2025: 2024-12-30 00:00:00 UTC
+  fourth Thursday of November 2024: 2024-11-28 00:00:00 UTC
+  last Monday of May 2024: 2024-05-27 00:00:00 UTC
+  day 60 of 2024: 2024-02-29 00:00:00 UTC
+  nothing set: 0001-01-01 00:00:00 UTC
+  date with era 1, 2000-02-29 13:14:15: 2000-02-29 13:14:15 UTC
+  date of ISO week 53 of 2020, Friday: 2021-01-01 00:00:00 UTC
+components objects
+  copy equal: yes, after a change: no
+  undefined: yes, isLeapMonth no
+  date: 2024-02-29 00:00:00 UTC, valid yes; 30 February valid: no
+  set by unit: hour 7
+adding
+  31 January 2024 + 1 month: 2024-02-29 12:00:00 UTC
+  + 13 months: 2025-02-28 12:00:00 UTC
+  29 February 2024 + 1 year: 2025-02-28 12:00:00 UTC, - 4 years: 2020-02-29 12:00:00 UTC
+  + 1 day, + 2 weeks, + 1 quarter: 2024-03-01 12:00:00 UTC, 2024-03-14 12:00:00 UTC, 2024-05-29 12:00:00 UTC
+  New York, 9 March 15:00 + 1 day: 2024-03-10 19:00:00 UTC; + 24 hours: 2024-03-10 20:00:00 UTC
+  - 1 day + 3 hours - 90 minutes: 2024-02-28 13:30:00 UTC
+  12:00 + 13 hours, wrapping: 2024-02-29 01:00:00 UTC
+  29 February + 1 day, wrapping: 2024-02-01 12:00:00 UTC
+  February + 11 months, wrapping: 2024-01-29 12:00:00 UTC
+differences
+  2024-01-01 to 2025-01-01 12:30:45: year 1 month 0 day 0 hour 12 minute 30 second 45
+  in days: day 366
+  in weeks and days: day 2 weekOfYear 52
+  backwards: month -12 day 0
+  31 January to 29 February: month 1 day 0
+  in hours: hour 8796
+  across the change in New York: day 1 hour 0
+  from components to components: year 3 month 9 day 15
+starts and ranges
+  start of 10 March 2024 in New York: 2024-03-10 05:00:00 UTC
+  start of 10 March 2024 in Havana: 2024-03-10 05:00:00 UTC
+  the day of 10 March 2024 in New York: yes from 2024-03-10 05:00:00 UTC for 82800s
+  the day of 3 November 2024 in New York: yes from 2024-11-03 04:00:00 UTC for 90000s
+  February 2024: yes from 2024-02-01 00:00:00 UTC for 2.5056e+06s
+  2024: yes from 2024-01-01 00:00:00 UTC for 3.16224e+07s
+  the week of 29 February 2024 (en_US): yes from 2024-02-25 00:00:00 UTC for 604800s
+  the week of 29 February 2024 (ISO 8601): yes from 2024-02-26 00:00:00 UTC for 604800s
+  the hour: yes from 2024-02-29 12:00:00 UTC for 3600s
+  days in February 2024: 1..29 (ordinality 29)
+  days in January 2023: 1..31 (ordinality 31)
+  days in 2024: 1..366 (ordinality 60)
+  months in the year: 1..12 (ordinality 2)
+  hours in the day: 0..23 (ordinality 13)
+  weekdays in the week: 1..7 (ordinality 5)
+  weeks in February 2024: 1..5 (ordinality 5)
+  weeks in 2024 (en_US): 1..52 (ordinality 9)
+  weeks in 2020 (ISO 8601, 1 July): 1..53 (ordinality 27)
+  weeks in week-based year 2020 (ISO 8601, 1 January 2021): 1..53 (ordinality 53)
+  quarters: 1..4 (ordinality 1)
+  day ranges: minimum 1..28, maximum 1..31
+  weeks of the year at most: 1..53
+days
+  today: yes, yesterday: yes, tomorrow: yes
+  yesterday is today: no
+  same day: yes; across midnight: no
+  Saturday weekend: yes, Thursday weekend: no
+  the weekend: yes from 2024-03-02 00:00:00 UTC for 172800s
+  next weekend: yes from 2024-03-02 00:00:00 UTC for 172800s
+  compare to the month: 1, to the day: 0; equal to the year: yes
+matching
+  next 09:00 after 29 February 12:00: 2024-03-01 09:00:00 UTC
+  previous 09:00: 2024-02-29 09:00:00 UTC
+  next 31st: 2024-03-31 00:00:00 UTC
+  next 29 February: 2028-02-29 00:00:00 UTC
+  next 29 February, previous time preserved: 2025-02-28 00:00:00 UTC
+  next Friday the 13th: 2024-09-13 00:00:00 UTC
+  next 02:30 in New York after 9 March: 2024-03-10 07:00:00 UTC (next time), 2024-03-10 07:30:00 UTC (preserving smaller units)
+  matches: yes, no
+  the first days of months after 29 February 2024: 2024-03-01 2024-04-01 2024-05-01 2024-06-01
+  set hour 18:15:00: 2024-02-29 18:15:00 UTC
+  set the day to 15: 2024-03-15 12:00:00 UTC
+  set the month to 6: 2024-06-29 12:00:00 UTC
+  set the year to 2030: 2030-03-01 00:00:00 UTC, to 2000: (nil)
+exit=0
