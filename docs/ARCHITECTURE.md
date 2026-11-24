@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Slipway (1.146)
+
+`freemac-slipway` is the default app for `application/vnd.debian.binary-package`
+(`/etc/xdg/mimeapps.list`). `slipway_store.read()` runs `dpkg-deb --field`
+for the control fields and streams `dpkg-deb --fsys-tarfile` through
+`tarfile` once, keeping the `.desktop` files under `usr/share/applications`
+and the image files that could be icons, so the app's own name and icon show
+before anything is installed; nothing from the package is run. The download
+site is the `user.xdg.origin.url` attribute browsers put on the file.
+Installing is PackageKit's `install_files` on a worker thread (polkit's
+`package-install-untrusted`, an administrator's password), with
+`ALLOW_REINSTALL` or `ALLOW_DOWNGRADE` when that or a newer version is
+installed. Afterwards the app opens through its `Gio.DesktopAppInfo`, and
+the package can go to the Trash with `Gio.File.trash`.
+
 ## Startup Disk (1.145)
 
 Dials > Startup Disk (`dials_startup.py`) lists the firmware's UEFI boot

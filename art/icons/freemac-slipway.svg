@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Slipway: a boat carrying a package slides down the ramp into the water. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fdcf2"/><stop offset="1" stop-color="#5fb4dc"/>
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f26b4f"/><stop offset="1" stop-color="#c8432b"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbe7c0"/><stop offset="1" stop-color="#e2be7f"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#sky)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <!-- the ramp: planks running down into the water -->
+    <path d="M8 58 L120 104 L120 120 L8 120 Z" fill="#9b7650"/>
+    <path d="M8 58 L120 104" stroke="#6e4f31" stroke-width="3"/>
+    <path d="M22 70 l4 -9 M40 77 l4 -9 M58 84 l4 -9 M76 92 l4 -9 M94 99 l4 -9" stroke="#6e4f31" stroke-width="2" stroke-opacity="0.6"/>
+    <!-- the water, over the foot of the ramp -->
+    <path d="M8 98 C30 93 48 95 66 99 S98 105 120 97 L120 120 L8 120 Z" fill="#1f7fa3"/>
+    <path d="M20 109 h14 M50 106 h18 M84 112 h20" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <!-- the boat with its package, tilted down the slope -->
+  <g transform="rotate(22 62 70)">
+    <rect x="48" y="34" width="30" height="24" rx="3" fill="url(#box)" stroke="#a9803f" stroke-width="1.5"/>
+    <path d="M63 34 v24" stroke="#a9803f" stroke-width="1.5"/>
+    <path d="M57 46 l6 6 l6 -6" fill="none" stroke="#a9803f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30 58 H96 L87 74 C85 77 82 78 79 78 H45 C42 78 39 77 37 74 Z" fill="url(#hull)"/>
+    <path d="M30 58 H96 L94 62 H32 Z" fill="#ffffff" fill-opacity="0.85"/>
+  </g>
+</svg>

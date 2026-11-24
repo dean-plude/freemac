@@ -46,3 +46,6 @@ font/woff2=freemac-typecase.desktop
 application/x-font-ttf=freemac-typecase.desktop
 application/x-font-otf=freemac-typecase.desktop
 application/vnd.ms-opentype=freemac-typecase.desktop
+application/vnd.debian.binary-package=freemac-slipway.desktop
+application/x-deb=freemac-slipway.desktop
+application/x-debian-package=freemac-slipway.desktop

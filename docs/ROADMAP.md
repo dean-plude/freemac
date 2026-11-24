@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.146 "Slipway" (done)
+
+Install an app you downloaded, as opening an installer package on a Mac opens Installer.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Double-clicking a downloaded .deb opens Slipway, with Introduction, Installation and Summary steps down the side | Slipway, mimeapps | done |
+| 2 | Introduction shows the app's own name and icon (read from the package without installing it), version, size, publisher and description, the website it was downloaded from and when, and what's installed already | slipway_store.py | done |
+| 3 | Install through PackageKit after an administrator's password, getting what else it needs from the internet, with progress in words; Reinstall when that version is there; a package for another kind of computer is refused with what to download instead | Slipway, PackageKit | done |
+| 4 | Summary: Open the app, and the offer to move the downloaded package to the Trash; a failure says why in plain words, with Try Again | Slipway | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.145 "Startup Disk" (done)
 
 Choose which system the computer starts up from, as a Mac's Startup Disk settings do, for PCs with Windows (or another system) beside freemac.
