@@ -1118,6 +1118,19 @@ TOPICS = {
         "Waking from sleep works on every PC. Starting up from off works on most; if yours doesn't, turn on the "
         "wake alarm (sometimes called RTC Alarm or Resume by Alarm) in its firmware settings.",
     ]),
+    "install-download": ("Install an app you downloaded", "install installer deb package download app software "
+                         "setup slipway website", [
+        "Most apps are in Harbor, freemac's app centre. If a website offers its app for Linux as a .deb file "
+        "(for Debian or Ubuntu), download that and double-click it in Downloads: Slipway opens.",
+        "Slipway shows the app with its icon, version, publisher and size, and the website you downloaded it "
+        "from. Click Install and give an administrator's password; anything else the app needs comes from the "
+        "internet.",
+        "When it's done, click Open to start the app, or find it in Marina and Seek. Slipway offers to move the "
+        "downloaded file to the Trash, since you don't need it any more.",
+        "Only install apps from people you trust: an app can see your files and change anything on the computer. "
+        "A file made for another kind of computer (ARM, or older 32-bit PCs) can't be installed; look for the "
+        "download for 64-bit PCs (amd64).",
+    ]),
     "startup-disk": ("Start up from Windows or another disk", "startup disk boot windows dual boot restart in "
                      "other system linux usb stick disc efi uefi bios firmware boot menu", [
         "If your computer has Windows or another system as well as freemac, choose which one it starts up from "

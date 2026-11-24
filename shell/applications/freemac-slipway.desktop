@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Slipway
+GenericName=App Installer
+Comment=Install an app you downloaded (.deb package)
+Exec=freemac-slipway %f
+Icon=freemac-slipway
+Categories=System;PackageManager;
+Keywords=install;installer;deb;package;download;app;software;setup;
+MimeType=application/vnd.debian.binary-package;application/x-deb;application/x-debian-package;
+StartupWMClass=org.freemac.Slipway
+StartupNotify=true
