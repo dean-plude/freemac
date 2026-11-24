@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Now Playing and Seek in the menu bar (1.162)
+
+`now_playing_menu.NowPlayingMenu` subscribes once to `PropertiesChanged` on
+the MPRIS object path and to `NameOwnerChanged` for `org.mpris.MediaPlayer2.*`
+names, and folds bursts of them (a new track changes title, cover and length
+together) into one `media.current()` a quarter of a second later; nothing
+polls while the menu is closed. `media.describe()` now gives the album, the
+length and the position in microseconds. While the menu is open a one-second
+timer reads `Position` from the player playing and redraws the whole popup,
+since a partial redraw of a see-through layer surface can leave the desktop
+showing through on some compositors. `Seek` is a plain `StatusButton` that
+launches `freemac-seek`. Both have holder names (`nowplaying`, `seek`) in
+`menubar_hide`, so Dials can hide them as it does Wi-Fi and the rest.
+
 ## Focus menu and menu bar choices (1.161)
 
 `focus_menu.FocusMenu` is a `StatusButton` that Topline updates from its

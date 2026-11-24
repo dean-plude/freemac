@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.162 "Now Playing and Seek in the menu bar" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | While an app plays music or a video, or has it paused, a music note shows in the menu bar, and goes away when it stops | now_playing_menu.py (new), media.py | done |
+| 2 | Its menu: the album cover, the track, the artist and album, the app, a line with the time gone and left, and back, play or pause, and forward | now_playing_menu.py | done |
+| 3 | Seek's magnifying glass beside Quick Settings, as Spotlight's is on a Mac; a click opens Seek as ⌘Space does | now_playing_menu.py | done |
+| 4 | Dials > Dock and Menu Bar: Show Now Playing and Show Seek in menu bar | Dials | done |
+| 5 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.161 "Focus menu and the menu bar's icons" (done)
 
 | # | Item | Component | Status |
