@@ -878,6 +878,16 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Quick Settings modules (1.160)
+
+`quick.py`'s `Tile` is a box of two buttons: a round `GtkToggleButton` holding
+the symbol (the module's state, styled `quick-tile-symbol`, blue when checked)
+and a flat button for the words. `show_state` sets the toggle with its handler
+blocked, so reading the state back never switches anything. A tile given a
+`more` callback shows a chevron and calls it from its words; Topline hands
+Quick Settings its `WifiMenu` and `BluetoothMenu` (`menus`), and the words
+open that menu from its own symbol, or Dials' panel when the symbol is hidden.
+
 ## Ferry's tables and outlines (1.159)
 
 `ferry/appkit/NSTableView.m` and `NSOutlineView.m`, with private declarations
