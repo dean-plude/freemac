@@ -30,6 +30,14 @@
  * NSCreatesSortDescriptorBindingOption is NO; so the user's selection and
  * a click on a column's title reach the controller.
  *
+ * Trees and rows (Ferry 0.19.0): in an outline view whose content is bound
+ * to a tree controller, a column's "arrangedObjects.key" is the key of
+ * each row's node's represented object, and the outline's selection is
+ * bound as selectionIndexPaths. A column's editable and enabled bindings
+ * are read for each row's object, like its value; an edited cell is
+ * written back only when they are true for its row and the value's
+ * controller is editable (unless NSConditionallySetsEditable is NO).
+ *
  * Written from Apple's public documentation of NSKeyValueBindingCreation
  * and the Cocoa Bindings Reference; no Apple code was used. */
 #import "AInternal.h"
@@ -245,12 +253,22 @@ static BOOL is_column_value(ABinding *b)
 {
     return [b->view isKindOfClass:[NSTableColumn class]] && [b->name isEqualToString:NSValueBinding];
 }
+/* A column's value, editable and enabled bindings give a value for each
+ * row (Ferry 0.19.0 for the last two). */
+static BOOL is_column_rows(ABinding *b)
+{
+    if (![b->view isKindOfClass:[NSTableColumn class]])
+        return NO;
+    NSString *base = base_name(b->name);
+    return [b->name isEqualToString:NSValueBinding] || [base isEqualToString:NSEditableBinding] ||
+           [base isEqualToString:NSEnabledBinding];
+}
 
 static void apply(ABinding *b)
 {
     if (!b->observed)
         return;
-    if (is_column_value(b)) {
+    if (is_column_rows(b)) {
         /* a value for each row: the table reads them as it draws */
         [[(NSTableColumn *)b->view tableView] _ferryBoundRowsChanged];
         return;
@@ -392,6 +410,53 @@ static NSArray *column_rows(ABinding *b, NSString **rest)
     return [rows isKindOfClass:[NSArray class]] ? rows : nil;
 }
 
+/* The object a column binding reads in a row: in an outline view, the
+ * row's item (a tree controller's node stands for its represented
+ * object); in a table, that row of the bound rows. *rest is the key path
+ * read on it. */
+static id row_object(ABinding *b, NSInteger row, NSString **rest, BOOL *found)
+{
+    *found = NO;
+    NSTableView *tv = [(NSTableColumn *)b->view tableView];
+    if ([tv isKindOfClass:[NSOutlineView class]]) {
+        NSRange dot = [b->keyPath rangeOfString:@"."];
+        *rest = dot.location == NSNotFound ? nil : [b->keyPath substringFromIndex:dot.location + 1];
+        if (row < 0 || row >= [tv numberOfRows])
+            return nil;
+        id item = [(NSOutlineView *)tv itemAtRow:row];
+        *found = item != nil;
+        return [item isKindOfClass:[NSTreeNode class]] ? [item representedObject] : item;
+    }
+    NSArray *rows = column_rows(b, rest);
+    if (row < 0 || (NSUInteger)row >= [rows count])
+        return nil;
+    *found = YES;
+    return [rows objectAtIndex:(NSUInteger)row];
+}
+
+/* The value at the rest of b's key path on obj (transformed), and whether
+ * it was there. */
+static id row_value(ABinding *b, id obj, NSString *rest, BOOL *ok)
+{
+    id v = obj;
+    *ok = YES;
+    if (rest) {
+        @try {
+            v = [obj valueForKeyPath:rest];
+        } @catch (NSException *e) {
+            if (![[e name] isEqualToString:NSUndefinedKeyException] ||
+                [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
+                @throw;
+            *ok = NO;
+            return nil;
+        }
+    }
+    NSValueTransformer *t = transformer_of(b);
+    if (t)
+        v = [t transformedValue:v];
+    return v == [NSNull null] ? nil : v;
+}
+
 id ABindingCellValue(NSTableColumn *column, NSInteger row, BOOL *bound)
 {
     ABinding *b = binding_named(column, NSValueBinding);
@@ -400,26 +465,59 @@ id ABindingCellValue(NSTableColumn *column, NSInteger row, BOOL *bound)
     if (!b || row < 0)
         return nil;
     NSString *rest;
-    NSArray *rows = column_rows(b, &rest);
-    if ((NSUInteger)row >= [rows count])
+    BOOL found, ok;
+    id obj = row_object(b, row, &rest, &found);
+    if (!found)
         return nil;
-    id obj = [rows objectAtIndex:(NSUInteger)row], v = obj;
-    if (rest) {
-        @try {
-            v = [obj valueForKeyPath:rest];
-        } @catch (NSException *e) {
-            if (![[e name] isEqualToString:NSUndefinedKeyException] ||
-                [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
-                @throw;
-            return nil;
-        }
-    }
-    NSValueTransformer *t = transformer_of(b);
-    if (t)
-        v = [t transformedValue:v];
-    if (v == [NSNull null])
-        v = nil;
+    id v = row_value(b, obj, rest, &ok);
+    if (!ok)
+        return nil;
     return v ?: option(b, NSNullPlaceholderBindingOption);
+}
+
+/* Each of the column's bindings named so (enabled, enabled2...) true for
+ * the row's object: YES when none is bound. */
+BOOL ABindingCellAllows(NSTableColumn *column, NSString *name, NSInteger row)
+{
+    NSDictionary *all = bindings_of(column, NO);
+    for (NSString *n in all) {
+        ABinding *b = [all objectForKey:n];
+        if (![base_name(n) isEqualToString:name] || !b->observed)
+            continue;
+        NSString *rest;
+        BOOL found, ok;
+        id obj = row_object(b, row, &rest, &found);
+        if (!found)
+            continue;
+        id v = row_value(b, obj, rest, &ok);
+        if (ok && !truth(v))
+            return NO;
+    }
+    return YES;
+}
+
+BOOL ABindingCellHas(NSTableColumn *column, NSString *name)
+{
+    NSDictionary *all = bindings_of(column, NO);
+    for (NSString *n in all)
+        if ([base_name(n) isEqualToString:name] && ((ABinding *)[all objectForKey:n])->observed)
+            return YES;
+    return NO;
+}
+
+/* Whether the row's cell may be edited through the column's bindings: its
+ * value's controller is editable (unless NSConditionallySetsEditable is
+ * NO), and its editable and enabled bindings are true for the row. */
+BOOL ABindingCellEditable(NSTableColumn *column, NSInteger row)
+{
+    ABinding *b = binding_named(column, NSValueBinding);
+    if (b) {
+        id conditional = option(b, NSConditionallySetsEditableBindingOption);
+        if ((!conditional || [conditional boolValue]) && [b->observed respondsToSelector:@selector(isEditable)] &&
+            ![b->observed isEditable])
+            return NO;
+    }
+    return ABindingCellAllows(column, NSEditableBinding, row) && ABindingCellAllows(column, NSEnabledBinding, row);
 }
 
 BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value)
@@ -427,9 +525,12 @@ BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value)
     ABinding *b = binding_named(column, NSValueBinding);
     if (!b || row < 0)
         return NO;
+    if (!ABindingCellEditable(column, row))
+        return NO;   /* the controller (or the row) doesn't take edits */
     NSString *rest;
-    NSArray *rows = column_rows(b, &rest);
-    if (!rest || (NSUInteger)row >= [rows count])
+    BOOL found;
+    id obj = row_object(b, row, &rest, &found);
+    if (!rest || !found || !obj)
         return NO;
     NSValueTransformer *t = transformer_of(b);
     if (t) {
@@ -437,7 +538,6 @@ BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value)
             return NO;
         value = [t reverseTransformedValue:value];
     }
-    id obj = [rows objectAtIndex:(NSUInteger)row];
     id now = [obj valueForKeyPath:rest];
     if (now == value || [now isEqual:value])
         return YES;
@@ -458,9 +558,13 @@ void ABindingColumnJoinedTable(NSTableColumn *column)
     if (!binding_named(table, NSContentBinding))
         [table bind:NSContentBinding toObject:controller withKeyPath:[b->keyPath substringToIndex:dot.location]
             options:nil];
-    if ([controller respondsToSelector:@selector(selectionIndexes)] &&
-        !binding_named(table, NSSelectionIndexesBinding))
+    if ([table isKindOfClass:[NSOutlineView class]] && [controller respondsToSelector:@selector(selectionIndexPaths)]) {
+        if (!binding_named(table, NSSelectionIndexPathsBinding))
+            [table bind:NSSelectionIndexPathsBinding toObject:controller withKeyPath:@"selectionIndexPaths" options:nil];
+    } else if ([controller respondsToSelector:@selector(selectionIndexes)] &&
+               !binding_named(table, NSSelectionIndexesBinding)) {
         [table bind:NSSelectionIndexesBinding toObject:controller withKeyPath:@"selectionIndexes" options:nil];
+    }
     if ([controller respondsToSelector:@selector(sortDescriptors)] && !binding_named(table, NSSortDescriptorsBinding))
         [table bind:NSSortDescriptorsBinding toObject:controller withKeyPath:@"sortDescriptors" options:nil];
 }
@@ -549,9 +653,15 @@ static void expose_defaults(void)
     expose(@"NSObjectController", @[ NSContentObjectBinding, NSEditableBinding ]);
     expose(@"NSArrayController", @[ NSContentBinding, NSContentArrayBinding, NSContentSetBinding,
                                     NSSelectionIndexesBinding, NSSortDescriptorsBinding, NSFilterPredicateBinding ]);
+    expose(@"NSTreeController", @[ NSContentBinding, NSContentArrayBinding, NSContentObjectBinding,
+                                   NSContentSetBinding, NSSelectionIndexPathsBinding, NSSortDescriptorsBinding ]);
+    expose(@"NSDictionaryController", @[ NSContentDictionaryBinding, NSIncludedKeysBinding, NSExcludedKeysBinding,
+                                         NSInitialKeyBinding, NSInitialValueBinding,
+                                         NSLocalizedKeyDictionaryBinding ]);
     expose(@"NSTableView", @[ NSContentBinding, NSSelectionIndexesBinding, NSSortDescriptorsBinding ]);
-    expose(@"NSTableColumn", @[ NSValueBinding, NSHiddenBinding, NSHeaderTitleBinding, NSMaxWidthBinding,
-                                NSMinWidthBinding, NSWidthBinding ]);
+    expose(@"NSOutlineView", @[ NSSelectionIndexPathsBinding ]);
+    expose(@"NSTableColumn", @[ NSValueBinding, NSEditableBinding, NSEnabledBinding, NSHiddenBinding,
+                                NSHeaderTitleBinding, NSMaxWidthBinding, NSMinWidthBinding, NSWidthBinding ]);
 }
 
 @implementation NSObject (NSKeyValueBindingCreation)

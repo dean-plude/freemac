@@ -1333,6 +1333,73 @@ typedef NSString *NSNibName;
 - (void)removeObjectsAtArrangedObjectIndexes:(NSIndexSet *)indexes;
 - (void)removeObjects:(NSArray *)objects;
 @end
+/* A node of a tree (Ferry 0.19.0): an object it stands for, its parent and
+ * its children. A tree controller's arrangedObjects are made of them, and
+ * an outline view bound to one shows them as its items. */
+@interface NSTreeNode : NSObject
++ (instancetype)treeNodeWithRepresentedObject:(id)modelObject;
+- (instancetype)initWithRepresentedObject:(id)modelObject;
+@property (readonly, retain) id representedObject;
+@property (readonly, copy) NSIndexPath *indexPath;
+@property (readonly, getter=isLeaf) BOOL leaf;
+@property (readonly, copy) NSArray<NSTreeNode *> *childNodes;
+@property (readonly) NSMutableArray<NSTreeNode *> *mutableChildNodes;
+@property (readonly, assign) NSTreeNode *parentNode;
+- (NSTreeNode *)descendantNodeAtIndexPath:(NSIndexPath *)indexPath;
+- (void)sortWithSortDescriptors:(NSArray<NSSortDescriptor *> *)sortDescriptors recursively:(BOOL)recursively;
+@end
+/* A tree of content objects (Ferry 0.19.0): each object's children are
+ * found at childrenKeyPath; arrangedObjects answers childNodes and
+ * descendantNodeAtIndexPath:, a tree of NSTreeNode sorted level by level;
+ * the selection is a list of index paths. */
+@interface NSTreeController : NSObjectController
+@property (copy) NSString *childrenKeyPath, *countKeyPath, *leafKeyPath;
+- (NSString *)childrenKeyPathForNode:(NSTreeNode *)node;
+- (NSString *)countKeyPathForNode:(NSTreeNode *)node;
+- (NSString *)leafKeyPathForNode:(NSTreeNode *)node;
+@property (readonly, retain) id arrangedObjects;
+- (void)rearrangeObjects;
+@property (copy) NSArray<NSSortDescriptor *> *sortDescriptors;
+@property BOOL avoidsEmptySelection, preservesSelection, selectsInsertedObjects, alwaysUsesMultipleValuesMarker;
+@property (readonly, copy) NSArray<NSIndexPath *> *selectionIndexPaths;
+- (BOOL)setSelectionIndexPaths:(NSArray<NSIndexPath *> *)indexPaths;
+@property (readonly, copy) NSIndexPath *selectionIndexPath;
+- (BOOL)setSelectionIndexPath:(NSIndexPath *)indexPath;
+- (BOOL)addSelectionIndexPaths:(NSArray<NSIndexPath *> *)indexPaths;
+- (BOOL)removeSelectionIndexPaths:(NSArray<NSIndexPath *> *)indexPaths;
+@property (readonly, copy) NSArray<NSTreeNode *> *selectedNodes;
+@property (readonly) BOOL canInsert, canInsertChild, canAddChild;
+- (IBAction)addChild:(id)sender;
+- (IBAction)insert:(id)sender;
+- (IBAction)insertChild:(id)sender;
+- (void)insertObject:(id)object atArrangedObjectIndexPath:(NSIndexPath *)indexPath;
+- (void)insertObjects:(NSArray *)objects atArrangedObjectIndexPaths:(NSArray<NSIndexPath *> *)indexPaths;
+- (void)removeObjectAtArrangedObjectIndexPath:(NSIndexPath *)indexPath;
+- (void)removeObjectsAtArrangedObjectIndexPaths:(NSArray<NSIndexPath *> *)indexPaths;
+- (void)moveNode:(NSTreeNode *)node toIndexPath:(NSIndexPath *)indexPath;
+- (void)moveNodes:(NSArray<NSTreeNode *> *)nodes toIndexPath:(NSIndexPath *)startingIndexPath;
+@end
+/* One key and its value, as an NSDictionaryController arranges them. */
+@protocol NSDictionaryControllerKeyValuePair
+@property (copy) NSString *key;
+@property (retain) id value;
+@property (readonly, copy) NSString *localizedKey;
+@property (readonly, getter=isExplicitlyIncluded) BOOL explicitlyIncluded;
+@end
+/* A dictionary shown as an array of key-value pairs (Ferry 0.19.0). */
+@interface NSDictionaryController : NSArrayController
+- (id<NSDictionaryControllerKeyValuePair>)newObject;
+@property (copy) NSString *initialKey;
+@property (retain) id initialValue;
+@property (copy) NSArray<NSString *> *includedKeys, *excludedKeys;
+@property (copy) NSDictionary<NSString *, NSString *> *localizedKeyDictionary;
+@property (copy) NSString *localizedKeyTable;
+@end
+/* Index paths as collection views use them. */
+@interface NSIndexPath (NSCollectionViewAdditions)
++ (NSIndexPath *)indexPathForItem:(NSInteger)item inSection:(NSInteger)section;
+@property (readonly) NSInteger item, section;
+@end
 /* What a controller's selection answers when there is no single value. */
 APPKIT_EXTERN id NSMultipleValuesMarker, NSNoSelectionMarker, NSNotApplicableMarker;
 APPKIT_EXTERN BOOL NSIsControllerMarker(id object);
@@ -1407,7 +1474,10 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
     *const NSMinValueBinding, *const NSMaxValueBinding, *const NSTextColorBinding, *const NSImageBinding,
     *const NSAlternateTitleBinding, *const NSFontBinding, *const NSContentArrayBinding, *const NSContentSetBinding,
     *const NSSelectionIndexesBinding, *const NSSortDescriptorsBinding, *const NSFilterPredicateBinding,
-    *const NSHeaderTitleBinding, *const NSMaxWidthBinding, *const NSMinWidthBinding, *const NSWidthBinding;
+    *const NSHeaderTitleBinding, *const NSMaxWidthBinding, *const NSMinWidthBinding, *const NSWidthBinding,
+    *const NSSelectionIndexPathsBinding, *const NSContentDictionaryBinding, *const NSIncludedKeysBinding,
+    *const NSExcludedKeysBinding, *const NSInitialKeyBinding, *const NSInitialValueBinding,
+    *const NSLocalizedKeyDictionaryBinding;
 APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelectionPlaceholderBindingOption,
     *const NSMultipleValuesPlaceholderBindingOption, *const NSNotApplicablePlaceholderBindingOption,
     *const NSValueTransformerNameBindingOption, *const NSValueTransformerBindingOption,

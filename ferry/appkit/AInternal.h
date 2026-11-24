@@ -122,6 +122,16 @@ void ABindingRefresh(id view, NSString *name);
  * its place), and a new one written back to that row's object. */
 id ABindingCellValue(NSTableColumn *column, NSInteger row, BOOL *bound);
 BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value);
+/* (Ferry 0.19.0) In an outline view the row's object is its item's
+ * represented object. A column's per-row bindings: whether all its
+ * bindings named `name` (editable, enabled, enabled2...) are true for the
+ * row (YES when none is bound), whether it has one, and whether the row's
+ * cell takes edits (the value's controller editable, and the row's
+ * editable and enabled true). ABindingSetCellValue writes nothing when it
+ * doesn't. */
+BOOL ABindingCellAllows(NSTableColumn *column, NSString *name, NSInteger row);
+BOOL ABindingCellHas(NSTableColumn *column, NSString *name);
+BOOL ABindingCellEditable(NSTableColumn *column, NSInteger row);
 /* A bound column joined a table: the table's content, selectionIndexes and
  * sortDescriptors are bound to the same controller if they aren't yet. */
 void ABindingColumnJoinedTable(NSTableColumn *column);
@@ -137,6 +147,10 @@ NSUInteger ABeepCount(void);
 /* A table's bound rows changed (a bound column's apply). */
 @interface NSTableView (FerryBindings)
 - (void)_ferryBoundRowsChanged;
+/* whether the table is being set from a binding, and running a step so
+ * (an outline view's own steps: nothing it does then is written back) */
+- (BOOL)_ferryIsBindingUpdate;
+- (void)_ferryAsBindingUpdate:(void (^)(void))step;
 @end
 
 /* A proxy that hears of its sources' keys (NSUserDefaultsController.m):
@@ -153,6 +167,24 @@ NSUInteger ABeepCount(void);
 - (NSArray *)_sources;
 - (void)_sourceWillChange;
 - (void)_sourceDidChange;
+@end
+
+/* The selection of an array or tree controller (NSArrayController.m):
+ * "selection.key" is the one value the controller's selectedObjects share,
+ * or NSMultipleValuesMarker (always, with more than one, when the
+ * controller's alwaysUsesMultipleValuesMarker says so), NSNoSelectionMarker
+ * or NSNotApplicableMarker; setting it sets every selected object's key. */
+@interface AArraySelection : AKeyProxy {
+@public
+    id controller;   /* not retained: it owns us */
+}
+@end
+/* The steps an array controller changes its content by, which
+ * NSDictionaryController follows (NSArrayController.m). */
+@interface NSArrayController (FerryPrivate)
+- (void)_contentInsert:(NSArray *)objects atIndexes:(NSIndexSet *)indexes;
+- (void)_contentRemove:(NSArray *)objects;
+- (NSArray *)_contentObjects;
 @end
 
 @interface NSButtonCell (FerryPrivate)

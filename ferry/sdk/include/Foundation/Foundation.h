@@ -639,6 +639,23 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 - (void)replaceObjectsAtIndexes:(NSIndexSet *)indexes withObjects:(NSArray<ObjectType> *)objects;
 @end
 
+/* Index paths (Ferry 0.19.0): a list of indexes, one for each step down a
+ * tree, as a tree controller's selection is. */
+@interface NSIndexPath : NSObject <NSCopying>
++ (instancetype)indexPathWithIndex:(NSUInteger)index;
++ (instancetype)indexPathWithIndexes:(const NSUInteger *)indexes length:(NSUInteger)length;
+- (instancetype)init;
+- (instancetype)initWithIndex:(NSUInteger)index;
+- (instancetype)initWithIndexes:(const NSUInteger *)indexes length:(NSUInteger)length;
+- (NSIndexPath *)indexPathByAddingIndex:(NSUInteger)index;
+- (NSIndexPath *)indexPathByRemovingLastIndex;
+- (NSUInteger)indexAtPosition:(NSUInteger)position;
+@property (readonly) NSUInteger length;
+- (void)getIndexes:(NSUInteger *)indexes range:(NSRange)positionRange;
+- (void)getIndexes:(NSUInteger *)indexes;
+- (NSComparisonResult)compare:(NSIndexPath *)otherObject;
+@end
+
 /* Sort descriptors: compare objects by the value at a key path. */
 @interface NSSortDescriptor : NSObject <NSCopying, NSSecureCoding>
 + (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending;

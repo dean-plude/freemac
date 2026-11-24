@@ -343,8 +343,46 @@ key-value observing are in. So are the collection operators in key paths
 `NSPredicate` subset for filtering. Removing an observer that isn't
 registered now raises, as on a Mac.
 
-`NSTreeController` (outline views bound to a tree of objects) isn't done
-yet. None of the nine apps has been run again with these.
+None of the nine apps has been run again with these.
+
+### Tree controllers and outline bindings ((1.190), Ferry 0.19.0)
+
+`NSTreeController` is in, with `NSTreeNode` and `NSIndexPath`. It holds a
+tree of objects, read through `childrenKeyPath` (an array or a set of
+children), with `leafKeyPath` or `countKeyPath` saying which objects are
+leaves. Its `arrangedObjects` is a tree of `NSTreeNode`s, each holding
+one of the objects, sorted level by level by `sortDescriptors`. The
+selection is a list of index paths (`selectionIndexPaths`), and
+`selectedObjects`, `selectedNodes` and `selection.someKey` follow it.
+Inserting, removing and moving at index paths change the children
+through each parent's accessors, so the model hears of each change. The
+`add:`, `insert:`, `addChild:`, `insertChild:` and `remove:` actions are
+carried out on the run loop's next turn. When the model changes its
+children, the tree is arranged again and the nodes that are still there
+are kept.
+
+An outline view column's `value` bound to `arrangedObjects.key` of a tree
+controller shows that key of each node's object. The outline's `content`,
+`selectionIndexPaths` and `sortDescriptors` are then bound to the same
+controller. Opening and closing rows works as with a data source, a
+click selects in the controller, a node the controller selects is shown
+with its parents opened, and a click on a column's title sorts the tree.
+A cell edited in place sets the key on its node's object.
+
+A table or outline column's `editable` and `enabled` bindings are now
+read for each row's object, so some rows can be locked or greyed. An
+edited cell is written back only when its controller is editable. With
+`NSConditionallySetsEditable` set to NO, the column's own editability
+decides.
+
+`NSDictionaryController` is in too. It shows a dictionary as key-value
+pairs sorted by key, with included, excluded and localized keys. A
+pair's changed key or value is written back to the dictionary, and `add:`
+makes a pair with a new key.
+
+These were written from Apple's documentation and not compared with a
+Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of the nine
+apps has been run again with these.
 
 ## What the apps need most
 

@@ -192,7 +192,7 @@ the library picked 1: arranged Eve,Ann,Cy,Dee,Ike, selection {1} (index 1), sele
 the library's people replaced: arranged Cy,Bob, selection {0} (index 0), selection.name Cy
   info: people
 table bound to: content arrangedObjects, selectionIndexes selectionIndexes, sortDescriptors sortDescriptors
-sort prototypes: name, age, nil; nick column titled 3; exposes value,hidden,headerTitle,maxWidth,minWidth,width
+sort prototypes: name, age, nil; nick column titled 3; exposes value,editable,enabled,hidden,headerTitle,maxWidth,minWidth,width
 bound: 3 rows, selected {0}
   row 0: [Cy] [33] [(none)]
   row 1: [Ann] [40] [(none)]

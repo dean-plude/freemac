@@ -97,8 +97,16 @@ adding, inserting and removing), with table columns bound to
 column's title sorts it, and an edited cell writes back. Key-value
 coding has `mutableSetValueForKey:` and the collection operators
 (`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and
-`NSPredicate` reads a subset of Apple's format strings. Tree controllers
-aren't there yet.
+`NSPredicate` reads a subset of Apple's format strings. From freemac
+(1.190) `NSTreeController` is there (children, count and leaf key paths,
+`arrangedObjects` as a tree of `NSTreeNode`s, a selection of
+`NSIndexPath`s, and adding, inserting, removing and moving nodes), with
+outline view columns bound to `arrangedObjects.key`: rows open and close,
+the selection goes both ways, a column's title sorts the tree, and an
+edited cell writes back. Columns' per-row `editable` and `enabled`
+bindings are followed, an edited cell isn't written back when its
+controller isn't editable, and `NSDictionaryController` shows a
+dictionary as key-value pairs.
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question

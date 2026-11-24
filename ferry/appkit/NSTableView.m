@@ -1334,6 +1334,18 @@ enum {
         else
             [self reloadData];
         ABindingRefresh(self, NSSelectionIndexesBinding);
+        ABindingRefresh(self, NSSelectionIndexPathsBinding);
+    } @finally {
+        _bindingUpdate = was;
+    }
+}
+- (BOOL)_ferryIsBindingUpdate { return _bindingUpdate; }
+- (void)_ferryAsBindingUpdate:(void (^)(void))step
+{
+    BOOL was = _bindingUpdate;
+    _bindingUpdate = YES;
+    @try {
+        step();
     } @finally {
         _bindingUpdate = was;
     }
@@ -2012,7 +2024,8 @@ enum {
 {
     NSTableColumn *c = [_columns objectAtIndex:(NSUInteger)column];
     NSCell *cell = [self _delegateCellForColumn:c row:row] ?: [c dataCellForRow:row];
-    return [cell isKindOfClass:[NSTextFieldCell class]] && [cell isEnabled] ? cell : nil;
+    BOOL enabled = ABindingCellHas(c, NSEnabledBinding) ? ABindingCellAllows(c, NSEnabledBinding, row) : [cell isEnabled];
+    return [cell isKindOfClass:[NSTextFieldCell class]] && enabled ? cell : nil;
 }
 /* Whether a double click (or Return, or Tab from the cell before) edits
  * this cell: in a view-based table, when it holds an editable text field;
@@ -2025,6 +2038,8 @@ enum {
     NSTableColumn *c = [_columns objectAtIndex:(NSUInteger)column];
     if ([c isHidden])
         return NO;
+    if (!ABindingCellEditable(c, row))
+        return NO;   /* its controller, or its row's editable or enabled binding, says no */
     if ([self _delegateMakesViews])
         return [self _editableFieldAtColumn:column row:row] != nil;
     if ([self _isGroupRow:row] || ![c isEditable] ||
@@ -2295,7 +2310,8 @@ enum {
     BOOL changed = [_selection countOfIndexesInRange:beyond] > 0;
     [_selection removeIndexesInRange:beyond];
     /* a bound selection is the controller's to choose */
-    if (!_empty && ![_selection count] && _rows > 0 && !ABindingIsBound(self, NSSelectionIndexesBinding)) {
+    if (!_empty && ![_selection count] && _rows > 0 && !ABindingIsBound(self, NSSelectionIndexesBinding) &&
+        !ABindingIsBound(self, NSSelectionIndexPathsBinding)) {
         [_selection addIndex:0];
         changed = YES;
     }
@@ -2500,8 +2516,10 @@ enum {
     if (![_selection count])
         _lastSelected = -1;
     [self _selectionChanged];
-    if (!_bindingUpdate)
+    if (!_bindingUpdate) {
         ABindingPush(self, NSSelectionIndexesBinding);
+        ABindingPush(self, NSSelectionIndexPathsBinding);
+    }
     if (notify)
         [self _post:[self _selectionDidChangeName] selector:[self _selectionDidChangeSelector] userInfo:nil];
 }
@@ -2757,7 +2775,7 @@ enum {
     NSTableColumn *col = [_columns objectAtIndex:(NSUInteger)column];
     NSCell *cell = [self preparedCellAtColumn:column row:row];
     if (![cell isKindOfClass:[NSButtonCell class]] || ![(NSButtonCell *)cell _isCheck] || ![cell isEnabled] ||
-        ![col isEditable])
+        ![col isEditable] || !ABindingCellEditable(col, row))
         return NO;
     NSInteger next = [cell state] == NSControlStateValueOn ? NSControlStateValueOff : NSControlStateValueOn;
     [self _setObjectValue:@(next) forColumn:col row:row];
@@ -3166,6 +3184,8 @@ enum {
     else
         [cell setObjectValue:value];
     [cell setControlView:self];
+    if (ABindingCellHas(c, NSEnabledBinding))
+        [cell setEnabled:ABindingCellAllows(c, NSEnabledBinding, row)];
     BOOL selected = [self isRowSelected:row] || [self isColumnSelected:column];
     [cell setBackgroundStyle:selected && [self _isEmphasized] && _highlight != NSTableViewSelectionHighlightStyleNone
                                  ? NSBackgroundStyleEmphasized

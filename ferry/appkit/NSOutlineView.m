@@ -20,6 +20,16 @@
  * new value going to outlineView:setObjectValue:forTableColumn:byItem:
  * and the delegate's outlineView:shouldEditTableColumn:item: asked first.
  *
+ * Bindings (Ferry 0.19.0): with its content bound to a tree controller's
+ * arrangedObjects, the items are the controller's NSTreeNodes (a node's
+ * children are its childNodes, and it can open unless it is a leaf), and
+ * a column bound to "arrangedObjects.key" shows each node's represented
+ * object's key, writing an edited cell back to it. Binding such a column
+ * binds the outline's content, selectionIndexPaths and sortDescriptors to
+ * the same controller, unless they are bound already. The selection goes
+ * both ways as index paths; a node the controller selects is shown, its
+ * parents opened. A click on a column's title sorts the controller.
+ *
  * Nibs: "NSOutlineViewIndentationPerLevelKey" and
  * "NSOutlineViewOutlineTableColumnKey". */
 #import "AInternal.h"
@@ -187,19 +197,63 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
             return n;
     return [self _nodeForItem:item under:_root identical:YES] ?: [self _nodeForItem:item under:_root identical:NO];
 }
+/* With bound content, the tree it is bound to: what answers childNodes
+ * (a tree controller's arrangedObjects), or an array of items. */
+- (BOOL)_hasBoundTree { return ABindingIsBound(self, NSContentBinding); }
+- (NSArray *)_boundChildrenOf:(id)item
+{
+    id kids;
+    if (item) {
+        kids = [item respondsToSelector:@selector(childNodes)] ? [item childNodes] : nil;
+    } else {
+        id tree = ABindingModelValue(self, NSContentBinding, NULL);
+        kids = [tree respondsToSelector:@selector(childNodes)] ? [tree childNodes] : tree;
+    }
+    if ([kids isKindOfClass:[NSSet class]])
+        kids = [kids allObjects];
+    return [kids isKindOfClass:[NSArray class]] ? kids : nil;
+}
+/* The data source's (or the bound tree's) answers. */
+- (NSInteger)_numberOfChildrenOf:(id)item
+{
+    if ([self _hasBoundTree])
+        return (NSInteger)[[self _boundChildrenOf:item] count];
+    id ds = [self dataSource];
+    return [ds respondsToSelector:@selector(outlineView:numberOfChildrenOfItem:)] ? [ds outlineView:self numberOfChildrenOfItem:item]
+                                                                                 : 0;
+}
+- (BOOL)_canAskForChildren
+{
+    return [self _hasBoundTree] || [[self dataSource] respondsToSelector:@selector(outlineView:child:ofItem:)];
+}
+- (id)_child:(NSInteger)i of:(id)item
+{
+    if ([self _hasBoundTree]) {
+        NSArray *kids = [self _boundChildrenOf:item];
+        return i >= 0 && (NSUInteger)i < [kids count] ? [kids objectAtIndex:(NSUInteger)i] : nil;
+    }
+    return [[self dataSource] outlineView:self child:i ofItem:item];
+}
+- (BOOL)_itemIsExpandable:(id)item
+{
+    if ([self _hasBoundTree]) {
+        if ([item respondsToSelector:@selector(isLeaf)])
+            return ![item isLeaf];
+        return [[self _boundChildrenOf:item] count] > 0;
+    }
+    id ds = [self dataSource];
+    return [ds respondsToSelector:@selector(outlineView:isItemExpandable:)] && [ds outlineView:self isItemExpandable:item];
+}
 /* Asks the data source for node's children again, keeping what is known
  * (open or not, grandchildren) of the ones it had before. */
 - (void)_loadChildrenOf:(AOutlineNode *)node
 {
-    id ds = [self dataSource];
-    NSInteger n = [ds respondsToSelector:@selector(outlineView:numberOfChildrenOfItem:)]
-                      ? [ds outlineView:self numberOfChildrenOfItem:node->item]
-                      : 0;
+    NSInteger n = [self _numberOfChildrenOf:node->item];
     NSMutableArray *old = node->children;
     NSMutableArray *kids = [[NSMutableArray alloc] initWithCapacity:(NSUInteger)MAX(n, 0)];
-    BOOL canAsk = [ds respondsToSelector:@selector(outlineView:child:ofItem:)];
+    BOOL canAsk = [self _canAskForChildren];
     for (NSInteger i = 0; canAsk && i < n; i++) {
-        id item = [ds outlineView:self child:i ofItem:node->item];
+        id item = [self _child:i of:node->item];
         AOutlineNode *c = nil;
         for (AOutlineNode *o in old)
             if (o->item == item) {
@@ -225,8 +279,7 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
         }
         c->parent = node;
         c->level = node->level + 1;
-        c->expandable = [ds respondsToSelector:@selector(outlineView:isItemExpandable:)] &&
-                        [ds outlineView:self isItemExpandable:item];
+        c->expandable = [self _itemIsExpandable:item];
         if (!c->expandable) {
             c->expanded = NO;
             [c->children release];
@@ -451,10 +504,8 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
     if (n == _root || children) {
         [self _loadChildrenOf:n];
     } else {
-        id ds = [self dataSource];
         BOOL was = n->expandable;
-        n->expandable = [ds respondsToSelector:@selector(outlineView:isItemExpandable:)] &&
-                        [ds outlineView:self isItemExpandable:n->item];
+        n->expandable = [self _itemIsExpandable:n->item];
         if (!n->expandable)
             n->expanded = NO;
         if (was == n->expandable) {
@@ -518,14 +569,24 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
 
 - (id)_objectValueForColumn:(NSTableColumn *)c row:(NSInteger)row
 {
+    BOOL bound;
+    id v = ABindingCellValue(c, row, &bound);
+    if (bound)
+        return v;
     id ds = [self dataSource];
     AOutlineNode *n = [self _nodeAtRow:row];
+    if (n && [self _hasBoundTree])
+        return n->item;
     if (n && [ds respondsToSelector:@selector(outlineView:objectValueForTableColumn:byItem:)])
         return [ds outlineView:self objectValueForTableColumn:c byItem:n->item];
     return nil;
 }
 - (void)_setObjectValue:(id)v forColumn:(NSTableColumn *)c row:(NSInteger)row
 {
+    if (ABindingIsBound(c, NSValueBinding)) {
+        ABindingSetCellValue(c, row, v);
+        return;
+    }
     id ds = [self dataSource];
     AOutlineNode *n = [self _nodeAtRow:row];
     if (n && [ds respondsToSelector:@selector(outlineView:setObjectValue:forTableColumn:byItem:)])
@@ -614,6 +675,8 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
 - (SEL)_columnDidResizeSelector { return @selector(outlineViewColumnDidResize:); }
 - (void)_sortDescriptorsDidChange:(NSArray *)old
 {
+    if (![self _ferryIsBindingUpdate])
+        ABindingPush(self, NSSortDescriptorsBinding);
     id ds = [self dataSource];
     if ([ds respondsToSelector:@selector(outlineView:sortDescriptorsDidChange:)])
         [ds outlineView:self sortDescriptorsDidChange:old];
@@ -627,6 +690,64 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
 {
     if ([[self delegate] respondsToSelector:@selector(outlineView:didClickTableColumn:)])
         [[self delegate] outlineView:self didClickTableColumn:c];
+}
+
+/* ---- bindings: the selection as index paths ---- */
+
+- (NSArray *)_selectedIndexPaths
+{
+    NSMutableArray *paths = [NSMutableArray array];
+    for (id item in [self _selectedItems])
+        if ([item respondsToSelector:@selector(indexPath)])
+            [paths addObject:[item indexPath]];
+    return paths;
+}
+/* The bound selection: each path's node is shown (its parents opened)
+ * and selected. */
+- (void)_selectIndexPaths:(NSArray *)paths
+{
+    id tree = ABindingModelValue(self, NSContentBinding, NULL);
+    NSMutableArray *items = [NSMutableArray array];
+    for (NSIndexPath *p in [paths isKindOfClass:[NSArray class]] ? paths : @[]) {
+        id node = [p isKindOfClass:[NSIndexPath class]] && [tree respondsToSelector:@selector(descendantNodeAtIndexPath:)]
+                      ? [tree descendantNodeAtIndexPath:p]
+                      : nil;
+        if (node)
+            [items addObject:node];
+    }
+    [self numberOfRows];
+    for (id item in items) {
+        NSMutableArray *up = [NSMutableArray array];
+        for (id a = [item respondsToSelector:@selector(parentNode)] ? [item parentNode] : nil;
+             a && [a respondsToSelector:@selector(parentNode)] && [a parentNode]; a = [a parentNode])
+            [up insertObject:a atIndex:0];
+        for (id a in up)
+            if (![self isItemExpanded:a])
+                [self expandItem:a];
+    }
+    NSMutableIndexSet *rows = [NSMutableIndexSet indexSet];
+    for (id item in items) {
+        NSInteger r = [self rowForItem:item];
+        if (r >= 0)
+            [rows addIndex:(NSUInteger)r];
+    }
+    if (![rows isEqualToIndexSet:[self selectedRowIndexes]])
+        [self selectRowIndexes:rows byExtendingSelection:NO];
+}
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSSelectionIndexPathsBinding])
+        [self _ferryAsBindingUpdate:^{
+            [self _selectIndexPaths:value];
+        }];
+    else
+        [super _ferrySetValue:value forBinding:binding];
+}
+- (id)_ferryValueForBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSSelectionIndexPathsBinding])
+        return [self _selectedIndexPaths];
+    return [super _ferryValueForBinding:binding];
 }
 
 /* ---- the disclosure chevrons ---- */

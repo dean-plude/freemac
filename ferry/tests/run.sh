@@ -32,7 +32,7 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller)
+        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -259,6 +259,10 @@ run_one appkit_binding_controls "$here/appkit/binding_controls.m" "$here/appkit/
     -framework Cocoa
 # NSArrayController, and a table whose columns are bound to it (Ferry 0.18.0).
 run_one appkit_array_controller "$here/appkit/array_controller.m" "$here/appkit/array_controller.out" -fobjc-arc \
+    -framework Cocoa
+# NSTreeController and NSTreeNode, an outline view bound to one, per-row
+# editable and enabled column bindings, and NSDictionaryController (Ferry 0.19.0).
+run_one appkit_tree_controller "$here/appkit/tree_controller.m" "$here/appkit/tree_controller.out" -fobjc-arc \
     -framework Cocoa
 # NSDocument autosaving, in a home of its own (Ferry 0.16.0).
 run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -fobjc-arc -framework Cocoa

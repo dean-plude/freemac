@@ -84,12 +84,6 @@ static BOOL same_objects(NSArray *a, NSArray *b)
 - (void)_contentDidChange;
 @end
 
-@interface AArraySelection : AKeyProxy {
-@public
-    NSArrayController *controller;   /* not retained */
-}
-@end
-
 @implementation NSArrayController {
     id _items;                       /* the content: an array or a set */
     NSMutableArray *_arranged;
@@ -773,7 +767,7 @@ static char arranged_context;
 @implementation AArraySelection
 - (NSArray *)_sources { return controller ? distinct([controller selectedObjects]) : [NSArray array]; }
 /* One value for all the selected objects, or a marker. */
-static id shared_value(NSArrayController *controller, NSString *keyPath, BOOL isPath)
+static id shared_value(id controller, NSString *keyPath, BOOL isPath)
 {
     NSArray *objects = [controller selectedObjects];
     if (![objects count])
