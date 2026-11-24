@@ -317,6 +317,35 @@ table's column cell formatter is used when its cells are edited. Array
 and tree controllers aren't done yet. None of the nine apps has been run
 again since.
 
+### Array controllers and table bindings ((1.188), Ferry 0.18.0)
+
+`NSArrayController` is in. It holds an array (or a set), set with
+`setContent:` or bound with `contentArray` or `contentSet`, and shows it
+in `arrangedObjects`, filtered by `filterPredicate` and sorted by
+`sortDescriptors`. `selection.someKey` reads and writes the key of every
+selected object: their one value, or `NSMultipleValuesMarker` when they
+disagree. Adding, inserting and removing change the bound array through
+its owner's accessors, so the owner hears of each change. The `add:`,
+`insert:` and `remove:` actions are carried out on the run loop's next
+turn, and `NSObjectController`'s `add:` and `remove:` now are too, as
+Apple documents. `avoidsEmptySelection`, `preservesSelection`,
+`selectsInsertedObjects`, `clearsFilterPredicateOnInsertion` and
+`automaticallyRearrangesObjects` are honoured.
+
+A table column's `value` bound to `arrangedObjects.key` shows that key of
+each arranged object. The table's `content`, `selectionIndexes` and
+`sortDescriptors` are then bound to the same controller, so a click on a
+row selects in the controller, and a click on a column's title sorts the
+controller's objects. A cell edited in place sets the key on its row's
+object. Underneath, `mutableSetValueForKey:` and the set mutation kinds of
+key-value observing are in. So are the collection operators in key paths
+(`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and an
+`NSPredicate` subset for filtering. Removing an observer that isn't
+registered now raises, as on a Mac.
+
+`NSTreeController` (outline views bound to a tree of objects) isn't done
+yet. None of the nine apps has been run again with these.
+
 ## What the apps need most
 
 Counted over the nine apps:

@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.188 "Ferry: array controllers and table bindings" (done)
+
+Mac programs that keep a list in an array controller and show it in a
+table, sorted, filtered and edited through bindings, now work the way they
+do on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSArrayController`: content from an array, a set or a binding; arranged objects filtered and sorted; selection by index or object, with next and previous; `selection.key` with the multiple, no-selection and not-applicable markers; add, insert and remove, with the usual options | Ferry AppKit | done |
+| 2 | Table columns bound to `arrangedObjects.key`: rows, values, sorting by a click on the column title, the selection both ways, and edited cells written back | Ferry AppKit | done |
+| 3 | `mutableSetValueForKey:`, the collection operators (`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions) and a subset of `NSPredicate` for filtering | Ferry Foundation | done |
+| 4 | Ferry 0.18.0, tests `foundation_kvc_collections` and `appkit_array_controller` (84 tests) | Ferry, Docs | done |
+
 ## 1.187 "Tint" (done)
 
 | # | Item | Component | Status |

@@ -21,6 +21,15 @@
  * property as it is, unless NSRaisesForNotApplicableKeysBindingOption is
  * YES.
  *
+ * Tables (Ferry 0.18.0): a table column's value bound to
+ * "arrangedObjects.key" of an array controller shows each arranged
+ * object's key in its row, and an edited cell sets it on that object.
+ * Binding a column so binds its table's content, selectionIndexes and
+ * sortDescriptors to the same controller, unless they are bound already,
+ * and gives the column a sort descriptor for the key (compare:), unless
+ * NSCreatesSortDescriptorBindingOption is NO; so the user's selection and
+ * a click on a column's title reach the controller.
+ *
  * Written from Apple's public documentation of NSKeyValueBindingCreation
  * and the Cocoa Bindings Reference; no Apple code was used. */
 #import "AInternal.h"
@@ -49,6 +58,10 @@ NSString *const NSMaxValueBinding = @"maxValue";
 NSString *const NSTextColorBinding = @"textColor";
 NSString *const NSImageBinding = @"image";
 NSString *const NSFontBinding = @"font";
+NSString *const NSHeaderTitleBinding = @"headerTitle";
+NSString *const NSMaxWidthBinding = @"maxWidth";
+NSString *const NSMinWidthBinding = @"minWidth";
+NSString *const NSWidthBinding = @"width";
 
 NSString *const NSNullPlaceholderBindingOption = @"NSNullPlaceholder";
 NSString *const NSNoSelectionPlaceholderBindingOption = @"NSNoSelectionPlaceholder";
@@ -62,6 +75,7 @@ NSString *const NSConditionallySetsEnabledBindingOption = @"NSConditionallySetsE
 NSString *const NSConditionallySetsEditableBindingOption = @"NSConditionallySetsEditable";
 NSString *const NSAllowsEditingMultipleValuesSelectionBindingOption = @"NSAllowsEditingMultipleValuesSelection";
 NSString *const NSValidatesImmediatelyBindingOption = @"NSValidatesImmediately";
+NSString *const NSCreatesSortDescriptorBindingOption = @"NSCreatesSortDescriptor";
 
 /* ---- the markers a controller's selection answers ---- */
 
@@ -227,10 +241,20 @@ static void apply_combined(id view, NSString *base)
         [(NSControl *)view setEnabled:result];
 }
 
+static BOOL is_column_value(ABinding *b)
+{
+    return [b->view isKindOfClass:[NSTableColumn class]] && [b->name isEqualToString:NSValueBinding];
+}
+
 static void apply(ABinding *b)
 {
     if (!b->observed)
         return;
+    if (is_column_value(b)) {
+        /* a value for each row: the table reads them as it draws */
+        [[(NSTableColumn *)b->view tableView] _ferryBoundRowsChanged];
+        return;
+    }
     NSString *base = base_name(b->name);
     if ([base isEqualToString:NSEnabledBinding] || [base isEqualToString:NSHiddenBinding]) {
         apply_combined(b->view, base);
@@ -308,6 +332,137 @@ void ABindingsPush(id view, BOOL continuousOnly)
             continue;
         push(b);
     }
+}
+
+/* ---- one binding, by name ---- */
+
+static ABinding *binding_named(id view, NSString *name)
+{
+    ABinding *b = [bindings_of(view, NO) objectForKey:name];
+    return b && b->observed ? b : nil;
+}
+
+BOOL ABindingIsBound(id view, NSString *name) { return binding_named(view, name) != nil; }
+
+id ABindingModelValue(id view, NSString *name, BOOL *bound)
+{
+    ABinding *b = binding_named(view, name);
+    if (bound)
+        *bound = b != nil;
+    if (!b)
+        return nil;
+    BOOL keep;
+    NSString *placeholder;
+    id v = shown_value(b, model_value(b), &keep, &placeholder);
+    return keep ? nil : v;
+}
+
+void ABindingPush(id view, NSString *name)
+{
+    ABinding *b = binding_named(view, name);
+    if (b && !b->pushing) {
+        [[b retain] autorelease];
+        push(b);
+    }
+}
+
+void ABindingRefresh(id view, NSString *name)
+{
+    ABinding *b = binding_named(view, name);
+    if (b)
+        apply(b);
+}
+
+/* "arrangedObjects.name": the rows are arrangedObjects, the cell is name. */
+static NSArray *column_rows(ABinding *b, NSString **rest)
+{
+    NSRange dot = [b->keyPath rangeOfString:@"."];
+    *rest = dot.location == NSNotFound ? nil : [b->keyPath substringFromIndex:dot.location + 1];
+    id rows;
+    @try {
+        rows = [b->observed valueForKeyPath:dot.location == NSNotFound ? b->keyPath
+                                                                       : [b->keyPath substringToIndex:dot.location]];
+    } @catch (NSException *e) {
+        if (![[e name] isEqualToString:NSUndefinedKeyException])
+            @throw;
+        return nil;
+    }
+    if ([rows isKindOfClass:[NSSet class]])
+        rows = [rows allObjects];
+    return [rows isKindOfClass:[NSArray class]] ? rows : nil;
+}
+
+id ABindingCellValue(NSTableColumn *column, NSInteger row, BOOL *bound)
+{
+    ABinding *b = binding_named(column, NSValueBinding);
+    if (bound)
+        *bound = b != nil;
+    if (!b || row < 0)
+        return nil;
+    NSString *rest;
+    NSArray *rows = column_rows(b, &rest);
+    if ((NSUInteger)row >= [rows count])
+        return nil;
+    id obj = [rows objectAtIndex:(NSUInteger)row], v = obj;
+    if (rest) {
+        @try {
+            v = [obj valueForKeyPath:rest];
+        } @catch (NSException *e) {
+            if (![[e name] isEqualToString:NSUndefinedKeyException] ||
+                [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
+                @throw;
+            return nil;
+        }
+    }
+    NSValueTransformer *t = transformer_of(b);
+    if (t)
+        v = [t transformedValue:v];
+    if (v == [NSNull null])
+        v = nil;
+    return v ?: option(b, NSNullPlaceholderBindingOption);
+}
+
+BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value)
+{
+    ABinding *b = binding_named(column, NSValueBinding);
+    if (!b || row < 0)
+        return NO;
+    NSString *rest;
+    NSArray *rows = column_rows(b, &rest);
+    if (!rest || (NSUInteger)row >= [rows count])
+        return NO;
+    NSValueTransformer *t = transformer_of(b);
+    if (t) {
+        if (![[t class] allowsReverseTransformation])
+            return NO;
+        value = [t reverseTransformedValue:value];
+    }
+    id obj = [rows objectAtIndex:(NSUInteger)row];
+    id now = [obj valueForKeyPath:rest];
+    if (now == value || [now isEqual:value])
+        return YES;
+    [obj setValue:value forKeyPath:rest];
+    return YES;
+}
+
+void ABindingColumnJoinedTable(NSTableColumn *column)
+{
+    ABinding *b = binding_named(column, NSValueBinding);
+    NSTableView *table = [column tableView];
+    if (!b || !table)
+        return;
+    NSRange dot = [b->keyPath rangeOfString:@"."];
+    if (dot.location == NSNotFound)
+        return;
+    id controller = b->observed;
+    if (!binding_named(table, NSContentBinding))
+        [table bind:NSContentBinding toObject:controller withKeyPath:[b->keyPath substringToIndex:dot.location]
+            options:nil];
+    if ([controller respondsToSelector:@selector(selectionIndexes)] &&
+        !binding_named(table, NSSelectionIndexesBinding))
+        [table bind:NSSelectionIndexesBinding toObject:controller withKeyPath:@"selectionIndexes" options:nil];
+    if ([controller respondsToSelector:@selector(sortDescriptors)] && !binding_named(table, NSSortDescriptorsBinding))
+        [table bind:NSSortDescriptorsBinding toObject:controller withKeyPath:@"sortDescriptors" options:nil];
 }
 
 BOOL ABindingsWantContinuous(id view)
@@ -392,6 +547,11 @@ static void expose_defaults(void)
                                 NSSelectedValueBinding ]);
     expose(@"NSSlider", @[ NSValueBinding, NSMinValueBinding, NSMaxValueBinding ]);
     expose(@"NSObjectController", @[ NSContentObjectBinding, NSEditableBinding ]);
+    expose(@"NSArrayController", @[ NSContentBinding, NSContentArrayBinding, NSContentSetBinding,
+                                    NSSelectionIndexesBinding, NSSortDescriptorsBinding, NSFilterPredicateBinding ]);
+    expose(@"NSTableView", @[ NSContentBinding, NSSelectionIndexesBinding, NSSortDescriptorsBinding ]);
+    expose(@"NSTableColumn", @[ NSValueBinding, NSHiddenBinding, NSHeaderTitleBinding, NSMaxWidthBinding,
+                                NSMinWidthBinding, NSWidthBinding ]);
 }
 
 @implementation NSObject (NSKeyValueBindingCreation)
@@ -442,6 +602,18 @@ static void expose_defaults(void)
         if (![[e name] isEqualToString:NSUndefinedKeyException] ||
             [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
             @throw;
+    }
+    if (is_column_value(b)) {
+        /* sorting by the column's key, unless asked not to */
+        NSRange dot = [keyPath rangeOfString:@"."];
+        id creates = option(b, NSCreatesSortDescriptorBindingOption);
+        if (dot.location != NSNotFound && ![(NSTableColumn *)self sortDescriptorPrototype] &&
+            (!creates || [creates boolValue]))
+            [(NSTableColumn *)self
+                setSortDescriptorPrototype:[NSSortDescriptor sortDescriptorWithKey:[keyPath substringFromIndex:dot.location + 1]
+                                                                         ascending:YES
+                                                                          selector:@selector(compare:)]];
+        ABindingColumnJoinedTable((NSTableColumn *)self);
     }
     apply(b);
 }

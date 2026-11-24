@@ -1,0 +1,245 @@
+defaults: avoids empty 1, preserves 1, selects inserted 1, clears filter 1, rearranges 0, always multiple 0
+empty: 0 arranged, can add 1, can insert 1, can remove 0, selection.name <NSNoSelectionMarker>, exposes content,contentArray,contentSet,selectionIndexes,sortDescriptors,filterPredicate,contentObject,editable
+content: arranged Ann,Bob,Cy, selection {0} (index 0), selection.name Ann
+set content:
+  heard arrangedObjects.name = Ann,Bob,Cy
+  heard arrangedObjects.@count = 3
+  heard selection.name = Ann
+  heard selectionIndexes = {0}
+Bob renamed (arranged, not selected):
+  heard arrangedObjects.name = Ann,Bobby,Cy
+Ann renamed (arranged and selected):
+  heard arrangedObjects.name = Anne,Bobby,Cy
+  heard selection.name = Anne
+arrangedObjects.age 40,25,33, .@count 3, .@sum.age 98, selectedObjects Anne, canRemove 1
+select {0} again: changed 0
+ann and cy: arranged Anne,Bobby,Cy, selection {0,2} (index 0), selection.name <NSMultipleValuesMarker>
+selection changed:
+  heard selection.name = <NSMultipleValuesMarker>
+  heard selectionIndexes = {0,2}
+  selection.age <NSMultipleValuesMarker>, selection.nothing <NSNotApplicableMarker>, same again 0
+  ages agree: selection.age 40
+  always the marker: selection.age <NSMultipleValuesMarker>
+  set selection.name: Twin and Twin
+set through the selection:
+  heard arrangedObjects.name = Twin,Bobby,Cy
+  heard selection.name = <NSMultipleValuesMarker>
+  heard arrangedObjects.name = Twin,Bobby,Twin
+  heard selection.name = Twin
+names put back:
+  heard arrangedObjects.name = Ann,Bobby,Twin
+  heard selection.name = <NSMultipleValuesMarker>
+  heard arrangedObjects.name = Ann,Bobby,Cy
+  heard selection.name = <NSMultipleValuesMarker>
+selected Bob by object: arranged Ann,Bobby,Cy, selection {1} (index 1), selection.name Bobby
+deselected Bob: arranged Ann,Bobby,Cy, selection {} (index -1), selection.name <NSNoSelectionMarker>
+select next: {1}, can select next 1, previous 1
+next twice, previous: {1}
+moving the selection:
+  heard selection.name = Bobby
+  heard selectionIndexes = {1}
+  heard selection.name = <NSNoSelectionMarker>
+  heard selectionIndexes = {}
+  heard selection.name = Ann
+  heard selectionIndexes = {0}
+  heard selection.name = Bobby
+  heard selectionIndexes = {1}
+  heard selection.name = Cy
+  heard selectionIndexes = {2}
+  heard selection.name = Bobby
+  heard selectionIndexes = {1}
+sorted by name, descending (Ann stays selected): arranged Cy,Bobby,Ann, selection {2} (index 2), selection.name Ann
+sorted:
+  heard selection.name = Ann
+  heard selectionIndexes = {0}
+  heard arrangedObjects.name = Cy,Bobby,Ann
+  heard arrangedObjects.@count = 3
+  heard selection.name = Ann
+  heard selectionIndexes = {2}
+by age, not preserving (index 2 stays): arranged Bobby,Cy,Ann, selection {2} (index 2), selection.name Ann
+filtered to age > 30 (Bob gone, so the first): arranged Cy,Ann, selection {0} (index 0), selection.name Cy
+filter off: arranged Bobby,Cy,Ann, selection {1} (index 1), selection.name Cy
+content Ann,Bobby,Cy (unchanged order)
+filtering:
+  heard arrangedObjects.name = Bobby,Cy,Ann
+  heard arrangedObjects.@count = 3
+  heard selection.name = Bobby
+  heard selectionIndexes = {0}
+  heard arrangedObjects.name = Cy,Ann
+  heard arrangedObjects.@count = 2
+  heard selection.name = Cy
+  heard selectionIndexes = {0}
+  heard arrangedObjects.name = Bobby,Cy,Ann
+  heard arrangedObjects.@count = 3
+  heard selection.name = Cy
+  heard selectionIndexes = {1}
+added Dee (filter cleared, at the end, selected): arranged Bobby,Cy,Ann,Dee, selection {3} (index 3), selection.name Dee
+  filter nil
+rearranged: arranged Dee,Bobby,Cy,Ann, selection {0} (index 0), selection.name Dee
+inserted Eve at 1: arranged Dee,Eve,Bobby,Cy,Ann, selection {1} (index 1), selection.name Eve
+  content Ann,Eve,Bobby,Cy,Dee
+added Fay and Gus, not selecting them: arranged Dee,Eve,Bobby,Cy,Ann,Fay,Gus, selection {1} (index 1), selection.name Eve
+removed Eve (selected): the next one: arranged Dee,Bobby,Cy,Ann,Fay,Gus, selection {1} (index 1), selection.name Bobby
+removed the last (selected): the new last: arranged Dee,Bobby,Cy,Ann,Fay, selection {4} (index 4), selection.name Fay
+remove: (not yet): arranged Dee,Bobby,Cy,Ann,Fay, selection {4} (index 4), selection.name Fay
+remove: (next turn), not avoiding an empty selection: arranged Dee,Bobby,Cy,Ann, selection {} (index -1), selection.name <NSNoSelectionMarker>
+adding and removing:
+  heard arrangedObjects.name = Cy,Ann
+  heard arrangedObjects.@count = 2
+  heard selection.name = Cy
+  heard selectionIndexes = {0}
+  heard arrangedObjects.name = Bobby,Cy,Ann
+  heard arrangedObjects.@count = 3
+  heard selection.name = Cy
+  heard selectionIndexes = {1}
+  heard arrangedObjects.name = Bobby,Cy,Ann,Dee
+  heard arrangedObjects.@count = 4
+  heard selection.name = Dee
+  heard selectionIndexes = {3}
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann
+  heard arrangedObjects.@count = 4
+  heard selection.name = Dee
+  heard selectionIndexes = {0}
+  heard arrangedObjects.name = Dee,Eve,Bobby,Cy,Ann
+  heard arrangedObjects.@count = 5
+  heard selection.name = Eve
+  heard selectionIndexes = {1}
+  heard arrangedObjects.name = Dee,Eve,Bobby,Cy,Ann,Fay,Gus
+  heard arrangedObjects.@count = 7
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann,Fay,Gus
+  heard arrangedObjects.@count = 6
+  heard selection.name = Bobby
+  heard selectionIndexes = {1}
+  heard selection.name = Gus
+  heard selectionIndexes = {5}
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann,Fay
+  heard arrangedObjects.@count = 5
+  heard selection.name = Fay
+  heard selectionIndexes = {4}
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann
+  heard arrangedObjects.@count = 4
+  heard selection.name = <NSNoSelectionMarker>
+  heard selectionIndexes = {}
+add: 4 arranged before the turn, 5 after; the new one a mutable dictionary, selected {4}
+insert: at the selection: arranged Dee,Hal,Bobby,Cy,Ann, selection {1} (index 1), selection.name Hal
+not editable: can add 0, can insert 0, can remove 0
+the actions:
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann,<null>
+  heard arrangedObjects.@count = 5
+  heard selection.name = (null)
+  heard selectionIndexes = {4}
+  heard arrangedObjects.name = Dee,Bobby,Cy,Ann
+  heard arrangedObjects.@count = 4
+  heard selection.name = Ann
+  heard selectionIndexes = {3}
+  heard selection.name = Bobby
+  heard selectionIndexes = {1}
+  heard arrangedObjects.name = Dee,<null>,Bobby,Cy,Ann
+  heard arrangedObjects.@count = 5
+  heard selection.name = (null)
+  heard selectionIndexes = {1}
+  heard arrangedObjects.name = Dee,Hal,Bobby,Cy,Ann
+  heard selection.name = Hal
+rearrangement key paths: age,name,nick
+rearranging by itself: arranged Ann,Bobby,Cy,Dee,Hal, selection {4} (index 4), selection.name Hal
+Bob renamed Zed: arranged Ann,Cy,Dee,Hal,Zed, selection {3} (index 3), selection.name Hal
+Cy given a nick (filtered out): arranged Ann,Dee,Hal,Zed, selection {2} (index 2), selection.name Hal
+no longer rearranging, Bob renamed Aaron: arranged Ann,Aaron,Cy,Dee,Hal, selection {4} (index 4), selection.name Hal
+rearranging:
+  heard arrangedObjects.name = Ann,Bobby,Cy,Dee,Hal
+  heard arrangedObjects.@count = 5
+  heard selection.name = Hal
+  heard selectionIndexes = {4}
+  heard arrangedObjects.name = Ann,Bobby,Cy,Dee,Hal
+  heard arrangedObjects.@count = 5
+  heard arrangedObjects.name = Ann,Zed,Cy,Dee,Hal
+  heard arrangedObjects.name = Ann,Cy,Dee,Hal,Zed
+  heard arrangedObjects.@count = 5
+  heard selection.name = Hal
+  heard selectionIndexes = {3}
+  heard arrangedObjects.name = Ann,Dee,Hal,Zed
+  heard arrangedObjects.@count = 4
+  heard selection.name = Hal
+  heard selectionIndexes = {2}
+  heard arrangedObjects.name = Ann,Cy,Dee,Hal,Zed
+  heard arrangedObjects.@count = 5
+  heard selection.name = Hal
+  heard selectionIndexes = {3}
+  heard arrangedObjects.name = Ann,Bob,Cy,Dee,Hal
+  heard arrangedObjects.@count = 5
+  heard selection.name = Hal
+  heard selectionIndexes = {4}
+  heard arrangedObjects.name = Ann,Bob,Cy,Dee,Hal
+  heard arrangedObjects.@count = 5
+  heard arrangedObjects.name = Ann,Aaron,Cy,Dee,Hal
+  heard arrangedObjects.name = Ann,Bob,Cy,Dee,Hal
+  heard arrangedObjects.name = Ann,Bob,Cy,Dee,Hal
+  heard arrangedObjects.@count = 5
+a set, sorted by age: arranged Bob,Cy,Ann, selection {2} (index 2), selection.name Ann
+  added to the set: content a set 1 of 4
+bound to the library: arranged Ann,Bob,Cy, selection {} (index -1), selection.name <NSNoSelectionMarker>
+  library picked {}
+  library: insert Dee at 3
+added Dee through the controller: arranged Ann,Bob,Cy,Dee, selection {3} (index 3), selection.name Dee
+  library has Ann,Bob,Cy,Dee, picked {3}
+  library: insert Eve at 0
+  library: remove Bob at 2
+inserted Eve at 0, removed the third: arranged Eve,Ann,Cy,Dee, selection {0} (index 0), selection.name Eve
+  library has Eve,Ann,Cy,Dee
+  library: insert Ike at 4
+the library added Ike: arranged Eve,Ann,Cy,Dee,Ike, selection {0} (index 0), selection.name Eve
+the library picked 1: arranged Eve,Ann,Cy,Dee,Ike, selection {1} (index 1), selection.name Ann
+the library's people replaced: arranged Cy,Bob, selection {0} (index 0), selection.name Cy
+  info: people
+table bound to: content arrangedObjects, selectionIndexes selectionIndexes, sortDescriptors sortDescriptors
+sort prototypes: name, age, nil; nick column titled 3; exposes value,hidden,headerTitle,maxWidth,minWidth,width
+bound: 3 rows, selected {0}
+  row 0: [Cy] [33] [(none)]
+  row 1: [Ann] [40] [(none)]
+  row 2: [Bob] [25] [(none)]
+clicked row 2: controller {2}, selection.name Bob
+command-clicked row 0: controller {0,2}, selection.name <NSMultipleValuesMarker>
+controller selected 1: table {1}
+Ann renamed and given a nick: 3 rows, selected {1}
+  row 0: [Cy] [33] [(none)]
+  row 1: [Annie] [40] [A]
+  row 2: [Bob] [25] [(none)]
+clicked Name's title: controller sorts by (
+    (name, ascending, compare:)
+)
+sorted by name: 3 rows, selected {0}
+  row 0: [Ann] [40] [(none)]
+  row 1: [Bob] [25] [(none)]
+  row 2: [Cy] [33] [(none)]
+clicked again: descending: 3 rows, selected {2}
+  row 0: [Cy] [33] [(none)]
+  row 1: [Bob] [25] [(none)]
+  row 2: [Ann] [40] [(none)]
+clicked Age's title: 2 descriptors, first age
+sorted by age: 3 rows, selected {2}
+  row 0: [Bob] [25] [(none)]
+  row 1: [Cy] [33] [(none)]
+  row 2: [Ann] [40] [(none)]
+clicked Nick's title (no prototype): first still age
+the controller sorted by name: the table's descriptors name
+double click on row 1's name: edited row 1 column 0
+typed Bea, Return: Ann, Bea, Cy; edited row -1
+edited: 3 rows, selected {1}
+  row 0: [Ann] [40] [(none)]
+  row 1: [Bea] [25] [(none)]
+  row 2: [Cy] [33] [(none)]
+nick edited: Bee
+Jo added: 4 rows, selected {3}
+  row 0: [Ann] [40] [(none)]
+  row 1: [Bea] [25] [Bee]
+  row 2: [Cy] [33] [(none)]
+  row 3: [Jo] [8] [(none)]
+remove: Jo: 3 rows, selected {2}
+  row 0: [Ann] [40] [(none)]
+  row 1: [Bea] [25] [Bee]
+  row 2: [Cy] [33] [(none)]
+nick column titled 3
+no content: 0 rows, selected {}
+selection.name <NSNoSelectionMarker>
+unbound: 0 rows
+exit=0

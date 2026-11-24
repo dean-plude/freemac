@@ -22,12 +22,21 @@
  * keyPathsForValuesAffecting<Key>), and may themselves be key paths
  * through to-one relationships.
  *
- * Not done: to-many key paths ("people.name") aren't followed past the
- * collection, sets (willChangeValueForKey:withSetMutation:) aren't
- * notified, a setter whose argument is a struct other than a point, size,
- * rect or range isn't rewritten, and removing an observer that isn't
- * registered is quietly ignored where a Mac raises. Written from Apple's
- * public documentation; no Apple code was used. */
+ * Unordered to-many keys (sets) announce their changes with
+ * willChangeValueForKey:withSetMutation:usingObjects: and the did form:
+ * a union is an insertion of the objects that weren't there, a minus or an
+ * intersect a removal of those that were, and setting the set a
+ * replacement (Ferry 0.18.0). The hidden subclass wraps add<Key>Object:,
+ * remove<Key>Object:, add<Key>:, remove<Key>: and intersect<Key>: so.
+ * Removing an observer that isn't registered raises NSRangeException, as
+ * on a Mac.
+ *
+ * Not done: to-many key paths ("people.name") aren't followed past a plain
+ * collection (an object that answers _ferryObservesElements, such as an
+ * array controller's arrangedObjects, follows them itself), and a setter
+ * whose argument is a struct other than a point, size, rect or range isn't
+ * rewritten. Written from Apple's public documentation; no Apple code was
+ * used. */
 #import "FInternal.h"
 #include <os/lock.h>
 
@@ -52,6 +61,7 @@ static os_unfair_lock kvo_lock = OS_UNFAIR_LOCK_INIT;
     NSKeyValueObservingOptions options;
     void *context;
     NSMutableArray *olds;          /* old values kept between will and did (NSNull for nil) */
+    NSMutableArray *news;          /* a set mutation's new objects, kept the same way */
     FKVOForwarder *forwarder;      /* watches `rest` on `subject` */
     id subject;                    /* the first key's value, retained while watched */
     BOOL removed;
@@ -100,6 +110,7 @@ static void dependency_release(id object, NSString *key);
     [firstKey release];
     [rest release];
     [olds release];
+    [news release];
     [forwarder release];
     [subject release];
     [super dealloc];
@@ -303,6 +314,36 @@ static void replace_many(id self, SEL _cmd, NSIndexSet *at, NSArray *objs)
     [self didChange:NSKeyValueChangeReplacement valuesAtIndexes:at forKey:key];
 }
 
+/* The unordered to-many mutators: one object, or a set of them. */
+static void set_union_one(id self, SEL _cmd, id obj)
+{
+    NSString *key = mutator_key(_cmd);
+    NSSet *objs = obj ? [NSSet setWithObject:obj] : [NSSet set];
+    [self willChangeValueForKey:key withSetMutation:NSKeyValueUnionSetMutation usingObjects:objs];
+    ORIGINAL(void (*)(id, SEL, id))(self, _cmd, obj);
+    [self didChangeValueForKey:key withSetMutation:NSKeyValueUnionSetMutation usingObjects:objs];
+}
+static void set_minus_one(id self, SEL _cmd, id obj)
+{
+    NSString *key = mutator_key(_cmd);
+    NSSet *objs = obj ? [NSSet setWithObject:obj] : [NSSet set];
+    [self willChangeValueForKey:key withSetMutation:NSKeyValueMinusSetMutation usingObjects:objs];
+    ORIGINAL(void (*)(id, SEL, id))(self, _cmd, obj);
+    [self didChangeValueForKey:key withSetMutation:NSKeyValueMinusSetMutation usingObjects:objs];
+}
+#define SET_MANY(fn, kind)                                                       \
+    static void fn(id self, SEL _cmd, NSSet *objs)                               \
+    {                                                                            \
+        NSString *key = mutator_key(_cmd);                                       \
+        objs = [[objs copy] autorelease] ?: [NSSet set];                         \
+        [self willChangeValueForKey:key withSetMutation:kind usingObjects:objs]; \
+        ORIGINAL(void (*)(id, SEL, NSSet *))(self, _cmd, objs);                  \
+        [self didChangeValueForKey:key withSetMutation:kind usingObjects:objs];  \
+    }
+SET_MANY(set_union_many, NSKeyValueUnionSetMutation)
+SET_MANY(set_minus_many, NSKeyValueMinusSetMutation)
+SET_MANY(set_intersect_many, NSKeyValueIntersectSetMutation)
+
 /* The rewritten setter for a setter taking this type, or NULL. */
 static IMP setter_for_type(const char *t)
 {
@@ -407,6 +448,11 @@ static void notify_automatically(id object, NSString *key)
     add_mutator(kvo, original, [NSString stringWithFormat:@"remove%@AtIndexes:", Key], key, (IMP)remove_many);
     add_mutator(kvo, original, [NSString stringWithFormat:@"replace%@AtIndexes:with%@:", Key, Key], key,
                 (IMP)replace_many);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"add%@Object:", Key], key, (IMP)set_union_one);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"remove%@Object:", Key], key, (IMP)set_minus_one);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"add%@:", Key], key, (IMP)set_union_many);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"remove%@:", Key], key, (IMP)set_minus_many);
+    add_mutator(kvo, original, [NSString stringWithFormat:@"intersect%@:", Key], key, (IMP)set_intersect_many);
     if (!known)
         object_setClass(object, kvo);
 }
@@ -439,8 +485,11 @@ static void entry_attach(FKVOEntry *e)
     if (!e->rest || e->removed)
         return;
     id subject = [e->object valueForKey:e->firstKey];
-    if (!subject || [subject isKindOfClass:[NSArray class]] || [subject isKindOfClass:[NSSet class]])
-        return;   /* to-many key paths aren't followed */
+    if (!subject)
+        return;
+    if (([subject isKindOfClass:[NSArray class]] || [subject isKindOfClass:[NSSet class]]) &&
+        ![subject respondsToSelector:@selector(_ferryObservesElements)])
+        return;   /* to-many key paths aren't followed through a plain collection */
     if (!e->forwarder) {
         e->forwarder = [[FKVOForwarder alloc] init];
         e->forwarder->entry = e;
@@ -523,6 +572,104 @@ static void entry_did(FKVOEntry *e, NSKeyValueChange kind, NSIndexSet *indexes, 
     if ((e->options & NSKeyValueObservingOptionOld) && hadOld &&
         (kind == NSKeyValueChangeSetting || old != [NSNull null]))
         [change setObject:old forKey:NSKeyValueChangeOldKey];
+    notify(e, change);
+}
+
+/* A set mutation: what it adds and removes, worked out against the set as
+ * it is before the change. */
+static NSKeyValueChange set_change_kind(NSKeyValueSetMutationKind m)
+{
+    switch (m) {
+    case NSKeyValueUnionSetMutation: return NSKeyValueChangeInsertion;
+    case NSKeyValueMinusSetMutation:
+    case NSKeyValueIntersectSetMutation: return NSKeyValueChangeRemoval;
+    default: return NSKeyValueChangeReplacement;
+    }
+}
+static void set_change_parts(id current, NSKeyValueSetMutationKind m, NSSet *objs, NSSet **added, NSSet **removed)
+{
+    NSMutableSet *add = [NSMutableSet set], *rem = [NSMutableSet set];
+    BOOL isSet = [current isKindOfClass:[NSSet class]];
+    switch (m) {
+    case NSKeyValueUnionSetMutation:
+        for (id o in objs)
+            if (!isSet || ![current containsObject:o])
+                [add addObject:o];
+        break;
+    case NSKeyValueMinusSetMutation:
+        for (id o in objs)
+            if (isSet && [current containsObject:o])
+                [rem addObject:o];
+        break;
+    case NSKeyValueIntersectSetMutation:
+        if (isSet)
+            for (id o in current)
+                if (![objs containsObject:o])
+                    [rem addObject:o];
+        break;
+    default:
+        if (isSet)
+            for (id o in current)
+                if (![objs containsObject:o])
+                    [rem addObject:o];
+        for (id o in objs)
+            if (!isSet || ![current containsObject:o])
+                [add addObject:o];
+        break;
+    }
+    *added = add;
+    *removed = rem;
+}
+
+static void entry_will_set(FKVOEntry *e, NSKeyValueSetMutationKind m, NSSet *objs)
+{
+    if (e->removed)
+        return;
+    if (e->rest) {
+        entry_will(e, NSKeyValueChangeSetting, nil, YES);
+        return;
+    }
+    NSKeyValueChange kind = set_change_kind(m);
+    NSSet *added, *removed;
+    set_change_parts([e->object valueForKey:e->firstKey], m, objs, &added, &removed);
+    if (!e->olds)
+        e->olds = [[NSMutableArray alloc] init];
+    if (!e->news)
+        e->news = [[NSMutableArray alloc] init];
+    [e->olds addObject:removed];
+    [e->news addObject:added];
+    if (e->options & NSKeyValueObservingOptionPrior) {
+        NSMutableDictionary *change = [NSMutableDictionary dictionary];
+        [change setObject:@(kind) forKey:NSKeyValueChangeKindKey];
+        [change setObject:@YES forKey:NSKeyValueChangeNotificationIsPriorKey];
+        if ((e->options & NSKeyValueObservingOptionOld) && kind != NSKeyValueChangeInsertion)
+            [change setObject:removed forKey:NSKeyValueChangeOldKey];
+        notify(e, change);
+    }
+}
+
+static void entry_did_set(FKVOEntry *e, NSKeyValueSetMutationKind m, NSSet *objs)
+{
+    if (e->removed)
+        return;
+    if (e->rest) {
+        entry_did(e, NSKeyValueChangeSetting, nil, YES);
+        return;
+    }
+    NSKeyValueChange kind = set_change_kind(m);
+    NSSet *added = nil, *removed = nil;
+    if ([e->olds count] && [e->news count]) {
+        removed = [[[e->olds lastObject] retain] autorelease];
+        added = [[[e->news lastObject] retain] autorelease];
+        [e->olds removeLastObject];
+        [e->news removeLastObject];
+    }
+    NSMutableDictionary *change = [NSMutableDictionary dictionary];
+    [change setObject:@(kind) forKey:NSKeyValueChangeKindKey];
+    if ((e->options & NSKeyValueObservingOptionOld) && removed && kind != NSKeyValueChangeInsertion)
+        [change setObject:removed forKey:NSKeyValueChangeOldKey];
+    if ((e->options & NSKeyValueObservingOptionNew) && added && kind != NSKeyValueChangeRemoval)
+        [change setObject:added forKey:NSKeyValueChangeNewKey];
     notify(e, change);
 }
 
@@ -646,12 +793,10 @@ static void dependency_release(id object, NSString *key)
 - (void)_ferryRemoveObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath any:(BOOL)any context:(void *)context
 {
     FKVOInfo *info = objc_getAssociatedObject(self, &info_key);
-    if (!info)
-        return;
     FKVOEntry *found = nil;
     LOCK();
     /* the most recent matching registration, as on a Mac */
-    for (NSInteger i = (NSInteger)[info->entries count] - 1; i >= 0; i--) {
+    for (NSInteger i = info ? (NSInteger)[info->entries count] - 1 : -1; i >= 0; i--) {
         FKVOEntry *e = [info->entries objectAtIndex:(NSUInteger)i];
         if (e->observer == observer && [e->keyPath isEqualToString:keyPath] && (any || e->context == context)) {
             found = [[e retain] autorelease];
@@ -662,7 +807,9 @@ static void dependency_release(id object, NSString *key)
     }
     UNLOCK();
     if (!found)
-        return;
+        FRaise(NSRangeException, @"Cannot remove an observer <%@ %p> for the key path \"%@\" from <%@ %p> because it "
+                                 @"is not registered as an observer.",
+               [observer class], observer, keyPath, [self class], self);
     entry_detach(found);
     dependency_release(self, found->firstKey);
 }
@@ -704,6 +851,18 @@ static void dependency_release(id object, NSString *key)
 {
     for (FKVOEntry *e in entries_for(self, key))
         entry_did(e, kind, indexes, YES);
+}
+- (void)willChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutation
+                 usingObjects:(NSSet *)objects
+{
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_will_set(e, mutation, objects);
+}
+- (void)didChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutation
+                usingObjects:(NSSet *)objects
+{
+    for (FKVOEntry *e in entries_for(self, key))
+        entry_did_set(e, mutation, objects);
 }
 
 /* automaticallyNotifiesObserversOf<Key>, if the class has it; else YES. */

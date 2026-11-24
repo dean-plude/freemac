@@ -32,7 +32,7 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls)
+        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -130,6 +130,10 @@ run_one foundation_kvo "$here/foundation/kvo.m" "$here/foundation/kvo.out" -fram
 # Automatic notification through the hidden subclass, dependent keys, key
 # paths, to-many changes and key-value coding's search (Ferry 0.17.0).
 run_one foundation_kvo_auto "$here/foundation/kvo_auto.m" "$here/foundation/kvo_auto.out" -framework Foundation
+# Set mutations, collection operators, removing an observer that isn't
+# registered, and predicates (Ferry 0.18.0).
+run_one foundation_kvc_collections "$here/foundation/kvc_collections.m" "$here/foundation/kvc_collections.out" \
+    -fobjc-arc -fblocks -framework Foundation
 # NSInvocation, NSMethodSignature, NSProxy and forwarding, and undo through
 # prepareWithInvocationTarget: (Ferry 0.14.0), also unoptimized and with
 # chained fixups. The program ends on a message nothing implements.
@@ -252,6 +256,9 @@ run_one appkit_formatters "$here/appkit/formatters.m" "$here/appkit/formatters.o
 # Bindings that follow and write back: controls, NSObjectController,
 # NSUserDefaultsController and bindings loaded from a nib (Ferry 0.17.0).
 run_one appkit_binding_controls "$here/appkit/binding_controls.m" "$here/appkit/binding_controls.out" -fobjc-arc \
+    -framework Cocoa
+# NSArrayController, and a table whose columns are bound to it (Ferry 0.18.0).
+run_one appkit_array_controller "$here/appkit/array_controller.m" "$here/appkit/array_controller.out" -fobjc-arc \
     -framework Cocoa
 # NSDocument autosaving, in a home of its own (Ferry 0.16.0).
 run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -fobjc-arc -framework Cocoa

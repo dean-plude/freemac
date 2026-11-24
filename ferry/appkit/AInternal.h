@@ -110,6 +110,21 @@ void ADragAttach(NSWindow *window, GtkWidget *area);
 void ABindingsPush(id view, BOOL continuousOnly);
 /* Whether a binding of the view asks for continuous updates. */
 BOOL ABindingsWantContinuous(id view);
+/* One binding of a view: whether it is bound, its key path's value now
+ * (*bound says whether there is one), writing the view's value back, and
+ * setting the view from the key path again (Ferry 0.18.0). */
+BOOL ABindingIsBound(id view, NSString *name);
+id ABindingModelValue(id view, NSString *name, BOOL *bound);
+void ABindingPush(id view, NSString *name);
+void ABindingRefresh(id view, NSString *name);
+/* A table column whose value is bound to "arrangedObjects.key" of a
+ * controller: the value shown in a row (transformed, nil's placeholder in
+ * its place), and a new one written back to that row's object. */
+id ABindingCellValue(NSTableColumn *column, NSInteger row, BOOL *bound);
+BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value);
+/* A bound column joined a table: the table's content, selectionIndexes and
+ * sortDescriptors are bound to the same controller if they aren't yet. */
+void ABindingColumnJoinedTable(NSTableColumn *column);
 /* The number of times NSBeep was called (NSTableView.m beeps once). */
 NSUInteger ABeepCount(void);
 /* How a binding sets and reads a view's property; views and controllers
@@ -117,6 +132,27 @@ NSUInteger ABeepCount(void);
 @interface NSObject (FerryBindings)
 - (void)_ferrySetValue:(id)value forBinding:(NSString *)binding;
 - (id)_ferryValueForBinding:(NSString *)binding;
+@end
+
+/* A table's bound rows changed (a bound column's apply). */
+@interface NSTableView (FerryBindings)
+- (void)_ferryBoundRowsChanged;
+@end
+
+/* A proxy that hears of its sources' keys (NSUserDefaultsController.m):
+ * the first key of each key path observed on it is observed on each of
+ * _sources (by default the one _source), and announced as its own. The
+ * owner wraps a change of sources in _sourceWillChange and
+ * _sourceDidChange. */
+@interface AKeyProxy : NSObject {
+@public
+    NSMutableDictionary *_keys;   /* first key observed on the proxy -> how many times */
+    NSArray *_watched;            /* what those keys are observed on */
+}
+- (id)_source;
+- (NSArray *)_sources;
+- (void)_sourceWillChange;
+- (void)_sourceDidChange;
 @end
 
 @interface NSButtonCell (FerryPrivate)

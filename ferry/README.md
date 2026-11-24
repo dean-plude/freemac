@@ -89,8 +89,16 @@ the user's edits back to their key path (text fields, buttons, pop-up
 buttons and sliders, with `NSObjectController`'s `selection.*`,
 `NSUserDefaultsController`'s `values.*` and bindings made in nibs), and
 formatters on controls, cells and edited table cells show values, read
-what is typed and beep at what they can't read. Array and tree
-controllers aren't there yet.
+what is typed and beep at what they can't read. From freemac (1.188)
+`NSArrayController` is there too (bound content, sorted and filtered
+`arrangedObjects`, a selection that answers `NSMultipleValuesMarker`, and
+adding, inserting and removing), with table columns bound to
+`arrangedObjects.key`: a click selects in the controller, a click on a
+column's title sorts it, and an edited cell writes back. Key-value
+coding has `mutableSetValueForKey:` and the collection operators
+(`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and
+`NSPredicate` reads a subset of Apple's format strings. Tree controllers
+aren't there yet.
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question
