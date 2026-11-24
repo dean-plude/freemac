@@ -36,6 +36,12 @@
 /* section types (low byte of a section's flags) */
 #define S_MOD_INIT_FUNC_POINTERS 0x9
 #define S_INIT_FUNC_OFFSETS      0x16
+/* thread-local variables (src/tlv.c) */
+#define S_THREAD_LOCAL_REGULAR                0x11
+#define S_THREAD_LOCAL_ZEROFILL               0x12
+#define S_THREAD_LOCAL_VARIABLES              0x13
+#define S_THREAD_LOCAL_VARIABLE_POINTERS      0x14
+#define S_THREAD_LOCAL_INIT_FUNCTION_POINTERS 0x15
 
 /* export trie */
 #define EXPORT_KIND_MASK         0x3

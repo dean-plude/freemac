@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.204 "Ferry: thread-local variables" (done)
+
+Ferry 0.31.0: Mac programs can keep a separate copy of a variable for each thread, which many C++ and newer apps rely on.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Ferry's own `_tlv_bootstrap`: each thread gets its own copy of each image's thread-local variables on first use, in the program, its libraries and libraries opened with `dlopen` | Ferry | done |
+| 2 | A fast path that keeps every register the compiler relies on, and a slow path that saves the vector registers too | Ferry | done |
+| 3 | C++ `thread_local` objects built on first use and destroyed when their thread ends (`_tlv_atexit`, `__cxa_thread_atexit`); a thread's copies freed when it ends | Ferry | done |
+| 4 | Works on pthreads, `NSThread`, `std::thread` and dispatch's worker threads; `dlsym` of a thread-local variable gives the caller's copy | Ferry | done |
+| 5 | `ferry-cc` links these programs; six new tests; `make check` 138 of 138 | Ferry | done |
+
+The destructors of threads still running when a program exits aren't run.
+
 ## 1.203 "Ferry: C++ programs" (done)
 
 Ferry 0.30.0: Mac programs written in C++ and Objective-C++ run, on the same open-source C++ library a Mac uses.

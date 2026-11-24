@@ -1,0 +1,11 @@
+job 1: fresh yes, kept yes, on the main thread no
+job 2: fresh yes, kept yes, on the main thread no
+job 3: fresh yes, kept yes, on the main thread no
+job 4: fresh yes, kept yes, on the main thread no
+job 5: fresh yes, kept yes, on the main thread no
+job 6: fresh yes, kept yes, on the main thread no
+job 7: fresh yes, kept yes, on the main thread no
+job 8: fresh yes, kept yes, on the main thread no
+destructors run as the threads ended: 8
+main thread kept its own: calls 42, label main, depth 2, scale 1.5
+exit=0

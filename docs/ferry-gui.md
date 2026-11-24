@@ -1146,6 +1146,12 @@ The new or extended ones:
 | `objcxx_mixed` | (freemac (1.203), Ferry 0.30.0) Objective-C++ under ARC: an object whose C++ ivars (a class, a `vector` and a `map` holding `NSString`s) are built and destroyed by `.cxx_construct` and `.cxx_destruct`, `NSString`s in a `vector`, a block capturing a C++ object (copied once on the stack and again on the heap, all destroyed), an `NSException` through a C++ frame running its destructor, a C++ exception through `@finally`, `@catch (NSException *)` letting a C++ exception through, `catch (...)` taking an `NSException` and rethrowing it, `@catch (...)` taking a C++ exception and rethrowing it with `@throw`, and a plain `@try` with `@finally` |
 | `cxx_missing` | (freemac (1.203), Ferry 0.30.0) a C++ program without this system's libc++ (`FERRY_LIBCXX` naming a file that isn't there) stopping with exit status 127 and naming the packages libc++1 and libc++abi1 |
 | `cxx_not_loaded` | (freemac (1.203), Ferry 0.30.0) an Objective-C program with no C++ never loading libc++ |
+| `tlv_threads` | (freemac (1.204), Ferry 0.31.0) C `__thread` and `_Thread_local` variables, with first values and without, an array, a pointer to a global, a variable aligned to 64 bytes and a static one: eight threads each start from the template and keep their own copy while all eight change theirs at once, and the main thread's copy stays as it was; the thunk keeps every general register the compiler relies on and all sixteen vector registers, on a thread's first use and after it (checked from assembly); a function in the image's thread-local init section runs once; `dispatch_apply` on the global queue counts on each worker thread's own copy; and 32 threads that each fill a 4 MB thread-local array, half ending with `pthread_exit`, leave no storage behind |
+| `tlv_threads_chained` | (freemac (1.204), Ferry 0.31.0) the same program as `tlv_threads`, linked with chained fixups |
+| `tlv_dylib` | (freemac (1.204), Ferry 0.31.0) thread-local variables in a Mac library the program links through `@rpath`: the program reaches the library's variables directly, by their exported names, and through the library's own calls, and gets the same variable each way; six threads each start from the library's template and count on their own copies beside the program's own variable |
+| `tlv_dlopen` | (freemac (1.204), Ferry 0.31.0) thread-local variables in a Mac library opened with `dlopen` while the program runs: a thread started before the library was opened, four threads started after it and the main thread each get their own copies; `dlsym` of a thread-local variable gives the calling thread's copy, and a write through it is seen by the library; destructors registered with `_tlv_atexit` and `__cxa_thread_atexit` run as each thread ends, the last registered first and still able to read the thread's variables, and the main thread's run when `main` returns, before the program's `atexit` function |
+| `tlv_objc` | (freemac (1.204), Ferry 0.31.0) Objective-C `__thread` variables (an `int`, an unretained `NSString`, a static `NSInteger` and a `double`) on eight `NSThread`s started with a target and selector, with a block, detached and with `performSelectorInBackground:`: each sees the first values and keeps its own, one leaves with `+[NSThread exit]`, a destructor registered on each runs as it ends, and the main thread keeps its own values |
+| `cxx_thread_local` | (freemac (1.204), Ferry 0.31.0) C++ `thread_local` objects across eight `std::thread`s: objects with constructors and destructors at namespace scope, as a static class member and inside a function, a `std::vector` and a `std::string`; each thread builds them on first use and destroys them in reverse order when it ends, a destructor reads another `thread_local` that is still there, and the main thread's objects are destroyed when `main` returns, before the program's static objects (skipped without libc++, like the other C++ tests) |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -2155,9 +2161,6 @@ The new or extended ones:
     smallest one `pthread_attr_setstacksize` accepts.
 
 - **C++ programs, not done yet** (freemac (1.203), Ferry 0.30.0).
-  - `thread_local` variables are missing, as all Mac thread-local
-    variables are (`_tlv_bootstrap`). A program that uses them can't be
-    linked by `ferry-cc` and isn't run.
   - A Mac `operator new` or `operator delete` that the program defines
     replaces the one its own code calls, but not the one this system's
     libc++ calls from inside the library.
@@ -2196,6 +2199,47 @@ The new or extended ones:
     when an `NSException` and a C++ exception meet in one frame.
   - Stream positions after `seekg` and `tellp` on a `stringstream` opened
     for both reading and writing.
+
+- **Thread-local variables, not done yet** (freemac (1.204), Ferry 0.31.0).
+  - The first 128 images with thread-local variables are reached the quick
+    way. A program with more than that still works, but each use of a
+    variable in a later image takes the slow way, which saves and restores
+    every register.
+  - The thread that calls `exit`, and the main thread when `main` returns,
+    runs its thread-local destructors but keeps its storage until the
+    program ends, because static destructors may still reach it.
+  - Ferry keeps a small table of each thread's copies in this system's own
+    thread storage, which takes about 1 KB from every thread's stack. A
+    program that asks for a very small stack has that much less.
+  - A library that `dlopen` fails to load part way through keeps the key
+    Ferry gave it. A program can have 512 images with thread-local
+    variables in all, as many as Ferry loads.
+  - `dladdr` on the address of a thread's copy of a variable names nothing,
+    because the copies are on the heap and in no image.
+
+- **Thread-local variables, not compared with a Mac** (freemac (1.204), Ferry 0.31.0).
+  - When the functions in an image's thread-local init section
+    (`S_THREAD_LOCAL_INIT_FUNCTION_POINTERS`) run. The format's description
+    only says they initialise thread-local values, and clang doesn't emit
+    them. Ferry runs them once, when the image is set up, on the thread
+    that loads it, before the image's C and C++ initialisers. The
+    `tlv_threads` test prints that another thread doesn't see what they
+    set.
+  - What `dlsym` gives for the name of a thread-local variable. Ferry gives
+    the address of the calling thread's copy, not the descriptor.
+  - Whether the destructors of threads still running when the program
+    exits are run. Ferry doesn't run them.
+  - The order of a destructor registered while another one runs. Ferry
+    runs the new one next, before the ones registered earlier.
+  - What a destructor gets when it reaches a variable after the thread's
+    storage was freed, which can only happen from a later destructor of
+    this system's thread-specific data. Ferry makes a fresh copy from the
+    template and frees it again.
+  - The order between thread-local destructors and a thread's other
+    end-of-thread work (pthread key destructors and an `NSThread`'s
+    autorelease pool), which here follows this system's C library.
+  - The tests' output was written from the C and C++ standards, not from a
+    Mac run.
 
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -2273,3 +2317,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.28.0 (freemac (1.201)): `sysctl`, `dlopen`/`dlsym` and loading code after start-up, `@available` checks, `getattrlist`, the Mach host and task statistics, and NSBundle plug-ins that really load, `make check` 121/121.
 - 2026-11-24: Ferry 0.29.0 (freemac (1.202)): real threads: NSThread, per-thread run loops and autorelease pools, real locks and `@synchronized`, pthreads, libdispatch on a worker pool, concurrent NSOperationQueue, a thread-safe runtime, and URL loading on a network thread of its own, `make check` 125/125.
 - 2026-11-24: Ferry 0.30.0 (freemac (1.203)): C++ and Objective-C++ programs on this system's LLVM libc++ and libc++abi, loaded only when a program needs them: the standard library, exceptions across images and mixed with Objective-C's, and C++ threads on a Mac's layouts, `make check` 131/131.
+- 2026-11-24: Ferry 0.31.0 (freemac (1.204)): Mac thread-local variables (`__thread`, `_Thread_local`, C++ `thread_local`) through Ferry's own `_tlv_bootstrap` and `_tlv_atexit`, per thread and per image, in libraries opened with `dlopen` too, with destructors at thread exit, `make check` 138/138.
