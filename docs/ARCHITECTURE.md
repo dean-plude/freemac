@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Bluetooth menu (1.158)
+
+`bluetooth_menu.BluetoothMenu` subclasses `status.Bluetooth`, which still
+draws the symbol from BlueZ's objects on the system bus (an
+`ObjectManagerClient` on `org.bluez`, whose cached properties follow
+`PropertiesChanged`). Its menu is a `menubar_popup.Popup`, refilled whenever
+BlueZ changes something while it is open. The switch sets the first
+adapter's `Adapter1.Powered`; the devices are that adapter's objects with
+`Device1.Paired`, connected first, each with `Battery1.Percentage` when
+BlueZ has it. A click calls `Device1.Connect` or `Disconnect` asynchronously
+with a 30-second timeout and shows a spinner on that row meanwhile; on an
+error BlueZ's reason (such as `br-connection-page-timeout`) is replaced by
+words a person can act on in a Beacon notification. Pairing stays in Dials,
+which runs discovery and the agent for PIN and passkey prompts.
+
 ## Ferry's menu bar items (1.157)
 
 `ferry/appkit/NSStatusBar.m`. Each `NSStatusItem` registers two objects on the

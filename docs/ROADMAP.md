@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.158 "Bluetooth menu" (done)
+
+The menu bar's Bluetooth menu, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Click the Bluetooth symbol in the menu bar for its menu: a switch that turns Bluetooth on or off | Topline, bluetooth_menu.py | done |
+| 2 | Devices: the paired headphones, keyboards and mice, connected ones first with a blue symbol and their battery when they report it | bluetooth_menu.py | done |
+| 3 | Click a device to connect or disconnect it, with a spinner while it works and a notification, in plain words, when it can't connect | bluetooth_menu.py | done |
+| 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.157 "Ferry: menu bar items" (done)
 
 Mac programs run through Ferry put their own items in freemac's menu bar.

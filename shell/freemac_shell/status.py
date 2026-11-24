@@ -546,7 +546,7 @@ class Bluetooth(StatusButton):
 
     def __init__(self):
         super().__init__()
-        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "bluetooth"))
+        self.connect("clicked", lambda *_: self._clicked())
         self.manager = None
         try:
             self.manager = Gio.DBusObjectManagerClient.new_for_bus_sync(
@@ -586,6 +586,9 @@ class Bluetooth(StatusButton):
             self.show_icon("bluetooth-active-symbolic", "Connected to " + ", ".join(sorted(connected)))
         else:
             self.show_icon("bluetooth-disconnected-symbolic", "Bluetooth is on")
+
+    def _clicked(self):
+        launch("freemac-dials", "--panel", "bluetooth")
 
 
 JOB_DONE, JOB_CANCELED, JOB_ABORTED = 9, 7, 8

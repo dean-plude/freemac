@@ -17,7 +17,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import (announce, apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
                notify_rules, quick, main_display, recent_items, services, status, style, wifi_menu,
-               battery_menu, extras)
+               battery_menu, bluetooth_menu, extras)
 from . import dials_keys  # noqa: E402
 from .ini import ini_get  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
@@ -191,7 +191,7 @@ class Topline(Gtk.Window):
         bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
         # computer has nothing to show (no battery, no sound server).
-        for indicator in (battery_menu.BatteryMenu(), status.Sound(), wifi_menu.WifiMenu(), status.VPN(), status.Bluetooth(),
+        for indicator in (battery_menu.BatteryMenu(), status.Sound(), wifi_menu.WifiMenu(), status.VPN(), bluetooth_menu.BluetoothMenu(),
                           status.Printing(), status.Recording(), status.ScreenShared(), status.InUse(), status.InputMenu(),
                           status.UserMenu()):
             indicator.get_style_context().add_class("status")
