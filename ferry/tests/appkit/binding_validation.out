@@ -1,0 +1,46 @@
+bound: age "34", name "Ann"; 0 checks so far
+  presented: “-3” isn't an age. (People 1)
+typed -3: model Ann 34, field "34", 1 checks
+  presented: “old” isn't an age. (People 1)
+typed old: model Ann 34, field "34"
+typed 200: model Ann 130 (a number 1), field "130"
+typed 41: model Ann 41, field "41", the unvalidated field "41"
+typed "  Anne  ": model "Anne", field "Anne"
+  presented: A name is needed. (People 2)
+typed spaces: model "Anne", field "Anne"
+without the option: typed -7, model Anne -7, no check 1; the validated field "-7"
+selection's validateValue: 12 -> 1 12; x -> 0 (“x” isn't an age.)
+Bo and Cy selected: field placeholder Multiple Values
+  presented: “-1” isn't an age. (People 1)
+typed -1 for both: Bo 7, Cy 60, field placeholder Multiple Values
+typed 500 for both: Bo 130, Cy 130, field "130"
+  presented: “ten” isn't an age. (People 1)
+table: typed ten in Bo's age: Bo 130, cell "130"
+table: typed 9: Bo 9 (a number 1), cell "9"
+table: typed " Cyd " in Cy's name: "Cyd"
+cell views: 41 9 130
+  presented: “-2” isn't an age. (People 1)
+cell view: typed -2: Anne 41, field "41"
+cell view: typed 140: Anne 130, field "130", the other field "130"
+selection.colour, no option: field "as it was", placeholder nil
+option NO: field "", placeholder Not Applicable, enabled 1 editable 0
+option YES: raised NSUnknownKeyException
+no selection: field enabled 1 editable 0 "" placeholder No Selection, check box enabled 0
+Ann selected: field enabled 1 editable 1 "Anne", check box enabled 1
+controller not editable: field enabled 1 editable 0 "Anne", check box enabled 0
+editable again: field enabled 1 editable 1 "Anne", check box enabled 1
+two selected: field enabled 1 editable 1 "" placeholder Multiple Values, check box enabled 1
+two selected, editing multiple values off: field enabled 1 editable 0 "" placeholder Multiple Values, check box enabled 0
+Bo selected: field enabled 1 editable 1 "Bo", check box enabled 1
+enabled bound to NO: field enabled 1 editable 1 "Bo", check box enabled 0
+enabled bound to YES: field enabled 1 editable 1 "Bo", check box enabled 1
+enabled YES, no selection: field enabled 1 editable 0 "" placeholder No Selection, check box enabled 0
+no selection, sets enabled on the field, off on the check box: field enabled 0 editable 1 "" placeholder No Selection, check box enabled 1
+bound again, the field set uneditable beforehand: field enabled 1 editable 0 "" placeholder No Selection, check box enabled 0
+unbound: field enabled 1 editable 0 "", check box enabled 1
+deletes on remove: 1 items left, deleted desk,lamp
+without the option: 0 items left, deleted desk,lamp
+selects all: bound {0,1,2}, content set again {0,1}; without it {}, the other {0,1,2}
+compound value: owner's list z,b,c set 3 times, immutable 1; controller z,b,c
+compound value in the defaults: green,blue
+exit=0

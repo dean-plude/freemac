@@ -1099,6 +1099,7 @@ enum {
     /* views */
     NSMutableDictionary *_rowViews;   /* row number -> NSTableRowView */
     NSMutableDictionary *_nibs;       /* identifier -> NSNib */
+    BOOL _nibPrototypes;              /* the nib gave cell view prototypes (Ferry 0.20.0) */
     NSMutableDictionary *_reusable;   /* identifier -> views out of sight */
     NSInteger _updateDepth;
     BOOL _tiling, _updatingViews, _sizing;
@@ -1187,8 +1188,10 @@ enum {
     NSDictionary *prototypes = decoded(coder, @"NSTableViewArchivedReusableViewsKey", [NSDictionary class]);
     for (id key in prototypes) {
         id nib = [prototypes objectForKey:key];
-        if ([key isKindOfClass:[NSString class]] && [nib isKindOfClass:[NSNib class]])
+        if ([key isKindOfClass:[NSString class]] && [nib isKindOfClass:[NSNib class]]) {
             [_nibs setObject:nib forKey:key];
+            _nibPrototypes = YES;
+        }
     }
     [self tile];
     return self;
@@ -1389,12 +1392,23 @@ enum {
     return ![_delegate respondsToSelector:@selector(tableView:shouldEditTableColumn:row:)] ||
            [_delegate tableView:self shouldEditTableColumn:c row:row];
 }
-- (BOOL)_delegateMakesViews { return [_delegate respondsToSelector:@selector(tableView:viewForTableColumn:row:)]; }
+/* With bindings, a table whose nib holds cell view prototypes is
+ * view-based without the delegate's tableView:viewForTableColumn:row:, as
+ * Apple documents for tables with bindings. */
+- (BOOL)_makesViewsFromNib { return _nibPrototypes && ABindingIsBound(self, NSContentBinding); }
+- (NSView *)_viewFromNibForColumn:(NSTableColumn *)c
+{
+    return c && [c identifier] ? [self makeViewWithIdentifier:[c identifier] owner:_delegate] : nil;
+}
+- (BOOL)_delegateMakesViews
+{
+    return [_delegate respondsToSelector:@selector(tableView:viewForTableColumn:row:)] || [self _makesViewsFromNib];
+}
 - (NSView *)_delegateViewForColumn:(NSTableColumn *)c row:(NSInteger)row
 {
-    return [_delegate respondsToSelector:@selector(tableView:viewForTableColumn:row:)]
-               ? [_delegate tableView:self viewForTableColumn:c row:row]
-               : nil;
+    if ([_delegate respondsToSelector:@selector(tableView:viewForTableColumn:row:)])
+        return [_delegate tableView:self viewForTableColumn:c row:row];
+    return [self _makesViewsFromNib] ? [self _viewFromNibForColumn:c] : nil;
 }
 - (NSTableRowView *)_delegateRowViewForRow:(NSInteger)row
 {

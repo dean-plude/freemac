@@ -335,6 +335,11 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
 - (void)_setObjectValue:(id)value forColumn:(NSTableColumn *)column row:(NSInteger)row;
 - (BOOL)_delegateMakesViews;
 - (NSView *)_delegateViewForColumn:(NSTableColumn *)column row:(NSInteger)row;
+/* (Ferry 0.20.0) A table from a nib with cell view prototypes, its rows
+ * from bindings, makes its own views when its delegate doesn't: the
+ * prototype named by each column's identifier, the delegate its owner. */
+- (BOOL)_makesViewsFromNib;
+- (NSView *)_viewFromNibForColumn:(NSTableColumn *)column;
 - (NSTableRowView *)_delegateRowViewForRow:(NSInteger)row;
 - (void)_didAddRowView:(NSTableRowView *)view row:(NSInteger)row;
 - (void)_didRemoveRowView:(NSTableRowView *)view row:(NSInteger)row;

@@ -146,6 +146,8 @@ static NSString *first_key(NSString *keyPath)
     id _content;
     ASelectionProxy *_selection;
     Class _objectClass;
+    NSArray *_declaredKeys;          /* the keys Interface Builder lists (Ferry 0.20.0) */
+    NSString *_entityName;
     BOOL _prepares, _editable;
 }
 - (instancetype)initWithContent:(id)content
@@ -171,8 +173,25 @@ static NSString *first_key(NSString *keyPath)
         _editable = [coder decodeBoolForKey:@"NSEditable"];
     if ([coder containsValueForKey:@"NSAutomaticallyPreparesContent"])
         _prepares = [coder decodeBoolForKey:@"NSAutomaticallyPreparesContent"];
+    /* (Ferry 0.20.0) the attribute keys and a Core Data entity's name, kept;
+     * there is no Core Data to fetch from */
+    id keys = [coder containsValueForKey:@"NSDeclaredKeys"] ? [coder decodeObjectForKey:@"NSDeclaredKeys"] : nil;
+    if ([keys isKindOfClass:[NSArray class]])
+        _declaredKeys = [keys copy];
+    id entity = [coder containsValueForKey:@"NSEntityName"] ? [coder decodeObjectForKey:@"NSEntityName"] : nil;
+    if ([entity isKindOfClass:[NSString class]])
+        _entityName = [entity copy];
     return self;
 }
+- (NSArray *)_ferryDeclaredKeys { return _declaredKeys ?: [NSArray array]; }
+- (NSString *)entityName { return _entityName; }
+- (void)setEntityName:(NSString *)name
+{
+    [_entityName autorelease];
+    _entityName = [name copy];
+}
+- (id)managedObjectContext { return nil; }
+- (void)setManagedObjectContext:(id)context {}
 - (void)awakeFromNib
 {
     if (_prepares && !_content)
@@ -181,6 +200,8 @@ static NSString *first_key(NSString *keyPath)
 - (void)dealloc
 {
     [_content release];
+    [_declaredKeys release];
+    [_entityName release];
     if (_selection)
         _selection->controller = nil;
     [_selection release];
@@ -267,6 +288,17 @@ static NSString *first_key(NSString *keyPath)
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath
 {
     [[controller content] setValue:value forKeyPath:keyPath];
+}
+/* Validation goes to the content (Ferry 0.20.0). */
+- (BOOL)validateValue:(id *)value forKey:(NSString *)key error:(NSError **)error
+{
+    id c = [controller content];
+    return c ? [c validateValue:value forKey:key error:error] : YES;
+}
+- (BOOL)validateValue:(id *)value forKeyPath:(NSString *)keyPath error:(NSError **)error
+{
+    id c = [controller content];
+    return c ? [c validateValue:value forKeyPath:keyPath error:error] : YES;
 }
 - (BOOL)_ferryIsKeyValueProxy { return YES; }
 - (NSString *)description

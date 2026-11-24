@@ -318,6 +318,8 @@ static NSArray *sorted_paths(NSArray *paths)
         _preserves = [coder decodeBoolForKey:@"NSPreservesSelection"];
     if ([coder containsValueForKey:@"NSSelectsInsertedObjects"])
         _selectsInserted = [coder decodeBoolForKey:@"NSSelectsInsertedObjects"];
+    if ([coder containsValueForKey:@"NSAlwaysUsesMultipleValuesMarker"])
+        _alwaysMultiple = [coder decodeBoolForKey:@"NSAlwaysUsesMultipleValuesMarker"];
     return self;
 }
 - (void)awakeFromNib

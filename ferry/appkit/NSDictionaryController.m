@@ -90,6 +90,30 @@ NSString *const NSLocalizedKeyDictionaryBinding = @"localizedKeyDictionary";
     }
     return self;
 }
+/* From a nib (Ferry 0.20.0): the initial key and value, the included and
+ * excluded keys and the localized key dictionary and table. The key names
+ * are a guess at Interface Builder's, after its attributes' names. */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [super initWithCoder:coder]))
+        return nil;
+    id v;
+#define DECODED(key, cls) ([coder containsValueForKey:key] && [(v = [coder decodeObjectForKey:key]) isKindOfClass:[cls class]])
+    if (DECODED(@"NSInitialKey", NSString))
+        [self setInitialKey:v];
+    if ([coder containsValueForKey:@"NSInitialValue"])
+        [self setInitialValue:[coder decodeObjectForKey:@"NSInitialValue"]];
+    if (DECODED(@"NSIncludedKeys", NSArray))
+        [self setIncludedKeys:v];
+    if (DECODED(@"NSExcludedKeys", NSArray))
+        [self setExcludedKeys:v];
+    if (DECODED(@"NSLocalizedKeyDictionary", NSDictionary))
+        [self setLocalizedKeyDictionary:v];
+    if (DECODED(@"NSLocalizedKeyTable", NSString))
+        [self setLocalizedKeyTable:v];
+#undef DECODED
+    return self;
+}
 - (void)dealloc
 {
     for (ADictionaryPair *p in [self _contentObjects])

@@ -23,7 +23,15 @@
  *
  * Observers of "arrangedObjects.someKey" hear of that key changing on any
  * of the arranged objects (so a table column bound to it is redrawn), as
- * well as of new arranged objects. */
+ * well as of new arranged objects.
+ *
+ * The content bindings' options (Ferry 0.20.0):
+ * NSSelectsAllWhenSettingContent selects every arranged object when the
+ * bound content changes; NSHandlesContentAsCompoundValue writes a new
+ * array (or set) to the bound key path for each change, instead of
+ * changing the bound one in place (for the user's defaults, say); and
+ * NSDeletesObjectsOnRemove has an object removed from the content deleted
+ * from its managedObjectContext (deleteObject:), when it has one. */
 #import "AInternal.h"
 
 NSString *const NSContentArrayBinding = @"contentArray";
@@ -31,6 +39,11 @@ NSString *const NSContentSetBinding = @"contentSet";
 NSString *const NSSelectionIndexesBinding = @"selectionIndexes";
 NSString *const NSSortDescriptorsBinding = @"sortDescriptors";
 NSString *const NSFilterPredicateBinding = @"filterPredicate";
+/* Options of the content bindings (Ferry 0.20.0). Apple's name for the
+ * first has "Bindings" in it. */
+NSString *const NSDeletesObjectsOnRemoveBindingsOption = @"NSDeletesObjectsOnRemove";
+NSString *const NSSelectsAllWhenSettingContentBindingOption = @"NSSelectsAllWhenSettingContent";
+NSString *const NSHandlesContentAsCompoundValueBindingOption = @"NSHandlesContentAsCompoundValue";
 
 @interface NSPredicate (FerryKeyPaths)
 - (void)_ferryAddKeyPathsTo:(NSMutableSet *)paths;
@@ -150,6 +163,8 @@ static NSArray *selection_keys(void)
         _clearsFilter = [coder decodeBoolForKey:@"NSClearsFilterPredicateOnInsertion"];
     if ([coder containsValueForKey:@"NSAutomaticallyRearrangesObjects"])
         _autoRearranges = [coder decodeBoolForKey:@"NSAutomaticallyRearrangesObjects"];
+    if ([coder containsValueForKey:@"NSAlwaysUsesMultipleValuesMarker"])
+        _alwaysMultiple = [coder decodeBoolForKey:@"NSAlwaysUsesMultipleValuesMarker"];
     return self;
 }
 - (void)awakeFromNib
@@ -427,15 +442,48 @@ static NSArray *selection_keys(void)
 - (BOOL)canInsert { return [self isEditable]; }
 - (BOOL)canRemove { return [self isEditable] && [_selectionIndexes count] > 0; }
 
+/* An option of the content's binding. */
+- (BOOL)_contentOption:(NSString *)name
+{
+    NSDictionary *info = [self infoForBinding:NSContentArrayBinding] ?: [self infoForBinding:NSContentSetBinding];
+    id v = [[info objectForKey:NSOptionsKey] objectForKey:name];
+    return v != [NSNull null] && [v boolValue];
+}
+/* The bound content as a whole, changed by `change` and written back as a
+ * new value (NSHandlesContentAsCompoundValue). */
+- (void)_replaceBoundContent:(NSDictionary *)info set:(BOOL)isSet change:(void (^)(id mutable))change
+{
+    id observed = [info objectForKey:NSObservedObjectKey];
+    NSString *path = [info objectForKey:NSObservedKeyPathKey];
+    id now = [observed valueForKeyPath:path];
+    if (NSIsControllerMarker(now))
+        now = nil;
+    id m;
+    if (isSet)
+        m = [NSMutableSet setWithArray:[now isKindOfClass:[NSSet class]] ? [now allObjects] : now ?: @[]];
+    else
+        m = [NSMutableArray arrayWithArray:[now isKindOfClass:[NSSet class]] ? [now allObjects] : now ?: @[]];
+    change(m);
+    [observed setValue:[[m copy] autorelease] forKeyPath:path];
+    [self _takeContent:[observed valueForKeyPath:path]];
+}
 /* The content changed in place: through the bound array or set, so that
  * its owner hears of it, or the controller's own array. */
 - (void)_contentInsert:(NSArray *)objects atIndexes:(NSIndexSet *)indexes
 {
     NSDictionary *arrayInfo = [self infoForBinding:NSContentArrayBinding];
     NSDictionary *setInfo = [self infoForBinding:NSContentSetBinding];
+    BOOL compound = [self _contentOption:NSHandlesContentAsCompoundValueBindingOption];
     _editingContent = YES;
     @try {
-        if (arrayInfo) {
+        if ((arrayInfo || setInfo) && compound) {
+            [self _replaceBoundContent:arrayInfo ?: setInfo set:!arrayInfo change:^(id m) {
+                if ([m isKindOfClass:[NSMutableSet class]])
+                    [m addObjectsFromArray:objects];
+                else
+                    [m insertObjects:objects atIndexes:indexes];
+            }];
+        } else if (arrayInfo) {
             id observed = [arrayInfo objectForKey:NSObservedObjectKey];
             NSString *path = [arrayInfo objectForKey:NSObservedKeyPathKey];
             [[observed mutableArrayValueForKeyPath:path] insertObjects:objects atIndexes:indexes];
@@ -466,9 +514,17 @@ static NSArray *selection_keys(void)
     NSDictionary *arrayInfo = [self infoForBinding:NSContentArrayBinding];
     NSDictionary *setInfo = [self infoForBinding:NSContentSetBinding];
     NSIndexSet *where = indexes_of(objects, [self _contentObjects]);
+    BOOL compound = [self _contentOption:NSHandlesContentAsCompoundValueBindingOption];
     _editingContent = YES;
     @try {
-        if (arrayInfo) {
+        if ((arrayInfo || setInfo) && compound) {
+            [self _replaceBoundContent:arrayInfo ?: setInfo set:!arrayInfo change:^(id m) {
+                if ([m isKindOfClass:[NSMutableSet class]])
+                    [m minusSet:[NSSet setWithArray:objects]];
+                else
+                    [m removeObjectsAtIndexes:where];
+            }];
+        } else if (arrayInfo) {
             id observed = [arrayInfo objectForKey:NSObservedObjectKey];
             NSString *path = [arrayInfo objectForKey:NSObservedKeyPathKey];
             [[observed mutableArrayValueForKeyPath:path] removeObjectsAtIndexes:where];
@@ -597,8 +653,17 @@ static NSArray *selection_keys(void)
 {
     if (![objects count])
         return;
+    objects = [[objects copy] autorelease];
     [self _contentRemove:objects];
     [self _removedObjects:objects];
+    if ([self _contentOption:NSDeletesObjectsOnRemoveBindingsOption])
+        for (id o in objects) {
+            id context = [o respondsToSelector:@selector(managedObjectContext)]
+                             ? [o performSelector:@selector(managedObjectContext)]
+                             : nil;
+            if ([context respondsToSelector:@selector(deleteObject:)])
+                [context performSelector:@selector(deleteObject:) withObject:o];
+        }
 }
 - (void)removeObjectAtArrangedObjectIndex:(NSUInteger)index
 {
@@ -629,10 +694,14 @@ static NSArray *selection_keys(void)
         [binding isEqualToString:NSContentBinding]) {
         if (NSIsControllerMarker(value))
             value = nil;
-        if (_editingContent)
+        if (_editingContent) {
             [self _takeContent:value];   /* our own change, arranged by us */
-        else
+        } else {
             [self setContent:value];
+            if (![binding isEqualToString:NSContentBinding] &&
+                [self _contentOption:NSSelectsAllWhenSettingContentBindingOption])
+                [self setSelectionIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, [_arranged count])]];
+        }
     } else if ([binding isEqualToString:NSSelectionIndexesBinding]) {
         [self setSelectionIndexes:[value isKindOfClass:[NSIndexSet class]] ? value : [NSIndexSet indexSet]];
     } else if ([binding isEqualToString:NSSortDescriptorsBinding]) {
@@ -803,6 +872,19 @@ static id shared_value(id controller, NSString *keyPath, BOOL isPath)
 {
     for (id o in [controller selectedObjects])
         [o setValue:value forKeyPath:keyPath];
+}
+/* Each selected object validates the value in turn, and may change it for
+ * the next (Ferry 0.20.0). */
+- (BOOL)validateValue:(id *)value forKeyPath:(NSString *)keyPath error:(NSError **)error
+{
+    for (id o in distinct([controller selectedObjects]))
+        if (![o validateValue:value forKeyPath:keyPath error:error])
+            return NO;
+    return YES;
+}
+- (BOOL)validateValue:(id *)value forKey:(NSString *)key error:(NSError **)error
+{
+    return [self validateValue:value forKeyPath:key error:error];
 }
 - (BOOL)_ferryIsKeyValueProxy { return YES; }
 - (NSString *)description

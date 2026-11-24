@@ -1081,9 +1081,10 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 85 tests (60 at M7, 69 before freemac (1.170), 74 before
+check` runs 87 tests (60 at M7, 69 before freemac (1.170), 74 before
 freemac (1.173), 77 before freemac (1.178), 79 before freemac (1.184), 82
-before freemac (1.188), 84 before freemac (1.190)), all passing.
+before freemac (1.188), 84 before freemac (1.190), 85 before freemac
+(1.NEXT)), all passing.
 The new or extended ones:
 
 | Test | Proves |
@@ -1100,6 +1101,8 @@ The new or extended ones:
 | `foundation_kvc_collections` | (freemac (1.188), Ferry 0.18.0) `mutableSetValueForKey:` through a class's set accessors (one object at a time, and `add<Key>:` for a union), through its setter and straight to an instance variable, with the set mutation kinds observers hear (insertion of what a union adds, removal of what a minus or an intersect takes away, replacement for `setSet:`) and the old, new and prior options, and `willChangeValueForKey:withSetMutation:usingObjects:` by hand; the collection operators `@count`, `@sum`, `@avg`, `@min`, `@max`, `@unionOfObjects`, `@distinctUnionOfObjects`, `@unionOfArrays`, `@distinctUnionOfArrays` and `@distinctUnionOfSets` on arrays, sets and through a to-one key, with nil values, empty collections and an unknown operator; arrays and sets answering and taking keys; removing an observer that isn't registered (or with the wrong context) raising `NSRangeException`; `NSPredicate`'s format strings (comparisons, `[c]`, `[d]`, `LIKE`, `BETWEEN`, `IN`, `ANY`, `ALL`, `NONE`, `AND`, `OR`, `NOT`, the format arguments and an argument array), `$variables`, blocks, `NSCompoundPredicate`, filtering arrays and sets, and formats it can't read |
 | `appkit_array_controller` | (freemac (1.188), Ferry 0.18.0) `NSArrayController`: its defaults, content given (an array and a set) and bound (`contentArray`, changed through the owner's indexed accessors and by the owner), `arrangedObjects` sorted and filtered, `selectionIndexes` and `selectedObjects`, `selection.name` with the multiple-values, no-selection and not-applicable markers and `alwaysUsesMultipleValuesMarker`, writing through the selection, `preservesSelection`, `avoidsEmptySelection`, `selectsInsertedObjects`, `clearsFilterPredicateOnInsertion`, adding, inserting at an index and removing, `add:`, `insert:` and `remove:` on the run loop's next turn, `selectNext:` and `selectPrevious:`, `canAdd`, `canInsert` and `canRemove`, `automaticallyRearrangesObjects`, observers of `arrangedObjects.name`, `arrangedObjects.@count`, `selection.name` and `selectionIndexes`, and the `selectionIndexes` binding both ways; a cell-based table whose columns are bound to `arrangedObjects.key`: its content, `selectionIndexes` and `sortDescriptors` bound for it, the columns' sort descriptors (and `NSCreatesSortDescriptorBindingOption`), the null placeholder, a column title bound, clicks and command-clicks selecting in the controller and the controller's selection shown, a model change redrawn, clicks on column titles sorting the controller, cells edited in place written back, rows added and removed |
 | `appkit_tree_controller` | (freemac (1.190), Ferry 0.19.0) `NSIndexPath` (adding and removing an index, `indexAtPosition:` past the end, `getIndexes:range:`, equality, hashing, `compare:` and sorting, `section` and `item`); `NSTreeNode` on its own (children through `mutableChildNodes`, observed, a node taken from its old parent, `parentNode`, `indexPath`, `descendantNodeAtIndexPath:`, sorting recursively); `NSTreeController`: its defaults and exposed bindings, content with `childrenKeyPath`, a leaf decided by having no children, by `leafKeyPath` or by `countKeyPath`, `arrangedObjects` as a tree of nodes kept across rearranging, `selectionIndexPaths`, `selectedObjects`, `selectedNodes` and `selection.name` with the multiple-values marker, writing through the selection, sorting level by level with `preservesSelection` on and off, the model adding, removing and replacing children (observed through its indexed accessors), inserting at an index path, removing (a node and its child at once), an index path that has no parent raising, `moveNode:toIndexPath:`, `add:`, `insert:`, `addChild:`, `insertChild:` and `remove:` on the run loop's next turn, `canAddChild` on a leaf, with `countKeyPath` and with no selection, `canAdd` and the rest when not editable, the `contentArray` and `selectionIndexPaths` bindings both ways, and dictionaries as the objects; an outline view whose columns are bound to `arrangedObjects.key`: its `content`, `selectionIndexPaths` and `sortDescriptors` bound for it, its items the controller's nodes, rows opened by code and by a click on a chevron, clicks and command-clicks selecting in the controller, a node the controller selects shown with its parents opened, a model change redrawn, clicks on column titles sorting the controller with open rows kept open, cells edited in place written back (text and a number), no editing and no write back when the controller isn't editable, `addChild:` and `remove:` shown; a table column's per-row `editable` (through `NSNegateBoolean`) and `enabled` bindings for text cells and check boxes, and `NSConditionallySetsEditable`; `NSDictionaryController`: its defaults, a bound `contentDictionary` with included, excluded and localized keys, a pair's value and key changed and written back, `add:` making unique keys, `remove:`, a new dictionary from the model, and an unbound mutable dictionary changed in place |
+| `appkit_nib_controllers` | (freemac (1.NEXT), Ferry 0.20.0) A nib written in the test with Ferry's own `NSKeyedArchiver` (an `NSIBObjectData` with custom objects, outlet and binding connectors, and a window template), loaded with `NSNib` and nothing bound in code: an `NSArrayController` (object class, editable, prepares content, avoids empty selection, preserves selection, selects inserted objects, clears the filter on insertion, rearranges automatically, always uses the multiple-values marker, declared keys), an `NSTreeController` (children and leaf key paths), an `NSObjectController` (an entity name, and content prepared at `awakeFromNib`) and an `NSDictionaryController` (initial key and value, included, excluded and localized keys) read back; their `contentArray`, `sortDescriptors` and `contentDictionary` bound to File's Owner by connectors; a cell-based table whose columns are bound to `arrangedObjects.key` (content, selection and sorting bound for it); a view-based table and a view-based outline with no delegate and no data source, bound to the controllers, making their cell views from the table's own prototype nibs (`NSTableViewArchivedReusableViewsKey`), with a text field and a check box in each cell view bound to `objectValue.key`; the rows, a click selecting through the controller, a field bound to `selection.title` and its no-selection and multiple-values placeholders, the field edited and the table and cell views rearranged, a cell view's field edited in place and its check box clicked (written back), the model changed under the views, `add:` and `remove:`, the outline's cell views given the nodes' represented objects and edited in place, `addChild:`, the object controller's prepared dictionary edited through a field with a null placeholder, and the dictionary controller's pairs written back |
+| `appkit_binding_validation` | (freemac (1.NEXT), Ferry 0.20.0) `NSValidatesImmediatelyBindingOption`: values typed into fields bound through an object controller's and an array controller's selection put to `validate<Key>:error:` before they are written; a refused one presented (the application delegate's `application:willPresentError:` sees it, and the alert is answered) and the field showing the model's value again, a changed one (trimmed, a string made a number, clamped) written changed and shown, nothing asked without the option; the selection proxies' own `validateValue:forKeyPath:error:`; the same for a cell-based table's columns and for a field in a view-based table's cell view bound to `objectValue.age`; `NSRaisesForNotApplicableKeysBindingOption` absent (the field kept), NO ("Not Applicable", not editable) and YES (raises); a field made uneditable and a check box disabled with no selection, with a controller that isn't editable (followed as it changes) and with multiple values when `NSAllowsEditingMultipleValuesSelection` is NO; an `enabled` binding taken together with them; `NSConditionallySetsEnabled` and `...Editable` set by hand; the views' own settings given back when unbound; `NSDeletesObjectsOnRemove` (through the objects' `managedObjectContext`), `NSSelectsAllWhenSettingContent`, and `NSHandlesContentAsCompoundValue` into an owner's immutable array and into the user defaults through `NSUserDefaultsController` |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1280,33 +1283,38 @@ The new or extended ones:
   as public classes. `predicateFormat` writes Apple's documented forms
   (strings in double quotes, `NOT` before a comparison without
   parentheses); not compared character for character with a Mac.
-- **Bindings: controllers, tables and outlines, cell-based** (freemac
-  (1.184), `NSArrayController` and table bindings from freemac (1.188),
+- **Bindings: controllers, tables and outlines** (freemac (1.184),
+  `NSArrayController` and table bindings from freemac (1.188),
   `NSTreeController`, `NSDictionaryController`, outline views and per-row
-  column bindings from freemac (1.190)). Text views, images, date
+  column bindings from freemac (1.190), controllers from nibs, cell views'
+  bindings and validation from freemac (1.NEXT)). Text views, images, date
   pickers and segmented controls have no bindings of their own (a binding
   to a property of the same name is set by key-value coding, one way). A
-  table's and an outline's bindings are the cell-based ones: a view-based
-  table gives its cell views the row's object (or the bound column's
-  value) as their `objectValue`, but bindings inside cell views loaded
-  from a nib weren't tried, and a view-based outline's cell views aren't
-  given a node's represented object. `NSDeletesObjectsOnRemove`,
-  `NSSelectsAllWhenSettingContent`, `NSHandlesContentAsCompoundValue` and
-  `contentArrayForMultipleSelection` aren't done. A column's
-  `NSConditionallySetsEditable` is followed (an edited cell is written
-  back only when the value's controller is editable, unless the option is
-  NO), but a control's own `NSConditionallySetsEnabled` and
-  `...Editable` aren't. Validation (`NSValidatesImmediatelyBindingOption`,
-  `validateValue:forKey:error:` from a binding),
-  `NSAllowsEditingMultipleValuesSelection`, `NSInsertsNullPlaceholder`
-  and editors registered with a controller (`commitEditing` always says
-  YES) aren't done. `infoForBinding:`'s options are only those given, not
-  every option with its default, and `optionDescriptionsForBinding:` is
-  empty. A key the observed object lacks leaves the view as it is unless
-  `NSRaisesForNotApplicableKeysBindingOption` is YES (a Mac raises by
-  default). A text field shows the no-selection, multiple-values and null
-  placeholders greyed, as its placeholder. The bindings a class exposes
-  follow Apple's Cocoa Bindings Reference, not a list read from a Mac.
+  view-based table or outline from a nib whose content is bound and whose
+  delegate makes no views makes each cell view from the prototype nib
+  named by its column's identifier; a table with neither prototypes nor a
+  delegate that makes views still draws cells. `contentArrayForMultipleSelection`,
+  `NSInsertsNullPlaceholder` and editors registered with a controller
+  (`commitEditing` always says YES) aren't done. Validation happens only
+  with `NSValidatesImmediately`: without it a value is written as typed,
+  and nothing validates it later (a Mac validates pending edits when they
+  are committed). A refused value is presented as an alert through
+  `presentError:` on the view's responder chain, not as a sheet on its
+  window, and there is no "Discard Change" button to recover with; a
+  value refused while typing continuously is skipped quietly.
+  `NSHandlesContentAsCompoundValue` covers adding and removing objects
+  (a new array is set whole); a change to one element's own keys isn't
+  written back as a new array. `NSDeletesObjectsOnRemove` asks each
+  removed object's `managedObjectContext` to `deleteObject:` it (Ferry has
+  no Core Data), on the array controller only, not the tree controller.
+  `infoForBinding:`'s options are only those given, not every option with
+  its default, and `optionDescriptionsForBinding:` is empty. A key the
+  observed object lacks leaves the view as it is unless
+  `NSRaisesForNotApplicableKeysBindingOption` is given (YES raises, NO
+  shows "Not Applicable"); a Mac raises by default. A text field shows
+  the no-selection, multiple-values, not-applicable and null placeholders
+  greyed, as its placeholder. The bindings a class exposes follow Apple's
+  Cocoa Bindings Reference, not a list read from a Mac.
 - **NSArrayController: written from the documentation, not compared
   with a Mac** (freemac (1.188)). What a Mac would settle: the order in
   which observers of the selection and of `arrangedObjects` hear of a
@@ -1325,8 +1333,8 @@ The new or extended ones:
   `NSPreservesSelection`, `NSSelectsInsertedObjects`,
   `NSClearsFilterPredicateOnInsertion`,
   `NSAutomaticallyRearrangesObjects`) are a guess, untested against
-  Interface Builder's output, and no nib with an array controller was
-  tried. `NSObjectController`'s `add:` and `remove:` now also wait for the
+  Interface Builder's output; the nibs tried were written by Ferry's own
+  archiver with those keys (see `appkit_nib_controllers`). `NSObjectController`'s `add:` and `remove:` now also wait for the
   run loop's next turn, as Apple documents.
 - **NSTreeController and NSDictionaryController: written from the
   documentation, not compared with a Mac** (freemac (1.190)). What a Mac
@@ -1352,9 +1360,38 @@ The new or extended ones:
   keys `key`, `key1`, ... after `initialKey`, and writes a bound dictionary
   back as a new copy. The nib keys of the tree controller's key paths
   (`NSTreeContentChildrenKey`, `NSTreeContentCountKey`,
-  `NSTreeContentLeafKey`) are a guess, and no nib with either controller
-  was tried. `NSIndexPath` isn't archived, and `NSTreeNode`'s
+  `NSTreeContentLeafKey`) are a guess, and the dictionary controller's
+  have no documented name at all; the nibs tried were Ferry's own. `NSIndexPath` isn't archived, and `NSTreeNode`'s
   `representedObject` can't be changed after it is made.
+- **Controllers from nibs, cell views' bindings and validation: written
+  from the documentation, not compared with a Mac** (freemac (1.NEXT)).
+  Apple doesn't document the keys of a compiled nib, so every controller
+  key Ferry reads is a guess after Interface Builder's attribute names:
+  `NSObjectClassName`, `NSEditable`, `NSAutomaticallyPreparesContent`,
+  `NSDeclaredKeys`, `NSEntityName`, `NSAlwaysUsesMultipleValuesMarker`, the
+  array controller's selection keys above, the tree controller's
+  `NSTreeContent...Key`s, and the dictionary controller's `NSInitialKey`,
+  `NSInitialValue`, `NSIncludedKeys`, `NSExcludedKeys`,
+  `NSLocalizedKeyDictionary` and `NSLocalizedKeyTable`. The binding
+  connector's keys (`NSBinding`, `NSKeyPath`, `NSOptions`, and `NSLabel`
+  as "binding: key path") and the table's prototype nibs under
+  `NSTableViewArchivedReusableViewsKey` follow public descriptions of the
+  format. No nib saved by Interface Builder was loaded: the tests' nibs
+  were written by Ferry's own keyed archiver. What a Mac would settle:
+  that a view-based outline bound to a tree controller gives its cell
+  views the node's represented object, not the `NSTreeNode` (Ferry: the
+  represented object); that a table with prototypes and bound content but
+  a delegate that doesn't make views makes them from the prototypes by
+  the column's identifier, with the delegate as owner; the defaults of
+  `NSConditionallySetsEnabled` (Ferry: YES, but NO for a text field,
+  which is made uneditable instead through `NSConditionallySetsEditable`,
+  YES) and which conditions count (Ferry: no selection, multiple values
+  when they can't be edited, not applicable when the raise option is
+  given, and an observed controller that isn't editable); that the
+  option NO for `NSRaisesForNotApplicableKeys` shows "Not Applicable";
+  that a value a validation method changes is shown at once, even while
+  editing goes on; and whether a controller's selection validates against
+  each selected object, stopping at the first that refuses (Ferry).
 - **Formatters: text fields, cells and table cells** (freemac (1.184)).
   A text field edits its own text (there is no field editor), so
   `isPartialStringValid:proposedSelectedRange:...` (the newer form) isn't
@@ -1398,10 +1435,12 @@ columns, set mutations, collection operators and `NSPredicate` in
 (1.188), see `appkit_array_controller` and
 `foundation_kvc_collections`; `NSTreeController`, `NSTreeNode`,
 `NSIndexPath`, bindings on outline views, per-row column bindings and
-`NSDictionaryController` in (1.190), see `appkit_tree_controller`), then
-controllers loaded from a nib, bindings in view-based tables' cell views,
-validation through bindings, other calendars, locales' own number and date
-data, and document versions.
+`NSDictionaryController` in (1.190), see `appkit_tree_controller`;
+controllers loaded from a nib, bindings in view-based tables' cell views
+and validation through bindings in (1.NEXT), see `appkit_nib_controllers`
+and `appkit_binding_validation`), then validating pending edits when they
+are committed (editors registered with a controller), other calendars,
+locales' own number and date data, and document versions.
 
 ## Known limits (for every milestone)
 
@@ -1440,3 +1479,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.17.0 (freemac (1.184)): automatic key-value observing through a hidden `NSKVONotifying_` subclass, dependent keys, the observing options and `mutableArrayValueForKey:`'s change kinds; two-way bindings on text fields, buttons, pop-up buttons and the new `NSSlider` (with the null placeholder, `NSNegateBoolean`, `NSIsNil`, `NSIsNotNil` and `NSContinuouslyUpdatesValue`), `NSObjectController`, `NSUserDefaultsController`'s `values.*` and binding connectors in nibs; formatters on controls, cells and table cells being edited, `make check` 82/82.
 - 2026-11-24: Ferry 0.18.0 (freemac (1.188)): `NSArrayController` (content and `contentArray`/`contentSet` bindings, `arrangedObjects` sorted and filtered, the selection with `NSMultipleValuesMarker`, adding, inserting and removing, the selection options, automatic rearranging, observing `arrangedObjects.key`); table columns bound to `arrangedObjects.key` with the table's `content`, `selectionIndexes` and `sortDescriptors` bindings, edited cells written back and column titles sorting through the controller; `mutableSetValueForKey:` and the set mutation kinds, the collection operators in key paths, removing an observer that isn't registered raising, and an `NSPredicate` subset, `make check` 84/84.
 - 2026-11-24: Ferry 0.19.0 (freemac (1.190)): `NSTreeController` (children, count and leaf key paths, `arrangedObjects` as a tree of `NSTreeNode`s, `selectionIndexPaths` and `selectedObjects`, sorting, inserting, removing and moving at index paths, `add:`, `insert:`, `addChild:`, `insertChild:` and `remove:`), `NSTreeNode` and `NSIndexPath`; outline views bound to a tree controller (`content`, `selectionIndexPaths`, `sortDescriptors` and columns bound to `arrangedObjects.key`, edited cells written back); per-row `editable` and `enabled` column bindings, and no write back when the controller isn't editable; `NSDictionaryController`, `make check` 85/85.
+- 2026-11-24: Ferry 0.20.0 (freemac (1.NEXT)): `NSArrayController`, `NSTreeController`, `NSObjectController` and `NSDictionaryController` loaded from keyed nib archives with their settings and the binding connectors that join them, so a nib that binds a table or an outline to a controller works with no code; view-based tables and outlines from a nib making their cell views from the table's prototypes, with controls in a cell view bound to `objectValue.key` both ways; `NSValidatesImmediately` (`validateValue:forKeyPath:error:` and `validate<Key>:error:` before a bound value is written, a refused value presented and the control put back), `NSRaisesForNotApplicableKeys`, `NSConditionallySetsEnabled` and `...Editable` on controls, `NSAllowsEditingMultipleValuesSelection`, `NSDeletesObjectsOnRemove`, `NSSelectsAllWhenSettingContent` and `NSHandlesContentAsCompoundValue`, `make check` 87/87.

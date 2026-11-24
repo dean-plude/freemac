@@ -1,0 +1,43 @@
+nib (keyed archive 1) loaded 1: NSArrayController, NSDictionaryController, NSObjectController, NSTreeController, NSWindow
+books: NSArrayController of Book, editable 1, prepares 0, avoids empty 0, preserves 1, selects inserted 1, clears filter 0, rearranges 1, always multiple 1, declared keys title,pages,read
+shelves: NSTreeController of Node, children children, leaf leaf, count nil, avoids empty 0, preserves 0, selects inserted 0
+notes: NSObjectController, entity Note, content prepared at awakeFromNib: a mutable dictionary {
+}
+settings: initial setting = on, included theme, excluded secret, localized Theme
+books bound to LibraryOwner.books; table's content arrangedObjects, selectionIndexes selectionIndexes, sortDescriptors sortDescriptors (made by its columns)
+delegates: table nil, cards nil, outline nil; data sources nil nil nil
+cell-based table, sorted by title: [Alice|96] [Dune|412] [Emma|320] selected {}
+view-based table: [NSTableCellView Alice x] [NSTableCellView Dune -] [NSTableCellView Emma -] selected {}
+row 0's cell view: identifier card, objectValue is the book 1, text field editable 1
+title field: "" (placeholder No Selection), editable 0
+clicked Dune: controller {1}, title field "Dune", editable 1
+  view-based table: [NSTableCellView Alice x] [NSTableCellView Dune -] [NSTableCellView Emma -] selected {1}
+command-clicked Emma: title field placeholder Multiple Values (always multiple), editable 1
+typed Arrakis in the title field: model Arrakis (412); rearranged:
+  table: [Alice|96] [Arrakis|412] [Emma|320] selected {1}
+  cards: [NSTableCellView Alice x] [NSTableCellView Arrakis -] [NSTableCellView Emma -] selected {1}
+double click on Emma's card: editing 1
+typed Persuasion, Return: model Persuasion (320), row 2's cell view Persuasion
+clicked its check box: model Persuasion (320, read)
+  table: [Alice|96] [Arrakis|412] [Persuasion|320] selected {2}
+  cards: [NSTableCellView Alice x] [NSTableCellView Arrakis -] [NSTableCellView Persuasion x] selected {2}
+model changed: Alice's card "Through the Looking-Glass", check 0
+  table: [Arrakis|412] [Persuasion|320] [Through the Looking-Glass|96] selected {1}
+add: 4 books in the owner, the new one untitled (0) (a Book 1), selected {3}
+  cards: [NSTableCellView Arrakis -] [NSTableCellView Persuasion x] [NSTableCellView Through the Looking-Glass -] [NSTableCellView untitled -] selected {3}
+remove: 3 books
+  cards: [NSTableCellView Arrakis -] [NSTableCellView Persuasion x] [NSTableCellView Through the Looking-Glass -] selected {}
+outline: [0 Poems] [0 Plays]
+Poems opened: [0 Poems] [1 Odes] [1 Sonnets] [0 Plays]
+row 1's objectValue: Odes
+selected in the outline: controller Odes
+edited in place: model Elegies
+model renamed Sonnets: [0 Poems] [1 Elegies] [1 Haiku] [0 Plays]
+addChild: on Plays: 1 children, a Node 1
+  Plays opened: [0 Poems] [1 Elegies] [1 Haiku] [0 Plays] [1 ]
+note field: placeholder No note
+typed a note: content lent to Kim
+settings pairs: font(Font)=Serif theme(Theme)=nil
+font set through the selection: owner's settings Sans (new dictionary), secret kept xyzzy
+add: owner's settings has setting = on
+exit=0

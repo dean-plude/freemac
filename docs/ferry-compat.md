@@ -384,6 +384,41 @@ These were written from Apple's documentation and not compared with a
 Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of the nine
 apps has been run again with these.
 
+### Controllers from nibs, cell views and validation ((1.NEXT), Ferry 0.20.0)
+
+`NSArrayController`, `NSTreeController`, `NSObjectController` and
+`NSDictionaryController` now load from nibs with their settings: the
+object class, editable, preparing content, the selection options, the
+tree's key paths, and the dictionary's initial, included, excluded and
+localized keys. The binding connectors in the nib bind them to File's
+Owner and bind tables, outlines and fields to them, so a nib that shows a
+controller's objects in a table works with no code. Apple doesn't
+document a compiled nib's keys, so the controllers' keys are a guess
+after Interface Builder's names; `docs/ferry-gui.md` lists them.
+
+A view-based table or outline whose content is bound and whose delegate
+makes no views makes its cell views from the nib's prototypes. Each cell
+view's `objectValue` is its row's object (in an outline, the node's
+represented object), and a field or check box in it bound to
+`objectValue.key` shows that key and writes the user's edits back.
+
+Bindings now validate. With `NSValidatesImmediately`, a value is checked
+with the model's `validate<Key>:error:` before it is written: a refused
+value isn't written, its error is presented, and the control shows the
+model's value again; a value the method changes is written changed.
+`NSRaisesForNotApplicableKeys` is followed. A bound control is disabled,
+or a bound text field made uneditable, when there is nothing to edit: no
+selection, a controller that isn't editable, or several values when
+`NSAllowsEditingMultipleValuesSelection` is NO. The array controller
+takes `NSDeletesObjectsOnRemove`, `NSSelectsAllWhenSettingContent` and
+`NSHandlesContentAsCompoundValue` (for example a list in the user
+defaults, set whole each time).
+
+These were written from Apple's documentation and not compared with a
+Mac, and no nib saved by Interface Builder was tried: the tests write
+their nibs with Ferry's own keyed archiver. None of the nine apps has been
+run again with these.
+
 ## What the apps need most
 
 Counted over the nine apps:

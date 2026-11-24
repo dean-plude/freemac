@@ -1292,6 +1292,9 @@ typedef NSString *NSNibName;
 @property BOOL automaticallyPreparesContent;
 @property (getter=isEditable) BOOL editable;
 @property (readonly) BOOL canAdd, canRemove;
+/* Core Data's entity, kept from a nib; there is no Core Data (Ferry 0.20.0). */
+@property (copy) NSString *entityName;
+@property (retain) id managedObjectContext;
 - (id)newObject;
 - (void)prepareContent;
 - (void)addObject:(id)object;
@@ -1484,7 +1487,8 @@ APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelecti
     *const NSContinuouslyUpdatesValueBindingOption, *const NSRaisesForNotApplicableKeysBindingOption,
     *const NSConditionallySetsEnabledBindingOption, *const NSConditionallySetsEditableBindingOption,
     *const NSAllowsEditingMultipleValuesSelectionBindingOption, *const NSValidatesImmediatelyBindingOption,
-    *const NSCreatesSortDescriptorBindingOption;
+    *const NSCreatesSortDescriptorBindingOption, *const NSDeletesObjectsOnRemoveBindingsOption,
+    *const NSSelectsAllWhenSettingContentBindingOption, *const NSHandlesContentAsCompoundValueBindingOption;
 @interface NSObject (NSKeyValueBindingCreation)
 + (void)exposeBinding:(NSString *)binding;
 @property (readonly, copy) NSArray<NSString *> *exposedBindings;
