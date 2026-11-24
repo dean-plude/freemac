@@ -1,0 +1,33 @@
+the program's own code
+  copy self: 0
+  check: 0
+  a requirement: 0
+  check against it: 0
+  static code: 0
+  check it: 0, strictly against the requirement 0
+  path: 0, security_code
+  same as the executable: yes
+  static code from that path: 0, check 0
+  signing information: 0, main executable
+  identifier (none), team (none), certificates (none)
+  main executable: security_code
+  designated requirement: -67062, none
+  guest by pid: 0, the same code 1
+  self twice: equal 1
+  another process: -67065
+other code
+  /bin/sh: 0
+  check: -67062, against the requirement -67062
+  with errors: -67062, an error in NSOSStatusErrorDomain, code -67062
+  signing information: main executable
+  designated requirement: -67062
+  a path with nothing there: -67068
+  no code: -67069
+requirements
+  as text: 0, anchor apple generic and identifier "org.example.app" and certificate leaf[subject.OU] = "ABCDE12345"
+  "": -67052, an error 1
+  "identifier "org.example": -67052, an error 1
+  "(anchor apple": -67052, an error 1
+  "anchor apple)": -67052, an error 1
+errSecCSUnsigned: Code signing: the code object is not signed at all.
+exit=0

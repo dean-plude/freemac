@@ -1,0 +1,12 @@
+plist: macOS 14.7 (23H124), user-visible 14.7
+stdio read 404 bytes; stat 0: size 404, regular 1, mode 644
+same as the property list's file: yes
+open: yes, reads "<?xml"
+open for writing: -1, EACCES
+writable: -1, readable: 0
+uname: Darwin 23.6.0
+NSProcessInfo: 14.7.0, "Version 14.7 (Build 23H124)"
+at least 11.0 1, 14.7 1, 14.7.1 0, 15.0 0
+Gestalt: 14.7.0 (0 0 0), sysv 0x1470 (0), unknown selector -5551, left 7
+all agree: yes
+exit=0

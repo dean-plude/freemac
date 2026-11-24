@@ -1,0 +1,25 @@
+certificates
+  from garbage: NULL
+  summary 127.0.0.1, common name 0 127.0.0.1
+  its data back: same, the same certificate again: equal
+trust
+  before evaluating: result 0
+  against the system's authorities: not trusted, result 5, OSStatus -67843, 1 in the chain
+  still, with no anchors of its own: not trusted, result 5, OSStatus -67843, 1 in the chain
+  with it as the anchor: trusted, result 4, 1 in the chain
+  SecTrustEvaluate: 0, result 4
+  with it and the system's: trusted, result 4, 1 in the chain
+  in 2000: not trusted, result 5, OSStatus -67819, 1 in the chain
+  in 2100: not trusted, result 5, OSStatus -67818, 1 in the chain
+  for localhost: not trusted, result 5, OSStatus -67602, 1 in the chain
+  basic X.509, anchored: trusted, result 4, 1 in the chain
+  policies 1, chain 1, its first the certificate yes
+  asynchronously: 0, trusted
+  no certificates: -50
+a server's trust, through NSURLSession
+  challenge: NSURLAuthenticationMethodServerTrust
+  the server's certificates: 1, the file's yes
+  as received: not trusted, result 5, OSStatus -67843, 1 in the chain
+  with its own certificate as the anchor: trusted, result 4, 1 in the chain
+  status 200: Hello, Ferry!
+exit=0

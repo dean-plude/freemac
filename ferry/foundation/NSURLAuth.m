@@ -108,7 +108,17 @@ NSString *FMD5Hex(NSString *text)
 - (void)dealloc
 {
     [host release];
+    [security release];
     [super dealloc];
+}
+- (NSString *)_ferryTrustHost { return host; }
+- (NSInteger)_ferryTrustPort { return port; }
+- (id)_ferrySecurityTrust { return security; }
+- (void)_setFerrySecurityTrust:(id)trust
+{
+    [trust retain];
+    [security release];
+    security = trust;
 }
 - (NSString *)description
 {

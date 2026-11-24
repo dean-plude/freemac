@@ -573,6 +573,28 @@ cache to themselves. Not yet supported:
 - looking inside a server's certificate (there is no Security framework);
 - background sessions, WebSockets and resume data.
 
+### Security and CommonCrypto (freemac 1.200, Ferry 0.27.0)
+
+Apps that link the Security framework now load, and the calls they make
+most work. `SecItemAdd`, `SecItemCopyMatching`, `SecItemUpdate` and
+`SecItemDelete` keep generic and internet passwords for the user in
+`~/.local/share/ferry/keychain` (a folder only the user can open), with the
+common attributes, the return types and match limits, and the documented
+status codes; the older `SecKeychainAddGenericPassword`,
+`SecKeychainFindGenericPassword` and their internet-password twins use the
+same items. Secrets in that file are encrypted with a key kept beside them,
+which protects against casual reading only, not against anyone or anything
+that can read the user's files. Code signing gets one plain answer: an
+app's check of its own signature passes, and everything else reads as
+unsigned (Ferry can't check Apple's signatures; `FERRY_VERBOSE=1` says so).
+`SecTrust` checks certificates with this system's OpenSSL against its
+certificate authorities, including the server trust a URL session's
+delegate is asked about. CommonCrypto (in libSystem) has the MD5, SHA-1
+and SHA-2 digests, HMAC, PBKDF2 and random bytes of its own, and AES
+(ECB, CBC with PKCS#7 padding, CTR) through OpenSSL. The macOS version is
+now one answer everywhere: 14.7 in `SystemVersion.plist`, `NSProcessInfo`,
+`Gestalt` and `uname` (Darwin 23.6.0).
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -600,8 +622,12 @@ Counted over the nine apps:
    (1.170), and `NSCalendar`, `NSNumberFormatter` and the other
    formatters in (1.173).
 5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
-   file or the app's code signature at start. Ferry could provide a version
-   file of its own and answer the signature check plainly.
+   file or the app's code signature at start. Done in (1.200): Ferry
+   serves a version file of its own (macOS 14.7, the same version that
+   `NSProcessInfo`, `Gestalt` and `uname` report), an app's check of its
+   own signature passes, and the Security framework's keychain and trust
+   calls are there for what comes after. Next is running the three apps
+   again to see what Sparkle asks for next.
 6. **Threads**: Ferry runs a program on one thread; dispatch queues run
    there too.
 

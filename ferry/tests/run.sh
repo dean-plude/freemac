@@ -76,6 +76,17 @@ run_one() {
                 XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        security_keychain)
+            # twice in one home: what the first run keeps, the second finds
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
+                HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" second >> "$build/$name.got" \
+                    2>> "$build/$name.err" ;;
+        security_code) FERRY_VERBOSE=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        security_trust)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            url_env env FERRY_TEST_TLS_CERT="$build/tls.der" "$top/ferry" "$exe" > "$build/$name.got" \
+                2> "$build/$name.err" ;;
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -102,6 +113,10 @@ done
 run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
 run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore
 run_one atomics "$here/atomics.c" "$here/atomics.out"
+# CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
+# through this system's OpenSSL, against published test vectors.
+run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"
+run_one commoncrypto_cryptor "$here/commoncrypto_cryptor.c" "$here/commoncrypto_cryptor.out"
 # Blocks from plain C, and the Objective-C runtime (M1).
 run_one blocks "$here/blocks.c" "$here/blocks.out" -fblocks
 # Grand Central Dispatch from plain C (M6).
@@ -136,6 +151,17 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
     -framework CoreFoundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
+# The macOS version, the same in the Mac's version file, uname, NSProcessInfo
+# and Gestalt, through CoreServices and through Carbon.
+run_one foundation_sysversion "$here/foundation/sysversion.m" "$here/foundation/sysversion.out" \
+    -framework Foundation -framework CoreServices
+run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foundation/sysversion.out" \
+    -framework Foundation -framework Carbon
+# Security: keychain items in a home of the test's own, kept between two
+# runs, and the code-signing answers (said once with FERRY_VERBOSE).
+run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
+    -framework Security
+run_one security_code "$here/security/code.m" "$here/security/code.out" -framework Foundation -framework Security
 # Exceptions a program catches (M7), unwound through frame-pointer and
 # frameless functions, and through Foundation's frames.
 run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \
@@ -208,8 +234,12 @@ if command -v python3 > /dev/null 2>&1; then
     if [ -n "$tls_port" ]; then
         run_one foundation_urltrust "$here/foundation/urltrust.m" "$here/foundation/urltrust.out" -fobjc-arc \
             -framework Foundation
+        # the same certificate through Security's trust calls, and the challenge's server trust
+        openssl x509 -in "$build/tls.crt" -outform DER -out "$build/tls.der"
+        run_one security_trust "$here/security/trust.m" "$here/security/trust.out" -framework Foundation \
+            -framework Security
     else
-        echo "skip foundation_urltrust (needs openssl, to make the test server a certificate)"
+        echo "skip foundation_urltrust and security_trust (need openssl, to make the test server a certificate)"
     fi
     kill "$http_pid" 2> /dev/null; wait "$http_pid" 2> /dev/null
 else
@@ -296,6 +326,15 @@ if LD_DEBUG=libs "$top/ferry" "$build/foundation_strings" 2>&1 >/dev/null | grep
 else
     echo "ok   libcurl loaded only when loading URLs"; pass=$((pass + 1))
 fi
+# OpenSSL only by programs that encrypt or check certificates: Ferry's own
+# digests need none of it.
+if LD_DEBUG=libs "$top/ferry" "$build/commoncrypto_digests" 2>&1 >/dev/null | grep -q "libcrypto"; then
+    echo "FAIL commoncrypto_digests loads libcrypto"; fail=$((fail + 1))
+elif ! LD_DEBUG=libs "$top/ferry" "$build/commoncrypto_cryptor" 2>&1 >/dev/null | grep -q "libcrypto"; then
+    echo "FAIL commoncrypto_cryptor doesn't load libcrypto"; fail=$((fail + 1))
+else
+    echo "ok   libcrypto loaded only when encrypting"; pass=$((pass + 1))
+fi
 # A program inside a Mac app bundle: Info.plist, resources, localized strings.
 app="$build/Hello.app"
 rm -rf "$app"; cp -r "$here/foundation/Hello.app" "$app"; mkdir -p "$app/Contents/MacOS"
@@ -316,6 +355,27 @@ if "$top/sdk/ferry-cc" -O1 -o "$app/Contents/MacOS/Hello" "$here/foundation/bund
     done
 else
     echo "FAIL foundation_bundle (did not compile)"; sed 's/^/    /' "$build/foundation_bundle.cc.log"
+    fail=$((fail + 1))
+fi
+# An app's check of its own signature, from inside its bundle.
+app="$build/SelfCheck.app"
+rm -rf "$app"; mkdir -p "$app/Contents/MacOS"
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+    '<key>CFBundleExecutable</key><string>SelfCheck</string>' \
+    '<key>CFBundleIdentifier</key><string>org.freemac.ferry.selfcheck</string>' '</dict></plist>' \
+    > "$app/Contents/Info.plist"
+if "$top/sdk/ferry-cc" -O1 -o "$app/Contents/MacOS/SelfCheck" "$here/security/selfcheck.m" -framework Foundation \
+        -framework Security 2> "$build/security_selfcheck.cc.log"; then
+    "$top/ferry" "$app/Contents/MacOS/SelfCheck" > "$build/security_selfcheck.got" 2> "$build/security_selfcheck.err"
+    echo "exit=$?" >> "$build/security_selfcheck.got"
+    if diff -u "$here/security/selfcheck.out" "$build/security_selfcheck.got" > "$build/security_selfcheck.diff"; then
+        echo "ok   security_selfcheck"; pass=$((pass + 1))
+    else
+        echo "FAIL security_selfcheck"; sed 's/^/    /' "$build/security_selfcheck.diff"
+        sed 's/^/    stderr: /' "$build/security_selfcheck.err"; fail=$((fail + 1))
+    fi
+else
+    echo "FAIL security_selfcheck (did not compile)"; sed 's/^/    /' "$build/security_selfcheck.cc.log"
     fail=$((fail + 1))
 fi
 # Key paths, value transformers and bindings (M6).
@@ -542,6 +602,13 @@ if grep -q "\-\[NSObject frobnicate\]: unrecognized selector sent to instance" "
     echo "ok   foundation_invocation message"; pass=$((pass + 1))
 else
     echo "FAIL foundation_invocation message"; sed 's/^/    stderr: /' "$build/foundation_invocation.err"; fail=$((fail + 1))
+fi
+# The code-signing answers are each said once with FERRY_VERBOSE, however often asked.
+if [ "$(grep -c "own code signature passes" "$build/security_code.err" 2>/dev/null)" = 1 ] &&
+    [ "$(grep -c "reads as unsigned (errSecCSUnsigned)" "$build/security_code.err" 2>/dev/null)" = 1 ]; then
+    echo "ok   security_code message"; pass=$((pass + 1))
+else
+    echo "FAIL security_code message"; sed 's/^/    stderr: /' "$build/security_code.err"; fail=$((fail + 1))
 fi
 # The unsupported program must also say what was missing.
 if grep -q "pthread_yield_np" "$build/unsupported.err" 2>/dev/null; then

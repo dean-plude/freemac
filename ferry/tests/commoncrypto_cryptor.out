@@ -1,0 +1,62 @@
+AES-128 ECB encrypt (rc 0, 16 bytes): matches
+AES-128 ECB decrypt (rc 0, 16 bytes): matches
+AES-192 ECB encrypt (rc 0, 16 bytes): matches
+AES-192 ECB decrypt (rc 0, 16 bytes): matches
+AES-256 ECB encrypt (rc 0, 16 bytes): matches
+AES-256 ECB decrypt (rc 0, 16 bytes): matches
+CBC-AES128: rc 0, 64 bytes
+CBC-AES128 encrypt: matches
+CBC-AES128 decrypt: matches
+CBC-AES256 encrypt: matches
+CBC-AES256 in place: rc 0
+CBC-AES256 decrypt in place: matches
+CTR create: rc 0
+  CTR update 5: rc 0, moved 5
+  CTR update 11: rc 0, moved 11
+  CTR update 16: rc 0, moved 16
+  CTR update 1: rc 0, moved 1
+  CTR update 31: rc 0, moved 31
+  CTR final: rc 0, moved 0
+CTR-AES128 encrypt: matches
+CTR-AES128 decrypt: matches
+padded  0 bytes -> 16 bytes, back to  0 (rc 0), same: yes
+padded  1 bytes -> 16 bytes, back to  1 (rc 0), same: yes
+padded  5 bytes -> 16 bytes, back to  5 (rc 0), same: yes
+  "abcde" encrypted 46dad22c2eb638e219fb7106a07ef0be
+padded 15 bytes -> 16 bytes, back to 15 (rc 0), same: yes
+padded 16 bytes -> 32 bytes, back to 16 (rc 0), same: yes
+padded 17 bytes -> 32 bytes, back to 17 (rc 0), same: yes
+padded 64 bytes -> 80 bytes, back to 64 (rc 0), same: yes
+spoilt padding: rc -4304, moved 0
+buffer too small: rc -4301, needs 32
+20 bytes without padding: rc -4303
+a 15-byte key: rc -4310
+a little-endian counter: rc -4305
+3DES: rc -4305
+an unknown option: rc -4300
+encrypting in pieces:
+  update  7: rc 0, moved  0 (output length said 0)
+  update  9: rc 0, moved 16 (output length said 16)
+  update 16: rc 0, moved 16 (output length said 16)
+  update  3: rc 0, moved  0 (output length said 0)
+  update 33: rc 0, moved 32 (output length said 32)
+  update 32: rc 0, moved 32 (output length said 32)
+  final length said 16
+  final: rc 0, moved 16
+  same as CCCrypt's: yes
+  after a reset (rc 0): the same again
+decrypting in pieces:
+  update  7: rc 0, moved  0 (output length said 0)
+  update  9: rc 0, moved  0 (output length said 0)
+  update 16: rc 0, moved 16 (output length said 16)
+  update  3: rc 0, moved 16 (output length said 16)
+  update 33: rc 0, moved 32 (output length said 32)
+  update 32: rc 0, moved 32 (output length said 32)
+  update  7: rc 0, moved  0 (output length said 0)
+  update  5: rc 0, moved  0 (output length said 0)
+  final length said 16
+  final: rc 0, moved 4
+  same as the original: yes
+  after a reset (rc 0): the same again
+final into 8 bytes: rc -4301, needs 16
+exit=0

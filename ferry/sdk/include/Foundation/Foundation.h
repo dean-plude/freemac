@@ -1468,8 +1468,19 @@ NSUncaughtExceptionHandler *NSGetUncaughtExceptionHandler(void);
 
 /* ---- NSProcessInfo, NSBundle, NSUserDefaults, NSFileManager ----------------------- */
 
+/* The macOS version Ferry presents (the same as the Mac's version file,
+ * /System/Library/CoreServices/SystemVersion.plist, and uname's Darwin
+ * release say). */
+typedef struct {
+    NSInteger majorVersion;
+    NSInteger minorVersion;
+    NSInteger patchVersion;
+} NSOperatingSystemVersion;
+
 @interface NSProcessInfo : NSObject
 + (NSProcessInfo *)processInfo;
+@property (readonly) NSOperatingSystemVersion operatingSystemVersion;
+- (BOOL)isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion)version;
 @property (readonly, copy) NSArray<NSString *> *arguments;
 @property (readonly, copy) NSDictionary<NSString *, NSString *> *environment;
 @property (copy) NSString *processName;

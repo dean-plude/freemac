@@ -1123,6 +1123,16 @@ The new or extended ones:
 | `foundation_urlcache` (ARC, run twice) | (freemac (1.199), Ferry 0.26.0) `NSURLCache` by hand (memory and disk, a second cache on the same files, memory-only and not-allowed entries, the fragment ignored, removal) and through sessions, counted by the server: `max-age`, `max-age=0`, `Expires`, `ETag` and `Last-Modified` revalidated with a 304, `no-store`, a POST; each request cache policy, the configuration's policy, the request's `Cache-Control: no-cache`; the twentieth-of-the-cache size rule; no cache; `URLSession:dataTask:willCacheResponse:completionHandler:` keeping, refusing and changing the entry; downloads not kept; the shared cache through `dataWithContentsOfURL:` and `NSURLConnection`, and its files; a second run answered from disk without the network |
 | `foundation_urldata` (ARC) | (freemac (1.199), Ferry 0.26.0) `data:` URLs (RFC 2397) through `NSURLSession`, `NSURLConnection`, `NSData` and `NSString`: plain and percent-encoded, base64, a charset, a MIME type, a fragment, bad base64 (-1015) and no comma (-1000), `canHandleRequest:` |
 | `foundation_urltrust` (ARC; needs openssl) | (freemac (1.199), Ferry 0.26.0) An https server whose certificate run.sh made, which the system doesn't trust: no delegate (-1202), the session-level challenge with default handling (-1202), cancel (-999) and a trust credential (the page loads), a password challenge after it, the task-level method alone, `NSURLConnection` accepting it, `dataWithContentsOfURL:` refusing it |
+| `commoncrypto_digests` | (freemac (1.200), Ferry 0.27.0) MD5, SHA-1, SHA-224, SHA-256, SHA-384 and SHA-512 against RFC 1321's suite and FIPS 180's examples (the empty message, "abc", the 448- and 896-bit messages, a million "a"), each one-shot and fed in every split; HMAC against RFC 2202 and RFC 4231 (keys shorter and longer than a block), one-shot and incremental; PBKDF2 against RFC 6070 and RFC 7914; `CCCalibratePBKDF`; `CCRandomGenerateBytes` and `CCRandomCopyBytes` |
+| `commoncrypto_cryptor` | (freemac (1.200), Ferry 0.27.0) AES through this system's OpenSSL: FIPS 197's ECB examples for 128, 192 and 256-bit keys, SP 800-38A's CBC (AES-128 and AES-256) and CTR (AES-128) examples, PKCS#7 padding and its lengths, `CCCrypt` and the `CCCryptor` calls fed in pieces, `CCCryptorReset`, `CCCryptorGetOutputLength`, and the documented status for a spoilt padding, a buffer too small (with the size needed), unaligned input, a wrong key size, an unknown option and an algorithm or mode Ferry doesn't have |
+| `foundation_sysversion` | (freemac (1.200), Ferry 0.27.0) One macOS version (14.7, build 23H124) everywhere: `/System/Library/CoreServices/SystemVersion.plist` read as a property list, with stdio (also through a doubled slash), with `open` and `stat`, refused for writing (`EACCES`, and `access` says so); `uname`'s Darwin 23.6.0; `NSProcessInfo`'s `operatingSystemVersion`, `operatingSystemVersionString` and `isOperatingSystemAtLeastVersion:`; `Gestalt`'s `sys1`, `sys2`, `sys3` and `sysv`, and an unknown selector |
+| `foundation_sysversion_carbon` | (freemac (1.200), Ferry 0.27.0) The same program linked against Carbon instead of CoreServices, for `Gestalt` |
+| `security_keychain` | (freemac (1.200), Ferry 0.27.0) Generic and internet passwords in a home of the test's own, run twice: `SecItemAdd`, `SecItemCopyMatching` (data, attributes, a reference, a persistent reference, several at once, one or all, case-insensitive), `SecItemUpdate` and `SecItemDelete`; the documented status for a duplicate, nothing found, a wrong type, a missing class, another class's attribute, a match limit where none belongs, a certificate (not kept); synchronizable items found only when asked for; the older `SecKeychain...` calls on the same items; the folder at mode 0700 and its files at 0600, no secret in the clear in the file, a tampered secret refused (`errSecDecode`); items kept for the second run; `SecCopyErrorMessageString`; `SecRandomCopyBytes` |
+| `security_code` | (freemac (1.200), Ferry 0.27.0) Code signing as Ferry answers it: `SecCodeCopySelf`, its static code and a static code made for the executable's path pass `SecCodeCheckValidity` and `SecStaticCodeCheckValidity`, with and without a requirement; `/bin/sh` reads as unsigned (`errSecCSUnsigned`, also as a `CFError`); signing information with no identifier, team or certificates; no designated requirement; the program found by its process id and no other; a path with nothing there; requirements kept as text and malformed ones refused |
+| `security_code message` | (freemac (1.200), Ferry 0.27.0) With `FERRY_VERBOSE` set, each of the two code-signing answers is said once on stderr, however often it is given |
+| `security_selfcheck` | (freemac (1.200), Ferry 0.27.0) An app's check of its own signature from inside its bundle: the running code is the bundle, static codes made for the bundle's and the executable's paths pass, the signing information carries the bundle's Info.plist and main executable but no identifier |
+| `security_trust` (needs openssl) | (freemac (1.200), Ferry 0.27.0) The test server's own certificate: read from DER (garbage refused), its subject summary and common name, its data back, `CFEqual`; a trust refused against the system's authorities (`errSecNotTrusted`), accepted with it as the anchor (alone and with the system's), refused in 2000 and 2100 (not yet valid, expired) and for another host name; basic X.509; `SecTrustEvaluate`, `SecTrustGetTrustResult`, the policies, the chain, `SecTrustEvaluateAsyncWithError`; and in an `NSURLSession` challenge, the server trust's certificates read from the server, refused as received and accepted once given its own certificate as the anchor, after which the page loads |
+| `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1898,6 +1908,101 @@ The new or extended ones:
     US-ASCII when no type is given, no encoding name when a type is given
     without a charset.
 
+- **Security and CommonCrypto** (freemac (1.200), Ferry 0.27.0).
+  - The keychain keeps generic and internet passwords only. Certificates,
+    keys and identities are never found (`errSecItemNotFound`) and can't be
+    added (`errSecUnimplemented`); there is no `SecKey`, `SecIdentity`,
+    `SecAccessControl` or import and export (`SecItemImport`, PKCS#12).
+  - The keychain file's encryption only keeps a secret from being read by
+    accident (a glance at the file, a backup listing, a search). The key is
+    in the same folder, so anyone who can read the user's files, every
+    program the user runs included, can read every secret. There is no
+    lock with the user's login password, no prompt before another app
+    reads an item, and access groups are only attributes that are matched:
+    any program can read any item.
+  - Nothing is synchronized: `kSecAttrSynchronizable` is kept and matched
+    and nothing more. `kSecAttrAccessible` is kept and has no effect.
+    `SecKeychainSetUserInteractionAllowed` is remembered and changes
+    nothing; Ferry never asks.
+  - The older keychain calls are the password ones (add, find, change,
+    delete, free) and `SecKeychainCopyDefault`; there are no keychain
+    files of their own (`SecKeychainCreate`, `SecKeychainOpen`), no search
+    objects and no `SecKeychainItemCopyContent` or `...CopyAttributesAndData`.
+  - `NSURLCredentialStorage` still keeps credentials in memory only; it
+    doesn't use the keychain yet.
+  - Code signing reads no signature at all. Every piece of code reads as
+    unsigned except for the running program's check of itself, which
+    passes. Requirements are checked only for their shape (quotes and
+    brackets), not parsed. There are no hosting calls, no
+    `SecTaskCopyValueForEntitlement` and no Gatekeeper (`SecAssessment`).
+  - Trust is checked by OpenSSL against this system's authorities: no
+    revocation (OCSP, CRLs), no certificate transparency, no Mac trust
+    settings, no network fetch of missing intermediates, and none of the
+    Mac's own rules (certificate lifetimes, policy constraints). Only the
+    SSL and basic X.509 policies exist; `SecTrustSetNetworkFetchAllowed`,
+    `SecTrustCopyKey`, `SecTrustCopyExceptions` and the like are missing.
+  - A server trust from `NSURLSession` fetches its certificates over a
+    second, direct connection the first time it is asked about, never
+    through a proxy: behind a proxy that is the only way out, it has no
+    certificates and is not trusted.
+  - CommonCrypto has AES only, in ECB, CBC and CTR (big-endian counter)
+    modes: no CFB, OFB, XTS or GCM, no DES, 3DES, CAST, RC4 or Blowfish
+    (`kCCUnimplemented`), no `CCCryptorCreateFromData`, no
+    `CCKeyDerivationHMac`, and no `CC_MD2` or `CC_MD4`. AES needs this system's OpenSSL (libcrypto 3
+    or 1.1): without it AES calls fail (`kCCUnimplemented`) and
+    certificates can't be read; the digests, HMAC, PBKDF2 and random bytes
+    are Ferry's own and always work.
+  - Two other ways to read the version are not served yet. `sysctl` and
+    `sysctlbyname` are missing, so a program that reads
+    `kern.osproductversion` or `kern.osrelease` that way stops. And
+    `@available` (`__builtin_available`) is compiled into the app as a call
+    to the compiler's runtime, which looks the version up through `dlsym`;
+    Ferry has no `dlsym` for Mac programs yet.
+- **Security and CommonCrypto** (freemac (1.200), Ferry 0.27.0).
+  - The constants' string values: the attribute keys that the older calls
+    also name are their four-letter tags ("acct", "svce", "srvr"...), the
+    protocols and authentication types are the older calls' codes
+    ("htps", "dflt"...), and every other key and value (`kSecClass`,
+    `kSecReturnData`, `kSecMatchLimitAll`, `kSecCodeInfoIdentifier`,
+    `kSecAttrAccessibleWhenUnlocked`...) is its own name.
+  - What `SecItemCopyMatching` returns when no `kSecReturn...` key is given
+    (Ferry: `errSecSuccess` and no result, a check that an item exists),
+    whether a query may ask for data with `kSecMatchLimitAll` (Ferry allows
+    it), and whether a key Ferry doesn't know is refused (Ferry ignores it,
+    and says so once with `FERRY_VERBOSE`).
+  - Which attributes come back: Ferry returns those given when the item was
+    made plus the class, the two dates and `sync`; a Mac also fills in
+    defaults (an empty account, the app's access group, the accessibility).
+    Uniqueness treats a missing account, service, server, path and the like
+    as empty and a missing port as 0.
+  - Which status comes back for an attribute of the other class
+    (`errSecNoSuchAttr`), a value of the wrong type (`errSecParam`), a class
+    Ferry doesn't keep (find and delete `errSecItemNotFound`, add
+    `errSecUnimplemented`), deleting an item reference twice
+    (`errSecInvalidItemRef`), and a secret that fails its check
+    (`errSecDecode`). The texts of `SecCopyErrorMessageString` are Ferry's
+    wording of the documented descriptions.
+  - The older calls: the label given to a new item (the service or server
+    name), what a `NULL` or empty name matches (anything), and which
+    attribute tags `SecKeychainItemModifyAttributesAndData` takes.
+  - Code signing: the status for a path with nothing there
+    (`errSecCSStaticCodeNotFound`), for an unknown guest process
+    (`errSecCSNoSuchCode`), for a requirement whose text is malformed
+    (`errSecCSReqInvalid`), and the keys a Mac puts in an unsigned
+    program's signing information (Ferry: main executable and Info.plist).
+  - Trust: the result for a trusted chain (`kSecTrustResultUnspecified`)
+    and for each failure (`kSecTrustResultRecoverableTrustFailure`), which
+    OpenSSL failure maps to which status (dates, host name, everything else
+    `errSecNotTrusted`), the error texts, and what
+    `SecTrustGetCertificateCount` counts before evaluating (Ferry
+    evaluates first).
+  - CommonCrypto: `CCCalibratePBKDF`'s timing, and the status and moved
+    length for every mistake, which follow the manual pages.
+  - The version Ferry presents, macOS 14.7 (build 23H124, Darwin 23.6.0),
+    is a choice: recent enough for apps that require macOS 11 to 14, and
+    the build number is the one of a released 14.7. A real Mac's version
+    file has more keys (`iOSSupportVersion`, `ProductCopyright`).
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -1970,3 +2075,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.24.0 (freemac (1.197)): `NSXMLDocument`, `NSXMLNode`, `NSXMLElement`, `NSXMLDTD` and `NSXMLDTDNode` on libxml2 (a tree of objects that can be walked, changed, searched with XPath and written out again, pretty printed or canonical); `dataUsingEncoding:` with ASCII and ISO Latin 1 converting for real, and `dataUsingEncoding:allowLossyConversion:`, `make check` 98/98.
 - 2026-11-24: Ferry 0.25.0 (freemac (1.198)): QuartzCore.framework with Core Animation basics (layers, shape, gradient and text layers, transactions, implicit and explicit animations, springs and groups), layer-backed and layer-hosting NSViews, NSAnimationContext and the views' animator, `make check` 101/101.
 - 2026-11-24: Ferry 0.26.0 (freemac (1.199)): redirects decided by the delegate, HTTP Basic and Digest authentication, server trust, `NSHTTPCookieStorage` saved to disk, `NSURLCache` in memory and on disk, and `data:` URLs, `make check` 107/107.
+- 2026-11-24: Ferry 0.27.0 (freemac (1.200)): Security.framework (keychain passwords, code-signing answers, certificate trust), CommonCrypto (digests, HMAC, PBKDF2, AES), and one macOS version (14.7) everywhere an app asks, `make check` 117/117.

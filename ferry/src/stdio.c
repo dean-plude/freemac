@@ -8,6 +8,7 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -102,7 +103,19 @@ static int is_std(struct mac_FILE *f)
 
 /* ---- opening and closing ------------------------------------------------- */
 
-static struct mac_FILE *mac_fopen(const char *path, const char *mode) { return wrap(fopen(path, mode)); }
+static struct mac_FILE *mac_fopen(const char *path, const char *mode)
+{
+    if (ferry_is_virtual(path)) {
+        /* the Mac's version file, which Ferry makes (sysversion.c) */
+        int writes = mode && (strchr(mode, 'w') || strchr(mode, 'a') || strchr(mode, '+'));
+        int fd = ferry_virtual_open(path, writes ? O_RDWR : O_RDONLY);
+        FILE *f = fd < 0 ? NULL : fdopen(fd, "r");
+        if (fd >= 0 && !f)
+            close(fd);
+        return wrap(f);
+    }
+    return wrap(fopen(path, mode));
+}
 static struct mac_FILE *mac_fdopen(int fd, const char *mode) { return wrap(fdopen(fd, mode)); }
 static struct mac_FILE *mac_tmpfile(void) { return wrap(tmpfile()); }
 static struct mac_FILE *mac_popen(const char *cmd, const char *mode) { return wrap(popen(cmd, mode)); }
