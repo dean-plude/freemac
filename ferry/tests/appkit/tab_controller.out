@@ -1,0 +1,43 @@
+style 0, transition 0x141, tab view style 6
+no tabs: selected -1
+adding three tabs:
+  general loads its view
+  observed selectedTabViewItemIndex: 0
+tabs 3, children 3, the third's label Keys, selected 0
+loading the view:
+on top: tab view 0,0 400x200; segments at y 208, centred 1: General* Colours Keys
+the view is 400x240, colours loaded 0
+choosing the second segment:
+  colors loads its view
+  observed selectedTabViewItemIndex: 1
+chosen: tab view 0,0 400x200; segments at y 208, centred 1: General Colours* Keys
+colours loaded 1, its view in the tab view 1
+selecting the third by index:
+  keys loads its view
+  observed selectedTabViewItemIndex: 2
+by index: tab view 0,0 400x200; segments at y 208, centred 1: General Colours Keys*
+selecting the first through the tab view:
+  observed selectedTabViewItemIndex: 0
+through the tab view: tab view 0,0 400x200; segments at y 208, centred 1: General* Colours Keys
+index 3: NSRangeException
+a tab with no view controller: NSInvalidArgumentException
+removing the first child:
+  observed selectedTabViewItemIndex: 0
+removed: tab view 0,0 400x200; segments at y 208, centred 1: Colours* Keys
+tabs 2, children 2
+on the bottom: tab view 0,40 400x200; segments at y 8, centred 1: Colours* Keys
+unspecified: tab view 0,0 400x240
+a new tab view after loading: NSInternalInconsistencyException
+  security loads its view
+putting the toolbar style in a window:
+toolbar 1, display mode 1, items: Security (security) Updates (NSTabViewController.tab.1)
+selected security, title Security, tab view fills the view 1
+choosing the second toolbar item:
+  updates loads its view
+  the subclass hears of Updates
+selected NSTabViewController.tab.1, index 1, title Updates
+a third tab:
+toolbar items 3, the last Advanced
+  one loads its view
+a window with its own toolbar keeps it 1
+exit=0

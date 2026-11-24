@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Pagination (freemac 1.NEXT, Ferry 0.NEXT): a view wider and taller than
+ * Pagination (freemac 1.210, Ferry 0.36.0): a view wider and taller than
  * the page, printed with automatic pagination (tiled, row by row from the
  * top), fit pagination (shrunk onto one page), and clip pagination (one
  * page, cut off); a view that isn't flipped; a view that moves each

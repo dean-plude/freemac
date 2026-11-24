@@ -885,5 +885,15 @@ then
 else
     echo "FAIL coredata_models message"; sed 's/^/    stderr: /' "$build/coredata_models.err"; fail=$((fail + 1))
 fi
+# gradients, shadows and the split view and tab view controllers
+run_one appkit_gradients "$here/appkit/gradients.m" "$here/appkit/gradients.out" -fobjc-arc -fblocks -framework Cocoa
+if [ "$(grep -c "drawing shadows isn't supported yet" "$build/appkit_gradients.err" 2>/dev/null)" = 1 ]
+then
+    echo "ok   appkit_gradients message"; pass=$((pass + 1))
+else
+    echo "FAIL appkit_gradients message"; sed 's/^/    stderr: /' "$build/appkit_gradients.err"; fail=$((fail + 1))
+fi
+run_one appkit_split_controller "$here/appkit/split_controller.m" "$here/appkit/split_controller.out" -fobjc-arc -fblocks -framework Cocoa
+run_one appkit_tab_controller "$here/appkit/tab_controller.m" "$here/appkit/tab_controller.out" -fobjc-arc -fblocks -framework Cocoa
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

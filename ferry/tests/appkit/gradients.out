@@ -1,0 +1,55 @@
+two colours: 2 stops: 0.00=(1.0 0.0 0.0) 1.00=(0.0 0.0 1.0)
+array: 3 stops: 0.00=(1.0 0.0 0.0) 0.50=(0.0 1.0 0.0) 1.00=(0.0 0.0 1.0)
+colours and locations, sorted: 3 stops: 0.00=(1.0 0.0 0.0) 0.25=(0.0 1.0 0.0) 1.00=(0.0 0.0 1.0)
+locations held to 0...1: 3 stops: 0.00=(1.0 0.0 0.0) 0.50=(0.0 1.0 0.0) 1.00=(0.0 0.0 1.0)
+no colours: nil
+no ending colour: nil
+at 0: 1.00 0.00 0.00 1.00
+at 0.25: 0.75 0.00 0.25 1.00
+at 1: 0.00 0.00 1.00 1.00
+mixed at 0.125: 0.50 0.50 0.00 1.00
+mixed at 0.625: 0.00 0.50 0.50 1.00
+before the first stop: 1.00 0.00 0.00 1.00
+after the last stop: 0.00 0.00 1.00 1.00
+index 2: NSRangeException
+archived and read back: 3 stops: 0.00=(1.0 0.0 0.0) 0.25=(0.0 1.0 0.0) 1.00=(0.0 0.0 1.0)
+a copy is the same gradient: yes
+line, before the start (2,1): 0.0 0.0 0.0 0.0
+line, the start (5,1): 0.9 0.0 0.1 1.0
+line, the middle (10,1): 0.5 0.0 0.5 1.0
+line, after the end (18,1): 0.0 0.0 0.0 0.0
+extended, before the start (2,1): 1.0 0.0 0.0 1.0
+extended, after the end (18,1): 0.0 0.0 1.0 1.0
+0 degrees, left (5,10): 0.9 0.0 0.1 1.0
+0 degrees, right (14,10): 0.1 0.0 0.9 1.0
+0 degrees, outside the rectangle (2,10): 0.0 0.0 0.0 0.0
+90 degrees, bottom (10,0): 1.0 0.0 0.0 1.0
+90 degrees, top (10,19): 0.0 0.0 1.0 1.0
+180 degrees, left (0,10): 0.0 0.0 1.0 1.0
+180 degrees, right (19,10): 1.0 0.0 0.0 1.0
+45 degrees, bottom left corner (0,0): 1.0 0.0 0.0 1.0
+45 degrees, top right corner (19,19): 0.0 0.0 1.0 1.0
+45 degrees, top left corner (0,19): 0.5 0.0 0.5 1.0
+in an oval, its middle (10,10): 0.5 0.0 0.5 1.0
+in an oval, a corner outside it (0,0): 0.0 0.0 0.0 0.0
+radial, the centre (10,10): 1.0 0.0 0.0 1.0
+radial, a corner (0,0): 0.0 0.0 1.0 1.0
+radial to the top right, the centre (10,10): 1.0 0.0 0.0 1.0
+radial to the top right, the bottom left (0,0): 0.0 0.0 1.0 1.0
+relative position 2: NSInvalidArgumentException
+between circles, the centre (10,10): 0.9 0.0 0.1 1.0
+between circles, outside the end circle (0,0): 0.0 0.0 0.0 0.0
+one colour (2,2): 0.0 1.0 0.0 1.0
+shadow: offset 0,0 blur 0
+shadow colour: 0.00 0.00 0.00 0.33
+copy equal: yes, then changed: not equal
+a blur below 0: 0
+archived shadow: offset 1,-1 blur 3, equal yes
+no colour: nil
+filled under a shadow with no colour (3,3): 1.0 0.0 0.0 1.0
+beside it (8,8): 0.0 0.0 0.0 0.0
+filled under a drop shadow (Ferry draws no shadow yet) (3,5): 1.0 0.0 0.0 1.0
+shadow attribute name: NSShadow
+text attributes: 2, shadow kept: yes
+text with a shadow attribute drawn
+exit=0

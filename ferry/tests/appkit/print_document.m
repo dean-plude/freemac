@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * A document printed to PDF (freemac 1.NEXT, Ferry 0.NEXT): an NSDocument
+ * A document printed to PDF (freemac 1.210, Ferry 0.36.0): an NSDocument
  * subclass makes its print operation in printOperationWithSettings:error:,
  * from its own print info, and printDocumentWithSettings: runs it with
  * the settings given (saving to a file) and calls the delegate back.

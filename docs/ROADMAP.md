@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.210 "Ferry: gradients, shadows and window layouts" (done)
+
+Ferry 0.36.0: the drawing and window-layout classes that six of the nine test apps use.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSGradient`: along a line, in a rectangle or path at an angle, between circles and from a centre | Ferry AppKit | done |
+| 2 | `NSShadow` with its settings, archives and the text attribute (not drawn yet) | Ferry AppKit | done |
+| 3 | `NSSplitViewController` and `NSSplitViewItem`: sidebars and inspectors that collapse, holding priorities and thickness limits | Ferry AppKit | done |
+| 4 | `NSTabViewController`, with a segmented control or the window's toolbar | Ferry AppKit | done |
+| 5 | Four new tests; `make check` 172 of 172 | Ferry | done |
+
+The nine apps weren't run again this time, because their downloads couldn't be fetched here; the fixes were chosen from what their public source code uses.
+
 ## 1.209 "Ferry: Core Data" (done)
 
 Ferry 0.35.0: Mac apps can keep their data with Core Data, Apple's framework for saving an app's records.

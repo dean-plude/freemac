@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * A view printed to a PDF file (freemac 1.NEXT, Ferry 0.NEXT): a tall
+ * A view printed to a PDF file (freemac 1.210, Ferry 0.36.0): a tall
  * view is laid out on several pages of the print info's paper, each page
  * drawn by the view's own drawRect: (not to the screen, with the print
  * operation current), and the file read back with Poppler: the number of
