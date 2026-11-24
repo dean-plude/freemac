@@ -163,6 +163,7 @@ one of them will be reverted.
 | Menu bar extras: apps that show an icon while they run (chat, cloud storage, password managers) get it in the menu bar, with their menus; Topline is the StatusNotifierItem host that Linux apps look for | **Topline** | 1.156 |
 | A Wi-Fi menu in the menu bar: networks you've joined, then the others with their signal and a padlock if they need a password; click one to join (a password is asked once and remembered), click the one you're on for its address, signal and channel, or switch Wi-Fi off and on | **Topline** | 1.153 |
 | Now Playing in the menu bar while music or a video plays: the cover, the track, how far it has got, and back, play or pause and forward; and Seek's magnifying glass, as ⌘Space; either can be hidden in Dials > Dock and Menu Bar | **Topline**, Dials | 1.162 |
+| Open in Web: a website in the Dock can show the page it's on in Web, with the address bar and tabs, from its File menu | **Web**, Topline | 1.168 |
 | Unread counts on websites in the Dock: a red badge with the number a site shows in its title, such as Facebook's (3), on its Dock icon | Dock | 1.166 |
 | Add to Dock for websites: File > Add to Dock… in Web puts a website in the Dock with its own icon and name; it opens in its own window, keeps its own sign-in, and is deleted with Options > Delete Web App… | **Web**, Dock | 1.165 |
 | Lifeboat in the menu bar: a lifebuoy that turns while a backup runs, with when the latest backup was made, Back Up Now or Skip This Backup, and Browse Lifeboat Backups | **Topline**, Lifeboat | 1.163 |

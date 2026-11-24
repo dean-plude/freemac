@@ -27,6 +27,8 @@ import json
 import os
 import re
 import shutil
+import sqlite3
+import subprocess
 import sys
 import threading
 import urllib.parse
@@ -704,12 +706,56 @@ def ask_to_delete(desktop_id):
     return 0 if remove_app(desktop_id) else 1
 
 
+# File > Open in Web: the page a web app shows, in Web itself, as a Mac's web
+# apps open theirs in Safari.
+def page_in_app(profile, title=""):
+    """The address a web app's window shows: the latest page in its own
+    history with that title, else the latest page it visited."""
+    path = os.path.join(profile, "ephy-history.db")
+    if not os.path.exists(path):
+        return None
+    try:
+        db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2)
+        try:
+            rows = db.execute("SELECT urls.url, urls.title FROM visits JOIN urls ON urls.id = visits.url "
+                              "ORDER BY visits.visit_time DESC, visits.id DESC LIMIT 50").fetchall()
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return None
+    # A title such as "(3) Facebook" gains its count after the visit is kept.
+    wanted = {" ".join((title or "").split()).lower(),
+              re.sub(r"^\s*\(\d[\d,.]*\+?\)\s*", "", title or "").strip().lower()} - {""}
+    for url, page_title in rows:
+        if " ".join((page_title or "").split()).lower() in wanted:
+            return url
+    return rows[0][0] if rows else None
+
+
+def open_in_web(desktop_id, title=""):
+    """Open the page a web app shows in Web (Epiphany's own profile)."""
+    desktop_id = as_desktop_id(desktop_id)
+    if not is_web_app(desktop_id):
+        return 1
+    app_id = desktop_id[len(PREFIX):-len(".desktop")]
+    fields = read_desktop(paths(app_id)["link"])
+    url = page_in_app(paths(app_id)["profile"], title) or fields.get("X-Freemac-WebApp-URL")
+    if not url or not url.startswith(("http://", "https://")):
+        return 1
+    # A list of arguments, never a shell: the address is passed as it is.
+    subprocess.Popen(["epiphany", url], start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["--remove"] and len(argv) == 2:
         return 0 if remove_app(as_desktop_id(argv[1])) else 1
     if argv[:1] == ["--delete"] and len(argv) == 2:
         return ask_to_delete(as_desktop_id(argv[1]))
+    if argv[:1] == ["--open-in-web"] and len(argv) in (2, 4) and argv[2:3] in ([], ["--title"]):
+        return open_in_web(argv[1], argv[3] if len(argv) == 4 else "")
     if argv[:1] == ["--list"]:
         for desktop_id, label, url in installed():
             print(f"{label}\t{url}\t{desktop_id}")

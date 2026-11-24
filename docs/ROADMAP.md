@@ -1183,6 +1183,14 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.168 "Open in Web" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > Open in Web in a website's own window opens the page it's on in Web, as a Mac's web apps open theirs in Safari | webapps.py, fallback_menus.py, Topline | done |
+| 2 | The page is found in the website's own history by its window's title (an unread count in front of it is allowed for), else the last page it visited, else its address in the Dock | webapps.py | done |
+| 3 | Guide line and README row | Guide, Docs | done |
+
 ## 1.167 "Ferry: documents, alerts and the workspace" (done)
 
 Mac programs run through Ferry that open, edit and save files (text editors,

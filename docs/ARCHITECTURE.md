@@ -915,6 +915,14 @@ app's launcher to `webapps.views_count`, which reads a leading "(3)" or an
 when no LauncherEntry count was sent. The Dock reads views on each Wayfire
 event and every five seconds, so the badge follows the title.
 
+A web app's File > Open in Web (`topline.open-in-web`, 1.168) runs
+`freemac-webapp --open-in-web ID --title T`. Epiphany keeps no session file
+for a web app, so `page_in_app` reads the profile's own `ephy-history.db`
+read-only and takes the latest visit whose page title is the window's
+(with or without a leading count), else the latest visit, else the
+launcher's `X-Freemac-WebApp-URL`. Only an http or https address is passed,
+as one argument, to `epiphany`, which opens it in a tab of Web's own profile.
+
 ## Lifeboat in the menu bar (1.163)
 
 `lifeboat_menu.LifeboatMenu` watches `lifeboat-status.json` and

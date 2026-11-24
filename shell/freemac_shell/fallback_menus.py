@@ -16,6 +16,7 @@ PRESS = "topline.press"
 CLOSE = "topline.close-window"
 CLOSE_NO_KEY = "close-window, no shortcut"   # where ⌘W already means Close Tab
 ADD_TO_DOCK = "topline.add-to-dock"           # Web's File > Add to Dock… (webapps.py)
+OPEN_IN_WEB = "topline.open-in-web"           # a web app's File > Open in Web
 WEB_APP_PREFIX = "org.gnome.epiphany.webapp_"  # a website added to the Dock
 
 # (label, shortcut it presses), with None between groups.
@@ -59,7 +60,7 @@ WEB = _browser("<Primary><Shift>n", "<Primary>h", CLOSE_NO_KEY, add_to_dock=True
 # A website added to the Dock opens in a window of its own with no tabs or
 # address bar; its menus keep what still applies.
 WEB_APP = [
-    ("File", [("Print…", "<Primary>p"), None, ("Close Window", CLOSE)]),
+    ("File", [("Open in Web", OPEN_IN_WEB), None, ("Print…", "<Primary>p"), None, ("Close Window", CLOSE)]),
     EDIT,
     ("View", [
         ("Reload Page", "<Primary>r"), None,
@@ -99,8 +100,8 @@ def menubar_for(app_id):
                 continue
             label, keys = entry
             item = Gio.MenuItem.new(label, None)
-            if keys == ADD_TO_DOCK:
-                item.set_action_and_target_value(ADD_TO_DOCK, None)
+            if keys in (ADD_TO_DOCK, OPEN_IN_WEB):
+                item.set_action_and_target_value(keys, None)
             elif keys in (CLOSE, CLOSE_NO_KEY):
                 item.set_action_and_target_value(CLOSE, None)
                 if keys == CLOSE:
