@@ -465,7 +465,7 @@ NSString *GFontMacFamily(NSString *name);
 /* The shared font manager if one has been made, without making one. */
 NSFontManager *AExistingFontManager(void);
 
-/* (Ferry 0.NEXT) The Core Data calls an entity-mode controller makes. AppKit
+/* (Ferry 0.36.0) The Core Data calls an entity-mode controller makes. AppKit
  * doesn't link CoreData: the classes are looked up by name, and these
  * declarations name the methods. */
 @protocol AManagedCalls

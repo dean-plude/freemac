@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * A view's drawing as PDF and EPS data (freemac 1.NEXT, Ferry 0.NEXT):
+ * A view's drawing as PDF and EPS data (freemac 1.210, Ferry 0.36.0):
  * dataWithPDFInsideRect: makes one page the size of the rect, holding the
  * view's drawing inside the rect (and none outside it) and its subviews';
  * PDFOperationWithView:insideRect:toData: and toPath: never show the

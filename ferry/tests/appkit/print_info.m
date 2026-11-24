@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * NSPrintInfo (freemac 1.NEXT, Ferry 0.NEXT): the shared print info's
+ * NSPrintInfo (freemac 1.210, Ferry 0.36.0): the shared print info's
  * defaults (the paper this system's locale uses, the margins, scaling,
  * pagination and centring), the paper sizes and names, orientation
  * turning the paper, the dictionary behind the properties, a copy that

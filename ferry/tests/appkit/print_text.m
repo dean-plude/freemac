@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * A text view printed across pages (freemac 1.NEXT, Ferry 0.NEXT): eighty
+ * A text view printed across pages (freemac 1.210, Ferry 0.36.0): eighty
  * numbered lines in a text view the width of the page, printed on US
  * Letter. Every line comes out once, whole and in order, each page ends
  * on a line's edge (the text view moves the page's bottom up rather than

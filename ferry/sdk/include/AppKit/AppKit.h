@@ -4094,4 +4094,120 @@ typedef NS_OPTIONS(NSUInteger, NSFontPanelModeMask) {
 #import <Foundation/NSUserNotification.h>
 #import <AppKit/NSDockTile.h>
 
+/* ---- gradients and shadows (NSGradient.m) -------------------------------------------- */
+
+typedef NS_OPTIONS(NSUInteger, NSGradientDrawingOptions) {
+    NSGradientDrawsBeforeStartingLocation = 1 << 0, NSGradientDrawsAfterEndingLocation = 1 << 1,
+};
+@interface NSGradient : NSObject <NSCopying, NSCoding>
+- (instancetype)initWithStartingColor:(NSColor *)start endingColor:(NSColor *)end;
+- (instancetype)initWithColors:(NSArray<NSColor *> *)colors;
+- (instancetype)initWithColorsAndLocations:(NSColor *)firstColor, ...;
+- (instancetype)initWithColors:(NSArray<NSColor *> *)colors atLocations:(const CGFloat *)locations
+                    colorSpace:(id)colorSpace;
+- (void)drawFromPoint:(NSPoint)start toPoint:(NSPoint)end options:(NSGradientDrawingOptions)options;
+- (void)drawInRect:(NSRect)rect angle:(CGFloat)angle;
+- (void)drawInBezierPath:(NSBezierPath *)path angle:(CGFloat)angle;
+- (void)drawFromCenter:(NSPoint)startCenter radius:(CGFloat)startRadius toCenter:(NSPoint)endCenter
+                radius:(CGFloat)endRadius options:(NSGradientDrawingOptions)options;
+- (void)drawInRect:(NSRect)rect relativeCenterPosition:(NSPoint)center;
+- (void)drawInBezierPath:(NSBezierPath *)path relativeCenterPosition:(NSPoint)center;
+@property (readonly, retain) id colorSpace;
+@property (readonly) NSInteger numberOfColorStops;
+- (void)getColor:(NSColor **)color location:(CGFloat *)location atIndex:(NSInteger)index;
+- (NSColor *)interpolatedColorAtLocation:(CGFloat)location;
+@end
+
+APPKIT_EXTERN NSAttributedStringKey const NSShadowAttributeName;
+@interface NSShadow : NSObject <NSCopying, NSCoding>
+@property NSSize shadowOffset;
+@property CGFloat shadowBlurRadius;
+@property (copy) NSColor *shadowColor;
+- (void)set;
+@end
+
+/* ---- split view and tab view controllers (NSSplitViewController.m, NSTabViewController.m) --- */
+
+#define NSSplitViewItemUnspecifiedDimension (-1.0)
+#define NSSplitViewControllerAutomaticDimension (-1.0)
+typedef NS_ENUM(NSInteger, NSSplitViewItemBehavior) {
+    NSSplitViewItemBehaviorDefault = 0, NSSplitViewItemBehaviorSidebar = 1, NSSplitViewItemBehaviorContentList = 2,
+    NSSplitViewItemBehaviorInspector = 3,
+};
+typedef NS_ENUM(NSInteger, NSSplitViewItemCollapseBehavior) {
+    NSSplitViewItemCollapseBehaviorDefault = 0, NSSplitViewItemCollapseBehaviorPreferResizingSplitViewWithFixedSiblings = 1,
+    NSSplitViewItemCollapseBehaviorPreferResizingSiblingsWithFixedSplitView = 2,
+    NSSplitViewItemCollapseBehaviorUseConstraints = 3,
+};
+typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
+    NSTitlebarSeparatorStyleAutomatic = 0, NSTitlebarSeparatorStyleNone = 1, NSTitlebarSeparatorStyleLine = 2,
+    NSTitlebarSeparatorStyleShadow = 3,
+};
+@interface NSSplitViewItem : NSObject <NSCoding>
++ (instancetype)splitViewItemWithViewController:(NSViewController *)vc;
++ (instancetype)sidebarWithViewController:(NSViewController *)vc;
++ (instancetype)contentListWithViewController:(NSViewController *)vc;
++ (instancetype)inspectorWithViewController:(NSViewController *)vc;
+@property (retain) NSViewController *viewController;
+@property (readonly) NSSplitViewItemBehavior behavior;
+@property (getter=isCollapsed) BOOL collapsed;
+@property BOOL canCollapse;
+@property (getter=isSpringLoaded) BOOL springLoaded;
+@property BOOL canCollapseFromWindowResize;
+@property NSSplitViewItemCollapseBehavior collapseBehavior;
+@property NSLayoutPriority holdingPriority;
+@property CGFloat minimumThickness, maximumThickness, preferredThicknessFraction, automaticMaximumThickness;
+@property BOOL allowsFullHeightLayout, automaticallyAdjustsSafeAreaInsets;
+@property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
+@end
+@interface NSSplitViewController : NSViewController <NSSplitViewDelegate, NSUserInterfaceValidations>
+@property (retain) NSSplitView *splitView;
+@property (copy) NSArray<NSSplitViewItem *> *splitViewItems;
+@property CGFloat minimumThicknessForInlineSidebars;
+- (void)addSplitViewItem:(NSSplitViewItem *)item;
+- (void)insertSplitViewItem:(NSSplitViewItem *)item atIndex:(NSInteger)index;
+- (void)removeSplitViewItem:(NSSplitViewItem *)item;
+- (NSSplitViewItem *)splitViewItemForViewController:(NSViewController *)vc;
+- (IBAction)toggleSidebar:(id)sender;
+- (IBAction)toggleInspector:(id)sender;
+- (void)viewDidLoad;
+- (BOOL)splitView:(NSSplitView *)sv canCollapseSubview:(NSView *)subview;
+- (CGFloat)splitView:(NSSplitView *)sv constrainMinCoordinate:(CGFloat)p ofSubviewAt:(NSInteger)i;
+- (CGFloat)splitView:(NSSplitView *)sv constrainMaxCoordinate:(CGFloat)p ofSubviewAt:(NSInteger)i;
+- (void)splitViewDidResizeSubviews:(NSNotification *)note;
+@end
+
+typedef NS_ENUM(NSInteger, NSTabViewControllerTabStyle) {
+    NSTabViewControllerTabStyleSegmentedControlOnTop = 0, NSTabViewControllerTabStyleSegmentedControlOnBottom = 1,
+    NSTabViewControllerTabStyleToolbar = 2, NSTabViewControllerTabStyleUnspecified = -1,
+};
+typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
+    NSViewControllerTransitionNone = 0x0, NSViewControllerTransitionCrossfade = 0x1,
+    NSViewControllerTransitionSlideUp = 0x10, NSViewControllerTransitionSlideDown = 0x20,
+    NSViewControllerTransitionSlideLeft = 0x40, NSViewControllerTransitionSlideRight = 0x80,
+    NSViewControllerTransitionSlideForward = 0x140, NSViewControllerTransitionSlideBackward = 0x180,
+    NSViewControllerTransitionAllowUserInteraction = 0x1000,
+};
+@interface NSTabViewController : NSViewController <NSTabViewDelegate, NSToolbarDelegate>
+@property NSTabViewControllerTabStyle tabStyle;
+@property (retain) NSTabView *tabView;
+@property NSViewControllerTransitionOptions transitionOptions;
+@property BOOL canPropagateSelectedChildViewControllerTitle;
+@property (copy) NSArray<NSTabViewItem *> *tabViewItems;
+@property NSInteger selectedTabViewItemIndex;
+- (void)addTabViewItem:(NSTabViewItem *)item;
+- (void)insertTabViewItem:(NSTabViewItem *)item atIndex:(NSInteger)index;
+- (void)removeTabViewItem:(NSTabViewItem *)item;
+- (NSTabViewItem *)tabViewItemForViewController:(NSViewController *)vc;
+- (void)viewDidLoad;
+- (BOOL)tabView:(NSTabView *)tv shouldSelectTabViewItem:(NSTabViewItem *)item;
+- (void)tabView:(NSTabView *)tv willSelectTabViewItem:(NSTabViewItem *)item;
+- (void)tabView:(NSTabView *)tv didSelectTabViewItem:(NSTabViewItem *)item;
+- (NSToolbarItem *)toolbar:(NSToolbar *)toolbar itemForItemIdentifier:(NSToolbarItemIdentifier)identifier
+    willBeInsertedIntoToolbar:(BOOL)flag;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarSelectableItemIdentifiers:(NSToolbar *)toolbar;
+@end
+
 #endif

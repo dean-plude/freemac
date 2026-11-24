@@ -194,6 +194,18 @@ in-memory stores with lightweight migration and batch deletes and updates.
 Compiled models (`.mom` and `.momd`) aren't read yet, and Ferry says so
 once when an app asks for one. Store files made on a Mac aren't read either.
 
+From Ferry 0.36.0 (freemac 1.210), Mac apps can draw gradients with
+`NSGradient`: along a line, in a rectangle or a path at an angle, and
+between circles, with stops at any locations. `NSShadow` is there with
+its settings, archives and the `NSShadow` text attribute, though shadows
+aren't drawn yet. `NSSplitViewController` and `NSSplitViewItem` lay out
+panes in a split view, with sidebars and inspectors that collapse by
+code, by `toggleSidebar:` or by dragging, holding priorities and
+thickness limits. `NSTabViewController` shows its tabs as a segmented
+control or as the window's toolbar, loading each tab's view when it is
+first shown. These are what MacPass's document window and preferences
+are built on.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

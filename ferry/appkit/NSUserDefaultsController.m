@@ -148,7 +148,7 @@ static NSString *first_key(NSString *keyPath)
     Class _objectClass;
     NSArray *_declaredKeys;          /* the keys Interface Builder lists (Ferry 0.20.0) */
     NSString *_entityName;
-    id _managedObjectContext;        /* (Ferry 0.NEXT) entity mode's context, retained */
+    id _managedObjectContext;        /* (Ferry 0.36.0) entity mode's context, retained */
     NSPredicate *_fetchPredicate;
     BOOL _prepares, _editable, _lazyFetching;
 }
@@ -177,7 +177,7 @@ static NSString *first_key(NSString *keyPath)
         _prepares = [coder decodeBoolForKey:@"NSAutomaticallyPreparesContent"];
     /* (Ferry 0.20.0) the attribute keys and a Core Data entity's name, kept;
      * the controller is in entity mode, fetching that entity, once it is
-     * given a managedObjectContext (Ferry 0.NEXT) */
+     * given a managedObjectContext (Ferry 0.36.0) */
     id keys = [coder containsValueForKey:@"NSDeclaredKeys"] ? [coder decodeObjectForKey:@"NSDeclaredKeys"] : nil;
     if ([keys isKindOfClass:[NSArray class]])
         _declaredKeys = [keys copy];
@@ -193,7 +193,7 @@ static NSString *first_key(NSString *keyPath)
     [_entityName autorelease];
     _entityName = [name copy];
 }
-/* ---- entity mode (Ferry 0.NEXT) ----
+/* ---- entity mode (Ferry 0.36.0) ----
  * With an entity name and a managed object context, newObject inserts a
  * new object of that entity into the context, and a fetch (fetch:, or
  * prepareContent when the controller prepares its content) makes the

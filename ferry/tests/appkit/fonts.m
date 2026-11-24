@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * The font manager and the font panel (freemac 1.NEXT, Ferry 0.NEXT): one
+ * The font manager and the font panel (freemac 1.210, Ferry 0.36.0): one
  * shared manager (a nib's or a program's own alloc gives it too); the
  * installed families and their members, from fontconfig; fonts made by
  * family, traits and weight; conversions to and from bold and italic, to

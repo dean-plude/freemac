@@ -33,7 +33,7 @@
  * NSDeletesObjectsOnRemove has an object removed from the content deleted
  * from its managedObjectContext (deleteObject:), when it has one.
  *
- * In Core Data's entity mode (Ferry 0.NEXT: an entityName and a
+ * In Core Data's entity mode (Ferry 0.36.0: an entityName and a
  * managedObjectContext, see NSObjectController), the content is a mutable
  * array of the fetched objects; remove: deletes the removed objects from
  * the context, and when the context says objects of the entity were
@@ -242,7 +242,7 @@ static NSArray *selection_keys(void)
         [self setContent:[NSMutableArray array]];
 }
 
-/* ---- Core Data's entity mode (Ferry 0.NEXT) ---- */
+/* ---- Core Data's entity mode (Ferry 0.36.0) ---- */
 
 /* Core Data's name for NSManagedObjectContextObjectsDidChangeNotification. */
 static NSString *const objects_did_change = @"NSObjectsChangedInManagingContextNotification";

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Printing on a display (freemac 1.NEXT, Ferry 0.NEXT): the print panel
+ * Printing on a display (freemac 1.210, Ferry 0.36.0): the print panel
  * and the page layout are GTK's print and page setup dialogs, shown as
  * sheets on the window. FERRY_PRINT_ANSWER and FERRY_PAGE_LAYOUT_ANSWER
  * make each dialog answer itself after a moment, so the test can go

@@ -1,0 +1,36 @@
+plain: vertical 1, thin 1, items 0
+plain: view is the split view 1, its delegate is the controller 1
+plain: a child added the general way has an item 1; items 2, children 2, panes 2
+plain: removed the first child: items 1, panes 1, the other left 1
+an item: behavior 0, can collapse 0, holding 250, minimum -1, maximum -1
+a sidebar: behavior 1, can collapse 1, spring loaded 1, fraction 0.15
+an inspector: behavior 3, a content list: behavior 2
+a new split view after loading: NSInternalInconsistencyException
+an item with no view controller: NSInvalidArgumentException
+document: the split view is in the view 1, fills it 1, vertical 1
+document: items 3, children 3, the window's content is the controller
+document: item for the inspector found 1
+document, inspector collapsed: 0+150 151+329 360+120 (collapsed)
+holding: 252 250 251
+toggleInspector: with no item of the inspector's behavior, nothing changes: 0+150 151+329 360+120 (collapsed)
+observed collapsed: 0
+opened by code: the content pane gives up the room: 0+150 151+208 360+120
+window wider: the content pane grows: 0+150 151+408 560+120
+narrower again: 0+150 151+308 460+120
+sidebar dragged narrow: held at its minimum: 0+150 151+308 460+120
+sidebar dragged wide: held at the content pane's minimum: 0+308 309+150 460+120
+in a wider window, held at its own maximum: 0+400 401+258 660+120
+narrower: the content pane gives way to its minimum, then the sidebar: 0+308 309+150 460+120
+observed collapsed: 1
+inspector dragged past halfway: it collapses: 0+308 309+271 460+120 (collapsed)
+observed collapsed: 0
+opened again by code, as thick as it was: 0+308 309+150 460+120
+toggleSidebar:: 0+308 (collapsed) 0+459 460+120
+toggleSidebar: enabled 1, titled Show Sidebar
+toggled back: collapsed 0, enabled 1, titled Hide Sidebar
+toggleSidebar: in the plain controller, with no sidebar, enabled 0
+inspector removed: items 2, children 2, panes 2
+two panes share the room: 0+308 309+271
+put back first: the first pane is the inspector's 1
+an item's view controller changed: NSInternalInconsistencyException
+exit=0
