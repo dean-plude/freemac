@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Messages: two speech bubbles in conversation, a blue one behind a white one with three dots, on a teal tile. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fd6b4"/><stop offset="1" stop-color="#139a8c"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5aa6ff"/><stop offset="1" stop-color="#2a6fe8"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e6eef0"/>
+    </linearGradient>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#sh)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="23.5" fill="none" stroke="#000" stroke-opacity="0.08"/>
+  <!-- the reply, behind: tail at the lower right -->
+  <g filter="url(#sh)">
+    <path d="M58 26 H90 A16 16 0 0 1 106 42 V56 A16 16 0 0 1 90 72 H88 L100 82 L80 72 H58 A16 16 0 0 1 42 56 V42 A16 16 0 0 1 58 26 Z"
+          fill="url(#blue)"/>
+  </g>
+  <!-- the message in front: tail at the lower left, three dots -->
+  <g filter="url(#sh)">
+    <path d="M38 50 H74 A16 16 0 0 1 90 66 V82 A16 16 0 0 1 74 98 H44 L26 106 L34 96 A16 16 0 0 1 22 82 V66 A16 16 0 0 1 38 50 Z"
+          fill="url(#paper)"/>
+  </g>
+  <g fill="#139a8c">
+    <circle cx="42" cy="74" r="5"/>
+    <circle cx="56" cy="74" r="5"/>
+    <circle cx="70" cy="74" r="5"/>
+  </g>
+</svg>

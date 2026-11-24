@@ -183,6 +183,9 @@ gnome-keyring
 libpam-gnome-keyring
 gcr
 gir1.2-secret-1
+# Messages: BlueBubbles' live events come over a websocket (websocket-client);
+# without it Messages asks the server every 15 seconds instead.
+python3-websocket
 # Purser reads a verification code's setup QR code off the screen (grim takes
 # the picture) with the ZBar library through python3-pyzbar, which needs PIL
 # (python3-pil, only suggested by the package) to read the picture.
