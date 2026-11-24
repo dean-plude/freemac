@@ -19,7 +19,7 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     NSAutoresizingMaskOptions _mask;
     NSView *_nextKeyView, *_previousKeyView;  /* not retained */
     CGFloat _alpha;
-    NSString *_toolTip;
+    NSString *_toolTip, *_identifier;
     NSFocusRingType _focusRing;
     BOOL _focusLocked;
     NSViewController *_viewController;   /* not retained */
@@ -162,6 +162,9 @@ void AViewDecode(NSView *v, NSCoder *c)
     NSString *tip = [c decodeObjectForKey:@"NSToolTip"];
     if ([tip isKindOfClass:[NSString class]])
         [v setToolTip:tip];
+    NSString *ident = [c containsValueForKey:@"NSIdentifier"] ? [c decodeObjectForKey:@"NSIdentifier"] : nil;
+    if ([ident isKindOfClass:[NSString class]])
+        [v setIdentifier:ident];
 }
 
 - (instancetype)initWithCoder:(NSCoder *)coder
@@ -191,6 +194,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     }
     [_subviews release];
     [_toolTip release];
+    [_identifier release];
     [_draggedTypes release];
     [super dealloc];
 }
@@ -299,6 +303,12 @@ void AViewDecode(NSView *v, NSCoder *c)
 {
     [_toolTip release];
     _toolTip = [tip copy];
+}
+- (NSUserInterfaceItemIdentifier)identifier { return _identifier; }
+- (void)setIdentifier:(NSUserInterfaceItemIdentifier)identifier
+{
+    [_identifier release];
+    _identifier = [identifier copy];
 }
 - (NSFocusRingType)focusRingType { return _focusRing; }
 - (void)setFocusRingType:(NSFocusRingType)type { _focusRing = type; }

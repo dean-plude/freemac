@@ -4,7 +4,10 @@
  * NSScrollers beside it. Scrollers take room beside the content (the
  * "legacy" style), which works the same with a mouse and a touchpad. The
  * clip view follows its document view's flippedness, as on a Mac, so a
- * flipped document starts at the top. */
+ * flipped document starts at the top. A document with a header view (a
+ * table) gets it shown above the clip view in a second clip view, which
+ * scrolls sideways with the first, and its corner view above the vertical
+ * scroller. */
 #import "AInternal.h"
 
 NSNotificationName const NSScrollViewWillStartLiveScrollNotification = @"NSScrollViewWillStartLiveScrollNotification";
@@ -371,6 +374,7 @@ static const CGFloat scroller_width = 15;
     NSEdgeInsets _contentInsets, _scrollerInsets;
     NSInteger _findBarPosition;
     BOOL _tiling;
+    NSClipView *_headerClip;   /* shows the document's header view, if it has one */
 }
 
 static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize : NSMakeSize(1, 1); }
@@ -429,8 +433,15 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         /* a nib lists the clip view and scrollers among the subviews too */
         NSClipView *clip = [coder decodeObjectForKey:@"NSContentView"];
         NSScroller *v = [coder decodeObjectForKey:@"NSVScroller"], *h = [coder decodeObjectForKey:@"NSHScroller"];
+        NSClipView *header = [coder containsValueForKey:@"NSHeaderClipView"] ? [coder decodeObjectForKey:@"NSHeaderClipView"] : nil;
+        if ([coder containsValueForKey:@"NSCornerView"])
+            [coder decodeObjectForKey:@"NSCornerView"]; /* the table keeps it too; tile places it */
         for (NSView *sub in [self subviews]) {
-            if (!clip && [sub isKindOfClass:[NSClipView class]])
+            if ([sub isKindOfClass:[NSClipView class]] && sub != clip && sub != header &&
+                [[(NSClipView *)sub documentView] isKindOfClass:[NSTableHeaderView class]]) {
+                if (!header)
+                    header = (NSClipView *)sub;
+            } else if (!clip && [sub isKindOfClass:[NSClipView class]] && sub != header)
                 clip = (NSClipView *)sub;
             else if ([sub isKindOfClass:[NSScroller class]]) {
                 if ([(NSScroller *)sub _vertical] && !v)
@@ -440,6 +451,10 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
             }
         }
         _tiling = YES;
+        if ([header isKindOfClass:[NSClipView class]] && header != clip) {
+            _headerClip = [header retain];
+            [_headerClip setDrawsBackground:NO];
+        }
         if (clip)
             [self setContentView:clip];
         else {
@@ -470,6 +485,7 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
     [_clip release];
     [_vertical release];
     [_horizontal release];
+    [_headerClip release];
     [super dealloc];
 }
 - (BOOL)isFlipped { return YES; }
@@ -631,6 +647,23 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 - (void)setRulersVisible:(BOOL)f { _rulersVisible = f; }
 - (void)flashScrollers {}
 
+/* The document's header view and corner view, when it has them (a table
+ * view with a header). */
+- (NSView *)_documentHeader
+{
+    NSView *doc = [_clip documentView];
+    NSView *header = [doc respondsToSelector:@selector(headerView)] ? [(id)doc headerView] : nil;
+    return [header isKindOfClass:[NSView class]] ? header : nil;
+}
+- (CGFloat)_headerHeight
+{
+    NSView *header = [self _documentHeader];
+    if (!header)
+        return 0;
+    CGFloat h = [header frame].size.height;
+    return h > 0 ? h : 28;
+}
+
 /* Which scrollers show inside room r. With autohiding, a scroller shows
  * only while the document is larger than the room left for it. */
 - (void)_wantsVertical:(BOOL *)v horizontal:(BOOL *)h inside:(NSRect)r
@@ -653,6 +686,10 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         return;
     _tiling = YES;
     NSRect b = NSInsetRect([self bounds], border_size(_border).width, border_size(_border).height);
+    NSView *header = [self _documentHeader];
+    CGFloat headerHeight = [self _headerHeight];
+    b.origin.y += headerHeight;
+    b.size.height = fmax(b.size.height - headerHeight, 0);
     BOOL v, h;
     [self _wantsVertical:&v horizontal:&h inside:b];
     NSRect content = b;
@@ -674,6 +711,28 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         [_horizontal setHidden:!h];
         [_horizontal setFrame:NSMakeRect(b.origin.x, NSMaxY(content), content.size.width, scroller_width)];
     }
+    if (header) {
+        if (!_headerClip) {
+            _headerClip = [[NSClipView alloc] initWithFrame:NSZeroRect];
+            [_headerClip setDrawsBackground:NO];
+        }
+        if ([_headerClip superview] != self)
+            [self addSubview:_headerClip];
+        if ([_headerClip documentView] != header)
+            [_headerClip setDocumentView:header];
+        [_headerClip setHidden:NO];
+        [_headerClip setFrame:NSMakeRect(b.origin.x, b.origin.y - headerHeight, content.size.width, headerHeight)];
+        NSView *doc = [_clip documentView];
+        NSView *corner = [doc respondsToSelector:@selector(cornerView)] ? [(id)doc cornerView] : nil;
+        if ([corner isKindOfClass:[NSView class]]) {
+            if ([corner superview] != self)
+                [self addSubview:corner];
+            [corner setHidden:!v];
+            [corner setFrame:NSMakeRect(NSMaxX(content), b.origin.y - headerHeight, scroller_width, headerHeight)];
+        }
+    } else if (_headerClip) {
+        [_headerClip setHidden:YES];
+    }
     _tiling = NO;
     [self reflectScrolledClipView:_clip];
     [self setNeedsDisplay:YES];
@@ -694,6 +753,7 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
     if (_autohides && [_clip documentView]) {
         BOOL v, h;
         NSRect r = NSInsetRect([self bounds], border_size(_border).width, border_size(_border).height);
+        r.size.height = fmax(r.size.height - [self _headerHeight], 0);
         [self _wantsVertical:&v horizontal:&h inside:r];
         if (v != (_vertical && ![_vertical isHidden]) || h != (_horizontal && ![_horizontal isHidden])) {
             [self tile];
@@ -711,6 +771,10 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         CGFloat room = d.size.width - b.size.width;
         [_horizontal setFloatValue:room > 0 ? (float)((b.origin.x - d.origin.x) / room) : 0
                     knobProportion:d.size.width > 0 ? b.size.width / d.size.width : 1];
+    }
+    if (_headerClip && ![_headerClip isHidden] && [_headerClip bounds].origin.x != b.origin.x) {
+        [_headerClip setBoundsOrigin:NSMakePoint(b.origin.x, [_headerClip bounds].origin.y)];
+        [_headerClip setNeedsDisplay:YES];
     }
 }
 - (void)_scrollerMoved:(NSScroller *)s

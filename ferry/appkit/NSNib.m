@@ -519,6 +519,18 @@ static NSData *read_nib(NSString *path)
     }
     return self;
 }
+/* A nib kept inside another nib, as table views keep their cell views'
+ * prototypes: the inner nib's bytes, under "NSNibFileData". */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    NSData *data = [coder containsValueForKey:@"NSNibFileData"] ? [coder decodeObjectForKey:@"NSNibFileData"] : nil;
+    if (![data isKindOfClass:[NSData class]]) {
+        [self release];
+        return nil;
+    }
+    return [self initWithNibData:data bundle:nil];
+}
+- (void)encodeWithCoder:(NSCoder *)coder { [coder encodeObject:_data forKey:@"NSNibFileData"]; }
 - (instancetype)initWithNibNamed:(NSString *)name bundle:(NSBundle *)bundle
 {
     bundle = bundle ?: [NSBundle mainBundle];

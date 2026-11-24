@@ -10,7 +10,8 @@
 # them. PanelArchive.nib holds the panel nib again in the "NIBArchive"
 # form that current versions of Xcode write (see ferry/appkit/
 # ANibArchive.m), converted from the keyed archive here. dot.png is the
-# image the panel's image view names. Run this again
+# image the panel's image view names. Tables.nib holds a view-based
+# table and an outline view. Run this again
 # only to change the fixtures.
 import os, plistlib, struct
 from plistlib import UID
@@ -155,11 +156,14 @@ class Archive:
     def set(self, items):
         return self.add(self.obj("NSMutableSet", ("NSSet",), **{"NS.objects": list(items)}))
 
+    def data(self, top):
+        data = {"$archiver": "NSKeyedArchiver", "$version": 100000, "$top": top, "$objects": self.objects}
+        return plistlib.dumps(data, fmt=plistlib.FMT_BINARY, sort_keys=True)
+
     def save(self, path, top):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        data = {"$archiver": "NSKeyedArchiver", "$version": 100000, "$top": top, "$objects": self.objects}
         with open(path, "wb") as f:
-            plistlib.dump(data, f, fmt=plistlib.FMT_BINARY, sort_keys=True)
+            f.write(self.data(top))
 
     def save_nib_archive(self, path, top):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -447,6 +451,90 @@ def panes_nib(path):
     a.save_nib_archive(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def cell_view_nib():
+    """The bytes of a view-based table's cell view prototype: an
+    NSTableCellView named "NameCell" holding a text field, its textField
+    outlet connected, as a nib inside the table's nib."""
+    a = Archive()
+    owner = custom(a, "NSObject")
+    first = custom(a, "FirstResponder")
+    cell, field = a.reserve(), a.reserve()
+    view(a, cell, "NSTableCellView", VIEW, "{{0, 0}, {150, 20}}", 256 | 2, UID(0), NSSubviews=a.array([field]),
+         NSIdentifier=a.add("NameCell"))
+    view(a, field, "NSTextField", CONTROL, "{{2, 2}, {146, 16}}", 256 | 2, cell,
+         NSCell=text_cell(a, "NSTextFieldCell", "Table View Cell", 0x04000000, background=False))
+    conns = [connector(a, "NSNibOutletConnector", cell, field, "textField")]
+    pairs = [(owner, owner), (first, owner), (cell, owner), (field, cell)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    return a.data({"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
+def tables_nib(path):
+    """A view nib, as a keyed archive, with a view-based table in a scroll
+    view (its header in a header clip view, a corner view, two columns
+    with sort prototypes, a cell view prototype) and an outline view in a
+    second scroll view."""
+    a = Archive()
+    owner = custom(a, "TablesOwner")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    (top, scroll, clip, header_clip, header, corner, table,
+     scroll2, clip2, outline) = (a.reserve() for _ in range(10))
+    view(a, top, "NSView", VIEW, "{{0, 0}, {320, 400}}", 256 | 18, UID(0), NSSubviews=a.array([scroll, scroll2]))
+
+    def column(ident, title, width, key, editable=True, hidden=False):
+        proto = a.add(a.obj("NSSortDescriptor", (), NSKey=a.add(key), NSAscending=True, NSSelector=a.add("compare:")))
+        hcell = text_cell(a, "NSTableHeaderCell", title, 0x04000000, background=False)
+        dcell = text_cell(a, "NSTextFieldCell", "Text Cell", 0x04000000, background=False)
+        return a.add(a.obj("NSTableColumn", (), NSIdentifier=a.add(ident), NSWidth=float(width), NSMinWidth=40.0,
+                           NSMaxWidth=1000.0, NSHeaderCell=hcell, NSDataCell=dcell, NSResizingMask=3,
+                           NSIsEditable=editable, NSIsHidden=hidden, NSTableView=table,
+                           NSSortDescriptorPrototype=proto))
+    name_col = column("name", "Name", 150, "name")
+    size_col = column("size", "Size", 120, "size", editable=False)
+    prototypes = a.add(a.obj("NSDictionary", (), **{"NS.keys": [a.add("NameCell")],
+                                                    "NS.objects": [a.add(a.obj("NSNib", (), NSNibFileData=cell_view_nib()))]}))
+    view(a, scroll, "NSScrollView", VIEW, "{{0, 200}, {320, 200}}", 256 | 18, top,
+         NSSubviews=a.array([clip, header_clip, corner]), NSContentView=clip, NSHeaderClipView=header_clip,
+         NSCornerView=corner, NSsFlags=0x20032, NSAutohidesScrollers=True)
+    view(a, clip, "NSClipView", VIEW, "{{1, 29}, {318, 170}}", 256 | 18, scroll, NSSubviews=a.array([table]),
+         NSDocView=table, NSDrawsBackground=True)
+    view(a, header_clip, "NSClipView", VIEW, "{{1, 1}, {318, 28}}", 256 | 2, scroll, NSSubviews=a.array([header]),
+         NSDocView=header, NSDrawsBackground=False)
+    view(a, header, "NSTableHeaderView", VIEW, "{{0, 0}, {318, 28}}", 256 | 2, header_clip, NSTableView=table)
+    view(a, corner, "_NSCornerView", VIEW, "{{0, 0}, {15, 28}}", 256, scroll)
+    tv_flags = 0x40000000 | 0x10000000 | 0x08000000 | 0x00800000  # resizing, empty, multiple, alternating
+    view(a, table, "NSTableView", CONTROL, "{{0, 0}, {318, 170}}", 256 | 18, clip,
+         NSTableColumns=a.array([name_col, size_col]), NSHeaderView=header, NSCornerView=corner,
+         NSRowHeight=20.0, NSIntercellSpacingWidth=3.0, NSIntercellSpacingHeight=2.0, NSTvFlags=tv_flags,
+         NSColumnAutoresizingStyle=1, NSGridColor=catalog_color(a, "gridColor", 0.8),
+         NSBackgroundColor=catalog_color(a, "controlBackgroundColor", 1), NSDraggingSourceMaskForLocal=15,
+         NSDraggingSourceMaskForNonLocal=0, NSAllowsTypeSelect=True, NSEnabled=True,
+         NSTableViewArchivedReusableViewsKey=prototypes)
+    tree_col = a.add(a.obj("NSTableColumn", (), NSIdentifier=a.add("tree"), NSWidth=200.0, NSMinWidth=40.0,
+                           NSMaxWidth=1000.0,
+                           NSHeaderCell=text_cell(a, "NSTableHeaderCell", "Tree", 0x04000000, background=False),
+                           NSDataCell=text_cell(a, "NSTextFieldCell", "Text Cell", 0x04000000, background=False),
+                           NSResizingMask=3, NSIsEditable=True, NSTableView=outline))
+    view(a, scroll2, "NSScrollView", VIEW, "{{0, 0}, {320, 190}}", 256 | 18, top, NSSubviews=a.array([clip2]),
+         NSContentView=clip2, NSsFlags=0x20032)
+    view(a, clip2, "NSClipView", VIEW, "{{1, 1}, {318, 188}}", 256 | 18, scroll2, NSSubviews=a.array([outline]),
+         NSDocView=outline)
+    view(a, outline, "NSOutlineView", ("NSTableView",) + CONTROL, "{{0, 0}, {318, 188}}", 256 | 18, clip2,
+         NSTableColumns=a.array([tree_col]), NSRowHeight=18.0, NSTvFlags=0x40000000 | 0x10000000,
+         NSOutlineViewIndentationPerLevelKey=12.0, NSOutlineViewOutlineTableColumnKey=tree_col)
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, top, "view"), connector(a, out, owner, table, "table"),
+             connector(a, out, owner, outline, "outline"),
+             connector(a, out, table, owner, "dataSource"), connector(a, out, table, owner, "delegate"),
+             connector(a, out, outline, owner, "dataSource"), connector(a, out, outline, owner, "delegate")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (top, owner), (scroll, top), (clip, scroll),
+             (header_clip, scroll), (header, header_clip), (corner, scroll), (table, clip), (scroll2, top),
+             (clip2, scroll2), (outline, clip2)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
@@ -456,6 +544,7 @@ dot_png(os.path.join(resources, "dot.png"))
 window_controller_nib(os.path.join(resources, "Controlled.nib"))
 view_controller_nib(os.path.join(resources, "ListViewController.nib"))
 panes_nib(os.path.join(here, "Panes.nib"))
+tables_nib(os.path.join(here, "Tables.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

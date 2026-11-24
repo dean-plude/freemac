@@ -1316,6 +1316,15 @@ static BOOL keeps_state(NSButtonType t)
     NSRect tr = [self _textRect];
     NSFont *font = [self font];
     NSColor *color = _enabled ? [self textColor] : [NSColor disabledControlTextColor];
+    /* on a selected table row (its cell's background is emphasized) the
+     * usual label colours turn white, as on a Mac */
+    if (_enabled && !_editing && [_cell backgroundStyle] == NSBackgroundStyleEmphasized) {
+        NSColor *c = [self textColor];
+        if ([c isEqual:[NSColor labelColor]] || [c isEqual:[NSColor textColor]] || [c isEqual:[NSColor controlTextColor]])
+            color = [NSColor whiteColor];
+        else if ([c isEqual:[NSColor secondaryLabelColor]] || [c isEqual:[NSColor tertiaryLabelColor]])
+            color = [NSColor colorWithWhite:1 alpha:0.8];
+    }
 
     if (!_editing && _lineBreak == NSLineBreakByWordWrapping && _maxLines != 1) {
         NSMutableParagraphStyle *style = [[[NSMutableParagraphStyle alloc] init] autorelease];

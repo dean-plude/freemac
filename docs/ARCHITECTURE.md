@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Ferry's tables and outlines (1.159)
+
+`ferry/appkit/NSTableView.m` and `NSOutlineView.m`, with private declarations
+shared in `appkit/AInternal.h`. A cell-based table draws each visible row
+through its columns' data cells; a view-based table asks its delegate for a
+view per visible row and column, keeps them in `NSTableRowView`s, and puts
+views that scroll out of sight in a reuse queue keyed by identifier
+(`makeViewWithIdentifier:owner:` also instantiates prototype views stored as
+nibs inside the table's nib, which `NSNib` can now decode). `NSScrollView`
+tiles a table's header view above its clip view and keeps it in step with
+horizontal scrolling. The outline view is a table whose rows map to items
+through a flattened, lazily expanded tree; its first column is indented by
+level and draws the chevron.
+
 ## Bluetooth menu (1.158)
 
 `bluetooth_menu.BluetoothMenu` subclasses `status.Bluetooth`, which still

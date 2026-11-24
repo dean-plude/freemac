@@ -143,6 +143,65 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
 - (void)_setDrawingToScreen:(BOOL)screen;
 @end
 
+/* ---- tables (NSTableView.m, NSOutlineView.m) --------------------------------------------- */
+
+/* Private steps the table, its header and row views, and NSOutlineView
+ * share. NSOutlineView overrides the data and delegate ones. */
+@interface NSTableView (FerryTablePrivate)
+- (NSInteger)_countRows;
+- (id)_objectValueForColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (void)_setObjectValue:(id)value forColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (BOOL)_delegateMakesViews;
+- (NSView *)_delegateViewForColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (NSTableRowView *)_delegateRowViewForRow:(NSInteger)row;
+- (void)_didAddRowView:(NSTableRowView *)view row:(NSInteger)row;
+- (void)_didRemoveRowView:(NSTableRowView *)view row:(NSInteger)row;
+- (NSCell *)_delegateCellForColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (void)_willDisplayCell:(NSCell *)cell column:(NSTableColumn *)column row:(NSInteger)row;
+- (BOOL)_delegateHasRowHeights;
+- (CGFloat)_delegateHeightOfRow:(NSInteger)row;
+- (BOOL)_isGroupRow:(NSInteger)row;
+- (BOOL)_selectionShouldChange;
+- (BOOL)_shouldSelectRow:(NSInteger)row;
+- (NSNotificationName)_selectionDidChangeName;
+- (SEL)_selectionDidChangeSelector;
+- (NSNotificationName)_columnDidResizeName;
+- (SEL)_columnDidResizeSelector;
+- (void)_sortDescriptorsDidChange:(NSArray *)old;
+- (void)_mouseDownInHeaderOfColumn:(NSTableColumn *)column;
+- (void)_didClickColumn:(NSTableColumn *)column;
+- (CGFloat)_indentationForRow:(NSInteger)row column:(NSInteger)column;
+- (BOOL)_handleMouseDown:(NSEvent *)event row:(NSInteger)row column:(NSInteger)column point:(NSPoint)p;
+- (void)_drawDecorationsForRow:(NSInteger)row;
+- (void)_drawDecorationsInRowView:(NSTableRowView *)view;
+/* the table's own */
+- (void)_columnWidthChanged:(NSTableColumn *)column from:(CGFloat)old;
+- (void)_userResizedColumn:(NSTableColumn *)column by:(CGFloat)delta;
+- (void)_headerClickedColumn:(NSTableColumn *)column;
+- (BOOL)_isEmphasized;
+- (NSTableViewStyle)_drawingStyle;
+- (NSInteger)_rowForRowView:(NSTableRowView *)view;
+- (void)_updateVisibleViews;
+- (void)_dropAllRowViews;
+/* the rows were worked out again, with no notifications (an outline opened or closed) */
+- (void)_reloadRowsQuietly;
+- (void)_setAnchor:(NSInteger)row;
+- (void)_selectionChanged;
+- (void)_setSelection:(NSIndexSet *)rows notify:(BOOL)notify;
+- (void)_post:(NSNotificationName)name selector:(SEL)sel userInfo:(NSDictionary *)info;
+@end
+
+@interface NSTableRowView (FerryPrivate)
+- (NSView *)_viewForColumnKey:(id)key;
+@end
+/* A line of text in frame, cut short with an ellipsis; a chevron pointing
+ * right (or down); a selection, rounded and inset unless the style is full
+ * width or plain, joined to the rows above and below if they are selected. */
+void ATableDrawTextLine(NSAttributedString *string, NSRect frame, NSTextAlignment align, BOOL flipped);
+void ATableDrawChevron(NSRect rect, BOOL down, NSColor *color, BOOL flipped);
+void ATableDrawSelection(NSRect rect, NSTableViewStyle style, NSTableViewSelectionHighlightStyle highlight,
+                         BOOL emphasized, BOOL joinsAbove, BOOL joinsBelow);
+
 /* ---- graphics ----------------------------------------------------------------------- */
 
 void AColorRGBA(NSColor *color, CGFloat rgba[4]);

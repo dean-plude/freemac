@@ -550,6 +550,81 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (void)intersectSet:(NSSet<ObjectType> *)other;
 @end
 
+/* Index sets: sorted, non-overlapping ranges of indexes (a table's selection). */
+NSRange NSIntersectionRange(NSRange a, NSRange b);
+NSRange NSUnionRange(NSRange a, NSRange b);
+@interface NSIndexSet : NSObject <NSCopying, NSMutableCopying>
++ (instancetype)indexSet;
++ (instancetype)indexSetWithIndex:(NSUInteger)index;
++ (instancetype)indexSetWithIndexesInRange:(NSRange)range;
+- (instancetype)init;
+- (instancetype)initWithIndex:(NSUInteger)index;
+- (instancetype)initWithIndexesInRange:(NSRange)range;
+- (instancetype)initWithIndexSet:(NSIndexSet *)indexSet;
+@property (readonly) NSUInteger count;
+@property (readonly) NSUInteger firstIndex, lastIndex;
+- (BOOL)containsIndex:(NSUInteger)index;
+- (BOOL)containsIndexesInRange:(NSRange)range;
+- (BOOL)containsIndexes:(NSIndexSet *)indexSet;
+- (BOOL)intersectsIndexesInRange:(NSRange)range;
+- (NSUInteger)countOfIndexesInRange:(NSRange)range;
+- (NSUInteger)indexGreaterThanIndex:(NSUInteger)value;
+- (NSUInteger)indexLessThanIndex:(NSUInteger)value;
+- (NSUInteger)indexGreaterThanOrEqualToIndex:(NSUInteger)value;
+- (NSUInteger)indexLessThanOrEqualToIndex:(NSUInteger)value;
+- (NSUInteger)getIndexes:(NSUInteger *)buffer maxCount:(NSUInteger)max inIndexRange:(NSRangePointer)range;
+- (BOOL)isEqualToIndexSet:(NSIndexSet *)indexSet;
+- (void)enumerateIndexesUsingBlock:(void (^)(NSUInteger idx, BOOL *stop))block;
+- (void)enumerateIndexesWithOptions:(NSEnumerationOptions)opts usingBlock:(void (^)(NSUInteger idx, BOOL *stop))block;
+- (void)enumerateRangesUsingBlock:(void (^)(NSRange range, BOOL *stop))block;
+- (void)enumerateRangesWithOptions:(NSEnumerationOptions)opts usingBlock:(void (^)(NSRange range, BOOL *stop))block;
+- (NSUInteger)indexPassingTest:(BOOL (^)(NSUInteger idx, BOOL *stop))predicate;
+- (NSIndexSet *)indexesPassingTest:(BOOL (^)(NSUInteger idx, BOOL *stop))predicate;
+@end
+@interface NSMutableIndexSet : NSIndexSet
+- (void)addIndex:(NSUInteger)index;
+- (void)addIndexes:(NSIndexSet *)indexSet;
+- (void)addIndexesInRange:(NSRange)range;
+- (void)removeIndex:(NSUInteger)index;
+- (void)removeIndexes:(NSIndexSet *)indexSet;
+- (void)removeIndexesInRange:(NSRange)range;
+- (void)removeAllIndexes;
+- (void)shiftIndexesStartingAtIndex:(NSUInteger)index by:(NSInteger)delta;
+@end
+@interface NSArray<ObjectType> (NSIndexSetAccess)
+- (NSArray<ObjectType> *)objectsAtIndexes:(NSIndexSet *)indexes;
+- (NSIndexSet *)indexesOfObjectsPassingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+- (void)enumerateObjectsAtIndexes:(NSIndexSet *)indexes options:(NSEnumerationOptions)opts
+                       usingBlock:(void (^)(ObjectType obj, NSUInteger idx, BOOL *stop))block;
+@end
+@interface NSMutableArray<ObjectType> (NSIndexSetAccess)
+- (void)removeObjectsAtIndexes:(NSIndexSet *)indexes;
+- (void)insertObjects:(NSArray<ObjectType> *)objects atIndexes:(NSIndexSet *)indexes;
+- (void)replaceObjectsAtIndexes:(NSIndexSet *)indexes withObjects:(NSArray<ObjectType> *)objects;
+@end
+
+/* Sort descriptors: compare objects by the value at a key path. */
+@interface NSSortDescriptor : NSObject <NSCopying, NSSecureCoding>
++ (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending;
++ (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending selector:(SEL)selector;
++ (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending comparator:(NSComparator)cmptr;
+- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending;
+- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending selector:(SEL)selector;
+- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending comparator:(NSComparator)cmptr;
+@property (readonly, copy) NSString *key;
+@property (readonly) BOOL ascending;
+@property (readonly) SEL selector;
+@property (readonly) NSComparator comparator;
+@property (readonly, retain) id reversedSortDescriptor;
+- (NSComparisonResult)compareObject:(id)object1 toObject:(id)object2;
+@end
+@interface NSArray<ObjectType> (NSSortDescriptorSorting)
+- (NSArray<ObjectType> *)sortedArrayUsingDescriptors:(NSArray<NSSortDescriptor *> *)sortDescriptors;
+@end
+@interface NSMutableArray<ObjectType> (NSSortDescriptorSorting)
+- (void)sortUsingDescriptors:(NSArray<NSSortDescriptor *> *)sortDescriptors;
+@end
+
 /* ---- NSData ------------------------------------------------------------------------- */
 
 typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 };
