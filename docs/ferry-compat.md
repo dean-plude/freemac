@@ -384,7 +384,7 @@ These were written from Apple's documentation and not compared with a
 Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of the nine
 apps has been run again with these.
 
-### Controllers from nibs, cell views and validation ((1.NEXT), Ferry 0.20.0)
+### Controllers from nibs, cell views and validation ((1.191), Ferry 0.20.0)
 
 `NSArrayController`, `NSTreeController`, `NSObjectController` and
 `NSDictionaryController` now load from nibs with their settings: the
