@@ -1183,6 +1183,23 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.216 "Messages" (done)
+
+Messages: conversations in bubbles, with real iMessage through BlueBubbles on a Mac you own and an Android phone's texts through KDE Connect.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Messages: a sidebar of conversations with search and New Message (⌘N), a conversation pane with bubbles (blue iMessage, green SMS/RCS, grey for the other side), time lines between bursts, Sending…/Sent/Delivered/Read/Not Delivered under what you sent, big emoji on their own, an emoji button and a send button | **Messages** | done |
+| 2 | iMessage through BlueBubbles: server address and password, conversations, messages, sending into a conversation or to new addresses, attachments on click, and live new-message, delivered and read events over Socket.IO (polling every 15 seconds without a websocket) | **Messages** (messages_bluebubbles.py) | done |
+| 3 | An Android phone's texts over KDE Connect: freemac's own client for the open protocol (UDP and TCP discovery, TLS with its own certificate, protocol 8, pairing with a code checked on both screens, the phone's certificate kept and checked), conversations, history, sending, new texts as they come, and MMS attachments | **Messages** (messages_kdeconnect.py) | done |
+| 4 | A kdeconnectd already running is used over D-Bus instead, so the phone never sees two computers | **Messages** | done |
+| 5 | An offline store (SQLite in ~/.local/share/freemac/messages), so conversations show at once and survive restarts; the BlueBubbles password in the keychain, or a file only you can read without one | **Messages** (messages_store.py) | done |
+| 6 | A first-run screen that explains both ways plainly: real iMessage needs a Mac running BlueBubbles, and an iPhone can't send texts through KDE Connect | **Messages** | done |
+| 7 | Notifications for new messages (a click opens the conversation), an unread count on the Dock icon, and Messages stays open with no window, as Post does | **Messages**, Pier, Strata | done |
+| 8 | An original speech-bubble icon, a place in the Dock after Post and in Marina | Art, Pier | done |
+| 9 | Tests with a stand-in phone over localhost TLS and a stand-in BlueBubbles server (HTTP and websocket), the store, and the window's building and bubble layout, headless | Tests | done |
+| 10 | Guide topic, README row | Guide, Docs | done |
+
 ## 1.215 "Ferry: global hotkeys and moving windows" (done)
 
 Ferry 0.41.0: Mac window managers and clipboard apps do their main jobs on freemac's desktop, with the user's say.

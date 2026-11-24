@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Messages
+Comment=Conversations from iMessage through BlueBubbles and texts from an Android phone
+Exec=freemac-messages
+Icon=freemac-messages
+Categories=Network;InstantMessaging;Chat;
+Keywords=messages;chat;text;texts;sms;mms;rcs;imessage;bluebubbles;kde connect;phone;android;
+StartupWMClass=org.freemac.Messages
+StartupNotify=true

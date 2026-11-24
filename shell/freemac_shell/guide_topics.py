@@ -1371,6 +1371,17 @@ TOPICS = {
         "The menu bar's clock and freemac's calendars change at once. Other apps change after you log out and back in; click Log Out… on the page to do it now.",
         "The menu bar shows a 24-hour clock where the region uses one. To choose for yourself, use Time format in Dials > Date & Time.",
     ]),
+    "messages": ("Send messages and texts", "messages imessage text texts sms mms rcs chat bluebubbles kde connect android phone iphone mac conversation", [
+        "Open Messages from the Dock. The first time, it explains the two ways it can get your conversations.",
+        "For iMessage: real iMessage needs a Mac that you own running the free BlueBubbles Server app. "
+        "Choose Messages > Settings… (⌘,), click iMessage, and type the server's address and password.",
+        "For texts from an Android phone: install KDE Connect on the phone, keep it on the same Wi-Fi network, "
+        "then turn on Messages > Settings… > Phone and click Pair… next to it. Check that both screens show the same code.",
+        "An iPhone can't send texts through KDE Connect; use BlueBubbles with a Mac instead.",
+        "Click New Message (⌘N), type a name, phone number or email after To:, then type and press Return. "
+        "Blue bubbles go by iMessage, green ones as texts.",
+        "Conversations are kept on this computer, so they show even when the phone or the Mac isn't in reach.",
+    ]),
     "tint": ("Find the colour of anything on the screen", "tint colour color meter picker eyedropper pixel hex rgb value what colour is this digital color meter", [
         "Open Tint from Applications > Utilities, or search for it with Seek.",
         "Point at anything on the screen. Tint shows the pixels under the pointer enlarged, and the colour's red, green and blue values.",
