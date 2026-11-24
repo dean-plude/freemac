@@ -1183,6 +1183,14 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.183 "Summary Info" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > Get Summary Info (⌃⌘I): one Info window for everything chosen, with how many items, their kind (or Multiple kinds), their size all together with folders added up, and where they are | drawer.py, drawer_summary.py | done |
+| 2 | Tags and Locked set from it go on every item; Locked shows a dash when only some are locked; aliases are left unlocked, as in Get Info | drawer_summary.py | done |
+| 3 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.182 "Back and Forward lists" (done)
 
 | # | Item | Component | Status |

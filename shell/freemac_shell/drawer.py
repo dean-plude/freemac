@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, drawer_summary, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -1251,6 +1251,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "compress": self.compress,
             "get-info": self.get_info,
             "show-inspector": self.show_inspector,
+            "summary-info": self.summary_info,
             "copy-pathname": self.copy_pathname,
             "eject": self.eject,
             "copy": self.copy,
@@ -2722,6 +2723,13 @@ class DrawerWindow(Gtk.ApplicationWindow):
         paths = self.selected_paths() or [self.path]
         drawer_info.show(paths, self)
 
+    def summary_info(self):
+        """⌃⌘I: one Info window for everything chosen."""
+        paths = self.selected_paths() or [self.path]
+        paths = [p for p in paths if os.path.isabs(p) and os.path.lexists(p)]
+        if paths:
+            drawer_summary.show(paths, self)
+
     def show_inspector(self):
         """⌥⌘I: one Info window that follows what is selected."""
         drawer_info.inspector((self.selected_paths() or [self.path])[0], self)
@@ -3245,6 +3253,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.switch_tab((self.current + (-1 if back else 1)) % len(self.tabs))
         elif key == Gdk.KEY_Delete or (ctrl and key == Gdk.KEY_BackSpace):
             self.trash()  # Command+Backspace, as on a Mac
+        elif ctrl and event.state & (Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.MOD4_MASK
+                                     | Gdk.ModifierType.META_MASK) and key in (Gdk.KEY_i, Gdk.KEY_I):
+            self.summary_info()   # ⌃⌘I
         elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_i, Gdk.KEY_I):
             self.show_inspector()
         elif ctrl and key in (Gdk.KEY_i, Gdk.KEY_I):
@@ -3324,7 +3335,8 @@ def menubar():
             [("Show in Enclosing Folder", "win.show-enclosing", None)],
             [("Duplicate", "win.duplicate", "<Ctrl>d"), ("Make Alias", "win.make-alias", None),
              ("Show Original", "win.show-original", "<Ctrl>r")],
-            [("Get Info", "win.get-info", "<Ctrl>i"), ("Show Inspector", "win.show-inspector", "<Ctrl><Alt>i")],
+            [("Get Info", "win.get-info", "<Ctrl>i"), ("Get Summary Info", "win.summary-info", None),
+             ("Show Inspector", "win.show-inspector", "<Ctrl><Alt>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace"), ("Put Back", "win.put-back", None)],
             [("Share…", "win.share", None)],

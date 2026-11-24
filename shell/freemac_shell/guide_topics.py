@@ -1346,6 +1346,12 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "summary-info": ("See information about several items at once", "summary info get summary info several items many files total size together lock all tag all control command i", [
+        "Choose the items in Drawer.",
+        "Choose File > Get Summary Info, or press ⌃⌘I.",
+        "One window shows how many items there are, their kind, their size all together and where they are.",
+        "A tag or Locked set there is set on every item. Locked shows a dash when only some are locked.",
+    ]),
     "back-list": ("Jump back several folders at once", "back forward history list hold press and hold right-click folders visited earlier jump drawer", [
         "In Drawer, press and hold the Back button (‹), or right-click it.",
         "The folders you came through are listed, the nearest first.",
