@@ -454,7 +454,8 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 - (NSViewController *)presentingViewController { return nil; }
 - (NSArray *)presentedViewControllers { return @[]; }
 
-/* Shown as a window of its own: Ferry has no sheets or popovers yet. */
+/* Shown as a window of its own: Ferry has no sheets yet (a popover is an
+ * NSPopover, NSPopover.m). */
 - (void)_presentInWindow:(NSViewController *)vc
 {
     NSWindow *w = [NSWindow windowWithContentViewController:vc];
@@ -469,10 +470,20 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 - (void)presentViewController:(NSViewController *)vc asPopoverRelativeToRect:(NSRect)rect ofView:(NSView *)view
                 preferredEdge:(NSRectEdge)edge behavior:(NSInteger)behavior
 {
-    AWarnOnce("popovers (a view controller presented as a popover gets a window of its own)");
-    [self _presentInWindow:vc];
+    if ([view window])
+        APresentAsPopover(vc, rect, view, edge, behavior);
+    else
+        [self _presentInWindow:vc];
 }
-- (void)dismissViewController:(NSViewController *)vc { [[[vc viewIfLoaded] window] close]; }
-- (void)dismissController:(id)sender { [[[self viewIfLoaded] window] close]; }
+- (void)dismissViewController:(NSViewController *)vc
+{
+    if (!ADismissPopover(vc))
+        [[[vc viewIfLoaded] window] close];
+}
+- (void)dismissController:(id)sender
+{
+    if (!ADismissPopover(self))
+        [[[self viewIfLoaded] window] close];
+}
 - (NSStoryboard *)storyboard { return nil; }
 @end

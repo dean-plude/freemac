@@ -622,6 +622,70 @@ def controls_nib(path):
     a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def more_controls_nib(path):
+    """A window nib for more_controls.m: a stepper (0 to 10 by 2, at 4, not
+    wrapping), a rating level indicator (3 of 5), a colour well, a date
+    picker (date only), a combo box with three items, a path control and a
+    token field."""
+    a = Archive()
+    owner = custom(a, "MoreOwner")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    content, stepper, level, well, picker, combo, path_control, tokens = (a.reserve() for _ in range(8))
+    window = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=15, NSWindowBacking=2,
+                         NSWindowRect="{{100, 100}, {420, 240}}", NSWindowTitle=a.add("More Controls"),
+                         NSWindowClass=a.add("NSWindow"), NSWindowView=content))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {420, 240}}", 256 | 18, UID(0),
+         NSSubviews=a.array([stepper, level, well, picker, combo, path_control, tokens]))
+    stepper_cell = a.add(a.obj("NSStepperCell", CELL, NSCellFlags=0x04000000, NSCellFlags2=0,
+                               NSMinValue=0.0, NSMaxValue=10.0, NSIncrement=2.0, NSValue=4.0, NSAutorepeat=True,
+                               NSValueWraps=False))
+    view(a, stepper, "NSStepper", CONTROL, "{{20, 200}, {19, 27}}", 256, content, NSCell=stepper_cell, NSEnabled=True)
+    level_cell = a.add(a.obj("NSLevelIndicatorCell", CELL, NSCellFlags=0x04000000, NSCellFlags2=0,
+                             NSIndicatorStyle=3, NSMinValue=0.0, NSMaxValue=5.0, NSValue=3.0, NSWarningValue=0.0,
+                             NSCriticalValue=0.0))
+    view(a, level, "NSLevelIndicator", CONTROL, "{{60, 204}, {80, 16}}", 256, content, NSCell=level_cell,
+         NSEnabled=True)
+    rgb = a.add(a.obj("NSColor", (), NSColorSpace=1, NSRGB=b"0.2 0.4 0.6\x00"))
+    view(a, well, "NSColorWell", CONTROL, "{{160, 200}, {44, 23}}", 256, content, NSColor=rgb, NSIsBordered=True,
+         NSEnabled=True)
+    date = a.add(a.obj("NSDate", (), **{"NS.time": 786240000.0}))
+    picker_cell = a.add(a.obj("NSDatePickerCell", CELL, NSCellFlags=0x04000000, NSCellFlags2=0, NSSupport=font(a),
+                              NSContents=date, NSDatePickerElements=0xe0, NSDatePickerType=0, NSDatePickerMode=0))
+    view(a, picker, "NSDatePicker", CONTROL, "{{20, 160}, {120, 27}}", 256, content, NSCell=picker_cell,
+         NSEnabled=True)
+    combo_cell = a.add(a.obj("NSComboBoxCell", ("NSTextFieldCell",) + CELL, NSContents=a.add(""),
+                             NSCellFlags=0x14000000 | 0x00400000, NSCellFlags2=0, NSSupport=font(a),
+                             NSDrawsBackground=True, NSBackgroundColor=catalog_color(a, "textBackgroundColor", 1),
+                             NSTextColor=catalog_color(a, "controlTextColor", 0),
+                             NSPopUpListData=a.array([a.add("Apple"), a.add("Apricot"), a.add("Banana")]),
+                             NSCompletes=True, NSVisibleItemCount=3, NSUsesDataSource=False))
+    view(a, combo, "NSComboBox", ("NSTextField",) + CONTROL, "{{160, 160}, {140, 22}}", 256, content,
+         NSCell=combo_cell, NSEnabled=True)
+    url = a.add(a.obj("NSURL", (), **{"NS.base": UID(0), "NS.relative": a.add("file:///usr/share/doc")}))
+    path_cell = a.add(a.obj("NSPathCell", CELL, NSCellFlags=0x04000000, NSCellFlags2=0, NSSupport=font(a),
+                            NSContents=url, NSPathStyle=0))
+    view(a, path_control, "NSPathControl", CONTROL, "{{20, 120}, {380, 22}}", 256, content, NSCell=path_cell,
+         NSEnabled=True)
+    token_cell = a.add(a.obj("NSTokenFieldCell", ("NSTextFieldCell",) + CELL, NSContents=a.add("red, green"),
+                             NSCellFlags=0x14000000 | 0x00400000, NSCellFlags2=0, NSSupport=font(a),
+                             NSDrawsBackground=True, NSBackgroundColor=catalog_color(a, "textBackgroundColor", 1),
+                             NSTextColor=catalog_color(a, "controlTextColor", 0), NSTokenStyle=2))
+    view(a, tokens, "NSTokenField", ("NSTextField",) + CONTROL, "{{20, 80}, {380, 22}}", 256, content,
+         NSCell=token_cell, NSEnabled=True)
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, window, "window"), connector(a, out, owner, stepper, "stepper"),
+             connector(a, out, owner, level, "level"), connector(a, out, owner, well, "well"),
+             connector(a, out, owner, picker, "picker"), connector(a, out, owner, combo, "combo"),
+             connector(a, out, owner, path_control, "pathControl"), connector(a, out, owner, tokens, "tokens"),
+             connector(a, "NSNibControlConnector", stepper, owner, "stepped:")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (window, owner), (content, window), (stepper, content),
+             (level, content), (well, content), (picker, content), (combo, content), (path_control, content),
+             (tokens, content)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 def bindings_nib(path):
     """A window nib with bindings: a text field bound to an object
     controller's selection.name (with a null placeholder), a slider (0 to
@@ -768,6 +832,7 @@ view_controller_nib(os.path.join(resources, "ListViewController.nib"))
 panes_nib(os.path.join(here, "Panes.nib"))
 tables_nib(os.path.join(here, "Tables.nib"))
 controls_nib(os.path.join(here, "Controls.nib"))
+more_controls_nib(os.path.join(here, "MoreControls.nib"))
 bindings_nib(os.path.join(here, "Bindings.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}

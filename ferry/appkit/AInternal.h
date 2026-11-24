@@ -407,4 +407,17 @@ NSSize ALineSize(NSAttributedString *string, CGFloat *ascent, CGFloat *descent);
 NSAttributedString *AAttributed(NSString *string, NSFont *font, NSColor *color);
 void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *stroke);
 
+/* ---- more controls (NSPopover.m, NSControl.m) --------------------------------------- */
+
+/* A view controller presented as a popover, and dismissed again (NO when it
+ * wasn't shown as one). */
+void APresentAsPopover(NSViewController *vc, NSRect rect, NSView *view, NSRectEdge edge, NSInteger behavior);
+BOOL ADismissPopover(NSViewController *vc);
+@interface NSTextField (FerryEditingText)
+/* the text being edited, and its selection, set and read by a subclass
+ * (completion in a combo box) */
+- (void)_setEditingText:(NSString *)text selectedRange:(NSRange)range;
+- (NSRange)_selectedTextRange;
+@end
+
 #endif

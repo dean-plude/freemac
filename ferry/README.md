@@ -57,6 +57,13 @@ system's libxml2, as on a Mac), `NSOperationQueue` with `NSOperation`,
 and a task's notifications come on that thread, from the run loop.
 ICU and libxml2 are loaded only when a program first uses them.
 
+From Ferry 0.22.0 (freemac 1.195), steppers, level indicators, colour
+wells (with a basic colour panel), date pickers (text with a stepper, or
+a calendar and a clock), combo boxes, popovers, path controls and token
+fields are there too, with their cells and read from nibs, and `NSSound`
+plays sounds through PipeWire's `pw-play` (or `paplay` or `aplay`),
+finding the Mac's alert sounds by name among freemac's own.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

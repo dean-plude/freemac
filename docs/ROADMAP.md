@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.195 "Ferry: the rest of the everyday controls" (done)
+
+Ferry 0.22.0: the controls Mac apps' windows use that Ferry lacked.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSStepper`, `NSLevelIndicator` (continuous, discrete, relevancy and rating stars) and `NSColorWell` with a basic colour panel | Ferry | done |
+| 2 | `NSDatePicker`: typed and stepped part by part, or a month calendar and a clock | Ferry | done |
+| 3 | `NSComboBox`, `NSPopover` (view controllers can be shown as popovers) and `NSPathControl` | Ferry | done |
+| 4 | `NSSound`, played through PipeWire, with the Mac's alert sound names mapped to freemac's own sounds; and `NSTokenField` | Ferry | done |
+| 5 | All of them read from nibs with their targets and actions; one new test, `make check` 94 of 94 | Ferry | done |
+
 ## 1.194 "Ferry: tools, regular expressions and XML" (done)
 
 Ferry 0.21.0: the Foundation pieces Mac apps use to run helper tools,
