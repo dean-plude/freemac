@@ -878,6 +878,19 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## List view options (1.175)
+
+View Options builds its rows from `view_mode`; `_view_toggled` destroys and
+rebuilds an open panel, so it always speaks for the view in front. The list
+columns are kept in `list_columns` and hidden with `set_visible`; the hidden
+ones, `relative_dates` and `calculate_sizes` are saved with the other Drawer
+settings. `when()` formats Today/Yesterday or the full date from the module
+flag `RELATIVE_DATES`, and `date_width()` widens the Modified column to fit.
+With `FOLDER_SIZES` on, `refresh` calls `Folder.add_up_folders()`, a thread
+that runs `drawer_info.folder_total` on each folder row and fills C_SIZE and
+C_BYTES on the main loop; `Folder.cancel()` stops it when the folder changes.
+`sort_key` then sorts folders by their total, biggest first, like files.
+
 ## Custom icons and comments (1.174)
 
 A custom icon is a PNG, at most 512 pixels a side, kept once in

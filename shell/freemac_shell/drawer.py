@@ -88,13 +88,22 @@ def human_size(size):
     return ""
 
 
+RELATIVE_DATES = [True]   # View Options > Use relative dates
+
+
 def when(stamp):
     if not stamp:
         return ""
-    now = time.time()
-    if now - stamp < 86400 and time.localtime(now).tm_mday == time.localtime(stamp).tm_mday:
-        return time.strftime("Today %-I:%M %p", time.localtime(stamp))
-    return time.strftime("%b %-d, %Y", time.localtime(stamp))
+    if not RELATIVE_DATES[0]:
+        return time.strftime("%b %-d, %Y at %-I:%M %p", time.localtime(stamp))
+    now = time.localtime()
+    day = time.localtime(stamp)
+    yesterday = time.localtime(time.time() - 86400)
+    if day[:3] == now[:3]:
+        return time.strftime("Today %-I:%M %p", day)
+    if day[:3] == yesterday[:3]:
+        return time.strftime("Yesterday %-I:%M %p", day)
+    return time.strftime("%b %-d, %Y", day)
 
 
 def applications_folder():
@@ -178,8 +187,18 @@ def sort_key(model, it, sort):
     if sort == "date":
         return first + (-(stamp or 0), key[1:])
     if sort == "size":
+        if FOLDER_SIZES[0]:
+            return (-(size or 0), key[1:])   # folders added up sort among the files
         return (bool(is_dir), -(size or 0), key[1:])
     return first + (key[1:],)
+
+
+FOLDER_SIZES = [False]   # View Options > Calculate all sizes
+
+
+def date_width():
+    """Room for the longest date the Modified column shows."""
+    return 150 if RELATIVE_DATES[0] else 196
 
 
 def compare_rows(model, a, b, sort):
@@ -340,6 +359,38 @@ class Folder:
         stop = getattr(self, "stop", None)
         if stop is not None:
             stop.set()
+        sizing = getattr(self, "sizing", None)
+        if sizing is not None:
+            sizing.set()
+
+    def add_up_folders(self, done=None):
+        """Calculate all sizes: each folder's size, added up in the
+        background, as Finder's list view does with that option on."""
+        rows = [(Gtk.TreeRowReference.new(self.store, row.path), row[C_PATH]) for row in self.store
+                if row[C_IS_DIR] and row[C_PATH] and os.path.isdir(row[C_PATH])]
+        if not rows:
+            return
+        self.sizing = stop = threading.Event()
+        for ref, _path in rows:
+            self.store.set(self.store.get_iter(ref.get_path()), {C_SIZE: "Adding up\u2026"})
+
+        def run():
+            for ref, path in rows:
+                if stop.is_set():
+                    return
+                found = drawer_info.folder_total(path, stop)
+                if found is None:
+                    return
+                GLib.idle_add(show, ref, found[0])
+            if done is not None:
+                GLib.idle_add(done)
+
+        def show(ref, total):
+            if not stop.is_set() and ref.valid():
+                it = self.store.get_iter(ref.get_path())
+                self.store.set(it, {C_SIZE: human_size(total) if total else "Zero bytes", C_BYTES: float(total)})
+            return False
+        threading.Thread(target=run, daemon=True).start()
 
     def _add_neighbour(self, name, address, icon):
         """One computer in the Network place; opening it connects."""
@@ -600,6 +651,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.grid_spacing = min(40, max(0, int(spacing))) if isinstance(spacing, (int, float)) else 6
         self.text_size = config.get("text_size") if config.get("text_size") in TEXT_SIZES else None
         self.item_info_shown = bool(config.get("item_info", False))
+        FOLDER_SIZES[0] = bool(config.get("calculate_sizes", False))
+        RELATIVE_DATES[0] = bool(config.get("relative_dates", True))
+        self.hidden_columns = {c for c in config.get("hidden_columns", []) if isinstance(c, str)}
         self.view_options = None
         self.text_css = Gtk.CssProvider()
 
@@ -1497,13 +1551,19 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def _build_list_view(self):
         self.list_view = Gtk.TreeView(headers_visible=True, enable_search=False)
+        self.list_view.get_style_context().add_provider(self.text_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.list_view.append_column(name_column())
+        self.list_columns = {}
         for title, col, by in (("Modified", C_MODIFIED, C_STAMP), ("Size", C_SIZE, C_BYTES), ("Kind", C_KIND, C_KIND)):
             renderer = Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END)
             renderer.set_property("foreground-rgba", Gdk.RGBA(0.45, 0.45, 0.5, 1))
             column = Gtk.TreeViewColumn(title, renderer, text=col)
             column.set_min_width(110)
+            if col == C_MODIFIED:
+                column.set_min_width(date_width())
             column.set_sort_column_id(by)   # a click on the heading sorts by it
+            column.set_visible(title.lower() not in self.hidden_columns)
+            self.list_columns[title.lower()] = column
             self.list_view.append_column(column)
         self.list_view.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         self.list_view.connect("row-activated", lambda v, p, _c: self._activate(v.get_model(), p))
@@ -1725,6 +1785,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         self.folder = folder
         if neighbours.is_place(self.path) or self.in_search():
             folder.on_change = lambda: self.folder is folder and self._show_status()
+        elif FOLDER_SIZES[0] and self.view_mode == "list" and not self.in_virtual():
+            folder.add_up_folders()
         model = self._model(folder)
         self.icon_view.set_model(model)
         self.list_view.set_model(Gtk.TreeModelSort(model=model))
@@ -2124,7 +2186,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     # ---- View Options (⌘J) ---------------------------------------------------
     def _apply_text_size(self):
-        css = f"iconview {{ font-size: {self.text_size}pt; }}" if self.text_size else "iconview {}"
+        css = f"iconview, treeview {{ font-size: {self.text_size}pt; }}" if self.text_size else "iconview {}"
         self.text_css.load_from_data(css.encode())
 
     def show_view_options(self):
@@ -2157,12 +2219,15 @@ class DrawerWindow(Gtk.ApplicationWindow):
             box.pack_start(row, False, False, 0)
             return scale
 
-        heading("Icon size:")
-        slider(32, 128, 8, self.icon_size, "image-x-generic-symbolic", "image-x-generic-symbolic",
-               lambda s: self._set_icon_size(int(round(s.get_value() / 8)) * 8))
-        heading("Grid spacing:")
-        slider(0, 40, 2, self.grid_spacing, "view-grid-symbolic", "view-grid-symbolic",
-               lambda s: self._set_grid_spacing(int(s.get_value())))
+        listing = self.view_mode == "list"
+        panel.set_title("View Options: List" if listing else "View Options")
+        if not listing:
+            heading("Icon size:")
+            slider(32, 128, 8, self.icon_size, "image-x-generic-symbolic", "image-x-generic-symbolic",
+                   lambda s: self._set_icon_size(int(round(s.get_value() / 8)) * 8))
+            heading("Grid spacing:")
+            slider(0, 40, 2, self.grid_spacing, "view-grid-symbolic", "view-grid-symbolic",
+                   lambda s: self._set_grid_spacing(int(s.get_value())))
         row = Gtk.Box(spacing=8)
         row.pack_start(Gtk.Label(label="Text size:", xalign=0), False, False, 0)
         sizes = Gtk.ComboBoxText()
@@ -2173,9 +2238,24 @@ class DrawerWindow(Gtk.ApplicationWindow):
         sizes.connect("changed", lambda c: self._set_text_size(int(c.get_active_id()) if c.get_active_id() else None))
         row.pack_end(sizes, False, False, 0)
         box.pack_start(row, False, False, 4)
-        info = Gtk.CheckButton(label="Show item info", active=self.item_info_shown)
-        info.connect("toggled", lambda b: self._set_item_info(b.get_active()))
-        box.pack_start(info, False, False, 0)
+        if listing:
+            # List view's own options, as in Finder: which columns show,
+            # relative dates and folder sizes.
+            heading("Show Columns:")
+            for key, title in (("modified", "Date Modified"), ("size", "Size"), ("kind", "Kind")):
+                shown = Gtk.CheckButton(label=title, active=key not in self.hidden_columns, margin_start=8)
+                shown.connect("toggled", lambda b, k=key: self._show_column(k, b.get_active()))
+                box.pack_start(shown, False, False, 0)
+            relative = Gtk.CheckButton(label="Use relative dates", active=RELATIVE_DATES[0])
+            relative.connect("toggled", lambda b: self._set_relative_dates(b.get_active()))
+            box.pack_start(relative, False, False, 0)
+            sizes_box = Gtk.CheckButton(label="Calculate all sizes", active=FOLDER_SIZES[0])
+            sizes_box.connect("toggled", lambda b: self._set_folder_sizes(b.get_active()))
+            box.pack_start(sizes_box, False, False, 0)
+        else:
+            info = Gtk.CheckButton(label="Show item info", active=self.item_info_shown)
+            info.connect("toggled", lambda b: self._set_item_info(b.get_active()))
+            box.pack_start(info, False, False, 0)
         row = Gtk.Box(spacing=8)
         row.pack_start(Gtk.Label(label="Sort By:", xalign=0), False, False, 0)
         sorts = Gtk.ComboBoxText()
@@ -2219,6 +2299,26 @@ class DrawerWindow(Gtk.ApplicationWindow):
         save_setting("text_size", size)
         self._apply_text_size()
         self.icon_view.queue_resize()
+
+    def _show_column(self, key, on):
+        if on:
+            self.hidden_columns.discard(key)
+        else:
+            self.hidden_columns.add(key)
+        save_setting("hidden_columns", sorted(self.hidden_columns))
+        self.list_columns[key].set_visible(on)
+
+    def _set_relative_dates(self, on):
+        RELATIVE_DATES[0] = on
+        save_setting("relative_dates", on)
+        self.list_columns["modified"].set_min_width(date_width())
+        self._refill_kept()
+
+    def _set_folder_sizes(self, on):
+        FOLDER_SIZES[0] = on
+        save_setting("calculate_sizes", on)
+        if self.view_mode == "list":
+            self._refill_kept()
 
     def _set_item_info(self, on):
         self.item_info_shown = on
@@ -2516,6 +2616,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if button.get_active():
             keep = self.selected_paths() if self.path else []
             self.view_mode = mode
+            if self.view_options is not None:
+                # The panel shows the options of the view in front.
+                self.view_options.destroy()
+                self.show_view_options()
             if self.path:
                 self.refresh()
                 if keep and mode != "columns":

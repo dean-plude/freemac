@@ -1304,6 +1304,14 @@ TOPICS = {
         "To go back to the usual icon, click the icon in the Info window and press Delete.",
         "Type in Comments to keep a few words with the item. Seek finds files by their comments.",
     ]),
+    "list-view-options": ("Choose what list view shows", "list view columns date modified size kind "
+                          "folder sizes calculate relative dates today yesterday view options", [
+        "In Drawer, choose View > as List (⌘2), then View > Show View Options (⌘J).",
+        "Under Show Columns, untick Date Modified, Size or Kind to hide that column.",
+        "Use relative dates shows Today and Yesterday; untick it for the full date and time.",
+        "Calculate all sizes adds up each folder, so you can sort by Size and see which folders take the most room.",
+        "Changes apply to every Drawer window and are kept for next time.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",
