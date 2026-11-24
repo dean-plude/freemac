@@ -1,0 +1,140 @@
+followed
+  redirect 302 to /hello, GET
+  currentRequest before: /redirect-to?code=302&to=/hello
+  status 200 from /hello
+    body: Hello, Ferry!
+  originalRequest /redirect-to?code=302&to=/hello, currentRequest /hello
+two in a row
+  redirect 301 to /redirect-to?code=307&to=/hello, GET
+  currentRequest before: /redirect-to?code=301&to=/redirect-to%3Fcode%3D307%26to%3D/hello
+  redirect 307 to /hello, GET
+  currentRequest before: /redirect-to?code=307&to=/hello
+  status 200 from /hello
+    body: Hello, Ferry!
+  originalRequest /redirect-to?code=301&to=/redirect-to%3Fcode%3D307%26to%3D/hello, currentRequest /hello
+followed, answered later
+  redirect 302 to /hello, GET
+  currentRequest before: /redirect-to?code=302&to=/hello
+  status 200 from /hello
+    body: Hello, Ferry!
+  originalRequest /redirect-to?code=302&to=/hello, currentRequest /hello
+changed by the delegate
+  redirect 302 to /hello, GET
+  currentRequest before: /redirect-to?code=302&to=/hello
+  status 200 from /headers
+    body: method=GET
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=text/x-changed
+    body: body=
+  originalRequest /redirect-to?code=302&to=/hello, currentRequest /headers
+refused
+  redirect 302 to /hello, GET
+  currentRequest before: /redirect-to?code=302&to=/hello
+  status 302 from /redirect-to?code=302&to=/hello
+    body: redirecting
+  originalRequest /redirect-to?code=302&to=/hello, currentRequest /redirect-to?code=302&to=/hello
+POST, 301
+  redirect 301 to /headers, GET
+  currentRequest before: /redirect-to?code=301&to=/headers
+  status 200 from /headers
+    body: method=GET
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=(none)
+    body: body=
+  originalRequest /redirect-to?code=301&to=/headers, currentRequest /headers
+POST, 302
+  redirect 302 to /headers, GET
+  currentRequest before: /redirect-to?code=302&to=/headers
+  status 200 from /headers
+    body: method=GET
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=(none)
+    body: body=
+  originalRequest /redirect-to?code=302&to=/headers, currentRequest /headers
+POST, 303
+  redirect 303 to /headers, GET
+  currentRequest before: /redirect-to?code=303&to=/headers
+  status 200 from /headers
+    body: method=GET
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=(none)
+    body: body=
+  originalRequest /redirect-to?code=303&to=/headers, currentRequest /headers
+POST, 307
+  redirect 307 to /headers, POST with abc
+  currentRequest before: /redirect-to?code=307&to=/headers
+  status 200 from /headers
+    body: method=POST
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=text/plain
+    body: body=abc
+  originalRequest /redirect-to?code=307&to=/headers, currentRequest /headers
+POST, 308
+  redirect 308 to /headers, POST with abc
+  currentRequest before: /redirect-to?code=308&to=/headers
+  status 200 from /headers
+    body: method=POST
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=text/plain
+    body: body=abc
+  originalRequest /redirect-to?code=308&to=/headers, currentRequest /headers
+PUT, 303
+  redirect 303 to /headers, GET
+  currentRequest before: /redirect-to?code=303&to=/headers
+  status 200 from /headers
+    body: method=GET
+    body: authorization=(none)
+    body: cookie=(none)
+    body: if-none-match=(none)
+    body: if-modified-since=(none)
+    body: content-type=(none)
+    body: body=
+  originalRequest /redirect-to?code=303&to=/headers, currentRequest /headers
+relative Location
+  redirect 302 to /hello, GET
+  currentRequest before: /redirect-to?code=302&to=hello
+  status 200 from /hello
+    body: Hello, Ferry!
+  originalRequest /redirect-to?code=302&to=hello, currentRequest /hello
+no delegate
+  status 200 from /hello
+    body: Hello, Ferry!
+  originalRequest /redirect-to?code=307&to=/hello, currentRequest /hello
+connection, followed
+  willSendRequest /redirect-to?code=302&to=/hello, no redirect response
+  willSendRequest /hello, after 302
+  response 200, currentRequest /hello
+  data: Hello, Ferry!
+  finished
+  originalRequest /redirect-to?code=302&to=/hello
+connection, refused
+  willSendRequest /redirect-to?code=302&to=/hello, no redirect response
+  willSendRequest /hello, after 302
+  response 302, currentRequest /redirect-to?code=302&to=/hello
+  data: redirecting
+  finished
+  originalRequest /redirect-to?code=302&to=/hello
+connection, the first request refused
+  willSendRequest /hello, no redirect response
+  originalRequest /hello
+synchronous: 200 from /hello: Hello, Ferry!
+contents: Hello, Ferry!
+exit=0

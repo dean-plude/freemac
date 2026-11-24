@@ -1,0 +1,55 @@
+from properties:
+  flavour=oat domain .example.com path /shop, expires 2000000000, session only no, secure yes, HTTP only no
+  comment a test, version 0
+  properties: Comment Domain Expires Name Path Secure Value Version
+without a name: no
+without a domain: no
+from an origin URL:
+  x=y domain www.example.com path /a, expires at the end of the session, session only yes, secure no, HTTP only no
+read from Set-Cookie (5):
+  a=1 domain .example.com path /, expires at the end of the session, session only yes, secure no, HTTP only no
+  b=2 domain www.example.com path /dir, expires 2139722880, session only no, secure no, HTTP only yes
+  c=3 domain www.example.com path /dir, expires in a minute, session only no, secure yes, HTTP only no
+  e=5 domain www.example.com path /dir, expires already, session only no, secure no, HTTP only no
+  f="quoted" domain www.example.com path /x, expires at the end of the session, session only yes, secure no, HTTP only no
+request fields: a=1; b=2
+request fields for none: 0
+shared storage: 0 cookies, policy 2
+for /dir/page: deep=2 temp=1 keep=yes
+for /other: keep=yes
+over https: temp=1 safe=3 keep=yes
+for another subdomain: keep=yes
+for another site: (none)
+replaced: deep=2 temp=2 keep=yes
+deleted deep: temp=2 keep=yes
+sorted by name: keep=yes safe=3 temp=2
+policy never: temp=2 keep=yes
+from another main document's site: temp=2 keep=yes
+from the main document's site: temp=2 late=1 keep=yes
+changes posted: yes
+saved: keep
+default configuration's storage is the shared one: yes, its policy 2
+before: cookie=(none)
+after Set-Cookie: cookie=sid=abc; lasting=1
+with a narrower path: cookie=narrow=1; sid=abc; lasting=1
+elsewhere: cookie=sid=abc; lasting=1
+expired by the server: cookie=sid=abc; lasting=1
+request without cookies: cookie=(none)
+request with its own Cookie field: cookie=mine=1
+after a redirect that set one: cookie=sid=abc; lasting=1; hop=7
+dataWithContentsOfURL: cookie=sid=abc; lasting=1; hop=7
+NSURLConnection: cookie=sid=abc; lasting=1; hop=7
+HTTPShouldSetCookies off: cookie=(none)
+and kept none: cookie=sid=abc; lasting=1; hop=7
+policy never: still sends: cookie=sid=abc; lasting=1; hop=7
+no storage: cookie=(none)
+ephemeral, before: cookie=(none)
+ephemeral, after: cookie=private=1
+the shared storage didn't get it: cookie=sid=abc; lasting=1; hop=7
+ephemeral storage: private=1
+saved: keep lasting
+second run, read back: keep=yes lasting=1
+  keep=yes domain .example.com path /, expires 2139722880, session only no, secure no, HTTP only no
+sent again: cookie=lasting=1
+all deleted: 0 left, saved file no
+exit=0

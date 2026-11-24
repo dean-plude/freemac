@@ -1344,6 +1344,7 @@ typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) 
 @property (readonly, copy) NSURL *baseURL;
 @property (readonly, copy) NSString *relativeString;
 @property (readonly, copy) NSString *user;
+@property (readonly, copy) NSString *password;
 @property (readonly) BOOL hasDirectoryPath;
 @property (readonly, copy) NSURL *URLByStandardizingPath;
 @property (readonly, copy) NSURL *URLByResolvingSymlinksInPath;

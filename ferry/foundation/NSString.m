@@ -214,7 +214,7 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
 + (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error
 {
     NSString *scheme = [[url scheme] lowercaseString];
-    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"data"]) {
         NSString *s = FStringWithContentsOfNetworkURL(url, enc, NULL, error);
         return s ? [self stringWithString:s] : nil;
     }

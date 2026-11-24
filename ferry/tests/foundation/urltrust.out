@@ -1,0 +1,24 @@
+no delegate
+  error NSURLErrorDomain -1202
+default handling
+  session challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  error NSURLErrorDomain -1202
+cancelled
+  session challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  error NSURLErrorDomain -999
+accepted
+  session challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  status 200: Hello, Ferry!
+accepted, then a password
+  session challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  task challenge: NSURLAuthenticationMethodHTTPBasic, https, host 127.0.0.1, a trust no, realm ferry
+  status 200: basic ok ann
+accepted at the task's level
+  task challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  status 200: Hello, Ferry!
+connection, accepted
+  connection challenge: NSURLAuthenticationMethodServerTrust, https, host 127.0.0.1, a trust yes, realm (nil)
+  data: Hello, Ferry!
+  finished
+dataWithContentsOfURL: nil, underlying -1202
+exit=0

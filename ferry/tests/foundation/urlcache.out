@@ -1,0 +1,62 @@
+capacities: 100000 in memory, 1000000 on disk, used 0
+stored: by hand, field kept, user info user info, policy 0, memory used 7
+with a fragment: yes
+on disk: yes
+another cache on the same files: by hand from disk, memory-only one no
+first cache, memory-only one: yes
+removed: yes, from the other: no
+all removed: yes, memory used 0, disk used 0
+not allowed: stored no
+default storage policy: 0
+default configuration's cache is the shared one: yes, policy 0
+ephemeral configuration's cache is the shared one: no
+max-age, first: maxage a, answer 1 (status 200); server: requests=1 notmodified=0
+max-age, again: maxage a, answer 1 (status 200); server: requests=1 notmodified=0
+in the cache: maxage a, answer 1, Cache-Control max-age=3600
+max-age=0, first: maxage b, answer 1 (status 200); server: requests=1 notmodified=0
+max-age=0, again: maxage b, answer 2 (status 200); server: requests=2 notmodified=0
+Expires, first: expires f, answer 1 (status 200); server: requests=1 notmodified=0
+Expires, again: expires f, answer 1 (status 200); server: requests=1 notmodified=0
+ETag, first: etag c, answer 1 (status 200); server: requests=1 notmodified=0
+ETag, again: etag c, answer 1 (status 200, with a 304's fields); server: requests=2 notmodified=1
+Last-Modified, first: lastmod d, answer 1 (status 200); server: requests=1 notmodified=0
+Last-Modified, again: lastmod d, answer 1 (status 200); server: requests=2 notmodified=1
+no-store, first: nostore e, answer 1 (status 200); server: requests=1 notmodified=0
+no-store, again: nostore e, answer 2 (status 200); server: requests=2 notmodified=0
+no-store in the cache: no
+reload ignoring the cache: maxage a, answer 2 (status 200); server: requests=2 notmodified=0
+then the protocol's policy: maxage a, answer 2 (status 200); server: requests=2 notmodified=0
+cache else load, stale ETag entry: etag c, answer 1 (status 200, with a 304's fields); server: requests=2 notmodified=1
+cache else load, nothing stored: maxage h, answer 1 (status 200); server: requests=1 notmodified=0
+cache, don't load, stored: maxage h, answer 1 (status 200); server: requests=1 notmodified=0
+cache, don't load, nothing stored: error -1008; server: requests=0 notmodified=0
+reload, revalidating: etag c, answer 1 (status 200, with a 304's fields); server: requests=3 notmodified=2
+request's Cache-Control no-cache: maxage a, answer 3; server: requests=3 notmodified=0
+POST stored: no
+configuration's cache else load: etag c, answer 1 (status 200, with a 304's fields); server: requests=3 notmodified=2
+configuration's reload: maxage a, answer 4 (status 200); server: requests=4 notmodified=0
+4000 bytes of 100000 kept: yes, 6000 kept: no
+no cache, first: maxage n, answer 1 (status 200); server: requests=1 notmodified=0
+no cache, again: maxage n, answer 2 (status 200); server: requests=2 notmodified=0
+delegate, kept as proposed
+  willCacheResponse: maxage delegate0, answer 1, policy 0
+  completed: maxage delegate0, answer 1
+  in the cache: maxage delegate0, answer 1, policy 0
+delegate, refused
+  willCacheResponse: maxage delegate1, answer 1, policy 0
+  completed: maxage delegate1, answer 1
+  in the cache: (nil), policy 0
+delegate, changed, in memory only
+  willCacheResponse: maxage delegate2, answer 1, policy 0
+  completed: maxage delegate2, answer 1
+  in the cache: changed, policy 1
+download kept: no
+dataWithContentsOfURL twice: maxage shared, answer 1; server: requests=1 notmodified=0
+NSURLConnection: maxage shared, answer 1; server: requests=1 notmodified=0
+the shared cache's files in ~/.cache/<program>/URLCache: 1
+second run, from disk: maxage a, answer 4 (status 200); server: requests=4 notmodified=0
+second run, ETag from disk, revalidated: etag c, answer 1 (status 200, with a 304's fields); server: requests=4 notmodified=3
+second run, the memory-only one: error -1008; server: requests=1 notmodified=0
+second run, the shared cache: maxage shared, answer 1 (status 200); server: requests=1 notmodified=0
+removed: disk used 0 and 0
+exit=0

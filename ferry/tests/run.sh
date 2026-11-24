@@ -10,6 +10,16 @@ mkdir -p "$build"
 export FERRY_SDK="$top/sdk"
 pass=0
 fail=0
+# For the URL loading tests: the test server on 127.0.0.1, reached directly,
+# never through a proxy, and a home of the test's own (for cookies and caches).
+url_env() {
+    env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy -u ALL_PROXY \
+        NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 TMPDIR="$build/home_$name" \
+        HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_CACHE_HOME= XDG_DATA_HOME= \
+        FERRY_TEST_HTTP="127.0.0.1:$http_port" FERRY_TEST_CLOSED_PORT="$closed_port" \
+        FERRY_TEST_HTTPS="${tls_port:+127.0.0.1:$tls_port}" "$@"
+}
+
 run_one() {
     name=$1; src=$2; expected=$3; shift 3
     exe="$build/$name"
@@ -32,13 +42,14 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        foundation_url*)
-            # the test server on 127.0.0.1, reached directly, never through a proxy
+        foundation_urlcookies|foundation_urlcache)
+            # twice in one home: what the first run keeps, the second finds
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
-            env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy -u ALL_PROXY \
-                NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 TMPDIR="$build/home_$name" \
-                FERRY_TEST_HTTP="127.0.0.1:$http_port" FERRY_TEST_CLOSED_PORT="$closed_port" \
-                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+            url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
+                url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
+        foundation_url*)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            url_env "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
@@ -172,18 +183,37 @@ run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archiv
 # NSData's and NSString's ...ContentsOfURL:, against a small HTTP server
 # started here on 127.0.0.1 (nothing goes past the loopback address).
 if command -v python3 > /dev/null 2>&1; then
-    rm -f "$build/http.port"
-    python3 -I "$here/tools/http_server.py" "$build/http.port" > "$build/http_server.log" 2>&1 &
+    rm -f "$build/http.port" "$build/tls.crt" "$build/tls.key"
+    # with openssl, a certificate of its own for a TLS port too, which this system doesn't trust
+    tls_files=
+    if command -v openssl > /dev/null 2>&1 &&
+        openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 \
+            -keyout "$build/tls.key" -out "$build/tls.crt" > "$build/openssl.log" 2>&1; then
+        tls_files="$build/tls.crt $build/tls.key"
+    fi
+    python3 -I "$here/tools/http_server.py" "$build/http.port" $tls_files > "$build/http_server.log" 2>&1 &
     http_pid=$!
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do [ -s "$build/http.port" ] && break; sleep 0.25; done
-    read http_port closed_port < "$build/http.port"
+    tls_port=
+    read http_port closed_port tls_port < "$build/http.port"
     run_one foundation_urlsession "$here/foundation/urlsession.m" "$here/foundation/urlsession.out" -fobjc-arc \
         -framework Foundation
     run_one foundation_urlconnection "$here/foundation/urlconnection.m" "$here/foundation/urlconnection.out" \
         -framework Foundation
+    # redirects, authentication, cookies and caching decided as a Mac does,
+    # data: URLs, and a server's certificate as a challenge
+    for t in urlredirects urlauth urlcookies urlcache urldata; do
+        run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -fobjc-arc -framework Foundation
+    done
+    if [ -n "$tls_port" ]; then
+        run_one foundation_urltrust "$here/foundation/urltrust.m" "$here/foundation/urltrust.out" -fobjc-arc \
+            -framework Foundation
+    else
+        echo "skip foundation_urltrust (needs openssl, to make the test server a certificate)"
+    fi
     kill "$http_pid" 2> /dev/null; wait "$http_pid" 2> /dev/null
 else
-    echo "skip foundation_urlsession, foundation_urlconnection (need python3, for a test server)"
+    echo "skip foundation_urlsession, foundation_urlconnection and the other URL tests (need python3, for a test server)"
 fi
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
 run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
