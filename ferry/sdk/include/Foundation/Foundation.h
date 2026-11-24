@@ -2110,5 +2110,8 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSThread.h>
 /* URL loading: NSURLSession, NSURLConnection, requests and responses. */
 #include <Foundation/NSURLSession.h>
+/* Streams, and the network services of Bonjour. */
+#include <Foundation/NSStream.h>
+#include <Foundation/NSNetServices.h>
 
 #endif

@@ -919,6 +919,7 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
 static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreFoundation", "Foundation"},
     {"SystemConfiguration", "Foundation"},
+    {"CFNetwork", "Foundation"},        /* the socket streams' properties, next to CFStream */
     {"CoreServices", "Foundation"}, /* Gestalt only, next to NSProcessInfo */
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},

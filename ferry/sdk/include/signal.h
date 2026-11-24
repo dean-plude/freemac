@@ -31,6 +31,7 @@ __FERRY_BEGIN
 #define SIGUSR2 31
 #define NSIG 32
 typedef void (*sig_t)(int);
+typedef int sig_atomic_t;
 #define SIG_DFL ((sig_t)0)
 #define SIG_IGN ((sig_t)1)
 #define SIG_ERR ((sig_t)-1)

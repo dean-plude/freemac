@@ -1,0 +1,33 @@
+source added: scheduled 1, contained 1
+not signalled: run result 3 (timed out), performed 0
+signalled: run result 4 (handled a source), performed 1
+signalled from another thread: performed 2, on this thread 1
+removed: cancelled 1, contained 0
+invalidated: valid 0
+listener: set address 0
+listener: bound length 16, sin_len 16, family 2, port set 1, flags 131
+listener: context info kept 1
+client: connect in the background 0
+listener: accept callback, a new socket 1, from 127.0.0.1, address length 16, info listener info
+client: connect callback, connected
+server: got "ferry" from the peer at an IPv4 address
+server: send 0
+client: data callback "FERRY"
+client: echo "FERRY", accepted 1, peer address is the listener's 1
+client: the same CFSocket for its descriptor 1
+client invalidated: valid 0, native -1, descriptor closed 1
+server: the client closed (empty data)
+connected by signature: 1
+listener: accept callback, a new socket 1, from 127.0.0.1, address length 16, info listener info
+accepted 2 connections
+listener invalidated: its source valid 0
+refused: connect callback, error 61 (ECONNREFUSED 1)
+refused, waiting: -1 (kCFSocketError)
+sent 0 0
+datagram: "one" from port of the sender
+datagram: "two" from port of the sender
+read callback: 1 call while the byte waits unread
+enabled again: 2 calls
+write callback: 1 call
+CFRunLoopRunInMode with nothing left: 1 (finished)
+exit=0

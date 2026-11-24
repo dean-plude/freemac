@@ -1,0 +1,48 @@
+struct kevent 32 bytes, struct kevent64_s 48
+empty pipe: 0 events
+pipe READ: 1 event, ident ok 1 filter -1 data 3 udata ok 1 eof 0
+level-triggered: again 1
+after reading it: 0
+EV_CLEAR: 1, then 0, after more data 1 (data 2)
+writer closed: 1 event, EV_EOF 1 data 2
+after close, EV_DELETE: -1 errno 2 (ENOENT 2)
+socket WRITE: 1 event, filter -2, room 1
+READ and WRITE on one socket: 2 events, read data 5, write 1
+peer closed: EV_EOF 1
+file READ: 1 event, data 6
+change list: 3 results
+  ident ok 1 EV_ERROR 1 data 0
+  ident ok 1 EV_ERROR 1 data 9
+  ident ok 1 EV_ERROR 1 data 2
+an error with no room: -1 errno 9 (EBADF 9)
+an unknown filter: -1 errno 22
+EV_ONESHOT: 1 then 0, then deleting: -1 errno 2
+EV_DISPATCH: 1 then 0, enabled again 1
+EV_DISABLE: 0
+50 ms timer: 1 event after 45-1000 ms 1, data 1 udata 0x51
+one-shot: then 0
+20 ms repeating timer after 110 ms: 1 event, counted 3 or more 1
+and again: 1, data 1
+absolute time in the past: 1 event, ident 3
+disabled timer: 0
+ignored SIGUSR1 sent twice: 1 event, ident 30 data 2
+then 0
+the program's disposition is still SIG_IGN 1
+deleted, SIGUSR1 still ignored: alive
+SIGUSR2 with a handler: handler ran 1, event 1 data 1
+deleted: the handler alone 2
+SIGKILL can't be watched: -1 errno 22
+child running: 0 events
+child exited: 1 event, ident ok 1 NOTE_EXIT 1 NOTE_EXITSTATUS 1 status 7, EV_EOF 1
+the event is gone: -1 errno 2
+waitpid still reaps it: 1 status 7
+no such process: -1 errno 3 (ESRCH 3)
+user event, not triggered: 0
+triggered: 1 event, fflags 0x1
+EV_CLEAR: then 0
+triggered from another thread while waiting: 1 event, fflags 0x10
+without EV_CLEAR it stays triggered: 1 1
+kevent64: 1 event, udata 123456789abcdef ext 11 22
+closing the kqueue: 0
+kevent on it after: -1 errno 9
+exit=0

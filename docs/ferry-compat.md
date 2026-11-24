@@ -661,8 +661,8 @@ waiting for something nothing can do) Ferry stops the program with a
 message instead. This was written from Apple's documentation and not
 compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 Left out: `NSDistributedLock`, call stack symbols, dispatch sources for
-descriptors, signals and processes, and priorities that change how threads
-are scheduled.
+files and Mach ports (those for descriptors, signals and processes came in
+1.205), and priorities that change how threads are scheduled.
 
 ### C++ programs (freemac 1.203, Ferry 0.30.0)
 
@@ -722,6 +722,43 @@ with a Mac; `docs/ferry-gui.md` lists what a Mac would settle. The
 destructors of threads still running when the program exits are not run,
 and the variables of images after the first 128 that have them are reached
 the slow way.
+
+### Sockets and streams (freemac 1.205, Ferry 0.32.0)
+
+Mac programs get BSD sockets with Mac layouts. Ferry converts every
+socket address between the Mac form (with `sa_len`, and AF_INET6 as 30)
+and Linux's, and converts `msghdr` and control messages (32-bit lengths,
+4-byte alignment), `timeval` socket options, `addrinfo` (whose
+`ai_canonname` comes before `ai_addr` on a Mac), `ifaddrs` (with an AF_LINK
+entry for each interface) and `fd_set`. Socket options with Mac numbers are
+mapped, and the Mac-only ones are made: SO_NOSIGPIPE (sends are made with
+MSG_NOSIGNAL), SO_NREAD, TCP_KEEPALIVE, LOCAL_PEERPID and LOCAL_PEERCRED.
+Errors come back as Mac errno and EAI_ values.
+
+kqueue and kevent are built on epoll. Each event in a kqueue gets a
+descriptor of its own: a duplicate for READ and WRITE, a timerfd for
+TIMER, a pidfd for PROC, an eventfd for USER, and for SIGNAL a counter fed
+by Ferry's own signal handler, so the program's disposition stays as it set
+it. select and poll take Mac structures and flags. libdispatch's READ,
+WRITE, SIGNAL, PROC and TIMER sources run on an internal kqueue served by a
+thread.
+
+CFSocket works with a run loop source, using the run loop's descriptor
+watching. CFReadStream, CFWriteStream, NSInputStream and NSOutputStream
+work over data, files, memory, a bound pair, a native socket, and a host
+and port (CFStreamCreatePairWithSocketToHost and
+getStreamsToHostWithName:port:inputStream:outputStream:), with delegates,
+client callbacks, run loops or a dispatch queue, and blocking use. The
+connection is made on a worker thread, so opening never blocks. TLS
+(kCFStreamPropertySSLSettings or NSStreamSocketSecurityLevelKey) uses the
+system's OpenSSL, and the server's certificates are checked with the same
+Security.framework trust calls a program can use itself; the peer trust is
+available as kCFStreamPropertySSLPeerTrust. CFNetwork.framework is an alias
+of Foundation.
+
+NSNetService and NSNetServiceBrowser are there, but without Bonjour: they
+say they will start and then fail with NSNetServicesUnknownError, as a Mac
+does when mDNSResponder can't be reached. TXT records are made and read.
 
 ## What the apps need most
 

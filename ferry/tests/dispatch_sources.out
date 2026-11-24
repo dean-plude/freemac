@@ -1,0 +1,14 @@
+read source: handle matches 1 mask 0
+nothing to read: 0 calls
+after a write: waited 0, data 3, read "abc", on its queue 1
+suspended: text still "abc"
+resumed: waited 0, read "abcdef"
+writer closed: the handler saw the end and cancelled, cancel handler ran 0, testcancel 1
+write source: waited 0, room reported 1, peer read "ping"
+signal source: waited 0, counted 3 SIGUSR1, handle 30
+cancelled, SIGUSR1 still ignored: alive
+a source for signal 0: NULL
+process source: nothing while it runs 1
+child exited: waited 0, DISPATCH_PROC_EXIT 1, exit status 5
+main queue read source: "later" on the main thread 1
+exit=0

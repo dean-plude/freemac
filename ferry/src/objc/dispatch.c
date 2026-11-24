@@ -3,7 +3,7 @@
  * Grand Central Dispatch (libdispatch), the part of libSystem that Mac
  * programs use to run blocks later or elsewhere: queues, dispatch_async and
  * dispatch_sync, dispatch_once, dispatch_after, dispatch_apply, groups,
- * semaphores and timer and data sources.
+ * semaphores and timer, data, read, write, signal and process sources.
  *
  * Work runs on real threads, as on a Mac. The global queues are concurrent:
  * their blocks run on a pool of worker threads that grows when every
@@ -83,6 +83,13 @@ struct dobj {
     void *handler, *cancel_handler; /* blocks */
     int cancelled, armed;
     unsigned long data, fired_data;
+    /* read, write, signal and process sources: what they watch, and their
+     * registration with the kqueue that the sources thread waits on */
+    uintptr_t handle;
+    unsigned long mask;
+    uint64_t kid;
+    int kregistered, kpending, kdone;
+    struct dobj *next_k;
 };
 
 struct specific {
@@ -579,10 +586,12 @@ int ferry_dispatch_timeout_ms(void)
 /* For Foundation's run loop: is dispatch doing anything, or due to (work
  * queued or running anywhere, or dispatch_after's still to come)? Work that
  * isn't the main queue's may still send some there. */
+static int live_ksources; /* read, write, signal and process sources that may still fire */
+
 int ferry_dispatch_busy(void)
 {
     pthread_mutex_lock(&dq);
-    int busy = busy_workers > 0 || later || MAIN_Q->head || listed_head;
+    int busy = busy_workers > 0 || later || MAIN_Q->head || listed_head || live_ksources;
     pthread_mutex_unlock(&dq);
     return busy;
 }
@@ -599,7 +608,7 @@ void ferry_dispatch_set_main_wakeup(void (*fn)(void))
  * program's is running, no worker is busy, nothing is queued or due. */
 static int nothing_can_happen(void)
 {
-    return busy_workers == 0 && !later && !startable_work() && ferry_pthread_live_threads() == 0;
+    return busy_workers == 0 && !later && !startable_work() && ferry_pthread_live_threads() == 0 && !live_ksources;
 }
 
 /* For Foundation's waits that block a thread (its locks and NSOperation's
@@ -778,6 +787,7 @@ void dispatch_suspend(struct dobj *o)
 }
 
 static void arm_timer_locked(struct dobj *s);
+static void ksource_resumed_locked(struct dobj *s);
 
 /* After a resume, any queue's work may be free to run again. */
 static void kick_all_locked(void)
@@ -798,8 +808,10 @@ static void kick_all_locked(void)
 static void resume_locked(struct dobj *o, struct dobj *domain)
 {
     if (o->kind == K_SOURCE) {
-        if (o->suspended > 0 && --o->suspended == 0)
+        if (o->suspended > 0 && --o->suspended == 0) {
             arm_timer_locked(o);
+            ksource_resumed_locked(o);
+        }
         return;
     }
     if (o->suspended > 0 && --o->suspended == 0) {
@@ -1292,7 +1304,7 @@ long dispatch_semaphore_wait(struct dobj *s, uint64_t timeout)
 /* ---- sources ---------------------------------------------------------------- */
 
 /* DISPATCH_SOURCE_TYPE_TIMER and the others are addresses of variables. */
-enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_OTHER };
+enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_READ, S_WRITE, S_SIGNAL, S_PROC, S_OTHER };
 char ferry_dispatch_source_type_timer[16], ferry_dispatch_source_type_data_add[16],
     ferry_dispatch_source_type_data_or[16], ferry_dispatch_source_type_data_replace[16],
     ferry_dispatch_source_type_read[16], ferry_dispatch_source_type_write[16],
@@ -1309,10 +1321,10 @@ static const struct {
     {"data_add", ferry_dispatch_source_type_data_add, S_DATA_ADD},
     {"data_or", ferry_dispatch_source_type_data_or, S_DATA_OR},
     {"data_replace", ferry_dispatch_source_type_data_replace, S_DATA_REPLACE},
-    {"read", ferry_dispatch_source_type_read, S_OTHER},
-    {"write", ferry_dispatch_source_type_write, S_OTHER},
-    {"signal", ferry_dispatch_source_type_signal, S_OTHER},
-    {"proc", ferry_dispatch_source_type_proc, S_OTHER},
+    {"read", ferry_dispatch_source_type_read, S_READ},
+    {"write", ferry_dispatch_source_type_write, S_WRITE},
+    {"signal", ferry_dispatch_source_type_signal, S_SIGNAL},
+    {"proc", ferry_dispatch_source_type_proc, S_PROC},
     {"vnode", ferry_dispatch_source_type_vnode, S_OTHER},
     {"mach_recv", ferry_dispatch_source_type_mach_recv, S_OTHER},
     {"mach_send", ferry_dispatch_source_type_mach_send, S_OTHER},
@@ -1323,17 +1335,22 @@ static const struct {
  * on a serial queue of the source's own that targets that queue. */
 struct dobj *dispatch_source_create(const void *type, uintptr_t handle, unsigned long mask, struct dobj *q)
 {
-    (void)handle;
-    (void)mask;
-    struct dobj *s = new_object(K_SOURCE);
-    s->source_type = S_OTHER;
+    int t = S_OTHER;
     for (size_t i = 0; i < sizeof source_types / sizeof source_types[0]; i++)
         if (type == source_types[i].addr) {
-            s->source_type = source_types[i].type;
-            if (s->source_type == S_OTHER)
+            t = source_types[i].type;
+            if (t == S_OTHER)
                 fprintf(stderr, "ferry: dispatch sources of type %s aren't supported yet; this one won't fire\n",
                         source_types[i].name);
         }
+    /* what a Mac refuses: a signal that isn't one, a descriptor that can't be */
+    if ((t == S_SIGNAL && (handle == 0 || handle >= 32)) || ((t == S_READ || t == S_WRITE) && handle > INT32_MAX) ||
+        (t == S_PROC && (handle == 0 || handle > INT32_MAX)))
+        return NULL;
+    struct dobj *s = new_object(K_SOURCE);
+    s->source_type = t;
+    s->handle = handle;
+    s->mask = mask;
     s->target = dispatch_queue_create_with_target("source", NULL, q ? q : DEFAULT_Q);
     s->suspended = 1; /* a new source starts suspended */
     return s;
@@ -1432,6 +1449,166 @@ void dispatch_source_set_cancel_handler(struct dobj *s, void *block)
         _Block_release(old);
 }
 
+/* Read, write, signal and process sources wait on one kqueue (src/kqueue.c)
+ * in a thread of their own. When it reports one, the source's data is
+ * merged (bytes ready, signals counted, process events or'ed) and its
+ * handler queued on its target queue, as for a data source. A read or
+ * write source is registered EV_DISPATCH and enabled again once its
+ * handler has run, so it fires again while the descriptor stays ready, as
+ * on a Mac. The kqueue's udata is the source's registration number, looked
+ * up among the live sources, so a cancelled source is never touched. */
+static int kfd = -1;
+static struct dobj *ksources;
+static uint64_t next_kid;
+
+static int ksource_change(struct dobj *s, int flags)
+{
+    int16_t filter = s->source_type == S_READ ? FERRY_EVFILT_READ : s->source_type == S_WRITE ? FERRY_EVFILT_WRITE
+                   : s->source_type == S_SIGNAL ? FERRY_EVFILT_SIGNAL : FERRY_EVFILT_PROC;
+    struct kevent64_s k = {.ident = s->handle, .filter = filter, .flags = (uint16_t)flags, .udata = s->kid};
+    if (s->source_type == S_PROC)
+        k.fflags = (uint32_t)(s->mask | FERRY_NOTE_EXIT);
+    return ferry_kevent64(kfd, &k, 1, NULL, 0, 0, NULL);
+}
+
+static void fire_ksource(void *ctx)
+{
+    struct dobj *s = ctx;
+    pthread_mutex_lock(&dq);
+    s->armed = 0;
+    if (s->cancelled || s->suspended > 0) { /* kept for the resume */
+        pthread_mutex_unlock(&dq);
+        objc_release((id)s);
+        return;
+    }
+    unsigned long data = s->data;
+    int pending = s->kpending;
+    s->data = 0;
+    s->kpending = 0;
+    pthread_mutex_unlock(&dq);
+    if (pending && (data || s->source_type == S_READ || s->source_type == S_WRITE))
+        call_handler(s, data);
+    if (s->source_type == S_READ || s->source_type == S_WRITE) {
+        pthread_mutex_lock(&dq);
+        if (!s->cancelled && s->kregistered == 1) /* under the lock, so a cancel can't come between */
+            ksource_change(s, FERRY_EV_ENABLE);
+        pthread_mutex_unlock(&dq);
+    }
+    objc_release((id)s);
+}
+
+static void *ksource_main(void *unused)
+{
+    (void)unused;
+    struct kevent64_s ev[16];
+    for (;;) {
+        int n = ferry_kevent64(kfd, NULL, 0, ev, 16, 0, NULL);
+        if (n <= 0)
+            continue;
+        pthread_mutex_lock(&dq);
+        for (int i = 0; i < n; i++) {
+            struct dobj *s = ksources;
+            while (s && s->kid != ev[i].udata)
+                s = s->next_k;
+            if (!s || s->cancelled)
+                continue;
+            switch (s->source_type) {
+            case S_READ:
+            case S_WRITE: s->data = ev[i].data > 0 ? (unsigned long)ev[i].data : 0; break;
+            case S_SIGNAL: s->data += (unsigned long)ev[i].data; break;
+            case S_PROC:
+                s->data |= ev[i].fflags & s->mask;
+                if ((ev[i].flags & FERRY_EV_EOF) && !s->kdone) {
+                    s->kdone = 1; /* nothing more will come */
+                    live_ksources--;
+                }
+                break;
+            }
+            s->kpending = 1;
+            if (!s->armed && s->suspended <= 0) {
+                s->armed = 1;
+                objc_retain((id)s);
+                enqueue_locked(make_work(s->target, NULL, fire_ksource, s));
+            }
+        }
+        pthread_mutex_unlock(&dq);
+    }
+    return NULL;
+}
+
+static void ksource_start_locked(struct dobj *s)
+{
+    if (kfd < 0) {
+        kfd = ferry_kqueue();
+        pthread_t t;
+        pthread_attr_t a;
+        pthread_attr_init(&a);
+        pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+        if (kfd < 0 || pthread_create(&t, &a, ksource_main, NULL) != 0) {
+            pthread_attr_destroy(&a);
+            fprintf(stderr, "ferry: can't watch descriptors, signals or processes for dispatch sources\n");
+            s->kregistered = -1;
+            return;
+        }
+        pthread_attr_destroy(&a);
+    }
+    s->kid = ++next_kid;
+    int flags = FERRY_EV_ADD | (s->source_type == S_READ || s->source_type == S_WRITE ? FERRY_EV_DISPATCH : 0);
+    if (ksource_change(s, flags) < 0) {
+        int e = errno;
+        fprintf(stderr, "ferry: a dispatch %s source for %lu can't be watched (%s); it won't fire\n",
+                s->source_type == S_READ ? "read" : s->source_type == S_WRITE ? "write"
+                : s->source_type == S_SIGNAL ? "signal" : "process",
+                (unsigned long)s->handle, strerror(e));
+        s->kregistered = -1;
+        return;
+    }
+    s->kregistered = 1;
+    objc_retain((id)s); /* until it is cancelled, as on a Mac */
+    s->next_k = ksources;
+    ksources = s;
+    live_ksources++;
+}
+
+/* The source's count of suspensions came back to 0. */
+static void ksource_resumed_locked(struct dobj *s)
+{
+    if (s->source_type != S_READ && s->source_type != S_WRITE && s->source_type != S_SIGNAL &&
+        s->source_type != S_PROC)
+        return;
+    if (s->cancelled)
+        return;
+    if (!s->kregistered)
+        ksource_start_locked(s);
+    else if (s->kpending && !s->armed) {
+        s->armed = 1;
+        objc_retain((id)s);
+        enqueue_locked(make_work(s->target, NULL, fire_ksource, s));
+    }
+}
+
+/* At its cancel: out of the list; 1 if the kqueue has to forget it too. */
+static int ksource_forget_locked(struct dobj *s)
+{
+    if (s->kregistered != 1)
+        return 0;
+    for (struct dobj **p = &ksources; *p; p = &(*p)->next_k)
+        if (*p == s) {
+            *p = s->next_k;
+            break;
+        }
+    if (!s->kdone)
+        live_ksources--;
+    s->kregistered = 2;
+    return 1;
+}
+
+static void ksource_unwatch(struct dobj *s)
+{
+    ksource_change(s, FERRY_EV_DELETE); /* fails when the descriptor was closed first, which is fine */
+    objc_release((id)s);
+}
+
 void dispatch_source_cancel(struct dobj *s)
 {
     pthread_mutex_lock(&dq);
@@ -1442,7 +1619,10 @@ void dispatch_source_cancel(struct dobj *s)
     __atomic_store_n(&s->cancelled, 1, __ATOMIC_RELEASE);
     void *handler = s->cancel_handler;
     s->cancel_handler = NULL;
+    int unwatch = ksource_forget_locked(s);
     pthread_mutex_unlock(&dq);
+    if (unwatch)
+        ksource_unwatch(s);
     if (handler) {
         dispatch_async(s->target, handler);
         _Block_release(handler);
@@ -1450,8 +1630,8 @@ void dispatch_source_cancel(struct dobj *s)
 }
 long dispatch_source_testcancel(struct dobj *s) { return __atomic_load_n(&s->cancelled, __ATOMIC_ACQUIRE); }
 unsigned long dispatch_source_get_data(struct dobj *s) { return s->fired_data; }
-unsigned long dispatch_source_get_mask(struct dobj *s) { (void)s; return 0; }
-uintptr_t dispatch_source_get_handle(struct dobj *s) { (void)s; return 0; }
+unsigned long dispatch_source_get_mask(struct dobj *s) { return s ? s->mask : 0; }
+uintptr_t dispatch_source_get_handle(struct dobj *s) { return s ? s->handle : 0; }
 
 static void fire_data(void *ctx)
 {

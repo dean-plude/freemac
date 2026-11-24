@@ -8,6 +8,7 @@ DESTDIR ?=
 
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/pthread.c src/passthrough.c src/host.c \
       src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
+      src/socket.c src/kqueue.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
       src/objc/symbols.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
@@ -24,6 +25,8 @@ FOUNDATION = frameworks/Foundation.framework/Foundation
 FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h \
                      sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h \
                      $(wildcard sdk/include/Foundation/NS*.h) \
+                     sdk/include/CoreFoundation/CFSocket.h sdk/include/CoreFoundation/CFStream.h \
+                     sdk/include/CFNetwork/CFNetwork.h \
                      foundation/FCurl.h foundation/FURLInternal.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
@@ -135,6 +138,8 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	sdk/gen-alias-tbd.sh SystemConfiguration $@ > frameworks/SystemConfiguration.framework/SystemConfiguration.tbd
 	@mkdir -p frameworks/CoreServices.framework
 	sdk/gen-alias-tbd.sh CoreServices $@ > frameworks/CoreServices.framework/CoreServices.tbd
+	@mkdir -p frameworks/CFNetwork.framework
+	sdk/gen-alias-tbd.sh CFNetwork $@ > frameworks/CFNetwork.framework/CFNetwork.tbd
 
 $(HOST_TBD): ferry sdk/gen-tbd.sh
 	@mkdir -p graphics/build
@@ -206,7 +211,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

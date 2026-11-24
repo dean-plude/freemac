@@ -51,6 +51,20 @@ void FRunLoopAddPoller(int (*prepare)(void *ctx, int *timeout_ms, struct pollfd 
                        BOOL (*dispatch)(void *ctx, struct pollfd *fds, int count), BOOL (*active)(void *ctx),
                        void *ctx);
 
+/* Run loop sources other than timers and ports (NSRunLoop.m), for CFSocket,
+ * CFRunLoopSource and the socket streams: a descriptor watched for some
+ * poll() events, and a count of sources that keep the loop running while
+ * they have nothing to poll for. */
+@interface NSRunLoop (FerrySources)
+- (void)_addDescriptor:(int)fd events:(short)events handler:(void (*)(int fd, short revents, void *ctx))handler
+               context:(void *)ctx;
+- (void)_removeDescriptor:(int)fd context:(void *)ctx;
+- (void)_addKeepAlive;
+- (void)_removeKeepAlive;
+@end
+/* Prints a note on standard error once, when FERRY_VERBOSE is set (CFSocket.m). */
+void FVerboseOnce(NSString *message);
+
 /* Blocks the calling thread on a pthread condition until it is signalled
  * or limit (seconds since the reference date) passes; returns 0 or
  * ETIMEDOUT. On the main thread a wait with no limit wakes every 250 ms

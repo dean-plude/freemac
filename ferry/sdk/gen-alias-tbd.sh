@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Writes the link stub for a Mac framework that one of Ferry's own framework
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
+# SystemConfiguration, CoreServices and CFNetwork in Foundation's,
 # Cocoa in AppKit's): the calls the files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
@@ -24,6 +25,7 @@ case $framework in
     ApplicationServices) pattern='^_(CG|kCG|CT|kCT)' ;;
     ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
+    CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
     CoreServices) pattern='^_Gestalt$' ;;
     Cocoa) pattern='.' ;;
     Carbon) pattern='^_(Gestalt$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;

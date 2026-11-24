@@ -1152,6 +1152,12 @@ The new or extended ones:
 | `tlv_dlopen` | (freemac (1.204), Ferry 0.31.0) thread-local variables in a Mac library opened with `dlopen` while the program runs: a thread started before the library was opened, four threads started after it and the main thread each get their own copies; `dlsym` of a thread-local variable gives the calling thread's copy, and a write through it is seen by the library; destructors registered with `_tlv_atexit` and `__cxa_thread_atexit` run as each thread ends, the last registered first and still able to read the thread's variables, and the main thread's run when `main` returns, before the program's `atexit` function |
 | `tlv_objc` | (freemac (1.204), Ferry 0.31.0) Objective-C `__thread` variables (an `int`, an unretained `NSString`, a static `NSInteger` and a `double`) on eight `NSThread`s started with a target and selector, with a block, detached and with `performSelectorInBackground:`: each sees the first values and keeps its own, one leaves with `+[NSThread exit]`, a destructor registered on each runs as it ends, and the main thread keeps its own values |
 | `cxx_thread_local` | (freemac (1.204), Ferry 0.31.0) C++ `thread_local` objects across eight `std::thread`s: objects with constructors and destructors at namespace scope, as a static class member and inside a function, a `std::vector` and a `std::string`; each thread builds them on first use and destroys them in reverse order when it ends, a destructor reads another `thread_local` that is still there, and the main thread's objects are destroyed when `main` returns, before the program's static objects (skipped without libc++, like the other C++ tests) |
+| `libsystem_sockets` | (freemac (1.205), Ferry 0.32.0) BSD sockets with the Mac layouts: `sa_len`, AF_INET6 30, the Mac `msghdr`, `cmsghdr`, `addrinfo`, `ifaddrs` and `fd_set`; TCP over 127.0.0.1, UDP with IP_PKTINFO and IP_RECVTTL, Unix sockets with SCM_RIGHTS and LOCAL_PEERPID, Mac socket options (SO_NOSIGPIPE, SO_NREAD, TCP_KEEPALIVE), Mac errno and EAI_ values, select and poll, getaddrinfo, getnameinfo, gethostbyname, inet_pton, and getifaddrs with an AF_LINK entry for the loopback; ::1 when the host has IPv6 |
+| `libsystem_kqueue` | (freemac (1.205), Ferry 0.32.0) kqueue, kevent and kevent64 on epoll: EVFILT_READ and WRITE on pipes, sockets and files with EV_EOF, EV_CLEAR, EV_ONESHOT, EV_DISPATCH and EV_DISABLE; EVFILT_TIMER (one-shot, repeating, absolute); EVFILT_SIGNAL counting signals without changing the program's disposition; EVFILT_PROC NOTE_EXIT with the status while waitpid still reaps; EVFILT_USER from another thread; change-list errors as EV_ERROR results |
+| `dispatch_sources` | (freemac (1.205), Ferry 0.32.0) libdispatch READ, WRITE, SIGNAL and PROC sources on real descriptors, signals and processes: data counts, suspend and resume, cancel handlers, a source on the main queue, and NULL for signal 0 |
+| `corefoundation_socket` | (freemac (1.205), Ferry 0.32.0) CFRunLoopSource version 0 (schedule, perform, cancel, signal) and CFSocket with a run loop source: a TCP listener with the accept callback, a client with the connect and data callbacks, an echo, a refused connection, datagrams, the read callback re-enabled automatically and the write callback once |
+| `foundation_streams` | (freemac (1.205), Ferry 0.32.0) NSInputStream and NSOutputStream over data, files and memory with delegate events; a bound pair; socket streams from getStreamsToHostWithName and CFStreamCreatePairWithSocketToHost with delegates, a dispatch queue and blocking use; a refused connection (ECONNREFUSED 61); a native socket; and TLS through the system's OpenSSL against a local server: an untrusted server fails with -9807, without validation the page arrives, and the peer trust holds the server's certificate |
+| `foundation_netservice` | (freemac (1.205), Ferry 0.32.0) NSNetService TXT records made and read as RFC 6763 says; publish, resolve and search say "will" and then fail in the run loop with NSNetServicesUnknownError (-72000), as on a Mac where Bonjour can't be reached |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -2123,8 +2129,9 @@ The new or extended ones:
   - A file handle's background reads (`readInBackgroundAndNotify` and the
     like) are served by the main run loop only, and their notifications
     are posted on the main thread, whichever thread asked.
-  - Dispatch sources for reads, writes, signals, processes, files and
-    Mach ports still never fire (timer and data sources do).
+  - Dispatch sources for files and Mach ports still never fire (timer
+    and data sources do, and from freemac (1.205) read, write, signal and
+    process sources do too).
   - `NSDistributedLock` is missing.
   - `callStackSymbols` is empty, for a thread and for an exception.
   - Threads' priorities and qualities of service are kept and read back,
@@ -2241,6 +2248,28 @@ The new or extended ones:
   - The tests' output was written from the C and C++ standards, not from a
     Mac run.
 
+- **Sockets and streams, not done yet** (freemac (1.205), Ferry 0.32.0).
+  - Bonjour: NSNetService and NSNetServiceBrowser don't use Avahi, so publishing, resolving and searching always fail with NSNetServicesUnknownError (-72000). Only TXT records work.
+  - kevent accepts EVFILT_VNODE, EVFILT_EXCEPT, EVFILT_FS, EVFILT_VM and EVFILT_MACHPORT but never reports them.
+  - libdispatch has no dispatch_io, and no VNODE or MACH_RECV/MACH_SEND sources.
+  - TLS settings on a socket stream count only before it opens; an open stream can't be upgraded to TLS. There are no TLS server streams (kCFStreamSSLIsServer fails with -50) and no client certificates (kCFStreamSSLCertificates is ignored).
+  - The SOCKS and proxy properties of streams are ignored, so streams always connect straight to the host.
+  - CFRunLoopSource version 1 (Mach ports) isn't offered.
+  - CFReadStreamGetBuffer works only for streams over data.
+  - Run loop modes are ignored by sockets and streams: they fire in any mode of the loops they are scheduled on.
+  - IPv6 (::1) was not tried here, because the sandbox has no IPv6 loopback; the test checks it only where the host has one.
+
+- **Sockets and streams, not compared with a Mac** (freemac (1.205), Ferry 0.32.0).
+  - The string values of the kCFStream and NSStream property keys, and of NSNetServicesErrorCode and NSNetServicesErrorDomain.
+  - The TLS error codes: Ferry gives -9807 for every certificate trust failure and -9806 for any other failed handshake.
+  - The error for a host name that can't be looked up (kCFErrorDomainCFNetwork code 2 with kCFGetAddrInfoFailureKey).
+  - When a socket stream's status moves from opening to open, and when the end and has-space events come.
+  - A stream into a fixed buffer returning 0 and being at its end once the buffer is full.
+  - CFSocketConnectToAddress with a timeout of 0 waiting without a limit.
+  - CFSocket's default flags (131: the read callback re-enabled automatically, close on invalidate).
+  - The key order in TXT records made by NSNetService, "key=" for an empty value, and the order of NSNetService's failure events.
+  - kqueue: the data field of EVFILT_WRITE (Ferry reports Linux's send buffer size, which Linux doubles, less what is queued), kevent failing with EINVAL for an unknown filter rather than reporting it as an EV_ERROR result, and the data counts of signal events.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2318,3 +2347,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.29.0 (freemac (1.202)): real threads: NSThread, per-thread run loops and autorelease pools, real locks and `@synchronized`, pthreads, libdispatch on a worker pool, concurrent NSOperationQueue, a thread-safe runtime, and URL loading on a network thread of its own, `make check` 125/125.
 - 2026-11-24: Ferry 0.30.0 (freemac (1.203)): C++ and Objective-C++ programs on this system's LLVM libc++ and libc++abi, loaded only when a program needs them: the standard library, exceptions across images and mixed with Objective-C's, and C++ threads on a Mac's layouts, `make check` 131/131.
 - 2026-11-24: Ferry 0.31.0 (freemac (1.204)): Mac thread-local variables (`__thread`, `_Thread_local`, C++ `thread_local`) through Ferry's own `_tlv_bootstrap` and `_tlv_atexit`, per thread and per image, in libraries opened with `dlopen` too, with destructors at thread exit, `make check` 138/138.
+- 2026-11-24: Ferry 0.32.0 (freemac (1.205)): BSD sockets with the Mac's layouts, kqueue and kevent on epoll, dispatch read, write, signal and process sources, CFSocket and run loop sources, CFStream and NSStream with TLS checked by SecTrust, and NSNetService's TXT records (no Bonjour yet), `make check` 144/144.

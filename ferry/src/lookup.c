@@ -264,7 +264,7 @@ static const struct ferry_symbol *const tables[] = {
     ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_pthread_symbols, ferry_blocks_symbols,
     ferry_dispatch_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
     ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
-    ferry_tlv_symbols,
+    ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols,
 };
 
 static void *find_own(const char *name)

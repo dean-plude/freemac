@@ -1,0 +1,32 @@
+data stream: status 0, open 2, has bytes 1, read 4 "abcd", then 6 "efghij", then 0, status 5 (at end)
+closed: status 6, read -1
+CF bytes stream: buffer "012" (3), then read "3456789"
+memory stream: "hello memory", has space 1
+buffer stream: wrote 4 then 0, "abcd", status 5 (at end)
+file stream from offset 5: "one
+line two", offset now 18
+a missing file: status 7, NSPOSIXErrorDomain 2
+a stream is its own delegate: 1
+nothing before the run loop runs: ""
+data stream events: open bytes(4) bytes(4) bytes(2) end, read "0123456789"
+bound pair: read "the quick brown fox jumps over the lazy dog", written in pieces 1, the reader ended 1
+socket streams opened: opening or open 1 1
+delegate: both opened 1 1, heard "HELLO|BYE|" in 1 bytes events or more, the end 1, error 0
+properties: host 127.0.0.1, port is the server's 1, native handle 4 bytes, status 5 (at end)
+CF clients set 1 1
+its queue back 1
+opened 1 1
+dispatch queue: waited 0, heard "QUEUE|BYE|", events open 1 bytes 1 end 1, all on its queue 1
+closed: status 6
+blocking: wrote 13, read "BLOCKING|BYE|", status 5
+the echo server saw 3 connections
+refused: error event 1, NSPOSIXErrorDomain 61, CF error domain 1 code 61, status 7, opened 0
+refused, blocking: write -1
+a socket of the program's: wrote 6 "native", read 4 "back", handle the same 1, still open 1
+TLS level set: kCFStreamSocketSecurityLevelNegotiatedSSL
+TLS, untrusted server: error event 1, NSOSStatusErrorDomain -9807, opened 0
+SSL settings taken 1
+TLS, not validated: wrote 1, status line "HTTP/1.1 200 OK", body "Hello, Ferry!"
+its trust: 1 certificate, the server's file 1, trusted as is 0, with it as the anchor 1
+TLS settings after open taken 0
+exit=0
