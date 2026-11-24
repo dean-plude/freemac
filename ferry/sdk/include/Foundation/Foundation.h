@@ -2113,5 +2113,8 @@ enum { NSFormattingError = 2048 };
 /* Streams, and the network services of Bonjour. */
 #include <Foundation/NSStream.h>
 #include <Foundation/NSNetServices.h>
+/* Ordered sets and UUIDs, which Core Data's ordered relationships and UUID attributes hold. */
+#include <Foundation/NSOrderedSet.h>
+#include <Foundation/NSUUID.h>
 
 #endif

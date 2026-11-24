@@ -1,0 +1,50 @@
+SQLite store:
+  saved: 1 nil
+  store type SQLite, url people.sqlite
+  saved again: 1
+  metadata: type SQLite, same uuid 1, colour teal, hashes 5, compatible 1
+  2 people, the first a fault until used: 1
+  people: Ann,Bob (nil)
+  ann: age 41 score 2.25 active 0 born 123456.5 nickname nil
+  ann: tags x+y uuid 0E3A8F2C-4B5D-4E6F-8A9B-0C1D2E3F4A5B home file:///Users/ann/ photo <000102ff>
+  ann: department Research (budget 1250.5), cars P-3, notes c,a,b
+  bob: class Manager, entity Manager, level 3, department Research
+  research employees: Ann,Bob
+  uri round trip: 1, permanent 1
+Binary store:
+  saved: 1 nil
+  store type Binary, url people.bin
+  saved again: 1
+  metadata: type Binary, same uuid 1, colour teal, hashes 5, compatible 1
+  2 people, the first a fault until used: 1
+  people: Ann,Bob (nil)
+  ann: age 41 score 2.25 active 0 born 123456.5 nickname nil
+  ann: tags x+y uuid 0E3A8F2C-4B5D-4E6F-8A9B-0C1D2E3F4A5B home file:///Users/ann/ photo <000102ff>
+  ann: department Research (budget 1250.5), cars P-3, notes c,a,b
+  bob: class Manager, entity Manager, level 3, department Research
+  research employees: Ann,Bob
+  uri round trip: 1, permanent 1
+in-memory store:
+  saved: 1
+  2 people, the first a fault until used: 1
+  people: Ann,Bob (nil)
+  ann: age 41 score 2.25 active 0 born 123456.5 nickname nil
+  ann: tags x+y uuid 0E3A8F2C-4B5D-4E6F-8A9B-0C1D2E3F4A5B home file:///Users/ann/ photo <000102ff>
+  ann: department Research (budget 1250.5), cars P-1,P-2, notes c,a,b
+  bob: class Manager, entity Manager, level 3, department Research
+  research employees: Ann,Bob
+  uri round trip: 1, permanent 1
+metadata set on a closed file:
+  set: 1
+  read without a type: SQLite, written while closed
+a container with a store description:
+  default store: People.sqlite in Application Support 1
+  loaded c.db: nil
+  saved: 1, calls 1, concurrency main 1
+  second container finds 1
+  default location loads: nil, file there 1
+not a store:
+  added 0, error 134000
+  unknown type: added 0, error 134000
+  save with no store: 0, error 134060
+exit=0

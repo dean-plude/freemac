@@ -183,6 +183,17 @@ panels, the progress panel and font collections are left out.
 
 From Ferry 0.34.0 (freemac 1.207), programs can post notifications with UNUserNotificationCenter or NSUserNotificationCenter. They are shown by the desktop's notification server, with the app's name and icon, their actions as buttons and a text reply where the server has one, and the delegates hear what the user clicked or typed. Requests can wait for a time interval or a calendar date. The app's Dock badge, its requests for attention and its Dock menu reach the Dock over the LauncherEntry interface that freemac's Dock reads, which shows the badge, words or a number, and the app's Dock menu. With no notification server, nothing is shown and the program carries on.
 
+From Ferry 0.35.0 (freemac 1.209), Mac programs can use Core Data: a
+model built in code or read from its Xcode source (`.xcdatamodeld`),
+managed objects with `@dynamic` accessors, contexts on the main queue, on
+private queues and as children of other contexts, with undo, merging and
+the change notifications. Fetch requests and the fetched results
+controller work, as do `NSPersistentContainer` and SQLite, binary and
+in-memory stores with lightweight migration and batch deletes and updates.
+`NSArrayController` and `NSObjectController` work in entity mode.
+Compiled models (`.mom` and `.momd`) aren't read yet, and Ferry says so
+once when an app asks for one. Store files made on a Mac aren't read either.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
@@ -296,7 +307,9 @@ without a window.
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
   what stops each one. These are being added step by step (see
   [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
-  frameworks are further off.
+  frameworks are further off. Core Data is there (from Ferry 0.35.0), but
+  compiled models aren't read yet, so an app that ships only a `.momd`
+  stops there.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
   so when given an arm64 one.
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,

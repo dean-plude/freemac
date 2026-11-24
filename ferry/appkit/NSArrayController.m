@@ -31,7 +31,14 @@
  * array (or set) to the bound key path for each change, instead of
  * changing the bound one in place (for the user's defaults, say); and
  * NSDeletesObjectsOnRemove has an object removed from the content deleted
- * from its managedObjectContext (deleteObject:), when it has one. */
+ * from its managedObjectContext (deleteObject:), when it has one.
+ *
+ * In Core Data's entity mode (Ferry 0.NEXT: an entityName and a
+ * managedObjectContext, see NSObjectController), the content is a mutable
+ * array of the fetched objects; remove: deletes the removed objects from
+ * the context, and when the context says objects of the entity were
+ * inserted (and match fetchPredicate) or deleted, they are added to the
+ * content or taken from it. */
 #import "AInternal.h"
 
 NSString *const NSContentArrayBinding = @"contentArray";
@@ -175,6 +182,7 @@ static NSArray *selection_keys(void)
 }
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self _unwatchForRearranging];
     if (_arrangedProxy) {
         [_arrangedProxy _contentWillChange];
@@ -228,7 +236,71 @@ static NSArray *selection_keys(void)
 - (NSArray *)contentArray { return [self _contentObjects]; }
 - (void)prepareContent
 {
-    [self setContent:[NSMutableArray array]];
+    if ([self _ferryEntityMode])
+        [self fetch:nil];
+    else
+        [self setContent:[NSMutableArray array]];
+}
+
+/* ---- Core Data's entity mode (Ferry 0.NEXT) ---- */
+
+/* Core Data's name for NSManagedObjectContextObjectsDidChangeNotification. */
+static NSString *const objects_did_change = @"NSObjectsChangedInManagingContextNotification";
+
+- (BOOL)_ferryContentBound
+{
+    return [self infoForBinding:NSContentArrayBinding] || [self infoForBinding:NSContentSetBinding] ||
+           [self infoForBinding:NSContentBinding];
+}
+- (void)setManagedObjectContext:(id)context
+{
+    id old = [self managedObjectContext];
+    if (old)
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:objects_did_change object:old];
+    if (context)
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_ferryObjectsDidChange:)
+                                                     name:objects_did_change object:context];
+    [super setManagedObjectContext:context];
+}
+- (void)_ferryTakeFetched:(NSArray *)found merge:(BOOL)merge
+{
+    NSMutableArray *content = [NSMutableArray array];
+    if (merge)
+        [content addObjectsFromArray:[self _contentObjects]];
+    for (id o in found)
+        if (!merge || ![content containsObject:o])
+            [content addObject:o];
+    [self setContent:content];
+}
+- (void)_ferryObjectsDidChange:(NSNotification *)note
+{
+    if (![self _ferryEntityMode] || [self _ferryContentBound] || !_items)
+        return;
+    NSDictionary *info = [note userInfo];
+    if ([info objectForKey:@"invalidatedAll"]) {
+        [self fetchWithRequest:nil merge:NO error:NULL];
+        return;
+    }
+    id context = [self managedObjectContext];
+    id entity = [NSClassFromString(@"NSEntityDescription") entityForName:[self entityName]
+                                                  inManagedObjectContext:context];
+    NSPredicate *predicate = [self fetchPredicate];
+    NSMutableArray *content = [[[self _contentObjects] mutableCopy] autorelease];
+    BOOL changed = NO;
+    for (NSString *key in @[ @"deleted", @"invalidated" ])
+        for (id o in [info objectForKey:key])
+            if ([content containsObject:o]) {
+                [content removeObject:o];
+                changed = YES;
+            }
+    for (id o in [info objectForKey:@"inserted"])
+        if (![content containsObject:o] && [[o entity] isKindOfEntity:entity] &&
+            (!predicate || [predicate evaluateWithObject:o])) {
+            [content addObject:o];
+            changed = YES;
+        }
+    if (changed)
+        [self setContent:content];
 }
 
 /* The arranged objects and the selection change together: observers of
@@ -684,7 +756,14 @@ static NSArray *selection_keys(void)
     [self insertObject:obj atArrangedObjectIndex:MIN(at, [_arranged count])];
     [obj release];
 }
-- (void)_ferryRemove { [self removeObjectsAtArrangedObjectIndexes:_selectionIndexes]; }
+- (void)_ferryRemove
+{
+    NSArray *gone = [_arranged objectsAtIndexes:_selectionIndexes];
+    [self removeObjectsAtArrangedObjectIndexes:_selectionIndexes];
+    if ([self _ferryEntityMode])
+        for (id o in gone)
+            [[self managedObjectContext] deleteObject:o];
+}
 
 /* ---- bindings ---- */
 

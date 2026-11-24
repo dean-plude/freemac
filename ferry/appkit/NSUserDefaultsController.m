@@ -148,7 +148,9 @@ static NSString *first_key(NSString *keyPath)
     Class _objectClass;
     NSArray *_declaredKeys;          /* the keys Interface Builder lists (Ferry 0.20.0) */
     NSString *_entityName;
-    BOOL _prepares, _editable;
+    id _managedObjectContext;        /* (Ferry 0.NEXT) entity mode's context, retained */
+    NSPredicate *_fetchPredicate;
+    BOOL _prepares, _editable, _lazyFetching;
 }
 - (instancetype)initWithContent:(id)content
 {
@@ -174,7 +176,8 @@ static NSString *first_key(NSString *keyPath)
     if ([coder containsValueForKey:@"NSAutomaticallyPreparesContent"])
         _prepares = [coder decodeBoolForKey:@"NSAutomaticallyPreparesContent"];
     /* (Ferry 0.20.0) the attribute keys and a Core Data entity's name, kept;
-     * there is no Core Data to fetch from */
+     * the controller is in entity mode, fetching that entity, once it is
+     * given a managedObjectContext (Ferry 0.NEXT) */
     id keys = [coder containsValueForKey:@"NSDeclaredKeys"] ? [coder decodeObjectForKey:@"NSDeclaredKeys"] : nil;
     if ([keys isKindOfClass:[NSArray class]])
         _declaredKeys = [keys copy];
@@ -190,8 +193,65 @@ static NSString *first_key(NSString *keyPath)
     [_entityName autorelease];
     _entityName = [name copy];
 }
-- (id)managedObjectContext { return nil; }
-- (void)setManagedObjectContext:(id)context {}
+/* ---- entity mode (Ferry 0.NEXT) ----
+ * With an entity name and a managed object context, newObject inserts a
+ * new object of that entity into the context, and a fetch (fetch:, or
+ * prepareContent when the controller prepares its content) makes the
+ * entity's objects that match fetchPredicate the content. Core Data is
+ * reached through the class names, so AppKit doesn't link it. */
+- (id)managedObjectContext { return _managedObjectContext; }
+- (void)setManagedObjectContext:(id)context
+{
+    if (context == _managedObjectContext)
+        return;
+    [context retain];
+    [_managedObjectContext release];
+    _managedObjectContext = context;
+    if (_prepares && context && _entityName && ![self infoForBinding:NSContentObjectBinding] &&
+        ![self infoForBinding:@"contentArray"] && ![self infoForBinding:@"contentSet"])
+        [self fetch:nil];
+}
+- (NSPredicate *)fetchPredicate { return _fetchPredicate; }
+- (void)setFetchPredicate:(NSPredicate *)predicate
+{
+    [predicate retain];
+    [_fetchPredicate release];
+    _fetchPredicate = predicate;
+}
+- (BOOL)usesLazyFetching { return _lazyFetching; }
+- (void)setUsesLazyFetching:(BOOL)f { _lazyFetching = f; }
+- (BOOL)_ferryEntityMode { return _entityName && _managedObjectContext; }
+- (id)defaultFetchRequest
+{
+    if (!_entityName)
+        return nil;
+    id request = [NSClassFromString(@"NSFetchRequest") fetchRequestWithEntityName:_entityName];
+    [request setPredicate:_fetchPredicate];
+    return request;
+}
+/* The fetch: action, like add:, takes effect on the run loop's next turn. */
+- (void)fetch:(id)sender { [self performSelector:@selector(_ferryFetch) withObject:nil afterDelay:0]; }
+- (void)_ferryFetch { [self fetchWithRequest:nil merge:NO error:NULL]; }
+- (BOOL)fetchWithRequest:(id)request merge:(BOOL)merge error:(NSError **)error
+{
+    if (!_managedObjectContext)
+        return NO;
+    if (!request)
+        request = [self defaultFetchRequest];
+    if (!request)
+        return NO;
+    NSArray *found = [_managedObjectContext executeFetchRequest:request error:error];
+    if (!found)
+        return NO;
+    [self _ferryTakeFetched:found merge:merge];
+    return YES;
+}
+/* One object's controller holds the first one found. */
+- (void)_ferryTakeFetched:(NSArray *)found merge:(BOOL)merge
+{
+    if (!merge || !_content)
+        [self setContent:[found count] ? [found objectAtIndex:0] : nil];
+}
 - (void)awakeFromNib
 {
     if (_prepares && !_content)
@@ -202,6 +262,8 @@ static NSString *first_key(NSString *keyPath)
     [_content release];
     [_declaredKeys release];
     [_entityName release];
+    [_managedObjectContext release];
+    [_fetchPredicate release];
     if (_selection)
         _selection->controller = nil;
     [_selection release];
@@ -232,9 +294,19 @@ static NSString *first_key(NSString *keyPath)
 - (void)setEditable:(BOOL)f { _editable = f; }
 - (BOOL)canAdd { return _editable && !_content; }
 - (BOOL)canRemove { return _editable && _content != nil; }
-- (id)newObject { return [[_objectClass alloc] init]; }
+- (id)newObject
+{
+    if ([self _ferryEntityMode])
+        return [[NSClassFromString(@"NSEntityDescription") insertNewObjectForEntityForName:_entityName
+                                                                 inManagedObjectContext:_managedObjectContext] retain];
+    return [[_objectClass alloc] init];
+}
 - (void)prepareContent
 {
+    if ([self _ferryEntityMode]) {
+        [self fetch:nil];
+        return;
+    }
     id obj = [self newObject];
     [self setContent:obj];
     [obj release];
@@ -255,7 +327,13 @@ static NSString *first_key(NSString *keyPath)
     [self addObject:obj];
     [obj release];
 }
-- (void)_ferryRemove { [self removeObject:_content]; }
+- (void)_ferryRemove
+{
+    id obj = [[_content retain] autorelease];
+    [self removeObject:obj];
+    if (obj && [self _ferryEntityMode])
+        [_managedObjectContext deleteObject:obj];
+}
 /* bound to contentObject: the bound value is the content */
 - (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
 {

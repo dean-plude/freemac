@@ -68,7 +68,14 @@ INSTALLER_SRC = installer/Installer.m installer/IPackage.m
 INSTALLER_APP = installer/Installer.app
 INSTALLER = $(INSTALLER_APP)/Contents/MacOS/Installer
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER)
+# Core Data: models, contexts and stores (SQLite on this system's SQLite,
+# binary and in memory).
+COREDATA_SRC = $(wildcard coredata/*.m)
+COREDATA_OBJ = $(COREDATA_SRC:coredata/%.m=coredata/build/%.o)
+COREDATA = frameworks/CoreData.framework/CoreData
+COREDATA_HEADERS = coredata/CDInternal.h sdk/include/CoreData/CoreData.h $(FOUNDATION_HEADERS)
+
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -196,10 +203,19 @@ $(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKI
 	cp installer/Info.plist $(INSTALLER_APP)/Contents/Info.plist
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -o $@ $(INSTALLER_SRC) -framework Cocoa -lz -llzma
 
+coredata/build/%.o: coredata/%.m $(COREDATA_HEADERS) sdk/ferry-cc
+	@mkdir -p coredata/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(COREDATA): $(COREDATA_OBJ) $(FOUNDATION) $(TWIN_TBD)
+	@mkdir -p frameworks/CoreData.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreData.framework/Versions/A/CoreData \
+	    -o $@ $(COREDATA_OBJ) -framework Foundation -lsqlite3
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -218,10 +234,11 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
+	install -Dm755 $(COREDATA) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreData.framework/CoreData
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app
+	    installer/Installer.app coredata/build
 
 .PHONY: all check install clean

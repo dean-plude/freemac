@@ -1332,9 +1332,17 @@ typedef NSString *NSNibName;
 @property BOOL automaticallyPreparesContent;
 @property (getter=isEditable) BOOL editable;
 @property (readonly) BOOL canAdd, canRemove;
-/* Core Data's entity, kept from a nib; there is no Core Data (Ferry 0.20.0). */
+/* Core Data's entity mode (Ferry 0.NEXT): with an entity name (kept from a
+ * nib since Ferry 0.20.0) and a managed object context, newObject inserts
+ * an object of that entity, and a fetch makes the entity's objects that
+ * match fetchPredicate the content. */
 @property (copy) NSString *entityName;
 @property (retain) id managedObjectContext;
+@property (retain) NSPredicate *fetchPredicate;
+@property BOOL usesLazyFetching;
+- (id)defaultFetchRequest;
+- (BOOL)fetchWithRequest:(id)fetchRequest merge:(BOOL)merge error:(NSError **)error;
+- (IBAction)fetch:(id)sender;
 - (id)newObject;
 - (void)prepareContent;
 - (void)addObject:(id)object;

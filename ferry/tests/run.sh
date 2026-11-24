@@ -99,6 +99,13 @@ run_one() {
         pthreads|dispatch_concurrent|foundation_threads|foundation_locks|cxx_threads|libsystem_sockets|libsystem_kqueue|\
         dispatch_sources|corefoundation_socket|foundation_netservice)
             timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Core Data (freemac 1.209, Ferry 0.35.0): stores in a home of the
+        # test's own, no display, and threads, so a hang is a failure
+        coredata_*)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" TMPDIR="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
+                env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" \
+                2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -761,7 +768,7 @@ if grep -q "pthread_yield_np" "$build/unsupported.err" 2>/dev/null; then
 else
     echo "FAIL unsupported message"; fail=$((fail + 1))
 fi
-# Printing, Page Setup and the font panel (freemac 1.NEXT, Ferry 0.NEXT):
+# Printing, Page Setup and the font panel (freemac 1.206, Ferry 0.33.0):
 # print info, views printed to PDF files and read back with Poppler,
 # pagination, a text view across pages, PDF data, a document, and the font
 # manager, with no display; then GTK's dialogs on a headless Weston.
@@ -860,6 +867,23 @@ if notify_build notify_none; then
     else
         echo "ok   appkit_notify_nobus"; pass=$((pass + 1))
     fi
+fi
+# Core Data (freemac 1.209, Ferry 0.35.0): the model and validation,
+# the SQLite, binary and in-memory stores, fetches, undo and rollback,
+# parent and child contexts and threads, the fetched results controller,
+# batch requests, lightweight migration, models read from their source, and
+# NSArrayController in entity mode; a compiled model is said once on stderr.
+for t in model stores fetch undo contexts frc batch migration models; do
+    run_one "coredata_$t" "$here/coredata/$t.m" "$here/coredata/$t.out" -fobjc-arc -fblocks -framework Foundation \
+        -framework CoreData
+done
+run_one coredata_array_controller "$here/coredata/array_controller.m" "$here/coredata/array_controller.out" \
+    -fobjc-arc -fblocks -framework Cocoa -framework CoreData
+if [ "$(grep -c "compiled models (.mom and .momd) aren't supported yet" "$build/coredata_models.err" 2>/dev/null)" = 1 ]
+then
+    echo "ok   coredata_models message"; pass=$((pass + 1))
+else
+    echo "FAIL coredata_models message"; sed 's/^/    stderr: /' "$build/coredata_models.err"; fail=$((fail + 1))
 fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

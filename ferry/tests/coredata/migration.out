@@ -1,0 +1,25 @@
+SQLite store:
+  v2 compatible with the store: 0
+  v2 without the migration options:        added 0, error 134100
+  a required attribute with no default:    added 0, error 134110
+  an attribute whose type changed:         added 0, error 134190
+  migrated Ann: age 30, email nil, rank 7, photo key gone 1
+  migrated Bob: age 40, email nil, rank 7, photo key gone 1
+  saved with the new model: 1 nil
+  store metadata now matches v2: 1, entities 6
+  reopened without options: Carol with email
+  badges: 1
+  the old model on the new store:          added 0, error 134100
+Binary store:
+  v2 compatible with the store: 0
+  v2 without the migration options:        added 0, error 134100
+  a required attribute with no default:    added 0, error 134110
+  an attribute whose type changed:         added 0, error 134190
+  migrated Ann: age 30, email nil, rank 7, photo key gone 1
+  migrated Bob: age 40, email nil, rank 7, photo key gone 1
+  saved with the new model: 1 nil
+  store metadata now matches v2: 1, entities 6
+  reopened without options: Carol with email
+  badges: 1
+  the old model on the new store:          added 0, error 134100
+exit=0

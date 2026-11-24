@@ -1,0 +1,37 @@
+entities: Car,Department,Manager,Note,Person
+manager super: Person, kind of person: 1, person kind of manager: 0
+manager attributes: 11, has name: 1, level: NSNumber
+cars: to-many 1, inverse owner, rule 2; notes ordered 1
+version hashes: 5 entities, person hash 32 bytes
+ann: class Person, entity Person, inserted 1, temporary 1, active 1 (default)
+ann: Ann 41 3.5 Annie red+blue E621E1F8-C36C-495A-93FC-0C247A3E6E5F https://example.com/ann
+kvc: age 41, active 1, name Ann
+after setValue: age 42, primitive 42
+bob: class Manager, level 1, age 0, kind of Person 1
+eng employees after ann.department = eng: Anne
+bob.department after addEmployeesObject: Engineering
+ann cars: AB-1,CD-2, c2 owner Anne
+after c2.owner = bob: ann AB-1, bob CD-2
+kvo seen: name:1 department.title:1 department.title:1 cars:2 cars:2 cars:3
+notes: zero,one,three, zero.person Anne
+hasChanges 1, inserted 9
+save: 1
+after save: hasChanges 0, temporary 0, uri x-coredata
+changed: age, updated 1, committed age 42
+save with deny: 0, error: 1600 key employees
+eng after rollback: deleted 0, employees Anne,Bob
+save after emptying: 1
+ann deleted 1; cascaded: c1 1, notes 3 deleted
+save: 1; c1 gone: 1
+deleting a note (no action) leaves bob's notes: memo
+deleting a car nullifies: bob cars CD-2
+validateForInsert empty: 0, error: 1570 key name
+name '': 0, error: 1670 key name
+long name: 0, error: 1660 key name
+age 200: 0, error: 1610 key age
+age -1: 0, error: 1620 key age
+age 30: 1
+save invalid: 0, error: 1560 [1570/name 1610/age]
+save valid: 1
+description: Apple's form
+exit=0

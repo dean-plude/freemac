@@ -837,6 +837,48 @@ From freemac 1.208, a badge label that isn't a number, such as "New" or "!",
 shows as words in freemac's Dock badge, and the menu from the delegate's
 `applicationDockMenu:` shows in the app's right-click menu in freemac's Dock.
 
+### Core Data (freemac 1.209, Ferry 0.35.0)
+
+Mac programs can now use Core Data (`CoreData.framework`). A model is built
+in code, or read from the XML source that Xcode keeps in a `.xcdatamodeld`
+folder. The model has entities with inheritance, attributes of every
+documented type (with default values, and optional, transient and
+transformable attributes), and relationships (to-one, to-many and ordered,
+with inverses and the nullify, cascade, deny and no-action delete rules).
+`NSManagedObject` subclasses get their `@dynamic` accessors made on first
+use. The accessors cover objects and scalars, primitive values and the
+to-many mutable proxies, and they work with KVC and KVO. Faults, object IDs,
+`changedValues` and validation with the documented error codes are there.
+
+`NSManagedObjectContext` inserts, deletes, saves, rolls back, resets and
+refreshes, and undoes through its `NSUndoManager`. It posts the will-save,
+did-save and objects-did-change notifications. Contexts can be on the main
+queue or on a private queue (with `performBlock:` and
+`performBlockAndWait:`), and can have a parent context. The merge methods,
+`automaticallyMergesChangesFromParent` and the five merge policies work.
+`NSFetchRequest` takes a predicate, sort descriptors, a limit and an offset.
+It gives objects, object IDs, dictionaries or a count, with or without
+unsaved changes. `NSFetchedResultsController` gives sections and tells its
+delegate what changed. `NSPersistentContainer` and
+`NSPersistentStoreDescription` load stores into Application Support.
+
+The stores are SQLite (this system's SQLite, in Ferry's own table layout),
+binary (Ferry's keyed archiver) and in memory. Each keeps its metadata. A
+store opens under a changed model when what changed can be inferred:
+entities and attributes added or removed. `NSBatchDeleteRequest` and
+`NSBatchUpdateRequest` change an SQLite store's rows directly.
+`NSArrayController` and `NSObjectController` work in entity mode: they
+fetch their content, `add:` inserts and `remove:` deletes. Foundation gained
+`NSOrderedSet` and `NSUUID` for Core Data's ordered relationships and UUID
+attributes.
+
+Left out: compiled models (`.mom` and `.momd`), whose format isn't
+published, so most apps that ship only a compiled model stop there, and
+Ferry says so once. Also left out are store files made by a Mac, the XML
+store, heavyweight migration, expressions in fetches, and uniqueness
+constraints. The work was written from Apple's documentation and not
+compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
+
 ## What the apps need most
 
 Counted over the nine apps:

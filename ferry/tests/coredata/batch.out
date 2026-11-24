@@ -1,0 +1,21 @@
+stored: p0/20/1/Eng p1/21/1/Eng p2/22/1/Eng p3/23/1/- p4/24/1/- p5/25/1/- c0(p0) c1(p1) c2(p2) c3(p3) c4(p4) c5(p5)
+batch update: 3 IDs (nil)
+stored: p0/20/1/Eng p1/21/1/Eng p2/22/1/Eng p3/99/0/- p4/99/0/- p5/99/0/- c0(p0) c1(p1) c2(p2) c3(p3) c4(p4) c5(p5)
+p3 in the context before merging: age 23
+p3 after merging the IDs: age 99 active 0
+count result: 3
+status result: 1
+a relationship can't be batch-updated: 0, error 134070
+p0 refreshed: age 50
+batch delete by fetch: 6 IDs deleted, with their cars
+stored: p1/21/1/Eng p2/22/1/Eng p5/50/0/- c1(p1) c2(p2) c5(p5)
+p3 after merging the deletes: context 0
+batch delete by ID: 2 deleted, with its car
+stored: p2/22/1/Eng p5/50/0/- c2(p2) c5(p5)
+deleting a department that has employees (deny): 0, error 1600
+p2's cars before: 1
+deleting every car: 1
+stored: p2/22/1/Eng p5/50/0/-
+p2's cars after a refresh: 0
+on an in-memory store: 0, error 134091
+exit=0

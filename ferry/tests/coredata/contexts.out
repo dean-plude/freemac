@@ -1,0 +1,21 @@
+notification names: NSManagingContextWillSaveChangesNotification, NSManagingContextDidSaveChangesNotification, NSObjectsChangedInManagingContextNotification
+keys: inserted updated deleted refreshed invalidated invalidatedAll
+obtain permanent IDs: 1, ann temporary 0, bob temporary 1
+notifications: changed(inserted=2) will-save() did-save(inserted=2) changed(deleted=1 updated=1) will-save() did-save(deleted=1 updated=1)
+child: parent is main 1, coordinator 1, has changes 1; main has changes 0
+child saved: 1; cy temporary 1
+main after the child's save: ann 32, people 2, has changes 1, store has 1
+main saved: 1; store has 2
+cy found in main by the child's ID: Cy
+performBlockAndWait: from the main thread runs there: 1; saved inserted=20 updated=1
+merged into main: ann 33, people 22
+four threads: done 4 off the main thread 4, each saved 25: 25 25 25 25, all 122
+viewer sees ann 33
+viewer merged automatically: ann 34
+a child of the viewer follows it: ann 35
+error          saved 0 error 133020 conflicts 1; store has age 50 score 1; b sees 60
+object trumps  saved 1 error 0 conflicts 0; store has age 60 score 1; b sees 60
+store trumps   saved 1 error 0 conflicts 0; store has age 50 score 1; b sees 50
+overwrite      saved 1 error 0 conflicts 0; store has age 60 score nil; b sees 60
+rollback       saved 1 error 0 conflicts 0; store has age 50 score 1; b sees 50
+exit=0

@@ -1183,6 +1183,22 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.209 "Ferry: Core Data" (done)
+
+Ferry 0.35.0: Mac apps can keep their data with Core Data, Apple's framework for saving an app's records.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Models built in code or read from Xcode's `.xcdatamodeld` source, with every attribute type, inheritance and relationships with delete rules | Ferry | done |
+| 2 | `NSManagedObject` with `@dynamic` accessors, faults, object IDs and validation | Ferry | done |
+| 3 | Contexts: save, rollback, undo, notifications, private-queue and child contexts, merging and the five merge policies | Ferry | done |
+| 4 | Fetch requests and `NSFetchedResultsController` | Ferry | done |
+| 5 | SQLite, binary and in-memory stores, `NSPersistentContainer`, lightweight migration, batch deletes and updates | Ferry | done |
+| 6 | `NSArrayController` and `NSObjectController` in entity mode | Ferry | done |
+| 7 | Eleven new tests; `make check` 168 of 168 | Ferry | done |
+
+Compiled models (`.mom` and `.momd`) aren't read yet, so most apps that use Core Data still stop there, with a clear message.
+
 ## 1.208 "Dock: word badges and app menus" (done)
 
 The Dock now shows what apps tell it, as a Mac's Dock does.
