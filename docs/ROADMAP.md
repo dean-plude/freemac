@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.198 "Ferry: Core Animation" (done)
+
+Ferry 0.25.0: Mac apps get layers and animation, so views can fade, slide and round their corners.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | QuartzCore.framework with `CALayer` geometry, its tree, key-value coding and drawing (backgrounds, borders, rounded corners, opacity, contents, transforms) | Ferry | done |
+| 2 | Shape, gradient and text layers | Ferry | done |
+| 3 | `CATransaction`, implicit animations through the documented action lookup, and basic, keyframe, spring and group animations stepped on the main run loop | Ferry | done |
+| 4 | Layer-backed and layer-hosting `NSView`s, `updateLayer`, `NSAnimationContext` and the views' `animator` | Ferry | done |
+| 5 | Three new tests; `make check` 101 of 101 | Ferry | done |
+
 ## 1.197 "Ferry: XML documents" (done)
 
 Ferry 0.24.0: Mac apps can read, change and write whole XML documents.

@@ -8,6 +8,7 @@
 #import <Foundation/Foundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
+#import <QuartzCore/QuartzCore.h>
 
 #define APPKIT_EXTERN extern
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
@@ -569,7 +570,24 @@ typedef NS_OPTIONS(NSUInteger, NSAutoresizingMaskOptions) {
 typedef NS_ENUM(NSUInteger, NSFocusRingType) { NSFocusRingTypeDefault = 0, NSFocusRingTypeNone = 1, NSFocusRingTypeExterior = 2 };
 
 typedef NSString *NSUserInterfaceItemIdentifier;
-@interface NSView : NSResponder
+
+typedef NS_ENUM(NSInteger, NSViewLayerContentsRedrawPolicy) {
+    NSViewLayerContentsRedrawNever = 0, NSViewLayerContentsRedrawOnSetNeedsDisplay = 1,
+    NSViewLayerContentsRedrawDuringViewResize = 2, NSViewLayerContentsRedrawBeforeViewResize = 3,
+    NSViewLayerContentsRedrawCrossfade = 4,
+};
+
+/* Objects whose properties an animator proxy animates: setting a property
+ * through [object animator] inside an NSAnimationContext group (or alone,
+ * over a quarter of a second) moves it there over the group's duration. */
+@protocol NSAnimatablePropertyContainer
+- (instancetype)animator;
+@property (copy) NSDictionary<NSString *, id> *animations;
+- (id)animationForKey:(NSString *)key;
++ (id)defaultAnimationForKey:(NSString *)key;
+@end
+
+@interface NSView : NSResponder <NSAnimatablePropertyContainer>
 - (instancetype)initWithFrame:(NSRect)frame NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
 @property NSRect frame, bounds;
@@ -591,6 +609,12 @@ typedef NSString *NSUserInterfaceItemIdentifier;
 @property NSAutoresizingMaskOptions autoresizingMask;
 @property (readonly) NSInteger tag;
 @property BOOL wantsLayer;
+@property (strong) CALayer *layer;
+- (CALayer *)makeBackingLayer;
+@property (readonly) BOOL wantsUpdateLayer;
+- (void)updateLayer;
+@property NSViewLayerContentsRedrawPolicy layerContentsRedrawPolicy;
+@property BOOL canDrawSubviewsIntoLayer;
 @property CGFloat alphaValue;
 @property (copy) NSString *toolTip;
 @property (copy) NSUserInterfaceItemIdentifier identifier;
@@ -640,6 +664,22 @@ typedef NSString *NSUserInterfaceItemIdentifier;
 - (BOOL)performKeyEquivalent:(NSEvent *)event;
 - (void)setKeyboardFocusRingNeedsDisplayInRect:(NSRect)rect;
 @end
+
+/* A group of animated changes, as CATransaction groups a layer's: the
+ * duration, timing function and completion handler set on the current
+ * context apply to the animator proxies' changes made in the group. */
+@interface NSAnimationContext : NSObject
++ (void)runAnimationGroup:(void (^)(NSAnimationContext *context))changes completionHandler:(void (^)(void))completionHandler;
++ (void)runAnimationGroup:(void (^)(NSAnimationContext *context))changes;
++ (void)beginGrouping;
++ (void)endGrouping;
++ (NSAnimationContext *)currentContext;
+@property NSTimeInterval duration;
+@property (strong) CAMediaTimingFunction *timingFunction;
+@property (copy) void (^completionHandler)(void);
+@property BOOL allowsImplicitAnimation;
+@end
+
 APPKIT_EXTERN NSNotificationName const NSViewFrameDidChangeNotification;
 APPKIT_EXTERN NSNotificationName const NSViewBoundsDidChangeNotification;
 

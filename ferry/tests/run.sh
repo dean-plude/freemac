@@ -196,6 +196,12 @@ run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometr
     -framework ApplicationServices -framework CoreFoundation
 run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/drawing.out" \
     -framework CoreGraphics -Wl,-fixup_chains
+# Core Animation: layers drawn with Core Graphics, and animations stepped by
+# the test clock.
+run_one quartzcore_layers "$here/quartzcore/layers.m" "$here/quartzcore/layers.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/animations.out" -fobjc-arc -fblocks \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
 # AppKit (M4). First with no display, where windows are drawn off screen,
 # linked through Cocoa and through AppKit itself.
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
@@ -323,6 +329,10 @@ run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_c
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
+# Layer-backed and layer-hosting views, NSAnimationContext and animator
+# proxies, on Core Animation's test clock.
+run_one appkit_layers "$here/appkit/layers.m" "$here/appkit/layers.out" -fobjc-arc -fblocks -framework Cocoa \
+    -framework QuartzCore
 # Pasteboards, and cut, copy and paste in text fields (M7).
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
 # Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).

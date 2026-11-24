@@ -1,0 +1,67 @@
+new bounds: 0 0 0 0
+anchor 0.5 0.5, opacity 1, hidden no, scale 1, gravity resize
+border colour alpha 1, background none
+bounds: 0 0 30 40
+position: 25 40
+frame, anchor at the corner: 25 40 30 40
+frame, scaled twice: -5 0 60 80
+frame, turned: 5 25 40 30
+transform is affine: yes
+position.x: 25
+bounds after bounds.size.width: 0 0 50 40
+opacity by key: 0.5
+a key of its own: kept
+frame by key: an NSValue
+dynamic property default: 0.25
+dynamic properties: 0.75 volume, by key 0.75
+needs display after the change: yes
+order: abc, superlayer is root: yes
+after replacing: bc, a has no superlayer: yes
+child (5,5) in root: 15 25
+root (15,25) in child: 5 5
+hit at (15,25): child, at (50,50): root, outside: none
+background: inside red, outside white
+border: edge blue, inside red
+rounded: corner white, edge red
+one corner rounded: bottom left red, top right white
+half opacity: pink
+half opacity, as a group: 127,255,127 and pink
+hidden: white white
+sticking out: green
+masked: white, inside green
+before turning: (8,24) white, (24,8) red
+turned a quarter about its corner: (24,32) red, (40,24) white
+moved: (52,36) red, (36,20) white
+sublayer transform: (8,40) red, (8,8) white
+geometry flipped: top left red, bottom left white
+contents flipped: root no, box yes
+in order: blue
+with zPosition: green
+contents: top left red, top right blue, bottom left green, bottom right yellow
+in a flipped superlayer: top left red, bottom left green
+bottom left gravity: (4,12) red, (12,4) yellow, (40,40) white
+top right gravity: (52,60) red, (60,52) yellow, (8,8) white
+centred: (28,36) red, (36,28) yellow, (4,4) white
+aspect fit: (20,40) red, (44,24) yellow, (4,32) white
+before setNeedsDisplay: draws 0, white
+after: draws 1, bottom blue, top white, contents is an image: yes
+drawn again without asking: draws 1
+drawn flipped: draws 2, contents flipped yes, top blue, bottom white
+needs display on a bounds change: yes
+displayLayer: top left red
+dial at a half: (16,32) red, (48,32) white
+shape defaults: fill alpha 1, stroke none, line width 1, miter 10, end 1, cap butt
+filled circle: centre red, corner white
+stroked: edge blue, centre white, top blue
+stroke end at a half: (16,32) blue, (48,32) white
+stroke start at a half: (16,32) white, (48,32) blue
+dashed: (8,32) blue, (16,32) white
+even-odd: ring green, hole white
+gradient defaults: start 0.5 0, end 0.5 1, type axial
+axial: bottom red yes, top blue yes, middle between yes
+sideways, a hard edge at the middle: (16,32) red, (48,32) blue
+radial: centre red yes, corner blue
+text defaults: size 36, colour white yes, wrapped no
+text: ink at the top yes, none at the bottom yes
+right aligned: ink on the right yes, none on the left yes
+exit=0

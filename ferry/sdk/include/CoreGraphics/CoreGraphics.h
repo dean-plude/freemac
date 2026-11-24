@@ -265,6 +265,9 @@ void CGContextSetInterpolationQuality(CGContextRef c, CGInterpolationQuality qua
 CGInterpolationQuality CGContextGetInterpolationQuality(CGContextRef c);
 void CGContextSetShadow(CGContextRef c, CGSize offset, CGFloat blur);
 void CGContextSetShadowWithColor(CGContextRef c, CGSize offset, CGFloat blur, CGColorRef color);
+void CGContextBeginTransparencyLayer(CGContextRef c, CFDictionaryRef auxiliaryInfo);
+void CGContextBeginTransparencyLayerWithRect(CGContextRef c, CGRect rect, CFDictionaryRef auxiliaryInfo);
+void CGContextEndTransparencyLayer(CGContextRef c);
 
 void CGContextBeginPath(CGContextRef c);
 void CGContextMoveToPoint(CGContextRef c, CGFloat x, CGFloat y);

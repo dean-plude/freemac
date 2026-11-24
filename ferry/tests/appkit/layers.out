@@ -1,0 +1,42 @@
+no layer before wantsLayer: yes
+backing layer: CALayer, delegate is the view: yes
+layer frame: {{10, 20}, {40, 30}}
+layer anchor: {0, 0}
+layer frame after the view moved: {{5, 6}, {50, 40}}
+no animation for that change: yes
+alphaValue 0.5: opacity 0.50
+hidden view, hidden layer: yes
+makeBackingLayer: CAShapeLayer
+wantsLayer NO drops it: yes
+drawn: border blue, background red, drawRect green, outside clear; drawRect calls 1
+a sublayer at (4,4), above the drawing, from the bottom: white; top-left stays red
+in a flipped view the sublayer is at the top: white; the bottom-left is red
+alphaValue 0.5 drawn: background alpha 0.5, drawRect alpha 0.5
+cornerRadius 10: the corner clear, the edge's middle red
+updateLayer: 1 calls, drawRect 0 calls, drawn yellow
+not needing display: still 1 calls
+after setNeedsDisplay: 2 calls
+hosted layer: kept yes, delegate not the view yes, frame {{60, 10}, {30, 30}}, drawn purple, drawRect calls 0
+the context outside a group: duration 0.25, implicit no
+default animations: frame CABasicAnimation, alphaValue CABasicAnimation, toolTip yes
+in the group: duration 1.00, the transaction's 1.00, current yes
+frame right after: {{0, 0}, {20, 20}}
+frame halfway: {{20, 10}, {40, 30}}
+alpha halfway 0.625, layer opacity 0.625, done 0
+frame at the end: {{40, 20}, {60, 40}}
+alpha at the end 0.250, completion handler ran 1 time(s)
+and not again: 1
+animator outside a group (a quarter second, default timing): after 1/8 s 0.852, after 0.325 s 1.000
+duration 0 sets it at once: {{7, 8}, {60, 40}}
+a new animation of the same property takes over: x 12.7 (halfway from where it was)
+and ends where it was sent: {{0, 8}, {60, 40}}
+an animations entry of NSNull: set at once: {9, 9}
+other messages go to the view: tip
+frame change outside a group animates the layer: no
+with allowsImplicitAnimation it does: yes, over 1.00 s
+halfway (linear) shown at x 35.0, drawn there: x 38 red, x 55 green, x 32 clear, x 78 clear
+finished: animation gone yes
+drawn where its layer is shown: x 50..90 green, x 20 clear; the view's frame stays {{10, 10}, {40, 40}}
+after it: x 20 red, x 70 clear
+a window's layer-backed content view: blue
+exit=0

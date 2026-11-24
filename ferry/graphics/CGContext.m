@@ -370,6 +370,34 @@ void CGContextSetShadow(CGContextRef c, CGSize offset, CGFloat blur)
     CGContextSetShadowWithColor(c, offset, blur, NULL);
 }
 
+/* Transparency layers: what is drawn between the two calls is gathered on
+ * its own (a Cairo group, which saves Cairo's state too) and composited as
+ * one picture at the alpha in force when the layer began. Inside the layer
+ * the alpha starts again at 1. */
+void CGContextBeginTransparencyLayerWithRect(CGContextRef c, CGRect rect, CFDictionaryRef auxiliaryInfo)
+{
+    CGContextSaveGState(c);
+    GSTATE(CTX)->alpha = 1;
+    cairo_push_group(CR);
+}
+
+void CGContextBeginTransparencyLayer(CGContextRef c, CFDictionaryRef auxiliaryInfo)
+{
+    CGContextBeginTransparencyLayerWithRect(c, CGRectInfinite, auxiliaryInfo);
+}
+
+void CGContextEndTransparencyLayer(CGContextRef c)
+{
+    if (!CTX->depth)
+        return;
+    double alpha = CTX->states[CTX->depth - 1].alpha;
+    cairo_pop_group_to_source(CR);
+    GContextWillDraw(CTX);
+    cairo_paint_with_alpha(CR, alpha);
+    GContextDidDraw(CTX);
+    CGContextRestoreGState(c);
+}
+
 /* ---- colours ------------------------------------------------------------------------- */
 
 void GContextSetSource(GContext *c, const double rgba[4])

@@ -523,6 +523,32 @@ left out. This was written from Apple's documentation and not compared
 with a Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of
 the apps that use `NSXMLDocument` has been run again with it.
 
+### Core Animation basics (freemac 1.198, Ferry 0.25.0)
+
+Ferry has a QuartzCore.framework now, so apps that link it load. It is
+written from Apple's documentation. A `CALayer` has its geometry (bounds,
+position, anchor point, frame, transform and the `CATransform3D`
+functions), a tree of sublayers, and the drawing an AppKit app uses:
+background colour, border, rounded corners, opacity, hidden,
+`masksToBounds`, `zPosition`, an image as its contents with the contents
+gravities, and the delegate's `drawLayer:inContext:` and `displayLayer:`
+after `setNeedsDisplay`. A subclass can add `@dynamic` properties, which
+animate. `CAShapeLayer`, `CAGradientLayer` (axial and radial) and
+`CATextLayer` draw too. Changes inside a `CATransaction` animate implicitly
+over its duration, unless actions are disabled, and its completion block
+runs when they are all done. `CABasicAnimation`, `CAKeyframeAnimation`,
+`CASpringAnimation` and `CAAnimationGroup` run with the documented timing
+(begin time, speed, repeats, autoreverse, fill modes and the named timing
+functions). A timer on the main run loop steps them, and the delegate is
+told when each starts and stops. An NSView gets a backing layer from
+`makeBackingLayer` when it wants one, keeps it in step with its frame,
+alpha and hidden state, and draws it with the view: the layer's background
+and border around the view's `drawRect:` (or `updateLayer`), and its
+sublayers above. A layer set with `setLayer:` first is hosted.
+`NSAnimationContext` groups and a view's `animator` animate `frame`,
+`bounds` and `alphaValue`. Left out: shadows, masks, filters, transitions,
+3D perspective, and views' layers joined into one tree.
+
 ## What the apps need most
 
 Counted over the nine apps:

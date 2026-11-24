@@ -1114,6 +1114,9 @@ The new or extended ones:
 | `foundation_urlconnection` (manual retain/release) | (freemac (1.196), Ferry 0.23.0) `NSURLConnection`: synchronous (200, 404, closed port), asynchronous (on the main queue or a private one; a redirect; a bad URL), with a delegate (PATCH with a body, a closed port, `startImmediately:NO`, cancel), `canHandleRequest:`; `NSData` and `NSString` `...ContentsOfURL:` over http (charset from the response, Cocoa error 256 with the URL error underneath); requests and responses made by hand (header case, `addValue:`, copies, Content-Type parsing, status texts) |
 | `libcurl loaded only when loading URLs` (check in `run.sh`) | (freemac (1.196), Ferry 0.23.0) a Foundation program that loads no URL never opens libcurl (`LD_DEBUG`) |
 | `foundation_xmldocument` | (freemac (1.197), Ferry 0.24.0) `NSXMLDocument` on libxml2: a document with a declaration, a comment, a processing instruction, a default and a prefixed namespace and an entity read into objects (kinds, names, local names, prefixes, URIs, namespaces, attributes, string values, indexes and levels, siblings, next and previous nodes, `elementsForName:` with a prefix, `elementsForLocalName:URI:`, `attributeForLocalName:URI:`, resolving namespaces and prefixes); written out compact, pretty printed, with compact empty elements and single quotes; XPath (by local name, with a prefix, attributes, a relative path, processing instructions, comments, the document, the namespace axis, a result that isn't nodes and a bad expression); the tree changed (inserting, removing, replacing, `setChildren:`, `insertChildren:atIndex:`, a duplicate attribute ignored, removing an attribute, setting string values, normalizing text nodes, a namespace added and a node detached) and XPath and `XMLString` seeing every change; a node that has a parent and an attribute added as children (exceptions); documents built in code, written as ISO-8859-1, US-ASCII (character references) and UTF-16 data and read back; `setRootElement:`; object values (a number, a date, a boolean); resolving entities; CDATA with `]]>` in it; `NSXMLNode` making an `NSXMLElement` for its kind; an element from a string, copied deeply; whitespace and CDATA with and without the preserve options; a document that isn't well formed (error 76 and its line), tidied, empty (error 4) and invalid with `NSXMLDocumentValidate`; a DTD with public and system ids, an entity, an element and an attribute declaration (kinds, values, written back, changed), a declaration made from a string, a predefined entity; canonical XML with and without comments, and of an element; data in ISO-8859-1, a file URL, a web URL refused; a document class whose `replacementClassForClass:` makes its own elements |
+| `quartzcore_layers` | (freemac (1.198), Ferry 0.25.0) Layer geometry (frame from bounds, position, anchor point and transform, through scaling and a quarter turn), key-value coding of layer properties and of keys of the caller's own, a subclass's `@dynamic` properties with `defaultValueForKey:` and `needsDisplayForKey:`, sublayer order and replacing, point conversion and hit-testing; drawing checked pixel by pixel: background, border, rounded corners and `maskedCorners`, opacity per layer and as a group, hidden, `masksToBounds`, transforms, `sublayerTransform`, `geometryFlipped`, `zPosition`, an image's contents with the gravities, the delegate's `drawLayer:inContext:` and `displayLayer:`, `needsDisplayOnBoundsChange`, shape layers (fill, stroke, stroke start and end, dashes, even-odd), axial and radial gradients, and text layers |
+| `quartzcore_animations` | (freemac (1.198), Ferry 0.25.0) One animation on the real run-loop clock, then everything on the test clock: the transform functions, the named timing functions, implicit animations and when they start, transactions (duration, disabling actions, nesting, the completion block), actions from the `actions` dictionary and the delegate, `onOrderIn`; basic animations (fill modes, replacing, `byValue`, additive, autoreverse, cumulative repeats, a later begin time, speed, a key path into the transform); keyframe animations in every calculation mode, with key times, timing functions and a path; groups; springs; the delegate's start and stop messages; a layer drawn while a property animates |
+| `appkit_layers` | (freemac (1.198), Ferry 0.25.0) A view's backing layer and its geometry, `makeBackingLayer`, a layer-backed view drawn with its layer's background, border, corner radius, opacity and sublayers (in plain and flipped views), `wantsUpdateLayer`/`updateLayer`, a hosted layer; `NSAnimationContext` groups with the view's `animator` for `frame` and `alphaValue`, the completion handler, the default duration outside a group, a duration of 0, a new animation taking over, the `animations` dictionary; implicit layer animations only with `allowsImplicitAnimation`; an explicit animation of a view's layer moving where the view is drawn; a window drawing a layer-backed content view |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1773,6 +1776,49 @@ The new or extended ones:
     is written as libxml2 read it until it is changed, then as Ferry
     writes it.
 
+- **Core Animation, not done yet** (freemac (1.198), Ferry 0.25.0).
+  - Shadows (`shadowOpacity` and the rest) are kept but not drawn.
+  - Masks (`mask`) and filters (`filters`, `backgroundFilters`,
+    `compositingFilter`) are kept but not drawn.
+  - CATransition keeps its type, subtype and timing, but nothing is drawn
+    for it: the change shows at once.
+  - `contentsRect`, `contentsCenter` and `contentsScale` are stored but not
+    used when the contents are drawn.
+  - Only the 2D part of a layer's transform is drawn. Perspective and
+    rotations about x or y are kept and animate, but the drawing is flat.
+  - A keyframe animation's `rotationMode` is ignored.
+  - A change of `contents` doesn't crossfade, and `hidden` doesn't animate:
+    both change at once, as `masksToBounds` does.
+  - The conic gradient type is drawn as an axial gradient.
+  - There's no `CAConstraintLayoutManager`, `CAScrollLayer`,
+    `CAReplicatorLayer`, `CATiledLayer`, `CAEmitterLayer`, `CAMetalLayer`
+    or `CAOpenGLLayer`. `CADisplayLink` isn't there either.
+  - A view's layer isn't made a sublayer of its superview's layer. Each
+    view draws its own layer tree, so a view's `superlayer` is nil and
+    `zPosition` doesn't reorder views.
+  - The animator proxy animates numbers, points, sizes and rects only.
+    Colours set through it change at once. Only views have `animator`, not
+    windows, constraints or other objects.
+  - `layerContentsRedrawPolicy` and `canDrawSubviewsIntoLayer` are kept but
+    change nothing.
+  - Hit-testing ignores where an animation of a view's layer shows it.
+- **Core Animation, not compared with a Mac** (freemac (1.198), Ferry 0.25.0).
+  - A spring animation's `settlingDuration` (1.28 s for the defaults) and
+    the values it passes through.
+  - When an implicit animation first runs. Here a layer animates its changes
+    once it has been drawn on screen, or once the transaction it was made in
+    is committed.
+  - Where the contents gravities put an image in flipped spaces.
+  - Where a text layer's lines land, and its default font (Helvetica).
+  - How autoresizing shares a change of size between the margins and the
+    width or height when several are flexible.
+  - `contentsAreFlipped` for a view's layer.
+  - The animator's default timing: the default timing function is used here
+    when the context doesn't set one.
+  - Whether a nested NSAnimationContext group starts from the outer group's
+    duration. Here each group starts at a quarter of a second.
+  - Where an animation of a flipped view's layer position shows the view.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -1843,3 +1889,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.22.0 (freemac (1.195)): `NSStepper`, `NSLevelIndicator`, `NSColorWell` with a basic `NSColorPanel`, `NSDatePicker` (text with a stepper, or a calendar and a clock), `NSComboBox`, `NSPopover` (and view controllers presented as popovers), `NSPathControl`, `NSSound` (through `pw-play`, `paplay` or `aplay`) and `NSTokenField`, each with its cell and read from nibs, `make check` 94/94.
 - 2026-11-24: Ferry 0.23.0 (freemac (1.196)): loading http and https URLs through this system's libcurl, opened only when a program first loads one: `NSURLSession` (data, upload and download tasks, handlers and delegates, a serial operation queue of its own when none is given), `NSURLConnection`, `NSURLRequest`, `NSHTTPURLResponse`, `NSURLErrorDomain` and `NSData`'s and `NSString`'s `...ContentsOfURL:` for web addresses; a new core call, `ferry_network_symbol`, `make check` 97/97.
 - 2026-11-24: Ferry 0.24.0 (freemac (1.197)): `NSXMLDocument`, `NSXMLNode`, `NSXMLElement`, `NSXMLDTD` and `NSXMLDTDNode` on libxml2 (a tree of objects that can be walked, changed, searched with XPath and written out again, pretty printed or canonical); `dataUsingEncoding:` with ASCII and ISO Latin 1 converting for real, and `dataUsingEncoding:allowLossyConversion:`, `make check` 98/98.
+- 2026-11-24: Ferry 0.25.0 (freemac (1.198)): QuartzCore.framework with Core Animation basics (layers, shape, gradient and text layers, transactions, implicit and explicit animations, springs and groups), layer-backed and layer-hosting NSViews, NSAnimationContext and the views' animator, `make check` 101/101.
