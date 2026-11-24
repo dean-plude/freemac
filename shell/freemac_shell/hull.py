@@ -6,7 +6,9 @@ each with the volumes on it. Choosing one shows how much of it is used,
 what kind of disk or file system it is and where it's connected. The
 buttons at the top mount or unmount a volume, erase a volume or a whole
 drive (asking for a name and a format first), and eject a drive. Double-
-click a volume, or choose Edit > Rename, to give it a new name.
+click a volume, or choose Edit > Rename, to give it a new name. Restore
+copies a disk image onto a drive that's plugged in, to make a USB stick
+that starts up freemac or another system.
 
 The disk freemac is running from can be looked at but not changed.
 
@@ -181,7 +183,9 @@ class Window(Gtk.ApplicationWindow):
         self.erase_button = self._tool("edit-clear-all-symbolic", "Erase", self.erase)
         self.eject_button = self._tool("media-eject-symbolic", "Eject", self.eject)
         self.info_button = self._tool("document-edit-symbolic", "Rename", self.rename)
-        for button in (self.eject_button, self.info_button, self.erase_button, self.mount_button):
+        self.restore_button = self._tool("document-revert-symbolic", "Restore", self.restore)
+        for button in (self.eject_button, self.info_button, self.restore_button, self.erase_button,
+                       self.mount_button):
             header.pack_end(button)
         self.spinner = Gtk.Spinner()
         header.pack_start(self.spinner)
@@ -251,7 +255,7 @@ class Window(Gtk.ApplicationWindow):
 
         menus.add_actions(self, {"close": self.close, "mount": self.toggle_mount, "erase": self.erase,
                                  "eject": self.eject, "rename": self.rename, "open-image": self.open_image,
-                                 "new-image": self.new_image})
+                                 "new-image": self.new_image, "restore": self.restore})
         self.bus, self._watch = hull_store.watch(self._changed)
         self.connect("destroy", lambda *_: [self.bus.signal_unsubscribe(i) for i in self._watch])
         header.show_all()
@@ -491,7 +495,9 @@ class Window(Gtk.ApplicationWindow):
                                         and not (vol and vol.drive.optical))
         self.info_button.set_sensitive(free and not locked and bool(vol and vol.has_fs))
         self.eject_button.set_sensitive(free and bool(drive and (drive.external or drive.ejectable)))
+        self.restore_button.set_sensitive(free and self._restorable(drive))
         for name, on in (("mount", self.mount_button), ("erase", self.erase_button),
+                         ("restore", self.restore_button),
                          ("rename", self.info_button), ("eject", self.eject_button)):
             action = self.lookup_action(name)
             if action:
@@ -574,6 +580,99 @@ class Window(Gtk.ApplicationWindow):
             self.actions.erase_volume(item, fstype, label, done)
 
 
+    # -- restore --
+
+    @staticmethod
+    def _restorable(drive):
+        """A drive that's plugged in and can be written whole: not the system's,
+        not a disc, not an open disk image."""
+        return bool(drive and drive.external and not drive.system and not drive.optical
+                    and drive.whole is not None and not isinstance(drive, hull_store.ImageDrive))
+
+    def restore(self):
+        kind, item = self._current()
+        drive = item if kind == "drive" else (item.drive if item else None)
+        if self.busy or not self._restorable(drive):
+            return
+        icon = self._gicon(drive_icon(drive))
+        dialog = Gtk.FileChooserNative(title=f"Choose a Disk Image to Restore onto “{drive.name}”",
+                                       transient_for=self, action=Gtk.FileChooserAction.OPEN,
+                                       accept_label="Choose")
+        only = Gtk.FileFilter()
+        only.set_name("Disk images (.iso, .img)")
+        for suffix in disk_images.TYPES:
+            only.add_pattern("*" + suffix)
+        for mime in disk_images.MIME_TYPES:
+            only.add_mime_type(mime)
+        dialog.add_filter(only)
+        downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
+        if downloads and os.path.isdir(downloads):
+            dialog.set_current_folder(downloads)
+        if dialog.run() != Gtk.ResponseType.ACCEPT:
+            return
+        image = dialog.get_filename()
+        image_name = os.path.basename(image)
+        try:
+            image_size = os.path.getsize(image)
+        except OSError as e:
+            alert.tell(self, f"“{image_name}” couldn’t be read.", e.strerror or "", icon=icon)
+            return
+        if image_size > drive.size:
+            alert.tell(self, f"“{image_name}” won’t fit on “{drive.name}”.",
+                       f"The disk image is {size_words(image_size)} and the drive holds "
+                       f"{size_words(drive.size)}. Use a bigger drive.", icon=icon)
+            return
+        answer = alert.ask(self, f"Restore “{drive.name}” from “{image_name}”?",
+                           f"Everything on “{drive.name}” will be replaced by what’s in the disk image, and "
+                           "this can’t be undone. Restoring a system’s .iso this way makes a USB drive "
+                           "that can start up a computer.",
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Restore", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.CANCEL, destructive=Gtk.ResponseType.OK, icon=icon)
+        if answer != Gtk.ResponseType.OK:
+            return
+        name = drive.name
+        self.chosen = ("drive", drive.path)
+        self._working(True)
+        sheet = Restoring(self, name, image_name, icon)
+        sheet.show_all()
+        state = {"last": 0.0}
+
+        def progress(done, total):
+            now = GLib.get_monotonic_time() / 1e6
+            if now - state["last"] > 0.2 or done == total:
+                state["last"] = now
+                GLib.idle_add(sheet.show_progress, done, total)
+
+        def finished(why, stopped):
+            sheet.destroy()
+            self._working(False)
+            self.reload()
+            if stopped:
+                alert.tell(self, f"Restoring “{name}” was stopped.",
+                           "Only part of the disk image was copied, so the drive can’t be used as it is. "
+                           "Restore it again, or erase it to use it for files.", icon=icon)
+            elif why is not None:
+                alert.tell(self, f"“{name}” wasn’t restored.", why, icon=icon)
+            else:
+                text = f"It now holds what’s in “{image_name}”."
+                if image_name.lower().endswith(".iso"):
+                    text += " To start up from it, choose it in Dials > Startup Disk."
+                alert.tell(self, f"“{name}” is restored.", text, icon=icon)
+            return False
+
+        def work():
+            why, stopped = None, False
+            try:
+                disk_images.restore(image, drive.whole.path, drive.path, progress, lambda: sheet.stopped)
+            except disk_images.Cancelled:
+                stopped = True
+            except disk_images.Failed as e:
+                why = str(e) or "Something went wrong while it was being copied."
+            except GLib.Error as e:
+                why = e.message
+            GLib.idle_add(finished, why, stopped)
+        threading.Thread(target=work, daemon=True).start()
+
     # -- disk images --
 
     def open_image(self):
@@ -586,6 +685,9 @@ class Window(Gtk.ApplicationWindow):
         for mime in disk_images.MIME_TYPES:
             only.add_mime_type(mime)
         dialog.add_filter(only)
+        downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
+        if downloads and os.path.isdir(downloads):
+            dialog.set_current_folder(downloads)
         if dialog.run() == Gtk.ResponseType.ACCEPT:
             try:
                 Gio.Subprocess.new(["freemac-hatch", dialog.get_filename()], Gio.SubprocessFlags.NONE)
@@ -648,13 +750,57 @@ class Window(Gtk.ApplicationWindow):
         threading.Thread(target=work, daemon=True).start()
 
 
+class Restoring(Gtk.Window):
+    """The sheet-like window that shows a restore going, with Stop."""
+
+    def __init__(self, parent, drive_name, image_name, icon):
+        super().__init__(title="Restore", transient_for=parent, modal=True, resizable=False,
+                         type_hint=Gdk.WindowTypeHint.DIALOG)
+        self.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+        self.stopped = False
+        box = Gtk.Box(spacing=14)
+        for side in ("start", "end", "top", "bottom"):
+            getattr(box, "set_margin_" + side)(20)
+        image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
+        image.set_pixel_size(48)
+        box.pack_start(image, False, False, 0)
+        words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        title = Gtk.Label(label=f"Restoring “{drive_name}” from “{image_name}”…", xalign=0,
+                          max_width_chars=44, wrap=True)
+        title.get_style_context().add_class("hull-drive-name")
+        words.pack_start(title, False, False, 0)
+        self.bar = Gtk.ProgressBar()
+        self.bar.set_size_request(340, -1)
+        words.pack_start(self.bar, False, False, 0)
+        self.count = Gtk.Label(label="Getting the drive ready…", xalign=0)
+        self.count.get_style_context().add_class("hull-what")
+        words.pack_start(self.count, False, False, 0)
+        stop = Gtk.Button(label="Stop", halign=Gtk.Align.END)
+        stop.connect("clicked", lambda *_: self.stop())
+        words.pack_start(stop, False, False, 0)
+        box.pack_start(words, True, True, 0)
+        self.add(box)
+        self.connect("delete-event", lambda *_: self.stop() or True)
+
+    def stop(self):
+        self.stopped = True
+        self.count.set_text("Stopping…")
+
+    def show_progress(self, done, total):
+        if not self.stopped:
+            self.bar.set_fraction(done / total if total else 0)
+            self.count.set_text(f"{size_words(done)} of {size_words(total)}")
+        return False
+
+
 def menubar():
     return menus.menubar([
         ("_File", [[("Open Disk Image…", "win.open-image", "<Shift><Ctrl>o"),
                     ("New Image from Folder…", "win.new-image", "<Shift><Ctrl>n")],
                    [("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
                    [("Close", "win.close", "<Ctrl>w")]]),
-        ("_Edit", [[("Rename…", "win.rename", None), ("Erase…", "win.erase", "<Shift><Ctrl>e")]]),
+        ("_Edit", [[("Rename…", "win.rename", None), ("Erase…", "win.erase", "<Shift><Ctrl>e"),
+                    ("Restore…", "win.restore", "<Shift><Ctrl>r")]]),
     ])
 
 

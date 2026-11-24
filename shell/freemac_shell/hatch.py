@@ -72,7 +72,7 @@ class Hatch(Gtk.Application):
             only.add_mime_type(mime)
         dialog.add_filter(only)
         downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
-        if downloads:
+        if downloads and os.path.isdir(downloads):
             dialog.set_current_folder(downloads)
         self.hold()
         if dialog.run() == Gtk.ResponseType.ACCEPT:

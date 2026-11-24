@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Restore in Hull (1.149)
+
+`disk_images.restore()` runs on a thread: it unmounts every mounted file
+system whose `Block.Drive` is the chosen drive, then asks udisks2 for
+`Block.OpenForRestore` on the drive's whole block device, which hands back a
+writable file descriptor (polkit `open-device`, allowed without a password for
+a local, active administrator by `50-freemac-drives.rules`; the system's own
+disks use `open-device-system`, which still asks). It copies the image in
+4 MiB chunks, reports progress to Hull's `Restoring` window through
+`GLib.idle_add` at most five times a second, checks a stop flag between
+chunks, and `fsync`s before closing; closing the descriptor makes udisks read
+the drive again, so its new volumes appear in Hull and on the Desktop.
+`Window._restorable()` allows only external drives that aren't the system's,
+optical or an open disk image.
+
 ## The Applications folder (1.148)
 
 `~/Applications` is a real, empty folder so the sidebar has somewhere to go;

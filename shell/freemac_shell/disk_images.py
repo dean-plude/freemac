@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Disk images (.iso, .img): opening one as a disk, as a Mac opens a disk
-image you double-click, and making one from a folder.
+image you double-click, making one from a folder, and restoring one onto a
+drive (a USB stick that starts up a system, for example).
 
 udisks2 attaches the file as a loop device (a disk whose contents are the
 file) and mounts the file systems on it, so it shows on the Desktop and in
@@ -257,3 +258,81 @@ def make_from_folder(folder, image):
             pass
         raise Failed((done.stderr.strip().splitlines() or [""])[-1] if done else reason)
     return image
+
+
+# ---- restoring one onto a drive ----------------------------------------------------
+
+CHUNK = 4 * 1024 * 1024
+
+
+class Cancelled(Exception):
+    """The person stopped a restore partway."""
+
+
+def unmount_drive(drive_path, bus=None):
+    """Unmount every file system on a drive, its hidden ones too."""
+    bus = _bus(bus)
+    for path, props in _objects(bus).items():
+        block = props.get(P + "Block")
+        fs = props.get(P + "Filesystem")
+        if block is None or fs is None or not fs.get("MountPoints"):
+            continue
+        if block.get("Drive") == drive_path or path == drive_path:
+            try:
+                _call(bus, path, "Filesystem", "Unmount", _none())
+            except GLib.Error as e:
+                raise Failed(_busy_words(e))
+
+
+def _busy_words(error):
+    words = _words(error)
+    if words and "busy" in words.lower():
+        return "Something is still using it. Close any windows and apps using its files, then try again."
+    return words or ""
+
+
+def restore(image, block_path, drive_path, progress=None, cancelled=None, bus=None):
+    """Copy the image, byte for byte, onto the whole drive whose block device
+    is block_path, replacing everything on it. progress(done, total) is called
+    from this thread as it goes; cancelled() returning True stops it, raising
+    Cancelled. Raises Failed with words for a person."""
+    bus = _bus(bus)
+    try:
+        total = os.path.getsize(image)
+        src = os.open(image, os.O_RDONLY)
+    except OSError as e:
+        raise Failed(e.strerror or str(e))
+    try:
+        size = _objects(bus).get(block_path, {}).get(P + "Block", {}).get("Size", 0)
+        if size and total > size:
+            raise Failed("The disk image is bigger than the drive. Choose a bigger drive.")
+        unmount_drive(drive_path, bus)
+        try:
+            reply, fds = bus.call_with_unix_fd_list_sync(
+                BUS_NAME, block_path, P + "Block", "OpenForRestore", _none(),
+                GLib.VariantType.new("(h)"), INTERACTIVE, 60000, None, None)
+        except GLib.Error as e:
+            raise Failed(_busy_words(e))
+        dst = fds.steal_fds()[reply.unpack()[0]]
+        try:
+            done = 0
+            while True:
+                if cancelled is not None and cancelled():
+                    raise Cancelled()
+                chunk = os.read(src, CHUNK)
+                if not chunk:
+                    break
+                view = memoryview(chunk)
+                while view:
+                    n = os.write(dst, view)
+                    view = view[n:]
+                done += len(chunk)
+                if progress is not None:
+                    progress(done, total)
+            os.fsync(dst)
+        except OSError as e:
+            raise Failed(e.strerror or str(e))
+        finally:
+            os.close(dst)      # udisks reads the drive again when it's closed
+    finally:
+        os.close(src)
