@@ -878,6 +878,27 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Tender (1.143)
+
+Tender (`tender.py`, with the copying in `tender_store.py`) looks on every
+mounted drive for `freemac-backups/<computer>-<user>/<date>` (the newest
+backup of each), `Users/<name>` with a Documents, Desktop or Pictures folder
+(Windows; Public and Default are skipped) and `home/<name>` (another Linux
+computer). A source becomes a list of kinds, each a list of (from, to)
+folder pairs; Windows' `OneDrive/Documents` and the like join the same kinds.
+Symbolic links on a Windows disk, AppData, `desktop.ini` and `NTUSER.DAT`
+stay behind.
+
+`bring()` walks each pair and copies file by file with `shutil.copy2`. A file
+whose destination exists and is the same (same size, and the same time or
+the same bytes) is skipped, and so is one that matches an earlier "name 2"
+beside it, so running Tender twice brings nothing twice. A different file
+with the same name comes over as "name 2". Settings are the exception: the
+dotfiles of a Lifeboat backup or Linux home replace this account's, which
+are first moved to `~/.local/share/freemac-tender/replaced-<date>/`. Caches,
+Trash, keyrings, `.Xauthority`, Lifeboat's drive choice and the like are
+never brought, since they belong to the other computer.
+
 ## VPN (1.142)
 
 VPN configurations are ordinary NetworkManager connections of type

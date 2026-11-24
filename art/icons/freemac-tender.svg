@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Tender: a little boat ferrying a box of files across the water. Original freemac artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd38a"/><stop offset="1" stop-color="#f29b6b"/>
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d6fd8"/><stop offset="1" stop-color="#2447a3"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbe7c0"/><stop offset="1" stop-color="#e9c98e"/>
+    </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="112" height="112" rx="24"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#sky)" filter="url(#sh)"/>
+  <g clip-path="url(#tile)">
+    <circle cx="94" cy="34" r="11" fill="#fff6dc" fill-opacity="0.9"/>
+    <path d="M8 84 C28 79 44 80 62 85 S96 92 120 83 L120 120 L8 120 Z" fill="#2a8ca8"/>
+    <path d="M8 98 C28 93 46 95 64 99 S96 105 120 96 L120 120 L8 120 Z" fill="#1d6a83"/>
+    <path d="M18 108 h14 M44 104 h18 M80 110 h20" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <!-- the box of files -->
+  <g>
+    <rect x="44" y="46" width="40" height="30" rx="3" fill="url(#box)" stroke="#b58a46" stroke-width="1.5"/>
+    <path d="M44 54 h40" stroke="#b58a46" stroke-width="1.5"/>
+    <rect x="58" y="58" width="12" height="5" rx="2" fill="#b58a46"/>
+    <rect x="50" y="38" width="12" height="12" rx="1.5" fill="#ffffff" stroke="#9aa3b5" stroke-width="1" transform="rotate(-8 56 44)"/>
+    <rect x="64" y="36" width="12" height="14" rx="1.5" fill="#ffffff" stroke="#9aa3b5" stroke-width="1" transform="rotate(6 70 43)"/>
+  </g>
+  <!-- the boat -->
+  <path d="M26 74 H102 L92 92 C90 95 87 96 84 96 H44 C41 96 38 95 36 92 Z" fill="url(#hull)"/>
+  <path d="M26 74 H102 L100 78 H28 Z" fill="#ffffff" fill-opacity="0.85"/>
+  <circle cx="48" cy="85" r="2.5" fill="#ffffff" fill-opacity="0.7"/>
+  <circle cx="64" cy="85" r="2.5" fill="#ffffff" fill-opacity="0.7"/>
+  <circle cx="80" cy="85" r="2.5" fill="#ffffff" fill-opacity="0.7"/>
+</svg>

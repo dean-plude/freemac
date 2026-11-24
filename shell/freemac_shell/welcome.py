@@ -249,6 +249,11 @@ class Welcome(Gtk.Window):
         guide.set_tooltip_text("Short how-tos: windows, files, screenshots, Wi-Fi and more")
         guide.connect("clicked", lambda *_: subprocess.Popen(["freemac-guide"], start_new_session=True))
         buttons.pack_start(guide, False, False, 0)
+        if not LIVE and shutil.which("freemac-tender"):
+            bring = Gtk.Button(label="Bring Files Over…")
+            bring.set_tooltip_text("Copy your files from a Lifeboat backup, a Windows PC or another computer")
+            bring.connect("clicked", lambda *_: subprocess.Popen(["freemac-tender"], start_new_session=True))
+            buttons.pack_start(bring, False, False, 0)
         if LIVE and shutil.which("freemac-keel"):
             install = Gtk.Button(label="Install freemac…")
             install.get_style_context().add_class("suggested-action")

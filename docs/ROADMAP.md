@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.143 "Tender" (done)
+
+Bring your files over from your old computer, as a Mac's Migration Assistant does.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Tender finds sources on plugged-in drives: the newest Lifeboat backup of each computer, each person's files on a Windows disk, and another freemac or Linux computer's home folders; or any folder you choose | Tender | done |
+| 2 | Choose what to bring (Documents, Pictures, Music, Videos, Desktop, Downloads, other files), each with its size, against the free space here; OneDrive's folders come with Windows' | Tender | done |
+| 3 | Copying merges and never overwrites: files already here are left alone, a different one with the same name comes over as "name 2", and running it again skips what came before; Windows' own files (AppData, desktop.ini, links) stay behind | Tender | done |
+| 4 | Settings and app data from a Lifeboat backup or freemac disk replace this account's, which are kept in .local/share/freemac-tender; Log Out… when done | Tender | done |
+| 5 | Bring Files Over… in Welcome, Guide topic, README row and screenshots | Welcome, Guide, Docs | done |
+
 ## 1.142 "VPN" (done)
 
 Connect to a workplace's or a VPN provider's network from Dials and the menu bar, as on a Mac.

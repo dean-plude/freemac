@@ -1106,6 +1106,20 @@ TOPICS = {
         "- Get Help Online opens these pages on the web. Join a Wi-Fi network first, from the top right.",
         "When you're done, click the power button at the top right and choose Restart.",
     ]),
+    "bring-over": ("Bring your files from another computer", "migrate migration move transfer old computer new "
+                   "windows pc tender copy files settings bring over onedrive", [
+        "Tender copies your documents, pictures, music, videos, desktop and downloads from your old computer. "
+        "Press F4 and click Tender, or click Bring Files Over… in Welcome.",
+        "Plug in the drive with your Lifeboat backup, or your old computer's disk. A Windows PC's disk can go in "
+        "a USB case; Tender finds the files of each person on it, OneDrive's too. Or click Choose a Folder….",
+        "Choose where the files are and click Continue, then tick what to bring. Each kind shows its size and "
+        "whether there's room for it on this computer.",
+        "Nothing is deleted and no file you have is replaced: a file that's already here is left alone, and a "
+        "different one with the same name comes over as \"name 2\". You can run Tender again later; it skips "
+        "what it brought before.",
+        "From a Lifeboat backup you can also bring Settings and app data. They replace this account's own, "
+        "which are kept in a hidden folder, .local/share/freemac-tender. Log out and back in afterwards.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",
