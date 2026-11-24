@@ -90,6 +90,7 @@ run_one() {
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         # threads: a hang is a failure, not a stuck run
+        tlv_*|cxx_thread_local) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         pthreads|dispatch_concurrent|foundation_threads|foundation_locks|cxx_threads)
             timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -219,6 +220,25 @@ run_one security_code "$here/security/code.m" "$here/security/code.out" -framewo
 # runtime under real threads.
 run_one foundation_threads "$here/foundation/threads.m" "$here/foundation/threads.out" -framework Foundation
 run_one foundation_locks "$here/foundation/locks.m" "$here/foundation/locks.out" -framework Foundation
+# Thread-local variables (__thread, _Thread_local): eight threads at once,
+# the thunk's registers, the image's set-up functions, dispatch's workers
+# and storage freed (with both relocation formats), in a library the
+# program links and in one opened with dlopen, and with NSThread.
+run_one tlv_threads "$here/tlv/threads.c" "$here/tlv/threads.out" -fblocks
+run_one tlv_threads_chained "$here/tlv/threads.c" "$here/tlv/threads.out" -fblocks -Wl,-fixup_chains
+mkdir -p "$build/tlv_lib" "$build/tlv_plug"
+if "$top/sdk/ferry-cc" -O1 -dynamiclib -install_name @rpath/libtlvlib.dylib -o "$build/tlv_lib/libtlvlib.dylib" \
+        "$here/tlv/lib.c" 2> "$build/tlv_lib.cc.log" &&
+    "$top/sdk/ferry-cc" -O1 -dynamiclib -install_name @rpath/libtlvplug.dylib \
+        -o "$build/tlv_plug/libtlvplug.dylib" "$here/tlv/plug.c" 2>> "$build/tlv_lib.cc.log"; then
+    run_one tlv_dylib "$here/tlv/dylib_main.c" "$here/tlv/dylib_main.out" -L"$build/tlv_lib" -ltlvlib \
+        -Wl,-rpath,@executable_path/tlv_lib
+    run_one tlv_dlopen "$here/tlv/dlopen_main.c" "$here/tlv/dlopen_main.out" -Wl,-rpath,@executable_path/tlv_plug
+else
+    echo "FAIL tlv_dylib, tlv_dlopen (a library did not compile)"; sed 's/^/    /' "$build/tlv_lib.cc.log"
+    fail=$((fail + 1))
+fi
+run_one tlv_objc "$here/tlv/objc.m" "$here/tlv/objc.out" -fobjc-arc -framework Foundation
 # Exceptions a program catches (M7), unwound through frame-pointer and
 # frameless functions, and through Foundation's frames.
 run_one foundation_trycatch "$here/foundation/trycatch.m" "$here/foundation/trycatch.out" -fobjc-arc \
@@ -246,6 +266,7 @@ if [ -s "$top/sdk/lib/libc++.tbd" ] &&
         fail=$((fail + 1))
     fi
     run_one cxx_threads "$here/cxx/threads.cpp" "$here/cxx/threads.out" -std=c++17 -lc++
+    run_one cxx_thread_local "$here/cxx/thread_local.cpp" "$here/cxx/thread_local.out" -std=c++17 -lc++
     run_one objcxx_mixed "$here/cxx/objcxx_mixed.mm" "$here/cxx/objcxx_mixed.out" -std=c++17 -fobjc-arc \
         -framework Foundation -lc++
     # Without this system's libc++, a C++ program stops and says what to install.
@@ -264,7 +285,7 @@ if [ -s "$top/sdk/lib/libc++.tbd" ] &&
         echo "ok   cxx_not_loaded"; pass=$((pass + 1))
     fi
 else
-    echo "skip cxx_basics, cxx_exceptions, cxx_threads, objcxx_mixed (need LLVM's libc++: libc++-dev, libc++1, libc++abi1)"
+    echo "skip cxx_basics, cxx_exceptions, cxx_threads, cxx_thread_local, objcxx_mixed (need LLVM's libc++: libc++-dev, libc++1, libc++abi1)"
 fi
 # Linked against a system framework Ferry doesn't have (only its .tbd exists).
 run_one foundation_missing "$here/foundation/missing.m" "$here/foundation/missing.out" -framework Foundation \

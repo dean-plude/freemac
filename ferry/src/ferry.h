@@ -109,6 +109,12 @@ extern const struct ferry_symbol ferry_attrlist_symbols[];
 /* dyld.c: dlopen and the rest of <dlfcn.h>, and the _dyld_ image calls */
 extern const struct ferry_symbol ferry_dyld_symbols[];
 extern const struct ferry_symbol ferry_wchar_symbols[]; /* wchar.c: wide characters, xlocale, __cxa_atexit */
+/* tlv.c: thread-local variables (_tlv_bootstrap, _tlv_atexit) */
+extern const struct ferry_symbol ferry_tlv_symbols[];
+struct ferry_tlv_section { uint8_t *addr; uint64_t size; uint32_t type, align; };
+int ferry_tlv_image_loaded(const char *path, const struct ferry_tlv_section *s, int n); /* -1: too many */
+void ferry_tlv_exit(void);   /* the calling thread's thread-local destructors, as exit runs them */
+void *ferry_tlv_address(void *descriptor); /* the calling thread's copy of a variable, for dlsym */
 int ferry_is_virtual(const char *path);                    /* /System/Library/CoreServices/SystemVersion.plist */
 int ferry_virtual_open(const char *path, int linux_flags); /* -1 and errno if it can't be */
 int ferry_virtual_stat(const char *path, struct stat *s);  /* 1 if it was one of Ferry's files */

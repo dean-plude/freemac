@@ -155,8 +155,18 @@ That covers:
 - Objective-C and C++ exceptions passing through each other's frames.
 
 Without those libraries, a C++ program stops and names them, and other
-programs are unaffected. `thread_local` and wide file streams are not
-supported yet.
+programs are unaffected. Wide file streams are not supported yet.
+
+From Ferry 0.31.0 (freemac 1.204), Mac programs can use thread-local
+variables: C's `__thread` and `_Thread_local`, Objective-C's `__thread` and
+C++'s `thread_local`, in the program, in its own libraries and in libraries
+opened with `dlopen`. Each thread gets its own copy of an image's variables
+the first time it uses one, started from their first values, on pthreads,
+`NSThread`, `std::thread` and dispatch's worker threads alike. C++
+`thread_local` objects are built on first use and destroyed, last built
+first, when their thread ends, and the main thread's are destroyed when the
+program exits, before its static objects. A thread's copies are freed when
+it ends, and `ferry-cc` links programs that use them.
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and

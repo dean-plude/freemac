@@ -1,0 +1,6 @@
+main thread: lib_counter 7, lib_tag library, own 3
+the same variable directly and through the library: yes
+after two calls on the main thread: 9 (read directly)
+6 threads: from the template 6, one copy each 6, counted on their own 6, sums right 6
+main thread still: lib_counter 9, own 3, hidden sum 0
+exit=0

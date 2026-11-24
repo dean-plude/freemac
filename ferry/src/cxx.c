@@ -200,8 +200,9 @@ void *ferry_cxx_lookup(const char *name)
     void *table = ferry_cxx_layout_table(name);
     if (table)
         return table;
-    /* __cxa_atexit and the like are the C library's, under the same names */
-    if (!strcmp(name, "__cxa_atexit") || !strcmp(name, "__cxa_finalize"))
+    /* __cxa_atexit and the like are the C library's, under the same names;
+     * __cxa_thread_atexit is Ferry's, with the thread-local variables (tlv.c) */
+    if (!strcmp(name, "__cxa_atexit") || !strcmp(name, "__cxa_finalize") || !strcmp(name, "__cxa_thread_atexit"))
         return NULL;
     return ferry_cxx_symbol(name);
 }

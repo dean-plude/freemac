@@ -1,0 +1,9 @@
+set-up functions ran 1 time(s); main thread 1, another thread 0
+8 threads started from the template: 8
+aligned to 64 bytes: 8, kept their own values: 8, totals right: 8
+addresses differ from thread to thread: yes
+main thread: counter 5, total 0, name template, ratio 0.25, hidden 9, *pointer 42
+registers kept on a thread's first use: yes, after it: yes, on the main thread: yes
+dispatch_apply: 64 iterations counted on their workers' own copies: yes; one copy a thread: yes
+32 threads with 4 MB each, storage freed: yes
+exit=0

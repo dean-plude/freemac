@@ -693,10 +693,35 @@ says what to install, and everything else runs as before.
 `ferry-cc` builds `.cpp` and `.mm` sources with LLVM's libc++ headers
 (package libc++-dev) when given `-lc++`. Not yet:
 
-- `thread_local` variables;
 - wide file streams;
 - Mac error numbers in error codes from the library (above 34);
 - an `operator new` of the program's own used inside the library.
+
+### Thread-local variables (freemac 1.204, Ferry 0.31.0)
+
+Mac programs can now use thread-local variables: C's `__thread` and
+`_Thread_local`, Objective-C's `__thread` and C++'s `thread_local`. Each
+image's variables are bound to Ferry's own `_tlv_bootstrap`, so every
+thread gets its own copy of them the first time it uses one, started from
+the image's first values and zeroed where they have none. That holds for
+the program, the libraries it links and libraries and plug-ins opened later
+with `dlopen`, and for every kind of thread Ferry runs: pthreads,
+`NSThread`, `std::thread` and dispatch's worker threads. C++ objects with
+constructors are built on each thread when it first uses them, and their
+destructors, registered with `_tlv_atexit` or `__cxa_thread_atexit`, run in
+reverse order when the thread ends. For the thread that calls `exit`, and
+for the main thread when `main` returns, they run before the program's
+static destructors. A thread's copies are freed when it ends. `dlsym` of a
+thread-local variable gives the calling thread's copy, and the functions in
+an image's thread-local init section run once, when the image is set up.
+`ferry-cc` links programs that use thread-local variables. The thunk
+changes no register but the one it answers in, as the compiler expects,
+and it keeps the vector registers too. This was written from the Mach-O
+format's public description and the code clang emits, and not compared
+with a Mac; `docs/ferry-gui.md` lists what a Mac would settle. The
+destructors of threads still running when the program exits are not run,
+and the variables of images after the first 128 that have them are reached
+the slow way.
 
 ## What the apps need most
 

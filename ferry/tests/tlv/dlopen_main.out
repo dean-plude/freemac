@@ -1,0 +1,10 @@
+dlopen: ok, calls found: yes
+main thread: plug_next() 101, plug_note main/101
+dlsym("plug_value") on the main thread reads 101
+written through it, plug_next() gives 501
+thread started before dlopen: ok, its destructors: second(102) first
+4 threads after it: right values 4, destructors in order 4, dlsym gave each its own: yes
+main returns
+main thread's destructors at exit: second(501) first
+then the atexit function
+exit=0

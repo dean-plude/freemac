@@ -37,7 +37,7 @@
 struct section {
     char segname[17], name[17];
     uint64_t addr, size;
-    uint32_t flags, reserved1;
+    uint32_t flags, reserved1, align;
 };
 
 struct segment {
@@ -250,6 +250,7 @@ static void parse_commands(struct image *im)
                 d->size = sec[k].size;
                 d->flags = sec[k].flags;
                 d->reserved1 = sec[k].reserved1;
+                d->align = sec[k].align;
             }
             break;
         }
@@ -1132,6 +1133,28 @@ static void do_classic(struct image *im)
     note("applied %d fixups in the old (relocation entry) form", count);
 }
 
+/* ---- thread-local variables ----------------------------------------------------
+ * The image's template and descriptors go to src/tlv.c, which binds each
+ * descriptor to its own thunk once the image's fixups are done. */
+
+static void find_tlv(struct image *im)
+{
+    struct ferry_tlv_section tlv[MAX_SECTIONS];
+    int n = 0;
+    for (int i = 0; i < im->nsect; i++) {
+        uint32_t type = im->sect[i].flags & S_TYPE_MASK;
+        if (type != S_THREAD_LOCAL_REGULAR && type != S_THREAD_LOCAL_ZEROFILL && type != S_THREAD_LOCAL_VARIABLES)
+            continue;
+        tlv[n].addr = (uint8_t *)(im->sect[i].addr + im->slide);
+        tlv[n].size = im->sect[i].size;
+        tlv[n].type = type;
+        tlv[n].align = im->sect[i].align;
+        n++;
+    }
+    if (n && ferry_tlv_image_loaded(im->path, tlv, n) < 0)
+        die("%s: can't set up its thread-local variables", im->path);
+}
+
 /* ---- loading ----------------------------------------------------------------- */
 
 static void apply_fixups(struct image *im)
@@ -1171,6 +1194,7 @@ static struct image *load_image(const char *path)
     for (int i = 0; i < im->ndylibs; i++)
         im->deps[i] = load_library(im, im->dylibs[i], im->dep_weak[i]);
     apply_fixups(im);
+    find_tlv(im);
     ferry_cxx_image_loaded(im);   /* its unwind tables, once a program uses C++ */
     im->has_objc = objc_find(im, &im->objc);
     if (im->has_objc) {
@@ -1197,6 +1221,15 @@ static void initialize_image(struct image *im, int argc, char **argv, char **env
             initialize_image(im->deps[i], argc, argv, envp, apple);
     if (im->has_objc)
         ferry_objc_load_image(&im->objc);
+    /* thread-local variables' set-up functions, once, ahead of the rest */
+    for (int i = 0; i < im->nsect; i++) {
+        struct section *sec = &im->sect[i];
+        if ((sec->flags & 0xff) != S_THREAD_LOCAL_INIT_FUNCTION_POINTERS)
+            continue;
+        initializer *f = (initializer *)(sec->addr + im->slide);
+        for (uint64_t k = 0; k < sec->size / sizeof *f; k++)
+            f[k](argc, argv, envp, apple);
+    }
     for (int i = 0; i < im->nsect; i++) {
         struct section *sec = &im->sect[i];
         uint8_t type = sec->flags & 0xff;
@@ -1243,10 +1276,20 @@ struct image *ferry_image_containing(const void *addr)
     return NULL;
 }
 
-/* A symbol the image exports, by its Mach-O name ("_main"). */
+/* A symbol the image exports, by its Mach-O name ("_main"), for dlsym. A
+ * thread-local variable is exported as its descriptor; what the caller
+ * gets is the calling thread's variable. */
 void *ferry_image_symbol(struct image *im, const char *macho_name)
 {
-    return im && macho_name ? trie_lookup(im, macho_name, 0) : NULL;
+    void *addr = im && macho_name ? trie_lookup(im, macho_name, 0) : NULL;
+    struct image *owner = addr ? ferry_image_containing(addr) : NULL;
+    for (int i = 0; owner && i < owner->nsect; i++) {
+        struct section *sec = &owner->sect[i];
+        uint64_t a = (uint64_t)addr - owner->slide;
+        if ((sec->flags & S_TYPE_MASK) == S_THREAD_LOCAL_VARIABLES && a >= sec->addr && a < sec->addr + sec->size)
+            return ferry_tlv_address(addr);
+    }
+    return addr;
 }
 
 /* The libraries it links that are files Ferry loaded; *builtin says whether
@@ -1422,5 +1465,7 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
     if (im->unixthread)
         start_unixthread(im->thread_pc + im->slide, argc, argv, envp);
     note("calling main at %p", (void *)entry);
-    return entry(argc, argv, envp, apple);
+    int status = entry(argc, argv, envp, apple);
+    ferry_tlv_exit();   /* as exit would: the main thread's thread-local destructors */
+    return status;
 }

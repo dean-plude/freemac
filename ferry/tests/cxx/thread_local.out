@@ -1,0 +1,13 @@
+thread 1: +first +second +member +local -local -reader(start-100) -member -second -first1 
+thread 2: +first +second +member -reader(start-200) -member -second -first2 
+thread 3: +first +second +member +local -local -reader(start-300) -member -second -first3 
+thread 4: +first +second +member -reader(start-400) -member -second -first4 
+thread 5: +first +second +member +local -local -reader(start-500) -member -second -first5 
+thread 6: +first +second +member -reader(start-600) -member -second -first6 
+thread 7: +first +second +member +local -local -reader(start-700) -member -second -first7 
+thread 8: +first +second +member -reader(start-800) -member -second -first8 
+main thread so far: [] numbers 0 words start
+main returns
+main thread's thread_local destroyed: main's
+static object destroyed after them: [+first +second +member +local -main local -reader(main's) -member -second -first ]
+exit=0
