@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.165 "Add to Dock for websites" (done)
+
+A website such as Facebook can sit in the Dock and open like an app, as Safari's
+File > Add to Dock does on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > Add to Dock… in Web: the site's own name and its largest icon (from its manifest, touch icon or favicon), drawn on a rounded tile, or its first letter on a coloured tile when it has none | webapps.py (new), fallback_menus.py, Topline | done |
+| 2 | The website goes in the Dock and Applications at once and opens in its own window, without the address bar or tabs, with its own sign-in; its name and menus show in the menu bar | webapps.py, apps.py, Dock | done |
+| 3 | Options > Delete Web App… in the Dock asks first, quits it if it's open, and removes it with its sign-in | Dock, webapps.py | done |
+| 4 | The desktop portal (xdg-desktop-portal, GTK backend) that Web uses to make web apps, set up for each session | Build | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.164 "Ferry: toolbars, pop-up lists and search fields" (done)
 
 Mac programs run through Ferry get the controls most Mac windows have along

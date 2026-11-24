@@ -149,6 +149,10 @@ class Topline(Gtk.Window):
         close = Gio.SimpleAction.new("close-window", None)
         close.connect("activate", lambda *_: self._own_action("close-window"))
         self._own_actions.add_action(close)
+        # Web's File > Add to Dock… makes the page in front an app (webapps.py).
+        dock = Gio.SimpleAction.new("add-to-dock", None)
+        dock.connect("activate", lambda *_: self._own_action("add-to-dock"))
+        self._own_actions.add_action(dock)
         # Menus for apps that publish none press the app's own shortcuts.
         press = Gio.SimpleAction.new("press", GLib.VariantType.new("s"))
         press.connect("activate", lambda _a, keys: GLib.timeout_add(150, self._press, keys.get_string()))
@@ -975,6 +979,13 @@ class Topline(Gtk.Window):
             self._quit(view)
         elif name == "close-window" and view.get("id"):
             self.wf.close(view["id"])
+        elif name == "add-to-dock":
+            # The window's title is its page's (as it is now, not when the
+            # window came to the front): Web's saved tabs say which address
+            # it has.
+            fresh = next((v for v in self.wf.views() if v.get("id") == view.get("id")), view)
+            GLib.spawn_async(["freemac-webapp", "--title", fresh.get("title") or ""],
+                             flags=GLib.SpawnFlags.SEARCH_PATH)
 
     def _press(self, keys):
         """Press a shortcut in the app in front, for the menus of apps that

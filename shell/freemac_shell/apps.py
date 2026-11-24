@@ -20,6 +20,8 @@ def app_info(app_id):
         if info:
             break
     if not info:
+        info = _just_made(app_id)
+    if not info:
         for other in Gio.AppInfo.get_all():
             wm_class = other.get_startup_wm_class() if hasattr(other, "get_startup_wm_class") else None
             if wm_class and wm_class.lower() == app_id.lower():
@@ -27,6 +29,23 @@ def app_info(app_id):
                 break
     _cache[app_id] = info
     return info
+
+
+def _just_made(app_id):
+    """An app entry made in the last moments (a website added to the Dock):
+    GLib's list of apps only learns of a new file once its folder watch has
+    told it, so read the person's own apps folder directly."""
+    import os
+    folder = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
+                          "applications")
+    name = app_id if app_id.endswith(".desktop") else app_id + ".desktop"
+    path = os.path.join(folder, name)
+    if "/" in name or not os.path.exists(path):
+        return None
+    try:
+        return Gio.DesktopAppInfo.new_from_filename(path)
+    except TypeError:
+        return None
 
 
 # Helper programs with no app entry of their own, named the way a person

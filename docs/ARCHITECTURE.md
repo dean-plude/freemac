@@ -878,6 +878,36 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Add to Dock for websites (1.165)
+
+Web (Epiphany) makes web apps itself: a profile folder
+`~/.local/share/org.gnome.Epiphany.WebApp_<id>` with a `.app` marker, and a
+launcher running `epiphany --application-mode --profile=…`, which gives the
+site its own window and cookies. Epiphany finds its launcher through the
+desktop portal's DynamicLauncher, so the image now ships
+`xdg-desktop-portal` and `xdg-desktop-portal-gtk`, with
+`freemac-portals.conf` choosing the GTK backend, and `wayfire.ini` runs
+`dbus-update-activation-environment` at login so the portal can reach the
+Wayland display.
+
+`webapps.py` (`freemac-webapp`) writes that layout without Epiphany's own
+dialog. The id is a SHA-1 of the address. The launcher is written under the
+portal's `applications` folder and linked into `~/.local/share/applications`,
+with the address in `X-Freemac-WebApp-URL`, and `Exec` quoted so that a `%`,
+`$` or quote in an address can't reach the shell. The menu item
+`topline.add-to-dock` (Web's File menu) runs it with the window's title; the
+address comes from Epiphany's `session_state.xml`, matching that title. A
+background thread reads the page for a manifest, touch icons and icons
+(`icon_choices` ranks them) and draws a 256-pixel tile: a large opaque icon
+fills it, a small or transparent one sits on white, and a site with none gets
+its first letter on a colour from its host. Add pins the launcher in
+`pier.json`. Topline gives app ids starting `org.gnome.Epiphany.WebApp_`
+the shorter `WEB_APP` menus. Because GLib's list of apps can lag a new
+launcher, `apps.app_info` and the Dock read it from its file. Delete Web
+App… asks first, stops the app's own Epiphany (matched by its `--profile`
+argument, waiting for it to exit so it can't rewrite the folder), then
+removes the link, launcher, profile and pin.
+
 ## Lifeboat in the menu bar (1.163)
 
 `lifeboat_menu.LifeboatMenu` watches `lifeboat-status.json` and

@@ -15,6 +15,8 @@ from gi.repository import Gio, GLib  # noqa: E402
 PRESS = "topline.press"
 CLOSE = "topline.close-window"
 CLOSE_NO_KEY = "close-window, no shortcut"   # where ⌘W already means Close Tab
+ADD_TO_DOCK = "topline.add-to-dock"           # Web's File > Add to Dock… (webapps.py)
+WEB_APP_PREFIX = "org.gnome.epiphany.webapp_"  # a website added to the Dock
 
 # (label, shortcut it presses), with None between groups.
 EDIT = ("Edit", [
@@ -26,7 +28,7 @@ EDIT = ("Edit", [
 FILE = ("File", [("Close Window", CLOSE)])
 
 
-def _browser(private, history, close_window):
+def _browser(private, history, close_window, add_to_dock=False):
     """A web browser's menus; browsers differ only in a few keys."""
     return [
         ("File", [
@@ -35,7 +37,7 @@ def _browser(private, history, close_window):
             ("Open File…", "<Primary>o"), ("Open Location…", "<Primary>l"), None,
             ("Close Tab", "<Primary>w"), ("Close Window", close_window), None,
             ("Save Page As…", "<Primary>s"), ("Print…", "<Primary>p"),
-        ]),
+        ] + ([None, ("Add to Dock…", ADD_TO_DOCK)] if add_to_dock else [])),
         ("Edit", EDIT[1] + [("Find Again", "<Primary>g")]),
         ("View", [
             ("Reload Page", "<Primary>r"), None,
@@ -53,7 +55,19 @@ def _browser(private, history, close_window):
 
 
 FIREFOX = _browser("<Primary><Shift>p", "<Primary><Shift>h", "<Primary><Shift>w")
-WEB = _browser("<Primary><Shift>n", "<Primary>h", CLOSE_NO_KEY)
+WEB = _browser("<Primary><Shift>n", "<Primary>h", CLOSE_NO_KEY, add_to_dock=True)
+# A website added to the Dock opens in a window of its own with no tabs or
+# address bar; its menus keep what still applies.
+WEB_APP = [
+    ("File", [("Print…", "<Primary>p"), None, ("Close Window", CLOSE)]),
+    EDIT,
+    ("View", [
+        ("Reload Page", "<Primary>r"), None,
+        ("Zoom In", "<Primary>plus"), ("Zoom Out", "<Primary>minus"), ("Actual Size", "<Primary>0"),
+        None, ("Enter Full Screen", "F11"),
+    ]),
+    ("History", [("Back", "<Alt>Left"), ("Forward", "<Alt>Right"), ("Home", "<Alt>Home")]),
+]
 
 KNOWN = {
     "firefox": FIREFOX,
@@ -73,7 +87,8 @@ KNOWN = {
 
 def menubar_for(app_id):
     """A menu bar model for an app that publishes none."""
-    spec = KNOWN.get((app_id or "").lower(), [FILE, EDIT])
+    key = (app_id or "").lower()
+    spec = WEB_APP if key.startswith(WEB_APP_PREFIX) else KNOWN.get(key, [FILE, EDIT])
     bar = Gio.Menu()
     for title, entries in spec:
         menu, section = Gio.Menu(), Gio.Menu()
@@ -84,7 +99,9 @@ def menubar_for(app_id):
                 continue
             label, keys = entry
             item = Gio.MenuItem.new(label, None)
-            if keys in (CLOSE, CLOSE_NO_KEY):
+            if keys == ADD_TO_DOCK:
+                item.set_action_and_target_value(ADD_TO_DOCK, None)
+            elif keys in (CLOSE, CLOSE_NO_KEY):
                 item.set_action_and_target_value(CLOSE, None)
                 if keys == CLOSE:
                     item.set_attribute_value("accel", GLib.Variant("s", "<Primary>w"))

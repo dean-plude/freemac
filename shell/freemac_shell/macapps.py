@@ -20,8 +20,8 @@ generic app icon instead.
     freemac-mac-app icon Foo.app out.png         write its icon as a PNG
     freemac-mac-app scan                         add apps found in Applications to the app grid
 
-freemac can't run graphical Mac apps yet (Ferry runs simple command-line Mac
-programs), so opening one says so plainly instead of failing silently.
+Ferry runs Mac apps built only on the frameworks it has so far; when it can't
+run one, opening it says so plainly instead of failing silently.
 """
 import hashlib
 import os
@@ -390,8 +390,8 @@ def open_app(path):
         return 1
     if not shutil.which("ferry"):
         notify(f"“{name}” is a Mac app",
-               "freemac can't open graphical Mac apps yet. Ferry, an optional add-on, runs simple "
-               "Mac command-line programs.")
+               "Mac apps open with Ferry, an optional add-on that isn't installed on this "
+               "computer.")
         return 1
     # Ferry stops at once, with a message naming the reason, when a program
     # needs something it doesn't have yet (a Mac framework such as AppKit).
@@ -404,7 +404,7 @@ def open_app(path):
     if status != 0:
         reason = child.stderr.read().decode("utf-8", "replace").strip().splitlines()
         notify(f"“{name}” can't open yet",
-               ((reason[-1] + " ") if reason else "") + "freemac can't run graphical Mac apps yet.")
+               ((reason[-1] + " ") if reason else "") + "Ferry can't run this app yet.")
         return 1
     return 0
 
