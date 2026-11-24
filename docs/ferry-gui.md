@@ -1081,9 +1081,9 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 82 tests (60 at M7, 69 before freemac (1.170), 74 before
-freemac (1.173), 77 before freemac (1.178), 79 before freemac (1.184)),
-all passing.
+check` runs 84 tests (60 at M7, 69 before freemac (1.170), 74 before
+freemac (1.173), 77 before freemac (1.178), 79 before freemac (1.184), 82
+before freemac (1.188)), all passing.
 The new or extended ones:
 
 | Test | Proves |
@@ -1096,7 +1096,9 @@ The new or extended ones:
 | `appkit_bindings` | now also bindings following changes, and `NSUserDefaultsController` (applied at once, held until saved, reverted); from freemac (1.184) a view's exposed bindings include `NSView`'s `hidden` and `toolTip` |
 | `foundation_kvo_auto` | (freemac (1.184), Ferry 0.17.0) automatic key-value observing: the hidden `NSKVONotifying_` subclass made when an object first gets an observer (`class` still the original, `isMemberOfClass:`, the description), setters of objects, integers, `BOOL`, `double`, rects, points and ranges announced; `automaticallyNotifiesObserversForKey:` and `automaticallyNotifiesObserversOf<Key>`; instance variables set by `setValue:forKey:` announced; the subclass kept after the last observer goes; a subclass of an observed class; dependent keys by `keyPathsForValuesAffectingValueForKey:` and `keyPathsForValuesAffecting<Key>`, through a to-one relationship; key paths through a replaced object (the old one no longer followed); the Prior, Initial, Old and New options; `mutableArrayValueForKey:` through indexed accessors, a setter and an instance variable, with insertion, removal and replacement at indexes; `willChange:valuesAtIndexes:forKey:` by hand; nested changes; mutable dictionaries and `NSUserDefaults`; key-value coding's search order, `setValuesForKeysWithDictionary:`, `setNilValueForKey:` and the undefined-key exceptions |
 | `appkit_formatters` | (freemac (1.184), Ferry 0.17.0) formatters on text fields: the value shown with `stringForObjectValue:`, editing started from `editingStringForObjectValue:`, a keystroke `isPartialStringValid:` refuses (a beep, `control:didFailToValidatePartialString:errorDescription:`), Return and the end of editing reading the text with `getObjectValue:forString:errorDescription:`; a string it can't read beeping, asking `control:didFailToFormatString:errorDescription:` and keeping the editing going (or kept as the value when the delegate says so); `control:isValidObject:` refusing a value; focus with no typing keeping the value; `abortEditing` and `validateEditing`; an `NSNumberFormatter`; a cell's formatter, kept by its copy; a cell-based table's column cell formatter showing the value, starting the editing and giving the data source a number, a bad entry beeping once and Escape |
-| `appkit_binding_controls` | (freemac (1.184), Ferry 0.17.0) bindings that follow and write back: a text field's value (written when the editing ends or on Return, not when nothing was typed, or as it is typed with `NSContinuouslyUpdatesValueBindingOption`), the null placeholder shown as the field's placeholder and an emptied field writing nil, a check box through `NSNegateBoolean`, `enabled` and `enabled2` combined with AND and `hidden` and `hidden2` (through `NSIsNotNil`) with OR, a key path through a to-one relationship, pop-up buttons' `content`, `selectedObject`, `selectedIndex` and `selectedValue` (chosen with the mouse and written back, new content), a slider kept in its range and clicked; `NSObjectController` with no content (the no-selection placeholder, the binding's own), its `selection.name` followed and written, a new content, `remove:` and `add:`; `NSUserDefaultsController`'s `values.*` changed by a click, in the defaults and through the controller; exposed bindings, `infoForBinding:` and the markers; and a nib (`Bindings.nib`) with binding connectors to an object controller and the shared defaults controller, its slider snapping to its tick marks |
+| `appkit_binding_controls` | (freemac (1.184), Ferry 0.17.0) bindings that follow and write back: a text field's value (written when the editing ends or on Return, not when nothing was typed, or as it is typed with `NSContinuouslyUpdatesValueBindingOption`), the null placeholder shown as the field's placeholder and an emptied field writing nil, a check box through `NSNegateBoolean`, `enabled` and `enabled2` combined with AND and `hidden` and `hidden2` (through `NSIsNotNil`) with OR, a key path through a to-one relationship, pop-up buttons' `content`, `selectedObject`, `selectedIndex` and `selectedValue` (chosen with the mouse and written back, new content), a slider kept in its range and clicked; `NSObjectController` with no content (the no-selection placeholder, the binding's own), its `selection.name` followed and written, a new content, `remove:` and `add:` (from freemac (1.188) carried out on the run loop's next turn); `NSUserDefaultsController`'s `values.*` changed by a click, in the defaults and through the controller; exposed bindings, `infoForBinding:` and the markers; and a nib (`Bindings.nib`) with binding connectors to an object controller and the shared defaults controller, its slider snapping to its tick marks |
+| `foundation_kvc_collections` | (freemac (1.188), Ferry 0.18.0) `mutableSetValueForKey:` through a class's set accessors (one object at a time, and `add<Key>:` for a union), through its setter and straight to an instance variable, with the set mutation kinds observers hear (insertion of what a union adds, removal of what a minus or an intersect takes away, replacement for `setSet:`) and the old, new and prior options, and `willChangeValueForKey:withSetMutation:usingObjects:` by hand; the collection operators `@count`, `@sum`, `@avg`, `@min`, `@max`, `@unionOfObjects`, `@distinctUnionOfObjects`, `@unionOfArrays`, `@distinctUnionOfArrays` and `@distinctUnionOfSets` on arrays, sets and through a to-one key, with nil values, empty collections and an unknown operator; arrays and sets answering and taking keys; removing an observer that isn't registered (or with the wrong context) raising `NSRangeException`; `NSPredicate`'s format strings (comparisons, `[c]`, `[d]`, `LIKE`, `BETWEEN`, `IN`, `ANY`, `ALL`, `NONE`, `AND`, `OR`, `NOT`, the format arguments and an argument array), `$variables`, blocks, `NSCompoundPredicate`, filtering arrays and sets, and formats it can't read |
+| `appkit_array_controller` | (freemac (1.188), Ferry 0.18.0) `NSArrayController`: its defaults, content given (an array and a set) and bound (`contentArray`, changed through the owner's indexed accessors and by the owner), `arrangedObjects` sorted and filtered, `selectionIndexes` and `selectedObjects`, `selection.name` with the multiple-values, no-selection and not-applicable markers and `alwaysUsesMultipleValuesMarker`, writing through the selection, `preservesSelection`, `avoidsEmptySelection`, `selectsInsertedObjects`, `clearsFilterPredicateOnInsertion`, adding, inserting at an index and removing, `add:`, `insert:` and `remove:` on the run loop's next turn, `selectNext:` and `selectPrevious:`, `canAdd`, `canInsert` and `canRemove`, `automaticallyRearrangesObjects`, observers of `arrangedObjects.name`, `arrangedObjects.@count`, `selection.name` and `selectionIndexes`, and the `selectionIndexes` binding both ways; a cell-based table whose columns are bound to `arrangedObjects.key`: its content, `selectionIndexes` and `sortDescriptors` bound for it, the columns' sort descriptors (and `NSCreatesSortDescriptorBindingOption`), the null placeholder, a column title bound, clicks and command-clicks selecting in the controller and the controller's selection shown, a model change redrawn, clicks on column titles sorting the controller, cells edited in place written back, rows added and removed |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1242,26 +1244,54 @@ The new or extended ones:
 - **Disk images need 7-Zip** (`7zip` or `p7zip-full`, now a recommended
   package); without it the Installer says so. Encrypted images aren't
   handled.
-- **Key-value observing: arrays only, for to-many keys** (freemac
-  (1.184)). The hidden subclass wraps setters taking objects, integers,
-  `BOOL`, `float`, `double`, points, sizes, rects and ranges, and the
-  indexed array accessors; a setter taking another struct or a `long
-  double` isn't wrapped (its class has to announce the change).
-  `mutableSetValueForKey:`, `mutableOrderedSetValueForKey:` and the set
-  mutation kinds (`NSKeyValueUnionSetMutation` and the rest) aren't done,
-  and neither are collection operators in key paths (`@count`, `@sum`).
+- **Key-value observing: arrays and sets, not ordered sets** (freemac
+  (1.184), sets from freemac (1.188)). The hidden subclass wraps setters
+  taking objects, integers, `BOOL`, `float`, `double`, points, sizes,
+  rects and ranges, the indexed array accessors and the set accessors
+  (`add<Key>Object:`, `remove<Key>Object:`, `add<Key>:`, `remove<Key>:`,
+  `intersect<Key>:`); a setter taking another struct or a `long double`
+  isn't wrapped (its class has to announce the change).
+  `mutableOrderedSetValueForKey:` and ordered sets aren't done. The
+  collection operators are read in key paths, but a key path isn't
+  observed past a plain array or set (an array controller's
+  `arrangedObjects` is followed). `@sum` and `@avg` give an `NSNumber`
+  (an integer when every value is one); whether a Mac gives an
+  `NSDecimalNumber` there, and how it prints, wasn't checked, and the
+  custom operators some code defines (`_<key>ForKeyPath:`) aren't asked.
   The subclass's name, `NSKVONotifying_` and the class's, follows what is
   described publicly; `observationInfo` returns Ferry's own record, and
   setting it does nothing. Observers aren't retained, as on a Mac, and
-  removing one that isn't registered is ignored rather than raising.
+  removing one that isn't registered raises `NSRangeException`, as on a
+  Mac (from freemac (1.188); before, it was ignored); its reason follows
+  the wording Apple's documentation quotes, not compared with a Mac's.
   Not compared with a real Mac: the order of nested notifications and of
   several dependent keys.
-- **Bindings: no array or tree controllers** (freemac (1.184)).
-  `NSArrayController`, `NSTreeController` and `NSDictionaryController`
-  aren't there, so nothing yet answers `NSMultipleValuesMarker`, and table
-  columns, outline views, text views, images, date pickers and segmented
-  controls have no bindings of their own (a binding to a property of the
-  same name is set by key-value coding, one way). Validation
+- **Predicates: a subset** (freemac (1.188)). `NSPredicate` reads
+  comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `IN`,
+  `CONTAINS`, `BEGINSWITH`, `ENDSWITH`, `LIKE`, with `[c]`, `[d]` and
+  `[cd]`), `ANY`, `SOME`, `ALL` and `NONE`, `AND`, `OR` and `NOT`,
+  `TRUEPREDICATE` and `FALSEPREDICATE`, the format arguments `%@`, `%K`,
+  `%d`, `%i`, `%u`, `%f` and `%s` (with `l`, `ll` and `q`), argument
+  arrays, `$variables` and blocks, and `NSCompoundPredicate`. `[d]` folds
+  the accents of Latin letters only. Not done: `MATCHES` (regular
+  expressions), function expressions, `SUBQUERY`, arithmetic, keyed
+  archiving of predicates, and `NSExpression` and `NSComparisonPredicate`
+  as public classes. `predicateFormat` writes Apple's documented forms
+  (strings in double quotes, `NOT` before a comparison without
+  parentheses); not compared character for character with a Mac.
+- **Bindings: array controllers and tables, not trees** (freemac
+  (1.184), `NSArrayController` and table bindings from freemac (1.188)).
+  `NSTreeController` and `NSDictionaryController` aren't there, so outline
+  views have no bindings, and text views, images, date pickers and
+  segmented controls have none of their own (a binding to a property of
+  the same name is set by key-value coding, one way). A table's bindings
+  are the cell-based ones: a view-based table gives its cell views the
+  row's object (or the bound column's value) as their `objectValue`, but
+  bindings inside cell views loaded from a nib weren't tried. A column's
+  per-row `editable` and `enabled` bindings, `NSDeletesObjectsOnRemove`,
+  `NSSelectsAllWhenSettingContent`, `NSHandlesContentAsCompoundValue` and
+  `contentArrayForMultipleSelection` aren't done, and an edited cell
+  writes back even when its controller isn't editable. Validation
   (`NSValidatesImmediatelyBindingOption`, `validateValue:forKey:error:`
   from a binding), `NSConditionallySetsEnabled` and `...Editable`,
   `NSAllowsEditingMultipleValuesSelection`, `NSInsertsNullPlaceholder`
@@ -1273,6 +1303,27 @@ The new or extended ones:
   default). A text field shows the no-selection, multiple-values and null
   placeholders greyed, as its placeholder. The bindings a class exposes
   follow Apple's Cocoa Bindings Reference, not a list read from a Mac.
+- **NSArrayController: written from the documentation, not compared
+  with a Mac** (freemac (1.188)). What a Mac would settle: the order in
+  which observers of the selection and of `arrangedObjects` hear of a
+  change (Ferry: the selection's around the arranged objects'); where
+  `insert:` puts the new object with nothing selected (Ferry: the top);
+  where an object inserted at an arranged index goes in a sorted
+  controller's content array (Ferry: before the arranged object it is put
+  before); which object is selected when the selected ones are removed
+  (Ferry: the one now where the first removed one was); and that an empty
+  selection set by hand stays empty even with `avoidsEmptySelection`
+  (Ferry selects something only when content arrives or the selected
+  objects go). Automatic rearranging happens at once, not at the end of
+  the event loop's turn. An unbound content that isn't mutable is
+  replaced by a mutable copy when objects are added or removed. The nib
+  keys of its checkboxes (`NSAvoidsEmptySelection`,
+  `NSPreservesSelection`, `NSSelectsInsertedObjects`,
+  `NSClearsFilterPredicateOnInsertion`,
+  `NSAutomaticallyRearrangesObjects`) are a guess, untested against
+  Interface Builder's output, and no nib with an array controller was
+  tried. `NSObjectController`'s `add:` and `remove:` now also wait for the
+  run loop's next turn, as Apple documents.
 - **Formatters: text fields, cells and table cells** (freemac (1.184)).
   A text field edits its own text (there is no field editor), so
   `isPartialStringValid:proposedSelectedRange:...` (the newer form) isn't
@@ -1311,9 +1362,12 @@ document classes, `NSAlert` and `NSWorkspace` in 1.167, see
 see `appkit_editing` and `appkit_autosave`; automatic key-value observing,
 two-way bindings, `NSObjectController`, `NSSlider` and formatters in
 (1.184), see `foundation_kvo_auto`, `appkit_binding_controls` and
-`appkit_formatters`), then `NSArrayController` with bindings on table
-columns, other calendars, locales' own number and date data, and document
-versions.
+`appkit_formatters`; `NSArrayController`, bindings on tables and their
+columns, set mutations, collection operators and `NSPredicate` in
+(1.188), see `appkit_array_controller` and
+`foundation_kvc_collections`), then `NSTreeController` and bindings on
+outline views, an array controller loaded from a nib, other calendars,
+locales' own number and date data, and document versions.
 
 ## Known limits (for every milestone)
 
@@ -1350,3 +1404,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.15.0 (freemac (1.173)): `NSCalendar` (Gregorian and ISO 8601), `NSDateComponents`, `NSNumberFormatter`, `NSByteCountFormatter`, `NSISO8601DateFormatter`, `NSDateComponentsFormatter`, relative date formatting, locales' currencies, `make check` 77/77.
 - 2026-11-24: Ferry 0.16.0 (freemac (1.178)): editing text cells in place in table and outline views (double click, Return, Tab and Shift-Tab, Escape, `editColumn:row:withEvent:select:`, the data source's and delegate's calls, the text field's action), `NSDocument` autosaving in place with its timer, Revert To > Last Saved Version and closing without asking, `make check` 79/79.
 - 2026-11-24: Ferry 0.17.0 (freemac (1.184)): automatic key-value observing through a hidden `NSKVONotifying_` subclass, dependent keys, the observing options and `mutableArrayValueForKey:`'s change kinds; two-way bindings on text fields, buttons, pop-up buttons and the new `NSSlider` (with the null placeholder, `NSNegateBoolean`, `NSIsNil`, `NSIsNotNil` and `NSContinuouslyUpdatesValue`), `NSObjectController`, `NSUserDefaultsController`'s `values.*` and binding connectors in nibs; formatters on controls, cells and table cells being edited, `make check` 82/82.
+- 2026-11-24: Ferry 0.18.0 (freemac (1.188)): `NSArrayController` (content and `contentArray`/`contentSet` bindings, `arrangedObjects` sorted and filtered, the selection with `NSMultipleValuesMarker`, adding, inserting and removing, the selection options, automatic rearranging, observing `arrangedObjects.key`); table columns bound to `arrangedObjects.key` with the table's `content`, `selectionIndexes` and `sortDescriptors` bindings, edited cells written back and column titles sorting through the controller; `mutableSetValueForKey:` and the set mutation kinds, the collection operators in key paths, removing an observer that isn't registered raising, and an `NSPredicate` subset, `make check` 84/84.

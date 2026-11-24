@@ -180,8 +180,11 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 
 /* Key-value coding: getters, setters and instance variables by name, as
  * Apple's guide orders the search; scalars and NSPoint, NSSize, NSRect and
- * NSRange are boxed. Collection operators (@count, @sum...) aren't done. */
-@class NSIndexSet, NSSet, NSDictionary, NSMutableArray, NSError;
+ * NSRange are boxed. Arrays and sets answer the collection operators in key
+ * paths (@count, @sum, @avg, @min, @max, @unionOfObjects,
+ * @distinctUnionOfObjects, @unionOfArrays, @distinctUnionOfArrays and
+ * @distinctUnionOfSets). */
+@class NSIndexSet, NSSet, NSMutableSet, NSDictionary, NSMutableArray, NSError;
 @interface NSObject (NSKeyValueCoding)
 @property (class, readonly) BOOL accessInstanceVariablesDirectly;
 - (id)valueForKey:(NSString *)key;
@@ -195,6 +198,8 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 - (BOOL)validateValue:(id *)value forKeyPath:(NSString *)keyPath error:(NSError **)error;
 - (NSMutableArray *)mutableArrayValueForKey:(NSString *)key;
 - (NSMutableArray *)mutableArrayValueForKeyPath:(NSString *)keyPath;
+- (NSMutableSet *)mutableSetValueForKey:(NSString *)key;
+- (NSMutableSet *)mutableSetValueForKeyPath:(NSString *)keyPath;
 - (NSDictionary *)dictionaryWithValuesForKeys:(NSArray *)keys;
 - (void)setValuesForKeysWithDictionary:(NSDictionary *)keyedValues;
 @end
@@ -209,6 +214,10 @@ typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
 typedef NS_ENUM(NSUInteger, NSKeyValueChange) {
     NSKeyValueChangeSetting = 1, NSKeyValueChangeInsertion = 2, NSKeyValueChangeRemoval = 3,
     NSKeyValueChangeReplacement = 4,
+};
+typedef NS_ENUM(NSUInteger, NSKeyValueSetMutationKind) {
+    NSKeyValueUnionSetMutation = 1, NSKeyValueMinusSetMutation = 2, NSKeyValueIntersectSetMutation = 3,
+    NSKeyValueSetSetMutation = 4,
 };
 FOUNDATION_EXPORT NSString *const NSKeyValueChangeKindKey;
 FOUNDATION_EXPORT NSString *const NSKeyValueChangeNewKey;
@@ -228,6 +237,10 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (void)didChangeValueForKey:(NSString *)key;
 - (void)willChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
 - (void)didChange:(NSKeyValueChange)kind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
+- (void)willChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutation
+                 usingObjects:(NSSet *)objects;
+- (void)didChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutation
+                usingObjects:(NSSet *)objects;
 + (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key;
 + (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key;
 @property void *observationInfo;
@@ -546,6 +559,7 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 + (instancetype)setWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
 + (instancetype)setWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 + (instancetype)setWithArray:(NSArray<ObjectType> *)array;
++ (instancetype)setWithSet:(NSSet<ObjectType> *)set;
 - (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 - (BOOL)containsObject:(ObjectType)obj;
 - (ObjectType)member:(ObjectType)obj;
@@ -553,6 +567,11 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 @property (readonly, copy) NSArray<ObjectType> *allObjects;
 - (NSEnumerator<ObjectType> *)objectEnumerator;
 - (BOOL)isSubsetOfSet:(NSSet<ObjectType> *)other;
+- (BOOL)isEqualToSet:(NSSet<ObjectType> *)other;
+- (BOOL)intersectsSet:(NSSet<ObjectType> *)other;
+- (NSSet<ObjectType> *)setByAddingObject:(ObjectType)obj;
+- (NSSet<ObjectType> *)setByAddingObjectsFromSet:(NSSet<ObjectType> *)other;
+- (NSSet<ObjectType> *)setByAddingObjectsFromArray:(NSArray<ObjectType> *)other;
 @end
 
 @interface NSMutableSet<ObjectType> : NSSet<ObjectType>
@@ -564,6 +583,7 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (void)unionSet:(NSSet<ObjectType> *)other;
 - (void)minusSet:(NSSet<ObjectType> *)other;
 - (void)intersectSet:(NSSet<ObjectType> *)other;
+- (void)setSet:(NSSet<ObjectType> *)other;
 @end
 
 /* Index sets: sorted, non-overlapping ranges of indexes (a table's selection). */
@@ -639,6 +659,46 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 @end
 @interface NSMutableArray<ObjectType> (NSSortDescriptorSorting)
 - (void)sortUsingDescriptors:(NSArray<NSSortDescriptor *> *)sortDescriptors;
+@end
+
+/* Predicates (Ferry 0.18.0, a subset): comparisons of key paths and
+ * constants (==, !=, <, <=, >, >=, BETWEEN, IN, CONTAINS, BEGINSWITH,
+ * ENDSWITH and LIKE, with [c], [d] and [cd]), ANY, ALL and NONE, AND, OR and NOT,
+ * TRUEPREDICATE and FALSEPREDICATE, the format arguments %@, %K, %d, %i,
+ * %ld, %lu, %f and %s, $variables, and blocks. */
+@interface NSPredicate : NSObject <NSCopying>
++ (NSPredicate *)predicateWithFormat:(NSString *)format, ...;
++ (NSPredicate *)predicateWithFormat:(NSString *)format argumentArray:(NSArray *)arguments;
++ (NSPredicate *)predicateWithFormat:(NSString *)format arguments:(va_list)args;
++ (NSPredicate *)predicateWithValue:(BOOL)value;
++ (NSPredicate *)predicateWithBlock:(BOOL (^)(id evaluatedObject, NSDictionary *bindings))block;
+@property (readonly, copy) NSString *predicateFormat;
+- (BOOL)evaluateWithObject:(id)object;
+- (BOOL)evaluateWithObject:(id)object substitutionVariables:(NSDictionary *)bindings;
+- (instancetype)predicateWithSubstitutionVariables:(NSDictionary *)variables;
+@end
+typedef NS_ENUM(NSUInteger, NSCompoundPredicateType) {
+    NSNotPredicateType = 0, NSAndPredicateType, NSOrPredicateType,
+};
+@interface NSCompoundPredicate : NSPredicate
+- (instancetype)initWithType:(NSCompoundPredicateType)type subpredicates:(NSArray<NSPredicate *> *)subpredicates;
++ (NSCompoundPredicate *)andPredicateWithSubpredicates:(NSArray<NSPredicate *> *)subpredicates;
++ (NSCompoundPredicate *)orPredicateWithSubpredicates:(NSArray<NSPredicate *> *)subpredicates;
++ (NSCompoundPredicate *)notPredicateWithSubpredicate:(NSPredicate *)predicate;
+@property (readonly) NSCompoundPredicateType compoundPredicateType;
+@property (readonly, copy) NSArray *subpredicates;
+@end
+@interface NSArray<ObjectType> (NSPredicateSupport)
+- (NSArray<ObjectType> *)filteredArrayUsingPredicate:(NSPredicate *)predicate;
+@end
+@interface NSMutableArray<ObjectType> (NSPredicateSupport)
+- (void)filterUsingPredicate:(NSPredicate *)predicate;
+@end
+@interface NSSet<ObjectType> (NSPredicateSupport)
+- (NSSet<ObjectType> *)filteredSetUsingPredicate:(NSPredicate *)predicate;
+@end
+@interface NSMutableSet<ObjectType> (NSPredicateSupport)
+- (void)filterUsingPredicate:(NSPredicate *)predicate;
 @end
 
 /* ---- NSData ------------------------------------------------------------------------- */

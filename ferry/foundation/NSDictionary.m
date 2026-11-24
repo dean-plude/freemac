@@ -282,7 +282,13 @@ static unsigned long never_mutated;
 - (id)copyWithZone:(NSZone *)zone { return [[NSDictionary allocWithZone:zone] initWithDictionary:self]; }
 - (id)mutableCopyWithZone:(NSZone *)zone { return [[NSMutableDictionary allocWithZone:zone] initWithDictionary:self]; }
 - (id)objectForKeyedSubscript:(id)key { return [self objectForKey:key]; }
-- (id)valueForKey:(NSString *)key { return [self objectForKey:key]; }
+/* A key starting with "@" is a key of the dictionary object itself (@count). */
+- (id)valueForKey:(NSString *)key
+{
+    if ([key hasPrefix:@"@"] && [key length] > 1)
+        return [super valueForKey:[key substringFromIndex:1]];
+    return [self objectForKey:key];
+}
 - (NSArray *)allKeys
 {
     NSMutableArray *m = [NSMutableArray array];
@@ -611,6 +617,23 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
         [m addObject:o];
     return [NSArray arrayWithArray:m];
 }
++ (instancetype)setWithSet:(NSSet *)set { return [self setWithArray:[set allObjects]]; }
+- (BOOL)isEqualToSet:(NSSet *)other { return [self isEqual:other]; }
+- (BOOL)intersectsSet:(NSSet *)other
+{
+    for (id o in self)
+        if ([other containsObject:o])
+            return YES;
+    return NO;
+}
+- (NSSet *)setByAddingObject:(id)obj { return [self setByAddingObjectsFromArray:@[ obj ]]; }
+- (NSSet *)setByAddingObjectsFromSet:(NSSet *)other { return [self setByAddingObjectsFromArray:[other allObjects]]; }
+- (NSSet *)setByAddingObjectsFromArray:(NSArray *)other
+{
+    NSMutableSet *m = [[self mutableCopy] autorelease];
+    [m addObjectsFromArray:other];
+    return [NSSet setWithSet:m];
+}
 - (BOOL)isSubsetOfSet:(NSSet *)other
 {
     for (id o in self)
@@ -692,6 +715,11 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
     for (id o in [self allObjects])
         if (![other containsObject:o])
             [self removeObject:o];
+}
+- (void)setSet:(NSSet *)other
+{
+    [self removeAllObjects];
+    [self unionSet:other];
 }
 @end
 

@@ -1259,8 +1259,9 @@ typedef NSString *NSNibName;
 /* Loads its view from a nib (named after the class unless given) the first
  * time the view is asked for, and sits between the view and its superview
  * in the responder chain. Sheets and popovers are shown as windows. */
-/* Controllers for bindings: one object (NSObjectController), and the
- * user's defaults by key (NSUserDefaultsController). */
+/* Controllers for bindings: one object (NSObjectController), an array of
+ * them (NSArrayController), and the user's defaults by key
+ * (NSUserDefaultsController). */
 @interface NSController : NSObject <NSCoding>
 - (BOOL)commitEditing;
 - (void)discardEditing;
@@ -1297,6 +1298,40 @@ typedef NSString *NSNibName;
 - (void)removeObject:(id)object;
 - (IBAction)add:(id)sender;
 - (IBAction)remove:(id)sender;
+@end
+/* An array (or set) of content objects, arranged (filtered and sorted) for
+ * a table, with a selection of them (Ferry 0.18.0). "selection.someKey" is
+ * the value the selected objects share, or NSMultipleValuesMarker. */
+@interface NSArrayController : NSObjectController
+- (void)rearrangeObjects;
+- (NSArray *)arrangeObjects:(NSArray *)objects;
+@property (readonly, retain) id arrangedObjects;
+@property BOOL automaticallyRearrangesObjects;
+@property (readonly, copy) NSArray<NSString *> *automaticRearrangementKeyPaths;
+- (void)didChangeArrangementCriteria;
+@property (copy) NSArray<NSSortDescriptor *> *sortDescriptors;
+@property (retain) NSPredicate *filterPredicate;
+@property BOOL clearsFilterPredicateOnInsertion;
+@property BOOL avoidsEmptySelection, preservesSelection, selectsInsertedObjects, alwaysUsesMultipleValuesMarker;
+- (BOOL)setSelectionIndexes:(NSIndexSet *)indexes;
+@property (readonly, copy) NSIndexSet *selectionIndexes;
+- (BOOL)setSelectionIndex:(NSUInteger)index;
+@property (readonly) NSUInteger selectionIndex;
+- (BOOL)addSelectionIndexes:(NSIndexSet *)indexes;
+- (BOOL)removeSelectionIndexes:(NSIndexSet *)indexes;
+- (BOOL)setSelectedObjects:(NSArray *)objects;
+- (BOOL)addSelectedObjects:(NSArray *)objects;
+- (BOOL)removeSelectedObjects:(NSArray *)objects;
+@property (readonly) BOOL canSelectNext, canSelectPrevious, canInsert;
+- (IBAction)selectNext:(id)sender;
+- (IBAction)selectPrevious:(id)sender;
+- (IBAction)insert:(id)sender;
+- (void)addObjects:(NSArray *)objects;
+- (void)insertObject:(id)object atArrangedObjectIndex:(NSUInteger)index;
+- (void)insertObjects:(NSArray *)objects atArrangedObjectIndexes:(NSIndexSet *)indexes;
+- (void)removeObjectAtArrangedObjectIndex:(NSUInteger)index;
+- (void)removeObjectsAtArrangedObjectIndexes:(NSIndexSet *)indexes;
+- (void)removeObjects:(NSArray *)objects;
 @end
 /* What a controller's selection answers when there is no single value. */
 APPKIT_EXTERN id NSMultipleValuesMarker, NSNoSelectionMarker, NSNotApplicableMarker;
@@ -1370,13 +1405,16 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
     *const NSSelectedValueBinding, *const NSSelectedTagBinding, *const NSContentValuesBinding,
     *const NSContentObjectBinding, *const NSContentObjectsBinding, *const NSEditableBinding,
     *const NSMinValueBinding, *const NSMaxValueBinding, *const NSTextColorBinding, *const NSImageBinding,
-    *const NSAlternateTitleBinding, *const NSFontBinding;
+    *const NSAlternateTitleBinding, *const NSFontBinding, *const NSContentArrayBinding, *const NSContentSetBinding,
+    *const NSSelectionIndexesBinding, *const NSSortDescriptorsBinding, *const NSFilterPredicateBinding,
+    *const NSHeaderTitleBinding, *const NSMaxWidthBinding, *const NSMinWidthBinding, *const NSWidthBinding;
 APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelectionPlaceholderBindingOption,
     *const NSMultipleValuesPlaceholderBindingOption, *const NSNotApplicablePlaceholderBindingOption,
     *const NSValueTransformerNameBindingOption, *const NSValueTransformerBindingOption,
     *const NSContinuouslyUpdatesValueBindingOption, *const NSRaisesForNotApplicableKeysBindingOption,
     *const NSConditionallySetsEnabledBindingOption, *const NSConditionallySetsEditableBindingOption,
-    *const NSAllowsEditingMultipleValuesSelectionBindingOption, *const NSValidatesImmediatelyBindingOption;
+    *const NSAllowsEditingMultipleValuesSelectionBindingOption, *const NSValidatesImmediatelyBindingOption,
+    *const NSCreatesSortDescriptorBindingOption;
 @interface NSObject (NSKeyValueBindingCreation)
 + (void)exposeBinding:(NSString *)binding;
 @property (readonly, copy) NSArray<NSString *> *exposedBindings;

@@ -303,8 +303,10 @@ int main(void)
         printf("new content: %s; can remove %d, can add %d\n", [[sel stringValue] UTF8String], [oc canRemove],
                [oc canAdd]);
         [oc remove:nil];
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];   /* done on the next turn */
         printf("removed: \"%s\" (placeholder %s)\n", [[sel stringValue] UTF8String], str([sel placeholderString]));
         [oc add:nil];
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
         printf("added: content is a %s\n", [[oc content] isKindOfClass:[NSMutableDictionary class]] ? "dictionary" : "?");
         [w makeFirstResponder:sel];
         type(w, @"Dict");

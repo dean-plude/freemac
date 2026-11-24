@@ -1,0 +1,106 @@
+  club: addMembersObject: ann
+  club: addMembersObject: bob
+two added, one at a time:
+  members kind 2 new {ann}
+  members kind 2 new {bob}
+  club: addMembers: {bob cy dee}
+a union of three, one already there:
+  members kind 2 new {cy dee}
+  club: removeMembersObject: ann
+removed:
+  members kind 3 old {ann}
+  club: removeMembersObject: bob
+intersected (no intersectMembers:, so removals):
+  members kind 3 old {bob}
+members {cy dee}, count 2, contains cy 1, enumerated {cy dee}
+  club: removeMembersObject: cy
+  club: addMembersObject: eve
+set to dee and eve:
+  members kind 3 old {cy}
+  members kind 2 new {eve}
+members {dee eve}
+a union announced by hand:
+  members kind 2 prior
+  members kind 2 new {fay}
+setting announced by hand:
+  members kind 4 prior old {dee}
+  members kind 4 old {dee} new {fay}
+through the setter: {Emma Ivanhoe}, set 1 time(s)
+a setter's change:
+  books kind 1 old {Emma} new {Emma Ivanhoe}
+an instance variable, changed directly:
+  loose kind 2 new {cup pen}
+  loose kind 3 old {pen}
+  loose kind 4 old {cup} new {}
+loose now {}
+by key path: {dee eve}
+a key with no set: NSUnknownKeyException
+@count 4, @count.name 4
+@sum.count 8, @sum.price 8.5
+@avg.count 2, @avg.price 2.125
+@min.price 2.5, @max.price 3, @max.name cheese, @min.name apple
+@unionOfObjects.name apple,bread,cheese,apple
+@unionOfObjects.price 3,2.5,3
+@distinctUnionOfObjects.name {apple bread cheese}
+@unionOfArrays.tags red,fruit,baked,dairy,fruit
+@distinctUnionOfArrays.tags {baked dairy fruit red}
+@distinctUnionOfSets.colors {brown green red yellow} (a set 1)
+on a set: @count 4, @sum.count 8, names {apple bread cheese} (a set 1)
+numbers: @sum.self 7, @avg.self 2.3333333333333335, @max.self 4
+empty: @count 0, @sum 0, @avg 0, @max nil, union 0
+through a key: items.@count 4, items.@sum.price 8.5, items.@max.count 4
+a dictionary's @count: 2
+an unknown operator: NSUnknownKeyException
+names apple,bread,cheese,apple
+prices (
+    3,
+    2.5,
+    <null>,
+    3
+)
+set of names {apple bread cheese}
+each named: same,same,same,same
+each counted: 28
+removed twice: NSRangeException, "Cannot remove an observer <Watcher..."
+  then " for the key path "name" from <Item"... " because it is not registered as an observer."
+never registered, with a context: NSRangeException
+the wrong context: NSRangeException
+the right context: no exception
+name == 'Crème brûlée'                -> name == "Crème brûlée"            YES
+name ==[c] "CRÈME BRÛLÉE"             -> name ==[c] "CRÈME BRÛLÉE"         YES
+name BEGINSWITH[cd] 'creme'              -> name BEGINSWITH[cd] "creme"          YES
+name BEGINSWITH 'creme'                  -> name BEGINSWITH "creme"              NO
+name CONTAINS[c] 'BRÛ'                  -> name CONTAINS[c] "BRÛ"              YES
+name ENDSWITH 'lée'                     -> name ENDSWITH "lée"                 YES
+name LIKE 'Cr*br?l*'                     -> name LIKE "Cr*br?l*"                 YES
+name LIKE[c] '*CRÈME'                   -> name LIKE[c] "*CRÈME"               NO
+price > 6 AND count <= 3                 -> price > 6 AND count <= 3             YES
+price < 6 OR count = 3                   -> price < 6 OR count == 3              YES
+NOT (price >= 7) && !(count != 3)        -> NOT price >= 7 AND NOT count != 3    YES
+count BETWEEN {1, 3}                     -> count BETWEEN {1, 3}                 YES
+count IN {1, 2, 4}                       -> count IN {1, 2, 4}                   NO
+'sweet' IN tags                          -> "sweet" IN tags                      YES
+tags CONTAINS 'french'                   -> tags CONTAINS "french"               YES
+ANY tags BEGINSWITH 'fr'                 -> ANY tags BEGINSWITH "fr"             YES
+ALL tags BEGINSWITH 'fr'                 -> ALL tags BEGINSWITH "fr"             NO
+NONE tags == 'salty'                     -> NONE tags == "salty"                 YES
+SELF.count == 3                          -> count == 3                           YES
+price != nil AND name != NULL            -> price != nil AND name != nil         YES
+TRUEPREDICATE                            -> TRUEPREDICATE                        YES
+FALSEPREDICATE OR count > 2              -> FALSEPREDICATE OR count > 2          YES
+%K == %@                                 -> name == "Crème brûlée"            YES
+count == %d AND price > %f               -> count == 3 AND price > 6             YES
+name BEGINSWITH %s                       -> name BEGINSWITH "Cr"                 YES
+(count == 1 OR count == 3) AND price < 10 -> (count == 1 OR count == 3) AND price < 10 YES
+count == 1 OR (count == 3 AND price < 10) -> count == 1 OR (count == 3 AND price < 10) YES
+argument array: count > 2 1
+variable: count >= $least; 1 with 3, 0 with 4; substituted count >= 2
+filtered: fig,onion
+by a block: pepper,Crème brûlée
+filtered in place: fig,onion,Crème brûlée
+a set: {onion}
+compound: count > 1 AND (price == 1 OR FALSEPREDICATE) -> fig,onion
+not: NOT (count > 1 AND (price == 1 OR FALSEPREDICATE))
+a format it can't read: NSInvalidArgumentException
+an unknown word: NSInvalidArgumentException
+exit=0

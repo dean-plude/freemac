@@ -606,6 +606,21 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
     NSSize s = ALineSize(AAttributed([self title], [_headerCell font] ?: ADefaultFont(), [NSColor textColor]), NULL, NULL);
     [self setWidth:fmax(_minWidth, s.width + 24)];
 }
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSHeaderTitleBinding]) {
+        [self setTitle:value ? [value description] : @""];
+        [[_tableView headerView] setNeedsDisplay:YES];
+    } else {
+        [super _ferrySetValue:value forBinding:binding];
+    }
+}
+- (id)_ferryValueForBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSHeaderTitleBinding])
+        return [self title];
+    return [super _ferryValueForBinding:binding];
+}
 @end
 
 /* ---- NSTableHeaderView ---------------------------------------------------------------- */
@@ -1093,6 +1108,7 @@ enum {
     NSTextField *_editor;    /* the field being edited: a cell view's, or ATableCellEditor */
     id _editOriginal;        /* its value when editing began */
     BOOL _endingEdit, _editedOnClick;
+    BOOL _bindingUpdate;     /* set from a binding: not written back to it */
 }
 
 - (void)_setUp
@@ -1247,20 +1263,110 @@ enum {
     if (_rowsKnown)
         [self reloadData];
 }
+/* With bindings (Ferry 0.18.0) the rows are the bound content (or a bound
+ * column's rows), and a bound column's cells its key of each; otherwise
+ * the data source answers. */
+- (NSArray *)_boundRows
+{
+    BOOL bound;
+    id rows = ABindingModelValue(self, NSContentBinding, &bound);
+    if (!bound)
+        for (NSTableColumn *c in _columns)
+            if (ABindingIsBound(c, NSValueBinding)) {
+                NSDictionary *info = [c infoForBinding:NSValueBinding];
+                NSString *path = [info objectForKey:NSObservedKeyPathKey];
+                NSRange dot = [path rangeOfString:@"."];
+                if (dot.location != NSNotFound)
+                    path = [path substringToIndex:dot.location];
+                @try {
+                    rows = [[info objectForKey:NSObservedObjectKey] valueForKeyPath:path];
+                } @catch (NSException *e) {
+                    rows = nil;
+                }
+                bound = YES;
+                break;
+            }
+    if (!bound)
+        return nil;
+    if ([rows isKindOfClass:[NSSet class]])
+        rows = [rows allObjects];
+    return [rows isKindOfClass:[NSArray class]] ? rows : [NSArray array];
+}
 - (NSInteger)_countRows
 {
+    NSArray *rows = [self _boundRows];
+    if (rows)
+        return (NSInteger)[rows count];
     return [_dataSource respondsToSelector:@selector(numberOfRowsInTableView:)] ? [_dataSource numberOfRowsInTableView:self] : 0;
 }
 - (id)_objectValueForColumn:(NSTableColumn *)c row:(NSInteger)row
 {
+    BOOL bound;
+    id v = ABindingCellValue(c, row, &bound);
+    if (bound)
+        return v;
+    if (ABindingIsBound(self, NSContentBinding)) {
+        NSArray *rows = [self _boundRows];
+        return row >= 0 && (NSUInteger)row < [rows count] ? [rows objectAtIndex:(NSUInteger)row] : nil;
+    }
     if ([_dataSource respondsToSelector:@selector(tableView:objectValueForTableColumn:row:)])
         return [_dataSource tableView:self objectValueForTableColumn:c row:row];
     return nil;
 }
 - (void)_setObjectValue:(id)v forColumn:(NSTableColumn *)c row:(NSInteger)row
 {
+    if (ABindingIsBound(c, NSValueBinding)) {
+        ABindingSetCellValue(c, row, v);
+        return;
+    }
     if ([_dataSource respondsToSelector:@selector(tableView:setObjectValue:forTableColumn:row:)])
         [_dataSource tableView:self setObjectValue:v forTableColumn:c row:row];
+}
+/* The bound rows changed: loaded again, the selection taken from its
+ * binding, nothing written back. */
+- (void)_ferryBoundRowsChanged
+{
+    BOOL was = _bindingUpdate;
+    _bindingUpdate = YES;
+    @try {
+        if (_editor && _endingEdit)
+            [self _reloadRowsQuietly];
+        else
+            [self reloadData];
+        ABindingRefresh(self, NSSelectionIndexesBinding);
+    } @finally {
+        _bindingUpdate = was;
+    }
+}
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
+{
+    BOOL was = _bindingUpdate;
+    _bindingUpdate = YES;
+    @try {
+        if ([binding isEqualToString:NSContentBinding]) {
+            [self _ferryBoundRowsChanged];
+        } else if ([binding isEqualToString:NSSelectionIndexesBinding]) {
+            NSIndexSet *rows = [value isKindOfClass:[NSIndexSet class]] ? value : [NSIndexSet indexSet];
+            if (![rows isEqualToIndexSet:_selection])
+                [self selectRowIndexes:rows byExtendingSelection:NO];
+        } else if ([binding isEqualToString:NSSortDescriptorsBinding]) {
+            [self setSortDescriptors:[value isKindOfClass:[NSArray class]] ? value : @[]];
+        } else {
+            [super _ferrySetValue:value forBinding:binding];
+        }
+    } @finally {
+        _bindingUpdate = was;
+    }
+}
+- (id)_ferryValueForBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSSelectionIndexesBinding])
+        return [self selectedRowIndexes];
+    if ([binding isEqualToString:NSSortDescriptorsBinding])
+        return [self sortDescriptors];
+    if ([binding isEqualToString:NSContentBinding])
+        return [self _boundRows];
+    return [super _ferryValueForBinding:binding];
 }
 - (BOOL)_dataSourceTakesValues
 {
@@ -1325,6 +1431,8 @@ enum {
 - (SEL)_columnDidResizeSelector { return @selector(tableViewColumnDidResize:); }
 - (void)_sortDescriptorsDidChange:(NSArray *)old
 {
+    if (!_bindingUpdate)
+        ABindingPush(self, NSSortDescriptorsBinding);
     if ([_dataSource respondsToSelector:@selector(tableView:sortDescriptorsDidChange:)])
         [_dataSource tableView:self sortDescriptorsDidChange:old];
 }
@@ -1362,6 +1470,7 @@ enum {
     _fittedWidth = -1;
     [self _dropAllRowViews];
     [self tile];
+    ABindingColumnJoinedTable(c);
 }
 - (void)removeTableColumn:(NSTableColumn *)c
 {
@@ -1918,7 +2027,8 @@ enum {
         return NO;
     if ([self _delegateMakesViews])
         return [self _editableFieldAtColumn:column row:row] != nil;
-    if ([self _isGroupRow:row] || ![c isEditable] || ![self _dataSourceTakesValues] ||
+    if ([self _isGroupRow:row] || ![c isEditable] ||
+        !([self _dataSourceTakesValues] || ABindingIsBound(c, NSValueBinding)) ||
         ![self _editableCellAtColumn:column row:row])
         return NO;
     return [self _shouldEditColumn:c row:row];
@@ -2184,7 +2294,8 @@ enum {
     NSRange beyond = NSMakeRange((NSUInteger)_rows, NSNotFound - (NSUInteger)_rows);
     BOOL changed = [_selection countOfIndexesInRange:beyond] > 0;
     [_selection removeIndexesInRange:beyond];
-    if (!_empty && ![_selection count] && _rows > 0) {
+    /* a bound selection is the controller's to choose */
+    if (!_empty && ![_selection count] && _rows > 0 && !ABindingIsBound(self, NSSelectionIndexesBinding)) {
         [_selection addIndex:0];
         changed = YES;
     }
@@ -2389,6 +2500,8 @@ enum {
     if (![_selection count])
         _lastSelected = -1;
     [self _selectionChanged];
+    if (!_bindingUpdate)
+        ABindingPush(self, NSSelectionIndexesBinding);
     if (notify)
         [self _post:[self _selectionDidChangeName] selector:[self _selectionDidChangeSelector] userInfo:nil];
 }
@@ -2844,7 +2957,8 @@ enum {
                 continue;
             if ([v respondsToSelector:@selector(setObjectValue:)] &&
                 ([_dataSource respondsToSelector:@selector(tableView:objectValueForTableColumn:row:)] ||
-                 [_dataSource respondsToSelector:@selector(outlineView:objectValueForTableColumn:byItem:)]))
+                 [_dataSource respondsToSelector:@selector(outlineView:objectValueForTableColumn:byItem:)] ||
+                 ABindingIsBound(c, NSValueBinding) || ABindingIsBound(self, NSContentBinding)))
                 [(NSTableCellView *)v setObjectValue:[self _objectValueForColumn:c row:row]];
             [v setFrame:[self _cellFrameForColumn:(NSInteger)i row:row]];
             [rv->_views setObject:v forKey:key];

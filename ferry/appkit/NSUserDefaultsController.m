@@ -6,6 +6,8 @@
  * proxy that reads and writes the content's keys (selection.name), or
  * answers NSNoSelectionMarker while there is no content. Observers of
  * selection.someKey hear of the content's changes, and of a new content.
+ * Its add: and remove: actions are carried out on the run loop's next
+ * turn. NSArrayController (NSArrayController.m) builds on it.
  *
  * The defaults controller's "values" proxy reads and writes the user's
  * defaults by key (values.someKey), applied at once by default, or kept
@@ -25,19 +27,11 @@
 - (void)objectDidEndEditing:(id)editor {}
 @end
 
-/* A proxy that hears of its source's keys: it observes the first key of
- * each key path observed on it, on whatever object that key is read from,
- * and announces those changes as its own. */
-@interface AKeyProxy : NSObject {
-@public
-    NSMutableDictionary *_keys;   /* first key observed on the proxy -> how many times */
-    id _watched;              /* what those keys are observed on (retained) */
-}
-- (id)_source;
-- (void)_sourceWillChange;
-- (void)_sourceDidChange;
-@end
-
+/* AKeyProxy (declared in AInternal.h): a proxy that hears of its
+ * sources' keys. It observes the first key of each key path observed on
+ * it, on each object that key is read from (one content object, or each of
+ * an array controller's selected objects), and announces those changes as
+ * its own. */
 static char proxy_context;
 
 static NSString *first_key(NSString *keyPath)
@@ -48,10 +42,25 @@ static NSString *first_key(NSString *keyPath)
 
 @implementation AKeyProxy
 - (id)_source { return nil; }
+- (NSArray *)_sources
+{
+    id s = [self _source];
+    return s ? [NSArray arrayWithObject:s] : [NSArray array];
+}
+- (void)_watch:(NSString *)k
+{
+    for (id o in _watched)
+        [o addObserver:self forKeyPath:k options:NSKeyValueObservingOptionPrior context:&proxy_context];
+}
+- (void)_unwatch:(NSString *)k
+{
+    for (id o in _watched)
+        [o removeObserver:self forKeyPath:k context:&proxy_context];
+}
 - (void)dealloc
 {
     for (NSString *k in _keys)
-        [_watched removeObserver:self forKeyPath:k context:&proxy_context];
+        [self _unwatch:k];
     [_watched release];
     [_keys release];
     [super dealloc];
@@ -65,8 +74,8 @@ static NSString *first_key(NSString *keyPath)
     NSUInteger n = [[_keys objectForKey:k] unsignedIntegerValue];
     if (!n) {
         if (!_watched)
-            _watched = [[self _source] retain];
-        [_watched addObserver:self forKeyPath:k options:NSKeyValueObservingOptionPrior context:&proxy_context];
+            _watched = [[self _sources] copy];
+        [self _watch:k];
     }
     [_keys setObject:@(n + 1) forKey:k];
     [super addObserver:observer forKeyPath:keyPath options:options context:context];
@@ -82,7 +91,7 @@ static NSString *first_key(NSString *keyPath)
         return;
     }
     [_keys removeObjectForKey:k];
-    [_watched removeObserver:self forKeyPath:k context:&proxy_context];
+    [self _unwatch:k];
 }
 - (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath
 {
@@ -111,15 +120,16 @@ static NSString *first_key(NSString *keyPath)
 - (void)_sourceWillChange
 {
     for (NSString *k in _keys)
-        [_watched removeObserver:self forKeyPath:k context:&proxy_context];
+        [self _unwatch:k];
     [_watched release];
     _watched = nil;
 }
 - (void)_sourceDidChange
 {
-    _watched = [[self _source] retain];
+    [_watched release];
+    _watched = [[self _sources] copy];
     for (NSString *k in _keys)
-        [_watched addObserver:self forKeyPath:k options:NSKeyValueObservingOptionPrior context:&proxy_context];
+        [self _watch:k];
 }
 + (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key { return NO; }
 @end
@@ -214,13 +224,17 @@ static NSString *first_key(NSString *keyPath)
     if (object == _content)
         [self setContent:nil];
 }
-- (void)add:(id)sender
+/* add: and remove: take effect on the run loop's next turn, as Apple
+ * documents (since Mac OS X 10.4). */
+- (void)add:(id)sender { [self performSelector:@selector(_ferryAdd) withObject:nil afterDelay:0]; }
+- (void)remove:(id)sender { [self performSelector:@selector(_ferryRemove) withObject:nil afterDelay:0]; }
+- (void)_ferryAdd
 {
     id obj = [self newObject];
     [self addObject:obj];
     [obj release];
 }
-- (void)remove:(id)sender { [self removeObject:_content]; }
+- (void)_ferryRemove { [self removeObject:_content]; }
 /* bound to contentObject: the bound value is the content */
 - (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
 {

@@ -144,6 +144,14 @@ NSString *FDescribe(id obj, int indent)
 }
 - (instancetype)_initWithObject:(id)object key:(NSString *)key;
 @end
+/* The set mutableSetValueForKey: answers. */
+@interface FKVCSetProxy : NSMutableSet {
+    id _object;
+    NSString *_key;
+    SEL _addOne, _removeOne, _addMany, _removeMany, _intersect, _setter;
+}
+- (instancetype)_initWithObject:(id)object key:(NSString *)key;
+@end
 
 
 @implementation NSObject (NSObjectFoundation)
@@ -522,6 +530,18 @@ static BOOL send_setter(id self, SEL sel, const char *t, id value)
     return [[self valueForKeyPath:[path substringToIndex:dot.location]]
         mutableArrayValueForKey:[path substringFromIndex:dot.location + 1]];
 }
+- (NSMutableSet *)mutableSetValueForKey:(NSString *)key
+{
+    return [[[FKVCSetProxy alloc] _initWithObject:self key:key] autorelease];
+}
+- (NSMutableSet *)mutableSetValueForKeyPath:(NSString *)path
+{
+    NSRange dot = [path rangeOfString:@"." options:NSBackwardsSearch];
+    if (dot.location == NSNotFound)
+        return [self mutableSetValueForKey:path];
+    return [[self valueForKeyPath:[path substringToIndex:dot.location]]
+        mutableSetValueForKey:[path substringFromIndex:dot.location + 1]];
+}
 @end
 
 /* ---- mutableArrayValueForKey: -----------------------------------------------------
@@ -634,6 +654,306 @@ static BOOL send_setter(id self, SEL sel, const char *t, id value)
         [obj release];
     } else
         [self _change:NSKeyValueChangeReplacement at:i with:obj];
+}
+@end
+
+/* ---- mutableSetValueForKey: -------------------------------------------------------
+ * A mutable set standing for an object's unordered to-many key, searched
+ * as Apple's guide orders it: the object's add<Key>Object: and
+ * remove<Key>Object: (or add<Key>: and remove<Key>:, with intersect<Key>:
+ * if it has it), else set<Key>: with a changed copy, else an NSMutableSet
+ * instance variable changed directly and announced to observers with the
+ * set mutation kinds. */
+@implementation FKVCSetProxy
+- (instancetype)initWithObjects:(const id[])objects count:(NSUInteger)count { return self; }
+- (instancetype)_initWithObject:(id)object key:(NSString *)key
+{
+    if ((self = [super init])) {
+        _object = [object retain];
+        _key = [key copy];
+        NSString *Key = capitalized(key);
+#define FIND(var, fmt)                                                     \
+    do {                                                                   \
+        SEL s_ = NSSelectorFromString([NSString stringWithFormat:fmt, Key]); \
+        if ([object respondsToSelector:s_])                                \
+            var = s_;                                                      \
+    } while (0)
+        FIND(_addOne, @"add%@Object:");
+        FIND(_removeOne, @"remove%@Object:");
+        FIND(_addMany, @"add%@:");
+        FIND(_removeMany, @"remove%@:");
+        FIND(_intersect, @"intersect%@:");
+        if (!((_addOne || _addMany) && (_removeOne || _removeMany))) {
+            _addOne = _removeOne = _addMany = _removeMany = _intersect = NULL;
+            FIND(_setter, @"set%@:");
+        }
+#undef FIND
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_object release];
+    [_key release];
+    [super dealloc];
+}
+- (NSSet *)_current
+{
+    id v = [_object valueForKey:_key];
+    if ([v isKindOfClass:[NSArray class]])
+        v = [NSSet setWithArray:v];
+    return v;
+}
+- (NSUInteger)count { return [[self _current] count]; }
+- (id)member:(id)obj { return [[self _current] member:obj]; }
+- (NSArray *)allObjects { return [[self _current] allObjects] ?: [NSArray array]; }
+- (NSEnumerator *)objectEnumerator { return [[self allObjects] objectEnumerator]; }
+- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id *)buffer count:(NSUInteger)len
+{
+    /* a snapshot, kept by the pool around the loop */
+    if (!state->state)
+        state->extra[0] = (unsigned long)[self allObjects];
+    return [(NSArray *)state->extra[0] countByEnumeratingWithState:state objects:buffer count:len];
+}
+/* The set itself, when it is kept straight in an instance variable. */
+- (NSMutableSet *)_storage
+{
+    Ivar v = kvc_ivar(object_getClass(_object), _key);
+    if (!v || ivar_getTypeEncoding(v)[0] != '@')
+        FRaise(@"NSUnknownKeyException", @"[<%@ %p> mutableSetValueForKey:]: the key %@ can't be changed.",
+               [_object class], _object, _key);
+    id a = object_getIvar(_object, v);
+    if (!a) {
+        a = [[NSMutableSet alloc] init];
+        object_setIvar(_object, v, a);
+    }
+    if (![a isKindOfClass:[NSMutableSet class]])
+        FRaise(NSInternalInconsistencyException, @"the instance variable for %@ isn't a mutable set", _key);
+    return a;
+}
+/* One change of the set, through whichever way the object offers. */
+- (void)_mutate:(NSKeyValueSetMutationKind)kind with:(NSSet *)objs
+{
+    if (_addOne || _addMany) {
+        switch (kind) {
+        case NSKeyValueUnionSetMutation:
+            /* one object goes through the one-object method when there is one */
+            if (_addMany && !(_addOne && [objs count] == 1))
+                ((void (*)(id, SEL, id))objc_msgSend)(_object, _addMany, objs);
+            else
+                for (id o in objs)
+                    ((void (*)(id, SEL, id))objc_msgSend)(_object, _addOne, o);
+            return;
+        case NSKeyValueMinusSetMutation:
+            if (_removeMany && !(_removeOne && [objs count] == 1))
+                ((void (*)(id, SEL, id))objc_msgSend)(_object, _removeMany, objs);
+            else
+                for (id o in objs)
+                    ((void (*)(id, SEL, id))objc_msgSend)(_object, _removeOne, o);
+            return;
+        case NSKeyValueIntersectSetMutation:
+        case NSKeyValueSetSetMutation: {
+            if (kind == NSKeyValueIntersectSetMutation && _intersect) {
+                ((void (*)(id, SEL, id))objc_msgSend)(_object, _intersect, objs);
+                return;
+            }
+            NSMutableSet *gone = [NSMutableSet set];
+            for (id o in [self allObjects])
+                if (![objs containsObject:o])
+                    [gone addObject:o];
+            if ([gone count])
+                [self _mutate:NSKeyValueMinusSetMutation with:gone];
+            if (kind == NSKeyValueSetSetMutation) {
+                NSMutableSet *come = [NSMutableSet set];
+                NSSet *now = [self _current];
+                for (id o in objs)
+                    if (![now containsObject:o])
+                        [come addObject:o];
+                if ([come count])
+                    [self _mutate:NSKeyValueUnionSetMutation with:come];
+            }
+            return;
+        }
+        }
+    }
+    if (_setter) {
+        NSMutableSet *copy = [[[self _current] mutableCopy] autorelease] ?: [NSMutableSet set];
+        switch (kind) {
+        case NSKeyValueUnionSetMutation: [copy unionSet:objs]; break;
+        case NSKeyValueMinusSetMutation: [copy minusSet:objs]; break;
+        case NSKeyValueIntersectSetMutation: [copy intersectSet:objs]; break;
+        case NSKeyValueSetSetMutation: copy = [[objs mutableCopy] autorelease]; break;
+        }
+        ((void (*)(id, SEL, id))objc_msgSend)(_object, _setter, copy);
+        return;
+    }
+    NSMutableSet *set = [self _storage];
+    BOOL notifies = [[_object class] automaticallyNotifiesObserversForKey:_key];
+    if (notifies)
+        [_object willChangeValueForKey:_key withSetMutation:kind usingObjects:objs];
+    switch (kind) {
+    case NSKeyValueUnionSetMutation: [set unionSet:objs]; break;
+    case NSKeyValueMinusSetMutation: [set minusSet:objs]; break;
+    case NSKeyValueIntersectSetMutation: [set intersectSet:objs]; break;
+    case NSKeyValueSetSetMutation:
+        [set removeAllObjects];
+        [set unionSet:objs];
+        break;
+    }
+    if (notifies)
+        [_object didChangeValueForKey:_key withSetMutation:kind usingObjects:objs];
+}
+- (void)addObject:(id)obj
+{
+    if (!obj)
+        FRaise(NSInvalidArgumentException, @"*** -[NSKeyValueSet addObject:]: object cannot be nil");
+    [self _mutate:NSKeyValueUnionSetMutation with:[NSSet setWithObject:obj]];
+}
+- (void)removeObject:(id)obj
+{
+    if (obj)
+        [self _mutate:NSKeyValueMinusSetMutation with:[NSSet setWithObject:obj]];
+}
+- (void)addObjectsFromArray:(NSArray *)array { [self _mutate:NSKeyValueUnionSetMutation with:[NSSet setWithArray:array]]; }
+- (void)unionSet:(NSSet *)other { [self _mutate:NSKeyValueUnionSetMutation with:other ?: [NSSet set]]; }
+- (void)minusSet:(NSSet *)other { [self _mutate:NSKeyValueMinusSetMutation with:other ?: [NSSet set]]; }
+- (void)intersectSet:(NSSet *)other { [self _mutate:NSKeyValueIntersectSetMutation with:other ?: [NSSet set]]; }
+- (void)setSet:(NSSet *)other { [self _mutate:NSKeyValueSetSetMutation with:other ?: [NSSet set]]; }
+- (void)removeAllObjects { [self _mutate:NSKeyValueSetSetMutation with:[NSSet set]]; }
+@end
+
+/* ---- collection operators -----------------------------------------------------------
+ * In a key path, "@op.rest" applied to an array or a set, as Apple's
+ * "Key-Value Coding Programming Guide" describes: @count; @sum and @avg
+ * (nil counting as 0), @min and @max (by compare:, nil left out); and the
+ * unions, of the values (@unionOfObjects, @distinctUnionOfObjects) or of
+ * the arrays or sets the elements give (@unionOfArrays,
+ * @distinctUnionOfArrays, @distinctUnionOfSets). The unions leave nil out;
+ * a set gives a set. */
+
+static BOOL is_integer_number(id v)
+{
+    if (![v isKindOfClass:[NSNumber class]])
+        return NO;
+    const char *t = [v objCType];
+    return t && strchr("cCsSiIlLqQB", *t);
+}
+
+static id collection_operator(id collection, NSString *path)
+{
+    NSRange dot = [path rangeOfString:@"."];
+    NSString *op = dot.location == NSNotFound ? path : [path substringToIndex:dot.location];
+    NSString *right = dot.location == NSNotFound ? nil : [path substringFromIndex:dot.location + 1];
+    BOOL isSet = [collection isKindOfClass:[NSSet class]];
+    NSArray *items = isSet ? [collection allObjects] : collection;
+    if ([op isEqualToString:@"@count"])
+        return @([items count]);
+    NSMutableArray *values = [NSMutableArray array];   /* NSNull for nil */
+    for (id o in items) {
+        id v = right ? [o valueForKeyPath:right] : o;
+        [values addObject:v ?: [NSNull null]];
+    }
+    if ([op isEqualToString:@"@sum"] || [op isEqualToString:@"@avg"]) {
+        BOOL integers = YES;
+        long long isum = 0;
+        double dsum = 0;
+        for (id v in values) {
+            if (v == [NSNull null])
+                continue;
+            if (!is_integer_number(v))
+                integers = NO;
+            isum += [v longLongValue];
+            dsum += [v doubleValue];
+        }
+        if ([op isEqualToString:@"@sum"])
+            return integers ? @(isum) : @(dsum);
+        if (![values count])
+            return @0;
+        double avg = dsum / (double)[values count];
+        return integers && avg == floor(avg) ? @((long long)avg) : @(avg);
+    }
+    if ([op isEqualToString:@"@max"] || [op isEqualToString:@"@min"]) {
+        BOOL max = [op isEqualToString:@"@max"];
+        id best = nil;
+        for (id v in values) {
+            if (v == [NSNull null])
+                continue;
+            if (!best) {
+                best = v;
+                continue;
+            }
+            NSComparisonResult r = (NSComparisonResult)((NSInteger(*)(id, SEL, id))objc_msgSend)(v, @selector(compare:), best);
+            if ((max && r == NSOrderedDescending) || (!max && r == NSOrderedAscending))
+                best = v;
+        }
+        return best;
+    }
+    BOOL distinct = [op hasPrefix:@"@distinct"];
+    NSMutableArray *out = [NSMutableArray array];
+    void (^put)(id) = ^(id v) {
+        if (v == [NSNull null] || !v)
+            return;
+        if (distinct && [out containsObject:v])
+            return;
+        [out addObject:v];
+    };
+    if ([op isEqualToString:@"@unionOfObjects"] || [op isEqualToString:@"@distinctUnionOfObjects"]) {
+        for (id v in values)
+            put(v);
+    } else if ([op isEqualToString:@"@unionOfArrays"] || [op isEqualToString:@"@distinctUnionOfArrays"] ||
+               [op isEqualToString:@"@distinctUnionOfSets"]) {
+        for (id v in values) {
+            if ([v isKindOfClass:[NSSet class]])
+                v = [v allObjects];
+            if ([v isKindOfClass:[NSArray class]])
+                for (id x in v)
+                    put(x);
+        }
+        if ([op isEqualToString:@"@distinctUnionOfSets"])
+            return [NSSet setWithArray:out];
+    } else {
+        FRaise(@"NSUnknownKeyException", @"[<%@ %p> valueForKeyPath:]: this class does not implement the %@ operation.",
+               [collection class], collection, [op substringFromIndex:1]);
+    }
+    return isSet ? (id)[NSSet setWithArray:out] : (id)[NSArray arrayWithArray:out];
+}
+
+@implementation NSArray (FKVCCollections)
+- (id)valueForKeyPath:(NSString *)path
+{
+    if ([path hasPrefix:@"@"])
+        return collection_operator(self, path);
+    return [super valueForKeyPath:path];
+}
+/* each element's key is set */
+- (void)setValue:(id)value forKey:(NSString *)key
+{
+    for (id o in self)
+        [o setValue:value forKey:key];
+}
+@end
+
+@implementation NSSet (FKVCCollections)
+- (id)valueForKey:(NSString *)key
+{
+    NSMutableSet *m = [NSMutableSet set];
+    for (id o in self) {
+        id v = [o valueForKey:key];
+        if (v)
+            [m addObject:v];
+    }
+    return m;
+}
+- (id)valueForKeyPath:(NSString *)path
+{
+    if ([path hasPrefix:@"@"])
+        return collection_operator(self, path);
+    return [super valueForKeyPath:path];
+}
+- (void)setValue:(id)value forKey:(NSString *)key
+{
+    for (id o in self)
+        [o setValue:value forKey:key];
 }
 @end
 
