@@ -1183,6 +1183,14 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.185 "Show Clipboard" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Edit > Show Clipboard in Drawer: one window showing the files, picture or words on the clipboard, with what kind they are at the bottom | drawer.py, drawer_clipboard.py | done |
+| 2 | It changes as soon as anything is copied in any app; very long text is cut short and big pictures are shrunk to fit | drawer_clipboard.py | done |
+| 3 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.184 "Ferry: observing, bindings and formatters" (done)
 
 Mac programs whose windows follow their data by themselves, through
