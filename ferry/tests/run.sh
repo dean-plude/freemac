@@ -27,6 +27,10 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
+        foundation_dates)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_panes|appkit_tables|appkit_controls)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
@@ -118,6 +122,16 @@ run_one foundation_collections_chained "$here/foundation/collections.m" "$here/f
     -framework Foundation -Wl,-fixup_chains
 run_one foundation_attributed "$here/foundation/attributed.m" "$here/foundation/attributed.out" -framework Foundation
 run_one foundation_kvo "$here/foundation/kvo.m" "$here/foundation/kvo.out" -framework Foundation
+# NSInvocation, NSMethodSignature, NSProxy and forwarding, and undo through
+# prepareWithInvocationTarget: (Ferry 0.14.0), also unoptimized and with
+# chained fixups. The program ends on a message nothing implements.
+run_one foundation_invocation "$here/foundation/invocation.m" "$here/foundation/invocation.out" -framework Foundation
+run_one foundation_invocation_O0 "$here/foundation/invocation.m" "$here/foundation/invocation.out" -O0 \
+    -framework Foundation -Wl,-fixup_chains
+# JSON reading and writing, and dates: time zones, locales and date
+# formatting (Ferry 0.14.0).
+run_one foundation_json "$here/foundation/json.m" "$here/foundation/json.out" -framework Foundation
+run_one foundation_dates "$here/foundation/dates.m" "$here/foundation/dates.out" -framework Foundation
 # Keyed archives (M5), the format of nib files.
 run_one foundation_archive "$here/foundation/archive.m" "$here/foundation/archive.out" -framework Foundation
 # Core Graphics and Core Text (M3), drawn by this system's Cairo and Pango.
@@ -397,6 +411,12 @@ if grep -q "unrecognized selector sent to instance" "$build/objc_unknown.err" 2>
     echo "ok   objc_unknown message"; pass=$((pass + 1))
 else
     echo "FAIL objc_unknown message"; fail=$((fail + 1))
+fi
+# ... and so must one through Foundation's forwarding.
+if grep -q "\-\[NSObject frobnicate\]: unrecognized selector sent to instance" "$build/foundation_invocation.err" 2>/dev/null; then
+    echo "ok   foundation_invocation message"; pass=$((pass + 1))
+else
+    echo "FAIL foundation_invocation message"; sed 's/^/    stderr: /' "$build/foundation_invocation.err"; fail=$((fail + 1))
 fi
 # The unsupported program must also say what was missing.
 if grep -q "pthread_yield_np" "$build/unsupported.err" 2>/dev/null; then

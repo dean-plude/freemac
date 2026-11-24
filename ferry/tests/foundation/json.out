@@ -1,0 +1,85 @@
+reading
+  {"big":18446744073709551615,"exp":0.0025,"huge":1e+300,"name":"Ferry","neg":-12,"no":false,"none":null,"ok":true,"ratio":0.25,"tags":["mac","linux"],"version":14,"zero":0}
+  version is an integer: yes, ratio 0.25, big 18446744073709551615, ok is a boolean: yes, none is NSNull: yes
+  mutable: dictionary 0, array 0
+  string of 16 characters: 0071 0022 0062 005c 0073 002f 006e 000a 0074 0009 0072 000d 0062 0008 0066 000c
+  string of 2 characters: 00e9 4e2d
+  string of 2 characters: d83d de00
+  string of 4 characters: 0063 0061 0066 00e9
+  mutable containers (1, 1): {"key":"new","list":[1,{"added":"y","inner":"x"},3],"word":"leaf"}
+  mutable leaves: leafy
+  fragments: "just a string" 42 null
+  UTF-16LE with a byte order mark: ["é",1], UTF-16BE: ["é",1], UTF-32BE: ["é",1]
+mistakes
+   -> error 3840: Unexpected end of file during JSON parse around line 1, column 1. (at 0)
+      -> error 3840: Unexpected end of file during JSON parse around line 1, column 1. (at 0)
+  "fragment" -> error 3840: JSON text did not start with array or object and option to allow fragments not set around line 1, column 1. (at 0)
+  [1, 2 -> error 3840: Unexpected end of file while parsing array around line 1, column 1. (at 0)
+  [1 2] -> error 3840: Badly formed array around line 1, column 4. (at 3)
+  [1,] -> error 3840: Trailing comma in array around line 1, column 4. (at 3)
+  {"a" 1} -> error 3840: No value for key in object around line 1, column 6. (at 5)
+  {"a":1,} -> error 3840: Trailing comma in object around line 1, column 8. (at 7)
+  {1:2} -> error 3840: No string key for value in object around line 1, column 2. (at 1)
+  [01] -> error 3840: Leading zeros are not allowed around line 1, column 2. (at 1)
+  [1.] -> error 3840: Invalid number: no digits after the decimal point around line 1, column 2. (at 1)
+  [1e] -> error 3840: Invalid number: no digits in the exponent around line 1, column 2. (at 1)
+  [-] -> error 3840: Invalid value around line 1, column 2. (at 1)
+  [tru] -> error 3840: Invalid value around line 1, column 2. (at 1)
+  ["\x"] -> error 3840: Invalid escape sequence around line 1, column 3. (at 2)
+  ["\ud800"] -> error 3840: Missing low code point in surrogate pair around line 1, column 3. (at 2)
+  ["a
+b"] -> error 3840: Unescaped control character around line 1, column 4. (at 3)
+  ["open] -> error 3840: Unterminated string around line 1, column 2. (at 1)
+  [1] x -> error 3840: Garbage at end around line 1, column 5. (at 4)
+  {"a":
+  [1,
+   nope]} -> error 3840: Invalid value around line 3, column 4. (at 15)
+  [1e999] -> error 3840: Number out of range around line 1, column 2. (at 1)
+  [[[[[[[[[[[[[[[[[[[[[[[[ -> error 3840: Too many nested arrays or dictionaries around line 1, column 513. (at 512)
+writing
+  {"empty":[],"list":[1,2.5,-3,true,false,null,"tab\there","\u0001"],"name":"Ferry \"boat\"","nested":{"a":[{"deep":1e-07}],"b":"2"},"nothing":{},"numbers":[0.1,0.3333333333333333,1e+100,123456789012345678,18446744073709551615],"path":"\/usr\/lib\/ferry","unicode":"café 中"}
+{
+  "empty" : [
+
+  ],
+  "list" : [
+    1,
+    2.5,
+    -3,
+    true,
+    false,
+    null,
+    "tab\there",
+    "\u0001"
+  ],
+  "name" : "Ferry \"boat\"",
+  "nested" : {
+    "a" : [
+      {
+        "deep" : 1e-07
+      }
+    ],
+    "b" : "2"
+  },
+  "nothing" : {
+
+  },
+  "numbers" : [
+    0.1,
+    0.3333333333333333,
+    1e+100,
+    123456789012345678,
+    18446744073709551615
+  ],
+  "path" : "/usr/lib/ferry",
+  "unicode" : "café 中"
+}
+  reads back equal: yes
+  ["a\/b"]
+  fragment: "alone", a float: 0.1
+  valid: 1 0 0 0 0 1
+  NSInvalidArgumentException: Invalid type in JSON write (FDate)
+  NSInvalidArgumentException: +[NSJSONSerialization dataWithJSONObject:options:error:]: Invalid top-level type in JSON write
+  NSInvalidArgumentException: Invalid number value (infinite) in JSON write
+  NSInvalidArgumentException: Invalid (non-string) key in JSON dictionary
+exit=0

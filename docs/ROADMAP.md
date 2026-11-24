@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.170 "Ferry: messages passed on, JSON and dates" (done)
+
+Many larger Mac programs pass messages on to other objects, read and write
+JSON, and show dates in the computer's time zone; Ferry now has the pieces
+they're built on.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSMethodSignature` and `NSInvocation`: build a message, send it to any object and read its answer, for every kind of argument a PC's calling rules pass (whole numbers, decimals, small and large structures, more arguments than fit in registers) | Ferry Foundation | done |
+| 2 | Messages an object doesn't know are offered to `forwardInvocation:` before the program stops, as on a Mac; `NSProxy` stands in for another object | Ferry runtime, Foundation | done |
+| 3 | `NSUndoManager prepareWithInvocationTarget:` records the change to undo, with groups and redo | Ferry Foundation | done |
+| 4 | `NSJSONSerialization`: read and write JSON in UTF-8, UTF-16 or UTF-32, pretty-printed or with sorted keys, with a Mac's errors | Ferry Foundation | done |
+| 5 | `NSTimeZone` from the computer's own time zone files, a simple `NSLocale`, and `NSDateFormatter` writing and reading every date pattern, in English (United States) | Ferry Foundation | done |
+| 6 | Ferry 0.14.0, tests `foundation_invocation`, `foundation_json` and `foundation_dates` (74 tests) | Ferry, Docs | done |
+
 ## 1.169 "Accessibility Shortcuts" (done)
 
 | # | Item | Component | Status |

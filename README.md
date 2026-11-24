@@ -298,6 +298,9 @@ menu bar) appear in freemac's menu bar, with their menus.
 Their lists, tables and outlines (the kind with a column header you click
 to sort, or folders you open with a little arrow) work too, and so do their
 toolbars, pop-up lists, search fields and Day/Week/Month style buttons.
+Programs that read and write JSON, show dates in the right time zone and
+format, or pass messages on to other objects (as many larger Mac apps do
+behind the scenes) have what they need for that too.
 
 For apps that matter, the dependable route is the Linux or web version of the
 app, or a free alternative; Harbor, the app centre, lists those.

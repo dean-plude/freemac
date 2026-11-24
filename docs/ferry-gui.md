@@ -1081,7 +1081,8 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 69 tests (60 at M7), all passing. The new or extended ones:
+check` runs 74 tests (60 at M7, 69 before freemac (1.170)), all passing.
+The new or extended ones:
 
 | Test | Proves |
 | --- | --- |
@@ -1098,6 +1099,10 @@ check` runs 69 tests (60 at M7), all passing. The new or extended ones:
 | `appkit_tables` | (freemac 1.159) table and outline views: a cell-based table in a scroll view with its header tiled above it (geometry, drawing through its cells, a check box column), selection by click, shift- and command-click, double click and the arrow keys with the delegate's say, sorting by clicks on the header, columns resized by dragging the header's dividers and by each autoresizing style, rows inserted and removed; a view-based table making only the rows in sight and reusing their views; an outline view opened and closed by code, chevron clicks and the arrow keys, with items and rows mapped both ways; and both loaded from a nib with a prototype cell view |
 | `appkit_controls` | (freemac 1.164) pop-up buttons, segmented controls, search fields, stack views and toolbars: a pop-up list's menu opened over the button with the chosen item lined up, chosen by click and click, by press, drag and release, by the arrow keys, Return, Space and typing, closed by Escape or a click outside, disabled items passed over, an item's own action, the menu's delegate and the will-pop-up notification, and full keyboard access; a pull-down list; segmented controls in each tracking mode, with disabled segments, drags off a segment, tags, a segment's menu, the keys and every distribution; search fields searching after a pause, at once or only on Return, cleared by Escape and the clear button, with recent searches kept, saved and shown in the search menu; stack views in rows and columns (gravity areas, every distribution and alignment, insets, custom spacing, hidden and detached views, views dropped for want of room by visibility priority, nested stacks); toolbars from a delegate (the window's frame growing by the strip in each display and size mode, items placed with a flexible space, validation, clicks, a selectable item, items added and removed, the overflow menu, the saved configuration); and all of them loaded from a nib |
 | `appkit_documents` | (freemac 1.167) the document classes, alerts and the workspace, in `DocApp.app` from `make_nibs.py` (four document types in its Info.plist, the File and Edit menus and the app's own `NSDocumentController` subclass in its main nib, a document window nib): a note named on the command line opened at launch; the types, classes and extensions; New ("Untitled", "Untitled 2"); edits through the undo manager moving the change count and the window's edited dot, Undo and Redo from the Edit menu; the File menu's validation; Save and Save As through the Save panel shown as a sheet, saved safely beside the file; Revert in a sheet; closing with unsaved changes (Cancel, Don't Save and Save, by Escape, Command-D and Return); Open through the Open panel, a file already open, a type the app can't open and a file it can't read; a package read and written as a file wrapper; a class with only the Mac OS X 10.3 calls; the Recent Documents list in the defaults and the Open Recent menu, opened from and cleared; alerts run modally in a nested loop (Return, Escape, Command-D, a click), their layouts with an accessory view and the suppression check box, the old return codes, `FERRY_ALERT_ANSWER`, `presentError:`; sheets (queued, the window's close refused while one is up, the old `beginSheet:modalForWindow:...` call); the workspace opening addresses, files and folders through a stand-in `gio`, icons, apps by identifier and name, types; and quitting with two unsaved documents (the review alert, each document's sheet, `NSTerminateLater`). Pictures of an alert, a sheet and an edited window go to `FERRY_DOCUMENTS_PNG` |
+| `foundation_invocation` | (freemac (1.170), Ferry 0.14.0) `NSMethodSignature` from type encodings (sizes, alignments, frame length, `NSGetSizeAndAlignment`, bad encodings raising); `NSInvocation` calling methods that take and return integers of every width, pointers, objects, `float`, `double`, `long double`, C strings, small and large structs (`NSRect`, `NSRange`, structs mixing integers and floats, one in two vector registers, a struct passed on the stack), `SEL` and blocks, with more arguments than registers; `getReturnValue:`, `setReturnValue:`, `retainArguments` (objects, blocks and C strings kept), `invoke` and `invokeWithTarget:`, a nil target; exceptions thrown through `invoke` and through forwarding; an `NSProxy` that logs and re-sends every kind of call to its target; an `NSObject` subclass catching messages with `methodSignatureForSelector:` and `forwardInvocation:` (instance and class methods, `forwardingTargetForSelector:` going first); `NSUndoManager`'s `prepareWithInvocationTarget:` with groups, nested groups, redo, registration turned off and `removeAllActionsWithTarget:`; and a message nobody implements still stopping the program with the Mac's message (`foundation_invocation message`) |
+| `foundation_invocation_O0` | (freemac (1.170)) the same program unoptimized and linked with chained fixups |
+| `foundation_json` | (freemac (1.170)) `NSJSONSerialization` reading objects, arrays, every escape, surrogate pairs, integers, large integers and doubles, `true`, `false` and `null`; the mutability options and fragments; UTF-16 and UTF-32 input; mistakes as errors in the Cocoa domain (3840) with their line, column and index; nesting too deep; writing compactly, pretty-printed and with sorted keys, slashes escaped or not, fragments; `isValidJSONObject:`; what raises (other classes, infinite numbers, non-string keys, a bad top level) |
+| `foundation_dates` | (freemac (1.170)) `NSTimeZone` from the system's time zone database (offsets, abbreviations, daylight saving time, the next change, a year past the database's list, local mean time), from offsets and abbreviations, `$TZ` as the system zone; `NSLocale` identifiers and their parts; `NSDateFormatter` writing every pattern letter of Unicode date patterns, in four zones, and the standard styles; reading ISO 8601, RFC 2822 and other strings with offsets, zone names and abbreviations, abutting fields, two-digit years, missing fields, day of year, eras, strict and lenient; part of a string, errors; templates; changed symbols and copies |
 
 **What isn't done yet (and why).**
 
@@ -1112,10 +1117,33 @@ check` runs 69 tests (60 at M7), all passing. The new or extended ones:
   answers NO, so a document is saved only when the user saves it, as on
   Mac OS X 10.6; the autosave calls save nothing and Browse All Versions is
   disabled. Renaming, moving and locking from the title bar, printing and
-  Page Setup are disabled too. `NSUndoManager`'s
-  `prepareWithInvocationTarget:` answers nil (Ferry has no `NSInvocation`
-  yet), so undo registered that way is lost; the selector and block forms
-  work.
+  Page Setup are disabled too. (`NSUndoManager`'s
+  `prepareWithInvocationTarget:` works from freemac (1.170), so undo
+  registered that way is kept, as the selector and block forms were.)
+- **`NSInvocation` and forwarding: x86-64 only, and a few edge cases**
+  (freemac (1.170)). Arguments and results are laid out by Ferry's own
+  reading of the x86-64 System V calling convention. A `long double`
+  inside a struct that is returned in memory, `_Complex` types other than
+  `long double`, and vector types (`__m128` and the like, which type
+  encodings can't describe) aren't covered by the tests. When a forwarded
+  message's caller and `methodSignatureForSelector:` disagree on whether
+  the result comes back in memory, Ferry prints a warning and carries on
+  as the signature says (or stops, if no memory was given).
+- **JSON: no JSON5** (freemac (1.170)). `NSJSONReadingJSON5Allowed` is
+  accepted and plain JSON is still read; JSON5's comments, single quotes
+  and unquoted keys are mistakes. `TopLevelDictionaryAssumed` has no
+  effect. Error messages are Ferry's own words in Apple's style.
+- **Dates: English and Gregorian only** (freemac (1.170)). `NSLocale`
+  knows identifiers and their parts, but every locale writes and reads
+  dates in English (United States): its month and day names and its
+  standard styles (with a plain space before AM and PM, where newer Macs
+  put a narrow one). There's no `NSCalendar`, `NSDateComponents`,
+  `NSNumberFormatter`, `NSISO8601DateFormatter` or relative formatting
+  ("Today"); `doesRelativeDateFormatting` is kept and ignored. Time zone
+  names (`zzzz`, `vvvv`) come from a table of the common zones, and others
+  are written as GMT offsets. Fields a string leaves out come from
+  `defaultDate`, or else from 1 January 2000 at midnight. `dateFormatFromTemplate:` handles
+  the usual templates by rule, not from the Unicode locale data.
 - **Alerts and sheets are drawn inside Ferry** (1.167): a sheet hangs
   inside its window; one taller or wider than the window gets a window of
   its own, set modal for its parent. The alert's help button asks the
@@ -1151,8 +1179,11 @@ came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
 `appkit_tables`; `NSPopUpButton`, `NSSegmentedControl`, `NSSearchField`,
 `NSStackView` and `NSToolbar` in 1.164, see `appkit_controls`; the
 document classes, `NSAlert` and `NSWorkspace` in 1.167, see
-`appkit_documents`), then editing in tables' cells, `NSInvocation` (for
-`prepareWithInvocationTarget:` and forwarding) and autosaving.
+`appkit_documents`; `NSInvocation`, forwarding, `NSJSONSerialization` and
+`NSDateFormatter` in (1.170), see `foundation_invocation`,
+`foundation_json` and `foundation_dates`), then editing in tables' cells,
+autosaving, and `NSCalendar` and `NSNumberFormatter` on top of the new
+time zones and locales.
 
 ## Known limits (for every milestone)
 
@@ -1185,3 +1216,4 @@ bridge in the `ferry` binary.
 - 2026-11-22: M5 merged (#37). M6 done: real apps tried (docs/ferry-compat.md), NIBArchive nibs, missing frameworks tolerated, Grand Central Dispatch, pre-10.6 libraries, `make check` 48/48.
 - 2026-11-23: M6 merged (#136). M7 done: NSImage, catchable exceptions, window and view controllers, clipboard, Open/Save panels, drag and drop, dock icons, backing scale; Flycut's crash fixed, `make check` 60/60.
 - 2026-11-23: M7 merged (#171). More apps and installers: Ferry's Installer (.pkg, .dmg), scroll and text views, key-value observing, ICU, Carbon and Accessibility answers; ShiftIt runs into its event loop; MacPorts, XQuartz and Sequel Pro install, `make check` 67/67.
+- 2026-11-24: Ferry 0.14.0 (freemac (1.170)): `NSInvocation`, `NSMethodSignature`, `NSProxy` and message forwarding, `prepareWithInvocationTarget:`, `NSJSONSerialization`, `NSTimeZone`, `NSLocale` and `NSDateFormatter`, `make check` 74/74.

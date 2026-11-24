@@ -50,6 +50,16 @@ NSString *FUserFolder(NSSearchPathDirectory dir);
 /* Collections */
 void FSortObjects(id *items, NSUInteger n, SEL selector);
 
+/* The proleptic Gregorian calendar, as days since 1 January 1970 (NSTimeZone.m) */
+int64_t FDaysFromCivil(int64_t year, int month, int day);
+void FCivilFromDays(int64_t days, int64_t *year, int *month, int *day);
+
+@interface NSTimeZone (FerryInternal)
+/* The offset (seconds east of UTC), daylight saving flag and abbreviation in
+ * effect at t, in whole seconds since 1970. */
+- (void)_at:(int64_t)t offset:(int32_t *)off dst:(BOOL *)dst abbreviation:(const char **)abbr;
+@end
+
 @interface NSUserDefaults (FerryInternal)
 - (NSString *)_ferryDomain; /* the application id the defaults are saved under */
 @end

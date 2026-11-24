@@ -1,0 +1,149 @@
+signatures
+  v16@0:8: returns v (0 bytes), 2 arguments: @ :
+  {CGRect={CGPoint=dd}{CGSize=dd}}40@0:8{CGPoint=dd}16{CGSize=dd}32: returns {CGRect={CGPoint=dd}{CGSize=dd}} (32 bytes), 4 arguments: @ : {CGPoint=dd} {CGSize=dd}
+  Vv16@0:8: returns Vv (0 bytes), oneway, 2 arguments: @ :
+  r*24@0:8^{_NSZone=}16: returns r* (8 bytes), 3 arguments: @ : ^{_NSZone=}
+  D32@0:8D16: returns D (16 bytes), 3 arguments: @ : D
+  @?<v@?i>24@0:8@"NSString"16: returns @?<v@?i> (8 bytes), 3 arguments: @ : @"NSString"
+  {Tiny=cs}20@0:8{Tiny=cs}16: returns {Tiny=cs} (4 bytes), 3 arguments: @ : {Tiny=cs}
+  (U=ic[3s])16@0:8: returns (U=ic[3s]) (8 bytes), 2 arguments: @ :
+  {Bits=b3b5b9}16@0:8: returns {Bits=b3b5b9} (4 bytes), 2 arguments: @ :
+  equal ignoring offsets: yes, hash equal: yes
+  from the class: same
+  for a method nobody has: nil
+  sizes: c=1/1 s=2/2 i=4/4 q=8/8 f=4/4 d=8/8 D=16/16 @=8/8 ^v=8/8 {CGRect={CGPoint=dd}{CGSize=dd}}=32/8 {Tiny=cs}=4/2 [5i]=20/4 (U=ic[3s])=8/4 {Bits=b3b5b9}=4/4 {?=c{?=dc}}=24/8 jf=8/4
+  bad encoding: NSInvalidArgumentException
+  index 4: NSInvalidArgumentException
+invocations
+  add:to: 42, by message -2
+  negate: -5, by message 100
+  half: 32500, isPositive:-3 0, isPositive:9 1
+  eight integers (two on the stack): 654564, by message 121
+  mix:f:d: 3.75, by message 100.5
+  ten floating-point numbers (two on the stack): 55, by message 49
+  fsum: 3.75, by message 0.375
+  rectAt:size: (memory) {3, 4, 50, 60}, by message {-1, -2, 7, 8}
+  move:by: (two vector registers) {3.5, 3.5}, by message {11, 9}
+  shift:by: (two general registers) {15, 12}, by message {2, 2}
+  mixed: (a vector and a general register) {3, 42}, by message {-2, 0}
+  intFloat: (one general register) {21, 1.5}, by message {-6, 0.5}
+  scale:by: {2, 4, 6}, by message {-1, -1, -1}
+  sumBig:plus: (a struct on the stack) 1006, by message 0
+  bigFrom: {4, 40, 400}, by message {-1, -10, -100}
+  tiny: {b, 99}, by message {z, -1}
+  third: (x87) 3.333333, by message 0.333333
+  echo: ferry, by message boat
+  join:with: ferry+wave, by message a+b
+  call:with: 14, by message 2
+  selectorBack: description
+  caught CalcFailure: failed: by message
+the rest of NSInvocation
+  target is calc: yes, selector add:to:, retained: no
+  return value set by hand: 99
+  invokeWithTarget: 3, calls 2 and 1, target is now other: yes
+  to nil: 0
+  argument 1: add:to:
+  index 4: NSInvalidArgumentException
+  retainArguments: retained yes, count 1 -> 2
+  after the caller let go: kept+copied
+  a stack block copied by retainArguments: 105
+  caught CalcFailure: failed: through invoke
+  a class method: 1005
+through a proxy
+  [proxy] add:to:
+  [proxy] add:to:
+  add:to: 42, by message -2
+  [proxy] negate:
+  [proxy] negate:
+  negate: -5, by message 100
+  [proxy] half:
+  [proxy] isPositive:
+  [proxy] isPositive:
+  half: 32500, isPositive:-3 0, isPositive:9 1
+  [proxy] sumOf::::::::
+  [proxy] sumOf::::::::
+  eight integers (two on the stack): 654564, by message 121
+  [proxy] mix:f:d:
+  [proxy] mix:f:d:
+  mix:f:d: 3.75, by message 100.5
+  [proxy] tenDoubles::::::::::
+  [proxy] tenDoubles::::::::::
+  ten floating-point numbers (two on the stack): 55, by message 49
+  [proxy] fsum::
+  [proxy] fsum::
+  fsum: 3.75, by message 0.375
+  [proxy] rectAt:size:
+  [proxy] rectAt:size:
+  rectAt:size: (memory) {3, 4, 50, 60}, by message {-1, -2, 7, 8}
+  [proxy] move:by:
+  [proxy] move:by:
+  move:by: (two vector registers) {3.5, 3.5}, by message {11, 9}
+  [proxy] shift:by:
+  [proxy] shift:by:
+  shift:by: (two general registers) {15, 12}, by message {2, 2}
+  [proxy] mixed:
+  [proxy] mixed:
+  mixed: (a vector and a general register) {3, 42}, by message {-2, 0}
+  [proxy] intFloat:
+  [proxy] intFloat:
+  intFloat: (one general register) {21, 1.5}, by message {-6, 0.5}
+  [proxy] scale:by:
+  [proxy] scale:by:
+  scale:by: {2, 4, 6}, by message {-1, -1, -1}
+  [proxy] sumBig:plus:
+  [proxy] sumBig:plus:
+  sumBig:plus: (a struct on the stack) 1006, by message 0
+  [proxy] bigFrom:
+  [proxy] bigFrom:
+  bigFrom: {4, 40, 400}, by message {-1, -10, -100}
+  [proxy] tiny:
+  [proxy] tiny:
+  tiny: {b, 99}, by message {z, -1}
+  [proxy] third:
+  [proxy] third:
+  third: (x87) 3.333333, by message 0.333333
+  [proxy] echo:
+  [proxy] echo:
+  echo: ferry, by message boat
+  [proxy] join:with:
+  [proxy] join:with:
+  join:with: ferry+wave, by message a+b
+  [proxy] call:with:
+  [proxy] call:with:
+  call:with: 14, by message 2
+  [proxy] selectorBack:
+  selectorBack: description
+  [proxy] ping
+  [proxy] fail:
+  caught CalcFailure: failed: by message
+  forwarded 44 messages; calc counted 2 adds
+  [proxy] isKindOfClass:
+  [proxy] respondsToSelector:
+  [proxy] respondsToSelector:
+  isProxy 1; isKindOfClass: Calc 1; respondsToSelector: add:to: 1, frob 0
+  class Logger, description starts <Logger:
+  retain count 1 -> 2
+an object answering for itself
+  frame {1, 2, 30, 40}
+  ratio 0.625, grade -7, name recorded
+  note: hello x3
+  add:to: through forwardingTargetForSelector: 42
+  caught Boom: raised in forwardInvocation:
+  a class's own forwarding: 42
+  recorded: frame ratio grade name note:count: boom
+undo through prepareWithInvocationTarget:
+  prepare answers the undo manager: yes
+  edited: size 20, frame {10, 20, 30, 40}, title Second
+  can undo 1, menu item "Undo"
+  undone once: size 20, frame {1, 2, 3, 4}, title First
+  undo item "Undo Edit", redo item "Redo"
+  undone twice: size 10, frame {0, 0, 0, 0}, title (none)
+  redone: size 20, frame {1, 2, 3, 4}, title First
+  redone again: size 20, frame {10, 20, 30, 40}, title Second
+  can redo 0
+  nested edits: size 4, frame {10, 20, 30, 40}, title Nested
+  nested undone: size 20, frame {10, 20, 30, 40}, title Second
+  undone: size 20, frame {1, 2, 3, 4}, title First
+  after removeAllActionsWithTarget: can undo 0
+a message nobody implements
+exit=134

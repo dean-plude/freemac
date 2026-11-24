@@ -696,6 +696,143 @@ typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 }
 - (BOOL)isEqualToDate:(NSDate *)other;
 @end
 
+/* ---- NSTimeZone, NSLocale (NSTimeZone.m) ------------------------------------------- */
+
+/* Named zones come from this system's time zone database. NSLocale knows
+ * identifiers only: Ferry formats everything in English (United States). */
+@interface NSTimeZone : NSObject <NSCopying>
++ (NSTimeZone *)systemTimeZone;
++ (void)resetSystemTimeZone;
++ (NSTimeZone *)defaultTimeZone;
++ (void)setDefaultTimeZone:(NSTimeZone *)zone;
++ (NSTimeZone *)localTimeZone;
++ (NSArray *)knownTimeZoneNames;
++ (NSDictionary *)abbreviationDictionary;
++ (instancetype)timeZoneWithName:(NSString *)name;
++ (instancetype)timeZoneWithName:(NSString *)name data:(NSData *)data;
++ (instancetype)timeZoneForSecondsFromGMT:(NSInteger)seconds;
++ (instancetype)timeZoneWithAbbreviation:(NSString *)abbreviation;
+- (instancetype)initWithName:(NSString *)name;
+- (instancetype)initWithName:(NSString *)name data:(NSData *)data;
+@property (readonly, copy) NSString *name;
+@property (readonly, copy) NSData *data;
+@property (readonly) NSInteger secondsFromGMT;
+@property (readonly, copy) NSString *abbreviation;
+@property (readonly, getter=isDaylightSavingTime) BOOL daylightSavingTime;
+@property (readonly) NSTimeInterval daylightSavingTimeOffset;
+@property (readonly, copy) NSDate *nextDaylightSavingTimeTransition;
+- (NSInteger)secondsFromGMTForDate:(NSDate *)date;
+- (NSString *)abbreviationForDate:(NSDate *)date;
+- (BOOL)isDaylightSavingTimeForDate:(NSDate *)date;
+- (NSTimeInterval)daylightSavingTimeOffsetForDate:(NSDate *)date;
+- (NSDate *)nextDaylightSavingTimeTransitionAfterDate:(NSDate *)date;
+- (BOOL)isEqualToTimeZone:(NSTimeZone *)other;
+@end
+FOUNDATION_EXPORT NSString *const NSSystemTimeZoneDidChangeNotification;
+
+typedef NSString *NSLocaleKey;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleIdentifier;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleLanguageCode;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleCountryCode;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleScriptCode;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleVariantCode;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleDecimalSeparator;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleGroupingSeparator;
+FOUNDATION_EXPORT NSLocaleKey const NSLocaleUsesMetricSystem;
+FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
+
+@interface NSLocale : NSObject <NSCopying>
++ (NSLocale *)currentLocale;
++ (NSLocale *)autoupdatingCurrentLocale;
++ (NSLocale *)systemLocale;
++ (instancetype)localeWithLocaleIdentifier:(NSString *)ident;
++ (NSArray *)availableLocaleIdentifiers;
++ (NSArray *)ISOLanguageCodes;
++ (NSArray *)preferredLanguages;
++ (NSDictionary *)componentsFromLocaleIdentifier:(NSString *)string;
++ (NSString *)canonicalLocaleIdentifierFromString:(NSString *)string;
+- (instancetype)initWithLocaleIdentifier:(NSString *)string;
+- (id)objectForKey:(NSLocaleKey)key;
+- (NSString *)displayNameForKey:(NSLocaleKey)key value:(id)value;
+@property (readonly, copy) NSString *localeIdentifier;
+@property (readonly, copy) NSString *languageCode;
+@property (readonly, copy) NSString *countryCode;
+@property (readonly, copy) NSString *regionCode;
+@property (readonly, copy) NSString *scriptCode;
+@property (readonly, copy) NSString *variantCode;
+@property (readonly, copy) NSString *decimalSeparator;
+@property (readonly, copy) NSString *groupingSeparator;
+@property (readonly) BOOL usesMetricSystem;
+@end
+
+/* ---- NSFormatter, NSDateFormatter (NSDateFormatter.m) ------------------------------- */
+
+@interface NSFormatter : NSObject <NSCopying>
+- (NSString *)stringForObjectValue:(id)obj;
+- (NSString *)editingStringForObjectValue:(id)obj;
+- (BOOL)getObjectValue:(id *)obj forString:(NSString *)string errorDescription:(NSString **)error;
+- (BOOL)isPartialStringValid:(NSString *)partial newEditingString:(NSString **)newString
+            errorDescription:(NSString **)error;
+@end
+
+typedef NS_ENUM(NSUInteger, NSDateFormatterStyle) {
+    NSDateFormatterNoStyle = 0,
+    NSDateFormatterShortStyle = 1,
+    NSDateFormatterMediumStyle = 2,
+    NSDateFormatterLongStyle = 3,
+    NSDateFormatterFullStyle = 4,
+};
+typedef NS_ENUM(NSUInteger, NSDateFormatterBehavior) {
+    NSDateFormatterBehaviorDefault = 0,
+    NSDateFormatterBehavior10_0 = 1000,
+    NSDateFormatterBehavior10_4 = 1040,
+};
+
+/* Patterns are Unicode date patterns (Unicode Technical Standard #35); text
+ * is always English (United States), and the calendar is always Gregorian. */
+@interface NSDateFormatter : NSFormatter
++ (NSString *)localizedStringFromDate:(NSDate *)date dateStyle:(NSDateFormatterStyle)dstyle
+                            timeStyle:(NSDateFormatterStyle)tstyle;
++ (NSString *)dateFormatFromTemplate:(NSString *)tmpl options:(NSUInteger)opts locale:(NSLocale *)locale;
++ (NSDateFormatterBehavior)defaultFormatterBehavior;
++ (void)setDefaultFormatterBehavior:(NSDateFormatterBehavior)behavior;
+- (NSString *)stringFromDate:(NSDate *)date;
+- (NSDate *)dateFromString:(NSString *)string;
+- (BOOL)getObjectValue:(id *)obj forString:(NSString *)string range:(NSRange *)range error:(NSError **)error;
+- (void)setLocalizedDateFormatFromTemplate:(NSString *)tmpl;
+@property (copy) NSString *dateFormat;
+@property NSDateFormatterStyle dateStyle;
+@property NSDateFormatterStyle timeStyle;
+@property (copy) NSLocale *locale;
+@property (copy) NSTimeZone *timeZone;
+@property (getter=isLenient) BOOL lenient;
+@property BOOL generatesCalendarDates;
+@property BOOL doesRelativeDateFormatting;
+@property NSDateFormatterBehavior formatterBehavior;
+@property (copy) NSDate *defaultDate;
+@property (copy) NSDate *twoDigitStartDate;
+@property (copy) NSString *AMSymbol;
+@property (copy) NSString *PMSymbol;
+@property (copy) NSArray *eraSymbols;
+@property (copy) NSArray *longEraSymbols;
+@property (copy) NSArray *monthSymbols;
+@property (copy) NSArray *shortMonthSymbols;
+@property (copy) NSArray *veryShortMonthSymbols;
+@property (copy) NSArray *standaloneMonthSymbols;
+@property (copy) NSArray *shortStandaloneMonthSymbols;
+@property (copy) NSArray *veryShortStandaloneMonthSymbols;
+@property (copy) NSArray *weekdaySymbols;
+@property (copy) NSArray *shortWeekdaySymbols;
+@property (copy) NSArray *veryShortWeekdaySymbols;
+@property (copy) NSArray *standaloneWeekdaySymbols;
+@property (copy) NSArray *shortStandaloneWeekdaySymbols;
+@property (copy) NSArray *veryShortStandaloneWeekdaySymbols;
+@property (copy) NSArray *quarterSymbols;
+@property (copy) NSArray *shortQuarterSymbols;
+@property (copy) NSArray *standaloneQuarterSymbols;
+@property (copy) NSArray *shortStandaloneQuarterSymbols;
+@end
+
 /* ---- NSURL ------------------------------------------------------------------------- */
 
 @interface NSURL : NSObject <NSCopying, NSSecureCoding>
@@ -1002,6 +1139,28 @@ typedef NSUInteger NSPropertyListWriteOptions;
                     format:(NSPropertyListFormat *)format errorDescription:(NSString **)errorString;
 @end
 
+/* ---- NSJSONSerialization (NSJSONSerialization.m) ------------------------------------ */
+
+typedef NS_OPTIONS(NSUInteger, NSJSONReadingOptions) {
+    NSJSONReadingMutableContainers = 1 << 0,
+    NSJSONReadingMutableLeaves = 1 << 1,
+    NSJSONReadingFragmentsAllowed = 1 << 2,
+    NSJSONReadingJSON5Allowed = 1 << 3,            /* accepted; only plain JSON is read */
+    NSJSONReadingTopLevelDictionaryAssumed = 1 << 4, /* accepted; has no effect (it goes with JSON5) */
+    NSJSONReadingAllowFragments = NSJSONReadingFragmentsAllowed,
+};
+typedef NS_OPTIONS(NSUInteger, NSJSONWritingOptions) {
+    NSJSONWritingPrettyPrinted = 1 << 0,
+    NSJSONWritingSortedKeys = 1 << 1,
+    NSJSONWritingFragmentsAllowed = 1 << 2,
+    NSJSONWritingWithoutEscapingSlashes = 1 << 3,
+};
+@interface NSJSONSerialization : NSObject
++ (BOOL)isValidJSONObject:(id)obj;
++ (NSData *)dataWithJSONObject:(id)obj options:(NSJSONWritingOptions)opt error:(NSError **)error;
++ (id)JSONObjectWithData:(NSData *)data options:(NSJSONReadingOptions)opt error:(NSError **)error;
+@end
+
 /* ---- archiving (NSCoder, NSKeyedArchiver, NSKeyedUnarchiver) --------------------- */
 
 @interface NSCoder : NSObject
@@ -1296,12 +1455,70 @@ typedef NS_OPTIONS(NSUInteger, NSFileWrapperWritingOptions) {
 - (NSString *)keyForFileWrapper:(NSFileWrapper *)child;
 @end
 
+/* ---- NSMethodSignature, NSInvocation, NSProxy, forwarding ------------------------------ */
+
+/* Messages as objects (NSInvocation.m): a method signature is read from an
+ * Objective-C type encoding, and an invocation holds a message's target,
+ * selector, arguments and return value, laid out for the x86-64 calling
+ * convention. A message nothing implements is offered to
+ * forwardingTargetForSelector:, then (with the receiver's
+ * methodSignatureForSelector:) to forwardInvocation: as an invocation. */
+FOUNDATION_EXPORT const char *NSGetSizeAndAlignment(const char *typePtr, NSUInteger *sizep, NSUInteger *alignp);
+@interface NSMethodSignature : NSObject
++ (NSMethodSignature *)signatureWithObjCTypes:(const char *)types;
+@property (readonly) NSUInteger numberOfArguments;
+- (const char *)getArgumentTypeAtIndex:(NSUInteger)idx NS_RETURNS_INNER_POINTER;
+@property (readonly) NSUInteger frameLength;
+- (BOOL)isOneway;
+@property (readonly) const char *methodReturnType NS_RETURNS_INNER_POINTER;
+@property (readonly) NSUInteger methodReturnLength;
+@end
+
+@interface NSInvocation : NSObject
++ (NSInvocation *)invocationWithMethodSignature:(NSMethodSignature *)sig;
+@property (readonly, retain) NSMethodSignature *methodSignature;
+- (void)retainArguments;
+@property (readonly) BOOL argumentsRetained;
+@property (assign) id target;
+@property SEL selector;
+- (void)getReturnValue:(void *)retLoc;
+- (void)setReturnValue:(void *)retLoc;
+- (void)getArgument:(void *)argumentLocation atIndex:(NSInteger)idx;
+- (void)setArgument:(void *)argumentLocation atIndex:(NSInteger)idx;
+- (void)invoke;
+- (void)invokeWithTarget:(id)target;
+@end
+
+@interface NSObject (NSForwarding)
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector;
++ (NSMethodSignature *)instanceMethodSignatureForSelector:(SEL)aSelector;
+- (void)forwardInvocation:(NSInvocation *)anInvocation;
+@end
+
+/* A root class of its own for objects that stand in for others: a subclass
+ * answers methodSignatureForSelector: and forwardInvocation:. */
+OBJC_ROOT_CLASS
+@interface NSProxy <NSObject> {
+    Class isa;
+}
++ (id)alloc;
++ (id)allocWithZone:(NSZone *)zone;
++ (Class)class;
++ (BOOL)respondsToSelector:(SEL)aSelector;
+- (void)forwardInvocation:(NSInvocation *)invocation;
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)sel;
+- (void)dealloc;
+- (void)finalize;
+@property (readonly, copy) NSString *description;
+@property (readonly, copy) NSString *debugDescription;
+@end
+
 /* ---- NSUndoManager ----------------------------------------------------------------- */
 
 /* Undo and redo stacks of groups of actions (NSUndoManager.m). Actions are
- * registered with a selector or a block; prepareWithInvocationTarget:
- * needs NSInvocation, which Ferry doesn't have yet, so it answers nil (its
- * actions are not kept) and says so once. */
+ * registered with a selector, a block, or prepareWithInvocationTarget:
+ * and a message sent to what it returns (the undo manager itself), kept as
+ * an NSInvocation. */
 FOUNDATION_EXPORT NSNotificationName const NSUndoManagerCheckpointNotification;
 FOUNDATION_EXPORT NSNotificationName const NSUndoManagerWillUndoChangeNotification;
 FOUNDATION_EXPORT NSNotificationName const NSUndoManagerWillRedoChangeNotification;
