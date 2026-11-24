@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.164 "Ferry: toolbars, pop-up lists and search fields" (done)
+
+Mac programs run through Ferry get the controls most Mac windows have along
+their top: a toolbar, pop-up lists, segmented buttons and a search field.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Pop-up lists and pull-down lists (`NSPopUpButton`): the menu opens over the button with the chosen item lined up; chosen by click, by press, drag and release, or the keys and typing; disabled items passed over | Ferry AppKit | done |
+| 2 | Segmented controls (`NSSegmentedControl`), such as Day, Week and Month: select one, select any and momentary, with a segment's own menu and the arrow keys | Ferry AppKit | done |
+| 3 | Search fields (`NSSearchField`): searching as you type, at once or on Return, the clear button and Escape, and recent searches kept in the search menu | Ferry AppKit | done |
+| 4 | Stack views (`NSStackView`), laid out by Ferry itself: gravity areas, distributions, alignments, spacing, hidden views and views dropped when room runs short | Ferry AppKit | done |
+| 5 | Toolbars (`NSToolbar`): items from the program or its nib, icon and label modes, show and hide, validation, a chevron menu for items that don't fit, and the layout saved | Ferry AppKit | done |
+| 6 | Ferry 0.12.0, test `appkit_controls` (68 tests) | Ferry | done |
+
 ## 1.163 "Lifeboat in the menu bar" (done)
 
 | # | Item | Component | Status |

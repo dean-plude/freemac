@@ -1019,3 +1019,13 @@ int NSApplicationMain(int argc, const char *argv[])
     [NSApp run];
     return 0;
 }
+
+/* Full keyboard access: a Mac keeps it as bit 2 of the "AppleKeyboardUIMode"
+ * default, and with it on, Tab reaches buttons, pop-ups and segmented
+ * controls as well as text fields and lists. */
+@implementation NSApplication (FerryKeyboardAccess)
+- (BOOL)isFullKeyboardAccessEnabled
+{
+    return ([[NSUserDefaults standardUserDefaults] integerForKey:@"AppleKeyboardUIMode"] & 2) != 0;
+}
+@end

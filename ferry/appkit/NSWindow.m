@@ -64,6 +64,11 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSPoint _lastClickPoint;
     NSArray *_draggedTypes;
     BOOL _dropsWanted, _dropsOn;
+    /* the toolbar (NSToolbar.m) and its strip, and an open menu (NSPopUpButton.m) */
+    NSToolbar *_toolbar;
+    NSView *_toolbarView, *_overlay;
+    CGFloat _toolbarHeight;
+    NSWindowToolbarStyle _toolbarStyle;
 }
 
 /* Drag and drop (NSDragging.m): the window's own types, whose drops go to
@@ -125,8 +130,18 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 
 + (NSRect)frameRectForContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style { return rect; }
 + (NSRect)contentRectForFrameRect:(NSRect)rect styleMask:(NSWindowStyleMask)style { return rect; }
-- (NSRect)frameRectForContentRect:(NSRect)rect { return rect; }
-- (NSRect)contentRectForFrameRect:(NSRect)rect { return rect; }
+/* A window's own answers count its toolbar's strip, which is inside the
+ * frame and above the content. */
+- (NSRect)frameRectForContentRect:(NSRect)rect
+{
+    rect.size.height += _toolbarHeight;
+    return rect;
+}
+- (NSRect)contentRectForFrameRect:(NSRect)rect
+{
+    rect.size.height = fmax(rect.size.height - _toolbarHeight, 0);
+    return rect;
+}
 
 - (instancetype)init
 {
@@ -181,6 +196,12 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [_contentView _setWindow:nil];
     [_contentView setNextResponder:nil];
     [_contentView release];
+    [_overlay _setWindow:nil];
+    [_overlay release];
+    [_toolbar _setWindow:nil];
+    [_toolbar release];
+    [_toolbarView _setWindow:nil];
+    [_toolbarView release];
     [_title release];
     [_background release];
     [_autosaveName release];
@@ -234,7 +255,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [_contentView setNextResponder:nil];
     [_contentView release];
     _contentView = view;
-    [_contentView setFrame:NSMakeRect(0, 0, _frame.size.width, _frame.size.height)];
+    [_contentView setFrame:NSMakeRect(0, 0, _frame.size.width, fmax(_frame.size.height - _toolbarHeight, 0))];
     [_contentView setNextResponder:self];
     [_contentView _setWindow:self];
     [self _noteNeedsDisplay];
@@ -368,8 +389,88 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 }
 - (NSEvent *)currentEvent { return _current; }
 - (void)setDefaultButtonCell:(id)cell { AWarnOnce("-[NSWindow setDefaultButtonCell:] (give the button the key equivalent \\r)"); }
-- (void)update {}
+/* Each pass of the event loop (as on a Mac): the toolbar's items are
+ * validated. */
+- (void)update
+{
+    if (_toolbar && _toolbarHeight > 0)
+        [_toolbar validateVisibleItems];
+}
 - (void)invalidateShadow {}
+
+/* ---- the toolbar and an open menu ----------------------------------------------------- */
+
+- (NSToolbar *)toolbar { return _toolbar; }
+- (void)setToolbar:(NSToolbar *)toolbar
+{
+    if (toolbar == _toolbar)
+        return;
+    [toolbar retain];
+    [_toolbar _setWindow:nil];
+    [_toolbar release];
+    [_toolbarView _setWindow:nil];
+    [_toolbarView release];
+    _toolbarView = nil;
+    _toolbar = toolbar;
+    if (toolbar) {
+        [[toolbar _window] setToolbar:nil];
+        [toolbar _setWindow:self];
+        _toolbarView = [[toolbar _makeView] retain];
+        [_toolbarView setNextResponder:self];
+        [_toolbarView _setWindow:self];
+    }
+    [self _toolbarLayoutChanged];
+}
+- (NSView *)_toolbarView { return _toolbarView; }
+- (NSWindowToolbarStyle)toolbarStyle { return _toolbarStyle; }
+- (void)setToolbarStyle:(NSWindowToolbarStyle)style
+{
+    _toolbarStyle = style;
+    [self _toolbarLayoutChanged];
+}
+- (void)toggleToolbarShown:(id)sender { [_toolbar setVisible:![_toolbar isVisible]]; }
+- (void)runToolbarCustomizationPalette:(id)sender { [_toolbar runCustomizationPalette:sender]; }
+
+/* The strip's height changed: the frame grows or shrinks by as much, its
+ * top edge staying put, as a Mac's does, so the content keeps its size. */
+- (void)_toolbarLayoutChanged
+{
+    CGFloat h = _toolbar ? [_toolbar _height] : 0;
+    CGFloat delta = h - _toolbarHeight;
+    if (delta != 0) {
+        NSSize old = _frame.size;
+        _toolbarHeight = h;
+        _frame.size.height = fmax(_frame.size.height + delta, 1);
+        _frame.origin.y -= delta;
+        if (_gtk) {
+            if (!(_style & NSWindowStyleMaskResizable))
+                gtk_widget_set_size_request(_area, (int)_frame.size.width, (int)_frame.size.height);
+            gtk_window_resize(_gtk, (int)_frame.size.width, (int)_frame.size.height);
+        }
+        NSSize wanted = _frame.size;
+        _frame.size = old;
+        [self _resizedTo:wanted];
+    }
+    [_toolbarView setFrame:NSMakeRect(0, _frame.size.height - h, _frame.size.width, h)];
+    [_toolbarView setHidden:h <= 0];
+    [_toolbarView setNeedsDisplay:YES];
+    [self _noteNeedsDisplay];
+}
+
+- (NSView *)_overlayView { return _overlay; }
+- (void)_setOverlayView:(NSView *)view
+{
+    if (view == _overlay)
+        return;
+    [view retain];
+    [_overlay _setWindow:nil];
+    [_overlay release];
+    _overlay = view;
+    [view setFrame:NSMakeRect(0, 0, _frame.size.width, _frame.size.height)];
+    [view setNextResponder:self];
+    [view _setWindow:self];
+    [self _noteNeedsDisplay];
+}
 
 /* ---- size and place --------------------------------------------------------------- */
 
@@ -387,7 +488,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     if (NSEqualSizes(size, _frame.size))
         return;
     _frame.size = size;
-    [_contentView setFrameSize:size];
+    [_contentView setFrameSize:NSMakeSize(size.width, fmax(size.height - _toolbarHeight, 0))];
+    [_toolbarView setFrame:NSMakeRect(0, size.height - _toolbarHeight, size.width, _toolbarHeight)];
+    [_overlay setFrameSize:size];
     [self _noteNeedsDisplay];
     [self _post:NSWindowDidResizeNotification selector:@selector(windowDidResize:)];
 }
@@ -418,7 +521,10 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [self setFrameTopLeftPoint:p];
     return NSMakePoint(p.x + 20, p.y - 20);
 }
-- (void)setContentSize:(NSSize)size { [self setFrame:(NSRect){_frame.origin, size} display:YES]; }
+- (void)setContentSize:(NSSize)size
+{
+    [self setFrame:(NSRect){_frame.origin, {size.width, size.height + _toolbarHeight}} display:YES];
+}
 - (void)center
 {
     NSRect screen = AScreenFrame(YES);
@@ -486,6 +592,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     CGContextFillRect(ctx, all);
     CGContextRestoreGState(ctx);
     [_contentView _drawInContext:ctx dirty:all screen:YES];
+    [_toolbarView _drawInContext:ctx dirty:all screen:YES];
+    [_overlay _drawInContext:ctx dirty:all screen:YES];
     CGContextFlush(ctx);
     if (_area)
         gtk_widget_queue_draw(_area);
@@ -493,7 +601,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 
 - (void)displayIfNeeded
 {
-    if (_needsDisplay || [_contentView _needsDisplayAnywhere] || !_backing)
+    if (_needsDisplay || [_contentView _needsDisplayAnywhere] || [_toolbarView _needsDisplayAnywhere] ||
+        [_overlay _needsDisplayAnywhere] || !_backing)
         [self display];
 }
 
@@ -625,6 +734,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 {
     if (key_window == self)
         key_window = nil;
+    if ([_overlay isKindOfClass:[AMenuView class]])
+        [(AMenuView *)_overlay dismiss];     /* an open menu closes, as a Mac's does */
     [self _noteNeedsDisplay];
     [self _post:NSWindowDidResignKeyNotification selector:@selector(windowDidResignKey:)];
 }
@@ -730,6 +841,8 @@ static void collect_key_views(NSView *view, NSMutableArray *out)
 - (NSArray *)_keyViewOrder
 {
     NSMutableArray *views = [NSMutableArray array];
+    if (_toolbarHeight > 0)
+        collect_key_views(_toolbarView, views);
     collect_key_views(_contentView, views);
     [views sortUsingComparator:^NSComparisonResult(NSView *a, NSView *b) {
         NSRect ra = [a convertRect:[a bounds] toView:nil], rb = [b convertRect:[b bounds] toView:nil];
@@ -805,6 +918,20 @@ static int button_index(NSEventType t)
     }
 }
 
+/* The view under a point in window coordinates: an open menu overlay
+ * takes everything, then the toolbar strip, then the content view. */
+- (NSView *)_viewAt:(NSPoint)p
+{
+    if (_overlay)
+        return [_overlay hitTest:p] ?: _overlay;
+    if (_toolbarView && _toolbarHeight > 0 && ![_toolbarView isHidden]) {
+        NSView *v = [_toolbarView hitTest:p];
+        if (v)
+            return v;
+    }
+    return [_contentView hitTest:p];
+}
+
 - (void)sendEvent:(NSEvent *)e
 {
     if (_closing && [e type] != NSEventTypeApplicationDefined)
@@ -820,12 +947,12 @@ static int button_index(NSEventType t)
     case NSEventTypeOtherMouseDown: {
         if (![self isKeyWindow] && [self canBecomeKeyWindow])
             [self makeKeyAndOrderFront:nil];
-        NSView *v = [_contentView hitTest:[e locationInWindow]];
+        NSView *v = [self _viewAt:[e locationInWindow]];
         [_mouseView[b] release];
         _mouseView[b] = [v retain];
         if (!v)
             break;
-        if (t == NSEventTypeLeftMouseDown && v != (NSView *)_first && [v acceptsFirstResponder])
+        if (t == NSEventTypeLeftMouseDown && !_overlay && v != (NSView *)_first && [v acceptsFirstResponder])
             [self makeFirstResponder:v];
         if (t == NSEventTypeLeftMouseDown)
             [v mouseDown:e];
@@ -859,20 +986,28 @@ static int button_index(NSEventType t)
         break;
     }
     case NSEventTypeMouseMoved:
-        if (_acceptsMoved)
+        if (_overlay)
+            [_overlay mouseMoved:e];
+        else if (_acceptsMoved)
             [[self firstResponder] mouseMoved:e];
         break;
     case NSEventTypeScrollWheel: {
-        NSView *v = [_contentView hitTest:[e locationInWindow]];
+        NSView *v = [self _viewAt:[e locationInWindow]];
         [(v ?: (id)self) scrollWheel:e];
         break;
     }
     case NSEventTypeKeyDown:
+        if (_overlay) {          /* an open menu takes the keys */
+            [_overlay keyDown:e];
+            break;
+        }
         if (([e modifierFlags] & NSEventModifierFlagCommand) && [self performKeyEquivalent:e])
             break;
         [[self firstResponder] keyDown:e];
         break;
     case NSEventTypeKeyUp:
+        if (_overlay)
+            break;
         [[self firstResponder] keyUp:e];
         break;
     case NSEventTypeFlagsChanged:
@@ -885,7 +1020,12 @@ static int button_index(NSEventType t)
     [self release];
 }
 
-- (BOOL)performKeyEquivalent:(NSEvent *)event { return [_contentView performKeyEquivalent:event]; }
+- (BOOL)performKeyEquivalent:(NSEvent *)event
+{
+    if ([_contentView performKeyEquivalent:event])
+        return YES;
+    return _toolbarView && _toolbarHeight > 0 && [_toolbarView performKeyEquivalent:event];
+}
 
 /* The end of the responder chain for keys: Return and Escape press the
  * window's default and cancel buttons (the ones whose key equivalent is
@@ -1012,7 +1152,7 @@ static int on_motion(GtkWidget *w, GdkEvent *e, void *data)
                            : state & GDK_BUTTON3_MASK ? NSEventTypeRightMouseDragged
                            : state & GDK_BUTTON2_MASK ? NSEventTypeOtherMouseDragged
                                                       : NSEventTypeMouseMoved;
-        if (type == NSEventTypeMouseMoved && !win->_acceptsMoved)
+        if (type == NSEventTypeMouseMoved && !win->_acceptsMoved && !win->_overlay)
             return 1;
         AEnqueueEvent(AMouseEvent(type, p, AModifiersFromGdk(state), win, 0, type == NSEventTypeRightMouseDragged));
     }
@@ -1130,8 +1270,10 @@ NSWindow *AMainWindow(void) { return main_window; }
 void AWindowsDisplayIfNeeded(void)
 {
     for (NSWindow *w in [[all_windows copy] autorelease])
-        if ([w isVisible])
+        if ([w isVisible]) {
+            [w update];
             [w displayIfNeeded];
+        }
 }
 
 @implementation NSPanel {

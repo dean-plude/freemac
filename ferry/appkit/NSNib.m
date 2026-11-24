@@ -307,6 +307,12 @@ static int parse_components(NSData *d, CGFloat *out, int max)
     NSView *content = [c decodeObjectForKey:@"NSWindowView"];
     if ([content isKindOfClass:[NSView class]])
         [w setContentView:content];
+    /* the toolbar ("NSViewClass" in some descriptions of the format) */
+    NSToolbar *toolbar = [c containsValueForKey:@"NSToolbar"] ? [c decodeObjectForKey:@"NSToolbar"] : nil;
+    if (![toolbar isKindOfClass:[NSToolbar class]] && [c containsValueForKey:@"NSViewClass"])
+        toolbar = [c decodeObjectForKey:@"NSViewClass"];
+    if ([toolbar isKindOfClass:[NSToolbar class]])
+        [w setToolbar:toolbar];
     if ([c containsValueForKey:@"NSMinSize"])
         [w setMinSize:[c decodeSizeForKey:@"NSMinSize"]];
     if ([c containsValueForKey:@"NSMaxSize"]) {
@@ -613,9 +619,14 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
             [made addObject:real];
     }
 
-    /* Menu items and cells whose target is a stand-in. */
+    /* Menu items, cells and toolbar items whose target is a stand-in, and
+     * toolbars whose delegate is. */
     for (id o in all) {
-        if ([o isKindOfClass:[NSMenuItem class]] || [o isKindOfClass:[NSCell class]]) {
+        if ([o isKindOfClass:[NSToolbar class]] && [o delegate] &&
+            [map objectForKey:[NSValue valueWithPointer:[o delegate]]])
+            [o setDelegate:resolve([o delegate], map)];
+        if ([o isKindOfClass:[NSMenuItem class]] || [o isKindOfClass:[NSCell class]] ||
+            [o isKindOfClass:[NSToolbarItem class]]) {
             id t = [o target];
             if (t && [map objectForKey:[NSValue valueWithPointer:t]])
                 [o setTarget:resolve(t, map)];

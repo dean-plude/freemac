@@ -1291,23 +1291,38 @@ static BOOL keeps_state(NSButtonType t)
     [self _moveTo:[self _indexAtX:p.x] select:YES];
 }
 
+/* The steps of drawing a text field that a search field (NSSearchField.m)
+ * does its own way: the bezel, where the text is clipped, the placeholder. */
+- (BOOL)_isEditing { return _editing; }
+- (void)_drawBezelInRect:(NSRect)b focused:(BOOL)focused
+{
+    if (_drawsBackground) {
+        [[self backgroundColor] setFill];
+        NSRectFill(b);
+    }
+    [[NSColor colorWithWhite:0 alpha:_bezeled ? 0.25 : 0.5] setFill];
+    NSFrameRect(b);
+    if (focused) {
+        [[NSColor keyboardFocusIndicatorColor] setStroke];
+        NSBezierPath *ring = [NSBezierPath bezierPathWithRect:NSInsetRect(b, 1, 1)];
+        [ring setLineWidth:2];
+        [ring stroke];
+    }
+}
+- (NSRect)_clipRect { return NSInsetRect([self bounds], 1, 1); }
+- (NSAttributedString *)_shownPlaceholder
+{
+    if (_placeholderAttributed)
+        return _placeholderAttributed;
+    return _placeholder ? AAttributed(_placeholder, [self font], [NSColor placeholderTextColor]) : nil;
+}
+
 - (void)drawRect:(NSRect)dirty
 {
     NSRect b = [self bounds];
     BOOL focused = _editing && [[self window] isKeyWindow];
     if (_bezeled || _bordered) {
-        if (_drawsBackground) {
-            [[self backgroundColor] setFill];
-            NSRectFill(b);
-        }
-        [[NSColor colorWithWhite:0 alpha:_bezeled ? 0.25 : 0.5] setFill];
-        NSFrameRect(b);
-        if (focused) {
-            [[NSColor keyboardFocusIndicatorColor] setStroke];
-            NSBezierPath *ring = [NSBezierPath bezierPathWithRect:NSInsetRect(b, 1, 1)];
-            [ring setLineWidth:2];
-            [ring stroke];
-        }
+        [self _drawBezelInRect:b focused:focused];
     } else if (_drawsBackground) {
         [[self backgroundColor] setFill];
         NSRectFill(b);
@@ -1342,12 +1357,10 @@ static BOOL keeps_state(NSButtonType t)
     CGFloat baseline = [self _baseline];
     CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
     CGContextSaveGState(cg);
-    CGContextClipToRect(cg, NSInsetRect(b, 1, 1));
+    CGContextClipToRect(cg, [self _clipRect]);
 
     if (![shown length]) {
-        NSAttributedString *ph = _placeholderAttributed;
-        if (!ph && _placeholder)
-            ph = AAttributed(_placeholder, font, [NSColor placeholderTextColor]);
+        NSAttributedString *ph = [self _shownPlaceholder];
         if (ph)
             ADrawLine(ph, tr.origin.x, baseline);
     }

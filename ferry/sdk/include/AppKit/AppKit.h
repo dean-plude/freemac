@@ -2419,4 +2419,390 @@ enum { NSOutlineViewDropOnItemIndex = -1 };
 - (void)moveItemAtIndex:(NSInteger)fromIndex inParent:(id)oldParent toIndex:(NSInteger)toIndex inParent:(id)newParent;
 @end
 
+/* ---- pop-up buttons, segmented controls, search fields, stack views and toolbars ------ */
+/* (NSPopUpButton.m, NSSegmentedControl.m, NSSearchField.m, NSStackView.m, NSToolbar.m) */
+
+/* Auto Layout isn't in Ferry; these are what a view says about its own size,
+ * which stack views and toolbars use to lay views out by hand. */
+#define NSViewNoIntrinsicMetric ((CGFloat)-1)
+typedef NS_ENUM(NSInteger, NSUserInterfaceLayoutOrientation) {
+    NSUserInterfaceLayoutOrientationHorizontal = 0, NSUserInterfaceLayoutOrientationVertical = 1,
+};
+typedef NS_ENUM(NSInteger, NSLayoutConstraintOrientation) {
+    NSLayoutConstraintOrientationHorizontal = 0, NSLayoutConstraintOrientationVertical = 1,
+};
+typedef NS_ENUM(NSInteger, NSLayoutAttribute) {
+    NSLayoutAttributeLeft = 1, NSLayoutAttributeRight, NSLayoutAttributeTop, NSLayoutAttributeBottom,
+    NSLayoutAttributeLeading, NSLayoutAttributeTrailing, NSLayoutAttributeWidth, NSLayoutAttributeHeight,
+    NSLayoutAttributeCenterX, NSLayoutAttributeCenterY, NSLayoutAttributeLastBaseline,
+    NSLayoutAttributeBaseline = NSLayoutAttributeLastBaseline, NSLayoutAttributeFirstBaseline,
+    NSLayoutAttributeNotAnAttribute = 0,
+};
+@interface NSView (NSConstraintBasedLayout)
+@property (readonly) NSSize intrinsicContentSize;
+@property (readonly) NSSize fittingSize;
+@property BOOL needsLayout;
+- (void)layout;
+- (void)layoutSubtreeIfNeeded;
+- (void)invalidateIntrinsicContentSize;
+- (NSLayoutPriority)contentHuggingPriorityForOrientation:(NSLayoutConstraintOrientation)orientation;
+- (void)setContentHuggingPriority:(NSLayoutPriority)priority forOrientation:(NSLayoutConstraintOrientation)orientation;
+- (NSLayoutPriority)contentCompressionResistancePriorityForOrientation:(NSLayoutConstraintOrientation)orientation;
+- (void)setContentCompressionResistancePriority:(NSLayoutPriority)priority
+                                 forOrientation:(NSLayoutConstraintOrientation)orientation;
+@end
+
+@interface NSApplication (FerryKeyboardAccess)
+/* Whether Tab reaches every control, not only text fields and lists (the
+ * "AppleKeyboardUIMode" default, as a Mac keeps it). */
+@property (readonly, getter=isFullKeyboardAccessEnabled) BOOL fullKeyboardAccessEnabled;
+@end
+
+/* A pop-up button shows a menu: as a pop-up list, the chosen item is the
+ * button's title; as a pull-down list, the first item is the title and the
+ * menu opens below with the others. The menu opens inside the window. */
+typedef NS_ENUM(NSUInteger, NSPopUpArrowPosition) {
+    NSPopUpNoArrow = 0, NSPopUpArrowAtCenter = 1, NSPopUpArrowAtBottom = 2,
+};
+@interface NSMenuItemCell : NSButtonCell
+@property (retain) NSMenuItem *menuItem;
+@end
+@interface NSPopUpButtonCell : NSMenuItemCell
+- (instancetype)initTextCell:(NSString *)string pullsDown:(BOOL)pullDown;
+@property (retain) NSMenu *menu;
+@property BOOL pullsDown, autoenablesItems, usesItemFromMenu, altersStateOfSelectedItem;
+@property NSRectEdge preferredEdge;
+@property NSPopUpArrowPosition arrowPosition;
+- (void)addItemWithTitle:(NSString *)title;
+- (void)addItemsWithTitles:(NSArray<NSString *> *)titles;
+- (void)insertItemWithTitle:(NSString *)title atIndex:(NSInteger)index;
+- (void)removeItemWithTitle:(NSString *)title;
+- (void)removeItemAtIndex:(NSInteger)index;
+- (void)removeAllItems;
+@property (readonly, copy) NSArray<NSMenuItem *> *itemArray;
+@property (readonly) NSInteger numberOfItems;
+- (NSInteger)indexOfItem:(NSMenuItem *)item;
+- (NSInteger)indexOfItemWithTitle:(NSString *)title;
+- (NSInteger)indexOfItemWithTag:(NSInteger)tag;
+- (NSInteger)indexOfItemWithRepresentedObject:(id)obj;
+- (NSInteger)indexOfItemWithTarget:(id)target andAction:(SEL)action;
+- (NSMenuItem *)itemAtIndex:(NSInteger)index;
+- (NSMenuItem *)itemWithTitle:(NSString *)title;
+@property (readonly) NSMenuItem *lastItem;
+- (void)selectItem:(NSMenuItem *)item;
+- (void)selectItemAtIndex:(NSInteger)index;
+- (BOOL)selectItemWithTag:(NSInteger)tag;
+- (void)selectItemWithTitle:(NSString *)title;
+@property (readonly) NSMenuItem *selectedItem;
+@property (readonly) NSInteger indexOfSelectedItem;
+@property (readonly) NSInteger selectedTag;
+- (void)synchronizeTitleAndSelectedItem;
+- (NSString *)itemTitleAtIndex:(NSInteger)index;
+@property (readonly, copy) NSArray<NSString *> *itemTitles;
+@property (readonly, copy) NSString *titleOfSelectedItem;
+- (void)attachPopUpWithFrame:(NSRect)frame inView:(NSView *)view;
+- (void)dismissPopUp;
+- (void)performClickWithFrame:(NSRect)frame inView:(NSView *)view;
+@end
+@interface NSPopUpButton : NSButton
++ (instancetype)popUpButtonWithMenu:(NSMenu *)menu target:(id)target action:(SEL)action;
++ (instancetype)pullDownButtonWithTitle:(NSString *)title menu:(NSMenu *)menu;
+- (instancetype)initWithFrame:(NSRect)frame pullsDown:(BOOL)flag;
+@property (retain) NSMenu *menu;
+@property BOOL pullsDown, autoenablesItems, usesItemFromMenu;
+@property NSRectEdge preferredEdge;
+- (void)addItemWithTitle:(NSString *)title;
+- (void)addItemsWithTitles:(NSArray<NSString *> *)titles;
+- (void)insertItemWithTitle:(NSString *)title atIndex:(NSInteger)index;
+- (void)removeItemWithTitle:(NSString *)title;
+- (void)removeItemAtIndex:(NSInteger)index;
+- (void)removeAllItems;
+@property (readonly, copy) NSArray<NSMenuItem *> *itemArray;
+@property (readonly) NSInteger numberOfItems;
+- (NSInteger)indexOfItem:(NSMenuItem *)item;
+- (NSInteger)indexOfItemWithTitle:(NSString *)title;
+- (NSInteger)indexOfItemWithTag:(NSInteger)tag;
+- (NSInteger)indexOfItemWithRepresentedObject:(id)obj;
+- (NSInteger)indexOfItemWithTarget:(id)target andAction:(SEL)action;
+- (NSMenuItem *)itemAtIndex:(NSInteger)index;
+- (NSMenuItem *)itemWithTitle:(NSString *)title;
+@property (readonly) NSMenuItem *lastItem;
+- (void)selectItem:(NSMenuItem *)item;
+- (void)selectItemAtIndex:(NSInteger)index;
+- (BOOL)selectItemWithTag:(NSInteger)tag;
+- (void)selectItemWithTitle:(NSString *)title;
+@property (readonly) NSMenuItem *selectedItem;
+@property (readonly) NSInteger indexOfSelectedItem;
+@property (readonly) NSInteger selectedTag;
+- (void)synchronizeTitleAndSelectedItem;
+- (NSString *)itemTitleAtIndex:(NSInteger)index;
+@property (readonly, copy) NSArray<NSString *> *itemTitles;
+@property (readonly, copy) NSString *titleOfSelectedItem;
+@end
+APPKIT_EXTERN NSNotificationName const NSPopUpButtonWillPopUpNotification;
+APPKIT_EXTERN NSNotificationName const NSPopUpButtonCellWillPopUpNotification;
+
+/* A row of segments, each with a label or an image, that act as one
+ * control. */
+typedef NS_ENUM(NSUInteger, NSSegmentSwitchTracking) {
+    NSSegmentSwitchTrackingSelectOne = 0, NSSegmentSwitchTrackingSelectAny = 1,
+    NSSegmentSwitchTrackingMomentary = 2, NSSegmentSwitchTrackingMomentaryAccelerator = 3,
+};
+typedef NS_ENUM(NSInteger, NSSegmentStyle) {
+    NSSegmentStyleAutomatic = 0, NSSegmentStyleRounded = 1, NSSegmentStyleTexturedRounded = 2,
+    NSSegmentStyleRoundRect = 3, NSSegmentStyleTexturedSquare = 4, NSSegmentStyleCapsule = 5,
+    NSSegmentStyleSmallSquare = 6, NSSegmentStyleSeparated = 8,
+};
+typedef NS_ENUM(NSInteger, NSSegmentDistribution) {
+    NSSegmentDistributionFit = 0, NSSegmentDistributionFill, NSSegmentDistributionFillEqually,
+    NSSegmentDistributionFillProportionally,
+};
+@interface NSSegmentedCell : NSActionCell
+@property NSInteger segmentCount, selectedSegment;
+@property NSSegmentSwitchTracking trackingMode;
+@property NSSegmentStyle segmentStyle;
+- (BOOL)selectSegmentWithTag:(NSInteger)tag;
+- (void)makeNextSegmentKey;
+- (void)makePreviousSegmentKey;
+- (void)setWidth:(CGFloat)width forSegment:(NSInteger)segment;
+- (CGFloat)widthForSegment:(NSInteger)segment;
+- (void)setImage:(NSImage *)image forSegment:(NSInteger)segment;
+- (NSImage *)imageForSegment:(NSInteger)segment;
+- (void)setImageScaling:(NSImageScaling)scaling forSegment:(NSInteger)segment;
+- (NSImageScaling)imageScalingForSegment:(NSInteger)segment;
+- (void)setLabel:(NSString *)label forSegment:(NSInteger)segment;
+- (NSString *)labelForSegment:(NSInteger)segment;
+- (void)setSelected:(BOOL)selected forSegment:(NSInteger)segment;
+- (BOOL)isSelectedForSegment:(NSInteger)segment;
+- (void)setEnabled:(BOOL)enabled forSegment:(NSInteger)segment;
+- (BOOL)isEnabledForSegment:(NSInteger)segment;
+- (void)setMenu:(NSMenu *)menu forSegment:(NSInteger)segment;
+- (NSMenu *)menuForSegment:(NSInteger)segment;
+- (void)setToolTip:(NSString *)toolTip forSegment:(NSInteger)segment;
+- (NSString *)toolTipForSegment:(NSInteger)segment;
+- (void)setTag:(NSInteger)tag forSegment:(NSInteger)segment;
+- (NSInteger)tagForSegment:(NSInteger)segment;
+@end
+@interface NSSegmentedControl : NSControl
++ (instancetype)segmentedControlWithLabels:(NSArray<NSString *> *)labels trackingMode:(NSSegmentSwitchTracking)mode
+                                    target:(id)target action:(SEL)action;
++ (instancetype)segmentedControlWithImages:(NSArray<NSImage *> *)images trackingMode:(NSSegmentSwitchTracking)mode
+                                    target:(id)target action:(SEL)action;
+@property NSInteger segmentCount, selectedSegment;
+@property (readonly) NSInteger indexOfSelectedItem;
+@property NSSegmentSwitchTracking trackingMode;
+@property NSSegmentStyle segmentStyle;
+@property NSSegmentDistribution segmentDistribution;
+@property (copy) NSColor *selectedSegmentBezelColor;
+@property (getter=isSpringLoaded) BOOL springLoaded;
+- (BOOL)selectSegmentWithTag:(NSInteger)tag;
+- (void)setWidth:(CGFloat)width forSegment:(NSInteger)segment;
+- (CGFloat)widthForSegment:(NSInteger)segment;
+- (void)setImage:(NSImage *)image forSegment:(NSInteger)segment;
+- (NSImage *)imageForSegment:(NSInteger)segment;
+- (void)setImageScaling:(NSImageScaling)scaling forSegment:(NSInteger)segment;
+- (NSImageScaling)imageScalingForSegment:(NSInteger)segment;
+- (void)setLabel:(NSString *)label forSegment:(NSInteger)segment;
+- (NSString *)labelForSegment:(NSInteger)segment;
+- (void)setSelected:(BOOL)selected forSegment:(NSInteger)segment;
+- (BOOL)isSelectedForSegment:(NSInteger)segment;
+- (void)setEnabled:(BOOL)enabled forSegment:(NSInteger)segment;
+- (BOOL)isEnabledForSegment:(NSInteger)segment;
+- (void)setMenu:(NSMenu *)menu forSegment:(NSInteger)segment;
+- (NSMenu *)menuForSegment:(NSInteger)segment;
+- (void)setToolTip:(NSString *)toolTip forSegment:(NSInteger)segment;
+- (NSString *)toolTipForSegment:(NSInteger)segment;
+- (void)setTag:(NSInteger)tag forSegment:(NSInteger)segment;
+- (NSInteger)tagForSegment:(NSInteger)segment;
+- (void)setAlignment:(NSTextAlignment)alignment forSegment:(NSInteger)segment;
+- (NSTextAlignment)alignmentForSegment:(NSInteger)segment;
+@end
+
+/* A text field for searching: a magnifying glass, a placeholder, and a
+ * button that clears it. It sends its action as the user types (after a
+ * short pause, or at once), or only on Return. */
+@class NSSearchField;
+/* tags that mark the places for recent searches in a search menu template */
+enum {
+    NSSearchFieldRecentsTitleMenuItemTag = 1000, NSSearchFieldRecentsMenuItemTag = 1001,
+    NSSearchFieldClearRecentsMenuItemTag = 1002, NSSearchFieldNoRecentsMenuItemTag = 1003,
+};
+@interface NSSearchFieldCell : NSTextFieldCell
+@property (retain) NSButtonCell *searchButtonCell, *cancelButtonCell;
+- (void)resetSearchButtonCell;
+- (void)resetCancelButtonCell;
+- (NSRect)searchTextRectForBounds:(NSRect)rect;
+- (NSRect)searchButtonRectForBounds:(NSRect)rect;
+- (NSRect)cancelButtonRectForBounds:(NSRect)rect;
+@property (retain) NSMenu *searchMenuTemplate;
+@property BOOL sendsWholeSearchString, sendsSearchStringImmediately;
+@property NSInteger maximumRecents;
+@property (copy) NSArray<NSString *> *recentSearches;
+@property (copy) NSString *recentsAutosaveName;
+@end
+@protocol NSSearchFieldDelegate <NSTextFieldDelegate>
+@optional
+- (void)searchFieldDidStartSearching:(NSSearchField *)sender;
+- (void)searchFieldDidEndSearching:(NSSearchField *)sender;
+@end
+@interface NSSearchField : NSTextField
+@property (retain) NSMenu *searchMenuTemplate;
+@property BOOL sendsWholeSearchString, sendsSearchStringImmediately, centersPlaceholder;
+@property NSInteger maximumRecents;
+@property (copy) NSArray<NSString *> *recentSearches;
+@property (copy) NSString *recentsAutosaveName;
+@property (readonly) NSRect searchTextBounds, searchButtonBounds, cancelButtonBounds;
+- (NSRect)rectForSearchTextWhenCentered:(BOOL)isCentered;
+- (NSRect)rectForSearchButtonWhenCentered:(BOOL)isCentered;
+- (NSRect)rectForCancelButtonWhenCentered:(BOOL)isCentered;
+@end
+
+/* Lays out its views in a row or a column, by hand (there is no Auto
+ * Layout in Ferry): each at its intrinsic size, or its frame's size when it
+ * has none. */
+typedef NS_ENUM(NSInteger, NSStackViewGravity) {
+    NSStackViewGravityTop = 1, NSStackViewGravityLeading = 1, NSStackViewGravityCenter = 2,
+    NSStackViewGravityBottom = 3, NSStackViewGravityTrailing = 3,
+};
+typedef NS_ENUM(NSInteger, NSStackViewDistribution) {
+    NSStackViewDistributionGravityAreas = -1, NSStackViewDistributionFill = 0, NSStackViewDistributionFillEqually,
+    NSStackViewDistributionFillProportionally, NSStackViewDistributionEqualSpacing,
+    NSStackViewDistributionEqualCentering,
+};
+typedef float NSStackViewVisibilityPriority;
+static const NSStackViewVisibilityPriority NSStackViewVisibilityPriorityMustHold = 1000;
+static const NSStackViewVisibilityPriority NSStackViewVisibilityPriorityDetachOnlyIfNecessary = 900;
+static const NSStackViewVisibilityPriority NSStackViewVisibilityPriorityNotVisible = 0;
+#define NSStackViewSpacingUseDefault ((CGFloat)3.40282347e+38)
+@class NSStackView;
+@protocol NSStackViewDelegate <NSObject>
+@optional
+- (void)stackView:(NSStackView *)stackView willDetachViews:(NSArray<NSView *> *)views;
+- (void)stackView:(NSStackView *)stackView didReattachViews:(NSArray<NSView *> *)views;
+@end
+@interface NSStackView : NSView
++ (instancetype)stackViewWithViews:(NSArray<NSView *> *)views;
+@property (assign) id<NSStackViewDelegate> delegate;
+@property NSUserInterfaceLayoutOrientation orientation;
+@property NSLayoutAttribute alignment;
+@property NSEdgeInsets edgeInsets;
+@property NSStackViewDistribution distribution;
+@property CGFloat spacing;
+@property BOOL detachesHiddenViews;
+@property (readonly, copy) NSArray<__kindof NSView *> *arrangedSubviews;
+- (void)addArrangedSubview:(NSView *)view;
+- (void)insertArrangedSubview:(NSView *)view atIndex:(NSInteger)index;
+- (void)removeArrangedSubview:(NSView *)view;
+@property (readonly, copy) NSArray<__kindof NSView *> *views;
+@property (readonly, copy) NSArray<__kindof NSView *> *detachedViews;
+- (void)addView:(NSView *)view inGravity:(NSStackViewGravity)gravity;
+- (void)insertView:(NSView *)view atIndex:(NSUInteger)index inGravity:(NSStackViewGravity)gravity;
+- (void)removeView:(NSView *)view;
+- (NSArray<NSView *> *)viewsInGravity:(NSStackViewGravity)gravity;
+- (void)setViews:(NSArray<NSView *> *)views inGravity:(NSStackViewGravity)gravity;
+- (void)setVisibilityPriority:(NSStackViewVisibilityPriority)priority forView:(NSView *)view;
+- (NSStackViewVisibilityPriority)visibilityPriorityForView:(NSView *)view;
+- (void)setCustomSpacing:(CGFloat)spacing afterView:(NSView *)view;
+- (CGFloat)customSpacingAfterView:(NSView *)view;
+- (NSLayoutPriority)clippingResistancePriorityForOrientation:(NSLayoutConstraintOrientation)orientation;
+- (void)setClippingResistancePriority:(NSLayoutPriority)priority forOrientation:(NSLayoutConstraintOrientation)orientation;
+- (NSLayoutPriority)huggingPriorityForOrientation:(NSLayoutConstraintOrientation)orientation;
+- (void)setHuggingPriority:(NSLayoutPriority)priority forOrientation:(NSLayoutConstraintOrientation)orientation;
+@end
+
+/* A window's toolbar, drawn under the title bar in the same colour, as a
+ * Mac's unified title bar and toolbar look. */
+typedef NSString *NSToolbarIdentifier;
+typedef NSString *NSToolbarItemIdentifier;
+typedef NS_ENUM(NSUInteger, NSToolbarDisplayMode) {
+    NSToolbarDisplayModeDefault = 0, NSToolbarDisplayModeIconAndLabel = 1, NSToolbarDisplayModeIconOnly = 2,
+    NSToolbarDisplayModeLabelOnly = 3,
+};
+typedef NS_ENUM(NSUInteger, NSToolbarSizeMode) {
+    NSToolbarSizeModeDefault = 0, NSToolbarSizeModeRegular = 1, NSToolbarSizeModeSmall = 2,
+};
+typedef NS_ENUM(NSInteger, NSWindowToolbarStyle) {
+    NSWindowToolbarStyleAutomatic = 0, NSWindowToolbarStyleExpanded = 1, NSWindowToolbarStylePreference = 2,
+    NSWindowToolbarStyleUnified = 3, NSWindowToolbarStyleUnifiedCompact = 4,
+};
+typedef NSInteger NSToolbarItemVisibilityPriority;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityStandard = 0;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityLow = -1000;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityHigh = 1000;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityUser = 2000;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarSpaceItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarFlexibleSpaceItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarSeparatorItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarShowColorsItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarShowFontsItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarCustomizeToolbarItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarPrintItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarToggleSidebarItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarCloudSharingItemIdentifier;
+APPKIT_EXTERN NSToolbarItemIdentifier const NSToolbarSidebarTrackingSeparatorItemIdentifier;
+APPKIT_EXTERN NSNotificationName const NSToolbarWillAddItemNotification;
+APPKIT_EXTERN NSNotificationName const NSToolbarDidRemoveItemNotification;
+@class NSToolbar;
+@interface NSToolbarItem : NSObject <NSCopying>
+- (instancetype)initWithItemIdentifier:(NSToolbarItemIdentifier)identifier NS_DESIGNATED_INITIALIZER;
+@property (readonly, copy) NSToolbarItemIdentifier itemIdentifier;
+@property (readonly, assign) NSToolbar *toolbar;
+@property (copy) NSString *label, *paletteLabel, *toolTip, *title;
+@property (retain) NSMenuItem *menuFormRepresentation;
+@property NSInteger tag;
+@property (assign) id target;
+@property SEL action;
+@property (getter=isEnabled) BOOL enabled;
+@property (retain) NSImage *image;
+@property (retain) NSView *view;
+@property NSSize minSize, maxSize;
+@property NSToolbarItemVisibilityPriority visibilityPriority;
+@property BOOL autovalidates;
+@property (getter=isBordered) BOOL bordered;
+@property (getter=isNavigational) BOOL navigational;
+@property (readonly) BOOL allowsDuplicatesInToolbar;
+@property (readonly, getter=isVisible) BOOL visible;
+- (void)validate;
+@end
+@interface NSToolbarItemGroup : NSToolbarItem
+@property (copy) NSArray<NSToolbarItem *> *subitems;
+@end
+@protocol NSToolbarItemValidation <NSObject>
+- (BOOL)validateToolbarItem:(NSToolbarItem *)item;
+@end
+@protocol NSToolbarDelegate <NSObject>
+@optional
+- (NSToolbarItem *)toolbar:(NSToolbar *)toolbar itemForItemIdentifier:(NSToolbarItemIdentifier)identifier
+    willBeInsertedIntoToolbar:(BOOL)flag;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar;
+- (NSArray<NSToolbarItemIdentifier> *)toolbarSelectableItemIdentifiers:(NSToolbar *)toolbar;
+- (void)toolbarWillAddItem:(NSNotification *)notification;
+- (void)toolbarDidRemoveItem:(NSNotification *)notification;
+@end
+@interface NSToolbar : NSObject <NSCoding>
+- (instancetype)initWithIdentifier:(NSToolbarIdentifier)identifier NS_DESIGNATED_INITIALIZER;
+@property (readonly, copy) NSToolbarIdentifier identifier;
+@property (assign) id<NSToolbarDelegate> delegate;
+@property (readonly, copy) NSArray<__kindof NSToolbarItem *> *items, *visibleItems;
+@property NSToolbarDisplayMode displayMode;
+@property NSToolbarSizeMode sizeMode;
+@property (getter=isVisible) BOOL visible;
+@property BOOL showsBaselineSeparator, allowsUserCustomization, autosavesConfiguration, allowsExtensionItems;
+@property (copy) NSToolbarItemIdentifier selectedItemIdentifier, centeredItemIdentifier;
+@property (readonly) BOOL customizationPaletteIsRunning;
+@property (readonly, copy) NSDictionary<NSString *, id> *configurationDictionary;
+- (void)setConfigurationFromDictionary:(NSDictionary<NSString *, id> *)dictionary;
+- (void)insertItemWithItemIdentifier:(NSToolbarItemIdentifier)identifier atIndex:(NSInteger)index;
+- (void)removeItemAtIndex:(NSInteger)index;
+- (void)validateVisibleItems;
+- (void)runCustomizationPalette:(id)sender;
+@end
+@interface NSWindow (NSToolbarSupport)
+@property (retain) NSToolbar *toolbar;
+@property NSWindowToolbarStyle toolbarStyle;
+- (void)toggleToolbarShown:(id)sender;
+- (void)runToolbarCustomizationPalette:(id)sender;
+@end
+
 #endif
