@@ -30,7 +30,7 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # n
 
 from . import calendar_store as store  # noqa: E402
 from . import spelling  # noqa: E402
-from . import calendars, contacts_store, menus, style  # noqa: E402
+from . import calendars, contacts_store, menus, region, style  # noqa: E402
 from .minimonth import MiniMonth, month_weeks  # noqa: E402
 
 APP_ID = "org.freemac.Tide"
@@ -41,7 +41,6 @@ CHIP = 19          # one line of an event in the month view and the all-day band
 BLUE = (0.18, 0.48, 0.96)
 RED = (0.94, 0.26, 0.24)
 PURPLE = (0.62, 0.36, 0.86)
-WEEKDAYS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
 CSS = b"""
 .tide-title { font-size: 15px; font-weight: bold; }
@@ -214,7 +213,7 @@ class MonthView(Gtk.DrawingArea):
                 by_day.setdefault(day, []).append(occ)
         top = 26
         cw, ch = width / 7, (height - top) / 6
-        for col, name in enumerate(WEEKDAYS):
+        for col, name in enumerate(region.week_names()):
             text(cr, area, name, col * cw, 6, cw - 8, 12, rgba=(*ink, 0.6), align=2)
         today = dt.date.today()
         self.hits, self.cells = [], []
@@ -222,7 +221,7 @@ class MonthView(Gtk.DrawingArea):
             for col, day in enumerate(week):
                 x, y = col * cw, top + row * ch
                 self.cells.append((x, y, cw, ch, day))
-                if col in (0, 6):
+                if day.weekday() in (5, 6):
                     cr.set_source_rgba(*ink, 0.025)
                     cr.rectangle(x, y, cw, ch)
                     cr.fill()
@@ -335,7 +334,7 @@ class DayHeader(Gtk.DrawingArea):
         text(cr, area, "all-day", 0, DAY_HEAD + 2, GUTTER - 8, 10, rgba=(*ink, 0.5), align=2)
         for col, day in enumerate(days):
             x = GUTTER + col * cw
-            name = f"{WEEKDAYS[(day.weekday() + 1) % 7]}" if len(days) > 1 else day.strftime("%A")
+            name = region.WEEKDAY_NAMES[day.weekday()][:3] if len(days) > 1 else day.strftime("%A")
             number = str(day.day)
             if day == today:
                 cr.set_source_rgb(*RED)
@@ -409,8 +408,8 @@ class TimeGrid(Gtk.DrawingArea):
     def days(self):
         if self.count == 1:
             return [self.win.day]
-        sunday = self.win.day - dt.timedelta(days=(self.win.day.weekday() + 1) % 7)
-        return [sunday + dt.timedelta(days=n) for n in range(7)]
+        start = region.start_of_week(self.win.day)
+        return [start + dt.timedelta(days=n) for n in range(7)]
 
     def y_of(self, when):
         return 6 + (when.hour + when.minute / 60) * HOUR

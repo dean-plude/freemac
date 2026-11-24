@@ -65,14 +65,30 @@ def offset_text(zone, when=None):
     return f"UTC{sign}{hours}" + (f":{minutes:02d}" if minutes else "")
 
 
-def clock_format(prefs):
-    """The menu bar clock's strftime format from the shell preferences."""
+def am_pm(when=None):
+    """AM or PM as the region writes it, for strftime. Some regions' formats
+    have no word for it (it's left empty), so then plain AM and PM."""
+    when = time.localtime() if when is None else when
+    word = time.strftime("%p", when)
+    return "%p" if word.strip() else ("AM" if when.tm_hour < 12 else "PM")
+
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def clock_format(prefs, when=None):
+    """The menu bar clock's strftime format from the shell preferences. The
+    day and month are in English, as freemac's menus are, in the region's
+    order: Tue Nov 24 in the US, Tue 24 Nov in the UK."""
+    from . import region
+    when = time.localtime() if when is None else when
     parts = []
     if prefs.get("clock_day", True):
-        parts.append("%a")
+        parts.append(region.WEEKDAY_NAMES[when.tm_wday][:3])
     if prefs.get("clock_date", True):
-        parts.append("%b %-d")
-    hour = "%H:%M" if prefs.get("clock") == "24" else "%-I:%M %p"
+        month = MONTHS[when.tm_mon - 1]
+        parts.append(f"{month} {when.tm_mday}" if region.month_first() else f"{when.tm_mday} {month}")
+    hour = "%H:%M" if style.h24(prefs) else "%-I:%M " + am_pm()
     if prefs.get("clock_seconds"):
         hour = hour.replace("%M", "%M:%S")
     return ("   ".join([" ".join(parts), hour]) if parts else hour)
@@ -130,7 +146,7 @@ class DateTimePanel(Gtk.Box):
         clock = Gtk.ComboBoxText()
         for fmt, name in (("12", "12-hour (2:30 PM)"), ("24", "24-hour (14:30)")):
             clock.append(fmt, name)
-        clock.set_active_id(prefs.get("clock", "12"))
+        clock.set_active_id("24" if style.h24(prefs) else "12")
         clock.connect("changed", lambda c: window.save_prefs(clock=c.get_active_id()))
 
         self.status = Gtk.Label(xalign=0, wrap=True, no_show_all=True)
@@ -183,7 +199,7 @@ class DateTimePanel(Gtk.Box):
 
     def _tick(self):
         time.tzset()
-        fmt = "%A %-d %B %Y   %H:%M:%S" if style.prefs().get("clock") == "24" else "%A %-d %B %Y   %-I:%M:%S %p"
+        fmt = "%A %-d %B %Y   %H:%M:%S" if style.h24() else "%A %-d %B %Y   %-I:%M:%S " + am_pm()
         self.now_label.set_text(time.strftime(fmt))
         return self.get_mapped() or self.get_parent() is not None
 

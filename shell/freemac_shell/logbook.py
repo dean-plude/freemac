@@ -221,7 +221,7 @@ def hhmm(minutes):
 def clock(minutes):
     """How the menu bar would write the time: 9:30 PM, or 21:30."""
     when = datetime.time(minutes // 60 % 24, minutes % 60)
-    return when.strftime("%H:%M") if style.prefs().get("clock") == "24" else when.strftime("%-I:%M %p")
+    return when.strftime("%H:%M") if style.h24() else when.strftime("%-I:%M %p")
 
 
 def day_window(down, weekday):

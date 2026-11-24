@@ -182,7 +182,7 @@ def locked():
 
 
 def lock_command():
-    clock = "%H:%M" if style.prefs().get("clock") == "24" else "%-I:%M"
+    clock = "%H:%M" if style.h24() else "%-I:%M"
     command = ["gtklock", "--daemonize", "--style", write_style(), "--time-format", clock,
                "--idle-hide", "--idle-timeout", "20"]
     if style.is_dark():

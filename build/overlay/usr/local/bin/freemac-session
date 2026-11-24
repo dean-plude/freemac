@@ -23,6 +23,28 @@ for dir in /usr/lib/*/gtk-3.0/modules /usr/lib/gtk-3.0/modules; do
     break
   fi
 done
+# Language & Region (Dials): the region's dates, times, numbers and money
+# (LC_TIME, LC_NUMERIC...) for every app. Only lines of the form
+# "export LC_X=xx_YY.UTF-8" are taken, and only locales this computer has.
+region_env="${XDG_CONFIG_HOME:-$HOME/.config}/freemac/region.env"
+if [ -r "$region_env" ]; then
+  have=$(locale -a 2>/dev/null | tr 'A-Z' 'a-z' | tr -d '-')
+  while IFS= read -r line; do
+    case "$line" in
+      "export LC_"*=*) ;;
+      *) continue ;;
+    esac
+    name=${line#export }; name=${name%%=*}; value=${line#*=}
+    case "$name" in
+      LC_TIME|LC_NUMERIC|LC_MONETARY|LC_PAPER|LC_NAME|LC_ADDRESS|LC_TELEPHONE|LC_MEASUREMENT) ;;
+      *) continue ;;
+    esac
+    printf '%s' "$value" | grep -Eqx '[a-z]{2,3}_[A-Z]{2}\.UTF-8' || continue
+    short=$(printf '%s' "$value" | tr 'A-Z' 'a-z' | tr -d '-')
+    printf '%s\n' "$have" | grep -qx "$short" || continue
+    export "$name=$value"
+  done < "$region_env"
+fi
 # libseat finds seatd first (seatd.service); logind is the fallback.
 # Allow the software renderer (virtual machines, GPUs without drivers).
 export WLR_RENDERER_ALLOW_SOFTWARE=1

@@ -20,7 +20,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
-from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_security, dials_seek, dials_sharing, dials_startup, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
+from . import battery, default_apps, freemac_update, dials_accounts, dials_backup, dials_input, dials_keys, dials_login, dials_more, dials_update, dials_people, dials_region, dials_security, dials_seek, dials_sharing, dials_startup, dials_storage, dials_time, menus, pier, screen, style, sun, update_notice  # noqa: E402
 from .network import NetworkPanel  # noqa: E402
 
 CONFIG = os.path.expanduser("~/.config")
@@ -360,6 +360,8 @@ class DialsWindow(Gtk.ApplicationWindow):
              lambda: dials_startup.startup_disk_page(self)),
             (2, "datetime", "Date & Time", "preferences-system-time-symbolic", "blue",
              lambda: dials_time.DateTimePanel(self, page)),
+            (2, "region", "Language & Region", "freemac-language-symbolic", "blue",
+             lambda: dials_region.RegionPanel(self, page)),
             (2, "appearance", "Appearance", "preferences-desktop-appearance-symbolic", "dark", self.appearance),
             (2, "accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic", "blue",
              lambda: dials_more.accessibility(self)),
@@ -552,7 +554,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         if self.settings:
             # Show the change when the mode is switched from elsewhere.
             self.settings.connect("changed::color-scheme", lambda *_: self._show_mode())
-        where = sun.times_today(h24=style.prefs().get("clock") == "24")
+        where = sun.times_today(h24=style.h24())
         self.auto_note = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
         self.auto_note.get_style_context().add_class("dials-caption")
         self.auto_note.set_label(
@@ -992,7 +994,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         schedule = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
         schedule.append("sun", "Sunset to Sunrise")
         schedule.append("custom", "Custom")
-        where = sun.times_today(h24=style.prefs().get("clock") == "24")
+        where = sun.times_today(h24=style.h24())
         if where is None:
             schedule.set_sensitive(settings["schedule"] == "sun")
         schedule.set_active_id(settings["schedule"])

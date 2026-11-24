@@ -8,6 +8,7 @@
 #   freemac-system-helper file-sharing on|off   Sharing > File Sharing (SMB)
 #   freemac-system-helper screen-sharing on|off Sharing > Screen Sharing (VNC)
 #   freemac-system-helper computer-name NAME    Sharing > Computer name
+#   freemac-system-helper region xx_YY.UTF-8    Language & Region (installs before 1.189)
 set -e
 LANS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
 
@@ -80,6 +81,25 @@ if [ "$1" = computer-name ]; then
     printf '127.0.1.1\t%s\n' "$host" >> /etc/hosts
   fi
   systemctl try-restart avahi-daemon.service >/dev/null 2>&1 || true
+  exit 0
+fi
+
+if [ "$1" = region ]; then
+  # Language & Region on a computer installed before 1.189, which has only
+  # C.UTF-8: make the locale the person chose (one of glibc's own, as
+  # en_GB.UTF-8), and write in US English from then on if nothing else was set.
+  code=$2
+  printf '%s' "$code" | grep -Eqx '[a-z]{2,3}_[A-Z]{2}\.UTF-8' || { echo "That isn't a region." >&2; exit 2; }
+  grep -qx "$code UTF-8" /usr/share/i18n/SUPPORTED || { echo "This computer doesn't know that region." >&2; exit 2; }
+  grep -qx "$code UTF-8" /etc/locale.gen 2>/dev/null || printf '%s UTF-8\n' "$code" >> /etc/locale.gen
+  localedef -i "${code%.UTF-8}" -f UTF-8 "$code"
+  if [ "$code" != en_US.UTF-8 ] && ! locale -a 2>/dev/null | grep -qix 'en_US.utf8'; then
+    grep -qx "en_US.UTF-8 UTF-8" /etc/locale.gen || printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
+    localedef -i en_US -f UTF-8 en_US.UTF-8
+  fi
+  if ! grep -q '^LANG=' /etc/default/locale 2>/dev/null || grep -qx 'LANG=C.UTF-8' /etc/default/locale; then
+    printf 'LANG=en_US.UTF-8\n' > /etc/default/locale
+  fi
   exit 0
 fi
 

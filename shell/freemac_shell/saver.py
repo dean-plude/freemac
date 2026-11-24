@@ -175,7 +175,7 @@ class Clock:
         cr.set_source_rgb(0.01, 0.01, 0.03)
         cr.paint()
         now = now or time.localtime()
-        clock24 = style.prefs().get("clock") == "24"
+        clock24 = style.h24()
         text = time.strftime("%H:%M" if clock24 else "%-I:%M", now)
         date = time.strftime("%A, %-d %B", now)
         scale = h / 800

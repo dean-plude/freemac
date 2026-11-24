@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """A small month calendar: the month's name with arrows, then the days in
-weeks from Sunday. Today has a red circle; the chosen day a grey one; days
+weeks from the region's first day (Sunday in the US, Monday in much of
+the world: Dials > Language & Region). Today has a red circle; the chosen day a grey one; days
 with events a dot under them. Used by the menu bar's clock and by Tide's
 date picker. Original freemac code.
 """
@@ -13,14 +14,16 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gtk  # noqa: E402
 
+from . import region  # noqa: E402
+
 CELL = 30
 RED = (0.94, 0.26, 0.24)
 
 
-def month_weeks(year, month):
-    """Six weeks of dates (Sunday first) that show the month."""
-    first = dt.date(year, month, 1)
-    start = first - dt.timedelta(days=(first.weekday() + 1) % 7)
+def month_weeks(year, month, first_day=None):
+    """Six weeks of dates that show the month, each week from the region's
+    first day (first_day as datetime counts, Monday 0)."""
+    start = region.start_of_week(dt.date(year, month, 1), first_day)
     return [[start + dt.timedelta(days=7 * w + d) for d in range(7)] for w in range(6)]
 
 
@@ -91,7 +94,7 @@ class MiniMonth(Gtk.Box):
         cr.select_font_face("Sans")
         cr.set_font_size(10)
         cr.set_source_rgba(ink.red, ink.green, ink.blue, 0.5)
-        for col, name in enumerate(("S", "M", "T", "W", "T", "F", "S")):
+        for col, name in enumerate(region.week_letters()):
             ext = cr.text_extents(name)
             cr.move_to(col * CELL + (CELL - ext.width) / 2 - ext.x_bearing, 14)
             cr.show_text(name)

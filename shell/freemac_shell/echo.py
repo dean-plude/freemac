@@ -106,7 +106,7 @@ def clock(seconds):
 def when_words(stamp):
     then = time.localtime(stamp)
     now = time.localtime()
-    hour = time.strftime("%H:%M", then) if style.prefs().get("clock") == "24" else \
+    hour = time.strftime("%H:%M", then) if style.h24() else \
         time.strftime("%I:%M %p", then).lstrip("0")
     if then.tm_yday == now.tm_yday and then.tm_year == now.tm_year:
         return f"Today, {hour}"

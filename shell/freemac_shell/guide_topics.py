@@ -1346,6 +1346,14 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "language-region": ("Change how dates, times, numbers and money are written", "language region country locale format date time number decimal comma currency money first day of week monday sunday temperature celsius fahrenheit metric measurement uk britain europe", [
+        "Choose Dials > Language & Region.",
+        "Choose your country from Region. Every app then writes dates, times, numbers and money the way it's done there, for example 24/11/2026 and £1,234.56 in the United Kingdom.",
+        "The examples at the bottom of the page show how they will look.",
+        "Change First day of week, Temperature or Measurement system if yours differ from your region's. Choosing another region puts them back to that region's own.",
+        "The menu bar's clock and freemac's calendars change at once. Other apps change after you log out and back in; click Log Out… on the page to do it now.",
+        "The menu bar shows a 24-hour clock where the region uses one. To choose for yourself, use Time format in Dials > Date & Time.",
+    ]),
     "tint": ("Find the colour of anything on the screen", "tint colour color meter picker eyedropper pixel hex rgb value what colour is this digital color meter", [
         "Open Tint from Applications > Utilities, or search for it with Seek.",
         "Point at anything on the screen. Tint shows the pixels under the pointer enlarged, and the colour's red, green and blue values.",

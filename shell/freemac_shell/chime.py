@@ -67,7 +67,7 @@ def uses_24h(data):
     """Follow the clock format chosen in Dials > Date & Time."""
     if data.get("clock24") is not None:
         return bool(data["clock24"])
-    return style.prefs().get("clock") == "24"
+    return style.h24()
 
 
 def clock_text(dt, h24, seconds=False):
