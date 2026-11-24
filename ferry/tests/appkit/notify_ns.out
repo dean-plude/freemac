@@ -1,0 +1,69 @@
+Notify #1 app='appkit_notify_ns' replaces=0 icon='' summary='Build finished' body='freemac\nAll 12 targets &lt;built&gt;' timeout=-1
+    actions [default:Show, action:Open, other:Later]
+    hints {desktop-entry: 'appkit_notify_ns', sound-name: 'message-new-instant', urgency: 1}
+(clicks action on #1)
+Notify #2 app='appkit_notify_ns' replaces=0 icon='' summary='Ping' body='Are you there?' timeout=-1
+    actions [default:Show, inline-reply:Reply]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1, x-kde-reply-placeholder-text: 'Say something', x-kde-reply-submit-button-text: 'Reply'}
+(replies 'Pong' to #2)
+Notify #3 app='appkit_notify_ns' replaces=0 icon='' summary='Choices' body='Pick one' timeout=-1
+    actions [default:Show, more:copy:Copy, more:share:Share]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+(clicks more:share on #3)
+Notify #4 app='appkit_notify_ns' replaces=0 icon='' summary='Not now' body='Closed with the other button' timeout=-1
+    actions [default:Show, other:Close]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+(clicks other on #4)
+CloseNotification #4
+Notify #5 app='appkit_notify_ns' replaces=0 icon='' summary='Click me' body='Anywhere' timeout=-1
+    actions [default:Show]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+(clicks default on #5)
+Notify #6 app='appkit_notify_ns' replaces=0 icon='' summary='Scheduled' body='Half a second later' timeout=-1
+    actions [default:Show]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+CloseNotification #6
+Notify #7 app='appkit_notify_ns' replaces=0 icon='' summary='Download' body='50%' timeout=-1
+    actions [default:Show]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+Notify #7 app='appkit_notify_ns' replaces=7 icon='' summary='Download' body='Done' timeout=-1
+    actions [default:Show]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+Notify #8 app='appkit_notify_ns' replaces=0 icon='' summary='Shown anyway' body='The delegate said yes' timeout=-1
+    actions [default:Show]
+    hints {desktop-entry: 'appkit_notify_ns', suppress-sound: true, urgency: 1}
+CloseNotification #7
+CloseNotification #8
+----
+defaults: action button yes "Show", other "Close", sound none, activation 0
+delivered list straight after: 1
+delivered "Build finished", presented: yes, has a delivery date: yes
+activated "Build finished": type 2, userInfo 42; app active: yes
+delivered after the click: 
+delivered "Ping", presented: yes, has a delivery date: yes
+activated "Ping": type 3, response "Pong"; app active: yes
+delivered "Choices", presented: yes, has a delivery date: yes
+activated "Choices": type 4, action share (Share); app active: yes
+delivered "Not now", presented: yes, has a delivery date: yes
+delivered after the other button: 
+delivered "Click me", presented: yes, has a delivery date: yes
+activated "Click me": type 1; app active: yes
+delivered: 
+scheduled: Scheduled, In an hour
+scheduled after removing one: Scheduled
+delivered "Scheduled", presented: yes, has a delivery date: yes
+scheduled after it was delivered: 
+delivered: Scheduled
+delivered after removing it: 
+delivered "Download", presented: yes, has a delivery date: yes
+delivered "Download", presented: yes, has a delivery date: yes
+delivered: Download
+should present "Kept quiet"? no (the app is in front)
+should present "Shown anyway"? yes (the app is in front)
+delivered "Kept quiet", presented: no, has a delivery date: yes
+delivered "Shown anyway", presented: yes, has a delivery date: yes
+delivered: Download, Kept quiet, Shown anyway
+delivered after removing all: 
+done
+app exit=0
+exit=0

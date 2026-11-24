@@ -787,5 +787,79 @@ if command -v weston > /dev/null 2>&1; then
 else
     echo "skip appkit_window_print (needs weston, for a test display)"
 fi
+# Notifications and the Dock (UNUserNotificationCenter, NSUserNotification,
+# NSDockTile), shown through a stand-in freedesktop.org notification server
+# and Dock (fake_notify.py, which needs Python's gi bindings) on a private
+# session bus with no services of its own.
+notify_python=
+for p in python3 python3.13 python3.12 python3.11 python3.10; do
+    if command -v "$p" > /dev/null &&
+            "$p" -c "import gi; gi.require_version('Gio', '2.0'); from gi.repository import Gio" 2> /dev/null; then
+        notify_python=$p; break
+    fi
+done
+notify_home="$build/home_notify"; notify_vars=
+notify_env() {
+    rm -rf "$notify_home"; mkdir -p "$notify_home/share"
+    env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u XDG_RUNTIME_DIR HOME="$notify_home" \
+        XDG_DATA_HOME= XDG_DATA_DIRS="$notify_home/share" XDG_CONFIG_HOME= "$@"
+}
+notify_build() {
+    "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$build/appkit_$1" "$here/appkit/$1.m" -framework Cocoa \
+        -framework UserNotifications 2> "$build/appkit_$1.cc.log" && return 0
+    echo "FAIL appkit_$1 (did not compile)"; sed 's/^/    /' "$build/appkit_$1.cc.log"
+    fail=$((fail + 1)); return 1
+}
+# notify_test NAME [fake_notify.py options...]: tests/appkit/NAME.m, run against the stand-in.
+notify_test() {
+    name=$1; shift
+    notify_build "$name" || return 1
+    notify_env $notify_vars timeout 60 dbus-run-session --config-file="$here/appkit/session-bus.conf" -- \
+        sh "$here/appkit/notifications.sh" "$notify_python" "$top/ferry" "$build/appkit_$name" \
+        "$build/appkit_$name.log" "$@" > "$build/appkit_$name.got" 2> "$build/appkit_$name.err"
+    echo "exit=$?" >> "$build/appkit_$name.got"
+    if diff -u "$here/appkit/$name.out" "$build/appkit_$name.got" > "$build/appkit_$name.diff"; then
+        echo "ok   appkit_$name"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_$name"; sed 's/^/    /' "$build/appkit_$name.diff"
+        sed 's/^/    stderr: /' "$build/appkit_$name.log.err"; fail=$((fail + 1)); return 1
+    fi
+}
+if [ -n "$notify_python" ] && command -v dbus-run-session > /dev/null; then
+    notify_test notify_un --act "Lunch?=action:ACCEPT" --reply "New message=Yes, at noon" --dismiss Ignored \
+        --dismiss Dismissed --act "Tap me=default"
+    notify_test notify_ns --act "Build finished=action" --reply "Ping=Pong" --act "Choices=more:share" \
+        --act "Not now=other" --act "Click me=default"
+    notify_test notify_dock --dock --menu-click "New Window"
+    # No notification server on the bus: nothing is shown, and Ferry says so once.
+    notify_vars=FERRY_VERBOSE=1
+    if notify_test notify_none --no-server; then
+        if [ "$(grep -c "no notification server is running" "$build/appkit_notify_none.log.err")" = 1 ]; then
+            echo "ok   appkit_notify_none message"; pass=$((pass + 1))
+        else
+            echo "FAIL appkit_notify_none message"; sed 's/^/    stderr: /' "$build/appkit_notify_none.log.err"
+            fail=$((fail + 1))
+        fi
+    fi
+else
+    echo "skip appkit_notify_un, appkit_notify_ns, appkit_notify_dock and appkit_notify_none" \
+        "(they need dbus-run-session and a Python with the gi bindings)"
+fi
+# No session bus at all: the same program carries on, and says so once.
+if notify_build notify_none; then
+    notify_env FERRY_VERBOSE=1 timeout 60 "$top/ferry" "$build/appkit_notify_none" \
+        > "$build/appkit_notify_nobus.got" 2> "$build/appkit_notify_nobus.err"
+    echo "app exit=$?" >> "$build/appkit_notify_nobus.got"
+    sed '1,/^----$/d; /^exit=/d' "$here/appkit/notify_none.out" > "$build/appkit_notify_nobus.want"
+    if ! diff -u "$build/appkit_notify_nobus.want" "$build/appkit_notify_nobus.got" > "$build/appkit_notify_nobus.diff"; then
+        echo "FAIL appkit_notify_nobus"; sed 's/^/    /' "$build/appkit_notify_nobus.diff"
+        sed 's/^/    stderr: /' "$build/appkit_notify_nobus.err"; fail=$((fail + 1))
+    elif [ "$(grep -c "there is no session bus, so nothing is shown" "$build/appkit_notify_nobus.err")" != 1 ]; then
+        echo "FAIL appkit_notify_nobus (Ferry didn't say once that there is no session bus)"
+        sed 's/^/    stderr: /' "$build/appkit_notify_nobus.err"; fail=$((fail + 1))
+    else
+        echo "ok   appkit_notify_nobus"; pass=$((pass + 1))
+    fi
+fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

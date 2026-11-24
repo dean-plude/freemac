@@ -800,6 +800,36 @@ for a printer that the print dialog didn't choose fails here. The work
 was written from Apple's documentation and not compared with a Mac;
 `docs/ferry-gui.md` lists what a Mac would settle.
 
+### Notifications and the Dock (freemac 1.207, Ferry 0.34.0)
+
+Mac programs can post notifications with UNUserNotificationCenter
+(UserNotifications.framework, an alias of Ferry's AppKit) or with the older
+NSUserNotificationCenter. Both show them through the desktop's notification
+server, over the freedesktop.org `org.freedesktop.Notifications` interface
+on the session bus. The notification's title is the summary, and its
+subtitle and body make the body, with any markup characters escaped. The
+app's name comes from CFBundleDisplayName or CFBundleName, and its icon is
+the one Ferry or freemac-mac-app put in the icon theme. Actions become
+buttons, a click on the notification itself is the default action, and a
+text input action or an NSUserNotification reply button becomes an inline
+reply on servers that offer one (KDE's way of doing it). What the user does
+comes back on the main run loop and reaches the delegates as on a Mac:
+`didReceiveNotificationResponse:` with the action and any text, and
+`didActivateNotification:` with the activation type. Removing a delivered
+notification closes it on the server. Requests can wait for a time
+interval or a calendar date, and NSUserNotifications for a delivery date
+with a repeat interval. With no notification server, or no session bus,
+nothing is shown, every call still answers, and `FERRY_VERBOSE` says once
+why.
+
+The Dock is told about the app with the
+`com.canonical.Unity.LauncherEntry` signal, which freemac's Dock reads.
+NSApp's dockTile sends a badge label that is a number as the Dock's badge,
+`requestUserAttention:` makes the app's Dock icon ask for attention (for a
+second, or until the app becomes active for a critical request), and the
+delegate's `applicationDockMenu:` is served as a dbusmenu menu for docks that
+read one. The tile is sent again when freemac's Dock starts.
+
 ## What the apps need most
 
 Counted over the nine apps:

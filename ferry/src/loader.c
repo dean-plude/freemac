@@ -926,6 +926,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"ImageIO", "CoreGraphics"},
     {"Cocoa", "AppKit"},
     {"Carbon", "AppKit"},
+    {"UserNotifications", "AppKit"}, /* appkit/UNUserNotificationCenter.m, beside the Dock and D-Bus */
     {NULL, NULL},
 };
 

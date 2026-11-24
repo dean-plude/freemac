@@ -1,0 +1,39 @@
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+(the Dock starts again)
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Dock menu:
+    menu New Window
+    menu -
+    menu Recent
+      menu notes.txt
+(clicks New Window in the Dock menu)
+Update application://appkit_notify_dock.desktop {count: 7, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 12, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 12, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: true}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: true}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: true}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+----
+asked for the Dock menu
+tile: same each time yes, owner is NSApp yes, size 128x128, shows the badge yes, label none
+asked for the Dock menu
+Dock menu: New Window chosen
+label kept: New
+critical request: an id
+informational request: an id
+(waiting a second)
+(the app becomes active)
+request while active: none
+application icon kept: yes
+content view kept: yes
+tile view drawn at 128x128
+drawn by display: yes
+done
+app exit=0
+exit=0

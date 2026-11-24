@@ -4081,5 +4081,9 @@ typedef NS_OPTIONS(NSUInteger, NSFontPanelModeMask) {
 @interface NSTextView (NSFontChanging) <NSFontChanging>
 - (void)changeFont:(id)sender;
 @end
+/* ---- notifications and the Dock (NSUserNotification.m, NSDockTile.m) ------------------ */
+
+#import <Foundation/NSUserNotification.h>
+#import <AppKit/NSDockTile.h>
 
 #endif

@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.207 "Ferry: notifications and Dock badges" (done)
+
+Ferry 0.34.0: Mac apps can pop up notifications, with buttons and replies, and put a badge on their Dock icon or bounce it for attention.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `UNUserNotificationCenter`: requests, time and calendar triggers, categories with actions and text replies, pending and delivered lists, and the delegate's answers | Ferry | done |
+| 2 | The older `NSUserNotificationCenter`: deliver, schedule, buttons and replies | Ferry | done |
+| 3 | Notifications shown by this system's notification server over D-Bus, with clicks and replies sent back to the app | Ferry | done |
+| 4 | `NSDockTile` badges, `requestUserAttention:`, and the app's Dock menu, sent to the Dock as LauncherEntry updates | Ferry | done |
+| 5 | Six new tests on a private bus with a stand-in server and Dock; `make check` 157 of 157 | Ferry | done |
+
+Notifications don't stay after the app quits, and freemac's Dock shows number badges only for now.
+
 ## 1.206 "Ferry: printing and the font panel" (done)
 
 Ferry 0.33.0: Mac apps can print and save as PDF, set up the page, and pick fonts, from their File and Format menus as on a Mac.
