@@ -1892,4 +1892,125 @@ typedef NS_ENUM(NSUInteger, NSTitlePosition) {
 - (void)sizeToFit;
 @end
 
+
+/* ---- split views and tab views ------------------------------------------------------- */
+typedef float NSLayoutPriority;
+static const NSLayoutPriority NSLayoutPriorityRequired = 1000;
+static const NSLayoutPriority NSLayoutPriorityDefaultHigh = 750;
+static const NSLayoutPriority NSLayoutPriorityDragThatCanResizeWindow = 510;
+static const NSLayoutPriority NSLayoutPriorityWindowSizeStayPut = 500;
+static const NSLayoutPriority NSLayoutPriorityDragThatCannotResizeWindow = 490;
+static const NSLayoutPriority NSLayoutPriorityDefaultLow = 250;
+static const NSLayoutPriority NSLayoutPriorityFittingSizeCompression = 50;
+
+typedef NS_ENUM(NSInteger, NSSplitViewDividerStyle) {
+    NSSplitViewDividerStyleThick = 1, NSSplitViewDividerStyleThin = 2, NSSplitViewDividerStylePaneSplitter = 3,
+};
+@class NSSplitView;
+@protocol NSSplitViewDelegate <NSObject>
+@optional
+- (BOOL)splitView:(NSSplitView *)sv canCollapseSubview:(NSView *)subview;
+- (BOOL)splitView:(NSSplitView *)sv shouldCollapseSubview:(NSView *)subview forDoubleClickOnDividerAtIndex:(NSInteger)i;
+- (CGFloat)splitView:(NSSplitView *)sv constrainMinCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)i;
+- (CGFloat)splitView:(NSSplitView *)sv constrainMaxCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)i;
+- (CGFloat)splitView:(NSSplitView *)sv constrainSplitPosition:(CGFloat)proposed ofSubviewAt:(NSInteger)i;
+- (void)splitView:(NSSplitView *)sv resizeSubviewsWithOldSize:(NSSize)old;
+- (BOOL)splitView:(NSSplitView *)sv shouldAdjustSizeOfSubview:(NSView *)view;
+- (BOOL)splitView:(NSSplitView *)sv shouldHideDividerAtIndex:(NSInteger)i;
+- (NSRect)splitView:(NSSplitView *)sv effectiveRect:(NSRect)proposed forDrawnRect:(NSRect)drawn
+   ofDividerAtIndex:(NSInteger)i;
+- (NSRect)splitView:(NSSplitView *)sv additionalEffectiveRectOfDividerAtIndex:(NSInteger)i;
+- (void)splitViewWillResizeSubviews:(NSNotification *)note;
+- (void)splitViewDidResizeSubviews:(NSNotification *)note;
+@end
+APPKIT_EXTERN NSNotificationName const NSSplitViewWillResizeSubviewsNotification;
+APPKIT_EXTERN NSNotificationName const NSSplitViewDidResizeSubviewsNotification;
+@interface NSSplitView : NSView
+@property (getter=isVertical) BOOL vertical;
+@property NSSplitViewDividerStyle dividerStyle;
+@property (readonly) CGFloat dividerThickness;
+@property (readonly, copy) NSColor *dividerColor;
+@property (assign) id<NSSplitViewDelegate> delegate;
+@property (copy) NSString *autosaveName;
+@property BOOL arrangesAllSubviews;
+@property (readonly, copy) NSArray<__kindof NSView *> *arrangedSubviews;
+- (void)addArrangedSubview:(NSView *)view;
+- (void)insertArrangedSubview:(NSView *)view atIndex:(NSInteger)index;
+- (void)removeArrangedSubview:(NSView *)view;
+- (void)adjustSubviews;
+- (BOOL)isSubviewCollapsed:(NSView *)subview;
+- (CGFloat)positionOfDividerAtIndex:(NSInteger)index;
+- (void)setPosition:(CGFloat)position ofDividerAtIndex:(NSInteger)index;
+- (CGFloat)minPossiblePositionOfDividerAtIndex:(NSInteger)index;
+- (CGFloat)maxPossiblePositionOfDividerAtIndex:(NSInteger)index;
+- (NSLayoutPriority)holdingPriorityForSubviewAtIndex:(NSInteger)index;
+- (void)setHoldingPriority:(NSLayoutPriority)priority forSubviewAtIndex:(NSInteger)index;
+- (void)drawDividerInRect:(NSRect)rect;
+@end
+
+typedef NS_ENUM(NSUInteger, NSTabViewType) {
+    NSTopTabsBezelBorder = 0, NSLeftTabsBezelBorder = 1, NSBottomTabsBezelBorder = 2, NSRightTabsBezelBorder = 3,
+    NSNoTabsBezelBorder = 4, NSNoTabsLineBorder = 5, NSNoTabsNoBorder = 6,
+};
+typedef NS_ENUM(NSUInteger, NSTabPosition) {
+    NSTabPositionNone = 0, NSTabPositionTop = 1, NSTabPositionLeft = 2, NSTabPositionBottom = 3, NSTabPositionRight = 4,
+};
+typedef NS_ENUM(NSUInteger, NSTabViewBorderType) {
+    NSTabViewBorderTypeNone = 0, NSTabViewBorderTypeLine = 1, NSTabViewBorderTypeBezel = 2,
+};
+typedef NS_ENUM(NSUInteger, NSTabState) { NSSelectedTab = 0, NSBackgroundTab = 1, NSPressedTab = 2 };
+@class NSTabView;
+@interface NSTabViewItem : NSObject <NSCoding>
+- (instancetype)initWithIdentifier:(id)identifier;
++ (instancetype)tabViewItemWithViewController:(NSViewController *)vc;
+@property (retain) id identifier;
+@property (copy) NSString *label;
+@property (copy) NSString *toolTip;
+@property (copy) NSColor *color;
+@property (retain) NSImage *image;
+@property (retain) NSView *view;
+@property (retain) NSViewController *viewController;
+@property (assign) NSView *initialFirstResponder;
+@property (readonly) NSTabState tabState;
+@property (readonly, assign) NSTabView *tabView;
+- (NSSize)sizeOfLabel:(BOOL)shouldTruncate;
+- (void)drawLabel:(BOOL)shouldTruncate inRect:(NSRect)rect;
+@end
+@protocol NSTabViewDelegate <NSObject>
+@optional
+- (BOOL)tabView:(NSTabView *)tv shouldSelectTabViewItem:(NSTabViewItem *)item;
+- (void)tabView:(NSTabView *)tv willSelectTabViewItem:(NSTabViewItem *)item;
+- (void)tabView:(NSTabView *)tv didSelectTabViewItem:(NSTabViewItem *)item;
+- (void)tabViewDidChangeNumberOfTabViewItems:(NSTabView *)tv;
+@end
+@interface NSTabView : NSView
+@property NSTabViewType tabViewType;
+@property NSTabPosition tabPosition;
+@property NSTabViewBorderType tabViewBorderType;
+@property (copy) NSArray<NSTabViewItem *> *tabViewItems;
+@property (readonly) NSInteger numberOfTabViewItems;
+@property (readonly) NSTabViewItem *selectedTabViewItem;
+@property (assign) id<NSTabViewDelegate> delegate;
+@property (retain) NSFont *font;
+@property BOOL drawsBackground, allowsTruncatedLabels;
+@property NSControlSize controlSize;
+@property (readonly) NSRect contentRect;
+@property (readonly) NSSize minimumSize;
+- (void)addTabViewItem:(NSTabViewItem *)item;
+- (void)insertTabViewItem:(NSTabViewItem *)item atIndex:(NSInteger)index;
+- (void)removeTabViewItem:(NSTabViewItem *)item;
+- (NSTabViewItem *)tabViewItemAtIndex:(NSInteger)index;
+- (NSInteger)indexOfTabViewItem:(NSTabViewItem *)item;
+- (NSInteger)indexOfTabViewItemWithIdentifier:(id)identifier;
+- (NSTabViewItem *)tabViewItemAtPoint:(NSPoint)point;
+- (void)selectTabViewItem:(NSTabViewItem *)item;
+- (void)selectTabViewItemAtIndex:(NSInteger)index;
+- (void)selectTabViewItemWithIdentifier:(id)identifier;
+- (void)selectFirstTabViewItem:(id)sender;
+- (void)selectLastTabViewItem:(id)sender;
+- (void)selectNextTabViewItem:(id)sender;
+- (void)selectPreviousTabViewItem:(id)sender;
+- (void)takeSelectedTabViewItemFromSender:(id)sender;
+@end
+
 #endif

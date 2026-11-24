@@ -98,8 +98,8 @@ without a window.
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, outline and split views, pop-up buttons, tab views,
-  status bar items, alerts) and the document classes are missing, and
+  views (tables, outline views, pop-up buttons, toolbars, status bar
+  items, alerts) and the document classes are missing, and
   storyboards aren't read. Real apps' nibs (made by Xcode, in both its
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and

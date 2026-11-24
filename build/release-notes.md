@@ -12,6 +12,7 @@ freemac is an original, free desktop for x86-64 PCs that works like a classic Ma
 
 - **freemac-@VERSION@-amd64.iso** (about @SIZE@ MB)
 - **freemac-@VERSION@-amd64.iso.sha256**, to check the download: `sha256sum -c freemac-@VERSION@-amd64.iso.sha256`
+@FERRY@
 
 SHA-256: `@SHA256@`
 

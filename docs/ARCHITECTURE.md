@@ -878,6 +878,16 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Ferry in releases (1.155)
+
+Ferry stays off the ISO, but the release workflow now builds its package
+(`ferry/packaging/build-deb.sh`, with clang, lld and llvm for its Mac-side
+libraries) and attaches `freemac-ferry_VERSION_amd64.deb` to the release. The
+step may fail without stopping the release; `scripts/release-notes.py` names
+the package in the notes only when it was built. Ferry 0.10.0 adds
+`NSTabView`/`NSTabViewItem` and `NSSplitView` to its AppKit
+(`ferry/appkit/NSTabView.m`, `NSSplitView.m`), tested by `appkit_panes`.
+
 ## Battery menu (1.154)
 
 `battery_menu.BatteryMenu` subclasses `status.Battery`, which still draws the

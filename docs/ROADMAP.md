@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.155 "Ferry: tabs and split views" (done)
+
+Ferry, freemac's own layer for simple Intel Mac programs, now comes with every
+release, and gains two of the views Mac apps use most.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Every release now has Ferry's package beside the ISO (freemac-ferry_VERSION_amd64.deb), built by the release workflow; double-click it to install it with Slipway. A failed Ferry build doesn't hold up the ISO | release.yml, release-notes.py | done |
+| 2 | Tab views (`NSTabView`, `NSTabViewItem`): tabs along the top (or the other edges), selection by click, arrow keys, index or identifier, the delegate's questions, and loading from nibs | Ferry AppKit | done |
+| 3 | Split views (`NSSplitView`): vertical and horizontal, thin, thick and pane-splitter dividers, dragging with the delegate's limits, collapsing, holding priorities, and positions saved under an autosave name | Ferry AppKit | done |
+| 4 | A crash when a Mac app's window was resized or closed (its drawing surface was let go twice) | Ferry graphics | done |
+| 5 | A test of both views, built from a nib, in Ferry's test suite (65 tests) | Ferry tests | done |
+
 ## 1.154 "Battery menu" (done)
 
 The menu bar's Battery menu, as on a Mac.
