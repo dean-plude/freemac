@@ -6,7 +6,8 @@ Conversations and messages from every backend are kept in one SQLite file,
 everything is still there after a restart, with or without the phone or the
 server in reach. Backends hand over Chat and Message records; the store
 merges them by id, so the same message arriving twice (a refresh, then the
-live event) is kept once.
+live event) is kept once. Reactions (tapbacks) are kept apart, one per person
+per message: the newest from each person wins, and taking one back removes it.
 
 Settings are ~/.config/freemac/messages/settings.json. A BlueBubbles server's
 password goes to the login keychain (libsecret's Secret, through gi, which
@@ -69,8 +70,35 @@ class Message:
     status: str = "received"      # received, sending, sent, delivered, read, failed
     status_date: int = 0          # when it was delivered or read
     read: bool = True
-    attachments: list = field(default_factory=list)   # [{"id", "name", "mime", "path"}]
+    attachments: list = field(default_factory=list)   # [{"id", "name", "mime", "path", "thumbnail"?}]
     remote_id: str = ""
+
+
+# A reaction's kinds, as BlueBubbles names them, and what a bubble shows.
+REACTION_KINDS = ("love", "like", "dislike", "laugh", "emphasize", "question")
+REACTION_GLYPHS = {"love": "❤️", "like": "👍", "dislike": "👎", "laugh": "😂", "emphasize": "‼️",
+                   "question": "❓"}
+REACTION_NAMES = {"love": "Love", "like": "Like", "dislike": "Dislike", "laugh": "Laugh",
+                  "emphasize": "Emphasize", "question": "Question"}
+
+
+@dataclass
+class Reaction:
+    """A tapback on one message. kind "" takes the person's reaction back."""
+    id: str                       # the reaction's own id ("bb:<guid>")
+    chat_id: str
+    target: str                   # the message it's on ("bb:<guid>")
+    kind: str = ""                # one of REACTION_KINDS, "emoji", or "" (taken back)
+    emoji: str = ""               # for kind "emoji"
+    from_me: bool = False
+    sender: str = ""
+    date: int = 0
+
+    def glyph(self):
+        return self.emoji if self.kind == "emoji" else REACTION_GLYPHS.get(self.kind, "")
+
+    def who(self):
+        return "me" if self.from_me else normalise_address(self.sender)
 
 
 def normalise_address(address):
@@ -109,6 +137,10 @@ class Store:
                 sender TEXT, service TEXT, status TEXT, status_date INTEGER, read INTEGER,
                 attachments TEXT, remote_id TEXT);
             CREATE INDEX IF NOT EXISTS messages_by_chat ON messages(chat_id, date);
+            CREATE TABLE IF NOT EXISTS reactions (
+                target TEXT, who TEXT, id TEXT, chat_id TEXT, kind TEXT, emoji TEXT, from_me INTEGER,
+                sender TEXT, date INTEGER, PRIMARY KEY (target, who));
+            CREATE INDEX IF NOT EXISTS reactions_by_chat ON reactions(chat_id);
         """)
         self.db.commit()
 
@@ -173,6 +205,7 @@ class Store:
 
     def delete_chat(self, chat_id):
         self.db.execute("DELETE FROM messages WHERE chat_id=?", (chat_id,))
+        self.db.execute("DELETE FROM reactions WHERE chat_id=?", (chat_id,))
         self.db.execute("DELETE FROM chats WHERE id=?", (chat_id,))
         self.db.commit()
 
@@ -181,6 +214,7 @@ class Store:
         ids = [r["id"] for r in self.db.execute("SELECT id FROM chats WHERE backend=?", (backend,))]
         for chat_id in ids:
             self.db.execute("DELETE FROM messages WHERE chat_id=?", (chat_id,))
+            self.db.execute("DELETE FROM reactions WHERE chat_id=?", (chat_id,))
         self.db.execute("DELETE FROM chats WHERE backend=?", (backend,))
         self.db.commit()
 
@@ -205,11 +239,14 @@ class Store:
     def upsert_messages(self, messages):
         """Adds or updates messages; returns the ones that weren't here before.
         A message we sent ourselves and kept as "sending" is swapped for the
-        backend's own copy when that arrives."""
-        fresh = []
+        backend's own copy when that arrives. Reactions in the list go to
+        upsert_reactions, and new ones are returned too."""
+        fresh = self.upsert_reactions([m for m in messages if isinstance(m, Reaction)])
         for m in messages:
+            if isinstance(m, Reaction):
+                continue
             old = self.message(m.id)
-            if old is None and m.from_me:
+            if old is None and m.from_me and not m.id.startswith("tmp:"):
                 self._take_place_of_pending(m)
             if old is None:
                 fresh.append(m)
@@ -238,11 +275,51 @@ class Store:
         return fresh
 
     def _take_place_of_pending(self, m):
+        """The backend's copy of something we sent: the stand-in with the same
+        words goes (with no words, only one that also had files)."""
+        if not m.text and not m.attachments:
+            return
+        files = " AND attachments != '[]'" if not m.text else ""
         row = self.db.execute("SELECT id FROM messages WHERE chat_id=? AND from_me=1 AND id LIKE 'tmp:%'"
-                              " AND text=? AND abs(date-?) < 600000 ORDER BY date LIMIT 1",
+                              " AND text=? AND abs(date-?) < 600000" + files + " ORDER BY date LIMIT 1",
                               (m.chat_id, m.text, m.date)).fetchone()
         if row:
             self.db.execute("DELETE FROM messages WHERE id=?", (row["id"],))
+
+    # -- reactions -----------------------------------------------------------
+    def upsert_reactions(self, reactions):
+        """Keeps the newest reaction from each person on each message; one
+        with kind "" takes theirs back. Returns the new ones (not take-backs)."""
+        fresh = []
+        for r in sorted(reactions, key=lambda r: r.date):
+            row = self.db.execute("SELECT id, date FROM reactions WHERE target=? AND who=?",
+                                  (r.target, r.who())).fetchone()
+            if row is not None and (row["date"] or 0) > r.date:
+                continue
+            if not r.kind:
+                self.db.execute("DELETE FROM reactions WHERE target=? AND who=?", (r.target, r.who()))
+                continue
+            if row is None or row["id"] != r.id:
+                fresh.append(r)
+            self.db.execute("INSERT OR REPLACE INTO reactions VALUES (?,?,?,?,?,?,?,?,?)",
+                            (r.target, r.who(), r.id, r.chat_id, r.kind, r.emoji, int(r.from_me), r.sender,
+                             r.date))
+        self.db.commit()
+        return fresh
+
+    def reactions(self, chat_id):
+        """{message id: [Reaction, oldest first]} for one conversation."""
+        out = {}
+        for row in self.db.execute("SELECT * FROM reactions WHERE chat_id=? ORDER BY date", (chat_id,)):
+            out.setdefault(row["target"], []).append(
+                Reaction(id=row["id"], chat_id=row["chat_id"], target=row["target"], kind=row["kind"] or "",
+                         emoji=row["emoji"] or "", from_me=bool(row["from_me"]), sender=row["sender"] or "",
+                         date=row["date"] or 0))
+        return out
+
+    def my_reaction(self, message_id):
+        row = self.db.execute("SELECT kind FROM reactions WHERE target=? AND who='me'", (message_id,)).fetchone()
+        return row["kind"] if row else ""
 
     def set_status(self, message_id, status, when=0):
         self.db.execute("UPDATE messages SET status=?, status_date=? WHERE id=?", (status, when, message_id))

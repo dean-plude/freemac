@@ -15,13 +15,23 @@ part, and freemac only reads and writes through the server.
   GET  /api/v1/chat/<guid>/message          one conversation's messages
   POST /api/v1/message/query                messages since a time (catching up)
   POST /api/v1/message/text                 send into a conversation
+  POST /api/v1/message/attachment           send a file into a conversation (multipart form:
+                                            chatGuid, tempGuid, name, method, attachment)
+  POST /api/v1/message/react                add or take back a tapback (needs the Private API)
   POST /api/v1/chat/new                     start a conversation with addresses
   POST /api/v1/chat/<guid>/read             mark read (needs the Private API)
   GET  /api/v1/attachment/<guid>/download   an attachment's file
 * Events: Socket.IO (Engine.IO 4) over a websocket at /socket.io/, with
-  "new-message", "updated-message" (delivered and read) and
-  "message-send-error". The websocket is python3-websocket's; without it, or
-  while it can't connect, the server is asked every 15 seconds instead.
+  "new-message", "updated-message" (delivered and read),
+  "message-send-error" and "typing-indicator" ({"guid": chat, "display": on},
+  which the server sends while its Private API is on). The websocket is
+  python3-websocket's; without it, or while it can't connect, the server is
+  asked every 15 seconds instead.
+* Reactions (tapbacks) are messages of their own whose associatedMessageGuid
+  names the message they're on ("p:0/<guid>", or "bp:<guid>") and whose
+  associatedMessageType says which: love, like, dislike, laugh, emphasize,
+  question (or 2000-2005 on older servers), "-love" and so on (3000-3005)
+  taking one back, and 2006 or "emoji" with associatedMessageEmoji.
 
 Original freemac code.
 """
@@ -43,6 +53,9 @@ except ImportError:           # polling only
 
 POLL_EVERY = 15
 TIMEOUT = 20
+UPLOAD_TIMEOUT = 300
+MAX_UPLOAD = 100 * 1024 * 1024
+NUMBERED_REACTIONS = {2000 + i: kind for i, kind in enumerate(store.REACTION_KINDS + ("emoji",))}
 
 
 class ServerError(Exception):
@@ -67,6 +80,82 @@ def normalise_url(url):
 def is_reaction(raw):
     kind = raw.get("associatedMessageType")
     return bool(raw.get("associatedMessageGuid")) and kind not in (None, "", 0, "0")
+
+
+def reaction_kind(raw):
+    """(kind, taken back) from a message's associatedMessageType, or (None, False)
+    for anything that isn't a tapback (stickers and the like)."""
+    kind = raw.get("associatedMessageType")
+    if isinstance(kind, str) and kind.lstrip("-").isdigit():
+        kind = int(kind)
+    if isinstance(kind, int):
+        if kind in NUMBERED_REACTIONS:
+            return NUMBERED_REACTIONS[kind], False
+        if kind - 1000 in NUMBERED_REACTIONS:
+            return NUMBERED_REACTIONS[kind - 1000], True
+        return None, False
+    kind = (kind or "").strip().lower()
+    removed = kind.startswith("-")
+    kind = kind.lstrip("-")
+    return (kind, removed) if kind in store.REACTION_KINDS + ("emoji",) else (None, False)
+
+
+def reaction_target(guid):
+    """'p:0/ABC' or 'bp:ABC' -> 'ABC'."""
+    guid = guid or ""
+    if "/" in guid:
+        return guid.split("/", 1)[1]
+    return guid[3:] if guid.startswith("bp:") else guid
+
+
+def _chat_guid_of(raw, chat_guid):
+    if chat_guid is None:
+        chats = raw.get("chats") or []
+        chat_guid = chats[0].get("guid") if chats and isinstance(chats[0], dict) else None
+    return chat_guid
+
+
+def convert_reaction(raw, chat_guid=None):
+    """A tapback message -> Reaction (None for anything else)."""
+    if not isinstance(raw, dict) or not raw.get("guid") or not is_reaction(raw):
+        return None
+    chat_guid = _chat_guid_of(raw, chat_guid)
+    kind, removed = reaction_kind(raw)
+    target = reaction_target(raw.get("associatedMessageGuid"))
+    if not chat_guid or kind is None or not target:
+        return None
+    handle = raw.get("handle") if isinstance(raw.get("handle"), dict) else {}
+    from_me = bool(raw.get("isFromMe"))
+    emoji = str(raw.get("associatedMessageEmoji") or "") if kind == "emoji" else ""
+    if kind == "emoji" and not emoji and not removed:
+        return None
+    return store.Reaction(id=f"bb:{raw['guid']}", chat_id=f"bb:{chat_guid}", target=f"bb:{target}",
+                          kind="" if removed else kind, emoji=emoji, from_me=from_me,
+                          sender="" if from_me else (handle.get("address") or ""),
+                          date=int(raw.get("dateCreated") or 0))
+
+
+def convert_any(raw, chat_guid=None, names=None):
+    """A message or a tapback (None for anything else)."""
+    if isinstance(raw, dict) and is_reaction(raw):
+        return convert_reaction(raw, chat_guid)
+    return convert_message(raw, chat_guid, names)
+
+
+def multipart(fields, file_field, filename, mime, data):
+    """(body, content type) of a multipart/form-data upload."""
+    boundary = "freemac-" + uuid.uuid4().hex
+    safe = re.sub(r'[\r\n"\\]+', "_", filename) or "attachment"
+    out = []
+    for name, value in fields.items():
+        value = re.sub(r"[\r\n]+", " ", str(value))
+        out.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+                   .encode("utf-8"))
+    out.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{safe}"\r\n'
+               f'Content-Type: {mime or "application/octet-stream"}\r\n\r\n'.encode("utf-8"))
+    out.append(data)
+    out.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(out), f"multipart/form-data; boundary={boundary}"
 
 
 def convert_message(raw, chat_guid=None, names=None):
@@ -96,7 +185,8 @@ def convert_message(raw, chat_guid=None, names=None):
     for part in raw.get("attachments") or []:
         if isinstance(part, dict) and part.get("guid"):
             attachments.append({"id": part["guid"], "name": part.get("transferName") or "Attachment",
-                                "mime": part.get("mimeType") or "", "path": ""})
+                                "mime": part.get("mimeType") or "", "path": "",
+                                "size": int(part["totalBytes"]) if str(part.get("totalBytes")).isdigit() else 0})
     text = (raw.get("text") or "").replace("￼", "").strip()
     return store.Message(id=f"bb:{raw['guid']}", chat_id=f"bb:{chat_guid}", text=text,
                          date=int(raw.get("dateCreated") or 0), from_me=from_me,
@@ -129,6 +219,8 @@ class BlueBubbles:
       backend_data(backend, [Chat], [Message])
       backend_sent(backend, temp_id, Message or None, error text, chat id)
       backend_attachment(backend, message_id, attachment_id, path)
+      backend_typing(backend, chat id, on)
+      backend_error(backend, text)              something the person asked for didn't work
     """
     kind = "bluebubbles"
 
@@ -146,16 +238,21 @@ class BlueBubbles:
         self.ws = None
 
     # -- REST ---------------------------------------------------------------------
-    def _request(self, method, path, body=None, query=None, raw=False):
+    def _request(self, method, path, body=None, query=None, raw=False, upload=None):
+        """upload: (body bytes, content type) instead of a JSON body."""
         params = dict(query or {})
         params["password"] = self.password
         url = f"{self.url}{path}?{urllib.parse.urlencode(params)}"
-        data = json.dumps(body).encode("utf-8") if body is not None else None
+        if upload is not None:
+            data, content_type = upload
+        else:
+            data = json.dumps(body).encode("utf-8") if body is not None else None
+            content_type = "application/json"
         request = urllib.request.Request(url, data=data, method=method,
-                                         headers={"Content-Type": "application/json",
+                                         headers={"Content-Type": content_type,
                                                   "User-Agent": "freemac-messages"})
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT) as reply:
+            with urllib.request.urlopen(request, timeout=UPLOAD_TIMEOUT if upload else TIMEOUT) as reply:
                 payload = reply.read()
         except urllib.error.HTTPError as e:
             if e.code == 401:
@@ -202,13 +299,13 @@ class BlueBubbles:
         if before:
             query["before"] = int(before)
         found = self._request("GET", f"/api/v1/chat/{urllib.parse.quote(guid, safe='')}/message", query=query) or []
-        return [m for m in (convert_message(r, guid, self.names) for r in found) if m]
+        return [m for m in (convert_any(r, guid, self.names) for r in found) if m]
 
     def fetch_since(self, after):
         found = self._request("POST", "/api/v1/message/query",
                               {"limit": 200, "offset": 0, "after": int(after), "sort": "ASC",
                                "with": ["chat", "handle", "attachment"]}) or []
-        return [m for m in (convert_message(r, None, self.names) for r in found) if m]
+        return [m for m in (convert_any(r, None, self.names) for r in found) if m]
 
     # -- running --------------------------------------------------------------------
     def start(self, since=0):
@@ -320,6 +417,51 @@ class BlueBubbles:
             return found.get("lastMessage"), chat.remote_id
         self._send(call, temp_id)
 
+    def send_attachment(self, chat, path, temp_id, mime=""):
+        """A picture or file into a conversation, with the documented upload."""
+        method = "private-api" if self.private_api else "apple-script"
+        name = os.path.basename(path)
+
+        def call():
+            try:
+                if os.path.getsize(path) > MAX_UPLOAD:
+                    raise ServerError(f"“{name}” is too big to send (100 MB at most).")
+                with open(path, "rb") as f:
+                    data = f.read()
+            except OSError as e:
+                raise ServerError(f"“{name}” couldn't be read ({e.strerror or e}).") from None
+            upload = multipart({"chatGuid": chat.remote_id, "tempGuid": temp_id, "name": name, "method": method},
+                               "attachment", name, mime, data)
+            raw = self._request("POST", "/api/v1/message/attachment", upload=upload)
+            return raw, chat.remote_id
+        self._send(call, temp_id)
+
+    def can_react(self):
+        return self.private_api
+
+    def react(self, chat, message, kind, remove=False):
+        """Adds (or, with remove, takes back) a tapback on message. Needs the
+        Private API; the server's copy comes back as a Reaction."""
+        if not self.private_api:
+            raise ConnectionError("Tapbacks need the BlueBubbles Private API turned on on your Mac.")
+        if kind not in store.REACTION_KINDS:
+            raise ValueError(kind)
+
+        def run():
+            try:
+                raw = self._request("POST", "/api/v1/message/react",
+                                    {"chatGuid": chat.remote_id, "selectedMessageGuid": message.remote_id,
+                                     "reaction": ("-" if remove else "") + kind, "partIndex": 0})
+            except ServerError as e:
+                self.listener.backend_error(self.kind, f"The tapback couldn't be sent. {e}")
+                return
+            reaction = convert_reaction(raw, chat.remote_id) if isinstance(raw, dict) else None
+            if reaction is None:      # no copy back: say what we did ourselves
+                reaction = store.Reaction(id=f"bb:sent-{uuid.uuid4()}", chat_id=chat.id, target=message.id,
+                                          kind="" if remove else kind, from_me=True, date=store.now_ms())
+            self.listener.backend_data(self.kind, [], [reaction])
+        threading.Thread(target=run, daemon=True).start()
+
     def _send(self, call, temp_id):
         def run():
             try:
@@ -404,13 +546,15 @@ class BlueBubbles:
             return
         data = args[0] if args else None
         if name in ("new-message", "updated-message") and isinstance(data, dict):
-            message = convert_message(data, None, self.names)
+            message = convert_any(data, None, self.names)
             if message:
                 self._deliver([], [message])
         elif name == "message-send-error" and isinstance(data, dict):
             temp = data.get("tempGuid")
             if temp:
                 self.listener.backend_sent(self.kind, temp, None, "Not Delivered", "")
+        elif name == "typing-indicator" and isinstance(data, dict) and data.get("guid"):
+            self.listener.backend_typing(self.kind, f"bb:{data['guid']}", bool(data.get("display")))
 
 
 def new_temp_id():

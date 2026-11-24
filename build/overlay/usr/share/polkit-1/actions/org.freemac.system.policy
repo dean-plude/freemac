@@ -2,7 +2,8 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <!-- freemac: lets Dials turn the firewall, automatic updates and Remote Login on or off, and rename the computer,
-     for the whole computer after an administrator's password. -->
+     and lets Messages open KDE Connect's ports to the local network, for the whole computer after an
+     administrator's password. -->
 <policyconfig>
   <vendor>freemac</vendor>
   <action id="org.freemac.system.settings">

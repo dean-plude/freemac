@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Stand-ins for Messages' tests, all on localhost: a phone that speaks KDE
 Connect (UDP, TCP, TLS with its own certificate, pairing and the SMS
-packets), a BlueBubbles server (its REST API and a Socket.IO websocket), and
-a listener that records what backends tell the app. Made-up people and
-messages only; nothing here reaches the internet or a real device.
+packets), a BlueBubbles server (its REST API, attachment uploads, tapbacks
+and a Socket.IO websocket), a fake ufw for the system helper, and a listener
+that records what backends tell the app. Made-up people and messages only;
+nothing here reaches the internet, a real device or the real firewall.
 """
 import base64
+import email.parser
+import email.policy
 import hashlib
 import json
 import os
@@ -232,9 +235,12 @@ class FakeBlueBubbles:
     """A BlueBubbles server with two conversations, on localhost."""
     PASSWORD = "correct horse"
 
-    def __init__(self, socket_on=True):
+    def __init__(self, socket_on=True, private_api=False):
         self.requests = []
         self.sent = []
+        self.uploads = []        # (fields, filename, content type, bytes)
+        self.reacted = []
+        self.private_api = private_api
         self.sockets = []
         self.socket_on = socket_on
         self.socket_frames = queue.Queue()
@@ -275,7 +281,11 @@ class FakeBlueBubbles:
                 parts = urllib.parse.urlsplit(self.path)
                 query = urllib.parse.parse_qs(parts.query)
                 length = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(length) or b"null") if length else None
+                data = self.rfile.read(length) if length else b""
+                if (self.headers.get("Content-Type") or "").startswith("multipart/form-data"):
+                    body = fake.parse_form(self.headers["Content-Type"], data)
+                else:
+                    body = json.loads(data or b"null") if length else None
                 fake.requests.append((method, parts.path, query, body))
                 if parts.path == "/socket.io/":
                     return fake._websocket(self, query)
@@ -295,6 +305,31 @@ class FakeBlueBubbles:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     @staticmethod
+    def parse_form(content_type, data):
+        """A multipart/form-data body -> {"fields": {...}, "files": [(name, filename, type, bytes)]}."""
+        parsed = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(
+            b"Content-Type: " + content_type.encode() + b"\r\n\r\n" + data)
+        out = {"fields": {}, "files": []}
+        for part in parsed.iter_parts():
+            name = part.get_param("name", header="content-disposition")
+            filename = part.get_filename()
+            payload = part.get_payload(decode=True)
+            if filename is not None:
+                out["files"].append((name, filename, part.get_content_type(), payload))
+            else:
+                out["fields"][name] = payload.decode("utf-8")
+        return out
+
+    @staticmethod
+    def reaction(guid, kind, target, date, from_me, address, emoji=None):
+        """A tapback, as BlueBubbles reports one: a message of its own."""
+        raw = FakeBlueBubbles.message(guid, "", date, from_me, address)
+        raw.update(associatedMessageGuid=f"p:0/{target}", associatedMessageType=kind)
+        if emoji:
+            raw["associatedMessageEmoji"] = emoji
+        return raw
+
+    @staticmethod
     def message(guid, text, date, from_me, address, service="iMessage", delivered=None, read=None, attachments=None):
         return {"guid": guid, "text": text, "dateCreated": date, "isFromMe": from_me,
                 "handle": {"address": address, "service": service}, "dateDelivered": delivered,
@@ -305,7 +340,7 @@ class FakeBlueBubbles:
         if path == "/api/v1/ping":
             return handler._reply(200, "pong")
         if path == "/api/v1/server/info":
-            return handler._reply(200, {"private_api": False, "os_version": "test"})
+            return handler._reply(200, {"private_api": self.private_api, "os_version": "test"})
         if path == "/api/v1/chat/query":
             out = []
             for chat in self.chats:
@@ -329,6 +364,28 @@ class FakeBlueBubbles:
             m = self.message("sent-" + str(len(self.sent)), body["message"], int(time.time() * 1000), True,
                              body["chatGuid"].split(";")[-1])
             m["tempGuid"] = body["tempGuid"]
+            self.messages.setdefault(body["chatGuid"], []).append(m)
+            return handler._reply(200, m)
+        if path == "/api/v1/message/attachment":
+            fields, files = body["fields"], body["files"]
+            name, filename, kind, data = files[0]
+            self.uploads.append((fields, filename, kind, data))
+            if not data:
+                return handler._reply(400, None)
+            att = {"guid": "att-" + str(len(self.uploads)), "transferName": filename, "mimeType": kind,
+                   "totalBytes": len(data)}
+            m = self.message("upload-" + str(len(self.uploads)), "", int(time.time() * 1000), True,
+                             fields["chatGuid"].split(";")[-1], attachments=[att])
+            m["tempGuid"] = fields["tempGuid"]
+            self.messages.setdefault(fields["chatGuid"], []).append(m)
+            return handler._reply(200, m)
+        if path == "/api/v1/message/react":
+            if not self.private_api:
+                return handler._reply(400, None)
+            self.reacted.append(body)
+            kind = body["reaction"]
+            m = self.reaction("react-" + str(len(self.reacted)), kind, body["selectedMessageGuid"],
+                              int(time.time() * 1000), True, body["chatGuid"].split(";")[-1])
             self.messages.setdefault(body["chatGuid"], []).append(m)
             return handler._reply(200, m)
         if path == "/api/v1/chat/new":
@@ -389,6 +446,9 @@ class FakeBlueBubbles:
         for sock in list(self.sockets):
             sock.sendall(ws_frame("2"))
 
+    def typing(self, chat_guid, on=True):
+        self.emit("typing-indicator", {"guid": chat_guid, "display": on})
+
     def close(self):
         self.server.shutdown()
         self.server.server_close()
@@ -397,3 +457,51 @@ class FakeBlueBubbles:
                 sock.close()
             except OSError:
                 pass
+
+
+# -- the system helper, with a fake ufw -------------------------------------------------
+HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "build", "overlay", "usr",
+                      "libexec", "freemac-system-helper")
+
+
+class FakeHelper:
+    """freemac-system-helper copied into a folder of its own, with its notes
+    (/var/lib/freemac) moved there too, and run with a stand-in ufw first on
+    PATH that only writes down what it was asked. The real firewall, and the
+    real /var/lib/freemac, are never touched."""
+
+    def __init__(self, folder):
+        self.folder = folder
+        self.state = os.path.join(folder, "state")
+        bin_dir = os.path.join(folder, "bin")
+        os.makedirs(bin_dir)
+        self.log = os.path.join(folder, "ufw.log")
+        ufw = os.path.join(bin_dir, "ufw")
+        with open(ufw, "w") as f:
+            f.write("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '" + self.log + "'\n")
+        os.chmod(ufw, 0o755)
+        with open(HELPER) as f:
+            script = f.read()
+        if "/var/lib/freemac" not in script:
+            raise AssertionError("the helper's notes have moved; update FakeHelper")
+        self.script = os.path.join(folder, "freemac-system-helper")
+        with open(self.script, "w") as f:
+            f.write(script.replace("/var/lib/freemac", self.state))
+        # Only the fake ufw, and the ordinary tools, can be found.
+        self.env = {"PATH": bin_dir + ":/usr/bin:/bin", "LC_ALL": "C"}
+
+    def run(self, *args):
+        import subprocess
+        return subprocess.run(["sh", self.script, *args], env=self.env, cwd=self.folder,
+                              capture_output=True, text=True, timeout=20)
+
+    def calls(self):
+        try:
+            with open(self.log) as f:
+                return f.read().splitlines()
+        except OSError:
+            return []
+
+    def clear(self):
+        if os.path.exists(self.log):
+            os.remove(self.log)

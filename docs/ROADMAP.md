@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.218 "Messages: firewall, login, tapbacks and attachments" (done)
+
+Messages closes its main gaps: the phone gets through the Firewall, Messages starts at login, and bubbles carry tapbacks, pictures and files.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | With Firewall on, turning the phone on lets KDE Connect in (UDP 1716, TCP 1716–1764) from the local network only, and turning it off closes them again, through the system helper's new `kde-connect on\|off` under the existing polkit action; `firewall on` puts the rules back while the phone is on, and Settings > Phone offers Let Phone Through Firewall… when they're closed | **Messages**, system helper | done |
+| 2 | "Start Messages when you log in", on by default once a backend is set up: an autostart file runs `freemac-messages --background` with no window, so new messages arrive and notify | **Messages** | done |
+| 3 | Tapbacks: BlueBubbles' associated messages kept one per person per message and shown on the bubble's corner, a notification when someone reacts to yours, and a bubble's right-click menu (Copy, and the six tapbacks when the server's Private API is on) to add one or take it back | **Messages** (messages_store.py, messages_bluebubbles.py) | done |
+| 4 | Sending pictures and files: a paperclip button and drag and drop, through BlueBubbles' documented attachment upload and as an MMS through KDE Connect (version 2 `sms.request` with attachments, or kdeconnectd's `sendWithoutConversation`) | **Messages** (messages_bluebubbles.py, messages_kdeconnect.py) | done |
+| 5 | Pictures shown inline as thumbnails: sent ones from the file, BlueBubbles ones fetched when a conversation opens, and the phone's own thumbnails | **Messages** | done |
+| 6 | A typing bubble from BlueBubbles' `typing-indicator` event | **Messages** (messages_bluebubbles.py) | done |
+| 7 | Tests: the system helper's rules against a stand-in ufw (nothing on the real firewall), uploads as the server reads them, tapbacks, typing over the websocket, MMS to the stand-in phone and kdeconnectd, the menu, tray, pictures, login start and firewall asks, headless | Tests | done |
+| 8 | docs/messages.md, guide topic | Docs, Guide | done |
+
 ## 1.217 "Ferry: frames and the DOM in web views" (done)
 
 Ferry 0.42.0: the rest of the older `WebView` that Markdown editors like MacDown build their previews on.

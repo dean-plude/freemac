@@ -22,10 +22,14 @@ Messages needs, written from that documentation:
 * The SMS plugin: "kdeconnect.sms.request_conversations" (the newest
   message of every conversation), "kdeconnect.sms.request_conversation" (one
   conversation's messages), "kdeconnect.sms.request" (send a text) and
-  "kdeconnect.sms.request_attachment"; the phone answers with
+  "kdeconnect.sms.request_attachment". A request of version 2 may carry
+  "attachments" ([{"fileName", "base64EncodedFile", "mimeType"}]), which the
+  phone sends as an MMS. The phone answers with
   "kdeconnect.sms.messages", which it also sends by itself when a text comes
   in or goes out, and "kdeconnect.sms.attachment_file", whose file comes on a
-  second TLS connection to the port the packet names.
+  second TLS connection to the port the packet names. Each picture in
+  "kdeconnect.sms.messages" may carry "encoded_thumbnail" (a small JPEG, in
+  base64), shown in the bubble until the file itself is fetched.
 
 Python's ssl module can't accept an unknown certificate from a TLS *client*
 (it has no verify callback), so this client always ends up as the TLS
@@ -38,6 +42,7 @@ instead (KdeConnectDaemon below), so the phone never sees two computers.
 
 Original freemac code.
 """
+import base64
 import hashlib
 import json
 import os
@@ -47,6 +52,7 @@ import ssl
 import subprocess
 import threading
 import time
+import urllib.parse
 import uuid
 
 from . import messages_store as store
@@ -56,6 +62,8 @@ UDP_PORT = 1716
 TCP_PORTS = range(1716, 1765)
 MAX_LINE = 4 * 1024 * 1024        # the phone's longest packet (a big conversation)
 MAX_ATTACHMENT = 200 * 1024 * 1024  # bigger files are left on the phone
+MAX_MMS = 10 * 1024 * 1024        # what one text may carry (carriers often take far less)
+MAX_THUMBNAIL = 256 * 1024        # base64 characters kept for a picture's thumbnail
 VALID_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 OUR_ID = re.compile(r"^[A-Za-z0-9_]{32,38}$")
 INCOMING = ["kdeconnect.sms.messages", "kdeconnect.sms.attachment_file"]
@@ -142,6 +150,27 @@ def fingerprint(der):
     return hashlib.sha256(der).hexdigest()
 
 
+def guess_mime(path):
+    import mimetypes
+    return mimetypes.guess_type(path)[0] or "application/octet-stream"
+
+
+def mms_attachments(paths):
+    """Files for an MMS, as kdeconnect.sms.request version 2 carries them.
+    Raises OSError when one can't be read or they're too big for one text."""
+    out, total = [], 0
+    for path in paths:
+        total += os.path.getsize(path)
+        if total > MAX_MMS:
+            raise OSError(f"“{os.path.basename(path)}” is too big to send as a text (10 MB at most, "
+                          "and many carriers take less).")
+        with open(path, "rb") as f:
+            data = f.read()
+        out.append({"fileName": os.path.basename(path), "mimeType": guess_mime(path),
+                    "base64EncodedFile": base64.b64encode(data).decode("ascii")})
+    return out
+
+
 # -- normalising the phone's messages ----------------------------------------------
 def addresses_of(message):
     out = []
@@ -171,9 +200,13 @@ def convert(device_id, raw_messages, names=None):
         attachments = []
         for part in raw.get("attachments") or []:
             if isinstance(part, dict):
-                attachments.append({"id": str(part.get("unique_identifier") or part.get("part_id")),
-                                    "part_id": part.get("part_id"), "name": part.get("unique_identifier") or "",
-                                    "mime": part.get("mime_type") or "", "path": ""})
+                found = {"id": str(part.get("unique_identifier") or part.get("part_id")),
+                         "part_id": part.get("part_id"), "name": part.get("unique_identifier") or "",
+                         "mime": part.get("mime_type") or "", "path": ""}
+                thumb = part.get("encoded_thumbnail")
+                if isinstance(thumb, str) and 0 < len(thumb) <= MAX_THUMBNAIL:
+                    found["thumbnail"] = thumb
+                attachments.append(found)
         text = raw.get("body") or ""
         messages.append(store.Message(
             id=f"kdc:{device_id}:{raw.get('_id')}:{date}", chat_id=chat_id, text=text, date=date,
@@ -599,12 +632,15 @@ class KdeConnect:
             body["rangeStartTimestamp"] = int(before)
         link.send("kdeconnect.sms.request_conversation", body)
 
-    def send(self, addresses, text):
+    def send(self, addresses, text, attachments=None):
+        """A text, or with attachments (file paths) an MMS."""
         link = self.phone()
         if link is None:
             raise ConnectionError("Your phone isn't connected.")
-        link.send("kdeconnect.sms.request", {"version": 2, "addresses": [{"address": a} for a in addresses],
-                                             "messageBody": text})
+        body = {"version": 2, "addresses": [{"address": a} for a in addresses], "messageBody": text}
+        if attachments:
+            body["attachments"] = mms_attachments(attachments)
+        link.send("kdeconnect.sms.request", body)
 
     def request_attachment(self, message, attachment):
         link = self.phone()
@@ -802,16 +838,18 @@ class KdeConnectDaemon:
             self._call(self._path(), CONVERSATIONS_IFACE, "requestConversation",
                        GLib.Variant("(xii)", (int(chat.remote_id), 0, count)))
 
-    def send(self, addresses, text):
+    def send(self, addresses, text, attachments=None):
         from gi.repository import GLib
         if not self.device:
             raise ConnectionError("KDE Connect has no phone paired.")
+        # kdeconnectd takes the files' addresses and reads them itself.
+        files = [GLib.Variant("s", "file://" + urllib.parse.quote(os.path.abspath(p))) for p in attachments or []]
 
         def done(_value, error):
             if error is not None:
                 self.listener.backend_status(self.kind, "KDE Connect couldn't send the text.", False)
         self._call(self._path(), CONVERSATIONS_IFACE, "sendWithoutConversation",
-                   GLib.Variant("(avsav)", ([GLib.Variant("s", a) for a in addresses], text, [])), None, done)
+                   GLib.Variant("(avsav)", ([GLib.Variant("s", a) for a in addresses], text, files)), None, done)
 
     def devices(self):
         return [{"id": self.device, "name": self.device_name, "paired": True, "connected": True}] if self.device else []
