@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.190 "Ferry: tree controllers and outline bindings" (done)
+
+Mac programs that keep a tree of items in a tree controller and show it in
+an outline view, expanded, sorted, selected and edited through bindings,
+now work the way they do on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSIndexPath`, and `NSTreeNode` children, parents and index paths | Ferry Foundation, AppKit | done |
+| 2 | `NSTreeController`: children, count and leaf key paths; arranged nodes kept across changes so open rows stay open; selection by index path, `selection.key`; sorting; add, insert, add child, insert child, remove and move | Ferry AppKit | done |
+| 3 | Outline views bound to a tree controller: rows expanded and collapsed, selection both ways, sorting by a column title, edited cells written back; per-row `editable` and `enabled` column bindings | Ferry AppKit | done |
+| 4 | `NSDictionaryController`: key and value pairs, included, excluded and localized keys, add and remove | Ferry AppKit | done |
+| 5 | Ferry 0.19.0, test `appkit_tree_controller` (85 tests) | Ferry, Docs | done |
+
 ## 1.189 "Language & Region" (done)
 
 Dates, times, numbers and money can be written the way the person's own

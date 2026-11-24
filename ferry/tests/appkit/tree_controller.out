@@ -1,0 +1,512 @@
+index path [1.4]: length 2, at 1 4, at 5 NSNotFound, removing last [1], empty length 0
+  equal 1, hash equal 1, compare [1.4]/[1] 1, [1]/[1.4] -1, [0.9]/[1] -1, copy is itself 1
+  indexes 1 4; description starts <NSIndexPath:; item 4 section 1
+  description ends > {length = 2, path = 1 - 4}
+  sorted {[0],[0.2.1],[1],[1.0]}
+nodes: top leaf 0, b leaf 0, c leaf 1; c's parent b, path [0.0], top's path []
+  at [0.0] c, at [1] a, at [2] nil
+  sorted: a,b; b now at [1]
+  c moved under a: b has 0, a has 1, c's parent a
+  b removed: its parent nil, top has 1
+observing top's childNodes:
+  heard childNodes = b
+  heard childNodes = b,a
+  heard childNodes = a,b
+  heard childNodes = a
+defaults: children nil, count nil, leaf nil, avoids empty 1, preserves 1, selects inserted 1, always multiple 0, object class NSMutableDictionary
+  exposes content,contentArray,contentObject,contentSet,selectionIndexPaths,sortDescriptors,editable
+content (no leaf key path: no children is a leaf): selection {[0]}, selection.name Docs
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+    Pics/ [1]
+      Trip/ [1.0]
+        beach [1.0.0]
+      cat [1.1]
+    readme [2]
+    Empty [3]
+set content:
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = Docs
+  heard selectionIndexPaths = {[0]}
+arrangedObjects: 4 top-level, [1.0.0] beach, [9] nil; a node of NSTreeNode, parent of [0.1] is Docs
+leaf key path "file" (Empty can open): selection {[0]}, selection.name Docs
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+    Pics/ [1]
+      Trip/ [1.0]
+        beach [1.0.0]
+      cat [1.1]
+    readme [2]
+    Empty/ [3]
+  same node for Docs after arranging again: 1
+count key path: Empty leaf 1, Docs leaf 0, can add child 0
+key paths changed:
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+selected [1.0.0]: selection {[1.0.0]}, selection.name beach
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+    Pics/ [1]
+      Trip/ [1.0]
+        beach [1.0.0]
+      cat [1.1]
+    readme [2]
+    Empty/ [3]
+  selectedObjects beach, selectedNodes' objects beach, selectionIndexPath [1.0.0]
+added [0.1] and [7] (no such node): {[0.1],[1.0.0]}, selection.name <NSMultipleValuesMarker>, selection.size <NSMultipleValuesMarker>
+  set selection.name: same,same
+selecting and setting through the selection:
+  heard selection.name = beach
+  heard selectionIndexPaths = {[1.0.0]}
+  heard selection.name = <NSMultipleValuesMarker>
+  heard selectionIndexPaths = {[0.1],[1.0.0]}
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = <NSMultipleValuesMarker>
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = same
+removed [0.1] from the selection: {[1.0.0]}; can remove 1, can add child 0, can insert child 0
+Pics selected: can add child 1, can insert child 1, can add 1, can insert 1
+names put back:
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = <NSMultipleValuesMarker>
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = <NSMultipleValuesMarker>
+  heard selection.name = beach
+  heard selectionIndexPaths = {[1.0.0]}
+  heard selection.name = Pics
+  heard selectionIndexPaths = {[1]}
+sorted by name (todo stays selected): selection {[0.1]}, selection.name todo
+    Docs/ [0]
+      notes [0.0]
+      todo [0.1]
+    Empty/ [1]
+    Pics/ [2]
+      Trip/ [2.0]
+        beach [2.0.0]
+      cat [2.1]
+    readme [3]
+sorted:
+  heard selection.name = todo
+  heard selectionIndexPaths = {[0.0]}
+  heard arrangedObjects.name = Docs,Empty,Pics,readme
+  heard selection.name = todo
+  heard selectionIndexPaths = {[0.1]}
+by size, descending, not preserving ([0.1] is a leaf's child now: the first): selection {[0]}, selection.name readme
+    readme [0]
+    Docs/ [1]
+      notes [1.0]
+      todo [1.1]
+    Pics/ [2]
+      cat [2.0]
+      Trip/ [2.1]
+        beach [2.1.0]
+    Empty/ [3]
+sorted again:
+  heard arrangedObjects.name = readme,Docs,Pics,Empty
+  heard selection.name = readme
+  heard selectionIndexPaths = {[0]}
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = readme
+  heard selectionIndexPaths = {[2]}
+  model: Docs: insert plan at 2
+Docs got plan (from the model): selection {[1.1]}, selection.name cat
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+      plan [0.2]
+    Pics/ [1]
+      Trip/ [1.0]
+        beach [1.0.0]
+      cat [1.1]
+    readme [2]
+    Empty/ [3]
+  model: Pics: remove Trip at 0
+Pics lost Trip (cat stays selected): selection {[1.0]}, selection.name cat
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+      plan [0.2]
+    Pics/ [1]
+      cat [1.0]
+    readme [2]
+    Empty/ [3]
+the model changed:
+  heard selection.name = cat
+  heard selectionIndexPaths = {[1.1]}
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = cat
+  heard selectionIndexPaths = {[1.0]}
+Pics given new children (cat gone: the first is selected): selection {[0]}, selection.name Docs
+    Docs/ [0]
+      todo [0.0]
+      notes [0.1]
+      plan [0.2]
+    Pics/ [1]
+      dog [1.0]
+    readme [2]
+    Empty/ [3]
+Pics replaced, Docs renamed:
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = Docs
+  heard selectionIndexPaths = {[0]}
+  heard arrangedObjects.name = Documents,Pics,readme,Empty
+  heard selection.name = Documents
+  model: Docs: insert zip at 1
+inserted zip at [0.1]: selection {[0.1]}, selection.name zip
+    Docs/ [0]
+      todo [0.0]
+      zip [0.1]
+      notes [0.2]
+      plan [0.3]
+    Pics/ [1]
+      dog [1.0]
+    readme [2]
+    Empty/ [3]
+inserted top at [0]: selection {[0]}, selection.name top
+    top [0]
+    Docs/ [1]
+      todo [1.0]
+      zip [1.1]
+      notes [1.2]
+      plan [1.3]
+    Pics/ [2]
+      dog [2.0]
+    readme [3]
+    Empty/ [4]
+  model: Docs: remove zip at 1
+removed zip (selected): the one now there: selection {[0]}, selection.name top
+    top [0]
+    Docs/ [1]
+      todo [1.0]
+      notes [1.1]
+      plan [1.2]
+    Pics/ [2]
+      dog [2.0]
+    readme [3]
+    Empty/ [4]
+removed Pics and its dog: the one now there: selection {[0]}, selection.name top
+    top [0]
+    Docs/ [1]
+      todo [1.0]
+      notes [1.1]
+      plan [1.2]
+    readme [2]
+    Empty/ [3]
+inserting under [9]: NSRangeException
+  model: Docs: insert readme at 0
+moved readme to [1.0]: selection {[1.0]}, selection.name readme
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      notes [1.2]
+      plan [1.3]
+    Empty/ [2]
+inserting, removing and moving:
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = Docs
+  heard arrangedObjects.name = Docs,Pics,readme,Empty
+  heard selection.name = zip
+  heard selectionIndexPaths = {[0.1]}
+  heard arrangedObjects.name = top,Docs,Pics,readme,Empty
+  heard selection.name = top
+  heard selectionIndexPaths = {[0]}
+  heard arrangedObjects.name = top,Docs,Pics,readme,Empty
+  heard arrangedObjects.name = top,Docs,readme,Empty
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = readme
+  heard selectionIndexPaths = {[1.0]}
+add: 4 children of Docs before the turn, 5 after
+  model: Docs: insert untitled at 4
+add: after the selected node's last sibling: selection {[1.4]}, selection.name untitled
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      notes [1.2]
+      plan [1.3]
+      untitled/ [1.4]
+    Empty/ [2]
+  model: Docs: insert untitled at 4
+insert: where the selected node is: selection {[1.4]}, selection.name untitled
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      notes [1.2]
+      plan [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+    Empty/ [2]
+  model: Docs: insert untitled at 6
+  model: untitled: insert untitled at 0
+addChild: on Docs, then insertChild: on the new one: selection {[1.6.0]}, selection.name untitled
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      notes [1.2]
+      plan [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+      untitled/ [1.6]
+        untitled/ [1.6.0]
+    Empty/ [2]
+on a file: can add child 0
+  addChild: on a file did nothing: Docs has 7
+  model: Docs: remove notes at 2
+remove:: selection {[1.2]}, selection.name plan
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      plan [1.2]
+      untitled/ [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+        untitled/ [1.5.0]
+    Empty/ [2]
+add: with nothing selected: at the top: selection {[3]}, selection.name untitled
+    top [0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      plan [1.2]
+      untitled/ [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+        untitled/ [1.5.0]
+    Empty/ [2]
+    untitled/ [3]
+not editable: can add 0, insert 0, add child 0, remove 0
+the actions:
+  heard selection.name = todo
+  heard selectionIndexPaths = {[1.1]}
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = untitled
+  heard selectionIndexPaths = {[1.4]}
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = untitled
+  heard selectionIndexPaths = {[1.4]}
+  heard selection.name = Docs
+  heard selectionIndexPaths = {[1]}
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = untitled
+  heard selectionIndexPaths = {[1.6]}
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = untitled
+  heard selectionIndexPaths = {[1.6.0]}
+  heard selection.name = notes
+  heard selectionIndexPaths = {[1.2]}
+  heard arrangedObjects.name = top,Docs,Empty
+  heard selection.name = plan
+  heard selectionIndexPaths = {[1.2]}
+  heard selection.name = <NSNoSelectionMarker>
+  heard selectionIndexPaths = {}
+  heard arrangedObjects.name = top,Docs,Empty,untitled
+  heard selection.name = untitled
+  heard selectionIndexPaths = {[3]}
+bound to the disk: selection {}, selection.name <NSNoSelectionMarker>
+    Docs/ [0]
+      readme [0.0]
+      todo [0.1]
+      plan [0.2]
+      untitled/ [0.3]
+      untitled/ [0.4]
+      untitled/ [0.5]
+        untitled/ [0.5.0]
+    readme [1]
+  disk picked {}
+  model: disk: insert new at 1
+inserted at [1]: disk has Docs,new,readme, picked {[1]}
+  model: disk: remove new at 1
+  model: disk: insert Pics at 0
+the disk added Pics at the top: selection {[2]}, selection.name readme
+    Pics/ [0]
+      dog [0.0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      plan [1.2]
+      untitled/ [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+        untitled/ [1.5.0]
+    readme [2]
+the disk picked [0.0]: selection {[0.0]}, selection.name dog
+    Pics/ [0]
+      dog [0.0]
+    Docs/ [1]
+      readme [1.0]
+      todo [1.1]
+      plan [1.2]
+      untitled/ [1.3]
+      untitled/ [1.4]
+      untitled/ [1.5]
+        untitled/ [1.5.0]
+    readme [2]
+a dictionary: selection {[0]}, selection.name root
+    root [0]
+addChild: on it (a new dictionary, its children set): selection {[0.0]}, selection.name kid
+    root/ [0]
+      kid [0.0]
+  root's children: kid, class of the new one a mutable dictionary
+outline bound to: content arrangedObjects, selectionIndexPaths selectionIndexPaths, selectionIndexes nil, sortDescriptors sortDescriptors; exposes selectionIndexPaths,content,selectionIndexes,sortDescriptors,enabled,hidden,toolTip
+bound: 3 rows, selected {0}
+  row 0: level 0 >  [Music] [0]
+  row 1: level 0 >  [Films] [0]
+  row 2: level 0    [memo] [4]
+  item 0 is the controller's node 1; its object Music
+Films opened: 4 rows, selected {0}
+  row 0: level 0 >  [Music] [0]
+  row 1: level 0 v  [Films] [0]
+  row 2: level 1 >  [Old] [0]
+  row 3: level 0    [memo] [4]
+Music's chevron clicked: 6 rows, selected {0}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [aria] [60]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 >  [Old] [0]
+  row 5: level 0    [memo] [4]
+clicked row 2: controller {[0.1]}, selection.name aria
+command-clicked row 4: controller {[0.1],[1.0]}
+controller selected [1.0.0] (Old opened to show it): 7 rows, selected {5}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [aria] [60]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 0    [memo] [4]
+Films closed: controller {}, outline {}
+Films opened again, Music renamed Tunes by the model: 7 rows, selected {}
+  row 0: level 0 v  [Tunes] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [aria] [60]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 0    [memo] [4]
+clicked Name's title: controller sorts by name
+sorted by name (open items stay open): 7 rows, selected {0}
+  row 0: level 0 v  [Films] [0]
+  row 1: level 1 v  [Old] [0]
+  row 2: level 2    [reel] [700]
+  row 3: level 0 v  [Music] [0]
+  row 4: level 1    [aria] [60]
+  row 5: level 1    [song] [30]
+  row 6: level 0    [memo] [4]
+clicked Size's title: first size
+sorted by size: 7 rows, selected {0}
+  row 0: level 0 v  [Films] [0]
+  row 1: level 1 v  [Old] [0]
+  row 2: level 2    [reel] [700]
+  row 3: level 0 v  [Music] [0]
+  row 4: level 1    [song] [30]
+  row 5: level 1    [aria] [60]
+  row 6: level 0    [memo] [4]
+double click on aria's name: edited row 2
+typed opera, Return: song, opera
+size edited: 5 (a number: 1)
+controller not editable: double click edits row -1
+made not editable while editing, Return: name opera, editing ended 1
+after editing: 7 rows, selected {2}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [opera] [5]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 0    [memo] [4]
+memo selected: can add child 0
+addChild: on Old (shown, selected): 8 rows, selected {6}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [opera] [5]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 2 >  [film] [0]
+  row 7: level 0    [memo] [4]
+remove:: 7 rows, selected {5}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [opera] [5]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 0    [memo] [4]
+late inserted at the end: 8 rows, selected {7}
+  row 0: level 0 v  [Music] [0]
+  row 1: level 1    [song] [30]
+  row 2: level 1    [opera] [5]
+  row 3: level 0 v  [Films] [0]
+  row 4: level 1 v  [Old] [0]
+  row 5: level 2    [reel] [700]
+  row 6: level 0    [memo] [4]
+  row 7: level 0    [late] [9]
+no content: 0 rows, selected {}
+unbound: 0 rows
+per row: file cells enabled 0 1 1
+double click on two (locked): edited row -1
+unlocked, edited: deux
+clicked one's check box (disabled: size 0): file 1 (unchanged)
+clicked three's check box: file 0
+controller not editable, clicked again: file 0
+double click on three's name: edited row -1
+made not editable while editing, Return: three
+NSConditionallySetsEditable NO, controller not editable: drei
+dictionary controller: initial key key, value value; exposes contentDictionary,includedKeys,excludedKeys,initialKey,initialValue,localizedKeyDictionary,content,contentArray,contentSet,selectionIndexes,sortDescriptors,filterPredicate,contentObject,editable
+  pair color = blue, localized Colour, explicitly included 0
+  pair name = nil, localized name, explicitly included 1
+  pair size = 12, localized size, explicitly included 0
+  selection.key name, arrangedObjects.key color,name,size
+color set to red: settings color red, secret kept x
+size renamed points: settings color,points,secret
+add: twice: keys color,key,key1,points,secret, the new values value and value
+  selected color
+remove: keys key,key1,points,secret
+the disk's settings replaced: pairs name,only
+the disk's settings:
+  heard settings = {
+    color = red;
+    secret = x;
+    size = 12;
+}
+  heard settings = {
+    color = red;
+    points = 12;
+    secret = x;
+}
+  heard settings = {
+    color = red;
+    key = value;
+    points = 12;
+    secret = x;
+}
+  heard settings = {
+    color = red;
+    key = value;
+    key1 = value;
+    points = 12;
+    secret = x;
+}
+  heard settings = {
+    key = value;
+    key1 = value;
+    points = 12;
+    secret = x;
+}
+  heard settings = {
+    only = 1;
+}
+unbound, mutable: changed in place w, content is it 1, new key k1
+exit=0
