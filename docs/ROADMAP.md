@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.177 "Change picture" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Change picture in Dials > Wallpaper: never, every 5, 15 or 30 minutes, every hour, every day, or when logging in | dials.py, wallpaper_rotate.py | done |
+| 2 | Pictures from freemac's own wallpapers (day or night version to match the mode), the Pictures folder or any folder; Random order shuffles them | dials.py, wallpaper_rotate.py | done |
+| 3 | Backdrop checks once a minute and once per session at login, and writes the new picture as the wallpaper, so the Dials tiles follow it | backdrop.py, dials.py | done |
+| 4 | Picking one wallpaper by hand turns Change picture off | dials.py | done |
+| 5 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.176 "Locked files and folders" (done)
 
 | # | Item | Component | Status |

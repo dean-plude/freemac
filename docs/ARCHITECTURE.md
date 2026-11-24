@@ -878,6 +878,19 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Change picture (1.177)
+
+wallpaper_rotate.py keeps its settings in the `[background]` section of
+`wf-shell.ini` beside the image key: `rotate` (never, seconds, or login),
+`rotate_from` (a folder, empty for freemac's own), `rotate_random` and
+`rotate_last`. Backdrop runs for the whole session, so it calls `tick()` every
+minute and `login()` once per session (a marker file in `$XDG_RUNTIME_DIR`
+keeps a Backdrop restart from counting as a login). A change is written as
+the `image` key, which wf-background and everything else already follow;
+Dials watches the file to move its selected tile. freemac's scenes count
+once each, in the day or night version for the current mode. A missing or
+future `rotate_last` restarts the count instead of changing at once.
+
 ## Locked items (1.176)
 
 Linux has no user-settable lock flag a program can't simply ignore, so
