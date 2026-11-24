@@ -128,8 +128,9 @@ class Bar(Gtk.DrawingArea):
         return True
 
 
-def ask_name_and_format(parent, title, text, button, name, with_format, icon):
-    """An alert with a Name field (and a Format menu): (name, fstype) or None."""
+def ask_name_and_format(parent, title, text, button, name, with_format, icon, with_size=False):
+    """An alert with a Name field (and a Format menu, and a Size): (name,
+    fstype) or (name, fstype, bytes), or None."""
     buttons = [("Cancel", Gtk.ResponseType.CANCEL), (button, Gtk.ResponseType.OK)]
     dialog = alert.build(parent, title, text, buttons, default=Gtk.ResponseType.OK, icon=icon)
     body = dialog.get_content_area().get_children()[0]
@@ -138,8 +139,24 @@ def ask_name_and_format(parent, title, text, button, name, with_format, icon):
     entry = Gtk.Entry(text=name, activates_default=True, width_chars=18)
     grid.attach(entry, 1, 0, 1, 1)
     chosen = {"fstype": None}
+    size_row = None
+    if with_size:
+        grid.attach(Gtk.Label(label="Size:", xalign=1), 0, 1, 1, 1)
+        size_row = Gtk.Box(spacing=6)
+        amount = Gtk.SpinButton(digits=1, numeric=True, activates_default=True)
+        amount.set_range(1, 99999)
+        amount.set_increments(1, 10)
+        amount.set_value(100)
+        unit = Gtk.ComboBoxText()
+        unit.append("mb", "MB")
+        unit.append("gb", "GB")
+        unit.set_active_id("mb")
+        size_row.pack_start(amount, False, False, 0)
+        size_row.pack_start(unit, False, False, 0)
+        size_row.amount, size_row.unit = amount, unit
+        grid.attach(size_row, 1, 1, 1, 1)
     if with_format:
-        grid.attach(Gtk.Label(label="Format:", xalign=1, valign=Gtk.Align.START), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label="Format:", xalign=1, valign=Gtk.Align.START), 0, 2, 1, 1)
         choices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         first = None
         for title_, fstype, what, longest in hull_store.FORMATS:
@@ -161,7 +178,7 @@ def ask_name_and_format(parent, title, text, button, name, with_format, icon):
         picked_first = hull_store.FORMATS[0]
         chosen["fstype"] = picked_first[1]
         entry.set_max_length(picked_first[3])
-        grid.attach(choices, 1, 1, 1, 1)
+        grid.attach(choices, 1, 2, 1, 1)
     else:
         entry.set_max_length(16)
     body.pack_start(grid, False, False, 4)
@@ -184,6 +201,9 @@ def ask_name_and_format(parent, title, text, button, name, with_format, icon):
         if fstype == "vfat":
             label = label.upper()        # MS-DOS names are capital letters
         result = (label, fstype)
+        if size_row is not None:
+            scale = 1000 ** 3 if size_row.unit.get_active_id() == "gb" else 1000 ** 2
+            result += (int(size_row.amount.get_value() * scale) // (1024 * 1024) * 1024 * 1024,)
     dialog.destroy()
     return result
 
@@ -283,7 +303,8 @@ class Window(Gtk.ApplicationWindow):
         menus.add_actions(self, {"close": self.close, "mount": self.toggle_mount, "erase": self.erase,
                                  "eject": self.eject, "rename": self.rename, "open-image": self.open_image,
                                  "new-image": self.new_image, "restore": self.restore,
-                                 "first-aid": self.first_aid, "partition": self.partition})
+                                 "first-aid": self.first_aid, "partition": self.partition,
+                                 "new-blank": self.new_blank_image, "copy-image": self.copy_to_image})
         self.bus, self._watch = hull_store.watch(self._changed)
         self.connect("destroy", lambda *_: [self.bus.signal_unsubscribe(i) for i in self._watch])
         header.show_all()
@@ -555,6 +576,9 @@ class Window(Gtk.ApplicationWindow):
         self.restore_button.set_sensitive(free and self._restorable(drive))
         self.aid_button.set_sensitive(free and not locked and bool(self._aid_volumes(kind, item)))
         self.partition_button.set_sensitive(free and self._restorable(drive))
+        copy_action = self.lookup_action("copy-image")
+        if copy_action:
+            copy_action.set_enabled(not self.busy and self._copyable(kind, item))
         for name, on in (("mount", self.mount_button), ("erase", self.erase_button),
                          ("partition", self.partition_button),
                          ("restore", self.restore_button), ("first-aid", self.aid_button),
@@ -781,7 +805,7 @@ class Window(Gtk.ApplicationWindow):
         self.chosen = ("drive", drive.path)
         self._working(True)
         sheet = Restoring(self, name, image_name, icon)
-        sheet.show_all()
+        sheet.appear()
         state = {"last": 0.0}
 
         def progress(done, total):
@@ -896,6 +920,131 @@ class Window(Gtk.ApplicationWindow):
             GLib.idle_add(finished, why)
         threading.Thread(target=work, daemon=True).start()
 
+    def _save_image_as(self, title, name, folder):
+        """Ask where to save a new image: its path, or None."""
+        saver = Gtk.FileChooserNative(title=title, transient_for=self,
+                                      action=Gtk.FileChooserAction.SAVE, accept_label="Save")
+        saver.set_do_overwrite_confirmation(True)
+        saver.set_current_folder(folder if folder and os.path.isdir(folder) else GLib.get_home_dir())
+        saver.set_current_name(name)
+        if saver.run() != Gtk.ResponseType.ACCEPT:
+            return None
+        image = saver.get_filename()
+        if not image.lower().endswith(disk_images.TYPES):
+            image += ".img"
+        if os.path.exists(image):
+            try:
+                os.unlink(image)      # the save dialog has asked to replace it
+            except OSError as e:
+                alert.tell(self, f"“{os.path.basename(image)}” couldn’t be replaced.", e.strerror or "")
+                return None
+        return image
+
+    def new_blank_image(self):
+        icon = self._gicon("drive-removable-media")
+        answer = ask_name_and_format(self, "New Blank Image",
+                                     "An empty disk image works like a USB drive you keep in a file: "
+                                     "open it, put files on it, eject it, and copy or send the file.",
+                                     "Next", "Untitled", True, icon, with_size=True)
+        if not answer:
+            return
+        label, fstype, size = answer
+        if size < 32 * 1024 * 1024:
+            alert.tell(self, "That’s too small for a disk image.", "Make it at least 32 MB.", icon=icon)
+            return
+        documents = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)
+        image = self._save_image_as("Save Blank Image As", label + ".img", documents)
+        if image is None:
+            return
+        self._working(True)
+
+        def finished(why):
+            self._working(False)
+            if why is not None:
+                alert.tell(self, f"“{os.path.basename(image)}” couldn’t be made.", why, icon=icon)
+            else:
+                Gio.Subprocess.new(["freemac-hatch", image], Gio.SubprocessFlags.NONE)   # open it, ready to use
+            return False
+
+        def work():
+            try:
+                disk_images.make_blank(image, size, fstype, label)
+                why = None
+            except disk_images.Failed as e:
+                why = str(e) or "Something went wrong while it was being made."
+            GLib.idle_add(finished, why)
+        threading.Thread(target=work, daemon=True).start()
+
+    @staticmethod
+    def _copyable(kind, item):
+        """What New Image from a drive can copy: a drive or volume that isn't
+        the system's or an open image, with something in it."""
+        if item is None or item.system:
+            return False
+        drive = item if kind == "drive" else item.drive
+        if isinstance(drive, hull_store.ImageDrive) or not drive.media:
+            return False
+        return (drive.whole is not None) if kind == "drive" else True
+
+    def copy_to_image(self):
+        kind, item = self._current()
+        if self.busy or not self._copyable(kind, item):
+            return
+        whole = kind == "drive"
+        block = item.whole if whole else item
+        name = item.name
+        disc = whole and item.optical or (not whole and item.drive.optical)
+        icon = self._gicon(drive_icon(item) if whole else volume_icon(item))
+        documents = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)
+        image = self._save_image_as(f"Save an Image of “{name}” As",
+                                    name.replace("/", "-") + (".iso" if disc else ".img"), documents)
+        if image is None:
+            return
+        image_name = os.path.basename(image)
+        mounted = [v.path for v in (item.volumes if whole else [item]) if v.mounts]
+        self._working(True)
+        sheet = Restoring(self, name, image_name, icon, heading=f"Copying “{name}” into “{image_name}”…",
+                          window_title="New Image")
+        sheet.count.set_text("Getting the drive ready…")
+        sheet.appear()
+        state = {"shown": 0.0}
+
+        def progress(done, total):
+            now = GLib.get_monotonic_time() / 1e6
+            if now - state["shown"] > 0.2 or done >= total:
+                state["shown"] = now
+                GLib.idle_add(sheet.show_progress, done, total)
+
+        def finished(outcome, why):
+            sheet.destroy()
+            self._working(False)
+            if outcome == "done":
+                answer = alert.ask(self, f"“{image_name}” is ready.",
+                                   f"It holds a copy of everything on “{name}”. Restore it onto a drive in Hull "
+                                   "to put it back, or double-click it to open it as a disk.",
+                                   [("Show in Drawer", Gtk.ResponseType.APPLY), ("OK", Gtk.ResponseType.OK)],
+                                   default=Gtk.ResponseType.OK, icon=icon)
+                if answer == Gtk.ResponseType.APPLY:
+                    try:
+                        Gio.AppInfo.launch_default_for_uri(
+                            Gio.File.new_for_path(os.path.dirname(image)).get_uri(), None)
+                    except GLib.Error:
+                        pass
+            elif outcome == "failed" and why is not None:
+                alert.tell(self, f"The image of “{name}” wasn’t made.", why, icon=icon)
+            return False
+
+        def work():
+            try:
+                disk_images.copy_drive(block.path, image, progress, lambda: sheet.stopped, mounted=mounted)
+                outcome, why = "done", None
+            except disk_images.Cancelled:
+                outcome, why = "stopped", None
+            except disk_images.Failed as e:
+                outcome, why = "failed", (str(e) or None)
+            GLib.idle_add(finished, outcome, why)
+        threading.Thread(target=work, daemon=True).start()
+
 
 def first_aid_words(name, results):
     """The title and text of First Aid's report, from [(volume, format, result)]."""
@@ -960,8 +1109,8 @@ class Checking(Gtk.Window):
 class Restoring(Gtk.Window):
     """The sheet-like window that shows a restore going, with Stop."""
 
-    def __init__(self, parent, drive_name, image_name, icon):
-        super().__init__(title="Restore", transient_for=parent, modal=True, resizable=False,
+    def __init__(self, parent, drive_name, image_name, icon, heading=None, window_title="Restore"):
+        super().__init__(title=window_title, transient_for=parent, modal=True, resizable=False,
                          type_hint=Gdk.WindowTypeHint.DIALOG)
         self.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
         self.stopped = False
@@ -972,7 +1121,7 @@ class Restoring(Gtk.Window):
         image.set_pixel_size(48)
         box.pack_start(image, False, False, 0)
         words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        title = Gtk.Label(label=f"Restoring “{drive_name}” from “{image_name}”…", xalign=0,
+        title = Gtk.Label(label=heading or f"Restoring “{drive_name}” from “{image_name}”…", xalign=0,
                           max_width_chars=44, wrap=True)
         title.get_style_context().add_class("hull-drive-name")
         words.pack_start(title, False, False, 0)
@@ -989,6 +1138,18 @@ class Restoring(Gtk.Window):
         self.add(box)
         self.connect("delete-event", lambda *_: self.stop() or True)
 
+    def appear(self):
+        # Shown a moment later, once the window that came before it (a file
+        # chooser or an alert) has gone, or it can end up hidden.
+        self.connect("destroy", lambda *_: setattr(self, "gone", True))
+        GLib.timeout_add(400, self._show)
+
+    def _show(self):
+        if not getattr(self, "gone", False):
+            self.show_all()
+            self.present()
+        return False
+
     def stop(self):
         self.stopped = True
         self.count.set_text("Stopping…")
@@ -1002,8 +1163,10 @@ class Restoring(Gtk.Window):
 
 def menubar():
     return menus.menubar([
-        ("_File", [[("Open Disk Image…", "win.open-image", "<Shift><Ctrl>o"),
-                    ("New Image from Folder…", "win.new-image", "<Shift><Ctrl>n")],
+        ("_File", [[("Open Disk Image…", "win.open-image", "<Shift><Ctrl>o")],
+                   [("New Blank Image…", "win.new-blank", "<Ctrl>n"),
+                    ("New Image from Folder…", "win.new-image", "<Shift><Ctrl>n"),
+                    ("New Image from Drive…", "win.copy-image", None)],
                    [("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
                    [("Close", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("First Aid…", "win.first-aid", None), ("Rename…", "win.rename", None),
@@ -1028,7 +1191,8 @@ class Hull(Gtk.Application):
         self.set_accels_for_action("app.quit", ["<Control>q"])
         for action, keys in (("win.close", ["<Control>w"]), ("win.eject", ["<Control>e"]),
                              ("win.erase", ["<Shift><Control>e"]),
-                             ("win.open-image", ["<Shift><Control>o"]), ("win.new-image", ["<Shift><Control>n"])):
+                             ("win.open-image", ["<Shift><Control>o"]), ("win.new-image", ["<Shift><Control>n"]),
+                             ("win.new-blank", ["<Control>n"])):
             self.set_accels_for_action(action, keys)
         self.set_menubar(menubar())
 

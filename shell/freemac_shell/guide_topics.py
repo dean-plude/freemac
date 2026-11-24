@@ -1119,7 +1119,7 @@ TOPICS = {
         "wake alarm (sometimes called RTC Alarm or Resume by Alarm) in its firmware settings.",
     ]),
     "disk-images": ("Open a disk image (.iso or .img)", "disk image iso img dmg raw mount open eject hatch "
-                    "virtual disk cd dvd burn make image from folder hull", [
+                    "virtual disk cd dvd burn make image from folder hull blank new empty copy drive backup clone", [
         "Double-click an .iso or .img file, in Downloads for example: it opens as a disk, on the Desktop and in "
         "Drawer's sidebar, and its window opens. Its files are there to open or copy, as on a USB drive.",
         "When you're done, click the Eject button beside it in Drawer's sidebar, or in Hull. The image file "
@@ -1127,6 +1127,10 @@ TOPICS = {
         "An .iso, like a disc's, opens read-only. An .img that's yours opens so you can change what's on it.",
         "To make one, open Hull and choose File > New Image from Folder…: pick a folder and where to save it, and "
         "you get an .img holding a copy of that folder. Hull also lists the disk images you have open.",
+        "File > New Blank Image… (⌘N) in Hull makes an empty one of the size and format you choose: it opens like a "
+        "USB drive you keep in a file, to put files on, eject, and copy or send.",
+        "File > New Image from Drive… copies a whole USB drive, disc or volume into an .img (an .iso for a disc), "
+        "to keep as a backup or put back on a drive later with Restore.",
         "A Mac's .dmg files are for installing Mac apps; freemac can't open them. Look for the app in Harbor, or a "
         "download made for Linux.",
     ]),

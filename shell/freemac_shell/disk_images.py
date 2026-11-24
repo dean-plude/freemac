@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Disk images (.iso, .img): opening one as a disk, as a Mac opens a disk
-image you double-click, making one from a folder, and restoring one onto a
-drive (a USB stick that starts up a system, for example).
+image you double-click, making one (blank, from a folder, or a copy of a
+drive), and restoring one onto a drive (a USB stick that starts up a
+system, for example).
 
 udisks2 attaches the file as a loop device (a disk whose contents are the
 file) and mounts the file systems on it, so it shows on the Desktop and in
@@ -257,6 +258,136 @@ def make_from_folder(folder, image):
         except OSError:
             pass
         raise Failed((done.stderr.strip().splitlines() or [""])[-1] if done else reason)
+    return image
+
+
+def _mkfs(name):
+    return next((p for p in (f"/usr/sbin/{name}", f"/sbin/{name}") if os.path.exists(p)), name)
+
+
+def make_blank(image, size, fstype, label):
+    """An empty disk image of this many bytes, formatted (ext4, vfat or
+    exfat) and named. Raises Failed."""
+    if os.path.exists(image):
+        raise Failed(f"“{os.path.basename(image)}” is already there.")
+    try:
+        room = os.statvfs(os.path.dirname(os.path.abspath(image)))
+        if size > room.f_bavail * room.f_frsize:
+            raise Failed("There isn’t enough free space for it there. Make it smaller, or save it somewhere "
+                         "with more room.")
+    except OSError:
+        pass
+    if fstype == "ext4":
+        args = [_mkfs("mkfs.ext4"), "-q", "-F", "-L", label_for(label),
+                "-E", f"root_owner={os.getuid()}:{os.getgid()}", image]
+    elif fstype == "vfat":
+        args = [_mkfs("mkfs.fat"), "-n", label[:11].upper() or "UNTITLED", image]
+    elif fstype == "exfat":
+        args = [_mkfs("mkfs.exfat"), "-L", label[:15] or "Untitled", image]
+    else:
+        raise Failed(f"freemac can’t make {fstype} disk images.")
+    try:
+        with open(image, "wb") as f:
+            f.truncate(size)
+    except OSError as e:
+        raise Failed(e.strerror or str(e))
+    try:
+        done = subprocess.run(args, capture_output=True, text=True, timeout=600)
+        reason = (done.stderr.strip().splitlines() or [""])[-1] if done.returncode else None
+    except (OSError, subprocess.SubprocessError) as e:
+        reason = str(e)
+    if reason is not None:
+        try:
+            os.unlink(image)
+        except OSError:
+            pass
+        raise Failed(reason or "It couldn’t be formatted.")
+    return image
+
+
+# ---- copying a drive into one --------------------------------------------------------
+
+def copy_drive(block_path, image, progress=None, cancelled=None, bus=None, mounted=()):
+    """A disk image holding everything on the drive (or volume) whose block
+    device is block_path, byte for byte, as Restore can put back. The volumes
+    in mounted (udisks2 object paths) are unmounted while it's copied, so
+    nothing changes underneath, and mounted again afterwards. Stopping or
+    failing leaves no half-made file. Raises Failed or Cancelled."""
+    bus = _bus(bus)
+    away = []
+    try:
+        for path in mounted:
+            try:
+                bus.call_sync(BUS_NAME, path, P + "Filesystem", "Unmount", _none(), None,
+                              INTERACTIVE, 60000, None)
+            except GLib.Error as e:
+                raise Failed(_busy_words(e))
+            away.append(path)
+        return _copy(bus, block_path, image, progress, cancelled)
+    finally:
+        for path in away:
+            try:
+                bus.call_sync(BUS_NAME, path, P + "Filesystem", "Mount", _none(), None,
+                              INTERACTIVE, 60000, None)
+            except GLib.Error:
+                pass
+
+
+def _copy(bus, block_path, image, progress, cancelled):
+    if os.path.exists(image):
+        raise Failed(f"“{os.path.basename(image)}” is already there.")
+    total = _objects(bus).get(block_path, {}).get(P + "Block", {}).get("Size", 0)
+    try:
+        room = os.statvfs(os.path.dirname(os.path.abspath(image)))
+        if total > room.f_bavail * room.f_frsize:
+            raise Failed("There isn’t enough free space for it there. Save it on a drive with more room.")
+    except OSError:
+        pass
+    try:
+        reply, fds = bus.call_with_unix_fd_list_sync(
+            BUS_NAME, block_path, P + "Block", "OpenForBackup", _none(),
+            GLib.VariantType.new("(h)"), INTERACTIVE, 60000, None, None)
+    except GLib.Error as e:
+        raise Failed(_busy_words(e))
+    src = fds.steal_fds()[reply.unpack()[0]]
+    finished = False
+    try:
+        try:
+            dst = os.open(image, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        except OSError as e:
+            raise Failed(e.strerror or str(e))
+        try:
+            done = 0
+            while True:
+                if cancelled is not None and cancelled():
+                    raise Cancelled()
+                chunk = os.read(src, CHUNK)
+                if not chunk:
+                    break
+                if chunk.count(0) == len(chunk):
+                    os.lseek(dst, len(chunk), os.SEEK_CUR)     # empty space takes no room in the file
+                else:
+                    view = memoryview(chunk)
+                    while view:
+                        n = os.write(dst, view)
+                        view = view[n:]
+                done += len(chunk)
+                if progress is not None:
+                    progress(done, total or done)
+            os.ftruncate(dst, done)
+            os.fsync(dst)
+            finished = True
+        except OSError as e:
+            raise Failed(e.strerror or str(e))
+        finally:
+            os.close(dst)
+    finally:
+        os.close(src)
+        if not finished:
+            try:
+                os.unlink(image)
+            except OSError:
+                pass
     return image
 
 

@@ -878,6 +878,23 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## New Image in Hull (1.152)
+
+`disk_images.make_blank()` makes a sparse file of the size asked for with
+`truncate`, then formats it directly (`mkfs.exfat`, `mkfs.fat`, or
+`mkfs.ext4 -E root_owner=` so the user owns its top folder); no loop device
+or privilege is needed, and a failure removes the file. Hull then opens it
+with Hatch, so it mounts like any image. `disk_images.copy_drive()` unmounts
+the drive's mounted volumes through udisks2, calls `Block.OpenForBackup` for
+a read-only file descriptor (polkit `open-device`, allowed for an
+administrator at the computer, as for Restore), and copies 4 MiB at a time
+into a new file opened with `O_EXCL`; chunks that are all zeros become holes
+with `lseek`, so mostly empty drives make small files. Stopping or failing
+removes the file, and the volumes are mounted again either way. The copy runs
+on a thread and reports progress to the same window Restore uses, which is
+shown a moment after the file chooser closes so the compositor doesn't leave
+it hidden.
+
 ## Partition in Hull (1.151)
 
 `partition_plan.Layout` is the arithmetic, with no GTK: a list of parts
