@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.171 "Definitions in Seek" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Type a word in Seek and a Definition result shows its first meaning, with up to four meanings (noun, verb, adjective, adverb) in the preview beside it, as Spotlight does | seek.py, words.py | done |
+| 2 | Plurals and other forms find their word (mice finds mouse, running finds run), read straight from the dictionary's sorted files, so a result shows while you type | words.py | done |
+| 3 | Return opens the word in Words | seek.py | done |
+| 4 | Dials > Seek can turn Definitions off like the other kinds of result | seek_settings.py | done |
+| 5 | Guide line, README row and screenshot | Guide, Docs | done |
+
 ## 1.170 "Ferry: messages passed on, JSON and dates" (done)
 
 Many larger Mac programs pass messages on to other objects, read and write

@@ -14,6 +14,7 @@ original freemac code that reads WordNet's published file format.
 import bisect
 import datetime
 import difflib
+import functools
 import html
 import os
 import re
@@ -57,6 +58,120 @@ def key(text):
 
 def shown(lemma):
     return lemma.replace("_", " ")
+
+
+# Looking a word up without loading the dictionary ----------------------------
+# Seek shows a word's meaning as you type (as Spotlight's Definition does),
+# and stays running all day, so it reads WordNet's files where they lie: the
+# index and exception files are sorted, so a binary search finds a word's line
+# in a few reads, and the meaning is one more read in the data file.
+
+_files = {}
+
+
+def _open(path):
+    """The file, kept open for the next look-up (Seek asks at each key)."""
+    f = _files.get(path)
+    if f is None:
+        try:
+            f = _files[path] = open(path, "rb")
+        except OSError:
+            return None
+    return f
+
+
+def find_line(path, word):
+    """The line of a sorted WordNet file (index.noun, noun.exc…) whose first
+    field is `word`, as text, or None. Its licence lines, which start with
+    spaces, come first and sort before every word."""
+    if not word:
+        return None
+    target = word.encode("utf-8")
+    f = _open(path)
+    if f is None:
+        return None
+    f.seek(0, os.SEEK_END)
+    lo, hi = 0, f.tell()
+    while lo < hi:
+        mid = (lo + hi) // 2
+        f.seek(mid)
+        if mid:
+            f.readline()        # on to the start of the next line
+        line = f.readline()
+        if not line:
+            hi = mid
+            continue
+        first = b"" if line.startswith(b" ") else line.split(b" ", 1)[0].rstrip(b"\n")
+        if first < target:
+            lo = mid + 1
+        elif first > target:
+            hi = mid
+        else:
+            return line.decode("utf-8", "replace")
+    return None
+
+
+def _gloss(folder, pos, offset):
+    """One meaning's definition, without its examples."""
+    f = _open(os.path.join(folder, "data." + POS_FILES[pos]))
+    if f is None:
+        return ""
+    try:
+        f.seek(offset)
+        line = f.readline().decode("utf-8", "replace")
+    except (OSError, ValueError):
+        return ""
+    gloss = line.partition(" | ")[2].strip().replace("--", "—")
+    return re.split(r';?\s*"', gloss, maxsplit=1)[0].strip().rstrip(";").strip()
+
+
+@functools.lru_cache(maxsize=256)
+def meanings(text, limit=4, folder=WORDNET):
+    """[(part of speech, word, definition)] for a word or one of its forms
+    ("mice" finds mouse), the usual meaning of each part of speech first,
+    read straight from the files; [] if WordNet doesn't know it."""
+    word = key(text)
+    if not word or not re.fullmatch(r"[a-z][a-z'_.-]*", word):
+        return []
+    found = []          # (pos, lemma, [offsets])
+    for pos in POS_ORDER:
+        name = POS_FILES[pos]
+        candidates = [word]
+        exc = find_line(os.path.join(folder, name + ".exc"), word)
+        if exc:
+            candidates += exc.split()[1:]
+        candidates += [word[: len(word) - len(ending)] + replacement for ending, replacement in ENDINGS[pos]
+                       if word.endswith(ending) and len(word) > len(ending)]
+        seen = set()
+        for lemma in candidates:
+            if lemma in seen:
+                continue
+            seen.add(lemma)
+            line = find_line(os.path.join(folder, "index." + name), lemma)
+            if not line:
+                continue
+            parts = line.split()
+            try:
+                sense_count, pointer_count = int(parts[2]), int(parts[3])
+                start = 6 + pointer_count
+                offsets = [int(o) for o in parts[start:start + sense_count]]
+            except (IndexError, ValueError):
+                continue
+            found.append((pos, lemma, offsets))
+    # The first meaning of each part of speech, then the others in turn.
+    order = []
+    depth = 0
+    while len(order) < limit and any(depth < len(o) for _p, _l, o in found):
+        for pos, lemma, offsets in found:
+            if depth < len(offsets) and len(order) < limit:
+                order.append((pos, lemma, offsets[depth]))
+        depth += 1
+    out = []
+    for pos, lemma, offset in order:
+        definition = _gloss(folder, pos, offset)
+        if definition:
+            out.append((POS_NAMES[pos], shown(lemma), definition))
+    return out
 
 
 class Sense:

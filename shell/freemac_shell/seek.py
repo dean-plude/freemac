@@ -21,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, seek_settings, style  # noqa: E402
+from . import calendar_store, contacts_store, dials_pages, guide_topics, reminders_store, seek_index, seek_settings, style, words  # noqa: E402
 from .ready_panel import ReadyPanel  # noqa: E402
 from .convert import convert  # noqa: E402
 
@@ -344,6 +344,9 @@ class SeekWindow(ReadyPanel, Gtk.Window):
                     results.append(Result(title, "Guide", Gio.ThemedIcon.new("freemac-guide"),
                                           lambda n=name: launch("freemac-guide", "--topic", n),
                                           about=body[0].lstrip("- ")))
+            # What a word means, from Words' dictionary ("serendipity").
+            if show("definitions"):
+                results += self._definition(query)
             # The app in front's own menu items, as its Help menu finds them.
             if len(query) >= 2 and show("menus"):
                 found, app_icon = menu_items(query)
@@ -370,6 +373,24 @@ class SeekWindow(ReadyPanel, Gtk.Window):
                                           Gio.ThemedIcon.new("text-x-generic"), lambda p=path: open_path(p),
                                           path=path))
         self._show(results[:MAX_RESULTS])
+
+    @staticmethod
+    def _definition(query):
+        """A word's meaning as Spotlight's Definition shows it: the usual one
+        in the list, a few more beside it, and Return opens Words."""
+        if not re.fullmatch(r"[A-Za-z][A-Za-z'-]{2,}( [A-Za-z'-]+){0,2}", query):
+            return []
+        found = words.meanings(query, limit=4)
+        if not found:
+            return []
+        pos, lemma, first = found[0]
+        about = "\n\n".join(f"{n}. {p}: {d}" for n, (p, _l, d) in enumerate(found, 1))
+        line = f"Definition: {pos}, {first}"
+        if len(line) > 64:   # a long meaning would widen the panel, so cut it at a word
+            line = line[:64].rsplit(" ", 1)[0].rstrip(",;") + "\u2026"
+        return [Result(lemma, line, Gio.ThemedIcon.new("freemac-words"),
+                       lambda w=lemma: launch("freemac-service", "words", w),
+                       about=about + "\n\nPress Return to see it in Words.")]
 
     @staticmethod
     def _people(query):
@@ -472,7 +493,10 @@ class SeekWindow(ReadyPanel, Gtk.Window):
         self.preview.pack_start(title, False, False, 0)
         lines = file_facts(res.path) if res.path else ([res.about] if res.about else [])
         for line in lines:
-            label = Gtk.Label(label=line, wrap=True, max_width_chars=34, justify=Gtk.Justification.CENTER)
+            # A definition's numbered meanings read down the left, as a list.
+            several = "\n" in line
+            label = Gtk.Label(label=line, wrap=True, max_width_chars=28 if several else 34, xalign=0 if several else 0.5,
+                              justify=Gtk.Justification.LEFT if several else Gtk.Justification.CENTER)
             label.get_style_context().add_class("hint")
             self.preview.pack_start(label, False, False, 0)
         text = first_lines(res.path) if res.path and shown is None else ""
