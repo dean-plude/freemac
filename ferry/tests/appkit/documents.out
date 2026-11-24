@@ -1,0 +1,255 @@
+DocController made; shared: yes
+will finish launching; controller in the nib: yes
+  NoteDocument reads org.freemac.ferry.note: "launched text"
+  (noted as recent: Launch.note)
+== launch
+shared controller: DocController
+documents: Launch.note
+window "Launch.note", field "launched text", represented Launch.note
+recent: Launch.note
+== types
+classes: NoteDocument, BundleDocument, OldDocument
+default type: org.freemac.ferry.note
+type for .note: org.freemac.ferry.note
+type for .NOTE: org.freemac.ferry.note
+type for .txt: Plain Text
+type for .notes: Note Bundle
+type for .onote: Old Note
+type for .xyz: (nil)
+extensions of the note type: note
+display name: Note
+class for Plain Text: NoteDocument
+NoteDocument reads org.freemac.ferry.note, Plain Text; writes org.freemac.ferry.note
+native: note 1, plain text 0
+autosaves in place: 0, versions: 0
+== new
+documents: Launch.note, Untitled, Untitled 2
+window "Untitled 2", key 1, current document Untitled 2
+untitled: fileURL (nil), type org.freemac.ferry.note, edited 0
+== edits
+before the run loop turns: edited 0
+after: edited 1, window shows it 1
+undo manager: the window's is the document's 1; Undo Typing
+  Undo Typing
+  Redo (disabled)
+undone: text "", edited 0, window 0
+redone: text "first words", edited 1
+cleared: edited 0
+undone past the save: edited 1
+done again: edited 0
+File menu, an edited untitled document:
+  New
+  Open…
+  Open Recent
+  ----
+  Close
+  Save…
+  Save As…
+  Revert to Saved (disabled)
+== save
+the Save panel is a sheet, answered when the loop turns: saved yet 0
+  NoteDocument writes org.freemac.ferry.note
+  (noted as recent: First.note)
+saved as First.note (org.freemac.ferry.note), edited 0, window "First.note" edited 0
+file: "first words", modification date known 1
+File menu, saved:
+  New
+  Open…
+  Open Recent
+  ----
+  Close
+  Save… (disabled)
+  Save As…
+  Revert to Saved (disabled)
+== save again
+  NoteDocument writes org.freemac.ferry.note
+  (noted as recent: First.note)
+saved in place at once: edited 0, file "second words"
+nothing left beside it: First.note, Launch.note
+== save as
+  NoteDocument writes org.freemac.ferry.note
+  (noted as recent: Second.note)
+now Second.note; file "second words"; the first is still "second words"
+recent: Second.note, First.note, Launch.note
+== revert
+a sheet: 1, is a sheet 1, its parent is the window 1
+  text: Do you want to revert to the most recently saved version of the document “Second.note”?
+  text: Your current changes will be lost.
+  button: Revert (Return) tag 1000 at 128,181 118x28
+  button: Cancel (Escape) tag 1001 at 14,181 118x28
+  NoteDocument reads org.freemac.ferry.note: "second words"
+reverted: text "second words", edited 0, sheet gone 1
+Cancel: text "kept words", edited 1
+== close
+asks: 1
+  text: Do you want to save the changes made to the document “Second.note”?
+  text: Your changes will be lost if you don’t save them.
+  button: Save (Return) tag 1000 at 14,194 232x28
+  button: Cancel (Escape) tag 1001 at 14,224 232x28
+  button: Don’t Save (Cmd-d) tag 1002 at 14,254 232x28
+File menu with the sheet up:
+  New
+  Open…
+  Open Recent
+  ----
+  Close (disabled)
+  Save…
+  Save As…
+  Revert to Saved
+Cancel: still open 1, documents 3
+Don't Save: closed 1, file still "second words"
+documents: Launch.note, Untitled
+Save: the Save panel comes next; open 1
+  NoteDocument writes org.freemac.ferry.note
+  (noted as recent: Closing.note)
+saved "saved on closing" and closed 1
+documents: Launch.note
+an unedited document closes without asking: 1
+documents: 
+== open
+  NoteDocument reads Plain Text: "plain words"
+  (noted as recent: Plain.txt)
+documents: Plain.txt
+Plain.txt: type Plain Text, class NoteDocument, window "Plain.txt"
+again: the same 1, already open 1
+Strange.xyz: not opened, error 256: The document “Strange.xyz” couldn’t be opened. DocApp can’t open files of this kind.
+  NoteDocument reads org.freemac.ferry.note: "BAD note"
+Bad.note: not opened, error: The note is damaged.
+documents: Plain.txt
+== a package, as a file wrapper
+  (noted as recent: Pack.notes)
+saved 1: index.txt, version, index "inside the package"
+  (noted as recent: Pack.notes)
+saved over 1: "saved over"
+  BundleDocument reads a folder with 2 files
+read back: "saved over"; a package to the workspace 1
+== the calls of Mac OS X 10.3
+  OldDocument loadDataRepresentation: "old words"
+  (noted as recent: Old.onote)
+opened old words, file name Old.onote
+  OldDocument dataRepresentationOfType: Old Note
+  (noted as recent: Old.onote)
+file: "old words (saved)"
+== recent documents
+recent: Old.onote, Pack.notes, Plain.txt, Closing.note, Second.note, First.note, Launch.note
+Open Recent:
+  Old.onote
+  Pack.notes
+  Plain.txt
+  Closing.note
+  Second.note
+  First.note
+  Launch.note
+  ----
+  Clear Menu
+kept in the defaults: 7
+  OldDocument loadDataRepresentation: "old words (saved)"
+  (noted as recent: Old.onote)
+documents: Plain.txt, Old.onote
+cleared:
+  Clear Menu (disabled)
+recent: 
+  (noted as recent: Plain.txt)
+recent: Plain.txt
+== alerts
+three buttons, Return:
+  modal window: yes, 260x283
+  text: Do you want to save the changes made to the document “Report”?
+  text: Your changes will be lost if you don’t save them.
+  button: Save (Return) tag 1000 at 14,178 232x28
+  button: Cancel (Escape) tag 1001 at 14,208 232x28
+  button: Don’t Save (Cmd-d) tag 1002 at 14,238 232x28
+returned 1000
+Escape:
+  modal window: yes, 260x283
+  text: Do you want to save the changes made to the document “Report”?
+  text: Your changes will be lost if you don’t save them.
+  button: Save (Return) tag 1000 at 14,178 232x28
+  button: Cancel (Escape) tag 1001 at 14,208 232x28
+  button: Don’t Save (Cmd-d) tag 1002 at 14,238 232x28
+returned 1001
+Command-D:
+  modal window: yes, 260x283
+  text: Do you want to save the changes made to the document “Report”?
+  text: Your changes will be lost if you don’t save them.
+  button: Save (Return) tag 1000 at 14,178 232x28
+  button: Cancel (Escape) tag 1001 at 14,208 232x28
+  button: Don’t Save (Cmd-d) tag 1002 at 14,238 232x28
+returned 1002
+a click on the second button:
+returned 1001
+two buttons, critical, an accessory and the check box: 340x254, icon valid
+  check box "Do not show this message again" at 20,178; accessory at 20,126
+  modal window: yes, 340x254
+  text: Delete the note?
+  button: Do not show this message again (-) tag 0 at 20,178 221x18
+  button: Delete (Return) tag 1000 at 168,209 158x28
+  button: Cancel (Escape) tag 1001 at 14,209 158x28
+returned 1000, suppress next time 1
+  modal window: yes, 260x254
+  text: Old style
+  text: 3 things
+  button: OK (Return) tag 1 at 14,149 232x28
+  button: Cancel (Escape) tag 0 at 14,179 232x28
+  button: Other (-) tag -1 at 14,209 232x28
+old-style codes, Escape: 0
+FERRY_ALERT_ANSWER "Don't Save": 1002
+NSRunAlertPanel answered "2": 0
+from an error: "The file couldn’t be found." / "Check the name." / OK
+presentError: 1
+== sheets
+attached: the first 1; sheets 2; key window is the sheet 1; at 70,128 260x172
+closing the window while it has a sheet: still open 1
+first sheet ended: 1001
+then the second: 1
+second sheet ended: 1000
+none left 1, key again 1
+an old-style sheet: attached 1
+old-style sheet ended: 42, the context, still up 1
+after endSheet: attached 0
+== workspace
+shared: 1; its own notification centre 1
+notifications: NSWorkspaceWillSleepNotification, NSWorkspaceDidWakeNotification, NSWorkspaceDidLaunchApplicationNotification
+open a web address: 1
+open a file: 1
+open a missing file: 0
+open an address with no scheme: 0
+show in the file viewer: 1
+opened with a configuration: error none
+launch another app: 0
+  the launcher was given: open file://~/work/
+  the launcher was given: open file://~/work/Plain.txt
+  the launcher was given: open https://example.org/page?q=1
+  the launcher was given: open mailto:someone@example.org
+icon for Plain.txt: 32x32, valid
+icon for work: 32x32, valid
+icon for Pack.notes: 32x32, valid
+icon for Missing.zzz: 32x32, valid
+icon for type txt: 32x32, valid
+icon for type public.folder: 32x32, valid
+icon for type org.freemac.ferry.note: 32x32, valid
+icon for type 'TEXT': 32x32, valid
+this app by its identifier: DocApp.app
+an unknown app: (nil)
+this app by name: DocApp.app
+types: org.freemac.ferry.note, public.folder, public.plain-text
+a note is text 1, an image 0
+described: Ferry Note
+== quit
+documents: Plain.txt*, Old.onote, Untitled 3*
+review alert:
+  text: You have 2 documents with unsaved changes. Do you want to review these changes before quitting?
+  text: If you don’t review your documents, all your changes will be lost.
+  button: Review Changes… (Return) tag 1000 at 14,209 232x28
+  button: Cancel (Escape) tag 1001 at 14,239 232x28
+  button: Discard Changes (-) tag 1002 at 14,269 232x28
+terminate: returned; the sheets wait
+sheet on "Plain.txt": Do you want to save the changes made to the document “Plain.txt”?
+documents: Old.onote, Untitled 3*
+sheet on "Untitled 3": Do you want to save the changes made to the document “Untitled 3”?
+should terminate? later
+documents: Old.onote
+replying: yes
+documents: Old.onote
+will terminate
+exit=0

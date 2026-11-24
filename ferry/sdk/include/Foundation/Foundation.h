@@ -743,12 +743,27 @@ FOUNDATION_EXPORT NSString *const NSLocalizedDescriptionKey;
 FOUNDATION_EXPORT NSString *const NSFilePathErrorKey;
 FOUNDATION_EXPORT NSString *const NSUnderlyingErrorKey;
 
+FOUNDATION_EXPORT NSString *const NSLocalizedFailureReasonErrorKey;
+FOUNDATION_EXPORT NSString *const NSLocalizedRecoverySuggestionErrorKey;
+FOUNDATION_EXPORT NSString *const NSLocalizedRecoveryOptionsErrorKey;
+FOUNDATION_EXPORT NSString *const NSRecoveryAttempterErrorKey;
+FOUNDATION_EXPORT NSString *const NSHelpAnchorErrorKey;
+FOUNDATION_EXPORT NSString *const NSURLErrorKey;
+FOUNDATION_EXPORT NSString *const NSStringEncodingErrorKey;
+
 enum {
     NSFileNoSuchFileError = 4,
     NSFileReadUnknownError = 256,
+    NSFileReadNoPermissionError = 257,
+    NSFileReadCorruptFileError = 259,
     NSFileReadNoSuchFileError = 260,
+    NSFileReadUnsupportedSchemeError = 262,
     NSFileWriteUnknownError = 512,
+    NSFileWriteNoPermissionError = 513,
     NSFileWriteFileExistsError = 516,
+    NSFileWriteVolumeReadOnlyError = 642,
+    NSUserCancelledError = 3072,
+    NSFeatureUnsupportedError = 3328,
 };
 
 @interface NSError : NSObject <NSCopying>
@@ -758,6 +773,11 @@ enum {
 @property (readonly) NSInteger code;
 @property (readonly, copy) NSDictionary *userInfo;
 @property (readonly, copy) NSString *localizedDescription;
+@property (readonly, copy) NSString *localizedFailureReason;
+@property (readonly, copy) NSString *localizedRecoverySuggestion;
+@property (readonly, copy) NSArray<NSString *> *localizedRecoveryOptions;
+@property (readonly, retain) id recoveryAttempter;
+@property (readonly, copy) NSString *helpAnchor;
 @end
 
 typedef NSString *NSExceptionName;
@@ -1235,6 +1255,92 @@ NSArray<NSString *> *NSSearchPathForDirectoriesInDomains(NSSearchPathDirectory d
 #ifdef __cplusplus
 }
 #endif
+
+/* ---- NSFileWrapper ----------------------------------------------------------------- */
+
+/* A file, folder or symbolic link held in memory, as documents read and
+ * write them (NSFileWrapper.m). */
+typedef NS_OPTIONS(NSUInteger, NSFileWrapperReadingOptions) {
+    NSFileWrapperReadingImmediate = 1 << 0, NSFileWrapperReadingWithoutMapping = 1 << 1,
+};
+typedef NS_OPTIONS(NSUInteger, NSFileWrapperWritingOptions) {
+    NSFileWrapperWritingAtomic = 1 << 0, NSFileWrapperWritingWithNameUpdating = 1 << 1,
+};
+@interface NSFileWrapper : NSObject <NSCoding>
+- (instancetype)initWithURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError **)error;
+- (instancetype)initDirectoryWithFileWrappers:(NSDictionary<NSString *, NSFileWrapper *> *)wrappers;
+- (instancetype)initRegularFileWithContents:(NSData *)contents;
+- (instancetype)initSymbolicLinkWithDestinationURL:(NSURL *)url;
+- (instancetype)initWithSerializedRepresentation:(NSData *)data;
+- (instancetype)initWithPath:(NSString *)path;
+- (instancetype)initSymbolicLinkWithDestination:(NSString *)path;
+@property (readonly, getter=isDirectory) BOOL directory;
+@property (readonly, getter=isRegularFile) BOOL regularFile;
+@property (readonly, getter=isSymbolicLink) BOOL symbolicLink;
+@property (copy) NSString *preferredFilename;
+@property (copy) NSString *filename;
+@property (copy) NSDictionary<NSString *, id> *fileAttributes;
+@property (readonly, copy) NSData *regularFileContents;
+@property (readonly, copy) NSDictionary<NSString *, NSFileWrapper *> *fileWrappers;
+@property (readonly, copy) NSURL *symbolicLinkDestinationURL;
+@property (readonly, copy) NSData *serializedRepresentation;
+- (NSString *)symbolicLinkDestination;
+- (BOOL)matchesContentsOfURL:(NSURL *)url;
+- (BOOL)readFromURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError **)error;
+- (BOOL)writeToURL:(NSURL *)url options:(NSFileWrapperWritingOptions)options
+    originalContentsURL:(NSURL *)original error:(NSError **)error;
+- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)atomically updateFilenames:(BOOL)update;
+- (NSString *)addFileWrapper:(NSFileWrapper *)child;
+- (NSString *)addRegularFileWithContents:(NSData *)data preferredFilename:(NSString *)name;
+- (void)removeFileWrapper:(NSFileWrapper *)child;
+- (NSString *)keyForFileWrapper:(NSFileWrapper *)child;
+@end
+
+/* ---- NSUndoManager ----------------------------------------------------------------- */
+
+/* Undo and redo stacks of groups of actions (NSUndoManager.m). Actions are
+ * registered with a selector or a block; prepareWithInvocationTarget:
+ * needs NSInvocation, which Ferry doesn't have yet, so it answers nil (its
+ * actions are not kept) and says so once. */
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerCheckpointNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerWillUndoChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerWillRedoChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerDidUndoChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerDidRedoChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerDidOpenUndoGroupNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerWillCloseUndoGroupNotification;
+FOUNDATION_EXPORT NSNotificationName const NSUndoManagerDidCloseUndoGroupNotification;
+FOUNDATION_EXPORT NSString *const NSUndoManagerGroupIsDiscardableKey;
+enum { NSUndoCloseGroupingRunLoopOrdering = 350000 };
+@interface NSUndoManager : NSObject
+- (void)beginUndoGrouping;
+- (void)endUndoGrouping;
+@property (readonly) NSInteger groupingLevel;
+@property BOOL groupsByEvent;
+@property NSUInteger levelsOfUndo;
+@property (copy) NSArray<NSRunLoopMode> *runLoopModes;
+- (void)disableUndoRegistration;
+- (void)enableUndoRegistration;
+@property (readonly, getter=isUndoRegistrationEnabled) BOOL undoRegistrationEnabled;
+@property (readonly) BOOL canUndo, canRedo;
+@property (readonly, getter=isUndoing) BOOL undoing;
+@property (readonly, getter=isRedoing) BOOL redoing;
+- (void)undo;
+- (void)redo;
+- (void)undoNestedGroup;
+- (void)removeAllActions;
+- (void)removeAllActionsWithTarget:(id)target;
+- (void)registerUndoWithTarget:(id)target selector:(SEL)selector object:(id)object;
+- (void)registerUndoWithTarget:(id)target handler:(void (^)(id target))handler;
+- (id)prepareWithInvocationTarget:(id)target;
+- (void)setActionIsDiscardable:(BOOL)discardable;
+@property (readonly) BOOL undoActionIsDiscardable, redoActionIsDiscardable;
+- (void)setActionName:(NSString *)name;
+@property (readonly, copy) NSString *undoActionName, *redoActionName;
+@property (readonly, copy) NSString *undoMenuItemTitle, *redoMenuItemTitle;
+- (NSString *)undoMenuTitleForUndoActionName:(NSString *)name;
+- (NSString *)redoMenuTitleForUndoActionName:(NSString *)name;
+@end
 
 #define NSAssert(cond, desc, ...) do { if (!(cond)) [NSException raise:NSInternalInconsistencyException format:(desc), ##__VA_ARGS__]; } while (0)
 #define NSParameterAssert(cond) NSAssert((cond), @"Invalid parameter not satisfying: %s", #cond)

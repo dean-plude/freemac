@@ -76,6 +76,14 @@ selection, sorting from the header and resizable columns), pop-up
 buttons, segmented controls, search fields, stack views and toolbars are
 there too,
 and key-value observing, so bindings follow the values they are bound to.
+Document-based apps work: `NSDocument` and `NSDocumentController` take the
+document types from the app's Info.plist and give it New, Open, Save,
+Save As and Revert, the edited dot, the Save / Don't Save / Cancel question
+on closing and quitting, and the Open Recent menu (autosaving and versions
+are left out). `NSAlert` shows alerts, run modally or as sheets hanging in
+their window, and `NSWorkspace` opens web addresses, files and folders
+through the desktop's own launcher (`gio open` or `xdg-open`, never a Mac
+app) and gives files their icons from the desktop's icon theme.
 Ctrl works as Command (and Super too);
 `FERRY_CONTROL_KEY=control` makes it the Mac's Control key instead.
 

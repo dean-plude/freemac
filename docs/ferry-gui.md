@@ -1081,7 +1081,7 @@ seconds) and Sequel Pro's disk image all install through the window,
 checked page by page under Xvfb, and "Open Sequel Pro" starts the app. Of
 the nine apps, ShiftIt now runs into its event loop and stays there, and
 Gas Mask, Flycut and Spectacle get much further than before. `make
-check` runs 68 tests (60 at M7), all passing. The new or extended ones:
+check` runs 69 tests (60 at M7), all passing. The new or extended ones:
 
 | Test | Proves |
 | --- | --- |
@@ -1097,15 +1097,34 @@ check` runs 68 tests (60 at M7), all passing. The new or extended ones:
 | `appkit_statusbar` | (freemac 1.157) menu bar items, on a private session bus: their StatusNotifierItem properties and pictures, the dbusmenu layout of one item's menu (labels, ticks, a dimmed item, a submenu read on its own), clicks on menu items and on an item without a menu, hiding an item, and Quit |
 | `appkit_tables` | (freemac 1.159) table and outline views: a cell-based table in a scroll view with its header tiled above it (geometry, drawing through its cells, a check box column), selection by click, shift- and command-click, double click and the arrow keys with the delegate's say, sorting by clicks on the header, columns resized by dragging the header's dividers and by each autoresizing style, rows inserted and removed; a view-based table making only the rows in sight and reusing their views; an outline view opened and closed by code, chevron clicks and the arrow keys, with items and rows mapped both ways; and both loaded from a nib with a prototype cell view |
 | `appkit_controls` | (freemac 1.164) pop-up buttons, segmented controls, search fields, stack views and toolbars: a pop-up list's menu opened over the button with the chosen item lined up, chosen by click and click, by press, drag and release, by the arrow keys, Return, Space and typing, closed by Escape or a click outside, disabled items passed over, an item's own action, the menu's delegate and the will-pop-up notification, and full keyboard access; a pull-down list; segmented controls in each tracking mode, with disabled segments, drags off a segment, tags, a segment's menu, the keys and every distribution; search fields searching after a pause, at once or only on Return, cleared by Escape and the clear button, with recent searches kept, saved and shown in the search menu; stack views in rows and columns (gravity areas, every distribution and alignment, insets, custom spacing, hidden and detached views, views dropped for want of room by visibility priority, nested stacks); toolbars from a delegate (the window's frame growing by the strip in each display and size mode, items placed with a flexible space, validation, clicks, a selectable item, items added and removed, the overflow menu, the saved configuration); and all of them loaded from a nib |
+| `appkit_documents` | (freemac 1.167) the document classes, alerts and the workspace, in `DocApp.app` from `make_nibs.py` (four document types in its Info.plist, the File and Edit menus and the app's own `NSDocumentController` subclass in its main nib, a document window nib): a note named on the command line opened at launch; the types, classes and extensions; New ("Untitled", "Untitled 2"); edits through the undo manager moving the change count and the window's edited dot, Undo and Redo from the Edit menu; the File menu's validation; Save and Save As through the Save panel shown as a sheet, saved safely beside the file; Revert in a sheet; closing with unsaved changes (Cancel, Don't Save and Save, by Escape, Command-D and Return); Open through the Open panel, a file already open, a type the app can't open and a file it can't read; a package read and written as a file wrapper; a class with only the Mac OS X 10.3 calls; the Recent Documents list in the defaults and the Open Recent menu, opened from and cleared; alerts run modally in a nested loop (Return, Escape, Command-D, a click), their layouts with an accessory view and the suppression check box, the old return codes, `FERRY_ALERT_ANSWER`, `presentError:`; sheets (queued, the window's close refused while one is up, the old `beginSheet:modalForWindow:...` call); the workspace opening addresses, files and folders through a stand-in `gio`, icons, apps by identifier and name, types; and quitting with two unsaved documents (the review alert, each document's sheet, `NSTerminateLater`). Pictures of an alert, a sheet and an edited window go to `FERRY_DOCUMENTS_PNG` |
 
 **What isn't done yet (and why).**
 
 - **No real app is usable yet.** Tab, split, table and outline views, menu
   bar items, pop-up buttons, segmented controls, search fields, stack views
-  and toolbars have come in since these apps were tried (1.155 to 1.164);
-  what they stop at now is still to be checked. The document classes
-  (MacPass, MacDown, Sequel Pro) and their Sparkle updaters' checks of the
-  Mac's version file and code signatures are still missing. `docs/ferry-compat.md` has the list.
+  and toolbars have come in since these apps were tried (1.155 to 1.164),
+  and the document classes, `NSAlert` and `NSWorkspace` in 1.167; what they
+  stop at now is still to be checked. The Sparkle updaters' checks of the
+  Mac's version file and code signatures are still missing.
+  `docs/ferry-compat.md` has the list.
+- **Documents: no autosaving or versions** (1.167). `autosavesInPlace`
+  answers NO, so a document is saved only when the user saves it, as on
+  Mac OS X 10.6; the autosave calls save nothing and Browse All Versions is
+  disabled. Renaming, moving and locking from the title bar, printing and
+  Page Setup are disabled too. `NSUndoManager`'s
+  `prepareWithInvocationTarget:` answers nil (Ferry has no `NSInvocation`
+  yet), so undo registered that way is lost; the selector and block forms
+  work.
+- **Alerts and sheets are drawn inside Ferry** (1.167): a sheet hangs
+  inside its window; one taller or wider than the window gets a window of
+  its own, set modal for its parent. The alert's help button asks the
+  delegate and otherwise does nothing (no Help Books).
+- **The workspace opens things only through the desktop's launcher**
+  (1.167): `gio open`, else `xdg-open`, with the address as its one
+  argument and no shell; another Mac app is never launched, and an app
+  named for `openFile:withApplication:` is not used. The sleep, wake,
+  launch and mount notifications exist but nothing posts them.
 - **Install scripts aren't run**, by design: they expect a Mac and root.
   Packages whose files only work after their scripts (MacPorts) install
   their files but aren't usable as they are. Absolute links in a payload
@@ -1130,8 +1149,10 @@ that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
 `appkit_statusbar`; `NSTableView` and `NSOutlineView` in 1.159, see
 `appkit_tables`; `NSPopUpButton`, `NSSegmentedControl`, `NSSearchField`,
-`NSStackView` and `NSToolbar` in 1.164, see `appkit_controls`), editing in
-tables' cells, then the document classes, `NSAlert` and `NSWorkspace`.
+`NSStackView` and `NSToolbar` in 1.164, see `appkit_controls`; the
+document classes, `NSAlert` and `NSWorkspace` in 1.167, see
+`appkit_documents`), then editing in tables' cells, `NSInvocation` (for
+`prepareWithInvocationTarget:` and forwarding) and autosaving.
 
 ## Known limits (for every milestone)
 

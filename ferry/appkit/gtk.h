@@ -226,4 +226,32 @@ const char *g_variant_get_string(GVariant *value, size_t *length);
 gboolean g_variant_is_of_type(GVariant *value, const char *type);
 void g_variant_unref(GVariant *value);
 
+/* Sheets that don't fit in their window (NSWindow.m), the icon theme
+ * (NSWorkspace.m), the desktop's recent files (NSDocumentController.m), and
+ * starting the desktop's own launcher with no shell between (NSWorkspace.m).
+ * GIO's content types say which icon a kind of file has; a GIcon from it
+ * is a GThemedIcon, whose names are tried in turn. */
+typedef struct _GtkIconTheme GtkIconTheme;
+typedef struct _GtkRecentManager GtkRecentManager;
+typedef struct _GIcon GIcon;
+enum { GTK_ICON_LOOKUP_FORCE_SIZE = 1 << 4 };
+enum { G_SPAWN_SEARCH_PATH = 1 << 2, G_SPAWN_STDOUT_TO_DEV_NULL = 1 << 3, G_SPAWN_STDERR_TO_DEV_NULL = 1 << 4 };
+void gtk_window_set_transient_for(GtkWidget *window, GtkWidget *parent);
+void gtk_window_set_modal(GtkWidget *window, gboolean modal);
+GtkIconTheme *gtk_icon_theme_get_default(void);
+GtkIconTheme *gtk_icon_theme_new(void);
+void gtk_icon_theme_set_custom_theme(GtkIconTheme *theme, const char *name);
+gboolean gtk_icon_theme_has_icon(GtkIconTheme *theme, const char *name);
+GdkPixbuf *gtk_icon_theme_load_icon(GtkIconTheme *theme, const char *name, int size, int flags, GError **error);
+GtkRecentManager *gtk_recent_manager_get_default(void);
+gboolean gtk_recent_manager_add_item(GtkRecentManager *manager, const char *uri);
+char *g_content_type_guess(const char *filename, const unsigned char *data, size_t size, gboolean *uncertain);
+char *g_content_type_get_generic_icon_name(const char *type);
+GIcon *g_content_type_get_icon(const char *type);
+const char *const *g_themed_icon_get_names(GIcon *icon);
+gboolean g_spawn_async(const char *working_directory, char **argv, char **envp, int flags, void *child_setup,
+                       void *user_data, int *child_pid, GError **error);
+char *g_find_program_in_path(const char *program);
+char *g_filename_to_uri(const char *filename, const char *hostname, GError **error);
+
 #endif
