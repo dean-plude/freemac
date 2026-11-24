@@ -87,6 +87,19 @@ class Packets(unittest.TestCase):
         self.assertEqual(second.status, "sent")
         self.assertEqual(third.attachments[0]["part_id"], 3)
         self.assertEqual(third.attachments[0]["mime"], "image/jpeg")
+        self.assertNotIn("thumbnail", third.attachments[0])
+
+    def test_picture_thumbnails_kept(self):
+        _chats, messages = kdc.convert("dev", [
+            sms(13, 7, "", "+15550100004", 1500, attachments=[{"part_id": 3, "mime_type": "image/jpeg",
+                                                               "unique_identifier": "pic.jpg",
+                                                               "encoded_thumbnail": "AAAA"}]),
+            sms(14, 7, "", "+15550100004", 1600, attachments=[{"part_id": 4, "mime_type": "image/jpeg",
+                                                               "unique_identifier": "huge.jpg",
+                                                               "encoded_thumbnail": "A" * (kdc.MAX_THUMBNAIL + 4)}]),
+        ])
+        self.assertEqual(messages[0].attachments[0]["thumbnail"], "AAAA")
+        self.assertNotIn("thumbnail", messages[1].attachments[0])     # too big to keep
 
 
 @unittest.skipUnless(HAVE_OPENSSL, "needs openssl to make certificates")
@@ -194,6 +207,29 @@ class OverTheNetwork(unittest.TestCase):
         sent = self.phone.expect("kdeconnect.sms.request")["body"]
         self.assertEqual(sent, {"version": 2, "addresses": [{"address": "+15550100006"}],
                                 "messageBody": "See you there"})
+
+    def test_sending_a_picture_as_an_mms(self):
+        self.pair()
+        path = os.path.join(self.dir, "ferry.jpg")
+        data = b"\xff\xd8 a made-up picture of the ferry"
+        with open(path, "wb") as f:
+            f.write(data)
+        self.desktop.send(["+15550100006", "+15550100007"], "From the deck", attachments=[path])
+        body = self.phone.expect("kdeconnect.sms.request")["body"]
+        self.assertEqual(body["version"], 2)
+        self.assertEqual(body["messageBody"], "From the deck")
+        self.assertEqual(body["addresses"], [{"address": "+15550100006"}, {"address": "+15550100007"}])
+        self.assertEqual(body["attachments"], [{"fileName": "ferry.jpg", "mimeType": "image/jpeg",
+                                                "base64EncodedFile": base64.b64encode(data).decode()}])
+
+    def test_too_big_for_a_text(self):
+        self.pair()
+        path = os.path.join(self.dir, "big.bin")
+        with open(path, "wb") as f:
+            f.truncate(kdc.MAX_MMS + 1)
+        with self.assertRaises(OSError) as caught:
+            self.desktop.send(["+15550100006"], "", attachments=[path])
+        self.assertIn("too big", str(caught.exception))
 
     def test_attachment(self):
         self.pair()

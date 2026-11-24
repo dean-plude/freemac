@@ -1371,7 +1371,7 @@ TOPICS = {
         "The menu bar's clock and freemac's calendars change at once. Other apps change after you log out and back in; click Log Out… on the page to do it now.",
         "The menu bar shows a 24-hour clock where the region uses one. To choose for yourself, use Time format in Dials > Date & Time.",
     ]),
-    "messages": ("Send messages and texts", "messages imessage text texts sms mms rcs chat bluebubbles kde connect android phone iphone mac conversation", [
+    "messages": ("Send messages and texts", "messages imessage text texts sms mms rcs chat bluebubbles kde connect android phone iphone mac conversation tapback reaction picture photo attach file typing firewall login", [
         "Open Messages from the Dock. The first time, it explains the two ways it can get your conversations.",
         "For iMessage: real iMessage needs a Mac that you own running the free BlueBubbles Server app. "
         "Choose Messages > Settings… (⌘,), click iMessage, and type the server's address and password.",
@@ -1380,6 +1380,11 @@ TOPICS = {
         "An iPhone can't send texts through KDE Connect; use BlueBubbles with a Mac instead.",
         "Click New Message (⌘N), type a name, phone number or email after To:, then type and press Return. "
         "Blue bubbles go by iMessage, green ones as texts.",
+        "To send a picture or file, click the paperclip or drag it onto the conversation, then press Return.",
+        "To add a tapback, right-click a bubble. This needs the Private API turned on in BlueBubbles Server.",
+        "If Firewall is on, turning the phone on asks for your password to let KDE Connect in from your local network.",
+        "Messages starts when you log in, with no window, so new messages still arrive. "
+        "To stop that, turn off Start Messages when you log in in Messages > Settings….",
         "Conversations are kept on this computer, so they show even when the phone or the Mac isn't in reach.",
     ]),
     "tint": ("Find the colour of anything on the screen", "tint colour color meter picker eyedropper pixel hex rgb value what colour is this digital color meter", [

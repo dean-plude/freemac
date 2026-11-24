@@ -15,24 +15,37 @@ between bursts of messages, and Delivered or Read under the last one sent.
 Everything is kept in an offline store (messages_store.py), so the window
 fills at once; new messages come in while the window is closed, since
 Messages stays open as Post does, and show a notification and a count on
-the Dock icon.
+the Dock icon. Once a backend is set up, Messages starts at login with no
+window (freemac-messages --background, from ~/.config/autostart, as Chime's
+alarms do), unless "Start Messages when you log in" is turned off.
+
+Bubbles show tapbacks (and, with BlueBubbles' Private API, a bubble's menu
+adds one), pictures inline, and "…" while the other side is typing. The
+paperclip, or dropping files on a conversation, sends pictures and files.
+With the Firewall on, turning on the phone asks for an administrator's
+password to let KDE Connect's ports in from the local network
+(messages_firewall.py).
 
 Original freemac code; the icon is freemac's own (art/icons/freemac-messages.svg).
 """
+import mimetypes
 import os
 import re
 import subprocess
 import sys
 import time
+import uuid
 
 import gi
 
 gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 from . import launcher_badge, menus, style  # noqa: E402
+from . import messages_firewall as firewall  # noqa: E402
 from . import messages_store as store  # noqa: E402
 
 APP_ID = "org.freemac.Messages"
@@ -40,6 +53,11 @@ DESKTOP_ID = "freemac-messages.desktop"
 GAP_MS = 15 * 60 * 1000          # a time line between messages further apart than this
 NOTIFY_WITHIN_MS = 10 * 60 * 1000  # only messages this new pop up (not old ones found in a refresh)
 SEND_AS = (("bluebubbles", "iMessage"), ("kdeconnect", "Text Message"))
+THUMBNAIL = 240                   # a picture's longest side in a bubble
+TYPING_FOR_MS = 60 * 1000         # "…" goes if the server never says typing stopped
+AUTOSTART_FILE = "freemac-messages-background.desktop"
+REACTION_VERBS = {"love": "Loved", "like": "Liked", "dislike": "Disliked", "laugh": "Laughed at",
+                  "emphasize": "Emphasized", "question": "Questioned"}
 
 WELCOME_TEXT = ("Messages can show your conversations in two ways. Real iMessage needs a Mac that you own, "
                 "running the free BlueBubbles Server app; freemac talks to that Mac, never to Apple. "
@@ -92,6 +110,18 @@ CSS = b"""
 .msg-welcome-card-title { font-weight: 700; font-size: 15px; }
 .msg-to { padding: 6px 12px; border-bottom: 1px solid alpha(currentColor, 0.10); }
 .msg-to entry { border: none; box-shadow: none; background: none; }
+.msg-tapbacks { border-radius: 12px; padding: 1px 6px; margin: 0 6px -6px 6px; font-size: 13px;
+                background-color: mix(@theme_base_color, @theme_fg_color, 0.11);
+                border: 2px solid @theme_base_color; }
+.msg-tapbacks.mine-too { background-color: #2a7bf6; color: white; }
+.msg-picture { border-radius: 12px; }
+.msg-media { margin: 2px 12px; }
+.msg-media.sending { opacity: 0.6; }
+.msg-media button { padding: 0; border: none; box-shadow: none; }
+.msg-typing label { font-weight: 700; letter-spacing: 2px; }
+.msg-tray { padding: 6px 10px 0 10px; }
+.msg-staged { border-radius: 10px; padding: 2px 4px 2px 8px; background-color: alpha(currentColor, 0.07); }
+.msg-staged button { padding: 0; min-width: 18px; min-height: 18px; }
 """
 
 
@@ -234,6 +264,103 @@ def split_addresses(text, book=None):
     return out
 
 
+# -- starting at login --------------------------------------------------------------
+def autostart_path():
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "autostart", AUTOSTART_FILE)
+
+
+def set_autostart(on):
+    """Start Messages with no window at login (freemac-login-items opens
+    ~/.config/autostart), as Chime does for its alarms. Its own file name, so
+    Pier's Open at Login, which opens the window, stays separate."""
+    path = autostart_path()
+    if on:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write("[Desktop Entry]\nType=Application\nName=Messages\n"
+                    "Comment=Keeps Messages running so new messages arrive with no window open\n"
+                    "Exec=freemac-messages --background\nIcon=freemac-messages\nNoDisplay=true\n")
+    else:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def autostart_on():
+    return os.path.exists(autostart_path())
+
+
+# -- pictures and tapbacks -------------------------------------------------------------
+def mime_of(path):
+    return mimetypes.guess_type(path)[0] or "application/octet-stream"
+
+
+def is_picture(attachment):
+    mime = attachment.get("mime") or mime_of(attachment.get("name") or attachment.get("path") or "")
+    return mime.startswith("image/")
+
+
+_pictures = {}
+
+
+def picture(attachment, size=THUMBNAIL):
+    """A Pixbuf to show in the bubble: the file if it's here, or the phone's
+    own small thumbnail; None when there's nothing yet."""
+    path = attachment.get("path") or ""
+    if not is_picture(attachment):
+        return None
+    if path and os.path.exists(path):
+        key = (path, os.path.getmtime(path), size)
+        if key not in _pictures:
+            try:
+                _pictures[key] = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, size, size, True)
+            except GLib.Error:
+                _pictures[key] = None
+        if _pictures[key] is not None:
+            return _pictures[key]
+    thumb = attachment.get("thumbnail")
+    if thumb:
+        key = ("thumb", attachment.get("id"), len(thumb))
+        if key not in _pictures:
+            try:
+                import base64
+                loader = GdkPixbuf.PixbufLoader()
+                loader.write(base64.b64decode(thumb))
+                loader.close()
+                found = loader.get_pixbuf()
+                scale = min(1.0, size / max(found.get_width(), found.get_height(), 1)) if found else 1
+                _pictures[key] = found.scale_simple(max(1, int(found.get_width() * scale)),
+                                                    max(1, int(found.get_height() * scale)),
+                                                    GdkPixbuf.InterpType.BILINEAR) if found else None
+            except (GLib.Error, ValueError, TypeError):
+                _pictures[key] = None
+        return _pictures[key]
+    return None
+
+
+def tapback_text(reactions):
+    """The glyphs on a bubble's corner: each kind once, in the order given."""
+    seen = []
+    for r in reactions:
+        glyph = r.glyph()
+        if glyph and glyph not in seen:
+            seen.append(glyph)
+    count = len([r for r in reactions if r.glyph()])
+    return "".join(seen) + (f" {count}" if count > len(seen) else "")
+
+
+def reaction_line(reaction, target):
+    """'Loved “See you there”', for a notification."""
+    words = (target.text if target is not None else "") or "an attachment"
+    if len(words) > 60:
+        words = words[:59] + "…"
+    if reaction.kind == "emoji":
+        return f"Reacted {reaction.emoji} to “{words}”"
+    return f"{REACTION_VERBS.get(reaction.kind, 'Reacted to')} “{words}”"
+
+
 # -- widgets ---------------------------------------------------------------------------
 class Avatar(Gtk.DrawingArea):
     def __init__(self, name, size=40):
@@ -295,14 +422,23 @@ class ChatRow(Gtk.ListBoxRow):
         self.add(outer)
 
 
-def bubble_widget(message, tail, on_attachment=None):
-    """One message as a row: the bubble at the right for mine, the left for theirs."""
+def bubble_widget(message, tail, on_attachment=None, reactions=None, on_menu=None):
+    """One message as a row: the bubble at the right for mine, the left for
+    theirs, with its tapbacks on the corner toward the middle. on_menu(message,
+    event) is called for a right click on the bubble."""
     row = Gtk.Box(spacing=4)
     bubble = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
     ctx = bubble.get_style_context()
+    pictures = [(a, picture(a)) for a in message.attachments]
     jumbo = is_jumbo(message.text) and not message.attachments
-    ctx.add_class("msg-jumbo" if jumbo else "msg-bubble")
-    if not jumbo:
+    # Pictures with no words show on their own, with no bubble round them.
+    media = bool(pictures) and not message.text and all(p is not None for _a, p in pictures)
+    ctx.add_class("msg-jumbo" if jumbo else "msg-media" if media else "msg-bubble")
+    if media:
+        ctx.add_class("mine" if message.from_me else "them")
+        if message.status == "sending":
+            ctx.add_class("sending")
+    elif not jumbo:
         ctx.add_class("mine" if message.from_me else "them")
         if message.from_me:
             ctx.add_class("imessage" if message.service == "imessage" else "sms")
@@ -310,14 +446,23 @@ def bubble_widget(message, tail, on_attachment=None):
             ctx.add_class("tail")
         if message.status == "sending":
             ctx.add_class("sending")
-    for attachment in message.attachments:
+    bubble.pictures = []
+    for attachment, pixbuf in pictures:
         button = Gtk.Button(relief=Gtk.ReliefStyle.NONE)
-        button.get_style_context().add_class("msg-attachment")
-        inside = Gtk.Box(spacing=6)
-        inside.pack_start(Gtk.Image.new_from_icon_name("mail-attachment-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        inside.pack_start(Gtk.Label(label=attachment.get("name") or "Attachment",
-                                    ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=28), False, False, 0)
-        button.add(inside)
+        if pixbuf is not None:
+            image = Gtk.Image.new_from_pixbuf(pixbuf)
+            image.get_style_context().add_class("msg-picture")
+            button.add(image)
+            button.set_tooltip_text(attachment.get("name") or "Picture")
+            bubble.pictures.append(image)
+        else:
+            button.get_style_context().add_class("msg-attachment")
+            inside = Gtk.Box(spacing=6)
+            inside.pack_start(Gtk.Image.new_from_icon_name("mail-attachment-symbolic", Gtk.IconSize.MENU),
+                              False, False, 0)
+            inside.pack_start(Gtk.Label(label=attachment.get("name") or "Attachment",
+                                        ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=28), False, False, 0)
+            button.add(inside)
         if on_attachment:
             button.connect("clicked", lambda _b, a=attachment: on_attachment(message, a))
         bubble.pack_start(button, False, False, 0)
@@ -329,22 +474,80 @@ def bubble_widget(message, tail, on_attachment=None):
     bubble.set_tooltip_text(time.strftime("%A, %B %-d, %Y at ", time.localtime(message.date / 1000))
                             + clock(message.date))
     bubble.message = message
+    # The tapbacks sit above the bubble, on the corner toward the middle.
+    column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    row.tapbacks = None
+    reactions = [r for r in reactions or [] if r.glyph()]
+    if reactions:
+        tapbacks = Gtk.Label(label=tapback_text(reactions))
+        tapbacks.get_style_context().add_class("msg-tapbacks")
+        if any(r.from_me for r in reactions):
+            tapbacks.get_style_context().add_class("mine-too")
+        tapbacks.set_halign(Gtk.Align.START if message.from_me else Gtk.Align.END)
+        tapbacks.set_tooltip_text("\n".join(("You" if r.from_me else store.format_address(r.sender)) + " "
+                                            + (r.emoji if r.kind == "emoji" else
+                                               store.REACTION_NAMES.get(r.kind, "")).lower()
+                                            for r in reactions))
+        column.pack_start(tapbacks, False, False, 0)
+        row.tapbacks = tapbacks
+    clicks = Gtk.EventBox(visible_window=False)
+    clicks.add(bubble)
+    if on_menu:
+        clicks.connect("button-press-event",
+                       lambda _w, event: event.button == Gdk.BUTTON_SECONDARY and (on_menu(message, event) or True))
+    column.pack_start(clicks, False, False, 0)
     if message.from_me:
         row.set_halign(Gtk.Align.END)
         if message.status == "failed":
             mark = Gtk.Image.new_from_icon_name("dialog-error-symbolic", Gtk.IconSize.BUTTON)
             mark.get_style_context().add_class("msg-failed-mark")
             row.pack_start(mark, False, False, 0)
-        row.pack_start(bubble, False, False, 0)
+        row.pack_start(column, False, False, 0)
     else:
         row.set_halign(Gtk.Align.START)
-        row.pack_start(bubble, False, False, 0)
+        row.pack_start(column, False, False, 0)
     row.bubble = bubble
     return row
 
 
-def conversation_widgets(items, names=None, on_attachment=None):
+def typing_widget():
+    """The grey bubble with "•••" while the other side is typing."""
+    row = Gtk.Box(halign=Gtk.Align.START)
+    bubble = Gtk.Box()
+    for name in ("msg-bubble", "them", "tail", "msg-typing"):
+        bubble.get_style_context().add_class(name)
+    bubble.pack_start(Gtk.Label(label="•••"), False, False, 0)
+    bubble.set_tooltip_text("Typing…")
+    row.pack_start(bubble, False, False, 0)
+    row.typing = True
+    return row
+
+
+def bubble_menu(message, can_react=False, mine="", on_react=None, on_copy=None):
+    """A bubble's menu: Copy, and the six tapbacks when the BlueBubbles
+    server's Private API is on (choosing your own again takes it back)."""
+    menu = Gtk.Menu()
+    menu.reactions = {}
+    if message.text:
+        copy = Gtk.MenuItem(label="Copy")
+        copy.connect("activate", lambda *_: on_copy and on_copy(message.text))
+        menu.append(copy)
+    if can_react:
+        if menu.get_children():
+            menu.append(Gtk.SeparatorMenuItem())
+        for kind in store.REACTION_KINDS:
+            item = Gtk.CheckMenuItem(label=f"{store.REACTION_GLYPHS[kind]}  {store.REACTION_NAMES[kind]}")
+            item.set_active(kind == mine)
+            item.connect("activate", lambda _i, k=kind: on_react and on_react(message, k))
+            menu.append(item)
+            menu.reactions[kind] = item
+    menu.show_all()
+    return menu
+
+
+def conversation_widgets(items, names=None, on_attachment=None, reactions=None, on_menu=None):
     names = names or {}
+    reactions = reactions or {}
     widgets = []
     for item in items:
         if item[0] == "time":
@@ -357,7 +560,7 @@ def conversation_widgets(items, names=None, on_attachment=None):
             label.get_style_context().add_class("msg-sender")
             widgets.append(label)
         elif item[0] == "bubble":
-            widgets.append(bubble_widget(item[1], item[2], on_attachment))
+            widgets.append(bubble_widget(item[1], item[2], on_attachment, reactions.get(item[1].id), on_menu))
         elif item[0] == "status":
             label = Gtk.Label(label=item[1], xalign=1)
             label.get_style_context().add_class("msg-status")
@@ -502,8 +705,22 @@ class Window(Gtk.ApplicationWindow):
         self.scroll.add(self.bubbles)
         self.scroll.get_vadjustment().connect("changed", lambda adj: self._stick_to_bottom(adj))
         chat.pack_start(self.scroll, True, True, 0)
+        # Pictures and files waiting to go with the next message.
+        self.staged = []
+        self.tray = Gtk.Box(spacing=6)
+        self.tray.get_style_context().add_class("msg-tray")
+        self.tray.set_no_show_all(True)
+        chat.pack_start(self.tray, False, False, 0)
         compose = Gtk.Box(spacing=6)
         compose.get_style_context().add_class("msg-compose")
+        self.attach_button = Gtk.Button.new_from_icon_name("mail-attachment-symbolic", Gtk.IconSize.BUTTON)
+        self.attach_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.attach_button.set_tooltip_text("Attach a Picture or File…")
+        self.attach_button.connect("clicked", lambda *_: self.choose_files())
+        compose.pack_start(self.attach_button, False, False, 0)
+        # Files dropped anywhere on the conversation are attached.
+        chat.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry.new("text/uri-list", 0, 0)], Gdk.DragAction.COPY)
+        chat.connect("drag-data-received", self._dropped)
         self.emoji = Gtk.Button.new_from_icon_name("face-smile-symbolic", Gtk.IconSize.BUTTON)
         self.emoji.set_relief(Gtk.ReliefStyle.NONE)
         self.emoji.set_tooltip_text("Emoji")
@@ -583,6 +800,8 @@ class Window(Gtk.ApplicationWindow):
         self.fill_bubbles()
         if changed:
             self.stuck = True
+            self.staged = []
+            self._fill_tray()
             self.app.opened(chat)
             self.entry.grab_focus()
         self._update_compose()
@@ -594,9 +813,96 @@ class Window(Gtk.ApplicationWindow):
             return
         messages = self.app.store.messages(self.current.id)
         group = len(self.current.addresses) > 1
-        for widget in conversation_widgets(layout(messages, group), self.app.names, self.app.open_attachment):
+        for widget in conversation_widgets(layout(messages, group), self.app.names, self.app.open_attachment,
+                                           self.app.store.reactions(self.current.id), self.bubble_menu):
             self.bubbles.pack_start(widget, False, False, 0)
+        if self.app.is_typing(self.current.id):
+            self.bubbles.pack_start(typing_widget(), False, False, 0)
         self.bubbles.show_all()
+
+    def bubble_menu(self, message, event=None):
+        menu = bubble_menu(message, self.app.can_react(message), self.app.store.my_reaction(message.id),
+                           self.app.react, self._copy)
+        if not menu.get_children():
+            return None
+        menu.attach_to_widget(self, None)
+        if event is not None:
+            menu.popup_at_pointer(event)
+        return menu
+
+    def _copy(self, text):
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1)
+
+    # -- attachments ------------------------------------------------------------------
+    def can_attach(self):
+        """Files go into a conversation that exists; a new one through the phone
+        (as an MMS), but through BlueBubbles only after its first message."""
+        if self.composing:
+            return self.send_as.get_active_id() == "kdeconnect"
+        return self.current is not None
+
+    def choose_files(self):
+        if not self.can_attach():
+            return
+        dialog = Gtk.FileChooserNative.new("Attach", self, Gtk.FileChooserAction.OPEN, "Attach", "Cancel")
+        dialog.set_select_multiple(True)
+        if dialog.run() == Gtk.ResponseType.ACCEPT:
+            self.attach([f.get_path() for f in dialog.get_files() if f.get_path()])
+        dialog.destroy()
+
+    def _dropped(self, _widget, _context, _x, _y, data, _info, _time):
+        paths = []
+        for uri in data.get_uris() or []:
+            try:
+                path, _host = GLib.filename_from_uri(uri)
+            except GLib.Error:
+                continue
+            paths.append(path)
+        self.attach(paths)
+
+    def attach(self, paths):
+        """Stage files to go with the next message; returns how many were taken."""
+        if not self.can_attach():
+            return 0
+        taken = 0
+        for path in paths:
+            if os.path.isfile(path) and path not in self.staged:
+                self.staged.append(path)
+                taken += 1
+        self._fill_tray()
+        self._update_compose()
+        if taken:
+            self.entry.grab_focus()
+        return taken
+
+    def unstage(self, path):
+        if path in self.staged:
+            self.staged.remove(path)
+        self._fill_tray()
+        self._update_compose()
+
+    def _fill_tray(self):
+        for child in self.tray.get_children():
+            self.tray.remove(child)
+        for path in self.staged:
+            chip = Gtk.Box(spacing=4)
+            chip.get_style_context().add_class("msg-staged")
+            pixbuf = picture({"path": path, "name": path}, 48)
+            chip.pack_start(Gtk.Image.new_from_pixbuf(pixbuf) if pixbuf is not None else
+                            Gtk.Image.new_from_icon_name("text-x-generic-symbolic", Gtk.IconSize.BUTTON),
+                            False, False, 0)
+            chip.pack_start(Gtk.Label(label=os.path.basename(path), ellipsize=Pango.EllipsizeMode.MIDDLE,
+                                      max_width_chars=20), False, False, 0)
+            remove = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
+            remove.set_relief(Gtk.ReliefStyle.NONE)
+            remove.set_tooltip_text("Remove")
+            remove.connect("clicked", lambda _b, p=path: self.unstage(p))
+            chip.pack_start(remove, False, False, 0)
+            chip.path = path
+            self.tray.pack_start(chip, False, False, 0)
+        for child in self.tray.get_children():
+            child.show_all()
+        self.tray.set_visible(bool(self.staged))
 
     def refresh(self, chat_ids=None):
         """After the store changed: the list, and the conversation on show."""
@@ -621,6 +927,8 @@ class Window(Gtk.ApplicationWindow):
         kinds = self.app.available()
         self.send_as.set_active_id(kinds[0] if kinds else "bluebubbles")
         self.send_as.set_visible(len(kinds) > 1)
+        self.staged = []
+        self._fill_tray()
         self.fill_bubbles()
         self.pane.set_visible_child_name("chat")
         self.set_title("New Message – Messages")
@@ -638,7 +946,14 @@ class Window(Gtk.ApplicationWindow):
             ctx.remove_class("sms")
         if self.composing:
             self.entry.set_placeholder_text("iMessage" if service == "imessage" else "Text Message")
-        ready = bool(self.entry.get_text().strip()) and (not self.composing or bool(self.to.get_text().strip()))
+        if self.staged and not self.can_attach():
+            self.staged = []         # New Message switched to iMessage, which takes files only later
+            self._fill_tray()
+        self.attach_button.set_sensitive(self.can_attach())
+        self.attach_button.set_tooltip_text("Attach a Picture or File…" if self.can_attach() else
+                                            "Send a first message, then attach pictures and files.")
+        ready = (bool(self.entry.get_text().strip()) or bool(self.staged)) and \
+            (not self.composing or bool(self.to.get_text().strip()))
         self.send_button.set_sensitive(ready)
 
     def pick_emoji(self):
@@ -647,19 +962,23 @@ class Window(Gtk.ApplicationWindow):
 
     def send(self):
         text = self.entry.get_text().strip()
-        if not text:
+        files = list(self.staged)
+        if not text and not files:
             return
         if self.composing:
             addresses = split_addresses(self.to.get_text(), self.app.book)
             if not addresses:
                 self.to.grab_focus()
                 return
-            chat_id = self.app.send_new(self.send_as.get_active_id(), addresses, text)
+            chat_id = self.app.send_new(self.send_as.get_active_id(), addresses, text, files)
         elif self.current is not None:
-            chat_id = self.app.send(self.current, text)
+            chat_id = self.app.send(self.current, text, files)
         else:
             return
         self.entry.set_text("")
+        self.staged = []
+        self._fill_tray()
+        self._update_compose()
         self.stuck = True
         if chat_id:
             self.composing = False
@@ -683,6 +1002,8 @@ class Window(Gtk.ApplicationWindow):
 
     def update_status(self):
         lines = [text for _kind, (text, _ok) in sorted(self.app.status.items())]
+        if self.app.firewall_blocks_phone():
+            lines.append("The firewall blocks your phone")
         self.status.set_text(" · ".join(lines))
         self.status.set_tooltip_text("\n".join(lines))
         self.status.set_visible(bool(lines))
@@ -765,7 +1086,29 @@ class Settings(Gtk.Dialog):
         self.phone_status = Gtk.Label(xalign=0, wrap=True)
         self.phone_status.get_style_context().add_class("dim-label")
         page_phone.pack_start(self.phone_status, False, False, 0)
+        # With Dials' Firewall on, KDE Connect's ports have to be let in.
+        self.firewall_row = Gtk.Box(spacing=8)
+        self.firewall_label = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        self.firewall_button = Gtk.Button(label="Let Phone Through Firewall…", valign=Gtk.Align.CENTER)
+        self.firewall_button.connect("clicked", lambda *_: self.app.phone_firewall(True))
+        self.firewall_row.pack_start(self.firewall_label, True, True, 0)
+        self.firewall_row.pack_start(self.firewall_button, False, False, 0)
+        self.firewall_row.set_no_show_all(True)
+        page_phone.pack_start(self.firewall_row, False, False, 0)
         notebook.append_page(page_phone, Gtk.Label(label="Phone"))
+
+        # For both: keep running after login, so messages arrive with no window.
+        login = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, margin_start=16, margin_end=16,
+                        margin_top=10, margin_bottom=6)
+        self.login_check = Gtk.CheckButton(label="Start Messages when you log in")
+        self.login_check.set_active(app.start_at_login())
+        self.login_check.connect("toggled", lambda b: self.app.set_start_at_login(b.get_active()))
+        login.pack_start(self.login_check, False, False, 0)
+        hint = Gtk.Label(label="New messages then arrive, with a notification, even when no Messages window "
+                               "is open.", xalign=0, wrap=True, max_width_chars=60, margin_start=26)
+        hint.get_style_context().add_class("dim-label")
+        login.pack_start(hint, False, False, 0)
+        self.get_content_area().pack_start(login, False, False, 0)
         self.show_all()
         if page == "kdeconnect":
             notebook.set_current_page(1)
@@ -777,6 +1120,22 @@ class Settings(Gtk.Dialog):
         self.disconnect_button.set_sensitive(bool(self.app.settings.get("bluebubbles")))
         phone = self.app.status.get("kdeconnect")
         self.phone_status.set_text(phone[0] if phone else "Off")
+        self.login_check.set_sensitive(self.app.configured())
+        state = self.app.firewall_state()
+        if state is None:
+            self.firewall_row.hide()
+        else:
+            self.firewall_row.show_all()
+            if state == "open":
+                self.firewall_label.set_text("The firewall lets your phone in from this network (KDE Connect's "
+                                             "UDP port 1716 and TCP ports 1716–1764).")
+            elif state == "busy":
+                self.firewall_label.set_text("Asking for an administrator's password to let your phone "
+                                             "through the firewall…")
+            else:
+                self.firewall_label.set_text("The firewall is on and turns your phone away. Let it in from "
+                                             "this network only, after an administrator's password.")
+            self.firewall_button.set_visible(state == "closed")
         for row in self.devices.get_children():
             self.devices.remove(row)
         devices = self.app.devices if self.phone_switch.get_active() else []
@@ -847,7 +1206,7 @@ def menubar():
 
 class Messages(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.store = None
         self.settings = {}
         self.status = {}          # backend kind -> (text, connected)
@@ -858,6 +1217,11 @@ class Messages(Gtk.Application):
         self.pending_new = {}     # sorted normalised addresses -> placeholder chat id
         self.settings_window = None
         self.pair_dialog = None
+        self.typing = {}          # chat id -> when the "…" goes (ms)
+        self.fetching = set()     # attachment ids being fetched to show as pictures
+        self.firewall_busy = False
+        self.firewall_asked = None
+        self.firewall_runner = firewall.run   # the tests put a stand-in here
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
@@ -883,6 +1247,7 @@ class Messages(Gtk.Application):
         self.names, self.book = contact_book()
         self.start_backends()
         self.badge()
+        self.sync_autostart()
 
     def do_shutdown(self):
         for backend in self.backends.values():
@@ -897,6 +1262,15 @@ class Messages(Gtk.Application):
 
     def do_activate(self):
         self.main_window().present()
+
+    def do_command_line(self, command_line):
+        """freemac-messages opens the window; --background (at login) only
+        keeps Messages running, so new messages arrive with no window."""
+        if "--background" not in command_line.get_arguments()[1:]:
+            self.activate()
+        elif not self.configured() and not self.get_windows():
+            self.quit()          # nothing set up: nothing to wait for
+        return 0
 
     def _new_message(self):
         window = self.main_window()
@@ -915,6 +1289,61 @@ class Messages(Gtk.Application):
 
     def available(self):
         return [kind for kind, _label in SEND_AS if kind in self.backends]
+
+    # -- starting at login ----------------------------------------------------------
+    def start_at_login(self):
+        """The choice in Settings: on unless turned off."""
+        return self.settings.get("start_at_login", True) is not False
+
+    def set_start_at_login(self, on):
+        self.settings["start_at_login"] = bool(on)
+        store.save_settings(self.settings)
+        self.sync_autostart()
+
+    def sync_autostart(self):
+        """Starts at login once a backend is set up, if that's still wanted."""
+        wanted = self.configured() and self.start_at_login()
+        if wanted != autostart_on():
+            try:
+                set_autostart(wanted)
+            except OSError:
+                pass
+
+    # -- the firewall, for the phone ---------------------------------------------------
+    def firewall_state(self):
+        """None (the phone is off, or the firewall is), "open", "closed" or "busy"."""
+        if not (self.settings.get("phone") or {}).get("on"):
+            return None
+        if self.firewall_busy:
+            return "busy"
+        if firewall.ports_open():
+            return "open"
+        return "closed" if firewall.firewall_on() else None
+
+    def firewall_blocks_phone(self):
+        return self.firewall_state() == "closed"
+
+    def phone_firewall(self, on):
+        """Opens KDE Connect's ports to the local network when the phone is
+        turned on with the Firewall on, and closes them when it's turned off,
+        through freemac's system helper (an administrator's password)."""
+        change = firewall.change_for(on)
+        if change is None or self.firewall_busy or not firewall.available():
+            return False
+        self.firewall_busy, self.firewall_asked = True, change
+        self._changed_status()
+        self.firewall_runner(change, self._firewall_done)
+        return True
+
+    def _firewall_done(self, ok, error):
+        self.firewall_busy = False
+        if error:
+            self.tell(f"The firewall couldn’t be changed. {error}")
+        # The phone was switched the other way while the password was asked.
+        phone_on = bool((self.settings.get("phone") or {}).get("on"))
+        if ok and self.firewall_asked is not phone_on:
+            self.phone_firewall(phone_on)
+        self._changed_status()
 
     def start_backends(self):
         listener = OnMainLoop(self)
@@ -981,6 +1410,7 @@ class Messages(Gtk.Application):
         self.settings["welcomed"] = True
         store.save_settings(self.settings)
         self.start_backends()
+        self.sync_autostart()
         self._changed_status()
         window = self.window()
         if window:
@@ -998,6 +1428,8 @@ class Messages(Gtk.Application):
             self.start_backends()
         else:
             self.stop_backend("kdeconnect")
+        self.sync_autostart()
+        self.phone_firewall(bool(on))
         window = self.window()
         if window:
             window.root.set_visible_child_name("main")
@@ -1025,6 +1457,27 @@ class Messages(Gtk.Application):
                 backend.load_conversation(chat)
             except (OSError, ConnectionError, ValueError):
                 pass
+        self.fetch_pictures(chat)
+
+    def fetch_pictures(self, chat, newest=30, largest=25 * 1024 * 1024):
+        """Fetches the pictures of a BlueBubbles conversation's newest messages,
+        to show in their bubbles. The phone sends its own thumbnails, so its
+        pictures wait for a click."""
+        backend = self.backends.get(chat.backend)
+        if backend is None or chat.backend != "bluebubbles":
+            return
+        for message in self.store.messages(chat.id)[-newest:]:
+            if message.id.startswith("tmp:"):
+                continue
+            for a in message.attachments:
+                if not is_picture(a) or a.get("thumbnail") or a.get("id") in self.fetching or \
+                        (a.get("path") and os.path.exists(a["path"])) or (a.get("size") or 0) > largest:
+                    continue
+                self.fetching.add(a.get("id"))
+                try:
+                    backend.download(message.id, a)
+                except (OSError, ConnectionError):
+                    self.fetching.discard(a.get("id"))
 
     def read(self, chat):
         if chat is None:
@@ -1042,34 +1495,58 @@ class Messages(Gtk.Application):
             self.withdraw_notification("chat-" + chat.id)
 
     # -- sending -----------------------------------------------------------------------
-    def _pending(self, chat_id, text, service):
+    def _pending(self, chat_id, text, service, files=()):
         from .messages_bluebubbles import new_temp_id
+        attachments = [{"id": f"local:{uuid.uuid4().hex[:12]}", "name": os.path.basename(path),
+                        "mime": mime_of(path), "path": path} for path in files]
         message = store.Message(id=new_temp_id(), chat_id=chat_id, text=text, date=store.now_ms(), from_me=True,
-                                service=service, status="sending")
+                                service=service, status="sending", attachments=attachments)
         self.store.upsert_messages([message])
         return message
 
-    def send(self, chat, text):
+    def _send_to_phone(self, backend, addresses, text, files, message):
+        try:
+            if files:
+                backend.send(addresses, text, attachments=list(files))
+            else:
+                backend.send(addresses, text)
+            self.store.set_status(message.id, "sent")
+        except (OSError, ConnectionError) as e:
+            self.store.set_status(message.id, "failed")
+            self.tell(str(e))
+
+    def send(self, chat, text, files=()):
+        """Words and files into a conversation: through BlueBubbles each file is
+        a message of its own, then the words; through the phone one MMS."""
         backend = self.backends.get(chat.backend)
-        message = self._pending(chat.id, text, chat.service)
+        if chat.backend == "bluebubbles":
+            pending = [(self._pending(chat.id, "", chat.service, [path]), path) for path in files]
+            if text:
+                pending.append((self._pending(chat.id, text, chat.service), None))
+            for message, path in pending:
+                if backend is None:
+                    self.store.set_status(message.id, "failed")
+                elif path:
+                    backend.send_attachment(chat, path, message.id, mime_of(path))
+                else:
+                    backend.send_to_chat(chat, text, message.id)
+            return chat.id
+        message = self._pending(chat.id, text, chat.service, files)
         if backend is None:
             self.store.set_status(message.id, "failed")
-        elif chat.backend == "bluebubbles":
-            backend.send_to_chat(chat, text, message.id)
         else:
-            try:
-                backend.send(chat.addresses, text)
-                self.store.set_status(message.id, "sent")
-            except (OSError, ConnectionError) as e:
-                self.store.set_status(message.id, "failed")
-                self.tell(str(e))
+            self._send_to_phone(backend, chat.addresses, text, files, message)
         return chat.id
 
-    def send_new(self, kind, addresses, text):
+    def send_new(self, kind, addresses, text, files=()):
         kind = kind or (self.available() or ["bluebubbles"])[0]
         existing = self.store.find_chat(kind, addresses)
         if existing:
-            return self.send(existing, text)
+            return self.send(existing, text, files)
+        if kind == "bluebubbles":
+            files = ()          # chat/new takes words only; files go in once it exists
+        if not text and not files:
+            return None
         from .messages_bluebubbles import new_temp_id
         chat = store.Chat(id="new:" + new_temp_id()[4:], backend=kind,
                           title=", ".join(self.names.get(store.normalise_address(a)) or store.format_address(a)
@@ -1077,7 +1554,7 @@ class Messages(Gtk.Application):
                           addresses=list(addresses), service="imessage" if kind == "bluebubbles" else "sms",
                           last_date=store.now_ms(), last_text=text)
         self.store.upsert_chats([chat])
-        message = self._pending(chat.id, text, chat.service)
+        message = self._pending(chat.id, text, chat.service, files)
         backend = self.backends.get(kind)
         if backend is None:
             self.store.set_status(message.id, "failed")
@@ -1086,12 +1563,7 @@ class Messages(Gtk.Application):
             backend.send_new(addresses, text, message.id)
         else:
             self.pending_new[self._key(addresses)] = chat.id
-            try:
-                backend.send(addresses, text)
-                self.store.set_status(message.id, "sent")
-            except (OSError, ConnectionError) as e:
-                self.store.set_status(message.id, "failed")
-                self.tell(str(e))
+            self._send_to_phone(backend, addresses, text, files, message)
         return chat.id
 
     @staticmethod
@@ -1128,6 +1600,9 @@ class Messages(Gtk.Application):
                 moved[placeholder] = chat.id
         fresh = self.store.upsert_messages(messages)
         changed = {m.chat_id for m in messages} | {c.id for c in chats}
+        for m in fresh:          # a message from them ends their "…"
+            if isinstance(m, store.Message) and not m.from_me:
+                self.typing.pop(m.chat_id, None)
         if window:
             if window.current and window.current.id in moved:
                 window.select_chat(moved[window.current.id])
@@ -1135,19 +1610,25 @@ class Messages(Gtk.Application):
             if window.current and window.is_active() and window.current.id in changed:
                 self.store.mark_read(window.current.id)
             window.refresh(changed)
+            if window.current and window.current.id in changed:
+                self.fetch_pictures(window.current)
         self.notify(fresh, window)
         self.badge()
 
     def notify(self, fresh, window=None):
         now = store.now_ms()
         for m in fresh:
-            if m.from_me or m.read or now - m.date > NOTIFY_WITHIN_MS:
+            reaction = isinstance(m, store.Reaction)
+            if m.from_me or (not reaction and m.read) or now - m.date > NOTIFY_WITHIN_MS:
                 continue
             if window and window.is_active() and window.current and window.current.id == m.chat_id:
                 continue
             chat = self.store.chat(m.chat_id)
             note = Gio.Notification.new(chat.title if chat and chat.title else store.format_address(m.sender))
-            note.set_body(m.text or store.attachment_summary(m) or "New message")
+            if reaction:
+                note.set_body(reaction_line(m, self.store.message(m.target)))
+            else:
+                note.set_body(m.text or store.attachment_summary(m) or "New message")
             note.set_icon(Gio.ThemedIcon.new("freemac-messages"))
             note.set_default_action_and_target("app.open-chat", GLib.Variant("s", m.chat_id))
             self.send_notification("chat-" + m.chat_id, note)
@@ -1173,6 +1654,10 @@ class Messages(Gtk.Application):
             if message is None:
                 pending.chat_id, pending.status = target, "sent"
                 message = pending
+            # The file we sent is here already: its picture shows at once.
+            for mine, theirs in zip(pending.attachments, message.attachments):
+                if mine.get("path") and not theirs.get("path"):
+                    theirs["path"] = mine["path"]
             self.store.replace_message(temp_id, message)
             if started_in != target and started_in.startswith("new:"):
                 # The first message of a new conversation: it has its own id now.
@@ -1187,10 +1672,56 @@ class Messages(Gtk.Application):
     def backend_attachment(self, kind, message_id, attachment_id, path):
         if message_id:
             self.store.set_attachment_path(message_id, attachment_id, path)
+        if attachment_id in self.fetching:
+            # Fetched to show in its bubble, not asked for with a click.
+            self.fetching.discard(attachment_id)
+            window = self.window()
+            if window:
+                window.refresh()
+            return
         try:
             Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(), None)
         except GLib.Error:
             pass
+
+    def backend_typing(self, kind, chat_id, on):
+        if on:
+            self.typing[chat_id] = store.now_ms() + TYPING_FOR_MS
+            GLib.timeout_add(TYPING_FOR_MS + 500, self._typing_expired, chat_id)
+        else:
+            self.typing.pop(chat_id, None)
+        window = self.window()
+        if window and window.current and window.current.id == chat_id:
+            window.fill_bubbles()
+
+    def _typing_expired(self, chat_id):
+        if chat_id in self.typing and not self.is_typing(chat_id):
+            self.backend_typing(None, chat_id, False)
+        return False
+
+    def is_typing(self, chat_id):
+        return self.typing.get(chat_id, 0) > store.now_ms()
+
+    def backend_error(self, kind, text):
+        self.tell(text)
+
+    # -- tapbacks --------------------------------------------------------------------
+    def can_react(self, message):
+        """Only BlueBubbles' messages, once the server's Private API is on."""
+        backend = self.backends.get("bluebubbles")
+        return (backend is not None and message.id.startswith("bb:") and bool(message.remote_id)
+                and hasattr(backend, "can_react") and backend.can_react())
+
+    def react(self, message, kind):
+        """Adds a tapback; choosing the one you already put takes it back."""
+        chat = self.store.chat(message.chat_id)
+        backend = self.backends.get("bluebubbles")
+        if chat is None or backend is None:
+            return
+        try:
+            backend.react(chat, message, kind, remove=self.store.my_reaction(message.id) == kind)
+        except (ConnectionError, ValueError) as e:
+            self.tell(str(e))
 
     def open_attachment(self, message, attachment):
         path = attachment.get("path")

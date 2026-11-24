@@ -111,6 +111,54 @@ class Addresses(unittest.TestCase):
         self.assertEqual(store.format_address("sam@example.test"), "sam@example.test")
 
 
+class Tapbacks(unittest.TestCase):
+    setUp = StoreTests.setUp
+    tearDown = StoreTests.tearDown
+
+    def r(self, rid, kind, date, from_me=False, sender="+15550100001", target="bb:1"):
+        return store.Reaction(id=rid, chat_id="bb:iMessage;-;a", target=target, kind=kind, from_me=from_me,
+                              sender=sender, date=date)
+
+    def test_one_per_person_newest_wins(self):
+        fresh = self.store.upsert_messages([self.r("bb:t1", "love", 5000), self.r("bb:t2", "like", 5100, True, "")])
+        self.assertEqual([r.id for r in fresh], ["bb:t1", "bb:t2"])
+        # The same person changes their mind; the same one again is not new.
+        fresh = self.store.upsert_messages([self.r("bb:t3", "laugh", 6000, sender="+1 (555) 010-0001"),
+                                            self.r("bb:t2", "like", 5100, True, "")])
+        self.assertEqual([r.id for r in fresh], ["bb:t3"])
+        found = self.store.reactions("bb:iMessage;-;a")["bb:1"]
+        self.assertEqual(sorted((r.kind, r.from_me) for r in found), [("laugh", False), ("like", True)])
+        self.assertEqual(self.store.my_reaction("bb:1"), "like")
+        # An older one arriving late (a catch-up) doesn't undo a newer one.
+        self.store.upsert_messages([self.r("bb:t1", "love", 5000)])
+        self.assertIn("laugh", [r.kind for r in self.store.reactions("bb:iMessage;-;a")["bb:1"]])
+        # Not counted as unread messages, and not in the conversation's messages.
+        self.assertEqual(self.store.unread_total(), 2)
+        self.assertEqual([m.id for m in self.store.messages("bb:iMessage;-;a")], ["bb:1"])
+
+    def test_taken_back(self):
+        self.store.upsert_messages([self.r("bb:t1", "love", 5000, True, "")])
+        self.assertEqual(self.store.upsert_messages([self.r("bb:t9", "", 5500, True, "")]), [])
+        self.assertEqual(self.store.reactions("bb:iMessage;-;a"), {})
+        self.assertEqual(self.store.my_reaction("bb:1"), "")
+
+    def test_go_with_their_conversation(self):
+        self.store.upsert_messages([self.r("bb:t1", "question", 5000)])
+        self.store.delete_chat("bb:iMessage;-;a")
+        self.assertEqual(self.store.reactions("bb:iMessage;-;a"), {})
+
+    def test_two_pictures_sending_at_once_stay_two(self):
+        for name in ("a.png", "b.png"):
+            self.store.upsert_messages([Message(id="tmp:" + name, chat_id="bb:iMessage;-;a", date=7000,
+                                                from_me=True, status="sending",
+                                                attachments=[{"id": "local:" + name, "name": name, "path": ""}])])
+        self.assertEqual(len(self.store.messages("bb:iMessage;-;a")), 3)
+        # The phone's copy of an MMS with no words takes the place of one with files.
+        self.store.upsert_messages([Message(id="bb:p", chat_id="bb:iMessage;-;a", date=7100, from_me=True,
+                                            status="sent", attachments=[{"id": "x", "name": "a.png"}])])
+        self.assertEqual(len(self.store.messages("bb:iMessage;-;a")), 3)
+
+
 class Passwords(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()

@@ -11,6 +11,7 @@ import unittest
 from messages_fakes import FakeBlueBubbles, Recorder, wait_until
 
 from freemac_shell import messages_bluebubbles as bb
+from freemac_shell import messages_store as store
 
 
 class Converting(unittest.TestCase):
@@ -40,10 +41,36 @@ class Converting(unittest.TestCase):
         got = bb.convert_message(m("d", "hi", 1, False, "+15550100001"), "SMS;-;+15550100001")
         self.assertEqual((got.status, got.sender, got.service, got.read), ("received", "+15550100001", "sms", False))
 
-    def test_reactions_left_out(self):
+    def test_reactions_are_not_messages(self):
         tapback = dict(FakeBlueBubbles.message("e", "Loved “hi”", 1, False, "x"),
                        associatedMessageGuid="p:0/a", associatedMessageType="love")
         self.assertIsNone(bb.convert_message(tapback, "iMessage;-;x"))
+        reaction = bb.convert_any(tapback, "iMessage;-;x")
+        self.assertIsInstance(reaction, store.Reaction)
+        self.assertEqual((reaction.id, reaction.chat_id, reaction.target, reaction.kind, reaction.sender),
+                         ("bb:e", "bb:iMessage;-;x", "bb:a", "love", "x"))
+        self.assertEqual(reaction.glyph(), "❤️")
+
+    def test_reaction_kinds(self):
+        r = FakeBlueBubbles.reaction
+        self.assertEqual(bb.convert_reaction(r("1", "laugh", "m1", 5, True, "x"), "c").kind, "laugh")
+        self.assertTrue(bb.convert_reaction(r("1", "laugh", "m1", 5, True, "x"), "c").from_me)
+        self.assertEqual(bb.convert_reaction(r("2", "-laugh", "m1", 6, True, "x"), "c").kind, "")   # taken back
+        self.assertEqual(bb.convert_reaction(r("3", 2001, "m1", 5, False, "x"), "c").kind, "like")  # older servers
+        self.assertEqual(bb.convert_reaction(r("4", "3004", "m1", 5, False, "x"), "c").kind, "")
+        emoji = bb.convert_reaction(r("5", 2006, "m1", 5, False, "x", emoji="🎉"), "c")
+        self.assertEqual((emoji.kind, emoji.glyph()), ("emoji", "🎉"))
+        self.assertIsNone(bb.convert_any(r("6", 1000, "m1", 5, False, "x"), "c"))    # a sticker: left out
+        bp = dict(r("7", "question", "m1", 5, False, "x"), associatedMessageGuid="bp:m9")
+        self.assertEqual(bb.convert_reaction(bp, "c").target, "bb:m9")
+
+    def test_upload_form(self):
+        body, kind = bb.multipart({"chatGuid": "iMessage;-;x", "name": 'odd\r\nname'}, "attachment",
+                                  'pier "day".png', "image/png", b"\x89PNG")
+        self.assertTrue(kind.startswith("multipart/form-data; boundary=freemac-"))
+        form = FakeBlueBubbles.parse_form(kind, body)
+        self.assertEqual(form["fields"], {"chatGuid": "iMessage;-;x", "name": "odd name"})
+        self.assertEqual(form["files"], [("attachment", "pier _day_.png", "image/png", b"\x89PNG")])
 
 
 class AgainstAServer(unittest.TestCase):
@@ -134,6 +161,90 @@ class AgainstAServer(unittest.TestCase):
         self.assertTrue(path.endswith("beach_day.png"))
         with open(path, "rb") as f:
             self.assertTrue(f.read().startswith(b"\x89PNG"))
+
+    def test_send_a_picture(self):
+        client = self.connect()
+        chats, _ = client.fetch_chats()
+        path = os.path.join(self.dir, "harbour at dusk.jpg")
+        with open(path, "wb") as f:
+            f.write(b"\xff\xd8 a made-up picture")
+        client.send_attachment(chats[0], path, "tmp:4", "image/jpeg")
+        self.assertTrue(wait_until(lambda: self.listener.of("backend_sent")))
+        _kind, temp, message, error, chat_id = self.listener.last("backend_sent")
+        self.assertEqual((temp, error, chat_id), ("tmp:4", "", "bb:iMessage;-;+15550100001"))
+        self.assertEqual(message.attachments[0]["name"], "harbour at dusk.jpg")
+        fields, filename, kind, data = self.server.uploads[-1]
+        self.assertEqual(fields, {"chatGuid": "iMessage;-;+15550100001", "tempGuid": "tmp:4",
+                                  "name": "harbour at dusk.jpg", "method": "apple-script"})
+        self.assertEqual((filename, kind, data), ("harbour at dusk.jpg", "image/jpeg", b"\xff\xd8 a made-up picture"))
+        _m, path_sent, query, _b = [r for r in self.server.requests if r[1] == "/api/v1/message/attachment"][-1]
+        self.assertEqual(query["password"], [FakeBlueBubbles.PASSWORD])
+
+    def test_missing_file_fails_to_send(self):
+        client = self.connect()
+        chats, _ = client.fetch_chats()
+        client.send_attachment(chats[0], os.path.join(self.dir, "gone.png"), "tmp:5")
+        self.assertTrue(wait_until(lambda: self.listener.of("backend_sent")))
+        _kind, temp, message, error, _chat = self.listener.last("backend_sent")
+        self.assertEqual((temp, message), ("tmp:5", None))
+        self.assertIn("couldn't be read", error)
+        self.assertEqual(self.server.uploads, [])
+
+    def test_tapbacks_need_the_private_api(self):
+        client = self.connect()
+        client.check()
+        self.assertFalse(client.can_react())
+        chats, _ = client.fetch_chats()
+        target = store.Message(id="bb:m1", chat_id=chats[0].id, remote_id="m1")
+        with self.assertRaises(ConnectionError):
+            client.react(chats[0], target, "love")
+        self.assertEqual(self.server.reacted, [])
+
+    def test_tapback_sent_and_taken_back(self):
+        self.server.private_api = True
+        client = self.connect()
+        client.check()
+        self.assertTrue(client.can_react())
+        chats, _ = client.fetch_chats()
+        target = store.Message(id="bb:m1", chat_id=chats[0].id, remote_id="m1")
+        client.react(chats[0], target, "love")
+        self.assertTrue(wait_until(lambda: self.listener.of("backend_data")))
+        self.assertEqual(self.server.reacted[-1], {"chatGuid": "iMessage;-;+15550100001",
+                                                   "selectedMessageGuid": "m1", "reaction": "love", "partIndex": 0})
+        reaction = self.listener.last("backend_data")[2][0]
+        self.assertEqual((reaction.target, reaction.kind, reaction.from_me), ("bb:m1", "love", True))
+        client.react(chats[0], target, "love", remove=True)
+        self.assertTrue(wait_until(lambda: len(self.listener.of("backend_data")) == 2))
+        self.assertEqual(self.server.reacted[-1]["reaction"], "-love")
+        self.assertEqual(self.listener.last("backend_data")[2][0].kind, "")
+
+    def test_conversation_brings_its_tapbacks(self):
+        now = int(time.time() * 1000)
+        self.server.messages["iMessage;-;+15550100001"].append(
+            FakeBlueBubbles.reaction("t1", "like", "m2", now, False, "+15550100001"))
+        client = self.connect()
+        found = client.fetch_messages("iMessage;-;+15550100001")
+        reactions = [m for m in found if isinstance(m, store.Reaction)]
+        self.assertEqual([(r.target, r.kind) for r in reactions], [("bb:m2", "like")])
+        self.assertEqual(len([m for m in found if isinstance(m, store.Message)]), 2)
+
+    @unittest.skipIf(bb.websocket is None, "needs python3-websocket")
+    def test_typing_and_tapbacks_over_the_websocket(self):
+        client = self.connect()
+        client.start()
+        self.assertTrue(wait_until(lambda: self.server.sockets and client.socket_up), "no socket")
+        self.server.typing("iMessage;-;+15550100001", True)
+        self.assertTrue(wait_until(lambda: self.listener.of("backend_typing")))
+        self.assertEqual(self.listener.last("backend_typing"), ("bluebubbles", "bb:iMessage;-;+15550100001", True))
+        self.server.typing("iMessage;-;+15550100001", False)
+        self.assertTrue(wait_until(lambda: self.listener.last("backend_typing")[2] is False))
+        before = len(self.listener.of("backend_data"))
+        tapback = dict(FakeBlueBubbles.reaction("live-t", "emphasize", "m2", int(time.time() * 1000), False,
+                                                "+15550100001"), chats=[{"guid": "iMessage;-;+15550100001"}])
+        self.server.emit("new-message", tapback)
+        self.assertTrue(wait_until(lambda: len(self.listener.of("backend_data")) > before))
+        reaction = self.listener.last("backend_data")[2][0]
+        self.assertEqual((reaction.kind, reaction.target), ("emphasize", "bb:m2"))
 
     @unittest.skipIf(bb.websocket is None, "needs python3-websocket")
     def test_live_events_over_the_websocket(self):
