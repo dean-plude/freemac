@@ -1123,9 +1123,19 @@ static NSArray *dictionary_results(NSArray *objects, NSFetchRequest *request, NS
     if (!request)
         CDRaise(NSInvalidArgumentException, @"executeFetchRequest:error: needs a fetch request");
     [self processPendingChanges];
-    NSArray *objects = [self cd_objectsForRequest:request error:error];
+    BOOL dictionaries = [request resultType] == NSDictionaryResultType;
+    NSFetchRequest *all = request;
+    if (dictionaries && CDGroupsResults(request)) {   /* the groups are sorted and limited, not the objects */
+        all = [[request copy] autorelease];
+        [all setSortDescriptors:nil];
+        [all setFetchOffset:0];
+        [all setFetchLimit:0];
+    }
+    NSArray *objects = [self cd_objectsForRequest:all error:error];
     if (!objects)
         return nil;
+    if (dictionaries && CDFetchesExpressions(request))
+        return CDExpressionResults(objects, request, [self cd_entityForRequest:request]);
     switch ([request resultType]) {
     case NSManagedObjectIDResultType: return [objects valueForKey:@"objectID"];
     case NSDictionaryResultType: return dictionary_results(objects, request, [self cd_entityForRequest:request]);

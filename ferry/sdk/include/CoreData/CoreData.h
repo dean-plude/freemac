@@ -663,4 +663,11 @@ typedef NS_ENUM(NSUInteger, NSFetchedResultsChangeType) {
 - (void)performBackgroundTask:(void (^)(NSManagedObjectContext *))block;
 @end
 
+/* ---- expression descriptions (freemac 1.NEXT, Ferry 0.NEXT) ---------------------------- */
+
+@interface NSExpressionDescription : NSPropertyDescription
+@property (strong) NSExpression *expression;
+@property NSAttributeType expressionResultType;
+@end
+
 #endif

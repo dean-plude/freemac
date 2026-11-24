@@ -293,8 +293,23 @@ static BOOL transformer_is_archiving(NSString *name)
                                       [self attributeValueClassName], _default];
 }
 /* The stored form: transformable values become data through the attribute's transformer. */
+/* A decimal number as it is kept in a file: its digits as text, exactly
+ * (freemac 1.NEXT, Ferry 0.NEXT); one read from a file kept it as a
+ * double is the shortest decimal that reads back as that double. */
+static NSDecimalNumber *as_decimal_number(id value)
+{
+    if ([value isKindOfClass:[NSDecimalNumber class]])
+        return value;
+    if ([value isKindOfClass:[NSString class]])
+        return [NSDecimalNumber decimalNumberWithString:value];
+    if ([value isKindOfClass:[NSNumber class]])
+        return [NSDecimalNumber decimalNumberWithDecimal:[value decimalValue]];
+    return nil;
+}
 - (id)cd_storedValue:(id)value
 {
+    if (_type == NSDecimalAttributeType && value && value != [NSNull null])
+        return [as_decimal_number(value) description];
     if (_type != NSTransformableAttributeType || !value || value == [NSNull null])
         return value;
     NSValueTransformer *t = [NSValueTransformer valueTransformerForName:_transformerName
@@ -310,6 +325,8 @@ static BOOL transformer_is_archiving(NSString *name)
 }
 - (id)cd_valueFromStored:(id)stored
 {
+    if (_type == NSDecimalAttributeType && stored && stored != [NSNull null])
+        return as_decimal_number(stored);
     if (_type != NSTransformableAttributeType || !stored || stored == [NSNull null])
         return stored;
     NSValueTransformer *t = [NSValueTransformer valueTransformerForName:_transformerName
@@ -950,7 +967,7 @@ static id value_from_string(NSString *s, NSAttributeType type)
     case NSInteger16AttributeType:
     case NSInteger32AttributeType:
     case NSInteger64AttributeType: return @([s longLongValue]);
-    case NSDecimalAttributeType:
+    case NSDecimalAttributeType: return [NSDecimalNumber decimalNumberWithString:s];
     case NSDoubleAttributeType:
     case NSFloatAttributeType: return @([s doubleValue]);
     case NSBooleanAttributeType: return @([s isEqualToString:@"YES"] || [s boolValue]);

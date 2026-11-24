@@ -684,7 +684,7 @@ NSRange NSUnionRange(NSRange a, NSRange b);
  * ENDSWITH and LIKE, with [c], [d] and [cd]), ANY, ALL and NONE, AND, OR and NOT,
  * TRUEPREDICATE and FALSEPREDICATE, the format arguments %@, %K, %d, %i,
  * %ld, %lu, %f and %s, $variables, and blocks. */
-@interface NSPredicate : NSObject <NSCopying>
+@interface NSPredicate : NSObject <NSCopying, NSSecureCoding>
 + (NSPredicate *)predicateWithFormat:(NSString *)format, ...;
 + (NSPredicate *)predicateWithFormat:(NSString *)format argumentArray:(NSArray *)arguments;
 + (NSPredicate *)predicateWithFormat:(NSString *)format arguments:(va_list)args;
@@ -2116,5 +2116,10 @@ enum { NSFormattingError = 2048 };
 /* Ordered sets and UUIDs, which Core Data's ordered relationships and UUID attributes hold. */
 #include <Foundation/NSOrderedSet.h>
 #include <Foundation/NSUUID.h>
+/* Decimal numbers, expressions and comparison predicates (freemac 1.NEXT, Ferry 0.NEXT). */
+#include <Foundation/NSDecimal.h>
+#include <Foundation/NSDecimalNumber.h>
+#include <Foundation/NSExpression.h>
+#include <Foundation/NSComparisonPredicate.h>
 
 #endif

@@ -6,9 +6,9 @@
  * fetchBatchSize and relationshipKeyPathsForPrefetching are kept and
  * answered but change nothing: a fetch gives the whole array, and related
  * objects are read when first used. A dictionary fetch's
- * propertiesToFetch takes property names and descriptions; there are no
- * expression descriptions (Ferry has no NSExpression yet), so
- * propertiesToGroupBy and havingPredicate are kept and not used. */
+ * propertiesToFetch takes property names and descriptions, and
+ * expression descriptions, which NSExpressionDescription.m works out
+ * with propertiesToGroupBy and havingPredicate. */
 #import "CDInternal.h"
 
 @implementation NSNumber (NSFetchRequestResult)

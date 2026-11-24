@@ -1,0 +1,172 @@
+SQLite store:
+  Apple 0.1
+  Bread 2.35
+  Cherry 0.2
+  Donut 1.05
+  Eggs 3.333333333333333333333333333333
+  Fig 12345678901234567890.12345
+  Gum nil
+  sum 12345678901234567897.1567833333333333333
+ aggregates over everything:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=7/q meanQty=5.571428571428571/d most=24/i priced=6/q total=12345678901234567897.1567833333333333333/D
+ aggregates over fruit:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=3/q meanQty=5/d most=20/i priced=3/q total=12345678901234567890.42345/D
+ aggregates over nothing:
+    items=0/q priced=0/q
+ grouped by category:
+    count=1/q qty=5/q
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having more than one:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having a total under 5:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ the two largest:
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ after the largest:
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=bakery count=2/q qty=7/q total=3.4/D
+ a property outside the grouping: NSInvalidArgumentException
+ an expression for each object:
+    loud=CHERRY me=(object ID)/ID name=Cherry twice=20/i
+    loud=DONUT me=(object ID)/ID name=Donut twice=12/i
+    loud=EGGS me=(object ID)/ID name=Eggs twice=24/i
+ grouping alone:
+    category=fruit
+    category=dairy
+    category=bakery
+   
+ MATCHES:
+  name MATCHES "[A-C].*"                   Apple Bread Cherry (3)
+  name MATCHES "a.*"                        (0)
+  name MATCHES[c] "a.*|.*g"                Apple Fig (2)
+  category MATCHES "f.*" AND qty > 2       Apple Cherry (2)
+  NOT name MATCHES ".{3}"                  Apple Bread Cherry Donut Eggs (5)
+  name MATCHES "C.*y"                      Cherry (1)
+  decimals compared and sorted: Bread Donut
+Binary store:
+  Apple 0.1
+  Bread 2.35
+  Cherry 0.2
+  Donut 1.05
+  Eggs 3.333333333333333333333333333333
+  Fig 12345678901234567890.12345
+  Gum nil
+  sum 12345678901234567897.1567833333333333333
+ aggregates over everything:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=7/q meanQty=5.571428571428571/d most=24/i priced=6/q total=12345678901234567897.1567833333333333333/D
+ aggregates over fruit:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=3/q meanQty=5/d most=20/i priced=3/q total=12345678901234567890.42345/D
+ aggregates over nothing:
+    items=0/q priced=0/q
+ grouped by category:
+    count=1/q qty=5/q
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having more than one:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having a total under 5:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ the two largest:
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ after the largest:
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=bakery count=2/q qty=7/q total=3.4/D
+ a property outside the grouping: NSInvalidArgumentException
+ an expression for each object:
+    loud=CHERRY me=(object ID)/ID name=Cherry twice=20/i
+    loud=DONUT me=(object ID)/ID name=Donut twice=12/i
+    loud=EGGS me=(object ID)/ID name=Eggs twice=24/i
+ grouping alone:
+    category=fruit
+    category=dairy
+    category=bakery
+   
+ MATCHES:
+  name MATCHES "[A-C].*"                   Apple Bread Cherry (3)
+  name MATCHES "a.*"                        (0)
+  name MATCHES[c] "a.*|.*g"                Apple Fig (2)
+  category MATCHES "f.*" AND qty > 2       Apple Cherry (2)
+  NOT name MATCHES ".{3}"                  Apple Bread Cherry Donut Eggs (5)
+  name MATCHES "C.*y"                      Cherry (1)
+  decimals compared and sorted: Bread Donut
+InMemory store:
+  Apple 0.1
+  Bread 2.35
+  Cherry 0.2
+  Donut 1.05
+  Eggs 3.333333333333333333333333333333
+  Fig 12345678901234567890.12345
+  Gum nil
+  sum 12345678901234567897.1567833333333333333
+ aggregates over everything:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=7/q meanQty=5.571428571428571/d most=24/i priced=6/q total=12345678901234567897.1567833333333333333/D
+ aggregates over fruit:
+    cheapest=0.1/D dearest=12345678901234567890.12345/D items=3/q meanQty=5/d most=20/i priced=3/q total=12345678901234567890.42345/D
+ aggregates over nothing:
+    items=0/q priced=0/q
+ grouped by category:
+    count=1/q qty=5/q
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having more than one:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+ having a total under 5:
+    category=bakery count=2/q qty=7/q total=3.4/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ the two largest:
+    category=fruit count=3/q qty=15/q total=12345678901234567890.42345/D
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+ after the largest:
+    category=dairy count=1/q qty=12/q total=3.333333333333333333333333333333/D
+    category=bakery count=2/q qty=7/q total=3.4/D
+ a property outside the grouping: NSInvalidArgumentException
+ an expression for each object:
+    loud=CHERRY me=(object ID)/ID name=Cherry twice=20/i
+    loud=DONUT me=(object ID)/ID name=Donut twice=12/i
+    loud=EGGS me=(object ID)/ID name=Eggs twice=24/i
+ grouping alone:
+    category=fruit
+    category=dairy
+    category=bakery
+   
+ MATCHES:
+  name MATCHES "[A-C].*"                   Apple Bread Cherry (3)
+  name MATCHES "a.*"                        (0)
+  name MATCHES[c] "a.*|.*g"                Apple Fig (2)
+  category MATCHES "f.*" AND qty > 2       Apple Cherry (2)
+  NOT name MATCHES ".{3}"                  Apple Bread Cherry Donut Eggs (5)
+  name MATCHES "C.*y"                      Cherry (1)
+  decimals compared and sorted: Bread Donut
+an older SQLite store:
+  made older: 0 
+  Apple 0.1
+  Bread 2.35
+  Cherry 0.2
+  Donut 1.05
+  Eggs 3.3333333333333335
+  Fig 12345678901234567000
+  Gum nil
+  sum 12345678901234567007.0333333333333335
+  written after: 0.30000000000000000001
+  the column now: TEXT
+an older binary store:
+  Apple 0.1
+  Bread 2.35
+  Cherry 0.2
+  Donut 1.05
+  Eggs 3.3333333333333335
+  Fig 12345678901234567000
+  Gum nil
+  sum 12345678901234567007.0333333333333335
+exit=0

@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.211 "Ferry: expressions and exact decimals" (done)
+
+Ferry 0.37.0: Mac apps can do sums, averages and grouping over their data, and keep money-style numbers exact.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSExpression` and `NSComparisonPredicate` as public classes, with every documented form and the built-in functions | Ferry Foundation | done |
+| 2 | `MATCHES` with regular expressions, `SUBQUERY`, arithmetic and substitution variables in predicates | Ferry Foundation | done |
+| 3 | `NSDecimalNumber` and the `NSDecimal` functions: exact base-10 arithmetic, rounding modes and exceptions | Ferry Foundation | done |
+| 4 | Core Data: exact decimal attributes, aggregates, `propertiesToGroupBy` and `havingPredicate` | Ferry Core Data | done |
+| 5 | Three new tests; `make check` 175 of 175 | Ferry | done |
+
+Aggregates and grouping are worked out in memory rather than in SQL, and derived attributes aren't there yet.
+
 ## 1.210 "Ferry: gradients, shadows and window layouts" (done)
 
 Ferry 0.36.0: the drawing and window-layout classes that six of the nine test apps use.

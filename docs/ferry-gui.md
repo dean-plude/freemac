@@ -1187,6 +1187,9 @@ The new or extended ones:
 | `appkit_gradients message` | (freemac 1.210, Ferry 0.36.0) The test's stderr says exactly once that Ferry's Core Graphics draws no shadows yet, though two shadows are set |
 | `appkit_split_controller` | (freemac 1.210, Ferry 0.36.0) `NSSplitViewController` and `NSSplitViewItem`, with no display. A controller with no nib has its split view as its view, side by side with thin dividers, and is its delegate. A child view controller added the general way gets an item, and removing it takes its pane away. The item kinds' settings are checked (plain, sidebar, content list and inspector). A controller laid out like MacPass's document window has its own plain view holding the split view, with a sidebar, a content pane and a collapsed inspector added in `viewDidLoad`. The test checks the panes' first thicknesses (the sidebar at its preferred fraction held to its minimum, the room going to the lowest holding priority) and growing and shrinking the window, with the change going to the lowest holding priority within each item's limits. Dividers dragged by the mouse stop at the items' minimum and maximum thicknesses, and an inspector dragged past half its minimum collapses, which its item's `collapsed` reports to an observer. Opening it again by code gives back its thickness. `toggleSidebar:` collapses and opens the sidebar, the menu item is titled Show Sidebar or Hide Sidebar, and it is disabled with no sidebar. `toggleInspector:` does nothing when no item has the inspector's kind. Removing an item and putting it back first are checked too. A new split view after loading raises `NSInternalInconsistencyException`, an item with no view controller raises `NSInvalidArgumentException`, and so does changing an installed item's view controller |
 | `appkit_tab_controller` | (freemac 1.210, Ferry 0.36.0) `NSTabViewController`, with no display. The defaults are checked (segmented control on top, cross-fade and slide forward, a tab view with no tabs of its own). Tabs are added as items and as child view controllers, and a tab's view is loaded only when the tab is first shown. The controller's view is as big as the first tab's view, with the segmented control centred at the top or the bottom and the tab view filling the rest, and with no control the tab view fills the view. Choosing a segment, setting `selectedTabViewItemIndex` and selecting through the tab view each change the selection once for an observer, and so does removing the selected tab. An index out of range raises `NSRangeException`, a tab with no view controller raises `NSInvalidArgumentException`, and a new tab view after loading raises `NSInternalInconsistencyException`. A subclass that overrides `tabView:didSelectTabViewItem:` and calls super, as MacPass's preferences do, hears of each choice. In the toolbar style, put in a window, the controller makes the window's toolbar, showing icons and labels, with one item for each tab, named by the tab's identifier or by its place, and the selected one marked. Choosing an item selects its tab, a new tab adds an item, the selected tab's title becomes the controller's title, and a window with a toolbar of the app's own keeps it |
+| `foundation_expressions` | (freemac 1.211, Ferry 0.37.0) `NSExpression` in each of its forms (a constant, `SELF`, a key path, a variable with and without a context, a function, a function sent to a target, an aggregate, union, intersect and minus sets, a subquery, `ANYKEY`, a block and a conditional), with their types and descriptions; format strings with arithmetic and its precedence, `**` to the right, unary minus, hexadecimal, binary and octal numbers, `%K` and `%@`, and argument arrays; the built-in functions (`sum:`, `count:`, `min:`, `max:`, `average:`, `median:`, `mode:`, `stddev:`, the arithmetic, `sqrt:`, `log:`, `ln:`, `exp:`, `raise:toPower:`, `ceiling:`, `floor:`, `trunc:`, `abs:`, `modulus:by:`, the bitwise functions and shifts, `uppercase:`, `lowercase:`, `length:`, `random`, `now`), indexes (`FIRST`, `LAST`, `SIZE` and a number), `FUNCTION`, `TERNARY`, `CAST` and `SUBQUERY` with `.@count`; `NSComparisonPredicate` built in code (with options and a custom selector) and as the parser makes it, with its modifier and expressions; arithmetic, functions and subqueries inside predicates; `MATCHES` with and without `[c]` and `[d]`, a bad pattern raising, and filtering with it; `predicateWithSubstitutionVariables:` and `evaluateWithObject:substitutionVariables:`, a missing variable, an unknown function and a bad format raising; equality, hashing and copies of expressions; and a predicate archived and read back |
+| `foundation_decimals` | (freemac 1.211, Ferry 0.37.0) `NSDecimalNumber` arithmetic in base 10 (0.1 + 0.2 is 0.3), division to 38 or 39 digits, powers, powers of ten, numbers with more digits than fit, exponents, trailing zeros, text after a number and text that isn't one, a locale's decimal separator both ways, the mantissa initializer, zero, one, the largest and smallest numbers, numbers from doubles and integers, and the scalar values; the four rounding modes on halves and negatives at a scale, a negative scale and no scale; `NSDecimalAdd`, `NSDecimalSubtract`, `NSDecimalMultiply`, `NSDecimalDivide`, `NSDecimalPower`, `NSDecimalMultiplyByPowerOf10`, `NSDecimalCompare`, `NSDecimalRound`, `NSDecimalNormalize`, `NSDecimalCopy` and `NSDecimalCompact` with their error results (loss of precision, underflow, overflow, divide by zero); the overflow, underflow, divide by zero and exactness exceptions, a quiet handler, and `setDefaultBehavior:`; equality, comparison, hashing and sorting with `NSNumber` both ways, `decimalValue` of an `NSNumber`, and `@sum` of decimal numbers; `scanDecimal:`; `NSNumberFormatter` writing a decimal number's digits exactly and `generatesDecimalNumbers`; keyed archiving of a decimal number and a handler with secure coding; and `NSJSONSerialization` writing decimal numbers and refusing NaN |
+| `coredata_aggregates` | (freemac 1.211, Ferry 0.37.0) A decimal attribute kept exactly in an SQLite, a binary and an in-memory store, read back as `NSDecimalNumber`; `NSExpressionDescription`s in `propertiesToFetch` with `sum:`, `count:`, `min:`, `max:`, `average:` and arithmetic on an aggregate, over all objects, over the objects a predicate picks and over none; `propertiesToGroupBy` with a nil group, `havingPredicate` by key and by variable, the groups sorted, limited and offset, a fetched property outside the grouping raising, expressions evaluated for each object (arithmetic, a string function and `SELF` as an object ID), and grouping alone; `MATCHES` in fetches and counts, alone, with `[c]`, with `NOT` and inside `AND`; decimal comparisons and sorting; an SQLite store whose decimal column is REAL, as Ferry 0.35.0 made it, changed to text on opening and written exactly afterwards; and a binary store that kept decimal numbers as doubles |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -1343,9 +1346,7 @@ The new or extended ones:
   `mutableOrderedSetValueForKey:` and ordered sets aren't done. The
   collection operators are read in key paths, but a key path isn't
   observed past a plain array or set (an array controller's
-  `arrangedObjects` is followed). `@sum` and `@avg` give an `NSNumber`
-  (an integer when every value is one); whether a Mac gives an
-  `NSDecimalNumber` there, and how it prints, wasn't checked, and the
+  `arrangedObjects` is followed). `@sum` and `@avg` give an `NSNumber` (an integer when every value is one), and an `NSDecimalNumber` worked out in base 10 when one of the values is a decimal number (from freemac 1.211, Ferry 0.37.0); whether a Mac gives an `NSDecimalNumber` for plain numbers too, and how it prints, wasn't checked, and the
   custom operators some code defines (`_<key>ForKeyPath:`) aren't asked.
   The subclass's name, `NSKVONotifying_` and the class's, follows what is
   described publicly; `observationInfo` returns Ferry's own record, and
@@ -1355,17 +1356,14 @@ The new or extended ones:
   the wording Apple's documentation quotes, not compared with a Mac's.
   Not compared with a real Mac: the order of nested notifications and of
   several dependent keys.
-- **Predicates: a subset** (freemac (1.188)). `NSPredicate` reads
+- **Predicates and expressions** (freemac (1.188)). `NSPredicate` reads
   comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `IN`,
   `CONTAINS`, `BEGINSWITH`, `ENDSWITH`, `LIKE`, with `[c]`, `[d]` and
   `[cd]`), `ANY`, `SOME`, `ALL` and `NONE`, `AND`, `OR` and `NOT`,
   `TRUEPREDICATE` and `FALSEPREDICATE`, the format arguments `%@`, `%K`,
   `%d`, `%i`, `%u`, `%f` and `%s` (with `l`, `ll` and `q`), argument
   arrays, `$variables` and blocks, and `NSCompoundPredicate`. `[d]` folds
-  the accents of Latin letters only. Not done: `MATCHES` (regular
-  expressions), function expressions, `SUBQUERY`, arithmetic, keyed
-  archiving of predicates, and `NSExpression` and `NSComparisonPredicate`
-  as public classes. `predicateFormat` writes Apple's documented forms
+  the accents of Latin letters only. From freemac 1.211 (Ferry 0.37.0), `MATCHES` (regular expressions through `NSRegularExpression`), function expressions, `SUBQUERY`, `TERNARY`, `CAST`, arithmetic, and `NSExpression` and `NSComparisonPredicate` as public classes are there. Predicates are archived as their format strings, under Ferry's own keys, so an archive a Mac made isn't read. `predicateFormat` writes Apple's documented forms
   (strings in double quotes, `NOT` before a comparison without
   parentheses); not compared character for character with a Mac.
 - **Bindings: controllers, tables and outlines** (freemac (1.184),
@@ -1516,7 +1514,7 @@ The new or extended ones:
     `NSMatchingReportProgress` doesn't call the block during long searches.
     `NSMatchingWithoutAnchoringBounds` and `NSMatchingWithTransparentBounds`
     are passed to ICU and not tested.
-  - **NSScanner**: `scanDecimal:` (NSDecimal) is missing. A localized
+  - **NSScanner**: `scanDecimal:` reads an `NSDecimal` (from freemac 1.211, Ferry 0.37.0). A localized
     scanner uses its locale's decimal separator and nothing else, so
     grouping separators such as `1,000` stop a number.
   - **NSXMLParser**: `parser:foundElementDeclarationWithName:model:`,
@@ -2413,10 +2411,7 @@ The new or extended ones:
     added, and its values are lost. A changed type or a changed
     relationship is refused. Mapping models, `NSMigrationManager` and
     `NSEntityMigrationPolicy` aren't there.
-  - Ferry's Foundation has no `NSExpression`. So there are no
-    `NSExpressionDescription`s in `propertiesToFetch`, no aggregate
-    functions, and `propertiesToGroupBy` and `havingPredicate` are kept and
-    not used. `MATCHES` predicates aren't supported.
+  - `NSExpressionDescription`s in `propertiesToFetch`, aggregate functions, `propertiesToGroupBy` and `havingPredicate` are worked out in memory, not in SQL, on the objects the fetch's predicate picks (from freemac 1.211, Ferry 0.37.0). `MATCHES` in a fetch is evaluated in memory too.
   - The SQLite store puts only part of a predicate into SQL. Case-insensitive
     and diacritic-insensitive comparisons, key paths through relationships,
     `ANY`, `ALL` and blocks are evaluated in memory, on rows read from the
@@ -2425,8 +2420,7 @@ The new or extended ones:
   - `fetchBatchSize`, `relationshipKeyPathsForPrefetching` and
     `usesLazyFetching` are kept but change nothing. A fetch gives the
     whole array, and related objects are read when first used.
-  - Decimal attributes are stored as doubles, because Ferry's Foundation has
-    no `NSDecimalNumber`.
+  - Decimal attributes are kept exactly, as text, in the SQLite and binary stores (from freemac 1.211, Ferry 0.37.0). Comparisons and sorts on them are done in memory, not in SQL. A store that kept them as doubles is read as before, and an SQLite store's column is changed to text when it is opened for writing.
   - Uniqueness constraints are read from the model but not enforced.
     Fetched properties, derived attributes, `allowsExternalBinaryDataStorage`
     (the data is kept in the row), persistent history tracking, query
@@ -2509,6 +2503,36 @@ The new or extended ones:
   - When observers of `selectedTabViewItemIndex` hear of a change: here once for each new selection, once when the first tab is added, and once when a tab is removed.
   - Where the segmented control sits: here centred, 8 points from the top or bottom edge, with the tab view filling the rest. The controller's view is as big as the first tab's view, or 480 by 270 points when there is none.
   - The toolbar's identifiers for tabs that have no string identifier (here `NSTabViewController.tab.` and the tab's place), and its display mode (icons and labels).
+
+- **Expressions and decimal numbers, not done yet** (freemac (1.211), Ferry 0.37.0).
+  - `distanceToLocation:fromLocation:` raises `NSInvalidArgumentException`, because Ferry has no Core Location.
+  - `allowEvaluation` is accepted on an expression and does nothing, since Ferry doesn't keep expressions from being evaluated after they are read from an archive.
+  - Predicates and expressions are archived as their format strings, under Ferry's own keys. An archive a Mac made of a predicate isn't read, and a block predicate or a block expression can't be archived (archiving one raises). A constant that a format string can't write (an object other than a string, number, date, nil or a collection of those) doesn't come back as itself.
+  - A format string takes an `NSExpression` passed with `%@` as a constant value, not as a part of the expression.
+  - `[NSDecimalNumber numberWithInt:]` and the other `NSNumber` class methods give a plain `NSNumber`, not an `NSDecimalNumber`. The initializers (`initWithInt:`, `initWithInteger:`, `initWithDouble:`, `initWithBool:`) give an `NSDecimalNumber`.
+  - `NSJSONSerialization` reads numbers as integers and doubles, never as `NSDecimalNumber`, so a long decimal in a JSON file loses digits when it is read.
+  - `@sum` and `@avg` work in base 10 only when at least one of the values is an `NSDecimalNumber`; with plain numbers they add doubles as before.
+  - In Core Data, aggregates, grouping and having predicates are worked out in memory on the objects the fetch's predicate picks, not in SQL. A large store is read whole for them.
+  - The SQLite store doesn't put comparisons or sorts on decimal attributes into SQL, as before; they are done in memory, now in base 10.
+  - `MATCHES` in a fetch is always evaluated in memory, never in SQL.
+  - A having predicate is evaluated on each group's dictionary, by key or as a variable (`count > 1` or `$count > 1`); an expression description's expression passed in the having predicate's format isn't matched to that description.
+  - An aggregate is only recognized when its argument is read from each object (a key path, `SELF` or a function of those). An aggregate over a to-many key path (`sum:(items.price)`) isn't grouped.
+  - Derived attributes are still not done.
+
+- **Expressions and decimal numbers, not compared with a Mac** (freemac (1.211), Ferry 0.37.0).
+  - How `NSExpression` and `NSComparisonPredicate` describe themselves: arithmetic written back infix with its parentheses, functions as `name:(arguments)`, `FUNCTION`, `TERNARY`, `CAST` (and a date as a `CAST` of its reference date seconds), `SUBQUERY`, `BLOCK` and the options `[c]`, `[d]`, `[cd]` and `[n]`. Numbers in hexadecimal, octal or binary are written back in decimal.
+  - Which exceptions and reasons the expressions raise (a variable with no binding, an unknown function, the wrong number of arguments, a bad pattern for `MATCHES`). The reasons are Ferry's own words.
+  - `stddev:` is the population standard deviation (it divides by the count). `mode:` gives an array of the most frequent values. `median:` of an even count is the mean of the middle two. `average:` and `sum:` give an `NSDecimalNumber` when one of the values is one.
+  - Whether `MATCHES` without `[c]` lets `.` match a line break (here it doesn't, which is ICU's default), and how `[d]` is applied (the accents are folded from both the string and the pattern before matching).
+  - How many digits a decimal division keeps. Here a result keeps as many as fit in the 128 bit mantissa, which is 38 or 39 digits (1/3 has 39 threes and 2/3 has 38 sixes ending in 7). The exponent runs from 128 below to 127 above.
+  - What `NSDecimalString` writes for a number with a large exponent (here all its digits and zeros, never an exponent), and for "not a number" (`NaN`).
+  - What `decimalValue` gives for a double. Here it is the shortest decimal that reads back as the same double, so `@0.1` gives 0.1.
+  - The hash of a decimal number (here the hash of an `NSNumber` holding the same double), its `objCType` (here `d`), and what `NSNumberFormatter` does with one beyond writing its digits exactly.
+  - The keys a decimal number and a handler are archived under (Ferry's own: `NS.decimal`, a string, for the number).
+  - What a Core Data fetch with aggregates gives for an empty group (here `count:` gives 0 and the others give nothing), what a nil group by value looks like (here the key is left out of the dictionary), and the order of groups when no sort descriptors are given (here the order the first object of each group was found in).
+  - The result types of expression descriptions: here an `NSDecimalAttributeType` result is an `NSDecimalNumber`, the integer types are truncated, and an undefined result type keeps the value as it is.
+  - The exception raised for a fetched property that is neither grouped nor an aggregate (here `NSInvalidArgumentException`).
+  - A decimal attribute's column type and text in Ferry's SQLite store are Ferry's own (the table layout already is).
 
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -2596,3 +2620,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: freemac 1.208 (Ferry 0.34.0): freemac's Dock shows badge labels that aren't numbers as words and the app's `applicationDockMenu:` in its right-click menu, below its windows; `make check` 157/157.
 - 2026-11-24: Ferry 0.35.0 (freemac (1.209)): Core Data, with models built in code or read from their Xcode source, managed objects, main-queue, private-queue and child contexts with undo and merging, fetch requests, the fetched results controller, SQLite, binary and in-memory stores with lightweight migration and batch requests, and NSArrayController in entity mode, `make check` 168/168.
 - 2026-11-24: Ferry 0.36.0 (freemac (1.210)): `NSGradient` and `NSShadow` (kept, not yet drawn), `NSSplitViewController` with `NSSplitViewItem` sidebars and inspectors, and `NSTabViewController` with a segmented control or the window's toolbar, which MacPass's windows are built on, `make check` 172/172.
+- 2026-11-24: Ferry 0.37.0 (freemac (1.211)): `NSExpression` and `NSComparisonPredicate` as public classes, with every documented form, the built-in functions, `MATCHES` and substitution variables; `NSDecimalNumber` and the `NSDecimal` functions in base 10; and in Core Data, exact decimal attributes, expression descriptions with aggregates, `propertiesToGroupBy` and `havingPredicate`, `make check` 175/175.

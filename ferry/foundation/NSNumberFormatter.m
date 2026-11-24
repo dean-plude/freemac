@@ -156,8 +156,36 @@ static void dec_from_integer(unsigned long long u, BOOL neg, struct dec *x)
     dec_trim(x);
 }
 
+/* An NSDecimalNumber's digits, exactly, from its description. */
+static void dec_from_decimal_number(NSNumber *num, struct dec *x)
+{
+    memset(x, 0, sizeof *x);
+    const char *s = [[num description] UTF8String];
+    if (!strcmp(s, "NaN")) {
+        x->special = 1;
+        return;
+    }
+    if (*s == '-')
+        x->neg = YES, s++;
+    BOOL point = NO;
+    for (; *s && x->n < (int)sizeof x->d; s++) {
+        if (*s == '.') {
+            point = YES;
+            continue;
+        }
+        x->d[x->n++] = *s;
+        if (!point)
+            x->exp++;
+    }
+    dec_trim(x);
+}
+
 static void dec_from_number(NSNumber *num, struct dec *x)
 {
+    if ([num isKindOfClass:[NSDecimalNumber class]]) {
+        dec_from_decimal_number(num, x);
+        return;
+    }
     const char *t = [num objCType];
     switch (t ? *t : 'd') {
     case 'c': case 's': case 'i': case 'l': case 'q': case 'B': {
@@ -1273,6 +1301,24 @@ static BOOL take(NSString *s, NSUInteger *pos, NSUInteger end, NSString *word, B
         if (![self _readDigits:s at:&q end:e into:num fraction:&frac] || q != e)
             continue;
         double v = strtod([num UTF8String], NULL);
+        if (_decimalNumbers) {   /* the digits read, exactly */
+            NSDecimalNumber *d = [NSDecimalNumber decimalNumberWithString:num];
+            if (_multiplier && [_multiplier doubleValue] != 0 && [_multiplier doubleValue] != 1)
+                d = [d decimalNumberByDividingBy:[NSDecimalNumber decimalNumberWithDecimal:[_multiplier decimalValue]]];
+            if (tries[k].neg)
+                d = [[NSDecimalNumber zero] decimalNumberBySubtracting:d];
+            if (!_allowsFloats && [d compare:[d decimalNumberByRoundingAccordingToBehavior:
+                                                     [NSDecimalNumberHandler decimalNumberHandlerWithRoundingMode:NSRoundDown
+                                                                                                            scale:0
+                                                                                                 raiseOnExactness:NO
+                                                                                                  raiseOnOverflow:NO
+                                                                                                 raiseOnUnderflow:NO
+                                                                                              raiseOnDivideByZero:NO]]] != NSOrderedSame)
+                return nil;
+            if ((_min && [d compare:_min] == NSOrderedAscending) || (_max && [d compare:_max] == NSOrderedDescending))
+                return nil;
+            return d;
+        }
         if (_multiplier && [_multiplier doubleValue] != 0 && [_multiplier doubleValue] != 1) {
             double m = [_multiplier doubleValue], l = log10(fabs(m));
             if (m > 0 && l == floor(l) && fabs(l) < 30) {   /* moving the point, in decimal */

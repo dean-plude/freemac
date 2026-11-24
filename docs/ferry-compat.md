@@ -351,8 +351,7 @@ row selects in the controller, and a click on a column's title sorts the
 controller's objects. A cell edited in place sets the key on its row's
 object. Underneath, `mutableSetValueForKey:` and the set mutation kinds of
 key-value observing are in. So are the collection operators in key paths
-(`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and an
-`NSPredicate` subset for filtering. Removing an observer that isn't
+(`@count`, `@sum`, `@avg`, `@min`, `@max` and the unions), and `NSPredicate` for filtering (with expressions and `MATCHES` from freemac 1.211, Ferry 0.37.0). Removing an observer that isn't
 registered now raises, as on a Mac.
 
 None of the nine apps has been run again with these.
@@ -886,10 +885,49 @@ attributes.
 
 Left out: compiled models (`.mom` and `.momd`), whose format isn't
 published, so most apps that ship only a compiled model stop there, and
-Ferry says so once. Also left out are store files made by a Mac, the XML
-store, heavyweight migration, expressions in fetches, and uniqueness
-constraints. The work was written from Apple's documentation and not
+Ferry says so once. Also left out are store files made by a Mac, the XML store, heavyweight migration, and uniqueness constraints. Expressions in fetches came later, in freemac 1.211 (Ferry 0.37.0). The work was written from Apple's documentation and not
 compared with a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
+
+### Expressions and decimal numbers (freemac 1.211, Ferry 0.37.0)
+
+Ferry's Foundation now has `NSExpression` and `NSComparisonPredicate` as
+public classes, and every predicate the parser reads is built from them.
+Expressions come in every documented form: constants, `SELF`, key paths,
+variables, functions (also sent to a target), aggregates, the set
+expressions, subqueries, `ANYKEY`, blocks and conditionals. The built-in
+functions are there, from `sum:`, `count:`, `average:`, `median:`, `mode:`
+and `stddev:` to the arithmetic, the bitwise functions, `sqrt:`, `log:`,
+`raise:toPower:`, the string functions, `random` and `now`. Format strings
+take arithmetic, `FUNCTION`, `TERNARY`, `CAST`, `SUBQUERY` and indexes like
+`tags[FIRST]`. `MATCHES` matches regular expressions with this system's ICU,
+through `NSRegularExpression`. `predicateWithSubstitutionVariables:` fills
+in variables, and predicates can be archived.
+
+`NSDecimalNumber`, `NSDecimalNumberHandler` and the `NSDecimal` functions
+(`NSDecimalAdd` and the others, `NSDecimalRound`, `NSDecimalNormalize`,
+`NSDecimalCompare`, `NSDecimalString`) do exact arithmetic in base 10, so
+0.1 and 0.2 add up to 0.3. Numbers keep up to 38 digits, in the four
+rounding modes, and raise the documented exceptions on overflow, underflow
+and division by zero unless a handler says not to. Decimal numbers compare
+and hash with other `NSNumber`s, and `NSNumber` has `decimalValue`.
+`NSScanner` reads them with `scanDecimal:`, `NSNumberFormatter` writes
+their digits exactly and makes them with `generatesDecimalNumbers`, and
+they go through keyed archiving and `NSJSONSerialization`.
+
+In Core Data, decimal attributes now keep their exact digits, as text, in
+the SQLite and binary stores. A store an older Ferry wrote, which kept them
+as doubles, is read as before, and an SQLite store's column is changed to
+text the first time it is opened for writing. A dictionary fetch takes
+`NSExpressionDescription`s in `propertiesToFetch`, with aggregates such as
+`sum:`, `count:`, `min:`, `max:` and `average:`, and it groups by
+`propertiesToGroupBy` and keeps the groups that pass `havingPredicate`. This
+is worked out in memory, and so is `MATCHES` in a fetch's predicate.
+
+Left out: `distanceToLocation:fromLocation:` (Ferry has no Core Location),
+archives of predicates made by a Mac, numbers read from JSON as decimals,
+aggregates done in SQL, and derived attributes. The work was written from
+Apple's documentation and not compared with a Mac; `docs/ferry-gui.md` lists
+what a Mac would settle.
 
 ## What the apps need most
 

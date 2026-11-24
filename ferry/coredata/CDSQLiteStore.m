@@ -16,7 +16,9 @@
  *
  * Names are the model's in upper case. Dates are kept as seconds since the
  * reference date, UUIDs and URLs as text, Booleans as 0 and 1, and decimal
- * numbers as doubles.
+ * numbers as text, their digits exactly (freemac 1.NEXT, Ferry 0.NEXT; a
+ * store that kept them as doubles has those columns changed to text when
+ * it is opened for writing).
  *
  * A fetch puts in SQL the part of its predicate it can say exactly the
  * same way there (comparisons of numbers, dates and strings, to-one
@@ -83,13 +85,13 @@ static NSString *column_type(NSAttributeType t)
     case NSInteger32AttributeType:
     case NSInteger64AttributeType:
     case NSBooleanAttributeType: return @"INTEGER";
-    case NSDecimalAttributeType:
     case NSDoubleAttributeType:
     case NSFloatAttributeType:
     case NSDateAttributeType: return @"REAL";
     case NSStringAttributeType:
     case NSUUIDAttributeType:
-    case NSURIAttributeType: return @"TEXT";
+    case NSURIAttributeType:
+    case NSDecimalAttributeType: return @"TEXT";
     default: return @"BLOB";
     }
 }
@@ -108,7 +110,7 @@ static id raw_value(NSAttributeDescription *a, id value)
     case NSInteger64AttributeType:
     case NSBooleanAttributeType:
         return [value respondsToSelector:@selector(longLongValue)] ? @([value longLongValue]) : [NSNull null];
-    case NSDecimalAttributeType:
+    case NSDecimalAttributeType: return [value isKindOfClass:[NSString class]] ? value : [NSNull null];
     case NSDoubleAttributeType:
     case NSFloatAttributeType:
         return [value respondsToSelector:@selector(doubleValue)] ? @([value doubleValue]) : [NSNull null];
@@ -132,7 +134,7 @@ static id attribute_value(NSAttributeDescription *a, id raw)
     case NSInteger32AttributeType: v = [NSNumber numberWithInt:(int)[raw longLongValue]]; break;
     case NSInteger64AttributeType: v = [NSNumber numberWithLongLong:[raw longLongValue]]; break;
     case NSBooleanAttributeType: v = [NSNumber numberWithBool:[raw longLongValue] != 0]; break;
-    case NSDecimalAttributeType:
+    case NSDecimalAttributeType: v = raw; break;   /* text, or a double in an older store */
     case NSDoubleAttributeType: v = [NSNumber numberWithDouble:[raw doubleValue]]; break;
     case NSFloatAttributeType: v = [NSNumber numberWithFloat:(float)[raw doubleValue]]; break;
     case NSDateAttributeType: v = [NSDate dateWithTimeIntervalSinceReferenceDate:[raw doubleValue]]; break;
@@ -609,6 +611,61 @@ static BOOL bind_args(sqlite3_stmt *st, NSArray *args)
     return names;
 }
 
+/* The decimal attributes' columns that an older store made REAL: {table, column}. */
+- (NSArray *)cd_realDecimalColumns
+{
+    NSMutableArray *found = [NSMutableArray array];
+    NSMutableDictionary *types = [NSMutableDictionary dictionary];
+    for (NSEntityDescription *e in [[self cd_model] entities])
+        for (NSAttributeDescription *a in [e cd_persistentAttributes]) {
+            if ([a attributeType] != NSDecimalAttributeType)
+                continue;
+            NSString *t = table_name(e), *c = column_name([a name]);
+            NSMutableDictionary *have = [types objectForKey:t];
+            if (!have) {
+                [types setObject:(have = [NSMutableDictionary dictionary]) forKey:t];
+                for (NSArray *row in [self cd_query:[NSString stringWithFormat:@"PRAGMA table_info(%@)", quoted(t)]
+                                               args:nil
+                                              error:NULL])
+                    [have setObject:[[row objectAtIndex:2] description] forKey:[row objectAtIndex:1]];
+            }
+            NSDictionary *pair = @{@"table" : t, @"column" : c};
+            if ([[[have objectForKey:c] uppercaseString] isEqualToString:@"REAL"] && ![found containsObject:pair])
+                [found addObject:pair];
+        }
+    return found;
+}
+
+/* Changes those columns to text, each double kept as the shortest decimal that reads back as it. */
+- (BOOL)cd_migrateDecimalColumns:(NSArray *)columns error:(NSError **)error
+{
+    for (NSDictionary *pair in columns) {
+        NSString *t = quoted([pair objectForKey:@"table"]), *name = [pair objectForKey:@"column"];
+        NSString *c = quoted(name), *old = quoted([name stringByAppendingString:@"__REAL"]);
+        if (![self cd_run:[NSString stringWithFormat:@"ALTER TABLE %@ RENAME COLUMN %@ TO %@", t, c, old] args:nil error:error] ||
+            ![self cd_run:[NSString stringWithFormat:@"ALTER TABLE %@ ADD COLUMN %@ TEXT", t, c] args:nil error:error])
+            return NO;
+        NSArray *rows = [self cd_query:[NSString stringWithFormat:@"SELECT Z_PK, %@ FROM %@ WHERE %@ IS NOT NULL", old, t, old]
+                                  args:nil
+                                 error:error];
+        if (!rows)
+            return NO;
+        for (NSArray *row in rows) {
+            id v = [row objectAtIndex:1];
+            NSString *text = [v isKindOfClass:[NSNumber class]]
+                                 ? [[NSDecimalNumber decimalNumberWithDecimal:[v decimalValue]] description]
+                                 : [v description];
+            if (![self cd_run:[NSString stringWithFormat:@"UPDATE %@ SET %@ = ? WHERE Z_PK = ?", t, c]
+                         args:@[ text, [row objectAtIndex:0] ]
+                        error:error])
+                return NO;
+        }
+        if (![self cd_run:[NSString stringWithFormat:@"ALTER TABLE %@ DROP COLUMN %@", t, old] args:nil error:error])
+            return NO;
+    }
+    return YES;
+}
+
 /* Makes the tables and columns the model needs that the file lacks. */
 - (BOOL)cd_makeTables:(NSError **)error
 {
@@ -647,6 +704,8 @@ static BOOL bind_args(sqlite3_stmt *st, NSArray *args)
                             error:error])
                     return NO;
     }
+    if (![self cd_migrateDecimalColumns:[self cd_realDecimalColumns] error:error])
+        return NO;
     for (NSString *j in joins)
         if (![self cd_run:[NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@ (Z_SRC INTEGER, Z_DST INTEGER, "
                                                      @"Z_ORD INTEGER)",
@@ -847,6 +906,13 @@ static sqlite3 *open_file(NSString *path, BOOL readOnly)
         if (changed) {
             [self cd_close];
             return CDFail(error, NSMigrationError, @"A read-only store can't be migrated.", nil);
+        }
+        NSArray *real = readOnly ? @[] : [self cd_realDecimalColumns];
+        if ([real count]) {   /* decimal numbers that an older store kept as doubles */
+            if (![self cd_begin:error])
+                return NO;
+            if (![self cd_end:[self cd_migrateDecimalColumns:real error:error] error:error])
+                return NO;
         }
         [self cd_learnColumns];
         return YES;

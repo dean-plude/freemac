@@ -27,7 +27,7 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      $(wildcard sdk/include/Foundation/NS*.h) \
                      sdk/include/CoreFoundation/CFSocket.h sdk/include/CoreFoundation/CFStream.h \
                      sdk/include/CFNetwork/CFNetwork.h \
-                     foundation/FCurl.h foundation/FURLInternal.h
+                     foundation/FCurl.h foundation/FURLInternal.h foundation/FExpression.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
 # Core Graphics and Core Text (M3), one Mac library that draws with this
