@@ -1049,4 +1049,21 @@ enum { UNSEEN, DECODING, DONE };
         *length = [v length];
     return [v bytes];
 }
+
+/* For copying a collection view's item prototype out of a nib (AppKit's
+ * NSNib.m): the objects decoded so far, by their place in the archive, and
+ * a fresh reader told to reuse some of them instead of decoding them again. */
+- (NSUInteger)_ferryObjectCount { return _count; }
+- (id)_ferryDecodedObjectAtIndex:(NSUInteger)index
+{
+    return index < _count && _state[index] == DONE ? _decoded[index] : nil;
+}
+- (void)_ferrySeedObject:(id)object atIndex:(NSUInteger)index
+{
+    if (index == 0 || index >= _count || _state[index] != UNSEEN || !object)
+        return;
+    _decoded[index] = [object retain];
+    _state[index] = DONE;
+}
+- (id)_ferryDecodeObjectAtIndex:(NSUInteger)index { return [self objectForUID:index]; }
 @end

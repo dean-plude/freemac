@@ -1,0 +1,34 @@
+bindings: content selectionIndexes hidden toolTip
+sections 1, items 5, views made 5
+item 0: a Card, a copy, for Ada, view its own, in the collection view 1, its collection view 1
+item 1 for Bo, field "Bo"; prototype's field ""
+item 0: 0,0 66x30
+item 1: 66,0 66x30
+item 2: 132,0 66x30
+item 3: 0,30 66x30
+item 4: 66,30 66x30
+its view: 66,30 66x30
+collection view: 0,0 200x100
+item 7 of 8: 66,60 66x30
+two columns, item 3: 100,30 100x30
+at most 80 wide, item 1: 80,0 80x30
+one row, item 4: 240,0 60x30
+collection view, laid out: 0,0 300x100
+at least 90x40, item 1: 90,0 90x40
+at item 4's middle: 0.4
+new content: Ed's item kept, Ada's kept, views made 7
+items: Ed Ada Flo
+subviews 3
+bound: Ada* Bo Cy Di Ed
+controller selects 2: Ada Bo Cy* Di Ed
+selection {2}, observed 1
+controller adds Gus: Ada Bo Cy* Di Ed Gus
+clicked item 3: collection view {3}, controller {3}, observed 2
+items: Ada Bo Cy Di* Ed Gus
+command-clicked item 0: controller {0,3}
+controller removes Bo: Ada* Cy Di* Ed Gus
+default colours: 1
+one colour (100,50 from the top): 1.0 0.0 0.0
+first row (180,10 from the top): 1.0 1.0 1.0
+second row (180,40 from the top): 0.0 0.0 1.0
+exit=0

@@ -218,6 +218,18 @@ Core Data keeps decimal attributes exactly in its SQLite and binary stores,
 and a dictionary fetch takes expression descriptions with aggregates,
 `propertiesToGroupBy` and `havingPredicate`.
 
+From Ferry 0.38.0 (freemac 1.212), Mac apps can show collection views
+with `NSCollectionView`, of the item-based kind with a data source and
+of the older kind with a content array and an item prototype. Items are
+laid out by `NSCollectionViewFlowLayout` or `NSCollectionViewGridLayout`,
+made and reused through `makeItemWithIdentifier:forIndexPath:`, selected
+by the mouse and keys, and inserted, deleted, moved and reloaded, and a
+prototype in a nib is copied with its outlets, actions and bindings.
+`NSRulerView` and `NSRulerMarker` put rulers on scroll views, with
+measurement units, markers the user can drag, and subclasses that draw
+their own marks, such as line numbers. Nothing in a collection view is
+animated, and items can't be dragged yet.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

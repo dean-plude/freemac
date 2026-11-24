@@ -526,6 +526,174 @@ static id resolve(id obj, NSDictionary *map)
 }
 @end
 
+/* ---- copying a collection view's item prototype ----------------------------------------- */
+
+/* A collection view of the older kind makes an item for each of its
+ * content objects by copying its item prototype, which usually comes from
+ * a nib with its view, the view's subviews, and outlets and bindings among
+ * them. Ferry's views can't be archived again, so a copy is made by
+ * decoding the prototype's part of the nib once more. When a nib holds a
+ * collection view item, what that takes is kept with the item: the nib's
+ * bytes, where the item and the connections touching its part are in the
+ * archive, and the nib's other objects (weakly), which the new reader
+ * reuses instead of making them again, so that a binding to File's Owner
+ * or an outlet to a window still reaches the one there is. */
+@interface NSCoder (FerryNibCopying)
+- (NSUInteger)_ferryObjectCount;
+- (id)_ferryDecodedObjectAtIndex:(NSUInteger)index;
+- (void)_ferrySeedObject:(id)object atIndex:(NSUInteger)index;
+- (id)_ferryDecodeObjectAtIndex:(NSUInteger)index;
+@end
+
+@interface ANibPrototype : NSObject {
+@public
+    NSData *_data;
+    BOOL _nibArchive;
+    NSUInteger _item;          /* the item's place in the archive */
+    NSUInteger _nseeds, *_seedAt;
+    id *_seeds;                /* weak: the nib's other objects */
+    NSMutableArray *_placeholders; /* its stand-ins, kept */
+    id *_reals;                /* weak: what each stand-in stood for */
+    NSArray *_connectors;      /* the places of the connections */
+}
+@end
+@implementation ANibPrototype
+- (void)dealloc
+{
+    for (NSUInteger i = 0; i < _nseeds; i++)
+        objc_storeWeak(&_seeds[i], nil);
+    for (NSUInteger i = 0; i < [_placeholders count]; i++)
+        objc_storeWeak(&_reals[i], nil);
+    free(_seeds);
+    free(_seedAt);
+    free(_reals);
+    [_data release];
+    [_placeholders release];
+    [_connectors release];
+    [super dealloc];
+}
+@end
+
+static const char prototype_key = 0;
+
+static void note_member(NSMutableSet *members, id o)
+{
+    if (o)
+        [members addObject:[NSValue valueWithPointer:o]];
+}
+static BOOL is_member(NSSet *members, id o) { return o && [members containsObject:[NSValue valueWithPointer:o]]; }
+static void note_view_tree(NSMutableSet *members, NSView *v)
+{
+    if (!v)
+        return;
+    note_member(members, v);
+    if ([v isKindOfClass:[NSControl class]])
+        note_member(members, [(NSControl *)v cell]);
+    for (NSView *s in [v subviews])
+        note_view_tree(members, s);
+}
+
+/* The object a runtime-attributes connection sets values on. */
+static id connector_object(id conn)
+{
+    if (![conn isKindOfClass:[NSIBUserDefinedRuntimeAttributesConnector class]])
+        return nil;
+    id object = nil;
+    @try {
+        object = [conn valueForKey:@"object"];
+    } @catch (NSException *e) {
+        object = nil;
+    }
+    return object;
+}
+
+/* After a nib is loaded: for each collection view item in it, what copying
+ * it takes (see above). */
+static void record_prototypes(NSIBObjectData *nib, NSDictionary *map, NSCoder *u, NSData *data, BOOL nibArchive)
+{
+    Class itemClass = NSClassFromString(@"NSCollectionViewItem");
+    if (!itemClass || ![u respondsToSelector:@selector(_ferryObjectCount)])
+        return;
+    NSMutableDictionary *where = nil; /* object -> its place in the archive */
+    NSArray *objs = nib->_objects, *parents = nib->_parents;
+    NSUInteger n = MIN([objs count], [parents count]);
+    for (id o in objs) {
+        id real = resolve(o, map);
+        if (![real isKindOfClass:itemClass] || objc_getAssociatedObject(real, &prototype_key))
+            continue;
+        if (!where) {
+            where = [NSMutableDictionary dictionary];
+            NSUInteger count = [u _ferryObjectCount];
+            for (NSUInteger i = 0; i < count; i++) {
+                id d = [u _ferryDecodedObjectAtIndex:i];
+                NSValue *key = d ? [NSValue valueWithPointer:d] : nil;
+                if (key && ![where objectForKey:key])
+                    [where setObject:[NSNumber numberWithUnsignedInteger:i] forKey:key];
+            }
+        }
+        NSNumber *at = [where objectForKey:[NSValue valueWithPointer:o]];
+        if (!at)
+            continue;
+        /* The item's part: the item, its view and what is inside them. */
+        NSMutableSet *members = [NSMutableSet set];
+        note_member(members, o);
+        note_view_tree(members, [(NSViewController *)real viewIfLoaded]);
+        for (BOOL grew = YES; grew;) {
+            grew = NO;
+            for (NSUInteger i = 0; i < n; i++) {
+                id obj = [objs objectAtIndex:i], parent = [parents objectAtIndex:i];
+                if (is_member(members, parent) && !is_member(members, obj)) {
+                    note_member(members, obj);
+                    grew = YES;
+                }
+            }
+        }
+        NSMutableArray *connectors = [NSMutableArray array];
+        for (id c in nib->_connections) {
+            if (![c isKindOfClass:[NSNibConnector class]])
+                continue;
+            NSNibConnector *conn = c;
+            NSNumber *ci = [where objectForKey:[NSValue valueWithPointer:c]];
+            /* only those from the part: an outlet to the prototype from outside stays as it is */
+            if (ci && (is_member(members, conn->_source) || is_member(members, connector_object(c))))
+                [connectors addObject:ci];
+        }
+        /* Everything else the nib lists is reused. */
+        NSMutableArray *others = [NSMutableArray arrayWithArray:objs];
+        [others addObjectsFromArray:parents];
+        if (nib->_root)
+            [others addObject:nib->_root];
+        ANibPrototype *t = [[ANibPrototype alloc] init];
+        t->_data = [data retain];
+        t->_nibArchive = nibArchive;
+        t->_item = [at unsignedIntegerValue];
+        t->_connectors = [connectors copy];
+        t->_seeds = calloc([others count] + 1, sizeof(id));
+        t->_seedAt = calloc([others count] + 1, sizeof(NSUInteger));
+        t->_placeholders = [[NSMutableArray alloc] init];
+        NSMutableSet *seen = [NSMutableSet set];
+        for (id obj in others) {
+            NSValue *key = [NSValue valueWithPointer:obj];
+            NSNumber *place = [where objectForKey:key];
+            if (obj == [NSNull null] || is_member(members, obj) || !place || [seen containsObject:key])
+                continue;
+            [seen addObject:key];
+            t->_seedAt[t->_nseeds] = [place unsignedIntegerValue];
+            objc_storeWeak(&t->_seeds[t->_nseeds++], obj);
+            if ([obj isKindOfClass:[NSCustomObject class]])
+                [t->_placeholders addObject:obj];
+        }
+        t->_reals = calloc([t->_placeholders count] + 1, sizeof(id));
+        for (NSUInteger i = 0; i < [t->_placeholders count]; i++) {
+            id stand = [t->_placeholders objectAtIndex:i];
+            id r = [map objectForKey:[NSValue valueWithPointer:stand]];
+            objc_storeWeak(&t->_reals[i], r == [NSNull null] ? nil : r);
+        }
+        objc_setAssociatedObject(real, &prototype_key, t, OBJC_ASSOCIATION_RETAIN);
+        [t release];
+    }
+}
+
 /* ---- NSNib ----------------------------------------------------------------------------- */
 
 @implementation NSNib {
@@ -641,7 +809,6 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
         return NO;
     }
     [nib retain];
-    [u release];
 
     /* Stand-ins to real objects. */
     NSMutableDictionary *map = [NSMutableDictionary dictionary];
@@ -730,6 +897,9 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
         [w makeKeyAndOrderFront:nil];
     }
 
+    record_prototypes(nib, map, u, _data, nibArchive);
+    [u release];
+
     if (topLevelObjects)
         *topLevelObjects = top;
     [nib release];
@@ -740,6 +910,67 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
     return [self instantiateWithOwner:owner topLevelObjects:objects];
 }
 @end
+
+/* A new copy of an item prototype that came from a nib, or nil when it
+ * didn't (see record_prototypes). */
+id ANibCopyItemPrototype(id item)
+{
+    ANibPrototype *t = objc_getAssociatedObject(item, &prototype_key);
+    if (!t)
+        return nil;
+    NSCoder *u;
+    if (t->_nibArchive) {
+        u = [[ANibArchive alloc] initForReadingWithData:t->_data];
+    } else {
+        u = [[NSKeyedUnarchiver alloc] initForReadingFromData:t->_data error:NULL];
+        [(NSKeyedUnarchiver *)u setRequiresSecureCoding:NO];
+    }
+    if (![u respondsToSelector:@selector(_ferrySeedObject:atIndex:)]) {
+        [u release];
+        return nil;
+    }
+    for (NSUInteger i = 0; i < t->_nseeds; i++) {
+        id obj = objc_loadWeak(&t->_seeds[i]);
+        if (obj)
+            [u _ferrySeedObject:obj atIndex:t->_seedAt[i]];
+    }
+    ANibLoad load = {[NSMutableDictionary dictionary]};
+    ANibLoad *outer = current_load;
+    current_load = &load;
+    id made = [u _ferryDecodeObjectAtIndex:t->_item];
+    NSMutableArray *connectors = [NSMutableArray array];
+    for (NSNumber *ci in t->_connectors) {
+        id c = [u _ferryDecodeObjectAtIndex:[ci unsignedIntegerValue]];
+        if (c)
+            [connectors addObject:c];
+    }
+    current_load = outer;
+    NSMutableDictionary *map = [NSMutableDictionary dictionary];
+    for (NSUInteger i = 0; i < [t->_placeholders count]; i++)
+        [map setObject:objc_loadWeak(&t->_reals[i]) ?: (id)[NSNull null]
+                forKey:[NSValue valueWithPointer:[t->_placeholders objectAtIndex:i]]];
+    id real = made;
+    if ([made isKindOfClass:[NSCustomObject class]]) {
+        real = instantiate(made, NO, nil);
+        [map setObject:real ?: (id)[NSNull null] forKey:[NSValue valueWithPointer:made]];
+    }
+    [real retain];
+    /* Controls in the copy whose target is a stand-in, as when loading. */
+    NSUInteger count = [u _ferryObjectCount];
+    for (NSUInteger i = 0; i < count; i++) {
+        id o = [u _ferryDecodedObjectAtIndex:i];
+        if (([o isKindOfClass:[NSControl class]] || [o isKindOfClass:[NSCell class]]) && [o target] &&
+            [map objectForKey:[NSValue valueWithPointer:[o target]]])
+            [o setTarget:resolve([o target], map)];
+    }
+    for (NSNibConnector *conn in connectors)
+        if ([conn isKindOfClass:[NSNibConnector class]])
+            [conn _connectWith:map];
+    if (real)
+        objc_setAssociatedObject(real, &prototype_key, t, OBJC_ASSOCIATION_RETAIN);
+    [u release];
+    return real;
+}
 
 @implementation NSObject (NSNibAwaking)
 - (void)awakeFromNib {}

@@ -375,6 +375,7 @@ static const CGFloat scroller_width = 15;
     NSInteger _findBarPosition;
     BOOL _tiling;
     NSClipView *_headerClip;   /* shows the document's header view, if it has one */
+    NSRulerView *_hRuler, *_vRuler;
 }
 
 static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize : NSMakeSize(1, 1); }
@@ -486,6 +487,12 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
     [_vertical release];
     [_horizontal release];
     [_headerClip release];
+    if ([_hRuler scrollView] == self)
+        [_hRuler setScrollView:nil];
+    if ([_vRuler scrollView] == self)
+        [_vRuler setScrollView:nil];
+    [_hRuler release];
+    [_vRuler release];
     [super dealloc];
 }
 - (BOOL)isFlipped { return YES; }
@@ -639,12 +646,73 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 - (void)setFindBarVisible:(BOOL)f { _findBar = f; }
 - (NSInteger)findBarPosition { return _findBarPosition; }
 - (void)setFindBarPosition:(NSInteger)p { _findBarPosition = p; }
+/* Rulers (Ferry 0.NEXT, NSRulerView.m): made of rulerViewClass when asked
+ * for, laid out by tile while rulersVisible is YES. */
+static Class ruler_class;
++ (void)setRulerViewClass:(Class)cls { ruler_class = cls; }
++ (Class)rulerViewClass { return ruler_class ?: [NSRulerView class]; }
+- (NSRulerView *)_newRuler:(NSRulerOrientation)o
+{
+    return [[[[self class] rulerViewClass] alloc] initWithScrollView:self orientation:o];
+}
+- (NSRulerView *)horizontalRulerView { return _hRuler; }
+- (void)setHorizontalRulerView:(NSRulerView *)r
+{
+    if (r == _hRuler)
+        return;
+    if ([_hRuler superview] == self)
+        [_hRuler removeFromSuperview];
+    [r retain];
+    [_hRuler release];
+    _hRuler = r;
+    [r setScrollView:self];
+    [self tile];
+}
+- (NSRulerView *)verticalRulerView { return _vRuler; }
+- (void)setVerticalRulerView:(NSRulerView *)r
+{
+    if (r == _vRuler)
+        return;
+    if ([_vRuler superview] == self)
+        [_vRuler removeFromSuperview];
+    [r retain];
+    [_vRuler release];
+    _vRuler = r;
+    [r setScrollView:self];
+    [self tile];
+}
 - (BOOL)hasVerticalRuler { return _rulerV; }
-- (void)setHasVerticalRuler:(BOOL)f { _rulerV = f; }
+- (void)setHasVerticalRuler:(BOOL)f
+{
+    _rulerV = f;
+    if (f && !_vRuler) {
+        NSRulerView *r = [self _newRuler:NSVerticalRuler];
+        [self setVerticalRulerView:r];
+        [r release];
+    }
+    [self tile];
+}
 - (BOOL)hasHorizontalRuler { return _rulerH; }
-- (void)setHasHorizontalRuler:(BOOL)f { _rulerH = f; }
+- (void)setHasHorizontalRuler:(BOOL)f
+{
+    _rulerH = f;
+    if (f && !_hRuler) {
+        NSRulerView *r = [self _newRuler:NSHorizontalRuler];
+        [self setHorizontalRulerView:r];
+        [r release];
+    }
+    [self tile];
+}
 - (BOOL)rulersVisible { return _rulersVisible; }
-- (void)setRulersVisible:(BOOL)f { _rulersVisible = f; }
+- (void)setRulersVisible:(BOOL)f
+{
+    _rulersVisible = f;
+    [self tile];
+}
+/* The rulers' room: the horizontal one along the top, the vertical one
+ * down the left. */
+- (CGFloat)_hRulerThickness { return _rulersVisible && _rulerH && _hRuler ? [_hRuler requiredThickness] : 0; }
+- (CGFloat)_vRulerThickness { return _rulersVisible && _rulerV && _vRuler ? [_vRuler requiredThickness] : 0; }
 - (void)flashScrollers {}
 
 /* The document's header view and corner view, when it has them (a table
@@ -686,6 +754,12 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         return;
     _tiling = YES;
     NSRect b = NSInsetRect([self bounds], border_size(_border).width, border_size(_border).height);
+    NSRect rulers = b;
+    CGFloat hRuler = [self _hRulerThickness], vRuler = [self _vRulerThickness];
+    b.origin.x += vRuler;
+    b.size.width = fmax(b.size.width - vRuler, 0);
+    b.origin.y += hRuler;
+    b.size.height = fmax(b.size.height - hRuler, 0);
     NSView *header = [self _documentHeader];
     CGFloat headerHeight = [self _headerHeight];
     b.origin.y += headerHeight;
@@ -733,6 +807,18 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
     } else if (_headerClip) {
         [_headerClip setHidden:YES];
     }
+    [_hRuler setHidden:hRuler <= 0];
+    [_vRuler setHidden:vRuler <= 0];
+    if (hRuler > 0) {
+        if ([_hRuler superview] != self)
+            [self addSubview:_hRuler];
+        [_hRuler setFrame:NSMakeRect(b.origin.x, rulers.origin.y, content.size.width, hRuler)];
+    }
+    if (vRuler > 0) {
+        if ([_vRuler superview] != self)
+            [self addSubview:_vRuler];
+        [_vRuler setFrame:NSMakeRect(rulers.origin.x, content.origin.y, vRuler, content.size.height)];
+    }
     _tiling = NO;
     [self reflectScrolledClipView:_clip];
     [self setNeedsDisplay:YES];
@@ -753,7 +839,8 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
     if (_autohides && [_clip documentView]) {
         BOOL v, h;
         NSRect r = NSInsetRect([self bounds], border_size(_border).width, border_size(_border).height);
-        r.size.height = fmax(r.size.height - [self _headerHeight], 0);
+        r.size.height = fmax(r.size.height - [self _headerHeight] - [self _hRulerThickness], 0);
+        r.size.width = fmax(r.size.width - [self _vRulerThickness], 0);
         [self _wantsVertical:&v horizontal:&h inside:r];
         if (v != (_vertical && ![_vertical isHidden]) || h != (_horizontal && ![_horizontal isHidden])) {
             [self tile];
@@ -772,6 +859,10 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         [_horizontal setFloatValue:room > 0 ? (float)((b.origin.x - d.origin.x) / room) : 0
                     knobProportion:d.size.width > 0 ? b.size.width / d.size.width : 1];
     }
+    if (_hRuler && ![_hRuler isHidden])
+        [_hRuler setNeedsDisplay:YES];
+    if (_vRuler && ![_vRuler isHidden])
+        [_vRuler setNeedsDisplay:YES];
     if (_headerClip && ![_headerClip isHidden] && [_headerClip bounds].origin.x != b.origin.x) {
         [_headerClip setBoundsOrigin:NSMakePoint(b.origin.x, [_headerClip bounds].origin.y)];
         [_headerClip setNeedsDisplay:YES];
@@ -808,6 +899,13 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 }
 - (void)drawRect:(NSRect)dirty
 {
+    CGFloat hRuler = [self _hRulerThickness], vRuler = [self _vRulerThickness];
+    if (hRuler > 0 && vRuler > 0) {
+        /* the corner between two rulers */
+        NSRect b = NSInsetRect([self bounds], border_size(_border).width, border_size(_border).height);
+        [[NSColor colorWithCalibratedWhite:0.965 alpha:1] setFill];
+        NSRectFill(NSMakeRect(b.origin.x, b.origin.y, vRuler, hRuler));
+    }
     if (_border != NSNoBorder) {
         [[NSColor colorWithCalibratedWhite:_border == NSLineBorder ? 0.3 : 0.72 alpha:1] setFill];
         NSFrameRect([self bounds]);

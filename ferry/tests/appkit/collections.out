@@ -1,0 +1,91 @@
+flow defaults: item 50x50, lines 10, between 10
+flipped 1, selectable 0, empty 1, multiple 0
+sections 2, items 7 and 3
+content 200x210
+item 0.0: 10,25 40x30
+item 0.1: 80,25 40x30
+item 0.2: 150,25 40x30
+item 0.3: 10,60 40x30
+item 0.4: 80,60 40x30
+item 0.5: 150,60 40x30
+item 0.6: 10,95 40x30
+item 1.0: 10,165 40x30
+header 0: 0,0 200x20
+footer 0: 0,130 200x10
+header 1: 0,140 200x20
+in sight: 0.0=ant 0.1=bee 0.2=cat 0.3=dog 0.4=eel 0.5=fox 0.6=gnu
+collection view: 0,0 200x210
+made 7, reused 0
+headers in sight {0.0}, footers {}
+header view head 0, in the collection view
+its frame: 0,0 200x20
+at 75,40: 0.0; at 65,40 (a gap): none
+scrolled to 1.2 at the bottom: 0,75 200x120
+in sight: 0.3=dog 0.4=eel 0.5=fox 0.6=gnu 1.0=hen 1.1=ibis 1.2=jay
+made 7, reused 3
+scrolled to 0.3 at the top: 0,60 200x120
+in sight: 0.3=dog 0.4=eel 0.5=fox 0.6=gnu 1.0=hen 1.1=ibis 1.2=jay
+made 7, reused 3
+scrolled to 0.0, nearest edge: 0,25 200x120
+header 0 pinned at 60: 0,60 200x20
+own size 0.0: 10,25 30x30
+own size 0.1: 70,25 40x30
+own size 0.2: 140,25 50x30
+own size 0.3: 10,60 60x30
+own size 0.4: 120,60 70x30
+collapsed 0: 1; item 0.4 hidden; item 1.0 now: 10,95 40x30
+across: content 240x120
+across 0.0: 25,5 40x30
+across 0.1: 25,45 40x30
+across 0.2: 25,85 40x30
+across 0.3: 70,5 40x30
+across header 1: 165,0 15x120
+in sight: 0.0=ant 0.1=bee 0.2=cat 0.3=dog 0.4=eel 0.5=fox 0.6=gnu 1.0=hen 1.1=ibis 1.2=jay
+collection view: 0,0 240x120
+grid: content 200x182
+grid 0.0: 5,5 60x40
+grid 0.4: 70,49 60x40
+grid 1.0: 70,93 60x40
+two columns, 0.3: 90,49 80x40
+two rows: 0.3 shown, 0.4 hidden
+selected by code {0.1}, item selected 1
+delegate: 
+pressed 0.0: highlight 1, selection {0.1}
+released: highlight 0, selection {0.0}, first responder 1
+delegate: should highlight {0.0} 1; highlighted {0.0} 1; should highlight {0.1} 2; highlighted {0.1} 2; should highlight {0.0,0.1} 0; highlighted {0.0,0.1} 0; should deselect {0.1}; should select {0.0}; did deselect {0.1}; did select {0.0}
+command-click 0.2, single selection: {0.2}
+command-click 0.0: {0.0,0.2}
+delegate: should highlight {0.0} 1; highlighted {0.0} 1; should highlight {0.0} 0; highlighted {0.0} 0; should select {0.0}; did select {0.0}
+shift-click 0.3: {0.0,0.1,0.2,0.3}
+click eel, which may not be selected: {}
+delegate: should highlight {0.4} 1; highlighted {0.4} 1; should highlight {0.0,0.1,0.2,0.3} 2; highlighted {0.0,0.1,0.2,0.3} 2; should highlight {0.0,0.1,0.2,0.3,0.4} 0; highlighted {0.0,0.1,0.2,0.3,0.4} 0; should deselect {0.0,0.1,0.2,0.3}; should select {0.4}; did deselect {0.0,0.1,0.2,0.3}
+click a gap: {}
+click a gap, empty not allowed: {0.0}
+delegate: should highlight {0.0} 1; highlighted {0.0} 1; should highlight {0.0} 0; highlighted {0.0} 0; should select {0.0}; did select {0.0}
+right: {0.1}
+down: {0.4}
+left twice: {0.2}
+shift-right: {0.2,0.3}
+delegate: should deselect {0.0}; should select {0.1}; did deselect {0.0}; did select {0.1}; should deselect {0.1}; should select {0.4}; did deselect {0.1}; did select {0.4}; should deselect {0.4}; should select {0.3}; did deselect {0.4}; did select {0.3}; should deselect {0.3}; should select {0.2}; did deselect {0.3}; did select {0.2}; should select {0.3}; did select {0.3}
+select all: 10 selected
+deselect all, empty not allowed: 10 selected
+deselect all: 0 selected
+set to 0.1 and 0.9 (not there): {0.1}, indexes 1
+before: 0.0=ant 0.1=bee* 0.2=cat 0.3=dog 0.4=eel 0.5=fox 0.6=gnu
+inserted asp at 0.0: 8 items, selection {0.2}
+after: 0.0=asp 0.1=ant 0.2=bee* 0.3=cat 0.4=dog 0.5=eel 0.6=fox 0.7=gnu
+deleted ant: selection {0.1}
+after: 0.0=asp 0.1=bee* 0.2=cat 0.3=dog 0.4=eel 0.5=fox 0.6=gnu
+moved bee to 0.4: selection {0.4}
+after: 0.0=asp 0.1=cat 0.2=dog 0.3=eel 0.4=bee* 0.5=fox 0.6=gnu
+reloaded 0.0: now auk, 1 item reused
+batch done: finished 1, ran 1
+after the batch: 7 items, selection {0.4}
+after: 0.0=yak 0.1=auk 0.2=eel 0.3=emu 0.4=bee* 0.5=fox 0.6=gnu
+inserted a section: 3 sections, selection {1.4}
+moved section 1 to 2: selection {2.4}, 1.0 is hen
+deleted section 0: 2 sections, selection {1.4}
+reloaded: 0.0=hen 0.1=ibis 0.2=jay 1.0=yak 1.1=auk 1.2=eel
+made 10, reused 22
+sets: {0.0,0.2}, enumerated 0.2 0.1 0.0
+exit=0
