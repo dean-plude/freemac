@@ -3000,6 +3000,11 @@ class Drawer(Gtk.Application):
         DrawerWindow(self, self.start_folder()).show_all()
 
     def do_open(self, files, _n, _hint):
+        # Another app asked (Hatch, Seek, the Dock): the new window comes to
+        # the front even when one of Drawer's own windows is there already.
+        before = self._my_views()
+        if before is not None:
+            GLib.timeout_add(120, self._bring_forward, before, 25)
         for file in files:
             path = file.get_path()
             chosen = None
@@ -3009,6 +3014,33 @@ class Drawer(Gtk.Application):
             window.show_all()
             if chosen:   # opened with a file: show it chosen in its folder
                 GLib.idle_add(lambda w=window, c=chosen: w.select_paths([c]) and False)
+
+
+    @staticmethod
+    def _my_views():
+        """The ids of Drawer's windows the compositor knows, or None without it."""
+        try:
+            from .wfipc import Connection
+            views = Connection().call("window-rules/list-views")
+        except (ConnectionError, OSError, ValueError, ImportError):
+            return None
+        mine = os.getpid()
+        return {v.get("id") for v in views if isinstance(v, dict) and v.get("pid") == mine} \
+            if isinstance(views, list) else None
+
+    def _bring_forward(self, before, tries):
+        now = self._my_views()
+        new = sorted((now or set()) - before)
+        if new:
+            try:
+                from .wfipc import Connection
+                Connection().call("window-rules/focus-view", id=new[-1])
+            except (ConnectionError, OSError, ValueError):
+                pass
+            return False
+        if tries > 1:
+            GLib.timeout_add(120, self._bring_forward, before, tries - 1)
+        return False
 
 
 def main():

@@ -878,6 +878,27 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Hatch and disk images (1.147)
+
+`freemac-hatch` is the default app for `application/x-cd-image`,
+`application/x-iso9660-image` and `application/x-raw-disk-image`
+(`/etc/xdg/mimeapps.list`); its `.desktop` file is `NoDisplay`, and Pier keeps
+such apps out of the Dock's recents. `disk_images.attach()` passes an open file
+descriptor to udisks2's `Manager.LoopSetup` (read-only for an `.iso` or a file
+the user can't write), which polkit allows the active session's user without a
+password; an image already set up by this user is reused. `mount()` waits for
+udisks to see its file systems (the whole image or its partitions), mounts any
+the Desktop hasn't, then sets `Loop.SetAutoclear` so the loop device goes away
+when its disk is unmounted or ejected. Hatch opens each mount point with its
+default app, which is Drawer; `Drawer.do_open` then focuses the new window
+through Wayfire IPC (`window-rules/focus-view`), as an activation token from
+another app isn't available. Hull's `hull_store` shows loops set up by this
+user as an `ImageDrive` under Disk Images; ejecting one unmounts its volumes
+and deletes the loop if autoclear hasn't already. New Image from Folder sizes
+the image from the folder (plus a fifth and 16 MB) and runs
+`mkfs.ext4 -d FOLDER -E root_owner=UID:GID` on a sparse file, so nothing needs
+root.
+
 ## Slipway (1.146)
 
 `freemac-slipway` is the default app for `application/vnd.debian.binary-package`

@@ -1442,6 +1442,12 @@ class Pier(Gtk.Window):
         """An app not kept in the Dock was open: it goes first in the recents."""
         if desktop_id in [p.pin_id for p in self.pinned]:
             return
+        try:
+            info = Gio.DesktopAppInfo.new(desktop_id)
+        except (TypeError, GLib.Error):
+            info = None
+        if info is not None and info.get_nodisplay():
+            return      # a helper such as Hatch, not an app to come back to
         ids = [desktop_id] + [d for d in self.recent_ids if d != desktop_id]
         if ids != self.recent_ids:
             self.recent_ids = ids[:12]
@@ -1465,7 +1471,8 @@ class Pier(Gtk.Window):
                     continue
                 if desktop_id not in self.recent:
                     try:
-                        if Gio.DesktopAppInfo.new(desktop_id) is None:
+                        info = Gio.DesktopAppInfo.new(desktop_id)
+                        if info is None or info.get_nodisplay():
                             continue
                     except TypeError:
                         continue
