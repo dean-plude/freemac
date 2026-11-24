@@ -246,6 +246,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"atexit", atexit},
     {"__sincos_stret", mac_sincos_stret},
     {"__sincosf_stret", mac_sincosf_stret},
+    /* Ferry's Foundation reaches ICU and libxml2 through this (src/host.c) */
+    {"ferry_twin_symbol", ferry_twin_symbol},
     {NULL, NULL},
 };
 

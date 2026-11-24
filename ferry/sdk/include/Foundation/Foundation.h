@@ -118,6 +118,7 @@ typedef NS_OPTIONS(NSUInteger, NSStringCompareOptions) {
     NSBackwardsSearch = 4,
     NSAnchoredSearch = 8,
     NSNumericSearch = 64,
+    NSRegularExpressionSearch = 1024,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
@@ -2058,5 +2059,15 @@ enum { NSUndoCloseGroupingRunLoopOrdering = 350000 };
 #define NSAssert(cond, desc, ...) do { if (!(cond)) [NSException raise:NSInternalInconsistencyException format:(desc), ##__VA_ARGS__]; } while (0)
 #define NSParameterAssert(cond) NSAssert((cond), @"Invalid parameter not satisfying: %s", #cond)
 #define NSCAssert NSAssert
+
+/* Classes declared in headers of their own, as on a Mac */
+enum { NSFormattingError = 2048 };
+#include <Foundation/NSTask.h>
+#include <Foundation/NSRegularExpression.h>
+#include <Foundation/NSScanner.h>
+#include <Foundation/NSXMLParser.h>
+#include <Foundation/NSProgress.h>
+#include <Foundation/NSOperation.h>
+#include <Foundation/NSCache.h>
 
 #endif

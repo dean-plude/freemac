@@ -1,0 +1,40 @@
+before launch: pid 0, running 0
+echo: hello from echo
+status 0, reason 1, running 0, has a pid 1
+exit 3: status 3, reason 1
+killed: status 15, reason uncaught signal
+environment and folder: foo-bar | / | 
+inherited environment: inherited
+cat: through cat
+stdout: to stdout
+stderr: to stderr
+null device: status 0
+waiting: running 1
+terminationStatus too early: NSInvalidArgumentException: *** -[NSConcreteTask terminationStatus]: task still running
+launched twice: *** -[NSConcreteTask launch]: task already launched
+terminated: status 15, reason 2
+missing program: 0, NSCocoaErrorDomain 4, path /no/such/program
+launch: NSInvalidArgumentException: *** -[NSConcreteTask launch]: launch path not accessible
+missing folder: 0
+terminate before launch: *** -[NSConcreteTask terminate]: task not launched
+termination handler: status 5
+readability handler collected: one
+two
+log: [terminated 5]
+background: [read 3][read 0][to end: all of it][available: ready]
+semaphore: handler saw 9, task made
+launchedTaskWithLaunchPath: status 0
+the Mac child got an argument and inherited
+the Mac child exited 7
+missing file: nil
+missing file by URL: NSCocoaErrorDomain 260
+read 4: 0123, offset 4
+available: 456789
+end at 10
+file now: 01ab4567
+read after close: NSFileHandleOperationException
+seek with error: 1 at 8, read past end: 0 bytes
+closed: 1
+written to the standard output handle
+standard handles: 0 1 2
+exit=0

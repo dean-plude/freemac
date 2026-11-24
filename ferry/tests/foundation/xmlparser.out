@@ -1,0 +1,83 @@
+-- a document
+start document
+processing instruction xml-stylesheet "href="a.css""
+entity who = "Ferry"
+<list> kind="fruit" note="a & b < c" (line 4)
+  comment " the first "
+  <item> id="1" (line 6)
+    text "apple"
+  </item>
+  <item> id="2" (line 7)
+    text "pear "
+    text "&"
+    text " quince"
+  </item>
+  <empty> (line 8)
+  </empty>
+  <code> (line 9)
+    cdata 13 bytes "if (a < b) {}"
+  </code>
+  <by> (line 10)
+    text "Ferry"
+    text " on Linux "
+    text "é"
+    text "☺"
+  </by>
+</list>
+end document
+parse: 1
+-- namespaces off
+start document
+<feed> xmlns="http://www.w3.org/2005/Atom" xmlns:x="urn:x" (line 1)
+  <x:entry> plain="p" x:id="7" (line 2)
+    text "hi"
+  </x:entry>
+</feed>
+end document
+parse: 1
+-- namespaces on
+start document
+map "" -> http://www.w3.org/2005/Atom
+map "x" -> urn:x
+<feed> uri=http://www.w3.org/2005/Atom qname=feed (line 1)
+  <entry> uri=urn:x qname=x:entry plain="p" x:id="7" (line 2)
+    text "hi"
+  </entry>
+</feed>
+unmap ""
+unmap "x"
+end document
+parse: 1
+-- mismatched tags
+start document
+<a> (line 1)
+  <b> (line 2)
+error 76 at line 3
+parse: 0, error NSXMLParserErrorDomain 76
+-- nothing
+error 4 at line 1
+parse: 0, error NSXMLParserErrorDomain 4
+-- text after the end
+start document
+<a> (line 1)
+</a>
+error 5 at line 1
+parse: 0, error NSXMLParserErrorDomain 5
+-- an undeclared entity
+start document
+<a> (line 1)
+error 26 at line 1
+parse: 0, error NSXMLParserErrorDomain 26
+-- aborting
+start document
+<list> (line 1)
+  <item> (line 1)
+    text "1"
+  </item>
+  <item> (line 1)
+aborting
+error 512 at line 1
+parse: 0, error NSXMLParserErrorDomain 512
+-- from a file, no delegate: 1
+-- error details: code 76, line 2, has a message 1, parser line 2
+exit=0
