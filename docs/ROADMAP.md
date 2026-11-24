@@ -1171,6 +1171,17 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.150 "First Aid" (done)
+
+Hull's First Aid, as in a Mac's Disk Utility: check a drive for errors and repair them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A First Aid button and Edit > First Aid… for a volume, or a drive (every volume on it), that isn't the system's, a disc or a read-only image | Hull | done |
+| 2 | Unmounts while it checks, repairs only when the check finds errors, and mounts again afterwards if it was mounted | hull_store.py | done |
+| 3 | One plain report: no problems, repaired, or problems it couldn't repair (with what to do next); volumes in a format freemac can't check are named | Hull | done |
+| 4 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.149 "Restore" (done)
 
 Hull's Restore, as in a Mac's Disk Utility: copy a disk image onto a drive, the way to make a USB stick that starts up a system.

@@ -878,6 +878,17 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## First Aid in Hull (1.150)
+
+`hull_store.first_aid()` runs on a thread for each volume: it asks udisks2's
+`Manager.CanCheck` whether the format has a checker installed, unmounts the
+volume if it was mounted, calls `Filesystem.Check`, and only if that reports
+errors (and `Manager.CanRepair` allows) calls `Filesystem.Repair`, then mounts
+it again. udisks runs the format's own checker (e2fsck, fsck.vfat, fsck.exfat
+and so on); both calls use polkit `modify-device`, already allowed for an
+administrator at the computer on drives that aren't the system's.
+`first_aid_words()` turns the results into one report.
+
 ## Restore in Hull (1.149)
 
 `disk_images.restore()` runs on a thread: it unmounts every mounted file

@@ -449,6 +449,54 @@ class Actions:
         self._steps(steps, done)
 
 
+# ---- First Aid ---------------------------------------------------------------------
+
+OK, REPAIRED, BROKEN, UNSUPPORTED = "ok", "repaired", "broken", "unsupported"
+
+
+def _sync(bus, path, interface, method, args, reply_type=None):
+    return bus.call_sync(BUS_NAME, path, P + interface, method, args,
+                         GLib.VariantType.new(reply_type) if reply_type else None,
+                         Gio.DBusCallFlags.ALLOW_INTERACTIVE_AUTHORIZATION, TIMEOUT, None)
+
+
+def _can(bus, what, fstype):
+    try:
+        reply = _sync(bus, ROOT + "/Manager", "Manager", what, GLib.Variant("(s)", (fstype,)), "((bs))")
+        return reply.unpack()[0][0]
+    except GLib.Error:
+        return False
+
+
+def first_aid(path, fstype, mounted, bus=None):
+    """Check a volume's file system for errors and repair them if there are
+    any, as a Mac's Disk Utility First Aid does: unmounted while it runs,
+    mounted again afterwards if it was. One of OK, REPAIRED, BROKEN or
+    UNSUPPORTED; GLib.Error when udisks says no (busy, not allowed)."""
+    bus = bus or Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    if not _can(bus, "CanCheck", fstype):
+        return UNSUPPORTED
+    none = GLib.Variant("(a{sv})", ({},))
+    if mounted:
+        _sync(bus, path, "Filesystem", "Unmount", none)
+    try:
+        sound = _sync(bus, path, "Filesystem", "Check", none, "(b)").unpack()[0]
+        if sound:
+            result = OK
+        elif not _can(bus, "CanRepair", fstype):
+            result = BROKEN
+        else:
+            fixed = _sync(bus, path, "Filesystem", "Repair", none, "(b)").unpack()[0]
+            result = REPAIRED if fixed else BROKEN
+    finally:
+        if mounted:
+            try:
+                _sync(bus, path, "Filesystem", "Mount", none, "(s)")
+            except GLib.Error:
+                pass
+    return result
+
+
 def watch(callback, bus=None):
     """Call callback() when a drive or volume comes, goes or changes."""
     bus = bus or Gio.bus_get_sync(Gio.BusType.SYSTEM, None)

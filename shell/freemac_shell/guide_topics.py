@@ -1139,6 +1139,16 @@ TOPICS = {
         "To remove an app, open Harbor, find it and click Remove; dragging it to the Trash doesn't remove it. "
         "The apps that come with freemac can't be removed.",
     ]),
+    "first-aid": ("Check a drive for errors with First Aid", "first aid check repair fix drive disk errors "
+                  "corrupt damaged usb stick memory card fsck chkdsk hull won't open", [
+        "If a USB drive or memory card acts up, open Hull, choose it in the sidebar and click First Aid. "
+        "Choose a drive to check every volume on it, or one volume to check just that one.",
+        "It's unmounted while it's checked, so close any files on it first; it's mounted again afterwards.",
+        "First Aid repairs what it can. If it says there are problems it couldn't repair, copy what you need off "
+        "the drive and erase it to use it again.",
+        "freemac can check most formats, including ExFAT, MS-DOS (FAT) and Linux (ext4). The disk freemac is "
+        "running from is checked as the computer starts up, when it needs it.",
+    ]),
     "restore-usb": ("Copy a disk image onto a USB drive", "restore usb stick drive bootable startup start up "
                     "installer iso img write flash burn copy image onto hull", [
         "To make a USB drive that starts up freemac, or another system, from its .iso: plug the drive in, open "
