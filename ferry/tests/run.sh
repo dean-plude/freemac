@@ -295,6 +295,32 @@ else
     echo "FAIL appkit_controllers (did not compile)"; sed 's/^/    /' "$build/appkit_controllers.cc.log"
     fail=$((fail + 1))
 fi
+# Documents, alerts and the workspace (1.167): DocApp.app from make_nibs.py,
+# with a note named on the command line, an isolated home and a stand-in
+# "gio" first on the PATH that writes down what it was asked to open.
+app="$build/DocApp.app"
+home="$build/home_documents"
+rm -rf "$app" "$home"; cp -r "$here/appkit/DocApp.app" "$app"; mkdir -p "$app/Contents/MacOS" "$home/work" "$home/bin"
+printf '%s\n' '#!/bin/sh' 'echo "$*" >> "$HOME/gio.log"' > "$home/bin/gio"; chmod +x "$home/bin/gio"
+printf 'launched text' > "$home/work/Launch.note"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/DocApp" "$here/appkit/documents.m" -framework Cocoa \
+        2> "$build/appkit_documents.cc.log"; then
+    (cd "$home/work" && env -u WAYLAND_DISPLAY -u DISPLAY -u FERRY_ALERT_ANSWER -u FERRY_PANEL_ANSWER HOME="$home" \
+        XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$home" PATH="$home/bin:$PATH" \
+        "$top/ferry" "$app/Contents/MacOS/DocApp" Launch.note) > "$build/appkit_documents.got" \
+        2> "$build/appkit_documents.err"
+    echo "exit=$?" >> "$build/appkit_documents.got"
+    if diff -u "$here/appkit/documents.out" "$build/appkit_documents.got" > "$build/appkit_documents.diff"; then
+        echo "ok   appkit_documents"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_documents"; sed 's/^/    /' "$build/appkit_documents.diff"
+        sed 's/^/    stderr: /' "$build/appkit_documents.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_documents (did not compile)"; sed 's/^/    /' "$build/appkit_documents.cc.log"
+    fail=$((fail + 1))
+fi
 # Images (M7), in an app bundle the test writes its image files into: it
 # runs from there, so imageNamed: finds them. No image files are kept here.
 app="$build/ImageApp.app"

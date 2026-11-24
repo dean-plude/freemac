@@ -156,6 +156,34 @@ void ADragAttach(NSWindow *window, GtkWidget *area);
 - (NSView *)_toolbarView;
 @end
 
+/* Sheets (NSWindow.m). A sheet begun by NSApp's old call tells its
+ * delegate before it is put away; a picture of a window, with a title bar
+ * drawn as the desktop's compositor draws one, for tests and reports. */
+@interface NSWindow (FerrySheets)
+- (void)_setLegacySheet:(BOOL)flag;
+- (void)_detachSheet:(NSWindow *)sheet;
+- (BOOL)_isHostedSheet;
+- (NSString *)_shownTitle;
+- (NSBitmapImageRep *)_pictureWithTitleBar:(BOOL)titleBar;
+@end
+
+/* (NSApplication.m) Whether target takes item's action now: its
+ * validateMenuItem: for a menu item, else validateUserInterfaceItem:, else
+ * yes. */
+BOOL AValidateItem(id target, id item);
+/* (NSSavePanel.m) The file extensions a type name or uniform type
+ * identifier stands for; nil for an identifier Ferry doesn't know. */
+NSArray *AExtensionsForType(NSString *type);
+/* (NSDocumentController.m) The Open Recent menu named in a nib. */
+void ANoteRecentDocumentsMenu(NSMenu *menu);
+@interface NSDocumentController (FerryPrivate)
+/* the shared controller if one has been made, without making one */
++ (NSDocumentController *)_existingSharedController;
+- (NSArray *)_typesForClass:(Class)cls editorsOnly:(BOOL)editors;
+- (NSUInteger)_nextUntitledNumber;
+- (void)_fillRecentMenu;
+@end
+
 /* (NSToolbar.m) the strip a window's toolbar is drawn in, a root view of the
  * window above its content view. */
 @interface NSToolbar (FerryPrivate)

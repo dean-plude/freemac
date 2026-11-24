@@ -78,10 +78,7 @@ static void prepare_menu(NSMenu *menu)
         if (!action || [item isSeparatorItem] || [item hasSubmenu])
             continue;
         id target = [NSApp targetForAction:action to:[item target] from:item];
-        BOOL ok = target != nil;
-        if (ok && [target respondsToSelector:@selector(validateMenuItem:)])
-            ok = [target validateMenuItem:item];
-        [item setEnabled:ok];
+        [item setEnabled:target && AValidateItem(target, item)];
     }
 }
 

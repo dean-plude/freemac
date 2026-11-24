@@ -337,6 +337,8 @@ PASS(keyUp)
 PASS(flagsChanged)
 #undef PASS
 - (BOOL)performKeyEquivalent:(NSEvent *)event { return NO; }
+/* A window has one (or its document's); a responder uses its window's. */
+- (NSUndoManager *)undoManager { return [_next undoManager]; }
 
 /* A key press that reaches the end of the chain unhandled beeps, as on a
  * Mac; other events are dropped quietly. */

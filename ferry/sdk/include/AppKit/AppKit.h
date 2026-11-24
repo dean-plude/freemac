@@ -121,6 +121,7 @@ enum {
 
 @interface NSResponder : NSObject <NSCoding>
 @property (assign) NSResponder *nextResponder;
+@property (readonly) NSUndoManager *undoManager;
 @property (readonly) BOOL acceptsFirstResponder;
 - (BOOL)becomeFirstResponder;
 - (BOOL)resignFirstResponder;
@@ -890,6 +891,10 @@ enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLev
 - (void)windowDidMiniaturize:(NSNotification *)notification;
 - (void)windowDidDeminiaturize:(NSNotification *)notification;
 - (NSSize)windowWillResize:(NSWindow *)sender toSize:(NSSize)size;
+- (void)windowWillBeginSheet:(NSNotification *)notification;
+- (void)windowDidEndSheet:(NSNotification *)notification;
+- (NSRect)window:(NSWindow *)window willPositionSheet:(NSWindow *)sheet usingRect:(NSRect)rect;
+- (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window;
 @end
 
 @interface NSWindow : NSResponder
@@ -1109,6 +1114,11 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (void)applicationDidResignActive:(NSNotification *)notification;
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename;
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames;
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls;
+- (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender;
+- (BOOL)applicationOpenUntitledFile:(NSApplication *)sender;
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag;
+- (NSError *)application:(NSApplication *)application willPresentError:(NSError *)error;
 @end
 
 @interface NSApplication : NSResponder
@@ -2803,6 +2813,356 @@ APPKIT_EXTERN NSNotificationName const NSToolbarDidRemoveItemNotification;
 @property NSWindowToolbarStyle toolbarStyle;
 - (void)toggleToolbarShown:(id)sender;
 - (void)runToolbarCustomizationPalette:(id)sender;
+@end
+
+/* ---- validating menu items and controls ------------------------------------------- */
+
+@protocol NSValidatedUserInterfaceItem
+@property (readonly) SEL action;
+@property (readonly) NSInteger tag;
+@end
+@protocol NSUserInterfaceValidations
+- (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item;
+@end
+@interface NSMenuItem (NSValidatedUserInterfaceItem) <NSValidatedUserInterfaceItem>
+@end
+
+/* ---- sheets -------------------------------------------------------------------------
+ * A sheet is drawn inside its window, under the title bar and toolbar, as
+ * a Mac shows it; one bigger than its window gets a window of its own, set
+ * modal for its parent (which the compositor may show attached to it). */
+APPKIT_EXTERN NSNotificationName const NSWindowWillBeginSheetNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowDidEndSheetNotification;
+@interface NSWindow (NSSheets)
+- (void)beginSheet:(NSWindow *)sheet completionHandler:(void (^)(NSModalResponse returnCode))handler;
+- (void)beginCriticalSheet:(NSWindow *)sheet completionHandler:(void (^)(NSModalResponse returnCode))handler;
+- (void)endSheet:(NSWindow *)sheet;
+- (void)endSheet:(NSWindow *)sheet returnCode:(NSModalResponse)returnCode;
+@property (readonly) NSWindow *attachedSheet;
+@property (readonly) NSWindow *sheetParent;
+@property (readonly, copy) NSArray<NSWindow *> *sheets;
+@property (readonly, getter=isSheet) BOOL sheet;
+@property (copy) NSURL *representedURL;
+@property (copy) NSString *representedFilename;
+@property (readonly) NSUndoManager *undoManager;
+@end
+@interface NSApplication (NSSheets)
+- (void)beginSheet:(NSWindow *)sheet modalForWindow:(NSWindow *)window modalDelegate:(id)delegate
+    didEndSelector:(SEL)selector contextInfo:(void *)context;
+- (void)endSheet:(NSWindow *)sheet;
+- (void)endSheet:(NSWindow *)sheet returnCode:(NSInteger)returnCode;
+@end
+
+/* ---- errors, presented in an alert ---------------------------------------------------- */
+
+@interface NSResponder (NSErrorPresentation)
+- (BOOL)presentError:(NSError *)error;
+- (void)presentError:(NSError *)error modalForWindow:(NSWindow *)window delegate:(id)delegate
+    didPresentSelector:(SEL)selector contextInfo:(void *)context;
+- (NSError *)willPresentError:(NSError *)error;
+@end
+
+/* ---- alerts -------------------------------------------------------------------------
+ * Drawn by Ferry as a current Mac draws them: the icon, the message in
+ * bold, the informative text, an accessory view and a "Do not show this
+ * message again" check box above the buttons, all centred. runModal runs
+ * a nested event loop until a button is pressed; a sheet is shown inside
+ * its window. With no display, FERRY_ALERT_ANSWER (a button's title or
+ * number) answers an alert run modally at once. */
+typedef NS_ENUM(NSUInteger, NSAlertStyle) {
+    NSAlertStyleWarning = 0, NSAlertStyleInformational = 1, NSAlertStyleCritical = 2,
+};
+#define NSWarningAlertStyle NSAlertStyleWarning
+#define NSInformationalAlertStyle NSAlertStyleInformational
+#define NSCriticalAlertStyle NSAlertStyleCritical
+enum { NSAlertFirstButtonReturn = 1000, NSAlertSecondButtonReturn = 1001, NSAlertThirdButtonReturn = 1002 };
+enum { NSAlertDefaultReturn = 1, NSAlertAlternateReturn = 0, NSAlertOtherReturn = -1, NSAlertErrorReturn = -2 };
+@class NSAlert, NSButton;
+@protocol NSAlertDelegate <NSObject>
+@optional
+- (BOOL)alertShowHelp:(NSAlert *)alert;
+@end
+@interface NSAlert : NSObject
++ (NSAlert *)alertWithError:(NSError *)error;
++ (NSAlert *)alertWithMessageText:(NSString *)message defaultButton:(NSString *)defaultButton
+                  alternateButton:(NSString *)alternateButton otherButton:(NSString *)otherButton
+        informativeTextWithFormat:(NSString *)format, ...;
+@property (copy) NSString *messageText;
+@property (copy) NSString *informativeText;
+@property (retain) NSImage *icon;
+@property NSAlertStyle alertStyle;
+@property BOOL showsHelp;
+@property (copy) NSString *helpAnchor;
+@property (assign) id<NSAlertDelegate> delegate;
+@property (readonly, copy) NSArray<NSButton *> *buttons;
+- (NSButton *)addButtonWithTitle:(NSString *)title;
+@property BOOL showsSuppressionButton;
+@property (readonly) NSButton *suppressionButton;
+@property (retain) NSView *accessoryView;
+- (void)layout;
+@property (readonly) NSWindow *window;
+- (NSModalResponse)runModal;
+- (void)beginSheetModalForWindow:(NSWindow *)window completionHandler:(void (^)(NSModalResponse returnCode))handler;
+- (void)beginSheetModalForWindow:(NSWindow *)window modalDelegate:(id)delegate didEndSelector:(SEL)selector
+                     contextInfo:(void *)context;
+@end
+NSInteger NSRunAlertPanel(NSString *title, NSString *format, NSString *defaultButton, NSString *alternateButton,
+                          NSString *otherButton, ...);
+NSInteger NSRunInformationalAlertPanel(NSString *title, NSString *format, NSString *defaultButton,
+                                       NSString *alternateButton, NSString *otherButton, ...);
+NSInteger NSRunCriticalAlertPanel(NSString *title, NSString *format, NSString *defaultButton,
+                                  NSString *alternateButton, NSString *otherButton, ...);
+
+/* ---- the workspace ------------------------------------------------------------------
+ * Files and web addresses are opened by the desktop's own launcher (gio
+ * open, else xdg-open), which hands them to the app the desktop has for
+ * them; that is the only way Ferry starts anything outside itself. Icons
+ * come from the desktop's icon theme. The notifications are all there, but
+ * nothing on this system posts most of them. */
+@class NSRunningApplication;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceWillLaunchApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidLaunchApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidTerminateApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidActivateApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidDeactivateApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidHideApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidUnhideApplicationNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceWillSleepNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidWakeNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceScreensDidSleepNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceScreensDidWakeNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceWillPowerOffNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceSessionDidBecomeActiveNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceSessionDidResignActiveNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidMountNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceWillUnmountNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidUnmountNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceActiveSpaceDidChangeNotification;
+APPKIT_EXTERN NSString *const NSWorkspaceApplicationKey;
+@interface NSWorkspaceOpenConfiguration : NSObject <NSCopying>
++ (instancetype)configuration;
+@property BOOL activates, promptsUserIfNeeded, addsToRecentItems, hides, createsNewApplicationInstance;
+@property (copy) NSArray<NSString *> *arguments;
+@end
+@interface NSWorkspace : NSObject
+@property (class, readonly) NSWorkspace *sharedWorkspace;
+@property (readonly) NSNotificationCenter *notificationCenter;
+- (BOOL)openURL:(NSURL *)url;
+- (void)openURL:(NSURL *)url configuration:(NSWorkspaceOpenConfiguration *)configuration
+    completionHandler:(void (^)(NSRunningApplication *app, NSError *error))handler;
+- (BOOL)openFile:(NSString *)path;
+- (BOOL)openFile:(NSString *)path withApplication:(NSString *)app;
+- (BOOL)openFile:(NSString *)path withApplication:(NSString *)app andDeactivate:(BOOL)deactivate;
+- (BOOL)selectFile:(NSString *)path inFileViewerRootedAtPath:(NSString *)root;
+- (void)activateFileViewerSelectingURLs:(NSArray<NSURL *> *)urls;
+- (BOOL)launchApplication:(NSString *)name;
+- (NSImage *)iconForFile:(NSString *)path;
+- (NSImage *)iconForFiles:(NSArray<NSString *> *)paths;
+- (NSImage *)iconForFileType:(NSString *)type;
+- (BOOL)setIcon:(NSImage *)image forFile:(NSString *)path options:(NSUInteger)options;
+- (NSURL *)URLForApplicationWithBundleIdentifier:(NSString *)identifier;
+- (NSString *)absolutePathForAppBundleWithIdentifier:(NSString *)identifier;
+- (NSString *)fullPathForApplication:(NSString *)name;
+- (NSURL *)URLForApplicationToOpenURL:(NSURL *)url;
+- (BOOL)isFilePackageAtPath:(NSString *)path;
+- (NSString *)typeOfFile:(NSString *)path error:(NSError **)error;
+- (NSString *)localizedDescriptionForType:(NSString *)type;
+- (NSString *)preferredFilenameExtensionForType:(NSString *)type;
+- (BOOL)filenameExtension:(NSString *)extension isValidForType:(NSString *)type;
+- (BOOL)type:(NSString *)type conformsToType:(NSString *)other;
+- (void)noteFileSystemChanged:(NSString *)path;
+@end
+
+/* ---- documents ----------------------------------------------------------------------
+ * The document architecture, as Apple documents it: the Info.plist's
+ * CFBundleDocumentTypes say which types the app reads and writes and which
+ * NSDocument subclass holds each; NSDocumentController (or the app's own
+ * subclass, if one is made first) makes and opens documents and keeps the
+ * Recent Documents list; each document reads and writes its file and keeps
+ * its change count, which its windows show. Autosaving and versions are
+ * left out: autosavesInPlace answers NO and those calls do nothing. */
+typedef NS_ENUM(NSUInteger, NSDocumentChangeType) {
+    NSChangeDone = 0, NSChangeUndone = 1, NSChangeCleared = 2, NSChangeReadOtherContents = 3,
+    NSChangeAutosaved = 4, NSChangeRedone = 5, NSChangeDiscardable = 256,
+};
+typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
+    NSSaveOperation = 0, NSSaveAsOperation = 1, NSSaveToOperation = 2, NSAutosaveElsewhereOperation = 3,
+    NSAutosaveInPlaceOperation = 4, NSAutosaveAsOperation = 5,
+};
+#define NSAutosaveOperation NSAutosaveElsewhereOperation
+@class NSSavePanel, NSOpenPanel;
+@interface NSDocument : NSObject <NSUserInterfaceValidations, NSMenuItemValidation>
+- (instancetype)init;
+- (instancetype)initWithType:(NSString *)type error:(NSError **)error;
+- (instancetype)initWithContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+- (instancetype)initForURL:(NSURL *)url withContentsOfURL:(NSURL *)contentsURL ofType:(NSString *)type
+                     error:(NSError **)error;
+@property (class, readonly, copy) NSArray<NSString *> *readableTypes, *writableTypes;
++ (BOOL)isNativeType:(NSString *)type;
++ (BOOL)canConcurrentlyReadDocumentsOfType:(NSString *)type;
+@property (copy) NSURL *fileURL;
+@property (copy) NSString *fileType;
+@property (copy) NSDate *fileModificationDate;
+@property (readonly, copy) NSString *displayName;
+- (void)setDisplayName:(NSString *)name;
+- (NSString *)defaultDraftName;
+@property (getter=isDraft) BOOL draft;
+@property (readonly, getter=isDocumentEdited) BOOL documentEdited;
+@property (readonly) BOOL hasUnautosavedChanges;
+@property (retain) NSUndoManager *undoManager;
+@property BOOL hasUndoManager;
+- (void)updateChangeCount:(NSDocumentChangeType)change;
+- (id)changeCountTokenForSaveOperation:(NSSaveOperationType)operation;
+- (void)updateChangeCountWithToken:(id)token forSaveOperation:(NSSaveOperationType)operation;
+/* reading */
+- (BOOL)readFromURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+- (BOOL)readFromFileWrapper:(NSFileWrapper *)wrapper ofType:(NSString *)type error:(NSError **)error;
+- (BOOL)readFromData:(NSData *)data ofType:(NSString *)type error:(NSError **)error;
+- (BOOL)revertToContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+@property (readonly, getter=isEntireFileLoaded) BOOL entireFileLoaded;
+/* writing */
+- (BOOL)writeSafelyToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
+                   error:(NSError **)error;
+- (BOOL)writeToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
+    originalContentsURL:(NSURL *)original error:(NSError **)error;
+- (BOOL)writeToURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+- (NSFileWrapper *)fileWrapperOfType:(NSString *)type error:(NSError **)error;
+- (NSData *)dataOfType:(NSString *)type error:(NSError **)error;
+- (NSDictionary *)fileAttributesToWriteToURL:(NSURL *)url ofType:(NSString *)type
+                            forSaveOperation:(NSSaveOperationType)operation originalContentsURL:(NSURL *)original
+                                       error:(NSError **)error;
+@property (readonly) BOOL keepBackupFile;
+- (NSArray<NSString *> *)writableTypesForSaveOperation:(NSSaveOperationType)operation;
+- (NSString *)fileNameExtensionForType:(NSString *)type saveOperation:(NSSaveOperationType)operation;
+/* the calls before Mac OS X 10.4, still used by older apps */
+- (BOOL)readFromFile:(NSString *)path ofType:(NSString *)type;
+- (BOOL)readFromURL:(NSURL *)url ofType:(NSString *)type;
+- (BOOL)loadDataRepresentation:(NSData *)data ofType:(NSString *)type;
+- (BOOL)loadFileWrapperRepresentation:(NSFileWrapper *)wrapper ofType:(NSString *)type;
+- (NSData *)dataRepresentationOfType:(NSString *)type;
+- (NSFileWrapper *)fileWrapperRepresentationOfType:(NSString *)type;
+- (BOOL)writeToFile:(NSString *)path ofType:(NSString *)type;
+- (BOOL)writeToURL:(NSURL *)url ofType:(NSString *)type;
+- (NSString *)fileName;
+- (void)setFileName:(NSString *)name;
+/* saving */
+- (IBAction)saveDocument:(id)sender;
+- (IBAction)saveDocumentAs:(id)sender;
+- (IBAction)saveDocumentTo:(id)sender;
+- (IBAction)revertDocumentToSaved:(id)sender;
+- (IBAction)duplicateDocument:(id)sender;
+- (IBAction)renameDocument:(id)sender;
+- (IBAction)moveDocument:(id)sender;
+- (IBAction)lockDocument:(id)sender;
+- (IBAction)unlockDocument:(id)sender;
+- (IBAction)browseDocumentVersions:(id)sender;
+- (IBAction)printDocument:(id)sender;
+- (IBAction)runPageLayout:(id)sender;
+- (NSDocument *)duplicateAndReturnError:(NSError **)error;
+- (void)saveDocumentWithDelegate:(id)delegate didSaveSelector:(SEL)selector contextInfo:(void *)context;
+- (void)runModalSavePanelForSaveOperation:(NSSaveOperationType)operation delegate:(id)delegate
+                          didSaveSelector:(SEL)selector contextInfo:(void *)context;
+- (BOOL)prepareSavePanel:(NSSavePanel *)panel;
+@property (readonly) BOOL shouldRunSavePanelWithAccessoryView;
+@property (readonly) BOOL fileNameExtensionWasHiddenInLastRunSavePanel;
+@property (readonly, copy) NSString *fileTypeFromLastRunSavePanel;
+- (void)saveToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
+             delegate:(id)delegate didSaveSelector:(SEL)selector contextInfo:(void *)context;
+- (void)saveToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
+    completionHandler:(void (^)(NSError *error))handler;
+- (BOOL)saveToURL:(NSURL *)url ofType:(NSString *)type forSaveOperation:(NSSaveOperationType)operation
+            error:(NSError **)error;
+/* autosaving and versions: not in Ferry; these do nothing */
+@property (class, readonly) BOOL autosavesInPlace, autosavesDrafts, preservesVersions;
+@property (copy) NSURL *autosavedContentsFileURL;
+@property (readonly, copy) NSString *autosavingFileType;
+@property (readonly) BOOL autosavingIsImplicitlyCancellable;
+- (void)autosaveWithImplicitCancellability:(BOOL)cancellable completionHandler:(void (^)(NSError *error))handler;
+- (void)autosaveDocumentWithDelegate:(id)delegate didAutosaveSelector:(SEL)selector contextInfo:(void *)context;
+- (BOOL)checkAutosavingSafetyAndReturnError:(NSError **)error;
+- (void)scheduleAutosaving;
+/* closing */
+- (void)canCloseDocumentWithDelegate:(id)delegate shouldCloseSelector:(SEL)selector contextInfo:(void *)context;
+- (void)shouldCloseWindowController:(NSWindowController *)controller delegate:(id)delegate
+                shouldCloseSelector:(SEL)selector contextInfo:(void *)context;
+- (void)close;
+/* windows */
+- (void)makeWindowControllers;
+@property (readonly) NSString *windowNibName;
+- (void)windowControllerWillLoadNib:(NSWindowController *)controller;
+- (void)windowControllerDidLoadNib:(NSWindowController *)controller;
+- (void)setWindow:(NSWindow *)window;
+- (void)addWindowController:(NSWindowController *)controller;
+- (void)removeWindowController:(NSWindowController *)controller;
+@property (readonly, copy) NSArray<NSWindowController *> *windowControllers;
+- (void)showWindows;
+@property (readonly) NSWindow *windowForSheet;
+@property (readonly, getter=isLocked) BOOL locked;
+@property (readonly, getter=isInViewingMode) BOOL inViewingMode;
+/* errors */
+- (BOOL)presentError:(NSError *)error;
+- (void)presentError:(NSError *)error modalForWindow:(NSWindow *)window delegate:(id)delegate
+    didPresentSelector:(SEL)selector contextInfo:(void *)context;
+- (NSError *)willPresentError:(NSError *)error;
+- (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item;
+- (BOOL)validateMenuItem:(NSMenuItem *)item;
+@end
+
+@interface NSDocumentController : NSObject <NSCoding, NSUserInterfaceValidations, NSMenuItemValidation>
+@property (class, readonly) __kindof NSDocumentController *sharedDocumentController;
+@property (readonly, copy) NSArray<__kindof NSDocument *> *documents;
+@property (readonly) __kindof NSDocument *currentDocument;
+@property (readonly, copy) NSString *currentDirectory;
+- (void)addDocument:(NSDocument *)document;
+- (void)removeDocument:(NSDocument *)document;
+- (__kindof NSDocument *)documentForURL:(NSURL *)url;
+- (__kindof NSDocument *)documentForWindow:(NSWindow *)window;
+@property (readonly) BOOL hasEditedDocuments;
+/* types */
+@property (readonly, copy) NSArray<NSString *> *documentClassNames;
+@property (readonly, copy) NSString *defaultType;
+- (Class)documentClassForType:(NSString *)type;
+- (NSString *)displayNameForType:(NSString *)type;
+- (NSString *)typeForContentsOfURL:(NSURL *)url error:(NSError **)error;
+- (NSString *)typeFromFileExtension:(NSString *)extension;
+- (NSArray<NSString *> *)fileExtensionsFromType:(NSString *)type;
+/* new documents */
+- (IBAction)newDocument:(id)sender;
+- (id)openUntitledDocumentAndDisplay:(BOOL)display error:(NSError **)error;
+- (id)makeUntitledDocumentOfType:(NSString *)type error:(NSError **)error;
+- (id)makeDocumentWithContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+- (id)makeDocumentForURL:(NSURL *)url withContentsOfURL:(NSURL *)contentsURL ofType:(NSString *)type
+                   error:(NSError **)error;
+/* opening */
+- (IBAction)openDocument:(id)sender;
+- (NSArray<NSURL *> *)URLsFromRunningOpenPanel;
+- (NSInteger)runModalOpenPanel:(NSOpenPanel *)panel forTypes:(NSArray<NSString *> *)types;
+- (void)beginOpenPanelWithCompletionHandler:(void (^)(NSArray<NSURL *> *urls))handler;
+- (void)beginOpenPanel:(NSOpenPanel *)panel forTypes:(NSArray<NSString *> *)types
+     completionHandler:(void (^)(NSInteger result))handler;
+- (void)openDocumentWithContentsOfURL:(NSURL *)url display:(BOOL)display
+                    completionHandler:(void (^)(NSDocument *document, BOOL alreadyOpen, NSError *error))handler;
+- (id)openDocumentWithContentsOfURL:(NSURL *)url display:(BOOL)display error:(NSError **)error;
+- (id)openDocumentWithContentsOfFile:(NSString *)path display:(BOOL)display;
+/* closing */
+- (void)closeAllDocumentsWithDelegate:(id)delegate didCloseAllSelector:(SEL)selector contextInfo:(void *)context;
+- (void)reviewUnsavedDocumentsWithAlertTitle:(NSString *)title cancellable:(BOOL)cancellable delegate:(id)delegate
+                        didReviewAllSelector:(SEL)selector contextInfo:(void *)context;
+- (IBAction)saveAllDocuments:(id)sender;
+/* the Recent Documents list, and the Open Recent menu it fills */
+- (void)noteNewRecentDocument:(NSDocument *)document;
+- (void)noteNewRecentDocumentURL:(NSURL *)url;
+@property (readonly, copy) NSArray<NSURL *> *recentDocumentURLs;
+@property (readonly) NSUInteger maximumRecentDocumentCount;
+- (IBAction)clearRecentDocuments:(id)sender;
+@property NSTimeInterval autosavingDelay;
+/* errors */
+- (BOOL)presentError:(NSError *)error;
+- (void)presentError:(NSError *)error modalForWindow:(NSWindow *)window delegate:(id)delegate
+    didPresentSelector:(SEL)selector contextInfo:(void *)context;
+- (NSError *)willPresentError:(NSError *)error;
+- (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item;
+- (BOOL)validateMenuItem:(NSMenuItem *)item;
 @end
 
 #endif

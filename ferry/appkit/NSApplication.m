@@ -173,6 +173,15 @@ void AWindowDidClose(NSWindow *window)
 
 /* ---- menus --------------------------------------------------------------------------- */
 
+BOOL AValidateItem(id target, id item)
+{
+    if ([item isKindOfClass:[NSMenuItem class]] && [target respondsToSelector:@selector(validateMenuItem:)])
+        return ((BOOL(*)(id, SEL, id))objc_msgSend)(target, @selector(validateMenuItem:), item);
+    if ([target respondsToSelector:@selector(validateUserInterfaceItem:)])
+        return ((BOOL(*)(id, SEL, id))objc_msgSend)(target, @selector(validateUserInterfaceItem:), item);
+    return YES;
+}
+
 @implementation NSMenuItem {
     NSString *_title, *_key, *_tip;
     SEL _action;
@@ -474,7 +483,22 @@ void AWindowDidClose(NSWindow *window)
     return i ? [self indexOfItem:i] : -1;
 }
 - (void)setSubmenu:(NSMenu *)menu forItem:(NSMenuItem *)item { [item setSubmenu:menu]; }
-- (void)update {}
+
+/* With autoenablesItems (the default), each item is enabled when something
+ * in the responder chain takes its action and agrees in its validation,
+ * as on a Mac; an item with a submenu stays enabled. */
+- (void)update
+{
+    if (!_autoenables)
+        return;
+    for (NSMenuItem *item in [[_items copy] autorelease]) {
+        if ([item isSeparatorItem] || [item hasSubmenu])
+            continue;
+        SEL action = [item action];
+        id target = action ? [NSApp targetForAction:action to:[item target] from:item] : nil;
+        [item setEnabled:target && AValidateItem(target, item)];
+    }
+}
 
 /* Whether a key press is this item's key equivalent: the same key (an
  * upper-case equivalent means Shift too) and the same modifiers. */
@@ -505,16 +529,14 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
                 return YES;
             continue;
         }
-        if (![item isEnabled] || [item isHidden] || !matches(item, event))
+        if ((!_autoenables && ![item isEnabled]) || [item isHidden] || !matches(item, event))
             continue;
         SEL action = [item action];
         if (!action)
             return NO;
         if (_autoenables) {
             id target = [NSApp targetForAction:action to:[item target] from:item];
-            if (!target)
-                return NO;
-            if ([target respondsToSelector:@selector(validateMenuItem:)] && ![target validateMenuItem:item])
+            if (!target || !AValidateItem(target, item))
                 return NO;
         }
         [NSApp sendAction:action to:[item target] from:item];
@@ -537,7 +559,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     id _icon;
     NSWindow *_modal;
     NSModalResponse _modalCode;
-    BOOL _modalStopped;
+    BOOL _modalStopped, _waitingToTerminate;
 }
 
 + (NSApplication *)sharedApplication
@@ -764,8 +786,76 @@ static void register_app_icon(void)
     if (ADisplayAvailable())
         register_app_icon();
     [self _post:NSApplicationWillFinishLaunchingNotification selector:@selector(applicationWillFinishLaunching:)];
+    /* An app that declares document types gets a document controller (its
+     * own subclass, if one was made already, for instance in the nib). */
+    id types = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDocumentTypes"];
+    if ([types isKindOfClass:[NSArray class]] && [types count])
+        [NSDocumentController sharedDocumentController];
     [self activateIgnoringOtherApps:YES];
+    [self _openLaunchFiles];
     [self _post:NSApplicationDidFinishLaunchingNotification selector:@selector(applicationDidFinishLaunching:)];
+}
+
+/* The files named on the command line (after the program's own options,
+ * "-Key value" pairs that go to the user defaults), then, when none were
+ * opened, an untitled document if the app wants one. */
+- (void)_openLaunchFiles
+{
+    NSArray *args = [[NSProcessInfo processInfo] arguments];
+    NSMutableArray *files = [NSMutableArray array];
+    for (NSUInteger i = 1; i < [args count]; i++) {
+        NSString *a = args[i];
+        if ([a hasPrefix:@"-psn_"])
+            continue;
+        if ([a hasPrefix:@"-"] && [a length] > 1) {
+            i++;   /* its value */
+            continue;
+        }
+        NSString *path = [a stringByStandardizingPath];
+        if (![path isAbsolutePath])
+            path = [[[NSFileManager defaultManager] currentDirectoryPath] stringByAppendingPathComponent:path];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path])
+            [files addObject:[path stringByStandardizingPath]];
+    }
+    NSDocumentController *documents = [NSDocumentController _existingSharedController];
+    BOOL opened = NO;
+    if ([files count]) {
+        opened = YES;
+        if ([_delegate respondsToSelector:@selector(application:openURLs:)]) {
+            NSMutableArray *urls = [NSMutableArray array];
+            for (NSString *f in files)
+                [urls addObject:[NSURL fileURLWithPath:f]];
+            [_delegate application:self openURLs:urls];
+        } else if ([_delegate respondsToSelector:@selector(application:openFiles:)]) {
+            [_delegate application:self openFiles:files];
+        } else if ([_delegate respondsToSelector:@selector(application:openFile:)]) {
+            for (NSString *f in files)
+                [_delegate application:self openFile:f];
+        } else if (documents) {
+            for (NSString *f in files)
+                [documents openDocumentWithContentsOfURL:[NSURL fileURLWithPath:f] display:YES
+                                       completionHandler:^(NSDocument *d, BOOL already, NSError *error) {
+                                           if (!d && error)
+                                               [documents presentError:error];
+                                       }];
+        } else {
+            opened = NO;
+        }
+    }
+    if (opened)
+        return;
+    BOOL untitled = documents != nil;
+    if ([_delegate respondsToSelector:@selector(applicationShouldOpenUntitledFile:)])
+        untitled = [_delegate applicationShouldOpenUntitledFile:self];
+    if (!untitled)
+        return;
+    if ([_delegate respondsToSelector:@selector(applicationOpenUntitledFile:)]) {
+        [_delegate applicationOpenUntitledFile:self];
+    } else if (documents) {
+        NSError *error = nil;
+        if (![documents openUntitledDocumentAndDisplay:YES error:&error] && error)
+            [documents presentError:error];
+    }
 }
 
 - (void)run
@@ -813,16 +903,42 @@ static void post_wakeup(void)
     post_wakeup();
 }
 
+/* Quitting: documents with unsaved changes are reviewed first, then the
+ * delegate is asked; NSTerminateLater waits for
+ * replyToApplicationShouldTerminate:. */
 - (void)terminate:(id)sender
+{
+    if (_waitingToTerminate)
+        return;
+    NSDocumentController *documents = [NSDocumentController _existingSharedController];
+    if ([documents hasEditedDocuments]) {
+        [documents reviewUnsavedDocumentsWithAlertTitle:nil cancellable:YES delegate:self
+                                   didReviewAllSelector:@selector(_documentController:didReviewAll:contextInfo:)
+                                            contextInfo:NULL];
+        return;
+    }
+    [self _askDelegateToTerminate];
+}
+- (void)_documentController:(NSDocumentController *)dc didReviewAll:(BOOL)all contextInfo:(void *)info
+{
+    if (all)
+        [self _askDelegateToTerminate];
+}
+- (void)_askDelegateToTerminate
 {
     if ([_delegate respondsToSelector:@selector(applicationShouldTerminate:)]) {
         NSApplicationTerminateReply r = [_delegate applicationShouldTerminate:self];
         if (r == NSTerminateCancel)
             return;
         if (r == NSTerminateLater) {
-            AWarnOnce("NSTerminateLater (the program quits now)");
+            _waitingToTerminate = YES;
+            return;
         }
     }
+    [self _terminateNow];
+}
+- (void)_terminateNow
+{
     [self _post:NSApplicationWillTerminateNotification selector:@selector(applicationWillTerminate:)];
     [[NSUserDefaults standardUserDefaults] synchronize];
     fflush(stdout);
@@ -830,8 +946,47 @@ static void post_wakeup(void)
 }
 - (void)replyToApplicationShouldTerminate:(BOOL)shouldTerminate
 {
+    if (!_waitingToTerminate)
+        return;
+    _waitingToTerminate = NO;
     if (shouldTerminate)
-        [self terminate:nil];
+        [self _terminateNow];
+}
+
+/* ---- the old sheet calls: a modal delegate and a did-end selector ---- */
+- (void)beginSheet:(NSWindow *)sheet modalForWindow:(NSWindow *)window modalDelegate:(id)delegate
+    didEndSelector:(SEL)didEnd contextInfo:(void *)context
+{
+    [sheet _setLegacySheet:YES];
+    [window beginSheet:sheet completionHandler:^(NSModalResponse code) {
+        if (delegate && didEnd)
+            ((void (*)(id, SEL, id, NSInteger, void *))objc_msgSend)(delegate, didEnd, sheet, code, context);
+    }];
+}
+- (void)endSheet:(NSWindow *)sheet { [[sheet sheetParent] endSheet:sheet]; }
+- (void)endSheet:(NSWindow *)sheet returnCode:(NSInteger)code { [[sheet sheetParent] endSheet:sheet returnCode:code]; }
+
+/* Errors: the delegate may change one before it's shown. */
+- (BOOL)presentError:(NSError *)error
+{
+    if ([_delegate respondsToSelector:@selector(application:willPresentError:)])
+        error = [_delegate application:self willPresentError:error];
+    return [[NSAlert alertWithError:error] runModal] == NSAlertFirstButtonReturn;
+}
+- (void)presentError:(NSError *)error modalForWindow:(NSWindow *)window delegate:(id)delegate
+    didPresentSelector:(SEL)did contextInfo:(void *)context
+{
+    if ([_delegate respondsToSelector:@selector(application:willPresentError:)])
+        error = [_delegate application:self willPresentError:error];
+    NSAlert *alert = [NSAlert alertWithError:error];
+    void (^done)(NSModalResponse) = ^(NSModalResponse r) {
+        if (delegate && did)
+            ((void (*)(id, SEL, BOOL, void *))objc_msgSend)(delegate, did, NO, context);
+    };
+    if (window)
+        [alert beginSheetModalForWindow:window completionHandler:done];
+    else
+        done([alert runModal]);
 }
 
 static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFromType([e type])) != 0; }
@@ -924,11 +1079,18 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
             return w;
         if ([[w delegate] respondsToSelector:action])
             return [w delegate];
+        /* the window controller is in the chain already; then its document */
+        id doc = [[w windowController] document];
+        if ([doc respondsToSelector:action])
+            return doc;
     }
     if ([self respondsToSelector:action])
         return self;
     if ([_delegate respondsToSelector:action])
         return _delegate;
+    id documents = [NSDocumentController _existingSharedController];
+    if ([documents respondsToSelector:action])
+        return documents;
     return nil;
 }
 

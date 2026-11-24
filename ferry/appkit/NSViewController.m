@@ -4,17 +4,25 @@
  * the first time its window or view is asked for, as File's Owner, keeps
  * the nib's top-level objects alive, and takes its place in the responder
  * chain: a window's next responder is its window controller, and a view
- * controller comes between its view and the view's superview. Documents
- * (NSDocument) aren't in Ferry yet, so a window controller's document is
- * only kept. Built without ARC. */
+ * controller comes between its view and the view's superview. A window
+ * controller of a document shows the document's name and edited state in
+ * its window, and when its window closes, closes the document too if it
+ * was the document's last window (or shouldCloseDocument is set), else
+ * leaves the document. Built without ARC. */
 #import "AInternal.h"
 
-/* What a window controller tells its document (NSDocument, not in Ferry
- * yet, or an app's own class) about loading its nib. */
+/* What a window controller tells its document (an NSDocument, or an
+ * app's own class) about loading its nib. */
 @interface NSObject (FerryDocumentNibLoading)
 - (void)windowControllerWillLoadNib:(NSWindowController *)wc;
 - (void)windowControllerDidLoadNib:(NSWindowController *)wc;
 - (NSString *)displayName;
+- (NSArray *)windowControllers;
+- (void)removeWindowController:(NSWindowController *)wc;
+- (void)close;
+- (BOOL)isDocumentEdited;
+- (NSURL *)fileURL;
+- (BOOL)_isClosing;
 @end
 
 /* Loads a nib with owner as File's Owner; nil if it isn't there. */
@@ -79,6 +87,7 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     if ([_window nextResponder] == self)
         [_window setNextResponder:nil];
     if ([_window _windowController] == self)
@@ -136,6 +145,7 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         if (_window) {
             if (_autosaveName)
                 [_window setFrameAutosaveName:_autosaveName];
+            [self _showDocumentState];
             [self windowDidLoad];
             if ([_document respondsToSelector:@selector(windowControllerDidLoadNib:)])
                 [_document windowControllerDidLoadNib:self];
@@ -149,6 +159,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 {
     if (window == _window)
         return;
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    if (_window)
+        [nc removeObserver:self name:NSWindowWillCloseNotification object:_window];
     if ([_window nextResponder] == self)
         [_window setNextResponder:nil];
     if ([_window _windowController] == self)
@@ -160,7 +173,45 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         [_window _setWindowController:self];
         if (![_window nextResponder])
             [_window setNextResponder:self];
+        [nc addObserver:self selector:@selector(_windowWillClose:) name:NSWindowWillCloseNotification object:_window];
+        if (!_loading)
+            [self _showDocumentState];
     }
+}
+
+/* The document's last window closing closes the document. */
+- (void)_windowWillClose:(NSNotification *)n
+{
+    id doc = _document;
+    if (!doc || ([doc respondsToSelector:@selector(_isClosing)] && [doc _isClosing]))
+        return;
+    [[self retain] autorelease];
+    NSArray *controllers = [doc respondsToSelector:@selector(windowControllers)] ? [doc windowControllers] : nil;
+    BOOL last = YES;
+    for (NSWindowController *wc in controllers)
+        if (wc != self && [[wc window] isVisible])
+            last = NO;
+    if ((_closesWithDocument || last) && [doc respondsToSelector:@selector(close)])
+        [doc close];
+    else if ([doc respondsToSelector:@selector(removeWindowController:)])
+        [doc removeWindowController:self];
+}
+
+- (void)_showDocumentState
+{
+    if (!_document || !_window)
+        return;
+    [self synchronizeWindowTitleWithDocumentName];
+    if ([_document respondsToSelector:@selector(isDocumentEdited)])
+        [_window setDocumentEdited:[_document isDocumentEdited]];
+}
+
+/* Errors go to the document, then up to the application. */
+- (BOOL)presentError:(NSError *)error
+{
+    if (_document && [_document respondsToSelector:@selector(presentError:)])
+        return [_document presentError:[self willPresentError:error]];
+    return [super presentError:error];
 }
 
 - (IBAction)showWindow:(id)sender
@@ -191,7 +242,7 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 - (void)setDocument:(id)document
 {
     _document = document;
-    [self synchronizeWindowTitleWithDocumentName];
+    [self _showDocumentState];
 }
 - (NSString *)windowTitleForDocumentDisplayName:(NSString *)name { return name; }
 - (void)synchronizeWindowTitleWithDocumentName
@@ -199,6 +250,8 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     if (!_document || !_window || ![_document respondsToSelector:@selector(displayName)])
         return;
     [_window setTitle:[self windowTitleForDocumentDisplayName:[_document displayName]]];
+    NSURL *url = [_document respondsToSelector:@selector(fileURL)] ? [_document fileURL] : nil;
+    [_window setRepresentedURL:[url isFileURL] ? url : nil];
 }
 - (void)setDocumentEdited:(BOOL)edited { [_window setDocumentEdited:edited]; }
 

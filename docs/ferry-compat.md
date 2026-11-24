@@ -34,7 +34,7 @@ and the Sequel Pro disk image (`.dmg`). See "Installers" below.
 | [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | Starts, loads its main nib (`NIBArchive`) | `NSInvocation`/`NSMethodSignature` (forwarding), which Ferry doesn't have yet. It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
 | [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (Ferry answers no, as a Mac does before the user allows it), and waits in its event loop | Nothing visible: its only window is a status bar item (`NSStatusBar`, not in Ferry yet). Moving other apps' windows can't work as such on Wayland |
 | [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | Starts, loads its nibs, registers its shortcuts (accepted, never pressed) | Its Sparkle updater checks its own code signature (`SecStaticCodeCreateWithPath`, the Security framework). It also couldn't save its shortcuts file. Then the Accessibility API, as for ShiftIt |
-| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | Starts; all 30 of its nibs (`NIBArchive`) load on their own | The document classes (`NSDocumentController`, `NSDocument`): its own document controller class is left out and the app stops when it makes one |
+| [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | Starts; all 30 of its nibs (`NIBArchive`) load on their own | The document classes (`NSDocumentController`, `NSDocument`): its own document controller class is left out and the app stops when it makes one. (The document classes came in 1.167; not re-run since) |
 | [Gas Mask](https://github.com/2ndalpha/gasmask) 0.8.6 | Hosts-file editor (menu bar) | Starts (its Mac OS X 10.7 start-up format loads now), sends its log to a file, uses ICU's regular expressions (through RegexKitLite), watches network reachability, registers its hotkey, loads its preferences (an `NSUserDefaultsController` subclass) and its hosts lists, and sets up its main window | `NSSplitView` in its main window (`positionOfDividerAtIndex:`). Its hosts list is an `NSOutlineView`, also not in Ferry yet |
 | [MacDown](https://github.com/MacDownApp/macdown) 0.7.2 | Markdown editor | Starts, loads its main nib | Its Sparkle updater asserts that `/System/Library/CoreServices/SystemVersion.plist` (the Mac's version file) exists. It is also built on `NSDocument` and WebKit (a known limit) |
 | [Sequel Pro](https://github.com/sequelpro/sequelpro) 1.1.2 | MySQL client | Installed from its `.dmg` by Ferry's Installer; starts, loads its main nib | An array made with a nil object (`initWithObjects:count:`), most likely one of the 89 classes it uses that Ferry doesn't have yet (tables, outline and split views, documents...) being nil |
@@ -187,6 +187,57 @@ customizing a toolbar (the sheet), dragging the window by its toolbar, and
 read are the names published descriptions of the format give; a nib that
 names something differently loads with the default.
 
+### Documents, alerts and the workspace (1.167)
+
+`NSDocument`, `NSDocumentController` and the document side of
+`NSWindowController` are in Ferry now, written from Apple's documentation
+of the document architecture. The types come from the Info.plist's
+`CFBundleDocumentTypes` (`LSItemContentTypes` or `CFBundleTypeName`, the
+extensions from `CFBundleTypeExtensions` or the app's type declarations,
+the role and `NSDocumentClass`); New, Open (through the Open panel), Save,
+Save As, Save To, Revert and Duplicate work, and so do the File menu's
+actions and their validation. A document reads and writes its file as a
+URL, a file wrapper (a package) or data, each calling the next as
+documented, and the calls of Mac OS X 10.3 when a class overrides those
+instead; saving writes beside the file and then moves it into place. The
+change count follows the undo manager (`NSUndoManager` is new in
+Foundation, with the selector and block forms) and the window shows the
+edited dot. Closing an edited document asks Save, Cancel or Don't Save in a
+sheet, and quitting with several asks to review them first; the app's
+delegate may answer `NSTerminateLater`. The Recent Documents list is kept
+in the user defaults (and given to the desktop's recent files) and fills
+the Open Recent menu. The first document controller made is the shared
+one, so an app's own subclass in its main nib (MacPass has one) is used.
+Files named on the command line open at launch, else an untitled document
+when the app wants one. Left out: autosaving and versions
+(`autosavesInPlace` answers NO, as on Mac OS X 10.6, and the autosave calls
+save nothing), renaming, moving and locking from the title bar, and
+printing; `prepareWithInvocationTarget:` answers nil until Ferry has
+`NSInvocation`.
+
+`NSAlert` draws as a current Mac's alert: the app's icon (the caution sign
+for a critical alert), the message in bold, the informative text, an
+accessory view and the suppression check box, then one to three or more
+buttons; the first answers Return, Cancel answers Escape and Don't Save
+Command-D. `runModal` runs a nested event loop, and
+`beginSheetModalForWindow:` shows it as a sheet: sheets (any window's, and
+the old `beginSheet:modalForWindow:...` call) hang inside their window
+under its title bar and toolbar, queue one after another, and keep the
+window from closing while they are up. `presentError:` goes up the
+responder chain to an alert, and the `NSRunAlertPanel` family is there.
+With no display, `FERRY_ALERT_ANSWER` (a button's title or number) answers
+alerts, for scripted runs.
+
+`NSWorkspace` opens web addresses, files and folders ("show in Finder"
+opens the folder) through the desktop's own launcher, `gio open` or
+`xdg-open`, started with the address as its one argument and no shell;
+that is the only way Ferry starts anything outside itself, so another Mac
+app is never launched. Icons come from the desktop's icon theme (an app
+bundle shows its own), apps are found by bundle identifier or name only
+when they are this app or in `~/Applications` and `/Applications`, and the
+workspace's notifications are all defined, though nothing on Linux posts
+sleep, wake or launch ones.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -201,11 +252,12 @@ Counted over the nine apps:
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.
 3. **The document classes** (`NSDocument`, `NSDocumentController`):
-   MacPass, MacDown, Sequel Pro.
-4. **`NSAlert`, `NSWorkspace`, `NSInvocation`**, and Foundation's
-   `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle`, `NSDateFormatter`,
-   `NSXMLDocument` and `NSJSONSerialization` (each used by five or more of
-   the apps; `NSIndexSet` came in 1.159).
+   MacPass, MacDown, Sequel Pro. Done in 1.167, without autosaving and
+   versions.
+4. **`NSInvocation`**, and Foundation's `NSThread`,
+   `NSTask`/`NSPipe`/`NSFileHandle`, `NSDateFormatter`, `NSXMLDocument` and
+   `NSJSONSerialization` (each used by five or more of the apps;
+   `NSIndexSet` came in 1.159, `NSAlert` and `NSWorkspace` in 1.167).
 5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
    file or the app's code signature at start. Ferry could provide a version
    file of its own and answer the signature check plainly.

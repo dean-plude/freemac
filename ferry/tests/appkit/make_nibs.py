@@ -11,8 +11,9 @@
 # form that current versions of Xcode write (see ferry/appkit/
 # ANibArchive.m), converted from the keyed archive here. dot.png is the
 # image the panel's image view names. Tables.nib holds a view-based
-# table and an outline view. Run this again
-# only to change the fixtures.
+# table and an outline view. DocApp.app holds a document-based app's main
+# nib, its document's window nib and an Info.plist with document types,
+# for documents.m. Run this again only to change the fixtures.
 import os, plistlib, struct
 from plistlib import UID
 
@@ -620,6 +621,90 @@ def controls_nib(path):
     a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def doc_main_menu_nib(path):
+    """DocApp's main nib: the application, File and Edit menus a
+    document-based app has (Open Recent named _NSRecentDocumentsMenu, as
+    Interface Builder names it), the app delegate and the app's own
+    NSDocumentController subclass."""
+    a = Archive()
+    owner = custom(a, "NSApplication")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    delegate = custom(a, "AppDelegate")
+    controller = custom(a, "DocController")
+    menu, appmenu, filemenu, recentmenu, editmenu = (a.reserve() for _ in range(5))
+    appitem, fileitem, edititem, quit_ = (a.reserve() for _ in range(4))
+    new, open_, recent, clear, sep, close, save, save_as, revert = (a.reserve() for _ in range(9))
+    undo, redo = a.reserve(), a.reserve()
+
+    def item(uid, parent, title, key="", mask=CMD, **extra):
+        a.fill(uid, a.obj("NSMenuItem", (), NSMenu=parent, NSTitle=a.add(title), NSKeyEquiv=a.add(key),
+                          NSKeyEquivModMask=mask, NSMnemonicLoc=0x7fffffff, **extra))
+    sub = a.add("submenuAction:")
+    item(appitem, menu, "DocApp", NSSubmenu=appmenu, NSAction=sub)
+    item(fileitem, menu, "File", NSSubmenu=filemenu, NSAction=sub)
+    item(edititem, menu, "Edit", NSSubmenu=editmenu, NSAction=sub)
+    item(quit_, appmenu, "Quit DocApp", "q")
+    item(new, filemenu, "New", "n")
+    item(open_, filemenu, "Open…", "o")
+    item(recent, filemenu, "Open Recent", NSSubmenu=recentmenu, NSAction=sub)
+    item(clear, recentmenu, "Clear Menu")
+    item(sep, filemenu, "", mask=0, NSIsSeparator=True, NSIsDisabled=True)
+    item(close, filemenu, "Close", "w")
+    item(save, filemenu, "Save…", "s")
+    item(save_as, filemenu, "Save As…", "S", mask=CMD | (1 << 17))
+    item(revert, filemenu, "Revert to Saved")
+    item(undo, editmenu, "Undo", "z")
+    item(redo, editmenu, "Redo", "Z", mask=CMD | (1 << 17))
+    a.fill(menu, a.obj("NSMenu", (), NSTitle=a.add("AMainMenu"), NSMenuItems=a.array([appitem, fileitem, edititem]),
+                       NSName=a.add("_NSMainMenu")))
+    a.fill(appmenu, a.obj("NSMenu", (), NSTitle=a.add("DocApp"), NSMenuItems=a.array([quit_]),
+                          NSName=a.add("_NSAppleMenu")))
+    a.fill(filemenu, a.obj("NSMenu", (), NSTitle=a.add("File"),
+                           NSMenuItems=a.array([new, open_, recent, sep, close, save, save_as, revert])))
+    a.fill(recentmenu, a.obj("NSMenu", (), NSTitle=a.add("Open Recent"), NSMenuItems=a.array([clear]),
+                             NSName=a.add("_NSRecentDocumentsMenu")))
+    a.fill(editmenu, a.obj("NSMenu", (), NSTitle=a.add("Edit"), NSMenuItems=a.array([undo, redo])))
+    out, act = "NSNibOutletConnector", "NSNibControlConnector"
+    conns = [connector(a, out, app, delegate, "delegate"),
+             connector(a, out, delegate, controller, "documents")]
+    for uid, action in ((quit_, "terminate:"), (new, "newDocument:"), (open_, "openDocument:"),
+                        (clear, "clearRecentDocuments:"), (close, "performClose:"), (save, "saveDocument:"),
+                        (save_as, "saveDocumentAs:"), (revert, "revertDocumentToSaved:"), (undo, "undo:"),
+                        (redo, "redo:")):
+        conns.append(connector(a, act, uid, first, action))
+    pairs = [(owner, owner), (first, owner), (app, owner), (delegate, owner), (controller, owner), (menu, owner),
+             (appitem, menu), (fileitem, menu), (edititem, menu), (appmenu, appitem), (filemenu, fileitem),
+             (editmenu, edititem), (quit_, appmenu), (recentmenu, recent), (clear, recentmenu), (undo, editmenu),
+             (redo, editmenu)]
+    pairs += [(i, filemenu) for i in (new, open_, recent, sep, close, save, save_as, revert)]
+    names = [(owner, "File's Owner"), (first, "First Responder"), (app, "Application"), (menu, "MainMenu")]
+    data = object_data(a, owner, pairs, conns, [], names)
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
+def document_nib(path):
+    """A document's window nib, owned by the document: the window and a
+    text field the document fills in."""
+    a = Archive()
+    owner = custom(a, "NoteDocument")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    content, field = a.reserve(), a.reserve()
+    window = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=15, NSWindowBacking=2,
+                         NSWindowRect="{{200, 200}, {480, 360}}", NSWindowTitle=a.add("Window"),
+                         NSWindowClass=a.add("NSWindow"), NSWindowView=content))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {480, 360}}", 256 | 18, UID(0), NSSubviews=a.array([field]))
+    editable = 0x10000000 | 0x00200000 | 0x00400000 | 0x00100000 | 0x04000000
+    view(a, field, "NSTextField", CONTROL, "{{20, 318}, {440, 22}}", 256 | 2 | 8, content,
+         NSCell=text_cell(a, "NSTextFieldCell", "", editable), NSEnabled=True)
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, window, "window"), connector(a, out, owner, field, "textField")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (window, owner), (content, window), (field, content)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
@@ -635,3 +720,29 @@ info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:
     plistlib.dump(info, f)
+
+# DocApp.app, for documents.m: its nibs and an Info.plist with document types.
+docapp = os.path.join(here, "DocApp.app", "Contents")
+doc_main_menu_nib(os.path.join(docapp, "Resources", "Base.lproj", "MainMenu.nib"))
+document_nib(os.path.join(docapp, "Resources", "Document.nib"))
+docinfo = {
+    "CFBundleExecutable": "DocApp", "CFBundleIdentifier": "org.freemac.ferry.docapp", "CFBundleName": "DocApp",
+    "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication",
+    "CFBundleDocumentTypes": [
+        {"CFBundleTypeName": "Note", "CFBundleTypeRole": "Editor", "LSItemContentTypes": ["org.freemac.ferry.note"],
+         "NSDocumentClass": "NoteDocument"},
+        {"CFBundleTypeName": "Plain Text", "CFBundleTypeRole": "Viewer", "CFBundleTypeExtensions": ["txt", "text"],
+         "NSDocumentClass": "NoteDocument"},
+        {"CFBundleTypeName": "Note Bundle", "CFBundleTypeRole": "Editor", "CFBundleTypeExtensions": ["notes"],
+         "LSTypeIsPackage": True, "NSDocumentClass": "BundleDocument"},
+        {"CFBundleTypeName": "Old Note", "CFBundleTypeRole": "Editor", "CFBundleTypeExtensions": ["onote"],
+         "NSDocumentClass": "OldDocument"},
+    ],
+    "UTExportedTypeDeclarations": [
+        {"UTTypeIdentifier": "org.freemac.ferry.note", "UTTypeDescription": "Ferry Note",
+         "UTTypeConformsTo": ["public.plain-text"],
+         "UTTypeTagSpecification": {"public.filename-extension": ["note"]}},
+    ],
+}
+with open(os.path.join(docapp, "Info.plist"), "wb") as f:
+    plistlib.dump(docinfo, f)

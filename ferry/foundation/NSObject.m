@@ -13,6 +13,13 @@ void *objc_autoreleasePoolPush(void);
 void objc_autoreleasePoolPop(void *token);
 
 NSString *const NSCocoaErrorDomain = @"NSCocoaErrorDomain";
+NSString *const NSLocalizedFailureReasonErrorKey = @"NSLocalizedFailureReason";
+NSString *const NSLocalizedRecoverySuggestionErrorKey = @"NSLocalizedRecoverySuggestion";
+NSString *const NSLocalizedRecoveryOptionsErrorKey = @"NSLocalizedRecoveryOptions";
+NSString *const NSRecoveryAttempterErrorKey = @"NSRecoveryAttempter";
+NSString *const NSHelpAnchorErrorKey = @"NSHelpAnchor";
+NSString *const NSURLErrorKey = @"NSURL";
+NSString *const NSStringEncodingErrorKey = @"NSStringEncodingErrorKey";
 NSString *const NSPOSIXErrorDomain = @"NSPOSIXErrorDomain";
 NSString *const NSOSStatusErrorDomain = @"NSOSStatusErrorDomain";
 NSString *const NSLocalizedDescriptionKey = @"NSLocalizedDescription";
@@ -325,6 +332,11 @@ static NSComparisonResult compare_objects(id a, id b)
     }
     return [NSString stringWithFormat:@"The operation couldn’t be completed. (%@ error %ld.)", _domain, (long)_code];
 }
+- (NSString *)localizedFailureReason { return [_userInfo objectForKey:NSLocalizedFailureReasonErrorKey]; }
+- (NSString *)localizedRecoverySuggestion { return [_userInfo objectForKey:NSLocalizedRecoverySuggestionErrorKey]; }
+- (NSArray *)localizedRecoveryOptions { return [_userInfo objectForKey:NSLocalizedRecoveryOptionsErrorKey]; }
+- (id)recoveryAttempter { return [_userInfo objectForKey:NSRecoveryAttempterErrorKey]; }
+- (NSString *)helpAnchor { return [_userInfo objectForKey:NSHelpAnchorErrorKey]; }
 - (NSString *)description
 {
     NSMutableString *s = [NSMutableString stringWithFormat:@"Error Domain=%@ Code=%ld \"%@\"", _domain, (long)_code,

@@ -5,7 +5,11 @@
  * that image and turns GTK's input into NSEvents. The compositor decorates
  * the window, so a window's frame is its content rectangle. Wayland doesn't
  * let a program place its own windows, so a window's position on screen is
- * only what the program last set. */
+ * only what the program last set. A sheet is drawn inside its window, by a
+ * view over the window's own (ASheetHost), and gets its events from it; one
+ * too big for its window gets a GTK window of its own instead, modal for
+ * its window's. The sheet calls are written from Apple's public NSWindow
+ * documentation; no Apple code was used. */
 #import "AInternal.h"
 
 NSNotificationName const NSWindowWillCloseNotification = @"NSWindowWillCloseNotification";
@@ -20,6 +24,8 @@ NSNotificationName const NSWindowDidBecomeMainNotification = @"NSWindowDidBecome
 NSNotificationName const NSWindowDidResignMainNotification = @"NSWindowDidResignMainNotification";
 NSNotificationName const NSWindowDidMiniaturizeNotification = @"NSWindowDidMiniaturizeNotification";
 NSNotificationName const NSWindowDidDeminiaturizeNotification = @"NSWindowDidDeminiaturizeNotification";
+NSNotificationName const NSWindowWillBeginSheetNotification = @"NSWindowWillBeginSheetNotification";
+NSNotificationName const NSWindowDidEndSheetNotification = @"NSWindowDidEndSheetNotification";
 
 static NSMutableArray *all_windows;
 static NSInteger next_number = 1;
@@ -69,6 +75,15 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSView *_toolbarView, *_overlay;
     CGFloat _toolbarHeight;
     NSWindowToolbarStyle _toolbarStyle;
+    /* sheets: the one shown and those waiting their turn; as a sheet, its
+     * window (not retained), its handler and whether it is drawn there */
+    NSWindow *_sheet, *_sheetParent;
+    NSMutableArray *_pendingSheets;
+    void (^_sheetHandler)(NSModalResponse);
+    NSView *_sheetHost;
+    BOOL _hostedSheet, _endingSheet, _legacySheet;
+    NSURL *_representedURL;
+    NSUndoManager *_undo;
 }
 
 /* Drag and drop (NSDragging.m): the window's own types, whose drops go to
@@ -205,6 +220,13 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [_title release];
     [_background release];
     [_autosaveName release];
+    [_sheet release];
+    [_pendingSheets release];
+    [_sheetHandler release];
+    [_sheetHost _setWindow:nil];
+    [_sheetHost release];
+    [_representedURL release];
+    [_undo release];
     [_keysDown release];
     for (int i = 0; i < 3; i++)
         [_mouseView[i] release];
@@ -236,14 +258,32 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (CGFloat)contentBorderThicknessForEdge:(NSRectEdge)edge { return edge < 4 ? _contentBorder[edge] : 0; }
 - (void)setAutorecalculatesContentBorderThickness:(BOOL)flag forEdge:(NSRectEdge)edge {}
 - (BOOL)autorecalculatesContentBorderThicknessForEdge:(NSRectEdge)edge { return YES; }
+/* What the title bar shows: an edited document's title says so, as a
+ * Mac's title bar does. */
+- (NSString *)_shownTitle { return _edited ? [_title stringByAppendingString:@" — Edited"] : _title; }
 - (void)setTitle:(NSString *)title
 {
     [_title release];
     _title = [title ?: @"" copy];
     if (_gtk)
-        gtk_window_set_title(_gtk, [_title UTF8String]);
+        gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
 }
-- (void)setTitleWithRepresentedFilename:(NSString *)path { [self setTitle:[path lastPathComponent]]; }
+- (void)setTitleWithRepresentedFilename:(NSString *)path
+{
+    [self setRepresentedFilename:path];
+    [self setTitle:[path lastPathComponent]];
+}
+- (NSURL *)representedURL { return _representedURL; }
+- (void)setRepresentedURL:(NSURL *)url
+{
+    [_representedURL autorelease];
+    _representedURL = [url copy];
+}
+- (NSString *)representedFilename { return [_representedURL isFileURL] ? [_representedURL path] : @""; }
+- (void)setRepresentedFilename:(NSString *)path
+{
+    [self setRepresentedURL:[path length] ? [NSURL fileURLWithPath:path] : nil];
+}
 - (NSView *)contentView { return _contentView; }
 - (void)setContentView:(NSView *)view
 {
@@ -279,8 +319,14 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (BOOL)isMainWindow { return main_window == self; }
 - (BOOL)isMiniaturized { return _miniaturized; }
 - (BOOL)isZoomed { return _zoomed; }
-- (BOOL)canBecomeKeyWindow { return (_style & NSWindowStyleMaskTitled) || [self isKindOfClass:[NSPanel class]]; }
-- (BOOL)canBecomeMainWindow { return [self canBecomeKeyWindow] && ![self isKindOfClass:[NSPanel class]]; }
+- (BOOL)canBecomeKeyWindow
+{
+    return (_style & NSWindowStyleMaskTitled) || [self isKindOfClass:[NSPanel class]] || _sheetParent;
+}
+- (BOOL)canBecomeMainWindow
+{
+    return [self canBecomeKeyWindow] && ![self isKindOfClass:[NSPanel class]] && !_sheetParent;
+}
 - (BOOL)isReleasedWhenClosed { return _released; }
 - (void)setReleasedWhenClosed:(BOOL)flag { _released = flag; }
 - (NSColor *)backgroundColor { return _background ?: [NSColor windowBackgroundColor]; }
@@ -378,7 +424,49 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     return w;
 }
 - (BOOL)isDocumentEdited { return _edited; }
-- (void)setDocumentEdited:(BOOL)f { _edited = f; }
+- (void)setDocumentEdited:(BOOL)f
+{
+    if (f == _edited)
+        return;
+    _edited = f;
+    if (_gtk)
+        gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
+}
+
+/* The window's undo manager: its delegate's, else its document's, else
+ * one of its own. Edit > Undo and Redo send undo: and redo: here. */
+- (NSUndoManager *)undoManager
+{
+    if ([_delegate respondsToSelector:@selector(windowWillReturnUndoManager:)])
+        return [_delegate windowWillReturnUndoManager:self];
+    id doc = [_windowController document];
+    if ([doc respondsToSelector:@selector(undoManager)])
+        return [doc undoManager];
+    if (!_undo)
+        _undo = [[NSUndoManager alloc] init];
+    return _undo;
+}
+- (void)undo:(id)sender { [[self undoManager] undo]; }
+- (void)redo:(id)sender { [[self undoManager] redo]; }
+- (BOOL)validateMenuItem:(NSMenuItem *)item
+{
+    SEL a = [item action];
+    if (a == @selector(undo:) || a == @selector(redo:)) {
+        NSUndoManager *u = [self undoManager];
+        BOOL undo = a == @selector(undo:);
+        [item setTitle:undo ? [u undoMenuItemTitle] : [u redoMenuItemTitle]];
+        return undo ? [u canUndo] : [u canRedo];
+    }
+    if (a == @selector(performClose:))
+        return (_style & NSWindowStyleMaskClosable) && !_sheet;
+    if (a == @selector(performMiniaturize:))
+        return (_style & NSWindowStyleMaskMiniaturizable) != 0;
+    if (a == @selector(toggleToolbarShown:)) {
+        [item setTitle:[_toolbar isVisible] ? @"Hide Toolbar" : @"Show Toolbar"];
+        return _toolbar != nil;
+    }
+    return YES;
+}
 - (BOOL)titlebarAppearsTransparent { return _transparentTitle; }
 - (void)setTitlebarAppearsTransparent:(BOOL)flag { _transparentTitle = flag; }
 - (NSInteger)titleVisibility { return _titleVisibility; }
@@ -491,6 +579,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [_contentView setFrameSize:NSMakeSize(size.width, fmax(size.height - _toolbarHeight, 0))];
     [_toolbarView setFrame:NSMakeRect(0, size.height - _toolbarHeight, size.width, _toolbarHeight)];
     [_overlay setFrameSize:size];
+    [_sheetHost setFrameSize:size];
     [self _noteNeedsDisplay];
     [self _post:NSWindowDidResizeNotification selector:@selector(windowDidResize:)];
 }
@@ -543,6 +632,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (void)_noteNeedsDisplay
 {
     _needsDisplay = YES;
+    if (_hostedSheet)
+        [_sheetParent _noteNeedsDisplay];   /* drawn in its window */
     if (_area)
         gtk_widget_queue_draw(_area);
 }
@@ -578,11 +669,10 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     _needsDisplay = YES;
 }
 
-- (void)display
+/* The background, then the root views: content, toolbar strip, a sheet
+ * shown in the window, an open menu. */
+- (void)_drawWindowInContext:(CGContextRef)ctx screen:(BOOL)screen
 {
-    [self _ensureBacking];
-    _needsDisplay = NO;
-    CGContextRef ctx = _ctx;
     NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
     CGContextSaveGState(ctx);
     CGContextSetBlendMode(ctx, kCGBlendModeCopy);
@@ -591,19 +681,95 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     CGContextSetRGBFillColor(ctx, c[0], c[1], c[2], _opaque ? 1 : c[3]);
     CGContextFillRect(ctx, all);
     CGContextRestoreGState(ctx);
-    [_contentView _drawInContext:ctx dirty:all screen:YES];
-    [_toolbarView _drawInContext:ctx dirty:all screen:YES];
-    [_overlay _drawInContext:ctx dirty:all screen:YES];
-    CGContextFlush(ctx);
+    [_contentView _drawInContext:ctx dirty:all screen:screen];
+    [_toolbarView _drawInContext:ctx dirty:all screen:screen];
+    [_sheetHost _drawInContext:ctx dirty:all screen:screen];
+    [_overlay _drawInContext:ctx dirty:all screen:screen];
+}
+
+- (void)display
+{
+    if (_hostedSheet) {
+        _needsDisplay = NO;
+        [_sheetParent display];
+        return;
+    }
+    [self _ensureBacking];
+    _needsDisplay = NO;
+    [self _drawWindowInContext:_ctx screen:YES];
+    CGContextFlush(_ctx);
     if (_area)
         gtk_widget_queue_draw(_area);
 }
 
+- (BOOL)_rootViewsNeedDisplay
+{
+    return _needsDisplay || [_contentView _needsDisplayAnywhere] || [_toolbarView _needsDisplayAnywhere] ||
+           [_overlay _needsDisplayAnywhere];
+}
+
 - (void)displayIfNeeded
 {
-    if (_needsDisplay || [_contentView _needsDisplayAnywhere] || [_toolbarView _needsDisplayAnywhere] ||
-        [_overlay _needsDisplayAnywhere] || !_backing)
+    if (_hostedSheet) {
+        [_sheetParent displayIfNeeded];
+        return;
+    }
+    if ([self _rootViewsNeedDisplay] || [_sheet _rootViewsNeedDisplay] || !_backing)
         [self display];
+}
+
+/* ---- a picture of the window ------------------------------------------------------------
+ * What the window shows, with a title bar drawn above it as the desktop's
+ * compositor (Strata) draws one: neutral grey buttons, the close button
+ * holding a dot while the document is edited, and the title centred. For
+ * pictures of windows in tests and bug reports; on screen, the compositor
+ * draws the real title bar. */
+- (NSBitmapImageRep *)_pictureWithTitleBar:(BOOL)titleBar
+{
+    CGFloat bar = titleBar && _style != NSWindowStyleMaskBorderless ? 28 : 0;
+    NSSize s = _frame.size;
+    NSBitmapImageRep *rep = [[[NSBitmapImageRep alloc]
+        initWithBitmapDataPlanes:NULL pixelsWide:(NSInteger)ceil(s.width) pixelsHigh:(NSInteger)ceil(s.height + bar)
+                   bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace
+                     bytesPerRow:0 bitsPerPixel:32] autorelease];
+    NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
+    CGContextRef ctx = [gc CGContext];
+    [self _drawWindowInContext:ctx screen:NO];
+    if (bar > 0) {
+        [NSGraphicsContext saveGraphicsState];
+        [NSGraphicsContext setCurrentContext:gc];
+        NSRect strip = NSMakeRect(0, s.height, s.width, bar);
+        [[self backgroundColor] setFill];
+        NSRectFill(strip);
+        [[NSColor colorWithWhite:0 alpha:0.12] setFill];
+        NSRectFill(NSMakeRect(0, s.height, s.width, 1));
+        BOOL active = [self isKeyWindow] || [self isMainWindow] || [_sheet isKeyWindow];
+        BOOL enabled[3] = {(_style & NSWindowStyleMaskClosable) != 0, (_style & NSWindowStyleMaskMiniaturizable) != 0,
+                           (_style & NSWindowStyleMaskResizable) != 0};
+        for (int i = 0; i < 3; i++) {
+            NSRect r = NSMakeRect(9 + i * 20, s.height + (bar - 12) / 2, 12, 12);
+            NSBezierPath *b = [NSBezierPath bezierPathWithOvalInRect:r];
+            [[NSColor colorWithWhite:active && enabled[i] ? 0.62 : 0.82 alpha:1] setFill];
+            [b fill];
+            [[NSColor colorWithWhite:0 alpha:0.22] setStroke];
+            [b setLineWidth:0.5];
+            [b stroke];
+            if (i == 0 && _edited) {
+                [[NSColor colorWithWhite:0.25 alpha:1] setFill];
+                [[NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, 3.5, 3.5)] fill];
+            }
+        }
+        NSMutableParagraphStyle *p = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [p setAlignment:NSTextAlignmentCenter];
+        [p setLineBreakMode:NSLineBreakByTruncatingTail];
+        NSDictionary *a = @{NSFontAttributeName : [NSFont boldSystemFontOfSize:13],
+                            NSForegroundColorAttributeName : [NSColor colorWithWhite:active ? 0.15 : 0.55 alpha:1],
+                            NSParagraphStyleAttributeName : p};
+        [_title drawInRect:NSMakeRect(72, s.height + (bar - 17) / 2, fmax(s.width - 144, 0), 17) withAttributes:a];
+        [NSGraphicsContext restoreGraphicsState];
+    }
+    CGContextFlush(ctx);
+    return rep;
 }
 
 /* ---- ordering, key and main ---------------------------------------------------------- */
@@ -625,10 +791,16 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 
 - (void)_makeGtk
 {
-    if (_gtk || !ADisplayAvailable())
+    if (_gtk || _hostedSheet || !ADisplayAvailable())
         return;
     _gtk = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(_gtk, [_title UTF8String]);
+    gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
+    if (_sheetParent && _sheetParent->_gtk) {
+        /* a sheet too big for its window: modal for it, which a compositor
+         * may show attached to it */
+        gtk_window_set_transient_for(_gtk, _sheetParent->_gtk);
+        gtk_window_set_modal(_gtk, 1);
+    }
     gtk_window_set_default_size(_gtk, (int)_frame.size.width, (int)_frame.size.height);
     gtk_window_set_resizable(_gtk, (_style & NSWindowStyleMaskResizable) != 0);
     gtk_window_set_decorated(_gtk, _style != NSWindowStyleMaskBorderless);
@@ -686,6 +858,12 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 }
 - (void)orderOut:(id)sender
 {
+    if (_sheetParent && !_endingSheet) {
+        /* a sheet put away without endSheet: it leaves its window, with no
+         * handler called */
+        [_sheetParent _detachSheet:self];
+        return;
+    }
     if (!_visible)
         return;
     _visible = NO;
@@ -697,6 +875,152 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
         [self resignMainWindow];
 }
 
+/* ---- sheets --------------------------------------------------------------------------- */
+
+- (NSWindow *)attachedSheet { return _sheet; }
+- (NSWindow *)sheetParent { return _sheetParent; }
+- (BOOL)isSheet { return _sheetParent != nil; }
+- (NSArray *)sheets
+{
+    NSMutableArray *all = [NSMutableArray array];
+    if (_sheet)
+        [all addObject:_sheet];
+    for (NSArray *p in _pendingSheets)
+        [all addObject:p[0]];
+    return all;
+}
+
+/* Where the sheet is drawn, in this window's coordinates: centred, its top
+ * edge under the toolbar (the title bar is above the window's frame), or
+ * where the delegate says. */
+- (NSRect)_sheetRect
+{
+    NSSize s = _sheet ? [_sheet frame].size : NSZeroSize;
+    CGFloat top = _frame.size.height - _toolbarHeight;
+    NSRect r = NSMakeRect(floor((_frame.size.width - s.width) / 2), top - s.height, s.width, s.height);
+    if ([_delegate respondsToSelector:@selector(window:willPositionSheet:usingRect:)]) {
+        NSRect at = [_delegate window:self willPositionSheet:_sheet
+                            usingRect:NSMakeRect(0, top, _frame.size.width, 0)];
+        r.origin.y = NSMinY(at) - s.height;
+        if (at.size.width > 0)
+            r.origin.x = floor(NSMidX(at) - s.width / 2);
+    }
+    return r;
+}
+
+- (void)beginSheet:(NSWindow *)sheet completionHandler:(void (^)(NSModalResponse))handler
+{
+    if (!sheet || sheet == self || sheet->_sheetParent)
+        return;
+    if (_sheet) {
+        /* one at a time: this one waits for the one shown to end */
+        if (!_pendingSheets)
+            _pendingSheets = [[NSMutableArray alloc] init];
+        void (^h)(NSModalResponse) = [handler copy] ?: [^(NSModalResponse r) {} copy];
+        [_pendingSheets addObject:@[ sheet, h ]];
+        [h release];
+        return;
+    }
+    if ([_overlay isKindOfClass:[AMenuView class]])
+        [(AMenuView *)_overlay dismiss];
+    [self _post:NSWindowWillBeginSheetNotification selector:@selector(windowWillBeginSheet:)];
+    _sheet = [sheet retain];
+    sheet->_sheetParent = self;
+    [sheet->_sheetHandler release];
+    sheet->_sheetHandler = [handler copy];
+    NSSize s = [sheet frame].size;
+    sheet->_hostedSheet = s.width <= _frame.size.width && s.height <= _frame.size.height - _toolbarHeight;
+    if (sheet->_hostedSheet) {
+        [sheet _destroyGtk];
+        _sheetHost = [[NSClassFromString(@"ASheetHost") alloc] initWithFrame:NSMakeRect(0, 0, _frame.size.width,
+                                                                                      _frame.size.height)];
+        [_sheetHost setNextResponder:self];
+        [_sheetHost _setWindow:self];
+        NSRect r = [self _sheetRect];
+        [sheet setFrameOrigin:NSMakePoint(_frame.origin.x + r.origin.x, _frame.origin.y + r.origin.y)];
+    }
+    [sheet makeKeyAndOrderFront:nil];
+    [self _noteNeedsDisplay];
+}
+- (void)beginCriticalSheet:(NSWindow *)sheet completionHandler:(void (^)(NSModalResponse))handler
+{
+    if (_sheet && sheet && !sheet->_sheetParent) {
+        /* shown before any waiting */
+        if (!_pendingSheets)
+            _pendingSheets = [[NSMutableArray alloc] init];
+        void (^h)(NSModalResponse) = [handler copy] ?: [^(NSModalResponse r) {} copy];
+        [_pendingSheets insertObject:@[ sheet, h ] atIndex:0];
+        [h release];
+        return;
+    }
+    [self beginSheet:sheet completionHandler:handler];
+}
+
+/* Takes the sheet out of this window, then shows the next one waiting. */
+- (void)_detachSheet:(NSWindow *)sheet
+{
+    if (sheet != _sheet || !sheet)
+        return;
+    [[sheet retain] autorelease];
+    BOOL wasKey = key_window == sheet;
+    sheet->_endingSheet = YES;
+    [sheet orderOut:nil];
+    sheet->_endingSheet = NO;
+    sheet->_sheetParent = nil;
+    sheet->_hostedSheet = NO;
+    [sheet _destroyGtk];
+    [_sheet release];
+    _sheet = nil;
+    [_sheetHost _setWindow:nil];
+    [_sheetHost release];
+    _sheetHost = nil;
+    [self _noteNeedsDisplay];
+    if ((wasKey || !key_window) && _visible)
+        [self makeKeyWindow];
+    [self _post:NSWindowDidEndSheetNotification selector:@selector(windowDidEndSheet:)];
+    if ([_pendingSheets count] && !_sheet) {
+        NSArray *next = [[_pendingSheets[0] retain] autorelease];
+        [_pendingSheets removeObjectAtIndex:0];
+        [self beginSheet:next[0] completionHandler:next[1]];
+    }
+}
+
+- (void)endSheet:(NSWindow *)sheet { [self endSheet:sheet returnCode:NSModalResponseStop]; }
+- (void)endSheet:(NSWindow *)sheet returnCode:(NSModalResponse)code
+{
+    if (!sheet || sheet != _sheet)
+        return;
+    void (^handler)(NSModalResponse) = [sheet->_sheetHandler autorelease];
+    sheet->_sheetHandler = nil;
+    BOOL legacy = sheet->_legacySheet;
+    sheet->_legacySheet = NO;
+    if (legacy && handler) {
+        /* NSApp's old sheet calls: the delegate hears first, with the sheet
+         * still up, and usually orders it out itself */
+        sheet->_endingSheet = YES;
+        handler(code);
+        sheet->_endingSheet = NO;
+        handler = nil;
+    }
+    [self _detachSheet:sheet];
+    if (handler)
+        handler(code);
+}
+
+/* Shown over the window's own views, the sheet gets the window's mouse
+ * events (a click beside it only beeps) and draws there. */
+- (NSView *)_sheetHost { return _sheetHost; }
+- (BOOL)_isHostedSheet { return _hostedSheet; }
+- (void)_drawSheetContentInContext:(CGContextRef)ctx screen:(BOOL)screen
+{
+    NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
+    _needsDisplay = NO;
+    [_contentView _drawInContext:ctx dirty:all screen:screen];
+    [_toolbarView _drawInContext:ctx dirty:all screen:screen];
+    [_overlay _drawInContext:ctx dirty:all screen:screen];
+}
+- (void)_setLegacySheet:(BOOL)flag { _legacySheet = flag; }
+
 - (void)makeKeyAndOrderFront:(id)sender
 {
     [self orderFront:sender];
@@ -707,6 +1031,10 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 
 - (void)makeKeyWindow
 {
+    if (_sheet && [_sheet isVisible]) {
+        [_sheet makeKeyWindow];    /* the sheet takes the window's keys */
+        return;
+    }
     if (key_window == self || ![self canBecomeKeyWindow])
         return;
     [key_window resignKeyWindow];
@@ -747,15 +1075,29 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     [self _post:NSWindowDidResignMainNotification selector:@selector(windowDidResignMain:)];
 }
 
+/* A document's window asks its document first (which may ask to save its
+ * changes, in a sheet), as a Mac's does. */
 - (void)performClose:(id)sender
 {
-    if (!(_style & NSWindowStyleMaskClosable)) {
+    if (!(_style & NSWindowStyleMaskClosable) || _sheet) {
         NSBeep();
         return;
     }
     if ([_delegate respondsToSelector:@selector(windowShouldClose:)] && ![_delegate windowShouldClose:self])
         return;
+    id doc = [_windowController document];
+    SEL ask = @selector(shouldCloseWindowController:delegate:shouldCloseSelector:contextInfo:);
+    if ([doc respondsToSelector:ask]) {
+        ((void (*)(id, SEL, id, id, SEL, void *))objc_msgSend)(doc, ask, _windowController, self,
+                                                               @selector(_document:shouldClose:contextInfo:), NULL);
+        return;
+    }
     [self close];
+}
+- (void)_document:(id)document shouldClose:(BOOL)ok contextInfo:(void *)context
+{
+    if (ok)
+        [self close];
 }
 
 - (void)close
@@ -764,6 +1106,11 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
         return;
     _closing = YES;
     [self retain];
+    if (_sheet)
+        [self _detachSheet:_sheet];
+    [_pendingSheets removeAllObjects];
+    if (_sheetParent)
+        [_sheetParent _detachSheet:self];
     [self _post:NSWindowWillCloseNotification selector:@selector(windowWillClose:)];
     [self orderOut:nil];
     [self _destroyGtk];
@@ -924,6 +1271,8 @@ static int button_index(NSEventType t)
 {
     if (_overlay)
         return [_overlay hitTest:p] ?: _overlay;
+    if (_sheetHost)
+        return _sheetHost;
     if (_toolbarView && _toolbarHeight > 0 && ![_toolbarView isHidden]) {
         NSView *v = [_toolbarView hitTest:p];
         if (v)
@@ -945,6 +1294,11 @@ static int button_index(NSEventType t)
     case NSEventTypeLeftMouseDown:
     case NSEventTypeRightMouseDown:
     case NSEventTypeOtherMouseDown: {
+        if (_sheet && !_sheetHost) {
+            NSBeep();     /* its sheet, in a window of its own, must be answered first */
+            [_sheet makeKeyAndOrderFront:nil];
+            break;
+        }
         if (![self isKeyWindow] && [self canBecomeKeyWindow])
             [self makeKeyAndOrderFront:nil];
         NSView *v = [self _viewAt:[e locationInWindow]];
@@ -988,6 +1342,8 @@ static int button_index(NSEventType t)
     case NSEventTypeMouseMoved:
         if (_overlay)
             [_overlay mouseMoved:e];
+        else if (_sheetHost)
+            [_sheetHost mouseMoved:e];
         else if (_acceptsMoved)
             [[self firstResponder] mouseMoved:e];
         break;
@@ -1257,8 +1613,8 @@ static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
-        if (key_window == win)
-            A_REPORTING([win resignKeyWindow];)
+        if (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet))
+            A_REPORTING([key_window resignKeyWindow];)
     }
     return 0;
 }
@@ -1285,4 +1641,131 @@ void AWindowsDisplayIfNeeded(void)
 - (void)setBecomesKeyOnlyIfNeeded:(BOOL)flag { _keyOnlyIfNeeded = flag; }
 - (BOOL)worksWhenModal { return _worksWhenModal; }
 - (void)setWorksWhenModal:(BOOL)flag { _worksWhenModal = flag; }
+@end
+
+/* ---- a sheet shown in its window ------------------------------------------------------- */
+
+@interface NSWindow (FerrySheetHosting)
+- (NSRect)_sheetRect;
+- (BOOL)_rootViewsNeedDisplay;
+- (void)_drawSheetContentInContext:(CGContextRef)ctx screen:(BOOL)screen;
+@end
+
+/* Covers the whole window, above its content and toolbar: draws the sheet
+ * hanging from the top edge, with a shadow, and passes it the mouse events
+ * that fall on it, in its own coordinates. */
+@interface ASheetHost : NSView
+@end
+@implementation ASheetHost {
+    BOOL _inside[3];
+}
+- (NSWindow *)_sheet { return [[self window] attachedSheet]; }
+- (NSView *)hitTest:(NSPoint)p { return NSPointInRect(p, [self frame]) ? self : nil; }
+- (BOOL)_needsDisplayAnywhere { return [super _needsDisplayAnywhere] || [[self _sheet] _rootViewsNeedDisplay]; }
+
+/* The panel: square at the top, where it comes out from under the
+ * toolbar, rounded at the bottom. */
+static NSBezierPath *sheet_shape(NSRect r, CGFloat radius)
+{
+    NSBezierPath *p = [NSBezierPath bezierPath];
+    [p moveToPoint:NSMakePoint(NSMinX(r), NSMaxY(r))];
+    [p lineToPoint:NSMakePoint(NSMinX(r), NSMinY(r) + radius)];
+    [p appendBezierPathWithArcWithCenter:NSMakePoint(NSMinX(r) + radius, NSMinY(r) + radius) radius:radius
+                              startAngle:180 endAngle:270];
+    [p lineToPoint:NSMakePoint(NSMaxX(r) - radius, NSMinY(r))];
+    [p appendBezierPathWithArcWithCenter:NSMakePoint(NSMaxX(r) - radius, NSMinY(r) + radius) radius:radius
+                              startAngle:270 endAngle:360];
+    [p lineToPoint:NSMakePoint(NSMaxX(r), NSMaxY(r))];
+    [p closePath];
+    return p;
+}
+
+- (void)drawRect:(NSRect)dirty
+{
+    NSWindow *w = [self window], *s = [self _sheet];
+    if (!s)
+        return;
+    NSRect r = [w _sheetRect];
+    for (int i = 8; i >= 1; i--) {
+        [[NSColor colorWithWhite:0 alpha:0.025] setFill];
+        [sheet_shape(NSMakeRect(NSMinX(r) - i, NSMinY(r) - i - 2, r.size.width + 2 * i, r.size.height + i + 2),
+                     10 + i) fill];
+    }
+    NSBezierPath *panel = sheet_shape(r, 10);
+    [[s backgroundColor] setFill];
+    [panel fill];
+    NSGraphicsContext *gc = [NSGraphicsContext currentContext];
+    CGContextRef ctx = [gc CGContext];
+    CGContextSaveGState(ctx);
+    [panel addClip];
+    CGContextTranslateCTM(ctx, r.origin.x, r.origin.y);
+    [s _drawSheetContentInContext:ctx screen:[gc isDrawingToScreen]];
+    CGContextRestoreGState(ctx);
+    [[NSColor colorWithWhite:0 alpha:0.2] setStroke];
+    [panel setLineWidth:0.5];
+    [panel stroke];
+}
+
+static int button_of(NSEventType t)
+{
+    return t == NSEventTypeRightMouseDown || t == NSEventTypeRightMouseDragged || t == NSEventTypeRightMouseUp ? 1
+           : t == NSEventTypeOtherMouseDown || t == NSEventTypeOtherMouseDragged || t == NSEventTypeOtherMouseUp
+               ? 2
+               : 0;
+}
+
+- (void)_forward:(NSEvent *)e
+{
+    NSWindow *s = [self _sheet];
+    if (!s)
+        return;
+    NSRect r = [[self window] _sheetRect];
+    NSPoint p = [e locationInWindow];
+    p = NSMakePoint(p.x - r.origin.x, p.y - r.origin.y);
+    NSEvent *f = [e type] == NSEventTypeScrollWheel
+                     ? AScrollEvent(p, [e modifierFlags], s, [e scrollingDeltaX], [e scrollingDeltaY],
+                                    [e hasPreciseScrollingDeltas])
+                     : AMouseEvent([e type], p, [e modifierFlags], s, [e clickCount], [e buttonNumber]);
+    [s sendEvent:f];
+}
+- (void)_down:(NSEvent *)e
+{
+    int b = button_of([e type]);
+    _inside[b] = NSPointInRect([e locationInWindow], [[self window] _sheetRect]);
+    if (_inside[b])
+        [self _forward:e];
+    else
+        NSBeep();   /* the window waits for its sheet */
+}
+- (void)_moved:(NSEvent *)e
+{
+    if (_inside[button_of([e type])])
+        [self _forward:e];
+}
+- (void)_up:(NSEvent *)e
+{
+    int b = button_of([e type]);
+    if (_inside[b])
+        [self _forward:e];
+    _inside[b] = NO;
+}
+- (void)mouseDown:(NSEvent *)e { [self _down:e]; }
+- (void)rightMouseDown:(NSEvent *)e { [self _down:e]; }
+- (void)otherMouseDown:(NSEvent *)e { [self _down:e]; }
+- (void)mouseDragged:(NSEvent *)e { [self _moved:e]; }
+- (void)rightMouseDragged:(NSEvent *)e { [self _moved:e]; }
+- (void)otherMouseDragged:(NSEvent *)e { [self _moved:e]; }
+- (void)mouseUp:(NSEvent *)e { [self _up:e]; }
+- (void)rightMouseUp:(NSEvent *)e { [self _up:e]; }
+- (void)otherMouseUp:(NSEvent *)e { [self _up:e]; }
+- (void)mouseMoved:(NSEvent *)e
+{
+    if (NSPointInRect([e locationInWindow], [[self window] _sheetRect]))
+        [self _forward:e];
+}
+- (void)scrollWheel:(NSEvent *)e
+{
+    if (NSPointInRect([e locationInWindow], [[self window] _sheetRect]))
+        [self _forward:e];
+}
 @end

@@ -666,6 +666,9 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
     NSMenu *windows = [load.namedMenus objectForKey:@"_NSWindowsMenu"];
     if (windows && owner == NSApp)
         [NSApp setWindowsMenu:windows];
+    NSMenu *recent = [load.namedMenus objectForKey:@"_NSRecentDocumentsMenu"];
+    if (recent)
+        ANoteRecentDocumentsMenu(recent);
 
     /* awakeFromNib, to every object the nib made and to the owner. */
     NSMutableArray *awake = [NSMutableArray array];

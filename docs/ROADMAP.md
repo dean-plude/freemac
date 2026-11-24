@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.167 "Ferry: documents, alerts and the workspace" (done)
+
+Mac programs run through Ferry that open, edit and save files (text editors,
+password managers, drawing apps) get the document classes they're built on,
+with the alerts and sheets that go with them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Documents (`NSDocument`, `NSDocumentController`): the app's document types from its Info.plist; New, Open, Save, Save As, Save To, Revert and Duplicate; saved safely beside the file first; Open Recent with Clear Menu | Ferry AppKit | done |
+| 2 | Edits through `NSUndoManager` set the window's edited dot; closing an edited document asks Save, Cancel or Don't Save in a sheet; quitting with unsaved documents asks to review them | Ferry AppKit, Foundation | done |
+| 3 | Alerts (`NSAlert`): message and details, buttons with Return, Escape and ⌘D, the caution style, "Don't ask again" and an extra view; run on their own or as a sheet in the window; `presentError:` | Ferry AppKit | done |
+| 4 | `NSWorkspace`: open web addresses, files and folders with freemac's own apps, file icons from the icon theme, apps found by identifier or name; it never starts another Mac app | Ferry AppKit | done |
+| 5 | Ferry 0.13.0, test `appkit_documents` (69 tests); README screenshots | Ferry, Docs | done |
+
 ## 1.166 "Unread counts on websites in the Dock" (done)
 
 | # | Item | Component | Status |

@@ -12,7 +12,7 @@
 
 /* File name patterns for a type: an extension, or one of the common
  * uniform type identifiers. */
-static NSArray *extensions_for(NSString *type)
+NSArray *AExtensionsForType(NSString *type)
 {
     static NSDictionary *utis;
     if (!utis)
@@ -154,11 +154,11 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
         return url;
     NSString *ext = [[url pathExtension] lowercaseString];
     for (NSString *t in _types)
-        if ([extensions_for(t) containsObject:ext])
+        if ([AExtensionsForType(t) containsObject:ext])
             return url;
     if (_otherTypes && [ext length])
         return url;
-    NSString *first = [extensions_for([_types firstObject]) firstObject];
+    NSString *first = [AExtensionsForType([_types firstObject]) firstObject];
     return first ? [url URLByAppendingPathExtension:first] : url;
 }
 
@@ -208,7 +208,7 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
         gtk_file_chooser_set_current_folder(chooser, [[_directory path] fileSystemRepresentation]);
     NSMutableArray *patterns = [NSMutableArray array];
     for (NSString *t in _types)
-        for (NSString *e in extensions_for(t) ?: @[])
+        for (NSString *e in AExtensionsForType(t) ?: @[])
             [patterns addObject:e];
     if ([patterns count] && action != GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER) {
         GtkFileFilter *filter = gtk_file_filter_new();
@@ -367,7 +367,7 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
             NSString *ext = [[p pathExtension] lowercaseString];
             BOOL allowed = NO;
             for (NSString *t in _types)
-                allowed |= [extensions_for(t) containsObject:ext] || ![extensions_for(t) count];
+                allowed |= [AExtensionsForType(t) containsObject:ext] || ![AExtensionsForType(t) count];
             if (!allowed)
                 continue;
         }
