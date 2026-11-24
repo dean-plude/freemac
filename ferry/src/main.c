@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.11.0"
+#define FERRY_VERSION "0.12.0"
 
 static void usage(FILE *out)
 {

@@ -929,6 +929,19 @@ blocked, so reading the state back never switches anything. A tile given a
 Quick Settings its `WifiMenu` and `BluetoothMenu` (`menus`), and the words
 open that menu from its own symbol, or Dials' panel when the symbol is hidden.
 
+## Ferry's toolbars and controls (1.164)
+
+`ferry/appkit/NSPopUpButton.m`, `NSSegmentedControl.m`, `NSSearchField.m`,
+`NSStackView.m` and `NSToolbar.m`. Wayland gives a program no say over where
+its own windows go, so a pop-up button's menu is drawn inside the window,
+above its views: `NSWindow` routes events to the open menu first, and opening
+returns at once instead of running a modal loop. A toolbar is a strip of
+views under the title bar; the window's frame grows by its height with its
+top edge kept, and its items are validated from `-[NSWindow update]` on each
+pass of the event loop. Stack views are laid out by hand (Ferry has no Auto
+Layout) from each view's fitting size and its hugging, compression and
+visibility priorities.
+
 ## Ferry's tables and outlines (1.159)
 
 `ferry/appkit/NSTableView.m` and `NSOutlineView.m`, with private declarations

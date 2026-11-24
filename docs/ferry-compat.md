@@ -159,14 +159,44 @@ and `NSSortDescriptor` for them. Not done yet: editing text in a table's
 cells, dragging rows and columns, type-to-select, saved column widths, and
 animations (rows change at once).
 
+### Pop-up buttons, segmented controls, search fields, stack views and toolbars (1.164)
+
+`NSPopUpButton`, `NSSegmentedControl`, `NSSearchField`, `NSStackView` and
+`NSToolbar` are in Ferry now, with their cells and `NSToolbarItem`, all
+read from nibs and drawn by Ferry's own code to look like a current Mac's.
+A pop-up button's menu opens inside the window, the chosen item lined up
+over the button (a pull-down list's opens below it), and is worked by the
+mouse, the arrow keys, Return, Escape and typing; the menu's delegate is
+asked before it opens and items are enabled by their targets as in the
+menu bar. Segmented controls select one, any or momentarily, with segment
+menus and the four distributions. Search fields search as the user types
+(after a pause, or at once) or on Return, with the clear button, Escape
+and recent searches kept in the user defaults. Stack views lay out rows
+and columns by hand (Ferry has no Auto Layout) from their views' intrinsic
+sizes, with the gravity areas, every distribution and alignment, hidden
+and detached views and visibility priorities. A window's toolbar is drawn
+under the desktop's title bar in the same colour; the window grows by it
+as on a Mac, its items are validated as events come, and those that don't
+fit go in a chevron's menu. Pop-up buttons and segmented controls take the
+keyboard focus when full keyboard access is on (the `AppleKeyboardUIMode`
+default). Every app's nibs use some of these; the apps haven't been run
+again here, for the reason above. Not done yet: menus can't reach past the
+window, submenus in a pop-up button's menu, key equivalents shown in it,
+customizing a toolbar (the sheet), dragging the window by its toolbar, and
+`NSToolbarItemGroup` beyond showing its parts. The nib keys these classes
+read are the names published descriptions of the format give; a nib that
+names something differently loads with the default.
+
 ## What the apps need most
 
 Counted over the nine apps:
 
-1. **More views**: `NSPopUpButton`, `NSToolbar`, `NSSegmentedControl`,
-   `NSSearchField` and `NSStackView`. Every app's nibs use some of them.
-   (Split views and tab views came in 1.155; table and outline views,
-   which stopped Gas Mask and most likely Sequel Pro, in 1.159.)
+1. **More views**: done for the ones every app's nibs use. Split views
+   and tab views came in 1.155; table and outline views, which stopped Gas
+   Mask and most likely Sequel Pro, in 1.159; `NSPopUpButton`,
+   `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
+   1.164. Next is running the apps again to see which views they still
+   miss.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

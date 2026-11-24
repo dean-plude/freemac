@@ -277,6 +277,9 @@ void AViewDecode(NSView *v, NSCoder *c)
             [_window makeFirstResponder:nil];
     }
     [_superview setNeedsDisplay:YES];
+    /* a stack view lays its views out again (NSStackView.m) */
+    if ([_superview respondsToSelector:@selector(_arrangedSubviewVisibilityChanged:)])
+        [_superview performSelector:@selector(_arrangedSubviewVisibilityChanged:) withObject:self];
 }
 - (BOOL)isHiddenOrHasHiddenAncestor
 {

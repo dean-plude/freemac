@@ -1,0 +1,146 @@
+pop-up: Green, Blue, -, Other, Red; 5 items, chosen 0 "Green", title "Green", states 1000, tag of Other at 3, pulls down 0
+intrinsic size 80x25; cell NSPopUpButtonCell
+selected by title: 1 "Blue", object value 1, states 0100
+open: AMenuView, highlighted 1
+menu: 4,142 157x109
+chosen row's middle 213, the button's 212; rows 22 high, the separator 11
+after a click on Green: open 0, chosen 0 "Green", states 1000
+sent: will pop up; needs update; will open; did close; popped 0 "Green"
+dragging: highlighted 1, on the separator -1
+after a drag to Other: open 0, chosen "Other", tag 9
+sent: will pop up; needs update; will open; did close; popped 3 "Other"
+after a click outside: open 0, chosen "Other"
+sent: will pop up; needs update; will open; did close
+open on Other: 3, up past the separator: 1
+after up, Return: "Blue"
+after Escape: open 0
+typed "gr": 0
+after Space: "Green"
+sent: will pop up; needs update; will open; did close; popped 1 "Blue"; will pop up; needs update; will open; did close; will pop up; needs update; will open; did close; popped 0 "Green"
+down from Green past disabled Blue: 3
+click on disabled Blue: open 1, chosen "Green"
+sent: will pop up; needs update; will open; did close
+chosen "Green"
+sent: will pop up; needs update; will open; did close; own action of "Green"
+takes the focus: 0, with full keyboard access 1 (1)
+Space opened it: 1, highlighted 0
+after down, Return: "Blue"
+sent: will pop up; needs update; will open; did close; popped 1 "Blue"
+pull-down: title "Actions", chosen -1
+open below it: 1, the title row shown 0, highlighted -1
+after Paste: title "Actions", chosen 2, states 000
+sent: popped 2 "Paste"
+segments: 3, "One" "Two" "Three", chosen -1, width 60, intrinsic 180x24, cell NSSegmentedCell
+chosen 2, selected 001
+click on disabled 0: chosen 2
+pressed on 0, let go on 1: chosen 2
+select tag 11: 1, chosen 1; tag 99: 0
+sent: segment 1 [1]; segment 2 [2]
+select any: selected 101
+sent: segment 0 [0,1]; segment 2 [0,1,2]; segment 2 [0,2]
+momentary: selected 000
+sent: segment 0 [0]
+first responder: 1
+keys: segment 2 [2]; segment 1 [1]
+segment menu: open 1, below the segment 1
+closed 1, chosen 1
+sent: segment menu "Filter"
+distribution 0: 0 1 1 1 -1 -1 -1 -1 
+distribution 1: 0 0 0 1 1 1 1 1 
+distribution 2: 0 0 0 0 1 1 1 1 
+distribution 3: 0 0 1 1 1 1 1 1 
+28 actions
+search field: cell NSSearchFieldCell, whole 0, immediately 0, recents 10, intrinsic height 22
+glass: 4,3 16x16
+text: 22,2 156x18
+clear: 180,3 16x16
+typed ab: (nothing)
+a moment later: started; search "ab"
+typed c, d, then waited: search "abcd"
+Escape: ""
+sent: search ""; ended
+at once: started; search "x"; search "xy"
+the clear button: ""
+sent: search ""; ended
+whole: started; search "one"; search "two"; search "three"
+recents: three, two; saved: three, two
+search menu: Recent Searches, three, two, Clear Recents
+chose a recent one: "two"
+sent: search "two"
+after Clear Recents: 0 recents, menu No Recent Searches
+sent: (nothing)
+stack: orientation 0, alignment 10, spacing 8, distribution -1, detaches hidden 0, flipped 1
+row: 0,10 50x20 | 58,5 60x30 | 126,15 40x10
+fitting 166x30
+one trailing: 0,10 50x20 | 58,5 60x30 | 260,15 40x10
+one in the middle: 0,10 50x20 | 120,5 60x30 | 260,15 40x10
+in the gravities: 1 1 1
+distribution 0: 0,10 50x20 | 58,5 194x30 | 260,15 40x10
+distribution 1: 0,10 95x20 | 103,5 94x30 | 205,15 95x10
+distribution 2: 0,10 95x20 | 103,5 113x30 | 224,15 76x10
+distribution 3: 0,10 50x20 | 125,5 60x30 | 260,15 40x10
+distribution 4: 0,10 50x20 | 123,5 60x30 | 260,15 40x10
+alignment 3: 0,0 50x20 | 58,0 194x30 | 260,0 40x10
+alignment 4: 0,20 50x20 | 58,10 194x30 | 260,30 40x10
+custom spacing 20
+insets and spacing: 10,15 50x20 | 80,5 162x30 | 250,25 40x10
+one hidden: 10,15 50x20 | 80,5 162x30 (out) | 250,25 40x10
+shown again: 10,15 50x20 | 80,5 162x30 | 250,25 40x10
+hidden, detached: 10,15 135x20 | 80,5 162x30 (out) | 165,25 125x10
+detached 1
+shown, attached: 10,15 50x20 | 80,5 162x30 | 250,25 40x10
+column: 0,0 80x20 | 0,28 40x30
+column filled equally: 10,0 80x56 | 30,64 40x56
+200 wide: 0,5 60x20 | 68,5 60x20 | 136,5 60x20
+130 wide: 0,5 60x20 | 68,5 60x20 | 136,5 60x20 (out)
+detached 1, arranged 3
+70 wide: 0,5 60x20 | 68,5 60x20 (out) | 136,5 60x20 (out)
+300 wide: 0,5 60x20 | 68,5 60x20 | 136,5 60x20
+delegate: detach 1; detach 1; reattach 2
+inner fitting 30x38
+outer: 0,11 30x38 | 38,5 50x50
+inner: 0,0 30x10 | 0,18 30x20
+after a view left: 1 arranged
+toolbar: display mode 0, size mode 0, visible 1, customizable 0, autosaves 0
+frame before: 100,100 480x200
+frame with the toolbar: 100,62 480x238
+content: 0,0 480x200
+strip: 0,200 480x38
+content rect: 100,62 480x200
+items: open, find, NSToolbarFlexibleSpaceItem, share, info; visible: open, find, NSToolbarFlexibleSpaceItem, share, info
+delegate: made open; will add open; made find; will add find; will add NSToolbarFlexibleSpaceItem; made share; will add share; made info; will add info
+find's view: 50,8 160x22
+button: 8,0 36x38
+button: 394,0 36x38
+button: 436,0 36x38
+validated: share enabled 0, open enabled 1
+selected: info
+clicks: tool info from NSToolbarItem; tool open from NSToolbarItem
+display mode 1: strip 54, frame 254 high at 46, content 200, buttons 37 wide
+display mode 3: strip 32, frame 232 high at 68, content 200, buttons 45 wide
+display mode 2: strip 38, frame 238 high at 62, content 200, buttons 36 wide
+small: strip 32
+hidden: visible 0, frame 200 high, content 200
+shown: frame 238 high
+items: NSToolbarSpaceItem, open, find, NSToolbarFlexibleSpaceItem, share, info
+delegate: made extra; will add extra; will add NSToolbarSpaceItem; did remove extra
+configuration: NSToolbarSpaceItem, open, find, NSToolbarFlexibleSpaceItem, share, info
+narrow: visible NSToolbarSpaceItem, open, find, NSToolbarFlexibleSpaceItem
+overflow menu: Share, Info
+chosen: tool info from NSToolbarItem
+wide again: visible NSToolbarSpaceItem, open, find, NSToolbarFlexibleSpaceItem, share, info
+restored: open, find, NSToolbarFlexibleSpaceItem, share, info, display mode 3
+delegate: did remove NSToolbarSpaceItem; made open; will add open; made find; will add find; will add NSToolbarFlexibleSpaceItem; made share; will add share; made info; will add info
+no toolbar: frame 200 high, content 200
+nib loaded: 1
+pop-up NSPopUpButton: Small, Medium, Large, chosen 1 "Medium", states 010, pulls down 0, target owner 1, action sizeChosen:
+segments NSSegmentedControl: 3, "Day" "Week" "Month", chosen 1, mode 0
+search NSSearchField: placeholder "Find a file", whole 1, recents 5
+stack NSStackView: orientation 1, alignment 5, spacing 4, 2 arranged
+nib stack: 0,0 31x48 | 0,52 51x48
+toolbar NSToolbar "ControlsToolbar": the window's 1, delegate owner 1, display mode 2, size mode 1, items open, NSToolbarFlexibleSpaceItem, NSToolbarToggleSidebarItem
+open item: label "Open", target owner 1, action openThing:, tag 7
+nib window: 100,62 400x258
+nib content: 0,0 400x220
+owner: size Large; open from NSToolbarItem
+exit=0

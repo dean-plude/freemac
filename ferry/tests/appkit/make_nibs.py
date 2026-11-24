@@ -535,6 +535,91 @@ def tables_nib(path):
     a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
 
 
+def controls_nib(path):
+    """A window nib: a pop-up button (its menu, the second item chosen), a
+    segmented control of three segments, a search field that sends only on
+    Return, a column stack view of two labels, and a toolbar (its delegate
+    File's Owner) with an Open item aimed at File's Owner, a flexible space
+    and the standard sidebar item."""
+    a = Archive()
+    owner = custom(a, "ControlsOwner")
+    first = custom(a, "FirstResponder")
+    app = custom(a, "NSApplication")
+    content, popup, segments, search, stack, one, two = (a.reserve() for _ in range(7))
+    menu, small, medium, large = (a.reserve() for _ in range(4))
+    toolbar, open_item, flex_item, sidebar_item = (a.reserve() for _ in range(4))
+    window = a.add(a.obj("NSWindowTemplate", (), NSWindowStyleMask=15, NSWindowBacking=2,
+                         NSWindowRect="{{100, 100}, {400, 220}}", NSWindowTitle=a.add("Controls"),
+                         NSWindowClass=a.add("NSWindow"), NSWindowView=content, NSToolbar=toolbar))
+    view(a, content, "NSView", VIEW, "{{0, 0}, {400, 220}}", 256 | 18, UID(0),
+         NSSubviews=a.array([popup, segments, search, stack]))
+
+    def menu_item(uid, title, tag):
+        a.fill(uid, a.obj("NSMenuItem", (), NSMenu=menu, NSTitle=a.add(title), NSKeyEquiv=a.add(""),
+                          NSKeyEquivModMask=CMD, NSMnemonicLoc=0x7fffffff, NSTag=tag))
+    menu_item(small, "Small", 1)
+    menu_item(medium, "Medium", 2)
+    menu_item(large, "Large", 3)
+    a.fill(menu, a.obj("NSMenu", (), NSTitle=a.add("OtherViews"), NSMenuItems=a.array([small, medium, large])))
+    popup_cell = a.add(a.obj("NSPopUpButtonCell", ("NSMenuItemCell", "NSButtonCell") + CELL,
+                             NSContents=a.add("Medium"), NSCellFlags=0x04000000, NSCellFlags2=0x08000000,
+                             NSSupport=font(a), NSButtonFlags=0x04000000 | 0x00800000, NSButtonFlags2=1,
+                             NSKeyEquivalent=a.add(""), NSAlternateContents=a.add(""), NSMenu=menu,
+                             NSMenuItem=medium, NSPullDown=False, NSUsesItemFromMenu=True, NSAltersState=True,
+                             NSPreferredEdge=1, NSArrowPosition=1))
+    view(a, popup, "NSPopUpButton", ("NSButton",) + CONTROL, "{{20, 180}, {120, 25}}", 256, content,
+         NSCell=popup_cell, NSEnabled=True)
+
+    def segment(label, selected=False):
+        return a.add(a.obj("NSSegmentItem", (), NSSegmentItemLabel=a.add(label), NSSegmentItemSelected=selected,
+                           NSSegmentItemWidth=0.0))
+    seg_cell = a.add(a.obj("NSSegmentedCell", CELL, NSCellFlags=0x04000000, NSCellFlags2=0, NSSupport=font(a),
+                           NSSegmentImages=a.array([segment("Day"), segment("Week", True), segment("Month")]),
+                           NSSelectedSegment=1, NSTrackingMode=0, NSSegmentStyle=1))
+    view(a, segments, "NSSegmentedControl", CONTROL, "{{160, 180}, {180, 24}}", 256, content,
+         NSCell=seg_cell, NSEnabled=True)
+    search_cell = a.add(a.obj("NSSearchFieldCell", ("NSTextFieldCell",) + CELL, NSContents=a.add(""),
+                              NSCellFlags=0x14000000 | 0x00400000, NSCellFlags2=0, NSSupport=font(a),
+                              NSPlaceholderString=a.add("Find a file"), NSDrawsBackground=True,
+                              NSBackgroundColor=catalog_color(a, "textBackgroundColor", 1),
+                              NSTextColor=catalog_color(a, "controlTextColor", 0),
+                              NSMaximumRecents=5, NSSendsWholeSearchString=True))
+    view(a, search, "NSSearchField", ("NSTextField",) + CONTROL, "{{20, 140}, {200, 22}}", 256, content,
+         NSCell=search_cell, NSEnabled=True)
+    view(a, stack, "NSStackView", VIEW, "{{20, 20}, {200, 100}}", 256, content, NSSubviews=a.array([one, two]),
+         NSStackViewOrientation=1, NSStackViewAlignment=5, NSStackViewSpacing=4.0, NSStackViewDistribution=0,
+         NSStackViewDetachesHiddenViews=True)
+    view(a, one, "NSTextField", CONTROL, "{{0, 0}, {60, 17}}", 256, stack,
+         NSCell=text_cell(a, "NSTextFieldCell", "First", 0x04000000, background=False))
+    view(a, two, "NSTextField", CONTROL, "{{0, 20}, {60, 17}}", 256, stack,
+         NSCell=text_cell(a, "NSTextFieldCell", "Second", 0x04000000, background=False))
+
+    a.fill(open_item, a.obj("NSToolbarItem", (), NSToolbarItemIdentifier=a.add("open"),
+                            NSToolbarItemLabel=a.add("Open"), NSToolbarItemPaletteLabel=a.add("Open"),
+                            NSToolbarItemTarget=owner, NSToolbarItemAction=a.add("openThing:"),
+                            NSToolbarItemAutovalidates=True, NSToolbarItemEnabled=True, NSToolbarItemTag=7))
+    a.fill(flex_item, a.obj("NSToolbarItem", (), NSToolbarItemIdentifier=a.add("NSToolbarFlexibleSpaceItem")))
+    a.fill(sidebar_item, a.obj("NSToolbarItem", (), NSToolbarItemIdentifier=a.add("NSToolbarToggleSidebarItem"),
+                               NSToolbarItemLabel=a.add("Sidebar")))
+    items = [open_item, flex_item, sidebar_item]
+    a.fill(toolbar, a.obj("NSToolbar", (), NSToolbarIdentifier=a.add("ControlsToolbar"), NSToolbarDisplayMode=2,
+                          NSToolbarSizeMode=1, NSToolbarPrefersToBeShown=True, NSToolbarShowsBaselineSeparator=True,
+                          NSToolbarAllowsUserCustomization=False, NSToolbarAutosavesConfiguration=False,
+                          NSToolbarDelegate=owner, NSToolbarIBDefaultItems=a.array(items),
+                          NSToolbarIBAllowedItems=a.array(items)))
+    out = "NSNibOutletConnector"
+    conns = [connector(a, out, owner, window, "window"), connector(a, out, owner, popup, "popup"),
+             connector(a, out, owner, segments, "segments"), connector(a, out, owner, search, "search"),
+             connector(a, out, owner, stack, "stack"), connector(a, out, owner, toolbar, "toolbar"),
+             connector(a, "NSNibControlConnector", popup, owner, "sizeChosen:")]
+    pairs = [(owner, owner), (first, owner), (app, owner), (window, owner), (content, window), (popup, content),
+             (menu, popup), (small, menu), (medium, menu), (large, menu), (segments, content), (search, content),
+             (stack, content), (one, stack), (two, stack), (toolbar, window), (open_item, toolbar),
+             (flex_item, toolbar), (sidebar_item, toolbar)]
+    data = object_data(a, owner, pairs, conns, [], [(owner, "File's Owner")])
+    a.save(path, {"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+
 here = os.path.dirname(os.path.abspath(__file__))
 resources = os.path.join(here, "NibApp.app", "Contents", "Resources")
 main_menu_nib(os.path.join(resources, "Base.lproj", "MainMenu.nib"))
@@ -545,6 +630,7 @@ window_controller_nib(os.path.join(resources, "Controlled.nib"))
 view_controller_nib(os.path.join(resources, "ListViewController.nib"))
 panes_nib(os.path.join(here, "Panes.nib"))
 tables_nib(os.path.join(here, "Tables.nib"))
+controls_nib(os.path.join(here, "Controls.nib"))
 info = {"CFBundleExecutable": "NibApp", "CFBundleIdentifier": "org.freemac.ferry.nibapp", "CFBundleName": "NibApp",
         "CFBundlePackageType": "APPL", "NSMainNibFile": "MainMenu", "NSPrincipalClass": "NSApplication"}
 with open(os.path.join(here, "NibApp.app", "Contents", "Info.plist"), "wb") as f:

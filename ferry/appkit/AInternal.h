@@ -107,6 +107,64 @@ void ADragAttach(NSWindow *window, GtkWidget *area);
 - (NSButtonType)_buttonType;
 @end
 
+/* The steps of a text field's editing and drawing that NSSearchField
+ * changes (NSControl.m). */
+@interface NSTextField (FerryPrivate)
+- (BOOL)_isEditing;
+- (NSRect)_textRect;
+- (NSRect)_clipRect;
+- (void)_drawBezelInRect:(NSRect)rect focused:(BOOL)focused;
+- (NSAttributedString *)_shownPlaceholder;
+- (void)_changed;
+- (void)_post:(NSNotificationName)name selector:(SEL)sel;
+@end
+
+/* ---- menus opened in a window (NSPopUpButton.m) -------------------------------------- */
+
+/* A menu drawn over a window's views, as a Mac draws a pop-up menu, which
+ * takes the window's mouse and keys until an item is chosen or it is
+ * dismissed. Wayland doesn't let a program place a window of its own over
+ * another, so the menu stays inside its window. */
+@class AMenuView;
+@protocol AMenuOwner <NSObject>
+/* item is nil when the menu was dismissed */
+- (void)_menuView:(AMenuView *)menu didChooseItem:(NSMenuItem *)item;
+@end
+@interface AMenuView : NSView
+/* Opens menu for view: with item number aligned (its title over rect's,
+ * in view's coordinates), or below rect when aligned is -1; a pull-down
+ * list's menu leaves out its first item (skip). */
++ (AMenuView *)openMenu:(NSMenu *)menu forView:(NSView *)view rect:(NSRect)rect alignItem:(NSInteger)aligned
+              skipFirst:(BOOL)skip font:(NSFont *)font owner:(id<AMenuOwner>)owner;
+@property (readonly) NSMenu *menu;
+@property (readonly) NSInteger highlightedIndex;
+@property (readonly) NSRect menuRect;       /* in the window's coordinates */
+- (NSRect)rectOfItemAtIndex:(NSInteger)index;  /* in the window's coordinates */
+- (void)highlightItemAtIndex:(NSInteger)index;
+- (void)chooseHighlightedItem;
+- (void)dismiss;
+@end
+
+@interface NSWindow (FerryOverlay)
+/* A root view drawn over everything else in the window that gets every
+ * mouse and key event while it is there (an open menu). */
+- (NSView *)_overlayView;
+- (void)_setOverlayView:(NSView *)view;
+/* The toolbar's strip changed height: the window grows or shrinks by as
+ * much, keeping its content view's size (NSToolbar.m). */
+- (void)_toolbarLayoutChanged;
+- (NSView *)_toolbarView;
+@end
+
+/* (NSToolbar.m) the strip a window's toolbar is drawn in, a root view of the
+ * window above its content view. */
+@interface NSToolbar (FerryPrivate)
+- (void)_setWindow:(NSWindow *)window;
+- (NSWindow *)_window;
+- (CGFloat)_height;
+- (NSView *)_makeView;
+@end
+
 /* ---- nibs (NSNib.m) ---------------------------------------------------------------------- */
 
 @interface NSKeyedUnarchiver (FerryPrivate)
