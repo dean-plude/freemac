@@ -878,6 +878,24 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Battery menu (1.154)
+
+`battery_menu.BatteryMenu` subclasses `status.Battery`, which still draws the
+symbol, warns at 10% and 5% and applies Low Power Mode; `update()` now keeps
+the figures it read in `facts` for the menu. The menu is a
+`menubar_popup.Popup`, a layer-shell overlay drawn like the Sound and Wi-Fi
+menus, which closes on Escape, a little after the pointer leaves, or a few
+seconds after opening if it is never pointed at. "Using Significant Energy"
+comes from `energy.Sampler`: every 30 seconds it reads `/proc` for this
+person's processes and adds up their processor ticks per app. Wayfire's
+`window-rules/list-views` gives no pid, so an app's processes are found by
+name (the window's app id, its last dotted part, or the program its
+.desktop file runs; a script is known by its script's name) and then every
+process they started, stopping at one that belongs to another app. An app
+that used 15% of a core or more since the last sample is listed. The Low
+Power Mode switch writes `always` or `never` to `shell.json` through
+`style.save_prefs()`, which merges and writes the file atomically.
+
 ## Wi-Fi menu (1.153)
 
 `wifi_menu.WifiMenu` replaces the old network status icon in Topline. It

@@ -58,6 +58,7 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .sound-menu-title { font-weight: bold; padding: 0 6px; }
 .sound-menu-heading { color: @dim; font-size: 12px; font-weight: 600; padding: 2px 6px; }
 .sound-menu-item { padding: 4px 6px; border-radius: 7px; }
+.menu-note { color: @dim; padding: 0 6px; }
 .sound-menu-item:hover { background-color: alpha(currentColor, 0.08); }
 .sound-device { border-radius: 50%; padding: 5px; background-color: alpha(currentColor, 0.12); }
 .sound-device-on { background-color: @theme_selected_bg_color; color: white; }
@@ -131,6 +132,20 @@ def prefs():
             return json.load(f)
     except (OSError, ValueError):
         return {}
+
+
+def save_prefs(**changes):
+    """Change some shell preferences, keeping the rest (as Dials does)."""
+    values = prefs()
+    values.update(changes)
+    try:
+        os.makedirs(os.path.dirname(PREFS), exist_ok=True)
+        tmp = f"{PREFS}.{os.getpid()}-tmp"
+        with open(tmp, "w") as f:
+            json.dump(values, f, indent=2)
+        os.replace(tmp, PREFS)
+    except OSError:
+        pass
 
 
 def watch_prefs(callback):
