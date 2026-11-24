@@ -164,4 +164,66 @@ int gdk_drag_context_get_actions(GdkDragContext *context);
 char **gtk_selection_data_get_uris(const GtkSelectionData *data);
 unsigned char *gtk_selection_data_get_text(const GtkSelectionData *data);
 
+/* GIO's D-Bus calls, for menu bar items (NSStatusBar.m): the desktop's
+ * StatusNotifierItem and dbusmenu protocols. GVariant values are built with
+ * the constructors that take no format string. A GVariantType is its type
+ * string, so a type is passed as a string such as "a{sv}". */
+typedef struct _GVariant GVariant;
+typedef struct _GDBusConnection GDBusConnection;
+typedef struct _GDBusMethodInvocation GDBusMethodInvocation;
+typedef struct _GDBusNodeInfo GDBusNodeInfo;
+typedef struct _GDBusInterfaceInfo GDBusInterfaceInfo;
+typedef void (*GDBusMethodCall)(GDBusConnection *connection, const char *sender, const char *path,
+                                const char *iface, const char *method, GVariant *parameters,
+                                GDBusMethodInvocation *invocation, void *data);
+typedef GVariant *(*GDBusGetProperty)(GDBusConnection *connection, const char *sender, const char *path,
+                                      const char *iface, const char *property, GError **error, void *data);
+typedef struct {
+    GDBusMethodCall method_call;
+    GDBusGetProperty get_property;
+    void *set_property;
+    void *padding[8];
+} GDBusInterfaceVTable;
+typedef void (*GDBusSignalCallback)(GDBusConnection *connection, const char *sender, const char *path,
+                                    const char *iface, const char *signal, GVariant *parameters, void *data);
+enum { G_BUS_TYPE_SESSION = 2 };
+GDBusConnection *g_bus_get_sync(int bus_type, void *cancellable, GError **error);
+GDBusNodeInfo *g_dbus_node_info_new_for_xml(const char *xml, GError **error);
+GDBusInterfaceInfo *g_dbus_node_info_lookup_interface(GDBusNodeInfo *info, const char *name);
+unsigned g_dbus_connection_register_object(GDBusConnection *connection, const char *path, GDBusInterfaceInfo *iface,
+                                           const GDBusInterfaceVTable *vtable, void *data, void *free_data,
+                                           GError **error);
+gboolean g_dbus_connection_unregister_object(GDBusConnection *connection, unsigned id);
+gboolean g_dbus_connection_emit_signal(GDBusConnection *connection, const char *destination, const char *path,
+                                       const char *iface, const char *signal, GVariant *parameters, GError **error);
+void g_dbus_connection_call(GDBusConnection *connection, const char *name, const char *path, const char *iface,
+                            const char *method, GVariant *parameters, const char *reply_type, int flags,
+                            int timeout_ms, void *cancellable, void *callback, void *data);
+GVariant *g_dbus_connection_call_sync(GDBusConnection *connection, const char *name, const char *path,
+                                      const char *iface, const char *method, GVariant *parameters,
+                                      const char *reply_type, int flags, int timeout_ms, void *cancellable,
+                                      GError **error);
+unsigned g_dbus_connection_signal_subscribe(GDBusConnection *connection, const char *sender, const char *iface,
+                                            const char *member, const char *path, const char *arg0, int flags,
+                                            GDBusSignalCallback callback, void *data, void *free_data);
+void g_dbus_method_invocation_return_value(GDBusMethodInvocation *invocation, GVariant *value);
+void g_dbus_method_invocation_return_dbus_error(GDBusMethodInvocation *invocation, const char *name,
+                                                const char *message);
+GVariant *g_variant_new_string(const char *string);
+GVariant *g_variant_new_object_path(const char *path);
+GVariant *g_variant_new_int32(int32_t value);
+GVariant *g_variant_new_uint32(uint32_t value);
+GVariant *g_variant_new_boolean(gboolean value);
+GVariant *g_variant_new_variant(GVariant *value);
+GVariant *g_variant_new_tuple(GVariant *const *children, size_t n);
+GVariant *g_variant_new_array(const char *child_type, GVariant *const *children, size_t n);
+GVariant *g_variant_new_dict_entry(GVariant *key, GVariant *value);
+GVariant *g_variant_new_fixed_array(const char *element_type, const void *elements, size_t n, size_t element_size);
+GVariant *g_variant_get_child_value(GVariant *value, size_t index);
+size_t g_variant_n_children(GVariant *value);
+int32_t g_variant_get_int32(GVariant *value);
+const char *g_variant_get_string(GVariant *value, size_t *length);
+gboolean g_variant_is_of_type(GVariant *value, const char *type);
+void g_variant_unref(GVariant *value);
+
 #endif

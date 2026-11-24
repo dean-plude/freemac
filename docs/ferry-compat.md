@@ -131,6 +131,17 @@ and Gas Mask's is `NSOutlineView`.
 
 Ferry's package is now attached to every freemac release.
 
+### Menu bar items (1.157)
+
+`NSStatusBar` and `NSStatusItem` are in Ferry now: an item appears in
+freemac's menu bar (over StatusNotifierItem, which Topline has read since
+1.156), with its image or title drawn by Ferry and its menu read as it opens.
+That was Flycut's next known need, and the only window ShiftIt has; Spectacle
+and Gas Mask use one too. The apps haven't been run again here, for the reason
+above. Mac programs expect SSSE3, which every Intel Mac had; Ferry now says
+so plainly on a processor without it, where a program would otherwise stop
+with "Illegal instruction".
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -142,8 +153,8 @@ Counted over the nine apps:
    and they are now what stops Gas Mask and (most likely) Sequel Pro.
    (Split views and tab views came in 1.155.)
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
-   (Flycut, ShiftIt, Spectacle, Gas Mask). On freemac this would become a
-   tray icon (StatusNotifierItem), which needs the desktop's support.
+   (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
+   freemac's menu bar.
 3. **The document classes** (`NSDocument`, `NSDocumentController`):
    MacPass, MacDown, Sequel Pro.
 4. **`NSAlert`, `NSWorkspace`, `NSInvocation`**, and Foundation's

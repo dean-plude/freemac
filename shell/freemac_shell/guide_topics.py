@@ -890,6 +890,7 @@ TOPICS = {
         "always opens the menu when there is one. Scroll over an icon if the app reacts to that.",
         "An icon goes away when its app quits. To quit an app that has no window, choose Quit from its "
         "icon's menu.",
+        "Mac programs that run through Ferry put their menu bar items here too, as icons or words.",
     ]),
     "see-better": ("Make the screen easier to see", "reduce transparency solid see-through invert colours colors negative contrast accessibility vision eyes", [
         "Choose Dials > Accessibility and turn on Reduce transparency. The menu bar, the Dock and panels "

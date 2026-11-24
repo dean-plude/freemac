@@ -60,11 +60,20 @@ BOOL ADisplayAvailable(void)
         fprintf(stderr, "AppKit (Ferry): can't open the display; windows will only be drawn off screen\n");
         return NO;
     }
+    AGlibAttach();
+    display_state = 1;
+    return YES;
+}
+
+/* Has the run loop wait on GLib's main context too: for windows, and for
+ * D-Bus (menu bar items), which needs no display. */
+void AGlibAttach(void)
+{
+    if (glib)
+        return;
     glib = g_main_context_default();
     g_main_context_acquire(glib);
     FerryRunLoopSetPollHook(glib_prepare, glib_dispatch, NULL);
-    display_state = 1;
-    return YES;
 }
 
 static GdkMonitor *primary_monitor(void)

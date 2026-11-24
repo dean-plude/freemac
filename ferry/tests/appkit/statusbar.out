@@ -1,0 +1,27 @@
+item 1 Category: (<'ApplicationStatus'>,)
+item 1 Title: (<'appkit_statusbar'>,)
+item 1 Status: (<'Active'>,)
+item 1 ItemIsMenu: (<true>,)
+item 1 Menu: (<objectpath '/MenuBar/1'>,)
+item 1 ToolTip: (<('', @a(iiay) [], 'Weather', '')>,)
+item 1 Id: (<'appkit_statusbar-N'>,)
+item 1 pictures (width height): 16 16  21 22  31 32  ; drawn: yes
+item 2 pictures (width height): 16 16  22 22  32 32  ; drawn: yes
+item 2 ItemIsMenu: (<false>,), Menu: (<objectpath '/'>,)
+version: (<uint32 3>,)
+about to show: (false,)
+layout: (rev, (0, {'children-display': <'submenu'>}, [<(1, {'label': <'Open__Forecast'>}, @av [])>, <(2, {'type': <'separator'>}, @av [])>, <(3, {'label': <'Notify Me'>, 'toggle-type': <'checkmark'>, 'toggle-state': <1>}, @av [])>, <(4, {'label': <'Not Now'>, 'enabled': <false>}, @av [])>, <(5, {'label': <'Units'>, 'children-display': <'submenu'>}, [<(6, {'label': <'Celsius'>, 'toggle-type': <'checkmark'>, 'toggle-state': <1>}, @av [])>, <(7, {'label': <'Fahrenheit'>}, @av [])>])>, <(8, {'type': <'separator'>}, @av [])>, <(9, {'label': <'Quit'>}, @av [])>]))
+branch: (rev, (5, {'label': <'Units'>, 'children-display': <'submenu'>}, [<(6, {'label': <'Celsius'>, 'toggle-type': <'checkmark'>, 'toggle-state': <1>}, @av [])>, <(7, {'label': <'Fahrenheit'>}, @av [])>]))
+properties: ([(3, {'label': <'Notify Me'>, 'toggle-type': <'checkmark'>, 'toggle-state': <1>}), (4, {'label': <'Not Now'>, 'enabled': <false>})],)
+after toggle: ([(3, {'label': <'Notify Me'>})],)
+item 2 Status after click: (<'Passive'>,)
+app exit=0
+----
+thickness 22, vertical 0
+items made, menu yes, timer length -2
+menu needs update
+toggle: now 0
+open: Fahrenheit
+clicked: the timer's button
+quitting
+exit=0

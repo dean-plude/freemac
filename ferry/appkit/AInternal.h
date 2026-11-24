@@ -66,6 +66,7 @@ void ASetMouseLocation(NSPoint screenPoint, NSUInteger buttons);
 /* ---- windows and views --------------------------------------------------------------- */
 
 void AWindowsDisplayIfNeeded(void);
+void AGlibAttach(void);
 NSWindow *AKeyWindow(void);
 NSWindow *AMainWindow(void);
 NSArray *AAllWindows(void);
@@ -77,6 +78,7 @@ void AWindowDidClose(NSWindow *window);
 - (CGAffineTransform)_transformToSuperview;
 - (CGAffineTransform)_transformToWindow;
 - (void)_drawInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
+- (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
 - (BOOL)_needsDisplayAnywhere;
 @end
 

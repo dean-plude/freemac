@@ -1094,6 +1094,7 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
+| `appkit_statusbar` | (freemac 1.157) menu bar items, on a private session bus: their StatusNotifierItem properties and pictures, the dbusmenu layout of one item's menu (labels, ticks, a dimmed item, a submenu read on its own), clicks on menu items and on an item without a menu, hiding an item, and Quit |
 
 **What isn't done yet (and why).**
 
@@ -1124,8 +1125,8 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
 
 **What's next.** The views every app's nibs use (`NSTableView`,
 `NSOutlineView`, `NSPopUpButton`; `NSSplitView` and `NSTabView` came in
-freemac 1.155, see `appkit_panes`), then
-`NSStatusBar` as a tray icon, the document classes, `NSAlert` and
+freemac 1.155, see `appkit_panes`; `NSStatusBar` came in 1.157, see
+`appkit_statusbar`), then the document classes, `NSAlert` and
 `NSWorkspace`.
 
 ## Known limits (for every milestone)

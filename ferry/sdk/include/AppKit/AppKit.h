@@ -257,6 +257,7 @@ typedef NS_ENUM(NSUInteger, NSControlSize) {
 + (NSFont *)labelFontOfSize:(CGFloat)size;
 + (NSFont *)messageFontOfSize:(CGFloat)size;
 + (NSFont *)menuFontOfSize:(CGFloat)size;
++ (NSFont *)menuBarFontOfSize:(CGFloat)size;
 + (NSFont *)titleBarFontOfSize:(CGFloat)size;
 + (NSFont *)controlContentFontOfSize:(CGFloat)size;
 + (NSFont *)toolTipsFontOfSize:(CGFloat)size;
@@ -655,6 +656,7 @@ typedef NS_ENUM(NSUInteger, NSCellImagePosition) {
 @property (class) Class cellClass;
 @property (assign) id target;
 @property SEL action;
+- (NSInteger)sendActionOn:(NSInteger)mask;
 @property NSInteger tag;
 @property (getter=isEnabled) BOOL enabled;
 @property (retain) id formatter; /* kept, not applied yet */
@@ -1070,6 +1072,15 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidDeminiaturizeNotification;
 
 @protocol NSMenuItemValidation <NSObject>
 - (BOOL)validateMenuItem:(NSMenuItem *)item;
+@end
+
+@protocol NSMenuDelegate <NSObject>
+@optional
+- (void)menuNeedsUpdate:(NSMenu *)menu;
+- (void)menuWillOpen:(NSMenu *)menu;
+- (void)menuDidClose:(NSMenu *)menu;
+- (NSInteger)numberOfItemsInMenu:(NSMenu *)menu;
+- (BOOL)menu:(NSMenu *)menu updateItem:(NSMenuItem *)item atIndex:(NSInteger)index shouldCancel:(BOOL)shouldCancel;
 @end
 
 /* ---- the application ----------------------------------------------------------------- */
@@ -2011,6 +2022,47 @@ typedef NS_ENUM(NSUInteger, NSTabState) { NSSelectedTab = 0, NSBackgroundTab = 1
 - (void)selectNextTabViewItem:(id)sender;
 - (void)selectPreviousTabViewItem:(id)sender;
 - (void)takeSelectedTabViewItemFromSender:(id)sender;
+@end
+
+/* ---- menu bar items (NSStatusBar.m) -------------------------------------------------- */
+
+@class NSStatusItem;
+#define NSVariableStatusItemLength (-1.0)
+#define NSSquareStatusItemLength (-2.0)
+typedef NS_OPTIONS(NSUInteger, NSStatusItemBehavior) {
+    NSStatusItemBehaviorRemovalAllowed = 1 << 1, NSStatusItemBehaviorTerminationOnRemoval = 1 << 2,
+};
+@interface NSStatusBar : NSObject
++ (NSStatusBar *)systemStatusBar;
+- (NSStatusItem *)statusItemWithLength:(CGFloat)length;
+- (void)removeStatusItem:(NSStatusItem *)item;
+@property (readonly, getter=isVertical) BOOL vertical;
+@property (readonly) CGFloat thickness;
+@end
+@interface NSStatusBarButton : NSButton
+@property BOOL appearsDisabled;
+@end
+@interface NSStatusItem : NSObject
+@property (readonly, assign) NSStatusBar *statusBar;
+@property CGFloat length;
+@property (retain) NSMenu *menu;
+@property (readonly, retain) NSStatusBarButton *button;
+@property NSStatusItemBehavior behavior;
+@property (getter=isVisible) BOOL visible;
+@property (copy) NSString *autosaveName;
+/* the older ways, which a Mac still accepts */
+@property (copy) NSString *title;
+@property (copy) NSAttributedString *attributedTitle;
+@property (retain) NSImage *image, *alternateImage;
+@property (copy) NSString *toolTip;
+@property (assign) id target;
+@property SEL action, doubleAction;
+@property (getter=isEnabled) BOOL enabled;
+@property BOOL highlightMode;
+@property (retain) NSView *view;
+- (NSInteger)sendActionOn:(NSInteger)mask;
+- (void)popUpStatusItemMenu:(NSMenu *)menu;
+- (void)drawStatusBarBackgroundInRect:(NSRect)rect withHighlight:(BOOL)highlight;
 @end
 
 #endif
