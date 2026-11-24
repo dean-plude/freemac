@@ -1327,6 +1327,13 @@ TOPICS = {
         "Turn on Random order to shuffle them; otherwise they go in order by name.",
         "Picking one wallpaper yourself turns Change picture back to Never.",
     ]),
+    "permissions": ("Choose who can open or change a file", "permissions privileges sharing read write only no access everyone group owner share family other users private get info", [
+        "Choose the file or folder in Drawer or on the Desktop and press ⌘I to open its Info window.",
+        "Under Sharing and permissions, each name has a privilege: Read & Write, Read only or No Access.",
+        "Change one with its pop-up. Only the item's owner can change them, and not while it is locked.",
+        "everyone means the other people who use this computer.",
+        "For a folder, Apply to Enclosed Items gives everything inside the same privileges.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",

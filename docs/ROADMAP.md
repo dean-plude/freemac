@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.179 "Sharing and permissions" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Get Info's Sharing and permissions becomes a Name and Privilege table: the owner (Me), the group and everyone, each Read & Write, Read only or No Access, with a pop-up when the item is yours | drawer_info.py, permissions.py | done |
+| 2 | A folder's read follows into opening it; a file keeps whether it is a program; Write only (Drop Box) is shown when an item has it | permissions.py | done |
+| 3 | Apply to Enclosed Items… asks first, then gives everything inside the folder its privileges, deepest first, leaving aliases, locked items and other people's items alone | drawer_info.py, permissions.py | done |
+| 4 | A locked item shows the privileges it gets back when unlocked and can't be changed until then | drawer_info.py, permissions.py | done |
+| 5 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.178 "Ferry: editing tables and autosave" (done)
 
 Mac programs that keep lists you type into, and document apps that save as
