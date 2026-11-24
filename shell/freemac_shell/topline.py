@@ -16,8 +16,8 @@ gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
 from . import (announce, apps, beacon, dials_time, fallback_menus, focus_menu, held, helpsearch,  # noqa: E402
-               mac_accel, now_playing_menu, quick, main_display, recent_items, services, status, style, wifi_menu,
-               battery_menu, bluetooth_menu, extras)
+               lifeboat_menu, mac_accel, now_playing_menu, quick, main_display, recent_items, services, status,
+               style, wifi_menu, battery_menu, bluetooth_menu, extras)
 from . import dials_keys  # noqa: E402
 from .ini import ini_get  # noqa: E402
 from .wfipc import Wayfire, is_app_window, is_minimized  # noqa: E402
@@ -197,7 +197,8 @@ class Topline(Gtk.Window):
         for name, indicator in (("seek", now_playing_menu.Seek()), ("focus", self.dnd),
                                 ("battery", battery_menu.BatteryMenu()),
                                 ("sound", status.Sound()), ("wifi", wifi), (None, status.VPN()),
-                                ("bluetooth", bluetooth), ("nowplaying", now_playing_menu.NowPlayingMenu()),
+                                ("bluetooth", bluetooth), ("lifeboat", lifeboat_menu.LifeboatMenu()),
+                                ("nowplaying", now_playing_menu.NowPlayingMenu()),
                                 (None, status.Printing()), (None, status.Recording()),
                                 (None, status.ScreenShared()), (None, status.InUse()), (None, status.InputMenu()),
                                 (None, status.UserMenu())):

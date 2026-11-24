@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.163 "Lifeboat in the menu bar" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Once a backup drive is chosen, a lifebuoy sits in the menu bar, as a Mac shows its backups there; it turns slowly while a backup runs | lifeboat_menu.py (new), Topline | done |
+| 2 | Its menu says when the latest backup was made, how far the one running has got, or why the last one didn't finish, and asks for the drive when it isn't plugged in | lifeboat_menu.py | done |
+| 3 | Back Up Now, or Skip This Backup while one runs; Browse Lifeboat Backups; Lifeboat Settings… | lifeboat_menu.py | done |
+| 4 | Show Lifeboat in menu bar in Dials > Dock and Menu Bar; "1 minute ago" in Dials > Lifeboat instead of "1 minutes ago" | Dials | done |
+| 5 | Guide lines, README row and screenshot | Guide, Docs | done |
+
 ## 1.162 "Now Playing and Seek in the menu bar" (done)
 
 | # | Item | Component | Status |

@@ -735,6 +735,9 @@ TOPICS = {
         "Lifeboat keeps every backup of the last day, one a day for a month, and one a week before that. "
         "When the drive is full, the oldest go first.",
         "To eject the drive, eject it as usual. A backup that's running stops and starts again next time.",
+        "Once a drive is chosen, a lifebuoy sits in the menu bar. Click it to see when the latest backup was "
+        "made, to back up now or skip the backup that's running, or to browse your backups. The lifebuoy "
+        "turns while a backup runs.",
     ]),
     "date-time": ("Set the date, time and time zone", "date time clock time zone timezone city 24-hour 12-hour seconds automatic wrong time travel", [
         "Choose Dials > Date & Time.",
@@ -901,9 +904,9 @@ TOPICS = {
         "connect. Clicking the words of the others turns them on or off too.",
         "Settings… at the bottom opens Dials.",
     ]),
-    "menu-bar-icons": ("Choose which icons show in the menu bar", "menu bar icons hide show remove wifi wi-fi bluetooth sound volume battery focus now playing seek search control centre center clutter", [
+    "menu-bar-icons": ("Choose which icons show in the menu bar", "menu bar icons hide show remove wifi wi-fi bluetooth sound volume battery focus now playing seek search lifeboat backup control centre center clutter", [
         "Open Dials > Dock and Menu Bar. Under the menu bar settings, turn Show Wi-Fi, Bluetooth, Sound, "
-        "Battery, Focus, Now Playing or Seek in menu bar on or off.",
+        "Battery, Focus, Now Playing, Seek or Lifeboat in menu bar on or off.",
         "An icon you turn off leaves the menu bar at once. Wi-Fi, Bluetooth, Focus and the volume are still "
         "in Quick Settings, the symbol beside the clock.",
     ]),

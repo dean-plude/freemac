@@ -45,7 +45,8 @@ def _ago(when, now=None):
     if gap < 90:
         return "Just now"
     if gap < 3600:
-        return f"{int(gap // 60)} minutes ago"
+        minutes = int(gap // 60)
+        return "1 minute ago" if minutes == 1 else f"{minutes} minutes ago"
     return store.describe(when, now)
 
 
