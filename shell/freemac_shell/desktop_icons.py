@@ -41,7 +41,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
+from . import aliases, desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 from . import desktop_view  # noqa: E402
 from .drawer_info import item_info  # noqa: E402
@@ -259,7 +259,11 @@ class DesktopIcon(Gtk.EventBox):
         self.frame = Gtk.Box(halign=Gtk.Align.CENTER)
         self.frame.get_style_context().add_class("desk-icon")
         self.content_type = info.get_content_type() if info else ""
+        if path and aliases.is_broken(path):
+            info, icon = None, Gio.ThemedIcon.new("text-x-generic")
         self.pixbuf = picture_for(path, info, icon)
+        if path and aliases.is_alias(path):
+            self.pixbuf = aliases.badge(self.pixbuf)
         image = Gtk.Image.new_from_pixbuf(self.pixbuf) if self.pixbuf else Gtk.Image()
         image.set_size_request(ICON, ICON)
         self.frame.add(image)
@@ -890,10 +894,41 @@ class DesktopIcons(Gtk.Layout):
             pick = best[1]
         self.click(pick, False)
 
+    def make_alias(self, icons):
+        """An alias of each icon's item, on the Desktop beside it."""
+        try:
+            aliases.make([i.path for i in icons if i.path])
+        except OSError as err:
+            from . import alert
+            alert.tell(None, "The alias couldn’t be made.", err.strerror or "")
+        self.refresh()
+
+    def show_original(self, icon):
+        """The alias's original, chosen in a Drawer window."""
+        found = aliases.original(icon.path)
+        if not found:
+            aliases.ask_broken(None, icon.path)
+            self.refresh()
+            return
+        subprocess.Popen(["freemac-drawer", "--select", found], start_new_session=True)
+
     def open(self, icons):
         for icon in icons:
             if icon.mount is not None and icon.path:
                 subprocess.Popen(["freemac-drawer", icon.path], start_new_session=True)
+                continue
+            if icon.path and aliases.is_alias(icon.path):
+                # An alias opens its original, wherever that is.
+                found = aliases.original(icon.path)
+                if not found:
+                    aliases.ask_broken(None, icon.path)
+                    self.refresh()
+                else:
+                    try:
+                        Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(found).get_uri(), None)
+                        recents.note(found)
+                    except GLib.Error:
+                        subprocess.Popen(["xdg-open", found], start_new_session=True)
                 continue
             try:
                 Gio.AppInfo.launch_default_for_uri(icon.uri, None)
@@ -1008,6 +1043,10 @@ class DesktopIcons(Gtk.Layout):
                   (f"New Folder with Selection ({len(icons)} Item{'s' if len(icons) != 1 else ''})",
                    lambda: self.new_folder_with(icons)),
                   ("Duplicate", lambda: self.run_job([i.path for i in icons], self.folder, duplicate=True)),
+                  ("Make Alias", lambda: self.make_alias(icons)),
+                  ] + ([("Show Original", lambda: self.show_original(icons[0]))]
+                       if len(icons) == 1 and icons[0].path and aliases.is_alias(icons[0].path) else []) + [
+
                   ("Copy", lambda: transfer.copy_files([i.path for i in icons])), (None, None),
                   ("Move to Trash", lambda: self.trash(icons))]
         self.menu = self._menu(items, event)
