@@ -766,6 +766,11 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 - (void)setKeyboardFocusRingNeedsDisplayInRect:(NSRect)rect { [self setNeedsDisplay:YES]; }
 - (BOOL)_needsDisplayAnywhere
 {
+    /* A hidden view isn't drawn, so a mark under it is never cleared; counting
+     * it would have the window draw itself again on every turn of the run
+     * loop. Showing the view again marks its superview (setHidden:). */
+    if (_hidden)
+        return NO;
     if (_needsDisplay)
         return YES;
     for (NSView *v in _subviews)
