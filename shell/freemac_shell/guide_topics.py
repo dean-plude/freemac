@@ -1320,6 +1320,13 @@ TOPICS = {
         "Drawer won't rename a locked item, and asks before moving it to the Trash.",
         "To change it again, open its Info window and untick Locked.",
     ]),
+    "change-picture": ("Change the wallpaper automatically", "change picture rotate wallpaper every hour day login random shuffle slideshow folder", [
+        "Open Dials and choose Wallpaper, then scroll down to Change picture.",
+        "Choose how often: every 5, 15 or 30 minutes, every hour, every day, or when logging in.",
+        "Under Pictures from, keep freemac wallpapers or choose your Pictures folder or another folder.",
+        "Turn on Random order to shuffle them; otherwise they go in order by name.",
+        "Picking one wallpaper yourself turns Change picture back to Never.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",

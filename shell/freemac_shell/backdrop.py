@@ -6,7 +6,8 @@ menu bar and the dock. The picture fills the screen at any shape by default
 (cropping the edges rather than leaving bars). Dials writes the choice to the
 [background] section of ~/.config/wf-shell.ini; Backdrop watches that file.
 
-Keys: image = path, fit = fill | fit | stretch, dynamic = true | false.
+Keys: image = path, fit = fill | fit | stretch, dynamic = true | false, and
+Change picture's rotate keys (wallpaper_rotate.py).
 
 Dynamic (Dials > Wallpaper): with one of freemac's own scenes, the picture
 follows the sun where you are (sun.py) instead of light and dark mode, as a
@@ -36,6 +37,7 @@ WALLPAPERS = "/usr/share/backgrounds/freemac"
 SCENES = (("dusk-tide.png", "night-tide.png"), ("lagoon-day.png", "lagoon-night.png"),
           ("prism-day.png", "prism-night.png"), ("harbor-day.png", "harbor-night.png"))
 DYNAMIC_SECONDS = 60
+ROTATE_SECONDS = 60
 GOLD = (1.0, 0.58, 0.32)
 
 
@@ -178,6 +180,30 @@ class Backdrop:
         volumes.monitor().connect("volume-added", lambda _m, volume: volumes.mount_volume(volume))
         volumes.mount_new()
         GLib.timeout_add_seconds(DYNAMIC_SECONDS, self._sun_tick)
+        # Change picture (Dials > Wallpaper): checked once a minute, and once
+        # when the session starts for When logging in.
+        GLib.timeout_add_seconds(ROTATE_SECONDS, self._rotate_tick)
+        GLib.idle_add(self._rotate_login)
+
+    def _rotate_tick(self):
+        from . import style, wallpaper_rotate
+        try:
+            wallpaper_rotate.tick(CONFIG, style.is_dark())
+        except (OSError, ValueError):
+            pass
+        return True
+
+    def _rotate_login(self):
+        """When logging in: once a session, not each time Backdrop restarts."""
+        from . import style, wallpaper_rotate
+        marker = os.path.join(GLib.get_user_runtime_dir(), "freemac-wallpaper-changed")
+        if not os.path.exists(marker):
+            try:
+                open(marker, "w").close()
+                wallpaper_rotate.login(CONFIG, style.is_dark())
+            except (OSError, ValueError):
+                pass
+        return False
 
     def _sun_tick(self):
         if self.night_picture is not None and self.update_mix():

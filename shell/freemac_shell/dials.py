@@ -660,7 +660,92 @@ class DialsWindow(Gtk.ApplicationWindow):
                     group(row("Dynamic", dynamic,
                               "freemac's own wallpapers follow the sun where you are: day, "
                               "a golden sunset, then night."),
-                          row("Picture fit", fit)))
+                          row("Picture fit", fit)),
+                    self._change_picture())
+
+    def _change_picture(self):
+        """Change picture, as on a Mac: a new wallpaper every so often, from
+        freemac's own or a folder of pictures (wallpaper_rotate.py)."""
+        from . import wallpaper_rotate
+        every = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        for key, words in wallpaper_rotate.CHOICES:
+            every.append(key, words)
+        found = wallpaper_rotate.settings(SHELL_INI)
+        every.set_active_id(found["every"])
+        self.rotate_every = every
+        source = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        pictures = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES) or os.path.expanduser("~/Pictures")
+
+        def fill_source(chosen):
+            source.remove_all()
+            source.append("", "freemac wallpapers")
+            source.append(pictures, "Pictures")
+            if chosen and chosen != pictures:
+                source.append(chosen, os.path.basename(chosen.rstrip("/")) or chosen)
+            source.append("choose", "Choose a Folder…")
+            source.set_active_id(chosen or "")
+        fill_source(found["folder"])
+        shuffle = Gtk.Switch(active=found["random"], valign=Gtk.Align.CENTER)
+        shuffle.connect("notify::active", lambda sw, _p: ini_set(
+            SHELL_INI, "background", "rotate_random", "true" if sw.get_active() else "false"))
+
+        def sensitive():
+            on = every.get_active_id() != "never"
+            source.set_sensitive(on)
+            shuffle.set_sensitive(on)
+
+        def every_changed(combo):
+            ini_set(SHELL_INI, "background", "rotate", combo.get_active_id() or "never")
+            ini_set(SHELL_INI, "background", "rotate_last", "0")   # count from now
+            sensitive()
+
+        def source_changed(combo):
+            chosen = combo.get_active_id()
+            if chosen is None:
+                return
+            if chosen == "choose":
+                dialog = Gtk.FileChooserNative(title="Choose a Folder of Pictures", transient_for=self,
+                                               action=Gtk.FileChooserAction.SELECT_FOLDER)
+                if os.path.isdir(pictures):
+                    dialog.set_current_folder(pictures)
+                picked = dialog.get_filename() if dialog.run() == Gtk.ResponseType.ACCEPT else None
+                dialog.destroy()
+                combo.handler_block(source_handler)
+                fill_source(picked or wallpaper_rotate.settings(SHELL_INI)["folder"])
+                combo.handler_unblock(source_handler)
+                if not picked:
+                    return
+                chosen = picked
+            ini_set(SHELL_INI, "background", "rotate_from", chosen)
+            if every.get_active_id() != "never":
+                wallpaper_rotate.change(SHELL_INI, style.is_dark())   # show one from there now
+                self.refresh_wallpapers()
+        every.connect("changed", every_changed)
+        source_handler = source.connect("changed", source_changed)
+        sensitive()
+        # The picture can change while this page is open: show which one it is.
+        self.wall_monitor = Gio.File.new_for_path(os.path.dirname(SHELL_INI)).monitor_directory(
+            Gio.FileMonitorFlags.WATCH_MOVES, None)
+        self.wall_pending = None
+        self.wall_shown = ini_get(SHELL_INI, "background", "image")
+
+        def config_changed(_m, file, other, _e):
+            names = {f.get_basename() for f in (file, other) if f}
+            if os.path.basename(SHELL_INI) in names and not self.wall_pending:
+                self.wall_pending = GLib.timeout_add(300, wall_check)
+
+        def wall_check():
+            self.wall_pending = None
+            now = ini_get(SHELL_INI, "background", "image")
+            if now != self.wall_shown:
+                self.wall_shown = now
+                self.refresh_wallpapers()
+            return False
+        self.wall_monitor.connect("changed", config_changed)
+        return group(row("Change picture", every,
+                         "A new wallpaper every so often, or each time you log in."),
+                     row("Pictures from", source),
+                     row("Random order", shuffle))
 
     def refresh_wallpapers(self):
         """One tile per scene, showing the version for the current mode."""
@@ -698,6 +783,8 @@ class DialsWindow(Gtk.ApplicationWindow):
 
     def set_wallpaper(self, path):
         ini_set(SHELL_INI, "background", "image", path)
+        if getattr(self, "rotate_every", None) is not None and self.rotate_every.get_active_id() != "never":
+            self.rotate_every.set_active_id("never")   # one picture chosen: it stays, as on a Mac
         self.refresh_wallpapers()
 
     def choose_wallpaper(self, _button):

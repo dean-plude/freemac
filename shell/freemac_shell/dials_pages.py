@@ -52,7 +52,7 @@ SEARCH_WORDS = {
     "seek": "spotlight search results privacy private folders index rebuild find launcher command space hide",
     "dock": "control centre center menu bar icons show wi-fi wifi bluetooth sound volume battery focus stage manager recent apps strip side windows hide automatically autohide auto-hide menu bar magnification trash downloads title bar double-click hide minimize windows application icon default web browser email mail app links",
     "displays": "screen resolution refresh rate hz rotation rotate arrange arrangement mirror mirroring extend second display external projector main display menu bar dock brightness night light schedule sunset sunrise warm scale monitor",
-    "wallpaper": "background desktop picture dynamic sun sunset",
+    "wallpaper": "background desktop picture dynamic sun sunset change picture rotate shuffle every hour random slideshow",
     "screensaver": "screensaver idle drift clock album photos slideshow inactive",
     "power": "battery sleep suspend energy shut down restart percentage low battery time left charging awake keep screen on caffeinate prevent sleep low power mode saver health capacity cycle count usage level history schedule start up wake timer automatic shut down at set time bedtime",
     "lifeboat": "backup back up time machine restore drive disk copy",
