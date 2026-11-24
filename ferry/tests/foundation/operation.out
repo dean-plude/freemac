@@ -1,0 +1,31 @@
+queue: test queue, max -1, suspended 0, current is main 1
+main queue: NSOperationQueue Main Queue, max 1
+a ready 0, b ready 1, priority of 3: 4
+suspended, 4 operations, nothing ran: 0
+c runs on the test queue: 1
+ran: c d d2 b a a done
+a finished 1 executing 0, queue has 0
+then: c d d2 b a a done
+adding a finished operation: NSInvalidArgumentException
+f cancelled 1, ready 1
+ran: e; f finished 1
+later: started
+later: finishing
+  observed isFinished = 1
+after later
+barrier
+after the barrier
+  observed operationCount = 1
+  observed operationCount = 0
+on the main queue: 1
+started by hand
+started twice: NSInvalidArgumentException
+results: HEY 42
+void result: NSInvocationOperationVoidResultException
+NSLock: try while locked 0, after unlock 1, before a date while locked 0
+NSLock: taken after the other unlocked it
+NSRecursiveLock: twice, try 1
+NSCondition: signalled, ready 1
+NSCondition: a wait with no signal times out: 0
+NSConditionLock: condition 1, try when 2: 0, got it when 2, condition 2
+exit=0

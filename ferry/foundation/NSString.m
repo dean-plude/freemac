@@ -391,8 +391,13 @@ static unichar fold(unichar c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
 - (NSComparisonResult)localizedCaseInsensitiveCompare:(NSString *)other { return [self caseInsensitiveCompare:other]; }
 
 /* searching */
+NSRange FRegexSearch(NSString *string, NSString *pattern, NSStringCompareOptions mask, NSRange range);
+NSUInteger FRegexReplace(NSMutableString *string, NSString *pattern, NSString *templ, NSStringCompareOptions mask,
+                         NSRange range); /* NSRegularExpression.m */
 - (NSRange)rangeOfString:(NSString *)s options:(NSStringCompareOptions)mask range:(NSRange)range
 {
+    if (mask & NSRegularExpressionSearch)
+        return FRegexSearch(self, s, mask, range);
     NSRange none = {NSNotFound, 0};
     WITH_CHARS(self, a, na);
     WITH_CHARS(s, b, nb);
@@ -771,6 +776,8 @@ static unichar to_cap(unichar c, BOOL w) { return w ? to_upper(c, w) : to_lower(
 - (NSUInteger)replaceOccurrencesOfString:(NSString *)target withString:(NSString *)replacement
                                  options:(NSStringCompareOptions)options range:(NSRange)range
 {
+    if (options & NSRegularExpressionSearch) /* the replacement is a template */
+        return FRegexReplace(self, target, replacement, options, range);
     NSUInteger count = 0, pos = range.location, end = NSMaxRange(range);
     while (pos < end) {
         NSRange r = [self rangeOfString:target options:options & ~NSBackwardsSearch range:NSMakeRange(pos, end - pos)];

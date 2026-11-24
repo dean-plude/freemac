@@ -1103,6 +1103,12 @@ The new or extended ones:
 | `appkit_tree_controller` | (freemac (1.190), Ferry 0.19.0) `NSIndexPath` (adding and removing an index, `indexAtPosition:` past the end, `getIndexes:range:`, equality, hashing, `compare:` and sorting, `section` and `item`); `NSTreeNode` on its own (children through `mutableChildNodes`, observed, a node taken from its old parent, `parentNode`, `indexPath`, `descendantNodeAtIndexPath:`, sorting recursively); `NSTreeController`: its defaults and exposed bindings, content with `childrenKeyPath`, a leaf decided by having no children, by `leafKeyPath` or by `countKeyPath`, `arrangedObjects` as a tree of nodes kept across rearranging, `selectionIndexPaths`, `selectedObjects`, `selectedNodes` and `selection.name` with the multiple-values marker, writing through the selection, sorting level by level with `preservesSelection` on and off, the model adding, removing and replacing children (observed through its indexed accessors), inserting at an index path, removing (a node and its child at once), an index path that has no parent raising, `moveNode:toIndexPath:`, `add:`, `insert:`, `addChild:`, `insertChild:` and `remove:` on the run loop's next turn, `canAddChild` on a leaf, with `countKeyPath` and with no selection, `canAdd` and the rest when not editable, the `contentArray` and `selectionIndexPaths` bindings both ways, and dictionaries as the objects; an outline view whose columns are bound to `arrangedObjects.key`: its `content`, `selectionIndexPaths` and `sortDescriptors` bound for it, its items the controller's nodes, rows opened by code and by a click on a chevron, clicks and command-clicks selecting in the controller, a node the controller selects shown with its parents opened, a model change redrawn, clicks on column titles sorting the controller with open rows kept open, cells edited in place written back (text and a number), no editing and no write back when the controller isn't editable, `addChild:` and `remove:` shown; a table column's per-row `editable` (through `NSNegateBoolean`) and `enabled` bindings for text cells and check boxes, and `NSConditionallySetsEditable`; `NSDictionaryController`: its defaults, a bound `contentDictionary` with included, excluded and localized keys, a pair's value and key changed and written back, `add:` making unique keys, `remove:`, a new dictionary from the model, and an unbound mutable dictionary changed in place |
 | `appkit_nib_controllers` | (freemac (1.191), Ferry 0.20.0) A nib written in the test with Ferry's own `NSKeyedArchiver` (an `NSIBObjectData` with custom objects, outlet and binding connectors, and a window template), loaded with `NSNib` and nothing bound in code: an `NSArrayController` (object class, editable, prepares content, avoids empty selection, preserves selection, selects inserted objects, clears the filter on insertion, rearranges automatically, always uses the multiple-values marker, declared keys), an `NSTreeController` (children and leaf key paths), an `NSObjectController` (an entity name, and content prepared at `awakeFromNib`) and an `NSDictionaryController` (initial key and value, included, excluded and localized keys) read back; their `contentArray`, `sortDescriptors` and `contentDictionary` bound to File's Owner by connectors; a cell-based table whose columns are bound to `arrangedObjects.key` (content, selection and sorting bound for it); a view-based table and a view-based outline with no delegate and no data source, bound to the controllers, making their cell views from the table's own prototype nibs (`NSTableViewArchivedReusableViewsKey`), with a text field and a check box in each cell view bound to `objectValue.key`; the rows, a click selecting through the controller, a field bound to `selection.title` and its no-selection and multiple-values placeholders, the field edited and the table and cell views rearranged, a cell view's field edited in place and its check box clicked (written back), the model changed under the views, `add:` and `remove:`, the outline's cell views given the nodes' represented objects and edited in place, `addChild:`, the object controller's prepared dictionary edited through a field with a null placeholder, and the dictionary controller's pairs written back |
 | `appkit_binding_validation` | (freemac (1.191), Ferry 0.20.0) `NSValidatesImmediatelyBindingOption`: values typed into fields bound through an object controller's and an array controller's selection put to `validate<Key>:error:` before they are written; a refused one presented (the application delegate's `application:willPresentError:` sees it, and the alert is answered) and the field showing the model's value again, a changed one (trimmed, a string made a number, clamped) written changed and shown, nothing asked without the option; the selection proxies' own `validateValue:forKeyPath:error:`; the same for a cell-based table's columns and for a field in a view-based table's cell view bound to `objectValue.age`; `NSRaisesForNotApplicableKeysBindingOption` absent (the field kept), NO ("Not Applicable", not editable) and YES (raises); a field made uneditable and a check box disabled with no selection, with a controller that isn't editable (followed as it changes) and with multiple values when `NSAllowsEditingMultipleValuesSelection` is NO; an `enabled` binding taken together with them; `NSConditionallySetsEnabled` and `...Editable` set by hand; the views' own settings given back when unbound; `NSDeletesObjectsOnRemove` (through the objects' `managedObjectContext`), `NSSelectsAllWhenSettingContent`, and `NSHandlesContentAsCompoundValue` into an owner's immutable array and into the user defaults through `NSUserDefaultsController` |
+| `foundation_task` | (freemac (1.194), Ferry 0.21.0) `NSTask`, `NSPipe` and `NSFileHandle`: running this system's programs with arguments, environment, working directory and pipes, background reads, readability handlers, the termination handler and notification, waiting, signals and exit status |
+| `foundation_regex` | (freemac (1.194), Ferry 0.21.0) `NSRegularExpression` on ICU: options, groups and named groups, the searches, templates, escaping, and `NSString`'s `NSRegularExpressionSearch` |
+| `foundation_scanner` | (freemac (1.194), Ferry 0.21.0) `NSScanner`: integers with overflow, hexadecimal, floating point, a locale's decimal separator, strings, character sets, case and skipped characters |
+| `foundation_xmlparser` | (freemac (1.194), Ferry 0.21.0) `NSXMLParser` on libxml2: elements, attributes, text, CDATA, comments, processing instructions, entities, namespaces, errors with codes and lines, aborting, nested parses |
+| `foundation_operation` | (freemac (1.194), Ferry 0.21.0) `NSOperationQueue` with block, invocation and an app's own operations: dependencies, priorities, cancelling, completion blocks, suspending, barriers, key-value notifications, waits; the locks |
+| `foundation_cache` | (freemac (1.194), Ferry 0.21.0) `NSCache` (count and cost limits, least recently used first, the delegate) and `NSProgress` (trees of progress, fraction completed with key-value notifications, cancel and pause) |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1407,12 +1413,124 @@ The new or extended ones:
   circular slider is drawn and tracked as a linear one, and the knob is
   always round. The nib keys of `NSSliderCell` are those described
   publicly, not checked against Interface Builder's output.
-- **The desktop's "can't run graphical Mac apps yet" message.** The shell's
-  `freemac-mac-app open` (outside `ferry/`, the desktop side) runs an app
-  with Ferry, and when the app stops it shows Ferry's last line followed
-  by "freemac can't run graphical Mac apps yet". That sentence is now out
-  of date (some apps start, and the Installer is one); left for the
-  desktop side to reword.
+- **Foundation for tools, regular expressions, XML and operations** (freemac (1.194), Ferry 0.21.0).
+  - **NSTask**: `standardInput`, `standardOutput` and `standardError` take
+    an `NSPipe`, an `NSFileHandle` or nil (inherit). A child gets its own
+    process group only as the shell gives it, and there is no
+    `startsNewProcessGroup`. `qualityOfService` is kept and not used.
+    Programs are found as given: a launch path is not searched for in
+    `PATH`, as on a Mac. A Mac program inside an app bundle is run through
+    Ferry; any other file is run by this system as it is, so a script's `#!`
+    line names this system's interpreter.
+  - **NSFileHandle**: `acceptConnectionInBackgroundAndNotify` (sockets) is
+    missing. `writeabilityHandler` is called once, soon after it is set,
+    and not again each time the descriptor can take more. The
+    `...ForModes:` forms accept the modes but are served in every mode.
+    `fileHandleWithStandardInput` and the others are single objects that
+    never close their descriptors.
+  - **NSRegularExpression**: `NSDataDetector` and the other
+    `NSTextCheckingResult` kinds (dates, links, addresses, spelling) are
+    missing; only regular-expression results are made.
+    `NSMatchingReportProgress` doesn't call the block during long searches.
+    `NSMatchingWithoutAnchoringBounds` and `NSMatchingWithTransparentBounds`
+    are passed to ICU and not tested.
+  - **NSScanner**: `scanDecimal:` (NSDecimal) is missing. A localized
+    scanner uses its locale's decimal separator and nothing else, so
+    grouping separators such as `1,000` stop a number.
+  - **NSXMLParser**: `parser:foundElementDeclarationWithName:model:`,
+    `parser:foundAttributeDeclarationWithAttributeName:...` and
+    `parser:resolveExternalEntityName:systemID:` are never called, and
+    `foundIgnorableWhitespace:` only comes when libxml2 reports it (with no
+    DTD it doesn't). `initWithStream:` is missing (there is no
+    `NSInputStream`), and `initWithContentsOfURL:` reads files, not the
+    network. With `shouldResolveExternalEntities` set, external entities
+    and DTDs are loaded from files only, never over the network, and
+    `allowedExternalEntityURLs` and `externalEntityResolvingPolicy` are
+    kept but not enforced. Parsing stops at the first error, so
+    `parser:validationErrorOccurred:` never comes. `NSXMLDocument` (the
+    tree, with XPath) is still missing; several apps want it.
+  - **NSOperationQueue**: every queue's operations run on the one thread,
+    so `maxConcurrentOperationCount` only limits operations that finish
+    later (that override `-start`), and a block operation's blocks run one
+    after another in the order they were added. `underlyingQueue`,
+    `qualityOfService` and `threadPriority` are kept but not used.
+    `progress` counts finished operations once its `totalUnitCount` is
+    set. A completion block runs on the main queue soon after its
+    operation finishes, not on another thread.
+    `NSInvocationOperation`'s `result` for a structure return is an
+    `NSData` of its bytes, as Ferry has no `+[NSValue
+    valueWithBytes:objCType:]` yet.
+  - **Locks**: with one thread, `NSRecursiveLock` always succeeds, and an
+    `NSLock` taken twice without anything left to unlock it prints the
+    deadlock note and carries on. There is no `NSThread`, and
+    `NSDistributedLock` is missing.
+  - **NSCache**: nothing evicts but the limits; there is no memory
+    pressure signal. `discardContentIfPossible` isn't called on eviction.
+  - **NSProgress**: there's no publishing (`publish`, `addSubscriberForFileURL:`),
+    no `NSProgressReporting` adoption by Ferry's own classes, and no
+    `estimatedTimeRemaining` or `throughput` worked out by itself. A file
+    progress's descriptions are the plain ones ("50% completed", "1 of 2"),
+    not sizes in bytes.
+- **Foundation pieces written from the documentation, not compared with a Mac** (freemac (1.194), Ferry 0.21.0). What a Mac would settle:
+
+  - **NSTask**: the error codes and messages for a launch that fails
+    (Ferry: `NSCocoaErrorDomain` 4 for a missing file, 257 otherwise, with
+    `NSFilePathErrorKey`; `launch` raises `NSInvalidArgumentException`
+    "launch path not accessible"); whether `terminationHandler` runs before
+    or after `NSTaskDidTerminateNotification` is posted (Ferry: before);
+    the `terminationStatus` of a child killed by a signal (Ferry: the
+    signal number, with `NSTaskTerminationReasonUncaughtSignal`); and the
+    exception text of `NSFileHandle` errors (Ferry: `*** -[NSConcreteFileHandle
+    readDataOfLength:]: <strerror>`).
+  - **NSRegularExpression**: the characters `escapedPatternForString:`
+    escapes (Ferry: `\ * ? + [ ] ( ) { } ^ $ | . /`); that `rangeWithName:`
+    raises `NSInvalidArgumentException` for a name the pattern lacks; which
+    flags the last `NSMatchingReportCompletion` call carries; that a
+    `$` followed by more digits than there are groups takes the longest
+    number that names a group; the error for a bad pattern
+    (`NSCocoaErrorDomain` 2048 with the pattern under `NSInvalidValue`).
+  - **NSScanner**: that a failed scan leaves the location where it was even
+    after skipping white space; that `scanString:intoString:` gives the
+    scanned text (in the scanned string's case) rather than the argument;
+    that `scanUnsignedLongLong:` refuses a minus sign; what the integer
+    scans give on overflow (Ferry: the largest or smallest value, the
+    location past all the digits); hexadecimal scans with a `0x` and no
+    digit after it (Ferry: the `0` is scanned).
+  - **NSXMLParser**: that with namespaces off `namespaceURI` and
+    `qualifiedName` are nil (not empty strings); the attribute keys with
+    namespaces on (Ferry: the qualified name, `x:id`, and the `xmlns`
+    attributes left out); the order of `didEndMappingPrefix:` calls; that
+    CDATA goes to `foundCharacters:` when the delegate lacks `foundCDATA:`
+    (Ferry: it goes nowhere); the `userInfo` keys of a parse error (Ferry:
+    `NSXMLParserErrorLineNumber`, `NSXMLParserErrorColumn`,
+    `NSXMLParserErrorMessage`); that empty data gives error 4 and the
+    delegate hears of it; that `abortParsing` calls
+    `parser:parseErrorOccurred:` with code 512; that
+    `parserDidEndDocument:` doesn't come after an error.
+  - **NSOperation**: the exceptions for starting an operation twice, one
+    that isn't ready, or adding one that is finished or already queued
+    (Ferry: `NSInvalidArgumentException`, with Ferry's own wording); that
+    a cancelled operation is ready even with unfinished dependencies; that
+    `completionBlock` is set to nil once it has run; that
+    `+currentQueue` outside any operation is the main queue; the order in
+    which equal-priority operations of a suspended queue start once it is
+    resumed (Ferry: the order they were added); that a barrier also
+    holds back operations of higher priority added after it.
+  - **NSCache**: that the delegate hears of an object that is removed or
+    replaced, not only evicted; that `setObject:forKey:` with nil removes
+    the key (a Mac may raise); which object goes first when the cost limit
+    is passed (Ferry: the least recently used, which can be the one just
+    added if it alone is over the limit); that `name` starts as "".
+  - **NSProgress**: what `isFinished`, `isIndeterminate` and
+    `fractionCompleted` say for a total of 0 (Ferry: not finished, not
+    indeterminate, 0; 1 once something is completed); that only the first
+    progress made while another is current becomes its child; the exact
+    `localizedDescription` (Ferry: "N% completed", rounded to the nearest
+    percent, and "" when indeterminate) and `localizedAdditionalDescription`
+    (Ferry: "2 of 10"); which key-value notifications a change sends and in
+    what order (Ferry: `fractionCompleted` for the progress and every
+    ancestor, inner first, around the change of the unit count; and once
+    more when a child is attached).
 
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -1480,3 +1598,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.18.0 (freemac (1.188)): `NSArrayController` (content and `contentArray`/`contentSet` bindings, `arrangedObjects` sorted and filtered, the selection with `NSMultipleValuesMarker`, adding, inserting and removing, the selection options, automatic rearranging, observing `arrangedObjects.key`); table columns bound to `arrangedObjects.key` with the table's `content`, `selectionIndexes` and `sortDescriptors` bindings, edited cells written back and column titles sorting through the controller; `mutableSetValueForKey:` and the set mutation kinds, the collection operators in key paths, removing an observer that isn't registered raising, and an `NSPredicate` subset, `make check` 84/84.
 - 2026-11-24: Ferry 0.19.0 (freemac (1.190)): `NSTreeController` (children, count and leaf key paths, `arrangedObjects` as a tree of `NSTreeNode`s, `selectionIndexPaths` and `selectedObjects`, sorting, inserting, removing and moving at index paths, `add:`, `insert:`, `addChild:`, `insertChild:` and `remove:`), `NSTreeNode` and `NSIndexPath`; outline views bound to a tree controller (`content`, `selectionIndexPaths`, `sortDescriptors` and columns bound to `arrangedObjects.key`, edited cells written back); per-row `editable` and `enabled` column bindings, and no write back when the controller isn't editable; `NSDictionaryController`, `make check` 85/85.
 - 2026-11-24: Ferry 0.20.0 (freemac (1.191)): `NSArrayController`, `NSTreeController`, `NSObjectController` and `NSDictionaryController` loaded from keyed nib archives with their settings and the binding connectors that join them, so a nib that binds a table or an outline to a controller works with no code; view-based tables and outlines from a nib making their cell views from the table's prototypes, with controls in a cell view bound to `objectValue.key` both ways; `NSValidatesImmediately` (`validateValue:forKeyPath:error:` and `validate<Key>:error:` before a bound value is written, a refused value presented and the control put back), `NSRaisesForNotApplicableKeys`, `NSConditionallySetsEnabled` and `...Editable` on controls, `NSAllowsEditingMultipleValuesSelection`, `NSDeletesObjectsOnRemove`, `NSSelectsAllWhenSettingContent` and `NSHandlesContentAsCompoundValue`, `make check` 87/87.
+- 2026-11-24: Ferry 0.21.0 (freemac (1.194)): `NSTask`, `NSPipe` and `NSFileHandle`, `NSRegularExpression` on ICU, `NSScanner`, `NSXMLParser` on libxml2, `NSOperationQueue` and its operations, the locks, `NSCache` and `NSProgress`; ICU and libxml2 reached through a new core call, `ferry_twin_symbol`, only when first used; the desktop's notice for an app Ferry can't run now says "Ferry can't run this app yet" and keeps the app's output in `~/.cache/freemac/ferry/<app>.log` (1.193), `make check` 93/93.

@@ -21,7 +21,8 @@ FOUNDATION_SRC = $(wildcard foundation/*.m)
 FOUNDATION_OBJ = $(FOUNDATION_SRC:foundation/%.m=foundation/build/%.o)
 FOUNDATION = frameworks/Foundation.framework/Foundation
 FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h \
-                     sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h
+                     sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h \
+                     $(wildcard sdk/include/Foundation/NS*.h)
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
 
 # Core Graphics and Core Text (M3), one Mac library that draws with this

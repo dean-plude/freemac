@@ -419,6 +419,45 @@ Mac, and no nib saved by Interface Builder was tried: the tests write
 their nibs with Ferry's own keyed archiver. None of the nine apps has been
 run again with these.
 
+### Tasks, pipes, regular expressions, scanners, XML and operations ((1.194), Ferry 0.21.0)
+
+`NSTask`, `NSPipe` and `NSFileHandle` are in. A task is a child process:
+the program an app names (`/bin/sh`, `/usr/bin/env`, `/usr/bin/git`) is
+this system's program of that name, and a Mac program, such as a helper
+tool inside an app bundle, is run through Ferry. Arguments, environment,
+working directory, standard input, output and error (pipes, file handles
+or inherited), `terminationHandler`, `NSTaskDidTerminateNotification`,
+`waitUntilExit`, `terminate`, `interrupt` and the exit status and reason
+all work. File handles read and write files and pipes, at once or in the
+background (`readInBackgroundAndNotify`,
+`readToEndOfFileInBackgroundAndNotify`,
+`waitForDataInBackgroundAndNotify`, `readabilityHandler`), with the
+notifications arriving from the run loop.
+
+`NSRegularExpression` matches with this system's ICU, which is what a Mac
+uses, so patterns behave the same: options, capture groups and named
+groups, `enumerateMatchesInString:` and the other searches, templates
+(`$1`, `${name}`) in replacements, and `NSString`'s
+`rangeOfString:options:` and replacing with `NSRegularExpressionSearch`.
+`NSScanner` reads numbers (decimal, hexadecimal, floating point) and words
+out of a string. `NSXMLParser` parses with this system's libxml2, also
+what a Mac uses, and tells its delegate of elements, attributes, text,
+CDATA, comments, processing instructions, entity declarations and, with
+namespace processing on, namespaces and prefixes; errors come with
+libxml2's codes and line numbers.
+
+`NSOperationQueue` runs `NSBlockOperation`s, `NSInvocationOperation`s and
+operations of an app's own, with dependencies, priorities, cancelling,
+completion blocks, suspending and barriers, on Ferry's one thread. The
+locks (`NSLock`, `NSRecursiveLock`, `NSCondition`, `NSConditionLock`)
+are there so code written for threads runs; on one thread a lock only
+has to wait for work queued on the run loop. `NSCache` and `NSProgress`
+are in too.
+
+These were written from Apple's documentation and not compared with a
+Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of the nine
+apps has been run again with these.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -436,7 +475,10 @@ Counted over the nine apps:
    MacPass, MacDown, Sequel Pro. Done in 1.167, and autosaving in
    (1.178); versions are still left out.
 4. **Foundation's `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle` and
-   `NSXMLDocument`** (each used by five or more of the apps). `NSIndexSet`
+   `NSXMLDocument`** (each used by five or more of the apps). `NSTask`,
+   `NSPipe` and `NSFileHandle` came in (1.194), with `NSXMLParser`, which
+   some apps use instead of `NSXMLDocument`; `NSThread` and
+   `NSXMLDocument` are still missing. `NSIndexSet`
    came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`
    with message forwarding, `NSJSONSerialization` and `NSDateFormatter`
    (English only, with `NSTimeZone` and a minimal `NSLocale`) in

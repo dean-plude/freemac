@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.194 "Ferry: tools, regular expressions and XML" (done)
+
+Ferry 0.21.0: the Foundation pieces Mac apps use to run helper tools,
+search text, read XML and queue work.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSTask`, `NSPipe` and `NSFileHandle`: a Mac app can run this system's programs, or a Mac helper through Ferry, and read their output | Ferry | done |
+| 2 | `NSRegularExpression` and `NSScanner`, with patterns matched by this system's ICU, as on a Mac | Ferry | done |
+| 3 | `NSXMLParser` on this system's libxml2, as on a Mac | Ferry | done |
+| 4 | `NSOperationQueue` and its operations, the locks, `NSCache` and `NSProgress`, on Ferry's one thread | Ferry | done |
+| 5 | Six new tests; `make check` 93 of 93 | Ferry | done |
+
 ## 1.193 "Quick Note" (done)
 
 A small note that opens over whatever you're doing, like Quick Note on a

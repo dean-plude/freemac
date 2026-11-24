@@ -46,6 +46,17 @@ archives (`NSKeyedArchiver`, `NSKeyedUnarchiver`), `NSInvocation`,
 `NSNumberFormatter`, `NSISO8601DateFormatter`, `NSDateComponentsFormatter`
 and `NSByteCountFormatter` (dates and numbers in English only).
 
+From Ferry 0.21.0 (freemac 1.194) there are also `NSTask`, `NSPipe` and `NSFileHandle`
+(a task runs this system's program of the name it is given, or a Mac
+program through Ferry), `NSRegularExpression` and `NSTextCheckingResult`
+(on this system's ICU, as on a Mac), `NSScanner`, `NSXMLParser` (on this
+system's libxml2, as on a Mac), `NSOperationQueue` with `NSOperation`,
+`NSBlockOperation` and `NSInvocationOperation`, the locks (`NSLock`,
+`NSRecursiveLock`, `NSCondition`, `NSConditionLock`), `NSCache` and
+`NSProgress`. Ferry runs a program on one thread, so queued operations
+and a task's notifications come on that thread, from the run loop.
+ICU and libxml2 are loaded only when a program first uses them.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

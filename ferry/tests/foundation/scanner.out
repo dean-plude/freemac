@@ -1,0 +1,57 @@
+defaults: case sensitive 0, skips spaces 1, location 0
+letters: 1 width, location 7
+int instead of '=': 0, location 7
+'=': 1
+int: 1 640
+up to height: 1 ", "
+HEIGHT, case-insensitively: 1 "height"
+negative: 1 -480
+up to a letter: 1 ";  "
+double: 1 150
+at end: 0; x: 1; at end: 1
+past the end: 0 0
+case-sensitive: 0 1
+up to, case-sensitive: 1 "hello"
+scanInt "42": 1 42, location 2
+scanInt "+7": 1 7, location 2
+scanInt "-0": 1 0, location 2
+scanInt "2147483648 next": 1 2147483647, location 10
+scanInt "-99999999999": 1 -2147483648, location 12
+scanInt "12abc": 1 12, location 2
+scanInt "abc": 0 12345, location 0
+scanInt "- 3": 0 12345, location 0
+long long too big: 9223372036854775807, smallest: -9223372036854775808
+unsigned: 18446744073709551615, too big: 18446744073709551615
+scanHexInt "ff": 1 255 (0xff), location 2
+scanHexInt "0x1F": 1 31 (0x1f), location 4
+scanHexInt "0XaB rest": 1 171 (0xab), location 4
+scanHexInt "0x": 1 0 (0x0), location 1
+scanHexInt "0xg": 1 0 (0x0), location 1
+scanHexInt "100000000": 1 4294967295 (0xffffffff), location 9
+scanHexInt "zz": 0 7 (0x7), location 0
+hex long long: deadbeefcafe
+scanDouble "3.25": 1 3.25, location 4
+scanDouble "-.5": 1 -0.5, location 3
+scanDouble "7.": 1 7, location 2
+scanDouble "1e3": 1 1000, location 3
+scanDouble "2.5E-2x": 1 0.025, location 6
+scanDouble "1e": 1 1, location 1
+scanDouble "1e+": 1 1, location 1
+scanDouble ".": 0 -1, location 0
+scanDouble "-": 0 -1, location 0
+scanDouble "+4.0e+1": 1 40, location 7
+scanDouble "6,5": 1 6, location 1
+float: 1 0.1
+hex double: 1 12, 1 26, 1 -16
+with a comma for a separator: 1 6.5
+skipping dashes: 1 "a" then 1 "b"
+skipping nothing: 0, from 2: 1 7
+location past the end: NSRangeException
+copy at 1: 1
+string: a b
+empty: at end 1, up to: 0
+only spaces: at end 1
+fast -> yes
+name -> Ferry
+version -> 0.20
+exit=0

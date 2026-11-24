@@ -175,3 +175,30 @@ void *ferry_twin_lookup(const char *name)
     }
     return NULL;
 }
+
+/* For Ferry's own Foundation: one call of a twin library, looked up only when
+ * Foundation first needs it, so that a program which never makes a regular
+ * expression or parses XML doesn't load ICU or libxml2 (and doesn't stop if
+ * they aren't installed). Only the twins above are reachable this way, under
+ * their Mac install names, and not the calls that take a FILE; NULL when the
+ * library or the call isn't there. */
+void *ferry_twin_symbol(const char *install_name, const char *name)
+{
+    if (!install_name || !name || !ferry_twin_library(install_name))
+        return NULL;
+    for (int i = 0; takes_a_file[i]; i++)
+        if (!strcmp(name, takes_a_file[i]))
+            return NULL;
+    for (int i = 0; twins[i].mac; i++)
+        if (!strcmp(install_name, twins[i].mac)) {
+            if (!twin_handles[i])
+                return NULL;
+            if (!strcmp(twins[i].linux_name, "icu")) {
+                char versioned[256];
+                snprintf(versioned, sizeof versioned, "%s%s", name, icu_suffix);
+                return dlsym(twin_handles[i], versioned);
+            }
+            return dlsym(twin_handles[i], name);
+        }
+    return NULL;
+}

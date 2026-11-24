@@ -1,0 +1,51 @@
+defaults: name "", count limit 0, cost limit 0, evicts discarded 1
+1 is one
+adding a fourth:
+  evicting two
+2 is (null), 1 is one
+replacing 3:
+  evicting three
+lowering the limit to 1:
+  evicting four
+  evicting one
+removing 3:
+  evicting THREE
+left: (null)
+cost 6 + 3, then 4 more:
+  evicting big
+removing all:
+  evicting small
+  evicting medium
+an uncopyable key: plain
+discarded content:
+  evicting discardable
+  gives (null)
+progress: 0 of 10, fraction 0, indeterminate 0, finished 0, cancellable 1, pausable 0, "0% completed" "0 of 10"
+  top: fractionCompleted 0.2
+after 2: "20% completed" "2 of 10"
+current is top: 1
+  top: fractionCompleted 0.2
+  top: fractionCompleted 0.2
+current after resigning: none
+  top: fractionCompleted 0.4
+  child: completedUnitCount 1
+child half done: top 0.4
+the second (no parent) done: top 0.4
+  top: fractionCompleted 0.6
+  child: completedUnitCount 2
+  top: fractionCompleted 0.6
+child done: top 6 of 10, 0.6
+  top: fractionCompleted 0.7
+current with no child: top 7
+  top: fractionCompleted 0.7
+  top: fractionCompleted 0.775
+explicit quarter: top 0.775
+  explicit paused
+paused: 1 1
+  explicit resumed
+cancelled: 1 1, handler ran 1
+indeterminate: 1, fraction 0, current none 1
+finished: 1, fraction 1, "100% completed"
+user info: 2 keys, file total 5
+performAsCurrent: 1 of 1
+exit=0
