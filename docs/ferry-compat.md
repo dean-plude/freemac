@@ -255,6 +255,23 @@ writes and reads Unicode date patterns and the standard styles in English
 (United States) for every locale, with `NSTimeZone` reading this system's
 time zone database and an `NSLocale` that knows identifiers only.
 
+### Calendars and number formatters ((1.173), Ferry 0.15.0)
+
+`NSCalendar` (Gregorian and ISO 8601) and `NSDateComponents` split dates
+into components in any time zone and build them back, add components,
+count the difference between two dates, find starts of days and other
+units across daylight saving changes, and look for the next date that
+matches components, as Apple documents them. `NSNumberFormatter` writes
+and reads numbers in every style (decimal, percent, currency and its
+accounting, ISO code and plural forms, scientific, spell-out, ordinal) with
+digits, rounding modes, grouping, padding and patterns;
+`NSISO8601DateFormatter` writes and reads ISO 8601 dates with its format
+options; `NSDateFormatter` now does relative formatting ("Today at 3:05
+PM"); and `NSDateComponentsFormatter` and `NSByteCountFormatter` write
+durations and file sizes. All of it is English (United States) for every
+locale; a locale's country only picks the default currency. None of the
+nine apps has been run again since.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -276,7 +293,8 @@ Counted over the nine apps:
    came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`
    with message forwarding, `NSJSONSerialization` and `NSDateFormatter`
    (English only, with `NSTimeZone` and a minimal `NSLocale`) in
-   (1.170); `NSCalendar` and `NSNumberFormatter` are still missing.
+   (1.170), and `NSCalendar`, `NSNumberFormatter` and the other
+   formatters in (1.173).
 5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
    file or the app's code signature at start. Ferry could provide a version
    file of its own and answer the signature check plainly.

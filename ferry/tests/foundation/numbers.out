@@ -1,0 +1,214 @@
+styles
+  no style (#; fraction digits 0..0, integer digits 0..42)
+    1234567.891 -> "1234568"
+    -1234.5678 -> "-1235"
+    0.000123 -> "0"
+    1 -> "1"
+    0 -> "0"
+    0.5 -> "0"
+    9007199254740993 -> "9007199254740993"
+  decimal (#,##0.###; fraction digits 0..3, integer digits 1..2000000000)
+    1234567.891 -> "1,234,567.891"
+    -1234.5678 -> "-1,234.568"
+    0.000123 -> "0"
+    1 -> "1"
+    0 -> "0"
+    0.5 -> "0.5"
+    9007199254740993 -> "9,007,199,254,740,993"
+  percent (#,##0%; fraction digits 0..0, integer digits 1..2000000000)
+    1234567.891 -> "123,456,789%"
+    -1234.5678 -> "-123,457%"
+    0.000123 -> "0%"
+    1 -> "100%"
+    0 -> "0%"
+    0.5 -> "50%"
+    9007199254740993 -> "900,719,925,474,099,300%"
+  currency (¤#,##0.00; fraction digits 2..2, integer digits 1..2000000000)
+    1234567.891 -> "$1,234,567.89"
+    -1234.5678 -> "-$1,234.57"
+    0.000123 -> "$0.00"
+    1 -> "$1.00"
+    0 -> "$0.00"
+    0.5 -> "$0.50"
+    9007199254740993 -> "$9,007,199,254,740,993.00"
+  accounting (¤#,##0.00; fraction digits 2..2, integer digits 1..2000000000)
+    1234567.891 -> "$1,234,567.89"
+    -1234.5678 -> "($1,234.57)"
+    0.000123 -> "$0.00"
+    1 -> "$1.00"
+    0 -> "$0.00"
+    0.5 -> "$0.50"
+    9007199254740993 -> "$9,007,199,254,740,993.00"
+  ISO code (¤¤ #,##0.00; fraction digits 2..2, integer digits 1..2000000000)
+    1234567.891 -> "USD 1,234,567.89"
+    -1234.5678 -> "-USD 1,234.57"
+    0.000123 -> "USD 0.00"
+    1 -> "USD 1.00"
+    0 -> "USD 0.00"
+    0.5 -> "USD 0.50"
+    9007199254740993 -> "USD 9,007,199,254,740,993.00"
+  plural (#,##0.00 ¤¤¤; fraction digits 2..2, integer digits 1..2000000000)
+    1234567.891 -> "1,234,567.89 US dollars"
+    -1234.5678 -> "-1,234.57 US dollars"
+    0.000123 -> "0.00 US dollars"
+    1 -> "1.00 US dollars"
+    0 -> "0.00 US dollars"
+    0.5 -> "0.50 US dollars"
+    9007199254740993 -> "9,007,199,254,740,993.00 US dollars"
+  scientific (#E0; fraction digits 0..0, integer digits 0..1)
+    1234567.891 -> "1.234567891E6"
+    -1234.5678 -> "-1.2345678E3"
+    0.000123 -> "1.23E-4"
+    1 -> "1E0"
+    0 -> "0E0"
+    0.5 -> "5E-1"
+    9007199254740993 -> "9.007199254740993E15"
+  spell-out (0; fraction digits 0..0, integer digits 1..2000000000)
+    1234567.891 -> "one million two hundred thirty-four thousand five hundred sixty-seven point eight nine one"
+    -1234.5678 -> "minus one thousand two hundred thirty-four point five six seven eight"
+    0.000123 -> "zero point zero zero zero one two three"
+    1 -> "one"
+    0 -> "zero"
+    0.5 -> "zero point five"
+    9007199254740993 -> "nine quadrillion seven trillion one hundred ninety-nine billion two hundred fifty-four million seven hundred forty thousand nine hundred ninety-three"
+  ordinal (#,##0; fraction digits 0..0, integer digits 1..2000000000)
+    1234567.891 -> "1,234,568th"
+    -1234.5678 -> "-1,235th"
+    0.000123 -> "0th"
+    1 -> "1st"
+    0 -> "0th"
+    0.5 -> "0th"
+    9007199254740993 -> "9,007,199,254,740,993rd"
+  class method: 1,234,567.891, 26%
+  plural with no fraction digits:
+    1 -> "1 US dollar"
+    2 -> "2 US dollars"
+  spelled out:
+    21 -> "twenty-one"
+    100 -> "one hundred"
+    1000000005 -> "one billion five"
+    -40 -> "minus forty"
+    3.14 -> "three point one four"
+  ordinals: 1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th 11th 12th 13th 14th 15th 16th 17th 18th 19th 20th 21st 22nd 23rd 111th
+digits
+  2 to 4 fraction digits (#,##0.00##)
+    3 -> "3.00"
+    3.14159 -> "3.1416"
+    2.5e-05 -> "0.00"
+  4 integer digits, no grouping (0000.00##)
+    7.5 -> "0007.50"
+    123456.5 -> "123456.50"
+  at most 2 integer digits
+    123456.5 -> "56.50"
+  2 to 3 significant digits
+    1234567 -> "1,230,000"
+    3.14159 -> "3.14"
+    0.0012345 -> "0.00123"
+    5 -> "5.0"
+    0 -> "0.0"
+  scientific, 2 fraction digits
+    1234567.891 -> "1.23E6"
+    0.000123 -> "1.23E-4"
+    -0.5 -> "-5E-1"
+rounding
+                2.5    3.5   -2.5   2.51  -2.49    0.4   -0.4
+  ceiling         3      4     -2      3     -2      1     -0
+  floor           2      3     -3      2     -3      0     -1
+  down            2      3     -2      2     -2      0     -0
+  up              3      4     -3      3     -3      1     -1
+  half even       2      4     -2      3     -2      0     -0
+  half down       2      3     -2      3     -2      0     -0
+  half up         3      4     -3      3     -2      0     -0
+  2.675 and 1.005 to two places (half even, as decimals): 2.68, 1
+  999.999 to two places: 1,000
+  to the nearest 0.25: 1.25, 2
+settings
+  groups of 4: 1,2345,6789
+  3 then 2 (Indian style): 12,34,56,789
+  other separators: 1.234.567,891
+  multiplier 1000: 42.5 per mille
+  padded before prefix: *******-42
+  padded after prefix: -*******42
+  padded before suffix: -42*******
+  padded after suffix: -42*******
+  always the decimal separator: 5.
+  own prefixes: +1,234,567.891, (1,234.568) ((#,##0.###))
+patterns
+  #,##0.00: 1,234,567.89, -1,234.57, 0.00
+  0.###E0: 1.235E6, -1.235E3, 1.23E-4
+  00.00%: 123456789.10%, -123456.78%, 00.01%
+  #,##0.00 ¤¤: 1,234,567.89 USD, -1,234.57 USD, 0.00 USD
+  '#'0;'-'0: #1234568, -1235, #0
+  #,##0.00;(#,##0.00): 1,234,567.89, (1,234.57), 0.00
+  @@#: 1230000, -1230, 0.000123
+  ##0.##E0: 1.23E6, -1.23E3, 123E-6
+  format with a zero: 1,234,567.89, zero, -1,234.57
+symbols
+  . , % ‰ - + E $
+    nan -> "NaN"
+    inf -> "+∞"
+    -inf -> "-∞"
+    -0.0001 -> "-0"
+    0 -> "nothing"
+    nil -> "none", nil string -> (nil)
+currencies
+  EUR: -€1,234.57, €; 1,234,567.89 euros
+  GBP: -£1,234.57, £; 1,234,567.89 British pounds
+  JPY: -¥1,235, ¥; 1,234,568 Japanese yen
+  CAD: -CA$1,234.57, CA$; 1,234,567.89 Canadian dollars
+  INR: -₹1,234.57, ₹; 1,234,567.89 Indian rupees
+  CHF: -CHF 1,234.57, CHF; 1,234,567.89 Swiss francs
+  XYZ: -XYZ 1,234.57, XYZ; 1,234,567.89 XYZ
+  a fr_FR locale (written in English): EUR €1,234,567.89
+  locales: ja_JP JPY ¥, en_GB GBP, de_CH CHF, en (nil)
+  keyword: EUR
+reading
+  decimal
+    "1,234.5" -> 1234.5 (double)
+    "1234.5" -> 1234.5 (double)
+    "-42" -> -42 (integer)
+    "12abc" -> (nil)
+    " 7" -> (nil)
+    "1.5E3" -> 1500 (integer)
+    "" -> (nil)
+    "1,23" -> 123 (integer)
+    ".5" -> 0.5 (double)
+  decimal, lenient
+    " 7 " -> 7 (integer)
+    "$12" -> (nil)
+  currency
+    "$1,234.57" -> 1234.57 (double)
+    "-$3.10" -> -3.1 (double)
+    "1234.57" -> (nil)
+  currency, lenient
+    "1234.57" -> 1234.57 (double)
+  percent
+    "25%" -> 0.25 (double)
+    "12.5%" -> 0.125 (double)
+    "25" -> (nil)
+  accounting
+    "($5.00)" -> -5 (integer)
+  integers from 0 to 100
+    "50" -> 50 (integer)
+    "150" -> (nil)
+    "5.5" -> (nil)
+  symbols
+    "NaN" -> nan (double)
+    "-∞" -> -inf (double)
+  error: no, NSCocoaErrorDomain 2048 "The value “nope” is invalid."
+  a range: yes 123
+copies
+  €1.00, $1.00
+byte counts
+  file: Zero KB, 1 byte, 999 bytes, 1 KB, 1 KB, 1 KB, 2 KB, 1 MB, 1.2 MB, 1.5 GB, 123.46 TB, -2 KB
+  memory: Zero KB, 1 byte, 999 bytes, 1,000 bytes, 1,023 bytes, 1 KB, 2 KB, 977 KB, 1.2 MB, 1.4 GB, 112.28 TB, -2 KB
+  decimal: Zero KB, 1 byte, 999 bytes, 1 KB, 1 KB, 1 KB, 2 KB, 1 MB, 1.2 MB, 1.5 GB, 123.46 TB, -2 KB
+  binary: Zero KB, 1 byte, 999 bytes, 1,000 bytes, 1,023 bytes, 1 KB, 2 KB, 977 KB, 1.2 MB, 1.4 GB, 112.28 TB, -2 KB
+  only MB: 1.2 MB, 0 MB
+  with the byte count: 1.2 MB (1,234,567 bytes)
+  without the unit: 1.2
+  without the count: MB
+  zero, numeric: 0 bytes
+  not adaptive: 1.23 MB, 2 KB
+  zero-padded: 2.0 MB, 3.00 GB
+exit=0
