@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.161 "Focus menu and the menu bar's icons" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Focus symbol in the menu bar is a menu, as on a Mac: the four Focuses with the one on in blue and until when a schedule keeps it on, a click to switch or turn it off, and Focus Settings… | focus_menu.py (new), Topline | done |
+| 2 | Dials > Dock and Menu Bar: Show Wi-Fi, Bluetooth, Sound, Battery and Focus in menu bar, as a Mac's Control Centre settings choose; Topline hides or shows each at once | Dials, Topline | done |
+| 3 | Quick Settings opens Dials for Wi-Fi or Bluetooth when that symbol isn't in the menu bar | quick.py | done |
+| 4 | Guide topic, Focus guide, README row | Guide, Docs | done |
+
 ## 1.160 "Quick Settings drawn as a Mac's Control Centre" (done)
 
 | # | Item | Component | Status |

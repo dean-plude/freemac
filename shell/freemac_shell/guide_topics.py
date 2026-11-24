@@ -901,6 +901,12 @@ TOPICS = {
         "connect. Clicking the words of the others turns them on or off too.",
         "Settings… at the bottom opens Dials.",
     ]),
+    "menu-bar-icons": ("Choose which icons show in the menu bar", "menu bar icons hide show remove wifi wi-fi bluetooth sound volume battery focus control centre center clutter", [
+        "Open Dials > Dock and Menu Bar. Under the menu bar settings, turn Show Wi-Fi, Bluetooth, Sound, "
+        "Battery or Focus in menu bar on or off.",
+        "An icon you turn off leaves the menu bar at once. Wi-Fi, Bluetooth, Focus and the volume are still "
+        "in Quick Settings, the symbol beside the clock.",
+    ]),
     "menu-extras": ("Use apps' icons in the menu bar", "menu bar extras icons tray status icon system tray app indicator notification area background running chat cloud sync", [
         "Some apps put an icon of their own in the menu bar while they run, such as chat, cloud storage "
         "and password apps. They sit left of freemac's own icons, newest furthest left.",
@@ -1032,7 +1038,8 @@ TOPICS = {
         "To turn one on, click Quick Settings in the menu bar, click Focus and choose one. Click it again "
         "to turn it off. You can also choose it from Focus at the top of the notification centre.",
         "While a Focus is on, its symbol shows in the menu bar: a moon for Do Not Disturb, a bed for "
-        "Sleep, a briefcase for Work and a person for Personal.",
+        "Sleep, a briefcase for Work and a person for Personal. Click it to switch to another Focus, or "
+        "click the one that's on to turn it off.",
         "To choose the apps that can still reach you, open Dials > Focus and tick them under the Focus's "
         "Allowed apps.",
         "To have a Focus come on by itself, turn on Turn on at set times under it and choose the hours "

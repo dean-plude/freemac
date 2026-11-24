@@ -878,6 +878,19 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Focus menu and menu bar choices (1.161)
+
+`focus_menu.FocusMenu` is a `StatusButton` that Topline updates from its
+clock tick and from shell.json changes (`notify_rules.active_focus`, since a
+schedule turns a Focus on with nothing else saying so); its `Popup` lists
+`notify_rules.FOCUSES` and writes `notify_rules.focus_writes` through
+`beacon.write_prefs`, as Quick Settings does. Wi-Fi, Bluetooth, Sound,
+Battery and Focus each sit in a holder box in the bar; shell.json's
+`menubar_hide` (a list of those names, written by Dials) hides the holder,
+so an icon's own showing and hiding (no battery, no adapter) is untouched.
+Quick Settings checks `is_visible()`, which counts the holder, before opening
+a menu from its symbol.
+
 ## Quick Settings modules (1.160)
 
 `quick.py`'s `Tile` is a box of two buttons: a round `GtkToggleButton` holding

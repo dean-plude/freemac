@@ -403,7 +403,7 @@ class QuickSettings(StatusButton):
         in the menu bar, with its networks or devices."""
         menu = self.menus.get(name)
         self.popup.hide()
-        if menu is not None and menu.get_visible():
+        if menu is not None and menu.is_visible():
             menu._clicked()
         else:
             launch("freemac-dials", "--panel", "network" if name == "wifi" else "bluetooth")

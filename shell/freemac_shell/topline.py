@@ -15,8 +15,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-from . import (announce, apps, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
-               notify_rules, quick, main_display, recent_items, services, status, style, wifi_menu,
+from . import (announce, apps, focus_menu, beacon, dials_time, fallback_menus, held, helpsearch, mac_accel,  # noqa: E402
+               quick, main_display, recent_items, services, status, style, wifi_menu,
                battery_menu, bluetooth_menu, extras)
 from . import dials_keys  # noqa: E402
 from .ini import ini_get  # noqa: E402
@@ -185,19 +185,29 @@ class Topline(Gtk.Window):
         quick_settings = quick.QuickSettings()
         quick_settings.get_style_context().add_class("status")
         bar.pack_end(quick_settings, False, False, 0)
-        self.dnd = Gtk.Image.new_from_icon_name("freemac-focus-dnd-symbolic", Gtk.IconSize.MENU)
-        self.dnd_focus = None
-        self.dnd.set_no_show_all(True)
-        bar.pack_end(self.dnd, False, False, 4)
         # Status icons sit just left of the clock; each hides itself when the
-        # computer has nothing to show (no battery, no sound server).
+        # computer has nothing to show (no battery, no sound server). Those
+        # in MENU_BAR_CHOICES sit in a holder of their own, hidden when the
+        # person has taken that one out of the menu bar (Dials > Dock and
+        # Menu Bar), which leaves the icon's own showing and hiding alone.
+        self.dnd = focus_menu.FocusMenu()
         wifi, bluetooth = wifi_menu.WifiMenu(), bluetooth_menu.BluetoothMenu()
         quick_settings.menus.update(wifi=wifi, bluetooth=bluetooth)
-        for indicator in (battery_menu.BatteryMenu(), status.Sound(), wifi, status.VPN(), bluetooth,
-                          status.Printing(), status.Recording(), status.ScreenShared(), status.InUse(), status.InputMenu(),
-                          status.UserMenu()):
+        self.holders = {}
+        for name, indicator in (("focus", self.dnd), ("battery", battery_menu.BatteryMenu()),
+                                ("sound", status.Sound()), ("wifi", wifi), (None, status.VPN()),
+                                ("bluetooth", bluetooth), (None, status.Printing()), (None, status.Recording()),
+                                (None, status.ScreenShared()), (None, status.InUse()), (None, status.InputMenu()),
+                                (None, status.UserMenu())):
             indicator.get_style_context().add_class("status")
-            bar.pack_end(indicator, False, False, 0)
+            if name is None:
+                bar.pack_end(indicator, False, False, 0)
+                continue
+            holder = Gtk.Box()
+            holder.set_no_show_all(True)
+            holder.pack_start(indicator, True, True, 0)
+            self.holders[name] = holder
+            bar.pack_end(holder, False, False, 0)
         # Apps' own menu bar icons (menu bar extras), left of freemac's.
         self.extras = extras.Extras()
         bar.pack_end(self.extras, False, False, 0)
@@ -464,6 +474,9 @@ class Topline(Gtk.Window):
         dialog.destroy()
 
     def _prefs_changed(self, *_args):
+        hidden = style.prefs().get("menubar_hide") or []
+        for name, holder in self.holders.items():
+            holder.set_visible(name not in hidden)
         self._show_time()
         self._use_autohide(bool(style.prefs().get("menubar_autohide")))
 
@@ -543,13 +556,7 @@ class Topline(Gtk.Window):
         # The Focus on, by hand or by its schedule, shows by its symbol (a
         # moon for Do Not Disturb, a bed for Sleep...); the clock's tick keeps
         # it up to date.
-        focus = notify_rules.active_focus(prefs)
-        if focus != self.dnd_focus:
-            self.dnd_focus = focus
-            if focus:
-                self.dnd.set_from_icon_name(notify_rules.focus_icon(focus), Gtk.IconSize.MENU)
-                self.dnd.set_tooltip_text(f"{notify_rules.focus_name(focus)} is on")
-        self.dnd.set_visible(focus is not None)
+        self.dnd.update(prefs)
         self.clock.set_text(time.strftime(dials_time.clock_format(prefs), time.localtime()))
         self.announcer.tick(prefs)   # Announce the time (announce.py)
         if prefs.get("clock_seconds") != self._seconds:
