@@ -36,6 +36,12 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_more_controls)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" FERRY_TEST_DATA="$here/appkit" \
+                FERRY_SOUND_PLAYER="$here/appkit/fake_player.sh" FERRY_FAKE_PLAYER_LOG="$build/home_$name/player.log" \
+                TZ=Europe/Paris LANG=en_US.UTF-8 env -u WAYLAND_DISPLAY -u DISPLAY -u FERRY_COLOR_ANSWER \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_hidpi)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-hidpi DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -282,6 +288,8 @@ run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -f
 # Pop-up buttons, segmented controls, search fields, stack views and
 # toolbars, built in code and from a nib (1.161).
 run_one appkit_controls "$here/appkit/controls.m" "$here/appkit/controls.out" -fobjc-arc -framework Cocoa
+run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_controls.out" -fobjc-arc \
+    -framework Cocoa
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa

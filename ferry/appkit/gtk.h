@@ -254,4 +254,13 @@ gboolean g_spawn_async(const char *working_directory, char **argv, char **envp, 
 char *g_find_program_in_path(const char *program);
 char *g_filename_to_uri(const char *filename, const char *hostname, GError **error);
 
+/* The colour panel (NSColorWell.m): GTK's colour chooser dialog, shown
+ * without blocking; and a sound player that is waited for (NSSound.m). */
+typedef struct { double red, green, blue, alpha; } GdkRGBA;
+enum { GTK_RESPONSE_OK = -5, GTK_RESPONSE_DELETE_EVENT = -4 };
+enum { G_SPAWN_DO_NOT_REAP_CHILD = 1 << 1 };
+GtkWidget *gtk_color_chooser_dialog_new(const char *title, GtkWidget *parent);
+void gtk_color_chooser_set_rgba(void *chooser, const GdkRGBA *color);
+void gtk_color_chooser_get_rgba(void *chooser, GdkRGBA *color);
+void gtk_color_chooser_set_use_alpha(void *chooser, gboolean use_alpha);
 #endif

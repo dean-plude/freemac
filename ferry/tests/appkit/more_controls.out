@@ -1,0 +1,142 @@
+stepper: cell NSStepperCell, min 0 max 59 increment 1 value 0, autorepeat 1 wraps 1, size 19x27
+wrapping: stepped 0; stepped 3; stepped 0; stepped 10
+stopping at the ends: stepped 10; stepped 10; stepped 0; stepped 0
+set past the end: 10; set to -5: 0
+keys: stepped 7; stepped 4; stepped 1
+held down: repeats
+held down, autorepeat off: stepped 1
+level: cell NSLevelIndicatorCell, style 0, min 0 max 2 warning 0 critical 0, editable 0
+tick 0: 1,0 1x4
+tick 10: 118,0 1x4
+tick 11: NSRangeException
+set past the end: 10
+clicked and dragged: level 3; level 8
+continuous: level 1; level 2; level 2
+keys: level 3; level 4; level 3
+rating clicks: level 3; level 0; level 5
+relevancy cell: style 0, max 2
+colour panel exists before: 0
+well: colour 1.00 1.00 1.00 1.00, bordered 1, active 0
+activated: well 1, other well 0, panel shown 1, panel colour 0.00 0.50 1.00 1.00
+after the panel's answer: well 1.00 0.25 0.00 1.00, active 0, panel shown 0
+sent: well 1.00 0.25 0.00 1.00; panel 1.00 0.25 0.00 1.00; changeColor: from NSColorPanel 1.00 0.25 0.00 1.00
+clicked the other well: active 1, panel shown 1
+clicked again: active 0
+panel closed: well active 0
+no answer: (nothing)
+date picker: cell NSDatePickerCell, style 0, elements 0xee, mode 0, bezeled 1
+shown: "1/31/2025, 11:59:30 PM", size 198x27
+month and day: date 2/28/2025, 11:59:30 PM; date 2/1/2025, 11:59:30 PM; date 2/2/2025, 11:59:30 PM
+time: date 2/2/2025, 12:59:30 AM; date 2/2/2025, 12:00:30 AM; date 2/2/2025, 12:00:30 PM
+typed: date 1/2/2025, 12:00:30 PM; date 12/2/2025, 12:00:30 PM; date 12/25/2025, 12:00:30 PM; date 12/25/1999, 12:00:30 PM
+typed a single-digit month: date 3/25/1999, 12:00:30 PM; date 3/5/1999, 12:00:30 PM
+kept between the limits: "3/5/1999, 12:00:30 PM"
+below the minimum: date 3/1/1999, 12:00:00 AM
+delegate: weekend moved to Monday; date 6/9/2025, 9:00:00 AM
+stepper part: date 7/6/2025, 9:00:00 AM; date 6/6/2025, 9:00:00 AM; date 5/6/2025, 9:00:00 AM
+calendar: size 152x160
+calendar: date 6/10/2025; date 7/10/2025; date 7/11/2025; date 7/4/2025
+range: 2025-06-09 14:30:00 +0000 for 10 days
+range: date 6/9/2025; date 6/9/2025
+calendar and clock: size 270x160
+combo box: cell NSComboBoxCell, visible 5, item height 16, spacing 3x2, completes 0, scroller 1
+items 7: Apple,Apricot,Avocado,Banana,Blueberry,Cherry,Fig, "Banana" at 3, selected -1
+selected 3: "Banana", Banana
+select: selection 3
+list open: 1
+opened: will pop up
+moved down twice: "Cherry" 5
+list open after Return: 0
+chose with the keys: changing; selection 4; changing; selection 5; will dismiss; combo action "Cherry" 5
+clicked the second row: "Avocado" 2, open 0
+chose with the mouse: will pop up; changing; changing; selection 2; will dismiss; combo action "Avocado" 2
+Escape: open 0
+dismissed: will pop up; will dismiss
+clicked elsewhere: open 0
+clicked elsewhere: will pop up; will dismiss
+completed "bl": "blueberry", selected -1
+Backspace: "bl"
+completed "aPr": "aPricot"
+typed over the completion: "aPrx", selected -1
+completion: selection -1
+down with the list closed: "Blueberry" 4
+up twice: "Avocado" 2
+arrows: selection 4; selection 3; selection 2
+data source: 40 items, item 5 "Item 5"
+selected 30: "Item 30"
+data source completed "It": "Item 17"
+data source: (nothing)
+popover: behavior 0, animates 1, shown 0, size 0x0
+size from the view: 160x80
+no content: NSInternalInconsistencyException
+shown 1, overlay 1, view in a window 1
+content view in the window: 140,193 160x80
+show: will show; did show
+clicked inside: shown 1
+inside: clicked NSButton
+clicked outside (application defined): shown 1
+outside: clicked NSButton
+clicked outside, refused: shown 1
+refused: should close? no; clicked NSButton
+clicked outside (transient): shown 0, overlay 0, view in a window 0
+closed by a click: should close? yes; will close (NSPopoverCloseReasonStandard); did close
+below the button: 120,91 200x60
+Escape: shown 0
+semitransient: will show; did show; should close? yes; will close (NSPopoverCloseReasonStandard); did close
+no room above: below instead, kept in the window: 256,251 200x60
+a new size: 356,271 100x40
+performClose: shown 0
+edges: will show; did show; should close? yes; will close (NSPopoverCloseReasonStandard); did close
+presented as a popover: in the window 1, overlay 1
+dismissed: in a window 0, overlay 0
+presented: (nothing)
+path control: cell NSPathCell, style 0, URL (null)
+components: Computer > usr > share > doc; cells 4, first image 1
+second component: 97,0 39x22
+clicks: path clicked "usr" /usr; path clicked "doc" /usr/share/doc; path clicked "doc" /usr/share/doc; path double-clicked
+a web address: example.org > docs > guide > index.html
+no items: URL (null), placeholder "No file"
+own items: Projects > Ferry
+long path, last component: 245,0 80x22
+long path, a middle one: 165,0 28x22
+pop-up menu open: 1
+pop-up: menu [doc, share, usr, Computer]; path clicked "share" /usr/share
+types: 9, includes WAV 1
+Glass: found, name Glass, duration 2.0, same again 1
+Pop: found; pop: found; Basso: missing
+no such file: 0
+play: 1, playing 1, again 0
+finished: playing 0
+played: Glass finished 1
+pause 1, pause again 0, resume 1
+stop 1, playing 0, stop again 0
+stopped: Glass finished 0
+from data: duration 1.0, name set 1, taken again 1
+looping: playing 1
+from data: Mine finished 0
+the player was given:
+--volume=1.00 alert-bell.wav
+--volume=0.50 alert-bell.wav
+--volume=1.00 ferry-sound.wav
+--volume=1.00 ferry-sound.wav
+token field: cell NSTokenFieldCell, style 0, tokenizing "," 1, delay 0
+set: one|two, "one, two"
+typed: one|two|three|four, "one, two, three, four, fi"
+Return: one|two|three|four|fi
+Backspace twice: one|two|three|four
+the delegate's tokens: one|two|three|four|SIX
+editing ended: one|two|three|four|SIX|seven
+tokens: add [three] at 2; add [four] at 3; add [fi] at 4; tokens action one|two|three|four|fi; add [SIX] at 4; add [NO] at 5; add [seven] at 5
+a string: a|b|c
+tokenized at ";": a|b|c|x,y|z
+more tokens: add [x,y] at 3; add [z] at 4
+nib loaded: 1
+stepper NSStepper: min 0 max 10 increment 2 value 4 autorepeat 1 wraps 0, target owner 1, action stepped:
+level NSLevelIndicator: style 3, max 5, value 3
+well NSColorWell: 0.20 0.40 0.60 1.00, bordered 1
+date picker NSDatePicker: elements 0xe0, style 0, "12/1/2025"
+combo box NSComboBox: Apple,Apricot,Banana, completes 1, visible 3
+path control NSPathControl: Computer > usr > share > doc
+token field NSTokenField: red|green, style 2
+stepped in the nib: 6, owner told 1
+exit=0

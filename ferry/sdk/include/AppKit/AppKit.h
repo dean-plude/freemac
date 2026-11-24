@@ -2884,6 +2884,393 @@ enum {
 - (NSRect)rectForCancelButtonWhenCentered:(BOOL)isCentered;
 @end
 
+/* ---- more controls (NSStepper.m, NSDatePicker.m, NSComboBox.m, NSColorWell.m,
+ * NSLevelIndicator.m, NSPopover.m, NSPathControl.m, NSSound.m, NSTokenField.m) ---- */
+
+/* A pair of arrows that step a value up and down between minValue and
+ * maxValue (0 and 59 unless set) by increment (1), wrapping round if
+ * valueWraps, repeating while held if autorepeat. */
+@interface NSStepperCell : NSActionCell
+@property double minValue, maxValue, increment;
+@property BOOL autorepeat, valueWraps;
+@end
+@interface NSStepper : NSControl
+@property double minValue, maxValue, increment;
+@property BOOL autorepeat, valueWraps;
+@end
+
+/* Dates and times, shown as a text field with a stepper, a text field
+ * alone, or a calendar month (and clock). */
+typedef NS_ENUM(NSUInteger, NSDatePickerStyle) {
+    NSDatePickerStyleTextFieldAndStepper = 0, NSDatePickerStyleClockAndCalendar = 1, NSDatePickerStyleTextField = 2,
+};
+#define NSTextFieldAndStepperDatePickerStyle NSDatePickerStyleTextFieldAndStepper
+#define NSClockAndCalendarDatePickerStyle NSDatePickerStyleClockAndCalendar
+#define NSTextFieldDatePickerStyle NSDatePickerStyleTextField
+typedef NS_ENUM(NSUInteger, NSDatePickerMode) { NSDatePickerModeSingle = 0, NSDatePickerModeRange = 1 };
+#define NSSingleDateMode NSDatePickerModeSingle
+#define NSRangeDateMode NSDatePickerModeRange
+typedef NS_OPTIONS(NSUInteger, NSDatePickerElementFlags) {
+    NSDatePickerElementFlagHourMinute = 0x000c, NSDatePickerElementFlagHourMinuteSecond = 0x000e,
+    NSDatePickerElementFlagTimeZone = 0x0010, NSDatePickerElementFlagYearMonth = 0x00c0,
+    NSDatePickerElementFlagYearMonthDay = 0x00e0, NSDatePickerElementFlagEra = 0x0100,
+};
+#define NSHourMinuteDatePickerElementFlag NSDatePickerElementFlagHourMinute
+#define NSHourMinuteSecondDatePickerElementFlag NSDatePickerElementFlagHourMinuteSecond
+#define NSTimeZoneDatePickerElementFlag NSDatePickerElementFlagTimeZone
+#define NSYearMonthDatePickerElementFlag NSDatePickerElementFlagYearMonth
+#define NSYearMonthDayDatePickerElementFlag NSDatePickerElementFlagYearMonthDay
+#define NSEraDatePickerElementFlag NSDatePickerElementFlagEra
+@class NSDatePickerCell, NSDatePicker;
+@protocol NSDatePickerCellDelegate <NSObject>
+@optional
+- (void)datePickerCell:(NSDatePickerCell *)cell validateProposedDateValue:(NSDate **)date
+          timeInterval:(NSTimeInterval *)interval;
+@end
+@interface NSDatePickerCell : NSActionCell
+@property NSDatePickerStyle datePickerStyle;
+@property NSDatePickerMode datePickerMode;
+@property NSDatePickerElementFlags datePickerElements;
+@property (copy) NSDate *dateValue, *minDate, *maxDate;
+@property NSTimeInterval timeInterval;
+@property (copy) NSCalendar *calendar;
+@property (copy) NSLocale *locale;
+@property (copy) NSTimeZone *timeZone;
+@property BOOL drawsBackground;
+@property (copy) NSColor *backgroundColor, *textColor;
+@property (assign) id<NSDatePickerCellDelegate> delegate;
+@end
+@interface NSDatePicker : NSControl
+@property NSDatePickerStyle datePickerStyle;
+@property NSDatePickerMode datePickerMode;
+@property NSDatePickerElementFlags datePickerElements;
+@property (copy) NSDate *dateValue, *minDate, *maxDate;
+@property NSTimeInterval timeInterval;
+@property (copy) NSCalendar *calendar;
+@property (copy) NSLocale *locale;
+@property (copy) NSTimeZone *timeZone;
+@property (getter=isBezeled) BOOL bezeled;
+@property (getter=isBordered) BOOL bordered;
+@property BOOL drawsBackground, presentsCalendarOverlay;
+@property (copy) NSColor *backgroundColor, *textColor;
+@property (assign) id<NSDatePickerCellDelegate> delegate;
+@end
+
+/* A text field with a list of values to choose from, or to complete what
+ * is typed with. */
+@class NSComboBox, NSComboBoxCell;
+@protocol NSComboBoxDataSource <NSObject>
+@optional
+- (NSInteger)numberOfItemsInComboBox:(NSComboBox *)comboBox;
+- (id)comboBox:(NSComboBox *)comboBox objectValueForItemAtIndex:(NSInteger)index;
+- (NSUInteger)comboBox:(NSComboBox *)comboBox indexOfItemWithStringValue:(NSString *)string;
+- (NSString *)comboBox:(NSComboBox *)comboBox completedString:(NSString *)string;
+@end
+@protocol NSComboBoxCellDataSource <NSObject>
+@optional
+- (NSInteger)numberOfItemsInComboBoxCell:(NSComboBoxCell *)cell;
+- (id)comboBoxCell:(NSComboBoxCell *)cell objectValueForItemAtIndex:(NSInteger)index;
+- (NSUInteger)comboBoxCell:(NSComboBoxCell *)cell indexOfItemWithStringValue:(NSString *)string;
+- (NSString *)comboBoxCell:(NSComboBoxCell *)cell completedString:(NSString *)string;
+@end
+@protocol NSComboBoxDelegate <NSTextFieldDelegate>
+@optional
+- (void)comboBoxWillPopUp:(NSNotification *)notification;
+- (void)comboBoxWillDismiss:(NSNotification *)notification;
+- (void)comboBoxSelectionDidChange:(NSNotification *)notification;
+- (void)comboBoxSelectionIsChanging:(NSNotification *)notification;
+@end
+APPKIT_EXTERN NSNotificationName const NSComboBoxWillPopUpNotification, NSComboBoxWillDismissNotification;
+APPKIT_EXTERN NSNotificationName const NSComboBoxSelectionDidChangeNotification;
+APPKIT_EXTERN NSNotificationName const NSComboBoxSelectionIsChangingNotification;
+@interface NSComboBoxCell : NSTextFieldCell
+@property BOOL usesDataSource, completes, hasVerticalScroller;
+@property (getter=isButtonBordered) BOOL buttonBordered;
+@property (assign) id<NSComboBoxCellDataSource> dataSource;
+@property NSInteger numberOfVisibleItems;
+@property CGFloat itemHeight;
+@property NSSize intercellSpacing;
+@property (readonly) NSInteger numberOfItems, indexOfSelectedItem;
+@property (readonly, copy) NSArray *objectValues;
+@property (readonly) id objectValueOfSelectedItem;
+- (void)addItemWithObjectValue:(id)object;
+- (void)addItemsWithObjectValues:(NSArray *)objects;
+- (void)insertItemWithObjectValue:(id)object atIndex:(NSInteger)index;
+- (void)removeItemWithObjectValue:(id)object;
+- (void)removeItemAtIndex:(NSInteger)index;
+- (void)removeAllItems;
+- (id)itemObjectValueAtIndex:(NSInteger)index;
+- (NSInteger)indexOfItemWithObjectValue:(id)object;
+- (void)selectItemAtIndex:(NSInteger)index;
+- (void)selectItemWithObjectValue:(id)object;
+- (void)deselectItemAtIndex:(NSInteger)index;
+- (void)noteNumberOfItemsChanged;
+- (void)reloadData;
+- (void)scrollItemAtIndexToTop:(NSInteger)index;
+- (void)scrollItemAtIndexToVisible:(NSInteger)index;
+- (NSString *)completedString:(NSString *)string;
+@end
+@interface NSComboBox : NSTextField
+@property BOOL usesDataSource, completes, hasVerticalScroller;
+@property (getter=isButtonBordered) BOOL buttonBordered;
+@property (assign) id<NSComboBoxDataSource> dataSource;
+@property NSInteger numberOfVisibleItems;
+@property CGFloat itemHeight;
+@property NSSize intercellSpacing;
+@property (readonly) NSInteger numberOfItems, indexOfSelectedItem;
+@property (readonly, copy) NSArray *objectValues;
+@property (readonly) id objectValueOfSelectedItem;
+- (void)addItemWithObjectValue:(id)object;
+- (void)addItemsWithObjectValues:(NSArray *)objects;
+- (void)insertItemWithObjectValue:(id)object atIndex:(NSInteger)index;
+- (void)removeItemWithObjectValue:(id)object;
+- (void)removeItemAtIndex:(NSInteger)index;
+- (void)removeAllItems;
+- (id)itemObjectValueAtIndex:(NSInteger)index;
+- (NSInteger)indexOfItemWithObjectValue:(id)object;
+- (void)selectItemAtIndex:(NSInteger)index;
+- (void)selectItemWithObjectValue:(id)object;
+- (void)deselectItemAtIndex:(NSInteger)index;
+- (void)noteNumberOfItemsChanged;
+- (void)reloadData;
+- (void)scrollItemAtIndexToTop:(NSInteger)index;
+- (void)scrollItemAtIndexToVisible:(NSInteger)index;
+@end
+
+/* Colours: a well that shows one and opens the shared colour panel, and
+ * the panel, which sends changeColor: when the user picks a colour. */
+@class NSColorPanel;
+typedef NS_ENUM(NSInteger, NSColorPanelMode) {
+    NSColorPanelModeNone = -1, NSColorPanelModeGray = 0, NSColorPanelModeRGB = 1, NSColorPanelModeCMYK = 2,
+    NSColorPanelModeHSB = 3, NSColorPanelModeCustomPalette = 4, NSColorPanelModeColorList = 5,
+    NSColorPanelModeWheel = 6, NSColorPanelModeCrayon = 7,
+};
+typedef NS_OPTIONS(NSUInteger, NSColorPanelOptions) {
+    NSColorPanelGrayModeMask = 1 << 0, NSColorPanelRGBModeMask = 1 << 1, NSColorPanelCMYKModeMask = 1 << 2,
+    NSColorPanelHSBModeMask = 1 << 3, NSColorPanelCustomPaletteModeMask = 1 << 4,
+    NSColorPanelColorListModeMask = 1 << 5, NSColorPanelWheelModeMask = 1 << 6, NSColorPanelCrayonModeMask = 1 << 7,
+    NSColorPanelAllModesMask = 0xffff,
+};
+APPKIT_EXTERN NSNotificationName const NSColorPanelColorDidChangeNotification;
+@protocol NSColorChanging <NSObject>
+- (void)changeColor:(NSColorPanel *)sender;
+@end
+@interface NSColorPanel : NSPanel
+@property (class, readonly) NSColorPanel *sharedColorPanel;
+@property (class, readonly) BOOL sharedColorPanelExists;
++ (void)setPickerMask:(NSColorPanelOptions)mask;
++ (void)setPickerMode:(NSColorPanelMode)mode;
++ (BOOL)dragColor:(NSColor *)color withEvent:(NSEvent *)event fromView:(NSView *)view;
+@property (copy) NSColor *color;
+@property (readonly) CGFloat alpha;
+@property BOOL showsAlpha;
+@property NSColorPanelMode mode;
+@property (getter=isContinuous) BOOL continuous;
+@property (retain) NSView *accessoryView;
+- (void)setTarget:(id)target;
+- (void)setAction:(SEL)action;
+@end
+typedef NS_ENUM(NSInteger, NSColorWellStyle) {
+    NSColorWellStyleDefault = 0, NSColorWellStyleMinimal = 1, NSColorWellStyleExpanded = 2,
+};
+@interface NSColorWell : NSControl
+@property (copy) NSColor *color;
+@property (getter=isBordered) BOOL bordered;
+@property (readonly, getter=isActive) BOOL active;
+@property NSColorWellStyle colorWellStyle;
+@property BOOL supportsAlpha;
+- (void)activate:(BOOL)exclusive;
+- (void)deactivate;
+- (void)takeColorFrom:(id)sender;
+- (void)drawWellInside:(NSRect)rect;
+@end
+
+/* A level: a capacity bar (continuous or in segments), relevancy bars or
+ * a row of stars, coloured by warning and critical values. */
+typedef NS_ENUM(NSUInteger, NSLevelIndicatorStyle) {
+    NSLevelIndicatorStyleRelevancy = 0, NSLevelIndicatorStyleContinuousCapacity = 1,
+    NSLevelIndicatorStyleDiscreteCapacity = 2, NSLevelIndicatorStyleRating = 3,
+};
+#define NSRelevancyLevelIndicatorStyle NSLevelIndicatorStyleRelevancy
+#define NSContinuousCapacityLevelIndicatorStyle NSLevelIndicatorStyleContinuousCapacity
+#define NSDiscreteCapacityLevelIndicatorStyle NSLevelIndicatorStyleDiscreteCapacity
+#define NSRatingLevelIndicatorStyle NSLevelIndicatorStyleRating
+typedef NS_ENUM(NSInteger, NSLevelIndicatorPlaceholderVisibility) {
+    NSLevelIndicatorPlaceholderVisibilityAutomatic = 0, NSLevelIndicatorPlaceholderVisibilityAlways = 1,
+    NSLevelIndicatorPlaceholderVisibilityWhileEditing = 2,
+};
+@interface NSLevelIndicatorCell : NSActionCell
+- (instancetype)initWithLevelIndicatorStyle:(NSLevelIndicatorStyle)style;
+@property NSLevelIndicatorStyle levelIndicatorStyle;
+@property double minValue, maxValue, warningValue, criticalValue;
+@property NSTickMarkPosition tickMarkPosition;
+@property NSInteger numberOfTickMarks, numberOfMajorTickMarks;
+- (double)tickMarkValueAtIndex:(NSInteger)index;
+- (NSRect)rectOfTickMarkAtIndex:(NSInteger)index;
+@property (retain) NSImage *ratingImage, *ratingPlaceholderImage;
+@end
+@interface NSLevelIndicator : NSControl
+@property NSLevelIndicatorStyle levelIndicatorStyle;
+@property double minValue, maxValue, warningValue, criticalValue;
+@property NSTickMarkPosition tickMarkPosition;
+@property NSInteger numberOfTickMarks, numberOfMajorTickMarks;
+@property (getter=isEditable) BOOL editable;
+@property (copy) NSColor *fillColor, *warningFillColor, *criticalFillColor;
+@property BOOL drawsTieredCapacityLevels;
+@property NSLevelIndicatorPlaceholderVisibility placeholderVisibility;
+@property (retain) NSImage *ratingImage, *ratingPlaceholderImage;
+- (double)tickMarkValueAtIndex:(NSInteger)index;
+- (NSRect)rectOfTickMarkAtIndex:(NSInteger)index;
+@end
+
+/* A popover: a view controller's view shown next to a rectangle of a view,
+ * with an arrow pointing at it, inside that view's window. */
+@class NSPopover;
+typedef NS_ENUM(NSInteger, NSPopoverBehavior) {
+    NSPopoverBehaviorApplicationDefined = 0, NSPopoverBehaviorTransient = 1, NSPopoverBehaviorSemitransient = 2,
+};
+typedef NS_ENUM(NSInteger, NSPopoverAppearance) { NSPopoverAppearanceMinimal = 0, NSPopoverAppearanceHUD = 1 };
+typedef NSString *NSPopoverCloseReasonValue;
+APPKIT_EXTERN NSString *const NSPopoverCloseReasonKey;
+APPKIT_EXTERN NSPopoverCloseReasonValue const NSPopoverCloseReasonStandard, NSPopoverCloseReasonDetachToWindow;
+APPKIT_EXTERN NSNotificationName const NSPopoverWillShowNotification, NSPopoverDidShowNotification;
+APPKIT_EXTERN NSNotificationName const NSPopoverWillCloseNotification, NSPopoverDidCloseNotification;
+@protocol NSPopoverDelegate <NSObject>
+@optional
+- (BOOL)popoverShouldClose:(NSPopover *)popover;
+- (BOOL)popoverShouldDetach:(NSPopover *)popover;
+- (NSWindow *)detachableWindowForPopover:(NSPopover *)popover;
+- (void)popoverWillShow:(NSNotification *)notification;
+- (void)popoverDidShow:(NSNotification *)notification;
+- (void)popoverWillClose:(NSNotification *)notification;
+- (void)popoverDidClose:(NSNotification *)notification;
+@end
+@interface NSPopover : NSResponder <NSCoding>
+@property (retain) NSViewController *contentViewController;
+@property NSSize contentSize;
+@property NSPopoverBehavior behavior;
+@property BOOL animates;
+@property NSPopoverAppearance appearance;
+@property (assign) id<NSPopoverDelegate> delegate;
+@property (readonly, getter=isShown) BOOL shown;
+@property (readonly, getter=isDetached) BOOL detached;
+@property NSRect positioningRect;
+- (void)showRelativeToRect:(NSRect)rect ofView:(NSView *)view preferredEdge:(NSRectEdge)edge;
+- (IBAction)performClose:(id)sender;
+- (void)close;
+@end
+
+/* A path, one component a step: a file URL's folders from the computer
+ * down, or a web address's host and folders. */
+@class NSPathControl, NSPathCell;
+typedef NS_ENUM(NSInteger, NSPathStyle) { NSPathStyleStandard = 0, NSPathStyleNavigationBar = 1, NSPathStylePopUp = 2 };
+@interface NSPathControlItem : NSObject
+@property (copy) NSString *title;
+@property (copy) NSAttributedString *attributedTitle;
+@property (retain) NSImage *image;
+@property (readonly, copy) NSURL *URL;
+@end
+@interface NSPathComponentCell : NSTextFieldCell
+@property (retain) NSImage *image;
+@property (copy) NSURL *URL;
+@end
+@protocol NSPathControlDelegate <NSObject>
+@optional
+- (void)pathControl:(NSPathControl *)pathControl willPopUpMenu:(NSMenu *)menu;
+@end
+@interface NSPathCell : NSActionCell
++ (Class)pathComponentCellClass;
+- (NSRect)rectOfPathComponentCell:(NSPathComponentCell *)cell withFrame:(NSRect)frame inView:(NSView *)view;
+- (NSPathComponentCell *)pathComponentCellAtPoint:(NSPoint)point withFrame:(NSRect)frame inView:(NSView *)view;
+@property (copy) NSAttributedString *placeholderAttributedString;
+@property NSPathStyle pathStyle;
+@property (copy) NSURL *URL;
+@property (copy) NSArray<NSPathComponentCell *> *pathComponentCells;
+@property (readonly) NSPathComponentCell *clickedPathComponentCell;
+@property (copy) NSString *placeholderString;
+@property (copy) NSColor *backgroundColor;
+@property (copy) NSArray<NSString *> *allowedTypes;
+@property SEL doubleAction;
+@end
+@interface NSPathControl : NSControl
+@property NSPathStyle pathStyle;
+@property (copy) NSURL *URL;
+@property (copy) NSArray<NSPathControlItem *> *pathItems;
+@property (readonly) NSPathControlItem *clickedPathItem;
+@property (copy) NSArray<NSPathComponentCell *> *pathComponentCells;
+- (NSPathComponentCell *)clickedPathComponentCell;
+@property (copy) NSString *placeholderString;
+@property (copy) NSAttributedString *placeholderAttributedString;
+@property (copy) NSColor *backgroundColor;
+@property (copy) NSArray<NSString *> *allowedTypes;
+@property (getter=isEditable) BOOL editable;
+@property SEL doubleAction;
+@property (assign) id<NSPathControlDelegate> delegate;
+@end
+
+/* Sounds, played through the system's own player (pw-play, paplay or
+ * aplay). */
+@class NSSound;
+typedef NSString *NSSoundName;
+@protocol NSSoundDelegate <NSObject>
+@optional
+- (void)sound:(NSSound *)sound didFinishPlaying:(BOOL)finished;
+@end
+@interface NSSound : NSObject <NSCopying, NSCoding>
++ (NSSound *)soundNamed:(NSSoundName)name;
++ (NSArray<NSString *> *)soundUnfilteredTypes;
+- (instancetype)initWithContentsOfFile:(NSString *)path byReference:(BOOL)byRef;
+- (instancetype)initWithContentsOfURL:(NSURL *)url byReference:(BOOL)byRef;
+- (instancetype)initWithData:(NSData *)data;
+- (BOOL)setName:(NSSoundName)name;
+@property (readonly, copy) NSSoundName name;
+- (BOOL)play;
+- (BOOL)stop;
+- (BOOL)pause;
+- (BOOL)resume;
+@property (readonly, getter=isPlaying) BOOL playing;
+@property (assign) id<NSSoundDelegate> delegate;
+@property float volume;
+@property BOOL loops;
+@property (readonly) NSTimeInterval duration;
+@property NSTimeInterval currentTime;
+@end
+
+/* Tokens: what is typed becomes rounded tokens, split at commas (or the
+ * tokenizing characters). Its objectValue is an array. */
+@class NSTokenField;
+typedef NS_ENUM(NSUInteger, NSTokenStyle) {
+    NSTokenStyleDefault = 0, NSTokenStyleNone = 1, NSTokenStyleRounded = 2, NSTokenStyleSquared = 3,
+    NSTokenStylePlainSquared = 4,
+};
+#define NSDefaultTokenStyle NSTokenStyleDefault
+#define NSPlainTextTokenStyle NSTokenStyleNone
+#define NSRoundedTokenStyle NSTokenStyleRounded
+@protocol NSTokenFieldDelegate <NSTextFieldDelegate>
+@optional
+- (NSArray *)tokenField:(NSTokenField *)field completionsForSubstring:(NSString *)substring
+            indexOfToken:(NSInteger)index indexOfSelectedItem:(NSInteger *)selected;
+- (NSArray *)tokenField:(NSTokenField *)field shouldAddObjects:(NSArray *)tokens atIndex:(NSUInteger)index;
+- (NSString *)tokenField:(NSTokenField *)field displayStringForRepresentedObject:(id)object;
+- (NSString *)tokenField:(NSTokenField *)field editingStringForRepresentedObject:(id)object;
+- (id)tokenField:(NSTokenField *)field representedObjectForEditingString:(NSString *)string;
+- (NSTokenStyle)tokenField:(NSTokenField *)field styleForRepresentedObject:(id)object;
+@end
+@interface NSTokenFieldCell : NSTextFieldCell
+@property NSTokenStyle tokenStyle;
+@property (copy) NSCharacterSet *tokenizingCharacterSet;
+@property NSTimeInterval completionDelay;
++ (NSCharacterSet *)defaultTokenizingCharacterSet;
++ (NSTimeInterval)defaultCompletionDelay;
+@end
+@interface NSTokenField : NSTextField
+@property NSTokenStyle tokenStyle;
+@property (copy) NSCharacterSet *tokenizingCharacterSet;
+@property NSTimeInterval completionDelay;
++ (NSCharacterSet *)defaultTokenizingCharacterSet;
++ (NSTimeInterval)defaultCompletionDelay;
+@end
+
 /* Lays out its views in a row or a column, by hand (there is no Auto
  * Layout in Ferry): each at its intrinsic size, or its frame's size when it
  * has none. */

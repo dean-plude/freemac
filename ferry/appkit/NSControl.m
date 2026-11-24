@@ -1647,6 +1647,26 @@ static BOOL keeps_state(NSButtonType t)
     CFRelease(line);
     CGContextRestoreGState(cg);
 }
+/* For a subclass that changes the text being edited itself (a combo box
+ * completing what was typed): the text and its selection, with no
+ * notifications. */
+- (void)_setEditingText:(NSString *)text selectedRange:(NSRange)range
+{
+    if (!_editing) {
+        [self setStringValue:text];
+        return;
+    }
+    [_text setString:text];
+    NSUInteger n = [_text length];
+    _anchor = MIN(range.location, n);
+    _caret = MIN(NSMaxRange(range), n);
+    _dirty = YES;
+    [self setNeedsDisplay:YES];
+}
+- (NSRange)_selectedTextRange
+{
+    return _editing ? [self _selection] : NSMakeRange(NSNotFound, 0);
+}
 @end
 
 @implementation NSSecureTextField
