@@ -459,7 +459,16 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
     else
         [self removeObjectForKey:key];
 }
-- (void)setValue:(id)value forKey:(NSString *)key { [self setObject:value forKeyedSubscript:key]; }
+/* Observers of the key hear of a change made by key-value coding. */
+- (void)setValue:(id)value forKey:(NSString *)key
+{
+    BOOL observed = FKVOIsObserved(self);
+    if (observed)
+        [self willChangeValueForKey:key];
+    [self setObject:value forKeyedSubscript:key];
+    if (observed)
+        [self didChangeValueForKey:key];
+}
 - (void)removeObjectsForKeys:(NSArray *)keys
 {
     for (id k in keys)

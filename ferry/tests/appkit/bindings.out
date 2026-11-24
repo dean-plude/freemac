@@ -7,7 +7,7 @@ nonretained object: same, objCType @
 initWithContentsOfFile: v, mutable 2 keys
 bound field: bound, box enabled no, title kept "Button"
 info: observed is the settings yes, key path name
-exposed: color
+exposed: color,hidden,toolTip
 after a change: field changed, box enabled yes
 after unbind: unbound
 unbound field kept: changed

@@ -134,6 +134,8 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
 - (instancetype)init { return [self initWithObjects:NULL count:0]; }
 - (instancetype)initWithObjects:(const id[])objects count:(NSUInteger)count
 {
+    if (!count)
+        return self;   /* a subclass of its own that calls [super init] */
     [self release];
     FRaise(NSInvalidArgumentException, @"*** -[NSArray initWithObjects:count:]: method only defined for abstract class");
 }

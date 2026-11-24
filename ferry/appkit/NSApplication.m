@@ -109,8 +109,12 @@ CGFloat AScreenScale(void)
     return s > 0 ? s : 1;
 }
 
+static NSUInteger beeps;
+NSUInteger ABeepCount(void) { return beeps; }
+
 void NSBeep(void)
 {
+    beeps++;
     if (display_state > 0)
         gdk_display_beep(gdk_display_get_default());
 }
@@ -1190,4 +1194,10 @@ int NSApplicationMain(int argc, const char *argv[])
 {
     return ([[NSUserDefaults standardUserDefaults] integerForKey:@"AppleKeyboardUIMode"] & 2) != 0;
 }
+@end
+
+/* How many times NSBeep has been called: a Ferry addition, for tests that
+ * check a refused edit beeps (there is no sound with no display). */
+@implementation NSApplication (FerryBeeps)
+- (NSUInteger)_ferryBeepCount { return beeps; }
 @end

@@ -1,0 +1,33 @@
+formatter kept: 1
+shown: 21.5 °C, value the number 21.5, double 21.5
+setStringValue 30 °C: value the number 30, shown 30 °C
+setStringValue warm: value the string "warm", shown warm
+editing starts from: 21.5
+typed 2x: text 2, beeps 1
+  refused the keystroke making "2x": only numbers
+typed 5, Return: value the number 25, text 25, still editing 1
+  action: value the number 25
+typed 1-2, focus moved away: no, beeps 1, value the number 25
+  couldn't format "1-2": “1-2” isn't a temperature (editing goes on)
+Return on it: value the number 25, still editing 1
+  couldn't format "1-2": “1-2” isn't a temperature (editing goes on)
+the delegate takes it: focus moved yes, value the string "1-2", shown 1-2
+  couldn't format "1-2": “1-2” isn't a temperature (kept)
+typed 500 over a limit of 100: focus moved no, beeps 1, value the number 20
+  refused the number 500
+typed 99: focus moved yes, value the number 99, shown 99 °C
+no typing: value the number 99
+abortEditing: value the number 99, editing 0
+validateEditing: value the number 12, editing 1
+number formatter: shown 1,234.5
+typed 2,000: value the number 2000, shown 2,000
+a cell: -4 °C; its copy: -4 °C
+cell setStringValue 8: the number 8
+table cell shown: 22.5 °C
+editing the cell starts from: 22.5
+  the data source gets the number 18 for row 1
+typed 18, Return: edited row -1, value the number 18
+  the table's delegate hears "1-2" couldn't be read (control is the table: 1)
+typed 1-2, Return: edited row 1, beeps 1
+Escape: edited row -1, value the number 18
+exit=0

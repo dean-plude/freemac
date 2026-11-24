@@ -1,0 +1,86 @@
+before: class Person, isa Person
+observed: class Person, isa NSKVONotifying_Person, member of Person 1, kind of Person 1, superclass of isa Person
+description: <Person: 0x...>
+responds to setName: 1; its setter is the subclass's 1
+  name of Person: setting, old Ada, new Grace
+  awake of Person: setting, old 0, new 1
+  age of Person: setting, old 0, new 37
+  height of Person: setting, old 0, new 1.68
+  frame of Person: setting, old {{0, 0}, {0, 0}}, new {{1, 2}, {3, 4}}
+  spot of Person: setting, old {0, 0}, new {5, 6}
+  hidden of Person: setting, old <null>, new shy
+setters: 7 heard
+values kept: Grace 1 37 1.68 {{1, 2}, {3, 4}} {5, 6} shy
+  name of Person: setting, old Grace, new Lise
+  age of Person: setting, old 37, new 40
+  frame of Person: setting, old {{1, 2}, {3, 4}}, new {{0, 0}, {10, 10}}
+key-value coding: 3 heard
+quiet keys, by their setters: 0 heard
+  secret of Person: setting, new s3 [secret]
+quiet keys, announced: 1 heard
+  shoeSize of Person: setting, old 0, new 42
+  nickname of Person: setting, old <null>, new Addie
+instance variables: 2 heard
+read back: shoe size 42, nickname Addie
+after removing every observer: 0 heard
+isa after: NSKVONotifying_Person
+  name of Student: setting, new BOB
+  school of Student: setting, new Ferry High
+a subclass: 2 heard
+student: class Student, isa NSKVONotifying_Student
+dependent keys:
+  fullName of Person: setting (prior), old Ada Byron [full]
+  fullName of Person: setting, old Ada Byron, new Ada Lovelace [full]
+  greeting of Person: setting, new Hello, Ada Lovelace [greeting]
+  fullName of Person: setting (prior), old Ada Lovelace [full]
+  fullName of Person: setting, old Ada Lovelace, new Augusta Lovelace [full]
+  greeting of Person: setting, new Hello, Augusta Lovelace [greeting]
+  greeting of Person: setting, new Hello, Ada Lovelace [greeting]
+after removing both: 0 heard
+  friendLabel of Person: setting, old friend of Alan, new friend of Alonzo [label]
+  friendLabel of Person: setting, old friend of Alonzo, new friend of Kurt [label]
+  friendLabel of Person: setting, old friend of Kurt, new friend of Emmy [label]
+  friendLabel of Person: setting, old friend of Emmy, new friend of nobody [label]
+key paths:
+  friend.name of Person: setting, new not followed [path]
+  friend.name of Person: setting, old not followed, new Alan [path]
+  friend.name of Person: setting, old Alan, new Emmy [path]
+the old friend's change: 0 heard
+  friend.name of Person: setting, old Emmy, new Hedy [path]
+  friend.name of Person: setting, old Hedy, new <null> [path]
+  friend.name of Person: setting, old <null>, new old friend, not heard [path]
+after removal: 0 heard
+to-many:
+  items of Person: insertion at 2, new c [items]
+  items of Person: removal at 0, old a [items]
+  items of Person: replacement at 0, old b, new B [items]
+  items of Person: insertion at 0, new z [items]
+  items now z,B,c (3 through the proxy)
+  notes of Person: insertion at 0, new one [notes]
+  notes of Person: insertion at 1, new two [notes]
+  notes of Person: insertion at 0, new zero [notes]
+  notes of Person: replacement at 1, old one, new ONE [notes]
+  notes of Person: removal at 2, old two [notes]
+  notes now zero,ONE
+  tags of Person: setting, old x, new x,y [tags]
+  tags now x,y
+  items of Person: removal (prior) at 0 1, old z,B [by hand]
+  items of Person: removal at 0 1, old z,B [by hand]
+nested:
+  name of Person: setting, old <null>, new one [nested]
+  name of Person: setting, old one, new two [nested]
+  name of Person: setting, old one, new two [nested]
+dictionaries and defaults:
+  k of a dictionary: setting, old v1, new v2 [dict]
+  dictionary still a mutable dictionary
+  FerryKVOTest of NSUserDefaults: setting, old <null>, new on [defaults]
+  FerryKVOTest of NSUserDefaults: setting, old on, new <null> [defaults]
+key-value coding:
+  values: first none, friend unwatched, age 0
+  set from a dictionary: Mary, 7
+  a rect by its getter: {{0, 0}, {10, 10}}
+  nil for a scalar: NSInvalidArgumentException
+  NSUnknownKeyException: [<Person 0x...> valueForUndefinedKey:]: this class is not key value coding-compliant for the key nothing.
+  NSUnknownKeyException: [<Person 0x...> setValue:forUndefinedKey:]: this class is not key value coding-compliant for the key nothing.
+heard 50 in all
+exit=0

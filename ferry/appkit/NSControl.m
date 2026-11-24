@@ -7,7 +7,17 @@
  * editor. A text field being edited in a table's cell (NSTableView.m)
  * hands Return, Tab, Shift-Tab and Escape to its table, which moves the
  * editing on; the end-of-editing notification says how editing ended,
- * under "NSTextMovement", as Apple documents. */
+ * under "NSTextMovement", as Apple documents.
+ *
+ * Formatters (Ferry 0.17.0): a control with a formatter shows its value
+ * with stringForObjectValue:; a text field starts editing from
+ * editingStringForObjectValue:, refuses keystrokes isPartialStringValid:
+ * refuses, and reads the text with getObjectValue:forString:
+ * errorDescription: when editing ends or Return is pressed. If that fails
+ * it beeps, asks its delegate control:didFailToFormatString:
+ * errorDescription: (YES keeps the string as the value) and otherwise
+ * keeps editing. What the user changes reaches the control's bindings
+ * (NSKeyValueBinding.m). */
 #import "AInternal.h"
 
 NSNotificationName const NSControlTextDidBeginEditingNotification = @"NSControlTextDidBeginEditingNotification";
@@ -38,6 +48,7 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     NSLineBreakMode _lineBreak;
     NSControlSize _controlSize;
     NSCell *_cell;
+    NSFormatter *_formatter;
 }
 
 /* Defaults for a new control; subclasses add theirs. Used both by
@@ -95,6 +106,8 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
         _target = [cell target];
     if ([cell action])
         _action = [cell action];
+    if ([cell formatter])
+        [self setFormatter:[cell formatter]];
 }
 
 + (Class)cellClass { return [NSActionCell class]; }
@@ -113,7 +126,20 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     [_value release];
     [_font release];
     [_cell release];
+    [_formatter release];
     [super dealloc];
+}
+
+/* The formatter is the cell's too, as on a Mac, where the control asks its cell. */
+- (NSFormatter *)formatter { return _formatter; }
+- (void)setFormatter:(NSFormatter *)f
+{
+    [f retain];
+    [_formatter release];
+    _formatter = f;
+    if ([_cell formatter] != f)
+        [_cell setFormatter:f];
+    [self setNeedsDisplay:YES];
 }
 
 - (id)target { return _target; }
@@ -176,6 +202,11 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
 }
 - (NSString *)stringValue
 {
+    if (_formatter && _value && ![_value isKindOfClass:[NSString class]]) {
+        NSString *s = [_formatter stringForObjectValue:_value];
+        if (s)
+            return s;
+    }
     if ([_value isKindOfClass:[NSString class]])
         return _value;
     if ([_value isKindOfClass:[NSAttributedString class]])
@@ -184,7 +215,17 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
         return [_value stringValue];
     return _value ? [_value description] : @"";
 }
-- (void)setStringValue:(NSString *)s { [self setObjectValue:s ?: @""]; }
+/* With a formatter, a string is read into the value it stands for; one the
+ * formatter can't read is kept as a string. */
+- (void)setStringValue:(NSString *)s
+{
+    id obj = nil;
+    if (_formatter && s && [_formatter getObjectValue:&obj forString:s errorDescription:NULL]) {
+        [self setObjectValue:obj];
+        return;
+    }
+    [self setObjectValue:s ?: @""];
+}
 - (NSAttributedString *)attributedStringValue
 {
     if ([_value isKindOfClass:[NSAttributedString class]])
@@ -522,6 +563,7 @@ static BOOL keeps_state(NSButtonType t)
         return;
     [self setNextState];
     [self _turnOffSiblings];
+    ABindingsPush(self, NO);
     [self sendAction:_action to:_target];
 }
 
@@ -764,6 +806,7 @@ static BOOL keeps_state(NSButtonType t)
     CGFloat _preferredWidth;
     /* editing */
     BOOL _editing, _began;
+    BOOL _dirty;                    /* typed since the value was last read from the text */
     NSInteger _movement;            /* how the editing is ending: an NSTextMovement */
     NSMutableString *_text;
     NSUInteger _caret, _anchor;     /* the selection runs between them */
@@ -920,9 +963,53 @@ static BOOL keeps_state(NSButtonType t)
 {
     [super setObjectValue:value];
     if (_editing) {
-        [_text setString:[super stringValue]];
+        [_text setString:[self _editingString]];
         _caret = _anchor = [_text length];
+        _dirty = NO;
     }
+}
+
+/* The text editing starts from: with a formatter, its editing string. */
+- (NSString *)_editingString
+{
+    if (_formatter && _value && ![_value isKindOfClass:[NSString class]]) {
+        NSString *s = [_formatter editingStringForObjectValue:_value];
+        if (s)
+            return s;
+    }
+    return [super stringValue];
+}
+
+/* What was typed becomes the value. With a formatter it is read with
+ * getObjectValue:forString:errorDescription:; if that fails and complain is
+ * YES, the field beeps and its delegate may accept the string as it is
+ * (control:didFailToFormatString:errorDescription:). The delegate may also
+ * refuse a value (control:isValidObject:). NO keeps the editing going. */
+- (BOOL)_commitText:(BOOL)complain
+{
+    NSString *s = [[_text copy] autorelease];
+    id obj = s;
+    if (_formatter) {
+        NSString *error = nil;
+        obj = nil;
+        if (![_formatter getObjectValue:&obj forString:s errorDescription:&error]) {
+            if (!complain)
+                return NO;
+            NSBeep();
+            if (![_delegate respondsToSelector:@selector(control:didFailToFormatString:errorDescription:)] ||
+                ![_delegate control:self didFailToFormatString:s errorDescription:error])
+                return NO;
+            obj = s;
+        }
+    }
+    if (complain && [_delegate respondsToSelector:@selector(control:isValidObject:)] &&
+        ![_delegate control:self isValidObject:obj]) {
+        NSBeep();
+        return NO;
+    }
+    [super setObjectValue:obj];
+    _dirty = NO;
+    return YES;
 }
 
 /* What is shown: bullets in a secure field. */
@@ -958,9 +1045,9 @@ static BOOL keeps_state(NSButtonType t)
 - (BOOL)becomeFirstResponder
 {
     _editing = YES;
-    _began = NO;
+    _began = _dirty = NO;
     [_text release];
-    _text = [[super stringValue] mutableCopy];
+    _text = [[self _editingString] mutableCopy];
     _anchor = 0;
     _caret = [_text length];     /* everything selected, as on a Mac */
     _scroll = 0;
@@ -995,8 +1082,9 @@ static BOOL keeps_state(NSButtonType t)
     if (!_editing)
         return;
     [super setObjectValue:value];
-    [_text setString:[super stringValue]];
+    [_text setString:[self _editingString]];
     _caret = _anchor = [_text length];
+    _dirty = NO;
     [self setNeedsDisplay:YES];
 }
 - (void)_placeCaretAtEnd
@@ -1017,10 +1105,18 @@ static BOOL keeps_state(NSButtonType t)
             _movement = NSTextMovementOther;
             return NO;
         }
+        /* a formatter that can't read the text keeps the editing going */
+        if (_movement != NSTextMovementCancel && (_dirty || !_formatter) && ![self _commitText:_dirty]) {
+            _movement = NSTextMovementOther;
+            return NO;
+        }
         [[self retain] autorelease];
-        NSString *s = [[_text copy] autorelease];
+        BOOL changed = _began && _movement != NSTextMovementCancel;
         _editing = NO;
-        [super setObjectValue:s];
+        if (_movement == NSTextMovementCancel && !_formatter)
+            [super setObjectValue:[[_text copy] autorelease]];
+        if (changed)
+            ABindingsPush(self, NO);
         /* in a table, the field's action is sent when editing ends with a
          * change, or by Return, so that its target can find the row with
          * rowForView: */
@@ -1047,8 +1143,8 @@ static BOOL keeps_state(NSButtonType t)
     NSTableView *table = [self _editingTable];
     if (table)
         return [table abortEditing];
-    _began = NO;
-    [_text setString:[super stringValue]];
+    _began = _dirty = NO;
+    [_text setString:[self _editingString]];
     _movement = NSTextMovementCancel;
     if ([[self window] firstResponder] == self)
         [[self window] makeFirstResponder:nil];
@@ -1056,11 +1152,12 @@ static BOOL keeps_state(NSButtonType t)
         [self resignFirstResponder];
     return YES;
 }
-/* What has been typed becomes the field's value; the editing goes on. */
+/* What has been typed becomes the field's value, if the formatter can read
+ * it; the editing goes on. */
 - (void)validateEditing
 {
-    if (_editing)
-        [super setObjectValue:[[_text copy] autorelease]];
+    if (_editing && (_dirty || !_formatter))
+        [self _commitText:NO];
 }
 
 - (void)selectText:(id)sender
@@ -1084,7 +1181,12 @@ static BOOL keeps_state(NSButtonType t)
         _began = YES;
         [self _post:NSControlTextDidBeginEditingNotification selector:@selector(controlTextDidBeginEditing:)];
     }
+    _dirty = YES;
     [self _post:NSControlTextDidChangeNotification selector:@selector(controlTextDidChange:)];
+    if (_continuous || ABindingsWantContinuous(self)) {
+        [self validateEditing];
+        ABindingsPush(self, YES);
+    }
     if (_continuous)
         [self sendAction:_action to:_target];
     [self setNeedsDisplay:YES];
@@ -1103,6 +1205,24 @@ static BOOL keeps_state(NSButtonType t)
         return;
     }
     NSRange r = [self _selection];
+    if (_formatter) {
+        /* the formatter may refuse the text as it would be, or give its own */
+        NSMutableString *proposed = [[_text mutableCopy] autorelease];
+        [proposed replaceCharactersInRange:r withString:s];
+        NSString *fixed = nil, *error = nil;
+        if (![_formatter isPartialStringValid:proposed newEditingString:&fixed errorDescription:&error]) {
+            if ([_delegate respondsToSelector:@selector(control:didFailToValidatePartialString:errorDescription:)])
+                [_delegate control:self didFailToValidatePartialString:proposed errorDescription:error];
+            if (!fixed) {
+                NSBeep();
+                return;
+            }
+            [_text setString:fixed];
+            _caret = _anchor = [_text length];
+            [self _changed];
+            return;
+        }
+    }
     [_text replaceCharactersInRange:r withString:s];
     _caret = _anchor = r.location + [s length];
     [self _changed];
@@ -1295,9 +1415,14 @@ static BOOL keeps_state(NSButtonType t)
         [self _replaceSelectionWith:@"\n"];
         return;
     }
-    [_text retain];
-    [super setObjectValue:[[_text copy] autorelease]];
-    [_text release];
+    if ((_dirty || !_formatter) && ![self _commitText:_dirty])
+        return;   /* the formatter couldn't read it: the editing goes on */
+    if (_formatter) {
+        /* shown again as the formatter writes it */
+        [_text setString:[self _editingString]];
+    }
+    if (_began)
+        ABindingsPush(self, NO);
     [self sendAction:_action to:_target];
     NSEvent *e = [[self window] currentEvent];
     if (e && [e type] == NSEventTypeKeyDown)

@@ -719,7 +719,8 @@ static BOOL i_isKindOfClass(id self, SEL _cmd, Class cls)
     return NO;
 }
 
-static BOOL i_isMemberOfClass(id self, SEL _cmd, Class cls) { (void)_cmd; return object_getClass(self) == cls; }
+/* by -class, so that an object in key-value observing's hidden subclass is still a member of its class */
+static BOOL i_isMemberOfClass(id self, SEL _cmd, Class cls) { (void)_cmd; return SEND0(Class, self, SEL_class) == cls; }
 
 BOOL class_respondsToSelector(Class cls, SEL sel);
 BOOL class_conformsToProtocol(Class cls, struct c_protocol *p);

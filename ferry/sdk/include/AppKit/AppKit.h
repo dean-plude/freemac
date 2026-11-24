@@ -678,7 +678,9 @@ typedef NS_ENUM(NSUInteger, NSCellImagePosition) {
 - (NSInteger)sendActionOn:(NSInteger)mask;
 @property NSInteger tag;
 @property (getter=isEnabled) BOOL enabled;
-@property (retain) id formatter; /* kept, not applied yet */
+/* Shows the value with stringForObjectValue: and reads what is typed with
+ * getObjectValue:forString:errorDescription: (Ferry 0.17.0). */
+@property (retain) __kindof NSFormatter *formatter;
 @property (copy) id objectValue;
 @property (copy) NSString *stringValue;
 @property (copy) NSAttributedString *attributedStringValue;
@@ -765,6 +767,7 @@ typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
 @property (retain) NSImage *image;
 @property NSBackgroundStyle backgroundStyle;
 @property (readonly) NSBackgroundStyle interiorBackgroundStyle;
+@property (retain) __kindof NSFormatter *formatter;
 @end
 
 @interface NSActionCell : NSCell
@@ -870,6 +873,13 @@ typedef NS_ENUM(NSUInteger, NSTextFieldBezelStyle) { NSTextFieldSquareBezel = 0,
 /* fieldEditor is nil in Ferry: a text field edits its own text */
 - (BOOL)control:(NSControl *)control textShouldBeginEditing:(id)fieldEditor;
 - (BOOL)control:(NSControl *)control textShouldEndEditing:(id)fieldEditor;
+/* The control's formatter couldn't read what was typed: YES keeps the
+ * string as the value, NO (or no answer) keeps the editing going. */
+- (BOOL)control:(NSControl *)control didFailToFormatString:(NSString *)string
+    errorDescription:(NSString *)error;
+- (void)control:(NSControl *)control didFailToValidatePartialString:(NSString *)string
+    errorDescription:(NSString *)error;
+- (BOOL)control:(NSControl *)control isValidObject:(id)obj;
 @end
 @protocol NSTextFieldDelegate <NSControlTextEditingDelegate>
 @end
@@ -1249,7 +1259,8 @@ typedef NSString *NSNibName;
 /* Loads its view from a nib (named after the class unless given) the first
  * time the view is asked for, and sits between the view and its superview
  * in the responder chain. Sheets and popovers are shown as windows. */
-/* Controllers for bindings: the user's defaults by key. */
+/* Controllers for bindings: one object (NSObjectController), and the
+ * user's defaults by key (NSUserDefaultsController). */
 @interface NSController : NSObject <NSCoding>
 - (BOOL)commitEditing;
 - (void)discardEditing;
@@ -1269,6 +1280,27 @@ typedef NSString *NSNibName;
 - (void)revert:(id)sender;
 - (void)revertToInitialValues:(id)sender;
 @end
+/* Holds one content object; bind to "selection.someKey" to reach its keys
+ * (NSNoSelectionMarker while there is no content). */
+@interface NSObjectController : NSController
+- (instancetype)initWithContent:(id)content;
+@property (retain) id content;
+@property (readonly, retain) id selection;
+@property (readonly, copy) NSArray *selectedObjects;
+@property (assign) Class objectClass;
+@property BOOL automaticallyPreparesContent;
+@property (getter=isEditable) BOOL editable;
+@property (readonly) BOOL canAdd, canRemove;
+- (id)newObject;
+- (void)prepareContent;
+- (void)addObject:(id)object;
+- (void)removeObject:(id)object;
+- (IBAction)add:(id)sender;
+- (IBAction)remove:(id)sender;
+@end
+/* What a controller's selection answers when there is no single value. */
+APPKIT_EXTERN id NSMultipleValuesMarker, NSNoSelectionMarker, NSNotApplicableMarker;
+APPKIT_EXTERN BOOL NSIsControllerMarker(id object);
 
 @interface NSViewController : NSResponder <NSCoding>
 - (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle;
@@ -1330,10 +1362,21 @@ typedef NSString *NSNibName;
 - (void)prepareForInterfaceBuilder;
 @end
 
-/* Cocoa bindings: recorded, and the bound value set once (no observing yet). */
+/* Cocoa bindings (NSKeyValueBinding.m): a binding follows its key path by
+ * key-value observing and writes the user's changes back to it. */
 APPKIT_EXTERN NSString *const NSObservedObjectKey, *const NSObservedKeyPathKey, *const NSOptionsKey;
 APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NSHiddenBinding, *const NSTitleBinding,
-    *const NSContentBinding, *const NSSelectedIndexBinding, *const NSToolTipBinding;
+    *const NSContentBinding, *const NSSelectedIndexBinding, *const NSToolTipBinding, *const NSSelectedObjectBinding,
+    *const NSSelectedValueBinding, *const NSSelectedTagBinding, *const NSContentValuesBinding,
+    *const NSContentObjectBinding, *const NSContentObjectsBinding, *const NSEditableBinding,
+    *const NSMinValueBinding, *const NSMaxValueBinding, *const NSTextColorBinding, *const NSImageBinding,
+    *const NSAlternateTitleBinding, *const NSFontBinding;
+APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelectionPlaceholderBindingOption,
+    *const NSMultipleValuesPlaceholderBindingOption, *const NSNotApplicablePlaceholderBindingOption,
+    *const NSValueTransformerNameBindingOption, *const NSValueTransformerBindingOption,
+    *const NSContinuouslyUpdatesValueBindingOption, *const NSRaisesForNotApplicableKeysBindingOption,
+    *const NSConditionallySetsEnabledBindingOption, *const NSConditionallySetsEditableBindingOption,
+    *const NSAllowsEditingMultipleValuesSelectionBindingOption, *const NSValidatesImmediatelyBindingOption;
 @interface NSObject (NSKeyValueBindingCreation)
 + (void)exposeBinding:(NSString *)binding;
 @property (readonly, copy) NSArray<NSString *> *exposedBindings;
@@ -2651,6 +2694,43 @@ typedef NS_ENUM(NSInteger, NSSegmentDistribution) {
 - (NSInteger)tagForSegment:(NSInteger)segment;
 - (void)setAlignment:(NSTextAlignment)alignment forSegment:(NSInteger)segment;
 - (NSTextAlignment)alignmentForSegment:(NSInteger)segment;
+@end
+
+/* Sliders (NSSlider.m, Ferry 0.17.0): a value between minValue and
+ * maxValue (0 and 1 unless set), with tick marks if asked for. */
+typedef NS_ENUM(NSUInteger, NSTickMarkPosition) {
+    NSTickMarkPositionBelow = 0, NSTickMarkPositionAbove = 1,
+    NSTickMarkPositionLeading = 1, NSTickMarkPositionTrailing = 0,
+};
+#define NSTickMarkBelow NSTickMarkPositionBelow
+#define NSTickMarkAbove NSTickMarkPositionAbove
+#define NSTickMarkLeft NSTickMarkPositionLeading
+#define NSTickMarkRight NSTickMarkPositionTrailing
+typedef NS_ENUM(NSUInteger, NSSliderType) { NSSliderTypeLinear = 0, NSSliderTypeCircular = 1 };
+@interface NSSliderCell : NSActionCell
+@property double minValue, maxValue, altIncrementValue;
+@property NSInteger numberOfTickMarks;
+@property BOOL allowsTickMarkValuesOnly;
+@property NSTickMarkPosition tickMarkPosition;
+@property NSSliderType sliderType;
+@property (getter=isVertical) BOOL vertical;
+@end
+@interface NSSlider : NSControl
++ (instancetype)sliderWithTarget:(id)target action:(SEL)action;
++ (instancetype)sliderWithValue:(double)value minValue:(double)min maxValue:(double)max target:(id)target
+                         action:(SEL)action;
+@property double minValue, maxValue, altIncrementValue;
+@property (readonly) double knobThickness;
+@property NSInteger numberOfTickMarks;
+@property BOOL allowsTickMarkValuesOnly;
+@property NSTickMarkPosition tickMarkPosition;
+@property NSSliderType sliderType;
+@property (getter=isVertical) BOOL vertical;
+@property (copy) NSColor *trackFillColor;
+- (double)tickMarkValueAtIndex:(NSInteger)index;
+- (double)closestTickMarkValueToValue:(double)value;
+- (NSRect)rectOfTickMarkAtIndex:(NSInteger)index;
+- (NSInteger)indexOfTickMarkAtPoint:(NSPoint)point;
 @end
 
 /* A text field for searching: a magnifying glass, a placeholder, and a

@@ -136,104 +136,358 @@ NSString *FDescribe(id obj, int indent)
 
 /* ---- NSObject ------------------------------------------------------------------------ */
 
+/* The array mutableArrayValueForKey: answers (defined after NSObject's methods). */
+@interface FKVCArrayProxy : NSMutableArray {
+    id _object;
+    NSString *_key;
+    SEL _insert, _remove, _replace, _setter;
+}
+- (instancetype)_initWithObject:(id)object key:(NSString *)key;
+@end
+
+
 @implementation NSObject (NSObjectFoundation)
-- (NSString *)description { return [NSString stringWithFormat:@"<%s: %p>", object_getClassName(self), self]; }
+- (NSString *)description { return [NSString stringWithFormat:@"<%@: %p>", [self class], self]; }
 - (NSString *)debugDescription { return [self description]; }
 + (NSString *)description { return [NSString stringWithUTF8String:class_getName(self)]; }
 + (NSString *)debugDescription { return [self description]; }
-- (NSString *)className { return [NSString stringWithUTF8String:object_getClassName(self)]; }
+- (NSString *)className { return NSStringFromClass([self class]); }
 
-static id box(id self, SEL sel, char type)
+/* ---- key-value coding ---------------------------------------------------------------
+ * The search orders of Apple's "Key-Value Coding Programming Guide": for a
+ * value, get<Key>, <key>, is<Key> and _<key>, then (when the class allows
+ * it, as by default) the instance variables _<key>, _is<Key>, <key> and
+ * is<Key>; for setting, set<Key>: and _set<Key>:, then the same variables.
+ * Scalars, and points, sizes, rects and ranges, come and go as NSNumber
+ * and NSValue. Setting a variable directly notifies observers unless the
+ * class says not to; a setter notifies through key-value observing's
+ * hidden subclass (NSKeyValueObserving.m). */
+
+/* The boxed value of a scalar or struct at p, of type t. */
+static id box_at(const void *p, const char *t)
 {
-    switch (type) {
+    switch (*t) {
     case '@':
-    case '#': return ((id (*)(id, SEL))objc_msgSend)(self, sel);
-    case 'c':
-    case 'B': return [NSNumber numberWithBool:((BOOL (*)(id, SEL))objc_msgSend)(self, sel)];
-    case 'i': return [NSNumber numberWithInt:((int (*)(id, SEL))objc_msgSend)(self, sel)];
-    case 'I': return [NSNumber numberWithUnsignedInt:((unsigned (*)(id, SEL))objc_msgSend)(self, sel)];
-    case 's': return [NSNumber numberWithShort:((short (*)(id, SEL))objc_msgSend)(self, sel)];
+    case '#': return *(id *)p;
+    case 'c': return [NSNumber numberWithChar:*(const char *)p];
+    case 'B': return [NSNumber numberWithBool:*(const BOOL *)p];
+    case 'C': return [NSNumber numberWithUnsignedChar:*(const unsigned char *)p];
+    case 's': return [NSNumber numberWithShort:*(const short *)p];
+    case 'S': return [NSNumber numberWithUnsignedShort:*(const unsigned short *)p];
+    case 'i': return [NSNumber numberWithInt:*(const int *)p];
+    case 'I': return [NSNumber numberWithUnsignedInt:*(const unsigned *)p];
     case 'q':
-    case 'l': return [NSNumber numberWithLongLong:((long long (*)(id, SEL))objc_msgSend)(self, sel)];
+    case 'l': return [NSNumber numberWithLongLong:*(const long long *)p];
     case 'Q':
-    case 'L': return [NSNumber numberWithUnsignedLongLong:((unsigned long long (*)(id, SEL))objc_msgSend)(self, sel)];
-    case 'f': return [NSNumber numberWithFloat:((float (*)(id, SEL))objc_msgSend)(self, sel)];
-    case 'd': return [NSNumber numberWithDouble:((double (*)(id, SEL))objc_msgSend)(self, sel)];
+    case 'L': return [NSNumber numberWithUnsignedLongLong:*(const unsigned long long *)p];
+    case 'f': return [NSNumber numberWithFloat:*(const float *)p];
+    case 'd': return [NSNumber numberWithDouble:*(const double *)p];
+    case '{':
+        if (!strncmp(t, "{CGPoint=", 9) || !strncmp(t, "{_NSPoint=", 10))
+            return [NSValue valueWithPoint:*(const NSPoint *)p];
+        if (!strncmp(t, "{CGSize=", 8) || !strncmp(t, "{_NSSize=", 9))
+            return [NSValue valueWithSize:*(const NSSize *)p];
+        if (!strncmp(t, "{CGRect=", 8) || !strncmp(t, "{_NSRect=", 9))
+            return [NSValue valueWithRect:*(const NSRect *)p];
+        if (!strncmp(t, "{_NSRange=", 10))
+            return [NSValue valueWithRange:*(const NSRange *)p];
+        return nil;
     }
     return nil;
 }
 
-- (id)valueForKey:(NSString *)key
+/* Stores a boxed value at p as type t; NO if the type isn't one KVC knows. */
+static BOOL unbox_to(void *p, const char *t, id v)
 {
-    const char *k = [key UTF8String];
-    Class cls = object_getClass(self);
-    char name[256];
-    SEL sel = sel_registerName(k);
-    Method m = class_getInstanceMethod(cls, sel);
-    if (!m && k[0]) {
-        snprintf(name, sizeof name, "is%c%s", toupper((unsigned char)k[0]), k + 1);
-        sel = sel_registerName(name);
-        m = class_getInstanceMethod(cls, sel);
+    switch (*t) {
+    case 'c': *(char *)p = [v charValue]; return YES;
+    case 'B': *(BOOL *)p = [v boolValue]; return YES;
+    case 'C': *(unsigned char *)p = [v unsignedCharValue]; return YES;
+    case 's': *(short *)p = [v shortValue]; return YES;
+    case 'S': *(unsigned short *)p = [v unsignedShortValue]; return YES;
+    case 'i': *(int *)p = [v intValue]; return YES;
+    case 'I': *(unsigned *)p = [v unsignedIntValue]; return YES;
+    case 'q':
+    case 'l': *(long long *)p = [v longLongValue]; return YES;
+    case 'Q':
+    case 'L': *(unsigned long long *)p = [v unsignedLongLongValue]; return YES;
+    case 'f': *(float *)p = [v floatValue]; return YES;
+    case 'd': *(double *)p = [v doubleValue]; return YES;
+    case '{':
+        if (!strncmp(t, "{CGPoint=", 9) || !strncmp(t, "{_NSPoint=", 10))
+            *(NSPoint *)p = [v pointValue];
+        else if (!strncmp(t, "{CGSize=", 8) || !strncmp(t, "{_NSSize=", 9))
+            *(NSSize *)p = [v sizeValue];
+        else if (!strncmp(t, "{CGRect=", 8) || !strncmp(t, "{_NSRect=", 9))
+            *(NSRect *)p = [v rectValue];
+        else if (!strncmp(t, "{_NSRange=", 10))
+            *(NSRange *)p = [v rangeValue];
+        else
+            return NO;
+        return YES;
     }
-    if (m)
-        return box(self, sel, method_getTypeEncoding(m)[0]);
-    snprintf(name, sizeof name, "_%s", k);
-    Ivar v = class_getInstanceVariable(cls, name);
-    if (!v)
-        v = class_getInstanceVariable(cls, k);
-    if (v && ivar_getTypeEncoding(v)[0] == '@')
-        return object_getIvar(self, v);
-    FRaise(@"NSUnknownKeyException", @"[<%s %p> valueForUndefinedKey:]: this class is not key value coding-compliant "
-                                     @"for the key %@.",
-           object_getClassName(self), self, key);
+    return NO;
 }
 
-/* Observers of the key hear of the change (NSKeyValueObserving.m). */
-- (void)setValue:(id)value forKey:(NSString *)key
+static BOOL is_pair(const char *t)
 {
-    BOOL observed = FKVOIsObserved(self);
-    if (observed)
-        [self willChangeValueForKey:key];
-    [self _ferrySetValue:value forKey:key];
-    if (observed)
-        [self didChangeValueForKey:key];
+    return !strncmp(t, "{CGPoint=", 9) || !strncmp(t, "{_NSPoint=", 10) || !strncmp(t, "{CGSize=", 8) ||
+           !strncmp(t, "{_NSSize=", 9);
 }
-- (void)_ferrySetValue:(id)value forKey:(NSString *)key
+static BOOL is_rect(const char *t) { return !strncmp(t, "{CGRect=", 8) || !strncmp(t, "{_NSRect=", 9); }
+static BOOL is_range(const char *t) { return !strncmp(t, "{_NSRange=", 10); }
+
+/* The value a getter returns, boxed. */
+static id box(id self, SEL sel, const char *t)
 {
-    const char *k = [key UTF8String];
-    char name[256];
-    snprintf(name, sizeof name, "set%c%s:", toupper((unsigned char)k[0]), k + 1);
-    SEL sel = sel_registerName(name);
-    Method m = class_getInstanceMethod(object_getClass(self), sel);
-    if (m) {
-        char t[16];
-        method_getArgumentType(m, 2, t, sizeof t);
-        switch (t[0]) {
-        case '@': ((void (*)(id, SEL, id))objc_msgSend)(self, sel, value); return;
-        case 'c':
-        case 'B': ((void (*)(id, SEL, BOOL))objc_msgSend)(self, sel, [value boolValue]); return;
-        case 'i': ((void (*)(id, SEL, int))objc_msgSend)(self, sel, [value intValue]); return;
-        case 'q':
-        case 'Q':
-        case 'l':
-        case 'L': ((void (*)(id, SEL, long long))objc_msgSend)(self, sel, [value longLongValue]); return;
-        case 'f': ((void (*)(id, SEL, float))objc_msgSend)(self, sel, [value floatValue]); return;
-        case 'd': ((void (*)(id, SEL, double))objc_msgSend)(self, sel, [value doubleValue]); return;
+    switch (*t) {
+    case '@':
+    case '#': return ((id (*)(id, SEL))objc_msgSend)(self, sel);
+    case 'c':
+    case 'B':
+    case 'C': {
+        unsigned char v = ((unsigned char (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case 's':
+    case 'S': {
+        unsigned short v = ((unsigned short (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case 'i':
+    case 'I': {
+        unsigned v = ((unsigned (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case 'q':
+    case 'l':
+    case 'Q':
+    case 'L': {
+        long long v = ((long long (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case 'f': {
+        float v = ((float (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case 'd': {
+        double v = ((double (*)(id, SEL))objc_msgSend)(self, sel);
+        return box_at(&v, t);
+    }
+    case '{':
+        if (is_pair(t)) {
+            NSPoint v = ((NSPoint (*)(id, SEL))objc_msgSend)(self, sel);
+            return box_at(&v, t);
+        }
+        if (is_rect(t)) {
+            NSRect v = ((NSRect (*)(id, SEL))objc_msgSend_stret)(self, sel);
+            return box_at(&v, t);
+        }
+        if (is_range(t)) {
+            NSRange v = ((NSRange (*)(id, SEL))objc_msgSend)(self, sel);
+            return box_at(&v, t);
+        }
+        return nil;
+    }
+    return nil;
+}
+
+static NSString *capitalized(NSString *key)
+{
+    return [[[key substringToIndex:1] uppercaseString] stringByAppendingString:[key substringFromIndex:1]];
+}
+
+/* The instance variable KVC would use for key: _<key>, _is<Key>, <key>, is<Key>. */
+static Ivar kvc_ivar(Class cls, NSString *key)
+{
+    if (![cls accessInstanceVariablesDirectly])
+        return NULL;
+    NSString *Key = capitalized(key);
+    NSString *names[] = {[@"_" stringByAppendingString:key], [@"_is" stringByAppendingString:Key], key,
+                         [@"is" stringByAppendingString:Key]};
+    for (int i = 0; i < 4; i++) {
+        Ivar v = class_getInstanceVariable(cls, [names[i] UTF8String]);
+        if (v)
+            return v;
+    }
+    return NULL;
+}
+
+/* A getter with no arguments named for key, if there is one. */
+static SEL kvc_getter(Class cls, NSString *key, Method *out)
+{
+    NSString *Key = capitalized(key);
+    NSString *names[] = {[@"get" stringByAppendingString:Key], key, [@"is" stringByAppendingString:Key],
+                         [@"_" stringByAppendingString:key]};
+    for (int i = 0; i < 4; i++) {
+        SEL sel = NSSelectorFromString(names[i]);
+        Method m = class_getInstanceMethod(cls, sel);
+        if (m && method_getNumberOfArguments(m) == 2) {
+            *out = m;
+            return sel;
         }
     }
-    snprintf(name, sizeof name, "_%s", k);
-    Ivar v = class_getInstanceVariable(object_getClass(self), name);
-    if (!v)
-        v = class_getInstanceVariable(object_getClass(self), k);
-    if (v && ivar_getTypeEncoding(v)[0] == '@') {
-        id old = object_getIvar(self, v);
-        object_setIvar(self, v, [value retain]);
-        [old release];
+    return NULL;
+}
+
+/* Sends a one-argument setter whose argument has type t; NO if KVC can't. */
+static BOOL send_setter(id self, SEL sel, const char *t, id value)
+{
+    switch (*t) {
+    case '@':
+    case '#': ((void (*)(id, SEL, id))objc_msgSend)(self, sel, value); return YES;
+    case 'B': ((void (*)(id, SEL, int))objc_msgSend)(self, sel, [value boolValue]); return YES;
+    case 'c':
+    case 'C': ((void (*)(id, SEL, int))objc_msgSend)(self, sel, [value charValue]); return YES;
+    case 's':
+    case 'S': ((void (*)(id, SEL, int))objc_msgSend)(self, sel, [value shortValue]); return YES;
+    case 'i':
+    case 'I': ((void (*)(id, SEL, int))objc_msgSend)(self, sel, [value intValue]); return YES;
+    case 'q':
+    case 'Q':
+    case 'l':
+    case 'L': ((void (*)(id, SEL, long long))objc_msgSend)(self, sel, [value longLongValue]); return YES;
+    case 'f': ((void (*)(id, SEL, float))objc_msgSend)(self, sel, [value floatValue]); return YES;
+    case 'd': ((void (*)(id, SEL, double))objc_msgSend)(self, sel, [value doubleValue]); return YES;
+    case '{':
+        if (!strncmp(t, "{CGSize=", 8) || !strncmp(t, "{_NSSize=", 9)) {
+            ((void (*)(id, SEL, NSSize))objc_msgSend)(self, sel, [value sizeValue]);
+            return YES;
+        }
+        if (is_pair(t)) {
+            ((void (*)(id, SEL, NSPoint))objc_msgSend)(self, sel, [value pointValue]);
+            return YES;
+        }
+        if (is_rect(t)) {
+            ((void (*)(id, SEL, NSRect))objc_msgSend)(self, sel, [value rectValue]);
+            return YES;
+        }
+        if (is_range(t)) {
+            ((void (*)(id, SEL, NSRange))objc_msgSend)(self, sel, [value rangeValue]);
+            return YES;
+        }
+        return NO;
+    }
+    return NO;
+}
+
+- (id)valueForKey:(NSString *)key
+{
+    if (![key length])
+        return [self valueForUndefinedKey:key];
+    Class cls = object_getClass(self);
+    Method m = NULL;
+    SEL sel = kvc_getter(cls, key, &m);
+    if (sel) {
+        char t[256];
+        method_getReturnType(m, t, sizeof t);
+        return box(self, sel, t);
+    }
+    Ivar v = kvc_ivar(cls, key);
+    if (v)
+        return box_at((char *)self + ivar_getOffset(v), ivar_getTypeEncoding(v));
+    return [self valueForUndefinedKey:key];
+}
+- (id)valueForUndefinedKey:(NSString *)key
+{
+    FRaise(@"NSUnknownKeyException", @"[<%@ %p> valueForUndefinedKey:]: this class is not key value coding-compliant "
+                                     @"for the key %@.",
+           [self class], self, key);
+}
++ (BOOL)accessInstanceVariablesDirectly { return YES; }
+
+- (void)setValue:(id)value forKey:(NSString *)key
+{
+    if (![key length]) {
+        [self setValue:value forUndefinedKey:key];
         return;
     }
-    FRaise(@"NSUnknownKeyException", @"[<%s %p> setValue:forUndefinedKey:]: this class is not key value "
+    Class cls = object_getClass(self);
+    NSString *Key = capitalized(key);
+    NSString *setters[] = {[NSString stringWithFormat:@"set%@:", Key], [NSString stringWithFormat:@"_set%@:", Key]};
+    for (int i = 0; i < 2; i++) {
+        SEL sel = NSSelectorFromString(setters[i]);
+        Method m = class_getInstanceMethod(cls, sel);
+        if (!m || method_getNumberOfArguments(m) != 3)
+            continue;
+        char t[256];
+        method_getArgumentType(m, 2, t, sizeof t);
+        if (!value && *t != '@' && *t != '#') {
+            [self setNilValueForKey:key];
+            return;
+        }
+        if (send_setter(self, sel, t, value))
+            return;
+    }
+    Ivar v = kvc_ivar(cls, key);
+    if (v) {
+        const char *t = ivar_getTypeEncoding(v);
+        if (*t != '@' && !value) {
+            [self setNilValueForKey:key];
+            return;
+        }
+        BOOL notifies = [[self class] automaticallyNotifiesObserversForKey:key];
+        if (notifies)
+            [self willChangeValueForKey:key];
+        if (*t == '@') {
+            id old = object_getIvar(self, v);
+            object_setIvar(self, v, [value retain]);
+            [old release];
+        } else {
+            unbox_to((char *)self + ivar_getOffset(v), t, value);
+        }
+        if (notifies)
+            [self didChangeValueForKey:key];
+        return;
+    }
+    [self setValue:value forUndefinedKey:key];
+}
+- (void)setValue:(id)value forUndefinedKey:(NSString *)key
+{
+    FRaise(@"NSUnknownKeyException", @"[<%@ %p> setValue:forUndefinedKey:]: this class is not key value "
                                      @"coding-compliant for the key %@.",
-           object_getClassName(self), self, key);
+           [self class], self, key);
+}
+- (void)setNilValueForKey:(NSString *)key
+{
+    FRaise(NSInvalidArgumentException, @"[<%@ %p> setNilValueForKey]: could not set nil as the value for the key %@.",
+           [self class], self, key);
+}
+
+/* validate<Key>:error:, if the class has it. */
+- (BOOL)validateValue:(id *)value forKey:(NSString *)key error:(NSError **)error
+{
+    if (![key length])
+        return YES;
+    SEL sel = NSSelectorFromString([NSString stringWithFormat:@"validate%@:error:", capitalized(key)]);
+    if ([self respondsToSelector:sel])
+        return ((BOOL (*)(id, SEL, id *, NSError **))objc_msgSend)(self, sel, value, error);
+    return YES;
+}
+- (BOOL)validateValue:(id *)value forKeyPath:(NSString *)path error:(NSError **)error
+{
+    NSRange dot = [path rangeOfString:@"." options:NSBackwardsSearch];
+    if (dot.location == NSNotFound)
+        return [self validateValue:value forKey:path error:error];
+    return [[self valueForKeyPath:[path substringToIndex:dot.location]]
+        validateValue:value
+               forKey:[path substringFromIndex:dot.location + 1]
+                error:error];
+}
+
+- (NSDictionary *)dictionaryWithValuesForKeys:(NSArray *)keys
+{
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    for (NSString *k in keys)
+        [d setObject:[self valueForKey:k] ?: (id)[NSNull null] forKey:k];
+    return d;
+}
+- (void)setValuesForKeysWithDictionary:(NSDictionary *)values
+{
+    for (NSString *k in values) {
+        id v = [values objectForKey:k];
+        [self setValue:v == [NSNull null] ? nil : v forKey:k];
+    }
 }
 
 /* "a.b.c": each key in turn, from the object the one before gave. */
@@ -254,6 +508,132 @@ static id box(id self, SEL sel, char type)
     }
     [[self valueForKeyPath:[path substringToIndex:dot.location]] setValue:value
                                                                    forKey:[path substringFromIndex:dot.location + 1]];
+}
+
+- (NSMutableArray *)mutableArrayValueForKey:(NSString *)key
+{
+    return [[[FKVCArrayProxy alloc] _initWithObject:self key:key] autorelease];
+}
+- (NSMutableArray *)mutableArrayValueForKeyPath:(NSString *)path
+{
+    NSRange dot = [path rangeOfString:@"." options:NSBackwardsSearch];
+    if (dot.location == NSNotFound)
+        return [self mutableArrayValueForKey:path];
+    return [[self valueForKeyPath:[path substringToIndex:dot.location]]
+        mutableArrayValueForKey:[path substringFromIndex:dot.location + 1]];
+}
+@end
+
+/* ---- mutableArrayValueForKey: -----------------------------------------------------
+ * A mutable array standing for an object's to-many key. As Apple's guide
+ * describes, changes go through the object's indexed mutators
+ * (insertObject:in<Key>AtIndex: and removeObjectFrom<Key>AtIndex:, and
+ * replaceObjectIn<Key>AtIndex:withObject: if it has it), else through
+ * set<Key>: with a changed copy, else straight to an NSMutableArray
+ * instance variable, announced to observers as insertions, removals and
+ * replacements at their indexes. */
+@implementation FKVCArrayProxy
+- (instancetype)_initWithObject:(id)object key:(NSString *)key
+{
+    if ((self = [super init])) {
+        _object = [object retain];
+        _key = [key copy];
+        NSString *Key = capitalized(key);
+        SEL ins = NSSelectorFromString([NSString stringWithFormat:@"insertObject:in%@AtIndex:", Key]);
+        SEL rem = NSSelectorFromString([NSString stringWithFormat:@"removeObjectFrom%@AtIndex:", Key]);
+        if ([object respondsToSelector:ins] && [object respondsToSelector:rem]) {
+            _insert = ins;
+            _remove = rem;
+            SEL rep = NSSelectorFromString([NSString stringWithFormat:@"replaceObjectIn%@AtIndex:withObject:", Key]);
+            if ([object respondsToSelector:rep])
+                _replace = rep;
+        } else {
+            SEL set = NSSelectorFromString([NSString stringWithFormat:@"set%@:", Key]);
+            if ([object respondsToSelector:set])
+                _setter = set;
+        }
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_object release];
+    [_key release];
+    [super dealloc];
+}
+- (NSArray *)_current { return [_object valueForKey:_key]; }
+- (NSUInteger)count { return [[self _current] count]; }
+- (id)objectAtIndex:(NSUInteger)i { return [[self _current] objectAtIndex:i]; }
+/* The array itself, when it is kept straight in an instance variable. */
+- (NSMutableArray *)_storage
+{
+    Ivar v = kvc_ivar(object_getClass(_object), _key);
+    if (!v || ivar_getTypeEncoding(v)[0] != '@')
+        FRaise(@"NSUnknownKeyException", @"[<%@ %p> mutableArrayValueForKey:]: the key %@ can't be changed.",
+               [_object class], _object, _key);
+    id a = object_getIvar(_object, v);
+    if (!a) {
+        a = [[NSMutableArray alloc] init];
+        object_setIvar(_object, v, a);
+    }
+    if (![a isKindOfClass:[NSMutableArray class]])
+        FRaise(NSInternalInconsistencyException, @"the instance variable for %@ isn't a mutable array", _key);
+    return a;
+}
+- (void)_change:(NSKeyValueChange)kind at:(NSUInteger)i with:(id)obj
+{
+    if (_setter) {
+        NSMutableArray *copy = [[[self _current] mutableCopy] autorelease] ?: [NSMutableArray array];
+        if (kind == NSKeyValueChangeInsertion)
+            [copy insertObject:obj atIndex:i];
+        else if (kind == NSKeyValueChangeRemoval)
+            [copy removeObjectAtIndex:i];
+        else
+            [copy replaceObjectAtIndex:i withObject:obj];
+        ((void (*)(id, SEL, id))objc_msgSend)(_object, _setter, copy);
+        return;
+    }
+    NSMutableArray *a = [self _storage];
+    BOOL notifies = [[_object class] automaticallyNotifiesObserversForKey:_key];
+    NSIndexSet *at = [NSIndexSet indexSetWithIndex:i];
+    if (notifies)
+        [_object willChange:kind valuesAtIndexes:at forKey:_key];
+    if (kind == NSKeyValueChangeInsertion)
+        [a insertObject:obj atIndex:i];
+    else if (kind == NSKeyValueChangeRemoval)
+        [a removeObjectAtIndex:i];
+    else
+        [a replaceObjectAtIndex:i withObject:obj];
+    if (notifies)
+        [_object didChange:kind valuesAtIndexes:at forKey:_key];
+}
+- (void)insertObject:(id)obj atIndex:(NSUInteger)i
+{
+    if (!obj)
+        FRaise(NSInvalidArgumentException, @"*** -[NSKeyValueArray insertObject:atIndex:]: object cannot be nil");
+    if (_insert)
+        ((void (*)(id, SEL, id, NSUInteger))objc_msgSend)(_object, _insert, obj, i);
+    else
+        [self _change:NSKeyValueChangeInsertion at:i with:obj];
+}
+- (void)removeObjectAtIndex:(NSUInteger)i
+{
+    if (_remove)
+        ((void (*)(id, SEL, NSUInteger))objc_msgSend)(_object, _remove, i);
+    else
+        [self _change:NSKeyValueChangeRemoval at:i with:nil];
+}
+- (void)replaceObjectAtIndex:(NSUInteger)i withObject:(id)obj
+{
+    if (_replace)
+        ((void (*)(id, SEL, NSUInteger, id))objc_msgSend)(_object, _replace, i, obj);
+    else if (_insert) {
+        [obj retain];
+        ((void (*)(id, SEL, NSUInteger))objc_msgSend)(_object, _remove, i);
+        ((void (*)(id, SEL, id, NSUInteger))objc_msgSend)(_object, _insert, obj, i);
+        [obj release];
+    } else
+        [self _change:NSKeyValueChangeReplacement at:i with:obj];
 }
 @end
 

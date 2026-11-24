@@ -15,7 +15,7 @@
 - (void)rename:(NSString *)n
 {
     [self willChangeValueForKey:@"name"];
-    self.name = n;    /* the setter itself doesn't announce it: done around it */
+    _name = [n copy];   /* set straight, so announced around it */
     [self didChangeValueForKey:@"name"];
 }
 @end

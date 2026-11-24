@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.184 "Ferry: observing, bindings and formatters" (done)
+
+Mac programs whose windows follow their data by themselves, through
+key-value observing and Cocoa bindings, and fields that only take numbers
+or dates, now work the way they do on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Automatic key-value observing: an observed object's setters announce changes, with dependent keys, the Prior, Initial, Old and New options, nested changes, key paths through a replaced object, and array changes at indexes | Ferry Foundation | done |
+| 2 | Two-way bindings on text fields, buttons, pop-up buttons and the new slider, with placeholders and the value transformers; `NSObjectController`, `NSUserDefaultsController` and bindings made from nibs | Ferry AppKit | done |
+| 3 | Formatters on fields, cells and table cells: shown, edited, checked as you type, with a beep and the delegate's say when text can't be read | Ferry AppKit | done |
+| 4 | Ferry 0.17.0, tests `foundation_kvo_auto`, `appkit_formatters` and `appkit_binding_controls` (82 tests) | Ferry, Docs | done |
+
 ## 1.183 "Summary Info" (done)
 
 | # | Item | Component | Status |

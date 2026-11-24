@@ -71,10 +71,11 @@ framework Ferry doesn't have (Carbon, IOKit, Security, WebKit, Quartz...).
   `LC_DYLD_INFO`, and the message references of that era's compilers).
 - Nibs in the `NIBArchive` form.
 - Smaller pieces the apps hit: key paths, `NSValueTransformer`, Cocoa
-  bindings (set once, not yet kept up to date), `NSUserDefaults` through
+  bindings (at M6 set once and not kept up to date; they follow values since
+  the work after M7 and write edits back from (1.184)), `NSUserDefaults` through
   key-value coding, `+[NSValue valueWithNonretainedObject:]`,
   `-[NSDictionary initWithContentsOfFile:]`, `atexit`, a control's
-  `formatter`.
+  `formatter` (applied from (1.184)).
 
 ## What M7 changed
 
@@ -291,6 +292,30 @@ untitled, into Autosave Information), stays edited until it's saved, closes
 without asking, and gets Revert To > Last Saved Version, which puts back
 the file as it was last saved. Versions (Browse All Versions) are still
 left out. None of the nine apps has been run again since.
+
+### Key-value observing, bindings and formatters ((1.184), Ferry 0.17.0)
+
+Key-value observing is now automatic: the first observer of an object
+moves it to a hidden subclass (`NSKVONotifying_` and the class's name,
+while `class` still answers the original) whose setters announce the
+change, so a class's own setter called directly notifies its observers.
+Dependent keys (`keyPathsForValuesAffectingValueForKey:` and
+`keyPathsForValuesAffecting<Key>`) are followed, the Prior, Initial, Old
+and New options work, and `mutableArrayValueForKey:` reports insertions,
+removals and replacements with their indexes. Cocoa bindings now go both
+ways: text fields, buttons, pop-up buttons and sliders write the user's
+edits back to the key path they're bound to (text fields when the editing
+ends, or as it is typed with `NSContinuouslyUpdatesValue`), bindings made
+in nibs (`NSNibBindingConnector`) are made when the nib loads, and
+`NSObjectController` (`selection.*`) and `NSUserDefaultsController`
+(`values.*`) are there. The null placeholder and the `NSNegateBoolean`,
+`NSIsNil` and `NSIsNotNil` transformers are applied. `NSSlider` is new.
+A control's or cell's `formatter` now shows the value, reads what the user
+typed, refuses keystrokes it can't take and beeps (asking the delegate's
+`control:didFailToFormatString:errorDescription:`), and a cell-based
+table's column cell formatter is used when its cells are edited. Array
+and tree controllers aren't done yet. None of the nine apps has been run
+again since.
 
 ## What the apps need most
 

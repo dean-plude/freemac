@@ -412,10 +412,50 @@ static id resolve(id obj, NSDictionary *map)
 @implementation NSNibAXRelationshipConnector
 @end
 
-@interface NSNibBindingConnector : NSNibConnector
+/* A binding: the source (a view) bound to a key path of the destination (a
+ * controller, usually), with its options. "NSBinding", "NSKeyPath" and
+ * "NSOptions" are the names descriptions of the format give; NSLabel holds
+ * the two together ("value: selection.name") for older nibs. */
+@interface NSNibBindingConnector : NSNibConnector {
+    NSString *_binding, *_keyPath;
+    NSDictionary *_options;
+}
 @end
 @implementation NSNibBindingConnector
-- (void)_connectWith:(NSDictionary *)map { AWarnOnce("Cocoa bindings in nibs (they are skipped)"); }
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super initWithCoder:c])) {
+        id b = [c decodeObjectForKey:@"NSBinding"], k = [c decodeObjectForKey:@"NSKeyPath"];
+        id o = [c decodeObjectForKey:@"NSOptions"];
+        if (![b isKindOfClass:[NSString class]] && [_label isKindOfClass:[NSString class]]) {
+            NSRange colon = [_label rangeOfString:@":"];
+            if (colon.location != NSNotFound) {
+                b = [[_label substringToIndex:colon.location]
+                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+                k = [[_label substringFromIndex:NSMaxRange(colon)]
+                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+            }
+        }
+        _binding = [b isKindOfClass:[NSString class]] ? [b copy] : nil;
+        _keyPath = [k isKindOfClass:[NSString class]] ? [k copy] : nil;
+        _options = [o isKindOfClass:[NSDictionary class]] ? [o copy] : nil;
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_binding release];
+    [_keyPath release];
+    [_options release];
+    [super dealloc];
+}
+- (void)_connectWith:(NSDictionary *)map
+{
+    id src = resolve(_source, map), dst = resolve(_destination, map);
+    if (!src || !dst || ![_binding length] || ![_keyPath length])
+        return;
+    [src bind:_binding toObject:dst withKeyPath:_keyPath options:_options];
+}
 @end
 
 /* "User Defined Runtime Attributes": key paths set on an object. */

@@ -45,6 +45,7 @@ static id coder_value(NSCoder *c, NSString *key)
     SEL _action;
     NSView *_controlView;
     NSInteger _backgroundStyle;
+    NSFormatter *_formatter;
 }
 
 /* Light or dark ground behind the cell (a selected table row is dark):
@@ -76,6 +77,7 @@ static id coder_value(NSCoder *c, NSString *key)
 {
     [_value release];
     [_font release];
+    [_formatter release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone
@@ -97,6 +99,7 @@ static id coder_value(NSCoder *c, NSString *key)
     c->_controlSize = _controlSize;
     c->_target = _target;
     c->_action = _action;
+    c->_formatter = [_formatter retain];
     return c;
 }
 
@@ -151,6 +154,9 @@ static id coder_value(NSCoder *c, NSString *key)
     if ([action isKindOfClass:[NSString class]])
         _action = NSSelectorFromString(action);
     _target = coder_value(coder, @"NSTarget");
+    NSFormatter *formatter = coder_value(coder, @"NSFormatter");
+    if ([formatter isKindOfClass:[NSFormatter class]])
+        _formatter = [formatter retain];
     return self;
 }
 - (void)encodeWithCoder:(NSCoder *)coder
@@ -178,15 +184,38 @@ static id coder_value(NSCoder *c, NSString *key)
     _value = [value isKindOfClass:[NSImage class]] ? [value retain] : [value copy]; /* images are shared */
     [old release];
 }
+/* With a formatter, the value is shown as the formatter writes it; a string
+ * given to the cell is read by the formatter, and kept as it is if the
+ * formatter can't read it. */
 - (NSString *)stringValue
 {
+    if (_formatter && _value && ![_value isKindOfClass:[NSString class]]) {
+        NSString *s = [_formatter stringForObjectValue:_value];
+        if (s)
+            return s;
+    }
     if ([_value isKindOfClass:[NSAttributedString class]])
         return [_value string];
     if ([_value isKindOfClass:[NSString class]])
         return _value;
     return _value ? [_value description] : @"";
 }
-- (void)setStringValue:(NSString *)s { [self setObjectValue:s ?: @""]; }
+- (void)setStringValue:(NSString *)s
+{
+    id obj = nil;
+    if (_formatter && s && [_formatter getObjectValue:&obj forString:s errorDescription:NULL]) {
+        [self setObjectValue:obj];
+        return;
+    }
+    [self setObjectValue:s ?: @""];
+}
+- (NSFormatter *)formatter { return _formatter; }
+- (void)setFormatter:(NSFormatter *)f
+{
+    [f retain];
+    [_formatter release];
+    _formatter = f;
+}
 - (NSString *)title { return [self stringValue]; }
 - (void)setTitle:(NSString *)t { [self setStringValue:t]; }
 - (NSAttributedString *)attributedStringValue
@@ -196,9 +225,15 @@ static id coder_value(NSCoder *c, NSString *key)
     return [[[NSAttributedString alloc] initWithString:[self stringValue]] autorelease];
 }
 - (void)setAttributedStringValue:(NSAttributedString *)s { [self setObjectValue:s]; }
-- (int)intValue { return [[self stringValue] intValue]; }
-- (NSInteger)integerValue { return [[self stringValue] integerValue]; }
-- (double)doubleValue { return [[self stringValue] doubleValue]; }
+- (int)intValue { return [_value isKindOfClass:[NSNumber class]] ? [_value intValue] : [[self stringValue] intValue]; }
+- (NSInteger)integerValue
+{
+    return [_value isKindOfClass:[NSNumber class]] ? [_value integerValue] : [[self stringValue] integerValue];
+}
+- (double)doubleValue
+{
+    return [_value isKindOfClass:[NSNumber class]] ? [_value doubleValue] : [[self stringValue] doubleValue];
+}
 - (NSFont *)font { return _font; }
 - (void)setFont:(NSFont *)font
 {
