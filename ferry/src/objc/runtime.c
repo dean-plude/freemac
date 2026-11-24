@@ -632,8 +632,22 @@ IMP ferry_objc_lookup(id receiver, SEL sel, Class cls, int stret)
     return m->imp;
 }
 
+/* Where a message nothing implements goes once forwardingTargetForSelector:
+ * has found no other receiver: Ferry's Foundation sets these (through
+ * ferry_objc_setForwardHandler, a call of Ferry's own that only its
+ * Foundation uses) to its entry points, which are jumped to with the
+ * message's registers and stack exactly as the sender left them. */
+static void *forward_handler, *forward_handler_stret;
+
+void ferry_objc_setForwardHandler(void *fwd, void *fwd_stret)
+{
+    forward_handler = fwd;
+    forward_handler_stret = fwd_stret;
+}
+
 /* The receiver doesn't implement sel: try forwardingTargetForSelector:,
- * then doesNotRecognizeSelector:, which stops the program. */
+ * then Foundation's forwarding, then doesNotRecognizeSelector:, which
+ * stops the program. */
 IMP ferry_objc_forward_target(id self, SEL sel, Class unused, int stret)
 {
     (void)unused;
@@ -646,14 +660,6 @@ IMP ferry_objc_forward_target(id self, SEL sel, Class unused, int stret)
             return (IMP)(stret ? (void *)ferry_objc_resend_stret : (void *)ferry_objc_resend);
         }
     }
-    IMP fi = ferry_objc_find_imp(cls, SEL_forwardInvocation);
-    IMP root_fi = ferry_objc_find_imp(&ferry_class_NSObject, SEL_forwardInvocation);
-    if (fi && fi != root_fi) {
-        fflush(stdout);
-        fprintf(stderr, "ferry: %s forwards %s with forwardInvocation:, which needs NSInvocation; "
-                "Ferry doesn't support that yet\n", class_getName(cls), sel);
-        _exit(127);
-    }
     if (!ferry_objc_find_imp(cls, SEL_doesNotRecognizeSelector)) {
         /* A class Ferry left out because its superclass is missing: it has
          * no methods at all, not even NSObject's. */
@@ -661,6 +667,19 @@ IMP ferry_objc_forward_target(id self, SEL sel, Class unused, int stret)
         fflush(stdout);
         fprintf(stderr, "ferry: the program sent %s to %s, a class Ferry left out because it is built on a class "
                         "Ferry doesn't have yet\n", sel, ro && ro->name ? ro->name : "(unknown)");
+        _exit(127);
+    }
+    /* Foundation's forwarding (methodSignatureForSelector: and
+     * forwardInvocation:, with an NSInvocation), when Foundation is loaded. */
+    void *handler = stret ? forward_handler_stret : forward_handler;
+    if (handler)
+        return (IMP)handler;
+    IMP fi = ferry_objc_find_imp(cls, SEL_forwardInvocation);
+    IMP root_fi = ferry_objc_find_imp(&ferry_class_NSObject, SEL_forwardInvocation);
+    if (fi && fi != root_fi) {
+        fflush(stdout);
+        fprintf(stderr, "ferry: %s forwards %s with forwardInvocation:, which needs Foundation's NSInvocation; "
+                "the program doesn't use Foundation\n", class_getName(cls), sel);
         _exit(127);
     }
     FN(void (*)(id, SEL, SEL), ferry_objc_msgSend)(self, SEL_doesNotRecognizeSelector, sel);

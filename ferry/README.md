@@ -37,8 +37,11 @@ and the old text form), `NSBundle` (a program inside an `.app` folder finds
 its `Info.plist`, resources and localized strings), `NSUserDefaults` (kept
 in `~/.config/ferry/preferences/<app id>.plist`), `NSFileManager`,
 `NSProcessInfo`, `NSRunLoop`, `NSTimer`, `NSNotificationCenter`, and the
-`CF...` calls on the same objects, `NSAttributedString`, and keyed
-archives (`NSKeyedArchiver`, `NSKeyedUnarchiver`).
+`CF...` calls on the same objects, `NSAttributedString`, keyed
+archives (`NSKeyedArchiver`, `NSKeyedUnarchiver`), `NSInvocation`,
+`NSMethodSignature`, `NSProxy` and message forwarding
+(`forwardInvocation:`), `NSUndoManager`, `NSJSONSerialization`, and
+`NSDateFormatter` with `NSTimeZone` and `NSLocale` (in English only).
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
@@ -121,7 +124,7 @@ without a window.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
   so when given an arm64 one.
 - **Programs using calls Ferry doesn't have yet**, such as threads, sockets,
-  C++ (libc++), `NSInvocation` or extra libraries. (Some of a Mac's
+  C++ (libc++), `NSCalendar` or extra libraries. (Some of a Mac's
   `/usr/lib` libraries come from this system's copy: zlib, bzip2, xz,
   libxml2, SQLite and ICU.) When a program reaches a call Ferry lacks,
   it stops with a message naming that call (`this program uses X, which Ferry

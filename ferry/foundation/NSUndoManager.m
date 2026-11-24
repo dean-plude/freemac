@@ -7,10 +7,11 @@
  * groupsByEvent (the default), the first action registered outside any
  * group opens one, and it closes the next time the run loop turns, as a
  * Mac's closes at the end of the event. Actions are kept as a selector
- * with one object, or a block; prepareWithInvocationTarget: needs
- * NSInvocation (message forwarding with its arguments), which Ferry doesn't
- * have yet, so it answers nil: the messages sent to it do nothing, and the
- * first time Ferry says so. Targets aren't retained, as on a Mac. Built
+ * with one object, a block, or an NSInvocation: prepareWithInvocationTarget:
+ * answers the undo manager itself, as on a Mac, and the next message sent
+ * to it that it doesn't implement is forwarded (methodSignatureForSelector:
+ * asks the prepared target) and kept, with its arguments retained, as an
+ * undo action for that target. Targets aren't retained, as on a Mac. Built
  * without ARC. */
 #import "FInternal.h"
 
@@ -31,6 +32,7 @@ NSString *const NSUndoManagerGroupIsDiscardableKey = @"NSUndoManagerGroupIsDisca
     SEL selector;
     id object;
     void (^handler)(id);
+    NSInvocation *invocation;  /* its arguments retained, its target not */
     NSMutableArray *actions;   /* a group's */
     NSString *name;
     BOOL discardable;
@@ -41,6 +43,7 @@ NSString *const NSUndoManagerGroupIsDiscardableKey = @"NSUndoManagerGroupIsDisca
 {
     [object release];
     [handler release];
+    [invocation release];
     [actions release];
     [name release];
     [super dealloc];
@@ -52,7 +55,9 @@ NSString *const NSUndoManagerGroupIsDiscardableKey = @"NSUndoManagerGroupIsDisca
             [a run];
         return;
     }
-    if (handler)
+    if (invocation)
+        [invocation invokeWithTarget:target];
+    else if (handler)
         handler(target);
     else if (selector)
         ((void (*)(id, SEL, id))objc_msgSend)(target, selector, object);
@@ -83,6 +88,7 @@ static FUndoAction *new_group(void)
     NSUInteger _levels;
     BOOL _byEvent, _autoOpened, _undoing, _redoing;
     NSArray *_modes;
+    id _prepared;                      /* prepareWithInvocationTarget:'s, not retained */
 }
 
 - (instancetype)init
@@ -230,14 +236,36 @@ static FUndoAction *new_group(void)
 
 - (id)prepareWithInvocationTarget:(id)target
 {
-    static BOOL warned;
-    if (!warned) {
-        warned = YES;
-        fflush(stdout);
-        fprintf(stderr, "ferry: -[NSUndoManager prepareWithInvocationTarget:] needs NSInvocation, which Ferry "
-                        "doesn't have yet; those undo actions aren't kept\n");
+    _prepared = target;
+    return self;
+}
+
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)sel
+{
+    NSMethodSignature *sig = [super methodSignatureForSelector:sel];
+    if (!sig && _prepared)
+        sig = [_prepared methodSignatureForSelector:sel];
+    return sig;
+}
+
+/* The message sent after prepareWithInvocationTarget: becomes an undo action. */
+- (void)forwardInvocation:(NSInvocation *)inv
+{
+    id target = _prepared;
+    if (!target) {
+        [super forwardInvocation:inv];
+        return;
     }
-    return nil;
+    _prepared = nil;
+    if (_disabled)
+        return;
+    [inv setTarget:nil];
+    [inv retainArguments];
+    FUndoAction *a = [[FUndoAction alloc] init];
+    a->target = target;
+    a->invocation = [inv retain];
+    [[self _groupForNewAction]->actions addObject:a];
+    [a release];
 }
 
 - (void)setActionIsDiscardable:(BOOL)discardable
@@ -318,10 +346,13 @@ static FUndoAction *new_group(void)
     [_open removeAllObjects];
     _autoOpened = NO;
     _disabled = 0;
+    _prepared = nil;
 }
 
 - (void)removeAllActionsWithTarget:(id)target
 {
+    if (_prepared == target)
+        _prepared = nil;
     for (NSMutableArray *stack in @[ _undo, _redo, _open ])
         for (FUndoAction *g in [[stack copy] autorelease])
             if ([g dropTarget:target] && stack != _open)

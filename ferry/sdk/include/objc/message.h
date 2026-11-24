@@ -19,5 +19,6 @@ void objc_msgSend_stret(void);
 void objc_msgSendSuper_stret(void);
 void objc_msgSend_fpret(void);
 void _objc_msgForward(void);
+void _objc_msgForward_stret(void);
 __FERRY_END
 #endif

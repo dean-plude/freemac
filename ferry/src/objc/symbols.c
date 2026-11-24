@@ -33,6 +33,7 @@ extern char _objc_empty_cache_storage[];
     X(objc_msgSendSuper2_stret_fixedup, ferry_objc_msgSendSuper2_stret_fixup) \
     X(_objc_msgForward, ferry_objc_msgForward) \
     X(_objc_msgForward_stret, ferry_objc_msgForward_stret) \
+    X(ferry_objc_setForwardHandler, ferry_objc_setForwardHandler) \
     X(sel_registerName, sel_registerName) \
     X(sel_getUid, sel_getUid) \
     X(sel_getName, sel_getName) \

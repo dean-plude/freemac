@@ -31,7 +31,7 @@ and the Sequel Pro disk image (`.dmg`). See "Installers" below.
 | --- | --- | --- | --- |
 | [Hex Fiend](https://github.com/HexFiend/HexFiend) 2.18.1 | Hex editor | Doesn't start | Part of it is written in Swift (`libswiftCore.dylib`), a known limit. All 16 of its nibs (`NIBArchive`) load when tried on their own |
 | [Flycut](https://github.com/TermiT/Flycut) 1.9.6 | Clipboard history (menu bar) | Starts, loads its main nib, sets up its defaults and bindings, registers its global hotkey (accepted, never pressed), and opens its preferences nib | `NSTabView` in its preferences nib (`selectTabViewItemAtIndex:` sent to the plain view Ferry put in its place). Then `NSStatusBar`, for its menu bar item |
-| [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | Starts, loads its main nib (`NIBArchive`) | `NSInvocation`/`NSMethodSignature` (forwarding), which Ferry doesn't have yet. It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
+| [KeyCastr](https://github.com/keycastr/keycastr) 0.9.18 | Shows the keys you press | Starts, loads its main nib (`NIBArchive`) | `NSInvocation`/`NSMethodSignature` (forwarding), which Ferry has from (1.170); what it stops at now is still to be checked. It also needs to see every key pressed in other apps, which Wayland doesn't allow. (Not re-run since M7) |
 | [ShiftIt](https://github.com/fikovnik/ShiftIt) 1.6.6 | Moves and resizes other apps' windows | **Runs**: starts, loads its nibs, asks whether it may use the Accessibility API (Ferry answers no, as a Mac does before the user allows it), and waits in its event loop | Nothing visible: its only window is a status bar item (`NSStatusBar`, not in Ferry yet). Moving other apps' windows can't work as such on Wayland |
 | [Spectacle](https://github.com/eczarny/spectacle) 1.2 | Window tiling by shortcut | Starts, loads its nibs, registers its shortcuts (accepted, never pressed) | Its Sparkle updater checks its own code signature (`SecStaticCodeCreateWithPath`, the Security framework). It also couldn't save its shortcuts file. Then the Accessibility API, as for ShiftIt |
 | [MacPass](https://github.com/MacPass/MacPass) 0.8.1 | KeePass password manager | Starts; all 30 of its nibs (`NIBArchive`) load on their own | The document classes (`NSDocumentController`, `NSDocument`): its own document controller class is left out and the app stops when it makes one. (The document classes came in 1.167; not re-run since) |
@@ -212,8 +212,8 @@ Files named on the command line open at launch, else an untitled document
 when the app wants one. Left out: autosaving and versions
 (`autosavesInPlace` answers NO, as on Mac OS X 10.6, and the autosave calls
 save nothing), renaming, moving and locking from the title bar, and
-printing; `prepareWithInvocationTarget:` answers nil until Ferry has
-`NSInvocation`.
+printing. (`prepareWithInvocationTarget:` answered nil until Ferry had
+`NSInvocation`; it works from (1.170).)
 
 `NSAlert` draws as a current Mac's alert: the app's icon (the caution sign
 for a critical alert), the message in bold, the informative text, an
@@ -238,6 +238,23 @@ when they are this app or in `~/Applications` and `/Applications`, and the
 workspace's notifications are all defined, though nothing on Linux posts
 sleep, wake or launch ones.
 
+### Invocations, forwarding, JSON and dates ((1.170), Ferry 0.14.0)
+
+`NSInvocation` and `NSMethodSignature` call any method from its type
+encoding, laying out integers, pointers, objects, floating-point numbers,
+`long double`, and small and large structs as the x86-64 calling
+convention does, and read the result back. A message an object doesn't
+answer now goes, as on a Mac, to `forwardingTargetForSelector:`, then to
+`methodSignatureForSelector:` and `forwardInvocation:` (`NSProxy` is new,
+for proxies that catch and re-send messages), and only then to
+`doesNotRecognizeSelector:`, which stops the program with the same message
+as before. KeyCastr needed this, and `NSUndoManager`'s
+`prepareWithInvocationTarget:` is built on it. `NSJSONSerialization` reads
+and writes JSON with the usual options (not JSON5). `NSDateFormatter`
+writes and reads Unicode date patterns and the standard styles in English
+(United States) for every locale, with `NSTimeZone` reading this system's
+time zone database and an `NSLocale` that knows identifiers only.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -254,10 +271,12 @@ Counted over the nine apps:
 3. **The document classes** (`NSDocument`, `NSDocumentController`):
    MacPass, MacDown, Sequel Pro. Done in 1.167, without autosaving and
    versions.
-4. **`NSInvocation`**, and Foundation's `NSThread`,
-   `NSTask`/`NSPipe`/`NSFileHandle`, `NSDateFormatter`, `NSXMLDocument` and
-   `NSJSONSerialization` (each used by five or more of the apps;
-   `NSIndexSet` came in 1.159, `NSAlert` and `NSWorkspace` in 1.167).
+4. **Foundation's `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle` and
+   `NSXMLDocument`** (each used by five or more of the apps). `NSIndexSet`
+   came in 1.159, `NSAlert` and `NSWorkspace` in 1.167, and `NSInvocation`
+   with message forwarding, `NSJSONSerialization` and `NSDateFormatter`
+   (English only, with `NSTimeZone` and a minimal `NSLocale`) in
+   (1.170); `NSCalendar` and `NSNumberFormatter` are still missing.
 5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
    file or the app's code signature at start. Ferry could provide a version
    file of its own and answer the signature check plainly.
