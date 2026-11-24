@@ -1,0 +1,3 @@
+# com.canonical.Unity.LauncherEntry Update(app_uri, properties) from a Mac app through Ferry,
+# with its Dock tile's badgeLabel set to "New"; recorded on a private session bus.
+('application://dockmenu.desktop', {'count': <int64 1>, 'count-visible': <true>, 'urgent': <false>, 'quicklist': <'/com/canonical/unity/launcherentry/ferry/menu'>, 'x-freemac-badge-label': <'New'>})

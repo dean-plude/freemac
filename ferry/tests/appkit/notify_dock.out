@@ -11,8 +11,8 @@ Update application://appkit_notify_dock.desktop {count: 7, count-visible: true, 
 Update application://appkit_notify_dock.desktop {count: 12, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
 Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
 Update application://appkit_notify_dock.desktop {count: 12, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
-Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
-Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Update application://appkit_notify_dock.desktop {count: 1, count-visible: true, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false, x-freemac-badge-label: 'New'}
+Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false, x-freemac-badge-label: ''}
 Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: true}
 Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
 Update application://appkit_notify_dock.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: true}

@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.208 "Dock: word badges and app menus" (done)
+
+The Dock now shows what apps tell it, as a Mac's Dock does.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A badge can hold a word as well as a number, such as "New" or "!", and a long one ends in "…" so the badge stays small | Pier (launcher_badge.py) | done |
+| 2 | Mac apps' badge labels that aren't numbers now reach the Dock as words; other docks still see that there is a badge | Ferry (NSDockTile) | done |
+| 3 | An app's own Dock menu items, such as New Window, show in its right-click menu in the Dock, below its windows and above the Dock's own items as on a Mac, with separators, greyed-out items, ticks and submenus; choosing one tells the app | Pier (dock_menu.py) | done |
+| 4 | The Dock never waits on an app for its menu: if the app is slow or doesn't answer, the usual menu opens | Pier | done |
+| 5 | An app asking for attention bounces until you go to it; a quick request bounces once, a whole bounce | Pier | done |
+| 6 | Tests for badges, attention and Dock menus, against a stand-in app on a private bus (`python3 -m unittest discover -s shell/tests`) | shell/tests | done |
+
+Apps that send these things the way many Linux apps do (Telegram, Signal, Thunderbird and others) get the same: their badges, their progress bars, their bounce and their Dock menu items.
+
 ## 1.207 "Ferry: notifications and Dock badges" (done)
 
 Ferry 0.34.0: Mac apps can pop up notifications, with buttons and replies, and put a badge on their Dock icon or bounce it for attention.
@@ -1195,7 +1210,7 @@ Ferry 0.34.0: Mac apps can pop up notifications, with buttons and replies, and p
 | 4 | `NSDockTile` badges, `requestUserAttention:`, and the app's Dock menu, sent to the Dock as LauncherEntry updates | Ferry | done |
 | 5 | Six new tests on a private bus with a stand-in server and Dock; `make check` 157 of 157 | Ferry | done |
 
-Notifications don't stay after the app quits, and freemac's Dock shows number badges only for now.
+Notifications don't stay after the app quits.
 
 ## 1.206 "Ferry: printing and the font panel" (done)
 

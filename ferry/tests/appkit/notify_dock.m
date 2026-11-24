@@ -85,7 +85,7 @@ int main(void)
         pause_a_moment();
         tile.showsApplicationBadge = YES;
         pause_a_moment();
-        tile.badgeLabel = @"New";       // not a number: the dock can't show it
+        tile.badgeLabel = @"New";       // not a number: sent as the badge's text
         printf("label kept: %s\n", tile.badgeLabel.UTF8String);
         pause_a_moment();
         tile.badgeLabel = nil;
