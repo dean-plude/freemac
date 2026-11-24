@@ -1,0 +1,51 @@
+autosaving delay 30; autosaves in place: Note 1, Plain 0; drafts 0, versions 0
+opened: edited 0, unautosaved 0, window edited 0, text "first"
+changed: edited 1, unautosaved 1, window edited 1, text "second"
+before the delay: file "first"
+  (nothing written)
+after the delay: edited 1, unautosaved 0, window edited 1, text "second"
+file "second", autosaved contents (none)
+  autosave in place: "second" (implicitly cancellable: 1)
+the last saved version kept aside: "first"
+no change, no autosave:
+  (nothing written)
+autosaveWithImplicitCancellability: error none
+autosaved by hand: edited 1, unautosaved 0, window edited 1, text "third"
+file "third", the last saved version "first", implicitly cancellable now 0
+  autosave in place: "third" (implicitly cancellable: 0)
+  Note.txt: did autosave 1
+  (nothing written)
+the Revert item: "Revert To", enabled 1, its menu: "Last Saved Version" (1) "Browse All Versions…" (0)
+Revert To > Last Saved Version: edited 0, unautosaved 0, window edited 0, text "first"
+file "first", the copy kept aside (no file)
+  (nothing written)
+changed and autosaved: edited 1, unautosaved 0, window edited 1, text "fourth"
+the last saved version "first"
+saved: edited 0, unautosaved 0, window edited 0, text "fourth"
+file "fourth", the copy kept aside (no file)
+  autosave in place: "fourth" (implicitly cancellable: 1)
+  save: "fourth" (implicitly cancellable: 0)
+  Note.txt: should close 1
+closing without asking: file "fifth", sheet none
+  autosave in place: "fifth" (implicitly cancellable: 0)
+closed: documents 0, the copy kept aside (no file)
+untitled, after the delay: edited 1, unautosaved 0, window edited -1, text "draft"
+autosaved to ~/.local/share/Autosave Information/Untitled (Autosaved).txt: "draft"; its file (none)
+  autosave elsewhere: "draft" (implicitly cancellable: 1)
+autosaved again to the same file: "draft 2"
+  autosave elsewhere: "draft 2" (implicitly cancellable: 1)
+  Untitled: should close 1
+closed: the autosaved file (no file)
+not autosaving, after the delay: edited 1, unautosaved 1, window edited -1, text "plain 2"
+  (nothing written)
+  Plain.txt: did autosave 0
+its Revert item: "Revert to Saved", enabled 1, menu none
+NSChangeAutosaved: edited 1, unautosaved 0, window edited -1, text "plain 2"
+NSChangeDone: edited 1, unautosaved 1, window edited -1, text "plain 2"
+NSChangeCleared: edited 0, unautosaved 0, window edited -1, text "plain 2"
+with no delay, nothing is autosaved: "a" "b"
+  reviewed all 1, documents left 0
+quitting: "a 2" "b 2"
+  autosave in place: "a 2" (implicitly cancellable: 0)
+  autosave in place: "b 2" (implicitly cancellable: 0)
+exit=0

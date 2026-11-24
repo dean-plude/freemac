@@ -16,6 +16,10 @@
  * signed up for them, as on a Mac. The selection follows its items when
  * rows open and close; items hidden by a close are deselected.
  *
+ * Cells are edited in place as in a table (see NSTableView.m), with the
+ * new value going to outlineView:setObjectValue:forTableColumn:byItem:
+ * and the delegate's outlineView:shouldEditTableColumn:item: asked first.
+ *
  * Nibs: "NSOutlineViewIndentationPerLevelKey" and
  * "NSOutlineViewOutlineTableColumnKey". */
 #import "AInternal.h"
@@ -526,6 +530,19 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
     AOutlineNode *n = [self _nodeAtRow:row];
     if (n && [ds respondsToSelector:@selector(outlineView:setObjectValue:forTableColumn:byItem:)])
         [ds outlineView:self setObjectValue:v forTableColumn:c byItem:n->item];
+}
+- (BOOL)_dataSourceTakesValues
+{
+    return [[self dataSource] respondsToSelector:@selector(outlineView:setObjectValue:forTableColumn:byItem:)];
+}
+- (BOOL)_shouldEditColumn:(NSTableColumn *)c row:(NSInteger)row
+{
+    id d = [self delegate];
+    AOutlineNode *n = [self _nodeAtRow:row];
+    if (!n)
+        return NO;
+    return ![d respondsToSelector:@selector(outlineView:shouldEditTableColumn:item:)] ||
+           [d outlineView:self shouldEditTableColumn:c item:n->item];
 }
 - (BOOL)_delegateMakesViews { return [[self delegate] respondsToSelector:@selector(outlineView:viewForTableColumn:item:)]; }
 - (NSView *)_delegateViewForColumn:(NSTableColumn *)c row:(NSInteger)row

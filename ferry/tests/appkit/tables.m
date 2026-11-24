@@ -285,6 +285,7 @@ int main(void)
         [name setTitle:@"Name"];
         [name setWidth:120];
         [name setSortDescriptorPrototype:[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES]];
+        [name setEditable:NO]; /* so that a double click sends the double action (editing is in editing.m) */
         NSTableColumn *size = [[NSTableColumn alloc] initWithIdentifier:@"size"];
         [size setTitle:@"Size"];
         [size setWidth:80];

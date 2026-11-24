@@ -518,19 +518,26 @@ static NSArray *parse_types(void)
 - (void)reviewUnsavedDocumentsWithAlertTitle:(NSString *)title cancellable:(BOOL)cancellable delegate:(id)delegate
                         didReviewAllSelector:(SEL)selector contextInfo:(void *)context
 {
+    /* all the edited documents are gone through (those that autosave in
+     * place are autosaved without asking); the review is offered when two
+     * or more of them would ask */
     NSMutableArray *edited = [NSMutableArray array];
+    NSUInteger asking = 0;
     for (NSDocument *d in _documents)
-        if ([d isDocumentEdited])
+        if ([d isDocumentEdited]) {
             [edited addObject:d];
+            if (![d _closesWithoutAsking])
+                asking++;
+        }
     NSMutableDictionary *state = [self _stateFor:edited delegate:delegate selector:selector context:context];
-    if ([edited count] < 2) {
+    if (asking < 2) {
         [self _closeNext:state];
         return;
     }
     NSAlert *a = [[[NSAlert alloc] init] autorelease];
     [a setMessageText:title ?: [NSString stringWithFormat:@"You have %lu documents with unsaved changes. Do you want "
                                                           @"to review these changes before quitting?",
-                                                          (unsigned long)[edited count]]];
+                                                          (unsigned long)asking]];
     [a setInformativeText:@"If you don’t review your documents, all your changes will be lost."];
     [a addButtonWithTitle:@"Review Changes…"];
     if (cancellable)

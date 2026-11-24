@@ -117,6 +117,12 @@ void ADragAttach(NSWindow *window, GtkWidget *area);
 - (NSAttributedString *)_shownPlaceholder;
 - (void)_changed;
 - (void)_post:(NSNotificationName)name selector:(SEL)sel;
+/* editing in a table's cell (NSTableView.m) */
+- (NSTableView *)_editingTable;
+- (NSInteger)_textMovement;
+- (void)_setTextMovement:(NSInteger)movement;
+- (void)_discardEditsTo:(id)value;
+- (void)_placeCaretAtEnd;
 @end
 
 /* ---- menus opened in a window (NSPopUpButton.m) -------------------------------------- */
@@ -182,6 +188,11 @@ void ANoteRecentDocumentsMenu(NSMenu *menu);
 - (NSArray *)_typesForClass:(Class)cls editorsOnly:(BOOL)editors;
 - (NSUInteger)_nextUntitledNumber;
 - (void)_fillRecentMenu;
+@end
+@interface NSDocument (FerryPrivate)
+/* (NSDocument.m) whether closing autosaves instead of asking: the class
+ * autosaves in place and the document has a file */
+- (BOOL)_closesWithoutAsking;
 @end
 
 /* (NSToolbar.m) the strip a window's toolbar is drawn in, a root view of the
@@ -275,6 +286,13 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
 - (void)_selectionChanged;
 - (void)_setSelection:(NSIndexSet *)rows notify:(BOOL)notify;
 - (void)_post:(NSNotificationName)name selector:(SEL)sel userInfo:(NSDictionary *)info;
+/* editing a cell in place: NSOutlineView asks its own delegate and data source */
+- (BOOL)_shouldEditColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (BOOL)_dataSourceTakesValues;
+/* the text field being edited calls these (NSControl.m) */
+- (BOOL)_isEditingField:(NSTextField *)field;
+- (void)_endEditingWithMovement:(NSInteger)movement;
+- (void)_editingFieldDidResign:(NSTextField *)field;
 @end
 
 @interface NSTableRowView (FerryPrivate)

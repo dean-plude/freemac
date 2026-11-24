@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.178 "Ferry: editing tables and autosave" (done)
+
+Mac programs that keep lists you type into, and document apps that save as
+you go, now behave the way they do on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Editing text cells in place in tables and outline lists: double click, Return, Tab and Shift-Tab between cells, Escape to cancel, `editColumn:row:withEvent:select:`, with the data source's and delegate's calls; in view-based tables the cell's own text field | Ferry AppKit | done |
+| 2 | `NSDocument` autosaving in place on a timer, untitled documents kept in Autosave Information, the window staying edited | Ferry AppKit | done |
+| 3 | Revert To > Last Saved Version for autosaving documents, and closing or quitting without asking once autosaved | Ferry AppKit | done |
+| 4 | Ferry 0.16.0, tests `appkit_editing` and `appkit_autosave` (79 tests) | Ferry, Docs | done |
+
 ## 1.177 "Change picture" (done)
 
 | # | Item | Component | Status |
