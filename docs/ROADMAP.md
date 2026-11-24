@@ -1171,6 +1171,18 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.152 "New Image" (done)
+
+Hull's File > New Image, as in a Mac's Disk Utility: blank disk images and copies of drives.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | File > New Blank Image… (⌘N): a name, a size in MB or GB (at least 32 MB) and a format; saved in Documents, then opened as a disk on the Desktop | Hull, disk_images.py | done |
+| 2 | File > New Image from Drive…: a byte-for-byte copy of a USB drive, disc or volume into an .img (an .iso for a disc), in Documents, that Restore can put back | Hull, disk_images.py | done |
+| 3 | The drive's volumes are unmounted while it's copied and mounted again after; empty space takes no room in the file; a window shows progress and Stop leaves no half-made file | disk_images.py, Hull | done |
+| 4 | File menu grouped as on a Mac: Open Disk Image…, the three New Image items, Mount and Eject, Close | Hull | done |
+| 5 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.151 "Partition" (done)
 
 Hull's Partition, as in a Mac's Disk Utility: divide a drive into several volumes.
