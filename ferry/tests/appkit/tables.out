@@ -1,0 +1,119 @@
+rows 6, columns 3, row height 17, spacing 3x2, flipped 1
+size column 1, column 'done' titled Done, missing -1
+header: 0,0 305x28
+header clip: 0,0 305x28
+content clip: 0,28 305x172
+table: 0,0 305x172
+widths after fitting the clip: 120 80 96
+row 2: 0,38 305x19
+column 1: 123,0 83x172
+cell 1,2: 124,39 80x17
+row at y=40: 2, at y=500: -1; column at x=130: 1, at x=-5: -1
+rows in y 30..60: 1+3
+prepared cell 0,1: zebra.png (NSTextFieldCell); check cell 2,1 state 1
+drawn: cells displayed all
+first responder is the table: 1
+click row 1: selected 1 {1}, clicked 1,0
+  log: selection {1}; action row 1 column 0
+shift-click row 3: {1,2,3}
+command-click row 2: {1,3}, selected row 3
+  log: selection {1,2,3}; action row 3 column 0; selection {1,3}; action row 2 column 0
+click refused row 4: {1,3}
+down: {5}
+down past the refused row: {5}
+shift-up twice: {2,3,5}
+  log: action row 4 column 0; selection {5}; selection {3,5}; selection {2,3,5}
+double click: {1}
+  log: selection {1}; action row 1 column 0; double row 1
+while the delegate says no: {1}
+by code: {2,3,5}, row 5 selected 1
+no empty selection: {3,5}
+deselected: {}, selected row -1
+  log: selection {2,3}; selection {2,3,5}; selection {3,5}; selection {}
+single selection, shift-click: {3}
+click below the rows: {}
+check box row 0 now 1
+  log: set done of row 0 to 1; action row 0 column 2
+name header: 0,0 123x28
+sorted: apple.pdf berry.zip kiwi.rtf mango.mov notes.txt zebra.png
+  log: header down name; sort by name up (was 0); header click name
+again: zebra.png notes.txt mango.mov kiwi.rtf berry.zip apple.pdf
+by size: kiwi.rtf notes.txt apple.pdf berry.zip zebra.png mango.mov
+  log: header down name; sort by name down (was 1); header click name; header down size; sort by size up, name down (was 1); header click size
+sort descriptors: 2, first size ascending
+a column with no prototype: 2 descriptors
+  log: header down done; header click done
+widths: 120 80 96
+divider dragged 30 right, last column only: 150 80 66, table 305 wide
+dragged past the size column's maximum, no autoresizing: 150 200 66, table 425 wide
+scroll view wider, uniform: 170 100 86, sum 365, clip 365
+done hidden, last column sized to fit: size 189, column 2 0 wide
+inserted at 0: rows 7, selection {4}
+removed 0 and 1: rows 5, selection {2}
+  log: selection {4}; selection {2}
+last row gone: rows 4, selection {}
+  log: selection {}
+scrolled to row 30: rows 21 to 30 in sight, table 646 tall
+back to the top: clip at 0
+view based: header nil, clip 120 tall
+row views 7, cell views asked 14, made 14
+view at 1,2: NSTableCellView "b 2", row 2, column 1, row view NSTableRowView
+its frame: 104,1 94x17
+row view 2: 0,38 200x19
+row 40 before scrolling: nil
+scrolled to 40: "a 40", row views 7, asked 28, made 14 (the rest reused)
+row 2 now: nil
+made for row 2: "a 2"
+row 40 selected: row view selected 1, emphasized 1, cell view style 1, label style 1
+row 39's row view knows: next selected 1, previous 0; row 41 has none: nil
+clicked the label in row 39: {39}
+reloaded one cell: asked 1 more
+outline: > Fruit | > Veg | Rock
+expandable: fruit 1, rock 0; fruit open 0
+fruit opened: v Fruit |   Apple |   Pear | > Veg | Rock
+  log: will open Fruit; opened Fruit
+pear: row 2, level 1, parent Fruit, child index 1; row 1 is Apple
+fruit's parent nil, level 0; rock's row 4
+cell of pear: 31,39 187x17
+cell of fruit: 17,1 201x17
+fruit's chevron: 1,1 16x17
+pear's chevron (none): 0,0 0x0
+veg opened with its children (leek refused): v Fruit |   Apple |   Pear | v Veg |   Kale |   > Leek | Rock
+  log: will open Veg; opened Veg
+leek opened: v Fruit |   Apple |   Pear | v Veg |   Kale |   v Leek |     Baby leek | Rock
+baby leek: level 2, parent Leek
+  selecting kale: selection {4}
+fruit closed: kale at row 2, selection {2}
+  log: will close Fruit; closed Fruit
+veg closed: > Fruit | > Veg | Rock
+kale hidden: row -1, selection {}, leek still open 1
+  log: will close Veg; closed Veg; selection {}
+right arrow on fruit: v Fruit |   Apple |   Pear | > Veg | Rock
+down: Apple
+left on a leaf: selected Fruit
+left on fruit: > Fruit | > Veg | Rock
+  log: will open Fruit; opened Fruit; selection {1}; selection {0}; will close Fruit; closed Fruit
+chevron clicked: > Fruit | v Veg |   Kale |   v Leek |     Baby leek | Rock
+selection after the chevron click: {0}
+clicked again: > Fruit | > Veg | Rock
+  log: will open Veg; opened Veg; will close Veg; closed Veg
+plum added: v Fruit |   Apple |   Pear |   Plum | > Veg | Rock
+everything opened: v Fruit |   Apple |   Pear |   Plum | v Veg |   Kale |   v Leek |     Baby leek | Rock
+everything closed: > Fruit | > Veg | Rock
+reloaded, fruit kept open: v Fruit |   Apple |   Pear |   Plum | > Veg | Rock
+nib loaded: 1
+classes: NSTableView, NSOutlineView; data source and delegate set 1
+column name "Name": width 171 (40 to 1000), resizing 3, editable 1, hidden 0, sorts by name, table 1
+column size "Size": width 141 (40 to 1000), resizing 3, editable 0, hidden 0, sorts by size, table 1
+row height 20, spacing 3x2, multiple 1, empty 1, alternating 1, resizing 1, autoresizing 1, type select 1
+header NSTableHeaderView for the table 1, corner _NSCornerView
+header clip: 1,1 318x28
+content clip: 1,29 318x170
+prototypes: NameCell
+made from the prototype: NSTableCellView "Table View Cell", identifier NameCell, text field NSTextField
+unknown identifier: nil
+row 1: "item 1"; size column view nil
+widths, uniform in a 318 clip: 171 141
+outline: indentation 12, outline column tree, rows 3
+nib outline, veg opened: > Fruit | v Veg |   Kale |   > Leek | Rock
+exit=0

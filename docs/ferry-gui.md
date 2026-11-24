@@ -1095,15 +1095,15 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
 | `appkit_statusbar` | (freemac 1.157) menu bar items, on a private session bus: their StatusNotifierItem properties and pictures, the dbusmenu layout of one item's menu (labels, ticks, a dimmed item, a submenu read on its own), clicks on menu items and on an item without a menu, hiding an item, and Quit |
+| `appkit_tables` | (freemac 1.159) table and outline views: a cell-based table in a scroll view with its header tiled above it (geometry, drawing through its cells, a check box column), selection by click, shift- and command-click, double click and the arrow keys with the delegate's say, sorting by clicks on the header, columns resized by dragging the header's dividers and by each autoresizing style, rows inserted and removed; a view-based table making only the rows in sight and reusing their views; an outline view opened and closed by code, chevron clicks and the arrow keys, with items and rows mapped both ways; and both loaded from a nib with a prototype cell view |
 
 **What isn't done yet (and why).**
 
-- **No real app is usable yet.** The next things they stop at are views
-  Ferry doesn't have (`NSTabView` for Flycut, `NSSplitView` and
-  `NSOutlineView` for Gas Mask, tables for Sequel Pro), `NSStatusBar` (four
-  apps live in the menu bar), the document classes (MacPass, MacDown,
-  Sequel Pro), and their Sparkle updaters' checks of the Mac's version file
-  and code signatures. `docs/ferry-compat.md` has the list.
+- **No real app is usable yet.** Tab, split, table and outline views and
+  menu bar items have come in since these apps were tried (1.155 to 1.159);
+  what they stop at now is still to be checked. The document classes
+  (MacPass, MacDown, Sequel Pro) and their Sparkle updaters' checks of the
+  Mac's version file and code signatures are still missing. `docs/ferry-compat.md` has the list.
 - **Install scripts aren't run**, by design: they expect a Mac and root.
   Packages whose files only work after their scripts (MacPorts) install
   their files but aren't usable as they are. Absolute links in a payload
@@ -1123,11 +1123,12 @@ check` runs 67 tests (60 at M7), all passing. The new or extended ones:
   of date (some apps start, and the Installer is one); left for the
   desktop side to reword.
 
-**What's next.** The views every app's nibs use (`NSTableView`,
-`NSOutlineView`, `NSPopUpButton`; `NSSplitView` and `NSTabView` came in
-freemac 1.155, see `appkit_panes`; `NSStatusBar` came in 1.157, see
-`appkit_statusbar`), then the document classes, `NSAlert` and
-`NSWorkspace`.
+**What's next.** The views every app's nibs use (`NSPopUpButton`,
+`NSToolbar`, `NSSegmentedControl`, `NSSearchField`; `NSSplitView` and
+`NSTabView` came in freemac 1.155, see `appkit_panes`; `NSStatusBar` came
+in 1.157, see `appkit_statusbar`; `NSTableView` and `NSOutlineView` came in
+1.159, see `appkit_tables`), editing in tables' cells, then the document
+classes, `NSAlert` and `NSWorkspace`.
 
 ## Known limits (for every milestone)
 

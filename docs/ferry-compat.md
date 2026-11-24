@@ -142,16 +142,31 @@ above. Mac programs expect SSSE3, which every Intel Mac had; Ferry now says
 so plainly on a processor without it, where a program would otherwise stop
 with "Illegal instruction".
 
+### Table views and outline views (1.159)
+
+`NSTableView` and `NSOutlineView` are in Ferry now, with `NSTableColumn`,
+`NSTableHeaderView`, `NSTableRowView` and `NSTableCellView`: cell-based and
+view-based tables (cell views made from a nib's prototypes and reused as
+rows scroll), columns that are resized by dragging the header or follow the
+table's width, alternating rows and grid lines, selection by mouse and
+keyboard with the delegate's say, sorting from the header with Ferry's own
+sort arrow, and the source list's rounded selection. Outline views open and
+close items by their chevrons, the arrow keys or code. Scroll views now
+keep a table's header above its rows. Both are read from nibs. They were Gas
+Mask's next known need and are most likely Sequel Pro's; the apps haven't
+been run again here, for the reason above. Foundation gained `NSIndexSet`
+and `NSSortDescriptor` for them. Not done yet: editing text in a table's
+cells, dragging rows and columns, type-to-select, saved column widths, and
+animations (rows change at once).
+
 ## What the apps need most
 
 Counted over the nine apps:
 
-1. **More views**: `NSTableView` and `NSOutlineView` (with
-   `NSTableColumn` and `NSTableHeaderView`), `NSPopUpButton`,
-   `NSToolbar`, `NSSegmentedControl`,
-   `NSSearchField` and `NSStackView`. Every app's nibs use some of them,
-   and they are now what stops Gas Mask and (most likely) Sequel Pro.
-   (Split views and tab views came in 1.155.)
+1. **More views**: `NSPopUpButton`, `NSToolbar`, `NSSegmentedControl`,
+   `NSSearchField` and `NSStackView`. Every app's nibs use some of them.
+   (Split views and tab views came in 1.155; table and outline views,
+   which stopped Gas Mask and most likely Sequel Pro, in 1.159.)
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.
@@ -159,8 +174,8 @@ Counted over the nine apps:
    MacPass, MacDown, Sequel Pro.
 4. **`NSAlert`, `NSWorkspace`, `NSInvocation`**, and Foundation's
    `NSThread`, `NSTask`/`NSPipe`/`NSFileHandle`, `NSDateFormatter`,
-   `NSXMLDocument`, `NSJSONSerialization` and `NSIndexSet` (each used by
-   five or more of the apps).
+   `NSXMLDocument` and `NSJSONSerialization` (each used by five or more of
+   the apps; `NSIndexSet` came in 1.159).
 5. **Updaters**: three apps' Sparkle frameworks check the Mac's version
    file or the app's code signature at start. Ferry could provide a version
    file of its own and answer the signature check plainly.

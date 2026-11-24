@@ -70,7 +70,9 @@ app's icon in the dock, and menu bar items (`NSStatusItem`, shown in the
 desktop's menu bar over StatusNotifierItem, with their menus). Exceptions work as on a Mac: `@try`/`@catch`/
 `@finally` catch them, and one a program leaves uncaught in its event loop
 is reported and the app carries on. Scroll views, text views (with RTF
-and simple HTML documents), progress indicators and boxes are there too,
+and simple HTML documents), progress indicators, boxes, tab and split
+views, and table and outline views (cell-based or view-based, with
+selection, sorting from the header and resizable columns) are there too,
 and key-value observing, so bindings follow the values they are bound to.
 Ctrl works as Command (and Super too);
 `FERRY_CONTROL_KEY=control` makes it the Mac's Control key instead.
@@ -99,7 +101,7 @@ without a window.
 - **App Store apps.** They are signed and encrypted for Apple's systems. Ferry
   doesn't decrypt, bypass or imitate any of that, and never will.
 - **Most graphical Mac apps, for now.** Ferry's AppKit is young: many
-  views (tables, outline views, pop-up buttons, toolbars, alerts) and the document classes are missing, and
+  views (pop-up buttons, toolbars, alerts) and the document classes are missing, and
   storyboards aren't read. Real apps' nibs (made by Xcode, in both its
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and

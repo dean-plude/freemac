@@ -551,6 +551,7 @@ typedef NS_OPTIONS(NSUInteger, NSAutoresizingMaskOptions) {
 };
 typedef NS_ENUM(NSUInteger, NSFocusRingType) { NSFocusRingTypeDefault = 0, NSFocusRingTypeNone = 1, NSFocusRingTypeExterior = 2 };
 
+typedef NSString *NSUserInterfaceItemIdentifier;
 @interface NSView : NSResponder
 - (instancetype)initWithFrame:(NSRect)frame NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
@@ -575,6 +576,7 @@ typedef NS_ENUM(NSUInteger, NSFocusRingType) { NSFocusRingTypeDefault = 0, NSFoc
 @property BOOL wantsLayer;
 @property CGFloat alphaValue;
 @property (copy) NSString *toolTip;
+@property (copy) NSUserInterfaceItemIdentifier identifier;
 @property NSFocusRingType focusRingType;
 @property (assign) NSView *nextKeyView;
 @property (readonly, assign) NSView *previousKeyView;
@@ -1277,7 +1279,7 @@ typedef NSString *NSNibName;
 
 typedef NSString *NSNibName;
 
-@interface NSNib : NSObject
+@interface NSNib : NSObject <NSCoding>
 - (instancetype)initWithNibNamed:(NSNibName)name bundle:(NSBundle *)bundle;
 - (instancetype)initWithNibData:(NSData *)data bundle:(NSBundle *)bundle;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
@@ -2063,6 +2065,358 @@ typedef NS_OPTIONS(NSUInteger, NSStatusItemBehavior) {
 - (NSInteger)sendActionOn:(NSInteger)mask;
 - (void)popUpStatusItemMenu:(NSMenu *)menu;
 - (void)drawStatusBarBackgroundInRect:(NSRect)rect withHighlight:(BOOL)highlight;
+@end
+
+/* ---- table views and outline views (NSTableView.m, NSOutlineView.m) ------------------ */
+
+/* Cells draw themselves for cell-based tables (and anyone else who asks). */
+@interface NSCell (NSCellDrawing)
+- (void)drawWithFrame:(NSRect)frame inView:(NSView *)view;
+- (void)drawInteriorWithFrame:(NSRect)frame inView:(NSView *)view;
+@property (readonly) NSSize cellSize;
+- (NSSize)cellSizeForBounds:(NSRect)rect;
+- (NSRect)titleRectForBounds:(NSRect)rect;
+- (NSRect)imageRectForBounds:(NSRect)rect;
+- (NSRect)drawingRectForBounds:(NSRect)rect;
+@end
+
+@interface NSColor (NSTableViewColors)
+@property (class, readonly) NSArray<NSColor *> *alternatingContentBackgroundColors;
+@property (class, readonly) NSArray<NSColor *> *controlAlternatingRowBackgroundColors;
+@property (class, readonly) NSColor *selectedContentBackgroundColor, *unemphasizedSelectedContentBackgroundColor;
+@property (class, readonly) NSColor *alternateSelectedControlTextColor, *unemphasizedSelectedTextColor;
+@property (class, readonly) NSColor *selectedControlTextColor;
+@end
+
+@class NSTableView, NSTableColumn, NSTableHeaderView, NSTableRowView, NSOutlineView;
+
+typedef NS_OPTIONS(NSUInteger, NSTableViewGridLineStyle) {
+    NSTableViewGridNone = 0, NSTableViewSolidVerticalGridLineMask = 1 << 0,
+    NSTableViewSolidHorizontalGridLineMask = 1 << 1, NSTableViewDashedHorizontalGridLineMask = 1 << 3,
+};
+typedef NS_ENUM(NSUInteger, NSTableViewColumnAutoresizingStyle) {
+    NSTableViewNoColumnAutoresizing = 0, NSTableViewUniformColumnAutoresizingStyle = 1,
+    NSTableViewSequentialColumnAutoresizingStyle = 2, NSTableViewReverseSequentialColumnAutoresizingStyle = 3,
+    NSTableViewLastColumnOnlyAutoresizingStyle = 4, NSTableViewFirstColumnOnlyAutoresizingStyle = 5,
+};
+typedef NS_ENUM(NSInteger, NSTableViewSelectionHighlightStyle) {
+    NSTableViewSelectionHighlightStyleNone = -1, NSTableViewSelectionHighlightStyleRegular = 0,
+    NSTableViewSelectionHighlightStyleSourceList = 1,
+};
+typedef NS_ENUM(NSInteger, NSTableViewDraggingDestinationFeedbackStyle) {
+    NSTableViewDraggingDestinationFeedbackStyleNone = -1, NSTableViewDraggingDestinationFeedbackStyleRegular = 0,
+    NSTableViewDraggingDestinationFeedbackStyleSourceList = 1, NSTableViewDraggingDestinationFeedbackStyleGap = 2,
+};
+typedef NS_ENUM(NSInteger, NSTableViewRowSizeStyle) {
+    NSTableViewRowSizeStyleDefault = -1, NSTableViewRowSizeStyleCustom = 0, NSTableViewRowSizeStyleSmall = 1,
+    NSTableViewRowSizeStyleMedium = 2, NSTableViewRowSizeStyleLarge = 3,
+};
+typedef NS_ENUM(NSInteger, NSTableViewStyle) {
+    NSTableViewStyleAutomatic = 0, NSTableViewStyleFullWidth = 1, NSTableViewStyleInset = 2,
+    NSTableViewStyleSourceList = 3, NSTableViewStylePlain = 4,
+};
+typedef NS_OPTIONS(NSUInteger, NSTableColumnResizingOptions) {
+    NSTableColumnNoResizing = 0, NSTableColumnAutoresizingMask = 1 << 0, NSTableColumnUserResizingMask = 1 << 1,
+};
+typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
+    NSTableViewAnimationEffectNone = 0x0, NSTableViewAnimationEffectFade = 0x1, NSTableViewAnimationEffectGap = 0x2,
+    NSTableViewAnimationSlideUp = 0x10, NSTableViewAnimationSlideDown = 0x20, NSTableViewAnimationSlideLeft = 0x30,
+    NSTableViewAnimationSlideRight = 0x40,
+};
+typedef NS_ENUM(NSInteger, NSTableViewDropOperation) { NSTableViewDropOn = 0, NSTableViewDropAbove = 1 };
+
+APPKIT_EXTERN NSNotificationName const NSTableViewSelectionDidChangeNotification;
+APPKIT_EXTERN NSNotificationName const NSTableViewSelectionIsChangingNotification;
+APPKIT_EXTERN NSNotificationName const NSTableViewColumnDidMoveNotification;
+APPKIT_EXTERN NSNotificationName const NSTableViewColumnDidResizeNotification;
+APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSTableViewRowViewKey;
+
+@interface NSTableHeaderCell : NSTextFieldCell
+- (void)drawSortIndicatorWithFrame:(NSRect)frame inView:(NSView *)view ascending:(BOOL)ascending
+                          priority:(NSInteger)priority;
+- (NSRect)sortIndicatorRectForBounds:(NSRect)rect;
+@end
+
+@interface NSTableColumn : NSObject <NSCoding>
+- (instancetype)initWithIdentifier:(NSUserInterfaceItemIdentifier)identifier;
+@property (copy) NSUserInterfaceItemIdentifier identifier;
+@property (assign) NSTableView *tableView;
+@property CGFloat width, minWidth, maxWidth;
+@property (copy) NSString *title;
+@property (copy) NSString *headerToolTip;
+@property (retain) __kindof NSTableHeaderCell *headerCell;
+@property (retain) __kindof NSCell *dataCell;
+- (__kindof NSCell *)dataCellForRow:(NSInteger)row;
+@property (getter=isEditable) BOOL editable;
+@property (getter=isHidden) BOOL hidden;
+@property NSTableColumnResizingOptions resizingMask;
+@property (copy) NSSortDescriptor *sortDescriptorPrototype;
+- (void)sizeToFit;
+@end
+
+@protocol NSTableViewDataSource <NSObject>
+@optional
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView;
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (void)tableView:(NSTableView *)tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)column
+              row:(NSInteger)row;
+- (void)tableView:(NSTableView *)tableView sortDescriptorsDidChange:(NSArray<NSSortDescriptor *> *)oldDescriptors;
+- (id<NSPasteboardWriting>)tableView:(NSTableView *)tableView pasteboardWriterForRow:(NSInteger)row;
+- (BOOL)tableView:(NSTableView *)tableView writeRowsWithIndexes:(NSIndexSet *)rows
+     toPasteboard:(NSPasteboard *)pasteboard;
+@end
+
+@protocol NSTableViewDelegate <NSControlTextEditingDelegate>
+@optional
+- (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (NSTableRowView *)tableView:(NSTableView *)tableView rowViewForRow:(NSInteger)row;
+- (void)tableView:(NSTableView *)tableView didAddRowView:(NSTableRowView *)rowView forRow:(NSInteger)row;
+- (void)tableView:(NSTableView *)tableView didRemoveRowView:(NSTableRowView *)rowView forRow:(NSInteger)row;
+- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)column
+              row:(NSInteger)row;
+- (NSCell *)tableView:(NSTableView *)tableView dataCellForTableColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (BOOL)tableView:(NSTableView *)tableView shouldEditTableColumn:(NSTableColumn *)column row:(NSInteger)row;
+- (BOOL)selectionShouldChangeInTableView:(NSTableView *)tableView;
+- (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(NSInteger)row;
+- (NSIndexSet *)tableView:(NSTableView *)tableView
+    selectionIndexesForProposedSelection:(NSIndexSet *)proposedSelectionIndexes;
+- (BOOL)tableView:(NSTableView *)tableView shouldSelectTableColumn:(NSTableColumn *)column;
+- (void)tableView:(NSTableView *)tableView mouseDownInHeaderOfTableColumn:(NSTableColumn *)column;
+- (void)tableView:(NSTableView *)tableView didClickTableColumn:(NSTableColumn *)column;
+- (void)tableView:(NSTableView *)tableView didDragTableColumn:(NSTableColumn *)column;
+- (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row;
+- (BOOL)tableView:(NSTableView *)tableView isGroupRow:(NSInteger)row;
+- (CGFloat)tableView:(NSTableView *)tableView sizeToFitWidthOfColumn:(NSInteger)column;
+- (void)tableViewSelectionDidChange:(NSNotification *)notification;
+- (void)tableViewSelectionIsChanging:(NSNotification *)notification;
+- (void)tableViewColumnDidMove:(NSNotification *)notification;
+- (void)tableViewColumnDidResize:(NSNotification *)notification;
+@end
+
+/* A table of rows and columns. Cell-based tables draw each column's data
+ * cell with the data source's values; view-based tables show the views
+ * the delegate makes. Editing a cell in place isn't done yet. */
+@interface NSTableView : NSControl
+@property (assign) id<NSTableViewDataSource> dataSource;
+@property (assign) id<NSTableViewDelegate> delegate;
+@property (retain) NSTableHeaderView *headerView;
+@property (retain) NSView *cornerView;
+@property (readonly, copy) NSArray<NSTableColumn *> *tableColumns;
+@property (readonly) NSInteger numberOfColumns, numberOfRows;
+- (void)addTableColumn:(NSTableColumn *)column;
+- (void)removeTableColumn:(NSTableColumn *)column;
+- (void)moveColumn:(NSInteger)oldIndex toColumn:(NSInteger)newIndex;
+- (NSInteger)columnWithIdentifier:(NSUserInterfaceItemIdentifier)identifier;
+- (NSTableColumn *)tableColumnWithIdentifier:(NSUserInterfaceItemIdentifier)identifier;
+@property CGFloat rowHeight;
+@property NSSize intercellSpacing;
+@property NSTableViewRowSizeStyle rowSizeStyle;
+@property (readonly) NSTableViewRowSizeStyle effectiveRowSizeStyle;
+@property NSTableViewStyle style;
+@property (readonly) NSTableViewStyle effectiveStyle;
+@property BOOL usesAlternatingRowBackgroundColors;
+@property BOOL usesAutomaticRowHeights;
+@property (copy) NSColor *backgroundColor, *gridColor;
+@property NSTableViewGridLineStyle gridStyleMask;
+@property NSTableViewColumnAutoresizingStyle columnAutoresizingStyle;
+@property NSTableViewSelectionHighlightStyle selectionHighlightStyle;
+@property NSTableViewDraggingDestinationFeedbackStyle draggingDestinationFeedbackStyle;
+@property BOOL allowsColumnReordering, allowsColumnResizing, allowsColumnSelection;
+@property BOOL allowsMultipleSelection, allowsEmptySelection, allowsTypeSelect;
+@property BOOL floatsGroupRows, usesStaticContents, verticalMotionCanBeginDrag;
+@property (copy) NSString *autosaveName;
+@property BOOL autosaveTableColumns;
+@property SEL doubleAction;
+@property (readonly) NSInteger clickedRow, clickedColumn, editedRow, editedColumn;
+@property (copy) NSArray<NSSortDescriptor *> *sortDescriptors;
+@property (retain) NSTableColumn *highlightedTableColumn;
+- (void)setIndicatorImage:(NSImage *)image inTableColumn:(NSTableColumn *)column;
+- (NSImage *)indicatorImageInTableColumn:(NSTableColumn *)column;
+- (void)sizeLastColumnToFit;
+- (void)sizeToFit;
+- (void)tile;
+/* loading */
+- (void)reloadData;
+- (void)reloadDataForRowIndexes:(NSIndexSet *)rows columnIndexes:(NSIndexSet *)columns;
+- (void)noteNumberOfRowsChanged;
+- (void)noteHeightOfRowsWithIndexesChanged:(NSIndexSet *)rows;
+- (void)beginUpdates;
+- (void)endUpdates;
+- (void)insertRowsAtIndexes:(NSIndexSet *)rows withAnimation:(NSTableViewAnimationOptions)options;
+- (void)removeRowsAtIndexes:(NSIndexSet *)rows withAnimation:(NSTableViewAnimationOptions)options;
+- (void)moveRowAtIndex:(NSInteger)oldIndex toIndex:(NSInteger)newIndex;
+/* geometry */
+- (NSRect)rectOfRow:(NSInteger)row;
+- (NSRect)rectOfColumn:(NSInteger)column;
+- (NSRange)rowsInRect:(NSRect)rect;
+- (NSIndexSet *)columnIndexesInRect:(NSRect)rect;
+- (NSRect)frameOfCellAtColumn:(NSInteger)column row:(NSInteger)row;
+- (NSInteger)rowAtPoint:(NSPoint)point;
+- (NSInteger)columnAtPoint:(NSPoint)point;
+- (NSInteger)rowForView:(NSView *)view;
+- (NSInteger)columnForView:(NSView *)view;
+- (void)scrollRowToVisible:(NSInteger)row;
+- (void)scrollColumnToVisible:(NSInteger)column;
+/* selection */
+@property (readonly) NSInteger selectedRow, selectedColumn, numberOfSelectedRows, numberOfSelectedColumns;
+@property (readonly, copy) NSIndexSet *selectedRowIndexes, *selectedColumnIndexes;
+- (void)selectRowIndexes:(NSIndexSet *)indexes byExtendingSelection:(BOOL)extend;
+- (void)selectColumnIndexes:(NSIndexSet *)indexes byExtendingSelection:(BOOL)extend;
+- (void)selectRow:(NSInteger)row byExtendingSelection:(BOOL)extend;
+- (void)deselectRow:(NSInteger)row;
+- (void)deselectColumn:(NSInteger)column;
+- (BOOL)isRowSelected:(NSInteger)row;
+- (BOOL)isColumnSelected:(NSInteger)column;
+- (void)selectAll:(id)sender;
+- (void)deselectAll:(id)sender;
+/* views */
+- (__kindof NSView *)makeViewWithIdentifier:(NSUserInterfaceItemIdentifier)identifier owner:(id)owner;
+- (void)registerNib:(NSNib *)nib forIdentifier:(NSUserInterfaceItemIdentifier)identifier;
+@property (readonly, copy) NSDictionary<NSUserInterfaceItemIdentifier, NSNib *> *registeredNibsByIdentifier;
+- (__kindof NSView *)viewAtColumn:(NSInteger)column row:(NSInteger)row makeIfNecessary:(BOOL)make;
+- (__kindof NSTableRowView *)rowViewAtRow:(NSInteger)row makeIfNecessary:(BOOL)make;
+- (void)enumerateAvailableRowViewsUsingBlock:(void (^)(__kindof NSTableRowView *rowView, NSInteger row))block;
+/* drawing */
+- (void)drawRow:(NSInteger)row clipRect:(NSRect)clip;
+- (void)drawGridInClipRect:(NSRect)clip;
+- (void)drawBackgroundInClipRect:(NSRect)clip;
+- (void)highlightSelectionInClipRect:(NSRect)clip;
+- (NSCell *)preparedCellAtColumn:(NSInteger)column row:(NSInteger)row;
+- (void)editColumn:(NSInteger)column row:(NSInteger)row withEvent:(NSEvent *)event select:(BOOL)select;
+@end
+
+/* The row of column titles above a table; click a title to sort, drag a
+ * divider to resize. */
+@interface NSTableHeaderView : NSView
+@property (assign) NSTableView *tableView;
+@property (readonly) NSInteger draggedColumn, resizedColumn;
+@property (readonly) CGFloat draggedDistance;
+- (NSInteger)columnAtPoint:(NSPoint)point;
+- (NSRect)headerRectOfColumn:(NSInteger)column;
+@end
+
+/* The view behind one row of a view-based table, which draws the row's
+ * selection (and, in an outline view, its disclosure triangle). */
+@interface NSTableRowView : NSView
+@property (getter=isSelected) BOOL selected;
+@property (getter=isEmphasized) BOOL emphasized;
+@property (getter=isGroupRowStyle) BOOL groupRowStyle;
+@property (getter=isFloating) BOOL floating;
+@property (getter=isPreviousRowSelected) BOOL previousRowSelected;
+@property (getter=isNextRowSelected) BOOL nextRowSelected;
+@property NSTableViewSelectionHighlightStyle selectionHighlightStyle;
+@property NSTableViewDraggingDestinationFeedbackStyle draggingDestinationFeedbackStyle;
+@property (copy) NSColor *backgroundColor;
+@property (readonly) NSBackgroundStyle interiorBackgroundStyle;
+@property (readonly) NSInteger numberOfColumns;
+@property CGFloat indentationForDropOperation;
+@property (getter=isTargetForDropOperation) BOOL targetForDropOperation;
+- (void)drawBackgroundInRect:(NSRect)dirtyRect;
+- (void)drawSelectionInRect:(NSRect)dirtyRect;
+- (void)drawSeparatorInRect:(NSRect)dirtyRect;
+- (void)drawDraggingDestinationFeedbackInRect:(NSRect)dirtyRect;
+- (__kindof NSView *)viewAtColumn:(NSInteger)column;
+@end
+
+/* The usual cell view: an optional image view and text field, and the row's
+ * object. */
+@interface NSTableCellView : NSView
+@property (retain) id objectValue;
+@property (assign) IBOutlet NSTextField *textField;
+@property (assign) IBOutlet NSImageView *imageView;
+@property NSBackgroundStyle backgroundStyle;
+@property NSTableViewRowSizeStyle rowSizeStyle;
+@property (retain) NSArray *draggingImageComponents;
+@end
+
+/* An outline: a table whose rows are a tree of items, which open and close
+ * with a disclosure triangle in the outline column. */
+APPKIT_EXTERN NSNotificationName const NSOutlineViewSelectionDidChangeNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewSelectionIsChangingNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewColumnDidMoveNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewColumnDidResizeNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewItemWillExpandNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewItemDidExpandNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewItemWillCollapseNotification;
+APPKIT_EXTERN NSNotificationName const NSOutlineViewItemDidCollapseNotification;
+APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSOutlineViewDisclosureButtonKey;
+APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSOutlineViewShowHideButtonKey;
+enum { NSOutlineViewDropOnItemIndex = -1 };
+
+@protocol NSOutlineViewDataSource <NSObject>
+@optional
+- (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item;
+- (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item;
+- (id)outlineView:(NSOutlineView *)outlineView objectValueForTableColumn:(NSTableColumn *)column byItem:(id)item;
+- (void)outlineView:(NSOutlineView *)outlineView setObjectValue:(id)object forTableColumn:(NSTableColumn *)column
+             byItem:(id)item;
+- (id)outlineView:(NSOutlineView *)outlineView itemForPersistentObject:(id)object;
+- (id)outlineView:(NSOutlineView *)outlineView persistentObjectForItem:(id)item;
+- (void)outlineView:(NSOutlineView *)outlineView sortDescriptorsDidChange:(NSArray<NSSortDescriptor *> *)oldDescriptors;
+- (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outlineView pasteboardWriterForItem:(id)item;
+@end
+
+@protocol NSOutlineViewDelegate <NSControlTextEditingDelegate>
+@optional
+- (NSView *)outlineView:(NSOutlineView *)outlineView viewForTableColumn:(NSTableColumn *)column item:(id)item;
+- (NSTableRowView *)outlineView:(NSOutlineView *)outlineView rowViewForItem:(id)item;
+- (void)outlineView:(NSOutlineView *)outlineView didAddRowView:(NSTableRowView *)rowView forRow:(NSInteger)row;
+- (void)outlineView:(NSOutlineView *)outlineView didRemoveRowView:(NSTableRowView *)rowView forRow:(NSInteger)row;
+- (void)outlineView:(NSOutlineView *)outlineView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)column
+               item:(id)item;
+- (void)outlineView:(NSOutlineView *)outlineView willDisplayOutlineCell:(id)cell
+     forTableColumn:(NSTableColumn *)column item:(id)item;
+- (NSCell *)outlineView:(NSOutlineView *)outlineView dataCellForTableColumn:(NSTableColumn *)column item:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldEditTableColumn:(NSTableColumn *)column item:(id)item;
+- (BOOL)selectionShouldChangeInOutlineView:(NSOutlineView *)outlineView;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldSelectItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldExpandItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldCollapseItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView isGroupItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldShowOutlineCellForItem:(id)item;
+- (CGFloat)outlineView:(NSOutlineView *)outlineView heightOfRowByItem:(id)item;
+- (void)outlineView:(NSOutlineView *)outlineView mouseDownInHeaderOfTableColumn:(NSTableColumn *)column;
+- (void)outlineView:(NSOutlineView *)outlineView didClickTableColumn:(NSTableColumn *)column;
+- (void)outlineViewSelectionDidChange:(NSNotification *)notification;
+- (void)outlineViewSelectionIsChanging:(NSNotification *)notification;
+- (void)outlineViewColumnDidMove:(NSNotification *)notification;
+- (void)outlineViewColumnDidResize:(NSNotification *)notification;
+- (void)outlineViewItemWillExpand:(NSNotification *)notification;
+- (void)outlineViewItemDidExpand:(NSNotification *)notification;
+- (void)outlineViewItemWillCollapse:(NSNotification *)notification;
+- (void)outlineViewItemDidCollapse:(NSNotification *)notification;
+@end
+
+@interface NSOutlineView : NSTableView
+@property (assign) id<NSOutlineViewDataSource> dataSource;
+@property (assign) id<NSOutlineViewDelegate> delegate;
+@property (assign) NSTableColumn *outlineTableColumn;
+@property CGFloat indentationPerLevel;
+@property BOOL indentationMarkerFollowsCell, autoresizesOutlineColumn, autosaveExpandedItems;
+@property BOOL stronglyReferencesItems;
+- (BOOL)isExpandable:(id)item;
+- (NSInteger)numberOfChildrenOfItem:(id)item;
+- (id)child:(NSInteger)index ofItem:(id)item;
+- (void)expandItem:(id)item;
+- (void)expandItem:(id)item expandChildren:(BOOL)expandChildren;
+- (void)collapseItem:(id)item;
+- (void)collapseItem:(id)item collapseChildren:(BOOL)collapseChildren;
+- (BOOL)isItemExpanded:(id)item;
+- (void)reloadItem:(id)item;
+- (void)reloadItem:(id)item reloadChildren:(BOOL)reloadChildren;
+- (id)itemAtRow:(NSInteger)row;
+- (NSInteger)rowForItem:(id)item;
+- (NSInteger)levelForItem:(id)item;
+- (NSInteger)levelForRow:(NSInteger)row;
+- (id)parentForItem:(id)item;
+- (NSInteger)childIndexForItem:(id)item;
+- (NSRect)frameOfOutlineCellAtRow:(NSInteger)row;
+- (void)insertItemsAtIndexes:(NSIndexSet *)indexes inParent:(id)parent
+               withAnimation:(NSTableViewAnimationOptions)options;
+- (void)removeItemsAtIndexes:(NSIndexSet *)indexes inParent:(id)parent
+               withAnimation:(NSTableViewAnimationOptions)options;
+- (void)moveItemAtIndex:(NSInteger)fromIndex inParent:(id)oldParent toIndex:(NSInteger)toIndex inParent:(id)newParent;
 @end
 
 #endif

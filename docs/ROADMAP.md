@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.159 "Ferry: tables and outlines" (done)
+
+Mac programs run through Ferry can show lists, tables and outlines, the views
+most Mac apps are built around.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Table views (`NSTableView`, `NSTableColumn`, `NSTableHeaderView`, `NSTableRowView`, `NSTableCellView`): cell-based tables drawing text, check box, radio and image cells, and view-based tables making views only for the rows in sight and reusing them | Ferry AppKit | done |
+| 2 | Columns sized, hidden, moved and resized by dragging the header, by every autoresizing style and to fit; header clicks sort, with Ferry's own sort arrow | Ferry AppKit | done |
+| 3 | Rows of fixed or the delegate's heights, alternating colours, grid lines; inserted, removed and moved, with updates batched | Ferry AppKit | done |
+| 4 | Selection by click, shift- and command-click, dragging and the arrow keys, with the delegate's say; clicked row and column, action and double action; regular and source-list highlighting | Ferry AppKit | done |
+| 5 | Outline views (`NSOutlineView`): chevrons, indentation, items and rows both ways, opening and closing (whole subtrees too), the delegate's say and notifications, left and right keys | Ferry AppKit | done |
+| 6 | Both from nibs, with prototype cell views; `NSIndexSet` and `NSSortDescriptor` in Foundation | Ferry AppKit, Foundation | done |
+| 7 | A test that clicks, sorts, resizes, opens and closes them (67 tests) | Ferry tests | done |
+
 ## 1.157 "Ferry: menu bar items" (done)
 
 Mac programs run through Ferry put their own items in freemac's menu bar.
