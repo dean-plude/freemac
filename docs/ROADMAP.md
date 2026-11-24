@@ -1182,7 +1182,8 @@ Hull's Restore, as in a Mac's Disk Utility: copy a disk image onto a drive, the 
 | 3 | Its volumes are unmounted first (hidden ones too); something still using them is named in plain words | disk_images.py | done |
 | 4 | A window with a progress bar, how much is copied, and Stop; a stopped restore explains that the drive holds only part of the image | Hull | done |
 | 5 | No password for an administrator at the computer, as for erasing (polkit open-device for drives that aren't the system's) | polkit rules | done |
-| 6 | Guide topic, README rows and screenshots | Guide, Docs | done |
+| 6 | Hull's Open Disk Image… and Hatch's chooser open in Downloads too | Hull, Hatch | done |
+| 7 | Guide topic, README rows and screenshots | Guide, Docs | done |
 
 ## 1.148 "Applications" (done)
 

@@ -685,6 +685,9 @@ class Window(Gtk.ApplicationWindow):
         for mime in disk_images.MIME_TYPES:
             only.add_mime_type(mime)
         dialog.add_filter(only)
+        downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
+        if downloads and os.path.isdir(downloads):
+            dialog.set_current_folder(downloads)
         if dialog.run() == Gtk.ResponseType.ACCEPT:
             try:
                 Gio.Subprocess.new(["freemac-hatch", dialog.get_filename()], Gio.SubprocessFlags.NONE)
