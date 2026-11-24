@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.215 "Ferry: global hotkeys and moving windows" (done)
+
+Ferry 0.41.0: Mac window managers and clipboard apps do their main jobs on freemac's desktop, with the user's say.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `RegisterEventHotKey` bound by Strata, with each press sent only to the app that registered it | Ferry Carbon, Strata | done |
+| 2 | Carbon event handlers and global and local key monitors for those hotkeys | Ferry Carbon, AppKit | done |
+| 3 | The Accessibility API for windows: focused app and window, title, position, size, minimize, full screen and raise, through Wayfire's IPC | Ferry ApplicationServices | done |
+| 4 | Asked once per app ("Allow … to control other windows?"), and changed in Dials > Privacy & Security | Shell, Dials | done |
+| 5 | `NSScreen` for every display, with visible frames, from Wayfire | Ferry AppKit | done |
+| 6 | Four new Ferry tests against a stand-in Wayfire and nine shell tests; `make check` 204 of 204 | Ferry, Shell | done |
+
+Reading other apps' key presses in general (KeyCastr) stays out of reach by design, and what is inside other apps' windows isn't there.
+
 ## 1.214 "Ferry: web pages in Mac apps" (done)
 
 Ferry 0.40.0: Mac apps can show web pages, drawn by this system's WebKitGTK inside their own windows.

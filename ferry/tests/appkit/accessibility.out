@@ -1,0 +1,36 @@
+before asking: trusted 0, focused app -25211 NULL
+with the prompt: 0
+after the user's answer: trusted 1, with options 1
+asked --app-id APP --name appkit_accessibility
+focused app: pid 4242 (0), AXApplication "org.example.Editor", same type 1
+focused window: "Notes" AXStandardWindow at 100,60 size 600x400 (0 0 0 0)
+the focused element is that window 1
+the app's windows: 3 (0)
+  window: "Notes" AXStandardWindow at 100,60 size 600x400 (0 0 0 0)
+  window: "Other notes" AXStandardWindow at -1870,50 size 500x300 (0 0 0 0)
+  window: "Save changes?" AXDialog at 200,100 size 300x120 (0 0 0 0)
+position settable 1, title settable 0
+size 0, position 0, size 0
+moved: "Notes" AXStandardWindow at 0,28 size 640x772 (0 0 0 0)
+onto the main display 0
+moved: "Other notes" AXStandardWindow at 100,100 size 500x300 (0 0 0 0)
+browser window: "Web" AXStandardWindow at -1920,0 size 1920x1080 (0 0 0 0)
+minimize 0, raise 0
+focused app now pid 5151, the browser 1
+unknown attribute -25205 NULL
+position from a size -25201, read as a point 0, type 2
+a rectangle and back 1 1 2 3 4, value type 1
+screens 2, the main one first 1
+eDP-1 (2): frame 0,0 1280x800
+  visible 0,0 1280x772
+DP-1 (1): frame -1920,-280 1920x1080
+  visible -1920,-280 1920x1080
+wayfire: configure-view 10 100,60 640x772
+wayfire: configure-view 10 0,28 640x772
+wayfire: configure-view 10 0,28 640x772
+wayfire: configure-view 11 100,100 500x300 output 2
+wayfire: set-minimized 12 true
+wayfire: focus-view 12
+kept for the app: appkit_accessibility, allowed 1
+turned off: trusted 0, move -25211
+exit=0

@@ -494,3 +494,79 @@ static SEL command_for(unichar c, NSEventModifierFlags f)
     }
 }
 @end
+
+/* ---- event monitors (freemac 1.215, Ferry 0.41.0) -----------------------------------
+ * A local monitor's block sees each event of its kinds that the app sends
+ * itself (-[NSApplication sendEvent:]) and returns the event to go on with,
+ * another one, or nil to drop it. A global monitor's block sees events sent
+ * to other apps; on freemac no app sees another's keys, so the only events a
+ * global monitor gets are key-downs for the app's own registered hotkeys
+ * (Carbon.m), whichever app is in front. */
+
+@interface AEventMonitor : NSObject {
+@public
+    NSEventMask mask;
+    id block;
+    BOOL global;
+}
+@end
+@implementation AEventMonitor
+- (void)dealloc
+{
+    [block release];
+    [super dealloc];
+}
+@end
+
+static NSMutableArray *monitors;
+
+static id add_monitor(NSEventMask mask, id block, BOOL global)
+{
+    if (!block)
+        return nil;
+    if (!monitors)
+        monitors = [[NSMutableArray alloc] init];
+    AEventMonitor *m = [[AEventMonitor alloc] init];
+    m->mask = mask;
+    m->block = [block copy];
+    m->global = global;
+    [monitors addObject:m];
+    return [m autorelease];
+}
+
+@implementation NSEvent (FerryMonitors)
++ (id)addLocalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(NSEvent * (^)(NSEvent *))block
+{
+    return add_monitor(mask, block, NO);
+}
++ (id)addGlobalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(void (^)(NSEvent *))block
+{
+    return add_monitor(mask, block, YES);
+}
++ (void)removeMonitor:(id)monitor
+{
+    if (monitor)
+        [monitors removeObjectIdenticalTo:monitor];
+}
+@end
+
+NSEvent *ALocalMonitorsFilter(NSEvent *event)
+{
+    if (![monitors count])
+        return event;
+    for (AEventMonitor *m in [[monitors copy] autorelease]) {
+        if (m->global || !(m->mask & NSEventMaskFromType([event type])) || ![monitors containsObject:m])
+            continue;
+        event = ((NSEvent * (^)(NSEvent *)) m->block)(event);
+        if (!event)
+            return nil;
+    }
+    return event;
+}
+
+void AGlobalMonitorsDeliver(NSEvent *event)
+{
+    for (AEventMonitor *m in [[monitors copy] autorelease])
+        if (m->global && (m->mask & NSEventMaskFromType([event type])) && [monitors containsObject:m])
+            ((void (^)(NSEvent *))m->block)(event);
+}

@@ -4233,4 +4233,8 @@ typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
 
 APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
+/* ---- event monitors (NSEvent.m), (freemac 1.215, Ferry 0.41.0) ---------------------- */
+
+#import <AppKit/NSEventMonitors.h>
+
 #endif

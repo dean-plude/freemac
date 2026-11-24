@@ -78,6 +78,11 @@ unsigned short AMacKeyCode(uint16_t evdevPlusEight);
 NSString *ACharactersForKeyval(unsigned keyval, unsigned state, BOOL ignoringModifiers);
 void ASetCurrentModifiers(NSEventModifierFlags flags);
 void ASetMouseLocation(NSPoint screenPoint, NSUInteger buttons);
+/* Event monitors (NSEvent.m, freemac 1.215, Ferry 0.41.0): what the local
+ * monitors make of an event the app sends itself (nil: dropped), and an
+ * event handed to the global monitors (the app's own hotkeys). */
+NSEvent *ALocalMonitorsFilter(NSEvent *event);
+void AGlobalMonitorsDeliver(NSEvent *event);
 
 /* ---- windows and views --------------------------------------------------------------- */
 

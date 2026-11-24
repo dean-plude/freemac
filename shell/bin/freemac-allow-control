@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Asks once whether a Mac app may control other apps' windows (Ferry's
+# Accessibility API); see freemac_shell/window_control.py.
+import sys
+
+from freemac_shell.window_control import main
+
+sys.exit(main())

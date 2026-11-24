@@ -11,6 +11,13 @@ Wayland. It does everything the stock plugin does, plus:
   `org.gtk.Actions`) and show them in the bar
 - with `[strata-shell] global_menus = true` (the default) it tells GTK apps
   the desktop shows their menu bar, so they leave it out of the window
+- it keeps Mac apps' global shortcuts for Ferry (`strata/hotkeys/register`,
+  `unregister` and `clear`, in `app-hotkeys.hpp`, freemac 1.215): each
+  registered combination is bound as a Wayfire key binding, and a press is
+  sent as one datagram to the app's own socket in
+  `$XDG_RUNTIME_DIR/ferry/`. Only those combinations reach the app, and
+  each needs Command, Option or Control (or is a function key), so no app
+  can read other keys this way
 
 This is a modified copy of `plugins/protocols/gtk-shell.cpp` and
 `proto/gtk-shell.xml` from the Wayfire snapshot that Ubuntu 24.04 ships

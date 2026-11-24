@@ -1,45 +1,471 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * The few Carbon and Accessibility calls that Cocoa apps still make, served
  * from AppKit's file (Carbon links here, as Cocoa does), written from
- * Apple's public documentation of each call. What they ask for mostly can't
- * be had on this desktop, so each call answers the way a Mac does when the
- * thing isn't available, and the app carries on:
+ * Apple's public documentation of each call.
  *
- * - Global hotkeys (RegisterEventHotKey): accepted, but never pressed.
- *   Wayland doesn't let one app see the keys pressed in another.
+ * - Global hotkeys (RegisterEventHotKey), from freemac 1.215 (Ferry
+ *   0.41.0): on freemac's own compositor, Strata registers the combination
+ *   (AWayfire.m) and each press reaches the app's Carbon event handlers as
+ *   kEventHotKeyPressed and then kEventHotKeyReleased, and its global event
+ *   monitors (NSEvent.m) as a key-down. Only the combinations the app
+ *   registered are ever seen, never other keys. Elsewhere (no Wayfire, or a
+ *   Wayfire without Strata) a hotkey is accepted but never pressed, as
+ *   before: Wayland doesn't let one app see the keys pressed in another.
  * - Keyboard layouts (TIS..., UCKeyTranslate): there is a current input
  *   source, but it has no Mac key layout data, so key names can't be
  *   translated from it (apps then fall back to their own tables).
- * - Accessibility (AX...): this process is never trusted, as on a Mac
- *   before the user allows it; one app may not move another's windows.
+ * - Accessibility (AX...), from freemac 1.215 (Ferry 0.41.0): enough of
+ *   the API for a window manager such as Spectacle or ShiftIt to find the
+ *   focused app and its focused window, read their titles and move and
+ *   resize the window, through Wayfire's window-rules calls. As on a Mac,
+ *   this needs the user's say: AXIsProcessTrustedWithOptions with the
+ *   prompt option asks once (freemac-allow-control, from freemac's shell),
+ *   the answer is kept in ~/.config/freemac/window-control.json, and Dials >
+ *   Privacy & Security can turn it off again. Until then every call answers
+ *   kAXErrorAPIDisabled, as a Mac does before the user allows the app.
  * - Processes (GetCurrentProcess, TransformProcessType...): the process
  *   itself only. */
 #import "AInternal.h"
+#import "AWayfire.h"
+#include <Carbon/Carbon.h>
+#include <math.h>
 #include <unistd.h>
 
-typedef int32_t OSStatus;
-typedef uint32_t OptionBits;
 typedef struct {
     uint32_t highLongOfPSN, lowLongOfPSN;
 } ProcessSerialNumber;
-typedef struct {
-    uint32_t signature, id;
-} EventHotKeyID;
 
-enum {
-    noErr = 0,
-    paramErr = -50,
-    procNotFound = -600,
-    eventNotHandledErr = -9874,
-    eventParameterNotFoundErr = -9870,
-    kAXErrorAPIDisabled = -25211,
-};
+enum { procNotFound = -600 };
 
 /* Something to hand out where Carbon hands out an opaque reference. */
 @interface ACarbonRef : NSObject
 @end
 @implementation ACarbonRef
 @end
+
+/* ---- the Carbon Event Manager, as far as hotkeys need it ------------------------ */
+
+@interface ACarbonTarget : NSObject {
+@public
+    NSMutableArray *handlers;    /* the newest first, as Carbon calls them */
+}
+@end
+@implementation ACarbonTarget
+- (instancetype)init
+{
+    if ((self = [super init]))
+        handlers = [[NSMutableArray alloc] init];
+    return self;
+}
+@end
+
+@interface ACarbonHandler : NSObject {
+@public
+    EventHandlerUPP proc;
+    void *userData;
+    NSMutableData *types;
+    ACarbonTarget *target;       /* not retained: the target keeps the handler */
+}
+@end
+@implementation ACarbonHandler
+- (BOOL)wantsClass:(UInt32)cls kind:(UInt32)kind
+{
+    const EventTypeSpec *t = [types bytes];
+    for (NSUInteger i = 0; i < [types length] / sizeof *t; i++)
+        if (t[i].eventClass == cls && t[i].eventKind == kind)
+            return YES;
+    return NO;
+}
+- (void)dealloc
+{
+    [types release];
+    [super dealloc];
+}
+@end
+
+@interface ACarbonEvent : NSObject {
+@public
+    UInt32 cls, kind;
+    EventHotKeyID hotKey;
+    EventTime time;
+}
+@end
+@implementation ACarbonEvent
+@end
+
+/* What a handler is given as its call reference: where it is in the chain,
+ * so that CallNextEventHandler can go on from there. */
+@interface ACarbonCall : NSObject {
+@public
+    NSArray *chain;
+    NSUInteger index;
+    BOOL passedOn;
+}
+@end
+@implementation ACarbonCall
+- (void)dealloc
+{
+    [chain release];
+    [super dealloc];
+}
+@end
+
+static ACarbonTarget *application_target, *dispatcher_target, *monitor_target;
+
+static ACarbonTarget *named_target(ACarbonTarget **slot)
+{
+    if (!*slot)
+        *slot = [[ACarbonTarget alloc] init];
+    return *slot;
+}
+
+EventTargetRef GetApplicationEventTarget(void) { return (EventTargetRef)named_target(&application_target); }
+EventTargetRef GetEventDispatcherTarget(void) { return (EventTargetRef)named_target(&dispatcher_target); }
+EventTargetRef GetEventMonitorTarget(void) { return (EventTargetRef)named_target(&monitor_target); }
+
+EventHandlerUPP NewEventHandlerUPP(EventHandlerProcPtr proc) { return proc; }
+void DisposeEventHandlerUPP(EventHandlerUPP upp) {}
+OSStatus InvokeEventHandlerUPP(EventHandlerCallRef call, EventRef event, void *userData, EventHandlerUPP upp)
+{
+    return upp ? upp(call, event, userData) : eventNotHandledErr;
+}
+
+static BOOL is_target(void *target)
+{
+    return target && (target == application_target || target == dispatcher_target || target == monitor_target);
+}
+
+OSStatus InstallEventHandler(EventTargetRef target, EventHandlerUPP proc, UInt32 count, const EventTypeSpec *types,
+                             void *userData, EventHandlerRef *outRef)
+{
+    ACarbonHandler *h = [[ACarbonHandler alloc] init];
+    h->proc = proc;
+    h->userData = userData;
+    h->types = [[NSMutableData alloc] initWithBytes:types length:types ? count * sizeof *types : 0];
+    /* a window's target or another of Carbon's is accepted; only the three
+     * above are ever sent anything */
+    if (is_target(target)) {
+        h->target = (ACarbonTarget *)target;
+        [h->target->handlers insertObject:h atIndex:0];
+        [h release];
+    }
+    if (outRef)
+        *outRef = (EventHandlerRef)h;
+    return noErr;
+}
+OSStatus RemoveEventHandler(EventHandlerRef ref)
+{
+    ACarbonHandler *h = (ACarbonHandler *)ref;
+    if (!h)
+        return paramErr;
+    if (h->target)
+        [h->target->handlers removeObjectIdenticalTo:h];
+    else
+        [h release];
+    return noErr;
+}
+OSStatus AddEventTypesToHandler(EventHandlerRef ref, UInt32 count, const EventTypeSpec *types)
+{
+    if (!ref || (count && !types))
+        return paramErr;
+    [((ACarbonHandler *)ref)->types appendBytes:types length:count * sizeof *types];
+    return noErr;
+}
+OSStatus RemoveEventTypesFromHandler(EventHandlerRef ref, UInt32 count, const EventTypeSpec *types)
+{
+    if (!ref || (count && !types))
+        return paramErr;
+    NSMutableData *kept = [NSMutableData data];
+    const EventTypeSpec *have = [((ACarbonHandler *)ref)->types bytes];
+    for (NSUInteger i = 0; i < [((ACarbonHandler *)ref)->types length] / sizeof *have; i++) {
+        BOOL drop = NO;
+        for (UInt32 j = 0; j < count; j++)
+            drop |= have[i].eventClass == types[j].eventClass && have[i].eventKind == types[j].eventKind;
+        if (!drop)
+            [kept appendBytes:&have[i] length:sizeof *have];
+    }
+    [((ACarbonHandler *)ref)->types setData:kept];
+    return noErr;
+}
+
+/* Calls the chain's handlers from index on, until one handles the event
+ * (answers anything but eventNotHandledErr) or passes it on itself. */
+static OSStatus run_chain(NSArray *chain, NSUInteger from, ACarbonEvent *event)
+{
+    for (NSUInteger i = from; i < [chain count]; i++) {
+        ACarbonHandler *h = chain[i];
+        if (!h->proc)
+            continue;
+        ACarbonCall *call = [[ACarbonCall alloc] init];
+        call->chain = [chain retain];
+        call->index = i;
+        OSStatus r = eventNotHandledErr;
+        A_REPORTING(r = h->proc((EventHandlerCallRef)call, (EventRef)event, h->userData);)
+        BOOL passed = call->passedOn;
+        [call release];
+        if (passed || r != eventNotHandledErr)
+            return r;
+    }
+    return eventNotHandledErr;
+}
+
+OSStatus CallNextEventHandler(EventHandlerCallRef ref, EventRef event)
+{
+    ACarbonCall *call = (ACarbonCall *)ref;
+    if (!call || !event)
+        return paramErr;
+    call->passedOn = YES;
+    return run_chain(call->chain, call->index + 1, (ACarbonEvent *)event);
+}
+
+/* The event dispatcher's handlers see an event first, then its target's,
+ * then the application's. */
+static void send_carbon_event(ACarbonEvent *event, ACarbonTarget *target)
+{
+    NSMutableArray *chain = [NSMutableArray array];
+    NSMutableArray *targets = [NSMutableArray array];
+    for (ACarbonTarget *t in @[ named_target(&dispatcher_target), target ?: named_target(&application_target),
+                                named_target(&application_target) ])
+        if (![targets containsObject:t])
+            [targets addObject:t];
+    for (ACarbonTarget *t in targets)
+        for (ACarbonHandler *h in t->handlers)
+            if ([h wantsClass:event->cls kind:event->kind])
+                [chain addObject:h];
+    if ([chain count])
+        run_chain(chain, 0, event);
+}
+
+OSStatus GetEventParameter(EventRef ref, EventParamName name, EventParamType type, EventParamType *outType,
+                           unsigned long size, unsigned long *outSize, void *data)
+{
+    ACarbonEvent *event = (ACarbonEvent *)ref;
+    if (!event || ![(id)event isKindOfClass:[ACarbonEvent class]])
+        return paramErr;
+    if (event->cls == kEventClassKeyboard && name == kEventParamDirectObject &&
+        (type == typeEventHotKeyID || type == typeWildCard)) {
+        if (outType)
+            *outType = typeEventHotKeyID;
+        if (outSize)
+            *outSize = sizeof(EventHotKeyID);
+        if (data)
+            memcpy(data, &event->hotKey, size < sizeof(EventHotKeyID) ? size : sizeof(EventHotKeyID));
+        return noErr;
+    }
+    return eventParameterNotFoundErr;
+}
+UInt32 GetEventClass(EventRef ref)
+{
+    return ref && [(id)ref isKindOfClass:[ACarbonEvent class]] ? ((ACarbonEvent *)ref)->cls : 0;
+}
+UInt32 GetEventKind(EventRef ref)
+{
+    return ref && [(id)ref isKindOfClass:[ACarbonEvent class]] ? ((ACarbonEvent *)ref)->kind : 0;
+}
+EventTime GetEventTime(EventRef ref)
+{
+    return ref && [(id)ref isKindOfClass:[ACarbonEvent class]] ? ((ACarbonEvent *)ref)->time : 0;
+}
+EventRef RetainEvent(EventRef ref) { return (EventRef)[(id)ref retain]; }
+void ReleaseEvent(EventRef ref) { [(id)ref release]; }
+
+OSStatus CopySymbolicHotKeys(CFArrayRef *out)
+{
+    if (out)
+        *out = (CFArrayRef)[[NSArray alloc] init];
+    return noErr;
+}
+
+/* ---- global hotkeys --------------------------------------------------------------- */
+
+@interface ACarbonHotKey : NSObject {
+@public
+    UInt32 keyCode, modifiers;
+    EventHotKeyID hotKeyID;
+    ACarbonTarget *target;
+    int64_t strataID, tag;
+}
+@end
+@implementation ACarbonHotKey
+@end
+
+static NSMutableDictionary *hotkeys;        /* tag -> ACarbonHotKey */
+static int64_t next_tag = 1;
+
+/* A Mac virtual key code's Linux key number (AMacKeyCode, read backwards). */
+static int linux_key_for(UInt32 mac)
+{
+    static int16_t table[128];
+    static BOOL made;
+    if (!made) {
+        for (int i = 0; i < 128; i++)
+            table[i] = -1;
+        for (int key = 1; key < 128; key++) {
+            unsigned short code = AMacKeyCode((uint16_t)(key + 8));
+            if (code < 128 && table[code] < 0)
+                table[code] = (int16_t)key;
+        }
+        table[0] = 30;     /* A */
+        made = YES;
+    }
+    return mac < 128 ? table[mac] : -1;
+}
+
+static NSArray *modifier_names(UInt32 m)
+{
+    NSMutableArray *names = [NSMutableArray array];
+    if (m & cmdKey)
+        [names addObject:@"command"];
+    if (m & (optionKey | (1 << 14)))       /* rightOptionKey */
+        [names addObject:@"option"];
+    if (m & (controlKey | (1 << 15)))      /* rightControlKey */
+        [names addObject:@"control"];
+    if (m & (shiftKey | (1 << 13)))        /* rightShiftKey */
+        [names addObject:@"shift"];
+    return names;
+}
+
+static NSEventModifierFlags flags_for(UInt32 m)
+{
+    NSEventModifierFlags f = 0;
+    if (m & cmdKey)
+        f |= NSEventModifierFlagCommand;
+    if (m & (optionKey | (1 << 14)))
+        f |= NSEventModifierFlagOption;
+    if (m & (controlKey | (1 << 15)))
+        f |= NSEventModifierFlagControl;
+    if (m & (shiftKey | (1 << 13)))
+        f |= NSEventModifierFlagShift;
+    return f;
+}
+
+/* The characters a key types, for the key-down a global monitor is given:
+ * the letters, digits and function keys hotkeys are made of. */
+static NSString *characters_for(UInt32 mac)
+{
+    static const char ansi[0x33] = "asdfhgzxcv\0bqweryt123465=97-80]ou[ip\rlj'k;\\,/nm.\t `";
+    unichar c = 0;
+    switch (mac) {
+    case 0x7B: c = NSLeftArrowFunctionKey; break;
+    case 0x7C: c = NSRightArrowFunctionKey; break;
+    case 0x7D: c = NSDownArrowFunctionKey; break;
+    case 0x7E: c = NSUpArrowFunctionKey; break;
+    case 0x73: c = NSHomeFunctionKey; break;
+    case 0x77: c = NSEndFunctionKey; break;
+    case 0x74: c = NSPageUpFunctionKey; break;
+    case 0x79: c = NSPageDownFunctionKey; break;
+    case 0x33: c = NSDeleteCharacter; break;
+    case 0x35: c = 0x1b; break;
+    case 0x7A: c = NSF1FunctionKey; break;
+    case 0x78: c = NSF2FunctionKey; break;
+    case 0x63: c = NSF3FunctionKey; break;
+    case 0x76: c = NSF4FunctionKey; break;
+    case 0x60: c = NSF5FunctionKey; break;
+    case 0x61: c = NSF6FunctionKey; break;
+    case 0x62: c = NSF7FunctionKey; break;
+    case 0x64: c = NSF8FunctionKey; break;
+    case 0x65: c = NSF9FunctionKey; break;
+    case 0x6D: c = NSF10FunctionKey; break;
+    case 0x67: c = NSF11FunctionKey; break;
+    case 0x6F: c = NSF12FunctionKey; break;
+    default:
+        if (mac < sizeof ansi)
+            c = (unsigned char)ansi[mac];
+    }
+    return c ? [NSString stringWithCharacters:&c length:1] : @"";
+}
+
+static void hotkey_pressed(int64_t tag)
+{
+    ACarbonHotKey *hk = [[hotkeys[@(tag)] retain] autorelease];
+    if (!hk)
+        return;
+    EventTime now = [[NSProcessInfo processInfo] systemUptime];
+    for (UInt32 kind = kEventHotKeyPressed; kind <= kEventHotKeyReleased; kind++) {
+        ACarbonEvent *event = [[ACarbonEvent alloc] init];
+        event->cls = kEventClassKeyboard;
+        event->kind = kind;
+        event->hotKey = hk->hotKeyID;
+        event->time = now;
+        send_carbon_event(event, hk->target);
+        [event release];
+    }
+    NSString *chars = characters_for(hk->keyCode);
+    for (NSEventType type = NSEventTypeKeyDown; type <= NSEventTypeKeyUp; type++) {
+        NSEvent *e = [NSEvent keyEventWithType:type location:NSZeroPoint modifierFlags:flags_for(hk->modifiers)
+                                     timestamp:now windowNumber:0 context:nil characters:chars
+                   charactersIgnoringModifiers:chars isARepeat:NO keyCode:(unsigned short)hk->keyCode];
+        AGlobalMonitorsDeliver(e);
+    }
+}
+
+static void hotkeys_unavailable(void)
+{
+    AWarnOnce("global keyboard shortcuts (the app's shortcut is kept but never pressed)");
+}
+
+OSStatus RegisterEventHotKey(UInt32 keyCode, UInt32 modifiers, EventHotKeyID hotKeyID, EventTargetRef target,
+                             OptionBits options, EventHotKeyRef *outRef)
+{
+    if (outRef)
+        *outRef = NULL;
+    ACarbonHotKey *hk = [[ACarbonHotKey alloc] init];
+    hk->keyCode = keyCode;
+    hk->modifiers = modifiers;
+    hk->hotKeyID = hotKeyID;
+    hk->target = is_target(target) ? (ACarbonTarget *)target : named_target(&application_target);
+    hk->tag = next_tag++;
+    int key = linux_key_for(keyCode);
+    NSString *socket = AWayfireAvailable() ? AWayfireHotkeySocket(hotkey_pressed) : nil;
+    if (!socket) {
+        hotkeys_unavailable();
+    } else if (key < 0) {
+        [hk release];
+        return eventHotKeyInvalidErr;
+    } else {
+        id reply = AWayfireCall(@"strata/hotkeys/register", @{
+            @"key" : @(key),
+            @"modifiers" : modifier_names(modifiers),
+            @"socket" : socket,
+            @"tag" : @(hk->tag),
+        });
+        NSString *error = AWayfireError(reply);
+        if ([error isEqual:@"taken"]) {
+            [hk release];
+            return eventHotKeyExistsErr;
+        }
+        if (error && [error hasPrefix:@"No such method"]) {
+            hotkeys_unavailable();      /* a Wayfire without Strata */
+        } else if (error) {
+            [hk release];
+            return eventHotKeyInvalidErr;
+        } else {
+            hk->strataID = [reply[@"id"] longLongValue];
+            if (!hotkeys)
+                hotkeys = [[NSMutableDictionary alloc] init];
+            hotkeys[@(hk->tag)] = hk;
+        }
+    }
+    if (outRef)
+        *outRef = (EventHotKeyRef)hk;
+    else
+        [hk autorelease];
+    return noErr;
+}
+
+OSStatus UnregisterEventHotKey(EventHotKeyRef ref)
+{
+    ACarbonHotKey *hk = (ACarbonHotKey *)ref;
+    if (!hk)
+        return paramErr;
+    if (hk->strataID)
+        AWayfireCall(@"strata/hotkeys/unregister", @{@"id" : @(hk->strataID)});
+    [hotkeys removeObjectForKey:@(hk->tag)];
+    [hk release];
+    return noErr;
+}
+
+/* ---- keyboard input sources ---------------------------------------------------- */
 
 static id carbon_ref(void)
 {
@@ -48,54 +474,6 @@ static id carbon_ref(void)
         ref = [[ACarbonRef alloc] init];
     return ref;
 }
-
-/* ---- Carbon events and hotkeys -------------------------------------------------- */
-
-void *GetApplicationEventTarget(void) { return carbon_ref(); }
-void *GetEventDispatcherTarget(void) { return carbon_ref(); }
-void *GetEventMonitorTarget(void) { return carbon_ref(); }
-
-OSStatus InstallEventHandler(void *target, void *handler, unsigned long count, const void *types, void *userData,
-                             void **outRef)
-{
-    if (outRef)
-        *outRef = [[ACarbonRef alloc] init];
-    return noErr;
-}
-OSStatus RemoveEventHandler(void *ref)
-{
-    [(id)ref release];
-    return noErr;
-}
-OSStatus RegisterEventHotKey(uint32_t keyCode, uint32_t modifiers, EventHotKeyID hotKeyID, void *target,
-                             OptionBits options, void **outRef)
-{
-    AWarnOnce("global keyboard shortcuts (the app's shortcut is kept but never pressed)");
-    if (outRef)
-        *outRef = [[ACarbonRef alloc] init];
-    return noErr;
-}
-OSStatus UnregisterEventHotKey(void *ref)
-{
-    [(id)ref release];
-    return noErr;
-}
-OSStatus GetEventParameter(void *event, uint32_t name, uint32_t type, uint32_t *outType, unsigned long size,
-                           unsigned long *outSize, void *data)
-{
-    return eventParameterNotFoundErr;
-}
-uint32_t GetEventClass(void *event) { return 0; }
-uint32_t GetEventKind(void *event) { return 0; }
-OSStatus CallNextEventHandler(void *next, void *event) { return eventNotHandledErr; }
-OSStatus CopySymbolicHotKeys(CFArrayRef *out)
-{
-    if (out)
-        *out = (CFArrayRef)[[NSArray alloc] init];
-    return noErr;
-}
-
-/* ---- keyboard input sources ---------------------------------------------------- */
 
 void *TISCopyCurrentKeyboardInputSource(void) { return [carbon_ref() retain]; }
 void *TISCopyCurrentKeyboardLayoutInputSource(void) { return [carbon_ref() retain]; }
@@ -142,34 +520,750 @@ CFDictionaryRef ProcessInformationCopyDictionary(const ProcessSerialNumber *psn,
 const char *GetMacOSStatusCommentString(OSStatus err) { return ""; }
 const char *GetMacOSStatusErrorString(OSStatus err) { return ""; }
 
-/* ---- Accessibility --------------------------------------------------------------- */
+/* ---- Accessibility: the user's say ------------------------------------------------ */
 
-Boolean AXIsProcessTrusted(void) { return false; }
-Boolean AXIsProcessTrustedWithOptions(CFDictionaryRef options) { return false; }
-Boolean AXAPIEnabled(void) { return false; }
-void *AXUIElementCreateApplication(pid_t pid) { return [[ACarbonRef alloc] init]; }
-void *AXUIElementCreateSystemWide(void) { return [[ACarbonRef alloc] init]; }
-OSStatus AXUIElementCopyAttributeValue(void *element, CFStringRef attribute, CFTypeRef *value)
+/* The app as the user's answer is kept: its bundle identifier, or its
+ * program's path when it isn't in a bundle. */
+static NSString *app_key(void)
+{
+    NSBundle *b = [NSBundle mainBundle];
+    NSString *identifier = [b bundleIdentifier];
+    if ([identifier length])
+        return identifier;
+    NSString *exe = [b executablePath] ?: [[[NSProcessInfo processInfo] arguments] firstObject];
+    return [exe length] ? [exe stringByStandardizingPath] : [[NSProcessInfo processInfo] processName];
+}
+
+static NSString *app_name(void)
+{
+    NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+    for (NSString *k in @[ @"CFBundleDisplayName", @"CFBundleName" ])
+        if ([info[k] isKindOfClass:[NSString class]] && [info[k] length])
+            return info[k];
+    return [[NSProcessInfo processInfo] processName];
+}
+
+static NSString *grants_path(void)
+{
+    const char *config = getenv("XDG_CONFIG_HOME");
+    NSString *base = config && *config ? @(config) : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+    return [base stringByAppendingPathComponent:@"freemac/window-control.json"];
+}
+
+/* 1 allowed, 0 not allowed, -1 not asked yet. */
+static int stored_answer(void)
+{
+    NSData *d = [NSData dataWithContentsOfFile:grants_path()];
+    id j = d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:NULL] : nil;
+    id apps = [j isKindOfClass:[NSDictionary class]] ? j[@"apps"] : nil;
+    id entry = [apps isKindOfClass:[NSDictionary class]] ? apps[app_key()] : nil;
+    id allowed = [entry isKindOfClass:[NSDictionary class]] ? entry[@"allowed"] : nil;
+    if (![allowed isKindOfClass:[NSNumber class]])
+        return -1;
+    return [allowed boolValue] ? 1 : 0;
+}
+
+/* Asks the user, once, with freemac's own dialog (freemac-allow-control,
+ * which keeps the answer). The app is told it isn't trusted meanwhile, as
+ * on a Mac, and finds out by asking again. */
+static void ask_user(void)
+{
+    static BOOL asked;
+    if (asked)
+        return;
+    asked = YES;
+    const char *forced = getenv("FERRY_ACCESS_ASKER");
+    const char *wl = getenv("WAYLAND_DISPLAY"), *x = getenv("DISPLAY");
+    if (!(forced && *forced) && !(wl && *wl) && !(x && *x))
+        return;    /* no display to ask on */
+    char *found = forced && *forced ? NULL : g_find_program_in_path("freemac-allow-control");
+    NSString *asker = forced && *forced ? @(forced) : found ? @(found) : nil;
+    if (found)
+        g_free(found);
+    if (!asker) {
+        fflush(stdout);
+        fprintf(stderr, "AppKit (Ferry): can't ask whether %s may control other windows "
+                        "(freemac-allow-control isn't installed)\n", [app_name() UTF8String]);
+        return;
+    }
+    char *argv[] = {(char *)[asker fileSystemRepresentation], "--app-id", (char *)[app_key() UTF8String], "--name",
+                    (char *)[app_name() UTF8String], NULL};
+    GError *error = NULL;
+    g_spawn_async(NULL, argv, NULL, G_SPAWN_STDOUT_TO_DEV_NULL, NULL, NULL, NULL, &error);
+    if (error)
+        g_error_free(error);
+}
+
+Boolean AXIsProcessTrusted(void) { return stored_answer() == 1; }
+
+Boolean AXIsProcessTrustedWithOptions(CFDictionaryRef options)
+{
+    int answer = stored_answer();
+    id prompt = options ? [(NSDictionary *)options objectForKey:(id)kAXTrustedCheckOptionPrompt] : nil;
+    if (answer < 0 && [prompt respondsToSelector:@selector(boolValue)] && [prompt boolValue])
+        ask_user();
+    return answer == 1;
+}
+
+/* Before 10.9 a Mac had one switch for every app; here it is this app's. */
+Boolean AXAPIEnabled(void) { return AXIsProcessTrusted(); }
+
+/* ---- Accessibility: elements and values ------------------------------------------- */
+
+enum { AX_SYSTEM_WIDE, AX_APPLICATION, AX_WINDOW };
+
+@interface AAXElement : NSObject {
+@public
+    int kind;
+    pid_t pid;              /* the application's, 0 when only its app id is known */
+    NSString *appID;
+    int64_t view;           /* the window's Wayfire view */
+}
+@end
+@implementation AAXElement
+- (BOOL)isEqual:(id)o
+{
+    if (o == self)
+        return YES;
+    if (![o isKindOfClass:[AAXElement class]])
+        return NO;
+    AAXElement *e = o;
+    if (e->kind != kind)
+        return NO;
+    if (kind == AX_WINDOW)
+        return e->view == view;
+    if (kind == AX_APPLICATION)
+        return (pid && e->pid == pid) || (!pid && !e->pid && [appID isEqual:e->appID]);
+    return YES;
+}
+- (NSUInteger)hash { return (NSUInteger)kind * 31 + (NSUInteger)(kind == AX_WINDOW ? view : pid); }
+- (CFTypeID)_ferryCFTypeID { return (CFTypeID)[AAXElement class]; }
+- (NSString *)description
+{
+    static const char *names[] = {"system-wide", "application", "window"};
+    return [NSString stringWithFormat:@"<AXUIElement %s pid %d view %lld>", names[kind], (int)pid, (long long)view];
+}
+- (void)dealloc
+{
+    [appID release];
+    [super dealloc];
+}
+@end
+
+@interface AAXValue : NSObject {
+@public
+    AXValueType type;
+    union {
+        CGPoint point;
+        CGSize size;
+        CGRect rect;
+        CFRange range;
+        AXError error;
+    } v;
+}
+@end
+@implementation AAXValue
+- (CFTypeID)_ferryCFTypeID { return (CFTypeID)[AAXValue class]; }
+- (BOOL)isEqual:(id)o
+{
+    return [o isKindOfClass:[AAXValue class]] && ((AAXValue *)o)->type == type &&
+           !memcmp(&((AAXValue *)o)->v, &v, sizeof v);
+}
+- (NSUInteger)hash { return type; }
+- (NSString *)description
+{
+    switch (type) {
+    case kAXValueTypeCGPoint: return [NSString stringWithFormat:@"<AXValue point {%g, %g}>", v.point.x, v.point.y];
+    case kAXValueTypeCGSize:
+        return [NSString stringWithFormat:@"<AXValue size {%g, %g}>", v.size.width, v.size.height];
+    default: return [NSString stringWithFormat:@"<AXValue type %u>", type];
+    }
+}
+@end
+
+static size_t value_size(AXValueType type)
+{
+    switch (type) {
+    case kAXValueTypeCGPoint: return sizeof(CGPoint);
+    case kAXValueTypeCGSize: return sizeof(CGSize);
+    case kAXValueTypeCGRect: return sizeof(CGRect);
+    case kAXValueTypeCFRange: return sizeof(CFRange);
+    case kAXValueTypeAXError: return sizeof(AXError);
+    default: return 0;
+    }
+}
+
+CFTypeID AXValueGetTypeID(void) { return (CFTypeID)[AAXValue class]; }
+AXValueRef AXValueCreate(AXValueType type, const void *value)
+{
+    size_t n = value_size(type);
+    if (!n || !value)
+        return NULL;
+    AAXValue *v = [[AAXValue alloc] init];
+    v->type = type;
+    memcpy(&v->v, value, n);
+    return (AXValueRef)v;
+}
+AXValueType AXValueGetType(AXValueRef value)
+{
+    return value && [(id)value isKindOfClass:[AAXValue class]] ? ((AAXValue *)value)->type : kAXValueTypeIllegal;
+}
+Boolean AXValueGetValue(AXValueRef value, AXValueType type, void *out)
+{
+    if (!value || ![(id)value isKindOfClass:[AAXValue class]] || ((AAXValue *)value)->type != type || !out)
+        return false;
+    memcpy(out, &((AAXValue *)value)->v, value_size(type));
+    return true;
+}
+
+CFTypeID AXUIElementGetTypeID(void) { return (CFTypeID)[AAXElement class]; }
+
+static AAXElement *new_element(int kind, pid_t pid, NSString *appID, int64_t view)
+{
+    AAXElement *e = [[AAXElement alloc] init];
+    e->kind = kind;
+    e->pid = pid;
+    e->appID = [appID copy];
+    e->view = view;
+    return e;
+}
+
+AXUIElementRef AXUIElementCreateSystemWide(void) { return (AXUIElementRef)new_element(AX_SYSTEM_WIDE, 0, nil, 0); }
+AXUIElementRef AXUIElementCreateApplication(pid_t pid)
+{
+    return (AXUIElementRef)new_element(AX_APPLICATION, pid, nil, 0);
+}
+
+/* ---- Accessibility: the windows, from Wayfire -------------------------------------- */
+
+/* Where a window was last put, kept a second: Wayfire may still report the
+ * old place until the app has drawn the new one, and a window manager
+ * usually sets the size, then the position, then the size again. */
+@interface APendingPlace : NSObject {
+@public
+    NSRect local;
+    int64_t output;
+    NSTimeInterval when;
+}
+@end
+@implementation APendingPlace
+@end
+static NSMutableDictionary *pending_places;
+
+static NSTimeInterval uptime(void) { return [[NSProcessInfo processInfo] systemUptime]; }
+
+static NSRect json_rect(id j)
+{
+    if (![j isKindOfClass:[NSDictionary class]])
+        return NSZeroRect;
+    return NSMakeRect([j[@"x"] doubleValue], [j[@"y"] doubleValue], [j[@"width"] doubleValue],
+                      [j[@"height"] doubleValue]);
+}
+
+static BOOL is_window(id v)
+{
+    if (![v isKindOfClass:[NSDictionary class]])
+        return NO;
+    id kind = v[@"role"] ?: v[@"type"];
+    id mapped = v[@"mapped"];
+    return [kind isEqual:@"toplevel"] && (!mapped || [mapped boolValue]);
+}
+
+static NSArray *wayfire_windows(void)
+{
+    id list = AWayfireCall(@"window-rules/list-views", nil);
+    if (![list isKindOfClass:[NSArray class]])
+        return nil;
+    NSMutableArray *out = [NSMutableArray array];
+    for (id v in list)
+        if (is_window(v))
+            [out addObject:v];
+    /* the most recently focused first */
+    [out sortUsingComparator:^NSComparisonResult(id a, id b) {
+        double ta = [a[@"last-focus-timestamp"] doubleValue], tb = [b[@"last-focus-timestamp"] doubleValue];
+        return ta > tb ? NSOrderedAscending : ta < tb ? NSOrderedDescending : NSOrderedSame;
+    }];
+    return out;
+}
+
+static NSDictionary *window_by_id(NSArray *windows, int64_t view)
+{
+    for (NSDictionary *v in windows)
+        if ([v[@"id"] longLongValue] == view)
+            return v;
+    return nil;
+}
+
+/* {view id: process id} from Strata, or nil (plain Wayfire doesn't say). */
+static NSDictionary *window_pids(void)
+{
+    id reply = AWayfireCall(@"strata/view-pids", nil);
+    id views = [reply isKindOfClass:[NSDictionary class]] ? reply[@"views"] : nil;
+    if (![views isKindOfClass:[NSArray class]])
+        return nil;
+    NSMutableDictionary *out = [NSMutableDictionary dictionary];
+    for (id v in views)
+        if ([v isKindOfClass:[NSDictionary class]] && v[@"id"] && v[@"pid"])
+            out[@([v[@"id"] longLongValue])] = v[@"pid"];
+    return out;
+}
+
+static int64_t focused_view(void)
+{
+    id reply = AWayfireCall(@"window-rules/get-focused-view", nil);
+    id info = [reply isKindOfClass:[NSDictionary class]] ? reply[@"info"] : nil;
+    return is_window(info) ? [info[@"id"] longLongValue] : 0;
+}
+
+static BOOL belongs_to(NSDictionary *window, AAXElement *app, NSDictionary *pids)
+{
+    if (app->pid && pids)
+        return [pids[@([window[@"id"] longLongValue])] intValue] == app->pid;
+    return app->appID && [window[@"app-id"] isEqual:app->appID];
+}
+
+static AAXElement *application_of(NSDictionary *window, NSDictionary *pids)
+{
+    pid_t pid = pids ? [pids[@([window[@"id"] longLongValue])] intValue] : 0;
+    id appID = [window[@"app-id"] isKindOfClass:[NSString class]] ? window[@"app-id"] : nil;
+    return [new_element(AX_APPLICATION, pid, appID, 0) autorelease];
+}
+
+static NSArray *windows_of(AAXElement *app, NSArray *windows)
+{
+    NSDictionary *pids = app->pid ? window_pids() : nil;
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSDictionary *v in windows)
+        if (belongs_to(v, app, pids))
+            [out addObject:v];
+    return out;
+}
+
+static NSDictionary *output_by_id(NSArray *outputs, int64_t output)
+{
+    for (NSDictionary *o in outputs)
+        if ([o[@"id"] longLongValue] == output)
+            return o;
+    return [outputs firstObject];
+}
+
+/* A window's place in Wayfire: its output and its rectangle there. */
+static NSRect local_place(NSDictionary *window, int64_t *output)
+{
+    int64_t view = [window[@"id"] longLongValue];
+    APendingPlace *p = pending_places[@(view)];
+    if (p && uptime() - p->when < 1.0) {
+        *output = p->output;
+        return p->local;
+    }
+    *output = [window[@"output-id"] longLongValue];
+    return json_rect(window[@"geometry"]);
+}
+
+/* The Accessibility API's rectangle: from the main display's top left,
+ * with y running down. */
+static NSRect ax_frame(NSDictionary *window, NSArray *outputs)
+{
+    int64_t output;
+    NSRect r = local_place(window, &output);
+    NSRect main = [[outputs firstObject][@"frame"] rectValue];
+    NSRect of = [output_by_id(outputs, output)[@"frame"] rectValue];
+    r.origin.x += of.origin.x - main.origin.x;
+    r.origin.y += of.origin.y - main.origin.y;
+    return r;
+}
+
+static AXError put_window(NSDictionary *window, NSArray *outputs, NSRect ax)
+{
+    if (ax.size.width < 1 || ax.size.height < 1 || !isfinite(ax.origin.x) || !isfinite(ax.origin.y))
+        return kAXErrorIllegalArgument;
+    int64_t from;
+    local_place(window, &from);
+    NSRect main = [[outputs firstObject][@"frame"] rectValue];
+    NSRect layout = NSOffsetRect(ax, main.origin.x, main.origin.y);
+    NSPoint centre = NSMakePoint(NSMidX(layout), NSMidY(layout));
+    NSDictionary *to = nil;
+    for (NSDictionary *o in outputs)
+        if (NSPointInRect(centre, [o[@"frame"] rectValue]))
+            to = o;
+    for (NSDictionary *o in outputs)
+        if (!to && NSPointInRect(layout.origin, [o[@"frame"] rectValue]))
+            to = o;
+    if (!to)
+        to = output_by_id(outputs, from);
+    NSRect of = [to[@"frame"] rectValue];
+    NSRect local = NSMakeRect(round(layout.origin.x - of.origin.x), round(layout.origin.y - of.origin.y),
+                              round(layout.size.width), round(layout.size.height));
+    int64_t view = [window[@"id"] longLongValue], output = [to[@"id"] longLongValue];
+    NSMutableDictionary *data = [NSMutableDictionary dictionaryWithDictionary:@{
+        @"id" : @(view),
+        @"geometry" : @{
+            @"x" : @((long long)local.origin.x),
+            @"y" : @((long long)local.origin.y),
+            @"width" : @((long long)local.size.width),
+            @"height" : @((long long)local.size.height),
+        },
+    }];
+    if (output != from)
+        data[@"output_id"] = @(output);
+    id reply = AWayfireCall(@"window-rules/configure-view", data);
+    if (!reply)
+        return kAXErrorCannotComplete;
+    if (AWayfireError(reply))
+        return kAXErrorInvalidUIElement;
+    if (!pending_places)
+        pending_places = [[NSMutableDictionary alloc] init];
+    APendingPlace *p = [[APendingPlace alloc] init];
+    p->local = local;
+    p->output = output;
+    p->when = uptime();
+    pending_places[@(view)] = p;
+    [p release];
+    return kAXErrorSuccess;
+}
+
+static id copy_value(id value) { return value ? [value retain] : nil; }
+
+static id ax_bool(BOOL b) { return b ? (id)kCFBooleanTrue : (id)kCFBooleanFalse; }
+
+static AXValueRef point_value(CGPoint p) { return AXValueCreate(kAXValueTypeCGPoint, &p); }
+static AXValueRef size_value(CGSize s) { return AXValueCreate(kAXValueTypeCGSize, &s); }
+
+/* Every call checks the user's say first, then that there is a Wayfire to
+ * ask. */
+static AXError usable(AXUIElementRef element)
+{
+    if (!element || ![(id)element isKindOfClass:[AAXElement class]])
+        return kAXErrorIllegalArgument;
+    if (!AXIsProcessTrusted())
+        return kAXErrorAPIDisabled;
+    if (!AWayfireAvailable())
+        return kAXErrorCannotComplete;
+    return kAXErrorSuccess;
+}
+
+static NSArray *names_for(AAXElement *e)
+{
+    switch (e->kind) {
+    case AX_SYSTEM_WIDE: return @[ @"AXRole", @"AXFocusedApplication", @"AXFocusedUIElement" ];
+    case AX_APPLICATION:
+        return @[ @"AXRole", @"AXTitle", @"AXWindows", @"AXFocusedWindow", @"AXMainWindow", @"AXFrontmost",
+                  @"AXHidden" ];
+    default:
+        return @[ @"AXRole", @"AXSubrole", @"AXTitle", @"AXPosition", @"AXSize", @"AXMinimized", @"AXFullScreen",
+                  @"AXMain", @"AXFocused", @"AXParent" ];
+    }
+}
+
+AXError AXUIElementCopyAttributeNames(AXUIElementRef element, CFArrayRef *names)
+{
+    AXError r = usable(element);
+    if (r)
+        return r;
+    if (names)
+        *names = (CFArrayRef)[names_for((AAXElement *)element) copy];
+    return kAXErrorSuccess;
+}
+
+static AXError window_attribute(AAXElement *e, NSString *a, id *out)
+{
+    NSArray *windows = wayfire_windows();
+    if (!windows)
+        return kAXErrorCannotComplete;
+    NSDictionary *w = window_by_id(windows, e->view);
+    if (!w)
+        return kAXErrorInvalidUIElement;
+    if ([a isEqual:@"AXRole"])
+        *out = [@"AXWindow" retain];
+    else if ([a isEqual:@"AXSubrole"]) {
+        id parent = w[@"parent"];
+        BOOL dialog = [parent isKindOfClass:[NSNumber class]] && [parent longLongValue] >= 0 &&
+                      window_by_id(windows, [parent longLongValue]);
+        *out = [(dialog ? @"AXDialog" : @"AXStandardWindow") retain];
+    } else if ([a isEqual:@"AXTitle"])
+        *out = [([w[@"title"] isKindOfClass:[NSString class]] ? w[@"title"] : @"") retain];
+    else if ([a isEqual:@"AXPosition"] || [a isEqual:@"AXSize"]) {
+        NSArray *outputs = AWayfireOutputs();
+        if (!outputs)
+            return kAXErrorCannotComplete;
+        NSRect f = ax_frame(w, outputs);
+        *out = [a isEqual:@"AXPosition"] ? (id)point_value(f.origin) : (id)size_value(f.size);
+    } else if ([a isEqual:@"AXMinimized"]) {
+        id state = w[@"state"];
+        id m = w[@"minimized"] ?: ([state isKindOfClass:[NSDictionary class]] ? state[@"minimized"] : nil);
+        *out = ax_bool([m boolValue]);
+    } else if ([a isEqual:@"AXFullScreen"])
+        *out = ax_bool([w[@"fullscreen"] boolValue]);
+    else if ([a isEqual:@"AXMain"] || [a isEqual:@"AXFocused"])
+        *out = ax_bool(focused_view() == e->view);
+    else if ([a isEqual:@"AXParent"]) {
+        NSDictionary *pids = window_pids();
+        *out = [application_of(w, pids) retain];
+    } else
+        return kAXErrorAttributeUnsupported;
+    return kAXErrorSuccess;
+}
+
+static AXError application_attribute(AAXElement *e, NSString *a, id *out)
+{
+    if ([a isEqual:@"AXRole"]) {
+        *out = [@"AXApplication" retain];
+        return kAXErrorSuccess;
+    }
+    if ([a isEqual:@"AXHidden"]) {
+        *out = ax_bool(NO);
+        return kAXErrorSuccess;
+    }
+    NSArray *windows = wayfire_windows();
+    if (!windows)
+        return kAXErrorCannotComplete;
+    NSArray *mine = windows_of(e, windows);
+    if ([a isEqual:@"AXTitle"]) {
+        NSString *title = e->pid == getpid() ? app_name() : e->appID ?: [mine firstObject][@"app-id"];
+        *out = [([title isKindOfClass:[NSString class]] ? title : @"") retain];
+    } else if ([a isEqual:@"AXWindows"]) {
+        NSMutableArray *list = [NSMutableArray array];
+        for (NSDictionary *v in mine)
+            [list addObject:[new_element(AX_WINDOW, e->pid, e->appID, [v[@"id"] longLongValue]) autorelease]];
+        *out = [list copy];
+    } else if ([a isEqual:@"AXFocusedWindow"] || [a isEqual:@"AXMainWindow"]) {
+        /* the most recently focused of the app's windows */
+        NSDictionary *w = [mine firstObject];
+        if (!w)
+            return kAXErrorNoValue;
+        *out = new_element(AX_WINDOW, e->pid, e->appID, [w[@"id"] longLongValue]);
+    } else if ([a isEqual:@"AXFrontmost"]) {
+        int64_t f = focused_view();
+        BOOL front = NO;
+        for (NSDictionary *v in mine)
+            front |= [v[@"id"] longLongValue] == f;
+        *out = ax_bool(front);
+    } else
+        return kAXErrorAttributeUnsupported;
+    return kAXErrorSuccess;
+}
+
+static AXError system_wide_attribute(AAXElement *e, NSString *a, id *out)
+{
+    if ([a isEqual:@"AXRole"]) {
+        *out = [@"AXSystemWide" retain];
+        return kAXErrorSuccess;
+    }
+    if (![a isEqual:@"AXFocusedApplication"] && ![a isEqual:@"AXFocusedUIElement"])
+        return kAXErrorAttributeUnsupported;
+    NSArray *windows = wayfire_windows();
+    if (!windows)
+        return kAXErrorCannotComplete;
+    int64_t f = focused_view();
+    NSDictionary *w = f ? window_by_id(windows, f) : nil;
+    if (!w)
+        return kAXErrorNoValue;
+    AAXElement *app = application_of(w, window_pids());
+    if ([a isEqual:@"AXFocusedApplication"])
+        *out = [app retain];
+    else
+        *out = new_element(AX_WINDOW, app->pid, app->appID, f);
+    return kAXErrorSuccess;
+}
+
+AXError AXUIElementCopyAttributeValue(AXUIElementRef element, CFStringRef attribute, CFTypeRef *value)
 {
     if (value)
         *value = NULL;
-    return kAXErrorAPIDisabled;
+    AXError r = usable(element);
+    if (r)
+        return r;
+    if (!attribute || !value)
+        return kAXErrorIllegalArgument;
+    AAXElement *e = (AAXElement *)element;
+    NSString *a = (NSString *)attribute;
+    id out = nil;
+    @autoreleasepool {
+        r = e->kind == AX_WINDOW        ? window_attribute(e, a, &out)
+            : e->kind == AX_APPLICATION ? application_attribute(e, a, &out)
+                                        : system_wide_attribute(e, a, &out);
+    }
+    if (r == kAXErrorSuccess && (out == (id)kCFBooleanTrue || out == (id)kCFBooleanFalse))
+        out = copy_value(out);
+    *value = (CFTypeRef)out;
+    return r;
 }
-OSStatus AXUIElementSetAttributeValue(void *element, CFStringRef attribute, CFTypeRef value)
+
+AXError AXUIElementGetAttributeValueCount(AXUIElementRef element, CFStringRef attribute, CFIndex *count)
 {
-    return kAXErrorAPIDisabled;
+    CFTypeRef value = NULL;
+    AXError r = AXUIElementCopyAttributeValue(element, attribute, &value);
+    if (r)
+        return r;
+    if (count)
+        *count = [(id)value isKindOfClass:[NSArray class]] ? (CFIndex)[(NSArray *)value count] : 1;
+    CFRelease(value);
+    return kAXErrorSuccess;
 }
-OSStatus AXUIElementIsAttributeSettable(void *element, CFStringRef attribute, Boolean *settable)
+
+AXError AXUIElementCopyAttributeValues(AXUIElementRef element, CFStringRef attribute, CFIndex index,
+                                       CFIndex maxValues, CFArrayRef *values)
 {
-    if (settable)
-        *settable = false;
-    return kAXErrorAPIDisabled;
+    if (values)
+        *values = NULL;
+    CFTypeRef value = NULL;
+    AXError r = AXUIElementCopyAttributeValue(element, attribute, &value);
+    if (r)
+        return r;
+    if (![(id)value isKindOfClass:[NSArray class]]) {
+        CFRelease(value);
+        return kAXErrorIllegalArgument;
+    }
+    NSArray *all = (NSArray *)value;
+    NSUInteger from = index < 0 ? 0 : MIN((NSUInteger)index, [all count]);
+    NSUInteger n = maxValues < 0 ? 0 : MIN((NSUInteger)maxValues, [all count] - from);
+    if (values)
+        *values = (CFArrayRef)[[all subarrayWithRange:NSMakeRange(from, n)] copy];
+    CFRelease(value);
+    return kAXErrorSuccess;
 }
-OSStatus AXUIElementPerformAction(void *element, CFStringRef action) { return kAXErrorAPIDisabled; }
-unsigned long AXUIElementGetTypeID(void) { return 0x4158; }
-void *AXValueCreate(uint32_t type, const void *value) { return NULL; }
-uint32_t AXValueGetType(void *value) { return 0; }
-Boolean AXValueGetValue(void *value, uint32_t type, void *out) { return false; }
+
+static BOOL settable(AAXElement *e, NSString *a)
+{
+    if (e->kind == AX_WINDOW)
+        return [@[ @"AXPosition", @"AXSize", @"AXMinimized", @"AXFullScreen", @"AXMain", @"AXFocused" ]
+            containsObject:a];
+    return e->kind == AX_APPLICATION && [a isEqual:@"AXFrontmost"];
+}
+
+AXError AXUIElementIsAttributeSettable(AXUIElementRef element, CFStringRef attribute, Boolean *result)
+{
+    if (result)
+        *result = false;
+    AXError r = usable(element);
+    if (r)
+        return r;
+    if (!attribute || !result)
+        return kAXErrorIllegalArgument;
+    if (![names_for((AAXElement *)element) containsObject:(NSString *)attribute])
+        return kAXErrorAttributeUnsupported;
+    *result = settable((AAXElement *)element, (NSString *)attribute);
+    return kAXErrorSuccess;
+}
+
+static AXError focus(int64_t view)
+{
+    id reply = AWayfireCall(@"window-rules/focus-view", @{@"id" : @(view)});
+    return !reply ? kAXErrorCannotComplete : AWayfireError(reply) ? kAXErrorInvalidUIElement : kAXErrorSuccess;
+}
+
+static AXError set_window_attribute(AAXElement *e, NSString *a, id value)
+{
+    NSArray *windows = wayfire_windows();
+    if (!windows)
+        return kAXErrorCannotComplete;
+    NSDictionary *w = window_by_id(windows, e->view);
+    if (!w)
+        return kAXErrorInvalidUIElement;
+    if ([a isEqual:@"AXPosition"] || [a isEqual:@"AXSize"]) {
+        NSArray *outputs = AWayfireOutputs();
+        if (!outputs)
+            return kAXErrorCannotComplete;
+        NSRect f = ax_frame(w, outputs);
+        CGPoint p;
+        CGSize s;
+        if ([a isEqual:@"AXPosition"] && AXValueGetValue((AXValueRef)value, kAXValueTypeCGPoint, &p))
+            f.origin = p;
+        else if ([a isEqual:@"AXSize"] && AXValueGetValue((AXValueRef)value, kAXValueTypeCGSize, &s))
+            f.size = s;
+        else
+            return kAXErrorIllegalArgument;
+        return put_window(w, outputs, f);
+    }
+    if (![value respondsToSelector:@selector(boolValue)])
+        return kAXErrorIllegalArgument;
+    BOOL on = [value boolValue];
+    id reply;
+    if ([a isEqual:@"AXMinimized"])
+        reply = AWayfireCall(@"wm-actions/set-minimized", @{@"view_id" : @(e->view), @"state" : @(on)});
+    else if ([a isEqual:@"AXFullScreen"])
+        reply = AWayfireCall(@"wm-actions/set-fullscreen", @{@"view_id" : @(e->view), @"state" : @(on)});
+    else if ([a isEqual:@"AXMain"] || [a isEqual:@"AXFocused"])
+        return on ? focus(e->view) : kAXErrorSuccess;
+    else
+        return kAXErrorAttributeUnsupported;
+    return !reply ? kAXErrorCannotComplete : AWayfireError(reply) ? kAXErrorCannotComplete : kAXErrorSuccess;
+}
+
+AXError AXUIElementSetAttributeValue(AXUIElementRef element, CFStringRef attribute, CFTypeRef value)
+{
+    AXError r = usable(element);
+    if (r)
+        return r;
+    if (!attribute || !value)
+        return kAXErrorIllegalArgument;
+    AAXElement *e = (AAXElement *)element;
+    NSString *a = (NSString *)attribute;
+    @autoreleasepool {
+        if (e->kind == AX_WINDOW)
+            return set_window_attribute(e, a, (id)value);
+        if (e->kind == AX_APPLICATION && [a isEqual:@"AXFrontmost"]) {
+            if (![(id)value boolValue])
+                return kAXErrorSuccess;
+            NSArray *windows = wayfire_windows();
+            NSDictionary *w = [windows_of(e, windows) firstObject];
+            return !windows ? kAXErrorCannotComplete : w ? focus([w[@"id"] longLongValue]) : kAXErrorNoValue;
+        }
+        return [names_for(e) containsObject:a] ? kAXErrorIllegalArgument : kAXErrorAttributeUnsupported;
+    }
+}
+
+AXError AXUIElementCopyActionNames(AXUIElementRef element, CFArrayRef *names)
+{
+    AXError r = usable(element);
+    if (r)
+        return r;
+    if (names)
+        *names = (CFArrayRef)[(((AAXElement *)element)->kind == AX_WINDOW ? @[ @"AXRaise" ] : @[]) copy];
+    return kAXErrorSuccess;
+}
+
+AXError AXUIElementPerformAction(AXUIElementRef element, CFStringRef action)
+{
+    AXError r = usable(element);
+    if (r)
+        return r;
+    AAXElement *e = (AAXElement *)element;
+    if (e->kind != AX_WINDOW || ![(NSString *)action isEqual:@"AXRaise"])
+        return kAXErrorActionUnsupported;
+    return focus(e->view);
+}
+
+AXError AXUIElementGetPid(AXUIElementRef element, pid_t *pid)
+{
+    if (!element || ![(id)element isKindOfClass:[AAXElement class]] || !pid)
+        return kAXErrorIllegalArgument;
+    AAXElement *e = (AAXElement *)element;
+    if (e->kind == AX_SYSTEM_WIDE)
+        return kAXErrorIllegalArgument;
+    pid_t found = e->pid;
+    if (!found && e->kind == AX_WINDOW && AWayfireAvailable())
+        found = [window_pids()[@(e->view)] intValue];
+    if (!found)
+        return kAXErrorCannotComplete;
+    *pid = found;
+    return kAXErrorSuccess;
+}
+
+AXError AXUIElementSetMessagingTimeout(AXUIElementRef element, float timeout)
+{
+    return element && timeout >= 0 ? kAXErrorSuccess : kAXErrorIllegalArgument;
+}
+
+/* Ferry doesn't look inside other apps' windows, so there is no element at
+ * a point to give. */
+AXError AXUIElementCopyElementAtPosition(AXUIElementRef application, float x, float y, AXUIElementRef *element)
+{
+    if (element)
+        *element = NULL;
+    AXError r = usable(application);
+    return r ? r : kAXErrorNoValue;
+}
 
 /* The keys these calls take, defined where the calls are (a program that
  * checks for a call before using it weak-links its key too). */

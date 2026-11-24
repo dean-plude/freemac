@@ -26,6 +26,18 @@ CFTypeRef CFAutorelease(CFTypeRef cf) { return [OBJ(cf) autorelease]; }
 CFIndex CFGetRetainCount(CFTypeRef cf) { return (CFIndex)[OBJ(cf) retainCount]; }
 Boolean CFEqual(CFTypeRef a, CFTypeRef b) { return a == b || [OBJ(a) isEqual:OBJ(b)]; }
 CFHashCode CFHash(CFTypeRef cf) { return [OBJ(cf) hash]; }
+/* A type's identifier, for the types whose ...GetTypeID answers it
+ * (freemac 1.215, Ferry 0.41.0): an object that knows its own answers
+ * _ferryCFTypeID, and any other object its class. */
+CFTypeID CFGetTypeID(CFTypeRef cf)
+{
+    id o = OBJ(cf);
+    if (!o)
+        return 0;
+    if ([o respondsToSelector:@selector(_ferryCFTypeID)])
+        return ((CFTypeID(*)(id, SEL))objc_msgSend)(o, @selector(_ferryCFTypeID));
+    return (CFTypeID)[o class];
+}
 CFStringRef CFCopyDescription(CFTypeRef cf) { return (CFStringRef)[[OBJ(cf) description] copy]; }
 void CFShow(CFTypeRef obj)
 {

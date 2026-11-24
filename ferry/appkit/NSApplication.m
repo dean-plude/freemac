@@ -7,6 +7,7 @@
  * the same loop, and nextEventMatchingMask: works as on a Mac. */
 #import "AInternal.h"
 #import "ANotify.h"
+#import "AWayfire.h"
 
 NSApplication *NSApp;
 NSNotificationName const NSApplicationWillFinishLaunchingNotification = @"NSApplicationWillFinishLaunchingNotification";
@@ -122,22 +123,106 @@ void NSBeep(void)
 
 /* ---- NSScreen -------------------------------------------------------------------------- */
 
-@implementation NSScreen
+/* From freemac 1.215 (Ferry 0.41.0), on freemac's own compositor, every
+ * display Wayfire has is a screen, the main display first, with its visible
+ * frame from Wayfire's work area (less the menu bar and the Dock). GTK
+ * can't give a work area on Wayland. The frames are in a Mac's screen
+ * coordinates: the first screen's bottom left is the origin and y runs up.
+ * Without Wayfire (or under another compositor), one screen from GTK, as
+ * before. Wayfire's answer is kept for half a second. */
+@implementation NSScreen {
+    NSRect _frame, _visible;
+    NSString *_name;
+    NSInteger _number;
+    BOOL _wayfire;
+}
+
+static NSMutableArray *wayfire_screens;
+static NSTimeInterval wayfire_screens_read;
+
+/* Wayfire's displays are used only when they are the ones GTK shows (a
+ * program run under another compositor in a freemac session isn't on
+ * them), or when the tests name a stand-in Wayfire. */
+static BOOL wayfire_matches_gtk(NSArray *outputs)
+{
+    const char *forced = getenv("FERRY_WAYFIRE_SOCKET");
+    if (forced && *forced)
+        return YES;
+    if (!ADisplayAvailable())
+        return NO;
+    NSRect gtk = AScreenFrame(NO);
+    for (NSDictionary *o in outputs) {
+        NSRect f = [o[@"frame"] rectValue];
+        if (f.size.width == gtk.size.width && f.size.height == gtk.size.height)
+            return YES;
+    }
+    return NO;
+}
+
+static NSArray *screens_from_wayfire(void)
+{
+    NSTimeInterval now = [[NSProcessInfo processInfo] systemUptime];
+    if (wayfire_screens && now - wayfire_screens_read < 0.5)
+        return [wayfire_screens count] ? wayfire_screens : nil;
+    wayfire_screens_read = now;
+    NSArray *outputs = AWayfireAvailable() ? AWayfireOutputs() : nil;
+    if (!outputs || !wayfire_matches_gtk(outputs)) {
+        [wayfire_screens removeAllObjects];
+        return nil;
+    }
+    NSMutableArray *old = wayfire_screens ?: [NSMutableArray array];
+    NSMutableArray *list = [NSMutableArray array];
+    NSRect main = [outputs[0][@"frame"] rectValue];
+    for (NSDictionary *o in outputs) {
+        NSScreen *s = nil;
+        for (NSScreen *was in old)
+            if ([was->_name isEqual:o[@"name"]])
+                s = was;
+        if (!s) {
+            s = [[[NSScreen alloc] init] autorelease];
+            s->_name = [o[@"name"] copy];
+            s->_wayfire = YES;
+        }
+        NSRect f = [o[@"frame"] rectValue], w = [o[@"work"] rectValue];
+        /* Wayfire's layout runs down from the top left; a Mac's screens run
+         * up from the first screen's bottom left */
+        s->_frame = NSMakeRect(f.origin.x - main.origin.x, NSMaxY(main) - NSMaxY(f), f.size.width, f.size.height);
+        s->_visible = NSMakeRect(w.origin.x - main.origin.x, NSMaxY(main) - NSMaxY(w), w.size.width, w.size.height);
+        s->_number = [o[@"id"] integerValue];
+        [list addObject:s];
+    }
+    if (!wayfire_screens)
+        wayfire_screens = [[NSMutableArray alloc] init];
+    [wayfire_screens setArray:list];
+    return wayfire_screens;
+}
+
 + (NSScreen *)mainScreen
 {
+    NSArray *w = screens_from_wayfire();
+    if (w)
+        return w[0];
     static NSScreen *screen;
     if (!screen)
         screen = [[NSScreen alloc] init];
     return screen;
 }
-+ (NSArray *)screens { return @[ [self mainScreen] ]; }
-- (NSRect)frame { return AScreenFrame(NO); }
-- (NSRect)visibleFrame { return AScreenFrame(YES); }
++ (NSArray *)screens { return screens_from_wayfire() ?: @[ [self mainScreen] ]; }
+- (NSRect)frame { return _wayfire ? _frame : AScreenFrame(NO); }
+- (NSRect)visibleFrame { return _wayfire ? _visible : AScreenFrame(YES); }
 - (CGFloat)backingScaleFactor { return AScreenScale(); }
-- (NSString *)localizedName { return @"Display"; }
+- (NSString *)localizedName { return _wayfire && [_name length] ? _name : @"Display"; }
 - (NSDictionary *)deviceDescription
 {
-    return @{@"NSScreenNumber" : @1, @"NSDeviceSize" : [NSValue valueWithSize:[self frame].size]};
+    return @{
+        @"NSScreenNumber" : @(_wayfire ? _number : 1),
+        @"NSDeviceSize" : [NSValue valueWithSize:[self frame].size]
+    };
+}
+- (void)dealloc
+{
+    [_name release];
+    [super dealloc];
 }
 @end
 
@@ -1048,6 +1133,8 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
 
 - (void)sendEvent:(NSEvent *)e
 {
+    if (!(e = ALocalMonitorsFilter(e)))
+        return;
     NSEvent *saved = _current;
     _current = e;
     NSWindow *w = [e window];
