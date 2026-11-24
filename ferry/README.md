@@ -106,7 +106,16 @@ the selection goes both ways, a column's title sorts the tree, and an
 edited cell writes back. Columns' per-row `editable` and `enabled`
 bindings are followed, an edited cell isn't written back when its
 controller isn't editable, and `NSDictionaryController` shows a
-dictionary as key-value pairs.
+dictionary as key-value pairs. From freemac (1.191) the four controllers
+load from nibs with their settings and the binding connectors that join
+them, so a nib that binds a table or an outline to a controller works with
+no code; view-based tables and outlines make their cell views from the
+nib's prototypes, and controls in a cell view bound to `objectValue.key`
+write back. Bindings validate with `NSValidatesImmediately` (a refused
+value is presented and the control put back), follow
+`NSRaisesForNotApplicableKeys`, enable and make editable their controls
+conditionally, and the array controller takes `NSDeletesObjectsOnRemove`,
+`NSSelectsAllWhenSettingContent` and `NSHandlesContentAsCompoundValue`.
 Document-based apps work: `NSDocument` and `NSDocumentController` take the
 document types from the app's Info.plist and give it New, Open, Save,
 Save As and Revert, the edited dot, the Save / Don't Save / Cancel question

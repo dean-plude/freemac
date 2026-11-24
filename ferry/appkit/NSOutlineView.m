@@ -575,8 +575,9 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
         return v;
     id ds = [self dataSource];
     AOutlineNode *n = [self _nodeAtRow:row];
+    /* bound to a tree controller, a row's value is its node's object (Ferry 0.20.0) */
     if (n && [self _hasBoundTree])
-        return n->item;
+        return [n->item isKindOfClass:[NSTreeNode class]] ? [n->item representedObject] : n->item;
     if (n && [ds respondsToSelector:@selector(outlineView:objectValueForTableColumn:byItem:)])
         return [ds outlineView:self objectValueForTableColumn:c byItem:n->item];
     return nil;
@@ -605,14 +606,20 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
     return ![d respondsToSelector:@selector(outlineView:shouldEditTableColumn:item:)] ||
            [d outlineView:self shouldEditTableColumn:c item:n->item];
 }
-- (BOOL)_delegateMakesViews { return [[self delegate] respondsToSelector:@selector(outlineView:viewForTableColumn:item:)]; }
+- (BOOL)_delegateMakesViews
+{
+    return [[self delegate] respondsToSelector:@selector(outlineView:viewForTableColumn:item:)] ||
+           [self _makesViewsFromNib];
+}
 - (NSView *)_delegateViewForColumn:(NSTableColumn *)c row:(NSInteger)row
 {
     id d = [self delegate];
     AOutlineNode *n = [self _nodeAtRow:row];
-    return n && [d respondsToSelector:@selector(outlineView:viewForTableColumn:item:)]
-               ? [d outlineView:self viewForTableColumn:c item:n->item]
-               : nil;
+    if (!n)
+        return nil;
+    if ([d respondsToSelector:@selector(outlineView:viewForTableColumn:item:)])
+        return [d outlineView:self viewForTableColumn:c item:n->item];
+    return [self _makesViewsFromNib] ? [self _viewFromNibForColumn:c] : nil;
 }
 - (NSTableRowView *)_delegateRowViewForRow:(NSInteger)row
 {

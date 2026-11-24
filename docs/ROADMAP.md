@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.191 "Ferry: controllers from nibs and checked edits" (done)
+
+Mac programs whose windows come from a nib with array, tree, object or
+dictionary controllers bound to tables, outlines and fields now work with
+no code of their own, and a value the program refuses is not saved.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSArrayController`, `NSTreeController`, `NSObjectController` and `NSDictionaryController` loaded from nibs with their settings, joined up by the nib's bindings | Ferry AppKit | done |
+| 2 | View-based tables and outlines make their cell views from the nib's prototypes; a cell view's `objectValue` is its row's object, and fields bound to `objectValue.key` work both ways | Ferry AppKit | done |
+| 3 | Values checked with `validate<Key>:error:` before they are written; a refused one shows the program's error and the old value comes back | Ferry AppKit | done |
+| 4 | Controls turn off when there is nothing selected, the controller can't be edited, or several different values are selected; content options for deleting, selecting all and whole-array values | Ferry AppKit | done |
+| 5 | Ferry 0.20.0, 87 tests | Ferry | done |
+
 ## 1.190 "Ferry: tree controllers and outline bindings" (done)
 
 Mac programs that keep a tree of items in a tree controller and show it in

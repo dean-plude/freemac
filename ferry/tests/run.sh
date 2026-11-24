@@ -32,7 +32,7 @@ run_one() {
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_archive*) FERRY_TEST_DATA="$here/foundation" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller)
+        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -264,6 +264,15 @@ run_one appkit_array_controller "$here/appkit/array_controller.m" "$here/appkit/
 # editable and enabled column bindings, and NSDictionaryController (Ferry 0.19.0).
 run_one appkit_tree_controller "$here/appkit/tree_controller.m" "$here/appkit/tree_controller.out" -fobjc-arc \
     -framework Cocoa
+# Controllers loaded from a nib written with the keyed archiver, and
+# bindings in view-based tables' and outlines' cell views (Ferry 0.20.0).
+run_one appkit_nib_controllers "$here/appkit/nib_controllers.m" "$here/appkit/nib_controllers.out" -fobjc-arc \
+    -framework Cocoa
+# Validation through bindings, NSRaisesForNotApplicableKeys, conditionally
+# set enabled and editable, and the array controller's content options
+# (Ferry 0.20.0).
+run_one appkit_binding_validation "$here/appkit/binding_validation.m" "$here/appkit/binding_validation.out" \
+    -fobjc-arc -framework Cocoa
 # NSDocument autosaving, in a home of its own (Ferry 0.16.0).
 run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -fobjc-arc -framework Cocoa
 # Pop-up buttons, segmented controls, search fields, stack views and

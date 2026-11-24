@@ -30,6 +30,23 @@
  * NSCreatesSortDescriptorBindingOption is NO; so the user's selection and
  * a click on a column's title reach the controller.
  *
+ * Validation and conditions (Ferry 0.20.0): with
+ * NSValidatesImmediatelyBindingOption a value is validated
+ * (validateValue:forKeyPath:error:, so validate<Key>:error:) before it is
+ * written back; a value refused is not written, the error is presented
+ * (presentError:, from the view up the responder chain) and the view shows
+ * the model's value again; a value the validation changes is written and
+ * shown as changed. A continuously updated value that fails is skipped
+ * quietly until the editing ends. NSConditionallySetsEditable (YES by
+ * default) makes a bound text field editable only while its value can be
+ * edited (there is a selection, its controller is editable, multiple
+ * values are allowed to be edited, the key applies); NSConditionallySetsEnabled
+ * (YES by default except for text fields) does the same for the view's
+ * enabled state, ANDed with its enabled bindings. NSRaisesForNotApplicableKeys
+ * YES raises for a key a controller's selection doesn't have; NO shows the
+ * not-applicable placeholder ("Not Applicable" in a text field); left out,
+ * Ferry leaves the view as it is (a Mac raises).
+ *
  * Trees and rows (Ferry 0.19.0): in an outline view whose content is bound
  * to a tree controller, a column's "arrangedObjects.key" is the key of
  * each row's node's represented object, and the outline's selection is
@@ -126,6 +143,9 @@ BOOL NSIsControllerMarker(id object)
     NSDictionary *options;
     NSDictionary *info;
     BOOL observing, pushing, placeholderShown;
+    BOOL watchingEditable;        /* observing the controller's "editable" (Ferry 0.20.0) */
+    BOOL condDisabled;            /* the view disabled as its value can't be edited */
+    BOOL condUneditable, savedEditable;   /* a text field made not editable, and what it was */
     NSString *savedPlaceholder;   /* a text field's own, while a binding's shows */
 }
 - (void)stop;
@@ -168,17 +188,25 @@ static NSString *base_name(NSString *name)
 }
 
 /* The key path's value; the not-applicable marker for a key the object
- * doesn't have (unless the binding asks for the exception). */
+ * doesn't have (unless the binding asks for the exception, which is raised
+ * too for a key a controller's selection answers it for). */
 static id model_value(ABinding *b)
 {
+    id v;
     @try {
-        return [b->observed valueForKeyPath:b->keyPath];
+        v = [b->observed valueForKeyPath:b->keyPath];
     } @catch (NSException *e) {
         if (![[e name] isEqualToString:NSUndefinedKeyException] ||
             [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
             @throw;
         return NSNotApplicableMarker;
     }
+    if (v == NSNotApplicableMarker && [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
+        [NSException raise:NSUndefinedKeyException
+                    format:@"[<%@ %p> valueForUndefinedKey:]: the selection is not key value coding-compliant "
+                           @"for the key path %@ (the %@ binding of a %@).",
+                           [b->observed class], b->observed, b->keyPath, b->name, [b->view class]];
+    return v;
 }
 
 static BOOL is_text_value(ABinding *b)
@@ -198,7 +226,13 @@ static id shown_value(ABinding *b, id v, BOOL *keep, NSString **placeholder)
                                                       : NSNotApplicablePlaceholderBindingOption;
         id p = option(b, key);
         if (!p && v == NSNotApplicableMarker) {
-            *keep = YES;
+            /* left out, Ferry keeps the view as it is; NO (YES has raised) shows the placeholder */
+            if (!option(b, NSRaisesForNotApplicableKeysBindingOption)) {
+                *keep = YES;
+                return nil;
+            }
+            if (is_text_value(b))
+                *placeholder = @"Not Applicable";
             return nil;
         }
         if (is_text_value(b)) {
@@ -224,7 +258,34 @@ static id shown_value(ABinding *b, id v, BOOL *keep, NSString **placeholder)
 
 static BOOL truth(id v) { return [v respondsToSelector:@selector(boolValue)] ? [v boolValue] : v != nil; }
 
-/* enabled, enabled2, ... together: all must be true. hidden ones: any. */
+/* The bindings that set a view's value and write it back. */
+static BOOL writable(NSString *name)
+{
+    return [name isEqualToString:NSValueBinding] || [name isEqualToString:NSSelectedIndexBinding] ||
+           [name isEqualToString:NSSelectedObjectBinding] || [name isEqualToString:NSSelectedValueBinding] ||
+           [name isEqualToString:NSSelectedTagBinding];
+}
+
+/* Whether a value binding of the view now disables it (Ferry 0.20.0). */
+static BOOL any_condition_disables(id view)
+{
+    NSDictionary *all = bindings_of(view, NO);
+    for (NSString *name in all)
+        if (((ABinding *)[all objectForKey:name])->condDisabled)
+            return YES;
+    return NO;
+}
+static BOOL has_bound(id view, NSString *base)
+{
+    NSDictionary *all = bindings_of(view, NO);
+    for (NSString *name in all)
+        if ([base_name(name) isEqualToString:base] && ((ABinding *)[all objectForKey:name])->observed)
+            return YES;
+    return NO;
+}
+
+/* enabled, enabled2, ... together: all must be true (and no value binding
+ * disabling the view). hidden ones: any. */
 static void apply_combined(id view, NSString *base)
 {
     BOOL hidden = [base isEqualToString:NSHiddenBinding], result = !hidden;
@@ -243,10 +304,103 @@ static void apply_combined(id view, NSString *base)
         else
             result = result && truth(v);
     }
+    if (!hidden && any_condition_disables(view))
+        result = NO;
     if (hidden && [view respondsToSelector:@selector(setHidden:)])
         [(NSView *)view setHidden:result];
     else if (!hidden && [view respondsToSelector:@selector(setEnabled:)])
         [(NSControl *)view setEnabled:result];
+}
+
+/* ---- conditionally enabled and editable (Ferry 0.20.0) ---- */
+
+static char saved_enabled_key;
+
+static BOOL condition_option(ABinding *b, NSString *key, BOOL fallback)
+{
+    id o = option(b, key);
+    return o ? [o boolValue] : fallback;
+}
+
+/* Whether the bound value can be edited: there is a selection, multiple
+ * values may be edited, the key applies (when not-applicable keys don't
+ * raise), and the value's controller is editable. */
+static BOOL value_can_be_edited(ABinding *b, id raw)
+{
+    if (raw == NSNoSelectionMarker)
+        return NO;
+    if (raw == NSMultipleValuesMarker && !condition_option(b, NSAllowsEditingMultipleValuesSelectionBindingOption, YES))
+        return NO;
+    if (raw == NSNotApplicableMarker && option(b, NSRaisesForNotApplicableKeysBindingOption))
+        return NO;
+    if ([b->observed isKindOfClass:[NSController class]] && [b->observed respondsToSelector:@selector(isEditable)] &&
+        ![b->observed isEditable])
+        return NO;
+    return YES;
+}
+
+/* The view's enabled state after a value binding started or stopped
+ * disabling it: its enabled bindings decide, or else what it was before. */
+static void conditions_changed(id view, BOOL wasDisabled)
+{
+    BOOL now = any_condition_disables(view);
+    if (has_bound(view, NSEnabledBinding)) {
+        apply_combined(view, NSEnabledBinding);
+        return;
+    }
+    if (now && !wasDisabled) {
+        objc_setAssociatedObject(view, &saved_enabled_key, @([(NSControl *)view isEnabled]), OBJC_ASSOCIATION_RETAIN);
+        [(NSControl *)view setEnabled:NO];
+    } else if (!now && wasDisabled) {
+        NSNumber *saved = objc_getAssociatedObject(view, &saved_enabled_key);
+        [(NSControl *)view setEnabled:saved ? [saved boolValue] : YES];
+        objc_setAssociatedObject(view, &saved_enabled_key, nil, OBJC_ASSOCIATION_RETAIN);
+    }
+}
+
+static BOOL conditions_apply(ABinding *b)
+{
+    return writable(b->name) && ![b->view isKindOfClass:[NSTableColumn class]] &&
+           [b->view respondsToSelector:@selector(setEnabled:)] && [b->view respondsToSelector:@selector(isEnabled)];
+}
+
+static void set_conditions(ABinding *b, id raw)
+{
+    if (!conditions_apply(b))
+        return;
+    id view = b->view;
+    BOOL ok = value_can_be_edited(b, raw);
+    if ([view isKindOfClass:[NSTextField class]] && condition_option(b, NSConditionallySetsEditableBindingOption, YES)) {
+        NSTextField *f = view;
+        if (!ok && !b->condUneditable) {
+            b->savedEditable = [f isEditable];
+            b->condUneditable = YES;
+            [f setEditable:NO];
+        } else if (ok && b->condUneditable) {
+            b->condUneditable = NO;
+            [f setEditable:b->savedEditable];
+        }
+    }
+    BOOL enabling = condition_option(b, NSConditionallySetsEnabledBindingOption, ![view isKindOfClass:[NSTextField class]]);
+    BOOL disable = enabling && !ok;
+    if (disable != b->condDisabled) {
+        BOOL was = any_condition_disables(view);
+        b->condDisabled = disable;
+        conditions_changed(view, was);
+    }
+}
+
+/* A binding going away gives the view back what it took. */
+static void release_conditions(ABinding *b)
+{
+    if (b->condUneditable) {
+        b->condUneditable = NO;
+        [(NSTextField *)b->view setEditable:b->savedEditable];
+    }
+    if (b->condDisabled) {
+        b->condDisabled = NO;
+        conditions_changed(b->view, YES);
+    }
 }
 
 static BOOL is_column_value(ABinding *b)
@@ -280,29 +434,71 @@ static void apply(ABinding *b)
     }
     BOOL keep;
     NSString *placeholder;
-    id v = shown_value(b, model_value(b), &keep, &placeholder);
-    if (keep)
-        return;
-    if (is_text_value(b)) {
-        NSTextField *f = b->view;
-        if (placeholder) {
-            if (!b->placeholderShown) {
-                b->savedPlaceholder = [[f placeholderString] copy];
-                b->placeholderShown = YES;
+    id raw = model_value(b);
+    id v = shown_value(b, raw, &keep, &placeholder);
+    if (!keep) {
+        if (is_text_value(b)) {
+            NSTextField *f = b->view;
+            if (placeholder) {
+                if (!b->placeholderShown) {
+                    b->savedPlaceholder = [[f placeholderString] copy];
+                    b->placeholderShown = YES;
+                }
+                [f setPlaceholderString:placeholder];
+            } else if (b->placeholderShown) {
+                [f setPlaceholderString:b->savedPlaceholder];
+                [b->savedPlaceholder release];
+                b->savedPlaceholder = nil;
+                b->placeholderShown = NO;
             }
-            [f setPlaceholderString:placeholder];
-        } else if (b->placeholderShown) {
-            [f setPlaceholderString:b->savedPlaceholder];
-            [b->savedPlaceholder release];
-            b->savedPlaceholder = nil;
-            b->placeholderShown = NO;
         }
+        [b->view _ferrySetValue:v forBinding:b->name];
     }
-    [b->view _ferrySetValue:v forBinding:b->name];
+    set_conditions(b, raw);
 }
 
-/* Writes what the view now shows back to the key path. */
-static void push(ABinding *b)
+/* An error presented for a view: up the responder chain from it (a
+ * table's column from its table), else by the application. */
+static void present_error(id view, NSError *error)
+{
+    if ([view isKindOfClass:[NSTableColumn class]])
+        view = [(NSTableColumn *)view tableView];
+    if ([view respondsToSelector:@selector(presentError:)])
+        [view presentError:error];
+    else
+        [NSApp presentError:error];
+}
+
+/* With NSValidatesImmediately, *v validated for the key path on observed
+ * (it may be changed); NO when it is refused, the error presented unless
+ * quiet. A key path validation can't follow counts as valid. */
+static BOOL validated(id view, NSDictionary *options, id observed, NSString *keyPath, id *v, BOOL quiet)
+{
+    id o = [options objectForKey:NSValidatesImmediatelyBindingOption];
+    if (o == [NSNull null] || ![o boolValue])
+        return YES;
+    id checked = *v;
+    NSError *error = nil;
+    BOOL ok;
+    @try {
+        ok = [observed validateValue:&checked forKeyPath:keyPath error:&error];
+    } @catch (NSException *e) {
+        if (![[e name] isEqualToString:NSUndefinedKeyException])
+            @throw;
+        ok = YES;
+    }
+    if (!ok) {
+        if (!quiet && error)
+            present_error(view, error);
+        return NO;
+    }
+    *v = checked;
+    return YES;
+}
+
+/* Writes what the view now shows back to the key path; continuous: as it
+ * is typed, with the editing going on. */
+static void push(ABinding *b, BOOL continuous)
 {
     id v = [b->view _ferryValueForBinding:b->name];
     if (is_text_value(b) && option(b, NSNullPlaceholderBindingOption) && [v isKindOfClass:[NSString class]] &&
@@ -317,23 +513,27 @@ static void push(ABinding *b)
     id now = model_value(b);
     if (now == NSNotApplicableMarker || now == v || [now isEqual:v])
         return;
-    b->pushing = YES;
-    @try {
-        [b->observed setValue:v forKeyPath:b->keyPath];
-    } @finally {
-        b->pushing = NO;
+    id typed = v;
+    if (!validated(b->view, b->options, b->observed, b->keyPath, &v, continuous)) {
+        /* refused: not written, and the view shows the model's value again */
+        if (!continuous)
+            apply(b);
+        return;
     }
-    /* shown again as the model now has it (a placeholder for nil, say),
-     * unless the text is still being typed */
-    if (![b->view isKindOfClass:[NSTextField class]] || ![(NSTextField *)b->view _isEditing])
+    BOOL changed = !(typed == v || [typed isEqual:v]);
+    if (!(now == v || [now isEqual:v])) {
+        b->pushing = YES;
+        @try {
+            [b->observed setValue:v forKeyPath:b->keyPath];
+        } @finally {
+            b->pushing = NO;
+        }
+    }
+    /* shown again as the model now has it (a placeholder for nil, or a
+     * value the validation changed), unless the text is still being typed */
+    if ((changed && !continuous) || ![b->view isKindOfClass:[NSTextField class]] ||
+        ![(NSTextField *)b->view _isEditing])
         apply(b);
-}
-
-static BOOL writable(NSString *name)
-{
-    return [name isEqualToString:NSValueBinding] || [name isEqualToString:NSSelectedIndexBinding] ||
-           [name isEqualToString:NSSelectedObjectBinding] || [name isEqualToString:NSSelectedValueBinding] ||
-           [name isEqualToString:NSSelectedTagBinding];
 }
 
 void ABindingsPush(id view, BOOL continuousOnly)
@@ -348,7 +548,7 @@ void ABindingsPush(id view, BOOL continuousOnly)
             continue;
         if (continuousOnly && ![option(b, NSContinuouslyUpdatesValueBindingOption) boolValue])
             continue;
-        push(b);
+        push(b, continuousOnly);
     }
 }
 
@@ -380,7 +580,7 @@ void ABindingPush(id view, NSString *name)
     ABinding *b = binding_named(view, name);
     if (b && !b->pushing) {
         [[b retain] autorelease];
-        push(b);
+        push(b, NO);
     }
 }
 
@@ -541,6 +741,11 @@ BOOL ABindingSetCellValue(NSTableColumn *column, NSInteger row, id value)
     id now = [obj valueForKeyPath:rest];
     if (now == value || [now isEqual:value])
         return YES;
+    /* validated first, with NSValidatesImmediately (Ferry 0.20.0) */
+    if (!validated(column, b->options, obj, rest, &value, NO))
+        return NO;
+    if (now == value || [now isEqual:value])
+        return YES;
     [obj setValue:value forKeyPath:rest];
     return YES;
 }
@@ -578,10 +783,18 @@ BOOL ABindingsWantContinuous(id view)
     return NO;
 }
 
+static char editable_context;
+
 @implementation ABinding
 - (void)observeValueForKeyPath:(NSString *)path ofObject:(id)object change:(NSDictionary *)change
                        context:(void *)context
 {
+    if (context == &editable_context) {
+        /* the controller became editable or not: the conditions again */
+        [[self retain] autorelease];
+        apply(self);
+        return;
+    }
     if (pushing)
         return;   /* the view already shows it */
     [[self retain] autorelease];
@@ -602,12 +815,18 @@ BOOL ABindingsWantContinuous(id view)
     if (observing)
         [observed removeObserver:self forKeyPath:keyPath];
     observing = NO;
+    if (watchingEditable)
+        [observed removeObserver:self forKeyPath:@"editable" context:&editable_context];
+    watchingEditable = NO;
+    if (view)
+        release_conditions(self);
     if (placeholderShown && [view isKindOfClass:[NSTextField class]])
         [(NSTextField *)view setPlaceholderString:savedPlaceholder];
     placeholderShown = NO;
 }
 - (void)dealloc
 {
+    condDisabled = condUneditable = NO;   /* the view is going too */
     [self stop];
     [name release];
     [observed release];
@@ -712,6 +931,12 @@ static void expose_defaults(void)
         if (![[e name] isEqualToString:NSUndefinedKeyException] ||
             [option(b, NSRaisesForNotApplicableKeysBindingOption) boolValue])
             @throw;
+    }
+    /* a value bound through a controller follows its editable state */
+    if (conditions_apply(b) && [observable isKindOfClass:[NSController class]] &&
+        [observable respondsToSelector:@selector(isEditable)]) {
+        [observable addObserver:b forKeyPath:@"editable" options:0 context:&editable_context];
+        b->watchingEditable = YES;
     }
     if (is_column_value(b)) {
         /* sorting by the column's key, unless asked not to */
