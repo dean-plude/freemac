@@ -72,6 +72,13 @@ for web addresses, through this system's libcurl, opened only when a
 program first loads a URL. Transfers move, and handlers run, while the
 program runs its run loop or waits in dispatch.
 
+From Ferry 0.24.0 (freemac 1.197) there is also `NSXMLDocument`, with `NSXMLNode`,
+`NSXMLElement`, `NSXMLDTD` and `NSXMLDTDNode`: a document read from a
+string, data or a file (with this system's libxml2, as on a Mac) is a
+tree of objects that can be walked, changed, searched with XPath
+(`nodesForXPath:error:`) and written out again (`XMLString`, `XMLData`,
+pretty printed or canonical). XQuery, XSLT and HTML documents are left out.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

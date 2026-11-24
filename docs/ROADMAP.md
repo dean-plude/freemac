@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.197 "Ferry: XML documents" (done)
+
+Ferry 0.24.0: Mac apps can read, change and write whole XML documents.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSXMLDocument` read from a string, data or a file into a tree of `NSXMLNode`s and `NSXMLElement`s, on this system's libxml2 | Ferry | done |
+| 2 | The tree walked and changed (children, attributes, namespaces, values), and every change seen by XPath and by what is written | Ferry | done |
+| 3 | Written out compact, pretty printed or canonical, in UTF-8, UTF-16, ISO Latin 1 or ASCII; DTDs and their declarations; validation while reading | Ferry | done |
+| 4 | Strings turned into ASCII or ISO Latin 1 data for real, instead of UTF-8 | Ferry | done |
+| 5 | One new test and more string checks; `make check` 98 of 98 | Ferry | done |
+
 ## 1.196 "Ferry: loading web addresses" (done)
 
 Ferry 0.23.0: Mac apps can fetch from the web, for update checks, feeds and downloads.
