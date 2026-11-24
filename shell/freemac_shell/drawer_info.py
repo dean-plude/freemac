@@ -18,7 +18,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import alert, default_apps, macapps, tags  # noqa: E402
+from . import alert, app_list, default_apps, macapps, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -116,6 +116,11 @@ class InfoWindow(Gtk.Window):
         name = macapps.display_name(path) if is_bundle else info.get_display_name()
         kind = ("Mac app" if is_bundle else "Folder" if is_dir
                 else Gio.content_type_get_description(info.get_content_type() or "") or "Document")
+        # An app in Applications is shown as the app, not as its .desktop file.
+        app = Gio.DesktopAppInfo.new_from_filename(path) if app_list.is_installed_app(path) else None
+        if app is not None:
+            name, kind = app.get_display_name() or name, "Application"
+            self.set_title(f"{name} Info")
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=18)
         top = Gtk.Box(spacing=12)
@@ -123,6 +128,9 @@ class InfoWindow(Gtk.Window):
         pixbuf = macapps.cached_icon(path, 64) if is_bundle else None
         if pixbuf is not None:
             image.set_from_pixbuf(pixbuf)
+        elif app is not None and app.get_icon() is not None:
+            image.set_from_gicon(app.get_icon(), Gtk.IconSize.DIALOG)
+            image.set_pixel_size(64)
         elif info.get_icon() is not None:
             image.set_from_gicon(info.get_icon(), Gtk.IconSize.DIALOG)
             image.set_pixel_size(64)
@@ -131,7 +139,7 @@ class InfoWindow(Gtk.Window):
         title = Gtk.Label(label=name, xalign=0, wrap=True, max_width_chars=24)
         title.get_style_context().add_class("drawer-preview-name")
         titles.pack_start(title, False, False, 0)
-        self.size_line = Gtk.Label(xalign=0)
+        self.size_line = Gtk.Label(xalign=0, wrap=True, max_width_chars=30)
         self.size_line.get_style_context().add_class("dim-label")
         titles.pack_start(self.size_line, False, False, 0)
         top.pack_start(titles, True, True, 0)
@@ -141,7 +149,12 @@ class InfoWindow(Gtk.Window):
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
         rows = [("Kind", kind)]
         self.size_value = Gtk.Label(xalign=0, selectable=True, wrap=True, max_width_chars=30)
-        if is_dir or is_bundle:
+        if app is not None:
+            self.size_value.set_text("Adding up…")
+            self.size_line.set_text(app.get_description() or "")
+            self.version_value = Gtk.Label(label="—", xalign=0, selectable=True)
+            threading.Thread(target=self._app_package, args=(path,), daemon=True).start()
+        elif is_dir or is_bundle:
             self.size_value.set_text("Adding up…")
             self.size_line.set_text("Adding up…")
             threading.Thread(target=self._add_up, args=(path, is_bundle), daemon=True).start()
@@ -152,7 +165,11 @@ class InfoWindow(Gtk.Window):
         rows.append(("Size", self.size_value))
         where = os.path.dirname(os.path.abspath(path))
         home = GLib.get_home_dir()
-        rows.append(("Where", "Home" + where[len(home):] if where.startswith(home) else where))
+        if app is not None:
+            rows.append(("Version", self.version_value))
+            rows.append(("Where", "Applications"))
+        else:
+            rows.append(("Where", "Home" + where[len(home):] if where.startswith(home) else where))
         created = info.get_creation_date_time() if hasattr(info, "get_creation_date_time") else None
         modified = info.get_modification_date_time()
         rows.append(("Created", stamp_text(created.to_unix() if created else 0)))
@@ -169,7 +186,8 @@ class InfoWindow(Gtk.Window):
         box.pack_start(grid, False, False, 0)
 
         content = info.get_content_type() or ""
-        if not is_dir and not is_bundle and info.get_file_type() == Gio.FileType.REGULAR and content:
+        if not is_dir and not is_bundle and app is None and info.get_file_type() == Gio.FileType.REGULAR \
+                and content:
             box.pack_start(Gtk.Separator(), False, False, 0)
             box.pack_start(self._open_with(content, kind), False, False, 0)
 
@@ -186,6 +204,21 @@ class InfoWindow(Gtk.Window):
         # Nothing chosen when it opens: GTK would otherwise focus the Kind
         # line and highlight it.
         self.connect("map", lambda *_: GLib.idle_add(self._unfocus))
+
+    def _app_package(self, path):
+        """An app's size and version are its package's."""
+        found = app_list.package_of(path)
+
+        def show():
+            if found is None:
+                self.size_value.set_text("—")
+                return False
+            package, version, size = found
+            self.version_value.set_text((f"freemac {version}" if package == "freemac" else version) or "—")
+            self.size_value.set_text(f"{nice_size(size)} on disk" if size else
+                                     "Part of freemac" if package == "freemac" else "—")
+            return False
+        GLib.idle_add(show)
 
     def _open_with(self, content, kind):
         """Open with: the app that opens this kind of document, and Change

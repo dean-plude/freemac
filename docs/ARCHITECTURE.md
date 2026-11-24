@@ -878,6 +878,21 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## The Applications folder (1.148)
+
+`~/Applications` is a real, empty folder so the sidebar has somewhere to go;
+when Drawer lists it, `Folder._add_apps()` adds a row for each app from
+`app_list.installed_apps()`: `Gio.AppInfo.get_all()` filtered by
+`should_show()`, without Ferry's `ferry-` entries (the `.app` folders
+themselves show instead) and de-duplicated by id. Each row's path is the app's `.desktop` file,
+so `app_list.is_installed_app()` (a `.desktop` file under an `applications`
+data directory) lets `open_file` launch it with `Gio.DesktopAppInfo`, the
+gallery and Get Info show its icon, and Move to Trash refuses it with an alert
+pointing to Harbor. Get Info's Version and Size come from
+`app_list.package_of()` on a thread: freemac's own apps (`freemac-*.desktop`)
+report the freemac version from the manifest; others ask `dpkg-query -S` for
+the owning package and `-W` for its version and installed size.
+
 ## Hatch and disk images (1.147)
 
 `freemac-hatch` is the default app for `application/x-cd-image`,

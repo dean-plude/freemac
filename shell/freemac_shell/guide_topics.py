@@ -1130,6 +1130,15 @@ TOPICS = {
         "A Mac's .dmg files are for installing Mac apps; freemac can't open them. Look for the app in Harbor, or a "
         "download made for Linux.",
     ]),
+    "applications-folder": ("Find your apps in the Applications folder", "applications folder apps list all "
+                            "drawer get info version size remove uninstall delete trash shift command a", [
+        "Drawer's sidebar has Applications, as on a Mac: every app on this computer, freemac's own and the ones "
+        "you installed. ⇧⌘A opens it from Drawer's Go menu.",
+        "Double-click an app there to open it.",
+        "Select an app and press ⌘I for its Info: what it does, its version, and how much room it takes.",
+        "To remove an app, open Harbor, find it and click Remove; dragging it to the Trash doesn't remove it. "
+        "The apps that come with freemac can't be removed.",
+    ]),
     "install-download": ("Install an app you downloaded", "install installer deb package download app software "
                          "setup slipway website", [
         "Most apps are in Harbor, freemac's app centre. If a website offers its app for Linux as a .deb file "

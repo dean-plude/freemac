@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.148 "Applications" (done)
+
+Drawer gets the Mac's Applications folder: the apps on the computer, side by side with your own folders.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Applications in Drawer's sidebar lists every app on the computer, freemac's own and installed ones, with their own icons; a Mac app (.app folder) put there shows as itself | Drawer, app_list.py | done |
+| 2 | Double-clicking an app there opens it, as from the Dock | Drawer | done |
+| 3 | Get Info (⌘I) on an app: its description, Kind Application, Version, Size (or "Part of freemac"), and Where | Drawer | done |
+| 4 | Move to Trash (⌘⌫) on an app explains that apps are removed in Harbor, and that freemac's own can't be | Drawer | done |
+| 5 | Go menu shortcuts: Documents ⇧⌘O, Downloads ⌥⌘L, Home ⇧⌘H, Computer ⇧⌘C, Applications ⇧⌘A | Drawer | done |
+| 6 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.147 "Hatch" (done)
 
 Open a disk image you double-click, as a Mac mounts a .dmg: an .iso or .img becomes a disk on the Desktop and in Drawer, and ejects like a USB drive.

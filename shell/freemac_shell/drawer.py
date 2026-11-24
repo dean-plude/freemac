@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import app_list, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -97,10 +97,21 @@ def when(stamp):
     return time.strftime("%b %-d, %Y", time.localtime(stamp))
 
 
+def applications_folder():
+    """~/Applications: Mac apps added with Ferry are kept here, and every
+    installed app shows in it too, as in a Mac's Applications folder."""
+    path = os.path.join(GLib.get_home_dir(), "Applications")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        pass
+    return path
+
+
 def places():
     home = GLib.get_home_dir()
     found = [("Home", home, "user-home-symbolic")]
-    apps = os.path.join(home, "Applications")
+    apps = applications_folder()
     if os.path.isdir(apps):
         found.append(("Applications", apps, "folder-symbolic"))
     special = [
@@ -210,6 +221,7 @@ def place_icon(path):
 
 
 MAC_APP = "Mac App"
+APPLICATION = "Application"
 SPRING_DELAY = 900   # ms a drag rests on a folder before it springs open
 TEXT_SIZES = (10, 11, 12, 13, 14, 16)   # points, for names in icon view
 THUMB_LARGEST = 60_000_000   # bytes; bigger pictures keep their kind's icon
@@ -281,6 +293,8 @@ class Folder:
                     found[full] = names
             enum.close(None)
             tags.note_folder(path, found)
+            if os.path.realpath(path) == os.path.realpath(applications_folder()):
+                self._add_apps()
         if self.waiting:
             GLib.idle_add(self._thumbnails, self.waiting)
 
@@ -367,6 +381,20 @@ class Folder:
                 and info.get_size() < THUMB_LARGEST:
             self.waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
         return names
+
+    def _add_apps(self):
+        """Every installed app, as its own icon, in Applications."""
+        for name, full, gicon in app_list.installed_apps():
+            try:
+                stamp = os.stat(full).st_mtime
+            except OSError:
+                stamp = 0
+            gicon = gicon or Gio.ThemedIcon.new("application-x-executable")
+            self.store.append([
+                self.icon(gicon, self.icon_size), name, full, False, "", when(stamp), APPLICATION,
+                "1" + name.lower(), self.icon(gicon, 20), float(stamp), 0.0,
+                tags.markup(name, tags.get(full)),
+            ])
 
     def _markup(self, name, names, full, is_dir, info):
         """The name under an icon, with its tags' dots and, with Show Item
@@ -476,6 +504,10 @@ def gallery_pixbuf(path, fallback=None):
         info = Gio.File.new_for_path(path).query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
         if macapps.is_bundle(path):
             return Folder.app_icon(path, 256)
+        if app_list.is_installed_app(path):
+            app = Gio.DesktopAppInfo.new_from_filename(path)
+            if app is not None and app.get_icon() is not None:
+                return Folder.icon(app.get_icon(), 256) or fallback
         return Folder.icon(info.get_icon(), 256) or fallback
     except GLib.Error:
         return fallback
@@ -1085,7 +1117,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
                            ("go-documents", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS)),
                            ("go-downloads", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)),
                            ("go-desktop", GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)),
-                           ("go-computer", "/")):
+                           ("go-computer", "/"), ("go-applications", applications_folder())):
             menus.add_actions(self, {name: lambda p=path or GLib.get_home_dir(): self.navigate(p)})
         self.hidden_action = menus.add_toggle(self, "show-hidden", False, self._set_hidden)
         self.path_bar_action = menus.add_toggle(self, "path-bar", self.path_bar_shown, self._set_path_bar)
@@ -1753,6 +1785,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.open_file(path)
 
     def open_file(self, path):
+        if app_list.is_installed_app(path):
+            app = Gio.DesktopAppInfo.new_from_filename(path)
+            if app is not None:
+                try:
+                    app.launch([], self.get_display().get_app_launch_context())
+                except GLib.Error as err:
+                    self.notify(f"“{app.get_display_name()}” couldn’t be opened ({err.message}).")
+                return
         if macapps.is_bundle(path):
             GLib.spawn_async(["freemac-mac-app", "open", path], flags=GLib.SpawnFlags.SEARCH_PATH)
             return
@@ -1927,6 +1967,18 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if self.in_trash():
             self.put_back(paths)   # ⌘⌫ in the Trash puts things back, as in Finder
             return
+        apps = [p for p in paths if app_list.is_installed_app(p)]
+        if apps:
+            # An installed app isn't a file to throw away: Harbor removes it.
+            names = [n for n, f, _i in app_list.installed_apps() if f in apps]
+            what = f"“{names[0]}”" if len(names) == 1 else "These apps"
+            from . import alert
+            alert.tell(self, f"{what} can’t be moved to the Trash.",
+                       "To remove an app, open Harbor, find the app and click Remove. Apps that come with "
+                       "freemac can’t be removed.")
+            paths = [p for p in paths if p not in apps]
+            if not paths:
+                return
         went, error = transfer.to_trash(paths)
         if went:
             transfer.note_done({"kind": "trash", "paths": went})
@@ -2950,9 +3002,10 @@ def menubar():
         ("_Go", [
             [("Back", "win.back", "<Ctrl>bracketleft"), ("Forward", "win.forward", "<Ctrl>bracketright"),
              ("Enclosing Folder", "win.up", "<Ctrl>Up")],
-            [("Recents", "win.go-recents", "<Ctrl><Shift>f"), ("Home", "win.go-home", None), ("Desktop", "win.go-desktop", None),
-             ("Documents", "win.go-documents", None), ("Downloads", "win.go-downloads", None),
-             ("Computer", "win.go-computer", None), ("Network", "win.go-network", "<Ctrl><Shift>k")],
+            [("Recents", "win.go-recents", "<Ctrl><Shift>f"), ("Documents", "win.go-documents", "<Ctrl><Shift>o"),
+             ("Desktop", "win.go-desktop", None), ("Downloads", "win.go-downloads", "<Ctrl><Alt>l"),
+             ("Home", "win.go-home", "<Ctrl><Shift>h"), ("Computer", "win.go-computer", "<Ctrl><Shift>c"),
+             ("Network", "win.go-network", "<Ctrl><Shift>k"), ("Applications", "win.go-applications", "<Ctrl><Shift>a")],
             [("Go to Folder…", "win.go-to-folder", "<Ctrl><Shift>g"),
              ("Connect to Server…", "win.connect-to-server", "<Ctrl>k")],
             [("Browse Backups", "win.browse-backups", None)],
