@@ -883,6 +883,16 @@ TOPICS = {
         "Adapter. The switch in the Battery menu turns it on or off at once. The battery in the menu bar "
         "turns yellow while it's on.",
     ]),
+    "bluetooth": ("Connect Bluetooth headphones, keyboards and mice", "bluetooth headphones earbuds headset speaker keyboard mouse trackpad wireless pair connect disconnect battery devices menu bar", [
+        "Click the Bluetooth symbol in the menu bar for the Bluetooth menu. The switch at the top turns "
+        "Bluetooth on or off.",
+        "Under Devices are the headphones, keyboards, mice and other devices paired with this computer. "
+        "Connected ones are first, with a blue symbol, and those that report it show their battery.",
+        "Click a device to connect it, or click a connected one to disconnect it. If it can't connect, "
+        "make sure it's on and nearby, then try again.",
+        "To pair a new device, choose Bluetooth Settings… and put the device in pairing mode. Dials lists "
+        "it under Nearby Devices: click Pair.",
+    ]),
     "menu-extras": ("Use apps' icons in the menu bar", "menu bar extras icons tray status icon system tray app indicator notification area background running chat cloud sync", [
         "Some apps put an icon of their own in the menu bar while they run, such as chat, cloud storage "
         "and password apps. They sit left of freemac's own icons, newest furthest left.",
