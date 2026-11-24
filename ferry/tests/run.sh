@@ -322,6 +322,7 @@ run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/
 # AppKit (M4). First with no display, where windows are drawn off screen,
 # linked through Cocoa and through AppKit itself.
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
+run_one appkit_hidden_redraw "$here/appkit/hidden_redraw.m" "$here/appkit/hidden_redraw.out" -framework Cocoa
 run_one appkit_views_appkit "$here/appkit/views.m" "$here/appkit/views.out" -fblocks \
     -framework AppKit -framework Foundation -framework CoreGraphics -framework CoreText
 # Then on a real Wayland display: a headless Weston compositor, when installed.
