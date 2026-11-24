@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, locks, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -251,6 +251,7 @@ class Folder:
 
     icon_cache = {}
     badged = {}        # an icon -> the same icon with an alias's arrow
+    locked = {}        # an icon -> the same icon with a padlock
     custom = {}        # (custom icon file, size) -> its picture
     thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
@@ -435,6 +436,8 @@ class Folder:
                 plain = Gio.ThemedIcon.new("text-x-generic")
                 big, small = self.icon(plain, self.icon_size), self.icon(plain, 20)
             big, small = self.with_arrow(big), self.with_arrow(small)
+        elif locks.is_locked(full):
+            big, small = self.with_lock(big), self.with_lock(small)
         names = tags.get(full)
         it = self.store.append([
             big, name, full, is_dir,
@@ -488,6 +491,8 @@ class Folder:
                 small = self.thumbnail(path, stamp, 20)
                 if aliases.is_alias(path):
                     big, small = self.with_arrow(big), self.with_arrow(small)
+                elif locks.is_locked(path):
+                    big, small = self.with_lock(big), self.with_lock(small)
                 it = self.store.get_iter(ref.get_path())
                 self.store.set(it, {C_ICON: big, C_SMALL: small})
         return bool(waiting)
@@ -536,6 +541,16 @@ class Folder:
                 cls.badged.clear()
             cls.badged[pixbuf] = aliases.badge(pixbuf)
         return cls.badged[pixbuf]
+
+    @classmethod
+    def with_lock(cls, pixbuf):
+        if pixbuf is None:
+            return None
+        if pixbuf not in cls.locked:
+            if len(cls.locked) > 500:
+                cls.locked.clear()
+            cls.locked[pixbuf] = locks.badge(pixbuf)
+        return cls.locked[pixbuf]
 
     @classmethod
     def icon(cls, gicon, size):
@@ -2073,6 +2088,10 @@ class DrawerWindow(Gtk.ApplicationWindow):
 
     def rename(self, path=None):
         paths = [path] if path else self.selected_paths()
+        locked = locks.locked_among(paths)
+        if len(paths) > 1 and locked:
+            locks.tell_cant_rename(self, locked[0])
+            return
         if len(paths) > 1:
             batch_rename.ask(self, paths, self.notify)
             self.refresh()
@@ -2080,6 +2099,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
         if not paths:
             return
         path = paths[0]
+        if locks.is_locked(path):
+            locks.tell_cant_rename(self, path)
+            return
         dialog = Gtk.Dialog(title="Rename", transient_for=self, modal=True)
         dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Rename", Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
@@ -2120,6 +2142,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             paths = [p for p in paths if p not in apps]
             if not paths:
                 return
+        paths = locks.ask_trash(self, paths)
+        if not paths:
+            return
         went, error = transfer.to_trash(paths)
         if went:
             transfer.note_done({"kind": "trash", "paths": went})

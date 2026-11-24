@@ -1312,6 +1312,14 @@ TOPICS = {
         "Calculate all sizes adds up each folder, so you can sort by Size and see which folders take the most room.",
         "Changes apply to every Drawer window and are kept for next time.",
     ]),
+    "locked": ("Lock a file or folder", "lock locked unlock protect keep safe read only can't change "
+               "delete rename get info padlock", [
+        "Choose the file or folder in Drawer or on the Desktop and press ⌘I to open its Info window.",
+        "Tick Locked. A small padlock shows on its icon, and no app can change it.",
+        "A locked folder keeps its items: nothing can be added to it or taken out.",
+        "Drawer won't rename a locked item, and asks before moving it to the Trash.",
+        "To change it again, open its Info window and untick Locked.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",
