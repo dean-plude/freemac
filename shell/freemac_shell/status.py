@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Status icons for Topline: network, sound, battery, Bluetooth, printing, and
+"""Status icons for Topline: sound, battery, Bluetooth, printing, and
 the dot that shows an app is using the microphone or camera.
 
 Each one hides itself when the computer doesn't have the thing it shows (no
@@ -57,44 +57,6 @@ class StatusButton(Gtk.Button):
         self.set_tooltip_text(tooltip)
         self.show()
         self.image.show()
-
-
-class Network(StatusButton):
-    def __init__(self):
-        super().__init__()
-        self.connect("clicked", lambda *_: launch("freemac-dials", "--panel", "network"))
-        self.client = None
-        if NM:
-            try:
-                self.client = NM.Client.new(None)
-            except GLib.Error:
-                self.client = None
-        if self.client:
-            for signal in ("notify::primary-connection", "notify::state", "notify::connectivity"):
-                self.client.connect(signal, lambda *_: self.update())
-        GLib.timeout_add_seconds(20, lambda: self.update() or True)
-        self.update()
-
-    def update(self):
-        if not self.client:
-            self.hide()
-            return
-        active = self.client.get_primary_connection()
-        if not active:
-            self.show_icon("network-offline-symbolic", "Not connected")
-            return
-        kind = active.get_connection_type()
-        name = active.get_id()
-        if kind == "802-11-wireless":
-            strength = 0
-            for device in active.get_devices():
-                ap = device.get_active_access_point() if hasattr(device, "get_active_access_point") else None
-                if ap:
-                    strength = ap.get_strength()
-            level = "excellent" if strength > 75 else "good" if strength > 50 else "ok" if strength > 25 else "weak"
-            self.show_icon(f"network-wireless-signal-{level}-symbolic", f"Wi-Fi: {name}")
-        else:
-            self.show_icon("network-wired-symbolic", f"Wired: {name}")
 
 
 class VPN(Gtk.MenuButton):
@@ -276,6 +238,10 @@ class Sound(StatusButton):
         self.popup.connect("key-press-event", self._popup_key)
         self.popup.connect("leave-notify-event", self._popup_leave)
         self.popup.connect("enter-notify-event", self._popup_enter)
+        # A pointer already over the menu when it appears gets no enter
+        # event, so moving in it also keeps it open.
+        self.popup.add_events(Gdk.EventMask.POINTER_MOTION_MASK)
+        self.popup.connect("motion-notify-event", self._popup_enter)
         self.close_timer = None
         self.connect("clicked", self._toggle_popup)
         self.add_events(1 << 21)  # scroll
@@ -379,10 +345,12 @@ class Sound(StatusButton):
             self.close_timer = None
 
     def _popup_leave(self, _window=None, event=None):
+        """Close a little after the pointer leaves the menu; one that opens and
+        is never pointed at closes after a few seconds."""
         if event is not None and event.detail == Gdk.NotifyType.INFERIOR:
             return   # moved onto the slider or the mute button
         self._popup_enter()
-        self.close_timer = GLib.timeout_add(2500, self._auto_close)
+        self.close_timer = GLib.timeout_add(2500 if event is not None else 6000, self._auto_close)
 
     def _auto_close(self):
         self.close_timer = None

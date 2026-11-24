@@ -878,6 +878,25 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Wi-Fi menu (1.153)
+
+`wifi_menu.WifiMenu` replaces the old network status icon in Topline. It
+keeps one `NM.Client` and follows its signals and those of the first managed
+Wi-Fi device (an unmanaged one belongs to something else, such as a hotspot),
+debounced by 250 ms. The menu is a layer-shell overlay like the Sound menu.
+NetworkManager reports every scan result and change of strength while it is
+open, so `fill()` compares a plan of what the rows show and rebuilds only when
+it changes; a row rebuilt under the pointer would lose the click. Joining
+uses `activate_connection_async` for a saved network, or builds an
+`NM.SimpleConnection` (`wpa-psk`, `sae` or WEP) for `add_and_activate`;
+`_watch()` follows the new active connection and, if it is deactivated
+before it is activated, deletes it (so a wrong password is never kept) and
+sends a Beacon notification. Turning Wi-Fi off is never reported as a failed
+join. Clicking the joined network shows `_add_details()`; the Option key
+works too when Topline can see it, but a layer surface without keyboard
+focus is not told about modifiers. The image now installs `wpasupplicant`,
+which NetworkManager needs for any Wi-Fi network but only recommends.
+
 ## New Image in Hull (1.152)
 
 `disk_images.make_blank()` makes a sparse file of the size asked for with

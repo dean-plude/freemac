@@ -1171,6 +1171,20 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.153 "Wi-Fi menu" (done)
+
+The menu bar's Wi-Fi menu, as on a Mac, and a fix that lets every download join Wi-Fi.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Wi-Fi menu: a switch to turn Wi-Fi off and on, Known Networks first (the one you're on in blue), then Other Networks by signal, with a padlock for those that need a password | Topline, wifi_menu.py | done |
+| 2 | Click a network to join it: a saved one joins at once, an open one too, and one with a password asks for it in a window (Join stays off until it's long enough); a wrong password isn't saved and a notification says so | wifi_menu.py | done |
+| 3 | Click the network you're on for its IP address, router, security, BSSID, channel, signal and rate, and Disconnect | wifi_menu.py | done |
+| 4 | The menu-bar symbol shows the signal while Wi-Fi is joined, off or not joined, and the cable when only a cable is used | wifi_menu.py | done |
+| 5 | The downloads lacked wpasupplicant, so NetworkManager could not join any Wi-Fi network; it is now in the image, with wireless-regdb | build/packages | done |
+| 6 | Menu-bar menus stay open while the pointer is in them; a free-standing alert has no empty grey band at the top | status.py, alert.py | done |
+| 7 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.152 "New Image" (done)
 
 Hull's File > New Image, as in a Mac's Disk Utility: blank disk images and copies of drives.

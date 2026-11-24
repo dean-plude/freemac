@@ -117,9 +117,14 @@ TOPICS = {
         "In the toolbar, Options chooses where pictures go (Desktop, Documents, Pictures or just the "
         "clipboard), a 5 or 10 second timer, and whether the corner preview shows.",
     ]),
-    "wifi": ("Join a Wi-Fi network", "wifi wi-fi wireless internet network password connect", [
-        "Click the network icon in the menu bar, or choose Dials > Network, and choose the network.",
-        "Type its password when asked. freemac remembers it next time.",
+    "wifi": ("Join a Wi-Fi network", "wifi wi-fi wireless internet network password connect join menu bar "
+             "signal turn off on known networks disconnect ip address router", [
+        "Click the Wi-Fi icon in the menu bar. Networks you've joined are listed first, then the others, "
+        "strongest first. A padlock means the network needs a password.",
+        "Click a network to join it, and type its password when asked. freemac remembers it next time, "
+        "and a wrong password isn't kept.",
+        "Click the network you're on to see its IP address, router, signal and channel, or to disconnect.",
+        "The switch at the top turns Wi-Fi off and on. Wi-Fi Settings… opens Dials > Network.",
     ]),
     "wifi-password": ("Find or share a Wi-Fi password", "wifi wi-fi password forgot share guest phone qr code scan known networks forget join automatically", [
         "Choose Dials > Network. Known Networks lists every Wi-Fi network this computer has joined.",

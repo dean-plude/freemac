@@ -54,6 +54,13 @@ def build(parent, title, text="", buttons=(("OK", Gtk.ResponseType.OK),), defaul
     # panel with a shadow) and Strata adds no title bar or window buttons.
     empty = Gtk.Box()
     empty.set_size_request(-1, 0)
+    if parent is None:
+        # A sheet's title bar is hidden under its window's; a free-standing
+        # alert's would show as an empty grey band, so it takes no room.
+        flat = Gtk.CssProvider()
+        flat.load_from_data(b"* { min-height: 0; padding: 0; margin: 0; border: none; "
+                            b"background: none; box-shadow: none; }")
+        empty.get_style_context().add_provider(flat, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
     dialog.set_titlebar(empty)
     visual = dialog.get_screen().get_rgba_visual()
     if visual is not None:

@@ -30,6 +30,11 @@ dconf-gsettings-backend
 dconf-service
 # Networking (wired and Wi-Fi) and the permission service it uses.
 network-manager
+# NetworkManager joins every Wi-Fi network through wpa_supplicant; it's only a
+# Recommends, so without it here no Wi-Fi network could be joined at all.
+# wireless-regdb gives each country's allowed channels.
+wpasupplicant
+wireless-regdb
 # VPN in Dials > Network: OpenVPN (.ovpn) files; WireGuard is built into
 # NetworkManager and the kernel.
 network-manager-openvpn
