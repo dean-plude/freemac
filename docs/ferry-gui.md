@@ -1109,6 +1109,7 @@ The new or extended ones:
 | `foundation_xmlparser` | (freemac (1.194), Ferry 0.21.0) `NSXMLParser` on libxml2: elements, attributes, text, CDATA, comments, processing instructions, entities, namespaces, errors with codes and lines, aborting, nested parses |
 | `foundation_operation` | (freemac (1.194), Ferry 0.21.0) `NSOperationQueue` with block, invocation and an app's own operations: dependencies, priorities, cancelling, completion blocks, suspending, barriers, key-value notifications, waits; the locks |
 | `foundation_cache` | (freemac (1.194), Ferry 0.21.0) `NSCache` (count and cost limits, least recently used first, the delegate) and `NSProgress` (trees of progress, fraction completed with key-value notifications, cancel and pause) |
+| `appkit_more_controls` | (freemac (1.195), Ferry 0.22.0) Steppers by click, keys and holding the mouse down (autorepeat, wrapping or stopping at the ends, the value kept within the limits); level indicators in each style (tick marks and their rectangles, a click or drag setting the level when editable, continuous actions, the arrow keys, rating stars); colour wells taking turns with the shared colour panel (one active well, `changeColor:` sent to the active well and down the responder chain, a second click letting go, closing the panel letting go); date pickers in text-and-stepper style (each part stepped by the arrows without carrying into the next, typed digits moving on to the next part, a year typed short, AM and PM, the stepper, the minimum and maximum, the delegate's validation) and graphical style (days clicked, months turned, a range dragged, the clock beside the calendar); combo boxes with their own items and with a data source (the list opened by the button or the keys, chosen by Return or a click, closed by Escape or a click outside, the four notifications in order, completion keeping what was typed, the arrows stepping through the items with the list closed); popovers in each behaviour (shown beside a rectangle on any edge, moved to the other side when there is no room, kept in the window, closed by Escape, a click outside, `performClose:` or the delegate's refusal, the four notifications) and view controllers presented as popovers; path controls (components from a file URL and a web address, clicks and double clicks, own items, a placeholder, long paths cut in the middle, the pop-up style's menu); `NSSound` played through a stand-in player (named sounds, a sound from data, the volume, pause and resume, stop, looping, the delegate told whether it finished); token fields (tokens made at commas or at a character set, Return and end of editing, Backspace selecting then removing a token, the delegate's represented objects, display strings and refusals); and all of them loaded from a nib with their targets and actions |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
 | `appkit_panes` | (freemac 1.155) tab views and split views: layout, selection, the delegates, dragging, collapsing, holding priorities, autosaved positions, both built from a nib |
@@ -1531,6 +1532,65 @@ The new or extended ones:
     what order (Ferry: `fractionCompleted` for the progress and every
     ancestor, inner first, around the change of the unit count; and once
     more when a child is attached).
+- **Steppers, date pickers, combo boxes, colour wells, popovers, path
+  controls, sounds and token fields: what is left** (freemac (1.195), Ferry
+  0.22.0).
+  - `NSPopover`: detaching into a window (`detachableWindowForPopover:`),
+    animation (`animates` is kept and ignored), and the appearance options;
+    the bubble has a soft edge in place of a shadow, since Ferry draws no
+    shadows.
+  - `NSPathControl`: dragging files on and off, the "Choose…" item and its
+    open panel (`NSPathControlDelegate`'s open-panel methods are never
+    called), and editing the path.
+  - `NSTokenField`: the completion list (`completionsForSubstring:` is never
+    asked), tokens wrapping onto more lines, editing a token again, copying
+    and pasting tokens as tokens, and tokens' menus.
+  - `NSDatePicker`: the clock face is drawn but can't be set by dragging its
+    hands; time zones read from nibs (Ferry can't decode `NSTimeZone` yet,
+    so a nib's time zone is left out and the picker uses the default one).
+  - `NSComboBox`: the list is drawn inside the window, so a long list can't
+    reach past it (the same limit as pop-up buttons' menus).
+  - `NSColorPanel`: a basic panel. On a display it opens GTK's colour
+    chooser; it has no modes, swatches, opacity slider or eyedropper, and
+    `setColor:` on the panel answers no well.
+  - `NSSound`: seeking (`currentTime` is read only), changing the volume of
+    a sound already playing, `playbackDeviceIdentifier`, and formats other
+    than what the player takes (the duration is read only from WAV files).
+  - `NSProgressIndicator` wasn't changed here; `NSProgress` isn't there.
+- **Those controls: written from the documentation, not compared with a
+  Mac** (freemac (1.195), Ferry 0.22.0). They were written from Apple's
+  published documentation and general knowledge of how the controls behave:
+  - `NSStepper`: the defaults (0 to 59 by 1, autorepeat and wrapping on),
+    and that wrapping goes from the maximum to the minimum, not past it.
+  - `NSLevelIndicator`: the default maximum of 2, the colours at the warning
+    and critical values, and how a click between two stars rounds.
+  - `NSColorWell` and `NSColorPanel`: that a second click on an active well
+    lets go of the panel, that closing the panel lets go of every well, and
+    that the panel's `setColor:` reaches no well.
+  - `NSDatePicker`: that stepping a part wraps without carrying into the
+    next (the 31st up goes to the 1st of the same month), that typing moves
+    on to the next part once a part is full, that a two-digit year is taken
+    as 20xx, and that setting a limit brings the date within it at once.
+  - `NSComboBox`: that the arrow keys step through the items while the list
+    is closed, that choosing sends the action, that completion keeps the
+    case of what was typed, and the order of the notifications.
+  - `NSPopover`: that a click outside a transient popover goes on to what
+    was clicked as well as closing it, and where the bubble goes when there
+    is no room on either side.
+  - `NSPathControl`: "Computer" as the root's name, the pop-up menu's order
+    (the last component first), and which components are cut first when the
+    path is long.
+  - `NSSound`: that `stop` tells the delegate the sound didn't finish, and
+    that a named sound is kept and handed out again by `soundNamed:`.
+  - `NSTokenField`: that `stringValue` joins the tokens with ", ".
+  - The nib keys these classes read (`NSIncrement`, `NSAutorepeat`,
+    `NSValueWraps`, `NSIndicatorStyle`, `NSDatePickerElements`,
+    `NSPopUpListData`, `NSUsesDataSource`, `NSPathStyle`, `NSTokenStyle`,
+    `NSBehavior`, `NSContentViewController` and the rest) are the names
+    published descriptions of the format give; a nib that names something
+    differently loads with the default.
+  - How each control looks next to the real one: they are drawn by Ferry's
+    own code in freemac's look, not compared side by side.
 
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -1599,3 +1659,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.19.0 (freemac (1.190)): `NSTreeController` (children, count and leaf key paths, `arrangedObjects` as a tree of `NSTreeNode`s, `selectionIndexPaths` and `selectedObjects`, sorting, inserting, removing and moving at index paths, `add:`, `insert:`, `addChild:`, `insertChild:` and `remove:`), `NSTreeNode` and `NSIndexPath`; outline views bound to a tree controller (`content`, `selectionIndexPaths`, `sortDescriptors` and columns bound to `arrangedObjects.key`, edited cells written back); per-row `editable` and `enabled` column bindings, and no write back when the controller isn't editable; `NSDictionaryController`, `make check` 85/85.
 - 2026-11-24: Ferry 0.20.0 (freemac (1.191)): `NSArrayController`, `NSTreeController`, `NSObjectController` and `NSDictionaryController` loaded from keyed nib archives with their settings and the binding connectors that join them, so a nib that binds a table or an outline to a controller works with no code; view-based tables and outlines from a nib making their cell views from the table's prototypes, with controls in a cell view bound to `objectValue.key` both ways; `NSValidatesImmediately` (`validateValue:forKeyPath:error:` and `validate<Key>:error:` before a bound value is written, a refused value presented and the control put back), `NSRaisesForNotApplicableKeys`, `NSConditionallySetsEnabled` and `...Editable` on controls, `NSAllowsEditingMultipleValuesSelection`, `NSDeletesObjectsOnRemove`, `NSSelectsAllWhenSettingContent` and `NSHandlesContentAsCompoundValue`, `make check` 87/87.
 - 2026-11-24: Ferry 0.21.0 (freemac (1.194)): `NSTask`, `NSPipe` and `NSFileHandle`, `NSRegularExpression` on ICU, `NSScanner`, `NSXMLParser` on libxml2, `NSOperationQueue` and its operations, the locks, `NSCache` and `NSProgress`; ICU and libxml2 reached through a new core call, `ferry_twin_symbol`, only when first used; the desktop's notice for an app Ferry can't run now says "Ferry can't run this app yet" and keeps the app's output in `~/.cache/freemac/ferry/<app>.log` (1.193), `make check` 93/93.
+- 2026-11-24: Ferry 0.22.0 (freemac (1.195)): `NSStepper`, `NSLevelIndicator`, `NSColorWell` with a basic `NSColorPanel`, `NSDatePicker` (text with a stepper, or a calendar and a clock), `NSComboBox`, `NSPopover` (and view controllers presented as popovers), `NSPathControl`, `NSSound` (through `pw-play`, `paplay` or `aplay`) and `NSTokenField`, each with its cell and read from nibs, `make check` 94/94.

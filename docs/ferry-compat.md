@@ -458,6 +458,33 @@ These were written from Apple's documentation and not compared with a
 Mac; `docs/ferry-gui.md` lists what a Mac would settle. None of the nine
 apps has been run again with these.
 
+### Steppers, date pickers, combo boxes, colour wells, popovers, path controls, sounds and token fields (freemac 1.195, Ferry 0.22.0)
+
+`NSStepper`, `NSLevelIndicator`, `NSColorWell`, `NSColorPanel`,
+`NSDatePicker`, `NSComboBox`, `NSPopover`, `NSPathControl`, `NSSound` and
+`NSTokenField` are in Ferry now, with their cells, all read from nibs and
+drawn by Ferry's own code in freemac's look. Steppers step by click, the
+arrow keys and holding the mouse down. Level indicators draw the
+continuous, discrete, relevancy and rating styles with tick marks, and can
+be set by the mouse and keys when editable. A colour well opens the shared
+colour panel (GTK's colour chooser on a display) and sends `changeColor:`
+when a colour is chosen. Date pickers show their parts in the user's
+locale's order, are typed into and stepped part by part, keep within their
+limits and ask their delegate; the graphical style shows a month calendar
+(with ranges) and a clock, and a text picker can open its calendar in a
+popover. Combo boxes take their items or a data source, complete what is
+typed and open their list inside the window. Popovers open beside a
+rectangle in the window, on the side with room, and close as their
+behaviour says; view controllers can be presented as popovers. Path
+controls show a file's folders (or a web address's parts) with icons, in
+the standard, navigation-bar and pop-up styles. `NSSound` plays through
+`pw-play`, `paplay` or `aplay`, whichever is there, and `soundNamed:` finds
+the Mac's alert sounds' names in freemac's own sounds in
+`/usr/share/sounds/freemac`. Token fields turn what is typed into tokens at
+commas. Not done yet: detaching popovers, dragging files onto path
+controls, the token field's completion list, setting the clock by its
+hands, and time zones read from nibs.
+
 ## What the apps need most
 
 Counted over the nine apps:
