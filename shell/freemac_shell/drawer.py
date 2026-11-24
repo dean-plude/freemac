@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, drawer_summary, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_clipboard, drawer_settings, drawer_info, drawer_summary, locks, macapps, menus, neighbours, quick_actions, recent_folders, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -1252,6 +1252,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "get-info": self.get_info,
             "show-inspector": self.show_inspector,
             "summary-info": self.summary_info,
+            "show-clipboard": lambda: drawer_clipboard.show(self),
             "copy-pathname": self.copy_pathname,
             "eject": self.eject,
             "copy": self.copy,
@@ -3350,6 +3351,7 @@ def menubar():
              ("Paste Item", "win.paste", "<Ctrl>v"),
              ("Move Item Here", "win.move-here", "<Ctrl><Alt>v")],
             [("Select All", "win.select-all", "<Ctrl>a")],
+            [("Show Clipboard", "win.show-clipboard", None)],
             [("Find…", "win.filter", "<Ctrl>f"), ("Save Search…", "win.save-search", None)],
         ]),
         ("_View", [

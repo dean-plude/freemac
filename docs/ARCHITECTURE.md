@@ -878,6 +878,14 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Show Clipboard (1.185)
+
+`drawer_clipboard.ClipboardWindow` listens for the clipboard's
+`owner-change` and asks for its targets each time. Files come first,
+through `transfer.pasted_files()`, which also knows Drawer's own copies;
+then an `image/*` target as a picture, and otherwise text. There is one
+window per Drawer process.
+
 ## Summary Info (1.183)
 
 `drawer_summary.SummaryWindow` is a small window of its own beside

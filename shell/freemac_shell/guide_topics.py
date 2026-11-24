@@ -1346,6 +1346,12 @@ TOPICS = {
         "You can also hold Option and right-click it: Copy changes to Copy as Pathname.",
         "Paste it anywhere: for a few items, each path is on its own line.",
     ]),
+    "show-clipboard": ("See what's on the clipboard", "show clipboard copied what did I copy pasteboard contents edit menu drawer", [
+        "In Drawer, choose Edit > Show Clipboard.",
+        "A window shows what you copied last: words, a picture or files.",
+        "It changes as soon as you copy something else, in any app.",
+        "The line at the bottom says what kind of thing it is.",
+    ]),
     "summary-info": ("See information about several items at once", "summary info get summary info several items many files total size together lock all tag all control command i", [
         "Choose the items in Drawer.",
         "Choose File > Get Summary Info, or press ⌃⌘I.",
