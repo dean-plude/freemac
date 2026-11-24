@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.175 "List view options" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | View Options (⌘J) shows the options of the view in front, and changes with it: in list view, Show Columns ticks Date Modified, Size and Kind on or off | drawer.py | done |
+| 2 | Use relative dates: Today 9:19 AM and Yesterday, or the full date and time with a wider column | drawer.py | done |
+| 3 | Calculate all sizes adds up each folder in the background, "Adding up…" until done, and sorting by Size then puts the biggest folders first | drawer.py | done |
+| 4 | Each choice is kept for every Drawer window and the next start | drawer.py | done |
+| 5 | Guide topic, README row and screenshot | Guide, Docs | done |
+
 ## 1.174 "Custom icons and comments" (done)
 
 | # | Item | Component | Status |
