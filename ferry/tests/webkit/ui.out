@@ -1,0 +1,27 @@
+loaded: 1
+with a UI delegate:
+  alert "hello" (main frame 1)
+  -> after the alert
+  confirm "yes, please", answered later
+  -> 1
+  confirm "no, thanks", answered later
+  -> 0
+  prompt "name" with "Ferry"
+  -> Ferry!
+  prompt "cancel" with "x"
+  -> null
+a window the page opens:
+  create a web view for opened.html (target frame none, features none)
+  -> object
+  the opened view shows opened.html, title Opened, made with the configuration's store: 1
+  closed: the opened view 1
+  -> asked to close
+  create a web view for opened.html (target frame none, features none)
+  -> null
+with no UI delegate:
+  -> went on
+  -> 0
+  -> null
+  -> null
+done
+exit=0

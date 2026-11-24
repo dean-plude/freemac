@@ -106,6 +106,20 @@ run_one() {
             HOME="$build/home_$name" TMPDIR="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
                 env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
+        # WebKit (freemac 1.214, Ferry 0.40.0): two tests with no display
+        # (one as if WebKitGTK weren't installed), and the others on the X
+        # display of run.sh's own Xvfb; each in a home of its own
+        webkit_linked|webkit_missing)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            missing=; [ "$name" = webkit_missing ] && missing="$build/home_$name/none/libwebkit2gtk-4.1.so.0"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" TMPDIR="$build/home_$name" XDG_CONFIG_HOME= \
+                XDG_CACHE_HOME= XDG_DATA_HOME= FERRY_WEBKITGTK="$missing" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        webkit_*)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"; chmod 700 "$build/home_$name"
+            env -u WAYLAND_DISPLAY DISPLAY="$webkit_display" GDK_BACKEND=x11 NO_AT_BRIDGE=1 HOME="$build/home_$name" \
+                TMPDIR="$build/home_$name" XDG_RUNTIME_DIR="$build/home_$name" XDG_CONFIG_HOME= XDG_CACHE_HOME= \
+                XDG_DATA_HOME= timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -981,6 +995,55 @@ then
     echo "ok   foundation_applescript message"; pass=$((pass + 1))
 else
     echo "FAIL foundation_applescript message"; sed 's/^/    stderr: /' "$build/foundation_applescript.err"; fail=$((fail + 1))
+fi
+# WebKit: WKWebView and the older WebView, shown by this system's WebKitGTK
+# (freemac 1.214, Ferry 0.40.0). First what needs neither WebKitGTK nor a
+# display: the classes, web views that stay empty with no display, and the
+# same as if WebKitGTK weren't installed, each saying so once. Pages come
+# only from strings, data and local files, never the network.
+webkit_flags="-fobjc-arc -fblocks -framework Cocoa -framework WebKit"
+webkit_message() {   # test, what stderr says once
+    if [ "$(grep -c "$2" "$build/$1.err" 2>/dev/null)" = 1 ]; then
+        echo "ok   $1 message"; pass=$((pass + 1))
+    else
+        echo "FAIL $1 message"; sed 's/^/    stderr: /' "$build/$1.err"; fail=$((fail + 1))
+    fi
+}
+run_one webkit_linked "$here/webkit/linked.m" "$here/webkit/linked.out" $webkit_flags
+webkit_message webkit_linked "^WebKit (Ferry): web views need "
+run_one webkit_missing "$here/webkit/linked.m" "$here/webkit/linked.out" $webkit_flags
+webkit_message webkit_missing "^WebKit (Ferry): web views need WebKitGTK (libwebkit2gtk-4.1), which isn't installed"
+# WebKitGTK is opened only by programs that make a web view
+if LD_DEBUG=libs env -u DISPLAY -u WAYLAND_DISPLAY "$top/ferry" "$build/webkit_linked" classes 2>&1 >/dev/null |
+        grep -q "libwebkit2gtk"; then
+    echo "FAIL webkit_linked opens WebKitGTK with no web view"; fail=$((fail + 1))
+else
+    echo "ok   WebKitGTK opened only for web views"; pass=$((pass + 1))
+fi
+# Then on an X display of the tests' own (Xvfb, headless), when WebKitGTK
+# and Xvfb are installed.
+webkit_found=
+for d in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib /usr/local/lib; do
+    [ -e "$d/libwebkit2gtk-4.1.so.0" ] && webkit_found=1
+done
+if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
+    rm -f "$build/xvfb.display"
+    Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp 3> "$build/xvfb.display" > "$build/xvfb.log" 2>&1 &
+    xvfb_pid=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -s "$build/xvfb.display" ] && break; sleep 0.5; done
+    webkit_display=":$(cat "$build/xvfb.display")"
+    run_one webkit_wkwebview "$here/webkit/wkwebview.m" "$here/webkit/wkwebview.out" $webkit_flags
+    run_one webkit_ui "$here/webkit/ui.m" "$here/webkit/ui.out" $webkit_flags
+    run_one webkit_legacy "$here/webkit/legacy.m" "$here/webkit/legacy.out" $webkit_flags
+    run_one webkit_embed "$here/webkit/embed.m" "$here/webkit/embed.out" $webkit_flags
+    if grep -q "Gtk-CRITICAL\|Gtk-WARNING\|GLib-GObject-CRITICAL" "$build/webkit_embed.err" 2>/dev/null; then
+        echo "FAIL webkit_embed warnings from GTK"; sed 's/^/    stderr: /' "$build/webkit_embed.err"; fail=$((fail + 1))
+    else
+        echo "ok   webkit_embed with no warnings from GTK"; pass=$((pass + 1))
+    fi
+    kill "$xvfb_pid" 2> /dev/null; wait "$xvfb_pid" 2> /dev/null
+else
+    echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
 fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

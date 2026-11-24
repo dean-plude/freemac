@@ -1,0 +1,28 @@
+before the window is shown: not shown
+shown, filling its box: 20, 130, 200, 150, 0, 0
+shown: the page is 200x150
+larger than its box, which clips it: 20, 130, 200, 150, -50, -20
+clipped: the page is 300x200
+moved and made smaller: 30, 190, 100, 80, 0, 0
+smaller: the page is 100x80
+hidden: not shown
+shown again: 30, 190, 100, 80, 0, 0
+its box hidden: not shown
+its box shown again: 30, 190, 100, 80, 0, 0
+its window made larger: 20, 130, 300, 250, 0, 0
+larger window: the page is 300x250
+first responder before: the web view 0
+made the first responder: 1, the GTK view has the keyboard 1
+another view made the first responder: the GTK view has the keyboard 0
+its window ordered out (the view stays in it): 20, 130, 300, 250, 0, 0
+its window ordered in: 20, 130, 300, 250, 0, 0
+the page is still there: Embedded, true
+its window closed: not shown
+the page is still there: Embedded
+put in a new window: 0, 0, 300, 200, 0, 0
+still the same page: Embedded, true
+in the new window: the page is 300x200
+taken out of its window: not shown
+moved to a third window: 50, 50, 100, 100, 0, 0
+done
+exit=0

@@ -1,0 +1,94 @@
+standard preferences: Times 16, fixed Courier 13, JavaScript 1, images 1, encoding ISO-8859-1
+the same identifier, the same preferences: 1
+changed: 2 notifications, size 20, family DejaVu Serif
+WebUndefined is one object: 1; text/html shown as HTML 1, image/png shown 1, application/zip 0
+group tests, preferences test, main frame named "", in the view 1
+an HTML string:
+  policy for legacy: type 5, original URL legacy
+  start legacy (main frame 1)
+  commit (data source legacy, provisional none)
+  window object cleared (the view's: 1)
+  alert "hello"
+  confirm "sure?"
+  prompt "name" with "x"
+  finish; a script run here: title: Legacy
+titles received: Legacy
+progress notifications: started 1, finished 1, estimates some
+title Legacy, URL legacy, loading 0
+data source: legacy, title Legacy, loading 0
+stringByEvaluatingJavaScriptFromString:
+  6 * 7 -> "42"
+  'text' -> "text"
+  answer -> "true"
+  typed -> "typed"
+  thing -> ""
+  undefined -> ""
+  null -> ""
+  this is not JavaScript -> ""
+  var later = 1 -> ""
+  later + 1 -> "2"
+script objects:
+  the frame's window object is the view's: 1
+  thing -> a WebScriptObject ([object Object])
+  thing.n -> NSNumber 4
+  thing.add(2, 3) -> NSNumber 5
+  thing.add('a', 'b') -> "ab"
+  thing.name(thing) -> NSNumber 4
+  thing.missing() -> WebUndefined
+  thing.list[1] -> NSNumber 2
+  after setting: "1,two,3 true [1,"b"]"
+  after removing: "undefined"
+  undefined -> WebUndefined, null -> NSNull, true -> NSNumber 1, 1.5 -> NSNumber 1.5
+  an exception -> WebUndefined
+  a global made by a script -> "kept"
+  window.document.title -> "Legacy"
+a file:
+  policy for first.html: type 5, original URL first.html
+  start first.html (main frame 1)
+  policy for the type text/html (can show 1)
+  commit (data source first.html, provisional none)
+  window object cleared (the view's: 1)
+  finish; a script run here: title: First
+data source: request first.html, response first.html text/html, 53 bytes, title First
+a link clicked:
+  policy for second.html: type 0, original URL second.html
+  start second.html (main frame 1)
+  policy for the type text/html (can show 1)
+  commit (data source second.html, provisional none)
+  window object cleared (the view's: 1)
+  finish; a script run here: title: Second
+back 1, forward 0
+goBack: 1
+back:
+  policy for first.html: type 2, original URL first.html
+  start first.html (main frame 1)
+  commit (data source first.html, provisional none)
+  window object cleared (the view's: 1)
+  finish; a script run here: title: First
+title First
+the main frame's URL set:
+  policy for second.html: type 5, original URL second.html
+  start second.html (main frame 1)
+  policy for the type text/html (can show 1)
+  commit (data source second.html, provisional none)
+  window object cleared (the view's: 1)
+  finish; a script run here: title: Second
+a load the policy delegate ignores:
+  policy for blocked.html: type 5, original URL blocked.html
+still Second
+a file that isn't there:
+  policy for none.html: type 5, original URL none.html
+  start none.html (main frame 1)
+  failed provisionally: NSURLErrorDomain -1100
+a new window:
+  create a web view for first.html
+  show the new view (made here: 1)
+  start first.html (main frame 1)
+  commit (data source first.html, provisional none)
+  window object cleared (the view's: 1)
+the new view shows first.html, title First
+with no UI delegate: confirm false, prompt null
+text size: 1, larger 1.2, can make it standard 1
+user agent: FerryTest/1.0
+done
+exit=0

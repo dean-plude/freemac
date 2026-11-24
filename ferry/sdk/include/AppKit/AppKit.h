@@ -4231,4 +4231,6 @@ typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
 
 #import <AppKit/NSTextAttachment.h>
 
+APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
+
 #endif

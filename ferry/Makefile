@@ -76,7 +76,14 @@ COREDATA_OBJ = $(COREDATA_SRC:coredata/%.m=coredata/build/%.o)
 COREDATA = frameworks/CoreData.framework/CoreData
 COREDATA_HEADERS = coredata/CDInternal.h sdk/include/CoreData/CoreData.h $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA)
+# WebKit: web views shown by this system's WebKitGTK, which is opened only
+# when a program first makes one (src/host.c), inside AppKit's windows.
+WEBKIT_SRC = $(wildcard webkit/*.m)
+WEBKIT_OBJ = $(WEBKIT_SRC:webkit/%.m=webkit/build/%.o)
+WEBKIT = frameworks/WebKit.framework/WebKit
+WEBKIT_HEADERS = webkit/WKInternal.h webkit/WKHost.h $(wildcard sdk/include/WebKit/*.h) $(APPKIT_HEADERS)
+
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -89,10 +96,15 @@ src/cxx.o src/cxx_unwind.o src/cxx_threads.o src/lookup.o src/loader.o src/objc/
 
 # The Cairo, Pango, HarfBuzz, GTK, GdkPixbuf and Poppler calls Ferry's frameworks may make:
 # exactly the ones graphics/host.h and appkit/gtk.h declare.
-src/host_names.h: graphics/host.h appkit/gtk.h
+src/host_names.h: graphics/host.h appkit/gtk.h webkit/WKHost.h
 	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk|poppler)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
-src/host.o: src/host_names.h
+src/host.o: src/host_names.h src/webkit_names.h
+
+# The WebKitGTK and JavaScriptCore calls Ferry's WebKit may look up by name:
+# exactly the ones webkit/WKHost.h declares.
+src/webkit_names.h: webkit/WKHost.h
+	grep -oE '\b(webkit|jsc)_[a-z0-9_]+\(' $^ | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
 src/objc/%.o: src/objc/%.S
 	$(CC) -c -o $@ $<
@@ -213,10 +225,19 @@ $(COREDATA): $(COREDATA_OBJ) $(FOUNDATION) $(TWIN_TBD)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreData.framework/Versions/A/CoreData \
 	    -o $@ $(COREDATA_OBJ) -framework Foundation -lsqlite3
 
+webkit/build/%.o: webkit/%.m $(WEBKIT_HEADERS) sdk/ferry-cc
+	@mkdir -p webkit/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(WEBKIT): $(WEBKIT_OBJ) $(APPKIT) $(HOST_TBD)
+	@mkdir -p frameworks/WebKit.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/WebKit.framework/Versions/A/WebKit \
+	    -o $@ $(WEBKIT_OBJ) -framework Foundation -framework CoreGraphics -framework AppKit $(HOST_TBD)
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -236,10 +257,11 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 	install -Dm755 $(COREDATA) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreData.framework/CoreData
+	install -Dm755 $(WEBKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/WebKit.framework/WebKit
 
 clean:
-	rm -f ferry $(OBJ) $(TBD) src/host_names.h
+	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build
+	    installer/Installer.app coredata/build webkit/build
 
 .PHONY: all check install clean

@@ -14,3 +14,5 @@
 /installer/Installer.app/
 /installer/build/
 /coredata/build/
+/webkit/build/
+/src/webkit_names.h
