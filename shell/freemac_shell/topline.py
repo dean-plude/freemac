@@ -153,6 +153,10 @@ class Topline(Gtk.Window):
         dock = Gio.SimpleAction.new("add-to-dock", None)
         dock.connect("activate", lambda *_: self._own_action("add-to-dock"))
         self._own_actions.add_action(dock)
+        # A website in the Dock: File > Open in Web shows its page in Web.
+        in_web = Gio.SimpleAction.new("open-in-web", None)
+        in_web.connect("activate", lambda *_: self._own_action("open-in-web"))
+        self._own_actions.add_action(in_web)
         # Menus for apps that publish none press the app's own shortcuts.
         press = Gio.SimpleAction.new("press", GLib.VariantType.new("s"))
         press.connect("activate", lambda _a, keys: GLib.timeout_add(150, self._press, keys.get_string()))
@@ -985,6 +989,11 @@ class Topline(Gtk.Window):
             # it has.
             fresh = next((v for v in self.wf.views() if v.get("id") == view.get("id")), view)
             GLib.spawn_async(["freemac-webapp", "--title", fresh.get("title") or ""],
+                             flags=GLib.SpawnFlags.SEARCH_PATH)
+        elif name == "open-in-web" and view.get("app-id"):
+            fresh = next((v for v in self.wf.views() if v.get("id") == view.get("id")), view)
+            GLib.spawn_async(["freemac-webapp", "--open-in-web", view["app-id"] + ".desktop",
+                              "--title", fresh.get("title") or ""],
                              flags=GLib.SpawnFlags.SEARCH_PATH)
 
     def _press(self, keys):
