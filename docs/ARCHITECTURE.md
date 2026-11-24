@@ -878,6 +878,17 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Inspector (1.180)
+
+`drawer_info.InfoWindow` builds its contents in `_build(path)`, so the
+Inspector (`inspector=True`) can swap them with `show_path()` when Drawer's
+selection changes; the old item's comment is kept and its size thread is
+stopped first. Wayfire has no floating-panel role, so once mapped the
+Inspector finds its own view through the IPC socket, moves it to the top
+right of the work area and sets it always on top (as Picture in Picture
+does). GTK on Wayland only knows the whole screen, so its contents scroll
+past the screen's height less room for the menu bar and the Dock.
+
 ## Sharing and permissions (1.179)
 
 permissions.py maps a Mac's three privileges onto each permission class:

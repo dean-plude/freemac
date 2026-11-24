@@ -903,6 +903,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.side.show_all()
 
     def _selection_changed(self, *_args):
+        if drawer_info.INSPECTOR[0] is not None:
+            chosen = self.selected_paths()
+            drawer_info.inspect(chosen[0] if chosen else self.path)
         self._show_status()
         self._show_gallery()
         self._show_preview()
@@ -1241,6 +1244,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
             "add-to-sidebar": self.add_to_sidebar,
             "compress": self.compress,
             "get-info": self.get_info,
+            "show-inspector": self.show_inspector,
+            "copy-pathname": self.copy_pathname,
             "eject": self.eject,
             "copy": self.copy,
             "paste": self.paste,
@@ -2616,6 +2621,18 @@ class DrawerWindow(Gtk.ApplicationWindow):
         paths = self.selected_paths() or [self.path]
         drawer_info.show(paths, self)
 
+    def show_inspector(self):
+        """⌥⌘I: one Info window that follows what is selected."""
+        drawer_info.inspector((self.selected_paths() or [self.path])[0], self)
+
+    def copy_pathname(self):
+        """⌥⌘C: put the selected items' full paths on the clipboard, one a
+        line, as a Mac's Copy as Pathname does."""
+        paths = self.selected_paths() or ([self.path] if self.path and os.path.isabs(self.path) else [])
+        if not paths:
+            return
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text("\n".join(paths), -1)
+
     def toggle_hidden(self):
         self.hidden_action.change_state(GLib.Variant("b", not self.show_hidden))
 
@@ -2942,6 +2959,8 @@ class DrawerWindow(Gtk.ApplicationWindow):
         has_selection = bool(self.selected_paths())
         has_folder = any(os.path.isdir(p) for p in self.selected_paths()[:1])
         selected = self.selected_paths()
+        # Holding Option changes some items, as on a Mac.
+        option = bool((getattr(event, "state", 0) or 0) & Gdk.ModifierType.MOD1_MASK)
         one_archive = len(selected) == 1 and drawer_archive.is_archive(selected[0])
         one_app = len(selected) == 1 and macapps.is_bundle(selected[0])
         app_items = ()
@@ -2966,6 +2985,7 @@ class DrawerWindow(Gtk.ApplicationWindow):
         for label, handler, enabled in app_items + (
             ("Open", lambda *_: [self.open_or_enter(p) for p in self.selected_paths()], has_selection),
             ("Open With", None, has_selection),
+            ("Show Inspector", lambda *_: self.show_inspector(), True) if option else
             ("Get Info", lambda *_: self.get_info(), True),
             ("Rename…" if len(selected) < 2 else f"Rename {len(selected)} Items…", lambda *_: self.rename(), has_selection),
             ("Put Back" if in_trash else "Move to Trash",
@@ -2975,7 +2995,9 @@ class DrawerWindow(Gtk.ApplicationWindow):
             ("Duplicate", lambda *_: self.duplicate(), has_selection),
             ("Make Alias", lambda *_: self.make_alias(), has_selection and not in_trash and not self.in_virtual()),
             ("Show Original", lambda *_: self.show_original(), len(selected) == 1 and aliases.is_alias(selected[0])),
-            ("Copy", lambda *_: self.copy(), has_selection),
+            ((f"Copy “{os.path.basename(selected[0])}” as Pathname" if len(selected) == 1
+              else f"Copy {len(selected)} Items as Pathnames"), lambda *_: self.copy_pathname(), has_selection)
+            if option else ("Copy", lambda *_: self.copy(), has_selection),
             ("Paste Item", lambda *_: self.paste(), True),
             (None, None, True),
             ("Expand" if one_archive else "Compress",
@@ -3122,8 +3144,12 @@ class DrawerWindow(Gtk.ApplicationWindow):
             self.switch_tab((self.current + (-1 if back else 1)) % len(self.tabs))
         elif key == Gdk.KEY_Delete or (ctrl and key == Gdk.KEY_BackSpace):
             self.trash()  # Command+Backspace, as on a Mac
+        elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_i, Gdk.KEY_I):
+            self.show_inspector()
         elif ctrl and key in (Gdk.KEY_i, Gdk.KEY_I):
             self.get_info()
+        elif ctrl and event.state & Gdk.ModifierType.MOD1_MASK and key in (Gdk.KEY_c, Gdk.KEY_C):
+            self.copy_pathname()
         elif ctrl and not shift and key in (Gdk.KEY_c, Gdk.KEY_C):
             self.copy()
         elif ctrl and not shift and key in (Gdk.KEY_v, Gdk.KEY_V):
@@ -3193,7 +3219,7 @@ def menubar():
             [("Show in Enclosing Folder", "win.show-enclosing", None)],
             [("Duplicate", "win.duplicate", "<Ctrl>d"), ("Make Alias", "win.make-alias", None),
              ("Show Original", "win.show-original", "<Ctrl>r")],
-            [("Get Info", "win.get-info", "<Ctrl>i")],
+            [("Get Info", "win.get-info", "<Ctrl>i"), ("Show Inspector", "win.show-inspector", "<Ctrl><Alt>i")],
             [("Rename…", "win.rename", "F2"), ("Compress", "win.compress", None),
              ("Move to Trash", "win.trash", "<Ctrl>BackSpace"), ("Put Back", "win.put-back", None)],
             [("Share…", "win.share", None)],
@@ -3203,7 +3229,8 @@ def menubar():
         ]),
         ("_Edit", [
             [("Undo", "win.undo", "<Ctrl>z")],
-            [("Copy", "win.copy", "<Ctrl>c"), ("Paste Item", "win.paste", "<Ctrl>v"),
+            [("Copy", "win.copy", "<Ctrl>c"), ("Copy as Pathname", "win.copy-pathname", "<Ctrl><Alt>c"),
+             ("Paste Item", "win.paste", "<Ctrl>v"),
              ("Move Item Here", "win.move-here", "<Ctrl><Alt>v")],
             [("Select All", "win.select-all", "<Ctrl>a")],
             [("Find…", "win.filter", "<Ctrl>f"), ("Save Search…", "win.save-search", None)],
