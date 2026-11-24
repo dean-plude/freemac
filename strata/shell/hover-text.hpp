@@ -22,6 +22,10 @@
 // {"drawn": bool}, true once each has been drawn without the pointer, so
 // Topline takes the picture only then (a fixed wait could still catch the
 // arrow on a busy computer).
+// {"hide": true, "for": "meter"} hides it the same way for Tint, the colour
+// meter, whose picture of the pixels under the pointer has the same problem.
+// Tint asks only where strata/pointer says "software": a display that draws
+// the pointer itself (software_cursor_at()).
 // Original freemac code.
 #pragma once
 
@@ -47,6 +51,20 @@ namespace strata_hover
 {
 static const int REST_MS = 120;   // the pointer still this long, the panel follows it
 static const int HIDE_MAX_MS = 3000;   // a safety net: taking the picture can take a second
+
+/* Whether the output under (x, y) draws the pointer into its picture (no
+ * hardware cursor plane), so a screen grab there shows the arrow. */
+inline bool software_cursor_at(double x, double y)
+{
+    auto output = wf::get_core().output_layout->get_output_at(x, y);
+    if (!output || !output->handle)
+    {
+        return false;
+    }
+
+    return (output->handle->hardware_cursor == nullptr) ||
+           (output->handle->software_cursor_locks > 0);
+}
 
 class hover_t
 {
@@ -93,7 +111,9 @@ class hover_t
         }
 
         bool hide = data.contains("hide") && data["hide"].is_boolean() && data["hide"].get<bool>();
-        if (hide && active() && !hidden)
+        bool meter = data.contains("for") && data["for"].is_string() &&
+            data["for"].get<std::string>() == "meter";
+        if (hide && (active() || meter) && !hidden)
         {
             hidden = true;
             wf::get_core().hide_cursor();

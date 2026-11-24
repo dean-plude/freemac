@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.187 "Tint" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Tint, a new utility in the spirit of a Mac's colour meter: the pixels around the pointer enlarged, with the colour and its red, green and blue values, a few times a second | tint.py | done |
+| 2 | Values as 0–255, percentages or hex (View menu); Aperture size averages up to an 11 × 11 square | tint.py | done |
+| 3 | Color menu: Hold Color (⇧⌘H), Lock Position (⌘L), Copy Color as Text (⇧⌘C) and Copy Color as Image (⌥⌘C) | tint.py | done |
+| 4 | Where the display draws the pointer into the picture (no hardware cursor, as in many virtual machines), Strata says so and Tint reads the spot again with the arrow hidden for a moment once the pointer rests | strata-shell, tint.py | done |
+| 5 | Icon, guide topic, README row and screenshot | Art, Guide, Docs | done |
+
 ## 1.186 "Folder backgrounds" (done)
 
 | # | Item | Component | Status |

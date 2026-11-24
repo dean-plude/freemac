@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tint
+Comment=Point at anything on the screen to see its colour and its values
+Exec=freemac-tint
+Icon=freemac-tint
+Categories=Utility;Graphics;
+Keywords=color;colour;meter;picker;eyedropper;pixel;hex;rgb;digital color meter;
+StartupWMClass=org.freemac.Tint
+StartupNotify=true
