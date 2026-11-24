@@ -63,6 +63,9 @@ menuitem.menu-heading:disabled label, .topline menuitem.menu-heading:disabled la
 .sound-menu-item:hover { background-color: alpha(currentColor, 0.08); }
 .sound-device { border-radius: 50%; padding: 5px; background-color: alpha(currentColor, 0.12); }
 .sound-device-on { background-color: @theme_selected_bg_color; color: white; }
+/* Lifeboat's lifebuoy turns slowly while it backs up (lifeboat_menu.py). */
+@keyframes lifeboat-turn { from { -gtk-icon-transform: rotate(0deg); } to { -gtk-icon-transform: rotate(360deg); } }
+.lifeboat-busy image { animation: lifeboat-turn 4s linear infinite; }
 /* Now Playing in the menu bar (now_playing_menu.py). */
 .now-playing-blank { border-radius: 8px; background-color: alpha(currentColor, 0.1); color: @dim; }
 .now-playing-progress trough { min-height: 4px; border-radius: 2px; background-color: alpha(currentColor, 0.15); }

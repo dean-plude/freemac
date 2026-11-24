@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Lifeboat in the menu bar (1.163)
+
+`lifeboat_menu.LifeboatMenu` watches `lifeboat-status.json` and
+`lifeboat.json` with `Gio.FileMonitor`s and the volume monitor's mount
+signals, folding bursts into one look a quarter of a second later, plus a
+minute timer so "Just now" ages. `describe()` (no GTK) turns the settings,
+the status, whether the chosen drive is plugged in (`lifeboat.chosen_drive`,
+not the watcher's own `plugged`, which can be stale after a drive is first
+chosen) and the drive's backups into the menu's lines. Its buttons run
+`freemac-lifeboat --now` and `--stop`, which reach the running watcher
+through `GApplication`. While a backup runs the button has the class
+`lifeboat-busy`, whose CSS animation turns the icon with
+`-gtk-icon-transform`. Holder name `lifeboat` in `menubar_hide`.
+
 ## Now Playing and Seek in the menu bar (1.162)
 
 `now_playing_menu.NowPlayingMenu` subscribes once to `PropertiesChanged` on

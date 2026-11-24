@@ -794,6 +794,7 @@ class DialsWindow(Gtk.ApplicationWindow):
         ("focus", "Focus", "Its symbol shows while a Focus is on. Click it to change or turn off the Focus."),
         ("nowplaying", "Now Playing", "Shows while music or a video plays, with the track and its controls."),
         ("seek", "Seek", "A magnifying glass that opens Seek, as \u2318Space does."),
+        ("lifeboat", "Lifeboat", "Once a backup drive is chosen: when the latest backup was made, and Back Up Now."),
     )
 
     def menu_bar_choices(self):
