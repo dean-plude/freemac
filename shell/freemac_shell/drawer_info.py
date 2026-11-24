@@ -4,7 +4,8 @@ name, kind, size, where it is, when it was made and changed, and who can open
 it. A document also shows the app that opens it, and Change All… makes that
 app open every document of its kind. Click the icon and paste a picture
 (⌘V), or drop one on it, to give the item its own icon; Delete takes it off
-again. Comments are kept with the item and Seek finds them. A folder's size is added up in the
+again. Comments are kept with the item and Seek finds them. Locked keeps the
+item from being changed, renamed or thrown away. A folder's size is added up in the
 background, so the window opens at once. Original freemac code.
 """
 import os
@@ -20,7 +21,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import aliases, alert, app_list, comments, custom_icons, default_apps, macapps, tags  # noqa: E402
+from . import aliases, alert, app_list, comments, custom_icons, default_apps, locks, macapps, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -211,9 +212,18 @@ class InfoWindow(Gtk.Window):
             self._row(grid, row, label, value)
         box.pack_start(grid, False, False, 0)
 
+        self.lock_check = None
+        if app is None and not is_alias:
+            # Locked, as on a Mac: nothing can change, rename or throw it away.
+            self.lock_check = Gtk.CheckButton(label="Locked", active=locks.is_locked(path))
+            self.lock_check.set_sensitive(locks.can_lock(path))
+            self.lock_check.connect("toggled", self._lock_toggled)
+            box.pack_start(self.lock_check, False, False, 0)
+
         if app is None and not is_alias:
             box.pack_start(Gtk.Separator(), False, False, 0)
             box.pack_start(self._comments(path), False, False, 0)
+            self.comment_view.set_editable(not locks.is_locked(path))
 
         content = info.get_content_type() or ""
         if not is_dir and not is_bundle and app is None and info.get_file_type() == Gio.FileType.REGULAR \
@@ -452,7 +462,33 @@ class InfoWindow(Gtk.Window):
             return
         self._set_icon(picture)
 
+    def _locked_say(self):
+        """Say that a locked item's icon can't change; True if it is locked."""
+        if not locks.is_locked(self.path):
+            return False
+        alert.tell(self, f"The icon of “{os.path.basename(self.path)}” can’t be changed because it is locked.",
+                   "Untick Locked first.")
+        return True
+
+    def _lock_toggled(self, check):
+        on = check.get_active()
+        if on and getattr(self, "comment_view", None) is not None:
+            self._keep_comment()   # the words go in before writing is taken away
+        try:
+            locks.set_locked(self.path, on)
+        except OSError as err:
+            alert.tell(self, f"“{os.path.basename(self.path)}” couldn’t be {'locked' if on else 'unlocked'}.",
+                       err.strerror or "")
+            check.handler_block_by_func(self._lock_toggled)
+            check.set_active(not on)
+            check.handler_unblock_by_func(self._lock_toggled)
+            return
+        if getattr(self, "comment_view", None) is not None:
+            self.comment_view.set_editable(not on)
+
     def _set_icon(self, picture):
+        if self._locked_say():
+            return
         try:
             custom_icons.put(self.path, picture)
         except OSError as err:
@@ -497,7 +533,7 @@ class InfoWindow(Gtk.Window):
         return False
 
     def _clear_icon(self):
-        if not custom_icons.has(self.path):
+        if not custom_icons.has(self.path) or self._locked_say():
             return
         try:
             custom_icons.clear(self.path)
@@ -526,11 +562,14 @@ class InfoWindow(Gtk.Window):
 
         def keep(*_):
             text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False)
+            if text.strip() == comments.get(path) or locks.is_locked(path):
+                return False
             try:
                 comments.put(path, text)
             except OSError:
                 pass        # a disk that can't keep them; nothing to lose but the words
             return False
+        self._keep_comment = keep
         view.connect("focus-out-event", keep)
         self.connect("delete-event", keep)
         self.connect("destroy", keep)

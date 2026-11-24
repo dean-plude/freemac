@@ -41,7 +41,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, custom_icons, desktop_widgets, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
+from . import aliases, custom_icons, desktop_widgets, locks, quick_actions, recents, reveal, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 from . import desktop_view  # noqa: E402
 from .drawer_info import item_info  # noqa: E402
@@ -269,6 +269,8 @@ class DesktopIcon(Gtk.EventBox):
         self.pixbuf = picture_for(path, info, icon)
         if path and aliases.is_alias(path):
             self.pixbuf = aliases.badge(self.pixbuf)
+        elif path and locks.is_locked(path):
+            self.pixbuf = locks.badge(self.pixbuf)
         image = Gtk.Image.new_from_pixbuf(self.pixbuf) if self.pixbuf else Gtk.Image()
         image.set_size_request(ICON, ICON)
         self.frame.add(image)
@@ -1166,12 +1168,18 @@ class DesktopIcons(Gtk.Layout):
             volumes.eject(icon.mount, self.get_toplevel())
 
     def trash(self, icons):
-        went, _error = transfer.to_trash([icon.path for icon in icons])
+        paths = locks.ask_trash(None, [icon.path for icon in icons])
+        if not paths:
+            return
+        went, _error = transfer.to_trash(paths)
         if went:
             transfer.note_done({"kind": "trash", "paths": went})
         self.refresh()
 
     def rename(self, icon):
+        if icon.path and locks.is_locked(icon.path):
+            locks.tell_cant_rename(None, icon.path)
+            return True
         popover = Gtk.Popover(relative_to=icon.label, position=Gtk.PositionType.BOTTOM)
         entry = Gtk.Entry(text=icon.name, width_chars=22)
         popover.add(entry)
@@ -1183,6 +1191,10 @@ class DesktopIcons(Gtk.Layout):
         return True
 
     def rename_many(self, icons):
+        locked = locks.locked_among([i.path for i in icons if i.path])
+        if locked:
+            locks.tell_cant_rename(None, locked[0])
+            return
         # In its own process: a dialog this layer-shell process opens gets a frame
         # far bigger than the window. It prints the names it changed.
         self.own_window("batch_rename", [i.path for i in icons], self._renamed_many)

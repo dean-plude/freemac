@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.176 "Locked files and folders" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Locked tick box in Get Info, for items you own: locking takes away writing, so no app can change a locked file and nothing goes into or out of a locked folder; unlocking gives back the permission it had | drawer_info.py, locks.py | done |
+| 2 | A small padlock on a locked item's icon in Drawer and on the Desktop, as soon as it is ticked | drawer.py, desktop_icons.py | done |
+| 3 | Moving a locked item to the Trash asks first (Stop or Continue); renaming one says it is locked | drawer.py, desktop_icons.py | done |
+| 4 | A locked item's icon and comments can't be changed in Get Info until it is unlocked | drawer_info.py | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.175 "List view options" (done)
 
 | # | Item | Component | Status |

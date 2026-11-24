@@ -878,6 +878,20 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Locked items (1.176)
+
+Linux has no user-settable lock flag a program can't simply ignore, so
+locks.py uses the file's permission: `lock()` writes the current mode into the
+`user.freemac.locked` extended attribute first (writing a user attribute needs
+write permission) and then clears every write bit; `unlock()` restores the
+saved mode, then removes the attribute. The attribute is the mark Drawer,
+the Desktop and Get Info read; changing it touches ctime, so the folder
+monitors redraw the icon with `locks.badge()`. Only the owner can lock, and
+symbolic links (aliases) can't carry the attribute. `ask_trash()` asks
+before trashing and unlocks on Continue (moving a folder to another parent
+needs write permission on the folder itself); `tell_cant_rename()` is the
+refusal both rename paths share.
+
 ## List view options (1.175)
 
 View Options builds its rows from `view_mode`; `_view_toggled` destroys and
