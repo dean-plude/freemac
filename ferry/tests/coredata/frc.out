@@ -1,0 +1,21 @@
+performFetch: 1, 5 objects
+  sections: eng[E]:ann,bob ops[O]:cy,dee,eve
+  index titles: E,O
+  object at 1.2: eve; index path of bob: 0.1; section for title O: 1
+insert fay:                will, insert fay ->0.1, did
+ann's age 99, a move:      will, move ann 0.0>0.2, did
+ann's age 31, no move:     will, update ann 0.2>-, did
+bob to ops:                will, move bob 0.1>1.0, did
+cy filtered out:           will, delete cy 1.1>-, did
+delete dee:                will, delete dee 1.1>-, did
+gus in a new section:      will, section insert hr at 1, insert gus ->1.0, did
+  sections: eng[E]:fay,ann hr[H]:gus ops[O]:bob,eve
+eng emptied:               will, section delete eng at 0, delete fay 0.0>-, delete ann 0.1>-, did
+  sections: hr[H]:gus ops[O]:bob,eve
+save:                      
+rename eve:                will, update eva 1.1>-, did
+without a delegate: 3 objects kept
+fetched again: 4 objects
+no key path and no objects: 1 section of 0
+no sort descriptors: NSInvalidArgumentException
+exit=0

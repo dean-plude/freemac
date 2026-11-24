@@ -1,0 +1,13 @@
+merged from the bundle: Author(books->Book* name:700) Book(author->Author cover:1800? pages:200?=100 price:500?=9.5 read:800?=0 title:700) Ebook:Book(author->Author cover:1800? format:700?=epub pages:200?=100 price:500?=9.5 read:800?=0 title:700)
+from the source's URL: Author(books->Book* name:700) Book(author->Author cover:1800? pages:200?=100 price:500?=9.5 read:800?=0 title:700) Ebook:Book(author->Author cover:1800? format:700?=epub pages:200?=100 price:500?=9.5 read:800?=0 title:700)
+one version's folder: Book(title:700)
+template: Book pages > 300
+used: saved 1, book pages 100 price 9.5 format epub, author's books 1, cover blue+waves
+a name shorter than its minimum: valid 0, error 1670
+the container's model: Author(books->Book* name:700) Book(author->Author cover:1800? pages:200?=100 price:500?=9.5 read:800?=0 title:700) Ebook:Book(author->Author cover:1800? format:700?=epub pages:200?=100 price:500?=9.5 read:800?=0 title:700)
+merged from a bundle with only a .momd: nil
+a .momd's URL: nil
+a .mom's URL: nil
+a container named for a .momd: nil
+loading its store: error 134070
+exit=0

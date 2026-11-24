@@ -1,0 +1,119 @@
+SQLite store:
+ predicates:
+  age == 29                                    Dee,bob (2)
+  age != 29                                    Ann,Cyd,Fay,Max,Éva (5)
+  age > 30 AND age <= 52                       Ann,Cyd,Éva (3)
+  age < 20 OR age >= 60                        Fay,Max (2)
+  NOT (age BETWEEN {20, 40})                   Ann,Fay,Max,Éva (4)
+  age IN {18, 41, 99}                          Ann,Fay (2)
+  score == nil                                 Cyd,Max (2)
+  score != nil AND score < 2.5                 Dee,Fay,bob (3)
+  born > %@                                    Dee,Fay,Éva (3)
+  name BEGINSWITH 'D' OR name ENDSWITH 'y'     Dee,Fay (2)
+  name CONTAINS 'v'                            Éva (1)
+  name LIKE '?a*'                              Fay,Max (2)
+  name BEGINSWITH[c] 'b'                       bob (1)
+  name ==[cd] 'eva'                            Éva (1)
+  name CONTAINS[c] 'A'                         Ann,Fay,Max,Éva (4)
+  active == YES                                Ann,Cyd,Max,Éva (4)
+  department == %@                             Ann,Cyd,Fay (3)
+  department == %@                             Ann,Cyd,Fay (3)
+  department != %@                             Dee,Max,bob,Éva (4)
+  department == nil                            Dee (1)
+  department.title == 'Ops'                    Max,bob,Éva (3)
+  ANY cars.plate BEGINSWITH 'F'                Fay (1)
+  SELF == %@                                   Ann (1)
+  SELF IN %@                                   Ann (1)
+  TRUEPREDICATE                                Ann,Cyd,Dee,Fay,Max,bob,Éva (7)
+  FALSEPREDICATE                                (0)
+  a block predicate: Dee,Fay,bob
+ sorting and limits:
+  by age down, name up: Max,Éva,Ann,Cyd,Dee,bob,Fay
+  by score (nil first): Cyd,Max,Fay,bob,Dee,Ann,Éva
+  by name, case-insensitive: Ann,bob,Cyd,Dee,Fay,Max,Éva
+  by department title: Max,bob,Éva,Ann,Cyd,Fay
+  limit 3: Max,Éva,Ann
+  limit 3 offset 2: Ann,Cyd,Dee, count 3
+  offset 5: bob,Fay
+  limit 2 of an in-memory predicate: Max,Éva
+ entities:
+  managers: Max
+  people without subentities: 6
+  people with subentities: 7
+ result types:
+  IDs: 7, first is an ID 1
+  count: 1 result, 7
+  dictionary: Dee 29 department none
+  dictionary: bob 29 department an ID
+  dictionary: Fay 18 department an ID
+  distinct ages: 18,29,35,41,52,60
+ pending changes:
+  age 29, unsaved included: Ann,Dee,Gus (3)
+  the same, limit 1: Ann
+  age 29 as stored: 2 IDs
+  after rollback, gus deleted 1, ann 41
+ faults:
+  3 fetched as faults: 1
+  3 fetched filled: 1
+  objectWithID: same object 1; existingObjectWithID: 1
+  an unknown entity: NSInvalidArgumentException
+InMemory store:
+ predicates:
+  age == 29                                    Dee,bob (2)
+  age != 29                                    Ann,Cyd,Fay,Max,Éva (5)
+  age > 30 AND age <= 52                       Ann,Cyd,Éva (3)
+  age < 20 OR age >= 60                        Fay,Max (2)
+  NOT (age BETWEEN {20, 40})                   Ann,Fay,Max,Éva (4)
+  age IN {18, 41, 99}                          Ann,Fay (2)
+  score == nil                                 Cyd,Max (2)
+  score != nil AND score < 2.5                 Dee,Fay,bob (3)
+  born > %@                                    Dee,Fay,Éva (3)
+  name BEGINSWITH 'D' OR name ENDSWITH 'y'     Dee,Fay (2)
+  name CONTAINS 'v'                            Éva (1)
+  name LIKE '?a*'                              Fay,Max (2)
+  name BEGINSWITH[c] 'b'                       bob (1)
+  name ==[cd] 'eva'                            Éva (1)
+  name CONTAINS[c] 'A'                         Ann,Fay,Max,Éva (4)
+  active == YES                                Ann,Cyd,Max,Éva (4)
+  department == %@                             Ann,Cyd,Fay (3)
+  department == %@                             Ann,Cyd,Fay (3)
+  department != %@                             Dee,Max,bob,Éva (4)
+  department == nil                            Dee (1)
+  department.title == 'Ops'                    Max,bob,Éva (3)
+  ANY cars.plate BEGINSWITH 'F'                Fay (1)
+  SELF == %@                                   Ann (1)
+  SELF IN %@                                   Ann (1)
+  TRUEPREDICATE                                Ann,Cyd,Dee,Fay,Max,bob,Éva (7)
+  FALSEPREDICATE                                (0)
+  a block predicate: Dee,Fay,bob
+ sorting and limits:
+  by age down, name up: Max,Éva,Ann,Cyd,Dee,bob,Fay
+  by score (nil first): Cyd,Max,Fay,bob,Dee,Ann,Éva
+  by name, case-insensitive: Ann,bob,Cyd,Dee,Fay,Max,Éva
+  by department title: Max,bob,Éva,Ann,Cyd,Fay
+  limit 3: Max,Éva,Ann
+  limit 3 offset 2: Ann,Cyd,Dee, count 3
+  offset 5: bob,Fay
+  limit 2 of an in-memory predicate: Max,Éva
+ entities:
+  managers: Max
+  people without subentities: 6
+  people with subentities: 7
+ result types:
+  IDs: 7, first is an ID 1
+  count: 1 result, 7
+  dictionary: Dee 29 department none
+  dictionary: bob 29 department an ID
+  dictionary: Fay 18 department an ID
+  distinct ages: 18,29,35,41,52,60
+ pending changes:
+  age 29, unsaved included: Ann,Dee,Gus (3)
+  the same, limit 1: Ann
+  age 29 as stored: 2 IDs
+  after rollback, gus deleted 1, ann 41
+ faults:
+  3 fetched as faults: 1
+  3 fetched filled: 1
+  objectWithID: same object 1; existingObjectWithID: 1
+  an unknown entity: NSInvalidArgumentException
+exit=0

@@ -465,4 +465,22 @@ NSString *GFontMacFamily(NSString *name);
 /* The shared font manager if one has been made, without making one. */
 NSFontManager *AExistingFontManager(void);
 
+/* (Ferry 0.NEXT) The Core Data calls an entity-mode controller makes. AppKit
+ * doesn't link CoreData: the classes are looked up by name, and these
+ * declarations name the methods. */
+@protocol AManagedCalls
++ (id)fetchRequestWithEntityName:(NSString *)name;
++ (id)insertNewObjectForEntityForName:(NSString *)name inManagedObjectContext:(id)context;
++ (id)entityForName:(NSString *)name inManagedObjectContext:(id)context;
+- (void)setPredicate:(NSPredicate *)predicate;
+- (NSArray *)executeFetchRequest:(id)request error:(NSError **)error;
+- (void)deleteObject:(id)object;
+- (BOOL)isKindOfEntity:(id)entity;
+- (id)entity;
+@end
+@interface NSObjectController (AEntityMode)
+- (BOOL)_ferryEntityMode;
+- (void)_ferryTakeFetched:(NSArray *)found merge:(BOOL)merge;
+@end
+
 #endif

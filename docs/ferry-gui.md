@@ -1172,6 +1172,17 @@ The new or extended ones:
 | `appkit_notify_none` | (freemac (1.207), Ferry 0.34.0) a session bus with no notification server: every call still answers (authorization, adding requests, delivering, the delegate's `didDeliverNotification:`), nothing is shown, the badge and attention still reach the Dock, and the program carries on |
 | `appkit_notify_none message` | (freemac (1.207), Ferry 0.34.0) with `FERRY_VERBOSE` set, Ferry says once that no notification server is running |
 | `appkit_notify_nobus` | (freemac (1.207), Ferry 0.34.0) the same program with no session bus at all gives the same answers, and with `FERRY_VERBOSE` set Ferry says once that there is no session bus |
+| `coredata_model` | (freemac (1.209), Ferry 0.35.0) A model built in code, used with an in-memory store: attribute types, default values, optional and transient attributes, a transformable attribute, and a subentity. It covers `@dynamic` accessors for objects and scalars, KVC, KVO and the to-many mutable proxies, and primitive values. Inverses stay in step as to-one, to-many and ordered relationships change. The nullify, cascade, deny and no-action delete rules, `changedValues`, `committedValuesForKeys:` and the object's flags are checked. Validation gives the documented error codes (1570, 1660, 1670, 1610 and 1620, and 1560 with the detailed errors), and the deny rule refuses a save with 1600 |
+| `coredata_stores` | (freemac (1.209), Ferry 0.35.0) The SQLite store (through this system's sqlite3) and the binary store, each saved and then read again by a second coordinator. The check covers every attribute type, to-one, to-many and ordered relationships, a subentity, faults and object IDs with their URI representations. The in-memory store is checked the same way, short of reopening it. Store metadata is read and set, including on a closed file. `NSPersistentContainer` is checked with a store description and with its default store in Application Support. A file that isn't a store and an unknown store type give 134000, and a save with no store gives 134060 |
+| `coredata_fetch` | (freemac (1.209), Ferry 0.35.0) The same fetches from an SQLite store and from an in-memory one, which must answer alike. They cover predicates that the SQLite store puts in SQL (comparisons, strings, `BETWEEN`, `IN`, nil, to-one relationships, `SELF`, `AND`, `OR` and `NOT`) and ones it leaves to the context (key paths through relationships, `ANY`, case-insensitive and diacritic-insensitive comparisons, and a block). Sorting, limits and offsets are checked, with and without subentities. Results come as objects, object IDs, dictionaries (with `propertiesToFetch` and distinct results) and counts, and `countForFetchRequest:` is checked. Unsaved changes are included or left out, and objects come as faults or filled in. The batch size and prefetching are accepted |
+| `coredata_undo` | (freemac (1.209), Ferry 0.35.0) An attribute change, an insert, a delete with its cascade and nullify, and a relationship change are undone and redone through the context's `NSUndoManager`, with undo groups closed by the run loop and an explicit group. It also checks changes made with undo registration turned off, `rollback`, `reset`, refreshing an object (merging its changes or not), and a context without an undo manager |
+| `coredata_contexts` | (freemac (1.209), Ferry 0.35.0) Contexts together on an SQLite store. It checks the will-save, did-save and objects-did-change notifications and their keys, and `obtainPermanentIDsForObjects:`. A child context saves into its parent, and the parent saves to the store. Private-queue contexts work on their own threads with `performBlock:` and `performBlockAndWait:`, four at once, each saving 25 objects. A did-save notification is merged with `mergeChangesFromContextDidSaveNotification:`, and `automaticallyMergesChangesFromParent` is checked. The five merge policies are each tried when two contexts change the same object |
+| `coredata_frc` | (freemac (1.209), Ferry 0.35.0) `NSFetchedResultsController` sections from a key path, with their names, index titles and objects, and index paths both ways. The delegate's callbacks come in order as objects are inserted, updated, moved (by a change to the sort key or to the section) and deleted, and as sections come and go. A controller without a delegate keeps the results it fetched. A request with no sort descriptors raises |
+| `coredata_batch` | (freemac (1.209), Ferry 0.35.0) `NSBatchUpdateRequest` on an SQLite store with a predicate and its three result types. Objects in a context don't change until they are refreshed, or until the IDs are merged with `mergeChangesFromRemoteContextSave:intoContexts:`. `NSBatchDeleteRequest` is checked by fetch request and by object IDs, with the cascade and nullify rules applied to the rows and the deny rule refusing (1600). Both requests are refused on an in-memory store (134091) |
+| `coredata_migration` | (freemac (1.209), Ferry 0.35.0) Lightweight migration of an SQLite store and of a binary store to a model that adds optional attributes (one with a default value, which the old rows are given) and a new entity, and removes an attribute. The new model is refused without the migration options (134100). With them, it is still refused for a new required attribute with no default value (134110) and for an attribute whose type changed (134190). The store's metadata matches the new model afterwards, and the old model is refused on the migrated store |
+| `coredata_models` | (freemac (1.209), Ferry 0.35.0) A model's XML source (a `.xcdatamodeld` folder with two versions and its `.xccurrentversion`) read by `mergedModelFromBundles:`, by `initWithContentsOfURL:` and by `NSPersistentContainer` from the main bundle, then used. It covers attribute types and defaults, length limits, inheritance, inverse relationships, a transformable attribute and a fetch request template. A compiled model (`.momd` or `.mom`) isn't read: each way of asking for one answers nil, and loading the stores of a container without a model fails with 134070 |
+| `coredata_models message` | (freemac (1.209), Ferry 0.35.0) The test's stderr says exactly once that compiled models aren't supported yet, though it asks for one four times |
+| `coredata_array_controller` | (freemac (1.209), Ferry 0.35.0) `NSArrayController` in entity mode, with no display: an entity name and a managed object context. The content is fetched on the run loop's next turn when the controller prepares its content, by `fetch:` with a fetch predicate, and at once by `fetchWithRequest:merge:error:` (merging or replacing). `add:` inserts a new object of the entity into the context and selects it, and `remove:` deletes the selection from the context. Objects inserted into or deleted from the context by other code are followed, including a subentity's and not another entity's. `NSObjectController` in entity mode makes its new object in the context and fetches its content |
 | `libcrypto loaded only when encrypting` | (freemac (1.200), Ferry 0.27.0) A program using only CommonCrypto's digests doesn't load this system's OpenSSL; one using AES does |
 | `appkit_carbon` | The Carbon, Accessibility and SystemConfiguration answers, and the smaller AppKit and Foundation pieces |
 | `appkit_scrolling` | (before this report, same branch) scroll views, scrollers, text views, RTF and HTML, progress indicators, boxes |
@@ -1375,8 +1386,11 @@ The new or extended ones:
   `NSHandlesContentAsCompoundValue` covers adding and removing objects
   (a new array is set whole); a change to one element's own keys isn't
   written back as a new array. `NSDeletesObjectsOnRemove` asks each
-  removed object's `managedObjectContext` to `deleteObject:` it (Ferry has
-  no Core Data), on the array controller only, not the tree controller.
+  removed object's `managedObjectContext` to `deleteObject:` it, on the
+  array controller only, not the tree controller. In Core Data's entity
+  mode (freemac (1.209), Ferry 0.35.0), `remove:` deletes the removed
+  objects from the controller's context whether or not that option is
+  given.
   `infoForBinding:`'s options are only those given, not every option with
   its default, and `optionDescriptionsForBinding:` is empty. A key the
   observed object lacks leaves the view as it is unless
@@ -2374,6 +2388,101 @@ The new or extended ones:
   - The defaults of a new NSUserNotification (an action button titled "Show", an other button titled "Close", no sound) and when its buttons are shown: here only when their titles were set or the app's Info.plist asks for alerts.
   - That an informational attention request ends after one second, and the ids that `requestUserAttention:` returns.
 
+- **Core Data, not done yet** (freemac (1.209), Ferry 0.35.0).
+  - Compiled models (`.mom` and `.momd`) aren't read, because their format
+    isn't published. Asking for one, through `mergedModelFromBundles:`,
+    `initWithContentsOfURL:` or an `NSPersistentContainer` named for one,
+    answers nil and says so once on stderr. A model built in code, or the
+    model's XML source (`.xcdatamodeld` or `.xcdatamodel`) in the app's
+    resources, works. Most apps ship only the compiled model, so most apps
+    that use Core Data stop here for now.
+  - The SQLite store uses Ferry's own table layout. A store file written by
+    a Mac's Core Data isn't read, and a Mac won't read one of Ferry's.
+  - The XML store type isn't there. Adding one fails with
+    `NSPersistentStoreInvalidTypeError` (134000). Store classes of an app's
+    own (`registerStoreClass:forStoreType:`, `NSIncrementalStore` and
+    `NSAtomicStore`) aren't supported, and registering one says so once on
+    stderr.
+  - Only lightweight migration is done. Entities and attributes can be
+    added and removed, and a new non-optional attribute needs a default
+    value. A renamed property (`renamingIdentifier`) counts as removed and
+    added, and its values are lost. A changed type or a changed
+    relationship is refused. Mapping models, `NSMigrationManager` and
+    `NSEntityMigrationPolicy` aren't there.
+  - Ferry's Foundation has no `NSExpression`. So there are no
+    `NSExpressionDescription`s in `propertiesToFetch`, no aggregate
+    functions, and `propertiesToGroupBy` and `havingPredicate` are kept and
+    not used. `MATCHES` predicates aren't supported.
+  - The SQLite store puts only part of a predicate into SQL. Case-insensitive
+    and diacritic-insensitive comparisons, key paths through relationships,
+    `ANY`, `ALL` and blocks are evaluated in memory, on rows read from the
+    store. A limit and an offset are applied in SQL only when the whole
+    predicate went into SQL and every sort is on a number or a date.
+  - `fetchBatchSize`, `relationshipKeyPathsForPrefetching` and
+    `usesLazyFetching` are kept but change nothing. A fetch gives the
+    whole array, and related objects are read when first used.
+  - Decimal attributes are stored as doubles, because Ferry's Foundation has
+    no `NSDecimalNumber`.
+  - Uniqueness constraints are read from the model but not enforced.
+    Fetched properties, derived attributes, `allowsExternalBinaryDataStorage`
+    (the data is kept in the row), persistent history tracking, query
+    generations, CloudKit (`NSPersistentCloudKitContainer`),
+    `NSBatchInsertRequest`, `NSAsynchronousFetchRequest` and Spotlight
+    indexing aren't there.
+  - A batch update can't change relationships. It fails with
+    `NSPersistentStoreOperationError` (134070).
+  - A save that spans several stores is applied store by store, not as
+    one transaction.
+  - `NSFetchedResultsController` accepts a cache name but caches nothing on
+    disk. Without a delegate it doesn't follow changes, as Apple documents.
+  - Version hashes are Ferry's own (SHA-256 over each entity's shape). They
+    are only ever compared with hashes Ferry made.
+  - Entity mode in AppKit is on `NSObjectController` and `NSArrayController`
+    only, not on `NSTreeController`. `fetch:` takes effect on the run
+    loop's next turn, and `fetchWithRequest:merge:error:` takes effect at
+    once.
+
+- **Core Data, not compared with a Mac** (freemac (1.209), Ferry 0.35.0).
+  - The string values of the notification names and their user-info keys.
+    Examples are `NSManagedObjectContextObjectsDidChangeNotification`,
+    `NSInsertedObjectsKey`, the store option keys and `NSStoreTypeKey`.
+  - Which error code each failure gives where Apple's documentation doesn't
+    say. Examples are 134000 for a file that isn't a store, 134060 for a
+    save with no store, 134070 for a container with no model and for a batch
+    update of a relationship, 134100, 134110 and 134190 for the migration
+    failures, 134091 for a batch request on a store that can't do it, and
+    1560 with `NSDetailedErrorsKey` for several validation errors at once.
+  - When the objects-did-change notification is posted. Ferry posts it from
+    `processPendingChanges`, which runs on the run loop's next turn, before
+    a save and before a fetch. A did-save notification lists only the sets
+    that aren't empty.
+  - The order of `NSFetchedResultsController`'s callbacks within one change,
+    and what counts as a move and what as an update. Ferry reports a move
+    only when the object's place among the objects in both results changed,
+    or when its section changed.
+  - The order of fetch results that have no sort descriptors, and where nil
+    sorts (Ferry puts it first).
+  - What each merge policy leaves in the store, attribute by attribute. With
+    the overwrite policy, Ferry writes every attribute of the saving
+    context's object, so a value that only the other context changed is
+    overwritten too.
+  - A batch delete applying the delete rules to the rows (deny, cascade and
+    nullify), and the IDs it reports including the cascaded rows.
+  - The undo groups: one for each turn of the run loop, with no action names
+    of Ferry's own.
+  - The form of `description` for objects and object IDs, and the form of
+    an object ID's URI: `x-coredata://<store UUID>/<entity>/p<n>`, and
+    `x-coredata:///<entity>/t<UUID>` for a temporary one.
+  - `NSPersistentContainer`'s default directory. Apple says Application
+    Support, which in Ferry is `$XDG_DATA_HOME` (or `~/.local/share`). The
+    store's file name there is `<name>.sqlite`.
+  - The array controller in entity mode. Ferry fetches when it is given a
+    context and prepares its content, and adds objects of its entity that
+    another part of the app inserts into the context, if they match the
+    fetch predicate. `remove:` deletes from the context, but
+    `removeObjects:` called directly doesn't, unless the content binding has
+    `NSDeletesObjectsOnRemove`.
+
 **What's next.** Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2455,3 +2564,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.33.0 (freemac (1.206)): printing (NSPrintInfo, NSPrintOperation, pagination, PDF output, GTK's print and page setup dialogs), NSDocument's Print… and Page Setup…, and NSFontManager with the font panel (Bold and Italic in text views), `make check` 151/151.
 - 2026-11-24: Ferry 0.34.0 (freemac (1.207)): UNUserNotificationCenter and NSUserNotificationCenter through the freedesktop notification server, with actions, replies and delegates; NSDockTile badges, attention requests and the Dock menu through LauncherEntry, `make check` 157/157.
 - 2026-11-24: freemac 1.208 (Ferry 0.34.0): freemac's Dock shows badge labels that aren't numbers as words and the app's `applicationDockMenu:` in its right-click menu, below its windows; `make check` 157/157.
+- 2026-11-24: Ferry 0.35.0 (freemac (1.209)): Core Data, with models built in code or read from their Xcode source, managed objects, main-queue, private-queue and child contexts with undo and merging, fetch requests, the fetched results controller, SQLite, binary and in-memory stores with lightweight migration and batch requests, and NSArrayController in entity mode, `make check` 168/168.

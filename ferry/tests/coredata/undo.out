@@ -1,0 +1,32 @@
+undo manager: 1
+saved:                       Ann/30/Eng/C-1; changes 0
+two edits:                   Anna/31/Eng/C-1; changes 1
+can undo 1, action name 
+undo:                        Ann/31/Eng/C-1; changes 1
+undo:                        Ann/30/Eng/C-1; changes 0
+can undo 0, can redo 1
+redo:                        Ann/31/Eng/C-1; changes 1
+insert:                      Ann/30/Eng/C-1 Bob/40/-/-; changes 1
+undone insert: bob inserted 0, context 0
+                             Ann/30/Eng/C-1; changes 0
+redo insert:                 Ann/30/Eng/C-1 Bob/40/-/-; changes 1
+nullify:                     Ann/30/-/C-1; changes 1
+eng employees: 
+undo nullify:                Ann/30/Eng/C-1; changes 0
+eng employees: Ann
+deleted ann: car deleted 1 (cascade), eng employees 
+undone delete: ann deleted 0, car deleted 0, car owner Ann, eng employees Ann
+                             Ann/30/Eng/C-1; changes 0
+grouped:                     Ann/50/Eng/C-1 Cy/5/Eng/-; changes 1
+action name Grouped
+undo group:                  Ann/30/Eng/C-1; changes 0
+change without registration: age 77, can undo 0
+before rollback:             Changed/77/Eng/- Dee/1/-/-; changes 1
+rollback:                    Ann/30/Eng/C-1; changes 0
+after rollback: dee context 0, car deleted 0, can undo 0
+refresh, merging: age 99, nickname Nicky, fault 0
+refresh, not merging: fault 1, age 30, changes 0
+reset: registered 0, ann context 0
+ann again: Ann, a new object 1
+without an undo manager: age 3, rollback works 1
+exit=0

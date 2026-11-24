@@ -1,0 +1,25 @@
+saved: 1
+before a context: content nil, newObject a mutable dictionary 1
+context set: same context 1, content yet nil
+fetched on the next turn:                    Ann,Bob,Cy (selected Ann)
+content is a mutable array: 1
+default fetch request: Person where age > 40
+fetch: with a predicate, before the turn:    Ann,Bob,Cy (selected Ann)
+fetch: with a predicate, after it:           Bob,Cy (selected Bob)
+add: a Person, inserted 1, in the context's inserted objects 1, arranged 3
+named Dee:                                   Bob,Cy,Dee (selected Dee)
+inserted elsewhere (Eve, Fay, Gus, a car):   Bob,Cy,Dee,Eve,Gus (selected Dee)
+Bob deleted elsewhere:                       Cy,Dee,Eve,Gus (selected Dee)
+remove: Cy, deleted 1
+after remove:                                Dee,Eve,Gus (selected Dee)
+saved: 1 nil
+in the store: Ann,Dee,Eve,Fay,Gus
+fetchWithRequest: 1
+  Ann,Fay
+merged with Eve: Ann,Eve,Fay
+replaced by Eve: Eve
+no context: fetch 0
+object controller's newObject: a Department, inserted 1
+its prepared content: Ops
+remove: content nil, deleted 1
+exit=0

@@ -160,6 +160,7 @@ static NSString *const op_names[] = {@"==", @"!=", @"<", @"<=", @">", @">=", @"B
 - (BOOL)_evaluate:(id)object vars:(NSDictionary *)vars;
 - (NSPredicate *)_substitute:(NSDictionary *)vars;
 - (void)_ferryAddKeyPathsTo:(NSMutableSet *)set;
+- (id)_ferryStructure;
 @end
 
 /* Strings folded as the options ask: lower case, and Latin letters without
@@ -266,6 +267,8 @@ static BOOL compare_values(FPOp op, unsigned options, id l, id r)
             r = [r allValues];
         if ([r isKindOfClass:[NSSet class]])
             r = [r allObjects];
+        if ([r isKindOfClass:[NSOrderedSet class]])
+            r = [r array];
         if (![r isKindOfClass:[NSArray class]])
             return NO;
         for (id x in r)
@@ -331,6 +334,9 @@ static NSPredicate *parse(NSString *format, va_list *ap, NSArray *args);
 - (BOOL)_evaluate:(id)object vars:(NSDictionary *)vars { return NO; }
 - (NSPredicate *)_substitute:(NSDictionary *)vars { return self; }
 - (void)_ferryAddKeyPathsTo:(NSMutableSet *)set {}
+/* The predicate's tree, for Core Data's SQLite store to read (freemac
+ * 1.NEXT, Ferry 0.NEXT): nil for a predicate it can't describe. */
+- (id)_ferryStructure { return nil; }
 - (BOOL)evaluateWithObject:(id)object { return [self _evaluate:object vars:nil]; }
 - (BOOL)evaluateWithObject:(id)object substitutionVariables:(NSDictionary *)bindings
 {
@@ -351,6 +357,7 @@ static NSPredicate *parse(NSString *format, va_list *ap, NSArray *args);
 @implementation FValuePredicate
 - (NSString *)predicateFormat { return value ? @"TRUEPREDICATE" : @"FALSEPREDICATE"; }
 - (BOOL)_evaluate:(id)object vars:(NSDictionary *)vars { return value; }
+- (id)_ferryStructure { return @{@"type" : @"value", @"value" : @(value)}; }
 @end
 
 @implementation FBlockPredicate
@@ -385,6 +392,8 @@ static NSPredicate *parse(NSString *format, va_list *ap, NSArray *args);
         return compare_values(op, options, l, r);
     if ([l isKindOfClass:[NSSet class]])
         l = [l allObjects];
+    if ([l isKindOfClass:[NSOrderedSet class]])
+        l = [l array];
     if ([l isKindOfClass:[NSDictionary class]])
         l = [l allValues];
     if (![l isKindOfClass:[NSArray class]])
@@ -414,6 +423,33 @@ static NSPredicate *parse(NSString *format, va_list *ap, NSArray *args);
     for (FPExpr *e in @[ left, right ])
         if (e->kind == E_KEYPATH)
             [set addObject:e->value];
+}
+/* {type: comparison, op, modifier, options, left, right}, each side
+ * {kind: constant, keypath, self, variable or aggregate, value} */
+static id expr_structure(FPExpr *e)
+{
+    static NSString *const kinds[] = {@"constant", @"keypath", @"self", @"variable", @"aggregate"};
+    id v = e->value ?: [NSNull null];
+    if (e->kind == E_AGGREGATE) {
+        NSMutableArray *parts = [NSMutableArray array];
+        for (FPExpr *x in e->value)
+            [parts addObject:expr_structure(x)];
+        v = parts;
+    }
+    return @{@"kind" : kinds[e->kind], @"value" : v};
+}
+- (id)_ferryStructure
+{
+    static NSString *const mods[] = {@"direct", @"any", @"all", @"none"};
+    return @{
+        @"type" : @"comparison",
+        @"op" : op_names[op],
+        @"modifier" : mods[modifier],
+        @"caseInsensitive" : @((options & OPT_CASE) != 0),
+        @"diacriticInsensitive" : @((options & OPT_DIACRITIC) != 0),
+        @"left" : expr_structure(left),
+        @"right" : expr_structure(right),
+    };
 }
 @end
 
@@ -486,6 +522,18 @@ static NSPredicate *parse(NSString *format, va_list *ap, NSArray *args);
 {
     for (NSPredicate *p in _subpredicates)
         [p _ferryAddKeyPathsTo:set];
+}
+- (id)_ferryStructure
+{
+    static NSString *const types[] = {@"not", @"and", @"or"};
+    NSMutableArray *parts = [NSMutableArray array];
+    for (NSPredicate *p in _subpredicates) {
+        id s = [p _ferryStructure];
+        if (!s)
+            return nil;
+        [parts addObject:s];
+    }
+    return @{@"type" : types[_type], @"subpredicates" : parts};
 }
 @end
 
