@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tender
+GenericName=Bring Files Over
+Comment=Bring your files and settings over from a backup, a Windows PC or another computer
+Exec=freemac-tender %f
+Icon=freemac-tender
+Categories=System;Utility;
+Keywords=migrate;migration;move;transfer;old computer;windows;pc;copy files;bring over;new computer;
+StartupWMClass=org.freemac.Tender
+StartupNotify=true
