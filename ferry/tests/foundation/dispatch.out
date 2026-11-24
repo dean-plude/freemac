@@ -1,5 +1,5 @@
-queued; done 0
-back on the main queue: done 1
+queued
+back on the main queue: done 1, worked off the main thread 1, now on it 1
 worker released
 the queue was released with its worker: yes
 dispatch_after fired: yes, after at least 0.1 s: yes

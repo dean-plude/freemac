@@ -16,32 +16,37 @@
  *
  * The transfers themselves are done by this system's libcurl (FCurl.h),
  * through its "multi" interface: every transfer of the program shares one
- * multi handle, whose sockets are waited on by Foundation's run loop (as a
- * poller, NSRunLoop.m) and by dispatch's waits (dispatch_semaphore_wait,
- * dispatch_group_wait and dispatch_main, through ferry_dispatch_set_io in
- * src/objc/dispatch.c). Ferry runs a Mac program on one thread, so nothing
- * moves while the program neither runs its run loop nor waits on dispatch.
+ * multi handle, driven by a network thread of Foundation's own. The thread
+ * starts with the first transfer and ends when none is left; it waits on
+ * the transfers' sockets and on a pipe that wakes it when a transfer is
+ * added, paused, resumed or cancelled. Everything the engine keeps, every
+ * exchange (redirects, challenges, cookies and the cache included), and
+ * every task's, connection's and session's own state, is guarded by one
+ * recursive lock (engine_lock), so tasks may be made, resumed, suspended
+ * and cancelled, and a delegate's answers given, from any thread.
  *
  * Completion handlers and delegate messages are never called from inside
- * libcurl: each is queued, in order, on the session's delegate queue. That
- * is the queue the program gave (anything that takes addOperationWithBlock:,
- * as NSOperationQueue does) or else a serial dispatch queue of the
- * session's own; NSURLConnection's go to its delegate queue or else the
- * main queue. All of them run on the program's one thread, from the run
- * loop or from a dispatch wait. The synchronous calls
- * (sendSynchronousRequest:..., dataWithContentsOfURL:) wait on the network
- * alone, as a Mac's block their thread, and run nothing else meanwhile. */
+ * libcurl, nor with the lock held: each is queued, in order, on the
+ * session's delegate queue. That is the queue the program gave (anything
+ * that takes addOperationWithBlock:, as NSOperationQueue does) or else a
+ * serial operation queue of the session's own, whose work runs on a worker
+ * thread, as on a Mac; NSURLConnection's go to its delegate queue or else
+ * the main queue. A delegate may answer a question (a redirect, a
+ * challenge, a response, what to cache) later and from any thread; the
+ * exchange goes on, under the lock, when it does. The synchronous calls
+ * (sendSynchronousRequest:..., dataWithContentsOfURL:) block their thread
+ * until the network thread has finished the exchange. */
 #import "FURLInternal.h"
 #include "FCurl.h"
 #include <ctype.h>
 #include <dispatch/dispatch.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 void *ferry_network_symbol(const char *name);                                 /* src/host.c */
-void ferry_dispatch_set_io(int (*pending)(void), void (*wait)(int timeout_ms)); /* src/objc/dispatch.c */
 int mkstemps(char *template, int suffixlen);
 
 NSString *const NSURLErrorDomain = @"NSURLErrorDomain";
@@ -540,7 +545,19 @@ static struct nsock {
 } *socks;
 static int nsocks, capsocks;
 static NSTimeInterval curl_deadline = -1; /* when libcurl wants its timeout action */
-static unsigned long events;              /* client messages sent, so pollers can say they did something */
+static unsigned long events;              /* client messages sent */
+
+/* The engine's lock, recursive because a client's message may cancel or
+ * pause its own transfer, and an exchange's answer may start the next;
+ * engine_done is broadcast whenever a transfer or a waited-for exchange
+ * ends, for the calls that wait for one. */
+static pthread_mutex_t engine_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+static pthread_cond_t engine_done = PTHREAD_COND_INITIALIZER;
+static BOOL net_running;            /* the network thread is up */
+static int wake_pipe[2] = {-1, -1}; /* wakes it from its poll */
+static volatile int nloads;         /* transfers going on, read without the lock by the main run loop */
+#define LOCK_ENGINE() pthread_mutex_lock(&engine_lock)
+#define UNLOCK_ENGINE() pthread_mutex_unlock(&engine_lock)
 
 static int on_socket(CURL *easy, curl_socket_t s, int what, void *userp, void *socketp)
 {
@@ -571,20 +588,65 @@ static int on_timer(CURLM *m, long timeout_ms, void *userp)
 
 static int engine_prepare(void *ctx, int *timeout_ms, struct pollfd *fds, int max);
 static BOOL engine_dispatch(void *ctx, struct pollfd *fds, int count);
-static BOOL engine_active(void *ctx) { return [loads count] > 0; }
-static int io_pending(void) { return [loads count] > 0; }
 
-/* Waits for the network for at most timeout_ms (-1: as long as it takes),
- * then lets libcurl do what is ready. */
-static void engine_wait(int timeout_ms)
+/* For the main run loop: while a transfer goes on, its messages may still
+ * come, so the loop doesn't end for want of work. It waits on nothing of
+ * the engine's: the network thread does that. */
+static int idle_prepare(void *ctx, int *timeout_ms, struct pollfd *fds, int max) { return 0; }
+static BOOL idle_dispatch(void *ctx, struct pollfd *fds, int count) { return NO; }
+static BOOL engine_active(void *ctx) { return __atomic_load_n(&nloads, __ATOMIC_ACQUIRE) > 0; }
+
+/* The network thread: waits on the transfers' sockets and its wake pipe
+ * without the lock, then lets libcurl do what is ready with it, until no
+ * transfer is left. */
+static void *net_main(void *arg)
 {
-    struct pollfd fds[64];
-    int ms = timeout_ms;
-    int n = engine_prepare(NULL, &ms, fds, 64);
-    poll(fds, n, ms);
-    engine_dispatch(NULL, fds, n);
+    pthread_setname_np("com.apple.NSURLConnectionLoader");
+    LOCK_ENGINE();
+    while ([loads count]) {
+        @autoreleasepool {
+            struct pollfd fds[65];
+            int ms = -1;
+            int n = engine_prepare(NULL, &ms, fds, 64);
+            fds[n].fd = wake_pipe[0];
+            fds[n].events = POLLIN;
+            fds[n].revents = 0;
+            UNLOCK_ENGINE();
+            poll(fds, n + 1, ms);
+            if (fds[n].revents) {
+                char buf[64];
+                while (read(wake_pipe[0], buf, sizeof buf) > 0)
+                    ;
+            }
+            LOCK_ENGINE();
+            engine_dispatch(NULL, fds, n);
+        }
+    }
+    net_running = NO;
+    UNLOCK_ENGINE();
+    return NULL;
 }
 
+/* Called with the lock held after the transfers changed: starts the
+ * network thread, or wakes it to look again. */
+static void engine_kick(void)
+{
+    __atomic_store_n(&nloads, (int)[loads count], __ATOMIC_RELEASE);
+    if (!net_running && [loads count]) {
+        pthread_t t;
+        pthread_attr_t a;
+        pthread_attr_init(&a);
+        pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+        if (pthread_create(&t, &a, net_main, NULL) == 0)
+            net_running = YES;
+        pthread_attr_destroy(&a);
+    } else if (net_running) {
+        char c = 1;
+        (void)!write(wake_pipe[1], &c, 1);
+    }
+}
+
+/* Called with the lock held. */
 static BOOL load_curl(void)
 {
     if (curl_state)
@@ -611,9 +673,14 @@ static BOOL load_curl(void)
         goto missing;
     C.multi_setopt(multi, CURLMOPT_SOCKETFUNCTION, on_socket);
     C.multi_setopt(multi, CURLMOPT_TIMERFUNCTION, on_timer);
+    if (pipe(wake_pipe) < 0)
+        goto missing;
+    fcntl(wake_pipe[0], F_SETFL, O_NONBLOCK);
+    fcntl(wake_pipe[1], F_SETFL, O_NONBLOCK);
+    fcntl(wake_pipe[0], F_SETFD, FD_CLOEXEC);
+    fcntl(wake_pipe[1], F_SETFD, FD_CLOEXEC);
     loads = [[NSMutableArray alloc] init];
-    FRunLoopAddPoller(engine_prepare, engine_dispatch, engine_active, NULL);
-    ferry_dispatch_set_io(io_pending, engine_wait);
+    FRunLoopAddPoller(idle_prepare, idle_dispatch, engine_active, NULL);
     curl_state = 1;
     return YES;
 missing:
@@ -626,12 +693,13 @@ missing:
 static NSString *user_agent(void)
 {
     static NSString *agent;
-    if (!agent) {
-        NSBundle *b = [NSBundle mainBundle];
-        NSString *name = [b objectForInfoDictionaryKey:@"CFBundleName"] ?: [[NSProcessInfo processInfo] processName];
-        NSString *version = [b objectForInfoDictionaryKey:@"CFBundleVersion"] ?: @"1";
-        agent = [[NSString alloc] initWithFormat:@"%@/%@ Ferry (freemac)", name ?: @"Ferry", version];
-    }
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSBundle *b = [NSBundle mainBundle];
+      NSString *name = [b objectForInfoDictionaryKey:@"CFBundleName"] ?: [[NSProcessInfo processInfo] processName];
+      NSString *version = [b objectForInfoDictionaryKey:@"CFBundleVersion"] ?: @"1";
+      agent = [[NSString alloc] initWithFormat:@"%@/%@ Ferry (freemac)", name ?: @"Ferry", version];
+    });
     return agent;
 }
 
@@ -773,6 +841,8 @@ static void unload(FURLLoad *l)
     [l->client release];
     l->client = nil;
     [loads removeObjectIdenticalTo:l];
+    __atomic_store_n(&nloads, (int)[loads count], __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&engine_done);
 }
 
 static void finish(FURLLoad *l, NSError *error)
@@ -821,7 +891,8 @@ static NSString *wire_url(NSURL *url)
  * total how long it may take in all (0: no limit). body, when not nil,
  * replaces the request's body. insecure leaves the server's certificate
  * unchecked (the delegate accepted it). Redirects aren't followed here:
- * each is a response of its own, for the exchange to decide about. */
+ * each is a response of its own, for the exchange to decide about. Called
+ * with the engine's lock held. */
 static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSDictionary *added, NSTimeInterval idle,
                             NSTimeInterval total, NSData *body, BOOL insecure, id<FURLLoadClient> client,
                             NSError **error)
@@ -934,25 +1005,32 @@ static FURLLoad *start_load(NSURLRequest *request, NSDictionary *extra, NSDictio
     }
     [loads addObject:l];
     C.multi_add_handle(multi, e);
+    engine_kick();
     return l;
 }
 
 static void cancel_load(FURLLoad *l)
 {
-    if (!l || l->done)
-        return;
-    l->cancelled = YES;
-    [[l retain] autorelease];
-    unload(l);
+    LOCK_ENGINE();
+    if (l && !l->done) {
+        l->cancelled = YES;
+        [[l retain] autorelease];
+        unload(l);
+        engine_kick();
+    }
+    UNLOCK_ENGINE();
 }
 
 static void pause_load(FURLLoad *l, BOOL pause)
 {
-    if (!l || l->done || l->paused == pause)
-        return;
-    l->paused = pause;
-    l->active_at = now();
-    C.easy_pause(l->easy, pause ? CURLPAUSE_ALL : CURLPAUSE_CONT);
+    LOCK_ENGINE();
+    if (l && !l->done && l->paused != pause) {
+        l->paused = pause;
+        l->active_at = now();
+        C.easy_pause(l->easy, pause ? CURLPAUSE_ALL : CURLPAUSE_CONT);
+        engine_kick();
+    }
+    UNLOCK_ENGINE();
 }
 
 static int engine_prepare(void *ctx, int *timeout_ms, struct pollfd *fds, int max)
@@ -1031,9 +1109,11 @@ static BOOL engine_dispatch(void *ctx, struct pollfd *fds, int count)
  * asked the questions a delegate answers: whether to follow a redirect,
  * how to answer a challenge (the server's certificate before connecting
  * to an https server, a 401 after one) and what to store in the cache.
- * The owner may answer later, from its delegate's queue; until it does,
- * nothing moves. Cookies are sent with each request and kept from each
- * response, redirects and challenges included. */
+ * The owner may answer later, from its delegate's queue or any other
+ * thread; until it does, nothing moves. Every answer takes the engine's
+ * lock, as everything else an exchange does runs with it held. Cookies are
+ * sent with each request and kept from each response, redirects and
+ * challenges included. */
 
 @class FURLExchange;
 @protocol FURLExchangeOwner <FURLLoadClient>
@@ -1293,31 +1373,37 @@ static NSData *percent_decoded_bytes(NSString *s)
 
 - (void)start
 {
+    LOCK_ENGINE();
     [[self retain] autorelease];
     if (!checked) {
         checked = [[NSMutableSet alloc] init];
         trusted = [[NSMutableSet alloc] init];
     }
     [self _begin];
+    UNLOCK_ENGINE();
 }
 
 - (void)cancel
 {
-    if (done)
-        return;
-    done = YES;
-    [[self retain] autorelease];
-    cancel_load(load);
-    [load release];
-    load = nil;
-    [owner autorelease];
-    owner = nil;
+    LOCK_ENGINE();
+    if (!done) {
+        done = YES;
+        [[self retain] autorelease];
+        cancel_load(load);
+        [load release];
+        load = nil;
+        [owner autorelease];
+        owner = nil;
+    }
+    UNLOCK_ENGINE();
 }
 
 - (void)pause:(BOOL)p
 {
+    LOCK_ENGINE();
     paused = p;
     pause_load(load, p);
+    UNLOCK_ENGINE();
 }
 
 /* ---- the end, and what the owner hears */
@@ -1436,15 +1522,16 @@ static NSData *percent_decoded_bytes(NSString *s)
     [owner _exchange:self
           challenged:c
               answer:^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *cred) {
-                if (done)
-                    return;
-                if (disposition == NSURLSessionAuthChallengeCancelAuthenticationChallenge) {
+                LOCK_ENGINE();
+                if (done) {
+                } else if (disposition == NSURLSessionAuthChallengeCancelAuthenticationChallenge) {
                     [self _finish:url_error(cancelCode, [request URL], nil)];
-                    return;
+                } else {
+                    if (disposition == NSURLSessionAuthChallengeUseCredential && [cred _isForTrust])
+                        [trusted addObject:hp];
+                    [self _send];
                 }
-                if (disposition == NSURLSessionAuthChallengeUseCredential && [cred _isForTrust])
-                    [trusted addObject:hp];
-                [self _send];
+                UNLOCK_ENGINE();
               }];
 }
 
@@ -1618,14 +1705,16 @@ static NSData *percent_decoded_bytes(NSString *s)
         NSURLRequest *r = [[request retain] autorelease];
         NSURLCache *store = [[cache retain] autorelease];
         void (^then)(NSCachedURLResponse *) = ^(NSCachedURLResponse *answer) {
-          if (done)
-              return;
-          if (answer) {
-              if (![answer _storedAt])
-                  [answer _setStoredAt:[NSDate date]];
-              [store storeCachedResponse:answer forRequest:r];
+          LOCK_ENGINE();
+          if (!done) {
+              if (answer) {
+                  if (![answer _storedAt])
+                      [answer _setStoredAt:[NSDate date]];
+                  [store storeCachedResponse:answer forRequest:r];
+              }
+              [self _finish:nil];
           }
-          [self _finish:nil];
+          UNLOCK_ENGINE();
         };
         if ([owner respondsToSelector:@selector(_exchange:willCache:answer:)])
             [owner _exchange:self willCache:c answer:then];
@@ -1668,15 +1757,16 @@ static NSData *percent_decoded_bytes(NSString *s)
     if ([[[request mainDocumentURL] absoluteString] isEqualToString:[[request URL] absoluteString]])
         [next setMainDocumentURL:target];
     void (^answer)(NSURLRequest *) = ^(NSURLRequest *chosen) {
-      if (done)
-          return;
-      if (!chosen) {
+      LOCK_ENGINE();
+      if (done) {
+      } else if (!chosen) {
           [self _giveHeld];
-          return;
+      } else {
+          [request release];
+          request = [chosen copy];
+          [self _begin];
       }
-      [request release];
-      request = [chosen copy];
-      [self _begin];
+      UNLOCK_ENGINE();
     };
     if ([owner respondsToSelector:@selector(_exchange:redirectedBy:to:answer:)])
         [owner _exchange:self redirectedBy:r to:next answer:answer];
@@ -1791,30 +1881,31 @@ static NSData *percent_decoded_bytes(NSString *s)
                                                                                               sender:nil] autorelease];
     void (^answer)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) =
         ^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *cred) {
-          if (done)
-              return;
-          switch (disposition) {
-          case NSURLSessionAuthChallengeUseCredential:
-              if ([cred user])
-                  [self _useCredential:cred];
-              else
+          LOCK_ENGINE();
+          if (!done)
+              switch (disposition) {
+              case NSURLSessionAuthChallengeUseCredential:
+                  if ([cred user])
+                      [self _useCredential:cred];
+                  else
+                      [self _giveHeld];
+                  break;
+              case NSURLSessionAuthChallengeCancelAuthenticationChallenge:
+                  [self _finish:url_error(cancelCode, [request URL], nil)];
+                  break;
+              case NSURLSessionAuthChallengePerformDefaultHandling: {
+                  NSURLCredential *d = [self _defaultCredential];
+                  if (d)
+                      [self _useCredential:d];
+                  else
+                      [self _giveHeld];
+                  break;
+              }
+              default: /* rejecting the only protection space there is */
                   [self _giveHeld];
-              return;
-          case NSURLSessionAuthChallengeCancelAuthenticationChallenge:
-              [self _finish:url_error(cancelCode, [request URL], nil)];
-              return;
-          case NSURLSessionAuthChallengePerformDefaultHandling: {
-              NSURLCredential *d = [self _defaultCredential];
-              if (d)
-                  [self _useCredential:d];
-              else
-                  [self _giveHeld];
-              return;
-          }
-          default: /* rejecting the only protection space there is */
-              [self _giveHeld];
-              return;
-          }
+                  break;
+              }
+          UNLOCK_ENGINE();
         };
     if ([owner respondsToSelector:@selector(_exchange:challenged:answer:)])
         [owner _exchange:self challenged:c answer:answer];
@@ -1969,6 +2060,7 @@ static FURLExchange *new_exchange(NSURLRequest *request, id owner)
 {
     error = [e retain];
     done = YES;
+    pthread_cond_broadcast(&engine_done); /* for load_and_wait */
     if (then)
         then(self);
 }
@@ -1979,9 +2071,11 @@ static NSData *load_and_wait(NSURLRequest *request, NSURLResponse **response, NS
 {
     FURLGather *g = [[[FURLGather alloc] init] autorelease];
     FURLExchange *x = [new_exchange(request, g) retain];
+    LOCK_ENGINE();
     [x start];
     while (!g->done)
-        engine_wait(-1);
+        pthread_cond_wait(&engine_done, &engine_lock);
+    UNLOCK_ENGINE();
     [x release];
     if (response)
         *response = [[g->response retain] autorelease];
@@ -2217,6 +2311,10 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 - (void)_answered:(NSURLSessionResponseDisposition)disposition;
 - (void)_openFile;
 - (void)_endWithError:(NSError *)error;
+- (void)_resumeLocked;
+- (void)_suspendLocked;
+- (void)_cancelLocked;
+- (void)_answeredLocked:(NSURLSessionResponseDisposition)disposition;
 @end
 
 @implementation NSURLSessionTask
@@ -2303,6 +2401,24 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 
 - (void)resume
 {
+    LOCK_ENGINE();
+    [self _resumeLocked];
+    UNLOCK_ENGINE();
+}
+- (void)suspend
+{
+    LOCK_ENGINE();
+    [self _suspendLocked];
+    UNLOCK_ENGINE();
+}
+- (void)cancel
+{
+    LOCK_ENGINE();
+    [self _cancelLocked];
+    UNLOCK_ENGINE();
+}
+- (void)_resumeLocked
+{
     if (_ended || _state == NSURLSessionTaskStateCanceling || _state == NSURLSessionTaskStateCompleted)
         return;
     if (_started) {
@@ -2346,14 +2462,14 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     _exchange = x;
     [x start];
 }
-- (void)suspend
+- (void)_suspendLocked
 {
     if (_state != NSURLSessionTaskStateRunning)
         return;
     _state = NSURLSessionTaskStateSuspended;
     [_exchange pause:YES];
 }
-- (void)cancel
+- (void)_cancelLocked
 {
     if (_ended || _state == NSURLSessionTaskStateCanceling || _state == NSURLSessionTaskStateCompleted)
         return;
@@ -2371,12 +2487,14 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 {
     id d = [self _hearer];
     void (^go)(NSURLRequest *) = ^(NSURLRequest *chosen) {
+      LOCK_ENGINE();
       if (chosen) {
           [chosen retain];
           [_current release];
           _current = chosen;
       }
       answer(chosen);
+      UNLOCK_ENGINE();
     };
     if (![d respondsToSelector:@selector(URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:)]) {
         go(request);
@@ -2391,10 +2509,12 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
           willPerformHTTPRedirection:response
                           newRequest:request
                    completionHandler:^(NSURLRequest *chosen) {
-                     if (answered)
-                         return;
+                     LOCK_ENGINE();
+                     BOOL first = !answered;
                      answered = YES;
-                     once(chosen);
+                     if (first)
+                         once(chosen);
+                     UNLOCK_ENGINE();
                    }];
     }];
 }
@@ -2418,10 +2538,12 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     __block BOOL answered = NO;
     void (^once)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) =
         [[^(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential) {
-          if (answered)
-              return;
+          LOCK_ENGINE();
+          BOOL first = !answered;
           answered = YES;
-          answer(disposition, credential);
+          if (first)
+              answer(disposition, credential);
+          UNLOCK_ENGINE();
         } copy] autorelease];
     if (trust && [sd respondsToSelector:@selector(URLSession:didReceiveChallenge:completionHandler:)])
         [self _post:^{
@@ -2452,10 +2574,12 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
                    dataTask:(NSURLSessionDataTask *)self
           willCacheResponse:proposed
           completionHandler:^(NSCachedURLResponse *chosen) {
-            if (answered)
-                return;
+            LOCK_ENGINE();
+            BOOL first = !answered;
             answered = YES;
-            then(chosen);
+            if (first)
+                then(chosen);
+            UNLOCK_ENGINE();
           }];
     }];
 }
@@ -2482,14 +2606,22 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
                    dataTask:(NSURLSessionDataTask *)self
          didReceiveResponse:response
           completionHandler:^(NSURLSessionResponseDisposition disposition) {
-            if (answered)
-                return;
+            LOCK_ENGINE();
+            BOOL first = !answered;
             answered = YES;
-            [self _answered:disposition];
+            if (first)
+                [self _answeredLocked:disposition];
+            UNLOCK_ENGINE();
           }];
     }];
 }
 - (void)_answered:(NSURLSessionResponseDisposition)disposition
+{
+    LOCK_ENGINE();
+    [self _answeredLocked:disposition];
+    UNLOCK_ENGINE();
+}
+- (void)_answeredLocked:(NSURLSessionResponseDisposition)disposition
 {
     if (!_awaiting)
         return;
@@ -2498,7 +2630,7 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
         [_held removeAllObjects];
         _ended = NO;
         _state = NSURLSessionTaskStateRunning;
-        [self cancel];
+        [self _cancelLocked];
         return;
     }
     NSArray *held = [_held copy];
@@ -2605,7 +2737,9 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     id d = [self _hearer];
     NSURLResponse *response = _response;
     [self _post:^{
+      LOCK_ENGINE();
       _state = NSURLSessionTaskStateCompleted;
+      UNLOCK_ENGINE();
       NSURL *location = !error && _path ? [NSURL fileURLWithPath:_path] : nil;
       if (_handler) {
           if (_kind == KIND_DOWNLOAD)
@@ -2656,10 +2790,11 @@ static NSMutableArray *live_sessions; /* kept until invalidated, as a Mac keeps 
 + (NSURLSession *)sharedSession
 {
     static NSURLSession *shared;
-    if (!shared) {
-        shared = [[NSURLSession alloc] _initWithConfiguration:nil delegate:nil queue:nil];
-        shared->_shared = YES;
-    }
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      shared = [[NSURLSession alloc] _initWithConfiguration:nil delegate:nil queue:nil];
+      shared->_shared = YES;
+    });
     return shared;
 }
 + (NSURLSession *)sessionWithConfiguration:(NSURLSessionConfiguration *)configuration
@@ -2671,9 +2806,11 @@ static NSMutableArray *live_sessions; /* kept until invalidated, as a Mac keeps 
                              delegateQueue:(NSOperationQueue *)queue
 {
     NSURLSession *s = [[self alloc] _initWithConfiguration:configuration delegate:delegate queue:queue];
+    LOCK_ENGINE();
     if (!live_sessions)
         live_sessions = [[NSMutableArray alloc] init];
     [live_sessions addObject:s];
+    UNLOCK_ENGINE();
     return [s autorelease];
 }
 - (instancetype)_initWithConfiguration:(NSURLSessionConfiguration *)c delegate:(id)delegate queue:(id)queue
@@ -2720,6 +2857,7 @@ static NSMutableArray *live_sessions; /* kept until invalidated, as a Mac keeps 
     if (_invalid)
         FRaise(NSGenericException, @"Task created in a session that has been invalidated");
     NSURLSessionTask *t = [[[cls alloc] init] autorelease];
+    LOCK_ENGINE();
     t->_session = [self retain];
     t->_id = ++_nextID;
     t->_kind = kind;
@@ -2731,6 +2869,7 @@ static NSMutableArray *live_sessions; /* kept until invalidated, as a Mac keeps 
     t->_data = [[NSMutableData alloc] init];
     t->_held = [[NSMutableArray alloc] init];
     [_tasks addObject:t];
+    UNLOCK_ENGINE();
     return t;
 }
 static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest requestWithURL:url] : nil; }
@@ -2775,9 +2914,11 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
     NSData *body = [fileURL isFileURL] ? [NSData dataWithContentsOfFile:[fileURL path]] : nil;
     NSURLSessionUploadTask *t = [self uploadTaskWithRequest:request fromData:body completionHandler:handler];
     if (!body) {
+        LOCK_ENGINE();
         t->_started = YES;
         t->_state = NSURLSessionTaskStateRunning;
         [t _endWithError:url_error(NSURLErrorFileDoesNotExist, fileURL, nil)];
+        UNLOCK_ENGINE();
     }
     return t;
 }
@@ -2807,9 +2948,11 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 - (void)getAllTasksWithCompletionHandler:(void (^)(NSArray<__kindof NSURLSessionTask *> *))handler
 {
     NSMutableArray *open = [NSMutableArray array];
+    LOCK_ENGINE();
     for (NSURLSessionTask *t in _tasks)
         if (!t->_ended)
             [open addObject:t];
+    UNLOCK_ENGINE();
     id copy = [handler copy];
     [self _deliver:^{
       ((void (^)(NSArray *))copy)(open);
@@ -2833,31 +2976,39 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
           [d URLSession:self didBecomeInvalidWithError:nil];
       [_delegate release];
       _delegate = nil;
+      LOCK_ENGINE();
       [live_sessions removeObjectIdenticalTo:self];
+      UNLOCK_ENGINE();
     }];
 }
 - (void)_taskEnded:(NSURLSessionTask *)task
 {
     [[task retain] autorelease];
+    LOCK_ENGINE();
     [_tasks removeObjectIdenticalTo:task];
     [self _checkInvalid];
+    UNLOCK_ENGINE();
 }
 - (void)finishTasksAndInvalidate
 {
-    if (_shared || _invalid)
-        return;
-    _invalid = YES;
-    [self _checkInvalid];
+    LOCK_ENGINE();
+    if (!_shared && !_invalid) {
+        _invalid = YES;
+        [self _checkInvalid];
+    }
+    UNLOCK_ENGINE();
 }
 - (void)invalidateAndCancel
 {
-    if (_shared || _invalid)
-        return;
-    _invalid = YES;
-    NSArray *now_open = [[_tasks copy] autorelease];
-    for (NSURLSessionTask *t in now_open)
-        [t cancel];
-    [self _checkInvalid];
+    LOCK_ENGINE();
+    if (!_shared && !_invalid) {
+        _invalid = YES;
+        NSArray *now_open = [[_tasks copy] autorelease];
+        for (NSURLSessionTask *t in now_open)
+            [t cancel];
+        [self _checkInvalid];
+    }
+    UNLOCK_ENGINE();
 }
 @end
 
@@ -2879,10 +3030,12 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 }
 - (void)_answer:(NSURLSessionAuthChallengeDisposition)d credential:(NSURLCredential *)c
 {
+    LOCK_ENGINE();
     void (^a)(NSURLSessionAuthChallengeDisposition, NSURLCredential *) = [answer autorelease];
     answer = nil;
     if (a)
         a(d, c);
+    UNLOCK_ENGINE();
 }
 - (void)useCredential:(NSURLCredential *)credential forAuthenticationChallenge:(NSURLAuthenticationChallenge *)c
 {
@@ -2970,11 +3123,12 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
  * with nil, which ends the connection without another message. */
 - (void)start
 {
-    if (_started)
-        return;
+    LOCK_ENGINE();
+    BOOL first = !_started;
     _started = YES;
     id d = _delegate;
-    if ([d respondsToSelector:@selector(connection:willSendRequest:redirectResponse:)])
+    if (!first) {
+    } else if ([d respondsToSelector:@selector(connection:willSendRequest:redirectResponse:)])
         [self _tell:^{
           if (_over)
               return;
@@ -2987,9 +3141,15 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
         }];
     else
         [self _send:_request];
+    UNLOCK_ENGINE();
 }
 - (void)_send:(NSURLRequest *)request
 {
+    LOCK_ENGINE();
+    if (_over) {
+        UNLOCK_ENGINE();
+        return;
+    }
     if (request != _request) {
         [_current release];
         _current = [request copy];
@@ -3004,15 +3164,18 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
     }
     _exchange = x;
     [x start];
+    UNLOCK_ENGINE();
 }
 - (void)cancel
 {
-    if (_over)
-        return;
-    _over = YES;
-    [_exchange cancel];
-    [_delegate autorelease];
-    _delegate = nil;
+    LOCK_ENGINE();
+    if (!_over) {
+        _over = YES;
+        [_exchange cancel];
+        [_delegate autorelease];
+        _delegate = nil;
+    }
+    UNLOCK_ENGINE();
 }
 
 /* ---- what the exchange asks: the delegate's answers */
@@ -3022,12 +3185,14 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 {
     id d = _delegate;
     void (^go)(NSURLRequest *) = [[^(NSURLRequest *chosen) {
+      LOCK_ENGINE();
       if (chosen) {
           [chosen retain];
           [_current release];
           _current = chosen;
       }
       answer(chosen);
+      UNLOCK_ENGINE();
     } copy] autorelease];
     if (![d respondsToSelector:@selector(connection:willSendRequest:redirectResponse:)]) {
         go(request);
@@ -3138,16 +3303,23 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
 {
     id d = [_delegate retain];
     [self _tell:^{
-      if (!_over) {
+      LOCK_ENGINE();
+      BOOL tell = !_over;
+      id held = nil;
+      if (tell) {
           _over = YES;
+          held = _delegate; /* let go once it has heard */
+          _delegate = nil;
+      }
+      UNLOCK_ENGINE();
+      if (tell) {
           if (error) {
               if ([d respondsToSelector:@selector(connection:didFailWithError:)])
                   [d connection:self didFailWithError:error];
           } else if ([d respondsToSelector:@selector(connectionDidFinishLoading:)])
               [d connectionDidFinishLoading:self];
-          [_delegate release];
-          _delegate = nil;
       }
+      [held release];
       [d release];
     }];
 }

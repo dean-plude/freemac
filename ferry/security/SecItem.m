@@ -30,6 +30,7 @@
  * four-letter tag ("acct", "svce", "srvr"...), so both sets of calls see
  * the same items; every other key's value is its own name. */
 #include "SInternal.h"
+#include <dispatch/dispatch.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -178,14 +179,16 @@ static int class_bit(NSString *cls)
 static BOOL known_other_key(id key)
 {
     static NSSet *keys;
-    if (!keys)
-        keys = [[NSSet setWithObjects:(id)kSecClass, (id)kSecAttrSynchronizable, (id)kSecMatchLimit,
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      keys = [[NSSet setWithObjects:(id)kSecClass, (id)kSecAttrSynchronizable, (id)kSecMatchLimit,
                                               (id)kSecMatchCaseInsensitive, (id)kSecReturnData,
                                               (id)kSecReturnAttributes, (id)kSecReturnRef,
                                               (id)kSecReturnPersistentRef, (id)kSecValueData, (id)kSecValueRef,
                                               (id)kSecValuePersistentRef, (id)kSecUseDataProtectionKeychain,
                                               (id)kSecUseKeychain, (id)kSecUseAuthenticationUI,
                                               (id)kSecUseOperationPrompt, nil] retain];
+    });
     return [keys containsObject:key];
 }
 

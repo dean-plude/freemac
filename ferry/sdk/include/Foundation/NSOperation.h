@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: NSOperation and NSOperationQueue, and the locks
- * (foundation/NSOperation.m). Ferry runs a program on one thread, so every
- * queue's operations run on it, one at a time, from the run loop and from
- * dispatch's waits. Written for freemac from Apple's public API
- * documentation; not Apple's header. */
+ * (foundation/NSOperation.m). A queue's operations run on libdispatch's
+ * worker threads, as many at once as maxConcurrentOperationCount allows;
+ * the main queue's run on the main thread. Written for freemac from
+ * Apple's public API documentation; not Apple's header. */
 #ifndef _FERRY_FOUNDATION_NSOPERATION_H_
 #define _FERRY_FOUNDATION_NSOPERATION_H_
 #include <Foundation/Foundation.h>
@@ -76,7 +76,7 @@ FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationCancelledException;
 @property (getter=isSuspended) BOOL suspended;
 @property (copy) NSString *name;
 @property NSQualityOfService qualityOfService;
-@property (retain) id underlyingQueue; /* a dispatch queue; kept, the work still runs on the one thread */
+@property (retain) id underlyingQueue; /* a dispatch queue: the operations run on it */
 - (void)cancelAllOperations;
 - (void)waitUntilAllOperationsAreFinished;
 @property (readonly, copy) NSArray<__kindof NSOperation *> *operations;
@@ -84,8 +84,7 @@ FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationCancelledException;
 @property (readonly, retain) NSProgress *progress;
 @end
 
-/* ---- locks: on one thread, a lock held by the program is held by the
- * caller; a wait runs queued work until what it waits for happens. */
+/* ---- locks, on pthread mutexes and condition variables */
 
 @protocol NSLocking
 - (void)lock;

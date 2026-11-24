@@ -1,0 +1,21 @@
+main: is main 1, current is main 1, instance is main 1, name 'main', multithreaded 0
+main thread dictionary: main value
+before start: executing 0, finished 0, stack size 1048576
+initWithTarget: ran 1, on the main thread 0, argument 1, current thread 1, name 'first worker'
+after: executing 0, finished 1, multithreaded 1, notified once 1
+start again: NSInvalidArgumentException
+initWithBlock: cancelled 1, saw it 1, own dictionary 1, slept enough 1, pool drained 1, returned past +exit 0, qos utility 1
+detached: selector ran 1 (main 0, argument 1), block ran 1 (main 0)
+performSelectorOnMainThread: calls 11, on main 1, waitUntilDone saw 1
+from the main thread itself with waitUntilDone: runs at once, calls 111
+its run loop is its own: 1
+performSelector:onThread: waited, performed 2 on that thread 1
+100 more without waiting, then one waited for: performed 102
+performBlock: on that thread's run loop: 1
+performSelectorInBackground: ran 1, main 0, argument 1
+operation queue: two operations ran at once 1, any on the main thread 0
+operation queue limit 4: at most 4 at once, more than one 1
+main queue operation from a worker: on the main thread 1, current queue main 1
+16 threads at once: all right 16, will-exit notifications from them 16, became multithreaded notified 1 time(s)
+first worker's exit was notified: 1
+exit=0

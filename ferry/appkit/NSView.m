@@ -513,6 +513,7 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
 
 - (void)addSubview:(NSView *)view positioned:(NSInteger)place relativeTo:(NSView *)other
 {
+    AMainThreadOnly("-[NSView addSubview:]");
     if (!view || view == self)
         return;
     [view retain];
@@ -756,6 +757,7 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 - (BOOL)needsDisplay { return _needsDisplay; }
 - (void)setNeedsDisplay:(BOOL)flag
 {
+    AMainThreadOnly("-[NSView setNeedsDisplay:]");
     _needsDisplay = flag;
     if (flag)
         [_window _noteNeedsDisplay];

@@ -703,14 +703,27 @@ static void entry_did_set(FKVOEntry *e, NSKeyValueSetMutationKind m, NSSet *objs
 }
 @end
 
-static int dependency_depth;
+/* How deep dependencies are being followed on this thread (a key-value
+ * notification is sent on the thread that made the change). */
+static pthread_key_t depth_key;
+static intptr_t dependency_depth(intptr_t change)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      pthread_key_create(&depth_key, NULL);
+    });
+    intptr_t d = (intptr_t)pthread_getspecific(depth_key) + change;
+    if (change)
+        pthread_setspecific(depth_key, (void *)d);
+    return d;
+}
 
 /* An observer of key needs the key paths that affect it watched too: once
  * for all of key's observers. */
 static void dependency_retain(id object, NSString *key)
 {
     NSSet *affecting = [[object class] keyPathsForValuesAffectingValueForKey:key];
-    if (![affecting count] || dependency_depth > 16)
+    if (![affecting count] || dependency_depth(0) > 16)
         return;
     FKVOInfo *info = info_for(object, YES);
     LOCK();
@@ -731,11 +744,11 @@ static void dependency_retain(id object, NSString *key)
     d->paths = [paths copy];
     [info->dependencies setObject:d forKey:key];
     UNLOCK();
-    dependency_depth++;
+    dependency_depth(1);
     for (NSString *p in d->paths)
         [object addObserver:d forKeyPath:p options:NSKeyValueObservingOptionPrior context:NULL];
     d->observing = YES;
-    dependency_depth--;
+    dependency_depth(-1);
 }
 
 static void dependency_release(id object, NSString *key)

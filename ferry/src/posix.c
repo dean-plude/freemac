@@ -12,6 +12,7 @@
 #include <getopt.h>
 #include <limits.h>
 #include <locale.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
 #include <sched.h>
@@ -424,6 +425,29 @@ static int mac_sigprocmask(int how, const uint32_t *set, uint32_t *old)
     return rc;
 }
 
+/* The same for the calling thread only, returning an error number instead of setting errno. */
+static int mac_pthread_sigmask(int how, const uint32_t *set, uint32_t *old)
+{
+    sigset_t in, out;
+    int lhow = how == 1 ? SIG_BLOCK : how == 2 ? SIG_UNBLOCK : how == 3 ? SIG_SETMASK : -1;
+    if (lhow < 0 && set)
+        return ferry_errno_to_mac(EINVAL);
+    if (set)
+        set_to_linux(*set, &in);
+    int rc = pthread_sigmask(lhow < 0 ? SIG_BLOCK : lhow, set ? &in : NULL, &out);
+    if (rc == 0 && old)
+        *old = set_to_mac(&out);
+    return ferry_errno_to_mac(rc);
+}
+
+static int mac_pthread_kill(pthread_t t, int sig)
+{
+    int lsig = sig ? ferry_signal_to_linux(sig) : 0;
+    if (sig && !lsig)
+        return ferry_errno_to_mac(EINVAL);
+    return ferry_errno_to_mac(pthread_kill(t, lsig));
+}
+
 /* The Mac program's handlers get Mac signal numbers, so they run behind a trampoline. */
 struct mac_siginfo {
     int32_t signo, err, code, pid;
@@ -757,20 +781,8 @@ static int mac_getopt_long_only(int argc, char *const argv[], const char *opts, 
     return getopt_long_only(argc, argv, bsd_optstring(opts), lo, idx);
 }
 
-/* ---- libkern's atomics and spin locks (OSAtomic.h, OSSpinLockDeprecated.h,
- * os/lock.h), on the compiler's atomic builtins. A spin lock is an int32 (0
- * when free); an unfair lock is a uint32 owner word. */
-static void mac_OSSpinLockLock(volatile int32_t *l)
-{
-    while (__atomic_exchange_n(l, 1, __ATOMIC_ACQUIRE))
-        sched_yield();
-}
-static bool mac_OSSpinLockTry(volatile int32_t *l) { return !__atomic_exchange_n(l, 1, __ATOMIC_ACQUIRE); }
-static void mac_OSSpinLockUnlock(volatile int32_t *l) { __atomic_store_n(l, 0, __ATOMIC_RELEASE); }
-static void mac_os_unfair_lock_lock(volatile uint32_t *l) { mac_OSSpinLockLock((volatile int32_t *)l); }
-static bool mac_os_unfair_lock_trylock(volatile uint32_t *l) { return mac_OSSpinLockTry((volatile int32_t *)l); }
-static void mac_os_unfair_lock_unlock(volatile uint32_t *l) { mac_OSSpinLockUnlock((volatile int32_t *)l); }
-static void mac_os_unfair_lock_assert(volatile uint32_t *l) { (void)l; }
+/* ---- libkern's atomics (OSAtomic.h), on the compiler's atomic builtins.
+ * (Its spin locks and os_unfair_lock are in pthread.c, with the other locks.) */
 static void mac_OSMemoryBarrier(void) { __atomic_thread_fence(__ATOMIC_SEQ_CST); }
 static int32_t mac_OSAtomicAdd32(int32_t v, volatile int32_t *p) { return __atomic_add_fetch(p, v, __ATOMIC_SEQ_CST); }
 static int64_t mac_OSAtomicAdd64(int64_t v, volatile int64_t *p) { return __atomic_add_fetch(p, v, __ATOMIC_SEQ_CST); }
@@ -808,14 +820,6 @@ static bool mac_OSAtomicTestAndClear(uint32_t n, volatile void *addr)
 }
 
 const struct ferry_symbol ferry_posix_symbols[] = {
-    {"OSSpinLockLock", mac_OSSpinLockLock},
-    {"OSSpinLockTry", mac_OSSpinLockTry},
-    {"OSSpinLockUnlock", mac_OSSpinLockUnlock},
-    {"os_unfair_lock_lock", mac_os_unfair_lock_lock},
-    {"os_unfair_lock_trylock", mac_os_unfair_lock_trylock},
-    {"os_unfair_lock_unlock", mac_os_unfair_lock_unlock},
-    {"os_unfair_lock_assert_owner", mac_os_unfair_lock_assert},
-    {"os_unfair_lock_assert_not_owner", mac_os_unfair_lock_assert},
     {"OSMemoryBarrier", mac_OSMemoryBarrier},
     {"OSAtomicAdd32", mac_OSAtomicAdd32},
     {"OSAtomicAdd32Barrier", mac_OSAtomicAdd32},
@@ -883,6 +887,8 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"sigdelset", mac_sigdelset},
     {"sigismember", mac_sigismember},
     {"sigprocmask", mac_sigprocmask},
+    {"pthread_sigmask", mac_pthread_sigmask},
+    {"pthread_kill", mac_pthread_kill},
     {"sigaction", mac_sigaction},
     {"signal", mac_signal},
     {"kill", mac_kill},

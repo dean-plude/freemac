@@ -210,7 +210,23 @@ NSString *const NSProgressFileURLKey = @"NSProgressFileURLKey";
 NSString *const NSProgressFileTotalCountKey = @"NSProgressFileTotalCountKey";
 NSString *const NSProgressFileCompletedCountKey = @"NSProgressFileCompletedCountKey";
 
-static NSMutableArray *current_stack; /* the current progress objects, innermost last */
+/* Each thread's current progress objects, innermost last, as on a Mac,
+ * where the current progress belongs to a thread. */
+static pthread_key_t stack_key;
+static void free_stack(void *stack) { [(NSMutableArray *)stack release]; }
+static NSMutableArray *current_stack(BOOL make)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      pthread_key_create(&stack_key, free_stack);
+    });
+    NSMutableArray *stack = pthread_getspecific(stack_key);
+    if (!stack && make) {
+        stack = [[NSMutableArray alloc] init];
+        pthread_setspecific(stack_key, stack);
+    }
+    return stack;
+}
 
 @interface NSProgress () {
 @public
@@ -233,9 +249,11 @@ static NSMutableArray *current_stack; /* the current progress objects, innermost
 + (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key
 {
     static NSSet *manual;
-    if (!manual)
+    static dispatch_once_t manual_once;
+    dispatch_once(&manual_once, ^{
         manual = [[NSSet setWithObjects:@"totalUnitCount", @"completedUnitCount", @"fractionCompleted",
                                                 @"cancelled", @"paused", @"finished", @"indeterminate", nil] retain];
+    });
     return [manual containsObject:key] ? NO : [super automaticallyNotifiesObserversForKey:key];
 }
 + (NSSet *)keyPathsForValuesAffectingLocalizedDescription
@@ -247,7 +265,7 @@ static NSMutableArray *current_stack; /* the current progress objects, innermost
     return [NSSet setWithObjects:@"completedUnitCount", @"totalUnitCount", @"fractionCompleted", nil];
 }
 
-+ (NSProgress *)currentProgress { return [current_stack lastObject]; }
++ (NSProgress *)currentProgress { return [current_stack(NO) lastObject]; }
 + (NSProgress *)progressWithTotalUnitCount:(int64_t)n
 {
     NSProgress *p = [[[self alloc] initWithParent:[self currentProgress] userInfo:nil] autorelease];
@@ -402,19 +420,17 @@ static void did_change_fraction(NSProgress *p, NSString *also)
 }
 - (void)becomeCurrentWithPendingUnitCount:(int64_t)n
 {
-    if (!current_stack)
-        current_stack = [[NSMutableArray alloc] init];
     _pending = n;
     _pendingUsed = NO;
-    [current_stack addObject:self];
+    [current_stack(YES) addObject:self];
 }
 - (void)resignCurrent
 {
-    if ([current_stack lastObject] != self)
+    if ([current_stack(NO) lastObject] != self)
         FRaise(NSInternalInconsistencyException, @"*** -[NSProgress resignCurrent]: this progress is not the "
                                                  @"current progress");
     [[self retain] autorelease];
-    [current_stack removeLastObject];
+    [current_stack(NO) removeLastObject];
     /* no child came to do the pending work: count it as done */
     if (!_pendingUsed && _pending)
         [self setCompletedUnitCount:_completed + _pending];

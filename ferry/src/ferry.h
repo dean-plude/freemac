@@ -63,6 +63,9 @@ void ferry_program_started(const char *path, int argc, char **argv);
 extern const struct ferry_symbol ferry_core_symbols[];
 extern const struct ferry_symbol ferry_stdio_symbols[];
 extern const struct ferry_symbol ferry_posix_symbols[];
+extern const struct ferry_symbol ferry_pthread_symbols[];  /* libSystem's pthreads and locks */
+int ferry_pthread_live_threads(void);   /* threads the program started, still running */
+int ferry_pthread_is_main(void);
 extern const char *const ferry_passthrough[];
 extern const struct ferry_symbol ferry_blocks_symbols[];   /* libSystem's blocks */
 extern const struct ferry_symbol ferry_dispatch_symbols[]; /* libSystem's libdispatch */

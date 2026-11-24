@@ -20,12 +20,11 @@ NSString *const NSSecureUnarchiveFromDataTransformerName = @"NSSecureUnarchiveFr
 }
 @end
 
-static NSMutableDictionary *named;
+static NSMutableDictionary *named; /* under named_lock, as any thread may use it */
+static os_unfair_lock named_lock = OS_UNFAIR_LOCK_INIT;
 
-static void setup_named(void)
+static void make_named(void)
 {
-    if (named)
-        return;
     named = [[NSMutableDictionary alloc] init];
     [named setObject:[[FNegateBooleanTransformer new] autorelease] forKey:NSNegateBooleanTransformerName];
     FIsNilTransformer *isNil = [[FIsNilTransformer new] autorelease], *notNil = [[FIsNilTransformer new] autorelease];
@@ -37,6 +36,13 @@ static void setup_named(void)
     [named setObject:secure forKey:NSKeyedUnarchiveFromDataTransformerName];
     [named setObject:secure forKey:NSUnarchiveFromDataTransformerName];
 }
+static void setup_named(void)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      make_named();
+    });
+}
 
 @implementation NSValueTransformer
 + (void)setValueTransformer:(NSValueTransformer *)transformer forName:(NSValueTransformerName)name
@@ -44,21 +50,31 @@ static void setup_named(void)
     setup_named();
     if (!name)
         return;
+    os_unfair_lock_lock(&named_lock);
     if (transformer)
         [named setObject:transformer forKey:name];
     else
         [named removeObjectForKey:name];
+    os_unfair_lock_unlock(&named_lock);
 }
 + (NSValueTransformer *)valueTransformerForName:(NSValueTransformerName)name
 {
     setup_named();
-    NSValueTransformer *t = name ? [named objectForKey:name] : nil;
+    os_unfair_lock_lock(&named_lock);
+    NSValueTransformer *t = name ? [[[named objectForKey:name] retain] autorelease] : nil;
+    os_unfair_lock_unlock(&named_lock);
     if (!t && name) {
         /* A class of that name made on first use, as on a Mac. */
         Class cls = NSClassFromString(name);
         if ([cls isSubclassOfClass:[NSValueTransformer class]]) {
-            t = [[cls new] autorelease];
-            [named setObject:t forKey:name];
+            NSValueTransformer *made = [[cls new] autorelease];
+            os_unfair_lock_lock(&named_lock);
+            t = [named objectForKey:name];
+            if (!t) {
+                [named setObject:made forKey:name];
+                t = made;
+            }
+            os_unfair_lock_unlock(&named_lock);
         }
     }
     return t;
@@ -66,7 +82,10 @@ static void setup_named(void)
 + (NSArray *)valueTransformerNames
 {
     setup_named();
-    return [named allKeys];
+    os_unfair_lock_lock(&named_lock);
+    NSArray *names = [named allKeys];
+    os_unfair_lock_unlock(&named_lock);
+    return names;
 }
 + (Class)transformedValueClass { return [NSObject class]; }
 + (BOOL)allowsReverseTransformation { return YES; }

@@ -220,7 +220,7 @@ static void malloc_dealloc(id self, SEL _cmd)
  * piece of code that moves self into the second argument register, puts the
  * block in the first and jumps to the block's invoke function. */
 
-struct tramp_page { uint8_t *code; size_t used; };
+struct tramp_page { uint8_t *code; size_t used; int rwx; };
 static struct tramp_page tramp;
 #define TRAMP_SIZE 16
 struct tramp_rec { void *imp; void *block; struct tramp_rec *next; };
@@ -232,13 +232,20 @@ IMP imp_implementationWithBlock(id block)
     if (!b)
         return NULL;
     LOCK();
+    /* Other threads may be running the page's earlier pieces while a new
+     * one is written, so the page stays executable where this system
+     * allows that. */
     if (!tramp.code || tramp.used + TRAMP_SIZE > 4096) {
-        tramp.code = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        tramp.code = mmap(NULL, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        tramp.rwx = tramp.code != MAP_FAILED;
+        if (!tramp.rwx)
+            tramp.code = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         tramp.used = 0;
     }
     uint8_t *p = tramp.code + tramp.used;
     tramp.used += TRAMP_SIZE;
-    mprotect(tramp.code, 4096, PROT_READ | PROT_WRITE);
+    if (!tramp.rwx)
+        mprotect(tramp.code, 4096, PROT_READ | PROT_WRITE);
     uint64_t addr = (uint64_t)b;
     if (_Block_use_stret(b)) {
         p[0] = 0x48; p[1] = 0x89; p[2] = 0xf2;              /* mov %rsi,%rdx */
@@ -249,7 +256,8 @@ IMP imp_implementationWithBlock(id block)
         p[3] = 0x48; p[4] = 0xbf; memcpy(p + 5, &addr, 8);  /* movabs $block,%rdi */
         p[13] = 0xff; p[14] = 0x67; p[15] = 0x10;           /* jmp *16(%rdi) */
     }
-    mprotect(tramp.code, 4096, PROT_READ | PROT_EXEC);
+    if (!tramp.rwx)
+        mprotect(tramp.code, 4096, PROT_READ | PROT_EXEC);
     struct tramp_rec *r = malloc(sizeof *r);
     r->imp = p;
     r->block = b;

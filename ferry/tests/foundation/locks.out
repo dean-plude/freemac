@@ -1,0 +1,14 @@
+NSLock: 160000 (expected 160000), name counter lock
+NSLock held elsewhere: try 0, before 50 ms 0 (waited it out 1), before 5 s once let go 1
+NSRecursiveLock: 16000 (expected 16000), overlaps 0
+NSCondition: consumed 2000, sum 2001000 (expected 2001000), over 8 0, a wait with no signal timed out 1
+NSConditionLock: order 0 1 2 3 4, condition 5, a condition never set timed out 1
+@synchronized: 40000 (expected 40000), overlaps 0
++initialize: ran 1 time(s), a thread got in before it ended 0
+messages during a method add: 400000 (expected 400000), threads that called the new method 8
+retain/release: count back to 1
+weak references: bad loads 0, cleared after the last release 200 of 200
+associated objects: bad reads 0, removed 1
+autorelease pools: 8 threads all right
+notifications from 8 threads: heard 8000
+exit=0

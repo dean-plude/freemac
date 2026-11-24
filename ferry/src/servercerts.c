@@ -94,6 +94,8 @@ int ferry_server_certificates(const char *host, int port, int timeout_ms,
         int (*i2d)(X509 *, unsigned char **);
         void (*free_mem)(void *, const char *, int);
     } S;
+    static pthread_mutex_t load_lock = PTHREAD_MUTEX_INITIALIZER; /* the first threads to ask wait for the loading */
+    pthread_mutex_lock(&load_lock);
     if (!S.loaded) {
         S.loaded = 1;
 #define GET(field, name) (*(void **)&S.field = ferry_crypto_symbol(name))
@@ -105,6 +107,7 @@ int ferry_server_certificates(const char *host, int port, int timeout_ms,
                GET(free_mem, "CRYPTO_free");
 #undef GET
     }
+    pthread_mutex_unlock(&load_lock);
     if (!S.ok || !host || !*host || port <= 0 || port > 65535 || !each)
         return -1;
     int fd = connect_with_timeout(host, port, timeout_ms > 0 ? timeout_ms : 10000);

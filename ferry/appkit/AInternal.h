@@ -13,6 +13,7 @@
 #define FERRY_APPKIT_BUILD 1      /* NSFont and NSParagraphStyle are Core Text's */
 #import <AppKit/AppKit.h>
 #include <poll.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <objc/message.h>
 #include "gtk.h"
@@ -48,6 +49,9 @@ BOOL ADisplayAvailable(void);
 NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
 void AWarnOnce(const char *what);
+/* AppKit is for the main thread only, as on a Mac. Ferry doesn't stop a
+ * program that calls it from another thread, but says so, once. */
+void AMainThreadOnly(const char *what);
 
 /* Code GTK calls back into (drawing, resizing, closing, focus, drops) runs
  * the app's code under GTK's own frames, which Ferry can't unwind through,

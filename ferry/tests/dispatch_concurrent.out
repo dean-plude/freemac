@@ -1,0 +1,14 @@
+global queue: 4 blocks met at once: yes (wait 0), any on the main thread: 0
+serial queue: 4000 blocks, at most 1 at once, out of order 0
+dispatch_sync from 16 threads: 3200 (expected 3200)
+barrier: saw 6 of 6 before it done, overlap 0, 6 after it saw it: 6
+dispatch_apply: sum 2016, on more than one thread: yes
+semaphore ping-pong: 1000 turns, 0 lost
+counting semaphore: at most 3 inside (limit 3)
+dispatch_once from 8 threads: ran 1 time(s), returned early 0
+dispatch_after on a global queue: fired yes, after at least 30 ms: yes
+group notify after all 100: 100
+stress: wait 0, global 10000, serial 2500 2500 2500 2500
+main thread: 1
+main queue block: on the main thread 1 (the worker was 0)
+exit=0

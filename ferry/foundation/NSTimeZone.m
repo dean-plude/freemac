@@ -373,7 +373,8 @@ static NSTimeZone *default_zone, *system_zone;
 + (NSDictionary *)abbreviationDictionary
 {
     static NSDictionary *d;
-    if (!d)
+    static dispatch_once_t d_once;
+    dispatch_once(&d_once, ^{
         d = [@{
             @"GMT" : @"GMT", @"UTC" : @"UTC", @"BST" : @"Europe/London", @"WET" : @"Europe/Lisbon",
             @"WEST" : @"Europe/Lisbon", @"CET" : @"Europe/Paris", @"CEST" : @"Europe/Paris",
@@ -386,6 +387,7 @@ static NSTimeZone *default_zone, *system_zone;
             @"HST" : @"Pacific/Honolulu", @"NZST" : @"Pacific/Auckland", @"NZDT" : @"Pacific/Auckland",
             @"AEST" : @"Australia/Sydney", @"AEDT" : @"Australia/Sydney",
         } retain];
+    });
     return d;
 }
 
@@ -742,7 +744,8 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
 + (NSLocale *)currentLocale
 {
     static NSLocale *current;
-    if (!current) {
+    static dispatch_once_t current_once;
+    dispatch_once(&current_once, ^{
         NSString *ident = [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleLocale"];
         if (![ident length]) {
             const char *vars[] = {"LC_ALL", "LC_MESSAGES", "LANG"};
@@ -753,7 +756,7 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
             }
         }
         current = [[NSLocale alloc] initWithLocaleIdentifier:[ident length] ? ident : @"en_US"];
-    }
+    });
     return current;
 }
 
@@ -762,8 +765,10 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
 + (NSLocale *)systemLocale
 {
     static NSLocale *sys;
-    if (!sys)
-        sys = [[NSLocale alloc] initWithLocaleIdentifier:@""];
+    static dispatch_once_t sys_once;
+    dispatch_once(&sys_once, ^{
+      sys = [[NSLocale alloc] initWithLocaleIdentifier:@""];
+    });
     return sys;
 }
 

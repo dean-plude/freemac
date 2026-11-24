@@ -153,10 +153,25 @@ NSString *const NSXMLParserErrorDomain = @"NSXMLParserErrorDomain";
 /* The parsers parsing now, innermost last (a delegate may parse another
  * document from inside a callback). libxml2 hands each callback its parser
  * context, or the context of an entity's text being parsed inside it. */
-static NSMutableArray *active;
+static pthread_key_t active_key; /* each thread's own list */
+static void free_active(void *list) { [(NSMutableArray *)list release]; }
+static NSMutableArray *active_list(void)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      pthread_key_create(&active_key, free_active);
+    });
+    NSMutableArray *list = pthread_getspecific(active_key);
+    if (!list) {
+        list = [[NSMutableArray alloc] init];
+        pthread_setspecific(active_key, list);
+    }
+    return list;
+}
 
 static NSXMLParser *parser_for(void *ctx)
 {
+    NSMutableArray *active = active_list();
     NSXMLParser *p = [active lastObject];
     for (NSXMLParser *q in active)
         if (q->_ctxt == ctx)
@@ -508,9 +523,7 @@ static xmlSAXHandler handler = {
     [self retain];
     [_mappings release];
     _mappings = [[NSMutableArray alloc] init];
-    if (!active)
-        active = [[NSMutableArray alloc] init];
-    [active addObject:self];
+    [active_list() addObject:self];
     _parsing = YES;
 
     /* libxml2's messages go to the error callback, not the terminal */
@@ -555,7 +568,7 @@ static xmlSAXHandler handler = {
     }
     _current = NULL;
     _parsing = NO;
-    [active removeObjectIdenticalTo:self];
+    [active_list() removeObjectIdenticalTo:self];
     BOOL ok = _error == nil;
     [self release];
     return ok;

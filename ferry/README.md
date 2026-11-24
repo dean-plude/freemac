@@ -125,6 +125,22 @@ frameworks by their `/System/Library/Frameworks` paths. `NSBundle`'s
 plug-ins, and `@available` checks answer for macOS 14.7. Code loaded this
 way is never unloaded.
 
+From Ferry 0.29.0 (freemac 1.202), programs run on real threads:
+`NSThread` (each thread with its own run loop and autorelease pools, and
+`performSelectorOnMainThread:`, `performSelector:onThread:` and
+`performSelectorInBackground:`), the pthread calls Mac programs import,
+real `NSLock`, `NSRecursiveLock`, `NSCondition`, `NSConditionLock`,
+`@synchronized`, `OSSpinLock` and `os_unfair_lock`, dispatch's global
+queues on a pool of worker threads (the main queue still only on the main
+thread) and `NSOperationQueue` running operations at the same time. The
+Objective-C runtime and Foundation's shared state are safe across
+threads, URL loading included (redirects, challenges, cookies, the URL
+cache and server trust run on its network thread, and the cookie and
+credential storages and URL caches have locks of their own); AppKit is for
+the main thread only, and Ferry warns once when it
+is used elsewhere. Where a Mac would hang for ever on a deadlock, Ferry
+stops the program with a message.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

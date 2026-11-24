@@ -4,8 +4,7 @@
  * Mach-O library with ferry-cc. Layers keep their properties as objects in
  * a dictionary (a layer is a key-value coding container, as on a Mac), are
  * drawn with Ferry's Core Graphics, and are animated by a timer on the main
- * run loop (QAnimator.m), all on the program's one thread. Built without
- * ARC. */
+ * run loop (QAnimator.m), all on the main thread. Built without ARC. */
 #ifndef FERRY_QUARTZCORE_INTERNAL_H
 #define FERRY_QUARTZCORE_INTERNAL_H
 #include "../graphics/GInternal.h"

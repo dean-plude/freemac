@@ -235,7 +235,13 @@ static void cancelling(void)
                                        }];
     [task resume];
     [task cancel];
-    printf("cancelled: state %ld after cancel\n", (long)task.state);
+    /* Canceling until the handler is about to run, on the session's queue,
+     * which may be at once now that it runs on a thread of its own. */
+    NSURLSessionTaskState after = task.state;
+    printf("cancelled: after cancel %s\n",
+           after == NSURLSessionTaskStateCanceling || after == NSURLSessionTaskStateCompleted
+               ? "canceling (or completed already)"
+               : "still running");
     wait_for(sem);
     // cancelled before it was ever resumed
     NSURLSessionDataTask *never = [[NSURLSession sharedSession]

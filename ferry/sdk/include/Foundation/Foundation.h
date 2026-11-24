@@ -262,7 +262,6 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (void)performSelector:(SEL)aSelector withObject:(id)arg afterDelay:(NSTimeInterval)delay inModes:(NSArray *)modes;
 + (void)cancelPreviousPerformRequestsWithTarget:(id)target;
 + (void)cancelPreviousPerformRequestsWithTarget:(id)target selector:(SEL)aSelector object:(id)arg;
-- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(id)arg waitUntilDone:(BOOL)wait;
 @end
 
 @interface NSNull : NSObject <NSCopying, NSSecureCoding>
@@ -1820,7 +1819,7 @@ typedef NSString *NSRunLoopMode;
 FOUNDATION_EXPORT NSRunLoopMode const NSDefaultRunLoopMode;
 FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 
-@class NSTimer;
+@class NSTimer, NSPort;
 
 @interface NSRunLoop : NSObject
 + (NSRunLoop *)currentRunLoop;
@@ -1832,7 +1831,21 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 - (BOOL)runMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limit;
 - (void)performBlock:(void (^)(void))block;
 - (void)removeTimer:(NSTimer *)timer; /* Ferry */
+- (void)addPort:(NSPort *)port forMode:(NSRunLoopMode)mode;
+- (void)removePort:(NSPort *)port forMode:(NSRunLoopMode)mode;
+- (NSDate *)limitDateForMode:(NSRunLoopMode)mode;
+- (void)acceptInputForMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limit;
 - (CFRunLoopRef)getCFRunLoop;
+@end
+
+/* A port only keeps a run loop running here (as a Mac program adds one to
+ * a thread's run loop for that); nothing is sent through it. */
+@interface NSPort : NSObject <NSCopying>
++ (NSPort *)port;
+- (void)invalidate;
+@property (readonly, getter=isValid) BOOL valid;
+@end
+@interface NSMachPort : NSPort
 @end
 
 @interface NSTimer : NSObject
@@ -2094,6 +2107,7 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSProgress.h>
 #include <Foundation/NSOperation.h>
 #include <Foundation/NSCache.h>
+#include <Foundation/NSThread.h>
 /* URL loading: NSURLSession, NSURLConnection, requests and responses. */
 #include <Foundation/NSURLSession.h>
 

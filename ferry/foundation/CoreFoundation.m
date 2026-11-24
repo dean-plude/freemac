@@ -185,6 +185,7 @@ CFAbsoluteTime CFAbsoluteTimeGetCurrent(void) { return [NSDate timeIntervalSince
 
 @interface NSRunLoop (Ferry)
 - (void)stop;
+- (void)_wakeUp;
 - (SInt32)runFor:(CFTimeInterval)seconds returnAfterSource:(BOOL)once;
 @end
 
@@ -202,7 +203,7 @@ SInt32 CFRunLoopRunInMode(CFRunLoopMode mode, CFTimeInterval seconds, Boolean re
     return [[NSRunLoop currentRunLoop] runFor:seconds returnAfterSource:returnAfterSourceHandled];
 }
 void CFRunLoopStop(CFRunLoopRef rl) { [OBJ(rl) stop]; }
-void CFRunLoopWakeUp(CFRunLoopRef rl) {}
+void CFRunLoopWakeUp(CFRunLoopRef rl) { [OBJ(rl) _wakeUp]; }
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void)) { [OBJ(rl) performBlock:block]; }
 
 CFBundleRef CFBundleGetMainBundle(void) { return (CFBundleRef)[NSBundle mainBundle]; }
@@ -272,17 +273,26 @@ const CFStringRef kCFPreferencesCurrentUser = (CFStringRef)@"kCFPreferencesCurre
 static NSUserDefaults *prefs_for(CFStringRef app)
 {
     static NSMutableDictionary *others;
+    static os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
     NSString *name = OBJ(app);
     if (!name || [name isEqual:OBJ(kCFPreferencesCurrentApplication)] ||
         [name isEqual:[[NSBundle mainBundle] bundleIdentifier]])
         return [NSUserDefaults standardUserDefaults];
+    os_unfair_lock_lock(&lock);
     if (!others)
         others = [[NSMutableDictionary alloc] init];
     NSUserDefaults *d = [others objectForKey:name];
+    os_unfair_lock_unlock(&lock);
     if (!d) {
-        d = [[NSUserDefaults alloc] initWithSuiteName:name];
-        [others setObject:d forKey:name];
-        [d release];
+        NSUserDefaults *made = [[NSUserDefaults alloc] initWithSuiteName:name];
+        os_unfair_lock_lock(&lock);
+        d = [others objectForKey:name];
+        if (!d) {
+            [others setObject:made forKey:name];
+            d = made;
+        }
+        os_unfair_lock_unlock(&lock);
+        [made release];
     }
     return d;
 }

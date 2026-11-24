@@ -22,8 +22,10 @@ struct frun {
 static NSDictionary *empty_attrs(void)
 {
     static NSDictionary *empty;
-    if (!empty)
-        empty = [[NSDictionary alloc] init];
+    static dispatch_once_t empty_once;
+    dispatch_once(&empty_once, ^{
+      empty = [[NSDictionary alloc] init];
+    });
     return empty;
 }
 

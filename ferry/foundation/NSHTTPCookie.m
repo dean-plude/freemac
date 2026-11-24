@@ -5,8 +5,10 @@
  * cookies that outlive the session to ~/.config/ferry/cookies/<app id>.plist,
  * beside the program's preferences (as a Mac keeps them in
  * ~/Library/Cookies); it is read back the next time the program asks for
- * it. Sessions send and store cookies through it (NSURLSession.m). Written
- * from Apple's public API documentation and RFC 6265. */
+ * it. Sessions send and store cookies through it (NSURLSession.m), from
+ * the network thread, so a storage keeps its cookies (and writes its file)
+ * under a lock of its own; its notifications are posted after the lock is
+ * let go. Written from Apple's public API documentation and RFC 6265. */
 #import "FURLInternal.h"
 
 NSHTTPCookiePropertyKey const NSHTTPCookieName = @"Name";
@@ -482,25 +484,30 @@ static NSArray *split_joined(NSString *joined)
     NSMutableArray *_cookies;
     NSHTTPCookieAcceptPolicy _policy;
     NSString *_file; /* where the shared storage saves; nil for one in memory only */
+    pthread_mutex_t _lock; /* guards the cookies, the policy and the file */
 }
 @end
+
+#define LOCK() pthread_mutex_lock(&_lock)
+#define UNLOCK() pthread_mutex_unlock(&_lock)
 
 @implementation NSHTTPCookieStorage
 static NSHTTPCookieStorage *shared_storage;
 
 + (NSHTTPCookieStorage *)sharedHTTPCookieStorage
 {
-    if (!shared_storage) {
-        shared_storage = [[self alloc] init];
-        NSString *dir = [[FConfigHome() stringByAppendingPathComponent:@"ferry"] stringByAppendingPathComponent:@"cookies"];
-        shared_storage->_file = [[dir stringByAppendingPathComponent:[FURLAppID() stringByAppendingPathExtension:@"plist"]]
-            copy];
-        for (NSDictionary *p in [NSArray arrayWithContentsOfFile:shared_storage->_file]) {
-            NSHTTPCookie *c = [p isKindOfClass:[NSDictionary class]] ? [NSHTTPCookie cookieWithProperties:p] : nil;
-            if (c && ![c _expired] && ![c isSessionOnly])
-                [shared_storage->_cookies addObject:c];
-        }
-    }
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSHTTPCookieStorage *st = [[self alloc] init];
+      NSString *dir = [[FConfigHome() stringByAppendingPathComponent:@"ferry"] stringByAppendingPathComponent:@"cookies"];
+      st->_file = [[dir stringByAppendingPathComponent:[FURLAppID() stringByAppendingPathExtension:@"plist"]] copy];
+      for (NSDictionary *p in [NSArray arrayWithContentsOfFile:st->_file]) {
+          NSHTTPCookie *c = [p isKindOfClass:[NSDictionary class]] ? [NSHTTPCookie cookieWithProperties:p] : nil;
+          if (c && ![c _expired] && ![c isSessionOnly])
+              [st->_cookies addObject:c];
+      }
+      shared_storage = st;
+    });
     return shared_storage;
 }
 + (NSHTTPCookieStorage *)sharedCookieStorageForGroupContainerIdentifier:(NSString *)identifier
@@ -512,12 +519,14 @@ static NSHTTPCookieStorage *shared_storage;
 {
     _cookies = [[NSMutableArray alloc] init];
     _policy = NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain;
+    FRecursiveMutexInit(&_lock);
     return self;
 }
 - (void)dealloc
 {
     [_cookies release];
     [_file release];
+    pthread_mutex_destroy(&_lock);
     [super dealloc];
 }
 - (void)_save
@@ -545,9 +554,11 @@ static NSHTTPCookieStorage *shared_storage;
                    attributes:nil error:NULL];
     [keep writeToFile:_file atomically:YES];
 }
-- (void)_changed
+/* After a change, with the lock held: the file is written again. The
+ * notification is posted once the lock is let go (_tell). */
+- (void)_changed { [self _save]; }
+- (void)_tell
 {
-    [self _save];
     [[NSNotificationCenter defaultCenter] postNotificationName:NSHTTPCookieManagerCookiesChangedNotification
                                                         object:self];
 }
@@ -560,9 +571,11 @@ static NSHTTPCookieStorage *shared_storage;
 - (NSArray *)cookies
 {
     NSMutableArray *live = [NSMutableArray array];
+    LOCK();
     for (NSHTTPCookie *c in _cookies)
         if (![c _expired])
             [live addObject:c];
+    UNLOCK();
     return live;
 }
 /* Puts a cookie in, replacing one of the same name, domain and path; an
@@ -578,26 +591,45 @@ static NSHTTPCookieStorage *shared_storage;
 }
 - (void)setCookie:(NSHTTPCookie *)cookie
 {
-    if (_policy == NSHTTPCookieAcceptPolicyNever || !cookie)
+    if (!cookie)
         return;
-    [self _put:cookie];
-    [self _changed];
+    LOCK();
+    BOOL take = _policy != NSHTTPCookieAcceptPolicyNever;
+    if (take) {
+        [self _put:cookie];
+        [self _changed];
+    }
+    UNLOCK();
+    if (take)
+        [self _tell];
 }
 - (void)deleteCookie:(NSHTTPCookie *)cookie
 {
-    if (!cookie || [_cookies indexOfObject:cookie] == NSNotFound)
+    if (!cookie)
         return;
-    [self _drop:cookie];
-    [self _changed];
+    LOCK();
+    BOOL there = [_cookies indexOfObject:cookie] != NSNotFound;
+    if (there) {
+        [self _drop:cookie];
+        [self _changed];
+    }
+    UNLOCK();
+    if (there)
+        [self _tell];
 }
 - (void)removeCookiesSinceDate:(NSDate *)date
 {
+    LOCK();
     NSUInteger before = [_cookies count];
     for (NSHTTPCookie *c in [[_cookies copy] autorelease])
         if ([[c _created] compare:date] != NSOrderedAscending)
             [_cookies removeObjectIdenticalTo:c];
-    if ([_cookies count] != before)
+    BOOL changed = [_cookies count] != before;
+    if (changed)
         [self _changed];
+    UNLOCK();
+    if (changed)
+        [self _tell];
 }
 static NSInteger by_path_then_age(id a, id b, void *ctx)
 {
@@ -609,9 +641,11 @@ static NSInteger by_path_then_age(id a, id b, void *ctx)
 - (NSArray *)cookiesForURL:(NSURL *)URL
 {
     NSMutableArray *out = [NSMutableArray array];
+    LOCK();
     for (NSHTTPCookie *c in _cookies)
         if ([c _matchesURL:URL])
             [out addObject:c];
+    UNLOCK();
     return [out sortedArrayUsingFunction:by_path_then_age context:NULL];
 }
 static BOOL same_site(NSString *host, NSString *main)
@@ -629,23 +663,36 @@ static BOOL same_site(NSString *host, NSString *main)
     if (policy == NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain && main && !same_site([url host], [main host]))
         return;
     BOOL any = NO;
+    LOCK();
     for (NSHTTPCookie *c in cookies)
         if ([c isKindOfClass:[NSHTTPCookie class]] && (!url || domain_matches([url host], [c domain]) ||
                                                        domain_matches([c domain], [url host])))
             any |= [self _put:c];
     if (any)
         [self _changed];
+    UNLOCK();
+    if (any)
+        [self _tell];
 }
 - (void)setCookies:(NSArray *)cookies forURL:(NSURL *)URL mainDocumentURL:(NSURL *)mainDocumentURL
 {
-    [self _setCookies:cookies forURL:URL mainDocumentURL:mainDocumentURL policy:_policy];
+    [self _setCookies:cookies forURL:URL mainDocumentURL:mainDocumentURL policy:[self cookieAcceptPolicy]];
 }
-- (NSHTTPCookieAcceptPolicy)cookieAcceptPolicy { return _policy; }
+- (NSHTTPCookieAcceptPolicy)cookieAcceptPolicy
+{
+    LOCK();
+    NSHTTPCookieAcceptPolicy p = _policy;
+    UNLOCK();
+    return p;
+}
 - (void)setCookieAcceptPolicy:(NSHTTPCookieAcceptPolicy)policy
 {
-    if (policy == _policy)
-        return;
+    LOCK();
+    BOOL same = policy == _policy;
     _policy = policy;
+    UNLOCK();
+    if (same)
+        return;
     [[NSNotificationCenter defaultCenter] postNotificationName:NSHTTPCookieManagerAcceptPolicyChangedNotification
                                                         object:self];
 }
@@ -665,6 +712,9 @@ static BOOL same_site(NSString *host, NSString *main)
 }
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<NSHTTPCookieStorage %p>: %lu cookies", self, (unsigned long)[_cookies count]];
+    LOCK();
+    NSUInteger n = [_cookies count];
+    UNLOCK();
+    return [NSString stringWithFormat:@"<NSHTTPCookieStorage %p>: %lu cookies", self, (unsigned long)n];
 }
 @end

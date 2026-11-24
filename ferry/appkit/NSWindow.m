@@ -689,6 +689,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 
 - (void)display
 {
+    AMainThreadOnly("-[NSWindow display]");
     if (_hostedSheet) {
         _needsDisplay = NO;
         [_sheetParent display];
@@ -834,6 +835,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 
 - (void)orderFront:(id)sender
 {
+    AMainThreadOnly("-[NSWindow orderFront:]");
     if (_closing)
         return;
     BOOL was = _visible;

@@ -1,10 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry test: NSOperation, NSBlockOperation, NSInvocationOperation and
- * NSOperationQueue on Ferry's one thread: order, priorities, dependencies,
- * cancelling, completion blocks, suspending, barriers, operations that
- * finish later, key-value notifications, waiting; and the locks. */
+ * NSOperationQueue: order, priorities, dependencies, cancelling,
+ * completion blocks, suspending, barriers, operations that finish later,
+ * key-value notifications, waiting; and the locks, across threads. Queues
+ * run their operations on worker threads, so the parts that look at order
+ * use a queue that runs one operation at a time. */
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <unistd.h>
 
 /* An operation that finishes later, from a timer, as a download would. */
 @interface Later : NSOperation {
@@ -62,8 +65,10 @@ int main(void)
         printf("main queue: %s, max %ld\n", [[[NSOperationQueue mainQueue] name] UTF8String],
                (long)[[NSOperationQueue mainQueue] maxConcurrentOperationCount]);
 
-        /* order, priority and dependencies */
+        /* order, priority and dependencies, one at a time */
+        [q setMaxConcurrentOperationCount:1];
         [q setSuspended:YES];
+        dispatch_semaphore_t completed = dispatch_semaphore_create(0);
         NSBlockOperation *a = [NSBlockOperation blockOperationWithBlock:^{ [log addObject:@"a"]; }];
         NSBlockOperation *b = [NSBlockOperation blockOperationWithBlock:^{ [log addObject:@"b"]; }];
         NSBlockOperation *c = [NSBlockOperation blockOperationWithBlock:^{
@@ -74,7 +79,11 @@ int main(void)
         [d addExecutionBlock:^{ [log addObject:@"d2"]; }];
         [c setQueuePriority:NSOperationQueuePriorityVeryHigh];
         [a addDependency:b];
-        [a setCompletionBlock:^{ [log addObject:@"a done"]; }];
+        __block BOOL offMain = NO;
+        [a setCompletionBlock:^{
+            offMain = ![NSThread isMainThread];
+            dispatch_semaphore_signal(completed);
+        }];
         printf("a ready %d, b ready %d, priority of 3: %ld\n", [a isReady], [b isReady],
                (long)({ [d setQueuePriority:3]; [d queuePriority]; }));
         [q addOperations:@[ a, b, c, d ] waitUntilFinished:NO];
@@ -85,8 +94,10 @@ int main(void)
         printf("ran: %s\n", [[log componentsJoinedByString:@" "] UTF8String]);
         printf("a finished %d executing %d, queue has %lu\n", [a isFinished], [a isExecuting],
                (unsigned long)[q operationCount]);
-        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
-        printf("then: %s\n", [[log componentsJoinedByString:@" "] UTF8String]);
+        dispatch_semaphore_wait(completed, DISPATCH_TIME_FOREVER);
+        dispatch_release(completed);
+        printf("a's completion block ran off the main thread: %d\n", offMain);
+        [q setMaxConcurrentOperationCount:NSOperationQueueDefaultMaxConcurrentOperationCount];
         @try {
             [q addOperation:a];
         } @catch (NSException *e) {
@@ -158,7 +169,8 @@ int main(void)
             printf("void result: %s\n", [[ex name] UTF8String]);
         }
 
-        /* locks */
+        /* locks, with another thread on the other side */
+        dispatch_queue_t other = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
         NSLock *lock = [[[NSLock alloc] init] autorelease];
         [lock lock];
         printf("NSLock: try while locked %d", [lock tryLock]);
@@ -166,16 +178,29 @@ int main(void)
         printf(", after unlock %d", [lock tryLock]);
         printf(", before a date while locked %d\n",
                [lock lockBeforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]]);
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        [lock unlock];
+        dispatch_semaphore_t taken = dispatch_semaphore_create(0);
+        __block BOOL inside = NO;
+        dispatch_async(other, ^{
+            [lock lock];
+            inside = YES;
+            dispatch_semaphore_signal(taken);
+            usleep(20000);
+            inside = NO;
             [lock unlock];
         });
-        [lock lock]; /* waits until the block above unlocks it */
-        printf("NSLock: taken after the other unlocked it\n");
+        dispatch_semaphore_wait(taken, DISPATCH_TIME_FOREVER);
+        printf("NSLock: try while another thread holds it %d\n", [lock tryLock]);
+        [lock lock]; /* waits until the other thread unlocks it */
+        printf("NSLock: taken after the other unlocked it, other still inside %d\n", inside);
         [lock unlock];
         NSRecursiveLock *rl = [[[NSRecursiveLock alloc] init] autorelease];
         [rl lock];
         [rl lock];
-        printf("NSRecursiveLock: twice, try %d\n", [rl tryLock]);
+        printf("NSRecursiveLock: twice, try %d", [rl tryLock]);
+        __block BOOL otherGot = YES;
+        dispatch_sync(other, ^{ otherGot = [rl tryLock]; });
+        printf(", another thread's try %d\n", otherGot);
         [rl unlock];
         [rl unlock];
         [rl unlock];
@@ -183,7 +208,7 @@ int main(void)
         NSCondition *cond = [[[NSCondition alloc] init] autorelease];
         __block BOOL ready = NO;
         [cond lock];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC), other, ^{
             [cond lock];
             ready = YES;
             [cond signal];
@@ -198,13 +223,14 @@ int main(void)
 
         NSConditionLock *cl = [[[NSConditionLock alloc] initWithCondition:1] autorelease];
         printf("NSConditionLock: condition %ld, try when 2: %d", (long)[cl condition], [cl tryLockWhenCondition:2]);
-        dispatch_async(dispatch_get_main_queue(), ^{
+        dispatch_async(other, ^{
             [cl lock];
             [cl unlockWithCondition:2];
         });
         [cl lockWhenCondition:2];
         printf(", got it when 2, condition %ld\n", (long)[cl condition]);
         [cl unlockWithCondition:3];
+        dispatch_release(taken);
     }
     return 0;
 }

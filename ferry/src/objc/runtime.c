@@ -106,7 +106,15 @@ SEL sel_registerName(const char *name) { return register_sel(name, 1); }
 SEL sel_getUid(const char *name) { return register_sel(name, 1); }
 const char *sel_getName(SEL sel) { return sel ? sel : "<null selector>"; }
 BOOL sel_isEqual(SEL a, SEL b) { return a == b; }
-BOOL sel_isMapped(SEL sel) { return sel && ferry_table_get(&selectors, sel) == sel; }
+BOOL sel_isMapped(SEL sel)
+{
+    if (!sel)
+        return NO;
+    LOCK();
+    BOOL mapped = ferry_table_get(&selectors, sel) == sel;
+    UNLOCK();
+    return mapped;
+}
 
 SEL SEL_alloc, SEL_allocWithZone, SEL_init, SEL_new, SEL_dealloc, SEL_retain, SEL_release,
     SEL_autorelease, SEL_retainCount, SEL_initialize, SEL_load, SEL_copy, SEL_copyWithZone,
@@ -116,6 +124,10 @@ SEL SEL_alloc, SEL_allocWithZone, SEL_init, SEL_new, SEL_dealloc, SEL_retain, SE
 
 /* ---- the method cache ------------------------------------------------------- */
 
+/* Called with the runtime lock held. Messages are sent on other threads
+ * without it (msgsend.S), so the stores are ordered for them: a bucket's
+ * IMP before its selector, a new table before its mask. A table never gets
+ * smaller, so a mask read with the table before it always fits. */
 static void cache_alloc(Class cls, struct fclass_rt *rt, uintptr_t capacity)
 {
     struct fcache_head *h = calloc(1, sizeof *h + capacity * sizeof(struct fbucket));
@@ -123,9 +135,8 @@ static void cache_alloc(Class cls, struct fclass_rt *rt, uintptr_t capacity)
     h->capacity = capacity;
     /* The old table is left in place: a message being sent right now on
      * another thread may still be reading it. */
-    cls->mask16 = 0;
-    cls->cache = (struct fbucket *)(h + 1);
-    cls->mask16 = (capacity - 1) << 4;
+    __atomic_store_n(&cls->cache, (struct fbucket *)(h + 1), __ATOMIC_RELEASE);
+    __atomic_store_n(&cls->mask16, (capacity - 1) << 4, __ATOMIC_RELEASE);
     rt->occupied = 0;
 }
 
@@ -140,10 +151,11 @@ static void cache_fill(Class cls, SEL sel, IMP imp)
     uintptr_t i = (uintptr_t)sel & mask;
     while (b[i].sel && b[i].sel != sel)
         i = (i + 1) & mask;
-    if (!b[i].sel)
-        rt->occupied++;
-    b[i].imp = imp;
-    b[i].sel = sel;
+    if (b[i].sel)
+        return;
+    rt->occupied++;
+    __atomic_store_n(&b[i].imp, imp, __ATOMIC_RELEASE);
+    __atomic_store_n(&b[i].sel, sel, __ATOMIC_RELEASE);
 }
 
 void ferry_objc_flush_caches(void)
@@ -579,36 +591,63 @@ void ferry_objc_resend_stret(void);
 void *const ferry_objc_msgForward_ptr = (void *)ferry_objc_msgForward;
 __thread id ferry_objc_fwd_target;
 
+/* +initialize runs once, on the thread that first sends the class a
+ * message. Other threads that send it one meanwhile wait until it has
+ * finished; the initializing thread itself goes on (its +initialize may
+ * message the class). Nothing is cached for a class until then, so every
+ * message to it on another thread comes here. */
+static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t init_done = PTHREAD_COND_INITIALIZER;
+
+static uint32_t rt_flags(struct fclass_rt *rt) { return __atomic_load_n(&rt->flags, __ATOMIC_ACQUIRE); }
+
 static void initialize_class(Class cls)
 {
     if (cls->superclass)
         initialize_class(cls->superclass);
     LOCK();
     struct fclass_rt *rt = class_rt(cls);
-    if (rt->flags & (RT_INITIALIZED | RT_INITIALIZING)) {
+    if (rt->flags & RT_INITIALIZED) {
         UNLOCK();
         return;
     }
+    if (rt->flags & RT_INITIALIZING) {
+        int mine = pthread_equal(rt->init_thread, pthread_self());
+        UNLOCK();
+        if (mine)
+            return;
+        pthread_mutex_lock(&init_lock);
+        while (!(rt_flags(rt) & RT_INITIALIZED))
+            pthread_cond_wait(&init_done, &init_lock);
+        pthread_mutex_unlock(&init_lock);
+        return;
+    }
     rt->flags |= RT_INITIALIZING;
+    rt->init_thread = pthread_self();
     UNLOCK();
     SEND0(void, cls, SEL_initialize);
     LOCK();
     rt->flags |= RT_INITIALIZED;
     UNLOCK();
+    pthread_mutex_lock(&init_lock);
+    pthread_cond_broadcast(&init_done);
+    pthread_mutex_unlock(&init_lock);
 }
 
 IMP ferry_objc_lookup(id receiver, SEL sel, Class cls, int stret)
 {
     (void)receiver;
-    if (!class_is_realized(cls)) {
-        LOCK();
+    LOCK();
+    if (!class_is_realized(cls))
         realize_class(cls);
-        UNLOCK();
-    }
     struct fclass_rt *rt = class_rt(cls);
     Class nonmeta = rt->nonmeta ? rt->nonmeta : cls;
-    if (!(class_rt(nonmeta)->flags & (RT_INITIALIZED | RT_INITIALIZING)))
+    int initialized = (class_rt(nonmeta)->flags & RT_INITIALIZED) != 0;
+    UNLOCK();
+    if (!initialized) {
         initialize_class(nonmeta);
+        initialized = (rt_flags(class_rt(nonmeta)) & RT_INITIALIZED) != 0;
+    }
     LOCK();
     struct fmethod *m = find_method(cls, sel);
     UNLOCK();
@@ -626,9 +665,12 @@ IMP ferry_objc_lookup(id receiver, SEL sel, Class cls, int stret)
     }
     if (!m)
         return (IMP)(stret ? (void *)ferry_objc_msgForward_stret : (void *)ferry_objc_msgForward);
-    LOCK();
-    cache_fill(cls, sel, m->imp);
-    UNLOCK();
+    /* while +initialize is still running, other threads must keep coming here to wait */
+    if (initialized) {
+        LOCK();
+        cache_fill(cls, sel, m->imp);
+        UNLOCK();
+    }
     return m->imp;
 }
 
@@ -937,11 +979,15 @@ struct fprop *class_getProperty(Class cls, const char *name)
 {
     if (!name)
         return NULL;
+    LOCK();
     for (; cls; cls = cls->superclass)
         for (struct fplist *l = class_rt(cls)->props; l; l = l->next)
             for (uint32_t i = 0; i < l->count; i++)
-                if (!strcmp(l->p[i].name, name))
+                if (!strcmp(l->p[i].name, name)) {
+                    UNLOCK();
                     return &l->p[i];
+                }
+    UNLOCK();
     return NULL;
 }
 
@@ -949,6 +995,7 @@ struct fprop **class_copyPropertyList(Class cls, unsigned *out)
 {
     unsigned n = 0;
     struct fprop **list = NULL;
+    LOCK();
     if (cls) {
         for (struct fplist *l = class_rt(cls)->props; l; l = l->next)
             n += l->count;
@@ -960,6 +1007,7 @@ struct fprop **class_copyPropertyList(Class cls, unsigned *out)
                     list[n++] = &l->p[i];
         }
     }
+    UNLOCK();
     if (out)
         *out = n;
     return list;
@@ -1295,21 +1343,25 @@ BOOL class_conformsToProtocol(Class cls, Protocol *p)
 {
     if (!cls || !p)
         return NO;
+    LOCK();
     struct fclass_rt *rt = class_rt(cls);
-    for (uint32_t i = 0; i < rt->nprotos; i++)
-        if (protocol_conformsToProtocol(rt->protos[i], p))
-            return YES;
-    return NO;
+    BOOL found = NO;
+    for (uint32_t i = 0; i < rt->nprotos && !found; i++)
+        found = protocol_conformsToProtocol(rt->protos[i], p);
+    UNLOCK();
+    return found;
 }
 
 Protocol **class_copyProtocolList(Class cls, unsigned *out)
 {
+    LOCK();
     unsigned n = cls ? class_rt(cls)->nprotos : 0;
     Protocol **list = NULL;
     if (n) {
         list = calloc(n + 1, sizeof *list);
         memcpy(list, class_rt(cls)->protos, n * sizeof *list);
     }
+    UNLOCK();
     if (out)
         *out = n;
     return list;

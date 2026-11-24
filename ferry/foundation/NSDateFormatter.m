@@ -252,7 +252,8 @@ static NSString *zone_city(NSTimeZone *tz)
 static NSDictionary *default_symbols(void)
 {
     static NSDictionary *d;
-    if (!d) {
+    static dispatch_once_t d_once;
+    dispatch_once(&d_once, ^{
         NSArray *months = @[
             @"January", @"February", @"March", @"April", @"May", @"June", @"July", @"August", @"September",
             @"October", @"November", @"December"
@@ -287,7 +288,7 @@ static NSDictionary *default_symbols(void)
             @"standaloneQuarter" : quarters,
             @"shortStandaloneQuarter" : squarters,
         } retain];
-    }
+    });
     return d;
 }
 

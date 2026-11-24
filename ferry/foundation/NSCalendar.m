@@ -488,8 +488,10 @@ static NSString *region_of(NSLocale *l)
 static NSDateFormatter *symbols(void)
 {
     static NSDateFormatter *f;
-    if (!f)
-        f = [[NSDateFormatter alloc] init];
+    static dispatch_once_t f_once;
+    dispatch_once(&f_once, ^{
+      f = [[NSDateFormatter alloc] init];
+    });
     return f;
 }
 - (NSArray *)eraSymbols { return [symbols() eraSymbols]; }

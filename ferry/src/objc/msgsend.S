@@ -19,13 +19,18 @@
 #define CLS_MASK  24
 
 /* %r10 = class to search; \sel = selector register. Jumps to \miss with
- * %r10 intact when the selector isn't cached. */
+ * %r10 intact when the selector isn't cached. Other threads may be filling
+ * the cache or replacing it with a bigger one meanwhile: the mask is read
+ * once, before the table, and a writer stores a new table before its new
+ * mask (runtime.c), so the mask read never runs past the table read. */
 .macro PROBE sel, miss
     pushq   %rax
+    pushq   %rbx
+    movq    CLS_MASK(%r10), %rbx
     movq    CLS_CACHE(%r10), %r11
     movq    \sel, %rax
     shlq    $4, %rax
-1:  andq    CLS_MASK(%r10), %rax
+1:  andq    %rbx, %rax
     cmpq    \sel, (%r11,%rax)
     je      2f
     cmpq    $0, (%r11,%rax)
@@ -33,9 +38,11 @@
     addq    $16, %rax
     jmp     1b
 2:  movq    8(%r11,%rax), %r11
+    popq    %rbx
     popq    %rax
     jmp     *%r11
-3:  popq    %rax
+3:  popq    %rbx
+    popq    %rax
     jmp     \miss
 .endm
 
