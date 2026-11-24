@@ -448,6 +448,40 @@ class Actions:
         steps += [make_partition, mount_new]
         self._steps(steps, done)
 
+    def partition_drive(self, drive, layout, done):
+        """Wipe the whole drive and divide it as the partition_plan.Layout
+        says: a GUID partition map, then each volume in order, made, named
+        and mounted."""
+        whole = drive.whole
+        created = []
+
+        def maker(part, offset, size):
+            def make(then):
+                args = GLib.Variant("(ttssa{sv}sa{sv})", (offset, size, "", part.name, {}, part.fstype,
+                                                          self._format_options(part.fstype, part.name)))
+
+                def made(value, error):
+                    if value is not None:
+                        created.append(value.unpack()[0])
+                    then(value, error)
+                self._call(whole.path, "PartitionTable", "CreatePartitionAndFormat", args, made)
+            return make
+
+        def mount_all(then):
+            def one(left):
+                if not left:
+                    then()
+                    return
+                # A volume that won't mount is still made; it shows unmounted.
+                self._call(left[0], "Filesystem", "Mount", self._none(), lambda _v, _e: one(left[1:]))
+            one(list(created))
+
+        steps = self._unmount_all(drive.volumes)
+        steps.append((whole.path, "Block", "Format", GLib.Variant("(sa{sv})", ("gpt", {}))))
+        steps += [maker(part, offset, size) for part, (offset, size) in zip(layout.parts, layout.offsets())]
+        steps.append(mount_all)
+        self._steps(steps, done)
+
 
 # ---- First Aid ---------------------------------------------------------------------
 

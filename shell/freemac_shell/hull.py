@@ -8,9 +8,9 @@ buttons at the top mount or unmount a volume, erase a volume or a whole
 drive (asking for a name and a format first), and eject a drive. Double-
 click a volume, or choose Edit > Rename, to give it a new name. First Aid
 checks a volume, or every volume on a drive, for errors and repairs them.
-Restore
-copies a disk image onto a drive that's plugged in, to make a USB stick
-that starts up freemac or another system.
+Partition divides a drive that's plugged in into several volumes, on a pie
+chart (hull_partition). Restore copies a disk image onto a drive that's
+plugged in, to make a USB stick that starts up freemac or another system.
 
 The disk freemac is running from can be looked at but not changed.
 
@@ -26,7 +26,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import alert, disk_images, hull_store, menus, style  # noqa: E402
+from . import alert, disk_images, hull_partition, hull_store, menus, style  # noqa: E402
 from .hull_store import size_words  # noqa: E402
 
 APP_ID = "org.freemac.Hull"
@@ -49,6 +49,7 @@ CSS = b"""
 .hull-fact { border-bottom: 1px solid alpha(currentColor, 0.08); padding: 7px 12px; }
 .hull-legend-dot { border-radius: 5px; min-width: 10px; min-height: 10px; }
 .hull-tool { padding: 2px 8px; }
+.hull-volumes, .hull-volumes flowboxchild { background: transparent; padding: 0; }
 """
 
 USED = (0.26, 0.55, 0.96)
@@ -78,10 +79,15 @@ class Bar(Gtk.DrawingArea):
         super().__init__()
         self.set_size_request(-1, 22)
         self.fraction = None
+        self.parts = None          # [(fraction, colour)]: a drive's volumes, side by side
         self.connect("draw", self._draw)
 
     def show_fraction(self, fraction):
-        self.fraction = fraction
+        self.fraction, self.parts = fraction, None
+        self.queue_draw()
+
+    def show_parts(self, parts):
+        self.fraction, self.parts = None, parts
         self.queue_draw()
 
     def _draw(self, widget, cr):
@@ -105,6 +111,19 @@ class Bar(Gtk.DrawingArea):
             cr.set_source_rgb(*USED)
             cr.rectangle(0, 0, max(h, w * min(1.0, self.fraction)), h)
             cr.fill()
+            cr.restore()
+        if self.parts:
+            cr.save()
+            rounded(0, w)
+            cr.clip()
+            x = 0.0
+            for n, (fraction, colour) in enumerate(self.parts):
+                width = w - x if n == len(self.parts) - 1 else w * fraction
+                cr.set_source_rgb(*colour)
+                gap = 0 if n == len(self.parts) - 1 else 2     # a thin gap between volumes
+                cr.rectangle(x, 0, max(2.0, width - gap), h)
+                cr.fill()
+                x += width
             cr.restore()
         return True
 
@@ -187,8 +206,9 @@ class Window(Gtk.ApplicationWindow):
         self.info_button = self._tool("document-edit-symbolic", "Rename", self.rename)
         self.restore_button = self._tool("document-revert-symbolic", "Restore", self.restore)
         self.aid_button = self._tool("emblem-ok-symbolic", "First Aid", self.first_aid)
+        self.partition_button = self._tool("drive-multidisk-symbolic", "Partition", self.partition)
         for button in (self.eject_button, self.info_button, self.restore_button, self.erase_button,
-                       self.mount_button, self.aid_button):
+                       self.partition_button, self.mount_button, self.aid_button):
             header.pack_end(button)
         self.spinner = Gtk.Spinner()
         header.pack_start(self.spinner)
@@ -239,6 +259,10 @@ class Window(Gtk.ApplicationWindow):
         self.free_label = self._legend(legend, "free")
         self.legend = legend
         detail.pack_start(legend, False, False, 0)
+        self.volume_legend = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
+                                         column_spacing=18, row_spacing=6, homogeneous=False)
+        self.volume_legend.get_style_context().add_class("hull-volumes")
+        detail.pack_start(self.volume_legend, False, False, 0)
 
         self.note = Gtk.Label(xalign=0, wrap=True)
         self.note.get_style_context().add_class("hull-note")
@@ -259,7 +283,7 @@ class Window(Gtk.ApplicationWindow):
         menus.add_actions(self, {"close": self.close, "mount": self.toggle_mount, "erase": self.erase,
                                  "eject": self.eject, "rename": self.rename, "open-image": self.open_image,
                                  "new-image": self.new_image, "restore": self.restore,
-                                 "first-aid": self.first_aid})
+                                 "first-aid": self.first_aid, "partition": self.partition})
         self.bus, self._watch = hull_store.watch(self._changed)
         self.connect("destroy", lambda *_: [self.bus.signal_unsubscribe(i) for i in self._watch])
         header.show_all()
@@ -415,6 +439,8 @@ class Window(Gtk.ApplicationWindow):
         spaces = [s for s in (v.space() for v in drive.volumes) if s]
         used = sum(s[1] for s in spaces)
         self._show_space(used if drive.mounted else None, drive.size)
+        if count > 1 and drive.size and not drive.optical:
+            self._show_volumes(drive)
         self._note(drive)
         if image:
             self._fill_facts([
@@ -456,7 +482,34 @@ class Window(Gtk.ApplicationWindow):
             ("Format:", vol.kind), ("Connection:", drive.connection or "—"),
         ])
 
+    def _show_volumes(self, drive):
+        """A drive with several volumes: the bar shows each one's share, in
+        the colours Partition uses, with a name for each under it."""
+        colours = hull_partition.COLOURS
+        self.bar.show_parts([(v.size / drive.size, colours[i % len(colours)])
+                             for i, v in enumerate(drive.volumes)])
+        self.legend.set_visible(False)
+        for i, vol in enumerate(drive.volumes):
+            part = Gtk.Box(spacing=6)
+            dot = Gtk.DrawingArea(valign=Gtk.Align.CENTER)
+            dot.set_size_request(10, 10)
+            dot.connect("draw", lambda _w, cr, c=colours[i % len(colours)]:
+                        (cr.set_source_rgb(*c), cr.arc(5, 5, 5, 0, 6.2832), cr.fill()) and False)
+            part.pack_start(dot, False, False, 0)
+            words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            title = Gtk.Label(label=vol.name, xalign=0, ellipsize=Pango.EllipsizeMode.END, max_width_chars=18)
+            title.get_style_context().add_class("hull-shared")
+            words.pack_start(title, False, False, 0)
+            words.pack_start(Gtk.Label(label=size_words(vol.size), xalign=0), False, False, 0)
+            part.pack_start(words, False, False, 0)
+            self.volume_legend.add(part)
+        self.volume_legend.show_all()
+        self.volume_legend.set_visible(True)
+
     def _show_space(self, used, total, free=None):
+        for child in self.volume_legend.get_children():
+            self.volume_legend.remove(child)
+        self.volume_legend.set_visible(False)
         known = used is not None and total
         self.bar.show_fraction(used / total if known else None)
         self.legend.set_visible(bool(known))
@@ -501,7 +554,9 @@ class Window(Gtk.ApplicationWindow):
         self.eject_button.set_sensitive(free and bool(drive and (drive.external or drive.ejectable)))
         self.restore_button.set_sensitive(free and self._restorable(drive))
         self.aid_button.set_sensitive(free and not locked and bool(self._aid_volumes(kind, item)))
+        self.partition_button.set_sensitive(free and self._restorable(drive))
         for name, on in (("mount", self.mount_button), ("erase", self.erase_button),
+                         ("partition", self.partition_button),
                          ("restore", self.restore_button), ("first-aid", self.aid_button),
                          ("rename", self.info_button), ("eject", self.eject_button)):
             action = self.lookup_action(name)
@@ -643,6 +698,34 @@ class Window(Gtk.ApplicationWindow):
                 error = e
             GLib.idle_add(finished, results, error)
         threading.Thread(target=work, daemon=True).start()
+
+    # -- partition --
+
+    def partition(self):
+        kind, item = self._current()
+        drive = item if kind == "drive" else (item.drive if item else None)
+        if self.busy or not self._restorable(drive):
+            return
+        icon = self._gicon(drive_icon(drive))
+        layout = hull_partition.Sheet(self, drive, icon).run_sheet()
+        if layout is None:
+            return
+        name = drive.name
+        n = len(layout)
+        if n == 1:
+            text = (f"Everything on “{name}” will be erased, and it will be one volume, "
+                    f"{hull_partition.summary(layout)}. This can’t be undone.")
+        else:
+            text = (f"Everything on “{name}” will be erased, and it will be divided into {n} volumes: "
+                    f"{hull_partition.summary(layout)}. This can’t be undone.")
+        answer = alert.ask(self, f"Partition “{name}”?", text,
+                           [("Cancel", Gtk.ResponseType.CANCEL), ("Partition", Gtk.ResponseType.OK)],
+                           default=Gtk.ResponseType.CANCEL, destructive=Gtk.ResponseType.OK, icon=icon)
+        if answer != Gtk.ResponseType.OK:
+            return
+        self.chosen = ("drive", drive.path)     # stay on the drive while its volumes change
+        self._working(True)
+        self.actions.partition_drive(drive, layout, self._done(f"“{name}” wasn’t partitioned.", icon))
 
     # -- restore --
 
@@ -924,7 +1007,7 @@ def menubar():
                    [("Mount", "win.mount", None), ("Eject", "win.eject", "<Ctrl>e")],
                    [("Close", "win.close", "<Ctrl>w")]]),
         ("_Edit", [[("First Aid…", "win.first-aid", None), ("Rename…", "win.rename", None),
-                    ("Erase…", "win.erase", "<Shift><Ctrl>e"),
+                    ("Erase…", "win.erase", "<Shift><Ctrl>e"), ("Partition…", "win.partition", None),
                     ("Restore…", "win.restore", "<Shift><Ctrl>r")]]),
     ])
 

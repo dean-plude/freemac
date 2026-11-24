@@ -1171,6 +1171,19 @@ From 1.40 on, the work is on the desktop and the system itself.
 | 3 | + and the corner buttons work there as in the full overview | Strata, Topline | done |
 | 4 | Guide line, README row, every README screenshot retaken | Guide, Docs | done |
 
+## 1.151 "Partition" (done)
+
+Hull's Partition, as in a Mac's Disk Utility: divide a drive into several volumes.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Partition button and Edit > Partition… for a drive that's plugged in (not the system's, a disc or an open image) | Hull | done |
+| 2 | A pie chart of the drive: + splits the chosen volume in two, − takes it away, a click chooses a slice and dragging the white dots between slices resizes them | hull_partition.py, partition_plan.py | done |
+| 3 | Each volume's name, format (ExFAT, MS-DOS (FAT) or freemac (ext4)) and size, in GB or MB, never under 32 MB; up to eight volumes | hull_partition.py | done |
+| 4 | One last question names every volume, then a new GUID partition map is written and each volume made, named and mounted | hull_store.py | done |
+| 5 | A drive with several volumes shows each one's share of its bar in colour, with its name and size | Hull | done |
+| 6 | Guide topic, README rows and screenshots | Guide, Docs | done |
+
 ## 1.150 "First Aid" (done)
 
 Hull's First Aid, as in a Mac's Disk Utility: check a drive for errors and repair them.

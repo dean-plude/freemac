@@ -878,6 +878,23 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Partition in Hull (1.151)
+
+`partition_plan.Layout` is the arithmetic, with no GTK: a list of parts
+(name, format, size) whose sizes always add up to the drive less 2 MiB (the
+partition map at the start and its backup copy at the end), each a whole
+number of MiB and at least 32 MiB. Adding splits a part in half, removing
+gives its space to the part before it, and resizing (or `move_line`, for a
+dragged dot) moves space between neighbours. `hull_partition.Sheet` draws it
+as a pie with cairo and edits the chosen part. `Actions.partition_drive()`
+unmounts everything on the drive, formats the whole disk as `gpt`, then calls
+`PartitionTable.CreatePartitionAndFormat` once per part at the offsets
+`Layout.offsets()` gives (the last with size 0, the rest of the disk), with
+the part's name as both partition name and label, and mounts each new
+volume. polkit `modify-device` is already allowed for an administrator at the
+computer. A drive with more than one volume draws its bar in the same
+colours (`Bar.show_parts`).
+
 ## First Aid in Hull (1.150)
 
 `hull_store.first_aid()` runs on a thread for each volume: it asks udisks2's

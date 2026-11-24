@@ -1149,6 +1149,16 @@ TOPICS = {
         "freemac can check most formats, including ExFAT, MS-DOS (FAT) and Linux (ext4). The disk freemac is "
         "running from is checked as the computer starts up, when it needs it.",
     ]),
+    "partition": ("Divide a drive into several volumes", "partition split divide drive disk volumes "
+                  "partitions pie usb stick separate parts hull", [
+        "Open Hull, choose a USB drive (or one of its volumes) and click Partition.",
+        "Click + to split the chosen volume in two, and − to take it away. Click a slice of the pie to choose it, "
+        "then give it a name, a format and a size. Drag the white dots between slices to change their sizes.",
+        "Click Apply, and Hull asks once more, naming every volume. Partitioning erases everything on the drive, "
+        "so copy off anything you want to keep first.",
+        "The new volumes show on the Desktop and in Drawer like any drive. Erase the whole drive in Hull to make "
+        "it one volume again.",
+    ]),
     "restore-usb": ("Copy a disk image onto a USB drive", "restore usb stick drive bootable startup start up "
                     "installer iso img write flash burn copy image onto hull", [
         "To make a USB drive that starts up freemac, or another system, from its .iso: plug the drive in, open "
