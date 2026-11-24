@@ -15,8 +15,9 @@ The selected words come from Wayland's primary selection, which every app
 keeps up to date as you select. The apps that do the work are asked over
 the session bus, through the app actions every GApplication publishes
 (org.gtk.Actions), and started first when they aren't running.
-Which services show is kept in ~/.config/freemac/shell.json
-("services_off"). Original freemac code.
+Bosun shortcuts with Show in Services ticked join the list as
+"bosun_<id>" and run through freemac-bosun --run. Which services show is
+kept in ~/.config/freemac/shell.json ("services_off"). Original freemac code.
 """
 import json
 import mimetypes
@@ -99,14 +100,38 @@ def set_on(service_id, on):
     os.replace(tmp, PREFS)
 
 
+def _bosun(kind):
+    """Bosun's shortcuts offered as services (bosun_store), as entries like
+    SERVICES' own."""
+    try:
+        from . import bosun_store
+    except ImportError:
+        return []
+    if kind == "files":
+        return [(sid, name, "files", lambda p: bool(p), "") for sid, name in bosun_store.as_services("files")]
+    return [(sid, name, "text", lambda t: bool(t.strip()), "") for sid, name in bosun_store.as_services("text")]
+
+
+def entry(service_id):
+    """A service by id: one of freemac's own, or a Bosun shortcut."""
+    if service_id in BY_ID:
+        return BY_ID[service_id]
+    if service_id.startswith("bosun_"):
+        for kind in ("text", "files"):
+            for found in _bosun(kind):
+                if found[0] == service_id:
+                    return found
+    return None
+
+
 def shown(kind):
     """The services of this kind ("text" or "files") that are turned on."""
     off = turned_off()
-    return [s for s in SERVICES if s[2] == kind and s[0] not in off]
+    return [s for s in SERVICES + tuple(_bosun(kind)) if s[2] == kind and s[0] not in off]
 
 
 def suits(service_id, what):
-    service = BY_ID.get(service_id)
+    service = entry(service_id)
     if service is None or what is None:
         return False
     try:
@@ -206,6 +231,11 @@ def run(service_id, what):
         return _launch("freemac-drawer", os.path.expanduser(what.strip()))
     if service_id == "terminal":
         return _launch("foot", "--working-directory", what[0])
+    if service_id.startswith("bosun_"):
+        shortcut = service_id[len("bosun_"):]
+        if isinstance(what, list):
+            return _launch("freemac-bosun", "--run", shortcut, "--", *what)
+        return _launch("freemac-bosun", "--run", shortcut, "--text", what)
     if service_id == "wallpaper":
         from .ini import ini_set
         ini_set(SHELL_INI, "background", "image", os.path.abspath(what[0]))
@@ -223,10 +253,10 @@ def _tell(summary, body=""):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] not in BY_ID:
+    service = entry(argv[0]) if argv else None
+    if service is None:
         print(__doc__, file=sys.stderr)
         return 2
-    service = BY_ID[argv[0]]
     if service[2] == "files":
         what = [os.path.abspath(p) for p in argv[1:]]
     else:

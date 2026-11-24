@@ -46,7 +46,7 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
-from . import style  # noqa: E402
+from . import region, style  # noqa: E402
 
 SAVERS = (("drift", "Drift"), ("clock", "Clock"), ("album", "Album"))
 DEFAULT_SAVER = "drift"
@@ -177,7 +177,7 @@ class Clock:
         now = now or time.localtime()
         clock24 = style.h24()
         text = time.strftime("%H:%M" if clock24 else "%-I:%M", now)
-        date = time.strftime("%A, %-d %B", now)
+        date = time.strftime(region.long_date_format(), now)
         scale = h / 800
         big = PangoCairo.create_layout(cr)
         big.set_font_description(font(150 * scale, Pango.Weight.LIGHT))

@@ -27,7 +27,7 @@ import time
 
 from gi.repository import GLib
 
-from . import backdrop, saver, style
+from . import backdrop, region, saver, style
 
 DEFAULT_LOCK_AFTER = 5   # minutes
 
@@ -203,7 +203,7 @@ def lock():
         return 0
     # --daemonize returns once the screen is locked, so a caller that waits
     # (swayidle before sleep) knows the lock is up before the system sleeps.
-    code = subprocess.run(lock_command()).returncode
+    code = subprocess.run(lock_command(), env=region.english_env()).returncode
     # A screen saver under the lock would still be there after unlocking.
     saver.stop()
     return code
@@ -266,7 +266,7 @@ class Watcher:
         self.stop()
         self.current = command
         if command:
-            self.child = subprocess.Popen(command)
+            self.child = subprocess.Popen(command, env=region.english_env())
 
     def stop(self):
         if self.child and self.child.poll() is None:
@@ -280,7 +280,7 @@ class Watcher:
     def check(self):
         # swayidle exits if the compositor goes away; follow it.
         if self.child and self.child.poll() is not None and self.current:
-            self.child = subprocess.Popen(self.current)
+            self.child = subprocess.Popen(self.current, env=region.english_env())
         return True
 
 

@@ -1074,6 +1074,15 @@ class DialsWindow(Gtk.ApplicationWindow):
             self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
             lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row,
             items=dials_keys.SERVICE_SHORTCUTS, extra=in_menu)
+        bosun_items = dials_keys.bosun_shortcuts()
+        bosun_parts = []
+        if bosun_items:
+            self.bosun_keys = dials_keys.Shortcuts(
+                self, lambda sec, key, default=None: ini_get(WAYFIRE_INI, sec, key, default),
+                lambda sec, key, value: ini_set(WAYFIRE_INI, sec, key, value), group, row, items=bosun_items, restore=False)
+            bosun_heading = Gtk.Label(label="Bosun Shortcuts", xalign=0)
+            bosun_heading.get_style_context().add_class("dials-section")
+            bosun_parts = [bosun_heading, self.bosun_keys.widget]
         services_heading = Gtk.Label(label="Services", xalign=0)
         services_heading.get_style_context().add_class("dials-section")
         services_note = Gtk.Label(label="Select some words in any app, then choose a service from the app's menu "
@@ -1114,7 +1123,7 @@ class DialsWindow(Gtk.ApplicationWindow):
             row("Forget what was copied", clear),
         ), sources_heading, sources, input_menu, text_heading,
             dials_input.text_input_group(self, group, row, switch), services_heading, services_note,
-            self.service_keys.widget, heading, self.shortcuts.widget)
+            self.service_keys.widget, *bosun_parts, heading, self.shortcuts.widget)
 
     # Network ------------------------------------------------------------------
     def network(self):

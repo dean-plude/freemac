@@ -241,6 +241,25 @@ def english_names():
             continue
 
 
+def english_env(env=None):
+    """A copy of the environment for a program that isn't Python (gtklock),
+    with day and month names in English as english_names() gives freemac's
+    own, and FREEMAC_DATE_FORMAT, the long date in the region's order."""
+    env = dict(os.environ if env is None else env)
+    current = env.get("LC_ALL") or env.get("LC_TIME") or env.get("LANG") or ""
+    if not current.startswith("en_"):
+        env.pop("LC_ALL", None)
+        env["LC_TIME"] = "en_US.UTF-8"
+    env["FREEMAC_DATE_FORMAT"] = long_date_format()
+    return env
+
+
+def long_date_format():
+    """"Tuesday, November 24" where the month comes first, else
+    "Tuesday 24 November"."""
+    return "%A, %B %-d" if month_first() else "%A %-d %B"
+
+
 # ---- Examples, as Dials shows them -----------------------------------------------------
 _EXAMPLE = r"""
 import locale, sys, time

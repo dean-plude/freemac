@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.192 "Bosun" (done)
+
+An app for shortcuts, like Shortcuts on a Mac: steps put together and run
+with one click, from the Services menu, from Drawer or with keys.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Bosun: shortcuts as coloured tiles with a play button; an editor with the steps in order, each with its settings, and a list of steps to add, by category, with search | Bosun | done |
+| 2 | 29 steps: text (change case, replace, count, clipboard, speak, show, notify), files (get, open, show in Drawer, zip, PDF, rotate, resize, copy, wallpaper), apps and web pages, and the computer (appearance, volume, mute, Do Not Disturb, screenshot, lock, wait, shell script) | Bosun | done |
+| 3 | A Gallery of nine shortcuts to start from | Bosun | done |
+| 4 | Shortcuts that take words or files in every app's Services menu and in Drawer's menu, and keys for any shortcut in Dials > Keyboard > Bosun Shortcuts | Services, Dials | done |
+| 5 | The lock screen and screen saver show English day and month names in the region's date order, whatever the session's older language settings say | Latch, screen saver | done |
+
 ## 1.191 "Ferry: controllers from nibs and checked edits" (done)
 
 Mac programs whose windows come from a nib with array, tree, object or
