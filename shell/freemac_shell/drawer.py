@@ -21,7 +21,7 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import aliases, app_list, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
+from . import aliases, app_list, custom_icons, batch_rename, drawer_archive, drawer_settings, drawer_info, macapps, menus, neighbours, quick_actions, recents, servers, services, share, smart_folders, tags, transfer, volumes  # noqa: E402
 from .drawer_glance import Glance  # noqa: E402
 
 CONFIG = os.path.join(GLib.get_user_config_dir(), "freemac", "drawer.json")
@@ -232,6 +232,7 @@ class Folder:
 
     icon_cache = {}
     badged = {}        # an icon -> the same icon with an alias's arrow
+    custom = {}        # (custom icon file, size) -> its picture
     thumb_cache = {}   # (path, modified, size) -> the file's own small picture
 
     def __init__(self, path, show_hidden=False, sort="name", icon_size=48, item_info=False):
@@ -370,6 +371,11 @@ class Folder:
             name = macapps.display_name(full)
             big, small = self.app_icon(full, self.icon_size), self.app_icon(full, 20)
         alias = aliases.is_alias(full)
+        # An icon of its own, pasted in Get Info (an alias shows its original's).
+        own_path = aliases.original(full) if alias else full
+        own = custom_icons.pixbuf(own_path, self.icon_size, self.custom) if own_path else None
+        if own is not None:
+            big, small = own, custom_icons.pixbuf(own_path, 20, self.custom)
         if alias:
             # An alias shows its original's icon with a small arrow; a broken
             # one, a plain document's.
@@ -387,7 +393,7 @@ class Folder:
             self._markup(name, names, full, is_dir, info),
         ])
         content = info.get_content_type() or ""
-        if not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
+        if own is None and not is_dir and (content.startswith("image/") or Gio.content_type_is_a(content, "application/pdf")) \
                 and info.get_size() < THUMB_LARGEST:
             self.waiting.append((Gtk.TreeRowReference.new(self.store, self.store.get_path(it)), full, stamp))
         return names

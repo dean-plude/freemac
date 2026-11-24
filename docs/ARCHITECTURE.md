@@ -878,6 +878,29 @@ the password's, so an old written-down key stops working. `freemac-users-helper 
 the old password as a second line when you change your own, calls it too, so
 the disk follows the login password when they were the same.
 
+## Custom icons and comments (1.174)
+
+A custom icon is a PNG, at most 512 pixels a side, kept once in
+`~/.local/share/freemac/icons/` under a digest of its pixels; the item names
+it in its `user.freemac.icon` extended attribute (custom_icons.py), which
+moves with it on the same disk. `get()` accepts only a plain file name in
+that folder, so a crafted attribute can't point elsewhere. Clearing removes
+only the attribute, since another item may share the picture. Drawer's
+`_add` and the Desktop's `picture_for` ask `custom_icons.pixbuf()` first
+(for an alias, its original's) and skip the thumbnail; setting the attribute
+changes the item's ctime, which the folder monitors already report, so both
+redraw at once. In Get Info the icon is a focusable EventBox: ⌘C, ⌘X, ⌘V
+and Delete act on it while it is chosen, and it takes dropped pictures and
+picture files. Symbolic links can't carry user attributes, so an alias
+has no icon of its own.
+
+Comments live in `user.xdg.comment` (comments.py), the name freedesktop.org
+gives them, so other file managers read them too. seek_index indexes any
+file with a comment, whatever its kind, with the comment before its text,
+and keys files on the later of mtime and ctime so a new comment is read.
+A disk that can't keep extended attributes (FAT, some network shares) says
+so when an icon is pasted.
+
 ## Aliases (1.172)
 
 An alias is a symbolic link to the original's absolute path (aliases.py), so

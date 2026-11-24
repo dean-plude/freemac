@@ -2,7 +2,9 @@
 """Get Info for Drawer (Command+I): one small window per item with its icon,
 name, kind, size, where it is, when it was made and changed, and who can open
 it. A document also shows the app that opens it, and Change All… makes that
-app open every document of its kind. A folder's size is added up in the
+app open every document of its kind. Click the icon and paste a picture
+(⌘V), or drop one on it, to give the item its own icon; Delete takes it off
+again. Comments are kept with the item and Seek finds them. A folder's size is added up in the
 background, so the window opens at once. Original freemac code.
 """
 import os
@@ -18,7 +20,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gio, GdkPixbuf, GLib, Gtk  # noqa: E402
 
-from . import aliases, alert, app_list, default_apps, macapps, tags  # noqa: E402
+from . import aliases, alert, app_list, comments, custom_icons, default_apps, macapps, tags  # noqa: E402
 from .apps import DESKTOP_WINDOW  # noqa: E402
 
 ATTRS = ",".join((
@@ -128,6 +130,8 @@ class InfoWindow(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=18)
         top = Gtk.Box(spacing=12)
         image = Gtk.Image()
+        self.path, self.image = path, image
+        self.kind_icon = None     # the item's own icon, under any custom one
         pixbuf = macapps.cached_icon(path, 64) if is_bundle else None
         if pixbuf is not None:
             image.set_from_pixbuf(pixbuf)
@@ -148,7 +152,13 @@ class InfoWindow(Gtk.Window):
         elif info.get_icon() is not None:
             image.set_from_gicon(info.get_icon(), Gtk.IconSize.DIALOG)
             image.set_pixel_size(64)
-        top.pack_start(image, False, False, 0)
+        self.can_change_icon = app is None and not is_alias
+        if self.can_change_icon:
+            self.kind_icon = self._image_state()
+            custom = custom_icons.pixbuf(path, 64)
+            if custom is not None:
+                image.set_from_pixbuf(custom)
+        top.pack_start(self._icon_well(image) if self.can_change_icon else image, False, False, 0)
         titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, valign=Gtk.Align.CENTER)
         title = Gtk.Label(label=name, xalign=0, wrap=True, max_width_chars=24)
         title.get_style_context().add_class("drawer-preview-name")
@@ -200,6 +210,10 @@ class InfoWindow(Gtk.Window):
         for row, (label, value) in enumerate(rows):
             self._row(grid, row, label, value)
         box.pack_start(grid, False, False, 0)
+
+        if app is None and not is_alias:
+            box.pack_start(Gtk.Separator(), False, False, 0)
+            box.pack_start(self._comments(path), False, False, 0)
 
         content = info.get_content_type() or ""
         if not is_dir and not is_bundle and app is None and info.get_file_type() == Gio.FileType.REGULAR \
@@ -384,8 +398,148 @@ class InfoWindow(Gtk.Window):
 
         GLib.idle_add(show)
 
+    # ---- the icon -------------------------------------------------------
+
+    def _image_state(self):
+        """What the image shows now, to put back when a custom icon goes."""
+        kind = self.image.get_storage_type()
+        if kind == Gtk.ImageType.PIXBUF:
+            return ("pixbuf", self.image.get_pixbuf())
+        if kind == Gtk.ImageType.GICON:
+            return ("gicon", self.image.get_gicon()[0])
+        return None
+
+    def _show_kind_icon(self):
+        state = self.kind_icon
+        if state is None:
+            self.image.clear()
+        elif state[0] == "pixbuf":
+            self.image.set_from_pixbuf(state[1])
+        else:
+            self.image.set_from_gicon(state[1], Gtk.IconSize.DIALOG)
+            self.image.set_pixel_size(64)
+
+    def _icon_well(self, image):
+        """The icon, which a click chooses, as in Finder, so ⌘C, ⌘V and
+        Delete act on it, and which takes a picture dropped on it."""
+        from gi.repository import Gdk
+        well = Gtk.EventBox(can_focus=True, valign=Gtk.Align.CENTER)
+        well.get_style_context().add_class("info-icon")
+        provider = Gtk.CssProvider()
+        provider.load_from_data(b".info-icon { border-radius: 8px; padding: 4px; }"
+                                b".info-icon:focus { background-color: alpha(#3a8ef6, 0.28); }")
+        well.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        well.add(image)
+        well.set_tooltip_text("Click, then paste a picture (⌘V) to change the icon")
+        well.connect("button-press-event", lambda w, _e: w.grab_focus() or False)
+        well.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry.new("text/uri-list", 0, 0)],
+                           Gdk.DragAction.COPY)
+        well.drag_dest_add_image_targets()
+        well.connect("drag-data-received", self._dropped)
+        self.well = well
+        return well
+
+    def _dropped(self, _w, _context, _x, _y, data, _info, _time):
+        picture = data.get_pixbuf()
+        if picture is None:
+            for uri in data.get_uris() or []:
+                path = Gio.File.new_for_uri(uri).get_path()
+                picture = custom_icons.picture_of(path) if path else None
+                if picture is not None:
+                    break
+        if picture is None:
+            alert.tell(self, "That item can’t be used as an icon.", "Drop a picture, such as a PNG or JPEG file.")
+            return
+        self._set_icon(picture)
+
+    def _set_icon(self, picture):
+        try:
+            custom_icons.put(self.path, picture)
+        except OSError as err:
+            alert.tell(self, f"The icon of “{os.path.basename(self.path)}” couldn’t be changed.",
+                       "This disk can’t keep custom icons." if err.errno in (95, 1) else err.strerror or "")
+            return
+        self.image.set_from_pixbuf(custom_icons.pixbuf(self.path, 64))
+        self.well.grab_focus()
+
+    def _icon_key(self, event):
+        """⌘C, ⌘X, ⌘V and Delete on the chosen icon."""
+        from gi.repository import Gdk
+        ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+        key = Gdk.keyval_to_lower(event.keyval)
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        if ctrl and key in (Gdk.KEY_c, Gdk.KEY_x):
+            found = custom_icons.get(self.path)
+            picture = custom_icons.picture_of(found) if found else self.image.get_pixbuf()
+            if picture is None:
+                theme = Gtk.IconTheme.get_default()
+                state = self.kind_icon
+                looked = theme.lookup_by_gicon(state[1], 256, Gtk.IconLookupFlags.FORCE_SIZE) \
+                    if state and state[0] == "gicon" else None
+                picture = looked.load_icon() if looked else None
+            if picture is not None:
+                clipboard.set_image(picture)
+                clipboard.store()
+            if key == Gdk.KEY_x:
+                self._clear_icon()
+            return True
+        if ctrl and key == Gdk.KEY_v:
+            picture = custom_icons.from_clipboard()
+            if picture is None:
+                alert.tell(self, "There’s no picture to paste.",
+                           "Copy a picture, or a picture file in Drawer, then click the icon and press ⌘V.")
+            else:
+                self._set_icon(picture)
+            return True
+        if event.keyval in (Gdk.KEY_Delete, Gdk.KEY_BackSpace, Gdk.KEY_KP_Delete):
+            self._clear_icon()
+            return True
+        return False
+
+    def _clear_icon(self):
+        if not custom_icons.has(self.path):
+            return
+        try:
+            custom_icons.clear(self.path)
+        except OSError as err:
+            alert.tell(self, f"The icon of “{os.path.basename(self.path)}” couldn’t be changed.", err.strerror or "")
+            return
+        self._show_kind_icon()
+
+    # ---- comments -------------------------------------------------------
+
+    def _comments(self, path):
+        section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        heading = Gtk.Label(label="Comments", xalign=0)
+        heading.get_style_context().add_class("drawer-heading")
+        section.pack_start(heading, False, False, 0)
+        view = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=6, right_margin=6,
+                            top_margin=4, bottom_margin=4)
+        view.get_buffer().set_text(comments.get(path))
+        frame = Gtk.Frame()
+        frame.set_size_request(-1, 54)
+        frame.add(view)
+        section.pack_start(frame, False, False, 0)
+        self.comment_view = view
+
+        buffer = view.get_buffer()
+
+        def keep(*_):
+            text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False)
+            try:
+                comments.put(path, text)
+            except OSError:
+                pass        # a disk that can't keep them; nothing to lose but the words
+            return False
+        view.connect("focus-out-event", keep)
+        self.connect("delete-event", keep)
+        self.connect("destroy", keep)
+        return section
+
     def _key(self, _w, event):
         from gi.repository import Gdk
+        if getattr(self, "well", None) is not None and self.well.has_focus() and self._icon_key(event):
+            return True
         if event.keyval == Gdk.KEY_Escape or (event.state & Gdk.ModifierType.CONTROL_MASK and
                                               event.keyval in (Gdk.KEY_w, Gdk.KEY_W, Gdk.KEY_i, Gdk.KEY_I)):
             self.destroy()

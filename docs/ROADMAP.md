@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.174 "Custom icons and comments" (done)
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Click the icon in Get Info and paste a picture (⌘V), or drop a picture or picture file on it, to give a file or folder its own icon; Delete takes it off, ⌘C copies it | drawer_info.py, custom_icons.py | done |
+| 2 | Drawer and the Desktop show the icon of its own in place of the kind's, an alias shows its original's with the arrow, and they change as soon as it is pasted | drawer.py, desktop_icons.py | done |
+| 3 | A Comments box in Get Info keeps a few words with the item, in the freedesktop.org comment attribute, so they move with it | drawer_info.py, comments.py | done |
+| 4 | Seek finds files by their comments, whatever kind of file they are | seek_index.py | done |
+| 5 | Guide topic, README row and screenshots | Guide, Docs | done |
+
 ## 1.173 "Ferry: calendars and number formats" (done)
 
 Mac programs that show dates by week or month, money, percentages, file

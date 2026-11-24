@@ -1296,6 +1296,14 @@ TOPICS = {
         "If the original is deleted or moved away, opening the alias says so. Click Fix Alias… to choose "
         "a new original, or Delete Alias to move the alias to the Trash; the original is never touched.",
     ]),
+    "custom-icons": ("Change an icon or add a comment", "icon custom change picture paste folder comment "
+                     "comments note get info spotlight", [
+        "Choose a file or folder in Drawer or on the Desktop and press ⌘I to open its Info window.",
+        "Copy a picture (in Frame, or the picture file itself in Drawer), click the small icon at the top of "
+        "the Info window and press ⌘V. You can also drag a picture onto that icon.",
+        "To go back to the usual icon, click the icon in the Info window and press Delete.",
+        "Type in Comments to keep a few words with the item. Seek finds files by their comments.",
+    ]),
     "restore": ("Get back a file from a backup", "restore backup lifeboat deleted lost earlier version old file", [
         "Press F4 and click Lifeboat, or choose Go > Browse Backups in Drawer to start at that folder. "
         "The backup drive must be plugged in.",
