@@ -16,7 +16,7 @@
  * away first says it is Passive, so the menu bar hides it. Without a session
  * bus the items still work as objects; nothing is shown.
  */
-#import "AInternal.h"
+#import "ANotify.h"
 #import <objc/message.h>
 
 static const char *const WATCHER = "org.kde.StatusNotifierWatcher";
@@ -68,6 +68,7 @@ static const char *const MENU_XML =
 
 @interface NSStatusItem (FerryPrivate)
 - (instancetype)_initWithBar:(NSStatusBar *)bar length:(CGFloat)length;
+- (instancetype)_initServingMenuAt:(const char *)path refresh:(NSMenu *(^)(void))refresh;
 - (void)_changed;
 - (void)_gone;
 - (GVariant *)_property:(const char *)name;
@@ -497,6 +498,7 @@ static void menu_will_open(NSMenu *menu)
     unsigned _itemObject, _menuObject;
     NSMutableArray *_ids;               /* menu item id - 1 -> NSMenuItem, from the last layout */
     NSString *_shownTip, *_shownStatus;
+    NSMenu *(^_refresh)(void);          /* the Dock's menu (AMenuServe) */
 }
 
 - (instancetype)_initWithBar:(NSStatusBar *)bar length:(CGFloat)length
@@ -528,11 +530,32 @@ static void menu_will_open(NSMenu *menu)
     return self;
 }
 
+/* The Dock's menu (NSDockTile.m): only a menu, at path, asked for afresh
+ * as the dock opens it. */
+- (instancetype)_initServingMenuAt:(const char *)path refresh:(NSMenu *(^)(void))refresh
+{
+    if (!(self = [super init]))
+        return nil;
+    _revision = 1;
+    _ids = [[NSMutableArray alloc] init];
+    _refresh = [refresh copy];
+    if (!live_items)
+        live_items = [[NSMutableArray alloc] init];
+    [live_items addObject:[NSValue valueWithPointer:self]];
+    if (connect_bus())
+        _menuObject = g_dbus_connection_register_object(bus, path, menu_info, &menu_vtable, self, NULL, NULL);
+    return self;
+}
+
 - (void)_gone
 {
     if (_gone)
         return;
     _gone = YES;
+    if (bus && _menuObject && !_itemObject) {
+        g_dbus_connection_unregister_object(bus, _menuObject);
+        _menuObject = 0;
+    }
     if (bus && _itemObject) {
         /* There is no "unregister": a Passive item is hidden by the menu bar. */
         char path[64];
@@ -559,6 +582,7 @@ static void menu_will_open(NSMenu *menu)
     [_ids release];
     [_shownTip release];
     [_shownStatus release];
+    [_refresh release];
     [super dealloc];
 }
 
@@ -719,6 +743,9 @@ static void menu_will_open(NSMenu *menu)
 
 - (BOOL)_aboutToShow:(int)ident
 {
+    NSMenu *fresh = ident == 0 && _refresh ? _refresh() : _menu;
+    if (fresh != _menu)
+        [self setMenu:fresh];
     NSMenu *menu = ident == 0 ? _menu
                    : (ident <= (int)[_ids count] ? [(NSMenuItem *)_ids[ident - 1] submenu] : nil);
     if (menu)
@@ -806,3 +833,10 @@ static void menu_will_open(NSMenu *menu)
 }
 - (void)drawStatusBarBackgroundInRect:(NSRect)rect withHighlight:(BOOL)highlight {}
 @end
+
+id AMenuServe(const char *path, NSMenu *(^refresh)(void))
+{
+    NSStatusItem *item = [[[NSStatusItem alloc] _initServingMenuAt:path refresh:refresh] autorelease];
+    [item setMenu:refresh()];
+    return item;
+}

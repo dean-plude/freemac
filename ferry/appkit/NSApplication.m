@@ -6,6 +6,7 @@
  * Ferry's NSRunLoop), so timers, file descriptors and window events all wake
  * the same loop, and nextEventMatchingMask: works as on a Mac. */
 #import "AInternal.h"
+#import "ANotify.h"
 
 NSApplication *NSApp;
 NSNotificationName const NSApplicationWillFinishLaunchingNotification = @"NSApplicationWillFinishLaunchingNotification";
@@ -678,7 +679,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 {
     AWarnOnce("the standard About panel");
 }
-- (NSInteger)requestUserAttention:(NSInteger)type { return 0; }
+- (NSInteger)requestUserAttention:(NSInteger)type { return ADockRequestAttention(type); }
 
 /* ---- the app's icon in the dock ---------------------------------------------------------
  * A Wayland dock finds an app's icon through a desktop entry named after
@@ -798,6 +799,7 @@ static void register_app_icon(void)
     [self activateIgnoringOtherApps:YES];
     [self _openLaunchFiles];
     [self _post:NSApplicationDidFinishLaunchingNotification selector:@selector(applicationDidFinishLaunching:)];
+    ADockLaunched();
 }
 
 /* The files named on the command line (after the program's own options,

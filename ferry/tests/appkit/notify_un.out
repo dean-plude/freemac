@@ -1,0 +1,84 @@
+Notify #1 app='appkit_notify_un' replaces=0 icon='' summary='Lunch?' body='From Sam\nNoon at &lt;Café&gt; &amp; co' timeout=-1
+    actions [default:Open, action:ACCEPT:Accept, action:DECLINE:Decline]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+(clicks action:ACCEPT on #1)
+Notify #2 app='appkit_notify_un' replaces=0 icon='' summary='New message' body='Are you coming?' timeout=-1
+    actions [default:Open, action:READ:Mark as Read, inline-reply:Send]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1, x-kde-reply-placeholder-text: 'Your answer', x-kde-reply-submit-button-text: 'Send'}
+(replies 'Yes, at noon' to #2)
+Notify #3 app='appkit_notify_un' replaces=0 icon='' summary='Ignored' body='Swiped away' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+(dismisses #3)
+Notify #4 app='appkit_notify_un' replaces=0 icon='' summary='Dismissed' body='The category wants to know' timeout=-1
+    actions [default:Open, action:READ:Mark as Read, inline-reply:Send]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1, x-kde-reply-placeholder-text: 'Your answer', x-kde-reply-submit-button-text: 'Send'}
+(dismisses #4)
+Notify #5 app='appkit_notify_un' replaces=0 icon='' summary='Tap me' body='Opens the app' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+(clicks default on #5)
+Notify #6 app='appkit_notify_un' replaces=0 icon='' summary='Half a second later' body='' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+Notify #7 app='appkit_notify_un' replaces=0 icon='' summary='On the second' body='From a calendar trigger' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+CloseNotification #6
+Notify #7 app='appkit_notify_un' replaces=7 icon='' summary='On the second' body='Updated' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', sound-name: 'message-new-instant', urgency: 1}
+Update application://appkit_notify_un.desktop {count: 4, count-visible: true, urgent: false}
+Update application://appkit_notify_un.desktop {count: 0, count-visible: false, urgent: false}
+Notify #8 app='appkit_notify_un' replaces=0 icon='' summary='Shown in front' body='The delegate asked for a banner' timeout=-1
+    actions [default:Open]
+    hints {desktop-entry: 'appkit_notify_un', suppress-sound: true, urgency: 1}
+CloseNotification #7
+CloseNotification #8
+----
+same center: yes
+authorization granted: yes, error: none, answered off the main thread: yes
+settings: authorization 2, alert 2, sound 2, badge 2, style 1, previews 0
+categories: INVITE, MESSAGE
+added invite: no error
+pending (a request with no trigger isn't): 
+response invite -> ACCEPT (userInfo thread lunch); app active: yes
+delivered after the click: 
+added chat: no error
+response chat -> REPLY text "Yes, at noon"; app active: no
+added ignored: no error
+delivered after it was swiped away: 
+added dismissed: no error
+response dismissed -> com.apple.UNNotificationDismissActionIdentifier; app active: no
+added tap: no error
+response tap -> com.apple.UNNotificationDefaultActionIdentifier; app active: yes
+delivered: 
+added soon: no error
+time-interval trigger: 0.5 s, repeats no, next in under a second: yes
+pending: soon
+pending after it fired: 
+delivered: soon
+a repeating trigger under a minute: NSInternalInconsistencyException
+calendar trigger next in under three seconds: yes
+added clock: no error
+daily trigger next at 09:30
+added daily: no error
+added later: no error
+pending: clock, daily, later
+pending after removing daily: clock, later
+pending after the calendar trigger fired: later
+pending after removing all: 
+delivered after removing soon: clock
+added clock: no error
+delivered: clock
+added badge only: no error
+badge cleared: no error
+will present quiet (the app is in front)
+added quiet: no error
+will present front (the app is in front)
+added front: no error
+delivered: clock, front
+delivered after removing all: 
+done
+app exit=0
+exit=0

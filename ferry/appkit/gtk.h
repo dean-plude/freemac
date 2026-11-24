@@ -371,4 +371,14 @@ const char *pango_font_face_get_face_name(PangoFontFace *face);
 PangoFontDescription *pango_font_face_describe(PangoFontFace *face);
 gboolean pango_font_face_is_synthesized(PangoFontFace *face);
 char *poppler_page_get_text(PopplerPage *page);
+/* Notifications and the Dock (ANotifyServer.m, NSDockTile.m): the replies to
+ * D-Bus calls made without waiting, sending what is queued before the
+ * program ends, and the GVariant kinds that the notification and
+ * LauncherEntry interfaces use. */
+typedef struct _GAsyncResult GAsyncResult;
+GVariant *g_dbus_connection_call_finish(GDBusConnection *connection, GAsyncResult *result, GError **error);
+gboolean g_dbus_connection_flush_sync(GDBusConnection *connection, void *cancellable, GError **error);
+GVariant *g_variant_new_int64(int64_t value);
+GVariant *g_variant_new_byte(unsigned char value);
+uint32_t g_variant_get_uint32(GVariant *value);
 #endif
