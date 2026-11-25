@@ -264,6 +264,26 @@ static unsigned long never_mutated;
     return [self initWithDictionary:d];
 }
 - (instancetype)initWithContentsOfURL:(NSURL *)url { return [self initWithContentsOfFile:[url path]]; }
+/* The values are copied; keys always are (freemac 1.221, Ferry 0.45.0). */
+- (instancetype)initWithDictionary:(NSDictionary *)dict copyItems:(BOOL)flag
+{
+    if (!flag)
+        return [self initWithDictionary:dict];
+    NSUInteger n = [dict count];
+    id *k = malloc((n ? n : 1) * sizeof(id)), *v = malloc((n ? n : 1) * sizeof(id));
+    NSUInteger i = 0;
+    for (id key in dict) {
+        k[i] = key;
+        v[i] = [[dict objectForKey:key] copyWithZone:NULL];
+        i++;
+    }
+    self = [self initWithObjects:v forKeys:k count:i];
+    while (i--)
+        [v[i] release];
+    free(k);
+    free(v);
+    return self;
+}
 - (instancetype)initWithDictionary:(NSDictionary *)dict
 {
     NSUInteger n = [dict count];
@@ -596,6 +616,18 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
     return [self setWithArray:tmp];
 }
 - (instancetype)init { return [self initWithObjects:NULL count:0]; }
+- (instancetype)initWithSet:(NSSet *)set copyItems:(BOOL)flag
+{
+    NSArray *all = [set allObjects];
+    if (flag)
+        all = [[[NSArray alloc] initWithArray:all copyItems:YES] autorelease];
+    NSUInteger n = [all count];
+    id *objs = malloc((n ? n : 1) * sizeof(id));
+    [all getObjects:objs range:NSMakeRange(0, n)];
+    self = [self initWithObjects:objs count:n];
+    free(objs);
+    return self;
+}
 - (instancetype)initWithObjects:(const id[])objects count:(NSUInteger)count
 {
     [self release];

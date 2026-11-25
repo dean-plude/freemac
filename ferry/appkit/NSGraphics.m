@@ -300,6 +300,31 @@ NAMED(keyboardFocusIndicatorColor, 0.10, 0.45, 0.91, 0.5)
 NAMED(alternateSelectedControlColor, 0.10, 0.45, 0.91, 1)
 NAMED(headerTextColor, 0, 0, 0, 0.88)
 NAMED(linkColor, 0.0, 0.40, 0.85, 1)
+/* the older system colours (freemac 1.221, Ferry 0.45.0) */
+NAMED(windowFrameColor, 0.80, 0.80, 0.80, 1)
+NAMED(windowFrameTextColor, 0, 0, 0, 0.88)
+NAMED(scrollBarColor, 0.90, 0.90, 0.90, 1)
+NAMED(knobColor, 0, 0, 0, 0.45)
+NAMED(selectedKnobColor, 0, 0, 0, 0.6)
+NAMED(highlightColor, 1, 1, 1, 1)
+NAMED(shadowColor, 0, 0, 0, 1)
+NAMED(controlHighlightColor, 0.85, 0.85, 0.85, 1)
+NAMED(controlLightHighlightColor, 1, 1, 1, 1)
+NAMED(controlShadowColor, 0.5, 0.5, 0.5, 1)
+NAMED(controlDarkShadowColor, 0.25, 0.25, 0.25, 1)
+NAMED(selectedMenuItemColor, 0.10, 0.45, 0.91, 1)
+NAMED(selectedMenuItemTextColor, 1, 1, 1, 1)
+NAMED(quaternaryLabelColor, 0, 0, 0, 0.1)
+NAMED(unemphasizedSelectedTextBackgroundColor, 0.86, 0.86, 0.86, 1)
+NAMED(findHighlightColor, 1, 0.9, 0, 1)
+/* An app's named colours are in its compiled asset catalogue, which Ferry
+ * doesn't read: nil, as a Mac answers for a name it has no colour for. */
++ (NSColor *)colorNamed:(NSString *)name { return [self colorNamed:name bundle:nil]; }
++ (NSColor *)colorNamed:(NSString *)name bundle:(NSBundle *)bundle
+{
+    AWarnOnce("colorNamed: (an app's own colours, from its asset catalogue)");
+    return nil;
+}
 
 - (void)dealloc
 {
@@ -1200,6 +1225,60 @@ void NSRectFillUsingOperation(NSRect rect, NSCompositingOperation op)
     [c restoreGraphicsState];
     [c setCompositingOperation:saved];
 }
+/* lists of rectangles (freemac 1.221, Ferry 0.45.0) */
+static void fill_list(const NSRect *rects, NSColor *const *colors, const CGFloat *grays, NSInteger count,
+                      BOOL withOp, NSCompositingOperation op)
+{
+    NSGraphicsContext *c = current_context;
+    if (!c || !current_cg() || count <= 0)
+        return;
+    NSCompositingOperation saved = [c compositingOperation];
+    [c saveGraphicsState];
+    if (withOp)
+        [c setCompositingOperation:op];
+    for (NSInteger i = 0; i < count; i++) {
+        if (colors)
+            [colors[i] setFill];
+        else if (grays)
+            [[NSColor colorWithCalibratedWhite:grays[i] alpha:1] setFill];
+        CGContextFillRect(current_cg(), rects[i]);
+    }
+    [c restoreGraphicsState];
+    [c setCompositingOperation:saved];
+}
+void NSRectFillListWithColors(const NSRect *rects, NSColor *const *colors, NSInteger count)
+{
+    fill_list(rects, colors, NULL, count, NO, 0);
+}
+void NSRectFillListWithGrays(const NSRect *rects, const CGFloat *grays, NSInteger count)
+{
+    fill_list(rects, NULL, grays, count, NO, 0);
+}
+void NSRectFillListUsingOperation(const NSRect *rects, NSInteger count, NSCompositingOperation op)
+{
+    fill_list(rects, NULL, NULL, count, YES, op);
+}
+void NSRectFillListWithColorsUsingOperation(const NSRect *rects, NSColor *const *colors, NSInteger count,
+                                            NSCompositingOperation op)
+{
+    fill_list(rects, colors, NULL, count, YES, op);
+}
+
+/* A focus ring around what is filled or stroked next, until the graphics
+ * state is restored: a glow of the focus colour as the shape's shadow, and
+ * with NSFocusRingOnly the glow outside the shape alone, leaving what is
+ * under the shape as it was. The ring goes below the shape for
+ * NSFocusRingAbove as well (freemac 1.221, Ferry 0.45.0). */
+void NSSetFocusRingStyle(NSFocusRingPlacement placement)
+{
+    CGContextRef cg = current_cg();
+    if (!cg)
+        return;
+    NSColor *ring = [[NSColor keyboardFocusIndicatorColor] colorWithAlphaComponent:1];
+    CGContextSetShadowWithColor(cg, CGSizeZero, 3, [ring CGColor]);
+    GContextSetShadowOnly(cg, placement == NSFocusRingOnly);
+}
+
 void NSFrameRectWithWidth(NSRect r, CGFloat w)
 {
     if (!current_cg())

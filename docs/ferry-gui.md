@@ -2721,6 +2721,21 @@ the app's windows, which proposes, shows and takes the drop as on a Mac. A
 table shows the proposed drop as a ring around a row or a line between
 rows. Nothing is drawn under the pointer, and drags don't leave the app. (freemac 1.220, Ferry 0.44.0)
 
+- **Building the nine apps again, not compared with a Mac** (freemac 1.221, Ferry 0.45.0).
+  - `UCKeyTranslate`'s characters for dead keys and Option combinations (here no key is a dead key and Option types what the key types without it), and `LMGetKbdType` (here 40).
+  - `NSArchiver`'s format: Ferry writes its own property list (`archiverData` begins `bplist`), so archives made on a Mac can't be read and ones made here can't be read on a Mac.
+  - Which accents `NSDiacriticInsensitiveSearch` folds (here Latin letters with accents, cedillas and strokes) and which widths `NSWidthInsensitiveSearch` folds (here the fullwidth ASCII forms).
+  - The order of an `NSMapTable`'s or `NSHashTable`'s objects when enumerated.
+  - The run loop's ordered performs, which run in every mode, and the modes themselves, which change nothing but `currentMode`.
+  - When the file manager asks its delegate: here once for the item it was given, not for each item inside a folder.
+  - `editedRange` after several edits between `beginEditing` and `endEditing` (here the union of the edits' ranges, moved as later edits change the length before them).
+  - The focus ring's width and colour (here a glow 3 points wide in the focus colour), and `NSFocusRingAbove`, which draws the ring below the shape like `NSFocusRingBelow`.
+  - The colours of the older system colours (`windowFrameColor`, `controlShadowColor` and the rest), from Ferry's own light palette, and `NSAppKitVersionNumber` (here 2487).
+  - A text field as its own field editor: `currentEditor` answers the field, which takes `selectedRange` and `setSelectedRange:`, and `fieldEditor:forObject:` answers nil.
+  - `hitTestForEvent:inRect:ofView:` (here content for any point inside, editable text for an editable or selectable text cell, tracking for an enabled button cell).
+  - When a shading's function is called: here 256 times when the shading is made, not while it is drawn, so a function whose answers change later draws its first answers.
+  - `NSMenuDidBeginTrackingNotification` and `NSMenuDidEndTrackingNotification` for menus that open over a window; a status item's menu, which is the desktop's, posts neither.
+
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2814,3 +2829,4 @@ bridge in the `ferry` binary.
 - 2026-11-24: Ferry 0.42.0 (freemac 1.217): the older `WebView`'s `WebFrameView` and document view with scrolling, over forty DOM classes kept in step with the page, subframes and their loads, the resource load delegate, user style sheets and new windows through the policy delegate, `make check` 206/206.
 - 2026-11-25: Ferry 0.43.0 (freemac 1.219): what the nine apps call next: child windows and panels that hide with their app, login items as autostart entries (`LSSharedFileList`, `SMLoginItemSetEnabled`), directory enumerators, resource values, the trash and `NSFileCoordinator`, some seventy-five string encodings, text by line, word and sentence, Core Foundation collections with callbacks, `NSAssert` and `NSAffineTransform`, the older `WebView` no longer loses its page reports on a busy computer, `make check` 219/219.
 - 2026-11-25: Ferry 0.44.0 (freemac 1.220): Quartz Window Services and posted keys behind Control Other Windows, table and outline drag and drop within the app, `CFSet` and `CFBag` with callbacks, `NSDocument` as a file presenter, and a window controller's window no longer released twice, `make check` 223/223.
+- 2026-11-25: Ferry 0.45.0 (freemac 1.221): the nine apps' source compiled against Ferry's SDK and what stopped it added: the headers and BSD names every app includes first, keyboard layouts, file references, `NSArchiver` and coding without keys, `NSMapTable` and its kin, shadings, `NSScriptCommand`, and Foundation's and AppKit's older and smaller names, 418 of the apps' 637 files compiling, `make check` 231/231.

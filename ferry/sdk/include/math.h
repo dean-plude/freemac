@@ -74,5 +74,8 @@ long double expl(long double); long double logl(long double); long double sinl(l
 long double cosl(long double); long double tanl(long double); long double atan2l(long double, long double);
 long double frexpl(long double, int *); long double ldexpl(long double, int); long double modfl(long double, long double *);
 long double copysignl(long double, long double); long double nanl(const char *);
+long double roundl(long double); long double truncl(long double); long double fminl(long double, long double);
+long double fmaxl(long double, long double); long double log10l(long double); long double log2l(long double);
+long double exp2l(long double);
 __FERRY_END
 #endif

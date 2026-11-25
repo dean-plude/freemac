@@ -1,0 +1,16 @@
+source: com.apple.keylayout.US, English (US)
+type TISTypeKeyboardLayout, category TISCategoryKeyboardInputSource, languages en
+ascii capable 1, selected 1, unknown property NULL
+layout data yes, keyboard type 40
+a a, shift-a A, caps-a A, caps-shift-a A, control-a U+0001, control-a shown a
+1 1, shift-1 !, shift-/ ?, shift-` ~, caps-1 1, option-v v, command-v v
+keypad 7 7, keypad * *, ISO section U+00A7 and U+00B1
+return U+000D, tab U+0009, space  , delete U+0008, forward delete U+007F, escape U+001B
+left U+001C, up U+001E, home U+0001, page down U+000C, F5 U+0010, command key (nothing)
+key up (nothing), auto key a, NULL layout -50
+sources 1, US 1, none 0
+for English yes, for French none, select -50
+glyphs 2318 2325 2303 21E7, menu glyphs 11 2
+symbolic mode 1, after pop 0
+modifiers 0, keys held none
+exit=0

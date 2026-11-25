@@ -1,0 +1,13 @@
+the function was asked at many points
+before the start, extended (5,10):   0   0 255 255
+start (21,10):   6   0 249 255
+middle (50,10): 130   0 125 255
+end (79,10): 253   0   2 255
+after the end, not extended (95,10):   0   0   0   0
+radial centre (25,10):   9   0 246 255
+radial edge (44,10): 249   0   6 255
+outside the clip (75,10):   0   0   0   0
+clamped green (50,10):   0 128   0 255
+info released while shadings hold the function: 0
+info released after: 1
+exit=0

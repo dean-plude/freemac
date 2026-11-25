@@ -64,6 +64,10 @@ const char *const ferry_passthrough[] = {
     "sinf", "cosf", "tanf", "atanf", "atan2f", "expf", "logf", "log2f", "log10f", "powf",
     "sqrtf", "floorf", "ceilf", "roundf", "truncf", "fabsf", "fmodf", "fminf", "fmaxf",
     "hypotf",
+    /* long double maths: the same 80-bit format on both systems (freemac 1.221, Ferry 0.45.0) */
+    "sqrtl", "fabsl", "floorl", "ceill", "fmodl", "powl", "roundl", "truncl", "fminl", "fmaxl", "ldexpl",
+    "frexpl", "expl", "exp2l", "logl", "log10l", "log2l", "sinl", "cosl", "tanl", "atan2l", "modfl", "copysignl",
+    "imaxabs", "imaxdiv",
     /* getopt's variables (getopt itself is converted) */
     "optarg", "optind", "opterr", "optopt",
     NULL,

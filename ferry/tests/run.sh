@@ -47,7 +47,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
-        foundation_fileaccess)
+        foundation_fileaccess|foundation_fsrefs|foundation_more_names)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -76,7 +76,7 @@ run_one() {
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_bindings)
+        appkit_bindings|appkit_archiver)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -103,6 +103,10 @@ run_one() {
             url_env env FERRY_TEST_TLS_CERT="$build/tls.der" "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
+        libsystem_more)
+            # its files, and their extended attributes, in a home of its own
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            TMPDIR="$build/home_$name" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         # threads: a hang is a failure, not a stuck run
         tlv_*|cxx_thread_local) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -153,6 +157,10 @@ done
 # The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
 run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
 run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore
+# The plumbing the nine apps' sources needed first (freemac 1.221, Ferry
+# 0.45.0): the SDK's availability, target and BSD headers, zlib's and
+# Mach-O's, and malloc zones, basename, extended attributes and scandir.
+run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
@@ -625,6 +633,17 @@ run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_c
     -framework Cocoa
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
+# Keyboard layouts (freemac 1.221, Ferry 0.45.0): input sources and
+# UCKeyTranslate with the English (US) layout, with no Strata to ask.
+run_one appkit_keylayout "$here/appkit/keylayout.m" "$here/appkit/keylayout.out" -fobjc-arc -framework Cocoa \
+    -framework Carbon
+# NSArchiver and NSUnarchiver, and keyed archives' values without keys
+# (freemac 1.221, Ferry 0.45.0).
+run_one appkit_archiver "$here/appkit/archiver.m" "$here/appkit/archiver.out" -fobjc-arc -framework Cocoa
+# AppKit names the nine apps use: modes, older names, modal sessions, focus
+# rings, text storage edits, cell masks, field editors, menus, appearances
+# (freemac 1.221, Ferry 0.45.0).
+run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.out" -fobjc-arc -framework Cocoa
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
 # Layer-backed and layer-hosting views, NSAnimationContext and animator
 # proxies, on Core Animation's test clock.
@@ -976,6 +995,9 @@ run_one appkit_rulers "$here/appkit/rulers.m" "$here/appkit/rulers.out" -fobjc-a
 # strokes, images, gradients, text and transparency layers, in bitmaps.
 run_one graphics_shadows "$here/graphics/shadows.m" "$here/graphics/shadows.out" -fobjc-arc -framework CoreText \
     -framework CoreGraphics -framework Foundation
+# Functions and shadings (freemac 1.221, Ferry 0.45.0), as Sequel Pro's tab bar
+# draws its tabs, in a bitmap.
+run_one graphics_shadings "$here/graphics/shadings.c" "$here/graphics/shadings.out" -framework CoreGraphics
 # Tracking areas, tracking rectangles, cursor rectangles and cursors
 # (freemac 1.213, Ferry 0.39.0), by mouse events sent to a window.
 run_one appkit_tracking "$here/appkit/tracking.m" "$here/appkit/tracking.out" -fobjc-arc -fblocks -framework Cocoa
@@ -1050,6 +1072,16 @@ run_one foundation_cfmore "$here/foundation/cfmore.c" "$here/foundation/cfmore.o
 run_one foundation_cfset "$here/foundation/cfset.c" "$here/foundation/cfset.out" -framework CoreFoundation
 run_one foundation_fileaccess "$here/foundation/fileaccess.m" "$here/foundation/fileaccess.out" -fobjc-arc -fblocks \
     -framework Foundation
+# NSMapTable, NSHashTable and NSPointerArray, and Foundation names the
+# nine apps use (freemac 1.221, Ferry 0.45.0).
+run_one foundation_pointer_tables "$here/foundation/pointer_tables.m" "$here/foundation/pointer_tables.out" \
+    -fobjc-arc -framework Foundation
+run_one foundation_more_names "$here/foundation/more_names.m" "$here/foundation/more_names.out" -fobjc-arc \
+    -framework Foundation
+# File references and the trash, CoreServices' File Manager calls (freemac
+# 1.221, Ferry 0.45.0), in a home of the test's own.
+run_one foundation_fsrefs "$here/foundation/fsrefs.m" "$here/foundation/fsrefs.out" -fobjc-arc -framework Foundation \
+    -framework CoreServices
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \
     -framework Foundation
 if [ -f "$build/foundation_asserts.err" ] &&

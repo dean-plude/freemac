@@ -125,6 +125,7 @@ int ferry_virtual_stat(const char *path, struct stat *s);  /* 1 if it was one of
 int ferry_errno_to_mac(int linux_errno);
 int ferry_errno_to_linux(int mac_errno);
 void ferry_sync_errno(void);
+void ferry_set_mac_errno(int mac_errno); /* a Mac number with no Linux twin (ENOATTR) */
 
 /* posix.c */
 int ferry_signal_to_linux(int mac_signal);
@@ -140,6 +141,7 @@ void ferry_socket_closed(int fd);
 /* kqueue.c: kqueue and kevent on epoll, select and poll with the Mac's
  * structures, and the close that forgets a descriptor's events */
 extern const struct ferry_symbol ferry_kqueue_symbols[];
+extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs */
 struct sigaction;
 /* sigaction for posix.c: while a kqueue watches a signal, the program's
  * handler is kept here and called from the watcher's. */

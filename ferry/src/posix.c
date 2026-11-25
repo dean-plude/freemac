@@ -288,6 +288,64 @@ static int mac_closedir(struct mac_DIR *m)
 }
 
 static void mac_rewinddir(struct mac_DIR *m) { rewinddir(m->dir); }
+
+/* scandir(3) (freemac 1.221, Ferry 0.45.0): each entry is copied out in
+ * the Mac's layout, as long as its own record says, and sorted with the
+ * program's comparison, which is handed the Mac entries. */
+static int mac_alphasort(const struct mac_dirent **a, const struct mac_dirent **b)
+{
+    return strcoll((*a)->name, (*b)->name);
+}
+
+static int (*scandir_compare)(const struct mac_dirent **, const struct mac_dirent **);
+static int scandir_trampoline(const void *a, const void *b)
+{
+    return scandir_compare((const struct mac_dirent **)a, (const struct mac_dirent **)b);
+}
+
+static int mac_scandir(const char *path, struct mac_dirent ***out, int (*select)(const struct mac_dirent *),
+                       int (*compare)(const struct mac_dirent **, const struct mac_dirent **))
+{
+    static pthread_mutex_t sort_lock = PTHREAD_MUTEX_INITIALIZER;
+    struct mac_DIR *d = mac_opendir(path);
+    if (!d)
+        return -1;
+    struct mac_dirent **list = NULL;
+    size_t n = 0, cap = 0;
+    struct mac_dirent *e;
+    while ((e = mac_readdir(d))) {
+        if (select && !select(e))
+            continue;
+        if (n == cap) {
+            cap = cap ? cap * 2 : 32;
+            struct mac_dirent **bigger = realloc(list, cap * sizeof *list);
+            if (!bigger)
+                goto nomem;
+            list = bigger;
+        }
+        struct mac_dirent *copy = malloc(e->reclen);
+        if (!copy)
+            goto nomem;
+        memcpy(copy, e, e->reclen);
+        list[n++] = copy;
+    }
+    mac_closedir(d);
+    if (compare && n > 1) {
+        pthread_mutex_lock(&sort_lock);
+        scandir_compare = compare;
+        qsort(list, n, sizeof *list, scandir_trampoline);
+        pthread_mutex_unlock(&sort_lock);
+    }
+    *out = list;
+    return (int)n;
+nomem:
+    while (n)
+        free(list[--n]);
+    free(list);
+    mac_closedir(d);
+    errno = ENOMEM;
+    return -1;
+}
 static int mac_dirfd(struct mac_DIR *m) { return m->fd; }
 static long mac_telldir(struct mac_DIR *m) { return telldir(m->dir); }
 static void mac_seekdir(struct mac_DIR *m, long pos) { seekdir(m->dir, pos); }
@@ -879,6 +937,8 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"telldir$INODE64", mac_telldir},
     {"seekdir$INODE64", mac_seekdir},
     {"closedir", mac_closedir},
+    {"scandir$INODE64", mac_scandir},
+    {"alphasort$INODE64", mac_alphasort},
     {"dirfd", mac_dirfd},
     {"mmap", mac_mmap},
     {"clock_gettime", mac_clock_gettime},

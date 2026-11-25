@@ -1,0 +1,12 @@
+accents: 0, 6, without the option 1, case and accents 20, compare 0, width 1
+copied: 3 times, array 1, dictionary 1, set 1, not copied 1
+byte order: host 1, big int 44332211, big short bbaa, little 11223344, double back 2.50
+JSON from a stream: 3 numbers; to a stream: 5 bytes, ["x"]
+before the turn: 0 heard
+after it: first second third
+all cancelled: 3 heard
+registered blue, set red, mine 1, names 3, removed 0
+delegate: kept 1, copied 1, removed 1, asked: remove ferry-delegate, remove keep, copy inner, remove ferry-delegate
+script command: current none, direct window 1, evaluated no, runs to nil, error 6
+names: mapped 1, uncached 1, atomic 1, change key new, localized Untranslated
+exit=0

@@ -26,10 +26,10 @@ case $framework in
     ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
     CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
-    CoreServices) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList)' ;;
+    CoreServices) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList|FS[A-Z])' ;;
     ServiceManagement) pattern='^_SM' ;;
     Cocoa) pattern='.' ;;
-    Carbon) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
+    Carbon) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList|FS[A-Z]|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

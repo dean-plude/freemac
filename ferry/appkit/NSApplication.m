@@ -1257,6 +1257,69 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
 }
 - (void)stopModal { [self stopModalWithCode:NSModalResponseStop]; }
 - (void)abortModal { [self stopModalWithCode:NSModalResponseAbort]; }
+
+/* Modal sessions (freemac 1.221, Ferry 0.45.0): the modal loop above, a
+ * turn at a time, for a program that does its own work between turns. A
+ * session remembers the modal window it replaced. */
+struct _NSModalSession {
+    NSWindow *window, *outer;
+    NSModalResponse code;
+    BOOL stopped;
+};
+- (NSModalSession)beginModalSessionForWindow:(NSWindow *)window
+{
+    NSModalSession session = calloc(1, sizeof *session);
+    session->window = [window retain];
+    session->outer = _modal;
+    _modal = window;
+    _modalStopped = NO;
+    _modalCode = NSModalResponseContinue;
+    [window makeKeyAndOrderFront:nil];
+    return session;
+}
+- (NSModalResponse)runModalSession:(NSModalSession)session
+{
+    if (!session)
+        return NSModalResponseAbort;
+    if (session->stopped)
+        return session->code;
+    NSWindow *window = session->window;
+    for (;;) {
+        @autoreleasepool {
+            NSEvent *e = [self nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast]
+                                              inMode:NSModalPanelRunLoopMode dequeue:YES];
+            if (!e)
+                break;
+            NSWindow *w = [e window];
+            BOOL key = [e type] == NSEventTypeKeyDown || [e type] == NSEventTypeKeyUp;
+            @try {
+                if (!w || w == window || (key && AKeyWindow() == window))
+                    [self sendEvent:e];
+            } @catch (NSException *x) {
+                [self reportException:x];
+            }
+        }
+        if (_modalStopped)
+            break;
+    }
+    if (_modalStopped) {
+        session->stopped = YES;
+        session->code = _modalCode;
+        _modalStopped = NO;
+        return session->code;
+    }
+    return NSModalResponseContinue;
+}
+- (void)endModalSession:(NSModalSession)session
+{
+    if (!session)
+        return;
+    if (_modal == session->window)
+        _modal = session->outer;
+    _modalStopped = NO;
+    [session->window release];
+    free(session);
+}
 @end
 
 /* Makes the application object (the Info.plist's NSPrincipalClass, else

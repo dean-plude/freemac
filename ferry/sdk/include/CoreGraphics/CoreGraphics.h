@@ -190,6 +190,29 @@ CGGradientRef CGGradientCreateWithColors(CGColorSpaceRef space, CFArrayRef color
 CGGradientRef CGGradientRetain(CGGradientRef gradient);
 void CGGradientRelease(CGGradientRef gradient);
 
+/* Functions and shadings (freemac 1.221, Ferry 0.45.0): a shading's colours
+ * come from the program's function, which Ferry asks at 256 points along the
+ * shading and draws as a gradient through them. */
+typedef struct CGFunction *CGFunctionRef;
+typedef void (*CGFunctionEvaluateCallback)(void *info, const CGFloat *in, CGFloat *out);
+typedef void (*CGFunctionReleaseInfoCallback)(void *info);
+typedef struct CGFunctionCallbacks {
+    unsigned int version;
+    CGFunctionEvaluateCallback evaluate;
+    CGFunctionReleaseInfoCallback releaseInfo;
+} CGFunctionCallbacks;
+CGFunctionRef CGFunctionCreate(void *info, size_t domainDimension, const CGFloat *domain, size_t rangeDimension,
+                               const CGFloat *range, const CGFunctionCallbacks *callbacks);
+CGFunctionRef CGFunctionRetain(CGFunctionRef function);
+void CGFunctionRelease(CGFunctionRef function);
+typedef struct CGShading *CGShadingRef;
+CGShadingRef CGShadingCreateAxial(CGColorSpaceRef space, CGPoint start, CGPoint end, CGFunctionRef function,
+                                  bool extendStart, bool extendEnd);
+CGShadingRef CGShadingCreateRadial(CGColorSpaceRef space, CGPoint start, CGFloat startRadius, CGPoint end,
+                                   CGFloat endRadius, CGFunctionRef function, bool extendStart, bool extendEnd);
+CGShadingRef CGShadingRetain(CGShadingRef shading);
+void CGShadingRelease(CGShadingRef shading);
+
 /* ---- contexts ----------------------------------------------------------------- */
 
 typedef struct CGContext *CGContextRef;
@@ -354,6 +377,7 @@ CGAffineTransform CGPDFPageGetDrawingTransform(CGPDFPageRef page, CGPDFBox box, 
 void CGContextDrawPDFPage(CGContextRef c, CGPDFPageRef page);
 void CGContextDrawLinearGradient(CGContextRef c, CGGradientRef gradient, CGPoint startPoint, CGPoint endPoint,
                                  CGGradientDrawingOptions options);
+void CGContextDrawShading(CGContextRef c, CGShadingRef shading);
 void CGContextDrawRadialGradient(CGContextRef c, CGGradientRef gradient, CGPoint startCenter, CGFloat startRadius,
                                  CGPoint endCenter, CGFloat endRadius, CGGradientDrawingOptions options);
 

@@ -9,6 +9,26 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+/* What CoreFoundation brings in on a Mac, which programs rely on without
+ * including it themselves (freemac 1.221, Ferry 0.45.0). */
+#include <TargetConditionals.h>
+#include <Availability.h>
+#include <AvailabilityMacros.h>
+#include <sys/types.h>
+#include <mach/boolean.h>
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <float.h>
+#include <limits.h>
+#include <locale.h>
+#include <math.h>
+#include <signal.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 typedef const void *CFTypeRef;
 typedef CFTypeRef CFPropertyListRef;
@@ -23,6 +43,34 @@ typedef int32_t SInt32;
 typedef uint32_t UInt32;
 typedef uint8_t UInt8;
 typedef uint16_t UniChar;
+/* The rest of the classic Mac types (MacTypes.h), freemac 1.221, Ferry 0.45.0. */
+typedef int8_t SInt8;
+typedef uint16_t UInt16;
+typedef int16_t SInt16;
+typedef uint64_t UInt64;
+typedef int64_t SInt64;
+typedef float Float32;
+typedef double Float64;
+typedef uint8_t Byte;
+typedef int8_t SignedByte;
+typedef char *Ptr;
+typedef Ptr *Handle;
+typedef long Size;
+typedef uint16_t UTF16Char;
+typedef uint32_t UTF32Char;
+typedef uint8_t UTF8Char;
+typedef unsigned char Str255[256];
+typedef unsigned char Str63[64];
+typedef unsigned char Str31[32];
+typedef unsigned char *StringPtr;
+typedef const unsigned char *ConstStringPtr;
+typedef const unsigned char *ConstStr255Param;
+typedef uint32_t FourCharCode;
+typedef uint32_t ResType;
+typedef int16_t ScriptCode;
+typedef int16_t LangCode;
+typedef int16_t RegionCode;
+typedef struct { uint32_t lo, hi; } UnsignedWide; /* little-endian order */
 typedef UInt32 CFStringEncoding;
 typedef struct { CFIndex location, length; } CFRange;
 static inline CFRange CFRangeMake(CFIndex loc, CFIndex len) { CFRange r = {loc, len}; return r; }

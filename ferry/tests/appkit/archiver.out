@@ -1,0 +1,17 @@
+archived yes, not a Mac's typedstream 1
+back: Shape, keyed coding offered 0
+  square: sides 4, scale 0.00, angle 0.000, filled 0, frame {{0, 0}, {0, 0}}
+  action NULL, kind Nil, mixed 1 0.5 y, corners 0 0 0, label four, extra 0
+  triangle: sides 3, scale 1.50, angle 0.125, filled 1, frame {{1, 2}, {30, 40}}
+  action copy:, kind NSString, mixed -7 2.5 x, corners 10 -20 30, label three sides, extra 99
+  the friend's friend is the same object 1, the owner is the friend 1
+dictionary 5 entries, equal list 1, date 1, set 1
+colour 1.00 0.50 0.25, font same 13 pt
+a colour alone: a colour
+archiver data is the given data 1
+steps: 42, root string, {5, 6}, at end 1, keyed 0, version of Shape 3, of a missing class NSNotFound 1
+renamed: Replacement 7, decoded as Replacement
+keyed archive with unkeyed values: triangle, friend square
+to a file 1, back in a file
+a Mac's archive gives nil, junk gives nil, nil gives nil
+exit=0

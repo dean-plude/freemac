@@ -4,8 +4,10 @@
  * documentation of these classes and of the archive layout (a property
  * list with "$archiver", "$version", "$top" and "$objects", where objects
  * refer to each other by UID and each object names its class through a
- * "$class" entry holding "$classname" and "$classes"). Only keyed coding
- * is supported; the old sequential NSArchiver form is not. */
+ * "$class" entry holding "$classname" and "$classes"). Values coded
+ * without keys are given keys of their own ("$0", "$1"...), and NSArchiver
+ * and NSUnarchiver (freemac 1.221, Ferry 0.45.0) write and read archives
+ * of that form; see below. */
 #import "FInternal.h"
 
 NSString *const NSKeyedArchiveRootObjectKey = @"root";
@@ -39,8 +41,135 @@ static NSError *archive_error(NSInteger code, NSString *why)
 
 static void subclass_responsibility(id self, SEL cmd)
 {
-    FRaise(NSInvalidArgumentException, @"*** -[%s %s]: only keyed archivers implement this",
+    FRaise(NSInvalidArgumentException, @"*** -[%s %s]: only an archiver implements this",
            object_getClassName(self), sel_getName(cmd));
+}
+/* ---- coding without keys: walking a value by its type encoding ---------------------- */
+
+/* How many values without a key the object at each depth has had. */
+static NSUInteger *seq_slot(NSUInteger **seq, NSUInteger *cap, NSUInteger depth)
+{
+    if (depth >= *cap) {
+        NSUInteger n = depth + 8;
+        *seq = realloc(*seq, n * sizeof **seq);
+        for (NSUInteger i = *cap; i < n; i++)
+            (*seq)[i] = 0;
+        *cap = n;
+    }
+    return &(*seq)[depth];
+}
+
+static const char *skip_qualifiers(const char *t)
+{
+    while (*t && strchr("rnNoORVA", *t))
+        t++;
+    return t;
+}
+
+enum leaf_kind { LEAF_INT, LEAF_UINT, LEAF_BOOL, LEAF_FLOAT, LEAF_DOUBLE, LEAF_OBJECT, LEAF_CLASS, LEAF_SEL,
+                 LEAF_CSTRING, LEAF_BYTES };
+typedef void (^leaf_fn)(enum leaf_kind kind, void *addr, size_t size);
+
+static size_t size_of_type(const char *t)
+{
+    NSUInteger size = 0;
+    NSGetSizeAndAlignment(t, &size, NULL);
+    return size;
+}
+
+/* Each value a type is made of, in order: a structure's fields and an
+ * array's elements one by one, and anything else (unions, bit fields,
+ * long doubles) as its bytes. */
+static void walk_value(const char *type, char *addr, leaf_fn leaf)
+{
+    const char *t = skip_qualifiers(type);
+    switch (*t) {
+    case 'v': return;
+    case 'c': leaf(LEAF_INT, addr, 1); return;
+    case 's': case 'i': case 'l': case 'q': leaf(LEAF_INT, addr, size_of_type(t)); return;
+    case 'C': case 'S': case 'I': case 'L': case 'Q': leaf(LEAF_UINT, addr, size_of_type(t)); return;
+    case 'B': leaf(LEAF_BOOL, addr, sizeof(bool)); return;
+    case 'f': leaf(LEAF_FLOAT, addr, sizeof(float)); return;
+    case 'd': leaf(LEAF_DOUBLE, addr, sizeof(double)); return;
+    case '@': leaf(LEAF_OBJECT, addr, sizeof(id)); return;
+    case '#': leaf(LEAF_CLASS, addr, sizeof(Class)); return;
+    case ':': leaf(LEAF_SEL, addr, sizeof(SEL)); return;
+    case '*': leaf(LEAF_CSTRING, addr, sizeof(char *)); return;
+    case '[': {
+        char *end;
+        unsigned long n = strtoul(t + 1, &end, 10);
+        size_t es = size_of_type(end);
+        for (unsigned long i = 0; i < n; i++)
+            walk_value(end, addr + i * es, leaf);
+        return;
+    }
+    case '{': {
+        const char *f = t + 1;
+        while (*f && *f != '=' && *f != '}')
+            f++;
+        if (*f == '=') {
+            enum { MAX_FIELDS = 64 };
+            const char *types[MAX_FIELDS];
+            size_t offsets[MAX_FIELDS];
+            int count = 0;
+            BOOL plain = YES;
+            size_t off = 0;
+            f++;
+            while (*f && *f != '}' && plain) {
+                if (*f == '"') {
+                    f = strchr(f + 1, '"');
+                    f = f ? f + 1 : "";
+                    continue;
+                }
+                if (*f == 'b' || count == MAX_FIELDS) {
+                    plain = NO;
+                    break;
+                }
+                NSUInteger fs = 0, fa = 1;
+                const char *next = NSGetSizeAndAlignment(f, &fs, &fa);
+                off = (off + fa - 1) / fa * fa;
+                types[count] = f;
+                offsets[count++] = off;
+                off += fs;
+                f = next;
+            }
+            if (plain && count) {
+                for (int i = 0; i < count; i++) {
+                    const char *end = NSGetSizeAndAlignment(types[i], NULL, NULL);
+                    char *one = strndup(types[i], (size_t)(end - types[i]));
+                    walk_value(one, addr + offsets[i], leaf);
+                    free(one);
+                }
+                return;
+            }
+        }
+        leaf(LEAF_BYTES, addr, size_of_type(t));
+        return;
+    }
+    default:
+        leaf(LEAF_BYTES, addr, size_of_type(t));
+        return;
+    }
+}
+
+static int64_t read_int(const void *addr, size_t size, BOOL is_signed)
+{
+    switch (size) {
+    case 1: return is_signed ? *(const int8_t *)addr : *(const uint8_t *)addr;
+    case 2: return is_signed ? *(const int16_t *)addr : *(const uint16_t *)addr;
+    case 4: return is_signed ? *(const int32_t *)addr : *(const uint32_t *)addr;
+    default: return *(const int64_t *)addr;
+    }
+}
+
+static void write_int(void *addr, size_t size, int64_t v)
+{
+    switch (size) {
+    case 1: *(int8_t *)addr = (int8_t)v; break;
+    case 2: *(int16_t *)addr = (int16_t)v; break;
+    case 4: *(int32_t *)addr = (int32_t)v; break;
+    default: *(int64_t *)addr = v; break;
+    }
 }
 
 /* ---- NSCoder ------------------------------------------------------------------ */
@@ -104,6 +233,114 @@ static void subclass_responsibility(id self, SEL cmd)
     id s = [self decodeObjectForKey:key];
     return [s isKindOfClass:[NSString class]] ? NSRectFromString(s) : NSZeroRect;
 }
+
+/* Coding without keys, written in terms of the two calls each coder
+ * implements: encodeValueOfObjCType:at: and decodeValueOfObjCType:at:size:. */
+- (void)encodeValueOfObjCType:(const char *)type at:(const void *)addr { subclass_responsibility(self, _cmd); }
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data size:(NSUInteger)size
+{
+    subclass_responsibility(self, _cmd);
+}
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data
+{
+    [self decodeValueOfObjCType:type at:data size:size_of_type(type)];
+}
+- (void)encodeValuesOfObjCTypes:(const char *)types, ...
+{
+    va_list ap;
+    va_start(ap, types);
+    for (const char *t = types; t && *t;) {
+        const char *end = NSGetSizeAndAlignment(t, NULL, NULL);
+        char *one = strndup(t, (size_t)(end - t));
+        [self encodeValueOfObjCType:one at:va_arg(ap, const void *)];
+        free(one);
+        t = end;
+    }
+    va_end(ap);
+}
+- (void)decodeValuesOfObjCTypes:(const char *)types, ...
+{
+    va_list ap;
+    va_start(ap, types);
+    for (const char *t = types; t && *t;) {
+        const char *end = NSGetSizeAndAlignment(t, NULL, NULL);
+        char *one = strndup(t, (size_t)(end - t));
+        [self decodeValueOfObjCType:one at:va_arg(ap, void *) size:size_of_type(one)];
+        free(one);
+        t = end;
+    }
+    va_end(ap);
+}
+- (void)encodeArrayOfObjCType:(const char *)type count:(NSUInteger)count at:(const void *)array
+{
+    size_t size = size_of_type(type);
+    for (NSUInteger i = 0; i < count; i++)
+        [self encodeValueOfObjCType:type at:(const char *)array + i * size];
+}
+- (void)decodeArrayOfObjCType:(const char *)type count:(NSUInteger)count at:(void *)array
+{
+    size_t size = size_of_type(type);
+    for (NSUInteger i = 0; i < count; i++)
+        [self decodeValueOfObjCType:type at:(char *)array + i * size size:size];
+}
+- (void)encodeObject:(id)object { [self encodeValueOfObjCType:@encode(id) at:&object]; }
+- (void)encodeRootObject:(id)rootObject { [self encodeObject:rootObject]; }
+- (void)encodeBycopyObject:(id)anObject { [self encodeObject:anObject]; }
+- (void)encodeByrefObject:(id)anObject { [self encodeObject:anObject]; }
+- (void)encodeConditionalObject:(id)object { [self encodeObject:object]; }
+- (id)decodeObject
+{
+    id object = nil;
+    [self decodeValueOfObjCType:@encode(id) at:&object size:sizeof object];
+    return [object autorelease];
+}
+- (void)encodeDataObject:(NSData *)data { [self encodeObject:data]; }
+- (NSData *)decodeDataObject
+{
+    id data = [self decodeObject];
+    return [data isKindOfClass:[NSData class]] ? data : nil;
+}
+- (void)encodeBytes:(const void *)byteaddr length:(NSUInteger)length
+{
+    [self encodeDataObject:[NSData dataWithBytes:byteaddr length:length]];
+}
+- (void *)decodeBytesWithReturnedLength:(NSUInteger *)lengthp
+{
+    NSData *data = [self decodeDataObject];
+    if (lengthp)
+        *lengthp = [data length];
+    return (void *)[data bytes];
+}
+- (void)encodePropertyList:(id)aPropertyList { [self encodeObject:aPropertyList]; }
+- (id)decodePropertyList { return [self decodeObject]; }
+- (void)encodePoint:(NSPoint)point { [self encodeValueOfObjCType:@encode(NSPoint) at:&point]; }
+- (NSPoint)decodePoint
+{
+    NSPoint p = NSZeroPoint;
+    [self decodeValueOfObjCType:@encode(NSPoint) at:&p size:sizeof p];
+    return p;
+}
+- (void)encodeSize:(NSSize)size { [self encodeValueOfObjCType:@encode(NSSize) at:&size]; }
+- (NSSize)decodeSize
+{
+    NSSize s = NSZeroSize;
+    [self decodeValueOfObjCType:@encode(NSSize) at:&s size:sizeof s];
+    return s;
+}
+- (void)encodeRect:(NSRect)rect { [self encodeValueOfObjCType:@encode(NSRect) at:&rect]; }
+- (NSRect)decodeRect
+{
+    NSRect r = NSZeroRect;
+    [self decodeValueOfObjCType:@encode(NSRect) at:&r size:sizeof r];
+    return r;
+}
+/* The version of the class this program has: archives don't record one. */
+- (NSInteger)versionForClassName:(NSString *)className
+{
+    Class cls = NSClassFromString(className);
+    return cls ? class_getVersion(cls) : NSNotFound;
+}
+- (unsigned)systemVersion { return 1000; }
 @end
 
 /* ---- which class an object is archived as ------------------------------------------- */
@@ -123,6 +360,10 @@ static BOOL private_class(id obj)
 - (id)replacementObjectForKeyedArchiver:(NSKeyedArchiver *)archiver { return [self replacementObjectForCoder:archiver]; }
 - (id)awakeAfterUsingCoder:(NSCoder *)coder { return self; }
 + (NSArray *)classFallbacksForKeyedArchiver { return nil; }
+- (Class)classForArchiver { return [self classForCoder]; }
+- (id)replacementObjectForArchiver:(NSArchiver *)archiver { return [self replacementObjectForCoder:archiver]; }
++ (NSInteger)version { return class_getVersion(self); }
++ (void)setVersion:(NSInteger)aVersion { class_setVersion(self, (int)aVersion); }
 @end
 
 #define PUBLIC_CLASS(Base, Mutable)                                                   \
@@ -456,6 +697,9 @@ static NSMutableDictionary *global_class_names(void)
     struct ptrmap _uids;
     BOOL _secure, _finished;
     NSPropertyListFormat _format;
+    NSUInteger *_seq, _seqCap; /* how many values each object being filled has had without a key */
+    NSCoder *_facade;          /* the NSArchiver objects are given, when one writes through this */
+    NSString *_archiverName;
 }
 
 - (instancetype)initRequiringSecureCoding:(BOOL)secure
@@ -469,6 +713,7 @@ static NSMutableDictionary *global_class_names(void)
         _classNames = [[NSMutableDictionary alloc] init];
         _secure = secure;
         _format = NSPropertyListBinaryFormat_v1_0;
+        *seq_slot(&_seq, &_seqCap, 0) = 0;
     }
     return self;
 }
@@ -489,8 +734,10 @@ static NSMutableDictionary *global_class_names(void)
     [_top release];
     [_data release];
     [_encoded release];
+    [_archiverName release];
     free(_uids.keys);
     free(_uids.vals);
+    free(_seq);
     [super dealloc];
 }
 
@@ -572,13 +819,13 @@ static NSMutableDictionary *global_class_names(void)
 {
     if (!obj)
         return 0;
-    obj = [obj replacementObjectForKeyedArchiver:self];
+    obj = _facade ? [obj replacementObjectForArchiver:(NSArchiver *)_facade] : [obj replacementObjectForKeyedArchiver:self];
     if (!obj)
         return 0;
     NSUInteger *known = ptrmap_find(&_uids, obj, NO);
     if (known)
         return *known;
-    Class cls = [obj classForKeyedArchiver];
+    Class cls = _facade ? [obj classForArchiver] : [obj classForKeyedArchiver];
     NSUInteger uid = [_objects count];
     *ptrmap_find(&_uids, obj, YES) = uid;
     [_keep addObject:obj];
@@ -599,6 +846,7 @@ static NSMutableDictionary *global_class_names(void)
     [_objects addObject:d];
     [d setObject:make_uid([self uidForClass:cls]) forKey:@"$class"];
     [_stack addObject:d];
+    *seq_slot(&_seq, &_seqCap, [_stack count] - 1) = 0;
     /* Collections write their elements' UIDs straight into NS.objects
      * (and NS.keys), rather than as an archived array. */
     if ([obj isKindOfClass:[NSArray class]] || [obj isKindOfClass:[NSSet class]]) {
@@ -615,7 +863,7 @@ static NSMutableDictionary *global_class_names(void)
         [d setObject:keys forKey:@"NS.keys"];
         [d setObject:vals forKey:@"NS.objects"];
     } else {
-        [obj encodeWithCoder:self];
+        [obj encodeWithCoder:_facade ?: self];
     }
     [_stack removeLastObject];
     return uid;
@@ -658,7 +906,7 @@ static NSMutableDictionary *global_class_names(void)
         return;
     _finished = YES;
     NSDictionary *plist = [NSDictionary dictionaryWithObjectsAndKeys:
-        @"NSKeyedArchiver", @"$archiver", [NSNumber numberWithInt:100000], @"$version",
+        _archiverName ?: @"NSKeyedArchiver", @"$archiver", [NSNumber numberWithInt:100000], @"$version",
         _top, @"$top", _objects, @"$objects", nil];
     _encoded = [[NSPropertyListSerialization dataWithPropertyList:plist format:_format options:0 error:NULL] retain];
     if (_data && _encoded)
@@ -668,6 +916,43 @@ static NSMutableDictionary *global_class_names(void)
 {
     [self finishEncoding];
     return _encoded;
+}
+
+/* Values without a key get one of their own, "$0", "$1" and so on, in
+ * the object being written. */
+- (NSString *)nextUnkeyed
+{
+    NSUInteger *n = seq_slot(&_seq, &_seqCap, [_stack count] - 1);
+    return [NSString stringWithFormat:@"$%lu", (unsigned long)(*n)++];
+}
+- (void)encodeValueOfObjCType:(const char *)type at:(const void *)addr
+{
+    walk_value(type, (char *)addr, ^(enum leaf_kind kind, void *p, size_t size) {
+      NSString *key = [self nextUnkeyed];
+      switch (kind) {
+      case LEAF_INT: [self encodeInt64:read_int(p, size, YES) forKey:key]; break;
+      case LEAF_UINT: [self encodeInt64:read_int(p, size, NO) forKey:key]; break;
+      case LEAF_BOOL: [self encodeBool:*(bool *)p forKey:key]; break;
+      case LEAF_FLOAT: [self encodeFloat:*(float *)p forKey:key]; break;
+      case LEAF_DOUBLE: [self encodeDouble:*(double *)p forKey:key]; break;
+      case LEAF_OBJECT: [self encodeObject:*(id *)p forKey:key]; break;
+      case LEAF_CLASS: [self encodeObject:*(Class *)p ? NSStringFromClass(*(Class *)p) : nil forKey:key]; break;
+      case LEAF_SEL: [self encodeObject:*(SEL *)p ? NSStringFromSelector(*(SEL *)p) : nil forKey:key]; break;
+      case LEAF_CSTRING: {
+          const char *s = *(const char **)p;
+          [self encodeObject:s ? [NSData dataWithBytes:s length:strlen(s)] : nil forKey:key];
+          break;
+      }
+      case LEAF_BYTES: [self encodeBytes:p length:size forKey:key]; break;
+      }
+    });
+}
+/* For NSArchiver, which writes through a keyed archiver of its own. */
+- (void)_ferrySetFacade:(NSCoder *)facade name:(NSString *)name
+{
+    _facade = facade;
+    [_archiverName release];
+    _archiverName = [name copy];
 }
 @end
 
@@ -697,6 +982,8 @@ enum { UNSEEN, DECODING, DONE };
     NSSet *_allowed;
     BOOL _secure;
     NSDecodingFailurePolicy _policy;
+    NSUInteger *_seq, _seqCap; /* how many values each object being read has given without a key */
+    NSCoder *_facade;          /* the NSUnarchiver objects are given, when one reads through this */
 }
 
 - (instancetype)initForReadingFromData:(NSData *)data error:(NSError **)error
@@ -721,6 +1008,7 @@ enum { UNSEEN, DECODING, DONE };
     _decoded = calloc(_count + 1, sizeof(id));
     _state = calloc(_count + 1, 1);
     [_stack addObject:_top];
+    *seq_slot(&_seq, &_seqCap, 0) = 0;
     return self;
 }
 - (instancetype)initForReadingWithData:(NSData *)data
@@ -740,6 +1028,7 @@ enum { UNSEEN, DECODING, DONE };
         [_decoded[i] release];
     free(_decoded);
     free(_state);
+    free(_seq);
     [_objects release];
     [_top release];
     [_stack release];
@@ -921,10 +1210,11 @@ enum { UNSEEN, DECODING, DONE };
     id obj = [cls alloc];
     _decoded[uid] = obj;
     [_stack addObject:raw];
-    id made = [obj initWithCoder:self];
+    *seq_slot(&_seq, &_seqCap, [_stack count] - 1) = 0;
+    id made = [obj initWithCoder:_facade ?: self];
     [_stack removeLastObject];
     if (made) {
-        id after = [made awakeAfterUsingCoder:self];
+        id after = [made awakeAfterUsingCoder:_facade ?: self];
         if (after != made) {
             [after retain];
             [made release];
@@ -1066,4 +1356,329 @@ enum { UNSEEN, DECODING, DONE };
     _state[index] = DONE;
 }
 - (id)_ferryDecodeObjectAtIndex:(NSUInteger)index { return [self objectForUID:index]; }
+
+/* Values written without a key, in the order they were written. */
+- (NSString *)nextUnkeyed
+{
+    NSUInteger *n = seq_slot(&_seq, &_seqCap, [_stack count] - 1);
+    return [NSString stringWithFormat:@"$%lu", (unsigned long)(*n)++];
+}
+- (BOOL)_ferryAtEnd
+{
+    NSUInteger *n = seq_slot(&_seq, &_seqCap, [_stack count] - 1);
+    return [[self current] objectForKey:[NSString stringWithFormat:@"$%lu", (unsigned long)*n]] == nil;
+}
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data size:(NSUInteger)size
+{
+    if (size && size < size_of_type(type))
+        FRaise(NSInvalidArgumentException, @"*** -[%s %s]: a value of type %s doesn't fit in %lu bytes",
+               object_getClassName(self), sel_getName(_cmd), type, (unsigned long)size);
+    walk_value(type, data, ^(enum leaf_kind kind, void *p, size_t len) {
+      NSString *key = [self nextUnkeyed];
+      switch (kind) {
+      case LEAF_INT: case LEAF_UINT: write_int(p, len, [self decodeInt64ForKey:key]); break;
+      case LEAF_BOOL: *(bool *)p = [self decodeBoolForKey:key]; break;
+      case LEAF_FLOAT: *(float *)p = [self decodeFloatForKey:key]; break;
+      case LEAF_DOUBLE: *(double *)p = [self decodeDoubleForKey:key]; break;
+      /* an object comes retained, as the method's documentation says */
+      case LEAF_OBJECT: *(id *)p = [[self decodeObjectForKey:key] retain]; break;
+      case LEAF_CLASS: {
+          id name = [self decodeObjectForKey:key];
+          *(Class *)p = [name isKindOfClass:[NSString class]] ? NSClassFromString(name) : Nil;
+          break;
+      }
+      case LEAF_SEL: {
+          id name = [self decodeObjectForKey:key];
+          *(SEL *)p = [name isKindOfClass:[NSString class]] ? NSSelectorFromString(name) : NULL;
+          break;
+      }
+      case LEAF_CSTRING: {
+          id bytes = [self decodeObjectForKey:key];
+          if ([bytes isKindOfClass:[NSData class]]) {
+              NSMutableData *copy = [NSMutableData dataWithData:bytes];
+              [copy appendBytes:"" length:1];
+              *(char **)p = [copy mutableBytes];
+          } else {
+              *(char **)p = NULL;
+          }
+          break;
+      }
+      case LEAF_BYTES: {
+          NSUInteger got = 0;
+          const uint8_t *b = [self decodeBytesForKey:key returnedLength:&got];
+          memset(p, 0, len);
+          if (b)
+              memcpy(p, b, got < len ? got : len);
+          break;
+      }
+      }
+    });
+}
+- (void)_ferrySetFacade:(NSCoder *)facade { _facade = facade; }
+@end
+
+/* ---- NSArchiver and NSUnarchiver ---------------------------------------------------------- */
+
+/* The sequential archivers (freemac 1.221, Ferry 0.45.0), written from
+ * Apple's documentation of the two classes. Ferry's NSArchiver writes the
+ * values it is given, with or without keys, through a keyed archiver of its
+ * own, as a property list marked "FerryArchiver" in place of
+ * "NSKeyedArchiver"; NSUnarchiver reads those (and keyed archives) back.
+ * The objects being written or read are given the NSArchiver or
+ * NSUnarchiver itself, which answers NO to allowsKeyedCoding as a Mac's
+ * does, so that an object codes its values in order. Ferry's own classes,
+ * which code theirs with keys, may do so here too. An archive a Mac's
+ * NSArchiver wrote ("typedstream") isn't read: unarchiving one gives nil. */
+
+NSString *const NSInconsistentArchiveException = @"NSInconsistentArchiveException";
+
+@interface NSKeyedArchiver (FerrySequential)
+- (void)_ferrySetFacade:(NSCoder *)facade name:(NSString *)name;
+@end
+@interface NSKeyedUnarchiver (FerrySequential)
+- (void)_ferrySetFacade:(NSCoder *)facade;
+- (BOOL)_ferryAtEnd;
+@end
+
+static NSMutableDictionary *sequential_names(BOOL decoding)
+{
+    static NSMutableDictionary *encoded, *decoded;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      encoded = [[NSMutableDictionary alloc] init];
+      decoded = [[NSMutableDictionary alloc] init];
+    });
+    return decoding ? decoded : encoded;
+}
+
+static void set_sequential_name(BOOL decoding, NSString *from, NSString *to)
+{
+    os_unfair_lock_lock(&tables_lock);
+    if (from && to)
+        [sequential_names(decoding) setObject:to forKey:from];
+    else if (from)
+        [sequential_names(decoding) removeObjectForKey:from];
+    os_unfair_lock_unlock(&tables_lock);
+}
+
+static NSString *sequential_name(BOOL decoding, NSString *from)
+{
+    os_unfair_lock_lock(&tables_lock);
+    NSString *to = [[[sequential_names(decoding) objectForKey:from] retain] autorelease];
+    os_unfair_lock_unlock(&tables_lock);
+    return to;
+}
+
+@implementation NSArchiver {
+    NSKeyedArchiver *_writer;
+    NSMutableData *_data;
+    NSMutableDictionary *_names;
+    BOOL _written;
+}
+
++ (NSData *)archivedDataWithRootObject:(id)rootObject
+{
+    NSMutableData *data = [NSMutableData data];
+    NSArchiver *a = [[self alloc] initForWritingWithMutableData:data];
+    [a encodeRootObject:rootObject];
+    [a archiverData];
+    [a release];
+    return data;
+}
++ (BOOL)archiveRootObject:(id)rootObject toFile:(NSString *)path
+{
+    return [[self archivedDataWithRootObject:rootObject] writeToFile:path atomically:YES];
+}
+
+- (instancetype)initForWritingWithMutableData:(NSMutableData *)mdata
+{
+    if (!mdata)
+        FRaise(NSInvalidArgumentException, @"*** -[NSArchiver initForWritingWithMutableData:]: data is nil");
+    if ((self = [super init])) {
+        _data = [mdata retain];
+        _names = [[NSMutableDictionary alloc] init];
+        _writer = [[NSKeyedArchiver alloc] initForWritingWithMutableData:_data];
+        [_writer _ferrySetFacade:self name:@"FerryArchiver"];
+    }
+    return self;
+}
+- (instancetype)init { return [self initForWritingWithMutableData:[NSMutableData data]]; }
+- (void)dealloc
+{
+    [self archiverData];
+    [_writer _ferrySetFacade:nil name:@"FerryArchiver"];
+    [_writer release];
+    [_data release];
+    [_names release];
+    [super dealloc];
+}
+
+/* The property list is written whole, once the archive is asked for. */
+- (NSMutableData *)archiverData
+{
+    if (!_written) {
+        _written = YES;
+        [_writer finishEncoding];
+    }
+    return _data;
+}
+
+- (BOOL)allowsKeyedCoding { return NO; }
+
++ (void)encodeClassName:(NSString *)trueName intoClassName:(NSString *)inArchiveName
+{
+    set_sequential_name(NO, trueName, inArchiveName);
+}
++ (NSString *)classNameEncodedForTrueClassName:(NSString *)trueName { return sequential_name(NO, trueName); }
+- (void)encodeClassName:(NSString *)trueName intoClassName:(NSString *)inArchiveName
+{
+    if (trueName && inArchiveName)
+        [_names setObject:inArchiveName forKey:trueName];
+    else if (trueName)
+        [_names removeObjectForKey:trueName];
+    Class cls = NSClassFromString(trueName);
+    if (cls)
+        [_writer setClassName:inArchiveName forClass:cls];
+}
+- (NSString *)classNameEncodedForTrueClassName:(NSString *)trueName
+{
+    return [_names objectForKey:trueName] ?: [NSArchiver classNameEncodedForTrueClassName:trueName];
+}
+
+- (void)encodeValueOfObjCType:(const char *)type at:(const void *)addr
+{
+    if (_written)
+        FRaise(NSInvalidArchiveOperationException, @"*** -[NSArchiver encodeValueOfObjCType:at:]: the archive is already written");
+    /* the class names set for all archivers, as each class is first met */
+    const char *t = skip_qualifiers(type);
+    if (*t == '@' && *(id const *)addr) {
+        Class cls = [*(id const *)addr classForArchiver];
+        for (Class c = cls; c; c = class_getSuperclass(c)) {
+            NSString *name = NSStringFromClass(c);
+            NSString *mapped = [_names objectForKey:name] ?: sequential_name(NO, name);
+            if (mapped && ![_writer classNameForClass:c])
+                [_writer setClassName:mapped forClass:c];
+        }
+    }
+    [_writer encodeValueOfObjCType:type at:addr];
+}
+
+/* Keyed values, for Ferry's own classes, which code theirs only so. */
+- (void)encodeObject:(id)object forKey:(NSString *)key { [_writer encodeObject:object forKey:key]; }
+- (void)encodeConditionalObject:(id)object forKey:(NSString *)key { [_writer encodeConditionalObject:object forKey:key]; }
+- (void)encodeBool:(BOOL)value forKey:(NSString *)key { [_writer encodeBool:value forKey:key]; }
+- (void)encodeInt64:(int64_t)value forKey:(NSString *)key { [_writer encodeInt64:value forKey:key]; }
+- (void)encodeFloat:(float)value forKey:(NSString *)key { [_writer encodeFloat:value forKey:key]; }
+- (void)encodeDouble:(double)value forKey:(NSString *)key { [_writer encodeDouble:value forKey:key]; }
+- (void)encodeBytes:(const uint8_t *)bytes length:(NSUInteger)length forKey:(NSString *)key
+{
+    [_writer encodeBytes:bytes length:length forKey:key];
+}
+@end
+
+@implementation NSUnarchiver {
+    NSKeyedUnarchiver *_reader;
+    NSMutableDictionary *_names;
+}
+
+/* A Mac's NSArchiver begins its archives with this header. */
+static BOOL is_typedstream(NSData *data)
+{
+    static const char mark[] = "\x04\x0bstreamtyped";
+    return [data length] >= sizeof mark - 1 && !memcmp([data bytes], mark, sizeof mark - 1);
+}
+
++ (id)unarchiveObjectWithData:(NSData *)data
+{
+    if (!data)
+        return nil;
+    NSUnarchiver *u = [[self alloc] initForReadingWithData:data];
+    id root = [[u decodeObject] retain];
+    [u release];
+    return [root autorelease];
+}
++ (id)unarchiveObjectWithFile:(NSString *)path
+{
+    NSData *d = [NSData dataWithContentsOfFile:path];
+    return d ? [self unarchiveObjectWithData:d] : nil;
+}
+
+- (instancetype)initForReadingWithData:(NSData *)data
+{
+    if (!data)
+        FRaise(NSInvalidArgumentException, @"*** -[NSUnarchiver initForReadingWithData:]: data is nil");
+    if (!(self = [super init]))
+        return nil;
+    _names = [[NSMutableDictionary alloc] init];
+    _reader = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:NULL];
+    if (!_reader) {
+        static BOOL told;
+        if (is_typedstream(data) && !told) {
+            told = YES;
+            fprintf(stderr, "ferry: an archive written by a Mac's NSArchiver can't be read here; "
+                            "the program gets nil in its place\n");
+        }
+        [self release];
+        return nil;
+    }
+    [_reader setRequiresSecureCoding:NO];
+    [_reader setDecodingFailurePolicy:NSDecodingFailurePolicySetErrorAndReturn];
+    [_reader _ferrySetFacade:self];
+    os_unfair_lock_lock(&tables_lock);
+    NSDictionary *names = [[sequential_names(YES) copy] autorelease];
+    os_unfair_lock_unlock(&tables_lock);
+    for (NSString *archived in names) {
+        Class cls = NSClassFromString([names objectForKey:archived]);
+        if (cls)
+            [_reader setClass:cls forClassName:archived];
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_reader _ferrySetFacade:nil];
+    [_reader release];
+    [_names release];
+    [super dealloc];
+}
+
+- (BOOL)allowsKeyedCoding { return NO; }
+- (BOOL)isAtEnd { return [_reader _ferryAtEnd]; }
+- (NSError *)error { return [_reader error]; }
+
++ (void)decodeClassName:(NSString *)inArchiveName asClassName:(NSString *)trueName
+{
+    set_sequential_name(YES, inArchiveName, trueName);
+}
++ (NSString *)classNameDecodedForArchiveClassName:(NSString *)inArchiveName
+{
+    return sequential_name(YES, inArchiveName) ?: inArchiveName;
+}
+- (void)decodeClassName:(NSString *)inArchiveName asClassName:(NSString *)trueName
+{
+    if (inArchiveName && trueName)
+        [_names setObject:trueName forKey:inArchiveName];
+    else if (inArchiveName)
+        [_names removeObjectForKey:inArchiveName];
+    [_reader setClass:NSClassFromString(trueName) forClassName:inArchiveName];
+}
+- (NSString *)classNameDecodedForArchiveClassName:(NSString *)inArchiveName
+{
+    return [_names objectForKey:inArchiveName] ?: [NSUnarchiver classNameDecodedForArchiveClassName:inArchiveName];
+}
+
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data size:(NSUInteger)size
+{
+    [_reader decodeValueOfObjCType:type at:data size:size];
+}
+
+- (BOOL)containsValueForKey:(NSString *)key { return [_reader containsValueForKey:key]; }
+- (id)decodeObjectForKey:(NSString *)key { return [_reader decodeObjectForKey:key]; }
+- (BOOL)decodeBoolForKey:(NSString *)key { return [_reader decodeBoolForKey:key]; }
+- (int64_t)decodeInt64ForKey:(NSString *)key { return [_reader decodeInt64ForKey:key]; }
+- (double)decodeDoubleForKey:(NSString *)key { return [_reader decodeDoubleForKey:key]; }
+- (const uint8_t *)decodeBytesForKey:(NSString *)key returnedLength:(NSUInteger *)length
+{
+    return [_reader decodeBytesForKey:key returnedLength:length];
+}
 @end

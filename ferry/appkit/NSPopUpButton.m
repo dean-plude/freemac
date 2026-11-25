@@ -123,6 +123,7 @@ static BOOL choosable(NSMenuItem *item)
     if (aligned >= 0 && choosable([menu itemAtIndex:aligned]))
         m->_highlighted = aligned;
     [w _setOverlayView:m];
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSMenuDidBeginTrackingNotification object:menu];
     return m;
 }
 
@@ -254,6 +255,7 @@ static BOOL choosable(NSMenuItem *item)
     id delegate = [_menu delegate];
     if ([delegate respondsToSelector:@selector(menuDidClose:)])
         [delegate menuDidClose:_menu];
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSMenuDidEndTrackingNotification object:_menu];
     [_owner _menuView:self didChooseItem:item];
     [self release];
 }
@@ -1099,4 +1101,27 @@ static BOOL choosable(NSMenuItem *item)
     ADrawLine(t, x, baseline);
     CGContextRestoreGState(cg);
 }
+@end
+
+/* ---- cancelling a menu (freemac 1.221, Ferry 0.45.0) ---------------------------------- */
+
+/* Closes the menu where it is open over one of the program's windows (a
+ * pop-up's, a pull-down's or a contextual menu), as if the person had
+ * clicked away: nothing is chosen, and the delegate hears menuDidClose:.
+ * A status item's menu is the desktop's and stays open. */
+@implementation NSMenu (FerryTracking)
+- (void)cancelTracking
+{
+    for (NSWindow *w in [[[NSApp windows] copy] autorelease]) {
+        NSView *ov = [w _overlayView];
+        if (![ov isKindOfClass:[AMenuView class]])
+            continue;
+        for (NSMenu *m = [(AMenuView *)ov menu]; m; m = [m supermenu])
+            if (m == self) {
+                [(AMenuView *)ov dismiss];
+                break;
+            }
+    }
+}
+- (void)cancelTrackingWithoutAnimation { [self cancelTracking]; }
 @end

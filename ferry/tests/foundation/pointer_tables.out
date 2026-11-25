@@ -1,0 +1,20 @@
+weak keys: 2 entries, a's value 1
+after b went: 1 entries, gone 1
+weak values: c is c
+after c went: c is nil, a is a, 1 entries
+equal key finds one, other object of the same value finds nothing
+replaced: 1 entry, two
+copied key still found as before 1, as after 0
+integer keys: 40, 7 -> 49
+keys x,y,z, values X,Y,Z, dictionary Y
+after a removal 2, the copy 3; cleared 0
+hash table: 2, has e 1
+after e went: 1, member d d
+intersects 1, subset 0, union 3, minus p, intersect 2, set 1
+pointer array 4, [3] row 2, [2] NULL
+enumerated 4 (1 nil), after compacting first | row 2
+grown to 5, [4] NULL
+weak pointer array: [0] NULL, [1] d, compacted to 1
+out of range: NSRangeException
+gone in all 4
+exit=0

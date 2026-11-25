@@ -1183,6 +1183,30 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.221 "Ferry: building the nine apps again" (done)
+
+Ferry 0.45.0: each of the nine apps' source files compiled against Ferry's
+SDK, and what stopped them added, most-used first. Files that compile went
+from 139 of 637 to 418 of 637.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The headers every app includes before anything else: `TargetConditionals.h`, `Availability.h` and `AvailabilityMacros.h`, `sys/cdefs.h`, the BSD types and the Mac's limits (`PATH_MAX`, `MAXPATHLEN`, `sys/param.h`), `inttypes.h`, `zlib.h` (with `-lz`), `mach-o/loader.h`, `malloc/malloc.h`, `libgen.h`, `bitstring.h`, `sys/xattr.h`, Core Foundation's and Foundation's own headers by name, and the `NS_` and `CF_` macros; libSystem's malloc zones and sizes, `basename` and `dirname`, extended attributes, `scandir` and the `long double` maths | Ferry SDK, libSystem | done |
+| 2 | Keyboard layouts: the current input source, `UCKeyTranslate` with the English (US) layout, the virtual key codes and modifier glyphs, the symbolic hotkey mode and `GetKeys`, which Flycut, Spectacle, KeyCastr and MacPass use to name their shortcuts' keys | Ferry Carbon | done |
+| 3 | File references: `FSRef` from a path and back, `CFURLGetFSRef`, `CFURLCreateFromFSRef` and moving to the trash with `FSMoveObjectToTrashSync` | Ferry CoreServices | done |
+| 4 | `NSArchiver` and `NSUnarchiver`, and `NSCoder`'s calls without keys (`encodeValueOfObjCType:at:`, `encodeObject:`, `decodeObject` and the rest), in keyed archives too; a Mac's own typedstream archives aren't read | Ferry Foundation | done |
+| 5 | `NSMapTable`, `NSHashTable` and `NSPointerArray`, with weak keys, values and pointers that go when their objects do | Ferry Foundation | done |
+| 6 | Foundation's other missing names: searching without accents or widths, collections that copy their items, stable sorts with options, the byte-order functions, JSON through streams, the run loop's ordered performs, the defaults' volatile domains, the file manager's delegate, `NSScriptCommand` (which stopped 19 of Sequel Pro's files), Mach's `boolean_t`, `TRUE` and `FALSE`, and older names of options | Ferry Foundation | done |
+| 7 | AppKit's missing names: the tracking and modal run loop modes, `NSAppKitVersionNumber`, the older names of masks and styles, modal sessions, focus rings and rectangle lists, more system colours, the text storage's edits, the layout manager's rectangles, the button cell's highlight and state masks, a cell's menu and hit testing, the field editor's calls, `cancelTracking` and the menu tracking notifications, more image names, and `NSAppearance` | Ferry AppKit | done |
+| 8 | Core Graphics functions and shadings (`CGFunctionCreate`, `CGShadingCreateAxial`, `CGShadingCreateRadial`, `CGContextDrawShading`), which Sequel Pro's tab bar draws with | Ferry Core Graphics | done |
+| 9 | Eight new tests; `make check` 231 of 231 | Ferry | done |
+
+The apps still don't all compile: the table in `docs/ferry-compat.md` lists
+what stops each. Sequel Pro's own MySQL framework and MacPass's KeePassKit
+and other frameworks are the apps' own code, built from their source; none
+of the apps was linked or run, and the WebKit items (downloads, cookies,
+request bodies and DOM events) weren't reached.
+
 ## 1.220 "Ferry: other apps' windows, posted keys, drag and drop in tables" (done)
 
 Ferry 0.44.0: what 1.219 left over from the nine apps' calls.

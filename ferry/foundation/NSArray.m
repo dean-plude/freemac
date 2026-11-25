@@ -168,6 +168,22 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
     free(objs);
     return self;
 }
+/* The copies are the array's own, as copyWithZone: makes them (freemac 1.221, Ferry 0.45.0). */
+- (instancetype)initWithArray:(NSArray *)array copyItems:(BOOL)flag
+{
+    if (!flag)
+        return [self initWithArray:array];
+    NSUInteger n = [array count];
+    id *objs = malloc((n ? n : 1) * sizeof(id));
+    [array getObjects:objs range:NSMakeRange(0, n)];
+    for (NSUInteger i = 0; i < n; i++)
+        objs[i] = [objs[i] copyWithZone:NULL];
+    self = [self initWithObjects:objs count:n];
+    for (NSUInteger i = 0; i < n; i++)
+        [objs[i] release];
+    free(objs);
+    return self;
+}
 - (id)copyWithZone:(NSZone *)zone { return [[NSArray allocWithZone:zone] initWithArray:self]; }
 - (id)mutableCopyWithZone:(NSZone *)zone { return [[NSMutableArray allocWithZone:zone] initWithArray:self]; }
 - (id)objectAtIndexedSubscript:(NSUInteger)index { return [self objectAtIndex:index]; }
@@ -266,6 +282,10 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
 }
 - (NSArray *)sortedArrayUsingSelector:(SEL)comparator { return [self sortedWith:by_selector context:(void *)comparator]; }
 - (NSArray *)sortedArrayUsingComparator:(NSComparator)cmptr { return [self sortedWith:by_block context:(void *)cmptr]; }
+- (NSArray *)sortedArrayWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr
+{
+    return [self sortedArrayUsingComparator:cmptr];
+}
 - (NSArray *)sortedArrayUsingFunction:(NSInteger (*)(id, id, void *))fn context:(void *)ctx
 {
     return [self sortedWith:(fcompare)fn context:ctx];
@@ -463,6 +483,7 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
 }
 - (void)sortUsingSelector:(SEL)comparator { [self setArray:[self sortedArrayUsingSelector:comparator]]; }
 - (void)sortUsingComparator:(NSComparator)cmptr { [self setArray:[self sortedArrayUsingComparator:cmptr]]; }
+- (void)sortWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr { [self sortUsingComparator:cmptr]; }
 @end
 
 @implementation FMutableArray

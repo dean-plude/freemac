@@ -821,3 +821,87 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
 }
 - (void)removeObserver:(id)observer { [self removeObserver:observer name:nil object:nil]; }
 @end
+
+/* ---- messages for the next turn (freemac 1.221, Ferry 0.45.0) -------------------------- */
+
+@interface FOrderedPerform : NSObject {
+@public
+    SEL sel;
+    id target, argument;
+    NSUInteger order;
+}
+@end
+@implementation FOrderedPerform
+- (void)dealloc
+{
+    [target release];
+    [argument release];
+    [super dealloc];
+}
+@end
+
+static char pending_key;
+
+@implementation NSRunLoop (FerryOrderedPerform)
+- (NSMutableArray *)_ferryPending
+{
+    @synchronized(self) {
+        NSMutableArray *a = objc_getAssociatedObject(self, &pending_key);
+        if (!a) {
+            a = [NSMutableArray array];
+            objc_setAssociatedObject(self, &pending_key, a, OBJC_ASSOCIATION_RETAIN);
+        }
+        return a;
+    }
+}
+- (void)performSelector:(SEL)aSelector target:(id)target argument:(id)arg order:(NSUInteger)order
+                  modes:(NSArray *)modes
+{
+    FOrderedPerform *p = [[FOrderedPerform alloc] init];
+    p->sel = aSelector;
+    p->target = [target retain];
+    p->argument = [arg retain];
+    p->order = order;
+    NSMutableArray *pending = [self _ferryPending];
+    BOOL first;
+    @synchronized(pending) {
+        first = [pending count] == 0;
+        NSUInteger i = [pending count];
+        while (i > 0 && ((FOrderedPerform *)[pending objectAtIndex:i - 1])->order > order)
+            i--;
+        [pending insertObject:p atIndex:i];
+    }
+    [p release];
+    if (!first)
+        return;
+    [self performBlock:^{
+      NSArray *now;
+      @synchronized(pending) {
+          now = [[pending copy] autorelease];
+          [pending removeAllObjects];
+      }
+      for (FOrderedPerform *q in now)
+          ((void (*)(id, SEL, id))objc_msgSend)(q->target, q->sel, q->argument);
+    }];
+}
+- (void)cancelPerformSelector:(SEL)aSelector target:(id)target argument:(id)arg
+{
+    NSMutableArray *pending = [self _ferryPending];
+    @synchronized(pending) {
+        for (NSUInteger i = [pending count]; i > 0; i--) {
+            FOrderedPerform *q = [pending objectAtIndex:i - 1];
+            if (q->target == target && q->sel == aSelector && (q->argument == arg || [q->argument isEqual:arg]))
+                [pending removeObjectAtIndex:i - 1];
+        }
+    }
+}
+- (void)cancelPerformSelectorsWithTarget:(id)target
+{
+    NSMutableArray *pending = [self _ferryPending];
+    @synchronized(pending) {
+        for (NSUInteger i = [pending count]; i > 0; i--)
+            if (((FOrderedPerform *)[pending objectAtIndex:i - 1])->target == target)
+                [pending removeObjectAtIndex:i - 1];
+    }
+}
+@end

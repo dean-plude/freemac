@@ -11,9 +11,12 @@
  *   registered are ever seen, never other keys. Elsewhere (no Wayfire, or a
  *   Wayfire without Strata) a hotkey is accepted but never pressed, as
  *   before: Wayland doesn't let one app see the keys pressed in another.
- * - Keyboard layouts (TIS..., UCKeyTranslate): there is a current input
- *   source, but it has no Mac key layout data, so key names can't be
- *   translated from it (apps then fall back to their own tables).
+ * - Keyboard layouts (TIS..., UCKeyTranslate), from freemac 1.221 (Ferry
+ *   0.45.0): the current input source is the layout Strata has selected;
+ *   while it is English (US) its key layout data lets UCKeyTranslate turn
+ *   key codes into characters (with Shift, Caps Lock and Control). Other
+ *   layouts have no layout data, and apps then fall back to their own
+ *   tables.
  * - Accessibility (AX...), from freemac 1.215 (Ferry 0.41.0): enough of
  *   the API for a window manager such as Spectacle or ShiftIt to find the
  *   focused app and its focused window, read their titles and move and
@@ -465,30 +468,280 @@ OSStatus UnregisterEventHotKey(EventHotKeyRef ref)
     return noErr;
 }
 
-/* ---- keyboard input sources ---------------------------------------------------- */
+/* ---- keyboard input sources (freemac 1.221, Ferry 0.45.0) ---------------------------
+ * The current input source is the keyboard layout Strata says is selected
+ * (English (US) when there is no Strata to ask). An English (US) source
+ * carries key layout data of Ferry's own, which only UCKeyTranslate reads:
+ * a mark and a version; the keys themselves are in the tables below. */
 
-static id carbon_ref(void)
+@interface ATISInputSource : NSObject {
+@public
+    NSDictionary *properties;
+}
+@end
+@implementation ATISInputSource
+- (void)dealloc
 {
-    static ACarbonRef *ref;
-    if (!ref)
-        ref = [[ACarbonRef alloc] init];
-    return ref;
+    [properties release];
+    [super dealloc];
+}
+- (NSString *)description { return [NSString stringWithFormat:@"<TISInputSource %@>", properties[@"id"]]; }
+@end
+
+#define LAYOUT_MARK 0x46525553u /* "FRUS" */
+struct ferry_key_layout {
+    uint32_t mark, version;
+};
+
+/* What each key of an English (US) keyboard types without Shift, by Mac key
+ * code; keys that type nothing printable are 0. */
+static const unsigned char us_plain[128] = {
+    [0x00] = 'a', [0x01] = 's', [0x02] = 'd', [0x03] = 'f', [0x04] = 'h', [0x05] = 'g', [0x06] = 'z', [0x07] = 'x',
+    [0x08] = 'c', [0x09] = 'v', [0x0A] = 0xa7, [0x0B] = 'b', [0x0C] = 'q', [0x0D] = 'w', [0x0E] = 'e',
+    [0x0F] = 'r', [0x10] = 'y', [0x11] = 't', [0x12] = '1', [0x13] = '2', [0x14] = '3', [0x15] = '4',
+    [0x16] = '6', [0x17] = '5', [0x18] = '=', [0x19] = '9', [0x1A] = '7', [0x1B] = '-', [0x1C] = '8',
+    [0x1D] = '0', [0x1E] = ']', [0x1F] = 'o', [0x20] = 'u', [0x21] = '[', [0x22] = 'i', [0x23] = 'p',
+    [0x25] = 'l', [0x26] = 'j', [0x27] = '\'', [0x28] = 'k', [0x29] = ';', [0x2A] = '\\', [0x2B] = ',',
+    [0x2C] = '/', [0x2D] = 'n', [0x2E] = 'm', [0x2F] = '.', [0x32] = '`',
+    [0x41] = '.', [0x43] = '*', [0x45] = '+', [0x4B] = '/', [0x4E] = '-', [0x51] = '=', [0x52] = '0',
+    [0x53] = '1', [0x54] = '2', [0x55] = '3', [0x56] = '4', [0x57] = '5', [0x58] = '6', [0x59] = '7',
+    [0x5B] = '8', [0x5C] = '9',
+};
+/* ... and with Shift, for the keys that aren't letters. */
+static const char us_shifted_from[] = "1234567890-=[]\\;',./`", us_shifted_to[] = "!@#$%^&*()_+{}|:\"<>?~";
+
+/* The control characters the other keys type, as a Mac's layouts give them. */
+static UniChar us_special(UInt16 key)
+{
+    switch (key) {
+    case 0x24: return 0x0D;                                    /* Return */
+    case 0x4C: return 0x03;                                    /* Enter */
+    case 0x30: return 0x09;                                    /* Tab */
+    case 0x31: return ' ';
+    case 0x33: return 0x08;                                    /* Delete */
+    case 0x35: case 0x47: return 0x1B;                         /* Escape, keypad Clear */
+    case 0x75: return 0x7F;                                    /* Forward Delete */
+    case 0x73: return 0x01;                                    /* Home */
+    case 0x77: return 0x04;                                    /* End */
+    case 0x74: return 0x0B;                                    /* Page Up */
+    case 0x79: return 0x0C;                                    /* Page Down */
+    case 0x72: return 0x05;                                    /* Help */
+    case 0x7B: return 0x1C;                                    /* the arrows */
+    case 0x7C: return 0x1D;
+    case 0x7E: return 0x1E;
+    case 0x7D: return 0x1F;
+    case 0x7A: case 0x78: case 0x63: case 0x76: case 0x60: case 0x61: case 0x62: case 0x64: case 0x65:
+    case 0x6D: case 0x67: case 0x6F: case 0x69: case 0x6B: case 0x71: case 0x6A: case 0x40: case 0x4F:
+    case 0x50: case 0x5A:
+        return 0x10;                                           /* the function keys */
+    default: return 0;
+    }
 }
 
-void *TISCopyCurrentKeyboardInputSource(void) { return [carbon_ref() retain]; }
-void *TISCopyCurrentKeyboardLayoutInputSource(void) { return [carbon_ref() retain]; }
-void *TISCopyCurrentASCIICapableKeyboardInputSource(void) { return [carbon_ref() retain]; }
-void *TISCopyCurrentASCIICapableKeyboardLayoutInputSource(void) { return [carbon_ref() retain]; }
-void *TISGetInputSourceProperty(void *source, CFStringRef key) { return NULL; }
-OSStatus UCKeyTranslate(const void *layout, uint16_t keyCode, uint16_t action, uint32_t modifiers, uint32_t kbdType,
-                        OptionBits options, uint32_t *deadKeyState, unsigned long max, unsigned long *actualLength,
-                        uint16_t *chars)
+static NSString *selected_layout_name(void)
 {
+    id reply = AWayfireCall(@"strata/input-source", nil);
+    id names = [reply isKindOfClass:[NSDictionary class]] ? reply[@"names"] : nil;
+    if (![names isKindOfClass:[NSArray class]] || ![names count])
+        return @"English (US)";
+    NSUInteger i = [reply[@"index"] unsignedIntegerValue];
+    id name = i < [names count] ? names[i] : nil;
+    return [name isKindOfClass:[NSString class]] ? name : @"English (US)";
+}
+
+static ATISInputSource *make_source(NSString *name)
+{
+    ATISInputSource *src = [[ATISInputSource alloc] init];
+    BOOL us = [name isEqual:@"English (US)"];
+    NSMutableDictionary *p = [NSMutableDictionary dictionary];
+    p[@"name"] = name;
+    NSString *compact = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet]
+                                                                        invertedSet]] componentsJoinedByString:@""];
+    p[@"id"] = us ? @"com.apple.keylayout.US" : [@"org.freemac.keylayout." stringByAppendingString:compact];
+    p[@"languages"] = us ? @[ @"en" ] : @[];
+    if (us) {
+        struct ferry_key_layout layout = {LAYOUT_MARK, 1};
+        p[@"layout"] = [NSData dataWithBytes:&layout length:sizeof layout];
+    }
+    src->properties = [p copy];
+    return src;
+}
+
+static ATISInputSource *current_source(void) { return make_source(selected_layout_name()); }
+
+TISInputSourceRef TISCopyCurrentKeyboardInputSource(void) { return (TISInputSourceRef)current_source(); }
+TISInputSourceRef TISCopyCurrentKeyboardLayoutInputSource(void) { return (TISInputSourceRef)current_source(); }
+/* Every layout freemac offers types Latin letters, so the current one is
+ * also the current ASCII-capable one. */
+TISInputSourceRef TISCopyCurrentASCIICapableKeyboardInputSource(void) { return (TISInputSourceRef)current_source(); }
+TISInputSourceRef TISCopyCurrentASCIICapableKeyboardLayoutInputSource(void)
+{
+    return (TISInputSourceRef)current_source();
+}
+TISInputSourceRef TISCopyInputSourceForLanguage(CFStringRef language)
+{
+    NSString *l = (NSString *)language;
+    if ([l isEqual:@"en"] || [l hasPrefix:@"en-"] || [l hasPrefix:@"en_"])
+        return (TISInputSourceRef)make_source(@"English (US)");
+    return NULL;
+}
+
+static NSArray *all_sources(void)
+{
+    NSMutableArray *list = [NSMutableArray array];
+    id reply = AWayfireCall(@"strata/input-source", nil);
+    id names = [reply isKindOfClass:[NSDictionary class]] ? reply[@"names"] : nil;
+    if (![names isKindOfClass:[NSArray class]] || ![names count])
+        names = @[ @"English (US)" ];
+    for (id n in names)
+        if ([n isKindOfClass:[NSString class]])
+            [list addObject:[make_source(n) autorelease]];
+    return list;
+}
+
+CFArrayRef TISCreateInputSourceList(CFDictionaryRef filter, Boolean includeAllInstalled)
+{
+    NSMutableArray *out = [[NSMutableArray alloc] init];
+    NSDictionary *want = (NSDictionary *)filter;
+    for (ATISInputSource *src in all_sources()) {
+        BOOL ok = YES;
+        for (id key in want) {
+            id have = (id)TISGetInputSourceProperty((TISInputSourceRef)src, (CFStringRef)key);
+            if (!have || ![have isEqual:want[key]])
+                ok = NO;
+        }
+        if (ok)
+            [out addObject:src];
+    }
+    return (CFArrayRef)out;
+}
+
+CFArrayRef TISCreateASCIICapableInputSourceList(void) { return TISCreateInputSourceList(NULL, false); }
+
+/* Choosing the layout is the user's, in Topline. */
+OSStatus TISSelectInputSource(TISInputSourceRef source) { return paramErr; }
+
+CFTypeID TISInputSourceGetTypeID(void) { return (CFTypeID)(uintptr_t)[ATISInputSource class]; }
+
+void *TISGetInputSourceProperty(TISInputSourceRef ref, CFStringRef key)
+{
+    ATISInputSource *src = (ATISInputSource *)ref;
+    if (!src || ![src isKindOfClass:[ATISInputSource class]] || !key)
+        return NULL;
+    NSString *k = (NSString *)key;
+    NSDictionary *p = src->properties;
+    if ([k isEqual:(NSString *)kTISPropertyUnicodeKeyLayoutData])
+        return p[@"layout"];
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceID])
+        return p[@"id"];
+    if ([k isEqual:(NSString *)kTISPropertyLocalizedName])
+        return p[@"name"];
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceType])
+        return (void *)kTISTypeKeyboardLayout;
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceCategory])
+        return (void *)kTISCategoryKeyboardInputSource;
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceLanguages])
+        return p[@"languages"];
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceIsASCIICapable] ||
+        [k isEqual:(NSString *)kTISPropertyInputSourceIsEnabled] ||
+        [k isEqual:(NSString *)kTISPropertyInputSourceIsSelectCapable])
+        return (void *)kCFBooleanTrue;
+    if ([k isEqual:(NSString *)kTISPropertyInputSourceIsSelected])
+        return (void *)([p[@"name"] isEqual:selected_layout_name()] ? kCFBooleanTrue : kCFBooleanFalse);
+    return NULL;
+}
+
+/* The characters a key types, from Ferry's English (US) layout data. The
+ * modifier state is Carbon's modifier bits shifted right by 8. Option types
+ * what the key types without it, and no key is a dead key. Caps Lock makes
+ * letters capitals with or without Shift, as on a Mac. */
+OSStatus UCKeyTranslate(const UCKeyboardLayout *layoutPtr, UInt16 key, UInt16 action, UInt32 modifiers,
+                        UInt32 kbdType, OptionBits options, UInt32 *deadKeyState, UniCharCount max,
+                        UniCharCount *actualLength, UniChar *chars)
+{
+    const struct ferry_key_layout *layout = (const struct ferry_key_layout *)layoutPtr;
     if (actualLength)
         *actualLength = 0;
-    return paramErr;
+    if (!layout || layout->mark != LAYOUT_MARK || !deadKeyState || !actualLength || (max && !chars) ||
+        action > kUCKeyActionDisplay)
+        return paramErr;
+    *deadKeyState = 0;
+    if (action == kUCKeyActionUp || key >= 128)
+        return noErr;
+    BOOL shift = (modifiers & ((shiftKey | rightShiftKey) >> 8)) != 0;
+    BOOL caps = (modifiers & (alphaLock >> 8)) != 0;
+    BOOL control = (modifiers & ((controlKey | rightControlKey) >> 8)) != 0;
+    UniChar c = us_plain[key];
+    if (!c)
+        c = us_special(key);
+    else if (c >= 'a' && c <= 'z') {
+        if (control && action != kUCKeyActionDisplay)
+            c = (UniChar)(c - 'a' + 1);
+        else if (shift || caps)
+            c = (UniChar)(c - 'a' + 'A');
+    } else if (shift && key < 0x41) {
+        const char *at = c < 128 ? strchr(us_shifted_from, (int)c) : NULL;
+        if (at)
+            c = (UniChar)(unsigned char)us_shifted_to[at - us_shifted_from];
+        else if (c == 0xa7)
+            c = 0xb1; /* the ISO key: section sign, and plus-minus with Shift */
+    }
+    if (!c || max < 1)
+        return noErr;
+    chars[0] = c;
+    *actualLength = 1;
+    return noErr;
 }
-uint8_t LMGetKbdType(void) { return 0; }
+
+/* An ANSI keyboard (40 among the keyboard type numbers). */
+uint8_t LMGetKbdType(void) { return 40; }
+
+/* ---- the system's own hotkeys and the keyboard's state ------------------------------- */
+
+static OptionBits symbolic_mode;
+void *PushSymbolicHotKeyMode(OptionBits options)
+{
+    OptionBits *token = malloc(sizeof *token);
+    if (token)
+        *token = symbolic_mode;
+    symbolic_mode = options;
+    return token;
+}
+void PopSymbolicHotKeyMode(void *token)
+{
+    if (token) {
+        symbolic_mode = *(OptionBits *)token;
+        free(token);
+    }
+}
+OptionBits GetSymbolicHotKeyMode(void) { return symbolic_mode; }
+
+/* NSEvent's modifier flags in Carbon's bits. */
+UInt32 GetCurrentEventKeyModifiers(void)
+{
+    NSEventModifierFlags f = [NSEvent modifierFlags];
+    UInt32 m = 0;
+    if (f & NSEventModifierFlagCommand)
+        m |= cmdKey;
+    if (f & NSEventModifierFlagShift)
+        m |= shiftKey;
+    if (f & NSEventModifierFlagCapsLock)
+        m |= alphaLock;
+    if (f & NSEventModifierFlagOption)
+        m |= optionKey;
+    if (f & NSEventModifierFlagControl)
+        m |= controlKey;
+    return m;
+}
+UInt32 GetCurrentKeyModifiers(void) { return GetCurrentEventKeyModifiers(); }
+/* Which keys are held: Wayland tells an app only of the keys pressed in its
+ * own windows, which it hears as events, so none are reported here. */
+void GetKeys(KeyMap keys)
+{
+    if (keys)
+        memset(keys, 0, sizeof(KeyMap));
+}
+
 int16_t GetMBarHeight(void) { return 0; }
 
 /* ---- processes ----------------------------------------------------------------- */
@@ -1273,3 +1526,18 @@ const CFStringRef kTISPropertyInputSourceID = (CFStringRef)@"TISPropertyInputSou
 const CFStringRef kTISPropertyLocalizedName = (CFStringRef)@"TISPropertyLocalizedName";
 const CFStringRef kTISNotifySelectedKeyboardInputSourceChanged =
     (CFStringRef)@"TISNotifySelectedKeyboardInputSourceChanged";
+const CFStringRef kTISNotifyEnabledKeyboardInputSourcesChanged =
+    (CFStringRef)@"TISNotifyEnabledKeyboardInputSourcesChanged";
+const CFStringRef kTISPropertyInputSourceType = (CFStringRef)@"TISPropertyInputSourceType";
+const CFStringRef kTISPropertyInputSourceCategory = (CFStringRef)@"TISPropertyInputSourceCategory";
+const CFStringRef kTISPropertyInputSourceLanguages = (CFStringRef)@"TISPropertyInputSourceLanguages";
+const CFStringRef kTISPropertyInputSourceIsASCIICapable = (CFStringRef)@"TISPropertyInputSourceIsASCIICapable";
+const CFStringRef kTISPropertyInputSourceIsEnabled = (CFStringRef)@"TISPropertyInputSourceIsEnabled";
+const CFStringRef kTISPropertyInputSourceIsSelected = (CFStringRef)@"TISPropertyInputSourceIsSelected";
+const CFStringRef kTISPropertyInputSourceIsSelectCapable = (CFStringRef)@"TISPropertyInputSourceIsSelectCapable";
+const CFStringRef kTISPropertyBundleID = (CFStringRef)@"TISPropertyBundleID";
+const CFStringRef kTISCategoryKeyboardInputSource = (CFStringRef)@"TISCategoryKeyboardInputSource";
+const CFStringRef kTISTypeKeyboardLayout = (CFStringRef)@"TISTypeKeyboardLayout";
+const CFStringRef kHISymbolicHotKeyCode = (CFStringRef)@"kHISymbolicHotKeyCode";
+const CFStringRef kHISymbolicHotKeyModifiers = (CFStringRef)@"kHISymbolicHotKeyModifiers";
+const CFStringRef kHISymbolicHotKeyEnabled = (CFStringRef)@"kHISymbolicHotKeyEnabled";

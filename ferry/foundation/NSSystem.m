@@ -507,12 +507,16 @@ static NSMutableDictionary *bundles_by_path;
 /* ---- NSUserDefaults --------------------------------------------------------------------- */
 
 NSNotificationName const NSUserDefaultsDidChangeNotification = @"NSUserDefaultsDidChangeNotification";
+NSString *const NSGlobalDomain = @"NSGlobalDomain";
+NSString *const NSArgumentDomain = @"NSArgumentDomain";
+NSString *const NSRegistrationDomain = @"NSRegistrationDomain";
 static NSUserDefaults *standard_defaults;
 
 @implementation NSUserDefaults {
     NSString *_domain, *_file;
     NSMutableDictionary *_values, *_registered;
     NSDictionary *_arguments;
+    NSMutableDictionary *_volatile; /* the volatile domains a program set, by name */
 }
 + (NSUserDefaults *)standardUserDefaults
 {
@@ -555,6 +559,7 @@ static NSUserDefaults *standard_defaults;
     [_values release];
     [_registered release];
     [_arguments release];
+    [_volatile release];
     [super dealloc];
 }
 /* Key-value coding on the defaults reads and writes the defaults themselves. */
@@ -691,13 +696,76 @@ static NSUserDefaults *standard_defaults;
 }
 - (BOOL)synchronize { return YES; }
 - (NSString *)_ferryDomain { return _domain; }
+
+/* The volatile domains (freemac 1.221, Ferry 0.45.0): the registration
+ * domain is what registerDefaults: was given, the argument domain what the
+ * command line set, and others are the program's own. Values in a domain
+ * of the program's own aren't looked up by objectForKey:. */
+- (NSDictionary *)volatileDomainForName:(NSString *)domainName
+{
+    if ([domainName isEqualToString:NSRegistrationDomain])
+        return [NSDictionary dictionaryWithDictionary:_registered];
+    if ([domainName isEqualToString:NSArgumentDomain])
+        return _arguments;
+    NSDictionary *d = [_volatile objectForKey:domainName];
+    return d ?: [NSDictionary dictionary];
+}
+- (void)setVolatileDomain:(NSDictionary *)domain forName:(NSString *)domainName
+{
+    if ([domainName isEqualToString:NSRegistrationDomain]) {
+        [_registered setDictionary:domain ?: [NSDictionary dictionary]];
+        return;
+    }
+    if ([_volatile objectForKey:domainName])
+        FRaise(NSInvalidArgumentException, @"*** -[NSUserDefaults setVolatileDomain:forName:]: a volatile domain "
+                                            @"named %@ already exists", domainName);
+    if (!_volatile)
+        _volatile = [[NSMutableDictionary alloc] init];
+    [_volatile setObject:[NSDictionary dictionaryWithDictionary:domain] forKey:domainName];
+}
+- (void)removeVolatileDomainForName:(NSString *)domainName
+{
+    if ([domainName isEqualToString:NSRegistrationDomain])
+        [_registered removeAllObjects];
+    else
+        [_volatile removeObjectForKey:domainName];
+}
+- (NSArray *)volatileDomainNames
+{
+    NSMutableArray *names = [NSMutableArray arrayWithObjects:NSRegistrationDomain, NSArgumentDomain, nil];
+    [names addObjectsFromArray:[_volatile allKeys]];
+    return names;
+}
 @end
 
 /* ---- NSFileManager ------------------------------------------------------------------------ */
 
 NSDictionary *FFileAttributes(NSString *path, NSError **error);
 
-@implementation NSFileManager
+/* Set while a file manager copies, moves or removes, so that its delegate
+ * is asked about the item it was given and not about each file inside. */
+static __thread int file_operation_depth;
+
+static BOOL delegate_allows(NSFileManager *fm, SEL pathSel, SEL urlSel, NSString *a, NSString *b)
+{
+    id d = [fm delegate];
+    if (!d || file_operation_depth)
+        return YES;
+    if ([d respondsToSelector:pathSel])
+        return b ? ((BOOL(*)(id, SEL, id, id, id))objc_msgSend)(d, pathSel, fm, a, b)
+                 : ((BOOL(*)(id, SEL, id, id))objc_msgSend)(d, pathSel, fm, a);
+    if ([d respondsToSelector:urlSel])
+        return b ? ((BOOL(*)(id, SEL, id, id, id))objc_msgSend)(d, urlSel, fm, [NSURL fileURLWithPath:a],
+                                                                  [NSURL fileURLWithPath:b])
+                 : ((BOOL(*)(id, SEL, id, id))objc_msgSend)(d, urlSel, fm, [NSURL fileURLWithPath:a]);
+    return YES;
+}
+
+@implementation NSFileManager {
+    id _delegate;
+}
+- (id)delegate { return _delegate; }
+- (void)setDelegate:(id)delegate { _delegate = delegate; }
 + (NSFileManager *)defaultManager
 {
     static NSFileManager *shared;
@@ -827,6 +895,16 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error);
 - (NSArray *)subpathsAtPath:(NSString *)path { return [self subpathsOfDirectoryAtPath:path error:NULL]; }
 - (BOOL)removeItemAtPath:(NSString *)path error:(NSError **)error
 {
+    if (!delegate_allows(self, @selector(fileManager:shouldRemoveItemAtPath:),
+                         @selector(fileManager:shouldRemoveItemAtURL:), path, nil))
+        return YES;
+    file_operation_depth++;
+    BOOL ok = [self _ferryRemoveItemAtPath:path error:error];
+    file_operation_depth--;
+    return ok;
+}
+- (BOOL)_ferryRemoveItemAtPath:(NSString *)path error:(NSError **)error
+{
     struct stat st;
     const char *fs = [path fileSystemRepresentation];
     if (lstat(fs, &st) != 0) {
@@ -851,6 +929,16 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error);
 }
 - (BOOL)removeItemAtURL:(NSURL *)url error:(NSError **)error { return [self removeItemAtPath:[url path] error:error]; }
 - (BOOL)copyItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)error
+{
+    if (!delegate_allows(self, @selector(fileManager:shouldCopyItemAtPath:toPath:),
+                         @selector(fileManager:shouldCopyItemAtURL:toURL:), src, dst))
+        return YES;
+    file_operation_depth++;
+    BOOL ok = [self _ferryCopyItemAtPath:src toPath:dst error:error];
+    file_operation_depth--;
+    return ok;
+}
+- (BOOL)_ferryCopyItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)error
 {
     struct stat st;
     if (lstat([src fileSystemRepresentation], &st) != 0) {
@@ -892,6 +980,16 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error);
     return YES;
 }
 - (BOOL)moveItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)error
+{
+    if (!delegate_allows(self, @selector(fileManager:shouldMoveItemAtPath:toPath:),
+                         @selector(fileManager:shouldMoveItemAtURL:toURL:), src, dst))
+        return YES;
+    file_operation_depth++;
+    BOOL ok = [self _ferryMoveItemAtPath:src toPath:dst error:error];
+    file_operation_depth--;
+    return ok;
+}
+- (BOOL)_ferryMoveItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)error
 {
     if (lstat([dst fileSystemRepresentation], &(struct stat){0}) == 0) {
         FSetError(error, FPosixError(EEXIST, dst));

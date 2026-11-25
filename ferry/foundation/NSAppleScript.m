@@ -105,3 +105,81 @@ static void say_once(void)
                                       (unsigned long)[_source length]];
 }
 @end
+
+/* ---- NSScriptCommand (freemac 1.221, Ferry 0.45.0) ---- */
+
+@implementation NSScriptCommand {
+    NSScriptCommandDescription *_description;
+    id _direct, _expected;
+    NSDictionary *_arguments;
+    NSInteger _errorNumber;
+    NSString *_errorString;
+    NSAppleEventDescriptor *_offending;
+    BOOL _suspended;
+}
++ (NSScriptCommand *)currentCommand { return nil; }
+- (instancetype)initWithCommandDescription:(NSScriptCommandDescription *)commandDef
+{
+    if ((self = [super init]))
+        _description = [(id)commandDef retain];
+    return self;
+}
+- (instancetype)init { return [self initWithCommandDescription:nil]; }
+- (instancetype)initWithCoder:(NSCoder *)coder { return [self init]; }
+- (void)encodeWithCoder:(NSCoder *)coder {}
+- (void)dealloc
+{
+    [(id)_description release];
+    [_direct release];
+    [_expected release];
+    [_arguments release];
+    [_errorString release];
+    [_offending release];
+    [super dealloc];
+}
+- (NSScriptCommandDescription *)commandDescription { return _description; }
+- (id)directParameter { return _direct; }
+- (void)setDirectParameter:(id)p
+{
+    [p retain];
+    [_direct release];
+    _direct = p;
+}
+- (NSDictionary *)arguments { return _arguments ?: @{}; }
+- (void)setArguments:(NSDictionary *)a
+{
+    [_arguments release];
+    _arguments = [a copy];
+}
+/* no object specifiers to evaluate: the arguments as they are */
+- (NSDictionary *)evaluatedArguments { return [self arguments]; }
+- (id)evaluatedReceivers { return nil; }
+- (BOOL)isWellFormed { return YES; }
+- (NSInteger)scriptErrorNumber { return _errorNumber; }
+- (void)setScriptErrorNumber:(NSInteger)n { _errorNumber = n; }
+- (NSString *)scriptErrorString { return _errorString; }
+- (void)setScriptErrorString:(NSString *)s
+{
+    [_errorString release];
+    _errorString = [s copy];
+}
+- (id)scriptErrorExpectedTypeDescriptor { return _expected; }
+- (void)setScriptErrorExpectedTypeDescriptor:(id)d
+{
+    [d retain];
+    [_expected release];
+    _expected = d;
+}
+- (NSAppleEventDescriptor *)scriptErrorOffendingObjectDescriptor { return _offending; }
+- (void)setScriptErrorOffendingObjectDescriptor:(NSAppleEventDescriptor *)d
+{
+    [d retain];
+    [_offending release];
+    _offending = d;
+}
+- (NSAppleEventDescriptor *)appleEvent { return nil; }
+- (id)performDefaultImplementation { return nil; }
+- (id)executeCommand { return [self performDefaultImplementation]; }
+- (void)suspendExecution { _suspended = YES; }
+- (void)resumeExecutionWithResult:(id)result { _suspended = NO; }
+@end

@@ -8,18 +8,9 @@
 #include <sched.h>
 #include <time.h>
 #include <sys/qos.h>
+#include <sys/types.h>
 __FERRY_BEGIN
-struct _ferry_pthread;
-typedef struct _ferry_pthread *pthread_t;
-typedef unsigned long pthread_key_t;
-typedef struct { long __sig; char __opaque[56]; } pthread_attr_t;
-typedef struct { long __sig; char __opaque[56]; } pthread_mutex_t;
-typedef struct { long __sig; char __opaque[8]; } pthread_mutexattr_t;
-typedef struct { long __sig; char __opaque[40]; } pthread_cond_t;
-typedef struct { long __sig; char __opaque[8]; } pthread_condattr_t;
-typedef struct { long __sig; char __opaque[192]; } pthread_rwlock_t;
-typedef struct { long __sig; char __opaque[16]; } pthread_rwlockattr_t;
-typedef struct { long __sig; char __opaque[8]; } pthread_once_t;
+/* The types themselves come with <sys/types.h>, as on a Mac. */
 #ifndef _FERRY_MACH_PORT_T
 #define _FERRY_MACH_PORT_T
 typedef unsigned int mach_port_t;
