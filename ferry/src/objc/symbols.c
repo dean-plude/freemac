@@ -121,6 +121,8 @@ extern char _objc_empty_cache_storage[];
     X(object_getIvar, object_getIvar) \
     X(object_setIvar, object_setIvar) \
     X(object_setIvarWithStrongDefault, object_setIvarWithStrongDefault) \
+    X(object_getInstanceVariable, object_getInstanceVariable) \
+    X(object_setInstanceVariable, object_setInstanceVariable) \
     X(objc_retain, objc_retain) \
     X(objc_release, objc_release) \
     X(objc_autorelease, objc_autorelease) \

@@ -1183,6 +1183,46 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.226 "Ferry: Sequel Pro" (done)
+
+Ferry 0.50.0: Sequel Pro linked into a bundle and run, the seventh app.
+Its MySQL framework, SPMySQL, was built from its source against MariaDB
+Connector/C, which was built from its own source with Ferry's SDK. Sequel
+Pro opens its connection window, and pressing Connect for a server that
+isn't there brings up its "Connection failed!" sheet with the client
+library's own message. Counted with one survey script over the same
+clones as 1.225 (627 files), the files that compile went from 543 to 582,
+and Sequel Pro's from 150 to 188 of 190.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Sequel Pro links and runs. MariaDB Connector/C 3.4 was built from its source as a static library, without TLS and with its hashes from CommonCrypto. SPMySQL, QueryKit and PSMTabBar were built from Sequel Pro's source. The other frameworks Sequel Pro ships built (Growl, FeedbackReporter, ShortcutRecorder, UniversalDetector) were used as shipped, and Sparkle came from MacDown's build. On a fresh home it shows its window: the toolbar, the favourites list and the quick connect form with its TCP/IP, Socket and SSH tabs and colour choices. On the next launch Sparkle asks whether to check for updates. Given 127.0.0.1 and port 3306, where no server runs, Connect goes through SPMySQL and Connector/C to a refused socket, and the sheet shows "Can't connect to server on '127.0.0.1'". No server is installed, so no connection was made | Ferry AppKit, Foundation, Security, libSystem | done |
+| 2 | The older AppKit names Sequel Pro's files stop at: | Ferry AppKit | done |
+|   | - `NSColorList`, `NSMatrix`, `NSSpellChecker`, `NSPICTImageRep` (which reads no PICT data), the token field cell's delegate and print panel accessories | | |
+|   | - base coordinates, the layout manager's glyph queries and background layout, `graphicsPort`, the HFS type code calls | | |
+|   | - the rest of `NSCell`: its represented object, values set from numbers and taken from other controls, its type, states, `sendActionOn:`, `focusRingType` and comparing | | |
+|   | - a window's alpha, which now shows: a window at alpha 0 is kept off screen until it fades in | | |
+| 3 | The older Foundation, CoreServices and Security names: | Ferry Foundation, CoreServices, Security, WebKit | done |
+|   | - `NSCalendarDate`, with its formats and arithmetic, `NSScriptExecutionContext`, and `NSConnection` between the threads of one program | | |
+|   | - CFXML's entity calls, the DriverServices clock (`UpTime`, `AbsoluteToNanoseconds`, durations) and `unimpErr` | | |
+|   | - the older keychain calls: items added from an attribute list with an access list, searches by attribute, trusted applications | | |
+|   | - `WebHistoryItem` and `WebBackForwardList` | | |
+| 4 | What SPMySQL, MariaDB Connector/C and Sequel Pro call in libSystem: | Ferry libSystem, SDK | done |
+|   | - `pthread_cancel` (deferred) with cleanup handlers, `memset_pattern4`, `8` and `16`, `getlogin`, `ttyname`, `asl_set_query` and `asl_next` | | |
+|   | - libbz2 on Mac `FILE`s, `object_getInstanceVariable` and `object_setInstanceVariable`, `Block_copy` from CoreFoundation | | |
+|   | - the headers `memory.h`, `alloca.h`, `complex.h`, `bzlib.h`, `zconf.h`, `netinet/ip.h` and `select` from `unistd.h` | | |
+| 5 | Setting a view's frame to the frame it has posts no notification, as on a Mac; Sequel Pro sets the frame again from its observer | Ferry AppKit | done |
+| 6 | Four new tests; `make check` 266 of 266 | Ferry | done |
+
+The colours and the font in Sequel Pro's `PreferenceDefaults.plist` were
+archived by a Mac's `NSArchiver`, whose format is undocumented and which
+Ferry doesn't read, so the build script writes its own values there with
+Ferry's `NSArchiver`. Gas Mask and Hex Fiend still can't be linked, since
+both have Swift in them. MacPass's window still opens too small for its
+inspector, MacDown's toolbar doesn't show, and KeyCastr's Sparkle window
+is laid out too tall. JavaScript functions as blocks and a weak
+`JSManagedValue` weren't reached.
+
 ## 1.225 "Ferry: MacPass and MacDown" (done)
 
 Ferry 0.49.0: MacPass and MacDown linked into bundles, with the frameworks

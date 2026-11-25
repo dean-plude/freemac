@@ -22,6 +22,18 @@ enum {
 enum { gestaltUndefSelectorErr = -5551 };
 /* The Carbon-era result codes Launch Services answers with (MacErrors.h). */
 enum { noErr = 0, fnfErr = -43, paramErr = -50, memFullErr = -108, userCanceledErr = -128 };
+/* freemac 1.226, Ferry 0.50.0: "not implemented", which Sequel Pro answers with */
+enum { unimpErr = -4 };
+/* Generic icons from IconsCore (freemac 1.226, Ferry 0.50.0): their type
+ * codes, which NSFileTypeForHFSTypeCode makes a file type of. */
+enum {
+    kGenericDocumentIcon = 'docu',
+    kGenericApplicationIcon = 'APPL',
+    kGenericFolderIcon = 'fldr',
+    kGenericHardDiskIcon = 'hdsk',
+    kGenericNetworkIcon = 'gnet',
+    kTrashIcon = 'trsh',
+};
 enum { coreFoundationUnknownErr = -4960 };
 /* the reference constants callbacks are given back (MacTypes.h) */
 typedef void *SRefCon;
@@ -38,6 +50,8 @@ __FERRY_END
 #include <CoreServices/LaunchServices.h>
 /* Uniform type identifiers and icon references (freemac 1.223, Ferry 0.47.0). */
 #include <CoreServices/UTType.h>
+/* The Carbon clock calls (freemac 1.226, Ferry 0.50.0). */
+#include <CoreServices/DriverServices.h>
 #include <CoreServices/IconsCore.h>
 /* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
  * and Cocoa programs rely on it; its file calls bring in open and its

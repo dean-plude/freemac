@@ -77,7 +77,10 @@ void gtk_window_maximize(GtkWidget *window);
 void gtk_window_unmaximize(GtkWidget *window);
 GtkWidget *gtk_drawing_area_new(void);
 void gtk_container_add(GtkWidget *container, GtkWidget *widget);
+void gtk_widget_show(GtkWidget *widget);
 void gtk_widget_show_all(GtkWidget *widget);
+/* 0 to 1; a compositor draws the window that see-through */
+void gtk_widget_set_opacity(GtkWidget *widget, double opacity);
 void gtk_widget_hide(GtkWidget *widget);
 void gtk_widget_destroy(GtkWidget *widget);
 void gtk_widget_add_events(GtkWidget *widget, int events);

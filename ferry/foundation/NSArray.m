@@ -522,6 +522,9 @@ static void check_range(NSArray *a, NSRange r)
 
 @implementation NSMutableArray
 + (instancetype)arrayWithCapacity:(NSUInteger)capacity { return [[[self alloc] initWithCapacity:capacity] autorelease]; }
+/* NSArray's make a mutable copy when called on a mutable class */
++ (NSMutableArray *)arrayWithContentsOfFile:(NSString *)path { return (NSMutableArray *)[super arrayWithContentsOfFile:path]; }
++ (NSMutableArray *)arrayWithContentsOfURL:(NSURL *)url { return (NSMutableArray *)[super arrayWithContentsOfURL:url]; }
 - (instancetype)initWithCapacity:(NSUInteger)capacity { return [self init]; }
 - (id)copyWithZone:(NSZone *)zone { return [[NSArray allocWithZone:zone] initWithArray:self]; }
 - (void)insertObject:(id)obj atIndex:(NSUInteger)index {}

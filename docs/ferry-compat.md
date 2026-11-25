@@ -1701,6 +1701,96 @@ no framework of the apps' own built:
   - `uint64` in its templates (3), and a parse error inside its data
     inspector's fetch macros.
 
+### Sequel Pro (freemac 1.226, Ferry 0.50.0)
+
+The same 627 files as in 1.225 were compiled again with `ferry-cc
+-fsyntax-only`, before and after this work, by the same survey script,
+with MacPass's dependencies checked out as in 1.225. The "before" column
+is 1.225's "now".
+
+| App | Source files | Compiled before | Compile now |
+| --- | --- | --- | --- |
+| Flycut | 23 | 23 | 23 |
+| ShiftIt | 23 | 21 | 21 |
+| Spectacle | 31 | 31 | 31 |
+| Gas Mask | 43 | 39 | 40 |
+| MacPass | 159 | 159 | 159 |
+| MacDown | 36 | 21 | 21 |
+| Sequel Pro | 190 | 150 | 188 |
+| KeyCastr | 17 | 17 | 17 |
+| Hex Fiend | 105 | 82 | 82 |
+| All nine | 627 | 543 | 582 |
+
+The two Sequel Pro files left are one file counted in two targets,
+`SPAlertSheets.m`, whose method declared `void` returns a value. The
+clang of its day warned about that; today's stops. The build, which turns
+the warnings off as the survey doesn't, compiles it, and all 158 of the
+app target's files with it.
+
+The frameworks:
+
+| Framework | Files | From | What it does under Ferry |
+| --- | --- | --- | --- |
+| MariaDB Connector/C 3.4 | 36 | its public source, built with `ferry-cc` | the MySQL client protocol, linked into SPMySQL in place of the Mac `libmysqlclient.a` Sequel Pro's repository carries. Built without TLS, with its hashes from CommonCrypto. Three names differ from MySQL 5.5's (the transport `vio`, the SSL mode option and `SERVER_MORE_RESULTS_EXISTS`), and the build forces a header into SPMySQL's files that maps them |
+| SPMySQL | 23 | Sequel Pro's source | connects, queries and streams results, over Connector/C |
+| QueryKit | 9 | Sequel Pro's source | builds queries |
+| PSMTabBar | 13 | Sequel Pro's source | the tab bar. It declares two of the window server's private calls itself, to picture a window while a tab is dragged; the build links do-nothing ones, so the tab drags without its picture |
+| Growl, FeedbackReporter, ShortcutRecorder, UniversalDetector | | built, in Sequel Pro's repository | used as shipped. FeedbackReporter names `libgcc_s` and UniversalDetector `libstdc++`, which Ferry doesn't provide; both load without them |
+| Sparkle (1.x) | | MacDown's 1.225 build | its updater |
+
+Sequel Pro's `PreferenceDefaults.plist` holds its query editor's colours
+and font, and the favourite colours, as data a Mac's `NSArchiver` wrote.
+That format is undocumented, and Ferry's `NSUnarchiver` gives nil for it,
+so Sequel Pro put nil into an array. The build script writes those values
+again with Ferry's own `NSArchiver`, in colours chosen for it (black on
+white, with the usual syntax colours), not read from the shipped data.
+The built Info.plist's empty `CFBundleVersion` is set to 1, which Sparkle
+needs.
+
+Sequel Pro was run under X with no desktop, given input with XTest:
+
+| When | What it does |
+| --- | --- |
+| First launch, fresh home | Opens its window at 948 by 608 points: the toolbar (database menu, Structure, Content, Relations, Triggers, Table Info, Query, Table History, Users, Console), the favourites list with Quick Connect, and the connection form with its TCP/IP, Socket and SSH tabs, the colour choices, the fields with their placeholders and Connect |
+| Second launch | Sparkle's sheet asks whether to check for updates automatically |
+| Host 127.0.0.1, user root, port 3306, Connect | "Add to Favorites", "Save changes" and "Test connection" appear under the form. SPMySQL connects through Connector/C to a socket nothing listens on, and the sheet says "Connection failed!" with "MySQL said: Can't connect to server on '127.0.0.1' (36)". The 36 is `EINPROGRESS`, the `errno` left by Connector/C's non-blocking connect, which it reports rather than the socket's own error (61, connection refused, which Ferry gives, as a test program shows). No server is installed, so no query was run |
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `NSColorList`, the HFS type code calls (`NSFileTypeForHFSTypeCode` and the rest), base coordinates (`convertBaseToScreen:` and the others), the layout manager's glyph queries and `backgroundLayoutEnabled` | Sequel Pro | done; a colour list is read from and written to Ferry's own archives |
+| `NSMatrix`, with its modes, cells by row and column, `selectedTag` and rows running down from the top | Sequel Pro | done |
+| `NSSpellChecker` | Sequel Pro | done; it knows no words, so it finds nothing to correct |
+| `NSPICTImageRep` | Sequel Pro | done; it reads no PICT data |
+| `NSTokenFieldCellDelegate`, `NSPrintPanelAccessorizing`, `graphicsPort` (the context's `CGContext`) | Sequel Pro | done |
+| the rest of `NSCell`: represented object, numeric values set and taken from another control, type, mixed and next state, `sendActionOn:`, first responder, undo, single line mode, focus ring, writing direction, key equivalent and `compare:` | Sequel Pro | done |
+| a window's alpha applied to its window on screen, kept off screen at 0 | Sequel Pro (fades its window in) | done |
+| a frame set to the one a view already has posts nothing | Sequel Pro | done |
+| `NSCalendarDate`: its formats, fields, time zones, arithmetic and parsing | Sequel Pro | done |
+| `NSScriptExecutionContext`; `NSConnection` by registered name between the threads of one program, with its root proxy | Sequel Pro's SSH tunnel | done; another program's connection isn't found |
+| `CFXMLCreateStringByEscapingEntities` and its unescaping twin, the DriverServices clock, `unimpErr`, `object_getInstanceVariable`, `Block_copy` from CoreFoundation | Sequel Pro, SPMySQL | done |
+| `SecKeychainItemCreateFromContent`, `SecKeychainSearchCreateFromAttributes` and `SecKeychainSearchCopyNext`, `SecAccessCreate`, trusted applications | Sequel Pro (its passwords) | done; an access list is kept with nothing to check, as Ferry's keychain asks no one |
+| `WebHistoryItem`, `WebBackForwardList` | Sequel Pro's help viewer | done |
+| `NSMutableArray` and `NSMutableDictionary` read from files typed as mutable | Sequel Pro | done |
+| `pthread_cancel` and the cleanup handlers, `memset_pattern4`, `8` and `16`, `getlogin`, `ttyname`, `asl_set_query`, `asl_next` | MariaDB Connector/C, Sequel Pro | done; cancellation is acted on only in `pthread_testcancel` |
+| libbz2's calls on a Mac `FILE`; `memory.h`, `alloca.h`, `complex.h`, `bzlib.h`, `zconf.h`, `netinet/in_systm.h`, `netinet/ip.h` | Sequel Pro, Connector/C, Gas Mask | done |
+
+What still stops each app's files (the first error in each file), with
+no framework of the apps' own built:
+
+- **Flycut (0)**, **Spectacle (0)**, **KeyCastr (0)**, **MacPass (0)**:
+  all compile, and they link and run.
+- **ShiftIt (2)**: `X11/Xlib.h`, its X11 driver, left out of the NoX11
+  target that was linked.
+- **Gas Mask (3)**: its Swift bridging header; `SMAppService`;
+  `kSCNetworkFlagsReachable`.
+- **MacDown (15)**: only its libraries' headers, as in 1.225. Built as
+  frameworks, they let all 36 compile, and it links and runs.
+- **Sequel Pro (2)**: `SPAlertSheets.m`, in two targets, whose `void`
+  method returns a value. The build compiles it, and it links and runs.
+- **Hex Fiend (23)**: as in 1.225.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1711,7 +1801,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. Counted over the same clones, with MacPass's dependencies checked out where its build puts them, 543 of 627 files now compile (496 before, counted the same way), and the table under "MacPass and MacDown" lists what stops the rest. Next is Sequel Pro's MySQL framework, which it needs before it can be linked, and the older AppKit names its files still stop at. Gas Mask and Hex Fiend also have Swift in them, which Ferry can't build, so neither can be linked.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. In 1.226 Sequel Pro became the seventh, with its MySQL framework built against MariaDB Connector/C, built from its source, and the older AppKit, Foundation and keychain names its files stopped at: it shows its connection window, and Connect reaches the client library, which reports that no server answers. Counted over the same clones, 582 of 627 files now compile (543 before), and the table under "Sequel Pro" lists what stops the rest. Gas Mask and Hex Fiend also have Swift in them, which Ferry can't build, so neither can be linked.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

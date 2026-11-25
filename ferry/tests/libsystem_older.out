@@ -1,0 +1,26 @@
+cleanup handlers:
+  popped: 1 0, result 5
+  on exit: 2 then 1, result 7
+cancellation:
+  cancel: 0
+  state was enabled: 1
+  canceled: 1, reached 1, handler 1
+memset_pattern:
+  4: abcdabcdab
+  8: 01234567012
+  16: ABCDEFGHIJKLMNOPABCDE
+bzip2 through a FILE:
+  wrote: 0, 84 bytes in, compressed yes
+  read: 84 bytes, end 1, same 1
+complex numbers:
+  |3+4i| = 5, conj 3-4i
+  e^(i pi) = -1.000+0.000i
+  sqrt(-4) = 0+2i
+alloca and headers:
+  on the stack
+  ip header 20 bytes, version 4, tos 0x10
+  zconf: 8 1
+log query:
+  set: 0
+  results: none
+exit=0

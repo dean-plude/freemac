@@ -78,6 +78,7 @@ void *ferry_host_lookup(const char *name);
 int ferry_twin_library(const char *install_name);   /* zlib and the like: this system's copy */
 void *ferry_twin_lookup(const char *name);
 void *ferry_twin_symbol(const char *install_name, const char *name); /* lazily, for Foundation */
+void *ferry_host_file(void *mac_file);              /* stdio.c: this system's FILE behind a Mac FILE */
 void *ferry_network_symbol(const char *name);       /* libcurl, for Foundation's URL loading */
 void *ferry_crypto_symbol(const char *name);        /* OpenSSL, for CommonCrypto and Security */
 void *ferry_bus_symbol(const char *name);           /* GIO's D-Bus, for distributed notifications */

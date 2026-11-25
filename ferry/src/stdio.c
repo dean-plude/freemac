@@ -71,6 +71,13 @@ static FILE *real(struct mac_FILE *f)
     return f->cookie;
 }
 
+/* For the twin libraries' calls that take a FILE (host.c): this system's
+ * FILE behind the program's (freemac 1.226, Ferry 0.50.0). */
+void *ferry_host_file(void *mac_file)
+{
+    return mac_file ? real(mac_file) : NULL;
+}
+
 static void sync_flags(struct mac_FILE *f)
 {
     f->flags &= ~(MAC_SEOF | MAC_SERR);

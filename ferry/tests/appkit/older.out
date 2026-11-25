@@ -1,0 +1,64 @@
+names:
+  textured window 256, thick bezels 3 4, folder icon 'fldr'
+  excluded elements key: ExcludedElements
+  summary keys: name description
+HFS type codes:
+  'fldr' -> 0x666c6472
+  bare: 0x54455854, wrong: 0x0
+  of /: 'fldr', of nothing: nil
+  folder icon: 1
+colour lists:
+  System: 1, editable 0, has controlColor 1
+  windowBackgroundColor: 1, same as NSColor's 1
+  no such colour: nil
+  System unchanged: 1
+  Mine: green red blue
+  found by name: 1, listed 1
+  after removing red: green blue
+  archived and back: Mine, green blue
+  removed: gone
+base coordinates:
+  to base: 25,35 10x10
+  and back: 5,5
+  point: 21,32, size 4
+layout manager:
+  glyphs in view: 0+11
+  a quarter into the fifth glyph: glyph 4, fraction 0.25
+  three quarters in: glyph 4, fraction 0.75
+token field cell:
+  delegate kept: 1
+PICT:
+  from data: nil, can read 0
+NSMatrix:
+  2 x 1, 2 cells, buttons 2
+  selected tag 2, row 1, states 0 1
+  clicked the first: sender is the matrix 1, selected tag 1, states 1 0, sent 1
+  tag 2 at row 1 column 0; frame of row 1: y 21
+  a row added: 3 rows, 3 buttons
+NSSpellChecker:
+  shared 1, misspelled at none, completions 0
+  learned 1, ignored InnoDB, words 3
+WebKit history:
+  item: applewebdata://SHOW "SHOW" 5
+  empty: back 0 forward 0, capacity 100
+  three added: current UPDATE, back 2 forward 0
+  back twice: current SELECT, forward INSERT, back 0 forward 2
+  added after going back: SHOW, forward 0, list SELECT
+  capacity 1: back 0, contains the first 1
+more of NSCell:
+  represented object: the tab's item, type 1
+  integer 42: string 42, float 42.0
+  double 2.5: 2.5
+  taken: 2.5, compare 0
+  image cell type: 2
+  states: next of off 1, next of on -1, then 0
+  kept: ends editing 1, refuses 1 (accepts 0), focus ring 1, old mask 0
+  a text cell's click leaves its state: 0
+graphics port and layout:
+  port is the CG context: 1
+  background layout: 1, then 0
+frame notifications:
+  the same frame: 0 posted
+  two changes: 2 posted
+  window alpha: 0.0
+exit=0

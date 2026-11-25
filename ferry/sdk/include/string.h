@@ -16,6 +16,10 @@ char *strncpy(char *, const char *, size_t);
 char *stpcpy(char *, const char *);
 size_t strlcpy(char *, const char *, size_t);
 size_t strlcat(char *, const char *, size_t);
+/* a 4-, 8- or 16-byte pattern repeated over len bytes (freemac 1.226, Ferry 0.50.0) */
+void memset_pattern4(void *, const void *, size_t);
+void memset_pattern8(void *, const void *, size_t);
+void memset_pattern16(void *, const void *, size_t);
 char *strcat(char *, const char *);
 char *strncat(char *, const char *, size_t);
 int strcmp(const char *, const char *);

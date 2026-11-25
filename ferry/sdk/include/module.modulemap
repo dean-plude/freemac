@@ -8,6 +8,7 @@ module AppKit [system] {
     header "AppKit/AppKitApps.h"
     header "AppKit/AppKitDocumentApps.h"
     header "AppKit/AppKitMore.h"
+    header "AppKit/AppKitOlder.h"
     header "AppKit/NSAccessibility.h"
     header "AppKit/NSAnimation.h"
     header "AppKit/NSBezierPath.h"
@@ -128,6 +129,7 @@ module CloudKit [system] {
 module CoreServices [system] {
     header "CoreServices/CoreServices.h"
     header "CoreServices/AppleEvents.h"
+    header "CoreServices/DriverServices.h"
     header "CoreServices/FSEvents.h"
     header "CoreServices/Files.h"
     header "CoreServices/IconsCore.h"
@@ -153,6 +155,7 @@ module CoreText [system] {
 
 module Foundation [system] {
     header "Foundation/Foundation.h"
+    header "Foundation/FoundationOlder.h"
     header "Foundation/NSAffineTransform.h"
     header "Foundation/NSAppleEventDescriptor.h"
     header "Foundation/NSAppleScript.h"

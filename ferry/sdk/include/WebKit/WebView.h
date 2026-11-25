@@ -355,6 +355,48 @@ WEBKIT_EXTERN NSString *const WebViewProgressFinishedNotification;
 @property (readonly) BOOL canMakeTextStandardSize;
 @end
 
+/* ---- the back-forward list (freemac 1.226, Ferry 0.50.0) ----------------------------
+ * A web view's list holds the items added to it with addItem:, as Sequel
+ * Pro's help viewer adds its searches; adding one drops those after the
+ * current item. While it holds any, the view's goBack and goForward move
+ * in it and load the item they reach through the main frame (so the
+ * policy delegate decides on it). A view whose list holds none counts and
+ * moves through its page's own history. */
+@interface WebHistoryItem : NSObject <NSCopying>
+- (instancetype)initWithURLString:(NSString *)URLString title:(NSString *)title
+          lastVisitedTimeInterval:(NSTimeInterval)time;
+@property (readonly, copy) NSString *URLString;
+@property (readonly, copy) NSString *originalURLString;
+@property (readonly, copy) NSString *title;
+@property (copy) NSString *alternateTitle;
+@property (readonly) NSTimeInterval lastVisitedTimeInterval;
+@property (readonly, retain) NSImage *icon;
+@end
+WEBKIT_EXTERN NSString *const WebHistoryItemChangedNotification;
+
+@interface WebBackForwardList : NSObject
+- (void)addItem:(WebHistoryItem *)item;
+- (void)goBack;
+- (void)goForward;
+- (void)goToItem:(WebHistoryItem *)item;
+@property (readonly, retain) WebHistoryItem *backItem;
+@property (readonly, retain) WebHistoryItem *currentItem;
+@property (readonly, retain) WebHistoryItem *forwardItem;
+- (NSArray<WebHistoryItem *> *)backListWithLimit:(int)limit;
+- (NSArray<WebHistoryItem *> *)forwardListWithLimit:(int)limit;
+@property int capacity;
+@property (readonly) int backListCount;
+@property (readonly) int forwardListCount;
+- (BOOL)containsItem:(WebHistoryItem *)item;
+- (WebHistoryItem *)itemAtIndex:(int)index;
+@property int pageCacheSize;
+@end
+
+@interface WebView (FerryBackForward)
+@property (readonly, retain) WebBackForwardList *backForwardList;
+- (BOOL)goToBackForwardItem:(WebHistoryItem *)item;
+@end
+
 /* the page's selection (freemac 1.225, Ferry 0.49.0) */
 @interface WebView (FerryEditing)
 @property (readonly, retain) DOMRange *selectedDOMRange;

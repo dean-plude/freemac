@@ -1592,6 +1592,183 @@ static void on_resource_started(GtkWidget *web, WebKitWebResource *resource, Web
 
 /* ---- the web view ------------------------------------------------------------------- */
 
+/* ---- the back-forward list (freemac 1.226, Ferry 0.50.0) ------------------------------
+ * The items added with addItem:; while there are none, the list answers
+ * from the page's own history (WKBackForwardList). */
+
+NSString *const WebHistoryItemChangedNotification = @"WebHistoryItemChangedNotification";
+
+@implementation WebHistoryItem {
+    NSString *_URLString, *_originalURLString, *_title, *_alternateTitle;
+    NSTimeInterval _lastVisited;
+}
+- (instancetype)initWithURLString:(NSString *)URLString title:(NSString *)title
+          lastVisitedTimeInterval:(NSTimeInterval)time
+{
+    if ((self = [super init])) {
+        _URLString = [URLString copy];
+        _originalURLString = [URLString copy];
+        _title = [title copy];
+        _lastVisited = time;
+    }
+    return self;
+}
+- (instancetype)init { return [self initWithURLString:nil title:nil lastVisitedTimeInterval:0]; }
+- (id)copyWithZone:(NSZone *)zone
+{
+    WebHistoryItem *c = [[WebHistoryItem allocWithZone:zone] initWithURLString:_URLString title:_title
+                                                       lastVisitedTimeInterval:_lastVisited];
+    c->_alternateTitle = [_alternateTitle copy];
+    return c;
+}
+- (void)dealloc
+{
+    [_URLString release];
+    [_originalURLString release];
+    [_title release];
+    [_alternateTitle release];
+    [super dealloc];
+}
+- (NSString *)URLString { return _URLString; }
+- (NSString *)originalURLString { return _originalURLString; }
+- (NSString *)title { return _title; }
+- (NSString *)alternateTitle { return _alternateTitle; }
+- (void)setAlternateTitle:(NSString *)t
+{
+    t = [t copy];
+    [_alternateTitle release];
+    _alternateTitle = t;
+}
+- (NSTimeInterval)lastVisitedTimeInterval { return _lastVisited; }
+- (NSImage *)icon { return nil; }
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<WebHistoryItem %p %@ \"%@\">", self, _URLString, _title];
+}
+@end
+
+static WebHistoryItem *item_of(WKBackForwardListItem *wk)
+{
+    if (!wk)
+        return nil;
+    return [[[WebHistoryItem alloc] initWithURLString:[[wk URL] absoluteString] title:[wk title]
+                                 lastVisitedTimeInterval:0] autorelease];
+}
+
+@implementation WebBackForwardList {
+  @public
+    WebView *_view;   /* not retained: the view owns the list */
+    NSMutableArray *_items;
+    NSInteger _current;   /* the current item's index, -1 for none */
+    int _capacity, _pageCacheSize;
+}
+- (instancetype)init
+{
+    if ((self = [super init])) {
+        _items = [[NSMutableArray alloc] init];
+        _current = -1;
+        _capacity = 100;
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_items release];
+    [super dealloc];
+}
+- (WKBackForwardList *)_page { return [_items count] ? nil : [[_view _wk] backForwardList]; }
+
+- (void)addItem:(WebHistoryItem *)item
+{
+    if (!item || _capacity <= 0)
+        return;
+    NSInteger keep = _current + 1;
+    if ((NSUInteger)keep < [_items count])
+        [_items removeObjectsInRange:NSMakeRange((NSUInteger)keep, [_items count] - (NSUInteger)keep)];
+    [_items addObject:item];
+    while ([_items count] > (NSUInteger)_capacity)
+        [_items removeObjectAtIndex:0];
+    _current = (NSInteger)[_items count] - 1;
+}
+- (void)goBack
+{
+    if ([_items count]) {
+        if (_current > 0)
+            _current--;
+    } else {
+        [[_view _wk] goBack];
+    }
+}
+- (void)goForward
+{
+    if ([_items count]) {
+        if (_current + 1 < (NSInteger)[_items count])
+            _current++;
+    } else {
+        [[_view _wk] goForward];
+    }
+}
+- (void)goToItem:(WebHistoryItem *)item
+{
+    NSUInteger i = [_items indexOfObjectIdenticalTo:item];
+    if (i != NSNotFound)
+        _current = (NSInteger)i;
+}
+- (WebHistoryItem *)itemAtIndex:(int)index
+{
+    if (![_items count])
+        return item_of([[self _page] itemAtIndex:index]);
+    NSInteger i = _current + index;
+    return i >= 0 && i < (NSInteger)[_items count] ? [_items objectAtIndex:(NSUInteger)i] : nil;
+}
+- (WebHistoryItem *)backItem { return [self itemAtIndex:-1]; }
+- (WebHistoryItem *)currentItem { return [self itemAtIndex:0]; }
+- (WebHistoryItem *)forwardItem { return [self itemAtIndex:1]; }
+- (int)backListCount
+{
+    if (![_items count])
+        return (int)[[[self _page] backList] count];
+    return (int)_current;
+}
+- (int)forwardListCount
+{
+    if (![_items count])
+        return (int)[[[self _page] forwardList] count];
+    return (int)([_items count] - (NSUInteger)_current - 1);
+}
+- (NSArray *)backListWithLimit:(int)limit
+{
+    NSMutableArray *a = [NSMutableArray array];
+    for (int i = MIN(limit, [self backListCount]); i >= 1; i--)
+        if ([self itemAtIndex:-i])
+            [a addObject:[self itemAtIndex:-i]];
+    return a;
+}
+- (NSArray *)forwardListWithLimit:(int)limit
+{
+    NSMutableArray *a = [NSMutableArray array];
+    for (int i = 1; i <= MIN(limit, [self forwardListCount]); i++)
+        if ([self itemAtIndex:i])
+            [a addObject:[self itemAtIndex:i]];
+    return a;
+}
+- (BOOL)containsItem:(WebHistoryItem *)item { return [_items indexOfObjectIdenticalTo:item] != NSNotFound; }
+- (int)capacity { return _capacity; }
+- (void)setCapacity:(int)capacity
+{
+    _capacity = capacity < 0 ? 0 : capacity;
+    while ([_items count] > (NSUInteger)_capacity) {
+        [_items removeObjectAtIndex:0];
+        _current--;
+    }
+    if (_current < 0 && [_items count])
+        _current = 0;
+}
+- (int)pageCacheSize { return _pageCacheSize; }
+- (void)setPageCacheSize:(int)size { _pageCacheSize = size; }
+- (BOOL)_hasItems { return [_items count] != 0; }
+@end
+
 @implementation WebView {
     WKWebView *_wk;
     WebViewAdapter *_adapter;
@@ -1610,6 +1787,7 @@ static void on_resource_started(GtkWidget *web, WebKitWebResource *resource, Web
     WebKitUserContentManager *_manager;   /* its page's scripts (its opener's, for a new window) */
     WebKitUserStyleSheet *_styleSheet; /* the preferences' user style sheet */
     BOOL _madeForOpener;
+    WebBackForwardList *_backForward;   /* freemac 1.226, Ferry 0.50.0 */
 }
 
 + (NSArray *)MIMETypesShownAsHTML
@@ -1762,6 +1940,9 @@ static void on_resource_started(GtkWidget *web, WebKitWebResource *resource, Web
     [_groupName release];
     [_frameName release];
     [_hostWindow release];
+    if (_backForward)
+        _backForward->_view = nil;
+    [_backForward release];
     [super dealloc];
 }
 
@@ -1960,10 +2141,49 @@ static void on_resource_started(GtkWidget *web, WebKitWebResource *resource, Web
 - (NSString *)mainFrameTitle { return [_wk title] ?: @""; }
 - (BOOL)isLoading { return [_wk isLoading]; }
 - (double)estimatedProgress { return [_wk estimatedProgress]; }
-- (BOOL)canGoBack { return [_wk canGoBack]; }
-- (BOOL)canGoForward { return [_wk canGoForward]; }
-- (BOOL)goBack { return [_wk goBack] != nil; }
-- (BOOL)goForward { return [_wk goForward] != nil; }
+- (WebBackForwardList *)backForwardList
+{
+    if (!_backForward) {
+        _backForward = [[WebBackForwardList alloc] init];
+        _backForward->_view = self;
+    }
+    return _backForward;
+}
+/* the list's current item, loaded in the main frame */
+- (BOOL)_loadListItem
+{
+    NSURL *url = [NSURL URLWithString:[[_backForward currentItem] URLString] ?: @""];
+    if (url)
+        [_mainFrame loadRequest:[NSURLRequest requestWithURL:url]];
+    return url != nil;
+}
+- (BOOL)goToBackForwardItem:(WebHistoryItem *)item
+{
+    if (![_backForward containsItem:item])
+        return NO;
+    [_backForward goToItem:item];
+    return [self _loadListItem];
+}
+- (BOOL)canGoBack { return [_backForward _hasItems] ? [_backForward backListCount] > 0 : [_wk canGoBack]; }
+- (BOOL)canGoForward { return [_backForward _hasItems] ? [_backForward forwardListCount] > 0 : [_wk canGoForward]; }
+- (BOOL)goBack
+{
+    if (![_backForward _hasItems])
+        return [_wk goBack] != nil;
+    if ([_backForward backListCount] <= 0)
+        return NO;
+    [_backForward goBack];
+    return [self _loadListItem];
+}
+- (BOOL)goForward
+{
+    if (![_backForward _hasItems])
+        return [_wk goForward] != nil;
+    if ([_backForward forwardListCount] <= 0)
+        return NO;
+    [_backForward goForward];
+    return [self _loadListItem];
+}
 
 - (float)textSizeMultiplier { return _textSizeMultiplier; }
 - (void)setTextSizeMultiplier:(float)m

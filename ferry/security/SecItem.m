@@ -1028,7 +1028,31 @@ static NSDictionary *item_query(SecKeychainItemRef itemRef)
                                                       (id)kSecAttrSynchronizableAny, (id)kSecAttrSynchronizable, nil];
 }
 
-/* The tags are the attributes' own keys; text is UTF-8 and numbers 32 bits. */
+/* An attribute list's values, by their tags, into d: the tags are the
+ * attributes' own keys; text is UTF-8 and numbers 32 bits. */
+static OSStatus attributes_from_list(const SecKeychainAttributeList *attrList, NSMutableDictionary *d)
+{
+    for (UInt32 i = 0; attrList && i < attrList->count; i++) {
+        const SecKeychainAttribute *at = &attrList->attr[i];
+        NSString *tag = four_cc(at->tag);
+        const struct attr *a = find_attr(tag);
+        if (!a || a->type == A_DATE)
+            return errSecNoSuchAttr;
+        if (a->type == A_NUMBER || a->type == A_BOOL || at->tag == 'ptcl' || at->tag == 'atyp') {
+            UInt32 n;
+            if (at->length != 4 || !at->data)
+                return errSecParam;
+            memcpy(&n, at->data, 4);
+            [d setObject:(a->type == A_STRING ? (id)four_cc(n) : (id)[NSNumber numberWithUnsignedInt:n]) forKey:tag];
+        } else if (a->type == A_DATA) {
+            [d setObject:[NSData dataWithBytes:at->data length:at->length] forKey:tag];
+        } else {
+            [d setObject:text(at->length, at->data) ?: @"" forKey:tag];
+        }
+    }
+    return errSecSuccess;
+}
+
 S_EXPORT OSStatus SecKeychainItemModifyAttributesAndData(SecKeychainItemRef itemRef,
                                                          const SecKeychainAttributeList *attrList, UInt32 length,
                                                          const void *data)
@@ -1036,33 +1060,7 @@ S_EXPORT OSStatus SecKeychainItemModifyAttributesAndData(SecKeychainItemRef item
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSDictionary *q = item_query(itemRef);
     NSMutableDictionary *changes = [NSMutableDictionary dictionary];
-    OSStatus status = q ? errSecSuccess : errSecInvalidItemRef;
-    for (UInt32 i = 0; status == errSecSuccess && attrList && i < attrList->count; i++) {
-        const SecKeychainAttribute *at = &attrList->attr[i];
-        NSString *tag = four_cc(at->tag);
-        const struct attr *a = find_attr(tag);
-        if (!a || a->type == A_DATE) {
-            status = errSecNoSuchAttr;
-        } else if (a->type == A_NUMBER || a->type == A_BOOL) {
-            if (at->length != 4 || !at->data) {
-                status = errSecParam;
-            } else {
-                UInt32 n;
-                memcpy(&n, at->data, 4);
-                [changes setObject:[NSNumber numberWithUnsignedInt:n] forKey:tag];
-            }
-        } else if (a->type == A_DATA) {
-            [changes setObject:[NSData dataWithBytes:at->data length:at->length] forKey:tag];
-        } else if (at->tag == 'ptcl' || at->tag == 'atyp') {
-            UInt32 n;
-            if (at->length != 4 || !at->data)
-                status = errSecParam;
-            else
-                memcpy(&n, at->data, 4), [changes setObject:four_cc(n) forKey:tag];
-        } else {
-            [changes setObject:text(at->length, at->data) ?: @"" forKey:tag];
-        }
-    }
+    OSStatus status = q ? attributes_from_list(attrList, changes) : errSecInvalidItemRef;
     if (status == errSecSuccess && data)
         [changes setObject:[NSData dataWithBytes:data length:length] forKey:(id)kSecValueData];
     if (status == errSecSuccess) {
@@ -1072,6 +1070,182 @@ S_EXPORT OSStatus SecKeychainItemModifyAttributesAndData(SecKeychainItemRef item
     }
     [pool drain];
     return status;
+}
+
+/* ---- items made from attribute lists, searches and access lists ----------------------------
+ * (freemac 1.226, Ferry 0.50.0) */
+
+static id class_key(SecItemClass itemClass)
+{
+    if (itemClass == kSecGenericPasswordItemClass)
+        return (id)kSecClassGenericPassword;
+    if (itemClass == kSecInternetPasswordItemClass)
+        return (id)kSecClassInternetPassword;
+    return nil;
+}
+
+/* The item gets the attributes the list gives; a generic password's
+ * service and account, and an internet password's server and account, are
+ * empty when the list leaves them out, as SecKeychainAddGenericPassword
+ * makes them, and its label is the service's or server's name. The access
+ * list is not kept: Ferry's keychain asks no one. */
+S_EXPORT OSStatus SecKeychainItemCreateFromContent(SecItemClass itemClass, SecKeychainAttributeList *attrList,
+                                                   UInt32 length, const void *data, SecKeychainRef keychainRef,
+                                                   SecAccessRef initialAccess, SecKeychainItemRef *itemRef)
+{
+    id cls = class_key(itemClass);
+    if (!cls)
+        return errSecNoSuchClass;
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSMutableDictionary *a = [NSMutableDictionary dictionaryWithObject:cls forKey:(id)kSecClass];
+    OSStatus status = attributes_from_list(attrList, a);
+    if (status == errSecSuccess) {
+        id name = itemClass == kSecGenericPasswordItemClass ? (id)kSecAttrService : (id)kSecAttrServer;
+        if (![a objectForKey:name])
+            [a setObject:@"" forKey:name];
+        if (![a objectForKey:(id)kSecAttrAccount])
+            [a setObject:@"" forKey:(id)kSecAttrAccount];
+        if (![a objectForKey:(id)kSecAttrLabel])
+            [a setObject:[a objectForKey:name] forKey:(id)kSecAttrLabel];
+        status = legacy_add(a, length, data, itemRef);
+    }
+    [pool drain];
+    return status;
+}
+
+@interface SSearch : NSObject {
+  @public
+    NSArray *items;
+    NSUInteger next;
+}
+@end
+@implementation SSearch
+- (void)dealloc
+{
+    [items release];
+    [super dealloc];
+}
+- (NSString *)description { return [NSString stringWithFormat:@"<SecKeychainSearch %p>", self]; }
+@end
+
+/* The items whose attributes are the list's, found when the search is
+ * made; a NULL list finds every item of the class. */
+S_EXPORT OSStatus SecKeychainSearchCreateFromAttributes(CFTypeRef keychainOrArray, SecItemClass itemClass,
+                                                        const SecKeychainAttributeList *attrList,
+                                                        SecKeychainSearchRef *searchRef)
+{
+    id cls = class_key(itemClass);
+    if (!searchRef)
+        return errSecParam;
+    if (!cls)
+        return errSecNoSuchClass;
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSMutableDictionary *q = [NSMutableDictionary dictionaryWithObject:cls forKey:(id)kSecClass];
+    OSStatus status = attributes_from_list(attrList, q);
+    NSArray *found = [NSArray array];
+    if (status == errSecSuccess) {
+        [q setObject:(id)kSecMatchLimitAll forKey:(id)kSecMatchLimit];
+        [q setObject:(id)kCFBooleanTrue forKey:(id)kSecReturnRef];
+        CFTypeRef result = NULL;
+        status = SecItemCopyMatching((CFDictionaryRef)q, &result);
+        if (status == errSecSuccess)
+            found = [(id)result autorelease];
+        else if (status == errSecItemNotFound)
+            status = errSecSuccess;
+    }
+    if (status == errSecSuccess) {
+        SSearch *search = [[SSearch alloc] init];
+        search->items = [found retain];
+        *searchRef = (SecKeychainSearchRef)search;
+    }
+    [pool drain];
+    return status;
+}
+
+S_EXPORT OSStatus SecKeychainSearchCopyNext(SecKeychainSearchRef searchRef, SecKeychainItemRef *itemRef)
+{
+    SSearch *search = (SSearch *)searchRef;
+    if (![search isKindOfClass:[SSearch class]] || !itemRef)
+        return errSecParam;
+    if (search->next >= [search->items count])
+        return errSecItemNotFound;
+    *itemRef = (SecKeychainItemRef)[[search->items objectAtIndex:search->next++] retain];
+    return errSecSuccess;
+}
+
+@interface STrustedApplication : NSObject {
+  @public
+    NSString *path;
+}
+@end
+@implementation STrustedApplication
+- (void)dealloc
+{
+    [path release];
+    [super dealloc];
+}
+- (NSString *)description { return [NSString stringWithFormat:@"<SecTrustedApplication %p %@>", self, path]; }
+@end
+
+/* A NULL path is the running program's own. */
+S_EXPORT OSStatus SecTrustedApplicationCreateFromPath(const char *path, SecTrustedApplicationRef *app)
+{
+    if (!app)
+        return errSecParam;
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString *p = path ? [NSString stringWithUTF8String:path] : [[NSBundle mainBundle] executablePath];
+    OSStatus status = errSecSuccess;
+    if (path && ![[NSFileManager defaultManager] fileExistsAtPath:p])
+        status = errSecParam;
+    if (status == errSecSuccess) {
+        STrustedApplication *a = [[STrustedApplication alloc] init];
+        a->path = [p ?: @"" copy];
+        *app = (SecTrustedApplicationRef)a;
+    }
+    [pool drain];
+    return status;
+}
+
+/* The application's path, as its data. */
+S_EXPORT OSStatus SecTrustedApplicationCopyData(SecTrustedApplicationRef appRef, CFDataRef *data)
+{
+    STrustedApplication *a = (STrustedApplication *)appRef;
+    if (![a isKindOfClass:[STrustedApplication class]] || !data)
+        return errSecParam;
+    const char *p = [a->path fileSystemRepresentation];
+    *data = (CFDataRef)[[NSData alloc] initWithBytes:p length:strlen(p)];
+    return errSecSuccess;
+}
+
+@interface SAccess : NSObject {
+  @public
+    NSString *descriptor;
+    NSArray *trusted;
+}
+@end
+@implementation SAccess
+- (void)dealloc
+{
+    [descriptor release];
+    [trusted release];
+    [super dealloc];
+}
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<SecAccess %p %@, %lu applications>", self, descriptor,
+                                      (unsigned long)[trusted count]];
+}
+@end
+
+S_EXPORT OSStatus SecAccessCreate(CFStringRef descriptor, CFArrayRef trustedlist, SecAccessRef *accessRef)
+{
+    if (!descriptor || !accessRef)
+        return errSecParam;
+    SAccess *a = [[SAccess alloc] init];
+    a->descriptor = [(NSString *)descriptor copy];
+    a->trusted = [(NSArray *)trustedlist copy];
+    *accessRef = (SecAccessRef)a;
+    return errSecSuccess;
 }
 
 S_EXPORT OSStatus SecKeychainItemDelete(SecKeychainItemRef itemRef)

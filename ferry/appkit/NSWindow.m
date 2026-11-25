@@ -381,7 +381,22 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (BOOL)hasShadow { return _shadow; }
 - (void)setHasShadow:(BOOL)flag { _shadow = flag; }
 - (CGFloat)alphaValue { return _alpha; }
-- (void)setAlphaValue:(CGFloat)alpha { _alpha = alpha; }
+/* A see-through window is drawn so by the compositor, where there is one;
+ * a window whose alpha is 0 is kept off screen while it stays 0, though it
+ * still counts as visible (Sequel Pro fades its progress window in and out
+ * this way). */
+- (void)setAlphaValue:(CGFloat)alpha
+{
+    CGFloat was = _alpha;
+    _alpha = alpha;
+    if (!_gtk)
+        return;
+    gtk_widget_set_opacity(_gtk, alpha < 0 ? 0 : alpha > 1 ? 1 : alpha);
+    if (_visible && was <= 0 && alpha > 0)
+        gtk_widget_show_all(_gtk);
+    else if (_visible && was > 0 && alpha <= 0)
+        gtk_widget_hide(_gtk);
+}
 - (BOOL)isMovableByWindowBackground { return _movable; }
 - (void)setMovableByWindowBackground:(BOOL)flag { _movable = flag; }
 - (BOOL)viewsNeedDisplay { return _needsDisplay; }
@@ -865,7 +880,12 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "focus-out-event", on_focus_out, self);
     if (_dropsWanted)
         [self _enableDrops];
-    gtk_widget_show_all(_gtk);
+    if (_alpha != 1)
+        gtk_widget_set_opacity(_gtk, _alpha < 0 ? 0 : _alpha > 1 ? 1 : _alpha);
+    if (_alpha > 0)
+        gtk_widget_show_all(_gtk);
+    else
+        gtk_widget_show(_area);
     gtk_widget_grab_focus(_area);
 }
 
@@ -882,7 +902,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
         [self _noteNeedsDisplay];
     }
     [self _makeGtk];
-    if (_gtk)
+    if (_gtk && _alpha > 0)
         gtk_window_present(_gtk);
     /* the children put away with it come back, above it */
     for (NSWindow *c in [[_children copy] autorelease])
