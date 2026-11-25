@@ -86,6 +86,8 @@ long sysconf(int);
 #define _PC_CHOWN_RESTRICTED 7
 #define _PC_NO_TRUNC 8
 #define _PC_VDISABLE 9
+#define _PC_CASE_SENSITIVE 11 /* 1 on this system's file systems */
+#define _PC_CASE_PRESERVING 12
 long pathconf(const char *, int);
 long fpathconf(int, int);
 void swab(const void *, void *, ssize_t);

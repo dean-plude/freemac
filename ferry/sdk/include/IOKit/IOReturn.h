@@ -14,4 +14,9 @@ typedef int IOReturn;
 #define kIOReturnNotPrivileged ((IOReturn)0xe00002c1)
 #define kIOReturnNotFound ((IOReturn)0xe00002f0)
 #define kIOReturnNotPermitted ((IOReturn)0xe00002e2)
+#define kIOReturnBusy ((IOReturn)0xe00002d5)
+#define kIOReturnTimeout ((IOReturn)0xe00002d6)
+#define kIOReturnNotReady ((IOReturn)0xe00002d8)
+#define kIOReturnCannotLock ((IOReturn)0xe00002cc)
+#define kIOReturnExclusiveAccess ((IOReturn)0xe00002c5)
 #endif

@@ -13,4 +13,5 @@ for English yes, for French none, select -50
 glyphs 2318 2325 2303 21E7, menu glyphs 11 2
 symbolic mode 1, after pop 0
 modifiers 0, keys held none
+input method layout NULL, 1 with shift !, without 1, layout kind 2
 exit=0

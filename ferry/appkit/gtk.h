@@ -286,8 +286,6 @@ typedef struct _GtkPaperSize GtkPaperSize;
 typedef struct _GtkPrinter GtkPrinter;
 typedef struct _GtkPrintJob GtkPrintJob;
 typedef struct { int start, end; } GtkPageRange;
-typedef struct _PangoFontFamily PangoFontFamily;
-typedef struct _PangoFontFace PangoFontFace;
 typedef void (*GtkPrintJobCompleteFunc)(GtkPrintJob *job, void *data, const GError *error);
 typedef int (*GSourceFunc)(void *data);
 enum { GTK_UNIT_NONE = 0, GTK_UNIT_POINTS = 1, GTK_UNIT_INCH = 2, GTK_UNIT_MM = 3 };
@@ -372,13 +370,6 @@ char *pango_font_description_to_string(const PangoFontDescription *desc);
 int pango_font_description_get_size(const PangoFontDescription *desc);
 gboolean pango_font_description_get_size_is_absolute(const PangoFontDescription *desc);
 void pango_font_description_set_size(PangoFontDescription *desc, int size);
-void pango_font_map_list_families(PangoFontMap *fontmap, PangoFontFamily ***families, int *count);
-const char *pango_font_family_get_name(PangoFontFamily *family);
-gboolean pango_font_family_is_monospace(PangoFontFamily *family);
-void pango_font_family_list_faces(PangoFontFamily *family, PangoFontFace ***faces, int *count);
-const char *pango_font_face_get_face_name(PangoFontFace *face);
-PangoFontDescription *pango_font_face_describe(PangoFontFace *face);
-gboolean pango_font_face_is_synthesized(PangoFontFace *face);
 char *poppler_page_get_text(PopplerPage *page);
 /* Notifications and the Dock (ANotifyServer.m, NSDockTile.m): the replies to
  * D-Bus calls made without waiting, sending what is queued before the

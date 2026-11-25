@@ -10,6 +10,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct nw_object *nw_object_t;
 typedef struct nw_object *nw_path_monitor_t;
 typedef struct nw_object *nw_path_t;
@@ -58,5 +62,9 @@ bool nw_path_is_equal(nw_path_t path, nw_path_t other_path);
 nw_interface_type_t nw_interface_get_type(nw_interface_t interface);
 const char *nw_interface_get_name(nw_interface_t interface);
 uint32_t nw_interface_get_index(nw_interface_t interface);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -33,6 +33,12 @@ typedef NS_ENUM(NSUInteger, NSEventType) {
     NSEventTypeAppKitDefined = 13, NSEventTypeSystemDefined = 14, NSEventTypeApplicationDefined = 15,
     NSEventTypePeriodic = 16, NSEventTypeCursorUpdate = 17, NSEventTypeScrollWheel = 22,
     NSEventTypeOtherMouseDown = 25, NSEventTypeOtherMouseUp = 26, NSEventTypeOtherMouseDragged = 27,
+    /* tablets, gestures and touches, which Ferry's PCs don't send yet; Qt's
+     * Mac plugin names them */
+    NSEventTypeRotate = 18, NSEventTypeBeginGesture = 19, NSEventTypeEndGesture = 20,
+    NSEventTypeTabletPoint = 23, NSEventTypeTabletProximity = 24, NSEventTypeGesture = 29,
+    NSEventTypeMagnify = 30, NSEventTypeSwipe = 31, NSEventTypeSmartMagnify = 32, NSEventTypeQuickLook = 33,
+    NSEventTypePressure = 34, NSEventTypeDirectTouch = 37, NSEventTypeChangeMode = 38,
 };
 typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskLeftMouseDown = 1ULL << 1, NSEventMaskLeftMouseUp = 1ULL << 2,
@@ -43,6 +49,11 @@ typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskFlagsChanged = 1ULL << 12, NSEventMaskApplicationDefined = 1ULL << 15,
     NSEventMaskScrollWheel = 1ULL << 22, NSEventMaskOtherMouseDown = 1ULL << 25,
     NSEventMaskOtherMouseUp = 1ULL << 26, NSEventMaskOtherMouseDragged = 1ULL << 27,
+    NSEventMaskRotate = 1ULL << 18, NSEventMaskBeginGesture = 1ULL << 19, NSEventMaskEndGesture = 1ULL << 20,
+    NSEventMaskTabletPoint = 1ULL << 23, NSEventMaskTabletProximity = 1ULL << 24,
+    NSEventMaskGesture = 1ULL << 29, NSEventMaskMagnify = 1ULL << 30, NSEventMaskSwipe = 1ULL << 31,
+    NSEventMaskSmartMagnify = 1ULL << 32, NSEventMaskPressure = 1ULL << 34,
+    NSEventMaskDirectTouch = 1ULL << 37, NSEventMaskChangeMode = 1ULL << 38,
     NSEventMaskAny = ~0ULL,
 };
 static inline NSEventMask NSEventMaskFromType(NSEventType type) { return (NSEventMask)(1ULL << type); }
@@ -126,6 +137,10 @@ enum {
 /* Quartz events (freemac 1.220, Ferry 0.44.0, appkit/CGServices.m): an
  * event made from one, and one made from an event, which the caller
  * doesn't release (the NSEvent keeps it). */
+/* what a key event's key types with these modifiers held instead */
+@interface NSEvent (FerryApplyingModifiers)
+- (NSString *)charactersByApplyingModifiers:(NSEventModifierFlags)modifiers;
+@end
 @interface NSEvent (NSEventCGEvent)
 + (NSEvent *)eventWithCGEvent:(CGEventRef)cgEvent;
 @property (readonly) CGEventRef CGEvent;
@@ -558,7 +573,7 @@ typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
     NSImageCacheDefault, NSImageCacheAlways, NSImageCacheBySize, NSImageCacheNever,
 };
 typedef NSString *NSImageHintKey;
-APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation;
+APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation, NSImageHintUserInterfaceLayoutDirection;
 APPKIT_EXTERN NSString *const NSImageCompressionFactor;
 
 /* Images: read from PNG, JPEG, GIF, TIFF, BMP, ICO and ICNS files (by this
@@ -4641,5 +4656,9 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- what VLC's Mac interface calls besides (AppKitVLC.m), (freemac 1.233, Ferry 0.57.0) */
 
 #import <AppKit/AppKitVLC.h>
+
+/* ---- what Qt's Mac platform plugin calls besides (AppKitQt.m), for OBS */
+
+#import <AppKit/AppKitQt.h>
 
 #endif

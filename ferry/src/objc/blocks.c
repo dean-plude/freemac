@@ -7,6 +7,7 @@
  * objc_retain/objc_release work on them.
  */
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -323,6 +324,53 @@ void ferry_blocks_init(void)
                           sizeof(struct block), malloc_m, 1, NULL, 0, 0);
 }
 
+/* atexit_b: a block to run when the program exits, after the ones added
+ * later, as atexit's functions are (Qt's Cocoa plugin frees its shared
+ * menus so). The blocks run from one function given to atexit when the
+ * first is added, so they all run together where that one stands among
+ * atexit's functions. */
+static struct block **exit_blocks;
+static int exit_block_count, exit_block_room;
+static pthread_mutex_t exit_block_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void run_exit_blocks(void)
+{
+    for (;;) {
+        pthread_mutex_lock(&exit_block_lock);
+        struct block *b = exit_block_count ? exit_blocks[--exit_block_count] : NULL;
+        pthread_mutex_unlock(&exit_block_lock);
+        if (!b)
+            return;
+        b->invoke(b);
+        _Block_release(b);
+    }
+}
+
+static int ferry_atexit_b(void *block)
+{
+    struct block *b = _Block_copy(block);
+    if (!b)
+        return -1;
+    pthread_mutex_lock(&exit_block_lock);
+    int first = exit_blocks == NULL;
+    if (exit_block_count == exit_block_room) {
+        int room = exit_block_room ? exit_block_room * 2 : 16;
+        struct block **more = realloc(exit_blocks, room * sizeof *more);
+        if (!more) {
+            pthread_mutex_unlock(&exit_block_lock);
+            _Block_release(b);
+            return -1;
+        }
+        exit_blocks = more;
+        exit_block_room = room;
+    }
+    exit_blocks[exit_block_count++] = b;
+    pthread_mutex_unlock(&exit_block_lock);
+    if (first)
+        atexit(run_exit_blocks);
+    return 0;
+}
+
 /* What libSystem exports for blocks. */
 const struct ferry_symbol ferry_blocks_symbols[] = {
     {"_NSConcreteStackBlock", &ferry_block_stack},
@@ -341,5 +389,6 @@ const struct ferry_symbol ferry_blocks_symbols[] = {
     {"_Block_use_stret", _Block_use_stret},
     {"_Block_isDeallocating", _Block_isDeallocating},
     {"_Block_tryRetain", _Block_tryRetain},
+    {"atexit_b", ferry_atexit_b},
     {NULL, NULL},
 };

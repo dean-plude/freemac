@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/ipc.h>
@@ -906,6 +907,7 @@ static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(
 #define MAC_TIOCGWINSZ 0x40087468ul
 #define MAC_FIONREAD   0x4004667ful
 #define MAC_FIONBIO    0x8004667eul
+#define MAC_SIOCGIFMTU 0xc0206933ul /* a Mac's struct ifreq is 32 bytes, Linux's 40 */
 
 static int mac_ioctl(int fd, unsigned long req, ...)
 {
@@ -919,6 +921,16 @@ static int mac_ioctl(int fd, unsigned long req, ...)
         return ioctl(fd, FIONREAD, arg);
     if (req == MAC_FIONBIO) /* an int, nonzero for non-blocking */
         return ioctl(fd, FIONBIO, arg);
+    if (req == MAC_SIOCGIFMTU && arg) { /* both put the name first and the MTU after it */
+        struct ifreq lr;
+        memset(&lr, 0, sizeof lr);
+        memcpy(lr.ifr_name, arg, IFNAMSIZ);
+        lr.ifr_name[IFNAMSIZ - 1] = 0;
+        if (ioctl(fd, SIOCGIFMTU, &lr) < 0)
+            return -1;
+        memcpy((char *)arg + IFNAMSIZ, &lr.ifr_mtu, sizeof(int));
+        return 0;
+    }
     errno = ENOTTY;
     return -1;
 }

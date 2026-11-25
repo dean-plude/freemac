@@ -48,4 +48,5 @@ loopback flags: up 1 loopback 1 running 1
 loopback inet: len 16 127.0.0.1 netmask 255.0.0.0
 loopback's link address comes first 1, link 1 inet 1
 if_indextoname round trip 1
+ifreq 32 bytes, mtu 0 nonzero 1, media -1 ENOTTY 1, in6_ifreq flags -1, ETHER type 1
 exit=0

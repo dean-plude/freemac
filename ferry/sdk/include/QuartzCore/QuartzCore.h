@@ -302,6 +302,12 @@ typedef NS_OPTIONS(unsigned int, CAEdgeAntialiasingMask) {
 @property (copy) CAMediaTimingFillMode fillMode;
 @end
 
+/* whether the layer's content may be brighter than white (macOS 14); Ferry
+ * keeps the setting and draws in standard range */
+@interface CALayer (FerryExtendedDynamicRange)
+@property BOOL wantsExtendedDynamicRangeContent;
+@end
+
 /* ---- animations ------------------------------------------------------------------- */
 
 @protocol CAAnimationDelegate <NSObject>

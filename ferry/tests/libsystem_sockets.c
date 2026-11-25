@@ -8,9 +8,11 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <net/if_dl.h>
+#include <net/if_media.h>
 #include <net/if_types.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/in_var.h>
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <signal.h>
@@ -18,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/event.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -483,6 +486,25 @@ static void interfaces(void)
     char name[IF_NAMESIZE];
     printf("if_indextoname round trip %d\n",
            loop && if_indextoname(if_nametoindex(loop), name) && strcmp(name, loop) == 0);
+
+    /* what Qt's QNetworkInterface asks with ioctls: the MTU, and media and
+     * IPv6 address flags, which Ferry doesn't answer */
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    struct ifreq r;
+    memset(&r, 0, sizeof r);
+    strncpy(r.ifr_name, loop ? loop : "lo0", sizeof r.ifr_name - 1);
+    int mtu = ioctl(s, SIOCGIFMTU, &r);
+    struct ifmediareq m;
+    memset(&m, 0, sizeof m);
+    strncpy(m.ifm_name, r.ifr_name, sizeof m.ifm_name - 1);
+    int media = ioctl(s, SIOCGIFMEDIA, &m);
+    int media_errno = errno;
+    struct in6_ifreq r6;
+    memset(&r6, 0, sizeof r6);
+    printf("ifreq %d bytes, mtu %d nonzero %d, media %d ENOTTY %d, in6_ifreq flags %d, ETHER type %d\n",
+           (int)sizeof r, mtu, r.ifr_mtu > 0, media, media_errno == ENOTTY,
+           ioctl(s, SIOCGIFAFLAG_IN6, &r6), IFM_TYPE(IFM_ETHER | 3) == IFM_ETHER);
+    close(s);
     freeifaddrs(list);
 }
 

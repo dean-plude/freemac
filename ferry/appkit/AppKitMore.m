@@ -13,6 +13,7 @@ NSRunLoopMode const NSModalPanelRunLoopMode = @"NSModalPanelRunLoopMode";
 NSNotificationName const NSMenuDidBeginTrackingNotification = @"NSMenuDidBeginTrackingNotification";
 NSNotificationName const NSMenuDidEndTrackingNotification = @"NSMenuDidEndTrackingNotification";
 NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsDidChangeNotification";
+NSNotificationName const NSFontSetChangedNotification = @"NSFontSetChangedNotification";
 NSNotificationName const NSMenuWillSendActionNotification = @"NSMenuWillSendActionNotification";
 NSNotificationName const NSMenuDidSendActionNotification = @"NSMenuDidSendActionNotification";
 NSNotificationName const NSTextInputContextKeyboardSelectionDidChangeNotification =

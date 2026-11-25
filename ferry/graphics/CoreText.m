@@ -190,6 +190,12 @@ static GFont *load_font(NSString *family, int weight, int style, CGFloat size, c
     return f;
 }
 
+/* For Core Text's font descriptors (CTFontDescriptor.m). */
+GFont *GFontLoad(NSString *family, int weight, int style, CGFloat size, const CGAffineTransform *matrix)
+{
+    return load_font(family, weight, style, size, matrix);
+}
+
 static CGFloat units(GFont *f, double v) { return v * f->size / f->upem; }
 
 static GFont *default_font(void)
@@ -304,7 +310,7 @@ CTFontRef CTFontCreateCopyWithFamily(CTFontRef font, CGFloat size, const CGAffin
                                 matrix ? matrix : &FONT->matrix);
 }
 
-static NSString *style_name(GFont *f)
+NSString *GFontStyleName(GFont *f)
 {
     const char *w = f->weight >= 800   ? "Black"
                     : f->weight >= 700 ? "Bold"
@@ -324,12 +330,12 @@ CFStringRef CTFontCopyFamilyName(CTFontRef font) { return (CFStringRef)[FONT->fa
 CFStringRef CTFontCopyPostScriptName(CTFontRef font)
 {
     NSString *family = [FONT->family stringByReplacingOccurrencesOfString:@" " withString:@""];
-    return (CFStringRef)[[NSString alloc] initWithFormat:@"%@-%@", family, style_name(FONT)];
+    return (CFStringRef)[[NSString alloc] initWithFormat:@"%@-%@", family, GFontStyleName(FONT)];
 }
 
 CFStringRef CTFontCopyFullName(CTFontRef font)
 {
-    NSString *style = style_name(FONT);
+    NSString *style = GFontStyleName(FONT);
     if ([style isEqual:@"Regular"])
         return (CFStringRef)[FONT->family copy];
     return (CFStringRef)[[NSString alloc] initWithFormat:@"%@ %@", FONT->family, style];

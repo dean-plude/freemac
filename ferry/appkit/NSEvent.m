@@ -475,6 +475,9 @@ static SEL command_for(unichar c, NSEventModifierFlags f)
     return NULL;
 }
 
+/* The same for NSTextInputContext (AppKitQt.m). */
+SEL AKeyBindingCommand(unichar c, NSEventModifierFlags f) { return command_for(c, f); }
+
 - (void)interpretKeyEvents:(NSArray<NSEvent *> *)events
 {
     for (NSEvent *e in events) {

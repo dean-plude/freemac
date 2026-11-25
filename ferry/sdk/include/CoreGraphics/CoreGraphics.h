@@ -170,6 +170,26 @@ CGDataProviderRef CGDataProviderCreateWithURL(CFURLRef url);
 CGDataProviderRef CGDataProviderRetain(CGDataProviderRef provider);
 void CGDataProviderRelease(CGDataProviderRef provider);
 CFDataRef CGDataProviderCopyData(CGDataProviderRef provider);
+/* An ICC profile's space: Ferry draws RGB data in sRGB (grey and CMYK in its
+ * own spaces), and a space has no profile to give back. */
+CGColorSpaceRef CGColorSpaceCreateWithICCData(CFTypeRef data);
+CGColorSpaceRef CGColorSpaceCreateICCBased(size_t nComponents, const CGFloat *range, CGDataProviderRef profile,
+                                           CGColorSpaceRef alternate);
+CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef space);
+
+/* ---- fonts as Core Graphics sees them (a font file's data, or a Core Text font's) ---- */
+
+typedef struct CGFont *CGFontRef;
+CGFontRef CGFontCreateWithDataProvider(CGDataProviderRef provider);
+CGFontRef CGFontCreateWithFontName(CFStringRef name);
+CGFontRef CGFontRetain(CGFontRef font);
+void CGFontRelease(CGFontRef font);
+CFStringRef CGFontCopyFullName(CGFontRef font);
+CFStringRef CGFontCopyPostScriptName(CGFontRef font);
+int CGFontGetUnitsPerEm(CGFontRef font);
+size_t CGFontGetNumberOfGlyphs(CGFontRef font);
+CFDataRef CGFontCopyTableForTag(CGFontRef font, uint32_t tag);
+CFTypeID CGFontGetTypeID(void);
 
 CGImageRef CGImageCreate(size_t width, size_t height, size_t bitsPerComponent, size_t bitsPerPixel,
                          size_t bytesPerRow, CGColorSpaceRef space, CGBitmapInfo bitmapInfo,

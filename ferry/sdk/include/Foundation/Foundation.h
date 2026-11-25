@@ -3069,5 +3069,7 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSDateIntervalFormatter.h>
 /* What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0). */
 #include <Foundation/FoundationVLC.h>
+/* Handoff's user activities, which Qt's Mac plugin answers to. */
+#include <Foundation/NSUserActivity.h>
 
 #endif

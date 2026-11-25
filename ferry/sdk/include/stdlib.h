@@ -27,6 +27,9 @@ void abort(void) __attribute__((noreturn));
 void exit(int) __attribute__((noreturn));
 void _Exit(int) __attribute__((noreturn));
 int atexit(void (*)(void));
+#ifdef __BLOCKS__
+int atexit_b(void (^)(void));
+#endif
 int system(const char *);
 char *getenv(const char *);
 int setenv(const char *, const char *, int);

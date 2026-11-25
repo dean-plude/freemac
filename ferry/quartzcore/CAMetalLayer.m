@@ -48,3 +48,14 @@
 }
 - (id<CAMetalDrawable>)nextDrawable { return nil; }
 @end
+
+/* Any layer keeps whether it wants extended dynamic range (macOS 14); a
+ * Metal layer keeps its own. */
+@implementation CALayer (FerryExtendedDynamicRange)
+static char edr_key;
+- (BOOL)wantsExtendedDynamicRangeContent { return [objc_getAssociatedObject(self, &edr_key) boolValue]; }
+- (void)setWantsExtendedDynamicRangeContent:(BOOL)wants
+{
+    objc_setAssociatedObject(self, &edr_key, wants ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+@end

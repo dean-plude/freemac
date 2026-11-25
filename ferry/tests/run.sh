@@ -557,6 +557,10 @@ run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.o
 run_one graphics_drawing "$here/graphics/drawing.c" "$here/graphics/drawing.out" -framework CoreGraphics
 run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
     -framework CoreText -framework CoreGraphics -framework Foundation
+# Font descriptors, traits, names, tables and the family list, as Qt's font
+# database uses them on a Mac (for OBS).
+run_one graphics_fontdesc "$here/graphics/fontdesc.m" "$here/graphics/fontdesc.out" -fobjc-arc \
+    -framework CoreText -framework CoreGraphics -framework Foundation
 # The same, linked under ApplicationServices' Mac name, which CoreGraphics' file also serves.
 run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
     -framework ApplicationServices -framework CoreFoundation
@@ -1601,6 +1605,11 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 # the empty capture devices, address book and I/O Kit registry.
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
     -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
+# What Qt's Mac platform plugin calls besides, for OBS Studio: the Carbon
+# pasteboard with promises, Icon Services drawing, text input contexts,
+# screen depths and ICC profiles, key repeat, the window list, Handoff.
+run_one appkit_qt_calls "$here/appkit/qt_calls.m" "$here/appkit/qt_calls.out" -fblocks -framework Cocoa \
+    -framework ApplicationServices
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

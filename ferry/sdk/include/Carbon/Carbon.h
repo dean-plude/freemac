@@ -203,6 +203,14 @@ CFArrayRef TISCreateInputSourceList(CFDictionaryRef properties, Boolean includeA
 CFArrayRef TISCreateASCIICapableInputSourceList(void);
 void *TISGetInputSourceProperty(TISInputSourceRef source, CFStringRef key);
 OSStatus TISSelectInputSource(TISInputSourceRef source);
+/* An input method's own keyboard layout: freemac's input methods have none
+ * of their own, so this gives NULL and the current layout serves. */
+TISInputSourceRef TISCopyInputMethodKeyboardLayoutOverride(void);
+
+/* Which kind of layout data a keyboard layout has (Keyboards.h): Ferry's
+ * layouts hold only 'uchr' data. */
+typedef SInt32 KeyboardLayoutKind;
+enum { kKLKCHRuchrKind = 0, kKLKCHRKind = 1, kKLuchrKind = 2 };
 
 /* UCKeyTranslate and LMGetKbdType: CoreServices/UnicodeUtilities.h */
 

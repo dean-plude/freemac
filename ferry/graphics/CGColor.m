@@ -3,6 +3,7 @@
  * colour management yet: a colour's components are taken as sRGB values
  * whatever the space is called (grey and CMYK are converted simply). */
 #import "GInternal.h"
+#include <math.h>
 
 const CFStringRef kCGColorSpaceSRGB = (CFStringRef)@"kCGColorSpaceSRGB";
 const CFStringRef kCGColorSpaceGenericRGB = (CFStringRef)@"kCGColorSpaceGenericRGB";
@@ -90,6 +91,149 @@ CGColorSpaceRef CGColorSpaceCreateWithName(CFStringRef cfname)
         [name isEqual:(id)kCGColorSpaceDisplayP3])
         return (CGColorSpaceRef)make_space(kCGColorSpaceModelRGB, 3, name);
     return NULL;
+}
+
+/* An ICC profile names its data's colour space at byte 16 ('RGB ', 'GRAY',
+ * 'CMYK'); Ferry draws such data in its sRGB, grey or CMYK space. */
+CGColorSpaceRef CGColorSpaceCreateWithICCData(CFTypeRef data)
+{
+    NSData *d = (NSData *)data;
+    if (![d isKindOfClass:[NSData class]] || d.length < 20)
+        return NULL;
+    const unsigned char *b = d.bytes;
+    if (!memcmp(b + 16, "GRAY", 4))
+        return CGColorSpaceCreateWithName(kCGColorSpaceGenericGrayGamma2_2);
+    if (!memcmp(b + 16, "CMYK", 4))
+        return CGColorSpaceCreateWithName(kCGColorSpaceGenericCMYK);
+    if (!memcmp(b + 16, "RGB ", 4))
+        return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    return NULL;
+}
+
+CGColorSpaceRef CGColorSpaceCreateICCBased(size_t nComponents, const CGFloat *range, CGDataProviderRef profile,
+                                           CGColorSpaceRef alternate)
+{
+    (void)range;
+    CFDataRef data = profile ? CGDataProviderCopyData(profile) : NULL;
+    CGColorSpaceRef s = data ? CGColorSpaceCreateWithICCData(data) : NULL;
+    if (data)
+        CFRelease(data);
+    if (s && CGColorSpaceGetNumberOfComponents(s) == nComponents)
+        return s;
+    CGColorSpaceRelease(s);
+    if (alternate)
+        return CGColorSpaceRetain(alternate);
+    return nComponents == 1 ? CGColorSpaceCreateDeviceGray()
+           : nComponents == 4 ? CGColorSpaceCreateDeviceCMYK()
+                              : CGColorSpaceCreateDeviceRGB();
+}
+
+/* The ICC profile of an RGB or grey space: the space Ferry draws it in,
+ * sRGB or grey with sRGB's curve, written as an ICC version 4 display
+ * profile from the sRGB standard's (IEC 61966-2-1) primaries, adapted to
+ * the D50 white ICC profiles are measured against, and its tone curve.
+ * Programs such as Qt read a screen's or window's colour space from it. */
+static void icc_u32(NSMutableData *d, size_t at, uint32_t v)
+{
+    unsigned char b[4] = { v >> 24, v >> 16, v >> 8, v };
+    [d replaceBytesInRange:NSMakeRange(at, 4) withBytes:b];
+}
+static void icc_add32(NSMutableData *d, uint32_t v)
+{
+    unsigned char b[4] = { v >> 24, v >> 16, v >> 8, v };
+    [d appendBytes:b length:4];
+}
+static uint32_t icc_fixed(double v) { return (uint32_t)(int32_t)lround(v * 65536.0); }
+static void icc_pad(NSMutableData *d)
+{
+    static const unsigned char zero[4];
+    if (d.length % 4)
+        [d appendBytes:zero length:4 - d.length % 4];
+}
+static NSData *icc_xyz(double x, double y, double z)
+{
+    NSMutableData *t = [NSMutableData dataWithBytes:"XYZ \0\0\0\0" length:8];
+    icc_add32(t, icc_fixed(x));
+    icc_add32(t, icc_fixed(y));
+    icc_add32(t, icc_fixed(z));
+    return t;
+}
+static NSData *icc_text(NSString *text)
+{
+    NSMutableData *t = [NSMutableData dataWithBytes:"mluc\0\0\0\0" length:8];
+    NSData *u = [text dataUsingEncoding:NSUTF16BigEndianStringEncoding];
+    icc_add32(t, 1);
+    icc_add32(t, 12);
+    [t appendBytes:"enUS" length:4];
+    icc_add32(t, (uint32_t)u.length);
+    icc_add32(t, 28);
+    [t appendData:u];
+    return t;
+}
+static NSData *icc_profile(BOOL gray)
+{
+    /* sRGB's curve: (a x + b)^g above d, c x below */
+    NSMutableData *curve = [NSMutableData dataWithBytes:"para\0\0\0\0\0\3\0\0" length:12];
+    const double para[5] = { 2.4, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045 };
+    for (int i = 0; i < 5; i++)
+        icc_add32(curve, icc_fixed(para[i]));
+    struct { const char *sig; NSData *data; } tags[10];
+    int n = 0;
+    tags[n].sig = "desc", tags[n++].data = icc_text(gray ? @"Gray (sRGB curve)" : @"sRGB");
+    tags[n].sig = "cprt", tags[n++].data = icc_text(@"No copyright, use freely");
+    tags[n].sig = "wtpt", tags[n++].data = icc_xyz(0.9642, 1.0, 0.8249);
+    if (gray) {
+        tags[n].sig = "kTRC", tags[n++].data = curve;
+    } else {
+        tags[n].sig = "rXYZ", tags[n++].data = icc_xyz(0.4360747, 0.2225045, 0.0139322);
+        tags[n].sig = "gXYZ", tags[n++].data = icc_xyz(0.3850649, 0.7168786, 0.0971045);
+        tags[n].sig = "bXYZ", tags[n++].data = icc_xyz(0.1430804, 0.0606169, 0.7141733);
+        tags[n].sig = "rTRC", tags[n++].data = curve;
+        tags[n].sig = "gTRC", tags[n++].data = curve;
+        tags[n].sig = "bTRC", tags[n++].data = curve;
+    }
+    NSMutableData *d = [NSMutableData dataWithLength:128];
+    icc_u32(d, 8, 0x04300000);                       /* version 4.3 */
+    [d replaceBytesInRange:NSMakeRange(12, 4) withBytes:"mntr"];
+    [d replaceBytesInRange:NSMakeRange(16, 4) withBytes:gray ? "GRAY" : "RGB "];
+    [d replaceBytesInRange:NSMakeRange(20, 4) withBytes:"XYZ "];
+    [d replaceBytesInRange:NSMakeRange(36, 4) withBytes:"acsp"];
+    icc_u32(d, 68, icc_fixed(0.9642));               /* the D50 illuminant */
+    icc_u32(d, 72, icc_fixed(1.0));
+    icc_u32(d, 76, icc_fixed(0.8249));
+    icc_add32(d, (uint32_t)n);
+    size_t table = d.length;
+    [d increaseLengthBy:12 * n];
+    for (int i = 0; i < n; i++) {
+        size_t at = 0;
+        for (int j = 0; j < i; j++)
+            if (tags[j].data == tags[i].data)        /* shared, as the three curves are */
+                at = j;
+        size_t offset, size = tags[i].data.length;
+        if (at || (i && tags[0].data == tags[i].data)) {
+            unsigned char b[4];
+            [d getBytes:b range:NSMakeRange(table + 12 * at + 4, 4)];
+            offset = (size_t)b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3];
+        } else {
+            icc_pad(d);
+            offset = d.length;
+            [d appendData:tags[i].data];
+        }
+        [d replaceBytesInRange:NSMakeRange(table + 12 * i, 4) withBytes:tags[i].sig];
+        icc_u32(d, table + 12 * i + 4, (uint32_t)offset);
+        icc_u32(d, table + 12 * i + 8, (uint32_t)size);
+    }
+    icc_pad(d);
+    icc_u32(d, 0, (uint32_t)d.length);
+    return d;
+}
+
+CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef space)
+{
+    CGColorSpaceModel model = CGColorSpaceGetModel(space);
+    if (model != kCGColorSpaceModelRGB && model != kCGColorSpaceModelMonochrome)
+        return NULL;
+    return (CFDataRef)[icc_profile(model == kCGColorSpaceModelMonochrome) copy];
 }
 
 CGColorSpaceRef CGColorSpaceRetain(CGColorSpaceRef space) { return (CGColorSpaceRef)[OBJ(space) retain]; }

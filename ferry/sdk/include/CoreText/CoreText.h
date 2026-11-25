@@ -31,7 +31,13 @@ typedef enum {
 typedef enum {
     kCTFontTraitItalic = (1 << 0), kCTFontTraitBold = (1 << 1), kCTFontTraitExpanded = (1 << 5),
     kCTFontTraitCondensed = (1 << 6), kCTFontTraitMonoSpace = (1 << 10), kCTFontTraitVertical = (1 << 11),
-    kCTFontTraitUIOptimized = (1 << 12),
+    kCTFontTraitUIOptimized = (1 << 12), kCTFontTraitColorGlyphs = (1 << 13), kCTFontTraitComposite = (1 << 14),
+    kCTFontTraitClassMask = (15u << 28),
+    kCTFontItalicTrait = kCTFontTraitItalic, kCTFontBoldTrait = kCTFontTraitBold,
+    kCTFontExpandedTrait = kCTFontTraitExpanded, kCTFontCondensedTrait = kCTFontTraitCondensed,
+    kCTFontMonoSpaceTrait = kCTFontTraitMonoSpace, kCTFontVerticalTrait = kCTFontTraitVertical,
+    kCTFontUIOptimizedTrait = kCTFontTraitUIOptimized, kCTFontColorGlyphsTrait = kCTFontTraitColorGlyphs,
+    kCTFontCompositeTrait = kCTFontTraitComposite, kCTFontClassMaskTrait = kCTFontTraitClassMask,
 } CTFontSymbolicTraits;
 typedef enum { kCTFontOrientationDefault = 0, kCTFontOrientationHorizontal = 1, kCTFontOrientationVertical = 2 }
     CTFontOrientation;
@@ -71,6 +77,94 @@ CGPathRef CTFontCreatePathForGlyph(CTFontRef font, CGGlyph glyph, const CGAffine
 void CTFontDrawGlyphs(CTFontRef font, const CGGlyph glyphs[], const CGPoint positions[], size_t count,
                       CGContextRef context);
 CFTypeID CTFontGetTypeID(void);
+
+/* ---- font descriptors, traits, names and tables (for Qt's font database) ---- */
+
+/* A descriptor's attributes; the same keys as AppKit's NSFontDescriptor. */
+extern const CFStringRef kCTFontURLAttribute;
+extern const CFStringRef kCTFontNameAttribute;
+extern const CFStringRef kCTFontDisplayNameAttribute;
+extern const CFStringRef kCTFontFamilyNameAttribute;
+extern const CFStringRef kCTFontStyleNameAttribute;
+extern const CFStringRef kCTFontTraitsAttribute;
+extern const CFStringRef kCTFontVariationAttribute;
+extern const CFStringRef kCTFontSizeAttribute;
+extern const CFStringRef kCTFontMatrixAttribute;
+extern const CFStringRef kCTFontCascadeListAttribute;
+extern const CFStringRef kCTFontCharacterSetAttribute;
+extern const CFStringRef kCTFontLanguagesAttribute;
+extern const CFStringRef kCTFontFixedAdvanceAttribute;
+extern const CFStringRef kCTFontFeatureSettingsAttribute;
+/* the keys of a traits dictionary */
+extern const CFStringRef kCTFontSymbolicTrait;
+extern const CFStringRef kCTFontWeightTrait;
+extern const CFStringRef kCTFontWidthTrait;
+extern const CFStringRef kCTFontSlantTrait;
+/* the weights a weight trait holds, -1 to 1 */
+extern const CGFloat kCTFontWeightUltraLight, kCTFontWeightThin, kCTFontWeightLight, kCTFontWeightRegular,
+    kCTFontWeightMedium, kCTFontWeightSemibold, kCTFontWeightBold, kCTFontWeightHeavy, kCTFontWeightBlack;
+/* a font's names */
+extern const CFStringRef kCTFontCopyrightNameKey, kCTFontFamilyNameKey, kCTFontSubFamilyNameKey,
+    kCTFontStyleNameKey, kCTFontUniqueNameKey, kCTFontFullNameKey, kCTFontVersionNameKey,
+    kCTFontPostScriptNameKey, kCTFontTrademarkNameKey, kCTFontManufacturerNameKey, kCTFontDesignerNameKey,
+    kCTFontDescriptionNameKey, kCTFontVendorURLNameKey, kCTFontDesignerURLNameKey, kCTFontLicenseNameKey,
+    kCTFontLicenseURLNameKey, kCTFontSampleTextNameKey, kCTFontPostScriptCIDNameKey;
+/* a variation axis's keys */
+extern const CFStringRef kCTFontVariationAxisIdentifierKey, kCTFontVariationAxisMinimumValueKey,
+    kCTFontVariationAxisMaximumValueKey, kCTFontVariationAxisDefaultValueKey, kCTFontVariationAxisNameKey,
+    kCTFontVariationAxisHiddenKey;
+
+typedef uint32_t CTFontTableTag;
+typedef CF_OPTIONS(uint32_t, CTFontTableOptions) { kCTFontTableOptionNoOptions = 0, kCTFontTableOptionExcludeSynthetic = (1 << 0) };
+enum {
+    kCTFontTableBASE = 'BASE', kCTFontTableCFF = 'CFF ', kCTFontTableGDEF = 'GDEF', kCTFontTableGPOS = 'GPOS',
+    kCTFontTableGSUB = 'GSUB', kCTFontTableOS2 = 'OS/2', kCTFontTableCmap = 'cmap', kCTFontTableGlyf = 'glyf',
+    kCTFontTableHead = 'head', kCTFontTableHhea = 'hhea', kCTFontTableHmtx = 'hmtx', kCTFontTableKern = 'kern',
+    kCTFontTableLoca = 'loca', kCTFontTableMaxp = 'maxp', kCTFontTableName = 'name', kCTFontTablePost = 'post',
+};
+
+CTFontDescriptorRef CTFontDescriptorCreateWithAttributes(CFDictionaryRef attributes);
+CTFontDescriptorRef CTFontDescriptorCreateWithNameAndSize(CFStringRef name, CGFloat size);
+CTFontDescriptorRef CTFontDescriptorCreateCopyWithAttributes(CTFontDescriptorRef original, CFDictionaryRef attributes);
+CTFontDescriptorRef CTFontDescriptorCreateCopyWithFamily(CTFontDescriptorRef original, CFStringRef family);
+CTFontDescriptorRef CTFontDescriptorCreateCopyWithSymbolicTraits(CTFontDescriptorRef original,
+                                                                 CTFontSymbolicTraits value, CTFontSymbolicTraits mask);
+CFArrayRef CTFontDescriptorCreateMatchingFontDescriptors(CTFontDescriptorRef descriptor, CFSetRef mandatoryAttributes);
+CTFontDescriptorRef CTFontDescriptorCreateMatchingFontDescriptor(CTFontDescriptorRef descriptor,
+                                                                 CFSetRef mandatoryAttributes);
+CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef descriptor);
+CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute);
+CFTypeID CTFontDescriptorGetTypeID(void);
+
+CTFontRef CTFontCreateWithFontDescriptor(CTFontDescriptorRef descriptor, CGFloat size, const CGAffineTransform *matrix);
+CTFontDescriptorRef CTFontCopyFontDescriptor(CTFontRef font);
+CFTypeRef CTFontCopyAttribute(CTFontRef font, CFStringRef attribute);
+CFDictionaryRef CTFontCopyTraits(CTFontRef font);
+CFStringRef CTFontCopyName(CTFontRef font, CFStringRef nameKey);
+CFStringRef CTFontCopyLocalizedName(CTFontRef font, CFStringRef nameKey, CFStringRef *actualLanguage);
+CFDataRef CTFontCopyTable(CTFontRef font, CTFontTableTag table, CTFontTableOptions options);
+CFArrayRef CTFontCopyAvailableTables(CTFontRef font, CTFontTableOptions options);
+CFArrayRef CTFontCopyVariationAxes(CTFontRef font);
+CFDictionaryRef CTFontCopyVariation(CTFontRef font);
+CGGlyph CTFontGetGlyphWithName(CTFontRef font, CFStringRef glyphName);
+CFStringRef CTFontCopyNameForGlyph(CTFontRef font, CGGlyph glyph);
+CFArrayRef CTFontCopyDefaultCascadeListForLanguages(CTFontRef font, CFArrayRef languagePrefList);
+CGFontRef CTFontCopyGraphicsFont(CTFontRef font, CTFontDescriptorRef *attributes);
+CTFontRef CTFontCreateWithGraphicsFont(CGFontRef graphicsFont, CGFloat size, const CGAffineTransform *matrix,
+                                       CTFontDescriptorRef attributes);
+
+/* ---- the font manager ------------------------------------------------------------ */
+
+typedef CF_ENUM(uint32_t, CTFontManagerScope) {
+    kCTFontManagerScopeNone = 0, kCTFontManagerScopeProcess = 1, kCTFontManagerScopePersistent = 2,
+    kCTFontManagerScopeSession = 3, kCTFontManagerScopeUser = 2,
+};
+CFArrayRef CTFontManagerCopyAvailableFontFamilyNames(void);
+CFArrayRef CTFontManagerCopyAvailablePostScriptNames(void);
+CFArrayRef CTFontManagerCreateFontDescriptorsFromURL(CFURLRef fileURL);
+CTFontDescriptorRef CTFontManagerCreateFontDescriptorFromData(CFDataRef data);
+CFArrayRef CTFontManagerCreateFontDescriptorsFromData(CFDataRef data);
+void CTFontManagerEnableFontDescriptors(CFArrayRef descriptors, bool enable);
 
 /* ---- string attributes --------------------------------------------------------- */
 

@@ -329,6 +329,19 @@ OSErr GetIconRefFromFileInfo(const FSRef *ref, UniCharCount nameLength, const Un
     *out = (IconRef)[[NSString alloc] initWithUTF8String:p];
     return noErr;
 }
+/* A system icon's reference names its type as NSFileTypeForHFSTypeCode
+ * writes one, 'ques' in single quotes, for PlotIconRefInContext to draw. */
+OSErr GetIconRef(SInt16 vRefNum, OSType creator, OSType iconType, IconRef *out)
+{
+    (void)vRefNum;
+    (void)creator;
+    if (!out)
+        return paramErr;
+    char t[7] = { '\'', (char)(iconType >> 24), (char)(iconType >> 16), (char)(iconType >> 8), (char)iconType,
+                  '\'', 0 };
+    *out = (IconRef)[[NSString alloc] initWithBytes:t length:6 encoding:NSMacOSRomanStringEncoding];
+    return *out ? noErr : paramErr;
+}
 OSErr AcquireIconRef(IconRef icon)
 {
     if (!icon)
