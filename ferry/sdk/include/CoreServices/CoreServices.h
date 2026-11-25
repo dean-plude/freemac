@@ -34,6 +34,10 @@ enum {
     kGenericHardDiskIcon = 'hdsk',
     kGenericNetworkIcon = 'gnet',
     kTrashIcon = 'trsh',
+    /* the alert icons (freemac 1.NEXT, VLC) */
+    kAlertStopIcon = 'stop',
+    kAlertNoteIcon = 'note',
+    kAlertCautionIcon = 'caut',
 };
 enum { coreFoundationUnknownErr = -4960 };
 /* the reference constants callbacks are given back (MacTypes.h) */

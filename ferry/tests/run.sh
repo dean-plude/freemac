@@ -1497,6 +1497,11 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# What VLC's Mac interface calls besides (freemac 1.NEXT, Ferry 0.NEXT):
+# CoreMedia times, media keys and Now Playing, displays, slider cells, and
+# the empty capture devices, address book and I/O Kit registry.
+run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
+    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

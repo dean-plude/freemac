@@ -4,7 +4,7 @@
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
 # SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
 # UniformTypeIdentifiers in Foundation's,
-# Cocoa, Quartz, QuickLook, ScriptingBridge and CoreImage in AppKit's): the calls the files export for that framework, under
+# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia and AddressBook in AppKit's): the calls the files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
 # from the file. Cocoa, an umbrella, offers everything AppKit, Foundation and
@@ -33,7 +33,10 @@ case $framework in
     IOKit) pattern='^_(IO[A-Z]|kIO)' ;;
     Cocoa) pattern='.' ;;
     Carbon) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
-    AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType)' ;;
+    AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType|AVMediaType)' ;;
+    MediaPlayer) pattern='^_(OBJC_(METACLASS|CLASS)_\$_MP|MP)' ;;
+    CoreMedia) pattern='^_(CM|kCM)' ;;
+    AddressBook) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AB|kAB)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;
     ScriptingBridge) pattern='^_OBJC_(METACLASS|CLASS)_\$_SB(Object|Application|ElementArray)$' ;;

@@ -45,11 +45,44 @@ Test: `tests/libsystem_vlc.c`.
 With these, libvlccore, libvlc, the `vlc-osx` program and 249 of VLC's
 plugins build.
 
+## VLC's Mac interface (freemac 1.NEXT, Ferry 0.NEXT)
+
+What VLC's Cocoa interface (`modules/gui/macosx`) calls besides, written
+from Apple's public documentation:
+
+- AppKit: presentation options, `NSBeginAlertSheet` and its informational and
+  critical kinds (on NSAlert), `NSFrameRectWithWidthUsingOperation`, cell
+  tracking and layout direction, slider cells' drawing parts (bar and knob
+  rects, `drawBarInside:flipped:`, `drawKnob:`, tick marks), button cells'
+  title, image and bezel drawing, segmented cells' `drawSegment:`, scroller
+  arrows, `ancestorSharedWithView:`, `clipsToBounds`, a control's
+  `selectedCell`, `constrainFrameRect:toScreen:`, magnification events, image
+  cap insets, the screen's safe area and deepest screen, NSVisualEffectView,
+  `getFileSystemInfoForPath:...` and `mountedRemovableMedia` (removable disks
+  are those mounted under `/media`, `/run/media` and `/Volumes`),
+  `initWithHTML:options:documentAttributes:`, paragraph alignment and writing
+  direction in a range, and the zooming window delegate methods.
+- CoreGraphics' `CGDirectDisplay.h`: display IDs, lists and bounds from
+  NSScreen, and display fades as a fading full-screen window.
+- MediaPlayer: the remote command center (media keys) and Now Playing.
+- CoreMedia: `CMTime` and `CMTimeRange` arithmetic.
+- AddressBook and AVFoundation's capture devices: both empty. OBS will want
+  real capture devices; that is not here.
+- Foundation: `localizedStringWithFormat:`, `compare:options:range:` (with and
+  without a locale), `stringByReplacingCharactersInRange:withString:`,
+  NSLocale's language directions, NSScriptCommandDescription.
+- IOKit: the HID and CFPlugIn COM headers, `ev_keymap.h`, the storage media
+  class names, `IOBSD.h`, and calls that answer as a Mac with no matching
+  device would. CoreServices' `FSGetVolumeParms` answers "no such volume".
+- Headers: `paths.h`; `OS_OBJECT_USE_OBJC` defaults on in Objective-C.
+
+Test: `tests/appkit/vlc.m`.
+
 ## Still to do
 
-- VLC's Cocoa interface: about 120 AppKit, Foundation and CoreGraphics names
-  it uses that Ferry doesn't declare yet (custom slider, scroller and button
-  cell drawing, presentation options, display fades, alert sheets).
-- Video out and sound out need OpenGL, Core Video and Core Audio, which are
-  being built in Ferry's core for VLC and OBS together.
+- VLC's interface still needs Core Audio (`NSSound+VLCAdditions.m`), Core
+  Video's display link (`VLCSliderCell.m`) and NSOpenGLView's `reshape`
+  (`Windows.m`), which are being built in Ferry's core for VLC and OBS
+  together. Nothing else in it is missing.
+- Video out and sound out need the same OpenGL, Core Video and Core Audio.
 - The C++ plugins need libc++ linked.

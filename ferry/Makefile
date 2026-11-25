@@ -262,6 +262,10 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh QuickLook $@ > frameworks/QuickLook.framework/QuickLook.tbd
 	@mkdir -p frameworks/CoreImage.framework
 	sdk/gen-alias-tbd.sh CoreImage $@ > frameworks/CoreImage.framework/CoreImage.tbd
+	@mkdir -p frameworks/MediaPlayer.framework frameworks/CoreMedia.framework frameworks/AddressBook.framework
+	sdk/gen-alias-tbd.sh MediaPlayer $@ > frameworks/MediaPlayer.framework/MediaPlayer.tbd
+	sdk/gen-alias-tbd.sh CoreMedia $@ > frameworks/CoreMedia.framework/CoreMedia.tbd
+	sdk/gen-alias-tbd.sh AddressBook $@ > frameworks/AddressBook.framework/AddressBook.tbd
 	# Quartz window and event services live in AppKit's file (CGServices.m),
 	# so ApplicationServices offers them too
 	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ $(FOUNDATION) > frameworks/ApplicationServices.framework/ApplicationServices.tbd
@@ -327,7 +331,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUA
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia AddressBook; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

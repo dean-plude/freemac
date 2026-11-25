@@ -1101,6 +1101,9 @@ typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
 - (void)windowDidMiniaturize:(NSNotification *)notification;
 - (void)windowDidDeminiaturize:(NSNotification *)notification;
 - (NSSize)windowWillResize:(NSWindow *)sender toSize:(NSSize)size;
+/* zooming (freemac 1.NEXT, VLC); Ferry zooms by maximizing */
+- (NSRect)windowWillUseStandardFrame:(NSWindow *)window defaultFrame:(NSRect)newFrame;
+- (BOOL)windowShouldZoom:(NSWindow *)window toFrame:(NSRect)newFrame;
 - (void)windowWillBeginSheet:(NSNotification *)notification;
 - (void)windowDidEndSheet:(NSNotification *)notification;
 - (NSRect)window:(NSWindow *)window willPositionSheet:(NSWindow *)sheet usingRect:(NSRect)rect;
@@ -4611,5 +4614,9 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
  * (freemac 1.226, Ferry 0.50.0) */
 
 #import <AppKit/AppKitOlder.h>
+
+/* ---- what VLC's Mac interface calls besides (AppKitVLC.m), (freemac 1.NEXT, Ferry 0.NEXT) */
+
+#import <AppKit/AppKitVLC.h>
 
 #endif

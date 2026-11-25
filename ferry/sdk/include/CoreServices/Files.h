@@ -103,6 +103,22 @@ enum { kFSNodeLockedMask = 0x0001, kFSNodeIsDirectoryMask = 0x0010 };
 OSErr FSGetCatalogInfo(const FSRef *ref, FSCatalogInfoBitmap whichInfo, FSCatalogInfo *catalogInfo,
                        HFSUniStr255 *outName, FSSpecPtr fsSpec, FSRef *parentRef);
 
+/* A volume's parameters (Files.h; freemac 1.NEXT, Ferry 0.NEXT, VLC). Ferry
+ * gives volumes no numbers, so FSGetVolumeParms zeroes the buffer and
+ * answers nsvErr, "no such volume". */
+typedef struct GetVolParmsInfoBuffer {
+    SInt16 vMVersion;
+    SInt32 vMAttrib;
+    Handle vMLocalHand;
+    SInt32 vMServerAdr;
+    SInt32 vMVolumeGrade;
+    SInt16 vMForeignPrivID;
+    SInt32 vMExtendedAttributes;
+    void *vMDeviceID;
+    unsigned long vMMaxNameLength;
+} GetVolParmsInfoBuffer;
+OSStatus FSGetVolumeParms(FSVolumeRefNum volume, GetVolParmsInfoBuffer *buffer, unsigned long bufferSize);
+
 /* Math64.h, which these days is a cast. */
 static inline UInt64 UnsignedWideToUInt64(UnsignedWide w) { return ((UInt64)w.hi << 32) | w.lo; }
 static inline UnsignedWide UInt64ToUnsignedWide(UInt64 v)

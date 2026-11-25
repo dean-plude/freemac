@@ -10,7 +10,10 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 __FERRY_BEGIN
-typedef UnsignedWide AbsoluteTime;
+#ifndef _FERRY_ABSOLUTETIME_
+#define _FERRY_ABSOLUTETIME_
+typedef UnsignedWide AbsoluteTime; /* also in IOKit/IOTypes.h */
+#endif
 typedef UnsignedWide Nanoseconds;
 /* A Duration counts milliseconds, or microseconds when it is negative. */
 typedef SInt32 Duration;

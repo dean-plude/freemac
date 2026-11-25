@@ -343,3 +343,13 @@ OSErr ReleaseIconRef(IconRef icon)
     [(id)icon release];
     return noErr;
 }
+
+/* No volume has a number Ferry hands out (freemac 1.NEXT, VLC). */
+OSStatus FSGetVolumeParms(FSVolumeRefNum volume, GetVolParmsInfoBuffer *buffer, unsigned long bufferSize)
+{
+    (void)volume;
+    if (!buffer)
+        return paramErr;
+    memset(buffer, 0, bufferSize < sizeof *buffer ? bufferSize : sizeof *buffer);
+    return nsvErr;
+}
