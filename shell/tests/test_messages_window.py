@@ -62,7 +62,10 @@ class Layout(unittest.TestCase):
     def setUp(self):
         from freemac_shell import messages
         self.m = messages
-        self.now = int(time.time() * 1000)
+        # noon today, so that messages two hours back are still today
+        # whenever the tests run (they failed just after midnight)
+        t = time.localtime()
+        self.now = int(time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 12, 0, 0, 0, 0, -1)) * 1000)
 
     def msg(self, i, minutes_ago, from_me=False, status="received", sender="+15550100001", **kw):
         return Message(id=f"x{i}", chat_id="c", text=f"message {i}", date=self.now - minutes_ago * 60_000,

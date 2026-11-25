@@ -1,0 +1,37 @@
+count 6, contains 9 1, count of 3 2, first 3 at 1, last 3 at 5, 4 at -1
+sorted: 1 3 3 5 7 9
+binary search 7 -> 4, 4 -> 3, 100 -> 6
+sum 28
+replaced: 1 0 40 41 7
+emptied: 0
+equal string found at 1
+sorted words: apple,fig,pear
+after append 5, arrays equal 0, type is array 1
+values are the same objects: 1
+dictionary count 40, key17 present 1 -> 17, key99 present 0
+key3 3, key4 400, key400 there 0, count of value 400: 1
+values add up to 1176
+removing one freed 1 key
+emptying freed 40 keys, count 0
+copy has 3, value sum 4, contains value 2 1, is a dictionary 1, original unchanged 2
+copies equal 1
+uuid: 68753A44-4D6F-1226-9C60-0050E4C00067
+uuid bytes start 68 75, end 67
+same uuid equal 1, constant uuid kept 1, fresh is 36 long 1 and differs 1, type 1
+file url: file:///tmp/some%20dir/file.txt
+as HFS: Ferry:tmp:some dir:file.txt
+as Windows: \tmp\some dir\file.txt
+extension: txt
+last component: file.txt
+parent: file:///tmp/some%20dir/
+parent is a directory 1
+host: example.org
+query: q=1
+fragment: top
+port 8443
+file system representation: 1 /tmp/some dir/file.txt
+bundle version key: CFBundleVersion
+bundle identifier key: CFBundleIdentifier
+Core Foundation version past 10.10: 1
+byte order: 0x3412 0x4030201, host is little-endian 1
+exit=0

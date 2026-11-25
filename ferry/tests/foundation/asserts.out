@@ -1,0 +1,15 @@
+small n: passed
+big n: NSInternalInconsistencyException: n is 30, too big
+nil parameter: NSInvalidArgumentException: Invalid parameter not satisfying: arg != nil
+class method: NSInternalInconsistencyException: from a class method
+C assertion: NSInternalInconsistencyException: c_check: n is -2
+C parameter: NSInvalidArgumentException: Invalid parameter not satisfying: p
+C passing: passed
+same handler twice: yes, kept in the thread dictionary: yes
+custom handler: check: in asserts.m
+with a handler that doesn't raise: passed
+failures counted: 1
+another thread has its own handler: yes
+garbage collector: none, collectable is the same object: yes
+collectable memory: allocated
+exit=0

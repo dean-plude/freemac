@@ -53,6 +53,9 @@ typedef CGRect NSRect;
 typedef NSPoint *NSPointPointer;
 typedef NSSize *NSSizePointer;
 typedef NSRect *NSRectPointer;
+typedef NSPoint *NSPointArray;
+typedef NSSize *NSSizeArray;
+typedef NSRect *NSRectArray;
 typedef struct NSEdgeInsets { CGFloat top, left, bottom, right; } NSEdgeInsets;
 typedef NS_ENUM(NSUInteger, NSRectEdge) {
     NSRectEdgeMinX = 0, NSRectEdgeMinY = 1, NSRectEdgeMaxX = 2, NSRectEdgeMaxY = 3,
@@ -106,10 +109,33 @@ typedef NSComparisonResult (^NSComparator)(id obj1, id obj2);
 
 enum {
     NSASCIIStringEncoding = 1,
+    NSNEXTSTEPStringEncoding = 2,
+    NSJapaneseEUCStringEncoding = 3,
     NSUTF8StringEncoding = 4,
     NSISOLatin1StringEncoding = 5,
+    NSSymbolStringEncoding = 6,
+    NSNonLossyASCIIStringEncoding = 7,
+    NSShiftJISStringEncoding = 8,
+    NSISOLatin2StringEncoding = 9,
     NSUnicodeStringEncoding = 10,
+    NSWindowsCP1251StringEncoding = 11,
+    NSWindowsCP1252StringEncoding = 12,
+    NSWindowsCP1253StringEncoding = 13,
+    NSWindowsCP1254StringEncoding = 14,
+    NSWindowsCP1250StringEncoding = 15,
+    NSISO2022JPStringEncoding = 21,
+    NSMacOSRomanStringEncoding = 30,
     NSUTF16StringEncoding = 10,
+    NSUTF16BigEndianStringEncoding = 0x90000100,
+    NSUTF16LittleEndianStringEncoding = 0x94000100,
+    NSUTF32StringEncoding = 0x8c000100,
+    NSUTF32BigEndianStringEncoding = 0x98000100,
+    NSUTF32LittleEndianStringEncoding = 0x9c000100,
+    NSProprietaryStringEncoding = 65536,
+};
+typedef NS_OPTIONS(NSUInteger, NSStringEncodingConversionOptions) {
+    NSStringEncodingConversionAllowLossy = 1,
+    NSStringEncodingConversionExternalRepresentation = 2,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSStringCompareOptions) {
@@ -289,18 +315,11 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 - (instancetype)initWithUTF8String:(const char *)s;
 - (instancetype)initWithCString:(const char *)s encoding:(NSStringEncoding)enc;
 - (instancetype)initWithCharacters:(const unichar *)chars length:(NSUInteger)length;
-- (instancetype)initWithBytes:(const void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)enc;
 - (instancetype)initWithData:(NSData *)data encoding:(NSStringEncoding)enc;
 - (instancetype)initWithFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1, 2);
 - (instancetype)initWithFormat:(NSString *)format arguments:(va_list)args NS_FORMAT_FUNCTION(1, 0);
-+ (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;
 - (instancetype)initWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;
 @property (readonly) const char *UTF8String NS_RETURNS_INNER_POINTER;
-- (const char *)cStringUsingEncoding:(NSStringEncoding)enc NS_RETURNS_INNER_POINTER;
-- (BOOL)getCString:(char *)buffer maxLength:(NSUInteger)max encoding:(NSStringEncoding)enc;
-- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)enc;
-- (NSData *)dataUsingEncoding:(NSStringEncoding)enc;
-- (NSData *)dataUsingEncoding:(NSStringEncoding)encoding allowLossyConversion:(BOOL)lossy;
 - (BOOL)isEqualToString:(NSString *)other;
 - (NSComparisonResult)compare:(NSString *)other;
 - (NSComparisonResult)compare:(NSString *)other options:(NSStringCompareOptions)mask;
@@ -350,6 +369,62 @@ FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
 @property (readonly) const char *fileSystemRepresentation NS_RETURNS_INNER_POINTER;
 - (NSString *)stringByAppendingPathComponent:(NSString *)component;
 - (NSString *)stringByAppendingPathExtension:(NSString *)ext;
+@end
+
+/* Encodings, and the text calls: lines, paragraphs, words, sentences, composed
+ * characters and normalization (freemac 1.219, Ferry 0.43.0). */
+typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
+    NSStringEnumerationByLines = 0,
+    NSStringEnumerationByParagraphs = 1,
+    NSStringEnumerationByComposedCharacterSequences = 2,
+    NSStringEnumerationByWords = 3,
+    NSStringEnumerationBySentences = 4,
+    NSStringEnumerationReverse = 1UL << 8,
+    NSStringEnumerationSubstringNotRequired = 1UL << 9,
+    NSStringEnumerationLocalized = 1UL << 10, /* accepted; breaks are the same in every language here */
+};
+@interface NSString (FerryEncodings)
+- (instancetype)initWithBytes:(const void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)enc;
++ (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;
+- (const char *)cStringUsingEncoding:(NSStringEncoding)enc NS_RETURNS_INNER_POINTER;
+- (BOOL)getCString:(char *)buffer maxLength:(NSUInteger)max encoding:(NSStringEncoding)enc;
+- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)enc;
+- (NSData *)dataUsingEncoding:(NSStringEncoding)enc;
+- (NSData *)dataUsingEncoding:(NSStringEncoding)encoding allowLossyConversion:(BOOL)lossy;
+@property (class, readonly) const NSStringEncoding *availableStringEncodings; /* ends with 0 */
++ (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding;
+@property (class, readonly) NSStringEncoding defaultCStringEncoding;
+@property (readonly) NSStringEncoding fastestEncoding;
+@property (readonly) NSStringEncoding smallestEncoding;
+- (BOOL)canBeConvertedToEncoding:(NSStringEncoding)encoding;
+- (NSUInteger)maximumLengthOfBytesUsingEncoding:(NSStringEncoding)enc;
+- (BOOL)getBytes:(void *)buffer maxLength:(NSUInteger)maxBufferCount usedLength:(NSUInteger *)usedBufferCount
+        encoding:(NSStringEncoding)encoding options:(NSStringEncodingConversionOptions)options
+           range:(NSRange)range remainingRange:(NSRangePointer)leftover;
+- (instancetype)initWithBytesNoCopy:(void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)encoding
+                       freeWhenDone:(BOOL)freeBuffer;
+- (instancetype)initWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;
+@end
+@interface NSString (FerryText)
+- (void)getLineStart:(NSUInteger *)startPtr end:(NSUInteger *)lineEndPtr contentsEnd:(NSUInteger *)contentsEndPtr
+            forRange:(NSRange)range;
+- (void)getParagraphStart:(NSUInteger *)startPtr end:(NSUInteger *)parEndPtr contentsEnd:(NSUInteger *)contentsEndPtr
+                 forRange:(NSRange)range;
+- (NSRange)lineRangeForRange:(NSRange)range;
+- (NSRange)paragraphRangeForRange:(NSRange)range;
+- (void)enumerateSubstringsInRange:(NSRange)range options:(NSStringEnumerationOptions)opts
+                        usingBlock:(void (^)(NSString *substring, NSRange substringRange, NSRange enclosingRange,
+                                             BOOL *stop))block;
+- (NSRange)rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)index;
+- (NSRange)rangeOfComposedCharacterSequencesForRange:(NSRange)range;
+@property (readonly, copy) NSString *precomposedStringWithCanonicalMapping;
+@property (readonly, copy) NSString *decomposedStringWithCanonicalMapping;
+@property (readonly, copy) NSString *precomposedStringWithCompatibilityMapping;
+@property (readonly, copy) NSString *decomposedStringWithCompatibilityMapping;
+- (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)set options:(NSStringCompareOptions)mask;
+- (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)set options:(NSStringCompareOptions)mask range:(NSRange)range;
+- (NSString *)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)enc;
+- (NSString *)stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)enc;
 @end
 
 @interface NSMutableString : NSString
@@ -1585,8 +1660,11 @@ typedef NS_OPTIONS(NSUInteger, NSSearchPathDomainMask) {
     NSAllDomainsMask = 0x0ffff
 };
 
-enum { NSDirectoryEnumerationSkipsSubdirectoryDescendants = 1, NSDirectoryEnumerationSkipsPackageDescendants = 2,
-       NSDirectoryEnumerationSkipsHiddenFiles = 4 };
+typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
+    NSDirectoryEnumerationSkipsSubdirectoryDescendants = 1,
+    NSDirectoryEnumerationSkipsPackageDescendants = 2,
+    NSDirectoryEnumerationSkipsHiddenFiles = 4,
+};
 
 @interface NSFileManager : NSObject
 + (NSFileManager *)defaultManager;
@@ -1632,6 +1710,89 @@ enum { NSDirectoryEnumerationSkipsSubdirectoryDescendants = 1, NSDirectoryEnumer
 - (unsigned long long)fileSize;
 - (NSString *)fileType;
 - (NSDate *)fileModificationDate;
+@end
+
+/* More of the file calls (freemac 1.219, Ferry 0.43.0): directory
+ * enumerators, display names, attributes, the trash (the freedesktop.org
+ * one), resource values and the URL forms of the data and bundle calls. */
+FOUNDATION_EXPORT NSFileAttributeKey const NSFileCreationDate, NSFileOwnerAccountID, NSFileGroupOwnerAccountID,
+    NSFileOwnerAccountName, NSFileReferenceCount, NSFileSystemNumber, NSFileSystemFileNumber, NSFileExtensionHidden,
+    NSFileImmutable, NSFileAppendOnly, NSFileBusy;
+FOUNDATION_EXPORT NSString *const NSFileTypeCharacterSpecial, *const NSFileTypeBlockSpecial, *const NSFileTypeSocket,
+    *const NSFileTypeUnknown;
+
+@interface NSDirectoryEnumerator<ObjectType> : NSEnumerator<ObjectType>
+@property (readonly, copy) NSDictionary<NSFileAttributeKey, id> *fileAttributes;
+@property (readonly, copy) NSDictionary<NSFileAttributeKey, id> *directoryAttributes;
+@property (readonly) NSUInteger level;
+@property (readonly) BOOL isEnumeratingDirectoryPostOrder;
+- (void)skipDescendents;
+- (void)skipDescendants;
+@end
+
+@interface NSFileManager (FerryFileAccess)
+- (NSDirectoryEnumerator<NSString *> *)enumeratorAtPath:(NSString *)path;
+- (NSDirectoryEnumerator<NSURL *> *)enumeratorAtURL:(NSURL *)url includingPropertiesForKeys:(NSArray *)keys
+                                            options:(NSDirectoryEnumerationOptions)mask
+                                       errorHandler:(BOOL (^)(NSURL *url, NSError *error))handler;
+- (NSString *)displayNameAtPath:(NSString *)path;
+- (NSArray<NSString *> *)componentsToDisplayForPath:(NSString *)path;
+- (BOOL)setAttributes:(NSDictionary<NSFileAttributeKey, id> *)attributes ofItemAtPath:(NSString *)path
+                error:(NSError **)error;
+- (BOOL)linkItemAtPath:(NSString *)srcPath toPath:(NSString *)dstPath error:(NSError **)error;
+- (BOOL)createSymbolicLinkAtURL:(NSURL *)url withDestinationURL:(NSURL *)destURL error:(NSError **)error;
+- (BOOL)trashItemAtURL:(NSURL *)url resultingItemURL:(NSURL **)outResultingURL error:(NSError **)error;
+@end
+
+@interface NSDictionary (FerryFileAttributes)
+- (NSUInteger)filePosixPermissions;
+- (NSDate *)fileCreationDate;
+- (NSNumber *)fileOwnerAccountID;
+- (NSNumber *)fileGroupOwnerAccountID;
+- (NSString *)fileOwnerAccountName;
+- (NSUInteger)fileSystemNumber;
+- (NSUInteger)fileSystemFileNumber;
+- (BOOL)fileExtensionHidden;
+- (BOOL)fileIsImmutable;
+- (BOOL)fileIsAppendOnly;
+@end
+
+typedef NSString *NSURLResourceKey;
+FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NSURLPathKey, NSURLIsRegularFileKey,
+    NSURLIsDirectoryKey, NSURLIsSymbolicLinkKey, NSURLIsVolumeKey, NSURLIsPackageKey, NSURLIsHiddenKey,
+    NSURLIsAliasFileKey, NSURLIsReadableKey, NSURLIsWritableKey, NSURLIsExecutableKey, NSURLHasHiddenExtensionKey,
+    NSURLFileSizeKey, NSURLFileAllocatedSizeKey, NSURLTotalFileSizeKey, NSURLTotalFileAllocatedSizeKey,
+    NSURLCreationDateKey, NSURLContentModificationDateKey, NSURLContentAccessDateKey,
+    NSURLAttributeModificationDateKey, NSURLParentDirectoryURLKey, NSURLTypeIdentifierKey,
+    NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
+FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFileResourceTypeCharacterSpecial,
+    *const NSURLFileResourceTypeDirectory, *const NSURLFileResourceTypeBlockSpecial,
+    *const NSURLFileResourceTypeRegular, *const NSURLFileResourceTypeSymbolicLink,
+    *const NSURLFileResourceTypeSocket, *const NSURLFileResourceTypeUnknown;
+
+@interface NSURL (FerryFileAccess)
++ (NSURL *)fileURLWithPathComponents:(NSArray<NSString *> *)components;
++ (NSURL *)fileURLWithFileSystemRepresentation:(const char *)path isDirectory:(BOOL)isDir relativeToURL:(NSURL *)baseURL;
+@property (readonly) BOOL isFileReferenceURL; /* NO: file reference URLs are path URLs here */
+- (NSURL *)fileReferenceURL;
+@property (readonly, copy) NSURL *filePathURL;
+- (BOOL)checkResourceIsReachableAndReturnError:(NSError **)error;
+- (BOOL)getResourceValue:(id *)value forKey:(NSURLResourceKey)key error:(NSError **)error;
+- (NSDictionary<NSURLResourceKey, id> *)resourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys error:(NSError **)error;
+- (BOOL)setResourceValue:(id)value forKey:(NSURLResourceKey)key error:(NSError **)error;
+- (BOOL)setResourceValues:(NSDictionary<NSURLResourceKey, id> *)keyedValues error:(NSError **)error;
+@end
+
+@interface NSData (FerryFileAccess)
+- (BOOL)writeToURL:(NSURL *)url options:(NSDataWritingOptions)writeOptionsMask error:(NSError **)error;
+@end
+
+@interface NSBundle (FerryFileAccess)
+- (NSURL *)URLForResource:(NSString *)name withExtension:(NSString *)ext subdirectory:(NSString *)subpath;
+- (NSArray<NSURL *> *)URLsForResourcesWithExtension:(NSString *)ext subdirectory:(NSString *)subpath;
++ (NSURL *)URLForResource:(NSString *)name withExtension:(NSString *)ext subdirectory:(NSString *)subpath
+          inBundleWithURL:(NSURL *)bundleURL;
++ (NSString *)pathForResource:(NSString *)name ofType:(NSString *)ext inDirectory:(NSString *)bundlePath;
 @end
 
 /* ---- property lists -------------------------------------------------------------- */
@@ -2093,9 +2254,56 @@ enum { NSUndoCloseGroupingRunLoopOrdering = 350000 };
 - (NSString *)redoMenuTitleForUndoActionName:(NSString *)name;
 @end
 
-#define NSAssert(cond, desc, ...) do { if (!(cond)) [NSException raise:NSInternalInconsistencyException format:(desc), ##__VA_ARGS__]; } while (0)
-#define NSParameterAssert(cond) NSAssert((cond), @"Invalid parameter not satisfying: %s", #cond)
-#define NSCAssert NSAssert
+/* Assertions (freemac 1.219, Ferry 0.43.0): a failed one goes to the
+ * thread's assertion handler, which logs it and raises
+ * NSInternalInconsistencyException (NSInvalidArgumentException for a
+ * parameter), as on a Mac. NS_BLOCK_ASSERTIONS turns them off. */
+@interface NSAssertionHandler : NSObject
+@property (class, readonly, retain) NSAssertionHandler *currentHandler;
+- (void)handleFailureInMethod:(SEL)selector object:(id)object file:(NSString *)fileName lineNumber:(NSInteger)line
+                  description:(NSString *)format, ... NS_FORMAT_FUNCTION(5, 6);
+- (void)handleFailureInFunction:(NSString *)functionName file:(NSString *)fileName lineNumber:(NSInteger)line
+                    description:(NSString *)format, ... NS_FORMAT_FUNCTION(4, 5);
+@end
+FOUNDATION_EXPORT NSString *const NSAssertionHandlerKey;
+#if !defined(NS_BLOCK_ASSERTIONS)
+#define NSAssert(cond, desc, ...)                                                                                 \
+    do {                                                                                                          \
+        if (__builtin_expect(!(cond), 0))                                                                         \
+            [[NSAssertionHandler currentHandler] handleFailureInMethod:_cmd object:self                           \
+                                                                  file:[NSString stringWithUTF8String:__FILE__] \
+                                                            lineNumber:__LINE__                                   \
+                                                           description:(desc), ##__VA_ARGS__];                    \
+    } while (0)
+#define NSCAssert(cond, desc, ...)                                                                              \
+    do {                                                                                                        \
+        if (__builtin_expect(!(cond), 0))                                                                       \
+            [[NSAssertionHandler currentHandler]                                                                \
+                handleFailureInFunction:[NSString stringWithUTF8String:__PRETTY_FUNCTION__]                     \
+                                   file:[NSString stringWithUTF8String:__FILE__]                                \
+                             lineNumber:__LINE__                                                                \
+                            description:(desc), ##__VA_ARGS__];                                                 \
+    } while (0)
+#else
+#define NSAssert(cond, desc, ...) do { } while (0)
+#define NSCAssert(cond, desc, ...) do { } while (0)
+#endif
+#define NSAssert1(cond, desc, a1) NSAssert((cond), (desc), (a1))
+#define NSAssert2(cond, desc, a1, a2) NSAssert((cond), (desc), (a1), (a2))
+#define NSAssert3(cond, desc, a1, a2, a3) NSAssert((cond), (desc), (a1), (a2), (a3))
+#define NSAssert4(cond, desc, a1, a2, a3, a4) NSAssert((cond), (desc), (a1), (a2), (a3), (a4))
+#define NSAssert5(cond, desc, a1, a2, a3, a4, a5) NSAssert((cond), (desc), (a1), (a2), (a3), (a4), (a5))
+#define NSCAssert1(cond, desc, a1) NSCAssert((cond), (desc), (a1))
+#define NSCAssert2(cond, desc, a1, a2) NSCAssert((cond), (desc), (a1), (a2))
+#define NSCAssert3(cond, desc, a1, a2, a3) NSCAssert((cond), (desc), (a1), (a2), (a3))
+#define NSCAssert4(cond, desc, a1, a2, a3, a4) NSCAssert((cond), (desc), (a1), (a2), (a3), (a4))
+#define NSCAssert5(cond, desc, a1, a2, a3, a4, a5) NSCAssert((cond), (desc), (a1), (a2), (a3), (a4), (a5))
+#define NSParameterAssert(cond) NSAssert((cond), @"Invalid parameter not satisfying: %@", @#cond)
+#define NSCParameterAssert(cond) NSCAssert((cond), @"Invalid parameter not satisfying: %@", @#cond)
+
+/* Garbage collection, which never runs here: no collector, and the calls
+ * apps made for it give back what they were given (freemac 1.219). */
+#include <Foundation/NSGarbageCollector.h>
 
 /* Classes declared in headers of their own, as on a Mac */
 enum { NSFormattingError = 2048 };
@@ -2127,5 +2335,9 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSCharacterSet.h>
 /* NSAppleScript, which keeps its source and runs nothing. */
 #include <Foundation/NSAppleScript.h>
+/* File coordination and file presenters (freemac 1.219, Ferry 0.43.0). */
+#include <Foundation/NSFileCoordinator.h>
+/* Affine transforms (freemac 1.219, Ferry 0.43.0). */
+#include <Foundation/NSAffineTransform.h>
 
 #endif

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Writes the link stub for a Mac framework that one of Ferry's own framework
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
-# SystemConfiguration, CoreServices and CFNetwork in Foundation's,
+# SystemConfiguration, CoreServices, CFNetwork and ServiceManagement in Foundation's,
 # Cocoa in AppKit's): the calls the files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
@@ -26,9 +26,10 @@ case $framework in
     ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
     CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
-    CoreServices) pattern='^_Gestalt$' ;;
+    CoreServices) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList)' ;;
+    ServiceManagement) pattern='^_SM' ;;
     Cocoa) pattern='.' ;;
-    Carbon) pattern='^_(Gestalt$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
+    Carbon) pattern='^_(Gestalt$|LSSharedFileList|kLSSharedFileList|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

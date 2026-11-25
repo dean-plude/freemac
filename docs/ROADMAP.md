@@ -1183,6 +1183,26 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.219 "Ferry: the calls apps make next" (done)
+
+Ferry 0.43.0: what a search of the nine apps' source found them calling that Ferry didn't have, most-used first.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Child windows that move, hide and close with their parent; panels that hide while their app isn't active; ignoring the mouse, collection behaviour and the other window properties menu-bar apps set | Ferry AppKit | done |
+| 2 | Login items through `LSSharedFileList` and `SMLoginItemSetEnabled`, kept as autostart entries that Dials > Login Items lists; a ServiceManagement framework | Ferry Foundation | done |
+| 3 | The file calls: directory enumerators, display names, attributes, links, URL resource values and reachability, the freedesktop.org trash, bundle resources by URL, `NSFileCoordinator` and file presenters | Ferry Foundation | done |
+| 4 | Strings in some seventy-five encodings, a file's encoding found from its bytes, and Core Foundation's encoding calls | Ferry Foundation | done |
+| 5 | Text walked by line, paragraph, word, sentence and composed character; Unicode normalization; character-set searches; the older percent escapes | Ferry Foundation | done |
+| 6 | Core Foundation's arrays and dictionaries with callbacks of their own and the rest of their calls, `CFUUID`, more of `CFURL` and `CFString`, the bundle keys | Ferry Core Foundation | done |
+| 7 | `NSAssert` and its kin with `NSAssertionHandler`; the garbage-collection calls | Ferry Foundation | done |
+| 8 | `NSAffineTransform`, with paths transformed and their elements read back, and arcs between lines | Ferry Foundation, AppKit | done |
+| 9 | Nine new tests; `make check` 219 of 219 | Ferry | done |
+| 10 | The older `WebView` on a busy computer: the page's helper script could start after the web view had given it its number, so it never reported scrolling or subframe loads (`webkit_frames` failed 14 of 32 parallel runs, now 0); the number is now left on the page for the script to pick up | Ferry WebKit | done |
+| 11 | A Messages test that failed when run just after midnight | Tests | done |
+
+Table views' drop retargeting, `NSArchiver`, listing other programs' windows and posting events aren't done yet, and none of the apps was run again.
+
 ## 1.218 "Messages: firewall, login, tapbacks and attachments" (done)
 
 Messages closes its main gaps: the phone gets through the Firewall, Messages starts at login, and bubbles carry tapbacks, pictures and files.

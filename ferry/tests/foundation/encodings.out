@@ -1,0 +1,51 @@
+available: more than 20 yes, UTF-8 yes, Latin-1 yes, Shift JIS yes
+names: Unicode (UTF-8) / Western (Mac OS Roman) / Western (Windows Latin 1)
+default C string encoding is UTF-8: yes
+utf8: 63 61 66 c3 a9 20 e2 80 93 20 e2 82 ac 35
+latin1 strict: (nil)
+latin1 lossy: 63 61 66 e9 20 3f 20 3f 35
+cp1252: 63 61 66 e9 20 96 20 80 35
+mac roman: 63 61 66 8e 20 d0
+ascii strict: (nil)
+ascii lossy: 63 61 66 3f 20 3f 20 3f 35
+utf16 (with its byte-order mark): ff fe 41 00 62 00
+utf16 big-endian: 00 41 00 62
+utf16 little-endian: 41 00 62 00
+utf32 big-endian: 00 00 00 41 00 01 f6 00
+shift jis: 93 fa 96 7b
+non-lossy ascii: 61 5c 33 35 31 5c 75 32 30 61 63
+can convert to latin1: no, to cp1252: yes, to ascii: no
+bytes in UTF-8 14, in UTF-16 18, at most in UTF-8 yes
+from latin1: n<U+00E4>he
+from mac roman: caf<U+00E9> <U+2013>
+from cp1252: <U+20AC>5 <U+201C>q<U+201D>
+bad utf8: (nil)
+utf16 with a byte-order mark: Hi
+utf16 big-endian: H<U+20AC>
+from shift jis: <U+65E5><U+672C>
+from non-lossy ascii: a<U+00E9><U+20AC>
+from euc-kr: <U+D55C>
+getCString fits: yes (abc), too long: no
+latin1 C string: e9 74 e9 00
+ascii C string of a non-ascii string is NULL: yes
+getBytes: yes, used 4, rest at 3 length 2
+read utf8: <U+00FC>ber
+  found UTF-8: yes
+read utf16: <U+00FC>ber
+  found UTF-16: yes
+read latin: n<U+00E4>he
+  found Windows-1252: yes
+latin read as utf8: nil, error 261
+cf cp1252: 0x500, IANA windows-1252, code page 1252
+IANA shift_jis -> 0xa01, code page 932 -> 0x420, UTF-8 -> 0x8000100
+unknown IANA name is invalid: yes
+cf names: Western (Mac OS Roman) / Central European (ISO Latin 2)
+NS of cf UTF-8 is NSUTF8StringEncoding: yes, of cf Latin-2: 0x9
+system encoding is Mac Roman: yes, available: big5 yes, bogus no
+CFStringCreateWithBytes latin1: <U+00E9>t<U+00E9>
+CFStringGetBytes to UTF-8: 3 characters, 5 bytes
+  into 3 bytes: 2 characters, 3 bytes
+  a euro sign to Latin-1 with '?': 3 characters, a?b
+external representation in UTF-16: ff fe 68 00 69 00
+and back: hi
+exit=0

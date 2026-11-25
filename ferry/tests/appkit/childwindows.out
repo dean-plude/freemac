@@ -1,0 +1,20 @@
+children 2, child's parent is the parent yes, child visible yes
+adding the same child again: still 2
+after moving the parent by (30, -20) the child is at (180, 130)
+resizing in place leaves it at (180, 130)
+parent ordered out: child visible no, other visible no
+parent back: child visible yes, other visible yes
+removed one: children 1, its parent nil
+a removed child stays put: (630, 80)
+setParentWindow moves it: old parent has 0, new parent has 1
+closing the parent: child's parent nil, new parent's children 0
+panel hides on deactivate: yes, window does: no
+app deactivated: panel visible no, window visible yes
+app active again: panel visible yes
+one that doesn't hide stays: yes
+floating panel level 3 (floating is 3)
+ignores mouse yes, out of the window menu yes, collection behaviour 17, animation 2, level 25
+levels: dock 20, pop-up menu 101, screen saver 1000
+flushing disabled yes, after one enable yes, after two no
+base (10, 10) on the screen is (140, 90), and back (10, 10)
+exit=0

@@ -1021,10 +1021,12 @@ static NSDictionary *action_information(WKNavigationAction *action)
  * scrolls or changes size. Each message names its frame by its path in
  * window.frames, and its web view by the number the web view gives the
  * main frame's agent when the page is committed (the views a page opens
- * share their opener's scripts): until then the messages wait. */
+ * share their opener's scripts): until then the messages wait. The number
+ * is also left on the window, since the commit can reach the page before
+ * the agent has started there, and the agent then picks it up itself. */
 static const char agent_world[] = "ferry-webview";
 static NSString *const agent_script =
-    @"(function(){if(window.__ferryAgent)return;var A=window.__ferryAgent={v:0,q:[]};"
+    @"(function(){if(window.__ferryAgent)return;var A=window.__ferryAgent={v:window.__ferryView||0,q:[]};"
     @"var H=function(){try{return window.webkit.messageHandlers.ferryWebView;}catch(e){return null;}};"
     @"var root=function(){if(window===window.top)return A;"
     @"try{return window.top.__ferryAgent||null;}catch(e){return null;}};"
@@ -1316,7 +1318,7 @@ static void all_frames(WebFrame *frame, NSMutableArray *out)
     if (web)
         WK(webkit_web_view_evaluate_javascript)(
             web,
-            [[NSString stringWithFormat:@"if(window.__ferryAgent)window.__ferryAgent.setView(%ld)", number] UTF8String],
+            [[NSString stringWithFormat:@"window.__ferryView=%ld;if(window.__ferryAgent)window.__ferryAgent.setView(%ld)", number, number] UTF8String],
             -1, agent_world, NULL, NULL, NULL, NULL);
     id d = [view frameLoadDelegate];
     if ([d respondsToSelector:@selector(webView:didCommitLoadForFrame:)])

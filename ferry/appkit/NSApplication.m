@@ -733,6 +733,8 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     if (_active)
         return;
     _active = YES;
+    for (NSWindow *w in [[AAllWindows() copy] autorelease])
+        [w _appDidBecomeActive];
     [self _post:NSApplicationDidBecomeActiveNotification selector:@selector(applicationDidBecomeActive:)];
 }
 - (void)activate { [self activateIgnoringOtherApps:YES]; }
@@ -741,6 +743,8 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     if (!_active)
         return;
     _active = NO;
+    for (NSWindow *w in [[AAllWindows() copy] autorelease])   /* panels that hide on deactivation */
+        [w _appDidResignActive];
     [self _post:NSApplicationDidResignActiveNotification selector:@selector(applicationDidResignActive:)];
 }
 - (void)hide:(id)sender

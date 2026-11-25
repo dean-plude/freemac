@@ -31,6 +31,13 @@ BOOL FKVOIsObserved(id object);   /* has key-value observers (NSKeyValueObservin
 unichar *FDecodeUTF8(const char *s, NSUInteger len, NSUInteger *outLen);   /* malloc'd */
 char *FEncodeUTF8(const unichar *c, NSUInteger len, NSUInteger *outLen);   /* malloc'd */
 NSUInteger FHashChars(const unichar *c, NSUInteger len);
+/* String encodings (NSStringEncodings.m): characters from bytes (malloc'd;
+ * NULL when the bytes aren't text in enc), and bytes from characters (nil
+ * when one can't be written, unless lossByte, 1 to 255, stands in for it;
+ * external puts a byte order mark before UTF-16 and UTF-32). */
+unichar *FDecodeBytes(const void *bytes, NSUInteger len, NSStringEncoding enc, NSUInteger *outLen);
+NSData *FEncodeChars(const unichar *c, NSUInteger n, NSStringEncoding enc, int lossByte, BOOL external);
+BOOL FStringEncodingIsAvailable(NSStringEncoding enc);
 
 /* Descriptions in the old-style property list form Mac Foundation prints. */
 NSString *FDescribe(id obj, int indent);

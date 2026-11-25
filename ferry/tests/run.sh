@@ -47,6 +47,11 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
+        foundation_fileaccess)
+            # the trash and the test's files in a home of its own
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_url*)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -523,6 +528,30 @@ else
     echo "FAIL foundation_bundle (did not compile)"; sed 's/^/    /' "$build/foundation_bundle.cc.log"
     fail=$((fail + 1))
 fi
+# Login items (freemac 1.219, Ferry 0.43.0): the program runs as an app
+# with a login helper inside it, in a home of its own, and keeps its items
+# as autostart entries under that home's ~/.config.
+lhome="$build/home_loginitems"
+rm -rf "$lhome"; mkdir -p "$lhome/Apps"
+app="$lhome/Apps/LoginTest.app"
+cp -r "$here/foundation/LoginTest.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/loginitems" "$here/foundation/loginitems.m" \
+        -framework Foundation -framework CoreServices -framework ServiceManagement 2> "$build/foundation_loginitems.cc.log"
+then
+    HOME="$lhome" XDG_CONFIG_HOME= "$top/ferry" "$app/Contents/MacOS/loginitems" > "$build/foundation_loginitems.got" \
+        2> "$build/foundation_loginitems.err"
+    echo "exit=$?" >> "$build/foundation_loginitems.got"
+    if diff -u "$here/foundation/loginitems.out" "$build/foundation_loginitems.got" > "$build/foundation_loginitems.diff"
+    then
+        echo "ok   foundation_loginitems"; pass=$((pass + 1))
+    else
+        echo "FAIL foundation_loginitems"; sed 's/^/    /' "$build/foundation_loginitems.diff"
+        sed 's/^/    stderr: /' "$build/foundation_loginitems.err"; fail=$((fail + 1))
+    fi
+else
+    echo "FAIL foundation_loginitems (did not compile)"; sed 's/^/    /' "$build/foundation_loginitems.cc.log"
+    fail=$((fail + 1))
+fi
 # An app's check of its own signature, from inside its bundle.
 app="$build/SelfCheck.app"
 rm -rf "$app"; mkdir -p "$app/Contents/MacOS"
@@ -996,6 +1025,28 @@ then
 else
     echo "FAIL foundation_applescript message"; sed 's/^/    stderr: /' "$build/foundation_applescript.err"; fail=$((fail + 1))
 fi
+# Freemac 1.219, Ferry 0.43.0: what the nine apps surveyed call next.
+# String encodings and text (lines, words, normalization); the rest of Core
+# Foundation's arrays, dictionaries, UUIDs and URLs; the file calls
+# (enumerators, resource values, the trash, a file coordinator); NSAssert;
+# child windows and panels that hide with the app; NSAffineTransform and
+# the path elements.
+run_one foundation_encodings "$here/foundation/encodings.m" "$here/foundation/encodings.out" -framework Foundation
+run_one foundation_text "$here/foundation/text.m" "$here/foundation/text.out" -fblocks -framework Foundation
+run_one foundation_cfmore "$here/foundation/cfmore.c" "$here/foundation/cfmore.out" -framework CoreFoundation
+run_one foundation_fileaccess "$here/foundation/fileaccess.m" "$here/foundation/fileaccess.out" -fobjc-arc -fblocks \
+    -framework Foundation
+run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \
+    -framework Foundation
+if [ -f "$build/foundation_asserts.err" ] &&
+    [ "$(grep -c '^\*\*\* Assertion failure in ' "$build/foundation_asserts.err")" = 5 ]; then
+    echo "ok   foundation_asserts messages"; pass=$((pass + 1))
+else
+    echo "FAIL foundation_asserts messages"; sed 's/^/    stderr: /' "$build/foundation_asserts.err"; fail=$((fail + 1))
+fi
+run_one appkit_childwindows "$here/appkit/childwindows.m" "$here/appkit/childwindows.out" -fobjc-arc -fblocks \
+    -framework Cocoa
+run_one appkit_affine "$here/appkit/affine.m" "$here/appkit/affine.out" -fobjc-arc -fblocks -framework Cocoa
 # WebKit: WKWebView and the older WebView, shown by this system's WebKitGTK
 # (freemac 1.214, Ferry 0.40.0). First what needs neither WebKitGTK nor a
 # display: the classes, web views that stay empty with no display, and the

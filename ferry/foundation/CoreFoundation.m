@@ -14,9 +14,6 @@ const CFAllocatorRef kCFAllocatorNull = NULL;
 const CFRunLoopMode kCFRunLoopDefaultMode = (CFStringRef)@"kCFRunLoopDefaultMode";
 const CFRunLoopMode kCFRunLoopCommonModes = (CFStringRef)@"kCFRunLoopCommonModes";
 const CFTimeInterval kCFAbsoluteTimeIntervalSince1970 = 978307200.0;
-const char kCFTypeArrayCallBacks[1];
-const char kCFTypeDictionaryKeyCallBacks[1];
-const char kCFTypeDictionaryValueCallBacks[1];
 
 #define OBJ(x) ((id)(x))
 
@@ -47,15 +44,7 @@ void CFShow(CFTypeRef obj)
 
 /* ---- strings ------------------------------------------------------------------------- */
 
-static NSStringEncoding ns_encoding(CFStringEncoding enc)
-{
-    switch (enc) {
-    case kCFStringEncodingASCII: return NSASCIIStringEncoding;
-    case kCFStringEncodingISOLatin1: return NSISOLatin1StringEncoding;
-    case kCFStringEncodingUnicode: return NSUnicodeStringEncoding;
-    default: return NSUTF8StringEncoding;
-    }
-}
+static NSStringEncoding ns_encoding(CFStringEncoding enc) { return CFStringConvertEncodingToNSStringEncoding(enc); }
 
 CFStringRef CFStringCreateWithCString(CFAllocatorRef alloc, const char *s, CFStringEncoding enc)
 {
@@ -116,29 +105,7 @@ Boolean CFStringHasSuffix(CFStringRef s, CFStringRef suffix) { return [OBJ(s) ha
 SInt32 CFStringGetIntValue(CFStringRef s) { return [OBJ(s) intValue]; }
 double CFStringGetDoubleValue(CFStringRef s) { return [OBJ(s) doubleValue]; }
 
-/* ---- arrays and dictionaries (with the CFType callbacks only) ----------------------------- */
-
-CFIndex CFArrayGetCount(CFArrayRef a) { return (CFIndex)[OBJ(a) count]; }
-const void *CFArrayGetValueAtIndex(CFArrayRef a, CFIndex i) { return [OBJ(a) objectAtIndex:i]; }
-CFMutableArrayRef CFArrayCreateMutable(CFAllocatorRef alloc, CFIndex capacity, const void *callbacks)
-{
-    return (CFMutableArrayRef)[[NSMutableArray alloc] init];
-}
-void CFArrayAppendValue(CFMutableArrayRef a, const void *value) { [OBJ(a) addObject:OBJ(value)]; }
-
-CFIndex CFDictionaryGetCount(CFDictionaryRef d) { return (CFIndex)[OBJ(d) count]; }
-const void *CFDictionaryGetValue(CFDictionaryRef d, const void *key) { return [OBJ(d) objectForKey:OBJ(key)]; }
-Boolean CFDictionaryContainsKey(CFDictionaryRef d, const void *key) { return [OBJ(d) objectForKey:OBJ(key)] != nil; }
-CFMutableDictionaryRef CFDictionaryCreateMutable(CFAllocatorRef alloc, CFIndex capacity, const void *keyCallBacks,
-                                                 const void *valueCallBacks)
-{
-    return (CFMutableDictionaryRef)[[NSMutableDictionary alloc] init];
-}
-void CFDictionarySetValue(CFMutableDictionaryRef d, const void *key, const void *value)
-{
-    [OBJ(d) setObject:OBJ(value) forKey:OBJ(key)];
-}
-void CFDictionaryRemoveValue(CFMutableDictionaryRef d, const void *key) { [OBJ(d) removeObjectForKey:OBJ(key)]; }
+/* Arrays and dictionaries are in CFMore.m. */
 
 /* ---- numbers, booleans, data, time ----------------------------------------------------------- */
 

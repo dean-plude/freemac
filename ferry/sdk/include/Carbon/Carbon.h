@@ -6,6 +6,8 @@
 #ifndef _FERRY_CARBON_H_
 #define _FERRY_CARBON_H_
 #include <ApplicationServices/ApplicationServices.h>
+/* noErr and paramErr come from CoreServices, as on a Mac. */
+#include <CoreServices/CoreServices.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,8 +40,6 @@ typedef struct EventHotKeyID {
 } EventHotKeyID;
 
 enum {
-    noErr = 0,
-    paramErr = -50,
     eventNotHandledErr = -9874,
     eventParameterNotFoundErr = -9870,
     eventHotKeyExistsErr = -9878,
