@@ -4,8 +4,10 @@
  * the window is also a GTK toplevel holding one drawing area, which shows
  * that image and turns GTK's input into NSEvents. The compositor decorates
  * the window, so a window's frame is its content rectangle. Wayland doesn't
- * let a program place its own windows, so a window's position on screen is
- * only what the program last set. A sheet is drawn inside its window, by a
+ * let a program place its own windows, so there a window's position on
+ * screen is only what the program last set; under X11 (since freemac
+ * 1.229) the window is put where its frame says, and a move the user makes
+ * comes back into the frame. A sheet is drawn inside its window, by a
  * view over the window's own (ASheetHost), and gets its events from it; one
  * too big for its window gets a GTK window of its own instead, modal for
  * its window's. The sheet calls are written from Apple's public NSWindow
@@ -67,6 +69,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     GtkWidget *_gtk, *_area;
     NSSize _gtkWanted;                /* a size asked of GTK and not yet given */
     int _gtkWantedTries;
+    int _gtkMoveX, _gtkMoveY, _gtkMovesPending; /* a place asked of X11 and not yet seen */
     NSMutableSet *_keysDown;
     NSInteger _lastButton, _clicks;
     NSTimeInterval _lastClickTime;
@@ -414,8 +417,13 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (NSString *)frameAutosaveName { return _autosaveName; }
 - (BOOL)setFrameAutosaveName:(NSString *)name
 {
+    if ([name isEqualToString:_autosaveName])
+        return YES;
     [_autosaveName release];
     _autosaveName = [name copy];
+    /* a frame saved under the name before is the window's again (1.229) */
+    if ([name length])
+        [self setFrameUsingName:name];
     return YES;
 }
 /* the frame kept under that name (appkit/NSKeyCastrCalls.m, freemac 1.224,
@@ -652,6 +660,68 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [self _resizedTo:size];
 }
 
+/* Whether this program places its own windows: under X11, yes; Wayland
+ * leaves it to the compositor. */
+static BOOL places_own_windows(void)
+{
+    static int x11 = -1;
+    if (x11 < 0) {
+        GdkDisplay *d = ADisplayAvailable() ? gdk_display_get_default() : NULL;
+        const char *type = d ? g_type_name(**(size_t **)d) : NULL;
+        x11 = type && !strcmp(type, "GdkX11Display");
+    }
+    return x11;
+}
+
+/* The window goes where its frame says: a Mac's screen coordinates run up
+ * from the main screen's bottom, X11's down from its top. */
+- (void)_placeGtk
+{
+    if (!_gtk || !places_own_windows() || _hostedSheet)
+        return;
+    int x = (int)floor(_frame.origin.x), y = (int)floor(AScreenFrame(NO).size.height - NSMaxY(_frame));
+    _gtkMoveX = x, _gtkMoveY = y, _gtkMovesPending = 5;
+    gtk_window_move(_gtk, x, y);
+}
+/* X11 says where the window is: a place it wasn't asked for is the user's
+ * move (or the window manager's), which the frame takes. */
+- (void)_gtkMovedTo:(int)x y:(int)y
+{
+    if (_gtkMovesPending) {
+        if (x == _gtkMoveX && y == _gtkMoveY)
+            _gtkMovesPending = 0;
+        else
+            _gtkMovesPending--;
+        return;
+    }
+    NSPoint origin = NSMakePoint(x, AScreenFrame(NO).size.height - y - _frame.size.height);
+    if (fabs(origin.x - _frame.origin.x) < 1 && fabs(origin.y - _frame.origin.y) < 1)
+        return;
+    CGFloat dx = origin.x - _frame.origin.x, dy = origin.y - _frame.origin.y;
+    _frame.origin = origin;
+    for (NSWindow *c in [[_children copy] autorelease])
+        [c setFrameOrigin:NSMakePoint(c->_frame.origin.x + dx, c->_frame.origin.y + dy)];
+    [self _saveAutosavedFrame];
+    [self _post:NSWindowDidMoveNotification selector:@selector(windowDidMove:)];
+}
+/* A window with an autosave name keeps its frame in the defaults as it
+ * moves or is resized on screen. */
+- (void)_saveAutosavedFrame
+{
+    if (_visible && [_autosaveName length] && !_closing)
+        [self saveFrameUsingName:_autosaveName];
+}
+/* A titled window put on screen keeps its title bar there: one whose top
+ * is above the screen's visible top comes down (as a Mac constrains it). */
+- (void)_constrainToScreen
+{
+    if (!(_style & NSWindowStyleMaskTitled) || _sheetParent || _parent)
+        return;
+    NSRect vis = AScreenFrame(YES);
+    if (NSMaxY(_frame) > NSMaxY(vis))
+        [self setFrameOrigin:NSMakePoint(_frame.origin.x, NSMaxY(vis) - _frame.size.height)];
+}
+
 - (void)setFrame:(NSRect)frame display:(BOOL)display
 {
     if ([_delegate respondsToSelector:@selector(windowWillResize:toSize:)] && !NSEqualSizes(frame.size, _frame.size))
@@ -670,6 +740,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     }
     [self _resizedTo:frame.size];
     if (moved)
+        [self _placeGtk];
+    [self _saveAutosavedFrame];
+    if (moved)
         [self _post:NSWindowDidMoveNotification selector:@selector(windowDidMove:)];
     if (display)
         [self displayIfNeeded];
@@ -681,6 +754,10 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 {
     if (p.x == 0 && p.y == 0)
         p = NSMakePoint(_frame.origin.x, NSMaxY(_frame));
+    /* one that would run off the screen starts again at its top left */
+    NSRect vis = AScreenFrame(YES);
+    if (p.y - _frame.size.height < NSMinY(vis) || p.x + _frame.size.width > NSMaxX(vis))
+        p = NSMakePoint(NSMinX(vis) + 20, NSMaxY(vis) - 20);
     [self setFrameTopLeftPoint:p];
     return NSMakePoint(p.x + 20, p.y - 20);
 }
@@ -879,6 +956,7 @@ static int on_delete(GtkWidget *w, GdkEvent *e, void *data);
 static int on_focus_in(GtkWidget *w, GdkEvent *e, void *data);
 static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data);
 static void on_size(GtkWidget *w, GdkRectangle *r, void *data);
+static int on_configure(GtkWidget *w, GdkEvent *e, void *data);
 
 static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *window)
 {
@@ -889,6 +967,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
 {
     if (_gtk || _hostedSheet || !ADisplayAvailable())
         return;
+    [self _constrainToScreen];
     _gtk = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
     if (_sheetParent && _sheetParent->_gtk) {
@@ -927,6 +1006,10 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "delete-event", on_delete, self);
     connect(_gtk, "focus-in-event", on_focus_in, self);
     connect(_gtk, "focus-out-event", on_focus_out, self);
+    if (places_own_windows()) {
+        connect(_gtk, "configure-event", on_configure, self);
+        [self _placeGtk];
+    }
     if (_dropsWanted)
         [self _enableDrops];
     if (_alpha != 1)
@@ -1659,6 +1742,15 @@ static void on_size(GtkWidget *w, GdkRectangle *r, void *data)
         A_REPORTING([(NSWindow *)data _allocated:NSMakeSize(r->width, r->height)];)
     }
 }
+static int on_configure(GtkWidget *w, GdkEvent *e, void *data)
+{
+    int x = 0, y = 0;
+    gtk_window_get_position(w, &x, &y);
+    @autoreleasepool {
+        A_REPORTING([(NSWindow *)data _gtkMovedTo:x y:y];)
+    }
+    return 0;
+}
 
 static NSPoint location(NSWindow *win, const GdkEvent *e, unsigned *state)
 {
@@ -2046,4 +2138,33 @@ void NSEnableScreenUpdates(void)
 {
     if (screen_updates_disabled > 0)
         screen_updates_disabled--;
+}
+
+/* Where a nib's window starts (freemac 1.229). Interface Builder keeps the
+ * window's rect on the screen it was designed on, and which screen edges
+ * its place is fixed to (the xib's initial-position struts). On this
+ * screen, an axis with a fixed edge keeps the window's distance from it
+ * (the left or the bottom when both are fixed, the origin a Mac's
+ * coordinates start from); an axis with neither keeps its place in
+ * proportion to the room the window has. */
+NSRect AInitialWindowRect(NSRect rect, NSRect design, unsigned mask)
+{
+    if (design.size.width <= 0 || design.size.height <= 0)
+        return rect;
+    NSRect screen = AScreenFrame(YES);
+    CGFloat x = rect.origin.x - design.origin.x, y = rect.origin.y - design.origin.y;
+    if (mask & 1)
+        ;
+    else if (mask & 2)
+        x = screen.size.width - (design.size.width - x);
+    else if (design.size.width > rect.size.width)
+        x = x / (design.size.width - rect.size.width) * fmax(screen.size.width - rect.size.width, 0);
+    if (mask & 8)
+        ;
+    else if (mask & 4)
+        y = screen.size.height - (design.size.height - y);
+    else if (design.size.height > rect.size.height)
+        y = y / (design.size.height - rect.size.height) * fmax(screen.size.height - rect.size.height, 0);
+    rect.origin = NSMakePoint(floor(screen.origin.x + x), floor(screen.origin.y + y));
+    return rect;
 }

@@ -16,7 +16,14 @@ templates), views and custom views, text fields, secure fields, buttons,
 check boxes and radio buttons, pop-up buttons, image views, boxes,
 steppers, sliders, progress indicators, segmented controls, search fields,
 tab views, menus and their items, user-defaults, object and array
-controllers, and the app's own objects. Outlets, actions, bindings and
+controllers, and the app's own objects; since freemac 1.229 (Ferry
+0.53.0) also text views (with their attributed text, flags and colours),
+web views and their preferences, matrices of cells, level indicators,
+date pickers, path controls, collection views and their items, rule
+editors, plain controls, Quartz Composer views, the formatters of cells
+(number, date, byte-count, date-components and the app's own), the data
+cells of table columns, cells and formatters at the top level, and a
+window's initial position. Outlets, actions, bindings and
 user-defined runtime attributes are connected. A view element this tool
 doesn't know becomes a custom view of its Cocoa class (a "tableView" an
 NSTableView, made empty with -initWithFrame:), with its frame, so the
@@ -129,6 +136,10 @@ SUPERS = {
     "NSObjectController": ("NSController",), "NSArrayController": ("NSObjectController", "NSController"),
     "NSTreeController": ("NSObjectController", "NSController"),
     "NSDictionaryController": ("NSArrayController", "NSObjectController", "NSController"),
+    "NSTextView": ("NSText",) + VIEW, "WebView": VIEW, "QCView": VIEW, "NSCollectionView": VIEW,
+    "NSMatrix": CONTROL, "NSRuleEditor": CONTROL, "NSPredicateEditor": ("NSRuleEditor",) + CONTROL,
+    "NSActionCell": CELL, "NSPathCell": ACTION_CELL, "NSLevelIndicatorCell": ACTION_CELL,
+    "NSDatePickerCell": ACTION_CELL, "NSCollectionViewItem": ("NSViewController",) + RESPONDER,
 }
 
 
@@ -286,6 +297,158 @@ class Compiler:
             return self.a.add(self.a.obj("NSButtonImageSource", (), NSImageName=self.a.string(name)))
         return self.a.add(self.a.obj("NSCustomResource", (), NSClassName=self.a.string("NSImage"),
                                      NSResourceName=self.a.string(name)))
+
+    def date(self, e):
+        """A <date> element: an NSDate, by its seconds since 2001."""
+        if e is None or e.get("timeIntervalSinceReferenceDate") is None:
+            return None
+        return self.a.add(self.a.obj("NSDate", (), **{"NS.time": float(e.get("timeIntervalSinceReferenceDate"))}))
+
+    def url(self, e):
+        if e is None or not e.get("string"):
+            return None
+        return self.a.add(self.a.obj("NSURL", (), **{"NS.relative": self.a.string(e.get("string"))}))
+
+    def paragraph_style(self, e):
+        keys = dict(NSAlignment=ALIGN.get(e.get("alignment"), 4))
+        if e.get("lineBreakMode"):
+            keys["NSLineBreakMode"] = LINE_BREAK.get(e.get("lineBreakMode"), 0)
+        return self.a.add(self.a.obj("NSMutableParagraphStyle", ("NSParagraphStyle",), **keys))
+
+    def attributed_string(self, e, cls="NSAttributedString"):
+        """An <attributedString>: its fragments' text, and each fragment's
+        attributes (font, colour, paragraph style) as a run, written as a
+        keyed archive keeps an attributed string: one dictionary for the
+        whole text, or the distinct dictionaries and (length, index) pairs."""
+        a = self.a
+        runs = []
+        for f in e:
+            if f.tag != "fragment":
+                continue
+            content = f.get("content")
+            if content is None:
+                for c in f:
+                    if c.get("key") == "content":
+                        content = c.text if c.tag in ("string", "mutableString") else (c.get("content") or "")
+            content = content or ""
+            attrs = []
+            at = child(f, "attributes")
+            for c in (at if at is not None else []):
+                k = c.get("key")
+                if not k:
+                    continue
+                if c.tag == "font":
+                    attrs.append((k, self.font(c)))
+                elif c.tag == "color":
+                    attrs.append((k, self.color(c)))
+                elif c.tag == "paragraphStyle":
+                    attrs.append((k, self.paragraph_style(c)))
+                elif c.tag in ("integer", "real", "bool", "string"):
+                    v = self.plain_value(c)
+                    if v is not None:
+                        attrs.append((k, v))
+            if content:
+                runs.append((content, attrs))
+        text = "".join(t for t, _ in runs)
+        keys = {"NSString": a.string(text)}
+        if runs:
+            sigs, dicts, info = [], [], bytearray()
+            for t, attrs in runs:
+                sig = tuple((k, v.data if isinstance(v, UID) else v) for k, v in attrs)
+                if sig not in sigs:
+                    sigs.append(sig)
+                    dicts.append(a.dictionary(attrs))
+                for n in (len(t.encode("utf-16-le")) // 2, sigs.index(sig)):
+                    while True:
+                        b = n & 0x7f
+                        n >>= 7
+                        info.append(b | (0x80 if n else 0))
+                        if not n:
+                            break
+            if len(dicts) == 1:
+                keys["NSAttributes"] = dicts[0]
+            else:
+                keys["NSAttributes"] = a.array(dicts)
+                keys["NSAttributeInfo"] = a.add(bytes(info))
+        supers_ = {"NSAttributedString": (), "NSMutableAttributedString": ("NSAttributedString",),
+                   "NSTextStorage": ("NSMutableAttributedString", "NSAttributedString")}[cls]
+        return a.add(a.obj(cls, supers_, **keys))
+
+    # NSNumberFormatter's styles and behaviours, by the names Interface Builder writes
+    NUMBER_STYLES = {"none": 0, "decimal": 1, "currency": 2, "percent": 3, "scientific": 4, "spellOut": 5,
+                     "ordinal": 6, "currencyISOCode": 8, "currencyPlural": 9, "currencyAccounting": 10}
+    BEHAVIOURS = {"default10_4": 0, "default": 0, "10_0": 1000, "custom10_0": 1000, "custom10_4": 1040}
+    DATE_STYLES = {"none": 0, "short": 1, "medium": 2, "long": 3, "full": 4}
+
+    def formatter(self, f):
+        """A cell's formatter (or a formatter on its own): its class, and its
+        settings in "NS.attributes" under the names of its properties, which
+        Ferry's Foundation sets one by one. A formatter of the app's own
+        class is made as that class, with its settings if it has any."""
+        a = self.a
+        uid = self.uid_for(f.get("id")) if f.get("id") else a.reserve()
+        tag, attrs = f.tag, []
+        skip = ("id", "key", "customClass", "userLabel")
+
+        def number(v):
+            return a.add(float(v) if any(ch in v for ch in ".eE") or v in ("NaN", "inf", "-inf") else int(v))
+
+        cls = {"numberFormatter": "NSNumberFormatter", "dateFormatter": "NSDateFormatter",
+               "byteCountFormatter": "NSByteCountFormatter", "dateComponentsFormatter": "NSDateComponentsFormatter",
+               "customFormatter": "NSFormatter", "lengthFormatter": "NSLengthFormatter",
+               "massFormatter": "NSMassFormatter", "energyFormatter": "NSEnergyFormatter",
+               "dateIntervalFormatter": "NSDateIntervalFormatter",
+               "personNameComponentsFormatter": "NSPersonNameComponentsFormatter"}.get(tag, "NSFormatter")
+        enums = {"formatterBehavior": self.BEHAVIOURS, "numberStyle": self.NUMBER_STYLES,
+                 "dateStyle": self.DATE_STYLES, "timeStyle": self.DATE_STYLES,
+                 "countStyle": {"file": 0, "memory": 1, "decimal": 2, "binary": 3},
+                 "unitsStyle": {"positional": 0, "abbreviated": 1, "short": 2, "full": 3, "spellOut": 4, "brief": 5},
+                 "roundingMode": {"ceiling": 0, "floor": 1, "down": 2, "up": 3, "halfEven": 4, "halfDown": 5,
+                                  "halfUp": 6},
+                 "paddingPosition": {"beforePrefix": 0, "afterPrefix": 1, "beforeSuffix": 2, "afterSuffix": 3}}
+        for k, v in f.attrib.items():
+            if k in skip:
+                continue
+            if k in enums:
+                if v in enums[k]:
+                    attrs.append((k, a.add(enums[k][v])))
+            elif v in ("YES", "NO"):
+                attrs.append((k, a.add(v == "YES")))
+            elif k in ("minimumIntegerDigits", "maximumIntegerDigits", "minimumFractionDigits",
+                       "maximumFractionDigits", "groupingSize", "secondaryGroupingSize", "formatWidth",
+                       "minimumSignificantDigits", "maximumSignificantDigits", "maximumUnitCount"):
+                attrs.append((k, a.add(int(v))))
+            else:
+                attrs.append((k, a.string(v)))
+        for c in f:
+            k = c.get("key")
+            if not k:
+                continue
+            if c.tag in ("real", "integer", "decimal"):
+                v = c.get("value", "0")
+                if v != "NaN":
+                    attrs.append((k, number(v)))
+            elif c.tag == "string":
+                attrs.append((k, a.string(c.text or c.get("value") or "")))
+            elif c.tag == "attributedString":
+                attrs.append((k, self.attributed_string(c)))
+            elif c.tag == "zeroFormattingBehavior":
+                bits = {"default": 1, "dropLeading": 2, "dropMiddle": 4, "dropTrailing": 8, "dropAll": 14,
+                        "pad": 0x10000}
+                attrs.append((k, a.add(sum(b for n, b in bits.items() if yes(c, n)))))
+            elif c.tag == "calendarUnit":
+                bits = {"era": 2, "year": 4, "month": 8, "day": 16, "hour": 32, "minute": 64, "second": 128,
+                        "weekday": 512, "weekdayOrdinal": 1024, "quarter": 2048, "weekOfMonth": 4096,
+                        "weekOfYear": 8192, "yearForWeekOfYear": 16384, "nanosecond": 32768}
+                attrs.append((k, a.add(sum(b for n, b in bits.items() if yes(c, n)))))
+        custom = f.get("customClass")
+        keys = {"NS.attributes": a.dictionary(attrs)} if attrs else {}
+        if custom and custom != cls:
+            a.fill(uid, a.obj(custom, (cls, "NSFormatter") if cls != "NSFormatter" else ("NSFormatter",), **keys))
+        else:
+            a.fill(uid, a.obj(cls, ("NSFormatter",) if cls != "NSFormatter" else (), **keys))
+        self.connections_of(f, uid)
+        return uid
 
     def frame_keys(self, e, superview):
         r = child(e, "rect", "frame")
@@ -471,6 +634,20 @@ class Compiler:
             a.fill(uid, a.obj(cls, ((base,) if cls != base else ()) + chain, **keys))
         elif tag in ("view", "customView") or tag in VIEW_TAGS or tag.endswith("View"):
             self.view(e, uid, UID(0))
+        elif tag.endswith("Cell") or tag.endswith("Formatter"):
+            # a cell or a formatter on its own: made with its connections
+            self.any_cell(e) if tag.endswith("Cell") else self.formatter(e)
+            self.pairs.append((uid, owner))
+            return
+        elif tag in ("collectionViewItem", "viewController"):
+            base = "NS" + tag[0].upper() + tag[1:]
+            cls = e.get("customClass") or base
+            keys = {}
+            if e.get("nibName"):
+                keys["NSNibName"] = a.string(e.get("nibName"))
+            if e.get("title"):
+                keys["NSTitle"] = a.string(e.get("title"))
+            a.fill(uid, a.obj(cls, ((base,) if cls != base else ()) + supers(base), **keys))
         else:
             cls = e.get("customClass") or "NS" + tag[0].upper() + tag[1:]
             self.note_unknown(tag, "an object made with -init")
@@ -566,6 +743,16 @@ class Compiler:
                     NSWindowView=cuid, NSWTFlags=0x78000000)
         if child(e, "rect", "screenRect") is not None:
             keys["NSScreenRect"] = rect_string(child(e, "rect", "screenRect"))
+            # the screen edges the window keeps its distance from (1.229), in a
+            # key of Ferry's own: 1 left, 2 right, 4 top, 8 bottom; a window
+            # with no position mask stays where the xib puts it
+            pm = child(e, "windowPositionMask", "initialPositionMask")
+            if pm is not None:
+                mask = 0
+                for bit, name in ((1, "leftStrut"), (2, "rightStrut"), (4, "topStrut"), (8, "bottomStrut")):
+                    if yes(pm, name):
+                        mask |= bit
+                keys["FerryWindowPositionMask"] = mask
         for xkey, nkey in (("minSize", "NSMinSize"), ("maxSize", "NSMaxSize"),
                            ("contentMinSize", "NSWindowContentMinSize")):
             v = child(e, "value", xkey)
@@ -783,7 +970,7 @@ class Compiler:
         self.connections_of(c, cell_uid)
         self.runtime_attributes(c, cell_uid)
 
-    def text_cell(self, c, cls):
+    def text_cell(self, c, cls, extra=None):
         a = self.a
         uid = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
         keys = dict(NSContents=a.string(text(c, "title")), NSCellFlags=self.cell_flags(c, text_cell=True),
@@ -795,10 +982,27 @@ class Compiler:
             keys["NSPlaceholderString"] = a.string(c.get("placeholderString"))
         if c.get("tag"):
             keys["NSTag"] = int(c.get("tag"))
+        for f in c:
+            if f.get("key") == "formatter" and f.tag.endswith("Formatter"):
+                keys["NSFormatter"] = self.formatter(f)
+        keys.update(extra or {})
         a.fill(uid, a.obj(c.get("customClass") or cls, (cls,) + supers(cls) if c.get("customClass") else supers(cls),
                           **keys))
         self.cell_common(c, uid)
         return uid
+
+    def any_cell(self, c):
+        """A cell of any kind, by its element (a table column's data cell, a
+        control's cell, one of a matrix's cells, or a cell on its own)."""
+        tag = c.tag
+        if tag == "buttonCell":
+            return self.button_cell(c)
+        if tag == "popUpButtonCell":
+            return self.button_cell(c, "NSPopUpButtonCell", self.popup_keys(c, None))
+        if tag in CELL_BUILDERS:
+            return CELL_BUILDERS[tag](self, c)
+        cls = "NS" + tag[0].upper() + tag[1:]
+        return self.text_cell(c, cls if tag in TEXT_CELLS else "NSActionCell")
 
     def button_cell_keys(self, c, kind):
         a = self.a
@@ -874,6 +1078,10 @@ class Compiler:
         c = child(e, "popUpButtonCell", "cell")
         if c is None:
             return "NSPopUpButton", self.control_keys(e, None)
+        return "NSPopUpButton", self.control_keys(e, self.button_cell(c, "NSPopUpButtonCell", self.popup_keys(c, uid)))
+
+    def popup_keys(self, c, parent):
+        a = self.a
         extra = dict(NSPullDown=yes(c, "pullsDown"), NSUsesItemFromMenu=yes(c, "usesItemFromMenu", True),
                      NSAltersState=yes(c, "altersStateOfSelectedItem", True),
                      NSPreferredEdge={"minX": 0, "minY": 1, "maxX": 2, "maxY": 3}.get(c.get("preferredEdge"), 1),
@@ -883,32 +1091,36 @@ class Compiler:
         if m is not None:
             muid = self.uid_for(m.get("id")) if m.get("id") else a.reserve()
             self.menu(m, muid, None)
-            self.pairs.append((muid, uid))
+            if parent is not None:
+                self.pairs.append((muid, parent))
             extra["NSMenu"] = muid
             self.connections_of(m, muid)
         if c.get("selectedItem"):
             extra["NSMenuItem"] = self.uid_for(c.get("selectedItem"))
-        return "NSPopUpButton", self.control_keys(e, self.button_cell(c, "NSPopUpButtonCell", extra))
+        return extra
+
+    def image_cell(self, c):
+        a = self.a
+        cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+        keys = dict(NSCellFlags=self.cell_flags(c, 0), NSCellFlags2=0,
+                    NSAlign={"center": 0, "top": 1, "topLeft": 2, "topRight": 3, "left": 4, "bottom": 5,
+                             "bottomLeft": 6, "bottomRight": 7, "right": 8}.get(c.get("imageAlignment"), 0),
+                    NSScale={"proportionallyDown": 0, "axesIndependently": 1, "none": 2,
+                             "proportionallyUpOrDown": 3}.get(c.get("imageScaling"), 0),
+                    NSStyle={"none": 0, "photo": 1, "grayBezel": 2, "groove": 3, "button": 4}.get(
+                        c.get("imageFrameStyle"), 0),
+                    NSAnimates=yes(c, "animates"))
+        if c.get("image"):
+            keys["NSContents"] = self.image(c.get("image"))
+        cls = "NSImageCell"
+        a.fill(cell, a.obj(c.get("customClass") or cls, ((cls,) if c.get("customClass") else ()) + supers(cls),
+                           **keys))
+        self.cell_common(c, cell)
+        return cell
 
     def b_imageView(self, e, uid):
-        a = self.a
         c = child(e, "imageCell", "cell")
-        cell = None
-        if c is not None:
-            cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
-            keys = dict(NSCellFlags=self.cell_flags(c, 0), NSCellFlags2=0,
-                        NSAlign={"center": 0, "top": 1, "topLeft": 2, "topRight": 3, "left": 4, "bottom": 5,
-                                 "bottomLeft": 6, "bottomRight": 7, "right": 8}.get(c.get("imageAlignment"), 0),
-                        NSScale={"proportionallyDown": 0, "axesIndependently": 1, "none": 2,
-                                 "proportionallyUpOrDown": 3}.get(c.get("imageScaling"), 0),
-                        NSStyle={"none": 0, "photo": 1, "grayBezel": 2, "groove": 3, "button": 4}.get(
-                            c.get("imageFrameStyle"), 0),
-                        NSAnimates=yes(c, "animates"))
-            if c.get("image"):
-                keys["NSContents"] = self.image(c.get("image"))
-            a.fill(cell, a.obj("NSImageCell", supers("NSImageCell"), **keys))
-            self.cell_common(c, cell)
-        keys = self.control_keys(e, cell)
+        keys = self.control_keys(e, self.image_cell(c) if c is not None else None)
         keys["NSEditable"] = yes(e, "editable")
         return "NSImageView", keys
 
@@ -1084,11 +1296,9 @@ class Compiler:
             hc = child(col, "tableHeaderCell", "headerCell")
             if hc is not None:
                 keys["NSHeaderCell"] = self.text_cell(hc, "NSTableHeaderCell")
-            dc = child(col, "textFieldCell", "dataCell")
-            if dc is not None:
-                keys["NSDataCell"] = self.text_cell(dc, "NSTextFieldCell")
-            elif child(col, "buttonCell", "dataCell") is not None:
-                keys["NSDataCell"] = self.button_cell(child(col, "buttonCell", "dataCell"))
+            dc = [c for c in col if c.get("key") == "dataCell"]
+            if dc:
+                keys["NSDataCell"] = self.any_cell(dc[0])
             rm = child(col, "tableColumnResizingMask", "resizingMask")
             if rm is not None:
                 keys["NSResizingMask"] = (1 if yes(rm, "resizeWithTable") else 0) | (2 if yes(rm, "userResizable") else 0)
@@ -1206,19 +1416,25 @@ class Compiler:
             keys[key] = a.add(a.obj("NSStackViewContainer", (), NSStackViewContainerNonDroppedViews=a.array(views)))
         return "NSStackView", keys
 
-    def b_comboBox(self, e, uid):
+    def combo_cell(self, c):
+        """A combo box's cell, with its list: the items, or a data source."""
         a = self.a
-        cls, keys = self.b_textField(e, uid, "NSComboBox", "comboBoxCell", "NSComboBoxCell")
+        vals = child(c, "objectValues", "objectValues")
+        if vals is None:
+            vals = child(c, "objectValues")
+        items = [a.string(s.text or s.get("value") or "") for s in (vals if vals is not None else [])
+                 if s.tag == "string"]
+        return self.text_cell(c, "NSComboBoxCell", dict(
+            NSPopUpListData=a.array(items), NSUsesDataSource=yes(c, "usesDataSource"),
+            NSCompletes=yes(c, "completes", True), NSVisibleItemCount=int(c.get("numberOfVisibleItems", "5")),
+            NSHasVerticalScroller=yes(c, "hasVerticalScroller", True)))
+
+    def b_comboBox(self, e, uid):
         c = child(e, "comboBoxCell", "cell")
-        if c is not None:
-            vals = child(c, "objectValues", "objectValues")
-            items = [a.string(s.text or s.get("value") or "") for s in (vals if vals is not None else [])
-                     if s.tag == "string"]
-            keys.update(NSPopUpListData=a.array(items), NSUsesDataSource=yes(c, "usesDataSource"),
-                        NSCompletes=yes(c, "completes", True),
-                        NSVisibleItemCount=int(c.get("numberOfVisibleItems", "5")),
-                        NSHasVerticalScroller=yes(c, "hasVerticalScroller", True))
-        return cls, keys
+        keys = self.control_keys(e, self.combo_cell(c) if c is not None else None)
+        if e.get("placeholderString"):
+            keys["NSPlaceholderString"] = self.a.string(e.get("placeholderString"))
+        return "NSComboBox", keys
 
     def b_gridView(self, e, uid):
         """A grid view (freemac 1.225): its rows, its columns and its cells,
@@ -1292,6 +1508,207 @@ class Compiler:
                                    NSIsBordered=yes(e, "bordered", True), NSEnabled=yes(e, "enabled", True))
 
 
+    # -- text views, web views and the other classes the apps' xibs use (freemac 1.229) ------
+
+    def b_textView(self, e, uid):
+        """A text view: its text (a text storage, under its container's
+        layout manager, as a nib keeps it), its sizes and how it grows, and
+        what it lets its user do, in an NSTextViewSharedData (flags, whose
+        bits are Ferry's own, the colours and the find style)."""
+        a = self.a
+        lm_keys = {}
+        ts = child(e, "attributedString", "textStorage")
+        if ts is not None:
+            lm_keys["NSTextStorage"] = self.attributed_string(ts, "NSTextStorage")
+        lm = a.add(a.obj("NSLayoutManager", (), **lm_keys))
+        r = child(e, "rect", "frame")
+        container = a.add(a.obj("NSTextContainer", (), NSLayoutManager=lm,
+                                NSWidth=float(r.get("width", "0")) if r is not None else 0.0, NSTCFlags=1))
+        flags = 0
+        for bit, name, default in TEXT_VIEW_FLAGS:
+            if yes(e, name, default):
+                flags |= 1 << bit
+        shared = dict(NSFlags=flags, NSBackgroundColor=self.color(child(e, "color", "backgroundColor")),
+                      NSInsertionColor=self.color(child(e, "color", "insertionPointColor")),
+                      NSTextColor=self.color(child(e, "color", "textColor")),
+                      NSFindStyle={"panel": 1, "bar": 2}.get(e.get("findStyle"), 0))
+        if child(e, "font", "font") is not None:
+            shared["NSFont"] = self.font(child(e, "font", "font"))
+        keys = dict(NSTextContainer=container, NSSharedData=a.add(a.obj("NSTextViewSharedData", (), **shared)),
+                    NSTVFlags=(1 if yes(e, "horizontallyResizable") else 0) |
+                    (2 if yes(e, "verticallyResizable") else 0))
+        # "NSMinize" is the key's spelling in nibs
+        for xkey, nkey in (("minSize", "NSMinize"), ("maxSize", "NSMaxSize"),
+                           ("textContainerInset", "NSTextContainerInset")):
+            v = child(e, "size", xkey)
+            if v is not None:
+                keys[nkey] = size_string(v)
+        return "NSTextView", keys
+
+    def b_webView(self, e, uid):
+        """A WebView: its preferences (an identifier, or none for its own)
+        with their font sizes and switches, and its frame and group names."""
+        a = self.a
+        keys = dict(UseBackForwardList=yes(e, "maintainsBackForwardList", True))
+        for xkey, nkey in (("frameName", "FrameName"), ("groupName", "GroupName"),
+                           ("applicationNameForUserAgent", "ApplicationName")):
+            if e.get(xkey):
+                keys[nkey] = a.string(e.get(xkey))
+        p = child(e, "webPreferences", "preferences")
+        if p is not None:
+            pk = {}
+            if text(p, "identifier", None):
+                pk["Identifier"] = a.string(text(p, "identifier"))
+            for k, v in p.attrib.items():
+                if k in ("key", "id", "identifier"):
+                    continue
+                if v in ("YES", "NO"):
+                    pk[k] = v == "YES"
+                elif k.endswith("Size"):
+                    pk[k] = int(float(v))
+                else:
+                    pk[k] = a.string(v)
+            keys["WebPreferences"] = a.add(a.obj("WebPreferences", (), **pk))
+        return "WebView", keys
+
+    def path_cell(self, c):
+        a = self.a
+        extra = dict(NSPathStyle={"standard": 0, "navigationBar": 1, "popUp": 2}.get(c.get("pathStyle"), 0))
+        u = self.url(child(c, "url", "url"))
+        if u is not None:
+            extra["NSContents"] = u
+        types = child(c, "allowedTypes")
+        if types is not None:
+            extra["NSAllowedTypes"] = a.array([a.string(s.text or "") for s in types if s.tag == "string"])
+        if child(c, "color", "backgroundColor") is not None:
+            extra["NSBackgroundColor"] = self.color(child(c, "color", "backgroundColor"))
+        return self.text_cell(c, "NSPathCell", extra)
+
+    def b_pathControl(self, e, uid):
+        c = child(e, "pathCell", "cell")
+        keys = self.control_keys(e, self.path_cell(c) if c is not None else None)
+        if c is not None:
+            keys["NSEditable"] = yes(c, "editable")
+        return "NSPathControl", keys
+
+    def level_cell(self, c):
+        return self.text_cell(c, "NSLevelIndicatorCell", dict(
+            NSMinValue=float(c.get("minValue", "0")), NSMaxValue=float(c.get("maxValue", "2")),
+            NSWarningValue=float(c.get("warningValue", "0")), NSCriticalValue=float(c.get("criticalValue", "0")),
+            NSValue=float(c.get("doubleValue", c.get("minValue", "0"))),
+            NSIndicatorStyle={"relevancy": 0, "continuousCapacity": 1, "discreteCapacity": 2, "rating": 3}.get(
+                c.get("levelIndicatorStyle"), 0),
+            NSNumberOfTickMarks=int(c.get("numberOfTickMarks", "0")),
+            NSNumberOfMajorTickMarks=int(c.get("numberOfMajorTickMarks", "0")),
+            NSTickMarkPosition={"below": 0, "above": 1, "leading": 1, "trailing": 0}.get(
+                c.get("tickMarkPosition"), 0)))
+
+    def b_levelIndicator(self, e, uid):
+        c = child(e, "levelIndicatorCell", "cell")
+        return "NSLevelIndicator", self.control_keys(e, self.level_cell(c) if c is not None else None)
+
+    def date_picker_cell(self, c):
+        extra = dict(NSDatePickerType={"textFieldAndStepper": 0, "clockAndCalendar": 1, "textField": 2}.get(
+                         c.get("datePickerStyle"), 0),
+                     NSDatePickerMode={"single": 0, "range": 1}.get(c.get("datePickerMode"), 0),
+                     NSDrawsBackground=yes(c, "drawsBackground"),
+                     NSBackgroundColor=self.color(child(c, "color", "backgroundColor")),
+                     NSTextColor=self.color(child(c, "color", "textColor")),
+                     NSTimeInterval=float(c.get("timeInterval", "0")))
+        for xkey, nkey in (("date", "NSContents"), ("minDate", "NSMinDate"), ("maxDate", "NSMaxDate")):
+            d = self.date(child(c, "date", xkey))
+            if d is not None:
+                extra[nkey] = d
+        el = child(c, "datePickerElements", "datePickerElements")
+        if el is not None:
+            f = 0
+            if yes(el, "year") or yes(el, "month"):
+                f |= 0xc0
+            if yes(el, "day"):
+                f |= 0x20
+            if yes(el, "hour") or yes(el, "minute"):
+                f |= 0x0c
+            if yes(el, "second"):
+                f |= 0x02
+            if yes(el, "timeZone"):
+                f |= 0x10
+            if yes(el, "era"):
+                f |= 0x100
+            extra["NSDatePickerElements"] = f
+        return self.text_cell(c, "NSDatePickerCell", extra)
+
+    def b_datePicker(self, e, uid):
+        c = child(e, "datePickerCell", "cell")
+        return "NSDatePicker", self.control_keys(e, self.date_picker_cell(c) if c is not None else None)
+
+    def b_matrix(self, e, uid):
+        """A matrix: its cells, which the document lists column by column and
+        the nib row by row, its prototype, sizes, mode and colours."""
+        a = self.a
+        cols = []
+        cs = child(e, "cells")
+        for col in (cs if cs is not None else []):
+            if col.tag == "column":
+                cols.append([self.any_cell(c) for c in col if c.tag.endswith("Cell")])
+        rows = max([len(c) for c in cols] or [0])
+        cells = [cols[x][y] for y in range(rows) for x in range(len(cols)) if y < len(cols[x])]
+        keys = dict(NSCells=a.array(cells), NSNumRows=rows, NSNumCols=len(cols),
+                    NSMatrixMode={"radio": 0, "highlight": 1, "list": 2, "track": 3}.get(e.get("mode"), 0),
+                    NSAllowsEmptySelection=yes(e, "allowsEmptySelection", True),
+                    NSSelectionByRect=yes(e, "selectionByRect", True),
+                    NSAutosizesCells=yes(e, "autosizesCells", True),
+                    NSDrawsBackground=yes(e, "drawsBackground"),
+                    NSDrawsCellBackground=yes(e, "drawsCellBackground"),
+                    NSBackgroundColor=self.color(child(e, "color", "backgroundColor")),
+                    NSCellBackgroundColor=self.color(child(e, "color", "cellBackgroundColor")))
+        for xkey, nkey in (("cellSize", "NSCellSize"), ("intercellSpacing", "NSIntercellSpacing")):
+            v = child(e, "size", xkey)
+            if v is not None:
+                keys[nkey] = size_string(v)
+        proto = [c for c in e if c.get("key") == "prototype"]
+        if proto:
+            keys["NSProtoCell"] = self.any_cell(proto[0])
+        if e.get("tag"):
+            keys["NSTag"] = int(e.get("tag"))
+        keys["NSEnabled"] = yes(e, "enabled", True)
+        return "NSMatrix", keys
+
+    def b_collectionView(self, e, uid):
+        a = self.a
+        keys = dict(NSSelectable=yes(e, "selectable"), NSAllowsMultipleSelection=yes(e, "allowsMultipleSelection"),
+                    NSAllowsEmptySelection=yes(e, "allowsEmptySelection", True))
+        colors = [self.color(child(e, "color", k)) for k in ("primaryBackgroundColor", "secondaryBackgroundColor")
+                  if child(e, "color", k) is not None]
+        if colors:
+            keys["NSBackgroundColors"] = a.array(colors)
+        for xkey, nkey in (("maxNumberOfRows", "NSMaxNumberOfGridRows"),
+                           ("maxNumberOfColumns", "NSMaxNumberOfGridColumns")):
+            if e.get(xkey):
+                keys[nkey] = int(e.get(xkey))
+        for xkey, nkey in (("minItemSize", "NSMinGridSize"), ("maxItemSize", "NSMaxGridSize")):
+            v = child(e, "size", xkey)
+            if v is not None:
+                keys[nkey] = size_string(v)
+        return "NSCollectionView", keys
+
+    def b_ruleEditor(self, e, uid):
+        return "NSRuleEditor", dict(
+            NSRowHeight=float(e.get("rowHeight", "25")),
+            NSNestingMode={"single": 0, "list": 1, "compound": 2, "simple": 3}.get(e.get("nestingMode"), 2),
+            NSEditable=yes(e, "editable", True), NSCanRemoveAllRows=yes(e, "canRemoveAllRows"))
+
+    def b_control(self, e, uid):
+        """A plain control (one of the app's own classes, as a rule) with
+        whatever cell it has."""
+        cells = [c for c in e if c.get("key") == "cell"]
+        keys = self.control_keys(e, self.any_cell(cells[0]) if cells else None)
+        return "NSControl", keys
+
+    def b_qcView(self, e, uid):
+        return "QCView", dict(NSEraseColor=self.color(child(e, "color", "eraseColor")),
+                              NSAutostartsRendering=yes(e, "autostartsRendering"))
+
+
 VIEW_TAGS = {
     "textField": Compiler.b_textField, "secureTextField": Compiler.b_secureTextField,
     "searchField": Compiler.b_searchField, "button": Compiler.b_button, "popUpButton": Compiler.b_popUpButton,
@@ -1303,7 +1720,32 @@ VIEW_TAGS = {
     "outlineView": Compiler.b_outlineView, "tableCellView": Compiler.b_tableCellView,
     "splitView": Compiler.b_splitView, "stackView": Compiler.b_stackView, "comboBox": Compiler.b_comboBox,
     "colorWell": Compiler.b_colorWell, "gridView": Compiler.b_gridView, "tokenField": Compiler.b_tokenField,
+    "textView": Compiler.b_textView, "webView": Compiler.b_webView, "pathControl": Compiler.b_pathControl,
+    "levelIndicator": Compiler.b_levelIndicator, "datePicker": Compiler.b_datePicker, "matrix": Compiler.b_matrix,
+    "collectionView": Compiler.b_collectionView, "ruleEditor": Compiler.b_ruleEditor, "control": Compiler.b_control,
+    "qcView": Compiler.b_qcView,
 }
+# A cell's element and what makes it (any_cell); a text cell of another kind is made by text_cell.
+CELL_BUILDERS = {"imageCell": Compiler.image_cell, "comboBoxCell": Compiler.combo_cell,
+                 "pathCell": Compiler.path_cell, "levelIndicatorCell": Compiler.level_cell,
+                 "datePickerCell": Compiler.date_picker_cell,
+                 "textFieldCell": lambda c, e: c.text_cell(e, "NSTextFieldCell"),
+                 "secureTextFieldCell": lambda c, e: c.text_cell(e, "NSSecureTextFieldCell"),
+                 "searchFieldCell": lambda c, e: c.text_cell(e, "NSSearchFieldCell"),
+                 "tokenFieldCell": lambda c, e: c.text_cell(e, "NSTokenFieldCell"),
+                 "tableHeaderCell": lambda c, e: c.text_cell(e, "NSTableHeaderCell")}
+TEXT_CELLS = ("textFieldCell", "actionCell")
+# The flags of a text view's shared data, by bit: the document's name and its default.
+TEXT_VIEW_FLAGS = ((0, "editable", True), (1, "selectable", True), (2, "richText", True),
+                   (3, "importsGraphics", True), (4, "fieldEditor", False), (5, "usesFontPanel", False),
+                   (6, "usesRuler", False), (7, "drawsBackground", True), (8, "allowsUndo", False),
+                   (9, "continuousSpellChecking", False), (10, "smartInsertDelete", False),
+                   (11, "allowsDocumentBackgroundColorChange", False), (12, "rulerVisible", False),
+                   (13, "quoteSubstitution", False), (14, "dashSubstitution", False),
+                   (15, "spellingCorrection", False), (16, "allowsImageEditing", False),
+                   (17, "usesInspectorBar", False), (18, "linkDetection", False), (19, "textReplacement", False),
+                   (20, "dataDetection", False), (21, "grammarChecking", False),
+                   (22, "allowsNonContiguousLayout", False), (23, "incrementalSearching", False))
 # Elements whose Cocoa class isn't "NS" and the element's name.
 COCOA_NAMES = {"webView": "WebView", "wkWebView": "WKWebView", "pdfView": "PDFView", "mtkView": "MTKView",
                "openGLView": "NSOpenGLView", "sceneView": "SCNView", "avPlayerView": "AVPlayerView",

@@ -364,15 +364,20 @@ static NSTextField *label(NSString *s, NSFont *font, CGFloat x, CGFloat y, CGFlo
 - (NSModalResponse)runModal
 {
     [self layout];
+    NSWindow *w = [self window];
+    /* centred a third of the way down the main window, or the screen, and
+     * kept on the screen: a tall alert (ShiftIt's, with its picture) moves
+     * down rather than losing its top (1.229) */
+    NSWindow *over = [NSApp mainWindow];
+    NSRect f = [w frame], screen = [[NSScreen mainScreen] visibleFrame], base = over ? [over frame] : screen;
+    NSPoint at = NSMakePoint(floor(NSMidX(base) - f.size.width / 2),
+                             floor(NSMaxY(base) - (NSMaxY(base) - NSMinY(base)) / 3 - f.size.height / 2));
+    at.x = fmax(NSMinX(screen), fmin(at.x, NSMaxX(screen) - f.size.width));
+    at.y = fmin(fmax(at.y, NSMinY(screen)), NSMaxY(screen) - f.size.height); /* the top wins */
+    [w setFrameOrigin:at];
     NSModalResponse code;
     if (scripted_answer(_buttons, &code))
         return code;
-    NSWindow *w = [self window];
-    /* centred above the main window, or on the screen */
-    NSWindow *over = [NSApp mainWindow];
-    NSRect f = [w frame], base = over ? [over frame] : [[NSScreen mainScreen] visibleFrame];
-    [w setFrameOrigin:NSMakePoint(floor(NSMidX(base) - f.size.width / 2),
-                                  floor(NSMaxY(base) - (NSMaxY(base) - NSMinY(base)) / 3 - f.size.height / 2))];
     [self retain];
     _runningModal = YES;
     code = [NSApp runModalForWindow:w];

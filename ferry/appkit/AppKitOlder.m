@@ -385,6 +385,77 @@ NSAttributedStringDocumentAttributeKey const NSExcludedElementsDocumentAttribute
     return self;
 }
 
+/* From a nib (freemac 1.229, Ferry 0.53.0), as ferry-ibtool writes it: the
+ * cells row by row ("NSCells", "NSNumRows", "NSNumCols"), the prototype,
+ * the cell size and spacing, the mode, the selection switches and colours.
+ * In radio mode the first cell that is on is the selected one. */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [super initWithCoder:coder]))
+        return nil;
+    _cellClass = [NSActionCell class];
+    _cellSize = NSMakeSize(100, 17);
+    _spacing = NSMakeSize(1, 1);
+    _selected = -1;
+    _allowsEmpty = YES;
+    _cells = [[NSMutableArray alloc] init];
+    _buttons = [[NSMutableArray alloc] init];
+    if (![coder allowsKeyedCoding])
+        return self;
+    _mode = (NSMatrixMode)[coder decodeIntegerForKey:@"NSMatrixMode"];
+    if ([coder containsValueForKey:@"NSCellSize"])
+        _cellSize = [coder decodeSizeForKey:@"NSCellSize"];
+    if ([coder containsValueForKey:@"NSIntercellSpacing"])
+        _spacing = [coder decodeSizeForKey:@"NSIntercellSpacing"];
+    if ([coder containsValueForKey:@"NSAllowsEmptySelection"])
+        _allowsEmpty = [coder decodeBoolForKey:@"NSAllowsEmptySelection"];
+    _byRect = [coder decodeBoolForKey:@"NSSelectionByRect"];
+    _autosizes = [coder decodeBoolForKey:@"NSAutosizesCells"];
+    _drawsBackground = [coder decodeBoolForKey:@"NSDrawsBackground"];
+    _drawsCellBackground = [coder decodeBoolForKey:@"NSDrawsCellBackground"];
+    id v = [coder decodeObjectForKey:@"NSBackgroundColor"];
+    if ([v isKindOfClass:[NSColor class]])
+        _background = [v copy];
+    v = [coder decodeObjectForKey:@"NSCellBackgroundColor"];
+    if ([v isKindOfClass:[NSColor class]])
+        _cellBackground = [v copy];
+    v = [coder decodeObjectForKey:@"NSProtoCell"];
+    if ([v isKindOfClass:[NSCell class]]) {
+        _prototype = [v retain];
+        _cellClass = [v class];
+    }
+    NSArray *cells = [coder decodeObjectForKey:@"NSCells"];
+    NSInteger rows = [coder decodeIntegerForKey:@"NSNumRows"], columns = [coder decodeIntegerForKey:@"NSNumCols"];
+    if ([cells isKindOfClass:[NSArray class]] && rows > 0 && columns > 0 &&
+        (NSInteger)[cells count] == rows * columns) {
+        for (NSCell *c in cells) {
+            NSCell *cell = [c isKindOfClass:[NSCell class]] ? c : [self makeCellAtRow:0 column:0];
+            [cell setControlView:self];
+            [_cells addObject:cell];
+        }
+        _rows = rows;
+        _columns = columns;
+    }
+    for (NSInteger i = 0; i < (NSInteger)[_cells count] && _selected < 0; i++)
+        if ([(NSCell *)[_cells objectAtIndex:(NSUInteger)i] state] == NSControlStateValueOn)
+            _selected = i;
+    [self _rebuild];
+    return self;
+}
+
+/* A cell changed by something other than its button (a binding, or the
+ * program): its button shows it again. */
+- (void)updateCell:(NSCell *)cell
+{
+    NSUInteger i = [_cells indexOfObjectIdenticalTo:cell];
+    if (i == NSNotFound || i >= [_buttons count])
+        return;
+    NSButton *b = [_buttons objectAtIndex:i];
+    [b setState:[cell state]];
+    [b setEnabled:[cell isEnabled]];
+    [b setTitle:[cell title] ?: @""];
+}
+
 - (void)dealloc
 {
     [_prototype release];
@@ -685,6 +756,10 @@ static NSUInteger cell_index(NSInteger row, NSInteger column, NSInteger columns)
         [cell setState:[button state]];
         _selected = (NSInteger)i;
     }
+    /* a cell bound to a value (a nib's check box in a matrix) sets it */
+    for (NSCell *c in (_mode == NSRadioModeMatrix ? [[_cells copy] autorelease] : @[ cell ]))
+        ABindingsPush(c, NO);
+    ABindingsPush(self, NO);
     /* a cell with its own action sends it; otherwise the matrix's */
     SEL action = [cell action] ?: [self action];
     id target = [cell action] ? [cell target] : [self target];

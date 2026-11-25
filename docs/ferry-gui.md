@@ -2744,7 +2744,7 @@ rows. Nothing is drawn under the pointer, and drags don't leave the app. (freema
   - FSEvents' latency and coalescing: here events for the same path within the latency become one, with their flags combined. Event ids count from 1 for each program, not across the system. A stream started in the past gets only the history-done event. Renames come as two events with Renamed set, without the Mac's pairing of their ids. `ItemFinderInfoMod`, `ItemChangeOwner` and `ItemXattrMod` are never set (any attribute change sets `ItemInodeMetaMod`).
   - The Quick Look panel's look (here a 520 by 440 utility panel with a 48-point icon, the name and size over the preview), which files it previews as pictures or text (text is the first 64 KB of a file that reads as UTF-8), and that it shows no generator's previews.
   - `NSRuleEditor`'s look (pop-ups, labels and 22-point − and + buttons in rows 25 points high, nested rows indented 16 points) and its animation, which here doesn't happen.
-  - JavaScriptCore's engine and its version are this system's (WebKitGTK's), so messages, `Error` stacks and newer language features follow it. An object wrapped for a script stays alive as long as its context, and a context as long as any of its values. `JSManagedValue` keeps its value. A `BOOL` or `char` a block or method returns reaches the script as a boolean. JavaScript functions aren't turned into blocks.
+  - JavaScriptCore's engine and its version are this system's (WebKitGTK's), so messages, `Error` stacks and newer language features follow it. An object wrapped for a script stays alive as long as its context, and a context as long as any of its values. `JSManagedValue` holds its value weakly, kept alive by managed references and an owner (since 1.229). A `BOOL` or `char` a block or method returns reaches the script as a boolean. Blocks and exported methods reach a script as functions; JavaScript functions aren't turned into blocks, as on a Mac.
 
 - **Linking and running the apps, not compared with a Mac** (freemac 1.223, Ferry 0.47.0).
   - What `ferry-ibtool` makes of a xib: the keys and flags of the nib it writes are Ferry's own, read only by Ferry's AppKit. An element it doesn't know is made as a plain view of its class, with no settings, and outlets to objects it didn't make are left out with a warning. Fonts, colours and images are named as the xib names them, and an asset catalogue's images aren't compiled.
@@ -2828,6 +2828,20 @@ sent `-update` once after each event, as on a Mac, not on every turn of
 the run loop. A pattern colour as a window's background draws its image,
 as Flycut's bezel does, and `.icns` files with only JPEG 2000 pictures are
 read when OpenJPEG is installed.
+
+From freemac 1.229 every element in the apps' xibs is made as its own
+class, with its attributes: text views keep their text, fonts and
+colours, matrices their cells, web views their preferences, and fields
+their formatters. Under X a window is placed as a Mac places it: where
+its xib's initial position puts it on the screen it opens on, centred,
+or cascaded for a document, with a titled window's top kept on the
+screen, and a move the user makes is saved under the window's autosave
+name. Under Wayland the compositor still places windows. A split view
+controller shares out its panes once it is in a window, so MacPass's
+inspector opens at the width of its nib. A block reaches JavaScript as a
+function, and `JSManagedValue` holds its object weakly, so its value is
+nil once the collector has taken the object, unless a managed reference
+or its owner keeps it.
 
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
@@ -2930,3 +2944,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.50.0 (freemac 1.226): Sequel Pro links and runs, with SPMySQL built against MariaDB Connector/C built from its source, and shows its connection window, whose Connect reaches the client library; `NSColorList`, `NSMatrix`, `NSSpellChecker`, `NSPICTImageRep`, the rest of `NSCell`, a window's alpha shown, `NSCalendarDate`, `NSConnection` within one program, CFXML's entities, the DriverServices clock, the older keychain calls, the web view's history, thread cancellation and libbz2 on Mac files; 582 of the apps' 627 files compiling (543 before, counted the same way), `make check` 266/266.
 - 2026-11-25: Ferry 0.51.0 (freemac 1.227): Swift programs run. Swift's runtime and standard library (swift-6.1.3-RELEASE) are built for a Mac by `swift/build-runtime.sh` and served by Ferry. `sdk/ferry-swiftc` builds Swift with the SDK's module map and API notes, with bridging headers and generated `-Swift.h` headers. There are overlays for ObjectiveC, CoreGraphics and Foundation, and a first SwiftUI of Ferry's own, drawn with AppKit (stacks, grids, lists, forms, the controls, state, observable objects, windows, settings, menu bar extras, `NSHostingView` and `NSViewRepresentable`). Objective-C and Swift call each other in one program. TomatoBar, Spaceman, Maccy, Ice and the Swift in Gas Mask and Hex Fiend were surveyed; none links yet. `make check` 270/270, with eight Swift tests that skip without a toolchain.
 - 2026-11-25: Ferry 0.52.0 (freemac 1.228): the seven apps' windows laid out and drawn as on a Mac: a xib's constraints and toolbars in compiled nibs, a window's size giving way to its content's constraints, stack and split views with constraints, `-update` once after each event, pattern backgrounds, the help button, `displayedWhenStopped` read the right way and JPEG 2000 icons through OpenJPEG; MacPass's panes fill its window, MacDown shows its toolbar, KeyCastr its Sparkle window at its content's size and its icon, Flycut its bezel, `make check` 267/267.
+- 2026-11-2X: Ferry 0.53.0 (freemac 1.229): every element in the seven apps' xibs made as its own class, with its attributes (text and web views, matrices, level indicators, date pickers, path controls, collection views, rule editors, Quartz Composer views, formatters, 136 elements in all); windows placed under X as on a Mac, by a xib's initial position, centred or cascaded, with moves saved under the autosave name; MacPass's inspector at the width of its nib; alerts kept on the screen; blocks as JavaScript functions and a weak `JSManagedValue`; `webkit_dom` waits for its title change; `make check` 277/277.

@@ -59,6 +59,9 @@ gboolean g_main_context_iteration(GMainContext *context, gboolean may_block);
 unsigned long g_signal_connect_data(void *instance, const char *signal, GCallback handler, void *data,
                                     void *destroy_data, int flags);
 void g_set_prgname(const char *name);
+/* the name of an object's type ("GdkX11Display"): its type is the first
+ * field of the class its instance's first field points to */
+const char *g_type_name(size_t type);
 void g_set_application_name(const char *name);
 
 /* GTK */
@@ -67,6 +70,10 @@ GtkWidget *gtk_window_new(int type);
 void gtk_window_set_title(GtkWidget *window, const char *title);
 void gtk_window_set_default_size(GtkWidget *window, int width, int height);
 void gtk_window_resize(GtkWidget *window, int width, int height);
+/* Under X11 a program places its own windows (freemac 1.229): the position
+ * of a window's top left corner on the root window, in GTK's units. */
+void gtk_window_move(GtkWidget *window, int x, int y);
+void gtk_window_get_position(GtkWidget *window, int *x, int *y);
 void gtk_window_present(GtkWidget *window);
 void gtk_window_set_resizable(GtkWidget *window, gboolean resizable);
 void gtk_window_set_decorated(GtkWidget *window, gboolean decorated);

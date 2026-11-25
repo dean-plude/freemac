@@ -45,7 +45,7 @@ WEBKIT_EXTERN NSString *const WebPreferencesChangedNotification;
 @property (getter=isJavaEnabled) BOOL javaEnabled;
 @property (getter=isJavaScriptEnabled) BOOL javaScriptEnabled;
 @property BOOL javaScriptCanOpenWindowsAutomatically;
-@property BOOL plugInsEnabled;
+@property (getter=arePlugInsEnabled) BOOL plugInsEnabled;
 @property BOOL allowsAnimatedImages;
 @property BOOL allowsAnimatedImageLooping;
 @property BOOL loadsImagesAutomatically;

@@ -151,6 +151,15 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         if (_window) {
             if (_autosaveName)
                 [_window setFrameAutosaveName:_autosaveName];
+            /* a document's windows cascade, each below and right of the
+             * last, unless the window has a frame saved under its name
+             * (1.229) */
+            static NSPoint cascade;
+            NSString *saved = [_window frameAutosaveName];
+            if (_cascades && _document &&
+                !([saved length] &&
+                  [[NSUserDefaults standardUserDefaults] stringForKey:[@"NSWindow Frame " stringByAppendingString:saved]]))
+                cascade = [_window cascadeTopLeftFromPoint:cascade];
             [self _showDocumentState];
             [self windowDidLoad];
             if ([_document respondsToSelector:@selector(windowControllerDidLoadNib:)])

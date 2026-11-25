@@ -68,7 +68,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_ibtool)
+        appkit_ibtool|appkit_ibtool_classes)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/ibtool" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -680,10 +680,20 @@ run_one appkit_controls "$here/appkit/controls.m" "$here/appkit/controls.out" -f
 # it makes as a plain view goes to its log.
 rm -rf "$build/ibtool"; mkdir -p "$build/ibtool"
 if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/IBTool.nib" "$here/appkit/ibtool.xib" \
-        2> "$build/ibtool/ibtool.log" && grep -q "<levelIndicator> is made as a plain NSLevelIndicator" "$build/ibtool/ibtool.log"; then
+        2> "$build/ibtool/ibtool.log" && grep -q "<browser> is made as a plain NSBrowser" "$build/ibtool/ibtool.log"; then
     run_one appkit_ibtool "$here/appkit/ibtool.m" "$here/appkit/ibtool.out" -fobjc-arc -framework Cocoa
 else
     echo "FAIL appkit_ibtool (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/ibtool.log"; fail=$((fail + 1))
+fi
+# The classes the seven apps' xibs use that the tool used to make as plain
+# views, each made as its own class with its settings (1.229): the tool
+# says nothing of any of them.
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/Classes.nib" "$here/appkit/ibtool_classes.xib" \
+        2> "$build/ibtool/classes.log" && ! [ -s "$build/ibtool/classes.log" ]; then
+    run_one appkit_ibtool_classes "$here/appkit/ibtool_classes.m" "$here/appkit/ibtool_classes.out" -fobjc-arc \
+        -framework Cocoa -framework WebKit -framework Quartz
+else
+    echo "FAIL appkit_ibtool_classes (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/classes.log"; fail=$((fail + 1))
 fi
 # What MacPass's nibs and HNHUi need (freemac 1.225, Ferry 0.49.0): a window
 # controller naming its nib by overriding -windowNibName, a table of the
@@ -1318,18 +1328,20 @@ if LD_DEBUG=libs env -u DISPLAY -u WAYLAND_DISPLAY "$top/ferry" "$build/webkit_l
 else
     echo "ok   WebKitGTK opened only for web views"; pass=$((pass + 1))
 fi
-# Then on an X display of the tests' own (Xvfb, headless), when WebKitGTK
-# and Xvfb are installed.
+# Then on an X display of the tests' own (Xvfb, headless): the WebKit tests
+# when WebKitGTK is installed, and where windows go under X11.
 webkit_found=
 for d in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib /usr/local/lib; do
     [ -e "$d/libwebkit2gtk-4.1.so.0" ] && webkit_found=1
 done
-if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
+if command -v Xvfb > /dev/null 2>&1; then
     rm -f "$build/xvfb.display"
     Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp 3> "$build/xvfb.display" > "$build/xvfb.log" 2>&1 &
     xvfb_pid=$!
     for i in 1 2 3 4 5 6 7 8 9 10; do [ -s "$build/xvfb.display" ] && break; sleep 0.5; done
     webkit_display=":$(cat "$build/xvfb.display")"
+fi
+if [ -n "$webkit_found" ] && [ -n "${xvfb_pid:-}" ]; then
     run_one webkit_wkwebview "$here/webkit/wkwebview.m" "$here/webkit/wkwebview.out" $webkit_flags
     run_one webkit_ui "$here/webkit/ui.m" "$here/webkit/ui.out" $webkit_flags
     run_one webkit_legacy "$here/webkit/legacy.m" "$here/webkit/legacy.out" $webkit_flags
@@ -1343,9 +1355,45 @@ if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
     else
         echo "ok   webkit_embed with no warnings from GTK"; pass=$((pass + 1))
     fi
-    kill "$xvfb_pid" 2> /dev/null; wait "$xvfb_pid" 2> /dev/null
 else
     echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed, webkit_dom, webkit_frames (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
+fi
+# Where windows go on an X display with no window manager (1.229): the
+# program runs until its windows are up, a picture of the screen is taken
+# (ImageMagick's import), and the colours at a few points go to a file the
+# program prints.
+name=appkit_x11_placement
+if [ -n "${xvfb_pid:-}" ] && command -v import > /dev/null 2>&1 && command -v convert > /dev/null 2>&1; then
+    d="$build/home_$name"; rm -rf "$d"; mkdir -p "$d"
+    if ! python3 -I "$top/sdk/ferry-ibtool" --compile "$d/Placement.nib" "$here/appkit/placement.xib" 2> "$d/ibtool.log"; then
+        echo "FAIL $name (ferry-ibtool)"; sed 's/^/    /' "$d/ibtool.log"; fail=$((fail + 1))
+    elif ! "$top/sdk/ferry-cc" -O1 -o "$build/$name" "$here/appkit/x11_placement.m" -fobjc-arc -framework Cocoa \
+            2> "$build/$name.cc.log"; then
+        echo "FAIL $name (did not compile)"; sed 's/^/    /' "$build/$name.cc.log"; fail=$((fail + 1))
+    else
+        env -u WAYLAND_DISPLAY DISPLAY="$webkit_display" GDK_BACKEND=x11 NO_AT_BRIDGE=1 HOME="$d" \
+            XDG_RUNTIME_DIR="$d" XDG_CONFIG_HOME= FERRY_TEST_DATA="$d" \
+            timeout 60 "$top/ferry" "$build/$name" > "$build/$name.got" 2> "$build/$name.err" &
+        placed_pid=$!
+        for i in $(seq 1 200); do grep -q "^shown" "$build/$name.got" 2> /dev/null && break; sleep 0.1; done
+        import -display "$webkit_display" -window root "$d/screen.png" 2>> "$build/$name.err"
+        for p in "nothing at the top left:5,5" "red:200,674" "blue:640,355" "green:960,900" \
+                 "nothing where green was:60,990" "yellow:1140,120"; do
+            printf '%s: %s\n' "${p%%:*}" "$(convert "$d/screen.png" -format "%[pixel:p{${p#*:}}]" info: 2>&1)"
+        done > "$d/pixels.tmp" && mv "$d/pixels.tmp" "$d/pixels.txt"
+        wait "$placed_pid"; echo "exit=$?" >> "$build/$name.got"
+        if diff -u "$here/appkit/x11_placement.out" "$build/$name.got" > "$build/$name.diff"; then
+            echo "ok   $name"; pass=$((pass + 1))
+        else
+            echo "FAIL $name"; sed 's/^/    /' "$build/$name.diff"; sed 's/^/    stderr: /' "$build/$name.err"
+            fail=$((fail + 1))
+        fi
+    fi
+else
+    echo "skip $name (needs Xvfb and ImageMagick's import and convert)"
+fi
+if [ -n "${xvfb_pid:-}" ]; then
+    kill "$xvfb_pid" 2> /dev/null; wait "$xvfb_pid" 2> /dev/null
 fi
 # JavaScriptCore (freemac 1.222, Ferry 0.46.0): its C API passed to this
 # system's JavaScriptCore (libjavascriptcoregtk-4.1), and the Objective-C

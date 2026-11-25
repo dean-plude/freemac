@@ -9,7 +9,8 @@
  * table in a scroll view with its columns and header, a custom view and an
  * object of the app's own classes given values by the document's runtime
  * attributes, an element ferry-ibtool doesn't know made as a plain view of
- * its class, and a menu with key equivalents, a separator and a submenu. */
+ * its class (a browser since 1.229, a class Ferry hasn't got, so a plain
+ * NSView), and a menu with key equivalents, a separator and a submenu. */
 #import <Cocoa/Cocoa.h>
 
 @interface IBWindow : NSWindow
@@ -136,7 +137,7 @@ int main(void)
         NSStepper *st = owner.stepper;
         printf("stepper: %.0f in %.0f..%.0f by %.0f, in the box %s\n", [st doubleValue], [st minValue], [st maxValue],
                [st increment], yesno([st isDescendantOf:owner.box]));
-        printf("level indicator: %s\n", [[owner.level className] UTF8String]);
+        printf("browser, an element the tool does not know: %s\n", [[owner.level className] UTF8String]);
 
         NSTableView *t = owner.table;
         printf("table: %lu columns, row height %.0f, data source is the owner %s, in a scroll view %s, header %s\n",

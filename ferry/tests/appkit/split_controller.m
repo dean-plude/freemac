@@ -8,7 +8,8 @@
  * divider is dragged, collapsing by code, by toggleSidebar: and
  * toggleInspector: and by dragging (observed on the item), menu
  * validation, child view controllers added and removed the general way,
- * and the errors a Mac documents. */
+ * the errors a Mac documents, and (1.229) an inspector whose content's
+ * constraints need more than its item's minimum, which opens that wide. */
 #import <Cocoa/Cocoa.h>
 
 static NSEvent *mouse(NSEventType type, NSWindow *w, NSView *v, NSPoint p)
@@ -27,6 +28,7 @@ static NSEvent *mouse(NSEventType type, NSWindow *w, NSView *v, NSPoint p)
  * items made in viewDidLoad after super's. */
 @interface DocumentSplit : NSSplitViewController
 @property (strong) Pane *outline, *entries, *inspector;
+@property BOOL opensInspector;
 @end
 @implementation DocumentSplit
 - (instancetype)initWithNibName:(NSNibName)name bundle:(NSBundle *)bundle
@@ -57,7 +59,34 @@ static NSEvent *mouse(NSEventType type, NSWindow *w, NSView *v, NSPoint p)
     [self addSplitViewItem:outline];
     [self addSplitViewItem:entries];
     [self addSplitViewItem:inspector];
-    inspector.collapsed = YES;
+    inspector.collapsed = !self.opensInspector;
+}
+@end
+
+/* As MacPass's inspector nib: a view 278 wide, its content in a scroll view
+ * whose constraints ask for no width. */
+@interface WidePane : Pane
+@end
+@implementation WidePane
+- (void)loadView { [self setView:[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 278, 100)]]; }
+@end
+
+/* As MacPass's inspector: a field held 20 points in from each side and at
+ * least 220 wide, so the pane needs 260. */
+@interface FittedPane : Pane
+@end
+@implementation FittedPane
+- (void)loadView
+{
+    NSView *v = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
+    NSTextField *field = [NSTextField textFieldWithString:@"a password"];
+    [field setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [v addSubview:field];
+    [[field.leadingAnchor constraintEqualToAnchor:v.leadingAnchor constant:20] setActive:YES];
+    [[field.trailingAnchor constraintEqualToAnchor:v.trailingAnchor constant:-20] setActive:YES];
+    [[field.topAnchor constraintEqualToAnchor:v.topAnchor constant:10] setActive:YES];
+    [[field.widthAnchor constraintGreaterThanOrEqualToConstant:220] setActive:YES];
+    [self setView:v];
 }
 @end
 
@@ -205,6 +234,36 @@ int main(void)
         } @catch (NSException *e) {
             printf("an item's view controller changed: %s\n", [[e name] UTF8String]);
         }
+
+        /* an inspector whose content needs more than its minimum (1.229) */
+        DocumentSplit *fitted = [[DocumentSplit alloc] init];
+        fitted.inspector = [[FittedPane alloc] init];
+        NSWindow *fw = [NSWindow windowWithContentViewController:fitted];
+        [fw setContentSize:NSMakeSize(700, 272)];
+        NSSplitViewItem *wide = [fitted splitViewItemForViewController:fitted.inspector];
+        [wide setCollapsed:NO];
+        panes("an inspector needing 260 opened: it is 260, past its minimum of 120", fitted);
+        [fw setContentSize:NSMakeSize(600, 272)];
+        panes("narrower: the content pane gives way, the inspector keeps 260", fitted);
+        CGFloat edge = [[fitted splitView] positionOfDividerAtIndex:1];
+        [fw sendEvent:mouse(NSEventTypeLeftMouseDown, fw, [fitted splitView], NSMakePoint(edge, 50))];
+        [fw sendEvent:mouse(NSEventTypeLeftMouseDragged, fw, [fitted splitView], NSMakePoint(edge + 60, 50))];
+        [fw sendEvent:mouse(NSEventTypeLeftMouseUp, fw, [fitted splitView], NSMakePoint(edge + 60, 50))];
+        panes("its divider dragged 60 points right: held where the content fits", fitted);
+
+        /* MacPass sizes the view to the window's before putting it in: the
+         * panes are shared out only in the window, so the inspector keeps
+         * its nib's 278 rather than being squeezed into the nib's 480 (1.229) */
+        DocumentSplit *mp = [[DocumentSplit alloc] init];
+        mp.inspector = [[WidePane alloc] init];
+        mp.opensInspector = YES;
+        NSWindow *mw = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 700, 272)
+                                                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable
+                                                     backing:NSBackingStoreBuffered
+                                                       defer:NO];
+        [mp view].frame = [[mw contentView] frame];
+        [mw setContentViewController:mp];
+        panes("MacPass's window: the inspector keeps the 278 of its nib, the entries take the rest", mp);
     }
     return 0;
 }

@@ -1,7 +1,9 @@
 /* JavaScriptCore: the C API as MacDown uses it (a script's global read back
  * as JSON) and the Objective-C API as Spectacle uses it (blocks taking
  * rectangles, an object whose JSExport protocol keeps a JavaScript function
- * that Objective-C calls later, and an exception handler), with the values
+ * that Objective-C calls later, and an exception handler), blocks and
+ * exported methods as functions, managed values holding their objects
+ * weakly unless an owner keeps them (1.229), with the values
  * crossing both ways. Run by run.sh both with this system's JavaScriptCore
  * and with none, where the program must stop at its first call. */
 #import <CoreGraphics/CoreGraphics.h>
@@ -76,6 +78,30 @@ static void c_api(void)
     JSGlobalContextRelease(ctx);
 }
 
+/* An object only a managed value holds, made in a frame of its own so no
+ * pointer to it is left behind on this one's stack. */
+__attribute__((noinline)) static JSManagedValue *ManagedObject(JSContext *context, NSString *name, id owner)
+{
+    @autoreleasepool {
+        JSValue *o = [context evaluateScript:[NSString stringWithFormat:@"({name: '%@'})", name]];
+        return owner ? [JSManagedValue managedValueWithValue:o andOwner:owner] : [JSManagedValue managedValueWithValue:o];
+    }
+}
+/* Runs scripts that make garbage, letting the collector run, until the
+ * managed value's object is gone (or a good while has passed). */
+__attribute__((noinline)) static BOOL Collected(JSContext *context, JSManagedValue *m)
+{
+    for (int i = 0; i < 200; i++) {
+        @autoreleasepool {
+            [context evaluateScript:@"(function () { let a = []; for (let i = 0; i < 20000; i++) a.push({i: i}); })()"];
+            JSGarbageCollect(context.JSGlobalContextRef);
+            if (!m.value)
+                return YES;
+        }
+    }
+    return NO;
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -148,6 +174,33 @@ int main(void)
                [[context evaluateScript:@"(function (r) { return r === registry; })"]
                    callWithArguments:@[ registry ]].toString.UTF8String);
         printf("back to ObjC: %s\n", [[context[@"registry"] toObject] isEqual:registry] ? "the same object" : "another");
+
+        /* blocks and exported methods are functions (1.229) */
+        printf("functions: typeof %s, instance of Function %s, call %s, bind %s, apply on a method %s\n",
+               [[context evaluateScript:@"typeof sum"] toString].UTF8String,
+               [[context evaluateScript:@"sum instanceof Function"] toString].UTF8String,
+               [[context evaluateScript:@"sum.call(null, 3, 4)"] toString].UTF8String,
+               [[context evaluateScript:@"sum.bind(null, 5)(6)"] toString].UTF8String,
+               [[context evaluateScript:@"registry.add.apply(registry, [2, 3])"] toString].UTF8String);
+
+        /* a managed value holds its object weakly, and an owner keeps it (1.229) */
+        NSObject *owner = [NSObject new];
+        JSManagedValue *weak = ManagedObject(context, @"held weakly", nil);
+        JSManagedValue *owned = ManagedObject(context, @"owned", owner);
+        JSManagedValue *number = [JSManagedValue managedValueWithValue:[JSValue valueWithInt32:7 inContext:context]];
+        @autoreleasepool { /* the values read here are let go of before collecting */
+            printf("managed: \"%s\" and \"%s\" while their objects live, a number %d\n",
+                   [weak.value[@"name"] toString].UTF8String, [owned.value[@"name"] toString].UTF8String,
+                   [number.value toInt32]);
+        }
+        BOOL gone = Collected(context, weak);
+        @autoreleasepool {
+            printf("after collecting: the weak one %s, the owned one \"%s\", the number %d\n",
+                   gone ? "is gone" : "is still there", [owned.value[@"name"] toString].UTF8String,
+                   [number.value toInt32]);
+        }
+        [context.virtualMachine removeManagedReference:owned withOwner:owner];
+        printf("its owner let go: the owned one %s\n", Collected(context, owned) ? "is gone" : "is still there");
 
         /* exceptions, to the handler */
         [context evaluateScript:@"throw new RangeError('too far')"];

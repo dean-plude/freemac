@@ -13,6 +13,12 @@
 NSNotificationName const NSSplitViewWillResizeSubviewsNotification = @"NSSplitViewWillResizeSubviewsNotification";
 NSNotificationName const NSSplitViewDidResizeSubviewsNotification = @"NSSplitViewDidResizeSubviewsNotification";
 
+/* Told to a split view controller, the delegate, when its split view is
+ * put in a window (NSSplitViewController.m). */
+@interface NSObject (FerrySplitViewWindow)
+- (void)_splitViewDidMoveToWindow:(NSSplitView *)sv;
+@end
+
 @implementation NSSplitView {
     BOOL _vertical, _arrangesAll;
     NSSplitViewDividerStyle _style;
@@ -168,6 +174,13 @@ NSNotificationName const NSSplitViewDidResizeSubviewsNotification = @"NSSplitVie
     if ([_delegate respondsToSelector:sel])
         ((void (*)(id, SEL, id))objc_msgSend)(_delegate, sel, n);
     [[NSNotificationCenter defaultCenter] postNotification:n];
+}
+
+- (void)viewDidMoveToWindow
+{
+    [super viewDidMoveToWindow];
+    if ([self window] && [_delegate respondsToSelector:@selector(_splitViewDidMoveToWindow:)])
+        [_delegate _splitViewDidMoveToWindow:self];
 }
 
 /* Shares the room among the visible subviews in proportion to their sizes now. */

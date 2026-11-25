@@ -15,10 +15,18 @@
  * block's own signature, the protocol's extended method types) and the
  * result back, through NSInvocation.
  *
+ * A block and an exported method reach JavaScript as functions: their
+ * prototype is Function.prototype, so call, apply and bind work on them and
+ * they are instances of Function (freemac 1.229).
+ *
  * Unlike Apple's, an object wrapped for JavaScript stays alive as long as
  * its context does, and a context as long as any of its values does; so a
- * JSValue kept by an object that a context's script can reach keeps both,
- * and JSManagedValue holds its value strongly. Built without ARC. */
+ * JSValue kept by an object that a context's script can reach keeps both.
+ * A JSManagedValue holds a JavaScript object weakly (since 1.229, with the
+ * language's own WeakRef), so its value is nil once the collector has taken
+ * the object; the virtual machine's managed references, and an owner given
+ * when the value is made, keep it alive for as long as their owner is.
+ * Other values it holds as they are. Built without ARC. */
 #import <Foundation/Foundation.h>
 #import <JavaScriptCore/JavaScriptCore.h>
 #include <objc/runtime.h>
@@ -226,6 +234,22 @@ static BOOL IsBoolean(NSNumber *n) { return n == (id)kCFBooleanTrue || n == (id)
 
 static JSValueRef WrapperFor(JSContext *c, id object);
 
+/* A callable object of ours made a function: Function.prototype is its
+ * prototype. */
+static JSObjectRef AsFunction(JSContextRef ctx, JSObjectRef o)
+{
+    JSStringRef fn = JSStringCreateWithUTF8CString("Function"), proto = JSStringCreateWithUTF8CString("prototype");
+    JSValueRef f = JSObjectGetProperty(ctx, JSContextGetGlobalObject(ctx), fn, NULL);
+    if (f && JSValueIsObject(ctx, f)) {
+        JSValueRef p = JSObjectGetProperty(ctx, (JSObjectRef)f, proto, NULL);
+        if (p && JSValueIsObject(ctx, p))
+            JSObjectSetPrototype(ctx, o, p);
+    }
+    JSStringRelease(fn);
+    JSStringRelease(proto);
+    return o;
+}
+
 static JSValueRef ValueFromObject(JSContext *c, id object)
 {
     JSContextRef ctx = c->_ctx;
@@ -275,7 +299,7 @@ static JSValueRef ValueFromObject(JSContext *c, id object)
         return o;
     }
     if ([object isKindOfClass:NSClassFromString(@"NSBlock")])
-        return JSObjectMake(ctx, BlockClass(), [object copy]);
+        return AsFunction(ctx, JSObjectMake(ctx, BlockClass(), [object copy]));
     return WrapperFor(c, object);
 }
 
@@ -766,7 +790,7 @@ static JSValueRef ObjectGet(JSContextRef ctx, JSObjectRef object, JSStringRef na
         b->object = [target retain];
         b->sel = m->sel;
         b->types = m->types ? strdup(m->types) : NULL;
-        r = JSObjectMake(ctx, MethodClass(), b);
+        r = AsFunction(ctx, JSObjectMake(ctx, MethodClass(), b));
     }
     [pool drain];
     return r;
@@ -846,11 +870,41 @@ static JSClassRef MethodClass(void)
         JSContextGroupRelease(_group);
     [super dealloc];
 }
+/* A managed reference keeps a JSManagedValue's value alive while its owner
+ * lives: the owner holds the value strongly, once for each time it was
+ * added. */
+static char managed_key;
 - (void)addManagedReference:(id)object withOwner:(id)owner
 {
+    if (!object || !owner)
+        return;
+    @synchronized(owner) {
+        NSMutableDictionary *held = objc_getAssociatedObject(owner, &managed_key);
+        if (!held) {
+            held = [NSMutableDictionary dictionary];
+            objc_setAssociatedObject(owner, &managed_key, held, OBJC_ASSOCIATION_RETAIN);
+        }
+        NSValue *key = [NSValue valueWithPointer:object];
+        NSMutableArray *refs = held[key];
+        if (!refs)
+            held[key] = refs = [NSMutableArray array];
+        id value = [object isKindOfClass:[JSManagedValue class]] ? [(JSManagedValue *)object value] : object;
+        [refs addObject:value ?: [NSNull null]];
+    }
 }
 - (void)removeManagedReference:(id)object withOwner:(id)owner
 {
+    if (!object || !owner)
+        return;
+    @synchronized(owner) {
+        NSMutableDictionary *held = objc_getAssociatedObject(owner, &managed_key);
+        NSValue *key = [NSValue valueWithPointer:object];
+        NSMutableArray *refs = held[key];
+        if ([refs count])
+            [refs removeLastObject];
+        if (refs && ![refs count])
+            [held removeObjectForKey:key];
+    }
 }
 @end
 
@@ -1463,8 +1517,11 @@ static void Unprotect(JSContext *c, JSValueRef *argv, size_t n)
 
 /* ---- JSManagedValue --------------------------------------------------------------------- */
 
+/* An object is held by a WeakRef the context makes (or strongly, where the
+ * context's JavaScript has none); any other value as it is. */
 @implementation JSManagedValue {
-    JSValue *_value;
+    JSValue *_value;   /* a value that isn't an object */
+    JSValue *_weak;    /* or a WeakRef to the object */
 }
 + (JSManagedValue *)managedValueWithValue:(JSValue *)value
 {
@@ -1472,18 +1529,37 @@ static void Unprotect(JSContext *c, JSValueRef *argv, size_t n)
 }
 + (JSManagedValue *)managedValueWithValue:(JSValue *)value andOwner:(id)owner
 {
-    return [self managedValueWithValue:value];
+    JSManagedValue *m = [self managedValueWithValue:value];
+    [[[value context] virtualMachine] addManagedReference:m withOwner:owner];
+    return m;
 }
 - (instancetype)initWithValue:(JSValue *)value
 {
-    if ((self = [super init]))
+    if (!(self = [super init]))
+        return nil;
+    JSContext *c = [value context];
+    if (c && [value isObject]) {
+        JSValue *make = [c evaluateScript:@"(typeof WeakRef === 'function') ? (function (o) { return new WeakRef(o); })"
+                                          @" : undefined"];
+        JSValue *weak = [make isObject] ? [make callWithArguments:@[ value ]] : nil;
+        if ([weak isObject])
+            _weak = [weak retain];
+    }
+    if (!_weak)
         _value = [value retain];
     return self;
 }
 - (void)dealloc
 {
     [_value release];
+    [_weak release];
     [super dealloc];
 }
-- (JSValue *)value { return [[_value retain] autorelease]; }
+- (JSValue *)value
+{
+    if (!_weak)
+        return [[_value retain] autorelease];
+    JSValue *v = [_weak invokeMethod:@"deref" withArguments:@[]];
+    return v && ![v isUndefined] ? v : nil;
+}
 @end

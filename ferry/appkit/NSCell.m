@@ -31,6 +31,12 @@ static id coder_value(NSCoder *c, NSString *key)
     return [c containsValueForKey:key] ? [c decodeObjectForKey:key] : nil;
 }
 
+/* a matrix shows its cells with buttons of their own: it hears of a change */
+static void cell_changed(NSCell *cell, NSView *view)
+{
+    if ([view respondsToSelector:@selector(updateCell:)])
+        [view performSelector:@selector(updateCell:) withObject:cell];
+}
 @implementation NSCell {
 @protected
     id _value;
@@ -257,7 +263,11 @@ static id coder_value(NSCoder *c, NSString *key)
 - (BOOL)wraps { return _wraps; }
 - (void)setWraps:(BOOL)f { _wraps = f; }
 - (BOOL)isEnabled { return _enabled; }
-- (void)setEnabled:(BOOL)f { _enabled = f; }
+- (void)setEnabled:(BOOL)f
+{
+    _enabled = f;
+    cell_changed(self, _controlView);
+}
 - (BOOL)isEditable { return _editable; }
 - (void)setEditable:(BOOL)f
 {
@@ -278,7 +288,11 @@ static id coder_value(NSCoder *c, NSString *key)
 - (BOOL)isContinuous { return _continuous; }
 - (void)setContinuous:(BOOL)f { _continuous = f; }
 - (NSControlStateValue)state { return _state; }
-- (void)setState:(NSControlStateValue)s { _state = s; }
+- (void)setState:(NSControlStateValue)s
+{
+    _state = s;
+    cell_changed(self, _controlView);
+}
 - (NSInteger)tag { return _tag; }
 - (void)setTag:(NSInteger)t { _tag = t; }
 - (NSControlSize)controlSize { return _controlSize; }

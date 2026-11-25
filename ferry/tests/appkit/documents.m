@@ -540,6 +540,17 @@ static void show_recent(void)
 
     setenv("FERRY_ALERT_ANSWER", "Don't Save", 1);
     printf("FERRY_ALERT_ANSWER \"Don't Save\": %ld\n", (long)[a runModal]);
+    /* a tall alert, as ShiftIt's with its picture, is kept on the screen (1.229) */
+    NSAlert *tall = [NSAlert new];
+    [tall setMessageText:@"Authorization"];
+    [tall addButtonWithTitle:@"OK"];
+    [tall setAccessoryView:[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, 640)]];
+    setenv("FERRY_ALERT_ANSWER", "OK", 1);
+    [tall runModal];
+    NSRect tf = [[tall window] frame], vis = [[NSScreen mainScreen] visibleFrame];
+    printf("a tall alert: %.0f high on a screen %.0f high, its top %s the screen's, its bottom %s\n", tf.size.height,
+           vis.size.height, NSMaxY(tf) <= NSMaxY(vis) ? "within" : "above",
+           NSMinY(tf) >= NSMinY(vis) ? "on the screen" : "below it");
     setenv("FERRY_ALERT_ANSWER", "2", 1);
     printf("NSRunAlertPanel answered \"2\": %ld\n", (long)NSRunAlertPanel(@"Title", @"%@", @"OK", @"No", nil, @"x"));
     setenv("FERRY_ALERT_ANSWER", "1", 1);

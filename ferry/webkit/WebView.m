@@ -102,10 +102,37 @@ static NSDictionary *preference_defaults(void)
     return self;
 }
 
+/* From a nib (freemac 1.229, Ferry 0.53.0): the identifier, and the
+ * settings ferry-ibtool writes under the names they are kept by here. */
 - (instancetype)initWithCoder:(NSCoder *)coder
 {
     NSString *identifier = [coder allowsKeyedCoding] ? [coder decodeObjectForKey:@"Identifier"] : nil;
-    return [self initWithIdentifier:identifier];
+    if (![identifier isKindOfClass:[NSString class]])
+        identifier = nil;
+    if (!(self = [self initWithIdentifier:identifier]) || ![coder allowsKeyedCoding])
+        return self;
+    static NSString *const ints[] = {@"defaultFontSize", @"defaultFixedFontSize", @"minimumFontSize",
+                                     @"minimumLogicalFontSize", nil};
+    static NSString *const bools[] = {@"javaEnabled", @"javaScriptEnabled", @"javaScriptCanOpenWindowsAutomatically",
+                                      @"plugInsEnabled", @"allowsAnimatedImages", @"allowsAnimatedImageLooping",
+                                      @"loadsImagesAutomatically", @"autosaves", @"shouldPrintBackgrounds",
+                                      @"privateBrowsingEnabled", @"userStyleSheetEnabled", @"tabsToLinks",
+                                      @"usesPageCache", nil};
+    static NSString *const strings[] = {@"standardFontFamily", @"fixedFontFamily", @"serifFontFamily",
+                                        @"sansSerifFontFamily", @"cursiveFontFamily", @"fantasyFontFamily",
+                                        @"defaultTextEncodingName", nil};
+    for (int i = 0; ints[i]; i++)
+        if ([coder containsValueForKey:ints[i]])
+            [self _set:@([coder decodeIntegerForKey:ints[i]]) forKey:ints[i]];
+    for (int i = 0; bools[i]; i++)
+        if ([coder containsValueForKey:bools[i]])
+            [self _set:@([coder decodeBoolForKey:bools[i]]) forKey:bools[i]];
+    for (int i = 0; strings[i]; i++) {
+        id v = [coder containsValueForKey:strings[i]] ? [coder decodeObjectForKey:strings[i]] : nil;
+        if ([v isKindOfClass:[NSString class]])
+            [self _set:v forKey:strings[i]];
+    }
+    return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder
@@ -231,7 +258,8 @@ WEB_PREF_BOOL(isJavaEnabled, setJavaEnabled, @"javaEnabled")
 WEB_PREF_BOOL(isJavaScriptEnabled, setJavaScriptEnabled, @"javaScriptEnabled")
 WEB_PREF_BOOL(javaScriptCanOpenWindowsAutomatically, setJavaScriptCanOpenWindowsAutomatically,
               @"javaScriptCanOpenWindowsAutomatically")
-WEB_PREF_BOOL(plugInsEnabled, setPlugInsEnabled, @"plugInsEnabled")
+WEB_PREF_BOOL(arePlugInsEnabled, setPlugInsEnabled, @"plugInsEnabled")
+- (BOOL)plugInsEnabled { return [self arePlugInsEnabled]; }
 WEB_PREF_BOOL(allowsAnimatedImages, setAllowsAnimatedImages, @"allowsAnimatedImages")
 WEB_PREF_BOOL(allowsAnimatedImageLooping, setAllowsAnimatedImageLooping, @"allowsAnimatedImageLooping")
 WEB_PREF_BOOL(loadsImagesAutomatically, setLoadsImagesAutomatically, @"loadsImagesAutomatically")
@@ -1892,10 +1920,29 @@ static WebHistoryItem *item_of(WKBackForwardListItem *wk)
 
 - (instancetype)initWithFrame:(NSRect)frame { return [self initWithFrame:frame frameName:nil groupName:nil]; }
 
+/* From a nib: its preferences, frame and group names and whether it keeps
+ * a back-forward list, as ferry-ibtool writes them (freemac 1.229). */
 - (instancetype)initWithCoder:(NSCoder *)coder
 {
     self = [super initWithCoder:coder];
+    if ([coder allowsKeyedCoding]) {
+        id frame = [coder decodeObjectForKey:@"FrameName"], group = [coder decodeObjectForKey:@"GroupName"];
+        if ([frame isKindOfClass:[NSString class]])
+            _frameName = [frame copy];
+        if ([group isKindOfClass:[NSString class]])
+            _groupName = [group copy];
+    }
     [self _setUp];
+    if ([coder allowsKeyedCoding]) {
+        id prefs = [coder decodeObjectForKey:@"WebPreferences"];
+        if ([prefs isKindOfClass:[WebPreferences class]])
+            [self setPreferences:prefs];
+        if ([coder containsValueForKey:@"UseBackForwardList"])
+            [self setMaintainsBackForwardList:[coder decodeBoolForKey:@"UseBackForwardList"]];
+        id name = [coder decodeObjectForKey:@"ApplicationName"];
+        if ([name isKindOfClass:[NSString class]])
+            [self setApplicationNameForUserAgent:name];
+    }
     return self;
 }
 
