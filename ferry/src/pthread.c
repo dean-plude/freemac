@@ -722,7 +722,7 @@ static int mac_pthread_cond_destroy(struct mac_cond *c)
     return 0;
 }
 
-/* Waits on a condition are cancellation points, as on a Mac (freemac 1.NEXT,
+/* Waits on a condition are cancellation points, as on a Mac (freemac 1.235,
  * VLC): VLC ends its decoder and output threads with pthread_cancel while
  * they wait. A thread of the program's own whose cancellation is enabled
  * waits in tenths of a second, and between them leaves as a cancelled

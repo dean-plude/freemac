@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry test (freemac 1.NEXT): what VLC's core needs of threads and the main
+ * Ferry test (freemac 1.235): what VLC's core needs of threads and the main
  * run loop. Waiting on a condition is a cancellation point, as POSIX says, so
  * pthread_cancel ends a thread waiting there (VLC stops its decoder threads
  * that way), with the mutex held again for the cleanup handlers. On the main
  * thread CFRunLoopRun waits for work from the main queue until CFRunLoopStop,
  * as VLC's main does, while CFRunLoopRunInMode still finishes at once with
- * nothing to do. And nil is a null pointer in C too, through CoreServices
- * (VLC's sound out uses it so). A cancellable wait comes back now and then
- * to look at its condition again, as POSIX lets a wait do, so a wake taken
- * at the end of one of its slices isn't lost: threads handing work to each
- * other through a condition, as FFmpeg's decoding threads do, never hang. */
+ * nothing to do. Since freemac 1.NEXT: nil is a null pointer in C too,
+ * through CoreServices (VLC's sound out uses it so), and a cancellable wait
+ * comes back now and then to look at its condition again, as POSIX lets a
+ * wait do, so a wake taken at the end of one of its slices isn't lost:
+ * threads handing work to each other through a condition, as FFmpeg's
+ * decoding threads do, never hang. */
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
 #include <dispatch/dispatch.h>

@@ -1609,7 +1609,7 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
     -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices \
     -framework QuartzCore
-# what VLC's core needs (freemac 1.NEXT): condition waits as cancellation
+# what VLC's core needs (freemac 1.235): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
 # Cells of the app's own classes in a nib (freemac 1.NEXT): VLC's sliders,

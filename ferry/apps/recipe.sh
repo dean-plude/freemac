@@ -10,6 +10,10 @@
 #   apps/tomatobar.sh [WORK]    TomatoBar, a SwiftUI menu bar timer
 #   apps/ffmpeg.sh [WORK]       FFmpeg's libraries and tools, for VLC and OBS
 #
+# and the others listed in README.md. The Objective-C apps are built from
+# their Xcode projects by apps/xcode.py (freemac 1.236, Ferry 0.60.0),
+# through xcbuild below.
+#
 # WORK (or FERRY_APPS_WORK; apps/work by default, which git ignores) holds
 # the checkouts in src/ and what is built in build/APP/, with the bundle
 # at build/APP/APP.app. Nothing fetched is kept in freemac's repository:
@@ -34,7 +38,12 @@ die() { echo "${recipe_name:-recipe}: $*" >&2; exit 1; }
 # fetch NAME URL COMMIT: a checkout of URL at COMMIT in $src/NAME. Only that
 # commit is fetched (GitHub serves any commit by its hash).
 fetch() {
-    name=$1 url=$2 commit=$3 dir=$src/$1
+    fetch_into "$src/$1" "$2" "$3"
+}
+
+# fetch_into DIR URL COMMIT: the same, into DIR.
+fetch_into() {
+    name=$(basename "$1") url=$2 commit=$3 dir=$1
     if [ -d "$dir/.git" ] && [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" = "$commit" ] &&
        [ -z "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
         return 0
@@ -73,6 +82,74 @@ fetch_release() {
     mv "$1" "$src/$name"
     rmdir "$src/$name.unpack"
     touch "$src/$name/.release-$sum"
+}
+
+# submodule SUPER PATH URL: the submodule at PATH of the checkout
+# $src/SUPER, fetched from URL at the commit that SUPER's own commit pins
+# for it, so it is pinned by SUPER's hash.
+submodule() {
+    sm_commit=$(git -C "$src/$1" ls-tree HEAD "$2" | awk '$2 == "commit" { print $3 }')
+    [ -n "$sm_commit" ] || die "$1 has no submodule at $2"
+    fetch_into "$src/$1/$2" "$3" "$sm_commit"
+}
+
+# xcbuild PROJECT.xcodeproj TARGET [xcode.py options]: one target of an
+# Xcode project built into $build by apps/xcode.py, with Ferry's SDK; a
+# framework lands at $build/NAME.framework, where the targets after it
+# find it, an app at $build/NAME.app.
+xcbuild() {
+    xc_proj=$1 xc_target=$2
+    shift 2
+    say "building $xc_target"
+    python3 -I "$top/apps/xcode.py" build "$xc_proj" "$xc_target" "$build" --jobs "${FERRY_APPS_JOBS:-2}" "$@" ||
+        die "$xc_target didn't build"
+}
+
+# embed APP FRAMEWORK...: frameworks built in $build copied into the app's
+# Contents/Frameworks, as Xcode's Embed Frameworks phase does.
+embed() {
+    em_app=$1
+    shift
+    mkdir -p "$em_app/Contents/Frameworks"
+    for em_fw in "$@"; do
+        rm -rf "$em_app/Contents/Frameworks/$(basename "$em_fw")"
+        cp -R "$em_fw" "$em_app/Contents/Frameworks/"
+    done
+}
+
+# sparkle1 COMMIT VERSION: Sparkle 1.x, the updater most of the apps bring
+# (github.com/sparkle-project/Sparkle, MIT), built as $build/Sparkle.framework
+# with its ed25519 code (its submodule) compiled in. Its binary-delta
+# code needs xar, which this system lacks, so apps/sparkle-nodelta.m stands
+# in for it and a delta update falls back to the full one, as Sparkle
+# does whenever a delta can't be applied.
+sparkle1() {
+    fetch "Sparkle-$2" https://github.com/sparkle-project/Sparkle "$1"
+    submodule "Sparkle-$2" Vendor/ed25519 https://github.com/orlp/ed25519
+    sp=$src/Sparkle-$2
+    sp_add=
+    for sp_c in "$sp"/Vendor/ed25519/src/*.c; do sp_add="$sp_add --add $sp_c"; done
+    # shellcheck disable=SC2086
+    xcbuild "$sp/Sparkle.xcodeproj" Sparkle \
+        --cflags "-fobjc-arc -I $sp/Vendor/ed25519/src -DBUILDING_SPARKLE=1 -DMARKETING_VERSION=\\\"$2\\\"
+                  -DSPARKLE_NORMALIZE_INSTALLED_APPLICATION_NAME=0 -DSPARKLE_AUTOMATED_DOWNGRADES=0
+                  -DSPARKLE_APPEND_VERSION_NUMBER=1 -DSPARKLE_BUNDLE_IDENTIFIER=\\\"org.sparkle-project.Sparkle\\\"
+                  -DSPARKLE_RELAUNCH_TOOL_NAME=\\\"Autoupdate\\\" -DSPARKLE_FILEOP_TOOL_NAME=\\\"fileop\\\"" \
+        --skip SUBinaryDeltaApply.m --skip SUBinaryDeltaCommon.m --add "$top/apps/sparkle-nodelta.m" $sp_add \
+        --info "CFBundleShortVersionString=$2" \
+        --ldflags '-framework Cocoa -framework Security -framework SystemConfiguration -framework WebKit
+                   -framework IOKit -lz -lbz2'
+}
+
+# sparkle2 DIR: Sparkle 2's framework from its checkout in DIR, built as
+# $build/Sparkle.framework with its ed25519 library compiled in. Its
+# helper services (XPC services, Autoupdate) aren't built: Ferry's
+# NSXPCConnection never connects, so Sparkle reports each call to them
+# failed, as on a Mac without them.
+sparkle2() {
+    xcbuild "$1/Sparkle.xcodeproj" Sparkle --with ed25519 \
+        --ldflags '-framework Cocoa -framework Security -framework SystemConfiguration -framework WebKit
+                   -framework IOKit -lz -lbz2'
 }
 
 # need_swift: the toolchain and Ferry's Swift runtime, and Ferry's Swift

@@ -5,6 +5,7 @@
  * cell naming its row, column, content view and the cell it was merged
  * into, if any. */
 #import "AInternal.h"
+#include <objc/runtime.h>
 #import <AppKit/NSGridView.h>
 
 const CGFloat NSGridViewSizeForContent = 1.0e6;
@@ -637,6 +638,8 @@ static NSGridCellPlacement resolved(NSGridCellPlacement a, NSGridCellPlacement b
 {
     return a != NSGridCellPlacementInherited ? a : b != NSGridCellPlacementInherited ? b : c;
 }
+static char grid_hid_key;   /* a view the grid hid for its hidden row or column */
+
 /* where a view of a length goes in a span */
 static void place(NSGridCellPlacement p, CGFloat start, CGFloat span, CGFloat length, CGFloat *outStart,
                   CGFloat *outLength)
@@ -698,9 +701,18 @@ static void place(NSGridCellPlacement p, CGFloat start, CGFloat span, CGFloat le
             NSView *v = cell->_content;
             if (!v || cell->_head)
                 continue;
+            /* a hidden row or column hides its views; one the app hid
+             * itself stays hidden when its row shows again (freemac
+             * 1.236: Itsycal's agenda hides its video button this way) */
             BOOL hidden = row->_hidden || col->_hidden;
-            if ([v isHidden] != hidden)
-                [v setHidden:hidden];
+            BOOL ours = objc_getAssociatedObject(v, &grid_hid_key) != nil;
+            if (hidden && ![v isHidden]) {
+                [v setHidden:YES];
+                objc_setAssociatedObject(v, &grid_hid_key, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            } else if (!hidden && ours) {
+                objc_setAssociatedObject(v, &grid_hid_key, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                [v setHidden:NO];
+            }
             if (hidden)
                 continue;
             /* the cells merged into this one widen and heighten it */

@@ -45,7 +45,7 @@ Test: `tests/libsystem_vlc.c`.
 With these, libvlccore, libvlc, the `vlc-osx` program and 249 of VLC's
 plugins build.
 
-## VLC's Mac interface (freemac 1.NEXT, Ferry 0.NEXT)
+## VLC's Mac interface (freemac 1.233, Ferry 0.57)
 
 What VLC's Cocoa interface (`modules/gui/macosx`) calls besides, written
 from Apple's public documentation:
@@ -78,7 +78,7 @@ from Apple's public documentation:
 
 Test: `tests/appkit/vlc.m`.
 
-## Playing a video without the window (freemac 1.NEXT, Ferry 0.NEXT)
+## Playing a video without the window (freemac 1.235, Ferry 0.59)
 
 VLC's own `vlc-osx`, with its core, the mp4 demuxer and FFmpeg's H.264
 decoder, now plays a video to its end under Ferry and quits, with no window
@@ -129,12 +129,12 @@ decodes from the file. It needed two things:
 ## VLC's window, with the picture in it (freemac 1.NEXT, Ferry 0.NEXT)
 
 With Ferry's OpenGL, Core Video and CAOpenGLLayer (freemac 1.235), VLC's
-whole Mac interface builds, and `apps/vlc.sh` lays out `WORK/VLC.app` as
-VLC's own `make VLC.app` does. Run as itself, VLC opens its main window,
-with its own control bar, and plays a video in it: the picture through its
-`caopengllayer` video out, the sound through `auhal`, the time and the
-position slider moving, to the end. Its first-run question about album art
-shows as VLC's own dialog. It needed:
+whole Mac interface builds, and `apps/vlc.sh` lays out
+`WORK/build/vlc/VLC.app` as VLC's own `make VLC.app` does. Run as itself,
+VLC opens its main window, with its own control bar, and plays a video in
+it: the picture through its `caopengllayer` video out, the sound through
+`auhal`, the time and the position slider moving, to the end. Its first-run
+question about album art shows as VLC's own dialog. It needed:
 
 - Core Video named at link time too (the interface's display link), and
   `-dead_strip_dylibs`, so a module that doesn't call a framework named for
@@ -155,7 +155,7 @@ shows as VLC's own dialog. It needed:
 check (`tests/appkit/vlc_cells.xib`) cover these. To try it, as a user
 other than root (see above):
 
-    ferry WORK/VLC.app video.mp4
+    ferry WORK/build/vlc/VLC.app video.mp4
 
 ## Still to do
 
