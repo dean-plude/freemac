@@ -2,6 +2,7 @@
  * Colour spaces and colours. Ferry draws everything as sRGB and doesn't do
  * colour management yet: a colour's components are taken as sRGB values
  * whatever the space is called (grey and CMYK are converted simply). */
+#include <pthread.h>
 #import "GInternal.h"
 #include <math.h>
 
@@ -79,18 +80,43 @@ CGColorSpaceRef CGColorSpaceCreateDeviceRGB(void) { return (CGColorSpaceRef)[GSp
 CGColorSpaceRef CGColorSpaceCreateDeviceGray(void) { return (CGColorSpaceRef)[GSpaceGray() retain]; }
 CGColorSpaceRef CGColorSpaceCreateDeviceCMYK(void) { return (CGColorSpaceRef)[GSpaceCMYK() retain]; }
 
-CGColorSpaceRef CGColorSpaceCreateWithName(CFStringRef cfname)
+static GColorSpace *named_space(NSString *name)
 {
-    NSString *name = (NSString *)cfname;
     if ([name isEqual:(id)kCGColorSpaceGenericGray] || [name isEqual:(id)kCGColorSpaceGenericGrayGamma2_2])
-        return (CGColorSpaceRef)make_space(kCGColorSpaceModelMonochrome, 1, name);
+        return make_space(kCGColorSpaceModelMonochrome, 1, name);
     if ([name isEqual:(id)kCGColorSpaceGenericCMYK])
-        return (CGColorSpaceRef)make_space(kCGColorSpaceModelCMYK, 4, name);
+        return make_space(kCGColorSpaceModelCMYK, 4, name);
     if ([name isEqual:(id)kCGColorSpaceSRGB] || [name isEqual:(id)kCGColorSpaceGenericRGB] ||
         [name isEqual:(id)kCGColorSpaceLinearSRGB] || [name isEqual:(id)kCGColorSpaceExtendedSRGB] ||
         [name isEqual:(id)kCGColorSpaceDisplayP3])
-        return (CGColorSpaceRef)make_space(kCGColorSpaceModelRGB, 3, name);
-    return NULL;
+        return make_space(kCGColorSpaceModelRGB, 3, name);
+    return nil;
+}
+
+/* As on a Mac, a named space is made once and kept: each call hands back the
+ * same space, retained, so a program that lets go of its reference while it
+ * still uses the space (Qt's bitmap contexts do) keeps a live one. */
+CGColorSpaceRef CGColorSpaceCreateWithName(CFStringRef cfname)
+{
+    static NSMutableDictionary *kept;
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    NSString *name = (NSString *)cfname;
+    if (![name isKindOfClass:[NSString class]])
+        return NULL;
+    pthread_mutex_lock(&lock);
+    if (!kept)
+        kept = [[NSMutableDictionary alloc] init];
+    GColorSpace *s = [kept objectForKey:name];
+    if (!s) {
+        s = named_space(name);
+        if (s) {
+            [kept setObject:s forKey:name];
+            [s release];
+        }
+    }
+    [s retain];
+    pthread_mutex_unlock(&lock);
+    return (CGColorSpaceRef)s;
 }
 
 /* An ICC profile names its data's colour space at byte 16 ('RGB ', 'GRAY',
@@ -234,6 +260,26 @@ CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef space)
     if (model != kCGColorSpaceModelRGB && model != kCGColorSpaceModelMonochrome)
         return NULL;
     return (CFDataRef)[icc_profile(model == kCGColorSpaceModelMonochrome) copy];
+}
+
+CFPropertyListRef CGColorSpaceCopyPropertyList(CGColorSpaceRef space)
+{
+    if (!space)
+        return NULL;
+    NSString *name = ((GColorSpace *)space)->name;
+    if (name)
+        return (CFPropertyListRef)[name copy];
+    return (CFPropertyListRef)CGColorSpaceCopyICCData(space);
+}
+
+CGColorSpaceRef CGColorSpaceCreateWithPropertyList(CFPropertyListRef plist)
+{
+    id p = (id)plist;
+    if ([p isKindOfClass:[NSString class]])
+        return CGColorSpaceCreateWithName((CFStringRef)p);
+    if ([p isKindOfClass:[NSData class]])
+        return CGColorSpaceCreateWithICCData(p);
+    return NULL;
 }
 
 CGColorSpaceRef CGColorSpaceRetain(CGColorSpaceRef space) { return (CGColorSpaceRef)[OBJ(space) retain]; }

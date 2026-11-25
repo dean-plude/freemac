@@ -1,0 +1,3 @@
+range 3+2, mouse in 1, depth 24 bits, vector 3
+1.414 ok, nil is nullptr
+exit=0

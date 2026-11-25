@@ -622,3 +622,17 @@ NSNotificationName const NSWindowDidEnterFullScreenNotification = @"NSWindowDidE
 NSNotificationName const NSWindowWillExitFullScreenNotification = @"NSWindowWillExitFullScreenNotification";
 NSNotificationName const NSWindowDidExitFullScreenNotification = @"NSWindowDidExitFullScreenNotification";
 NSNotificationName const NSWindowDidChangeScreenProfileNotification = @"NSWindowDidChangeScreenProfileNotification";
+
+/* ---- scroller knobs and the menu bar's height -------------------------------------- */
+
+NSNotificationName const NSPreferredScrollerStyleDidChangeNotification = @"NSPreferredScrollerStyleDidChangeNotification";
+
+@implementation NSMenu (FerryMenuBarHeight)
+- (CGFloat)menuBarHeight {
+    if (self != [NSApp mainMenu]) return 0;
+    NSScreen *screen = [NSScreen mainScreen];
+    if (!screen) return 0;
+    CGFloat h = NSMaxY([screen frame]) - NSMaxY([screen visibleFrame]);
+    return h > 0 ? h : 0;
+}
+@end

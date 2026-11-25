@@ -207,6 +207,17 @@ int main(void)
         printf("image copy %zux%zu in sRGB %d, in grey %d; enter %d return %d\n", CGImageGetWidth(in_srgb),
                CGImageGetHeight(in_srgb), CGImageGetColorSpace(in_srgb) == srgb, in_gray == NULL,
                kEnterCharCode, kReturnCharCode);
+        CFPropertyListRef named = CGColorSpaceCopyPropertyList(srgb), unnamed = CGColorSpaceCopyPropertyList(rgb3);
+        CGColorSpaceRef again = CGColorSpaceCreateWithPropertyList(named);
+        NSMenu *bar = [[[NSMenu alloc] initWithTitle:@"bar"] autorelease];
+        printf("space list %d, device space list %d, back %d; plain menu height %g; knob styles %ld %ld\n",
+               CFGetTypeID(named) == CFStringGetTypeID(), unnamed != NULL,
+               CGColorSpaceGetModel(again) == kCGColorSpaceModelRGB, [bar menuBarHeight],
+               (long)NSScrollerKnobStyleDark, (long)NSScrollerKnobStyleLight);
+        CFRelease(named);
+        if (unnamed)
+            CFRelease(unnamed);
+        CGColorSpaceRelease(again);
         CGImageRelease(in_srgb);
         CGImageRelease(img);
         CGContextRelease(bc);

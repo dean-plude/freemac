@@ -176,6 +176,10 @@ CGColorSpaceRef CGColorSpaceCreateWithICCData(CFTypeRef data);
 CGColorSpaceRef CGColorSpaceCreateICCBased(size_t nComponents, const CGFloat *range, CGDataProviderRef profile,
                                            CGColorSpaceRef alternate);
 CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef space);
+/* A space as a property list, to keep or send: its name when it has one,
+ * otherwise its ICC profile; and back again. */
+CFPropertyListRef CGColorSpaceCopyPropertyList(CGColorSpaceRef space);
+CGColorSpaceRef CGColorSpaceCreateWithPropertyList(CFPropertyListRef plist);
 
 /* ---- fonts as Core Graphics sees them (a font file's data, or a Core Text font's) ---- */
 

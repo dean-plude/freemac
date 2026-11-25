@@ -474,6 +474,8 @@ if [ -s "$top/sdk/lib/libc++.tbd" ] &&
     run_one cxx_thread_local "$here/cxx/thread_local.cpp" "$here/cxx/thread_local.out" -std=c++17 -lc++
     run_one objcxx_mixed "$here/cxx/objcxx_mixed.mm" "$here/cxx/objcxx_mixed.out" -std=c++17 -fobjc-arc \
         -framework Foundation -lc++
+    run_one objcxx_cocoa "$here/cxx/objcxx_cocoa.mm" "$here/cxx/objcxx_cocoa.out" -std=c++17 \
+        -framework Cocoa -lc++
     # Without this system's libc++, a C++ program stops and says what to install.
     FERRY_LIBCXX=/nonexistent/libc++.so.1 "$top/ferry" "$build/cxx_basics" > /dev/null 2> "$build/cxx_missing.err"
     status=$?

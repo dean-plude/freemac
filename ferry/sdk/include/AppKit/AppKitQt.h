@@ -245,4 +245,17 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidChangeScreenProfileNotificatio
 @end
 
 
+/* ---- scroller knobs and the menu bar's height -------------------------------------- */
+
+typedef NS_ENUM(NSInteger, NSScrollerKnobStyle) {
+    NSScrollerKnobStyleDefault = 0, NSScrollerKnobStyleDark = 1, NSScrollerKnobStyleLight = 2,
+};
+APPKIT_EXTERN NSNotificationName const NSPreferredScrollerStyleDidChangeNotification;
+
+@interface NSMenu (FerryMenuBarHeight)
+/* the height of the strip the main menu takes at the top of the screen; 0 for
+ * any other menu */
+@property (readonly) CGFloat menuBarHeight;
+@end
+
 #endif

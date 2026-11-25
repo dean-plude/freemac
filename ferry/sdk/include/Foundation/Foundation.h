@@ -20,6 +20,16 @@
 #include <objc/NSObjCRuntime.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CGGeometry.h>
+/* In C++ every Foundation call has C linkage, as a Mac's FOUNDATION_EXPORT
+ * gives it; the C headers the parts below bring in come first, outside it. */
+#ifdef __cplusplus
+#include <inttypes.h>
+#include <limits.h>
+#include <sys/types.h>
+#include <uuid/uuid.h>
+#include <mach/message.h>
+#endif
+__FERRY_BEGIN
 
 #ifndef NS_FORMAT_FUNCTION
 #define NS_FORMAT_FUNCTION(F, A) __attribute__((format(__NSString__, F, A)))
@@ -3072,4 +3082,5 @@ enum { NSFormattingError = 2048 };
 /* Handoff's user activities, which Qt's Mac plugin answers to. */
 #include <Foundation/NSUserActivity.h>
 
+__FERRY_END
 #endif

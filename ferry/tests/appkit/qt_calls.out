@@ -18,4 +18,5 @@ touches 0, device 0, tablet 0
 tabbing 0 then 2, steps 4x8, modal 0, space is sRGB 1
 placement 11, touch types 3
 image copy 4x4 in sRGB 1, in grey 1; enter 3 return 13
+space list 1, device space list 1, back 1; plain menu height 0; knob styles 1 2
 exit=0

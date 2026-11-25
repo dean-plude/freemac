@@ -6,6 +6,10 @@
  * (freemac 1.226, Ferry 0.50.0; MariaDB Connector/C). */
 #include <sys/select.h>
 __FERRY_BEGIN
+/* the POSIX edition a Mac's libc follows, as its <sys/unistd.h> says */
+#define _POSIX_VERSION 200112L
+#define _POSIX2_VERSION 200112L
+#define _POSIX_THREADS 200112L
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2

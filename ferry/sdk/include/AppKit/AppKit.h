@@ -16,7 +16,12 @@
 #include <ApplicationServices/ApplicationServices.h>
 #import <QuartzCore/QuartzCore.h>
 
+/* In C++ every AppKit call has C linkage, as on a Mac. */
+#ifdef __cplusplus
+#include <sys/types.h>
+#endif
 #define APPKIT_EXTERN extern
+__FERRY_BEGIN
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
 @class NSApplication, NSWindow, NSView, NSEvent, NSColor, NSFont, NSMenu, NSMenuItem, NSScreen;
@@ -4685,4 +4690,5 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 #import <AppKit/AppKitQt.h>
 
+__FERRY_END
 #endif
