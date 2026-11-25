@@ -1863,6 +1863,38 @@ Both apps' Objective-C files import the header their Swift makes
 (`HexFiend_2-Swift.h`, `GasMask-Swift.h`). `ferry-swiftc` can now write
 that header, once the Swift compiles.
 
+### The apps' windows (freemac 1.228, Ferry 0.52.0)
+
+Each app was built again from the same source with this round's
+`ferry-ibtool` and run under X with no desktop, with input from XTest;
+Flycut's shortcut was pressed through a stand-in for freemac's desktop.
+No source file's result changed, and the survey wasn't run again; the
+table under "Sequel Pro" stands.
+
+| App | What was wrong | Why | Now |
+| --- | --- | --- | --- |
+| MacPass | The inspector ran off the window's right edge, the entry list and the outline started part way down, and a group's entry count was missing | `ferry-ibtool` left a xib's constraints out. The split view controller's split view wasn't held to its view when MacPass turned off its autoresizing mask, a pane's minimum thickness wasn't kept, and the solver moved panes the split view had placed | The outline with its counts, the entry list and the inspector with its tabs fill the window, each at least its minimum width. The inspector opens at its 200-point minimum, narrower than its tabs and its password row need, which a Mac would widen it for |
+| MacDown | A grey band across the top of the window, with the editor and preview under it at the xib's frames | `ferry-ibtool` made no toolbar and left the constraints out | The toolbar shows its items with their pictures, and the editor and preview fill the window. The layout pull-down shows no picture: MacDown takes out the empty item that holds it |
+| KeyCastr | Sparkle's window was too tall, with its content at the bottom, and the app's icon was a grey square | Sparkle's prompt is laid out by constraints in a stack view, which `ferry-ibtool` left out, and the window couldn't shrink to them. KeyCastr's `.icns` files hold only JPEG 2000 pictures, which GdkPixbuf doesn't read | The window is 437 by 171 points, the size of its content, with the icon drawn |
+| Spectacle | The accessibility window seemed shorter than its content | Its nib makes it 780 by 360 points, unresizable, with the picture under its buttons reaching past its bottom edge | As on a Mac; nothing changed |
+| ShiftIt | `AUTHORIZATION_INFORMATIVE_TEXT_10_9` shown in place of its text | The "ShiftIt NoX11" target, the one built, copies no `Localizable.strings` | The build script takes it from the ShiftIt target; Ferry's lookup was right |
+| Flycut | Pressing its shortcut under X showed nothing, and the app was killed for its memory | Ferry sent `-update` to the windows on every turn of the run loop. Flycut's bezel sets its background colour in `-update`, which asked for a redraw, so it was updated and drawn again without end, with nothing given back between turns | `-update` goes out once after each event, and the bezel shows its rounded pattern with "Empty" in it. It opens at the top left, where the X server puts it, since Ferry doesn't move windows itself |
+| Sequel Pro | Its spinner stayed in the connection form after "Connection failed!" | `ferry-ibtool` read `displayedWhenStopped` the wrong way round | The spinner shows only while it spins, and the help button is a round "?" |
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| a xib's constraints, hugging and compression resistance, and `translatesAutoresizingMaskIntoConstraints` in compiled nibs | all seven | done |
+| a window's content size held at `NSLayoutPriorityWindowSizeStayPut`, within its content minimum and maximum | KeyCastr (Sparkle), MacPass | done; the window keeps its top left corner |
+| `NSStackView`'s intrinsic size and hugging from its views; views laid out by constraints measured by their fitting size | KeyCastr (Sparkle), MacPass | done |
+| `NSSplitViewController`'s split view held to its view; a pane kept within its item's thickness | MacPass | done |
+| toolbars in xibs: items, images, views, sizes, actions, default items and the delegate | MacDown | done; a toolbar item without an image takes its view's |
+| `-[NSWindow update]` once after each event; `setWindowsNeedUpdate:` | Flycut | done |
+| pattern colours as a window's background | Flycut | done |
+| an image-only button, the round help button, the inline badge, a field's border and bezel turning each other off | Sequel Pro, MacDown, MacPass, Flycut | done |
+| JPEG 2000 pictures in `.icns` files | KeyCastr | done, through this system's OpenJPEG, which is optional |
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1873,7 +1905,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. In 1.226 Sequel Pro became the seventh, with its MySQL framework built against MariaDB Connector/C, built from its source, and the older AppKit, Foundation and keychain names its files stopped at: it shows its connection window, and Connect reaches the client library, which reports that no server answers. Counted over the same clones, 582 of 627 files now compile (543 before), and the table under "Sequel Pro" lists what stops the rest. Gas Mask and Hex Fiend also have Swift in them, which Ferry can't build, so neither can be linked.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. In 1.226 Sequel Pro became the seventh, with its MySQL framework built against MariaDB Connector/C, built from its source, and the older AppKit, Foundation and keychain names its files stopped at: it shows its connection window, and Connect reaches the client library, which reports that no server answers. Counted over the same clones, 582 of 627 files now compile (543 before), and the table under "Sequel Pro" lists what stops the rest. In 1.228 the seven apps' windows were laid out and drawn as on a Mac: the constraints in their xibs reach their nibs, a window's size gives way to them, and MacDown has its toolbar, Flycut its bezel and KeyCastr its icon (see "The apps' windows"). Gas Mask and Hex Fiend also have Swift in them; Ferry builds Swift since 1.227, but neither links yet.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

@@ -2818,6 +2818,17 @@ notification, as on a Mac.
     - `Date`, `URL`, `Data` and `UserDefaults` are the NS classes under Swift's names, so code that needs them to be values (copying, `==`, `Codable`) doesn't compile.
     - There is no Dispatch overlay, so `DispatchQueue` doesn't compile.
 
+From freemac 1.228 the constraints in an app's xibs reach its nibs, and
+a window holds its content's size only at
+`NSLayoutPriorityWindowSizeStayPut`: stronger constraints make it grow or
+shrink, keeping its top left corner, so Sparkle's prompt opens at the
+size of its content, and MacPass's panes fill its window.
+Toolbars in xibs are made, with their items, as MacDown's is. Windows are
+sent `-update` once after each event, as on a Mac, not on every turn of
+the run loop. A pattern colour as a window's background draws its image,
+as Flycut's bezel does, and `.icns` files with only JPEG 2000 pictures are
+read when OpenJPEG is installed.
+
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2918,3 +2929,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.49.0 (freemac 1.225): MacPass links and runs with KissXML, TransformerKit, KeePassKit, HNHUi and Sparkle built from their source, and opens, unlocks and shows a KeePass database; MacDown links and runs with its nine libraries, renders Markdown in its preview and opens its preferences; `ferry-ibtool` reads the older xib format; nib class swappers hand their place over; `NSGridView`, a small Core Image, key-value coding through indexed accessors, `NSURLComponents`, Apple event descriptors, string transforms, full case mapping, `UTType`, Security transforms' encoders, DOM ranges and a frame's JavaScriptCore context; 543 of the apps' 627 files compiling (496 before, counted the same way, with MacPass's dependencies checked out), `make check` 262/262.
 - 2026-11-25: Ferry 0.50.0 (freemac 1.226): Sequel Pro links and runs, with SPMySQL built against MariaDB Connector/C built from its source, and shows its connection window, whose Connect reaches the client library; `NSColorList`, `NSMatrix`, `NSSpellChecker`, `NSPICTImageRep`, the rest of `NSCell`, a window's alpha shown, `NSCalendarDate`, `NSConnection` within one program, CFXML's entities, the DriverServices clock, the older keychain calls, the web view's history, thread cancellation and libbz2 on Mac files; 582 of the apps' 627 files compiling (543 before, counted the same way), `make check` 266/266.
 - 2026-11-25: Ferry 0.51.0 (freemac 1.227): Swift programs run. Swift's runtime and standard library (swift-6.1.3-RELEASE) are built for a Mac by `swift/build-runtime.sh` and served by Ferry. `sdk/ferry-swiftc` builds Swift with the SDK's module map and API notes, with bridging headers and generated `-Swift.h` headers. There are overlays for ObjectiveC, CoreGraphics and Foundation, and a first SwiftUI of Ferry's own, drawn with AppKit (stacks, grids, lists, forms, the controls, state, observable objects, windows, settings, menu bar extras, `NSHostingView` and `NSViewRepresentable`). Objective-C and Swift call each other in one program. TomatoBar, Spaceman, Maccy, Ice and the Swift in Gas Mask and Hex Fiend were surveyed; none links yet. `make check` 270/270, with eight Swift tests that skip without a toolchain.
+- 2026-11-25: Ferry 0.52.0 (freemac 1.228): the seven apps' windows laid out and drawn as on a Mac: a xib's constraints and toolbars in compiled nibs, a window's size giving way to its content's constraints, stack and split views with constraints, `-update` once after each event, pattern backgrounds, the help button, `displayedWhenStopped` read the right way and JPEG 2000 icons through OpenJPEG; MacPass's panes fill its window, MacDown shows its toolbar, KeyCastr its Sparkle window at its content's size and its icon, Flycut its bezel, `make check` 267/267.

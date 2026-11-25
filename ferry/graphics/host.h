@@ -280,6 +280,48 @@ PopplerPage *poppler_document_get_page(PopplerDocument *document, int index);
 void poppler_page_get_size(PopplerPage *page, double *width, double *height);
 void poppler_page_render(PopplerPage *page, cairo_t *cairo);
 
+/* JPEG 2000 pictures, as an .icns file may hold its artwork (CGImage.m),
+ * read by OpenJPEG's published API: a decoder for the JP2 file format, a
+ * stream that reads from memory through three calls back, and the decoded
+ * image's components, one plane of whole numbers each. */
+typedef struct opj_codec opj_codec_t;
+typedef struct opj_stream opj_stream_t;
+typedef struct {
+    uint32_t dx, dy, w, h, x0, y0, prec, bpp, sgnd, resno_decoded, factor;
+    int32_t *data;
+    uint16_t alpha;
+} opj_image_comp_t;
+typedef struct {
+    uint32_t x0, y0, x1, y1, numcomps;
+    int color_space;
+    opj_image_comp_t *comps;
+    unsigned char *icc_profile_buf;
+    uint32_t icc_profile_len;
+} opj_image_t;
+/* opj_dparameters_t, which only OpenJPEG itself fills in and reads: room
+ * for it, larger than it is */
+typedef struct {
+    _Alignas(8) unsigned char room[65536];
+} opj_dparameters_t;
+enum { OPJ_CODEC_J2K = 0, OPJ_CODEC_JP2 = 2 };
+void opj_set_default_decoder_parameters(opj_dparameters_t *parameters);
+/* weakly: NULL when OpenJPEG isn't installed */
+opj_codec_t *opj_create_decompress(int format) __attribute__((weak_import));
+int opj_setup_decoder(opj_codec_t *codec, opj_dparameters_t *parameters);
+int opj_read_header(opj_stream_t *stream, opj_codec_t *codec, opj_image_t **image);
+int opj_set_decoded_resolution_factor(opj_codec_t *codec, uint32_t factor);
+int opj_decode(opj_codec_t *codec, opj_stream_t *stream, opj_image_t *image);
+int opj_end_decompress(opj_codec_t *codec, opj_stream_t *stream);
+void opj_destroy_codec(opj_codec_t *codec);
+void opj_image_destroy(opj_image_t *image);
+opj_stream_t *opj_stream_create(size_t buffer_size, int is_input);
+void opj_stream_set_read_function(opj_stream_t *stream, size_t (*read)(void *buffer, size_t n, void *data));
+void opj_stream_set_skip_function(opj_stream_t *stream, int64_t (*skip)(int64_t n, void *data));
+void opj_stream_set_seek_function(opj_stream_t *stream, int (*seek)(int64_t at, void *data));
+void opj_stream_set_user_data(opj_stream_t *stream, void *data, void (*free_data)(void *data));
+void opj_stream_set_user_data_length(opj_stream_t *stream, uint64_t length);
+void opj_stream_destroy(opj_stream_t *stream);
+
 /* Shadows (CGContext.m): what a call draws is gathered in a group, whose
  * pixels are blurred into the shadow, and inline images in text, which
  * take the room of a shape in Pango's layout (CoreText.m). */

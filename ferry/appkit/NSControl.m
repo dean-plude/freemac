@@ -347,7 +347,7 @@ static Class apps_cell_class(Class control)
     id _image, _alternateImage;
     NSCellImagePosition _imagePosition;
     NSImageScaling _imageScaling;
-    BOOL _imagePositionSet;
+    BOOL _imagePositionSet, _titleSet;
 }
 
 /* An image a button can draw: nibs also hold stand-ins for the system's
@@ -447,6 +447,7 @@ static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]
 - (NSString *)title { return _attributedTitle ? [_attributedTitle string] : _title; }
 - (void)setTitle:(NSString *)t
 {
+    _titleSet = YES;
     [_title release];
     _title = [t ?: @"" copy];
     [_attributedTitle release];
@@ -462,6 +463,7 @@ static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]
 - (NSAttributedString *)attributedTitle { return _attributedTitle ?: AAttributed(_title, [self font], nil); }
 - (void)setAttributedTitle:(NSAttributedString *)t
 {
+    _titleSet = YES;
     [_attributedTitle release];
     _attributedTitle = [t copy];
     [self setNeedsDisplay:YES];
@@ -524,14 +526,17 @@ static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]
     [self setNeedsDisplay:YES];
 }
 /* Unless set, a button with an image and no title shows only the image,
- * and one with both shows the image before the title. */
+ * and one with both shows the image before the title. A button made in
+ * code and given an image but never a title shows only the image too, as
+ * on a Mac: its title is the "Button" placeholder, which -setImage: there
+ * doesn't bring into view (toolbar buttons made this way are images). */
 - (NSCellImagePosition)imagePosition
 {
     if (_imagePositionSet)
         return _imagePosition;
     if (!drawable(_image))
         return NSNoImage;
-    return [[self title] length] ? NSImageLeft : NSImageOnly;
+    return [[self title] length] && _titleSet ? NSImageLeft : NSImageOnly;
 }
 - (void)setImagePosition:(NSCellImagePosition)p
 {
@@ -696,6 +701,10 @@ static BOOL keeps_state(NSButtonType t)
         t = NSMakeSize(t.width + im.width + 4, fmax(t.height, im.height));
     if (!_bordered)
         return NSMakeSize(ceil(t.width) + 4, ceil(t.height) + 2);
+    if (_bezel == NSBezelStyleInline)   /* a small badge, as in a source list */
+        return NSMakeSize(fmax(ceil(t.width) + 12, 18), fmax(ceil(t.height) + 2, 16));
+    if (_bezel == NSBezelStyleHelpButton)
+        return NSMakeSize(25, 25);
     if (pos == NSImageOnly)
         return NSMakeSize(fmax(ceil(t.width) + 16, 32), fmax(32, ceil(t.height) + 10));
     return NSMakeSize(fmax(ceil(t.width) + 28, 60), fmax(32, ceil(t.height) + 10));
@@ -825,6 +834,31 @@ static BOOL keeps_state(NSButtonType t)
         return;
     }
 
+    if (_bezel == NSBezelStyleInline) {
+        /* a pill-shaped badge, filling the frame's height up to a line's */
+        CGFloat h = fmin(b.size.height, 18);
+        NSRect pill = NSMakeRect(b.origin.x, floor(NSMidY(b) - h / 2), b.size.width, h);
+        NSColor *fill = [NSColor colorWithWhite:0 alpha:(_highlighted ? 0.4 : 0.25) * dim];
+        AFillRoundedRect(pill, h / 2, fill, nil);
+        [self _drawContentIn:NSInsetRect(pill, 4, 0) color:[NSColor colorWithWhite:1 alpha:dim]];
+        return;
+    }
+    if (_bezel == NSBezelStyleHelpButton) {
+        /* a round button with a question mark, 21 points across at most */
+        CGFloat d = fmin(fmin(b.size.width, b.size.height) - 2, 21);
+        NSRect circle = NSMakeRect(round(NSMidX(b) - d / 2), round(NSMidY(b) - d / 2), d, d);
+        NSColor *fill = _highlighted ? [NSColor colorWithWhite:0.85 alpha:1] : [NSColor whiteColor];
+        AFillRoundedRect(circle, d / 2, [fill colorWithAlphaComponent:dim], [NSColor colorWithWhite:0 alpha:0.22 * dim]);
+        if (focused)
+            AFillRoundedRect(NSInsetRect(circle, -2.5, -2.5), d / 2 + 2.5, nil, [NSColor keyboardFocusIndicatorColor]);
+        NSAttributedString *q = AAttributed(@"?", [NSFont boldSystemFontOfSize:fmax(d * 0.62, 8)], text);
+        CGFloat a, de;
+        NSSize qs = ALineSize(q, &a, &de);
+        CGFloat baseline = [self isFlipped] ? ceil(NSMidY(circle) + (a + de) / 2 - de)
+                                            : floor(NSMidY(circle) - (a + de) / 2 + de);
+        ADrawLine(q, round(NSMidX(circle) - qs.width / 2), baseline);
+        return;
+    }
     /* a rounded push button, drawn in the middle of a taller frame as a Mac
      * does for the classic 32-point button frame */
     CGFloat h = fmin(b.size.height - 4, 22), inset = b.size.height >= 28 ? 6 : 2;
@@ -976,12 +1010,19 @@ static BOOL keeps_state(NSButtonType t)
 - (void)setBezeled:(BOOL)f
 {
     _bezeled = f;
+    if (f)
+        _bordered = NO;
     [self setNeedsDisplay:YES];
 }
 - (BOOL)isBordered { return _bordered; }
+/* Bordered and bezeled are a field's two kinds of frame: setting either
+ * takes the other away, and a field told it has no border has no frame at
+ * all, as on a Mac (a field made in code is bezeled, and the usual way to
+ * make it a bare label, as Flycut's bezel does, is -setBordered:NO). */
 - (void)setBordered:(BOOL)f
 {
     _bordered = f;
+    _bezeled = NO;
     [self setNeedsDisplay:YES];
 }
 - (NSTextFieldBezelStyle)bezelStyle { return _bezelStyle; }

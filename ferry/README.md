@@ -416,6 +416,20 @@ windows, settings and menu bar extras; and `NSHostingView` and
 on standard output, and `FERRY_SWIFTUI_CLICK` names buttons and menu items
 to press in turn, as the tests do.
 
+From Ferry 0.52.0 (freemac 1.228), `sdk/ferry-ibtool` carries a xib's
+constraints, hugging and compression resistance and its window toolbars
+into the nib. The solver in `appkit/NSLayoutConstraint.m` holds a
+window's content at `NSLayoutPriorityWindowSizeStayPut` and resizes the
+window to stronger constraints, and leaves the panes of a split view and
+the views of a stack view where those put them; the stack view's own
+size and hugging are in `appkit/NSStackView.m`, and the split view
+controller's constraints in `appkit/NSSplitViewController.m`. `-update`
+is sent once after each event (`appkit/NSApplication.m`,
+`appkit/NSWindow.m`), and a pattern background is drawn in
+`appkit/NSWindow.m`. JPEG 2000 pictures in `.icns` files are read in
+`graphics/CGImage.m` by this system's OpenJPEG, an optional library group
+in `src/host.c`. The test is `appkit_polish`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

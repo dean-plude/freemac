@@ -317,6 +317,146 @@ static NSData *icns_largest_png(NSData *data)
     return found;
 }
 
+/* What OpenJPEG decoded, as 8-bit RGBA: one, two (grey and alpha), three or
+ * four planes of the same size, each scaled from its own precision. */
+static GImage *jpeg2000_image(opj_image_t *image)
+{
+    uint32_t nc = image->numcomps;
+    if (nc < 1 || nc > 4)
+        return nil;
+    opj_image_comp_t *c = image->comps;
+    size_t w = c[0].w, h = c[0].h;
+    if (!w || !h || w > 16384 || h > 16384)
+        return nil;
+    for (uint32_t i = 0; i < nc; i++)
+        if (c[i].w != w || c[i].h != h || !c[i].data || c[i].prec < 1 || c[i].prec > 16)
+            return nil;
+    NSMutableData *pixels = [NSMutableData dataWithLength:w * h * 4];
+    uint8_t *p = pixels.mutableBytes;
+    BOOL grey = nc < 3, alpha = nc == 2 || nc == 4;
+    for (size_t i = 0; i < w * h; i++) {
+        uint8_t v[4] = {0, 0, 0, 255};
+        for (uint32_t k = 0; k < nc; k++) {
+            int32_t x = c[k].data[i] + (c[k].sgnd ? 1 << (c[k].prec - 1) : 0);
+            int32_t top = (1 << c[k].prec) - 1;
+            x = x < 0 ? 0 : x > top ? top : x;
+            v[k] = (uint8_t)((x * 255 + top / 2) / top);
+        }
+        if (grey)
+            p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v[0], p[4 * i + 3] = alpha ? v[1] : 255;
+        else
+            memcpy(p + 4 * i, v, 4), p[4 * i + 3] = alpha ? v[3] : 255;
+    }
+    GDataProvider *provider = (GDataProvider *)CGDataProviderCreateWithCFData((CFDataRef)pixels);
+    GImage *im = make_image(w, h, 8, 32, w * 4, GSpaceRGB(), kCGImageAlphaLast, provider);
+    [provider release];
+    return im;
+}
+
+/* The largest JPEG 2000 picture in an .icns file (a JP2 file or a bare
+ * codestream, as the format's larger entries may hold), or nil. Its size
+ * isn't in a header this needs to read, so the longest entry is taken. */
+static NSData *icns_largest_jpeg2000(NSData *data, int *format)
+{
+    const uint8_t *b = data.bytes;
+    size_t n = data.length, at = 8, best = 0;
+    NSData *found = nil;
+    while (at + 8 <= n) {
+        size_t len = ((size_t)b[at + 4] << 24) | ((size_t)b[at + 5] << 16) | ((size_t)b[at + 6] << 8) | b[at + 7];
+        if (len < 8 || len > n - at)
+            break;
+        const uint8_t *d = b + at + 8;
+        size_t dl = len - 8;
+        int f = dl >= 12 && !memcmp(d, "\0\0\0\x0cjP  \r\n\x87\n", 12) ? OPJ_CODEC_JP2
+                : dl >= 4 && !memcmp(d, "\xff\x4f\xff\x51", 4)            ? OPJ_CODEC_J2K
+                                                                          : -1;
+        if (f >= 0 && dl > best) {
+            best = dl;
+            *format = f;
+            found = [NSData dataWithBytes:d length:dl];
+        }
+        at += len;
+    }
+    return found;
+}
+
+/* OpenJPEG reads the picture from memory through these */
+typedef struct {
+    const uint8_t *bytes;
+    size_t length, at;
+} j2k_input;
+static size_t j2k_read(void *buffer, size_t n, void *data)
+{
+    j2k_input *in = data;
+    if (in->at >= in->length)
+        return (size_t)-1;
+    if (n > in->length - in->at)
+        n = in->length - in->at;
+    memcpy(buffer, in->bytes + in->at, n);
+    in->at += n;
+    return n;
+}
+static int64_t j2k_skip(int64_t n, void *data)
+{
+    j2k_input *in = data;
+    if (n < 0 ? (size_t)-n > in->at : (size_t)n > in->length - in->at)
+        return -1;
+    in->at += n;
+    return n;
+}
+static int j2k_seek(int64_t at, void *data)
+{
+    j2k_input *in = data;
+    if (at < 0 || (size_t)at > in->length)
+        return 0;
+    in->at = (size_t)at;
+    return 1;
+}
+
+/* A JPEG 2000 picture as 8-bit RGBA, not premultiplied, by this system's
+ * OpenJPEG, or nil when it isn't installed or can't read the picture. A
+ * picture larger than 512 pixels across is read at a lower resolution, as
+ * the format keeps them, at least 256 across: icons are drawn far smaller
+ * than the 1024 an .icns file's largest entry holds, and the whole of one
+ * takes OpenJPEG most of a second. Grey and RGB pictures, with or without
+ * alpha, are read; any other kind is nil. */
+static GImage *jpeg2000_decode(NSData *data, int format)
+{
+    if (!opj_create_decompress)
+        return nil;
+    opj_dparameters_t *params = calloc(1, sizeof *params);
+    opj_set_default_decoder_parameters(params);
+    opj_codec_t *codec = opj_create_decompress(format);
+    j2k_input in = {data.bytes, data.length, 0};
+    opj_stream_t *stream = opj_stream_create(1 << 16, 1);
+    opj_image_t *image = NULL;
+    GImage *im = nil;
+    if (codec && stream && opj_setup_decoder(codec, params)) {
+        opj_stream_set_read_function(stream, j2k_read);
+        opj_stream_set_skip_function(stream, j2k_skip);
+        opj_stream_set_seek_function(stream, j2k_seek);
+        opj_stream_set_user_data(stream, &in, NULL);
+        opj_stream_set_user_data_length(stream, data.length);
+        if (opj_read_header(stream, codec, &image) && image && image->x1 > image->x0) {
+            uint32_t width = image->x1 - image->x0, factor = 0;
+            while (width >> factor > 512 && width >> (factor + 1) >= 256)
+                factor++;
+            if (factor && !opj_set_decoded_resolution_factor(codec, factor))
+                factor = 0;
+            if (opj_decode(codec, stream, image) && opj_end_decompress(codec, stream))
+                im = jpeg2000_image(image);
+        }
+    }
+    if (image)
+        opj_image_destroy(image);
+    if (stream)
+        opj_stream_destroy(stream);
+    if (codec)
+        opj_destroy_codec(codec);
+    free(params);
+    return im;
+}
+
 static GImage *pixbuf_decode(NSData *data, NSString **type);
 
 /* Any image file this system's GdkPixbuf reads (PNG, JPEG, GIF, TIFF, BMP,
@@ -324,13 +464,19 @@ static GImage *pixbuf_decode(NSData *data, NSString **type);
  * set to the file's kind as a uniform type identifier. GdkPixbuf reads an
  * .icns file only at the sizes it looks for, so an icon it can't read, such
  * as one ferry-actool made from an app's icon set with only small sizes, is
- * read from its largest PNG picture (freemac 1.224, Ferry 0.48.0). */
+ * read from its largest PNG picture (freemac 1.224, Ferry 0.48.0), and one
+ * with only JPEG 2000 pictures, which GdkPixbuf has no reader for, such as
+ * both of KeyCastr's, by OpenJPEG (freemac 1.228, Ferry 0.52.0). */
 GImage *GImageDecode(NSData *data, NSString **type)
 {
     GImage *im = pixbuf_decode(data, type);
     if (!im && data.length >= 8 && !memcmp(data.bytes, "icns", 4)) {
         NSData *png = icns_largest_png(data);
         im = png ? pixbuf_decode(png, NULL) : nil;
+        int format = 0;
+        NSData *j2k = im ? nil : icns_largest_jpeg2000(data, &format);
+        if (j2k)
+            im = jpeg2000_decode(j2k, format);
         if (im && type)
             *type = @"com.apple.icns";
     }

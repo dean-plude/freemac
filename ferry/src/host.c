@@ -24,11 +24,11 @@ const char *const ferry_host_names[] = {
     NULL,
 };
 
-/* Five groups: the drawing libraries Core Graphics and Core Text use, GTK,
- * which AppKit uses for windows, GdkPixbuf and Poppler, which read image
- * and PDF files, and GIO, whose D-Bus calls put menu bar items in the
- * desktop's menu bar and whose content types name the icon for a kind of
- * file. Each is opened the first time one of its calls is looked up. */
+/* Six groups: the drawing libraries Core Graphics and Core Text use, GTK,
+ * which AppKit uses for windows, GdkPixbuf, Poppler and OpenJPEG, which
+ * read image, PDF and JPEG 2000 files, and GIO, whose D-Bus calls put
+ * menu bar items in the desktop's menu bar and whose content types name
+ * the icon for a kind of file. Each is opened the first time one of its calls is looked up. */
 struct group {
     const char *what;
     const char *const *libraries;
@@ -45,11 +45,13 @@ static const char *const window_libraries[] = {"libgtk-3.so.0", "libgdk-3.so.0"}
 static const char *const image_libraries[] = {"libgdk_pixbuf-2.0.so.0"};
 static const char *const pdf_libraries[] = {"libpoppler-glib.so.8"};
 static const char *const gio_libraries[] = {"libgio-2.0.so.0"};
+static const char *const jpeg2000_libraries[] = {"libopenjp2.so.7"};
 static struct group drawing = {"drawing", drawing_libraries, 6, {0}, 0, 0};
 static struct group windows = {"windows", window_libraries, 2, {0}, 0, 0};
 static struct group images = {"reading image files", image_libraries, 1, {0}, 0, 1};
 static struct group pdf = {"reading PDF files", pdf_libraries, 1, {0}, 0, 1};
 static struct group gio = {"menu bar items and file icons", gio_libraries, 1, {0}, 0, 1};
+static struct group jpeg2000 = {"reading JPEG 2000 pictures", jpeg2000_libraries, 1, {0}, 0, 1};
 
 static void open_group(struct group *g)
 {
@@ -72,6 +74,7 @@ void *ferry_host_lookup(const char *name)
         return NULL;
     struct group *g = !strncmp(name, "gdk_pixbuf_", 11)                  ? &images
                       : !strncmp(name, "poppler_", 8)                   ? &pdf
+                      : !strncmp(name, "opj_", 4)                       ? &jpeg2000
                       : !strncmp(name, "g_bus_", 6) || !strncmp(name, "g_dbus_", 7) ||
                               !strncmp(name, "g_content_type_", 15) || !strncmp(name, "g_themed_icon_", 14)
                           ? &gio

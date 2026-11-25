@@ -120,10 +120,10 @@ src/%.o: src/%.c src/ferry.h src/macho.h src/objc/objc-private.h
 # C++ programs (src/cxx.c): this system's libc++, opened when a program links it.
 src/cxx.o src/cxx_unwind.o src/cxx_threads.o src/lookup.o src/loader.o src/objc/exception.o: src/cxx.h
 
-# The Cairo, Pango, HarfBuzz, GTK, GdkPixbuf and Poppler calls Ferry's frameworks may make:
-# exactly the ones graphics/host.h and appkit/gtk.h declare.
+# The Cairo, Pango, HarfBuzz, GTK, GdkPixbuf, Poppler and OpenJPEG calls Ferry's frameworks
+# may make: exactly the ones graphics/host.h and appkit/gtk.h declare.
 src/host_names.h: graphics/host.h appkit/gtk.h webkit/WKHost.h
-	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk|poppler)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
+	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk|poppler|opj)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
 src/host.o: src/host_names.h src/webkit_names.h src/jsc_names.h
 

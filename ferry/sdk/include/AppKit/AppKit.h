@@ -1383,6 +1383,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (id)targetForAction:(SEL)action to:(id)target from:(id)sender;
 - (BOOL)tryToPerform:(SEL)action with:(id)object;
 - (void)updateWindows;
+- (void)setWindowsNeedUpdate:(BOOL)needUpdate;
 - (NSWindow *)windowWithWindowNumber:(NSInteger)number;
 - (BOOL)setActivationPolicy:(NSApplicationActivationPolicy)policy;
 - (NSApplicationActivationPolicy)activationPolicy;

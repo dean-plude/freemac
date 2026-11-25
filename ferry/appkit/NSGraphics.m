@@ -195,12 +195,12 @@ static void hsb_to_rgb(CGFloat h, CGFloat s, CGFloat v, CGFloat *r, CGFloat *g, 
 + (NSColor *)colorWithCalibratedWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithDeviceWhite:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
 + (NSColor *)colorWithGenericGamma22White:(CGFloat)w alpha:(CGFloat)a { return make_color(w, w, w, a, YES); }
-/* Ferry doesn't fill with patterns yet: a pattern colour fills with the
- * image's average colour, and keeps the image for patternImage. */
+/* A pattern colour keeps its image for patternImage. A window's
+ * background tiles it (NSWindow.m); other fills use the image's average
+ * colour. */
 static char pattern_key;
 + (NSColor *)colorWithPatternImage:(NSImage *)image
 {
-    AWarnOnce("filling with a pattern colour (the image's average colour is used instead)");
     CGFloat rgba[4] = {0.9, 0.9, 0.9, 1};
     CGImageRef cg = [image CGImageForProposedRect:NULL context:nil hints:nil];
     if (cg) {

@@ -394,6 +394,7 @@ static void hotkey_pressed(int64_t tag)
                    charactersIgnoringModifiers:chars isARepeat:NO keyCode:(unsigned short)hk->keyCode];
         AGlobalMonitorsDeliver(e);
     }
+    AWindowsNeedUpdate();
 }
 
 static void hotkeys_unavailable(void)
