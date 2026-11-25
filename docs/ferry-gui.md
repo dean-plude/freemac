@@ -2800,6 +2800,24 @@ that fades a window in, as Sequel Pro does, isn't seen before it is
 drawn. Setting a view's frame to the frame it already has posts no frame
 notification, as on a Mac.
 
+- **Swift and SwiftUI, not compared with a Mac** (freemac 1.227, Ferry 0.51.0).
+  - SwiftUI's views are Ferry's AppKit controls:
+    - A `Stepper` is a two-part segmented control (minus and plus) beside its label.
+    - A `Slider` doesn't show its label.
+    - `Image(systemName:)` is a text symbol, where Ferry has one for the name.
+    - A `GroupBox` is a lightly shaded box with its title above.
+    - A `MenuBarExtra` is a status item with a menu. With the window style, its content opens in a window.
+  - Layout:
+    - Sizes follow SwiftUI's rules as Ferry has written them, and a window grows to fit its content.
+    - A `ScrollView` is at most 400 points tall when nothing else sets its height.
+    - Lazy stacks and grids make all their views at once.
+    - Shapes, `GeometryReader`, `overlay`, `offset` and animations aren't there yet.
+  - Accepted but not acted on yet: gestures (`onTapGesture`, `gesture`), `onHover`, `@FocusState` and `focused`, `contentShape`, and the accessibility labels.
+  - Swift code:
+    - `@MainActor`, `async` and `Task` don't compile, because Swift's concurrency library isn't built for Ferry. Ferry's SwiftUI works out its views on the main thread.
+    - `Date`, `URL`, `Data` and `UserDefaults` are the NS classes under Swift's names, so code that needs them to be values (copying, `==`, `Codable`) doesn't compile.
+    - There is no Dispatch overlay, so `DispatchQueue` doesn't compile.
+
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2899,3 +2917,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.48.0 (freemac 1.224): global shortcuts answered (Spectacle's 18 move and size the focused window, Flycut's opens its bezel); `ferry-actool` compiles asset catalogues, so Spectacle's status item shows its picture; KeyCastr links and runs with ShortcutRecorder, Sparkle 2 and its plug-ins; CoreFoundation's notification centers, `NSXPCConnection` that never connects, bookmarks, `renamex_np`, `O_NOFOLLOW_ANY`, tab stops, three- and nine-part images and the rest of what they call; MacDown's hoedown, LibYAML and GBCli built as frameworks; 445 of the apps' 627 files compiling (435 before, counted the same way), `make check` 260/260.
 - 2026-11-25: Ferry 0.49.0 (freemac 1.225): MacPass links and runs with KissXML, TransformerKit, KeePassKit, HNHUi and Sparkle built from their source, and opens, unlocks and shows a KeePass database; MacDown links and runs with its nine libraries, renders Markdown in its preview and opens its preferences; `ferry-ibtool` reads the older xib format; nib class swappers hand their place over; `NSGridView`, a small Core Image, key-value coding through indexed accessors, `NSURLComponents`, Apple event descriptors, string transforms, full case mapping, `UTType`, Security transforms' encoders, DOM ranges and a frame's JavaScriptCore context; 543 of the apps' 627 files compiling (496 before, counted the same way, with MacPass's dependencies checked out), `make check` 262/262.
 - 2026-11-25: Ferry 0.50.0 (freemac 1.226): Sequel Pro links and runs, with SPMySQL built against MariaDB Connector/C built from its source, and shows its connection window, whose Connect reaches the client library; `NSColorList`, `NSMatrix`, `NSSpellChecker`, `NSPICTImageRep`, the rest of `NSCell`, a window's alpha shown, `NSCalendarDate`, `NSConnection` within one program, CFXML's entities, the DriverServices clock, the older keychain calls, the web view's history, thread cancellation and libbz2 on Mac files; 582 of the apps' 627 files compiling (543 before, counted the same way), `make check` 266/266.
+- 2026-11-25: Ferry 0.51.0 (freemac 1.227): Swift programs run. Swift's runtime and standard library (swift-6.1.3-RELEASE) are built for a Mac by `swift/build-runtime.sh` and served by Ferry. `sdk/ferry-swiftc` builds Swift with the SDK's module map and API notes, with bridging headers and generated `-Swift.h` headers. There are overlays for ObjectiveC, CoreGraphics and Foundation, and a first SwiftUI of Ferry's own, drawn with AppKit (stacks, grids, lists, forms, the controls, state, observable objects, windows, settings, menu bar extras, `NSHostingView` and `NSViewRepresentable`). Objective-C and Swift call each other in one program. TomatoBar, Spaceman, Maccy, Ice and the Swift in Gas Mask and Hex Fiend were surveyed; none links yet. `make check` 270/270, with eight Swift tests that skip without a toolchain.

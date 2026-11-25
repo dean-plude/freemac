@@ -30,6 +30,8 @@ ivar _age i at 12
 property side Td,V_side
 property hash TQ,R
 property superclass T#,R
+property description T@"NSString",R,C
+property debugDescription T@"NSString",?,R,C
 side type d
 half: 3 args, returns f, takes f
 instance size Animal 16 Dog 24

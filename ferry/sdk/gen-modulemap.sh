@@ -68,9 +68,15 @@ fi
 if [ -d "$inc/ObjectiveC" ]; then
     echo
     echo "module ObjectiveC [system] {"
+    # each submodule holds the runtime's own header (objc/NSObject.h), so
+    # that a framework header's "#include <objc/NSObject.h>" imports it
+    # rather than copying it: Swift then sees one NSObject, the one its
+    # ObjectiveC overlay extends (freemac 1.227)
     for h in $(cd "$inc/ObjectiveC" && ls *.h | LC_ALL=C sort); do
+        hdr=ObjectiveC/$h
+        [ -f "$inc/objc/$h" ] && hdr=objc/$h
         echo "    module ${h%.h} {"
-        echo "        header \"ObjectiveC/$h\""
+        echo "        header \"$hdr\""
         echo "        export *"
         echo "    }"
     done

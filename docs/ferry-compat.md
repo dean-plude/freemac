@@ -1791,6 +1791,78 @@ no framework of the apps' own built:
   method returns a value. The build compiles it, and it links and runs.
 - **Hex Fiend (23)**: as in 1.225.
 
+### Swift programs and SwiftUI (freemac 1.227, Ferry 0.51.0)
+
+Gas Mask and Hex Fiend have Swift in them, and many newer Mac apps are
+written in Swift with SwiftUI. These are the first steps.
+
+How it fits together:
+
+| Part | Where | What it is |
+| --- | --- | --- |
+| Swift's runtime and standard library | `swift/build-runtime.sh` into `frameworks/swift` | the open-source Swift project's own, at swift-6.1.3-RELEASE, built unchanged for `x86_64-apple-macosx` with `ferry-cc` and a swift.org toolchain for Linux. It is the same kind of library as a Mac's `/usr/lib/swift/libswiftCore.dylib`, with Objective-C interoperability on |
+| Loading it | `src/swiftsupport.c` | `/usr/lib/swift/libswift*.dylib`, or `@rpath/libswift*.dylib` when the app carries no copy, is served from `frameworks/swift` |
+| What Swift's runtime asks of Objective-C | `src/objc/swift.c`, `src/objc/runtime.c` | classes made while the program runs are realized; class lookups go to Swift's hook first; generic classes get their names when asked. The older Swift-class bit is moved to the stable one |
+| The compiler driver | `sdk/ferry-swiftc` | the toolchain's `swift-frontend`, aimed at a Mac, reading the SDK's module map and API notes; `ferry-cc` links |
+| The SDK as Swift reads it | `sdk/include/*.apinotes`, `FERRY_SWIFT_NONNULL` and `FERRY_SWIFT_NULLABLE` | Swift's names for what Swift's own rules name differently, and nullability. Nullability that API notes give a method applies to all its parameters, so a method with a nullable parameter lists them all |
+| The overlays | `swift/overlays`, built by `swift/build-modules.sh` | ObjectiveC, CoreGraphics and Foundation. `String`, `Array`, `Dictionary`, `Set` and numbers bridge both ways. `Date`, `URL`, `Data` and the like are, for now, the NS classes under Swift's names. AppKit has no overlay yet |
+| SwiftUI | `swift/SwiftUI` | Ferry's own, drawn with Ferry's AppKit |
+
+How Ferry's SwiftUI works: each pass works out the views' bodies again
+and turns the result into a tree of plain nodes, each with a path. The
+state behind `@State`, `@StateObject` and the like is kept in a slot for
+that path, and the AppKit views are matched to the nodes by path, so a
+control is kept from one pass to the next and only its title or value
+changes. Layout is SwiftUI's: a parent proposes a size and the child
+answers. Stacks share what is left among the children that can grow.
+Changes are collected and drawn once per pass of the run loop. A window
+grows to fit what it holds.
+
+Programs that run (with the Swift toolchain present, in `make check`, and under X):
+
+| Program | When run |
+| --- | --- |
+| `hello` | the standard library: printing, arrays, sorting, dictionaries |
+| `foundation` | strings, arrays, dictionaries and numbers to and from their NS classes, `NSString`'s methods on Swift strings, a Swift `NSObject` subclass, and Swift strings, ASCII or not, as `NSDictionary` keys |
+| `appkit_window` | an application delegate written in Swift, a window and a button's target and action |
+| `swiftui_counter` | `@State`, `Text`, `Button`, stacks and `Toggle`. Its buttons are pressed in turn and the count changes |
+| `swiftui_app` | an `ObservableObject` model, `List`, `ForEach`, `TextField`, `Picker`, `Settings` and a `MenuBarExtra`. Its window and status menu items are pressed |
+| `swiftui_hosting` | `NSHostingView` in an AppKit program |
+| `swiftui_grid` | `GroupBox`, `LazyVGrid`, a `Stepper` and a `Slider` with label views, a button whose label is several views, `NSLocalizedString`, gestures, `@FocusState`, and an `NSViewRepresentable` whose coordinator counts the passes |
+| `mixed` | an Objective-C program using two Swift classes through the header `ferry-swiftc` wrote, the Swift built as a library beside it |
+
+The apps surveyed (cloned from their public source; SwiftUI names
+counted by one script, and the code was compiled where it could be):
+
+| App | Swift files | SwiftUI names Ferry has | How far it got |
+| --- | --- | --- | --- |
+| TomatoBar | 7 | 40 of 42 (no `GeometryReader`, `overlay`) | compiled with SwiftState built as its own module. Its other packages (LaunchAtLogin, KeyboardShortcuts) and the AVFoundation player were replaced by stand-ins for the test. 94 errors are left, all outside SwiftUI: `DispatchQueue` and `DispatchSource`, `JSONEncoder` and `Codable`, `FileHandle`, `DateComponentsFormatter`, `UNUserNotificationCenter.current()` being optional, and AppKit's Swift names (`NSImage.Name`, `NSFont.Weight`, `NSAttributedString.Key`, `NSStatusItem.variableLength`, `NSRectEdge.minY`, `makeKey()`, the popover's `show`) |
+| Spaceman | 14 | 35 of 39 (no `scaledToFit`, `offset`, `ignoresSafeArea`, `Link`) | not compiled: KeyboardShortcuts, LaunchAtLogin and Sparkle are Swift packages that would have to be built first |
+| Gas Mask (current source) | 23 | 51 of 57 (no `alert`, `Circle`, `onDrop`, `Link`, `NavigationSplitView`, `safeAreaInset`) | not compiled: it imports Combine (3 files), MASShortcut, Sparkle and UniformTypeIdentifiers |
+| Maccy | 120 | 71 of 97 | not tried: `@Observable` and the Observation module, SwiftData, Defaults and seven other packages, animations and shapes |
+| Ice | 116 | 82 of 106 | not tried: Combine in 34 files, shapes and paths, preference keys, ScreenCaptureKit and the private window server calls |
+
+The Swift in the two apps of the nine that have it:
+
+- **Hex Fiend** (4 files in the app, Cocoa and Foundation only):
+  compiled with its bridging header, which brings in all of the HexFiend
+  framework's headers and the app's. They are all read; the Swift stops
+  at 14 places: `@MainActor` (2), which needs Swift's concurrency library;
+  `DispatchQueue`; `JSONSerialization`; `NSColor.usingType`;
+  `NSPredicate.evaluate(with:substitutionVariables:)`; the interface item
+  identifiers as a type of their own (`.rawValue`, 3); `NSControl.StateValue`
+  as an `NSNumber` (2); and `NSWindowController`'s designated
+  initializers, so that its `init()` needs no `override`.
+- **Gas Mask** (23 files in its current source, 16 of them SwiftUI): its
+  windows are SwiftUI views that its Objective-C opens through
+  `NSHostingController`, which Ferry has. It also needs Combine, its
+  MASShortcut and Sparkle frameworks seen from Swift, and the six SwiftUI
+  names above.
+
+Both apps' Objective-C files import the header their Swift makes
+(`HexFiend_2-Swift.h`, `GasMask-Swift.h`). `ferry-swiftc` can now write
+that header, once the Swift compiles.
+
 ## What the apps need most
 
 Counted over the nine apps:

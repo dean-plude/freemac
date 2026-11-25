@@ -25,8 +25,8 @@ FOUNDATION_EXPORT NSString *const NSDecimalNumberDivideByZeroException;
 @end
 
 @interface NSDecimalNumber : NSNumber <NSSecureCoding>
-- (instancetype)initWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)flag;
-- (instancetype)initWithDecimal:(NSDecimal)dcm;
+- (instancetype FERRY_SWIFT_NONNULL)initWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)flag;
+- (instancetype FERRY_SWIFT_NONNULL)initWithDecimal:(NSDecimal)dcm;
 - (instancetype)initWithString:(NSString *)numberValue;
 - (instancetype)initWithString:(NSString *)numberValue locale:(id)locale;
 + (NSDecimalNumber *)decimalNumberWithMantissa:(unsigned long long)mantissa
@@ -35,11 +35,11 @@ FOUNDATION_EXPORT NSString *const NSDecimalNumberDivideByZeroException;
 + (NSDecimalNumber *)decimalNumberWithDecimal:(NSDecimal)dcm;
 + (NSDecimalNumber *)decimalNumberWithString:(NSString *)numberValue;
 + (NSDecimalNumber *)decimalNumberWithString:(NSString *)numberValue locale:(id)locale;
-@property (class, readonly, copy) NSDecimalNumber *zero;
-@property (class, readonly, copy) NSDecimalNumber *one;
-@property (class, readonly, copy) NSDecimalNumber *minimumDecimalNumber;
-@property (class, readonly, copy) NSDecimalNumber *maximumDecimalNumber;
-@property (class, readonly, copy) NSDecimalNumber *notANumber;
+@property (class, readonly, copy) NSDecimalNumber * FERRY_SWIFT_NONNULL zero;
+@property (class, readonly, copy) NSDecimalNumber * FERRY_SWIFT_NONNULL one;
+@property (class, readonly, copy) NSDecimalNumber * FERRY_SWIFT_NONNULL minimumDecimalNumber;
+@property (class, readonly, copy) NSDecimalNumber * FERRY_SWIFT_NONNULL maximumDecimalNumber;
+@property (class, readonly, copy) NSDecimalNumber * FERRY_SWIFT_NONNULL notANumber;
 @property (class, strong) id<NSDecimalNumberBehaviors> defaultBehavior;
 - (NSDecimalNumber *)decimalNumberByAdding:(NSDecimalNumber *)decimalNumber;
 - (NSDecimalNumber *)decimalNumberByAdding:(NSDecimalNumber *)decimalNumber
@@ -68,14 +68,14 @@ FOUNDATION_EXPORT NSString *const NSDecimalNumberDivideByZeroException;
 @end
 
 @interface NSDecimalNumberHandler : NSObject <NSDecimalNumberBehaviors, NSSecureCoding>
-@property (class, readonly, strong) NSDecimalNumberHandler *defaultDecimalNumberHandler;
-+ (instancetype)decimalNumberHandlerWithRoundingMode:(NSRoundingMode)roundingMode
+@property (class, readonly, strong) NSDecimalNumberHandler * FERRY_SWIFT_NONNULL defaultDecimalNumberHandler;
++ (instancetype FERRY_SWIFT_NONNULL)decimalNumberHandlerWithRoundingMode:(NSRoundingMode)roundingMode
                                                scale:(short)scale
                                     raiseOnExactness:(BOOL)exact
                                      raiseOnOverflow:(BOOL)overflow
                                     raiseOnUnderflow:(BOOL)underflow
                                  raiseOnDivideByZero:(BOOL)divideByZero;
-- (instancetype)initWithRoundingMode:(NSRoundingMode)roundingMode
+- (instancetype FERRY_SWIFT_NONNULL)initWithRoundingMode:(NSRoundingMode)roundingMode
                                scale:(short)scale
                     raiseOnExactness:(BOOL)exact
                      raiseOnOverflow:(BOOL)overflow

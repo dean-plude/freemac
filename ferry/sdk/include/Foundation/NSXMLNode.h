@@ -26,9 +26,9 @@ typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
 };
 
 @interface NSXMLNode : NSObject <NSCopying>
-- (instancetype)init;
-- (instancetype)initWithKind:(NSXMLNodeKind)kind;
-- (instancetype)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKind:(NSXMLNodeKind)kind;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
 
 + (id)document;
 + (id)documentWithRootElement:(NSXMLElement *)element;

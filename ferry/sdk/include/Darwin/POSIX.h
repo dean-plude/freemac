@@ -17,3 +17,13 @@
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+/* for Swift's Darwin overlay (freemac 1.227) */
+#include <MacTypes.h>
+#include <semaphore.h>
+#include <sys/ioctl.h>
+#include <sys/param.h>
+#include <sys/resource.h>
+#include <sys/select.h>
+#include <sys/sysctl.h>
+#include <sys/uio.h>
+#include <sys/utsname.h>

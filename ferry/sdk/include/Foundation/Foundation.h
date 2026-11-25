@@ -25,8 +25,12 @@
 #define NS_FORMAT_FUNCTION(F, A) __attribute__((format(__NSString__, F, A)))
 #endif
 #define NS_REQUIRES_NIL_TERMINATION __attribute__((sentinel(0, 1)))
-#define NS_ENUM(type, name) enum name : type name; enum name : type
-#define NS_OPTIONS(type, name) enum name : type name; enum name : type
+/* With the attributes a Mac's have, which tell Swift to import an NS_ENUM
+ * as a Swift enum and NS_OPTIONS as an option set (freemac 1.227). */
+#define NS_ENUM(type, name) enum __attribute__((enum_extensibility(open))) name : type name; \
+    enum __attribute__((enum_extensibility(open))) name : type
+#define NS_OPTIONS(type, name) enum __attribute__((flag_enum, enum_extensibility(open))) name : type name; \
+    enum __attribute__((flag_enum, enum_extensibility(open))) name : type
 #define NS_ASSUME_NONNULL_BEGIN _Pragma("clang assume_nonnull begin")
 #define NS_ASSUME_NONNULL_END _Pragma("clang assume_nonnull end")
 #define NS_SWIFT_NAME(x)
@@ -267,8 +271,8 @@ static inline CFTypeRef CFBridgingRetain(id X) { return (CFTypeRef)[X retain]; }
 #endif
 
 @interface NSObject (NSObjectFoundation)
-- (NSString *)description;
-- (NSString *)debugDescription;
+@property (readonly, copy) NSString *description;
+@property (readonly, copy) NSString *debugDescription;
 + (NSString *)description;
 @property (readonly, copy) NSString *className;
 @end
@@ -371,7 +375,7 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 @property (readonly) NSUInteger length;
 - (unichar)characterAtIndex:(NSUInteger)index;
 - (void)getCharacters:(unichar *)buffer range:(NSRange)range;
-+ (instancetype)string;
++ (instancetype FERRY_SWIFT_NONNULL)string;
 + (instancetype)stringWithString:(NSString *)string;
 + (instancetype)stringWithUTF8String:(const char *)s;
 + (instancetype)stringWithCString:(const char *)s encoding:(NSStringEncoding)enc;
@@ -379,7 +383,7 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 + (instancetype)stringWithFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1, 2);
 + (instancetype)stringWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;
 + (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithString:(NSString *)string;
 - (instancetype)initWithUTF8String:(const char *)s;
 - (instancetype)initWithCString:(const char *)s encoding:(NSStringEncoding)enc;
@@ -526,8 +530,8 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @end
 
 @interface NSMutableString : NSString
-+ (instancetype)stringWithCapacity:(NSUInteger)capacity;
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)stringWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
 - (void)appendString:(NSString *)s;
 - (void)appendFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1, 2);
 - (void)setString:(NSString *)s;
@@ -593,10 +597,10 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 + (NSNumber *)numberWithBool:(BOOL)v;
 + (NSNumber *)numberWithInteger:(NSInteger)v;
 + (NSNumber *)numberWithUnsignedInteger:(NSUInteger)v;
-- (instancetype)initWithInt:(int)v;
-- (instancetype)initWithInteger:(NSInteger)v;
-- (instancetype)initWithDouble:(double)v;
-- (instancetype)initWithBool:(BOOL)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithInt:(int)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithInteger:(NSInteger)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithDouble:(double)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithBool:(BOOL)v;
 @property (readonly) char charValue;
 @property (readonly) unsigned char unsignedCharValue;
 @property (readonly) short shortValue;
@@ -618,17 +622,17 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 - (BOOL)isEqualToNumber:(NSNumber *)number;
 @end
 @interface NSNumber (NSNumberCreation)
-- (instancetype)initWithChar:(char)v;
-- (instancetype)initWithUnsignedChar:(unsigned char)v;
-- (instancetype)initWithShort:(short)v;
-- (instancetype)initWithUnsignedShort:(unsigned short)v;
-- (instancetype)initWithUnsignedInt:(unsigned int)v;
-- (instancetype)initWithLong:(long)v;
-- (instancetype)initWithUnsignedLong:(unsigned long)v;
-- (instancetype)initWithLongLong:(long long)v;
-- (instancetype)initWithUnsignedLongLong:(unsigned long long)v;
-- (instancetype)initWithFloat:(float)v;
-- (instancetype)initWithUnsignedInteger:(NSUInteger)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithChar:(char)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedChar:(unsigned char)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithShort:(short)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedShort:(unsigned short)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedInt:(unsigned int)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithLong:(long)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedLong:(unsigned long)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithLongLong:(long long)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedLongLong:(unsigned long long)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFloat:(float)v;
+- (instancetype FERRY_SWIFT_NONNULL)initWithUnsignedInteger:(NSUInteger)v;
 @end
 
 /* ---- collections -------------------------------------------------------------------- */
@@ -641,11 +645,11 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @interface NSArray<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
 @property (readonly) NSUInteger count;
 - (ObjectType)objectAtIndex:(NSUInteger)index;
-+ (instancetype)array;
-+ (instancetype)arrayWithObject:(ObjectType)obj;
-+ (instancetype)arrayWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-+ (instancetype)arrayWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
-+ (instancetype)arrayWithArray:(NSArray<ObjectType> *)array;
++ (instancetype FERRY_SWIFT_NONNULL)array;
++ (instancetype FERRY_SWIFT_NONNULL)arrayWithObject:(ObjectType)obj;
++ (instancetype FERRY_SWIFT_NONNULL)arrayWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
++ (instancetype FERRY_SWIFT_NONNULL)arrayWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
++ (instancetype FERRY_SWIFT_NONNULL)arrayWithArray:(NSArray<ObjectType> *)array;
 + (NSArray<ObjectType> *)arrayWithContentsOfFile:(NSString *)path;
 /* freemac 1.224: a property list read from a file URL; the error says why one wasn't */
 + (NSArray<ObjectType> *)arrayWithContentsOfURL:(NSURL *)url;
@@ -653,11 +657,11 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 - (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error;
 - (instancetype)initWithContentsOfFile:(NSString *)path;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
-- (instancetype)init;
-- (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
-- (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
-- (instancetype)initWithArray:(NSArray<ObjectType> *)array copyItems:(BOOL)flag;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
+- (instancetype FERRY_SWIFT_NONNULL)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype FERRY_SWIFT_NONNULL)initWithArray:(NSArray<ObjectType> *)array copyItems:(BOOL)flag;
 - (ObjectType)objectAtIndexedSubscript:(NSUInteger)index;
 - (void)getObjects:(ObjectType __unsafe_unretained[])objects range:(NSRange)range;
 @property (readonly) ObjectType firstObject;
@@ -696,11 +700,11 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @end
 
 @interface NSMutableArray<ObjectType> : NSArray<ObjectType>
-+ (instancetype)arrayWithCapacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)arrayWithCapacity:(NSUInteger)capacity;
 /* mutable copies of what the file or URL holds (freemac 1.226, Ferry 0.50.0) */
 + (NSMutableArray<ObjectType> *)arrayWithContentsOfFile:(NSString *)path;
 + (NSMutableArray<ObjectType> *)arrayWithContentsOfURL:(NSURL *)url;
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
 - (void)addObject:(ObjectType)obj;
 - (void)insertObject:(ObjectType)obj atIndex:(NSUInteger)index;
 - (void)removeObjectAtIndex:(NSUInteger)index;
@@ -724,13 +728,13 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @property (readonly) NSUInteger count;
 - (ObjectType)objectForKey:(KeyType)key;
 - (NSEnumerator<KeyType> *)keyEnumerator;
-+ (instancetype)dictionary;
-+ (instancetype)dictionaryWithObject:(ObjectType)object forKey:(KeyType<NSCopying>)key;
-+ (instancetype)dictionaryWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
++ (instancetype FERRY_SWIFT_NONNULL)dictionary;
++ (instancetype FERRY_SWIFT_NONNULL)dictionaryWithObject:(ObjectType)object forKey:(KeyType<NSCopying>)key;
++ (instancetype FERRY_SWIFT_NONNULL)dictionaryWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
                                 count:(NSUInteger)count;
-+ (instancetype)dictionaryWithObjectsAndKeys:(id)first, ... NS_REQUIRES_NIL_TERMINATION;
++ (instancetype FERRY_SWIFT_NONNULL)dictionaryWithObjectsAndKeys:(id)first, ... NS_REQUIRES_NIL_TERMINATION;
 + (instancetype)dictionaryWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict;
-+ (instancetype)dictionaryWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType> *)keys;
++ (instancetype FERRY_SWIFT_NONNULL)dictionaryWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType> *)keys;
 + (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfFile:(NSString *)path;
 /* freemac 1.224: a property list read from a file URL; the error says why one wasn't */
 + (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfURL:(NSURL *)url;
@@ -738,12 +742,12 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 - (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error;
 - (instancetype)initWithContentsOfFile:(NSString *)path;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
-- (instancetype)init;
-- (instancetype)initWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
                           count:(NSUInteger)count;
 - (instancetype)initWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict;
 - (instancetype)initWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict copyItems:(BOOL)flag;
-- (instancetype)initWithObjectsAndKeys:(id)first, ... NS_REQUIRES_NIL_TERMINATION;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjectsAndKeys:(id)first, ... NS_REQUIRES_NIL_TERMINATION;
 - (ObjectType)objectForKeyedSubscript:(KeyType)key;
 - (ObjectType)valueForKey:(NSString *)key;
 @property (readonly, copy) NSArray<KeyType> *allKeys;
@@ -760,11 +764,11 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @end
 
 @interface NSMutableDictionary<KeyType, ObjectType> : NSDictionary<KeyType, ObjectType>
-+ (instancetype)dictionaryWithCapacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)dictionaryWithCapacity:(NSUInteger)capacity;
 /* mutable copies of what the file or URL holds (freemac 1.226, Ferry 0.50.0) */
 + (NSMutableDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfFile:(NSString *)path;
 + (NSMutableDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfURL:(NSURL *)url;
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
 - (void)setObject:(ObjectType)object forKey:(KeyType<NSCopying>)key;
 - (void)setObject:(ObjectType)object forKeyedSubscript:(KeyType<NSCopying>)key;
 - (void)setValue:(ObjectType)value forKey:(NSString *)key;
@@ -777,17 +781,17 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 
 @interface NSSet<__covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
 @property (readonly) NSUInteger count;
-+ (instancetype)set;
-+ (instancetype)setWithObject:(ObjectType)obj;
-+ (instancetype)setWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-+ (instancetype)setWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
-+ (instancetype)setWithArray:(NSArray<ObjectType> *)array;
-+ (instancetype)setWithSet:(NSSet<ObjectType> *)set;
-- (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
-- (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
-- (instancetype)initWithSet:(NSSet<ObjectType> *)set;
-- (instancetype)initWithSet:(NSSet<ObjectType> *)set copyItems:(BOOL)flag;
++ (instancetype FERRY_SWIFT_NONNULL)set;
++ (instancetype FERRY_SWIFT_NONNULL)setWithObject:(ObjectType)obj;
++ (instancetype FERRY_SWIFT_NONNULL)setWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
++ (instancetype FERRY_SWIFT_NONNULL)setWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
++ (instancetype FERRY_SWIFT_NONNULL)setWithArray:(NSArray<ObjectType> *)array;
++ (instancetype FERRY_SWIFT_NONNULL)setWithSet:(NSSet<ObjectType> *)set;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
+- (instancetype FERRY_SWIFT_NONNULL)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSet:(NSSet<ObjectType> *)set;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSet:(NSSet<ObjectType> *)set copyItems:(BOOL)flag;
 - (BOOL)containsObject:(ObjectType)obj;
 - (ObjectType)member:(ObjectType)obj;
 - (ObjectType)anyObject;
@@ -802,7 +806,7 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @end
 
 @interface NSMutableSet<ObjectType> : NSSet<ObjectType>
-+ (instancetype)setWithCapacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)setWithCapacity:(NSUInteger)capacity;
 - (void)addObject:(ObjectType)obj;
 - (void)removeObject:(ObjectType)obj;
 - (void)removeAllObjects;
@@ -816,15 +820,15 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
  * NSIndexSet and NSString (freemac 1.223, Ferry 0.47.0,
  * foundation/NSFrameworkCalls.m). */
 @interface NSMutableSet<ObjectType> (NSMutableSetCreation)
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
 @end
 
 /* A set that counts how many times each object is in it (freemac 1.223,
  * Ferry 0.47.0). */
 @interface NSCountedSet<ObjectType> : NSMutableSet<ObjectType>
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
-- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
-- (instancetype)initWithSet:(NSSet<ObjectType> *)set;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSet:(NSSet<ObjectType> *)set;
 - (NSUInteger)countForObject:(ObjectType)object;
 - (NSEnumerator<ObjectType> *)objectEnumerator;
 - (void)addObject:(ObjectType)object;
@@ -835,13 +839,13 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 NSRange NSIntersectionRange(NSRange a, NSRange b);
 NSRange NSUnionRange(NSRange a, NSRange b);
 @interface NSIndexSet : NSObject <NSCopying, NSMutableCopying>
-+ (instancetype)indexSet;
-+ (instancetype)indexSetWithIndex:(NSUInteger)index;
-+ (instancetype)indexSetWithIndexesInRange:(NSRange)range;
-- (instancetype)init;
-- (instancetype)initWithIndex:(NSUInteger)index;
-- (instancetype)initWithIndexesInRange:(NSRange)range;
-- (instancetype)initWithIndexSet:(NSIndexSet *)indexSet;
++ (instancetype FERRY_SWIFT_NONNULL)indexSet;
++ (instancetype FERRY_SWIFT_NONNULL)indexSetWithIndex:(NSUInteger)index;
++ (instancetype FERRY_SWIFT_NONNULL)indexSetWithIndexesInRange:(NSRange)range;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithIndex:(NSUInteger)index;
+- (instancetype FERRY_SWIFT_NONNULL)initWithIndexesInRange:(NSRange)range;
+- (instancetype FERRY_SWIFT_NONNULL)initWithIndexSet:(NSIndexSet *)indexSet;
 @property (readonly) NSUInteger count;
 @property (readonly) NSUInteger firstIndex, lastIndex;
 - (BOOL)containsIndex:(NSUInteger)index;
@@ -916,9 +920,9 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 @interface NSIndexPath : NSObject <NSCopying>
 + (instancetype)indexPathWithIndex:(NSUInteger)index;
 + (instancetype)indexPathWithIndexes:(const NSUInteger *)indexes length:(NSUInteger)length;
-- (instancetype)init;
-- (instancetype)initWithIndex:(NSUInteger)index;
-- (instancetype)initWithIndexes:(const NSUInteger *)indexes length:(NSUInteger)length;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithIndex:(NSUInteger)index;
+- (instancetype FERRY_SWIFT_NONNULL)initWithIndexes:(const NSUInteger *)indexes length:(NSUInteger)length;
 - (NSIndexPath *)indexPathByAddingIndex:(NSUInteger)index;
 - (NSIndexPath *)indexPathByRemovingLastIndex;
 - (NSUInteger)indexAtPosition:(NSUInteger)position;
@@ -933,9 +937,9 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 + (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending;
 + (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending selector:(SEL)selector;
 + (instancetype)sortDescriptorWithKey:(NSString *)key ascending:(BOOL)ascending comparator:(NSComparator)cmptr;
-- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending;
-- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending selector:(SEL)selector;
-- (instancetype)initWithKey:(NSString *)key ascending:(BOOL)ascending comparator:(NSComparator)cmptr;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKey:(NSString *)key ascending:(BOOL)ascending;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKey:(NSString *)key ascending:(BOOL)ascending selector:(SEL)selector;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKey:(NSString *)key ascending:(BOOL)ascending comparator:(NSComparator)cmptr;
 @property (readonly, copy) NSString *key;
 @property (readonly) BOOL ascending;
 @property (readonly) SEL selector;
@@ -964,7 +968,7 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 @property (readonly, copy) NSString *predicateFormat;
 - (BOOL)evaluateWithObject:(id)object;
 - (BOOL)evaluateWithObject:(id)object substitutionVariables:(NSDictionary *)bindings;
-- (instancetype)predicateWithSubstitutionVariables:(NSDictionary *)variables;
+- (instancetype FERRY_SWIFT_NONNULL)predicateWithSubstitutionVariables:(NSDictionary *)variables;
 @end
 typedef NS_ENUM(NSUInteger, NSCompoundPredicateType) {
     NSNotPredicateType = 0, NSAndPredicateType, NSOrPredicateType,
@@ -1023,7 +1027,7 @@ enum {
 };
 
 @interface NSMapTable<KeyType, ObjectType> : NSObject <NSCopying, NSFastEnumeration>
-- (instancetype)initWithKeyOptions:(NSPointerFunctionsOptions)keyOptions
+- (instancetype FERRY_SWIFT_NONNULL)initWithKeyOptions:(NSPointerFunctionsOptions)keyOptions
                       valueOptions:(NSPointerFunctionsOptions)valueOptions
                           capacity:(NSUInteger)initialCapacity;
 + (NSMapTable<KeyType, ObjectType> *)mapTableWithKeyOptions:(NSPointerFunctionsOptions)keyOptions
@@ -1047,7 +1051,7 @@ enum {
 @end
 
 @interface NSHashTable<ObjectType> : NSObject <NSCopying, NSFastEnumeration>
-- (instancetype)initWithOptions:(NSPointerFunctionsOptions)options capacity:(NSUInteger)initialCapacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithOptions:(NSPointerFunctionsOptions)options capacity:(NSUInteger)initialCapacity;
 + (NSHashTable<ObjectType> *)hashTableWithOptions:(NSPointerFunctionsOptions)options;
 + (NSHashTable<ObjectType> *)weakObjectsHashTable;
 + (id)hashTableWithWeakObjects;
@@ -1070,7 +1074,7 @@ enum {
 @end
 
 @interface NSPointerArray : NSObject <NSCopying, NSFastEnumeration>
-- (instancetype)initWithOptions:(NSPointerFunctionsOptions)options;
+- (instancetype FERRY_SWIFT_NONNULL)initWithOptions:(NSPointerFunctionsOptions)options;
 + (NSPointerArray *)pointerArrayWithOptions:(NSPointerFunctionsOptions)options;
 + (NSPointerArray *)strongObjectsPointerArray;
 + (NSPointerArray *)weakObjectsPointerArray;
@@ -1117,7 +1121,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 @interface NSData : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 @property (readonly) NSUInteger length;
 @property (readonly) const void *bytes NS_RETURNS_INNER_POINTER;
-+ (instancetype)data;
++ (instancetype FERRY_SWIFT_NONNULL)data;
 + (instancetype)dataWithBytes:(const void *)bytes length:(NSUInteger)length;
 + (instancetype)dataWithBytesNoCopy:(void *)bytes length:(NSUInteger)length;
 + (instancetype)dataWithBytesNoCopy:(void *)bytes length:(NSUInteger)length freeWhenDone:(BOOL)b;
@@ -1146,10 +1150,10 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 @interface NSMutableData : NSData
 @property (readonly) void *mutableBytes NS_RETURNS_INNER_POINTER;
 @property NSUInteger length;
-+ (instancetype)dataWithCapacity:(NSUInteger)capacity;
-+ (instancetype)dataWithLength:(NSUInteger)length;
-- (instancetype)initWithCapacity:(NSUInteger)capacity;
-- (instancetype)initWithLength:(NSUInteger)length;
++ (instancetype FERRY_SWIFT_NONNULL)dataWithCapacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)dataWithLength:(NSUInteger)length;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initWithLength:(NSUInteger)length;
 - (void)appendBytes:(const void *)bytes length:(NSUInteger)length;
 - (void)appendData:(NSData *)data;
 - (void)replaceBytesInRange:(NSRange)range withBytes:(const void *)bytes;
@@ -1167,21 +1171,21 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 
 @interface NSDate : NSObject <NSCopying, NSSecureCoding>
 @property (readonly) NSTimeInterval timeIntervalSinceReferenceDate;
-+ (instancetype)date;
-+ (instancetype)dateWithTimeIntervalSinceNow:(NSTimeInterval)secs;
-+ (instancetype)dateWithTimeIntervalSince1970:(NSTimeInterval)secs;
-+ (instancetype)dateWithTimeIntervalSinceReferenceDate:(NSTimeInterval)secs;
-+ (instancetype)distantFuture;
-+ (instancetype)distantPast;
++ (instancetype FERRY_SWIFT_NONNULL)date;
++ (instancetype FERRY_SWIFT_NONNULL)dateWithTimeIntervalSinceNow:(NSTimeInterval)secs;
++ (instancetype FERRY_SWIFT_NONNULL)dateWithTimeIntervalSince1970:(NSTimeInterval)secs;
++ (instancetype FERRY_SWIFT_NONNULL)dateWithTimeIntervalSinceReferenceDate:(NSTimeInterval)secs;
++ (instancetype FERRY_SWIFT_NONNULL)distantFuture;
++ (instancetype FERRY_SWIFT_NONNULL)distantPast;
 + (NSTimeInterval)timeIntervalSinceReferenceDate;
-- (instancetype)init;
-- (instancetype)initWithTimeIntervalSinceReferenceDate:(NSTimeInterval)secs;
-- (instancetype)initWithTimeIntervalSinceNow:(NSTimeInterval)secs;
-- (instancetype)initWithTimeIntervalSince1970:(NSTimeInterval)secs;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTimeIntervalSinceReferenceDate:(NSTimeInterval)secs;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTimeIntervalSinceNow:(NSTimeInterval)secs;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTimeIntervalSince1970:(NSTimeInterval)secs;
 @property (readonly) NSTimeInterval timeIntervalSince1970;
 @property (readonly) NSTimeInterval timeIntervalSinceNow;
 - (NSTimeInterval)timeIntervalSinceDate:(NSDate *)other;
-- (instancetype)dateByAddingTimeInterval:(NSTimeInterval)secs;
+- (instancetype FERRY_SWIFT_NONNULL)dateByAddingTimeInterval:(NSTimeInterval)secs;
 - (NSDate *)earlierDate:(NSDate *)other;
 - (NSDate *)laterDate:(NSDate *)other;
 - (NSComparisonResult)compare:(NSDate *)other;
@@ -1195,7 +1199,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 @interface NSTimeZone : NSObject <NSCopying>
 + (NSTimeZone *)systemTimeZone;
 + (void)resetSystemTimeZone;
-+ (NSTimeZone *)defaultTimeZone;
+@property (class, readonly, strong) NSTimeZone * FERRY_SWIFT_NONNULL defaultTimeZone;
 + (void)setDefaultTimeZone:(NSTimeZone *)zone;
 + (NSTimeZone *)localTimeZone;
 + (NSArray *)knownTimeZoneNames;
@@ -1237,8 +1241,8 @@ FOUNDATION_EXPORT NSLocaleKey const NSLocaleCurrencySymbol;
 FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
 
 @interface NSLocale : NSObject <NSCopying>
-+ (NSLocale *)currentLocale;
-+ (NSLocale *)autoupdatingCurrentLocale;
+@property (class, readonly, strong) NSLocale * FERRY_SWIFT_NONNULL currentLocale;
+@property (class, readonly, strong) NSLocale * FERRY_SWIFT_NONNULL autoupdatingCurrentLocale;
 + (NSLocale *)systemLocale;
 + (instancetype)localeWithLocaleIdentifier:(NSString *)ident;
 + (NSArray *)availableLocaleIdentifiers;
@@ -1414,8 +1418,8 @@ enum { NSDateComponentUndefined = NSIntegerMax, NSUndefinedDateComponent = NSInt
 /* Weeks start on the locale's first weekday (Sunday in the United States),
  * with the weekend on Saturday and Sunday everywhere. */
 @interface NSCalendar : NSObject <NSCopying>
-+ (NSCalendar *)currentCalendar;
-+ (NSCalendar *)autoupdatingCurrentCalendar;
+@property (class, readonly, strong) NSCalendar * FERRY_SWIFT_NONNULL currentCalendar;
+@property (class, readonly, strong) NSCalendar * FERRY_SWIFT_NONNULL autoupdatingCurrentCalendar;
 + (NSCalendar *)calendarWithIdentifier:(NSCalendarIdentifier)ident;
 - (instancetype)initWithCalendarIdentifier:(NSCalendarIdentifier)ident;
 @property (readonly, copy) NSCalendarIdentifier calendarIdentifier;
@@ -1920,7 +1924,7 @@ typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
 };
 
 @interface NSProcessInfo : NSObject
-+ (NSProcessInfo *)processInfo;
+@property (class, readonly, strong) NSProcessInfo * FERRY_SWIFT_NONNULL processInfo;
 @property (readonly) NSOperatingSystemVersion operatingSystemVersion;
 - (BOOL)isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion)version;
 @property (readonly, copy) NSArray<NSString *> *arguments;
@@ -1955,7 +1959,7 @@ typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
 @end
 
 @interface NSBundle : NSObject
-+ (NSBundle *)mainBundle;
+@property (class, readonly, strong) NSBundle * FERRY_SWIFT_NONNULL mainBundle;
 + (NSBundle *)bundleWithPath:(NSString *)path;
 + (NSBundle *)bundleForClass:(Class)cls;
 - (instancetype)initWithPath:(NSString *)path;
@@ -2025,7 +2029,7 @@ FOUNDATION_EXPORT NSString *const NSArgumentDomain;
 FOUNDATION_EXPORT NSString *const NSRegistrationDomain;
 
 @interface NSUserDefaults : NSObject
-+ (NSUserDefaults *)standardUserDefaults;
+@property (class, readonly, strong) NSUserDefaults * FERRY_SWIFT_NONNULL standardUserDefaults;
 + (void)resetStandardUserDefaults;
 - (instancetype)initWithSuiteName:(NSString *)name;
 /* another app's or suite's saved defaults, read after this app's own and
@@ -2122,7 +2126,7 @@ typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
 @end
 
 @interface NSFileManager : NSObject
-+ (NSFileManager *)defaultManager;
+@property (class, readonly, strong) NSFileManager * FERRY_SWIFT_NONNULL defaultManager;
 @property (assign) id<NSFileManagerDelegate> delegate;
 @property (readonly, copy) NSString *currentDirectoryPath;
 @property (readonly, copy) NSURL *homeDirectoryForCurrentUser;
@@ -2165,7 +2169,7 @@ typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
 /* a dictionary from arrays, and the objects of keys (NSCollectionsMore.m,
  * freemac 1.225) */
 @interface NSDictionary<KeyType, ObjectType> (FerryFromArrays)
-- (instancetype)initWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType<NSCopying>> *)keys;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType<NSCopying>> *)keys;
 - (NSArray<ObjectType> *)objectsForKeys:(NSArray<KeyType> *)keys notFoundMarker:(ObjectType)marker;
 @end
 /* the one zone there is (NSCollectionsMore.m, freemac 1.225) */
@@ -2468,7 +2472,7 @@ FOUNDATION_EXPORT NSString *const NSInvalidUnarchiveOperationException;
 + (NSData *)archivedDataWithRootObject:(id)root requiringSecureCoding:(BOOL)secure error:(NSError **)error;
 + (NSData *)archivedDataWithRootObject:(id)root;
 + (BOOL)archiveRootObject:(id)root toFile:(NSString *)path;
-- (instancetype)initRequiringSecureCoding:(BOOL)secure;
+- (instancetype FERRY_SWIFT_NONNULL)initRequiringSecureCoding:(BOOL)secure;
 - (instancetype)initForWritingWithMutableData:(NSMutableData *)data;
 @property NSPropertyListFormat outputFormat;
 @property (readonly, strong) NSData *encodedData;
@@ -2548,7 +2552,7 @@ typedef NSString *NSNotificationName;
 @class NSOperationQueue;
 
 @interface NSNotificationCenter : NSObject
-+ (NSNotificationCenter *)defaultCenter;
+@property (class, readonly, strong) NSNotificationCenter * FERRY_SWIFT_NONNULL defaultCenter;
 - (void)addObserver:(id)observer selector:(SEL)sel name:(NSNotificationName)name object:(id)object;
 - (id<NSObject>)addObserverForName:(NSNotificationName)name object:(id)obj queue:(NSOperationQueue *)queue
                         usingBlock:(void (^)(NSNotification *note))block;
@@ -2566,8 +2570,8 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 @class NSTimer, NSPort;
 
 @interface NSRunLoop : NSObject
-+ (NSRunLoop *)currentRunLoop;
-+ (NSRunLoop *)mainRunLoop;
+@property (class, readonly, strong) NSRunLoop * FERRY_SWIFT_NONNULL currentRunLoop;
+@property (class, readonly, strong) NSRunLoop * FERRY_SWIFT_NONNULL mainRunLoop;
 @property (readonly, copy) NSRunLoopMode currentMode;
 - (void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;
 - (void)run;
@@ -2609,7 +2613,7 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 + (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block;
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti repeats:(BOOL)repeats
                                       block:(void (^)(NSTimer *timer))block;
-- (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)ti target:(id)target selector:(SEL)sel
+- (instancetype FERRY_SWIFT_NONNULL)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)ti target:(id)target selector:(SEL)sel
                         userInfo:(id)info repeats:(BOOL)repeats;
 - (void)fire;
 - (void)invalidate;
@@ -2750,7 +2754,7 @@ typedef NS_ENUM(NSInteger, NSAttributedStringMarkdownInterpretedSyntax) {
                                options:(NSAttributedStringMarkdownParsingOptions *)options
                                baseURL:(NSURL *)baseURL
                                  error:(NSError **)error;
-- (instancetype)initWithMarkdown:(NSData *)markdown
+- (instancetype FERRY_SWIFT_NONNULL)initWithMarkdown:(NSData *)markdown
                          options:(NSAttributedStringMarkdownParsingOptions *)options
                          baseURL:(NSURL *)baseURL
                            error:(NSError **)error;
@@ -2810,7 +2814,7 @@ typedef NS_OPTIONS(NSUInteger, NSFileWrapperWritingOptions) {
 - (instancetype)initSymbolicLinkWithDestinationURL:(NSURL *)url;
 - (instancetype)initWithSerializedRepresentation:(NSData *)data;
 - (instancetype)initWithPath:(NSString *)path;
-- (instancetype)initSymbolicLinkWithDestination:(NSString *)path;
+- (instancetype FERRY_SWIFT_NONNULL)initSymbolicLinkWithDestination:(NSString *)path;
 @property (readonly, getter=isDirectory) BOOL directory;
 @property (readonly, getter=isRegularFile) BOOL regularFile;
 @property (readonly, getter=isSymbolicLink) BOOL symbolicLink;
@@ -2942,7 +2946,7 @@ enum { NSUndoCloseGroupingRunLoopOrdering = 350000 };
  * NSInternalInconsistencyException (NSInvalidArgumentException for a
  * parameter), as on a Mac. NS_BLOCK_ASSERTIONS turns them off. */
 @interface NSAssertionHandler : NSObject
-@property (class, readonly, retain) NSAssertionHandler *currentHandler;
+@property (class, readonly, retain) NSAssertionHandler * FERRY_SWIFT_NONNULL currentHandler;
 - (void)handleFailureInMethod:(SEL)selector object:(id)object file:(NSString *)fileName lineNumber:(NSInteger)line
                   description:(NSString *)format, ... NS_FORMAT_FUNCTION(5, 6);
 - (void)handleFailureInFunction:(NSString *)functionName file:(NSString *)fileName lineNumber:(NSInteger)line

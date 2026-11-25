@@ -1,0 +1,123 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#   ferry-swiftc [options] file.swift ... -o program
+#
+# Builds a Swift program for an Intel Mac with Ferry's own SDK (freemac
+# 1.227), as ferry-cc builds C and Objective-C ones. The Swift compiler is
+# the open-source one from swift.org; it compiles for x86_64-apple-macosx
+# with Objective-C interoperability on, as Xcode's does, so Swift code calls
+# Ferry's Objective-C frameworks directly ("import AppKit" reads the SDK's
+# module map). The program links Ferry's own build of Swift's runtime and
+# standard library (swift/build-runtime.sh) and Ferry's Swift modules (the
+# ObjectiveC, CoreGraphics, Foundation and AppKit overlays and SwiftUI,
+# swift/build-modules.sh), from the "swift" folder of Ferry's frameworks.
+#
+# Options: -o FILE; -O (optimise; the default is -Onone); -c (an object
+# only); -module-name NAME; -parse-as-library; -I DIR, -L DIR, -lNAME,
+# -framework NAME; -Xcc ARG and -Xfrontend ARG; -emit-library (a dylib);
+# -import-objc-header FILE (an app's bridging header, its Objective-C seen
+# from Swift) and -emit-objc-header-path FILE (the header that shows its
+# @objc Swift classes to Objective-C, as Xcode's "-Swift.h");
+# anything else that starts with -Xlinker goes to the linker. Sources may
+# be .swift files, and objects (.o) to link with them.
+#
+# The toolchain: FERRY_SWIFT_TOOLCHAIN (a folder holding usr/bin/
+# swift-frontend), or swift-frontend on PATH.
+set -eu
+here=$(dirname "$(readlink -f "$0")")
+if [ -n "${FERRY_SDK:-}" ]; then sdk=$FERRY_SDK
+elif [ -d "$here/include" ]; then sdk=$here
+else sdk=/usr/share/ferry/sdk
+fi
+if [ -n "${FERRY_FRAMEWORKS:-}" ]; then fw=$FERRY_FRAMEWORKS
+elif [ -d "$sdk/../frameworks" ]; then fw=$(cd "$sdk/../frameworks" && pwd)
+else fw=/usr/lib/ferry/frameworks
+fi
+frontend=
+if [ -n "${FERRY_SWIFT_TOOLCHAIN:-}" ]; then frontend=$FERRY_SWIFT_TOOLCHAIN/usr/bin/swift-frontend
+else frontend=$(command -v swift-frontend 2>/dev/null || true)
+fi
+if [ -z "$frontend" ] || [ ! -x "$frontend" ]; then
+    echo "ferry-swiftc: no Swift compiler (set FERRY_SWIFT_TOOLCHAIN to a swift.org toolchain's folder)" >&2
+    exit 1
+fi
+res=$fw/swift/usr/lib/swift
+if [ ! -f "$res/macosx/Swift.swiftmodule/x86_64-apple-macos.swiftmodule" ]; then
+    echo "ferry-swiftc: Ferry's Swift runtime isn't built (swift/build-runtime.sh)" >&2
+    exit 1
+fi
+
+out=a.out compile_only= opt=-Onone module=main library= emit_lib=
+sources= objects= fflags= lflags=
+while [ $# -gt 0 ]; do
+    case $1 in
+        -o) out=$2; shift ;;
+        -c) compile_only=1 ;;
+        -O|-Osize|-Ounchecked) opt=$1 ;;
+        -Onone) opt=-Onone ;;
+        -module-name) module=$2; shift ;;
+        -parse-as-library) library=1 ;;
+        -emit-library) emit_lib=1; library=1 ;;
+        -I) fflags="$fflags -I $2"; shift ;;
+        -I*) fflags="$fflags $1" ;;
+        -L) lflags="$lflags -L$2"; shift ;;
+        -L*|-l*) lflags="$lflags $1" ;;
+        -framework) lflags="$lflags -framework $2"; shift ;;
+        -Xcc) fflags="$fflags -Xcc $2"; shift ;;
+        -import-objc-header|-emit-objc-header-path) fflags="$fflags $1 $2"; shift ;;
+        -Xfrontend) fflags="$fflags $2"; shift ;;
+        -Xlinker) lflags="$lflags -Xlinker $2"; shift ;;
+        -D) fflags="$fflags -D $2"; shift ;;
+        -D*) fflags="$fflags $1" ;;
+        -g) fflags="$fflags -g" ;;
+        *.swift) sources="$sources $1" ;;
+        *.o|*.a|*.dylib) objects="$objects $1" ;;
+        *) echo "ferry-swiftc: unknown option $1" >&2; exit 1 ;;
+    esac
+    shift
+done
+[ -n "$sources" ] || [ -n "$objects" ] || { echo "ferry-swiftc: no input files" >&2; exit 1; }
+
+# Clang modules the Swift compiler builds from the SDK's headers are kept
+# with the others ferry-cc keeps, in a folder for this compiler and this
+# version of the module map.
+cache=${FERRY_MODULE_CACHE:-${TMPDIR:-/tmp}/ferry-modules-$(id -u)}
+# keyed by the module map, the API notes beside it (clang doesn't notice a new
+# one in a cache it made without it) and the compiler
+cache=$cache/swift-$( (cat "$sdk/include/module.modulemap" "$sdk"/include/*.apinotes 2>/dev/null
+                       "$frontend" --version 2>/dev/null) | cksum | cut -d' ' -f1)
+
+obj=$out
+[ -n "$compile_only" ] || obj=$(mktemp "${TMPDIR:-/tmp}/ferry-swiftc.XXXXXX")
+cleanup() { [ -n "$compile_only" ] || rm -f "$obj"; }
+trap cleanup EXIT
+if [ -n "$sources" ]; then
+    # one file, or the one named main.swift, is the program's top-level code
+    asmain=
+    [ -z "$library" ] || asmain=-parse-as-library
+    # an @main type (a SwiftUI App's) starts the program instead
+    # shellcheck disable=SC2086
+    if grep -qs '^@main' $sources; then asmain=-parse-as-library; fi
+    # The SDK's headers are system headers, whose clang modules clang doesn't
+    # check against them unless told to.
+    # shellcheck disable=SC2086
+    "$frontend" -frontend -c $sources -target x86_64-apple-macosx14.0 -resource-dir "$res" -sdk "$sdk" \
+        -module-name "$module" $asmain $opt -enable-objc-interop -swift-version 5 \
+        -Xcc -nostdlibinc -Xcc -isystem -Xcc "$sdk/include" -Xcc -fmodules-validate-system-headers -I "$res/macosx" \
+        -module-cache-path "$cache" -runtime-compatibility-version none \
+        -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import \
+        -disable-autolinking-runtime-compatibility-dynamic-replacements \
+        -disable-autolinking-runtime-compatibility-concurrency \
+        $fflags -o "$obj"
+    objects="$obj $objects"
+fi
+[ -z "$compile_only" ] || exit 0
+
+# The objects carry the libraries and frameworks they import (-lswiftCore,
+# -framework AppKit), which the linker finds in Ferry's Swift folder and
+# Ferry's frameworks.
+kind=
+[ -z "$emit_lib" ] || kind="-dynamiclib -install_name @rpath/$(basename "$out")"
+# shellcheck disable=SC2086
+FERRY_MACOS_MIN=14.0 "$here/ferry-cc" $kind -o "$out" $objects -L"$fw/swift" -F"$fw" -lobjc $lflags

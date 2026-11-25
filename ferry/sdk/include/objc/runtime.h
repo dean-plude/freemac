@@ -145,6 +145,19 @@ void objc_exception_rethrow(void) __attribute__((noreturn));
 objc_uncaught_exception_handler objc_setUncaughtExceptionHandler(objc_uncaught_exception_handler fn);
 objc_exception_preprocessor objc_setExceptionPreprocessor(objc_exception_preprocessor fn);
 void objc_terminate(void) __attribute__((noreturn));
+
+/* what Swift's runtime uses (freemac 1.227) */
+struct objc_image_info;
+Class objc_readClassPair(Class cls, const struct objc_image_info *info);
+Class class_setSuperclass(Class cls, Class newSuper);
+typedef BOOL (*objc_hook_getClass)(const char *name, Class *outClass);
+void objc_setHook_getClass(objc_hook_getClass newValue, objc_hook_getClass *outOldValue);
+typedef BOOL (*objc_hook_getImageName)(Class cls, const char **outImageName);
+void objc_setHook_getImageName(objc_hook_getImageName newValue, objc_hook_getImageName *outOldValue);
+typedef const char *(*objc_hook_lazyClassNamer)(Class cls);
+void objc_setHook_lazyClassNamer(objc_hook_lazyClassNamer newValue, objc_hook_lazyClassNamer *oldOutValue);
+#define OBJC_REALIZECLASSFROMSWIFT_DEFINED 1
+Class _objc_realizeClassFromSwift(Class cls, void *previously);
 __FERRY_END
 
 #define _C_ID       '@'

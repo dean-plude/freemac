@@ -88,5 +88,45 @@ long double copysignl(long double, long double); long double nanl(const char *);
 long double roundl(long double); long double truncl(long double); long double fminl(long double, long double);
 long double fmaxl(long double, long double); long double log10l(long double); long double log2l(long double);
 long double exp2l(long double);
+/* the rest of C99's float and long double maths (freemac 1.227, for Swift) */
+long double acosl(long double);
+long double asinl(long double);
+long double atanl(long double);
+long double acoshl(long double);
+long double asinhl(long double);
+long double atanhl(long double);
+long double coshl(long double);
+long double sinhl(long double);
+long double tanhl(long double);
+long double expm1l(long double);
+int ilogbl(long double);
+long double log1pl(long double);
+long double logbl(long double);
+long double scalbnl(long double, int);
+long double scalblnl(long double, long);
+long double cbrtl(long double);
+long double hypotl(long double, long double);
+long double erfl(long double);
+long double erfcl(long double);
+long double lgammal(long double);
+long double tgammal(long double);
+long double nearbyintl(long double);
+long double rintl(long double);
+long lrintl(long double);
+long long llrintl(long double);
+long lroundl(long double);
+long long llroundl(long double);
+long double remainderl(long double, long double);
+long double remquol(long double, long double, int*);
+long double nextafterl(long double, long double);
+long double nexttowardl(long double, long double);
+long double fdiml(long double, long double);
+double lgamma_r(double, int *); float lgammaf_r(float, int *); long double lgammal_r(long double, int *);
+/* the Bessel functions, which Swift's Darwin module wraps; only for Swift,
+ * as their short names (yn...) are ones programs use for their own */
+#ifdef __swift__
+double j0(double); double j1(double); double jn(int, double); double y0(double); double y1(double); double yn(int, double);
+#endif
+long double fmal(long double, long double, long double);
 __FERRY_END
 #endif

@@ -219,6 +219,12 @@ void *objc_destructInstance(id obj);
 extern void *const ferry_objc_msgForward_ptr;
 void ferry_objc_runtime_init(void);
 
+Class ferry_objc_realize_runtime_class(Class cls, const char *image);
+
+/* swift.c: what Swift's runtime asks of the Objective-C runtime */
+Class ferry_objc_class_from_hook(const char *name);
+const char *ferry_objc_lazy_class_name(Class cls);
+
 /* nsobject.c */
 id objc_retain(id obj);
 void objc_release(id obj);

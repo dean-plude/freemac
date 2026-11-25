@@ -34,10 +34,10 @@ APPKIT_EXTERN const CGFloat NSGridViewSizeForContent;
 @class NSGridRow, NSGridColumn, NSGridCell;
 
 @interface NSGridView : NSView
-+ (instancetype)gridViewWithNumberOfColumns:(NSInteger)columnCount rows:(NSInteger)rowCount;
++ (instancetype FERRY_SWIFT_NONNULL)gridViewWithNumberOfColumns:(NSInteger)columnCount rows:(NSInteger)rowCount;
 /* rows of views; a row shorter than the longest gets empty cells, and an
  * [NSGridCell emptyContentView] leaves a cell empty */
-+ (instancetype)gridViewWithViews:(NSArray<NSArray<NSView *> *> *)rows;
++ (instancetype FERRY_SWIFT_NONNULL)gridViewWithViews:(NSArray<NSArray<NSView *> *> *)rows;
 @property (readonly) NSInteger numberOfRows, numberOfColumns;
 - (NSGridRow *)rowAtIndex:(NSInteger)index;
 - (NSInteger)indexOfRow:(NSGridRow *)row;
@@ -85,7 +85,7 @@ APPKIT_EXTERN const CGFloat NSGridViewSizeForContent;
 @interface NSGridCell : NSObject <NSCoding>
 @property (strong, nullable) NSView *contentView;
 /* the view that marks a cell to be left empty */
-@property (class, readonly, strong) NSView *emptyContentView;
+@property (class, readonly, strong) NSView * FERRY_SWIFT_NONNULL emptyContentView;
 @property (readonly, weak, nullable) NSGridRow *row;
 @property (readonly, weak, nullable) NSGridColumn *column;
 @property NSGridCellPlacement xPlacement, yPlacement;

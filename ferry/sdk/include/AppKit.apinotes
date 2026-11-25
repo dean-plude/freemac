@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Ferry SDK: API notes for AppKit (freemac 1.227), which clang reads beside
+# the module map and Swift's compiler follows: the Swift names Apple's
+# documentation gives AppKit's factory methods, where Swift's own renaming
+# rules arrive at other ones, and which of them never return nil. Written
+# for Ferry from that documentation; extended as Swift apps need more.
+---
+Name: AppKit
+Classes:
+- Name: NSTextField
+  Methods:
+  - Selector: "labelWithString:"
+    MethodKind: Class
+    SwiftName: "init(labelWithString:)"
+    NullabilityOfRet: N
+  - Selector: "wrappingLabelWithString:"
+    MethodKind: Class
+    SwiftName: "init(wrappingLabelWithString:)"
+    NullabilityOfRet: N
+  - Selector: "labelWithAttributedString:"
+    MethodKind: Class
+    SwiftName: "init(labelWithAttributedString:)"
+    NullabilityOfRet: N
+  - Selector: "textFieldWithString:"
+    MethodKind: Class
+    SwiftName: "init(string:)"
+    NullabilityOfRet: N
+- Name: NSButton
+  Methods:
+  - Selector: "buttonWithTitle:target:action:"
+    MethodKind: Class
+    SwiftName: "init(title:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [N, O, O]
+  - Selector: "checkboxWithTitle:target:action:"
+    MethodKind: Class
+    SwiftName: "init(checkboxWithTitle:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [N, O, O]
+  - Selector: "radioButtonWithTitle:target:action:"
+    MethodKind: Class
+    SwiftName: "init(radioButtonWithTitle:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [N, O, O]
+  - Selector: "buttonWithImage:target:action:"
+    MethodKind: Class
+    SwiftName: "init(image:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [N, O, O]
+  - Selector: "buttonWithTitle:image:target:action:"
+    MethodKind: Class
+    SwiftName: "init(title:image:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [N, N, O, O]
+  Properties:
+  - Name: title
+    PropertyKind: Instance
+    Nullability: N
+- Name: NSSlider
+  Methods:
+  - Selector: "sliderWithValue:minValue:maxValue:target:action:"
+    MethodKind: Class
+    SwiftName: "init(value:minValue:maxValue:target:action:)"
+    NullabilityOfRet: N
+    Nullability: [S, S, S, O, O]
+  - Selector: "sliderWithTarget:action:"
+    MethodKind: Class
+    SwiftName: "init(target:action:)"
+    NullabilityOfRet: N
+    Nullability: [O, O]
+- Name: NSWindow
+  Methods:
+  - Selector: "windowWithContentViewController:"
+    MethodKind: Class
+    SwiftName: "init(contentViewController:)"
+    NullabilityOfRet: N
+  Properties:
+  - Name: title
+    PropertyKind: Instance
+    Nullability: N
+- Name: NSStackView
+  Methods:
+  - Selector: "stackViewWithViews:"
+    MethodKind: Class
+    SwiftName: "init(views:)"
+    NullabilityOfRet: N
+- Name: NSFont
+  Methods:
+  - Selector: "systemFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "boldSystemFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "systemFontOfSize:weight:"
+    MethodKind: Class
+    NullabilityOfRet: N
+- Name: NSControl
+  Properties:
+  - Name: stringValue
+    PropertyKind: Instance
+    Nullability: N
+- Name: NSMenuItem
+  Methods:
+  - Selector: "separatorItem"
+    MethodKind: Class
+    SwiftName: "separator()"
+    NullabilityOfRet: N
+  Properties:
+  - Name: title
+    PropertyKind: Instance
+    Nullability: N
+- Name: NSMenu
+  Methods:
+  - Selector: "addItem:"
+    MethodKind: Instance
+    SwiftName: "addItem(_:)"
+- Name: NSStatusBar
+  Methods:
+  - Selector: "statusItemWithLength:"
+    MethodKind: Instance
+    SwiftName: "statusItem(withLength:)"
+    NullabilityOfRet: N
+Protocols:
+- Name: NSApplicationDelegate
+  Methods:
+  - Selector: "applicationShouldTerminateAfterLastWindowClosed:"
+    MethodKind: Instance
+    SwiftName: "applicationShouldTerminateAfterLastWindowClosed(_:)"
+# the Swift names Apple's documentation gives these types and their cases
+Tags:
+- Name: NSControlStateValue
+  SwiftName: NSControl.StateValue
+- Name: NSAutoresizingMaskOptions
+  SwiftName: NSView.AutoresizingMask
+Enumerators:
+- Name: NSViewNotSizable
+  SwiftName: none
+- Name: NSViewMinXMargin
+  SwiftName: minXMargin
+- Name: NSViewWidthSizable
+  SwiftName: width
+- Name: NSViewMaxXMargin
+  SwiftName: maxXMargin
+- Name: NSViewMinYMargin
+  SwiftName: minYMargin
+- Name: NSViewHeightSizable
+  SwiftName: height
+- Name: NSViewMaxYMargin
+  SwiftName: maxYMargin

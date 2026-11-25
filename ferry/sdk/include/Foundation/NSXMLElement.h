@@ -10,7 +10,7 @@
 - (instancetype)initWithName:(NSString *)name URI:(NSString *)URI;
 - (instancetype)initWithName:(NSString *)name stringValue:(NSString *)string;
 - (instancetype)initWithXMLString:(NSString *)string error:(NSError **)error;
-- (instancetype)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
 
 - (NSArray<NSXMLElement *> *)elementsForName:(NSString *)name;
 - (NSArray<NSXMLElement *> *)elementsForLocalName:(NSString *)localName URI:(NSString *)URI;

@@ -40,7 +40,11 @@ typedef signed char BOOL;      /* Intel Macs: a signed char */
 #define OBJC_ARC_UNAVAILABLE
 #endif
 #define OBJC_ROOT_CLASS __attribute__((objc_root_class))
+#ifdef __cplusplus
+#define OBJC_EXPORT extern "C"
+#else
 #define OBJC_EXPORT extern
+#endif
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
 #define NS_RETURNS_NOT_RETAINED __attribute__((ns_returns_not_retained))
 #define NS_REQUIRES_SUPER __attribute__((objc_requires_super))

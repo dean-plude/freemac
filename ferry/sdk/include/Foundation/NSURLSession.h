@@ -177,13 +177,13 @@ typedef NS_ENUM(NSUInteger, NSURLCredentialPersistence) {
 @interface NSURLCredential : NSObject <NSCopying>
 + (NSURLCredential *)credentialWithUser:(NSString *)user password:(NSString *)password
                             persistence:(NSURLCredentialPersistence)persistence;
-- (instancetype)initWithUser:(NSString *)user password:(NSString *)password
+- (instancetype FERRY_SWIFT_NONNULL)initWithUser:(NSString *)user password:(NSString *)password
                  persistence:(NSURLCredentialPersistence)persistence;
 + (NSURLCredential *)credentialForTrust:(SecTrustRef)trust;
-- (instancetype)initWithTrust:(SecTrustRef)trust;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTrust:(SecTrustRef)trust;
 + (NSURLCredential *)credentialWithIdentity:(SecIdentityRef)identity certificates:(NSArray *)certArray
                                 persistence:(NSURLCredentialPersistence)persistence;
-- (instancetype)initWithIdentity:(SecIdentityRef)identity certificates:(NSArray *)certArray
+- (instancetype FERRY_SWIFT_NONNULL)initWithIdentity:(SecIdentityRef)identity certificates:(NSArray *)certArray
                      persistence:(NSURLCredentialPersistence)persistence;
 @property (readonly, copy) NSString *user;
 @property (readonly, copy) NSString *password;
@@ -220,13 +220,13 @@ typedef NS_ENUM(NSUInteger, NSURLCredentialPersistence) {
 @end
 
 @interface NSURLAuthenticationChallenge : NSObject
-- (instancetype)initWithProtectionSpace:(NSURLProtectionSpace *)space
+- (instancetype FERRY_SWIFT_NONNULL)initWithProtectionSpace:(NSURLProtectionSpace *)space
                      proposedCredential:(NSURLCredential *)credential
                    previousFailureCount:(NSInteger)previousFailureCount
                         failureResponse:(NSURLResponse *)response
                                   error:(NSError *)error
                                  sender:(id<NSURLAuthenticationChallengeSender>)sender;
-- (instancetype)initWithAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
+- (instancetype FERRY_SWIFT_NONNULL)initWithAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
                                          sender:(id<NSURLAuthenticationChallengeSender>)sender;
 @property (readonly, copy) NSURLProtectionSpace *protectionSpace;
 @property (readonly, copy) NSURLCredential *proposedCredential;
@@ -243,7 +243,7 @@ FOUNDATION_EXPORT NSNotificationName const NSURLCredentialStorageChangedNotifica
 FOUNDATION_EXPORT NSString *const NSURLCredentialStorageRemoveSynchronizableCredentials;
 
 @interface NSURLCredentialStorage : NSObject
-@property (class, readonly, strong) NSURLCredentialStorage *sharedCredentialStorage;
+@property (class, readonly, strong) NSURLCredentialStorage * FERRY_SWIFT_NONNULL sharedCredentialStorage;
 - (NSDictionary<NSString *, NSURLCredential *> *)credentialsForProtectionSpace:(NSURLProtectionSpace *)space;
 @property (readonly, copy)
     NSDictionary<NSURLProtectionSpace *, NSDictionary<NSString *, NSURLCredential *> *> *allCredentials;
@@ -288,7 +288,7 @@ FOUNDATION_EXPORT NSHTTPCookieStringPolicy const NSHTTPCookieSameSiteStrict;
 
 @interface NSHTTPCookie : NSObject
 + (NSHTTPCookie *)cookieWithProperties:(NSDictionary<NSHTTPCookiePropertyKey, id> *)properties;
-- (instancetype)initWithProperties:(NSDictionary<NSHTTPCookiePropertyKey, id> *)properties;
+- (instancetype FERRY_SWIFT_NONNULL)initWithProperties:(NSDictionary<NSHTTPCookiePropertyKey, id> *)properties;
 + (NSArray<NSHTTPCookie *> *)cookiesWithResponseHeaderFields:(NSDictionary<NSString *, NSString *> *)headerFields
                                                       forURL:(NSURL *)URL;
 + (NSDictionary<NSString *, NSString *> *)requestHeaderFieldsWithCookies:(NSArray<NSHTTPCookie *> *)cookies;
@@ -319,7 +319,7 @@ FOUNDATION_EXPORT NSNotificationName const NSHTTPCookieManagerCookiesChangedNoti
 /* The shared storage is kept in memory, and its cookies that outlive the
  * session are saved in ~/.config/ferry/cookies/<app id>.plist. */
 @interface NSHTTPCookieStorage : NSObject
-@property (class, readonly, strong) NSHTTPCookieStorage *sharedHTTPCookieStorage;
+@property (class, readonly, strong) NSHTTPCookieStorage * FERRY_SWIFT_NONNULL sharedHTTPCookieStorage;
 + (NSHTTPCookieStorage *)sharedCookieStorageForGroupContainerIdentifier:(NSString *)identifier;
 @property (readonly, copy) NSArray<NSHTTPCookie *> *cookies;
 - (void)setCookie:(NSHTTPCookie *)cookie;
@@ -356,10 +356,10 @@ typedef NS_ENUM(NSUInteger, NSURLCacheStoragePolicy) {
 
 /* The shared cache keeps its disk part in ~/.cache/<app id>/URLCache. */
 @interface NSURLCache : NSObject
-@property (class, strong) NSURLCache *sharedURLCache;
-- (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
+@property (class, strong) NSURLCache * FERRY_SWIFT_NONNULL sharedURLCache;
+- (instancetype FERRY_SWIFT_NONNULL)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
                               diskPath:(NSString *)path;
-- (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
+- (instancetype FERRY_SWIFT_NONNULL)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity
                           directoryURL:(NSURL *)directoryURL;
 - (NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request;
 - (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request;
@@ -405,8 +405,8 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityLow;
 FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 
 @interface NSURLSessionConfiguration : NSObject <NSCopying>
-@property (class, readonly, strong) NSURLSessionConfiguration *defaultSessionConfiguration;
-@property (class, readonly, strong) NSURLSessionConfiguration *ephemeralSessionConfiguration;
+@property (class, readonly, strong) NSURLSessionConfiguration * FERRY_SWIFT_NONNULL defaultSessionConfiguration;
+@property (class, readonly, strong) NSURLSessionConfiguration * FERRY_SWIFT_NONNULL ephemeralSessionConfiguration;
 + (NSURLSessionConfiguration *)backgroundSessionConfigurationWithIdentifier:(NSString *)identifier;
 @property (readonly, copy) NSString *identifier;
 @property NSURLRequestCachePolicy requestCachePolicy;
@@ -501,7 +501,7 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 @end
 
 @interface NSURLSession : NSObject
-@property (class, readonly, strong) NSURLSession *sharedSession;
+@property (class, readonly, strong) NSURLSession * FERRY_SWIFT_NONNULL sharedSession;
 + (NSURLSession *)sessionWithConfiguration:(NSURLSessionConfiguration *)configuration;
 + (NSURLSession *)sessionWithConfiguration:(NSURLSessionConfiguration *)configuration
                                   delegate:(id<NSURLSessionDelegate>)delegate

@@ -16,11 +16,11 @@ typedef NS_ENUM(NSUInteger, NSXMLDocumentContentKind) {
 };
 
 @interface NSXMLDocument : NSXMLNode
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithXMLString:(NSString *)string options:(NSXMLNodeOptions)mask error:(NSError **)error;
 - (instancetype)initWithContentsOfURL:(NSURL *)url options:(NSXMLNodeOptions)mask error:(NSError **)error;
 - (instancetype)initWithData:(NSData *)data options:(NSXMLNodeOptions)mask error:(NSError **)error;
-- (instancetype)initWithRootElement:(NSXMLElement *)element;
+- (instancetype FERRY_SWIFT_NONNULL)initWithRootElement:(NSXMLElement *)element;
 + (Class)replacementClassForClass:(Class)cls;
 
 @property (copy) NSString *characterEncoding;

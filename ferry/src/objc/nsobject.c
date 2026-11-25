@@ -243,6 +243,15 @@ id objc_autorelease(id obj)
     return SEND0(id, obj, SEL_autorelease);
 }
 
+/* NSObject's own -autorelease, which Swift's root class calls without a
+ * message (freemac 1.227). */
+id _objc_rootAutorelease(id obj)
+{
+    if (obj)
+        pool_add(obj);
+    return obj;
+}
+
 /* ARC's return-value handshake. A method returning an object at +0 ends
  * with objc_autoreleaseReturnValue(); its ARC caller immediately takes the
  * object back with objc_retainAutoreleasedReturnValue(). When the code at

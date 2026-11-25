@@ -145,6 +145,7 @@ extern char _objc_empty_cache_storage[];
     X(objc_storeWeak, objc_storeWeak) \
     X(objc_storeWeakOrNil, objc_storeWeakOrNil) \
     X(objc_initWeak, objc_initWeak) \
+    X(_objc_rootAutorelease, _objc_rootAutorelease) \
     X(objc_initWeakOrNil, objc_initWeakOrNil) \
     X(objc_destroyWeak, objc_destroyWeak) \
     X(objc_loadWeak, objc_loadWeak) \
@@ -193,7 +194,13 @@ extern char _objc_empty_cache_storage[];
     X(__gxx_personality_v0, ferry_objc_personality) \
     X(imp_implementationWithBlock, imp_implementationWithBlock) \
     X(imp_getBlock, imp_getBlock) \
-    X(imp_removeBlock, imp_removeBlock)
+    X(imp_removeBlock, imp_removeBlock) \
+    X(objc_readClassPair, objc_readClassPair) \
+    X(_objc_realizeClassFromSwift, _objc_realizeClassFromSwift) \
+    X(class_setSuperclass, class_setSuperclass) \
+    X(objc_setHook_getClass, objc_setHook_getClass) \
+    X(objc_setHook_getImageName, objc_setHook_getImageName) \
+    X(objc_setHook_lazyClassNamer, objc_setHook_lazyClassNamer)
 
 #define DECLARE(name, impl) void impl(void);
 OBJC_FUNCTIONS(DECLARE)

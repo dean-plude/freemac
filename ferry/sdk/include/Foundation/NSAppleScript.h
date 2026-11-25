@@ -15,7 +15,7 @@ FOUNDATION_EXPORT NSString *const NSAppleScriptErrorBriefMessage;
 FOUNDATION_EXPORT NSString *const NSAppleScriptErrorRange;
 
 @interface NSAppleScript : NSObject <NSCopying>
-- (instancetype)initWithSource:(NSString *)source;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSource:(NSString *)source;
 - (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSDictionary<NSString *, id> **)errorInfo;
 @property (readonly, copy) NSString *source;
 @property (readonly, getter=isCompiled) BOOL compiled;
@@ -38,8 +38,8 @@ enum {
     NSInternalScriptError = 8, NSOperationNotSupportedForKeyScriptError = 9, NSCannotCreateScriptCommandError = 10,
 };
 @interface NSScriptCommand : NSObject <NSCoding>
-+ (NSScriptCommand *)currentCommand;
-- (instancetype)initWithCommandDescription:(NSScriptCommandDescription *)commandDef;
+@property (class, readonly, strong) NSScriptCommand *currentCommand;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCommandDescription:(NSScriptCommandDescription *)commandDef;
 @property (readonly, retain) NSScriptCommandDescription *commandDescription;
 @property (retain) id directParameter;
 @property (copy) NSDictionary<NSString *, id> *arguments;

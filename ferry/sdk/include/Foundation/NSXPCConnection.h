@@ -38,7 +38,7 @@ typedef NS_OPTIONS(NSUInteger, NSXPCConnectionOptions) { NSXPCConnectionPrivileg
 @interface NSXPCConnection : NSObject <NSXPCProxyCreating>
 - (instancetype)initWithServiceName:(NSString *)serviceName;
 - (instancetype)initWithMachServiceName:(NSString *)name options:(NSXPCConnectionOptions)options;
-- (instancetype)initWithListenerEndpoint:(NSXPCListenerEndpoint *)endpoint;
+- (instancetype FERRY_SWIFT_NONNULL)initWithListenerEndpoint:(NSXPCListenerEndpoint *)endpoint;
 @property (readonly, copy) NSString *serviceName;
 @property (readonly, retain) NSXPCListenerEndpoint *endpoint;
 @property (retain) NSXPCInterface *exportedInterface;
@@ -60,7 +60,7 @@ typedef NS_OPTIONS(NSUInteger, NSXPCConnectionOptions) { NSXPCConnectionPrivileg
 @property (readonly) gid_t effectiveGroupIdentifier;
 /* taken; there is never another side to check */
 - (void)setCodeSigningRequirement:(NSString *)requirement;
-+ (NSXPCConnection *)currentConnection;
+@property (class, readonly, strong) NSXPCConnection *currentConnection;
 - (void)scheduleSendBarrierBlock:(void (^)(void))block;
 @end
 

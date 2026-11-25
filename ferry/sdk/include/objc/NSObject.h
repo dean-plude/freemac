@@ -8,20 +8,41 @@
 #include <objc/objc.h>
 #include <objc/NSObjCRuntime.h>
 
+/* Never nil, as Swift's importer sees it, and nothing for Objective-C: the
+ * initializers, factories and shared instances of Ferry's frameworks,
+ * whose other pointers Swift sees as implicitly unwrapped (freemac 1.227). */
+#ifndef FERRY_SWIFT_NONNULL
+#ifdef __swift__
+#define FERRY_SWIFT_NONNULL _Nonnull
+#else
+#define FERRY_SWIFT_NONNULL
+#endif
+#endif
+#ifndef FERRY_SWIFT_NULLABLE
+#ifdef __swift__
+#define FERRY_SWIFT_NULLABLE _Nullable
+#else
+#define FERRY_SWIFT_NULLABLE
+#endif
+#endif
+
 #ifdef __OBJC__
+/* Which pointers may be nil, as a Mac's header says, so that Swift sees
+ * NSObject() and -description as never nil (freemac 1.227). */
+#pragma clang assume_nonnull begin
 @class Protocol;
 @class NSString;
 typedef struct _NSZone NSZone;
 
 @protocol NSObject
-- (BOOL)isEqual:(id)object;
+- (BOOL)isEqual:(nullable id)object;
 @property (readonly) NSUInteger hash;
-@property (readonly) Class superclass;
+@property (readonly, nullable) Class superclass;
 - (Class)class;
 - (instancetype)self;
-- (id)performSelector:(SEL)aSelector;
-- (id)performSelector:(SEL)aSelector withObject:(id)object;
-- (id)performSelector:(SEL)aSelector withObject:(id)object1 withObject:(id)object2;
+- (nullable id)performSelector:(SEL)aSelector;
+- (nullable id)performSelector:(SEL)aSelector withObject:(nullable id)object;
+- (nullable id)performSelector:(SEL)aSelector withObject:(nullable id)object1 withObject:(nullable id)object2;
 - (BOOL)isProxy;
 - (BOOL)isKindOfClass:(Class)aClass;
 - (BOOL)isMemberOfClass:(Class)aClass;
@@ -34,9 +55,9 @@ typedef struct _NSZone NSZone;
 - (NSZone *)zone OBJC_ARC_UNAVAILABLE;
 /* as on a Mac, so an object known only by the protocol (id<NSObject>)
  * can be described */
-- (NSString *)description;
+@property (readonly, copy) NSString *description;
 @optional
-- (NSString *)debugDescription;
+@property (readonly, copy) NSString *debugDescription;
 @end
 
 OBJC_ROOT_CLASS
@@ -47,25 +68,26 @@ OBJC_ROOT_CLASS
 + (void)initialize;
 - (instancetype)init;
 + (instancetype)new;
-+ (instancetype)allocWithZone:(NSZone *)zone;
++ (instancetype)allocWithZone:(nullable NSZone *)zone;
 + (instancetype)alloc;
 - (void)dealloc;
 - (id)copy;
 - (id)mutableCopy;
-+ (id)copyWithZone:(NSZone *)zone OBJC_ARC_UNAVAILABLE;
-+ (id)mutableCopyWithZone:(NSZone *)zone OBJC_ARC_UNAVAILABLE;
++ (id)copyWithZone:(nullable NSZone *)zone OBJC_ARC_UNAVAILABLE;
++ (id)mutableCopyWithZone:(nullable NSZone *)zone OBJC_ARC_UNAVAILABLE;
 + (BOOL)instancesRespondToSelector:(SEL)aSelector;
 + (BOOL)conformsToProtocol:(Protocol *)protocol;
 - (IMP)methodForSelector:(SEL)aSelector;
 + (IMP)instanceMethodForSelector:(SEL)aSelector;
 - (void)doesNotRecognizeSelector:(SEL)aSelector;
-- (id)forwardingTargetForSelector:(SEL)aSelector;
+- (nullable id)forwardingTargetForSelector:(SEL)aSelector;
 + (BOOL)resolveClassMethod:(SEL)sel;
 + (BOOL)resolveInstanceMethod:(SEL)sel;
-+ (Class)superclass;
++ (nullable Class)superclass;
 + (Class)class;
 + (BOOL)isSubclassOfClass:(Class)aClass;
 + (NSUInteger)hash;
 @end
+#pragma clang assume_nonnull end
 #endif
 #endif

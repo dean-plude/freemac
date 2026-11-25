@@ -142,11 +142,11 @@ void NSRectFillListWithColorsUsingOperation(const NSRect *rects, NSColor *const 
  * catalogue that ferry-actool compiled (freemac 1.224, Ferry 0.48.0), and
  * answers nil for any name it doesn't know */
 @interface NSColor (FerryMoreSystemColors)
-@property (class, readonly) NSColor *windowFrameColor, *windowFrameTextColor, *scrollBarColor, *knobColor;
-@property (class, readonly) NSColor *selectedKnobColor, *highlightColor, *shadowColor, *controlHighlightColor;
-@property (class, readonly) NSColor *controlLightHighlightColor, *controlShadowColor, *controlDarkShadowColor;
-@property (class, readonly) NSColor *selectedMenuItemColor, *selectedMenuItemTextColor, *quaternaryLabelColor;
-@property (class, readonly) NSColor *unemphasizedSelectedTextBackgroundColor, *findHighlightColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL windowFrameColor, * FERRY_SWIFT_NONNULL windowFrameTextColor, * FERRY_SWIFT_NONNULL scrollBarColor, * FERRY_SWIFT_NONNULL knobColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedKnobColor, * FERRY_SWIFT_NONNULL highlightColor, * FERRY_SWIFT_NONNULL shadowColor, * FERRY_SWIFT_NONNULL controlHighlightColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL controlLightHighlightColor, * FERRY_SWIFT_NONNULL controlShadowColor, * FERRY_SWIFT_NONNULL controlDarkShadowColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedMenuItemColor, * FERRY_SWIFT_NONNULL selectedMenuItemTextColor, * FERRY_SWIFT_NONNULL quaternaryLabelColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL unemphasizedSelectedTextBackgroundColor, * FERRY_SWIFT_NONNULL findHighlightColor;
 + (NSColor *)colorNamed:(NSString *)name;
 + (NSColor *)colorNamed:(NSString *)name bundle:(NSBundle *)bundle;
 @end
@@ -263,8 +263,8 @@ APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastAq
 APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastDarkAqua;
 @interface NSAppearance : NSObject <NSCoding>
 + (NSAppearance *)appearanceNamed:(NSAppearanceName)name;
-@property (class, retain) NSAppearance *currentAppearance;
-@property (class, readonly) NSAppearance *currentDrawingAppearance;
+@property (class, retain) NSAppearance * FERRY_SWIFT_NONNULL currentAppearance;
+@property (class, readonly) NSAppearance * FERRY_SWIFT_NONNULL currentDrawingAppearance;
 @property (readonly, copy) NSAppearanceName name;
 @property (readonly) BOOL allowsVibrancy;
 - (NSAppearanceName)bestMatchFromAppearancesWithNames:(NSArray<NSAppearanceName> *)names;

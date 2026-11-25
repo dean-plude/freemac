@@ -1426,5 +1426,8 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
+# Swift toolchain or Swift's runtime built for Ferry
+. "$here/swift/run.sh"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

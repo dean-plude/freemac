@@ -12,20 +12,20 @@
 @property (readonly) NSUInteger count;
 - (ObjectType)objectAtIndex:(NSUInteger)idx;
 - (NSUInteger)indexOfObject:(ObjectType)object;
-+ (instancetype)orderedSet;
-+ (instancetype)orderedSetWithObject:(ObjectType)object;
-+ (instancetype)orderedSetWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-+ (instancetype)orderedSetWithObjects:(const ObjectType[])objects count:(NSUInteger)cnt;
-+ (instancetype)orderedSetWithArray:(NSArray<ObjectType> *)array;
-+ (instancetype)orderedSetWithSet:(NSSet<ObjectType> *)set;
-+ (instancetype)orderedSetWithOrderedSet:(NSOrderedSet<ObjectType> *)set;
-- (instancetype)init;
-- (instancetype)initWithObject:(ObjectType)object;
-- (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)cnt;
-- (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
-- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
-- (instancetype)initWithSet:(NSSet<ObjectType> *)set;
-- (instancetype)initWithOrderedSet:(NSOrderedSet<ObjectType> *)set;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSet;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithObject:(ObjectType)object;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithObjects:(const ObjectType[])objects count:(NSUInteger)cnt;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithArray:(NSArray<ObjectType> *)array;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithSet:(NSSet<ObjectType> *)set;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithOrderedSet:(NSOrderedSet<ObjectType> *)set;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObject:(ObjectType)object;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(const ObjectType[])objects count:(NSUInteger)cnt;
+- (instancetype FERRY_SWIFT_NONNULL)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
+- (instancetype FERRY_SWIFT_NONNULL)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSet:(NSSet<ObjectType> *)set;
+- (instancetype FERRY_SWIFT_NONNULL)initWithOrderedSet:(NSOrderedSet<ObjectType> *)set;
 - (ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 - (void)getObjects:(ObjectType __unsafe_unretained[])objects range:(NSRange)range;
 - (NSArray<ObjectType> *)objectsAtIndexes:(NSIndexSet *)indexes;
@@ -52,8 +52,8 @@
 @end
 
 @interface NSMutableOrderedSet<ObjectType> : NSOrderedSet<ObjectType>
-+ (instancetype)orderedSetWithCapacity:(NSUInteger)numItems;
-- (instancetype)initWithCapacity:(NSUInteger)numItems;
++ (instancetype FERRY_SWIFT_NONNULL)orderedSetWithCapacity:(NSUInteger)numItems;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCapacity:(NSUInteger)numItems;
 - (void)insertObject:(ObjectType)object atIndex:(NSUInteger)idx;
 - (void)removeObjectAtIndex:(NSUInteger)idx;
 - (void)replaceObjectAtIndex:(NSUInteger)idx withObject:(ObjectType)object;

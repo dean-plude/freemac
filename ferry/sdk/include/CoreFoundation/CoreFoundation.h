@@ -127,8 +127,11 @@ typedef enum {
 
 #define CF_RETURNS_RETAINED __attribute__((cf_returns_retained))
 #define CF_RETURNS_NOT_RETAINED __attribute__((cf_returns_not_retained))
-#define CF_ENUM(type, name) enum name : type name; enum name : type
-#define CF_OPTIONS(type, name) enum name : type name; enum name : type
+/* with a Mac's attributes, for Swift (freemac 1.227) */
+#define CF_ENUM(type, name) enum __attribute__((enum_extensibility(open))) name : type name; \
+    enum __attribute__((enum_extensibility(open))) name : type
+#define CF_OPTIONS(type, name) enum __attribute__((flag_enum, enum_extensibility(open))) name : type name; \
+    enum __attribute__((flag_enum, enum_extensibility(open))) name : type
 #define CF_EXPORT extern
 #define CF_INLINE static inline
 

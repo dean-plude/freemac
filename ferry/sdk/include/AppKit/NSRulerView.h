@@ -17,7 +17,7 @@ APPKIT_EXTERN NSRulerViewUnitName const NSRulerViewUnitPicas;
 
 /* A mark on a ruler, drawn as an image, that the user may move or remove. */
 @interface NSRulerMarker : NSObject <NSCopying, NSCoding>
-- (instancetype)initWithRulerView:(NSRulerView *)ruler markerLocation:(CGFloat)location image:(NSImage *)image
+- (instancetype FERRY_SWIFT_NONNULL)initWithRulerView:(NSRulerView *)ruler markerLocation:(CGFloat)location image:(NSImage *)image
                       imageOrigin:(NSPoint)imageOrigin;
 @property (readonly, assign) NSRulerView *ruler;
 @property CGFloat markerLocation;
@@ -39,7 +39,7 @@ APPKIT_EXTERN NSRulerViewUnitName const NSRulerViewUnitPicas;
 + (void)registerUnitWithName:(NSRulerViewUnitName)unitName abbreviation:(NSString *)abbreviation
     unitToPointsConversionFactor:(CGFloat)conversionFactor stepUpCycle:(NSArray<NSNumber *> *)stepUpCycle
                    stepDownCycle:(NSArray<NSNumber *> *)stepDownCycle;
-- (instancetype)initWithScrollView:(NSScrollView *)scrollView orientation:(NSRulerOrientation)orientation;
+- (instancetype FERRY_SWIFT_NONNULL)initWithScrollView:(NSScrollView *)scrollView orientation:(NSRulerOrientation)orientation;
 @property (assign) NSScrollView *scrollView;
 @property NSRulerOrientation orientation;
 @property CGFloat ruleThickness, reservedThicknessForMarkers, reservedThicknessForAccessoryView;

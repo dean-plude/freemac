@@ -60,12 +60,12 @@ typedef NS_OPTIONS(NSUInteger, NSStreamEvent) {
 @interface NSOutputStream : NSStream
 - (NSInteger)write:(const uint8_t *)buffer maxLength:(NSUInteger)len;
 @property (readonly) BOOL hasSpaceAvailable;
-- (instancetype)initToMemory;
-- (instancetype)initToBuffer:(uint8_t *)buffer capacity:(NSUInteger)capacity;
+- (instancetype FERRY_SWIFT_NONNULL)initToMemory;
+- (instancetype FERRY_SWIFT_NONNULL)initToBuffer:(uint8_t *)buffer capacity:(NSUInteger)capacity;
 - (instancetype)initWithURL:(NSURL *)url append:(BOOL)shouldAppend;
 - (instancetype)initToFileAtPath:(NSString *)path append:(BOOL)shouldAppend;
-+ (instancetype)outputStreamToMemory;
-+ (instancetype)outputStreamToBuffer:(uint8_t *)buffer capacity:(NSUInteger)capacity;
++ (instancetype FERRY_SWIFT_NONNULL)outputStreamToMemory;
++ (instancetype FERRY_SWIFT_NONNULL)outputStreamToBuffer:(uint8_t *)buffer capacity:(NSUInteger)capacity;
 + (instancetype)outputStreamToFileAtPath:(NSString *)path append:(BOOL)shouldAppend;
 + (instancetype)outputStreamWithURL:(NSURL *)url append:(BOOL)shouldAppend;
 @end
