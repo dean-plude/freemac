@@ -2861,6 +2861,16 @@ that asks for access; the answer is kept for each app. A view
 controller's preferred content size and its `viewDidLayout` work as on a
 Mac, so views that size themselves after layout show at their size.
 
+From freemac 1.236 every Mac app that has run under Ferry is built
+again from its source by a script in `ferry/apps/`, and each was run
+again after the layout pass came in. A stack view sizes a view held by
+its own width and height constraints to them, as on a Mac, and is as
+wide as the widest view in it that has a width of its own, so MacPass's
+welcome window shows its icon at 128 points with its title and buttons
+under it. A grid view leaves hidden a view the app hid itself when it
+shows that view's row, so Itsycal's agenda shows its video-call button
+only for an event with a meeting link.
+
 FFmpeg 8.0.1 and 6.1.1 build as Intel Mac libraries and tools with
 `ferry/apps/ffmpeg.sh`, for OBS and VLC, and run under Ferry: `ffmpeg` and
 `ffprobe` decode H.264, VP9, Theora and VP8 video and AAC, Opus, Vorbis and
@@ -2989,3 +2999,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.57.0 (freemac 1.233): FFmpeg 8.0.1 (for OBS) and 6.1.1 (for VLC) built as Mac dylibs and tools by `ferry/apps/ffmpeg.sh`, with `fetch_release` in `apps/recipe.sh`; `ffmpeg` and `ffprobe` under Ferry decode the H.264, VP9, Theora and VP8 test clips to the same frame MD5s as a Linux FFmpeg; `posix_spawn` and `posix_spawnp` with file actions and attributes, Mac children through Ferry; `glob`, `fnmatch` and `mach_wait_until`; `backtrace` through Mac code's frames, each named; `tcgetattr`, `tcsetattr` and the rest of termios in the Mac's layout, and `posix_openpt`; `getrusage` in the Mac's units; a plugin host test (`plugins`), `libsystem_media`, `libsystem_backtrace`, `libsystem_termios`, and `ffmpeg_decode` when `FERRY_FFMPEG` is set; `make check` 295/295, 296/296 with `FERRY_FFMPEG`.
 - 2026-11-25: Ferry 0.58.0 (freemac 1.234): Mac apps play and record sound: Core Audio's HAL on the sound server through libpulse, with each sink and source a device, devices that come and go, default devices, volume and mute, IO procs and listeners, and a null device when there is no server; Audio Toolbox's HALOutput and DefaultOutput units (render callbacks, input through `AudioUnitRender`), audio queues for output and input, PCM audio converters and channel layouts, the calls VLC's sound out and OBS's audio capture use; five new tests.
 - 2026-11-25: Ferry 0.59.0 (freemac 1.235): OpenGL, Core Video and IOSurface for VLC's and OBS's video output: CGL on this system's EGL with legacy, 3.2 and 4.1 core profiles, `NSOpenGLPixelFormat`, `NSOpenGLContext` and `NSOpenGLView`, `CAOpenGLLayer` drawn from any thread and asynchronously, `CVDisplayLink` at the display's rate, `CVPixelBuffer` and its pool on IOSurfaces with 420v, 420f, y420 and BGRA among the formats, attachments, OpenGL texture caches and `CGLTexImageIOSurface2D`; drawing is read back and painted into the window; `make check` 308/308.
+- 2026-11-25: Ferry 0.60.0 (freemac 1.236): every Mac app that has run under Ferry rebuilt by a recipe in `ferry/apps/` (Flycut, Spectacle, ShiftIt, KeyCastr, MacPass, MacDown, Itsycal and TomatoBar; Sequel Pro's still to come), the Objective-C ones from their Xcode projects by Ferry's own `apps/xcode.py`, with Sparkle 1 and 2 built from source; each run again after 1.232's layout pass, with screenshots in `docs/screenshots/ferry-apps/`; a stack view's views held to their own size constraints and its width across from its widest view (MacPass's welcome window); a grid view leaving hidden the views an app hid (Itsycal's video-call button); `appkit_polish` and `appkit_newer_apps` extended.

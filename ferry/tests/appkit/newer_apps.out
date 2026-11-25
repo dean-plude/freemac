@@ -37,4 +37,8 @@ resourceSpecifier: someone@example.com
 kSCNetworkFlagsReachable: same
 cornerCurve: circular
 cornerCurve: continuous
+a grid's button the app hid: hidden 1
+  its row hidden: label hidden 1, button hidden 1
+  its row shown again: label hidden 0, button hidden 1
+  shown by the app: button hidden 0
 exit=0

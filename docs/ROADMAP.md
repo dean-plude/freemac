@@ -1183,6 +1183,36 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.236 "Ferry: the Mac apps rebuilt by recipes" (done)
+
+Ferry 0.60.0: the open-source Mac apps that have run under Ferry are
+built again from their source by one script each, `ferry/apps/APP.sh`,
+which fetches the app and what it uses at pinned commits and builds them
+with Ferry's SDK, outside freemac's repository. Their Xcode projects are
+read by `ferry/apps/xcode.py`, Ferry's own reader of the project file,
+which compiles each target's sources, xibs and asset catalogues with
+`ferry-cc`, `ferry-ibtool` and `ferry-actool`. Recipes are new for
+Flycut, Spectacle, ShiftIt, KeyCastr, MacPass, MacDown and Itsycal, beside
+TomatoBar's. Each app was run again under X after 1.232's layout pass:
+two stack views and a grid view were put right, so MacPass's welcome
+window shows its title and buttons again and Itsycal's agenda shows its
+video-call button only for an event with a meeting link.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `ferry/apps/xcode.py`: one target of an Xcode project built for its Release configuration, with its .xcconfig files and `$(inherited)`, prefix header, definitions, search paths, ARC and each file's own flags, and its resources (xibs to nibs, asset catalogues, .lproj folders); an app, a framework with its headers, a plug-in bundle or a library | Ferry apps | done |
+| 2 | Recipes for Flycut, Spectacle, ShiftIt, KeyCastr, MacPass, MacDown and Itsycal, with the frameworks and pods they use; Sparkle 1 and 2 built from source by two shared helpers; `ferry/apps/README.md` lists them | Ferry apps | done |
+| 3 | Each app run again: Flycut's menu and preferences, Spectacle's and ShiftIt's menus, KeyCastr's update prompt, MacPass's welcome and document windows, MacDown's editor and preview, Itsycal's month and agenda and TomatoBar's popover show as before; screenshots in `docs/screenshots/ferry-apps/` | Ferry | done |
+| 4 | A stack view sizes a view held by its own width and height constraints to them, not to its intrinsic size, and is as wide across as the widest view that has a width of its own (MacPass's welcome: its 128-point icon had taken the whole stack, pushing its title and buttons out) | Ferry AppKit | done |
+| 5 | A grid view leaves hidden a view the app hid itself; it unhides only the views it hid for a hidden row or column (Itsycal's agenda showed its video-call button on every row) | Ferry AppKit | done |
+| 6 | Tests: `appkit_polish` and `appkit_newer_apps` extended. `make check` 309 of 309, three times | Ferry | done |
+
+Not done: Sequel Pro has no recipe yet (MariaDB Connector/C needs its
+hashes over CommonCrypto and its build configuration written for Ferry).
+Itsycal's window still appears seconds after the click: opening it solves
+the window's constraints 22 times, 3.9 seconds in all, and each large solve
+takes 80 rounds that hold one broken inequality at a time.
+
 ## 1.235 "Ferry: OpenGL and Core Video, for VLC's and OBS's video" (done)
 
 Ferry 0.59.0: Mac apps draw with OpenGL. CGL makes its contexts on this system's EGL (Mesa's software renderer will do), legacy 2.1 and core 3.2 and 4.1, and NSOpenGLView, NSOpenGLContext and CAOpenGLLayer draw into a window as VLC's and OBS's video output do, from the main thread or a thread of the app's own. Core Video gains display links at the display's rate, pixel buffers and pools on IOSurfaces in the formats video uses, and OpenGL texture caches, and IOSurface textures reach OpenGL with CGLTexImageIOSurface2D. Frames go through a copy on the CPU, about 5.5 ms for each 1080p frame, and surfaces aren't shared between programs. With this, everything VLC's interface was waiting on is in Ferry.
