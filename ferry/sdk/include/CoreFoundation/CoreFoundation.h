@@ -28,6 +28,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+/* and Block_copy, when blocks are on (freemac 1.226, Ferry 0.50.0) */
+#if __BLOCKS__
+#include <Block.h>
+#endif
 #include <time.h>
 
 typedef const void *CFTypeRef;

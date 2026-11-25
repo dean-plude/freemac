@@ -210,7 +210,7 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
 @implementation NSLayoutManager {
     NSTextStorage *_storage;   /* not retained: the storage holds us */
     NSMutableArray *_containers;
-    BOOL _nonContiguous, _fontLeading, _invisibles, _controls;
+    BOOL _nonContiguous, _fontLeading, _invisibles, _controls, _noBackgroundLayout;
 }
 - (instancetype)init
 {
@@ -311,6 +311,8 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
 }
 - (BOOL)allowsNonContiguousLayout { return _nonContiguous; }
 - (void)setAllowsNonContiguousLayout:(BOOL)f { _nonContiguous = f; }
+- (BOOL)backgroundLayoutEnabled { return !_noBackgroundLayout; }
+- (void)setBackgroundLayoutEnabled:(BOOL)f { _noBackgroundLayout = !f; }
 - (BOOL)usesFontLeading { return _fontLeading; }
 - (void)setUsesFontLeading:(BOOL)f { _fontLeading = f; }
 - (BOOL)showsInvisibleCharacters { return _invisibles; }

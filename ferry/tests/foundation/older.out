@@ -1,0 +1,41 @@
+NSCalendarDate:
+  is a date: 1, since 2001: 730904709
+  2024-02-29 13:05:09 +0000
+  Thursday 29 February 2024, 01:05 PM, day 060, weekday 4
+  fields: 2024-2-29 13:5:9, week day 4, year day 60
+  in +0200: 2024-02-29 15:05:09 +0200
+  a year on (from 29 February): 2025-02-28
+  a month back, two days and three hours on: 2024-01-31 18:05:09 +0200
+  difference: 1y 0m 0d 0h 0m 0s
+  backwards in days and hours: -365d 0h
+  parsed: 2010-07-04 18:30:00 -0500 (299979000)
+  parsed: 1999-03-03 19:04 GMT
+  not a date: nil
+  copy: 2010-07-04 18:30:00 -0500, equal 1
+  from NSDate: 2001-01-01 00:00:00.000 GMT
+NSScriptExecutionContext:
+  shared: 1, top level the app
+NSConnection:
+  registered: 1
+  same name again: 0
+  root proxy: hello tunnel
+  unknown name: nil
+  after invalidate: valid 0, found 0
+CFXML entities:
+  escaped: a &lt; b &amp; &quot;c&quot; &gt; &apos;d&apos;
+  back: a < b & "c" > 'd'
+  more: (c) AB &unknown; &amp
+DriverServices:
+  20 ms apart: 1
+  same as mach_absolute_time's count: 1
+  durations: 1500 ms, -250 (microseconds when negative)
+  two seconds on: 2000 ms
+  forever: 1
+object_getInstanceVariable:
+  name = first
+  raw = 0x1234
+  missing: NULL
+mutable collections from files:
+  dictionary: 2 keys, mutable 1
+  array: x y
+exit=0

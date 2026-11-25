@@ -518,6 +518,15 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
 /* ---- NSMutableDictionary -------------------------------------------------------- */
 
 @implementation NSMutableDictionary
+/* NSDictionary's make a mutable copy when called on a mutable class */
++ (NSMutableDictionary *)dictionaryWithContentsOfFile:(NSString *)path
+{
+    return (NSMutableDictionary *)[super dictionaryWithContentsOfFile:path];
+}
++ (NSMutableDictionary *)dictionaryWithContentsOfURL:(NSURL *)url
+{
+    return (NSMutableDictionary *)[super dictionaryWithContentsOfURL:url];
+}
 + (instancetype)dictionaryWithCapacity:(NSUInteger)capacity
 {
     return [[[self alloc] initWithCapacity:capacity] autorelease];

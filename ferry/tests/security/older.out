@@ -1,0 +1,18 @@
+trusted applications and access:
+  this program: 0
+  its data: 0, names it 1
+  no such file: -50, none
+  access: 0, made
+adding from attribute lists:
+  added Sequel Pro : one: 0, item made
+  added Sequel Pro : two: 0, item made
+  the same again: -25299
+  no class: -25306
+  found: 0, "first secret"
+searching:
+  by account: 0
+  items: 1, then -25300
+  everything generic: 0
+  items: 2, deleted
+  after deleting: -25300
+exit=0

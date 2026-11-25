@@ -71,6 +71,23 @@ int asl_remove_log_file(aslclient client, int fd);
 aslresponse asl_search(aslclient client, aslmsg query);
 aslmsg aslresponse_next(aslresponse r);
 void aslresponse_free(aslresponse r);
+/* A query's conditions (freemac 1.226, Ferry 0.50.0): kept, but the log
+ * can't be searched here, so a search finds nothing. */
+#define ASL_QUERY_OP_CASEFOLD 0x0010
+#define ASL_QUERY_OP_PREFIX 0x0020
+#define ASL_QUERY_OP_SUFFIX 0x0040
+#define ASL_QUERY_OP_SUBSTRING 0x0060
+#define ASL_QUERY_OP_NUMERIC 0x0080
+#define ASL_QUERY_OP_REGEX 0x0100
+#define ASL_QUERY_OP_EQUAL 0x0001
+#define ASL_QUERY_OP_GREATER 0x0002
+#define ASL_QUERY_OP_GREATER_EQUAL 0x0003
+#define ASL_QUERY_OP_LESS 0x0004
+#define ASL_QUERY_OP_LESS_EQUAL 0x0005
+#define ASL_QUERY_OP_NOT_EQUAL 0x0006
+#define ASL_QUERY_OP_TRUE 0x0007
+int asl_set_query(aslmsg msg, const char *key, const char *value, uint32_t op);
+aslmsg asl_next(aslresponse r);
 
 __FERRY_END
 #endif

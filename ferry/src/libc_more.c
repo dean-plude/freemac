@@ -807,6 +807,24 @@ static int mac_asl_remove_log_file(struct asl_object *c, int fd)
     return -1;
 }
 
+/* memset_pattern4, 8 and 16 (freemac 1.226, Ferry 0.50.0): fill len
+ * bytes with a 4-, 8- or 16-byte pattern repeated, the last copy cut
+ * short. Clang calls memset_pattern16 by itself when it compiles a loop
+ * that stores the same 16 bytes over and over for a Mac. */
+static void fill_pattern(void *b, const void *pattern, size_t n, size_t len)
+{
+    unsigned char *p = b;
+    while (len >= n) {
+        memcpy(p, pattern, n);
+        p += n;
+        len -= n;
+    }
+    memcpy(p, pattern, len);
+}
+static void mac_memset_pattern4(void *b, const void *pattern, size_t len) { fill_pattern(b, pattern, 4, len); }
+static void mac_memset_pattern8(void *b, const void *pattern, size_t len) { fill_pattern(b, pattern, 8, len); }
+static void mac_memset_pattern16(void *b, const void *pattern, size_t len) { fill_pattern(b, pattern, 16, len); }
+
 /* the log can't be searched: no results */
 static void *mac_asl_search(void *c, void *q)
 {
@@ -820,9 +838,19 @@ static void *mac_aslresponse_next(void *r)
     return NULL;
 }
 static void mac_aslresponse_free(void *r) { (void)r; }
+/* A query's conditions are kept as its keys and values (the operation is
+ * not needed, since nothing is searched). */
+static int mac_asl_set_query(struct asl_object *q, const char *key, const char *value, uint32_t op)
+{
+    (void)op;
+    return mac_asl_set(q, key, value ? value : "");
+}
 
 const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"malloc_good_size", mac_malloc_good_size},
+    {"memset_pattern4", mac_memset_pattern4},
+    {"memset_pattern8", mac_memset_pattern8},
+    {"memset_pattern16", mac_memset_pattern16},
     {"malloc_default_zone", mac_malloc_default_zone},
     {"malloc_default_purgeable_zone", mac_malloc_default_purgeable_zone},
     {"malloc_create_zone", mac_malloc_create_zone},
@@ -875,5 +903,7 @@ const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"asl_search", mac_asl_search},
     {"aslresponse_next", mac_aslresponse_next},
     {"aslresponse_free", mac_aslresponse_free},
+    {"asl_set_query", mac_asl_set_query},
+    {"asl_next", mac_aslresponse_next},
     {NULL, NULL},
 };

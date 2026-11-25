@@ -157,8 +157,41 @@ int ferry_twin_library(const char *install_name)
     return 0;
 }
 
+/* bzip2's two calls that take a FILE, given this system's FILE behind the
+ * program's (freemac 1.226, Ferry 0.50.0; Sequel Pro's .bz2 imports and
+ * exports). The rest of the FILE calls above still stop the program. */
+static void *bz2_call(const char *name)
+{
+    for (int i = 0; twins[i].mac; i++)
+        if (!strcmp(twins[i].linux_name, "libbz2.so.1.0") && twin_handles[i])
+            return dlsym(twin_handles[i], name);
+    return NULL;
+}
+static void *twin_bzReadOpen(int *err, void *file, int verbosity, int small, void *unused, int n_unused)
+{
+    void *(*f)(int *, void *, int, int, void *, int) = bz2_call("BZ2_bzReadOpen");
+    if (!f) {
+        if (err) *err = -6; /* BZ_IO_ERROR */
+        return NULL;
+    }
+    return f(err, ferry_host_file(file), verbosity, small, unused, n_unused);
+}
+static void *twin_bzWriteOpen(int *err, void *file, int block_size, int verbosity, int work_factor)
+{
+    void *(*f)(int *, void *, int, int, int) = bz2_call("BZ2_bzWriteOpen");
+    if (!f) {
+        if (err) *err = -6;
+        return NULL;
+    }
+    return f(err, ferry_host_file(file), block_size, verbosity, work_factor);
+}
+
 void *ferry_twin_lookup(const char *name)
 {
+    if (!strcmp(name, "BZ2_bzReadOpen"))
+        return bz2_call(name) ? (void *)twin_bzReadOpen : NULL;
+    if (!strcmp(name, "BZ2_bzWriteOpen"))
+        return bz2_call(name) ? (void *)twin_bzWriteOpen : NULL;
     for (int i = 0; takes_a_file[i]; i++)
         if (!strcmp(name, takes_a_file[i]))
             return NULL;

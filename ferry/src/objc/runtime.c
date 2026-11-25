@@ -1562,6 +1562,25 @@ void object_setIvar(id obj, struct fivar *v, id value)
         *(id *)((char *)obj + *v->offset) = value;
 }
 
+/* The older by-name calls, for code built without ARC (freemac 1.226,
+ * Ferry 0.50.0; Sequel Pro's combo box cell): the variable's value is
+ * copied out as raw bytes of the pointer's size, and set without retaining. */
+struct fivar *object_getInstanceVariable(id obj, const char *name, void **out)
+{
+    struct fivar *v = obj && name ? class_getInstanceVariable(object_getClass(obj), name) : NULL;
+    if (out)
+        *out = v ? *(void **)((char *)obj + *v->offset) : NULL;
+    return v;
+}
+
+struct fivar *object_setInstanceVariable(id obj, const char *name, void *value)
+{
+    struct fivar *v = obj && name ? class_getInstanceVariable(object_getClass(obj), name) : NULL;
+    if (v)
+        *(void **)((char *)obj + *v->offset) = value;
+    return v;
+}
+
 void object_setIvarWithStrongDefault(id obj, struct fivar *v, id value)
 {
     if (!obj || !v)

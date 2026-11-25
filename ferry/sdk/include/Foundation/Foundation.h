@@ -697,6 +697,9 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 
 @interface NSMutableArray<ObjectType> : NSArray<ObjectType>
 + (instancetype)arrayWithCapacity:(NSUInteger)capacity;
+/* mutable copies of what the file or URL holds (freemac 1.226, Ferry 0.50.0) */
++ (NSMutableArray<ObjectType> *)arrayWithContentsOfFile:(NSString *)path;
++ (NSMutableArray<ObjectType> *)arrayWithContentsOfURL:(NSURL *)url;
 - (instancetype)initWithCapacity:(NSUInteger)capacity;
 - (void)addObject:(ObjectType)obj;
 - (void)insertObject:(ObjectType)obj atIndex:(NSUInteger)index;
@@ -758,6 +761,9 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 
 @interface NSMutableDictionary<KeyType, ObjectType> : NSDictionary<KeyType, ObjectType>
 + (instancetype)dictionaryWithCapacity:(NSUInteger)capacity;
+/* mutable copies of what the file or URL holds (freemac 1.226, Ferry 0.50.0) */
++ (NSMutableDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfFile:(NSString *)path;
++ (NSMutableDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfURL:(NSURL *)url;
 - (instancetype)initWithCapacity:(NSUInteger)capacity;
 - (void)setObject:(ObjectType)object forKey:(KeyType<NSCopying>)key;
 - (void)setObject:(ObjectType)object forKeyedSubscript:(KeyType<NSCopying>)key;
@@ -3027,5 +3033,7 @@ enum { NSFormattingError = 2048 };
 #include <CoreServices/CoreServices.h>
 /* Apple event descriptors as objects, and the handlers (freemac 1.225, Ferry 0.49.0). */
 #include <Foundation/NSAppleEventDescriptor.h>
+/* NSCalendarDate, the scripting execution context and NSConnection (freemac 1.226, Ferry 0.50.0). */
+#include <Foundation/FoundationOlder.h>
 
 #endif

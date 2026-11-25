@@ -36,6 +36,11 @@ BOOL object_isClass(id obj);
 id object_getIvar(id obj, Ivar ivar);
 void object_setIvar(id obj, Ivar ivar, id value);
 void object_setIvarWithStrongDefault(id obj, Ivar ivar, id value);
+/* not under ARC, as on a Mac (freemac 1.226, Ferry 0.50.0) */
+#if !__has_feature(objc_arc)
+Ivar object_getInstanceVariable(id obj, const char *name, void **outValue);
+Ivar object_setInstanceVariable(id obj, const char *name, void *value);
+#endif
 
 Class objc_getClass(const char *name);
 Class objc_getMetaClass(const char *name);

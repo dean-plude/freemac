@@ -825,7 +825,8 @@ typedef NS_ENUM(NSUInteger, NSButtonType) {
 #define NSOnOffButton NSButtonTypeOnOff
 #define NSMomentaryPushInButton NSButtonTypeMomentaryPushIn
 typedef NS_ENUM(NSUInteger, NSBezelStyle) {
-    NSBezelStyleRounded = 1, NSBezelStyleRegularSquare = 2, NSBezelStyleDisclosure = 5,
+    NSBezelStyleRounded = 1, NSBezelStyleRegularSquare = 2, NSBezelStyleThickSquare = 3,
+    NSBezelStyleThickerSquare = 4, NSBezelStyleDisclosure = 5,
     NSBezelStyleShadowlessSquare = 6, NSBezelStyleCircular = 7, NSBezelStyleTexturedSquare = 8,
     NSBezelStyleHelpButton = 9, NSBezelStyleSmallSquare = 10, NSBezelStyleTexturedRounded = 11,
     NSBezelStyleRoundRect = 12, NSBezelStyleRecessed = 13, NSBezelStyleRoundedDisclosure = 14,
@@ -843,6 +844,8 @@ typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
     NSBackgroundStyleNormal = 0, NSBackgroundStyleEmphasized = 1, NSBackgroundStyleRaised = 2,
     NSBackgroundStyleLowered = 3, NSBackgroundStyleLight = 0, NSBackgroundStyleDark = 1,
 };
+@class NSText;
+typedef NS_ENUM(NSUInteger, NSCellType) { NSNullCellType = 0, NSTextCellType = 1, NSImageCellType = 2 };
 @interface NSCell : NSObject <NSCopying, NSCoding>
 - (instancetype)initTextCell:(NSString *)string;
 - (instancetype)initImageCell:(NSImage *)image;
@@ -876,6 +879,39 @@ typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
 @property (retain) __kindof NSFormatter *formatter;
 @property BOOL showsFirstResponder;
 - (void)performClick:(id)sender;
+/* freemac 1.226, Ferry 0.50.0: the object the cell stands for, the
+ * number setters, and settings Ferry keeps for the program (its controls
+ * decide editing, focus rings and undo themselves) */
+@property (retain) id representedObject;
+@property (readonly) float floatValue;
+- (void)setIntValue:(int)value;
+- (void)setIntegerValue:(NSInteger)value;
+- (void)setFloatValue:(float)value;
+- (void)setDoubleValue:(double)value;
+- (void)takeIntValueFrom:(id)sender;
+- (void)takeIntegerValueFrom:(id)sender;
+- (void)takeFloatValueFrom:(id)sender;
+- (void)takeDoubleValueFrom:(id)sender;
+- (void)takeStringValueFrom:(id)sender;
+- (void)takeObjectValueFrom:(id)sender;
+@property (readonly) BOOL hasValidObjectValue;
+@property NSCellType type;
+@property BOOL sendsActionOnEndEditing;
+- (NSInteger)sendActionOn:(NSInteger)mask;
+@property BOOL allowsMixedState;
+@property (readonly) NSInteger nextState;
+- (void)setNextState;
+@property BOOL refusesFirstResponder;
+@property (readonly) BOOL acceptsFirstResponder;
+@property BOOL allowsUndo;
+@property BOOL usesSingleLineMode;
+@property NSFocusRingType focusRingType;
+@property NSWritingDirection baseWritingDirection;
+@property (readonly, copy) NSString *keyEquivalent;
+@property (readonly, getter=isOpaque) BOOL opaque;
+- (NSComparisonResult)compare:(id)other;
+- (void)highlight:(BOOL)flag withFrame:(NSRect)frame inView:(NSView *)view;
+- (NSText *)setUpFieldEditorAttributes:(NSText *)editor;
 @end
 
 @interface NSActionCell : NSCell
@@ -1003,7 +1039,8 @@ typedef NS_OPTIONS(NSUInteger, NSWindowStyleMask) {
     NSWindowStyleMaskBorderless = 0, NSWindowStyleMaskTitled = 1 << 0, NSWindowStyleMaskClosable = 1 << 1,
     NSWindowStyleMaskMiniaturizable = 1 << 2, NSWindowStyleMaskResizable = 1 << 3,
     NSWindowStyleMaskUtilityWindow = 1 << 4, NSWindowStyleMaskDocModalWindow = 1 << 6,
-    NSWindowStyleMaskNonactivatingPanel = 1 << 7, NSWindowStyleMaskUnifiedTitleAndToolbar = 1 << 12,
+    NSWindowStyleMaskNonactivatingPanel = 1 << 7, NSWindowStyleMaskTexturedBackground = 1 << 8,
+    NSWindowStyleMaskUnifiedTitleAndToolbar = 1 << 12,
     NSWindowStyleMaskHUDWindow = 1 << 13, NSWindowStyleMaskFullScreen = 1 << 14,
     NSWindowStyleMaskFullSizeContentView = 1 << 15,
 };
@@ -2204,6 +2241,8 @@ APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRT
 @property (readonly, assign) NSTextStorage *textStorage;
 @property (readonly) NSArray<NSTextContainer *> *textContainers;
 @property BOOL allowsNonContiguousLayout, usesFontLeading, showsInvisibleCharacters, showsControlCharacters;
+/* kept; Ferry lays text out when it is asked for, never in the background */
+@property BOOL backgroundLayoutEnabled;
 @property (readonly) NSTextView *firstTextView;
 - (void)setTextStorage:(NSTextStorage *)storage;
 - (void)replaceTextStorage:(NSTextStorage *)storage;
@@ -4541,5 +4580,10 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 #import <AppKit/AppKitDocumentApps.h>
 /* the grid view (NSGridView.m) (freemac 1.225, Ferry 0.49.0) */
 #import <AppKit/NSGridView.h>
+
+/* ---- older names: base coordinates, colour lists, HFS file types (AppKitOlder.m),
+ * (freemac 1.226, Ferry 0.50.0) */
+
+#import <AppKit/AppKitOlder.h>
 
 #endif

@@ -262,7 +262,12 @@ typedef NS_OPTIONS(unsigned int, CAEdgeAntialiasingMask) {
 - (BOOL)needsLayout;
 - (void)layoutIfNeeded;
 - (void)layoutSublayers;
-@property (strong) id<CALayoutManager> layoutManager;
+/* An id<CALayoutManager>. Typed id here (freemac 1.226, Ferry 0.50.0):
+ * AppKit imports this header before its text classes, so for a message to
+ * an id this would be the first layoutManager clang meets, and
+ * [[textView layoutManager] glyphRange…] would find no such method, as it
+ * does on a Mac, where NSTextView's comes first. */
+@property (strong) id layoutManager;
 @property CAAutoresizingMask autoresizingMask;
 - (void)resizeSublayersWithOldSize:(CGSize)size;
 - (void)resizeWithOldSuperlayerSize:(CGSize)size;

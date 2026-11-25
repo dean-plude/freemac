@@ -105,7 +105,7 @@ static int threaded;                /* a second thread has been started */
 static int live_threads;            /* threads started for the program, still running */
 
 /* The kernel's thread ids of the threads Ferry started, for pthread_threadid_np. */
-struct known { pthread_t t; pid_t tid; struct known *next; };
+struct known { pthread_t t; pid_t tid; int cancel; struct known *next; };
 static struct known *known_threads;
 static pthread_mutex_t known_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -113,14 +113,29 @@ __attribute__((constructor)) static void note_main_thread(void) { main_thread = 
 
 static pid_t gettid_now(void) { return (pid_t)syscall(SYS_gettid); }
 
-static void remember(pthread_t t, pid_t tid)
+/* with known_lock held */
+static void remember_locked(pthread_t t, pid_t tid)
 {
+    for (struct known *k = known_threads; k; k = k->next)
+        if (pthread_equal(k->t, t)) {
+            if (tid)
+                k->tid = tid;
+            return;
+        }
     struct known *k = malloc(sizeof *k);
+    if (!k)
+        return;
     k->t = t;
     k->tid = tid;
-    pthread_mutex_lock(&known_lock);
+    k->cancel = 0;
     k->next = known_threads;
     known_threads = k;
+}
+
+static void remember(pthread_t t, pid_t tid)
+{
+    pthread_mutex_lock(&known_lock);
+    remember_locked(t, tid);
     pthread_mutex_unlock(&known_lock);
 }
 
@@ -146,6 +161,43 @@ struct start {
 static __thread jmp_buf *exit_point;
 static __thread void *exit_value;
 
+/* Cleanup handlers (freemac 1.226, Ferry 0.50.0). pthread_cleanup_push and
+ * pthread_cleanup_pop are macros in Ferry's <pthread.h>, as on a Mac, that
+ * keep each handler's record on the caller's stack and call these;
+ * pthread_exit, and a cancellation, run the thread's handlers newest first. */
+struct mac_cleanup {
+    void (*routine)(void *);
+    void *arg;
+    struct mac_cleanup *next;
+};
+static __thread struct mac_cleanup *cleanup_stack;
+
+static void mac___ferry_pthread_cleanup_push(struct mac_cleanup *c, void (*routine)(void *), void *arg)
+{
+    c->routine = routine;
+    c->arg = arg;
+    c->next = cleanup_stack;
+    cleanup_stack = c;
+}
+
+static void mac___ferry_pthread_cleanup_pop(struct mac_cleanup *c, int execute)
+{
+    if (cleanup_stack == c)
+        cleanup_stack = c->next;
+    if (execute && c->routine)
+        c->routine(c->arg);
+}
+
+static void run_cleanup_handlers(void)
+{
+    while (cleanup_stack) {
+        struct mac_cleanup *c = cleanup_stack;
+        cleanup_stack = c->next;
+        if (c->routine)
+            c->routine(c->arg);
+    }
+}
+
 static void *thread_main(void *p)
 {
     struct start s = *(struct start *)p;
@@ -159,6 +211,7 @@ static void *thread_main(void *p)
     else
         result = exit_value;
     exit_point = NULL;
+    cleanup_stack = NULL;
     forget(pthread_self());
     __atomic_sub_fetch(&live_threads, 1, __ATOMIC_ACQ_REL);
     return result;
@@ -176,7 +229,13 @@ static int mac_pthread_create(pthread_t *out, const struct mac_attr *attr, void 
     __atomic_store_n(&threaded, 1, __ATOMIC_RELEASE);
     __atomic_add_fetch(&live_threads, 1, __ATOMIC_ACQ_REL);
     pthread_t t;
+    /* The thread is known from here on, before it runs (its thread_main
+     * waits for the lock), so pthread_cancel finds it at once. */
+    pthread_mutex_lock(&known_lock);
     int rc = pthread_create(&t, attr && attr->sig == FERRY_ATTR ? &attr->a : NULL, thread_main, s);
+    if (!rc)
+        remember_locked(t, 0);
+    pthread_mutex_unlock(&known_lock);
     if (rc) {
         __atomic_sub_fetch(&live_threads, 1, __ATOMIC_ACQ_REL);
         free(s);
@@ -193,6 +252,7 @@ int ferry_pthread_is_main(void) { return pthread_equal(pthread_self(), main_thre
 
 static void mac_pthread_exit(void *value)
 {
+    run_cleanup_handlers();
     if (exit_point) {
         exit_value = value;
         longjmp(*exit_point, 1);
@@ -304,9 +364,65 @@ static int mac_pthread_setschedparam(pthread_t t, int policy, const struct mac_s
 
 static int mac_sched_get_priority_max(int policy) { (void)policy; return 47; }
 static int mac_sched_get_priority_min(int policy) { (void)policy; return 15; }
-static int mac_pthread_setcancelstate(int state, int *old) { (void)state; if (old) *old = 1; return 0; }
-static int mac_pthread_setcanceltype(int type, int *old) { (void)type; if (old) *old = 2; return 0; }
-static void mac_pthread_testcancel(void) {}
+/* Cancellation (freemac 1.226, Ferry 0.50.0) is deferred, and only
+ * pthread_testcancel acts on it: a thread that pthread_cancel has marked,
+ * with cancellation enabled, leaves there as pthread_exit(PTHREAD_CANCELED)
+ * would, its cleanup handlers run. A thread blocked in a read is not woken;
+ * a program that has to end one sends it a signal, as SPMySQL does. Only
+ * the program's own threads can be marked (ESRCH otherwise). */
+static __thread int cancel_disabled;
+#define MAC_PTHREAD_CANCEL_ENABLE 1
+#define MAC_PTHREAD_CANCEL_DISABLE 0
+#define MAC_PTHREAD_CANCEL_DEFERRED 2
+#define MAC_PTHREAD_CANCEL_ASYNCHRONOUS 0
+#define MAC_PTHREAD_CANCELED ((void *)1)
+
+static int mac_pthread_cancel(pthread_t t)
+{
+    int found = 0;
+    pthread_mutex_lock(&known_lock);
+    for (struct known *k = known_threads; k; k = k->next)
+        if (pthread_equal(k->t, t)) {
+            k->cancel = 1;
+            found = 1;
+            break;
+        }
+    pthread_mutex_unlock(&known_lock);
+    return found ? 0 : ESRCH;
+}
+
+static int mac_pthread_setcancelstate(int state, int *old)
+{
+    if (state != MAC_PTHREAD_CANCEL_ENABLE && state != MAC_PTHREAD_CANCEL_DISABLE)
+        return EINVAL;
+    if (old)
+        *old = cancel_disabled ? MAC_PTHREAD_CANCEL_DISABLE : MAC_PTHREAD_CANCEL_ENABLE;
+    cancel_disabled = state == MAC_PTHREAD_CANCEL_DISABLE;
+    return 0;
+}
+static int mac_pthread_setcanceltype(int type, int *old)
+{
+    (void)type;
+    if (old)
+        *old = MAC_PTHREAD_CANCEL_DEFERRED;
+    return 0;
+}
+static void mac_pthread_testcancel(void)
+{
+    if (cancel_disabled)
+        return;
+    int cancel = 0;
+    pthread_t self = pthread_self();
+    pthread_mutex_lock(&known_lock);
+    for (struct known *k = known_threads; k; k = k->next)
+        if (pthread_equal(k->t, self)) {
+            cancel = k->cancel;
+            break;
+        }
+    pthread_mutex_unlock(&known_lock);
+    if (cancel)
+        mac_pthread_exit(MAC_PTHREAD_CANCELED);
+}
 static int mac_pthread_getconcurrency(void) { return 0; }
 static int mac_pthread_setconcurrency(int n) { (void)n; return 0; }
 
@@ -785,7 +901,8 @@ const struct ferry_symbol ferry_pthread_symbols[] = {
     F(mach_thread_self), F(pthread_setname_np), F(pthread_getname_np), F(pthread_get_stacksize_np),
     F(pthread_get_stackaddr_np), F(pthread_once), F(pthread_getschedparam), F(pthread_setschedparam),
     F(sched_get_priority_max), F(sched_get_priority_min), F(sched_yield), F(pthread_setcancelstate),
-    F(pthread_setcanceltype), F(pthread_testcancel), F(pthread_getconcurrency), F(pthread_setconcurrency),
+    F(pthread_setcanceltype), F(pthread_testcancel), F(pthread_cancel), F(__ferry_pthread_cleanup_push),
+    F(__ferry_pthread_cleanup_pop), F(pthread_getconcurrency), F(pthread_setconcurrency),
     F(pthread_set_qos_class_self_np), F(qos_class_self), F(qos_class_main), F(pthread_get_qos_class_np),
     F(pthread_attr_init), F(pthread_attr_destroy), F(pthread_attr_setdetachstate), F(pthread_attr_getdetachstate),
     F(pthread_attr_setstacksize), F(pthread_attr_getstacksize), F(pthread_attr_setstack), F(pthread_attr_getstack),

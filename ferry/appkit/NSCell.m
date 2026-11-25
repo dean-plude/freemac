@@ -48,6 +48,11 @@ static id coder_value(NSCoder *c, NSString *key)
     NSFormatter *_formatter;
     NSMenu *_menu;
     BOOL _showsFirstResponder;
+    id _represented;
+    BOOL _sendsOnEndEditing, _allowsMixed, _refusesFirstResponder, _allowsUndo, _singleLine;
+    NSFocusRingType _focusRing;
+    NSWritingDirection _writingDirection;
+    NSInteger _sendMask;
 }
 
 /* Light or dark ground behind the cell (a selected table row is dark):
@@ -77,6 +82,7 @@ static id coder_value(NSCoder *c, NSString *key)
 }
 - (void)dealloc
 {
+    [_represented release];
     [_value release];
     [_font release];
     [_formatter release];
@@ -298,8 +304,8 @@ static id coder_value(NSCoder *c, NSString *key)
         [(NSControl *)_controlView performClick:sender];
         return;
     }
-    if ([self respondsToSelector:@selector(setNextState)])
-        [self performSelector:@selector(setNextState)];
+    if ([self isKindOfClass:[NSButtonCell class]])
+        [self setNextState];
     if (_action)
         [NSApp sendAction:_action to:_target from:_controlView ?: (id)self];
 }
@@ -313,6 +319,86 @@ static id coder_value(NSCoder *c, NSString *key)
     _menu = m;
 }
 - (NSMenu *)menuForEvent:(NSEvent *)event inRect:(NSRect)rect ofView:(NSView *)view { return _menu; }
+
+/* ---- more of the cell's settings (freemac 1.226, Ferry 0.50.0) ----
+ * The object a cell stands for (tab bar cells and menu-like cells keep
+ * theirs here), the setters for numbers, and switches that are kept for
+ * the program: Ferry's controls decide editing, focus rings and undo
+ * themselves. */
+- (id)representedObject { return _represented; }
+- (void)setRepresentedObject:(id)object
+{
+    [object retain];
+    [_represented release];
+    _represented = object;
+}
+- (float)floatValue { return (float)[self doubleValue]; }
+- (void)setIntValue:(int)v { [self setObjectValue:@(v)]; }
+- (void)setIntegerValue:(NSInteger)v { [self setObjectValue:@(v)]; }
+- (void)setFloatValue:(float)v { [self setObjectValue:@(v)]; }
+- (void)setDoubleValue:(double)v { [self setObjectValue:@(v)]; }
+- (void)takeIntValueFrom:(id)sender { [self setIntValue:[sender intValue]]; }
+- (void)takeIntegerValueFrom:(id)sender { [self setIntegerValue:[sender integerValue]]; }
+- (void)takeFloatValueFrom:(id)sender { [self setFloatValue:[sender floatValue]]; }
+- (void)takeDoubleValueFrom:(id)sender { [self setDoubleValue:[sender doubleValue]]; }
+- (void)takeStringValueFrom:(id)sender { [self setStringValue:[sender stringValue]]; }
+- (void)takeObjectValueFrom:(id)sender { [self setObjectValue:[sender objectValue]]; }
+- (BOOL)hasValidObjectValue { return YES; }
+- (NSCellType)type
+{
+    if ([_value isKindOfClass:[NSImage class]])
+        return NSImageCellType;
+    return _value ? NSTextCellType : NSNullCellType;
+}
+- (void)setType:(NSCellType)type
+{
+    if (type == NSTextCellType && ![_value isKindOfClass:[NSString class]])
+        [self setStringValue:@""];
+}
+- (BOOL)sendsActionOnEndEditing { return _sendsOnEndEditing; }
+- (void)setSendsActionOnEndEditing:(BOOL)f { _sendsOnEndEditing = f; }
+- (NSInteger)sendActionOn:(NSInteger)mask
+{
+    NSInteger old = _sendMask;
+    _sendMask = mask;
+    return old;
+}
+- (BOOL)allowsMixedState { return _allowsMixed; }
+- (void)setAllowsMixedState:(BOOL)f { _allowsMixed = f; }
+- (NSInteger)nextState
+{
+    NSInteger s = [self state];
+    if (s == NSControlStateValueOff)
+        return NSControlStateValueOn;
+    if (s == NSControlStateValueOn && [self allowsMixedState])
+        return NSControlStateValueMixed;
+    return NSControlStateValueOff;
+}
+- (void)setNextState { [self setState:[self nextState]]; }
+- (BOOL)refusesFirstResponder { return _refusesFirstResponder; }
+- (void)setRefusesFirstResponder:(BOOL)f { _refusesFirstResponder = f; }
+- (BOOL)acceptsFirstResponder { return _enabled && !_refusesFirstResponder; }
+- (BOOL)allowsUndo { return _allowsUndo; }
+- (void)setAllowsUndo:(BOOL)f { _allowsUndo = f; }
+- (BOOL)usesSingleLineMode { return _singleLine; }
+- (void)setUsesSingleLineMode:(BOOL)f { _singleLine = f; }
+- (NSFocusRingType)focusRingType { return _focusRing; }
+- (void)setFocusRingType:(NSFocusRingType)t { _focusRing = t; }
+- (NSWritingDirection)baseWritingDirection { return _writingDirection; }
+- (void)setBaseWritingDirection:(NSWritingDirection)d { _writingDirection = d; }
+- (NSString *)keyEquivalent { return @""; }
+- (BOOL)isOpaque { return NO; }
+- (NSComparisonResult)compare:(id)other
+{
+    return [[self stringValue] compare:[other stringValue]];
+}
+/* the cell lights up as a press is tracked, and its view is drawn again */
+- (void)highlight:(BOOL)flag withFrame:(NSRect)frame inView:(NSView *)view
+{
+    [self setHighlighted:flag];
+    [view setNeedsDisplayInRect:frame];
+}
+- (NSText *)setUpFieldEditorAttributes:(NSText *)editor { return editor; }
 /* What a click at the event's point would do, as Apple documents the
  * default: an editable or selectable text cell's text, an enabled button
  * cell's tracking, and anything inside the cell is content. */

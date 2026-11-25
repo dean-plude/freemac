@@ -2,6 +2,9 @@
 #ifndef _UNISTD_H_
 #define _UNISTD_H_
 #include <_ferry.h>
+/* A Mac's unistd.h declares select, with struct timeval and fd_set
+ * (freemac 1.226, Ferry 0.50.0; MariaDB Connector/C). */
+#include <sys/select.h>
 __FERRY_BEGIN
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -43,6 +46,9 @@ int link(const char *, const char *);
 int symlink(const char *, const char *);
 ssize_t readlink(const char *, char *, size_t);
 int isatty(int);
+/* freemac 1.226, Ferry 0.50.0: Sequel Pro's logger */
+char *getlogin(void);
+char *ttyname(int);
 pid_t getpid(void);
 pid_t getppid(void);
 uid_t getuid(void);

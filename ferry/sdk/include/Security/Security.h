@@ -306,6 +306,25 @@ OSStatus SecKeychainItemModifyAttributesAndData(SecKeychainItemRef itemRef, cons
 OSStatus SecKeychainItemDelete(SecKeychainItemRef itemRef);
 OSStatus SecKeychainItemFreeContent(SecKeychainAttributeList *attrList, void *data);
 
+/* (freemac 1.226, Ferry 0.50.0) Adding an item from an attribute list,
+ * searching by one, and the access lists an item is made with. Ferry's
+ * keychain is the user's own files and asks no one, so an access list is
+ * kept with nothing to check: SecAccessCreate and
+ * SecTrustedApplicationCreateFromPath make objects that only remember what
+ * they were given. A search's items are found when it is made. */
+typedef struct __SecKeychainSearch *SecKeychainSearchRef;
+typedef struct __SecTrustedApplication *SecTrustedApplicationRef;
+OSStatus SecKeychainItemCreateFromContent(SecItemClass itemClass, SecKeychainAttributeList *attrList, UInt32 length,
+                                          const void *data, SecKeychainRef keychainRef, SecAccessRef initialAccess,
+                                          SecKeychainItemRef *itemRef);
+OSStatus SecKeychainSearchCreateFromAttributes(CFTypeRef keychainOrArray, SecItemClass itemClass,
+                                               const SecKeychainAttributeList *attrList,
+                                               SecKeychainSearchRef *searchRef);
+OSStatus SecKeychainSearchCopyNext(SecKeychainSearchRef searchRef, SecKeychainItemRef *itemRef);
+OSStatus SecTrustedApplicationCreateFromPath(const char *path, SecTrustedApplicationRef *app);
+OSStatus SecTrustedApplicationCopyData(SecTrustedApplicationRef appRef, CFDataRef *data);
+OSStatus SecAccessCreate(CFStringRef descriptor, CFArrayRef trustedlist, SecAccessRef *accessRef);
+
 /* ---- code signing (CSCommon.h, SecCode.h, SecStaticCode.h, SecRequirement.h) -------------
  * Ferry can't check Apple's code signatures. It answers the same way every
  * time: every piece of code reads as unsigned (its signing information has

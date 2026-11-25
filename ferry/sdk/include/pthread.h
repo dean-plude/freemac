@@ -60,6 +60,28 @@ int pthread_setschedparam(pthread_t, int, const struct sched_param *);
 int pthread_setcancelstate(int, int *);
 int pthread_setcanceltype(int, int *);
 void pthread_testcancel(void);
+/* (freemac 1.226, Ferry 0.50.0) Cancellation is deferred and acted on only
+ * in pthread_testcancel. The cleanup handlers are macros, as on a Mac: each
+ * record lives on the caller's stack, between a push and its pop in one
+ * block, and pthread_exit runs the ones still pushed. */
+#define PTHREAD_CANCELED ((void *)1)
+int pthread_cancel(pthread_t);
+struct __ferry_pthread_cleanup {
+    void (*__routine)(void *);
+    void *__arg;
+    struct __ferry_pthread_cleanup *__next;
+};
+void __ferry_pthread_cleanup_push(struct __ferry_pthread_cleanup *, void (*)(void *), void *);
+void __ferry_pthread_cleanup_pop(struct __ferry_pthread_cleanup *, int);
+#define pthread_cleanup_push(routine, arg)                                                         \
+    {                                                                                              \
+        struct __ferry_pthread_cleanup __ferry_cleanup;                                            \
+        __ferry_pthread_cleanup_push(&__ferry_cleanup, (void (*)(void *))(routine), (void *)(arg)); \
+        {
+#define pthread_cleanup_pop(execute)                                \
+    }                                                               \
+    __ferry_pthread_cleanup_pop(&__ferry_cleanup, (execute));       \
+    }
 int pthread_getconcurrency(void);
 int pthread_setconcurrency(int);
 

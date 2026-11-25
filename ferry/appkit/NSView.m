@@ -257,8 +257,13 @@ void AViewDecode(NSView *v, NSCoder *c)
     AConstraintsViewChanged(self);
 }
 
+/* A frame set to what it is already posts nothing (observers that set
+ * frames as the notification comes, as Sequel Pro's connection view does,
+ * would otherwise be called again and again). */
 - (void)setFrame:(NSRect)frame
 {
+    if (NSEqualRects(frame, _frame))
+        return;
     BOOL posts = _postsFrame;
     _postsFrame = NO;
     [self setFrameOrigin:frame.origin];

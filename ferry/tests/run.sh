@@ -100,6 +100,9 @@ run_one() {
             HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" second >> "$build/$name.got" \
                     2>> "$build/$name.err" ;;
+        security_older)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_code) FERRY_VERBOSE=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_streams)
             # an echo server of its own, and run.sh's TLS server with its certificate
@@ -174,7 +177,7 @@ for t in hello files; do
 done
 # The start-up format of Mac OS X 10.7 and earlier (LC_UNIXTHREAD).
 run_one hello_unixthread "$here/unixthread.c" "$here/unixthread.out" -Wl,-headerpad,0x400
-run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore
+run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore -lxml2
 # The plumbing the nine apps' sources needed first (freemac 1.221, Ferry
 # 0.45.0): the SDK's availability, target and BSD headers, zlib's and
 # Mach-O's, and malloc zones, basename, extended attributes and scandir.
@@ -311,6 +314,10 @@ run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foun
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
     -framework Security
 run_one security_code "$here/security/code.m" "$here/security/code.out" -framework Foundation -framework Security
+# The older keychain calls Sequel Pro makes (freemac 1.226, Ferry 0.50.0):
+# items from attribute lists, searches and access lists, in a home of its
+# own.
+run_one security_older "$here/security/older.m" "$here/security/older.out" -framework Foundation -framework Security
 # NSThread, cross-thread performs and run loops, and the locks and the
 # runtime under real threads.
 run_one foundation_threads "$here/foundation/threads.m" "$here/foundation/threads.out" -framework Foundation
@@ -1408,5 +1415,16 @@ if command -v python3 > /dev/null 2>&1; then
 else
     echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility, appkit_cgservices, appkit_agent_app (they need python3)"
 fi
+# What Sequel Pro, SPMySQL and MariaDB Connector/C need (freemac 1.226,
+# Ferry 0.50.0): pthread cleanup handlers and cancellation, memset_pattern,
+# bzip2 through a FILE, complex numbers, alloca and a log query; the older
+# Foundation names (NSCalendarDate, NSConnection in one program, CFXML's
+# entities, DriverServices); and the older AppKit and WebKit names (colour
+# lists, HFS types, NSMatrix, the spelling checker, history items) with
+# more of NSCell.
+run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -lbz2
+run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
+    -framework CoreServices
+run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

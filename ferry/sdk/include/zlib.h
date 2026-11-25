@@ -20,29 +20,8 @@ __FERRY_BEGIN
 #define ZLIB_VER_REVISION 12
 #define ZLIB_VER_SUBREVISION 0
 
-#define MAX_MEM_LEVEL 9
-#define MAX_WBITS 15
-#define ZEXTERN extern
-#define ZEXPORT
-#define ZEXPORTVA
-#define OF(args) args
-#define FAR
-
-typedef unsigned char Byte;
-typedef unsigned int uInt;
-typedef unsigned long uLong;
-typedef Byte Bytef;
-typedef char charf;
-typedef int intf;
-typedef uInt uIntf;
-typedef uLong uLongf;
-typedef void const *voidpc;
-typedef void *voidpf;
-typedef void *voidp;
-typedef off_t z_off_t;
-typedef off_t z_off64_t;
-typedef size_t z_size_t;
-typedef unsigned int z_crc_t;
+/* the types and macros the calls are written with (freemac 1.226, Ferry 0.50.0) */
+#include <zconf.h>
 
 typedef voidpf (*alloc_func)(voidpf opaque, uInt items, uInt size);
 typedef void (*free_func)(voidpf opaque, voidpf address);

@@ -70,6 +70,15 @@ const char *const ferry_passthrough[] = {
     "sqrtl", "fabsl", "floorl", "ceill", "fmodl", "powl", "roundl", "truncl", "fminl", "fmaxl", "ldexpl",
     "frexpl", "expl", "exp2l", "logl", "log10l", "log2l", "sinl", "cosl", "tanl", "atan2l", "modfl", "copysignl",
     "imaxabs", "imaxdiv",
+    /* complex numbers, passed in the same registers on both systems
+     * (freemac 1.226, Ferry 0.50.0) */
+    "cabs", "cabsf", "cabsl", "carg", "cargf", "cargl", "creal", "crealf", "creall", "cimag",
+    "cimagf", "cimagl", "conj", "conjf", "conjl", "cproj", "cprojf", "cprojl", "cexp", "cexpf",
+    "cexpl", "clog", "clogf", "clogl", "cpow", "cpowf", "cpowl", "csqrt", "csqrtf", "csqrtl",
+    "csin", "csinf", "csinl", "ccos", "ccosf", "ccosl", "ctan", "ctanf", "ctanl", "casin", "casinf",
+    "casinl", "cacos", "cacosf", "cacosl", "catan", "catanf", "catanl", "csinh", "csinhf", "csinhl",
+    "ccosh", "ccoshf", "ccoshl", "ctanh", "ctanhf", "ctanhl", "casinh", "casinhf", "casinhl",
+    "cacosh", "cacoshf", "cacoshl", "catanh", "catanhf", "catanhl",
     /* getopt's variables (getopt itself is converted) */
     "optarg", "optind", "opterr", "optopt",
     NULL,

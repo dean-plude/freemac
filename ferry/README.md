@@ -382,6 +382,21 @@ mapping uses this system's ICU (`foundation/NSStringText.m`), and the
 Security transforms' encoders and `SecAccessControl` are in
 `security/SecTransform.m`.
 
+From Ferry 0.50.0 (freemac 1.226), Sequel Pro links and runs as the
+seventh app, with SPMySQL built against MariaDB Connector/C built from
+its source. The older AppKit classes and calls it uses (`NSColorList`,
+`NSMatrix`, `NSSpellChecker`, `NSPICTImageRep`, base coordinates, the
+glyph queries and the HFS type codes) are in `appkit/AppKitOlder.m`, and
+declared in `sdk/include/AppKit/AppKitOlder.h`; the rest of `NSCell` is
+in `appkit/NSCell.m`. `NSCalendarDate`, `NSScriptExecutionContext` and
+`NSConnection` are in `foundation/FoundationOlder.m`, CFXML's entity calls
+in `foundation/CFXMLEntities.m` and the DriverServices clock in
+`foundation/DriverServices.m`. The older keychain calls (attribute lists,
+searches, access lists and trusted applications) are in
+`security/SecItem.m`, and the web view's history in `webkit/WebView.m`.
+Thread cancellation and its cleanup handlers are in `src/pthread.c`, and
+libbz2's calls on a Mac `FILE` in `src/host.c`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

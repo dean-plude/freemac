@@ -328,6 +328,14 @@ CFURLRef CFBundleCopyResourceURL(CFBundleRef bundle, CFStringRef resourceName, C
 CFStringRef CFBundleCopyLocalizedString(CFBundleRef bundle, CFStringRef key, CFStringRef value, CFStringRef tableName);
 #define CFCopyLocalizedString(key, comment) \
     CFBundleCopyLocalizedString(CFBundleGetMainBundle(), (key), (key), NULL)
+
+/* XML's five predefined entities, and numeric character references when
+ * unescaping (freemac 1.226, Ferry 0.50.0; Sequel Pro's XML exports). The
+ * dictionary of other entities is used when unescaping only, as on a Mac. */
+CFStringRef CFXMLCreateStringByEscapingEntities(CFAllocatorRef allocator, CFStringRef string,
+                                                CFDictionaryRef entitiesDictionary);
+CFStringRef CFXMLCreateStringByUnescapingEntities(CFAllocatorRef allocator, CFStringRef string,
+                                                  CFDictionaryRef entitiesDictionary);
 CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 
