@@ -62,7 +62,7 @@ CFTypeRef IORegistryEntrySearchCFProperty(io_registry_entry_t entry, const io_na
 }
 
 /* the null object has no class and conforms to none; there is no service
- * to open, so no connection to call (freemac 1.NEXT, Ferry 0.NEXT) */
+ * to open, so no connection to call (freemac 1.233, Ferry 0.57.0) */
 boolean_t IOObjectConformsTo(io_object_t object, const io_name_t className) { return 0; }
 kern_return_t IOObjectGetClass(io_object_t object, io_name_t className)
 {

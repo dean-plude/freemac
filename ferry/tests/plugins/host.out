@@ -1,0 +1,26 @@
+the plugin folder: opened
+alpha.dylib: opened, entry point is its own: yes, a new one: yes
+  [core] alpha: constructed yes, whoami alpha
+  registered as module 0
+  its module_name: alpha
+beta.dylib: opened, entry point is its own: yes, a new one: yes
+  [core] beta: whoami core, dep_square(7) 49
+  registered as module 1
+  its module_name: beta
+broken.dylib: dlopen failed, error names the missing library: yes
+gamma.so: opened, entry point is its own: yes, a new one: yes
+  [core] gamma: host_version 7, whoami program, the missing weak call is NULL
+  registered as module 2
+noentry.dylib: opened, no entry point, error names it: yes; closed: 0
+readme.txt: not a plugin's name, left alone
+plugins loaded: 3, modules registered: 3
+the entry point is hidden from RTLD_DEFAULT: yes
+the program's core_whoami: program
+the core ran 4 threads
+  alpha: 2000
+  beta: 332833500
+  gamma: 7000
+alpha's pthread_once ran once: yes
+alpha opened again gives the same handle: yes
+every handle closed: yes
+exit=0

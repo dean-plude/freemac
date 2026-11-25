@@ -1,0 +1,29 @@
+timebase 1/1
+mach_wait_until: returned at or after the deadline: yes
+mach_wait_until a deadline already past: returned
+posix_spawn /bin/sh, stdout through a pipe: from the shell sh
+  returned 0, exit status 3
+posix_spawnp sh, stdout opened on a file, in another folder: 0, status 0
+  the file: in the folder
+written
+flags read back: 0x4008
+CLOEXEC_DEFAULT, 1 from dup2 and 2 and 20 inherited, open in the child:  1 2 20
+  returned 0, status 0
+posix_spawn of this Mac program: the child: argc 3, argv[2] "two words", FERRY_SPAWN_TEST=passed
+  returned 0, status 7
+posix_spawn of a missing file: 2 (ENOENT 2)
+POSIX_SPAWN_SETEXEC: 45 (ENOTSUP 45)
+glob *.txt: 0, 3: a.txt b.txt spawned.txt, MAGCHAR set
+GLOB_APPEND *.log: 0, 4, matchc 1, last c.log
+glob * with GLOB_MARK: 0: a.txt b.txt c.log spawned.txt sub/
+GLOB_DOOFFS 2, GLOB_BRACE {a,c}.*: 0: NULL NULL a.txt c.log NULL
+no match: -3 (GLOB_NOMATCH -3), 0
+GLOB_NOCHECK: 0, *.png
+fnmatch *.c x.c: 0
+fnmatch *.c x.h: 1 (FNM_NOMATCH 1)
+fnmatch * a/b, FNM_PATHNAME: 1, without: 0
+fnmatch * .x, FNM_PERIOD: 1, without: 0
+fnmatch *.TXT a.txt, FNM_CASEFOLD: 0
+fnmatch \\* \\x, FNM_NOESCAPE: 0, without: 1
+fnmatch a a/b/c, FNM_LEADING_DIR: 0
+exit=0

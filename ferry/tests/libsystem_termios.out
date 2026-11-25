@@ -1,0 +1,24 @@
+sizeof(struct termios) 72, NCCS 20
+posix_openpt, grantpt, unlockpt: ok, ptsname under /dev/pts: yes
+isatty: yes
+tcgetattr: 0
+a new terminal: ICANON yes, ECHO yes, ISIG yes, ICRNL yes, OPOST yes, ONLCR yes, CS8 yes, CREAD yes
+  VINTR 3, VQUIT 28, VERASE 127, VKILL 21, VEOF 4, VSUSP 26, VSTART 17, VSTOP 19
+canonical: read 3 bytes, "hi\n": yes
+  echoed back: yes
+tcsetattr raw, TCSANOW: 0
+raw read back: ICANON no, ECHO no, ISIG no, ICRNL no, OPOST no, CS8 yes, VMIN 1, VTIME 0
+raw: read 2 bytes, 'q' then '\r' unchanged: yes, nothing echoed: yes
+raw output: "a\n" arrives as it is: yes
+cfsetspeed(B115200): 0, cfsetspeed(12345): -1 (EINVAL yes)
+speeds read back: 115200 in, 115200 out
+tcsetattr TCSAFLUSH: 0
+VINTR set to 7: 7, VEOF set to 1: 1
+tcsetattr TCSANOW | TCSASOFT: 0
+  ECHO now yes, still 115200 baud
+back to the first settings: ICANON yes, VINTR 3, 38400 baud
+tcflush TCIFLUSH: 0, then nothing to read: yes
+tcflush 0: -1 (EINVAL yes); tcdrain: 0; tcflow TCOON: 0
+tcsetattr with action 7: -1 (EINVAL yes)
+tcgetattr of /dev/null: -1 (ENOTTY yes)
+exit=0

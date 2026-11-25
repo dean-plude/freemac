@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: Quartz Display Services (freemac 1.NEXT, Ferry 0.NEXT), the
+ * Ferry SDK: Quartz Display Services (freemac 1.233, Ferry 0.57.0), the
  * calls that list the displays and fade them, written for freemac from
  * Apple's public documentation; not Apple's header. Served from AppKit's
  * file (appkit/CGDisplay.m). A display's number is its NSScreen's

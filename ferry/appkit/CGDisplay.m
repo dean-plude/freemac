@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
  * Quartz Display Services (CGDirectDisplay.h), from AppKit's screens
- * (freemac 1.NEXT, Ferry 0.NEXT). */
+ * (freemac 1.233, Ferry 0.57.0). */
 #import "AInternal.h"
 
 static NSArray<NSScreen *> *screens(void)

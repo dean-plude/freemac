@@ -5,7 +5,7 @@
  * unnamed POSIX semaphores, written from the Mach reference pages; and a
  * few C library calls whose Mac data or numbers differ from this system's
  * (pathconf, getpwuid_r, sigwait, statvfs, sys_errlist), from the Mac's
- * man pages.
+ * man pages; and backtrace(3), which follows Mac code's frame pointers.
  *
  * A semaphore is a number standing for a POSIX semaphore of this system;
  * the numbers start well above Ferry's task and host ports.
@@ -396,7 +396,94 @@ static void mac_mach_error(const char *what, int e)
     fprintf(stderr, "%s %s (0x%x)\n", what ? what : "", mac_mach_error_string(e), (unsigned)e);
 }
 
+/* ---- backtrace: the frame pointers Mac code keeps, followed up this thread's stack, and
+ * each address named by the Mac image and symbol it is in, in a Mac's format
+ * (freemac 1.233, Ferry 0.57.0). This system's backtrace reads unwind tables,
+ * which Mac code loaded by Ferry doesn't register, and found only Ferry's own
+ * frame. The walk ends where a frame of Ferry's own, built without frame
+ * pointers, breaks the chain. */
+
+static int mac_backtrace(void **out, int size)
+{
+    pthread_attr_t a;
+    void *lo = NULL;
+    size_t len = 0;
+    if (pthread_getattr_np(pthread_self(), &a) == 0) {
+        pthread_attr_getstack(&a, &lo, &len);
+        pthread_attr_destroy(&a);
+    }
+    uintptr_t low = (uintptr_t)lo, high = low + len;
+    uintptr_t *fp = __builtin_frame_address(0);
+    int n = 0;
+    while (n < size && fp && (uintptr_t)fp >= low && (uintptr_t)fp + 16 <= high && !((uintptr_t)fp & 7)) {
+        void *ret = (void *)fp[1];
+        if (!ret)
+            break;
+        out[n++] = ret;
+        uintptr_t *next = (uintptr_t *)fp[0];
+        if (next <= fp)
+            break;
+        fp = next;
+    }
+    return n;
+}
+
+static int describe(void *addr, int i, char *buf, size_t size)
+{
+    struct image *im = ferry_image_containing(addr);
+    const char *file = "libsystem", *name = NULL;
+    void *start = NULL;
+    if (im) {
+        file = ferry_image_path(im);
+        name = ferry_image_nearest(im, addr, &start);
+    }
+    const char *leaf = file && strrchr(file, '/') ? strrchr(file, '/') + 1 : file ? file : "???";
+    if (name && name[0] == '_')
+        name++;
+    if (name && start)
+        return snprintf(buf, size, "%-4d%-35s 0x%016llx %s + %llu", i, leaf, (unsigned long long)(uintptr_t)addr,
+                        name, (unsigned long long)((uintptr_t)addr - (uintptr_t)start));
+    return snprintf(buf, size, "%-4d%-35s 0x%016llx 0x%llx + 0", i, leaf, (unsigned long long)(uintptr_t)addr,
+                    (unsigned long long)(uintptr_t)addr);
+}
+
+/* one block: the pointers, then the strings, freed with one free() */
+static char **mac_backtrace_symbols(void *const *addrs, int n)
+{
+    if (n <= 0)
+        return NULL;
+    size_t total = n * sizeof(char *);
+    char line[1024];
+    for (int i = 0; i < n; i++)
+        total += describe(addrs[i], i, line, sizeof line) + 1;
+    char **out = malloc(total);
+    if (!out)
+        return NULL;
+    char *p = (char *)(out + n), *end = (char *)out + total;
+    for (int i = 0; i < n; i++) {
+        out[i] = p;
+        p += describe(addrs[i], i, p, end - p) + 1;
+    }
+    return out;
+}
+
+static void mac_backtrace_symbols_fd(void *const *addrs, int n, int fd)
+{
+    char line[1024];
+    for (int i = 0; i < n; i++) {
+        int len = describe(addrs[i], i, line, sizeof line - 1);
+        if (len > (int)sizeof line - 2)
+            len = sizeof line - 2;
+        line[len++] = '\n';
+        if (write(fd, line, len) < 0)
+            break;
+    }
+}
+
 const struct ferry_symbol ferry_libc_vlc_symbols[] = {
+    {"backtrace", mac_backtrace},
+    {"backtrace_symbols", mac_backtrace_symbols},
+    {"backtrace_symbols_fd", mac_backtrace_symbols_fd},
     {"semaphore_create", mac_semaphore_create},
     {"semaphore_destroy", mac_semaphore_destroy},
     {"semaphore_signal", mac_semaphore_signal},

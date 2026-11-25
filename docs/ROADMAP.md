@@ -1183,6 +1183,43 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.234 "Ferry: sound, with Core Audio" (done)
+
+Ferry 0.58.0: Mac apps play and record sound. A new Core Audio, which also serves AudioToolbox and AudioUnit, makes each output and input of the desktop's sound server a device, through libpulse, and follows the server's default devices, volume and mute. HALOutput and DefaultOutput units play as VLC's sound out does, a HALOutput unit records as OBS's audio capture does, audio queues play and record as OBS's monitoring does, and converters change PCM formats and rates. With no sound server an app sees one null device and carries on. VLC and OBS themselves weren't run yet, and AAC in converters, which OBS's encoder needs, is next.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Core Audio's HAL, new, in `ferry/coreaudio/` (replacing 1.232's `CoreAudio.c`), on this system's sound server through libpulse, opened when a program first asks: | Ferry Core Audio | done |
+|   | - each sink is an output device and each source an input device, with the server's names as their UIDs; a sink's monitor is an input device that is never the default; the defaults are the server's | | |
+|   | - with no server, no libpulse, or `FERRY_AUDIO=null`, one null device, 48 kHz stereo both ways, that runs on the clock: what it plays can go to `FERRY_AUDIO_OUTPUT_FILE` and what it records come from `FERRY_AUDIO_INPUT_FILE` (32-bit float samples), or else it hears what it plays, 50 ms later | | |
+|   | - the system object and devices: device lists, the defaults (settable on the server), names, UIDs, manufacturers, transport, alive, running, streams and their formats, the nominal rate and the rates offered, buffer frame size, latency and safety offset, channel names, the stream configuration and preferred channel layout, data sources, hog mode, and volume and mute (read and set on the server) | | |
+|   | - property listeners, as procs and as blocks on a queue, told when the server's devices come and go and its defaults, volumes and mutes change, as well as of the program's own changes | | |
+|   | - IO procs (`AudioDeviceCreateIOProcID`, `AudioDeviceStart`, `AudioDeviceStop`), with the older `AudioDeviceAddIOProc` and `AudioHardwareGetProperty` calls, host time and its conversions, and Audio Hardware Services | | |
+| 2 | Audio Toolbox, served by Core Audio: | Ferry Core Audio | done |
+|   | - audio components, and the HALOutput, DefaultOutput, SystemOutput and GenericOutput units: stream formats on both sides, render callbacks and render notifications, input on HALOutput with an input callback and `AudioUnitRender`, channel maps, the volume parameter, the current device, following the default device, and the properties VLC and OBS ask of a unit | | |
+|   | - audio queues for output and input, in linear PCM, with callbacks on a run loop, a dispatch queue or the queue's own thread; start, stop (at once or once played out), pause, prime, flush and reset; volume, level meters and the current device; `IsRunning` listeners | | |
+|   | - audio converters between linear PCM formats: sample formats, byte order, interleaving, channel counts and maps, and rates (linear interpolation) | | |
+|   | - Audio Format Services' channel layouts (for a tag, for a bitmap, channel counts and names) and format information | | |
+| 3 | Five new tests, `coreaudio_devices`, `coreaudio_missing`, `coreaudio_auhal`, `coreaudio_queue` and, where PulseAudio is installed, `coreaudio_pulse` on a server of its own with null sinks | Ferry | done |
+| 4 | Compressed formats (AAC and the rest) in converters and queues, through FFmpeg's libavcodec | Ferry Core Audio | not done |
+| 5 | Pass-through of compressed audio to a device (VLC's S/PDIF path); a device's own rates and buffer sizes on the server, and hog mode taking a device for one program | Ferry Core Audio | not done |
+| 6 | VLC's sound out and OBS's audio capture and monitoring, tried with the apps themselves | Ferry Core Audio | not done |
+
+## 1.233 "Ferry: FFmpeg as Mac libraries, for VLC and OBS" (done)
+
+Ferry 0.57.0: FFmpeg 8.0.1, which OBS needs, and 6.1.1, which VLC 3.0.24 builds against, are built from their release tarballs as Intel Mac libraries and tools by `ferry/apps/ffmpeg.sh`, and under Ferry they decode, encode, mux and filter to the same output as FFmpeg on Linux. libSystem gains `posix_spawn`, `glob` and `fnmatch`, `mach_wait_until`, a Mac's terminal settings and a `backtrace` that names every Mac frame, and a plugin host test checks the `dlopen` path VLC and OBS take. The release also carries the VLC task's work on what VLC's Mac interface calls (#270): presentation options, alert sheets, slider, button and segmented cell drawing, `CGDirectDisplay.h` on NSScreen, CoreMedia's `CMTime`, MediaPlayer's remote commands and more. VLC's interface now waits only on Core Audio, Core Video's display link and NSOpenGLView.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | FFmpeg 8.0.1 (for OBS) and 6.1.1 (for VLC) built as Intel Mac dylibs and tools by `ferry/apps/ffmpeg.sh`, software codecs only | Ferry recipes | done |
+| 2 | FFmpeg's `ffmpeg` and `ffprobe` run under Ferry and decode H.264/AAC, VP9/Opus, Theora/Vorbis and VP8/MP3 to the same frame MD5s as a Linux FFmpeg | Ferry | done |
+| 3 | A plugin host test: libraries and plugins built in the test, opened with `dlopen` from four threads, `@rpath`/`@loader_path`, flat lookups, weak imports, plugins that fail to load | Ferry tests | done |
+| 4 | `posix_spawn` and `posix_spawnp` with file actions and attributes, Mac children run through Ferry | Ferry libSystem | done |
+| 5 | `glob`, `globfree` and `fnmatch` in the Mac's layout and flag numbers; `mach_wait_until`; `getrusage`'s `ru_maxrss` in bytes | Ferry libSystem | done |
+| 6 | `backtrace` and `backtrace_symbols` follow Mac code's frame pointers and name each frame's image and symbol | Ferry libSystem | done |
+| 7 | Terminal settings (`tcgetattr`, `tcsetattr`, `cfmakeraw`, speeds, flushing) with a Mac's `struct termios`, and `posix_openpt` | Ferry libSystem | done |
+| 8 | Hardware codecs (VideoToolbox, AudioToolbox) and external codec libraries (x264, libvpx, libopus) for FFmpeg | Ferry recipes | not started |
+
 ## 1.232 "Ferry: Itsycal and EventKit" (done)
 
 Ferry 0.56.0: Itsycal, the menu-bar calendar, is the ninth of the

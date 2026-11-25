@@ -32,7 +32,7 @@ typedef NSObject *dispatch_source_t;
  * that includes dispatch (Core Services, Carbon) declares NSObject. */
 #include <objc/NSObject.h>
 #ifndef OS_OBJECT_USE_OBJC
-#define OS_OBJECT_USE_OBJC 1 /* as os/object.h has it (freemac 1.NEXT, VLC) */
+#define OS_OBJECT_USE_OBJC 1 /* as os/object.h has it (freemac 1.233, VLC) */
 #endif
 typedef id dispatch_object_t;
 typedef id dispatch_queue_t;

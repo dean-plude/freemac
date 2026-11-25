@@ -84,6 +84,7 @@ void *ferry_crypto_symbol(const char *name);        /* OpenSSL, for CommonCrypto
 void *ferry_bus_symbol(const char *name);           /* GIO's D-Bus, for distributed notifications */
 void *ferry_webkit_symbol(const char *name);        /* WebKitGTK, for Ferry's WebKit (webkit/) */
 void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry's (javascriptcore/) */
+void *ferry_sound_symbol(const char *name);         /* libpulse, for Ferry's Core Audio (coreaudio/) */
 
 /* servercerts.c: the certificates an https server presents, for Security */
 int ferry_server_certificates(const char *host, int port, int timeout_ms,
@@ -132,6 +133,10 @@ void ferry_set_mac_errno(int mac_errno); /* a Mac number with no Linux twin (ENO
 /* posix.c */
 int ferry_signal_to_linux(int mac_signal);
 int ferry_signal_to_mac(int linux_signal);
+int ferry_open_flags_to_linux(int mac_flags); /* open(2)'s O_ flags (freemac 1.233) */
+
+/* libc_apps.c: posix_spawn, glob, fnmatch, termios and mach_wait_until (freemac 1.233) */
+extern const struct ferry_symbol ferry_libc_apps_symbols[];
 
 /* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
 extern const struct ferry_symbol ferry_socket_symbols[];

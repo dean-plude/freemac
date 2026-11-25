@@ -916,7 +916,7 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
  * CoreServices (Gestalt and login items), ServiceManagement, IOKit (foundation/IOKit.m) and
  * UniformTypeIdentifiers live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
  * (the few calls Cocoa apps still make, appkit/Carbon.m) inside AppKit, and
- * AudioToolbox inside CoreAudio. */
+ * AudioToolbox and AudioUnit inside CoreAudio. */
 
 static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreFoundation", "Foundation"},
@@ -937,10 +937,11 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"QuickLook", "AppKit"},         /* the generator calls and thumbnails, appkit/QuickLook.m */
     {"CoreImage", "AppKit"},         /* images, CIAffineTransform and detectors, appkit/CoreImage.m (1.225) */
     {"ScriptingBridge", "AppKit"},   /* apps that can't be scripted here, appkit/ScriptingBridge.m */
-    {"AudioToolbox", "CoreAudio"},   /* the audio objects' calls its header brings in (freemac 1.232) */
-    {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.NEXT) */
-    {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.NEXT) */
-    {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.NEXT) */
+    {"AudioToolbox", "CoreAudio"},   /* audio units and queues beside the HAL, coreaudio/ (1.232, 1.234) */
+    {"AudioUnit", "CoreAudio"},
+    {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.233) */
+    {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.233) */
+    {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.233) */
     {NULL, NULL},
 };
 

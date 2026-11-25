@@ -72,7 +72,7 @@ FOUNDATION_EXPORT AVFileType const AVFileTypeAC3 _FERRY_AV_SWIFT("ac3");
 - (float)averagePowerForChannel:(NSUInteger)channelNumber;
 @end
 
-/* capture devices, listed (freemac 1.NEXT, Ferry 0.NEXT) */
+/* capture devices, listed (freemac 1.233, Ferry 0.57.0) */
 #import <AVFoundation/AVCaptureDevice.h>
 
 #endif

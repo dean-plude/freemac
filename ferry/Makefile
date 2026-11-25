@@ -15,6 +15,8 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
 SRC += src/objc/swift.c src/swiftsupport.c
 # Mach semaphores, for VLC (freemac 1.232)
 SRC += src/libc_vlc.c
+# posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
+SRC += src/libc_apps.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
@@ -91,11 +93,17 @@ EVENTKIT_OBJ = $(EVENTKIT_SRC:eventkit/%.m=eventkit/build/%.o)
 EVENTKIT = frameworks/EventKit.framework/EventKit
 EVENTKIT_HEADERS = sdk/include/EventKit/EventKit.h $(FOUNDATION_HEADERS)
 
-# Core Audio: the default devices' names, volume and mute, through this
-# system's sound server (coreaudio/CoreAudio.c); Audio Toolbox's header
-# brings them in.
+# Core Audio (freemac 1.232; the HAL, audio units, audio queues and
+# converters 1.234) in one Mac library, which plays and records through
+# this system's sound server (libpulse, opened when a program first touches
+# the hardware, src/host.c) or a null device. AudioToolbox and AudioUnit
+# are served from it.
+COREAUDIO_SRC = $(wildcard coreaudio/*.m)
+COREAUDIO_OBJ = $(COREAUDIO_SRC:coreaudio/%.m=coreaudio/build/%.o)
 COREAUDIO = frameworks/CoreAudio.framework/CoreAudio
-COREAUDIO_HEADERS = sdk/include/CoreAudio/CoreAudio.h sdk/include/CoreFoundation/CoreFoundation.h
+COREAUDIO_HEADERS = coreaudio/CAInternal.h coreaudio/CAPulse.h $(wildcard sdk/include/CoreAudio/*.h) \
+                    $(wildcard sdk/include/CoreAudioTypes/*.h) $(wildcard sdk/include/AudioToolbox/*.h) \
+                    $(wildcard sdk/include/AudioUnit/*.h) $(FOUNDATION_HEADERS)
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
@@ -333,16 +341,16 @@ $(EVENTKIT): $(EVENTKIT_OBJ) $(FOUNDATION) $(GRAPHICS)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/EventKit.framework/Versions/A/EventKit \
 	    -o $@ $(EVENTKIT_OBJ) -framework Foundation -framework CoreGraphics
 
-coreaudio/build/CoreAudio.o: coreaudio/CoreAudio.c $(COREAUDIO_HEADERS) sdk/ferry-cc
+coreaudio/build/%.o: coreaudio/%.m $(COREAUDIO_HEADERS) sdk/ferry-cc
 	@mkdir -p coreaudio/build
-	sdk/ferry-cc $(OBJCFLAGS) -c -o $@ $<
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
-$(COREAUDIO): coreaudio/build/CoreAudio.o $(FOUNDATION)
-	@mkdir -p frameworks/CoreAudio.framework
+$(COREAUDIO): $(COREAUDIO_OBJ) $(FOUNDATION)
+	@mkdir -p frameworks/CoreAudio.framework frameworks/AudioToolbox.framework frameworks/AudioUnit.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio \
-	    -o $@ coreaudio/build/CoreAudio.o -framework CoreFoundation
-	@mkdir -p frameworks/AudioToolbox.framework
+	    -o $@ $(COREAUDIO_OBJ) -framework Foundation
 	sdk/gen-alias-tbd.sh AudioToolbox $@ > frameworks/AudioToolbox.framework/AudioToolbox.tbd
+	sdk/gen-alias-tbd.sh AudioUnit $@ > frameworks/AudioUnit.framework/AudioUnit.tbd
 
 check: all
 	./tests/run.sh
@@ -374,8 +382,9 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUA
 	install -Dm755 $(CLOUDKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CloudKit.framework/CloudKit
 	install -Dm755 $(EVENTKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/EventKit.framework/EventKit
 	install -Dm755 $(COREAUDIO) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreAudio.framework/CoreAudio
-	install -Dm644 frameworks/AudioToolbox.framework/AudioToolbox.tbd \
-	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AudioToolbox.framework/AudioToolbox.tbd
+	for f in AudioToolbox AudioUnit; do \
+	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
+	done
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h

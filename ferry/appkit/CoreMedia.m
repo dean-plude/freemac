@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
- * CoreMedia's times (freemac 1.NEXT, Ferry 0.NEXT): see CoreMedia/CoreMedia.h. */
+ * CoreMedia's times (freemac 1.233, Ferry 0.57.0): see CoreMedia/CoreMedia.h. */
 #include <CoreMedia/CoreMedia.h>
 #include <math.h>
 

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * IOKit's user-space driver plug-ins (freemac 1.NEXT, Ferry 0.NEXT),
+ * IOKit's user-space driver plug-ins (freemac 1.233, Ferry 0.57.0),
  * written from Apple's public IOKit documentation; not Apple's header.
  * Ferry has no I/O Kit registry, so no service has a plug-in: making one
  * answers kIOReturnUnsupported. Served from Foundation (foundation/IOKit.m). */
