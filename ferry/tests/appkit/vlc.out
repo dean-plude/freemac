@@ -13,4 +13,6 @@ I/O Kit media: 0
 capture devices: 0, default video none
 address book people: 0
 removable media listed: 1
+main display by its older name: 1
+screen updates held until flush, scale delegate keeps its own: 1
 exit=0

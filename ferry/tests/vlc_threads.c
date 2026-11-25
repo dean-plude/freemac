@@ -6,7 +6,10 @@
  * thread CFRunLoopRun waits for work from the main queue until CFRunLoopStop,
  * as VLC's main does, while CFRunLoopRunInMode still finishes at once with
  * nothing to do. And nil is a null pointer in C too, through CoreServices
- * (VLC's sound out uses it so). */
+ * (VLC's sound out uses it so). A cancellable wait comes back now and then
+ * to look at its condition again, as POSIX lets a wait do, so a wake taken
+ * at the end of one of its slices isn't lost: threads handing work to each
+ * other through a condition, as FFmpeg's decoding threads do, never hang. */
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
 #include <dispatch/dispatch.h>
@@ -56,6 +59,36 @@ static void *uncancellable(void *arg)
         pthread_cond_wait(&cond, &lock);
     pthread_mutex_unlock(&lock);
     return (void *)42;
+}
+
+/* two threads take turns, each waiting for the other's */
+static int turn, turns_done;
+static pthread_cond_t turn_cond = PTHREAD_COND_INITIALIZER;
+
+static void *taker(void *arg)
+{
+    int me = (int)(long)arg;
+    pthread_mutex_lock(&lock);
+    for (int i = 0; i < 20000; i++) {
+        while (turn != me)
+            pthread_cond_wait(&turn_cond, &lock);
+        turn = !me;
+        turns_done++;
+        pthread_cond_signal(&turn_cond);
+    }
+    pthread_mutex_unlock(&lock);
+    return NULL;
+}
+
+static volatile int looked;
+static void *looker(void *arg)
+{
+    (void)arg;
+    pthread_mutex_lock(&lock);
+    while (!looked)  /* nobody signals: the wait still comes back */
+        looked = 1, pthread_cond_wait(&turn_cond, &lock);
+    pthread_mutex_unlock(&lock);
+    return NULL;
 }
 
 static void cancel_one(const char *name, void *(*fn)(void *), void *arg)
@@ -114,5 +147,15 @@ int main(void)
     printf("CFRunLoopRun on the main thread: ran both blocks %d, then returned\n", ran == 2);
     char *none = nil;
     printf("nil in C: %d\n", none == NULL);
+
+    pthread_t a, b;
+    pthread_create(&a, NULL, taker, (void *)0L);
+    pthread_create(&b, NULL, taker, (void *)1L);
+    pthread_join(a, NULL);
+    pthread_join(b, NULL);
+    printf("turns taken through a condition: %d\n", turns_done);
+    pthread_create(&a, NULL, looker, NULL);
+    pthread_join(a, NULL);
+    printf("an unsignalled wait came back to look again: %d\n", looked);
     return 0;
 }

@@ -4,4 +4,6 @@ cancellation disabled: woken by the signal 1
 run in mode with nothing to do: finished 1
 CFRunLoopRun on the main thread: ran both blocks 1, then returned
 nil in C: 1
+turns taken through a condition: 40000
+an unsignalled wait came back to look again: 1
 exit=0

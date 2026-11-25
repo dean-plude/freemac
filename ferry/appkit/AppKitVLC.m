@@ -400,6 +400,9 @@ static char arrows_key;
 - (void)useOptimizedDrawing:(BOOL)flag
 {
 }
+- (void)disableScreenUpdatesUntilFlush
+{
+}
 - (NSRect)constrainFrameRect:(NSRect)frameRect toScreen:(NSScreen *)screen
 {
     screen = screen ?: [self screen] ?: [NSScreen mainScreen];

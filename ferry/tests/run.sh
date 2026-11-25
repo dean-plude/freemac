@@ -1607,10 +1607,28 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 # CoreMedia times, media keys and Now Playing, displays, slider cells, and
 # the empty capture devices, address book and I/O Kit registry.
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
-    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
+    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices \
+    -framework QuartzCore
 # what VLC's core needs (freemac 1.NEXT): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
+# Cells of the app's own classes in a nib (freemac 1.NEXT): VLC's sliders,
+# steppers and segmented controls keep theirs through ferry-ibtool
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/VLCCells.nib" "$here/appkit/vlc_cells.xib" \
+        2> "$build/vlc_cells.log" && python3 -I - "$build/VLCCells.nib" >> "$build/vlc_cells.log" 2>&1 <<'PY'
+import plistlib, sys
+objects = plistlib.load(open(sys.argv[1], "rb"))["$objects"]
+classes = [objects[o["$class"].data]["$classes"] for o in objects if isinstance(o, dict) and "$class" in o]
+for name, base in (("TimeSliderCell", "NSSliderCell"), ("CountStepperCell", "NSStepperCell"),
+                   ("HUDSegmentedCell", "NSSegmentedCell")):
+    if not any(c[0] == name and base in c for c in classes):
+        sys.exit("%s isn't kept as a %s" % (name, base))
+PY
+then
+    echo "ok   ibtool_vlc_cells"; pass=$((pass + 1))
+else
+    echo "FAIL ibtool_vlc_cells"; sed 's/^/    /' "$build/vlc_cells.log"; fail=$((fail + 1))
+fi
 
 # Core Audio, Audio Units, Audio Queues and converters (freemac 1.234,
 # Ferry 0.58.0), on no sound hardware: the devices and their formats, set

@@ -126,12 +126,42 @@ decodes from the file. It needed two things:
     VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --aout auhal \
         --vout vdummy --play-and-exit video.mp4
 
+## VLC's window, with the picture in it (freemac 1.NEXT, Ferry 0.NEXT)
+
+With Ferry's OpenGL, Core Video and CAOpenGLLayer (freemac 1.235), VLC's
+whole Mac interface builds, and `apps/vlc.sh` lays out `WORK/VLC.app` as
+VLC's own `make VLC.app` does. Run as itself, VLC opens its main window,
+with its own control bar, and plays a video in it: the picture through its
+`caopengllayer` video out, the sound through `auhal`, the time and the
+position slider moving, to the end. Its first-run question about album art
+shows as VLC's own dialog. It needed:
+
+- Core Video named at link time too (the interface's display link), and
+  `-dead_strip_dylibs`, so a module that doesn't call a framework named for
+  all of them doesn't load it.
+- `kCGDirectMainDisplay`, `-[NSWindow disableScreenUpdatesUntilFlush]` and
+  the `NSViewLayerContentScaleDelegate` protocol, which the video outs use.
+- ferry-ibtool keeping a slider's, a stepper's or a segmented control's
+  cell of the app's own class (`VLCSliderCell` and the HUD cells): before,
+  they came out as plain cells, and `VLCSlider` stopped on its assertion.
+- The decoding threads not hanging. A cancellable wait (above) waited in
+  slices and went back to waiting at the end of each; glibc may report a
+  wait it was also signalled in as timed out, and that wake was then lost,
+  so FFmpeg's frame threads could wait on each other for ever. The end of a
+  slice now returns as a spurious wakeup would, and the waiter looks at its
+  condition again.
+
+`tests/appkit/vlc.m`, `tests/vlc_threads.c` and the `ibtool_vlc_cells`
+check (`tests/appkit/vlc_cells.xib`) cover these. To try it, as a user
+other than root (see above):
+
+    ferry WORK/VLC.app video.mp4
+
 ## Still to do
 
-- VLC's interface still needs Core Video's display link (`VLCSliderCell.m`)
-  and NSOpenGLView's `reshape` (`Windows.m`), which are being built in
-  Ferry's core for VLC and OBS together. Nothing else in it is missing; its
-  Core Audio calls (`NSSound+VLCAdditions.m`) build since 1.234.
-- Video out needs the same OpenGL and Core Video; until then a video plays
-  with sound but without its window.
-- The C++ plugins need libc++ linked.
+- Menus, the playlist and the other windows are still to be tried.
+- The C++ plugins (adaptive streaming among them) need libc++ linked.
+- VideoToolbox decoding, the keychain, speech, the CD module and
+  SecureTransport don't build yet.
+- The download doesn't include Ferry's VLC build yet; this is Ferry's test
+  setup only.

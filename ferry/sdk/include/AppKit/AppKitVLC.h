@@ -150,6 +150,15 @@ typedef NS_ENUM(NSUInteger, NSScrollArrowPosition) {
 /* the rectangle moved, and shrunk if need be, to keep its title bar on the
  * screen's visible frame */
 - (NSRect)constrainFrameRect:(NSRect)frameRect toScreen:(NSScreen *)screen;
+/* Ferry shows a window's drawing once it's flushed anyway: nothing to hold */
+- (void)disableScreenUpdatesUntilFlush;
+@end
+
+/* a layer-backed view's say in its layers' scale when the window moves to a
+ * screen of another scale (VLC's video layer) */
+@protocol NSViewLayerContentScaleDelegate <NSObject>
+@optional
+- (BOOL)layer:(CALayer *)layer shouldInheritContentsScale:(CGFloat)newScale fromWindow:(NSWindow *)window;
 @end
 
 /* ---- events ------------------------------------------------------------------------- */
