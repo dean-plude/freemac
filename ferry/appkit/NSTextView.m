@@ -341,6 +341,87 @@ typedef struct {
 @end
 #pragma clang diagnostic pop
 
+/* What a nib's text view lets its user do, which ferry-ibtool writes from
+ * the xib (freemac 1.229, Ferry 0.53.0): "NSFlags", whose bits are
+ * Ferry's own (the order of TEXT_VIEW_FLAGS in sdk/ferry-ibtool), the
+ * background, insertion point and text colours, a font and the find style
+ * (1 the find panel, 2 the find bar). The text view applies it as it is
+ * decoded. */
+@interface NSTextViewSharedData : NSObject <NSCoding>
+@end
+@implementation NSTextViewSharedData {
+    unsigned _flags;
+    NSInteger _findStyle;
+    NSColor *_background, *_insertion, *_text;
+    NSFont *_font;
+}
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if ((self = [super init])) {
+        _flags = (unsigned)[coder decodeInt64ForKey:@"NSFlags"];
+        _findStyle = [coder decodeIntegerForKey:@"NSFindStyle"];
+        id v = [coder decodeObjectForKey:@"NSBackgroundColor"];
+        _background = [v isKindOfClass:[NSColor class]] ? [v retain] : nil;
+        v = [coder decodeObjectForKey:@"NSInsertionColor"];
+        _insertion = [v isKindOfClass:[NSColor class]] ? [v retain] : nil;
+        v = [coder decodeObjectForKey:@"NSTextColor"];
+        _text = [v isKindOfClass:[NSColor class]] ? [v retain] : nil;
+        v = [coder decodeObjectForKey:@"NSFont"];
+        _font = [v isKindOfClass:[NSFont class]] ? [v retain] : nil;
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)coder {}
+- (void)dealloc
+{
+    [_background release];
+    [_insertion release];
+    [_text release];
+    [_font release];
+    [super dealloc];
+}
+- (void)_ferryApplyTo:(NSTextView *)tv
+{
+    static const char *const setters[] = {
+        "setEditable:", "setSelectable:", "setRichText:", "setImportsGraphics:", "setFieldEditor:",
+        "setUsesFontPanel:", "setUsesRuler:", "setDrawsBackground:", "setAllowsUndo:",
+        "setContinuousSpellCheckingEnabled:", "setSmartInsertDeleteEnabled:",
+        "setAllowsDocumentBackgroundColorChange:", "setRulerVisible:", "setAutomaticQuoteSubstitutionEnabled:",
+        "setAutomaticDashSubstitutionEnabled:", "setAutomaticSpellingCorrectionEnabled:", "setAllowsImageEditing:",
+        "setUsesInspectorBar:", "setAutomaticLinkDetectionEnabled:", "setAutomaticTextReplacementEnabled:",
+        "setAutomaticDataDetectionEnabled:", "setGrammarCheckingEnabled:", "setAllowsNonContiguousLayout:",
+        "setIncrementalSearchingEnabled:"};
+    for (unsigned i = 0; i < sizeof setters / sizeof *setters; i++) {
+        SEL sel = sel_registerName(setters[i]);
+        if ([tv respondsToSelector:sel])
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(tv, sel, (_flags >> i) & 1);
+    }
+    if (_findStyle == 1)
+        [tv setUsesFindPanel:YES];
+    else if (_findStyle == 2)
+        [tv setUsesFindBar:YES];
+    if (_background)
+        [tv setBackgroundColor:_background];
+    if (_insertion)
+        [tv setInsertionPointColor:_insertion];
+    /* the font and colour are what's typed next: the document's own text
+     * keeps the ones its runs have */
+    if ([[tv textStorage] length] && [tv respondsToSelector:@selector(setTypingAttributes:)]) {
+        NSMutableDictionary *t = [[[tv typingAttributes] mutableCopy] autorelease] ?: [NSMutableDictionary dictionary];
+        if (_font)
+            [t setObject:_font forKey:NSFontAttributeName];
+        if (_text)
+            [t setObject:_text forKey:NSForegroundColorAttributeName];
+        [tv setTypingAttributes:t];
+        return;
+    }
+    if (_font)
+        [tv setFont:_font];
+    if (_text)
+        [tv setTextColor:_text];
+}
+@end
+
 @implementation NSTextView {
     NSSelectionGranularity _granularity;
     NSTextStorage *_storage;
@@ -1136,6 +1217,7 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
 {
     if (_began) {
         _began = NO;
+        ABindingsPush(self, NO);
         [self _post:NSTextDidEndEditingNotification selector:@selector(textDidEndEditing:)];
     }
     [self setNeedsDisplay:YES];
@@ -1212,7 +1294,11 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     }
     return YES;
 }
-- (void)didChangeText { [self _post:NSTextDidChangeNotification selector:@selector(textDidChange:)]; }
+- (void)didChangeText
+{
+    ABindingsPush(self, YES);
+    [self _post:NSTextDidChangeNotification selector:@selector(textDidChange:)];
+}
 - (void)replaceCharactersInRange:(NSRange)r withString:(NSString *)s
 {
     NSAttributedString *a = [[[NSAttributedString alloc] initWithString:s ?: @"" attributes:_typing] autorelease];
@@ -1520,5 +1606,38 @@ MOVE(pageDownAndModifySelection, [self _vertical:[self _linesPerPage] from:head]
     while (end < length && [word characterIsMember:[text characterAtIndex:end]])
         end++;
     return NSMakeRange(start, end - start);
+}
+@end
+
+/* A text view's value binding is its plain text, its attributedString one
+ * its text with its runs (1.229): what the user typed is written back when
+ * they leave it, or as they type when the binding asks for that. */
+@implementation NSTextView (FerryBindings)
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSValueBinding]) {
+        NSString *s = [value isKindOfClass:[NSString class]]             ? value
+                      : [value isKindOfClass:[NSAttributedString class]] ? [value string]
+                      : value && value != [NSNull null]                  ? [value description]
+                                                                         : @"";
+        if (![s isEqualToString:[self string]])
+            [self setString:s];
+    } else if ([binding isEqualToString:NSAttributedStringBinding]) {
+        NSAttributedString *a = [value isKindOfClass:[NSAttributedString class]] ? value : nil;
+        if (!a)
+            a = [[[NSAttributedString alloc] initWithString:[value isKindOfClass:[NSString class]] ? value : @""]
+                autorelease];
+        [[self textStorage] setAttributedString:a];
+    } else {
+        [super _ferrySetValue:value forBinding:binding];
+    }
+}
+- (id)_ferryValueForBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSValueBinding])
+        return [[[self string] copy] autorelease];
+    if ([binding isEqualToString:NSAttributedStringBinding])
+        return [[[NSAttributedString alloc] initWithAttributedString:[self textStorage]] autorelease];
+    return [super _ferryValueForBinding:binding];
 }
 @end

@@ -615,8 +615,12 @@ CGImageRef QLThumbnailImageCreate(CFAllocatorRef allocator, CFURLRef url, CGSize
 }
 - (instancetype)initWithCoder:(NSCoder *)coder
 {
-    if ((self = [super initWithCoder:coder]))
-        _eraseColor = [[NSColor blackColor] retain];
+    if ((self = [super initWithCoder:coder])) {
+        id color = [coder allowsKeyedCoding] ? [coder decodeObjectForKey:@"NSEraseColor"] : nil;
+        _eraseColor = [([color isKindOfClass:[NSColor class]] ? color : [NSColor blackColor]) retain];
+        if ([coder allowsKeyedCoding])
+            _autostarts = [coder decodeBoolForKey:@"NSAutostartsRendering"];
+    }
     return self;
 }
 - (void)dealloc

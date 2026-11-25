@@ -62,6 +62,11 @@ void AViewDecodeConstraints(NSView *view, NSCoder *coder);
 BOOL ADisplayAvailable(void);
 NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
+/* Where a nib's window starts (NSWindow.m, 1.229): its rect, laid out on
+ * the screen it was designed on, moved onto this screen keeping its
+ * distance from the edges in mask (1 left, 2 right, 4 top, 8 bottom) or, on
+ * an axis with neither, its place in proportion. */
+NSRect AInitialWindowRect(NSRect rect, NSRect designScreen, unsigned mask);
 void AWarnOnce(const char *what);
 
 /* An image or colour from a bundle's asset catalogue, as ferry-actool

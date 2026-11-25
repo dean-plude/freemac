@@ -1,0 +1,13 @@
+screen: 1280x1024
+red: 100,300 200x100
+blue, centred: 560,629 160x80
+green, moved: 900,100 120x60
+from the nib, fixed to the right and top: 1040,847 200x100
+shown
+nothing at the top left: srgb(0,0,0)
+red: srgb(255,0,0)
+blue: srgb(0,0,255)
+green: srgb(0,255,0)
+nothing where green was: srgb(0,0,0)
+yellow: srgb(255,255,0)
+exit=0

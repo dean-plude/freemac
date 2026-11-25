@@ -13,7 +13,7 @@ inserted: first child now #made, found 1, same object 1
 removed: found 0, parent nil
 innerHTML set: "new text", outerHTML "<p id="p1" data-x="1"><i>new</i> text</p>"
 outerHTML set: p2 nil, p3 "Three"
-title set: "Changed", the frame's data source says "Changed"
+title set: "Changed", the frame load delegate told 1, the frame's data source says "Changed"
 style: DOMCSSStyleDeclaration, color rgb(1, 2, 3), cssText "color: rgb(1, 2, 3);"
 a: DOMHTMLAnchorElement, href file:///tmp/dom/next.html#part, hash #part, absoluteLinkURL file:///tmp/dom/next.html#part
 links DOMHTMLCollection of 1

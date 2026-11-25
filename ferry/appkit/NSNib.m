@@ -316,6 +316,9 @@ static void hand_over(NSCoder *c, id old, id object)
         cls = [NSWindow class];
     }
     NSRect rect = [c decodeRectForKey:@"NSWindowRect"];
+    if ([c containsValueForKey:@"FerryWindowPositionMask"] && [c containsValueForKey:@"NSScreenRect"])
+        rect = AInitialWindowRect(rect, [c decodeRectForKey:@"NSScreenRect"],
+                                  (unsigned)[c decodeIntegerForKey:@"FerryWindowPositionMask"]);
     NSWindowStyleMask style = (NSWindowStyleMask)[c decodeInt64ForKey:@"NSWindowStyleMask"];
     NSWindow *w = [[cls alloc] initWithContentRect:rect styleMask:style backing:NSBackingStoreBuffered defer:YES];
     NSString *title = [c decodeObjectForKey:@"NSWindowTitle"];

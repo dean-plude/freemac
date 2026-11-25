@@ -1183,6 +1183,58 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.229 "Ferry: the apps' nibs whole, and windows placed" (done)
+
+Ferry 0.53.0: every element in the seven apps' xibs is made as its own
+class, with its attributes, where `ferry-ibtool` made 136 of them as
+empty views of their class or left them out, and dropped the formatters
+of cells in 16 xibs. Text views keep their text, fonts and colours, web
+views their preferences, and matrices their cells. MacPass's inspector
+opens at the width of its nib, wide enough for its tabs and its password
+row, and its unlock window shows its key file control. Under X a window
+is placed as a Mac places it, where its nib puts it on the screen it
+opens on, centred, or cascaded, where it used to open at the top left.
+Flycut's alert and bezel are centred, and ShiftIt's tall alert is kept
+on the screen. Blocks reach JavaScript as functions, and a
+`JSManagedValue` holds its object weakly.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `ferry-ibtool` makes the elements it didn't know as their own classes, with their attributes: | Ferry SDK, AppKit, WebKit | done |
+|   | - text views, with their attributed text, flags, colours and the text container's sizing | | |
+|   | - web views with their preferences (font sizes, plug-ins, JavaScript) | | |
+|   | - matrices with their cells and prototype, level indicators, date pickers, path controls, rule editors, plain controls with their cells, and Quartz Composer views | | |
+|   | - collection views with their item prototypes | | |
+|   | - the formatters of cells (number, date, byte-count, date-components and the app's own), the data cells of table columns, and cells and formatters at a nib's top level | | |
+|   | Over the 372 xibs the apps use, 136 elements of 13 kinds were made as empty views of their class or left out, and the formatters in 16 xibs were dropped. Sparkle's release-notes web views, Sequel Pro's text views and filter rule editor, MacPass's notes, key file control, icon picker, expiry date picker and strength indicator, ShiftIt's two matrices and KeyCastr's composition view were among them; none is left | | |
+| 2 | Bindings on the new classes: a text view's `value` and `attributedString` (pushed as the text changes and when the view gives up focus), and a button cell's `value` in a matrix. A text view's colour and font from the nib no longer overwrite the runs of its text. `NSAttributedStringBinding` and `NSDataBinding` are declared | Ferry AppKit | done |
+| 3 | A split view controller's panes are shared out only once its split view is in a window. MacPass sizes its document view to the window before putting it in, and Ferry squeezed the panes into the 480 points of the controller's nib first, so the inspector opened at its 200-point minimum. It now keeps the 278 points of its own nib. A pane laid out by constraints is also never thinner than its content's fitting size, past its item's minimum, as Auto Layout keeps it on a Mac, collapsed panes included | Ferry AppKit | done |
+| 4 | Windows placed under X11, where Ferry now moves them itself: | Ferry AppKit | done |
+|   | - a window goes where its frame says, and a move the user makes comes back into its frame, as a did-move notification, and is saved under its autosave name | | |
+|   | - a nib's window is placed by its xib's initial position: the edges it keeps its distance from, measured on the screen the xib was drawn on and kept on the screen it opens on | | |
+|   | - a document's windows cascade unless one has a frame saved under its name, and a frame saved under a name is the window's again when the name is set | | |
+|   | - a titled window's top is kept below the top of the visible screen, and `cascadeTopLeftFromPoint:` starts again at the top left when the next window would leave the screen | | |
+|   | Under Wayland the compositor still places windows | | |
+| 5 | An alert run modally is kept on the screen, its top first. ShiftIt's is 593 points tall with its picture; centred a third of the way down an 800-point screen, it would have lost its top 29 points | Ferry AppKit | done |
+| 6 | JavaScriptCore: a block or an exported method is a function in scripts (`Function.prototype` is its prototype, so `call`, `apply` and `bind` work and `instanceof Function` is true). A `JSManagedValue` holds an object through the language's `WeakRef`, so its value is nil once the collector has taken the object. `JSVirtualMachine`'s managed references, and an owner given when the value is made, keep the object alive for as long as their owner is alive | Ferry JavaScriptCore | done |
+| 7 | `webkit_dom` waits for the title change until both the frame load delegate and the frame's data source have it, rather than for a fixed time. It passed 8 runs of 8 | Ferry tests | done |
+| 8 | Two new tests (`appkit_ibtool_classes`, and `appkit_x11_placement`, which needs Xvfb and ImageMagick), and more cases in five others. `make check` 277 of 277, three times | Ferry | done |
+
+The xib's initial position is read as Ferry reads it, since Apple
+documents no format for it: an edge the window keeps its distance from
+is kept on the new screen, the left and bottom edges win when both edges
+of an axis are kept, and an axis with neither is placed in proportion. A
+window whose xib has no initial position is placed at its frame as it
+is, as Spectacle's is. No eighth app was added: Gas Mask and Hex Fiend,
+the two candidates already cloned, have Swift in them (the older Gas
+Mask clone here has none, but links four prebuilt frameworks whose
+source isn't here), and any other app would have had to be fetched from
+GitHub, which this round didn't do. A JavaScript
+function isn't made into an Objective-C block, which Apple's
+JavaScriptCore doesn't do either. MacDown's window fills the screen
+under Xvfb, so it looks as it did. `DDHotKey`'s demo xib, which no app
+uses, still doesn't compile: its base64 data is damaged.
+
 ## 1.228 "Ferry: the apps' windows" (done)
 
 Ferry 0.52.0: the seven apps' windows laid out and drawn as on a Mac.
@@ -1218,10 +1270,10 @@ Ferry's lookup was right. Spectacle's accessibility window is 780 by 360
 points in its nib, unresizable, with the picture under its buttons
 reaching past its bottom edge, and Ferry shows it as a Mac does. MacPass's
 inspector opens at its 200-point minimum, narrower than its tabs and its
-password row need, which a Mac would widen it for. MacDown's layout pull-down in its toolbar shows no
+password row need, which a Mac would widen it for. (1.229 fixed this.) MacDown's layout pull-down in its toolbar shows no
 picture, because MacDown takes out the empty item that holds it.
 JavaScript functions as blocks and a weak `JSManagedValue` weren't
-reached.
+reached. (1.229 did both.)
 
 ## 1.227 "Ferry: Swift programs and a first SwiftUI" (done)
 

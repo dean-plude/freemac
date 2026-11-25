@@ -64,6 +64,8 @@ NSString *const NSObservedKeyPathKey = @"NSObservedKeyPath";
 NSString *const NSOptionsKey = @"NSOptions";
 
 NSString *const NSValueBinding = @"value";
+NSString *const NSAttributedStringBinding = @"attributedString";
+NSString *const NSDataBinding = @"data";
 NSString *const NSEnabledBinding = @"enabled";
 NSString *const NSHiddenBinding = @"hidden";
 NSString *const NSTitleBinding = @"title";
@@ -263,7 +265,7 @@ static BOOL writable(NSString *name)
 {
     return [name isEqualToString:NSValueBinding] || [name isEqualToString:NSSelectedIndexBinding] ||
            [name isEqualToString:NSSelectedObjectBinding] || [name isEqualToString:NSSelectedValueBinding] ||
-           [name isEqualToString:NSSelectedTagBinding];
+           [name isEqualToString:NSSelectedTagBinding] || [name isEqualToString:NSAttributedStringBinding];
 }
 
 /* Whether a value binding of the view now disables it (Ferry 0.20.0). */
@@ -998,6 +1000,24 @@ static void expose_defaults(void)
     } @catch (NSException *e) {
         return nil;
     }
+}
+@end
+
+/* A button cell's value is its state, as a button's is (a check box in a
+ * matrix, say, 1.229): its string value is its title. */
+@implementation NSButtonCell (FerryBindings)
+- (void)_ferrySetValue:(id)value forBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSValueBinding])
+        [self setState:[value respondsToSelector:@selector(integerValue)] ? [value integerValue] : NSControlStateValueOff];
+    else
+        [super _ferrySetValue:value forBinding:binding];
+}
+- (id)_ferryValueForBinding:(NSString *)binding
+{
+    if ([binding isEqualToString:NSValueBinding])
+        return @([self state]);
+    return [super _ferryValueForBinding:binding];
 }
 @end
 

@@ -194,6 +194,7 @@ returned 1000, suppress next time 1
   button: Other (-) tag -1 at 14,209 232x28
 old-style codes, Escape: 0
 FERRY_ALERT_ANSWER "Don't Save": 1002
+a tall alert: 824 high on a screen 900 high, its top within the screen's, its bottom on the screen
 NSRunAlertPanel answered "2": 0
 from an error: "The file couldn’t be found." / "Check the name." / OK
 presentError: 1

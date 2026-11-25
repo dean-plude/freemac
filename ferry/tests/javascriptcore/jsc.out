@@ -12,6 +12,10 @@ inset: {10, 10, 80, 30}
 left half: {0, 0, 720, 900}, title Spectacle-like, count 1
 describe: ababab, add 3.5, same wrapper true
 back to ObjC: the same object
+functions: typeof function, instance of Function true, call 207, bind 211, apply on a method 5
+managed: "held weakly" and "owned" while their objects live, a number 7
+after collecting: the weak one is gone, the owned one "owned", the number 7
+its owner let go: the owned one is gone
 handler: RangeError: too far
 handler: TypeError: registry.noSuchMethod is not a function. (In 'registry.noSuchMethod()', 'registry.noSuchMethod' is undefined)
 exception property: TypeError

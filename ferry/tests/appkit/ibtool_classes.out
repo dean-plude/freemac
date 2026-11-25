@@ -1,0 +1,31 @@
+instantiated: yes
+top level: ICItem, NSComboBoxCell, NSDateComponentsFormatter, NSUserDefaultsController, NSView, NSWindow
+text view: NSTextView "Hello, world" editable no selectable yes rich no graphics no font panel yes undo yes smart yes
+  runs: "Hello, " 7 long, then "world" in DejaVuSansMono-Regular 12, colour 1.00 0.00 0.00, centred yes
+  background 1.00 1.00 0.50, in a scroll view yes, resizes vertically yes, max width 463
+notes: ICTextView "from the defaults" editable yes rich yes spelling yes ruler yes quotes yes
+  insertion point 0.00 0.00 1.00
+web view: WebView back-forward list no, font size 16 fixed 13 minimum 7, plug-ins no, JavaScript yes
+matrix: NSMatrix 2x1 mode 1 empty selection no cell 180x21 spacing 0x6 prototype NSButtonCell
+  "Show in menu bar" state 0 tag 0 action -
+  "Open at login" state 0 tag 7 action toggle:
+  first cell is the owner's yes, bound to values.ICShowsMenu
+  after the default changed: state 1
+level: NSLevelIndicator 3 in 0..5 warning 4 critical 2 style 3
+date picker: NSDatePicker 1982-02-12 elements 0xec
+path control: NSPathControl /tmp style 2 editable yes
+number formatter: NSNumberFormatter style 1 grouping no fraction digits 2, 1 .. 100
+  shows "3.14"
+byte-count formatter: NSByteCountFormatter style 3
+date formatter: NSDateFormatter date style 1 time style 0
+custom formatter: ICDaysFormatter shows "3 days"
+rule editor: NSRuleEditor nesting 2 row height 29 can remove all yes
+recorder: ICRecorder with a NSActionCell
+collection: NSCollectionView selectable yes prototype ICItem, the owner's item yes, its view 48x48
+composition: QCView starts by itself yes, erase colour 1.00 1.00 1.00
+durations: NSDateComponentsFormatter units style 0 zero behaviour 0x2
+combo cell: NSComboBoxCell 2 items, completes no, 4 visible
+column kind: NSComboBoxCell with 2 items, 5 visible
+column shown: NSImageCell
+toggle: from NSMatrix, the clicked cell "Open at login" state 1
+exit=0

@@ -1689,7 +1689,7 @@ APPKIT_EXTERN NSString *const NSValueBinding, *const NSEnabledBinding, *const NS
     *const NSHeaderTitleBinding, *const NSMaxWidthBinding, *const NSMinWidthBinding, *const NSWidthBinding,
     *const NSSelectionIndexPathsBinding, *const NSContentDictionaryBinding, *const NSIncludedKeysBinding,
     *const NSExcludedKeysBinding, *const NSInitialKeyBinding, *const NSInitialValueBinding,
-    *const NSLocalizedKeyDictionaryBinding;
+    *const NSLocalizedKeyDictionaryBinding, *const NSAttributedStringBinding, *const NSDataBinding;
 APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelectionPlaceholderBindingOption,
     *const NSMultipleValuesPlaceholderBindingOption, *const NSNotApplicablePlaceholderBindingOption,
     *const NSValueTransformerNameBindingOption, *const NSValueTransformerBindingOption,

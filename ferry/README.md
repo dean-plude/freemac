@@ -430,6 +430,19 @@ is sent once after each event (`appkit/NSApplication.m`,
 `graphics/CGImage.m` by this system's OpenJPEG, an optional library group
 in `src/host.c`. The test is `appkit_polish`.
 
+From Ferry 0.53.0 (freemac 1.229), `sdk/ferry-ibtool` makes every element
+the seven apps' xibs hold as its own class, with its attributes: text and
+web views, matrices, level indicators, date pickers, path controls,
+collection views, rule editors, Quartz Composer views and the formatters
+of cells, and a window's initial position, which `appkit/NSNib.m` applies
+to the screen the window opens on. Under X11, `appkit/NSWindow.m` places
+windows itself and takes back a move the user makes; documents' windows
+cascade in `appkit/NSViewController.m`. A split view controller shares
+out its panes once its split view is in a window
+(`appkit/NSSplitViewController.m`). Blocks are JavaScript functions and
+`JSManagedValue` is weak in `javascriptcore/JSValue.m`. The tests are
+`appkit_ibtool_classes` and `appkit_x11_placement`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

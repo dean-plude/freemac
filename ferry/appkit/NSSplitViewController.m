@@ -6,8 +6,14 @@
  * thick its pane may be, how firmly it holds its size, and whether it is
  * collapsed or may be collapsed. Without Auto Layout, an item's limits are
  * kept by the split view's delegate calls, and a collapsed pane is hidden
- * with the room going to the others, as a split view does. MacPass's
- * document window is one of these. Built without ARC. */
+ * with the room going to the others, as a split view does. A pane whose
+ * view is laid out by constraints is never thinner than its content needs
+ * (its fitting size), even past the item's minimum (freemac 1.229), as
+ * Auto Layout keeps it on a Mac. The panes are shared out only once the
+ * split view is in a window, so a pane keeps the thickness of its nib
+ * rather than being squeezed into the size the controller's own nib gave
+ * (also 1.229). MacPass's document window is one of these. Built without
+ * ARC. */
 #import "AInternal.h"
 
 @interface NSSplitViewController (FerryItems)
@@ -17,6 +23,8 @@
 @interface NSSplitViewItem (FerryItems)
 - (void)_setOwner:(NSSplitViewController *)owner;
 - (void)_noteCollapsed:(BOOL)f;
+- (CGFloat)_leastThickness;
+- (void)_setContentThickness:(CGFloat)t;
 @end
 
 /* ---- NSSplitViewItem ----------------------------------------------------------------- */
@@ -29,6 +37,7 @@
     NSTitlebarSeparatorStyle _separator;
     NSLayoutPriority _holding;
     CGFloat _min, _max, _fraction, _automaticMax;
+    CGFloat _content; /* the thickness its view's constraints need, or 0 */
     BOOL _collapsed, _canCollapse, _springLoaded, _fromResize, _fullHeight, _safeArea;
 }
 - (instancetype)init
@@ -109,6 +118,10 @@
 }
 
 - (void)_setOwner:(NSSplitViewController *)owner { _owner = owner; }
+/* the thinnest the pane may be: the item's minimum, or what its content
+ * needs when that is more */
+- (CGFloat)_leastThickness { return fmax(_min >= 0 ? _min : 0, _content); }
+- (void)_setContentThickness:(CGFloat)t { _content = t; }
 - (NSViewController *)viewController { return _viewController; }
 - (void)setViewController:(NSViewController *)vc
 {
@@ -404,9 +417,22 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
 {
     if ([item maximumThickness] >= 0)
         t = fmin(t, [item maximumThickness]);
-    if ([item minimumThickness] >= 0)
-        t = fmax(t, [item minimumThickness]);
-    return t;
+    return fmax(t, [item _leastThickness]);
+}
+
+/* What each pane's content needs along the split view's axis: the fitting
+ * size of a view laid out by constraints (a collapsed pane's too, whose
+ * constraints hold while it is hidden, as on a Mac). */
+- (void)_measureContent
+{
+    for (NSSplitViewItem *item in _items) {
+        NSView *v = [[item viewController] viewIfLoaded];
+        NSSize fit;
+        CGFloat t = 0;
+        if (v && AConstraintFittingSize(v, &fit))
+            t = ceil([self _vertical] ? fit.width : fit.height);
+        [item _setContentThickness:t];
+    }
 }
 
 /* Puts an item's pane in the split view, in the items' order, at a first
@@ -417,6 +443,8 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
     if (!v || [v superview] == _splitView)
         return;
     [v setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+    NSSize fit;
+    [item _setContentThickness:AConstraintFittingSize(v, &fit) ? ceil([self _vertical] ? fit.width : fit.height) : 0];
     CGFloat len = [self _length], t;
     if ([item preferredThicknessFraction] > 0)
         t = len * [item preferredThicknessFraction];
@@ -460,21 +488,30 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
 {
     NSArray *subviews = [_splitView subviews];
     NSUInteger n = [subviews count], visible = 0;
-    if (!n)
+    /* Panes are shared out only once the split view is in a window, as a
+     * Mac lays it out then: a pane isn't squeezed to fit the size the view
+     * had in its nib, before it is given the window's (1.229). */
+    if (!n || ![_splitView window])
         return;
     CGFloat sizes[n], used = 0;
     BOOL held[n];
     NSInteger taker = -1;
+    [self _measureContent];
     for (NSUInteger i = 0; i < n; i++) {
         NSView *v = [subviews objectAtIndex:i];
         sizes[i] = [self _thickness:v];
         /* a pane is never left outside its item's limits */
         NSSplitViewItem *item = [self _itemForView:v];
-        if (item && ![v isHidden])
+        if (item)
             sizes[i] = clamp_thickness(item, sizes[i]);
         held[i] = [v isHidden] || v == keep;
-        if ([v isHidden])
+        if ([v isHidden]) {
+            /* a collapsed pane takes no room, but its content's constraints
+             * still hold, so it keeps a thickness they fit */
+            if (sizes[i] != [self _thickness:v])
+                [self _setThickness:sizes[i] of:v];
             continue;
+        }
         used += sizes[i];
         visible++;
         taker = (NSInteger)i;
@@ -548,6 +585,9 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
         CGFloat t = [self _thickness:v];
         if (t <= 0)
             t = [self _length] / ([_items count] ?: 1);
+        NSSize fit;
+        [item _setContentThickness:AConstraintFittingSize(v, &fit) ? ceil([self _vertical] ? fit.width : fit.height)
+                                                                    : 0];
         [self _setThickness:clamp_thickness(item, t) of:v];
         [v setHidden:NO];
     }
@@ -613,8 +653,8 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
     NSSplitViewItem *a = [self _itemForView:[subviews objectAtIndex:i]];
     NSSplitViewItem *b = [self _itemForView:[subviews objectAtIndex:i + 1]];
     CGFloat start = [self _edgeOf:i in:sv start:YES], end = [self _edgeOf:i + 1 in:sv start:NO];
-    if ([a minimumThickness] >= 0)
-        p = fmax(p, start + [a minimumThickness]);
+    if ([a _leastThickness] > 0)
+        p = fmax(p, start + [a _leastThickness]);
     if ([b maximumThickness] >= 0)
         p = fmax(p, end - [b maximumThickness] - [sv dividerThickness]);
     return p;
@@ -629,8 +669,8 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
     CGFloat start = [self _edgeOf:i in:sv start:YES], end = [self _edgeOf:i + 1 in:sv start:NO];
     if ([a maximumThickness] >= 0)
         p = fmin(p, start + [a maximumThickness]);
-    if ([b minimumThickness] >= 0)
-        p = fmin(p, end - [b minimumThickness] - [sv dividerThickness]);
+    if ([b _leastThickness] > 0)
+        p = fmin(p, end - [b _leastThickness] - [sv dividerThickness]);
     return p;
 }
 /* When the split view changes size, the change goes by holding priority,
@@ -641,6 +681,13 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
         [self _shareKeeping:nil];
     else
         [sv adjustSubviews];
+}
+/* The split view is in a window: the panes are shared out for the first
+ * time (NSSplitView.m). */
+- (void)_splitViewDidMoveToWindow:(NSSplitView *)sv
+{
+    if (sv == _splitView && _installed && [sv window])
+        [self _shareKeeping:nil];
 }
 /* A pane the user collapsed by dragging, or opened again, is noted on its item. */
 - (void)splitViewDidResizeSubviews:(NSNotification *)note

@@ -143,10 +143,10 @@ DQ
                                     <rect key="frame" x="10" y="10" width="19" height="28"/>
                                     <stepperCell key="cell" continuous="YES" alignment="left" increment="5" maxValue="50" doubleValue="10" id="stpcell"/>
                                 </stepper>
-                                <levelIndicator verticalHuggingPriority="750" id="lvl">
+                                <browser verticalHuggingPriority="750" id="lvl">
                                     <rect key="frame" x="50" y="14" width="96" height="18"/>
-                                    <levelIndicatorCell key="cell" alignment="left" maxValue="5" levelIndicatorStyle="rating" id="lvlcell"/>
-                                </levelIndicator>
+                                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                </browser>
                             </subviews>
                         </view>
                     </box>

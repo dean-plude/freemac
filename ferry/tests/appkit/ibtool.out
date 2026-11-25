@@ -14,7 +14,7 @@ check after the default changed: state 1
 pop-up: 3 items, selected "Medium" tag 2, pulls down no
 box: "Details" holds 2 views
 stepper: 10 in 0..50 by 5, in the box yes
-level indicator: NSLevelIndicator
+browser, an element the tool does not know: NSView
 table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes, header yes
   column name "Name" width 150 editable yes
   column size "Size" width 120 editable no

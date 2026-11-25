@@ -27,8 +27,16 @@ static const char *cls(id o) { return o ? object_getClassName(o) : "nil"; }
 
 @interface Loads : NSObject <WebFrameLoadDelegate>
 @property int finished;
+@property (copy) NSString *title;
 @end
 @implementation Loads
+/* the main frame's title as WebKit reports it, which comes after a
+ * script's change, on a later turn of the run loop (1.229) */
+- (void)webView:(WebView *)sender didReceiveTitle:(NSString *)title forFrame:(WebFrame *)frame
+{
+    if (frame == sender.mainFrame)
+        self.title = title;
+}
 - (void)webView:(WebView *)sender didFinishLoadForFrame:(WebFrame *)frame
 {
     if (frame == sender.mainFrame)
@@ -112,8 +120,12 @@ int main(void)
         printf("outerHTML set: p2 %s, p3 \"%s\"\n", cls([doc getElementById:@"p2"]),
                [[doc getElementById:@"p3"].textContent UTF8String]);
         doc.title = @"Changed";
-        printf("title set: \"%s\", the frame's data source says \"%s\"\n", [doc.title UTF8String],
-               [web.mainFrameTitle UTF8String]);
+        /* the web view's title follows once WebKit says it changed */
+        BOOL told = spin_until(^{
+            return (BOOL)([loads.title isEqualToString:@"Changed"] && [web.mainFrameTitle isEqualToString:@"Changed"]);
+        });
+        printf("title set: \"%s\", the frame load delegate told %d, the frame's data source says \"%s\"\n",
+               [doc.title UTF8String], told, [web.mainFrameTitle UTF8String]);
         [h1.style setProperty:@"color" value:@"rgb(1, 2, 3)" priority:@""];
         printf("style: %s, color %s, cssText \"%s\"\n", cls(h1.style), [[h1.style getPropertyValue:@"color"] UTF8String],
                [h1.style.cssText UTF8String]);

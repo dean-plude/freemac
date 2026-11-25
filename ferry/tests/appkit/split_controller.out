@@ -10,9 +10,9 @@ an item with no view controller: NSInvalidArgumentException
 document: the split view is in the view 1, fills it 1, vertical 1
 document: items 3, children 3, the window's content is the controller
 document: item for the inspector found 1
-document, inspector collapsed: 0+150 151+329 360+120 (collapsed)
+document, inspector collapsed: 0+150 151+329 0+120 (collapsed)
 holding: 252 250 251
-toggleInspector: with no item of the inspector's behavior, nothing changes: 0+150 151+329 360+120 (collapsed)
+toggleInspector: with no item of the inspector's behavior, nothing changes: 0+150 151+329 0+120 (collapsed)
 observed collapsed: 0
 opened by code: the content pane gives up the room: 0+150 151+208 360+120
 window wider: the content pane grows: 0+150 151+408 560+120
@@ -33,4 +33,8 @@ inspector removed: items 2, children 2, panes 2
 two panes share the room: 0+308 309+271
 put back first: the first pane is the inspector's 1
 an item's view controller changed: NSInternalInconsistencyException
+an inspector needing 260 opened: it is 260, past its minimum of 120: 0+150 151+288 440+260
+narrower: the content pane gives way, the inspector keeps 260: 0+150 151+188 340+260
+its divider dragged 60 points right: held where the content fits: 0+150 151+188 340+260
+MacPass's window: the inspector keeps the 278 of its nib, the entries take the rest: 0+150 151+270 422+278
 exit=0

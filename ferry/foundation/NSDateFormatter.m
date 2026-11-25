@@ -18,7 +18,18 @@
 
 @implementation NSFormatter
 - (id)copyWithZone:(NSZone *)zone { return [[[self class] alloc] init]; }
-- (instancetype)initWithCoder:(NSCoder *)coder { return [self init]; }
+/* A formatter from a nib (a byte count or date components formatter, or
+ * the app's own) has its settings in "NS.attributes", named as its
+ * properties are (freemac 1.229, Ferry 0.53.0). */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [self init]))
+        return nil;
+    NSDictionary *attrs = [coder allowsKeyedCoding] ? [coder decodeObjectForKey:@"NS.attributes"] : nil;
+    if ([attrs isKindOfClass:[NSDictionary class]] && [attrs count])
+        FApplyFormatterAttributes(self, attrs, @[]);
+    return self;
+}
 - (void)encodeWithCoder:(NSCoder *)coder {}
 - (NSString *)stringForObjectValue:(id)obj { return nil; }
 - (NSString *)editingStringForObjectValue:(id)obj { return [self stringForObjectValue:obj]; }
