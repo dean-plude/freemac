@@ -414,3 +414,35 @@ void *ferry_jsc_symbol(const char *name)
     pthread_once(&once, open_jsc);
     return jsc_c_handle ? dlsym(jsc_c_handle, name) : NULL;
 }
+
+/* ---- sound -----------------------------------------------------------------------
+ * Ferry's Core Audio (coreaudio/: CoreAudio, AudioToolbox and AudioUnit)
+ * plays and records through this system's sound server with libpulse,
+ * which PulseAudio has and PipeWire offers through pipewire-pulse
+ * (freemac 1.234, Ferry 0.58.0). It asks for each call by name the first
+ * time a program touches the audio hardware, so a program that only links
+ * the frameworks doesn't open libpulse, and Ferry runs on a system without
+ * it (Core Audio then reports a null device that takes audio at real-time
+ * pace). Only libpulse's own calls (pa_) are served, from libpulse and
+ * libpulse-simple. FERRY_PULSE_LIBRARY names another library to open in
+ * libpulse's place (the tests use it to stand for a system without it). */
+static void *sound_handle, *sound_simple_handle;
+static void open_sound(void)
+{
+    const char *other = getenv("FERRY_PULSE_LIBRARY");
+    sound_handle = dlopen(other && *other ? other : "libpulse.so.0", RTLD_NOW | RTLD_LOCAL);
+    if (sound_handle)
+        sound_simple_handle = dlopen("libpulse-simple.so.0", RTLD_NOW | RTLD_LOCAL);
+}
+
+void *ferry_sound_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name || strncmp(name, "pa_", 3))
+        return NULL;
+    pthread_once(&once, open_sound);
+    void *addr = sound_handle ? dlsym(sound_handle, name) : NULL;
+    if (!addr && sound_simple_handle)
+        addr = dlsym(sound_simple_handle, name);
+    return addr;
+}

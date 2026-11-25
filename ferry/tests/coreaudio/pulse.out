@@ -1,0 +1,15 @@
+found: sink 1, other 1, monitor 1
+named: 1 1 1
+sink streams: 1 out, 0 in; monitor streams: 0 out, 1 in
+default input is the monitor: 0
+alive: 1
+default output set to the other sink: 0, heard yes, now 1
+and back: 1
+volume settable 1, set to a quarter: 0, heard yes, now 0.25
+set through channel 1: 0, now 1.00
+muted: 0 1, and not: 0
+started: 0 0
+recorded a second: yes; heard the sine: yes (after the server's latency)
+DefaultOutput on the other sink before the switch: silent, after: heard, its device now the other sink: 1
+loaded a sink: 0, listed: 1, two more devices (it and its monitor): 1
+exit=0

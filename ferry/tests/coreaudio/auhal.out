@@ -1,0 +1,16 @@
+HALOutput: found
+device side: 48000 Hz, 2 channels
+has output: 1
+buffer frames through the unit: 512
+running: 1
+one second rendered: yes, in about 100 calls, timestamps rising, running after stop: 0
+DefaultOutput: found
+its format: 48000 Hz, 2 channels, float 1, non-interleaved 1
+a quarter second rendered: yes
+HALOutput played: 47999 sounding frames, about 440 Hz, peak 0.50, right same as left
+DefaultOutput played: 5999 sounding frames, about 300 Hz, peak 0.25, right negates left
+recording from the default input: 1
+device side: 48000 Hz, 2 channels
+half a second recorded: yes, in about 47 calls, bus 1 always: 1, host times: 1, errors: 0
+left: about 1000 Hz, peak 0.50; right: about 2000 Hz, peak 0.25
+exit=0

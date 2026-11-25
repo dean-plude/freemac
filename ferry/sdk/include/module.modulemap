@@ -54,6 +54,27 @@ module ApplicationServices [system] {
 
 module AudioToolbox [system] {
     header "AudioToolbox/AudioToolbox.h"
+    header "AudioToolbox/AUComponent.h"
+    header "AudioToolbox/AudioComponent.h"
+    header "AudioToolbox/AudioConverter.h"
+    header "AudioToolbox/AudioFormat.h"
+    header "AudioToolbox/AudioOutputUnit.h"
+    header "AudioToolbox/AudioQueue.h"
+    header "AudioToolbox/AudioServices.h"
+    header "AudioToolbox/AudioUnit.h"
+    header "AudioToolbox/AudioUnitParameters.h"
+    header "AudioToolbox/AudioUnitProperties.h"
+    export *
+    link framework "CoreAudio"
+}
+
+module AudioUnit [system] {
+    header "AudioUnit/AudioUnit.h"
+    header "AudioUnit/AUComponent.h"
+    header "AudioUnit/AudioComponent.h"
+    header "AudioUnit/AudioOutputUnit.h"
+    header "AudioUnit/AudioUnitParameters.h"
+    header "AudioUnit/AudioUnitProperties.h"
     export *
     link framework "CoreAudio"
 }
@@ -157,6 +178,16 @@ module CloudKit [system] {
 
 module CoreAudio [system] {
     header "CoreAudio/CoreAudio.h"
+    header "CoreAudio/AudioHardware.h"
+    header "CoreAudio/AudioHardwareBase.h"
+    header "CoreAudio/CoreAudioTypes.h"
+    header "CoreAudio/HostTime.h"
+    export *
+    link framework "CoreAudio"
+}
+
+module CoreAudioTypes [system] {
+    header "CoreAudioTypes/CoreAudioTypes.h"
     export *
     link framework "CoreAudio"
 }

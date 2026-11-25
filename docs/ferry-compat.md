@@ -1991,6 +1991,27 @@ changes from run to run). Ctrl-C ends a recording cleanly, as on Linux.
 | `struct rusage` in the SDK's `sys/resource.h` | FFmpeg | done |
 | loading plugins: `dlopen` by path from several threads, `@rpath` and `@loader_path` in plugins, `-undefined dynamic_lookup` bundles, weak imports, `dladdr`, a plugin whose library is gone | VLC, OBS | done, with no change to Ferry's loader; libraries are never unloaded |
 
+### Sound: Core Audio and Audio Toolbox (freemac 1.234, Ferry 0.58.0)
+
+Ferry's Core Audio plays and records through this system's sound server,
+PulseAudio or PipeWire's PulseAudio server, which it reaches through
+libpulse when a program first asks for a device. VLC's sound out (its
+`auhal` module) and OBS's audio capture and monitoring were read for
+the calls and properties they use, from their source; neither app was
+run. AudioToolbox and AudioUnit are served by the Core Audio library.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| the HAL's objects and properties: the system object, its devices and their streams, with names, UIDs, formats, rates, buffer sizes, latency, channel layouts, data sources, hog mode, volume and mute; listeners as procs and blocks | VLC, OBS | done; a device's rate and buffer size are what the program asks for, and the server converts to its own |
+| devices from the server: sinks as outputs, sources as inputs, monitors as inputs that are never the default; devices that come and go, and default devices set and followed | VLC, OBS | done |
+| a null device when there is no server, which plays into a file or to its own loopback in real time | tests | done |
+| IO procs, host time | VLC (pass-through) | done for linear PCM; no compressed formats reach a device |
+| HALOutput and DefaultOutput units with render callbacks, HALOutput recording with `AudioUnitRender`, channel maps, the volume parameter | VLC, OBS | done |
+| audio queues for output and input | OBS (monitoring) | done for linear PCM, interleaved |
+| audio converters | OBS | done for linear PCM to linear PCM; AAC and other compressed formats answer `kAudioConverterErr_FormatNotSupported` |
+| Audio Format Services' channel layouts | VLC | done |
+| the default devices' volume and mute, from 1.232 | Itsycal | done, through libpulse in place of pactl and wpctl; the null device has no volume |
+
 ## What the apps need most
 
 Counted over the nine apps:

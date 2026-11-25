@@ -193,20 +193,23 @@ static void older_calls(void)
 
 static void core_audio(void)
 {
-    /* no pactl or wpctl to find: the devices are there, not running */
-    setenv("PATH", "/nonexistent", 1);
+    /* no sound server, whatever this system has (freemac 1.234): the
+     * default devices are Ferry's null device, which has no volume */
+    setenv("FERRY_AUDIO", "null", 1);
     AudioObjectPropertyAddress a = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
                                     kAudioObjectPropertyElementMain};
     AudioDeviceID dev = 0;
     UInt32 size = sizeof dev;
     OSStatus s = AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &size, &dev);
-    printf("default output: status %d, device %u\n", (int)s, (unsigned)dev);
+    printf("default output: status %d, device %s\n", (int)s, dev != kAudioObjectUnknown ? "found" : "none");
     a.mSelector = kAudioDevicePropertyVolumeScalar;
     a.mScope = kAudioObjectPropertyScopeOutput;
     Float32 volume = -1;
     size = sizeof volume;
     s = AudioObjectGetPropertyData(dev, &a, 0, NULL, &size, &volume);
-    printf("volume with no sound server: %s\n", s == kAudioHardwareNotRunningError ? "not running" : "answered");
+    printf("volume with no sound server: %s\n", s == kAudioHardwareUnknownPropertyError && !AudioObjectHasProperty(dev, &a)
+                                                     ? "no volume control"
+                                                     : "answered");
     printf("an unknown object: %s\n", AudioObjectHasProperty(99, &a) ? "has it" : "hasn't");
 }
 
