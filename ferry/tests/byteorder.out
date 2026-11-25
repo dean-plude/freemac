@@ -1,0 +1,6 @@
+host order is little: 1
+to little: 11223344, to big: 44332211
+read big: 1020304, read little: 807
+written big: ab cd
+64: 807060504030201
+exit=0

@@ -575,6 +575,9 @@ run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.o
 run_one graphics_drawing "$here/graphics/drawing.c" "$here/graphics/drawing.out" -framework CoreGraphics
 run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
     -framework CoreText -framework CoreGraphics -framework Foundation
+# (1.NEXT) font descriptors, collections and font files, as VLC's subtitle text finds fonts
+run_one graphics_fonts "$here/graphics/fonts.c" "$here/graphics/fonts.out" \
+    -framework CoreText -framework CoreFoundation -framework CoreGraphics
 # The same, linked under ApplicationServices' Mac name, which CoreGraphics' file also serves.
 run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
     -framework ApplicationServices -framework CoreFoundation
@@ -590,6 +593,9 @@ run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/
 # linked through Cocoa and through AppKit itself.
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
 run_one appkit_hidden_redraw "$here/appkit/hidden_redraw.m" "$here/appkit/hidden_redraw.out" -framework Cocoa
+# (1.NEXT) no untitled document, and no error, at the launch of an app with
+# no document class that uses the document controller for recents (VLC)
+run_one appkit_viewer_launch "$here/appkit/viewer_launch.m" "$here/appkit/viewer_launch.out" -framework Cocoa
 run_one appkit_views_appkit "$here/appkit/views.m" "$here/appkit/views.out" -fblocks \
     -framework AppKit -framework Foundation -framework CoreGraphics -framework CoreText
 # Then on a real Wayland display: a headless Weston compositor, when installed.
@@ -1612,6 +1618,10 @@ run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa 
 # what VLC's core needs (freemac 1.235): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
+# (1.NEXT) setjmp and longjmp in a Mac's jmp_buf, which FreeType uses
+run_one setjmp "$here/setjmp.c" "$here/setjmp.out"
+# OSByteOrder.h, which a Mac's CoreFoundation brings in (VLC's fonts).
+run_one byteorder "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation
 # Cells of the app's own classes in a nib (freemac 1.NEXT): VLC's sliders,
 # steppers and segmented controls keep theirs through ferry-ibtool
 if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/VLCCells.nib" "$here/appkit/vlc_cells.xib" \

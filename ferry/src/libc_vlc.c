@@ -6,6 +6,7 @@
  * few C library calls whose Mac data or numbers differ from this system's
  * (pathconf, getpwuid_r, sigwait, statvfs, sys_errlist), from the Mac's
  * man pages; and backtrace(3), which follows Mac code's frame pointers.
+ * And setjmp and longjmp (freemac 1.NEXT), which FreeType uses.
  *
  * A semaphore is a number standing for a POSIX semaphore of this system;
  * the numbers start well above Ferry's task and host ports.
@@ -289,6 +290,105 @@ static int mac_sigsuspend(const uint32_t *set)
     return r;
 }
 
+/* ---- setjmp and longjmp, in a Mac's jmp_buf (freemac 1.NEXT) -------------------------
+ *
+ * A Mac's jmp_buf is 37 ints (148 bytes) and its sigjmp_buf 38, smaller than
+ * this system's, so Mac code can't use glibc's. What's inside is libSystem's
+ * own business; Ferry keeps, in order: the return address, the stack pointer
+ * the caller had before the call, rbp, rbx, r12 to r15, MXCSR and the x87
+ * control word (4 bytes each), whether the signal mask was kept, and the
+ * Mac's 32-bit signal mask. setjmp and longjmp keep and restore the mask, as
+ * BSD's do; _setjmp and _longjmp don't; sigsetjmp keeps it when asked to,
+ * and siglongjmp (or longjmp) restores it when it was kept. Only the signals
+ * a Mac has are changed back, so Ferry's own stay as they are. */
+
+enum { JB_KEPT = 72, JB_MASK = 76 };
+
+__attribute__((used)) static void jmp_keep_mask(char *buf)
+{
+    sigset_t s;
+    pthread_sigmask(SIG_BLOCK, NULL, &s);
+    uint32_t mac = sigs_to_mac(&s);
+    memcpy(buf + JB_MASK, &mac, 4);
+}
+
+__attribute__((used)) static void jmp_restore_mask(const char *buf)
+{
+    int32_t kept;
+    uint32_t mac;
+    memcpy(&kept, buf + JB_KEPT, 4);
+    if (!kept)
+        return;
+    memcpy(&mac, buf + JB_MASK, 4);
+    sigset_t block, unblock;
+    sigs_to_linux(mac, &block);
+    sigs_to_linux(~mac, &unblock);
+    pthread_sigmask(SIG_BLOCK, &block, NULL);
+    pthread_sigmask(SIG_UNBLOCK, &unblock, NULL);
+}
+
+int mac_setjmp(void *buf), mac__setjmp(void *buf), mac_sigsetjmp(void *buf, int keep);
+void mac_longjmp(void *buf, int value), mac__longjmp(void *buf, int value);
+__asm__(".text\n"
+        "mac_setjmp:\n"
+        "    movl $1, %esi\n"
+        "    jmp mac_sigsetjmp\n"
+        "mac__setjmp:\n"
+        "    xorl %esi, %esi\n"
+        "mac_sigsetjmp:\n"
+        "    movq (%rsp), %rax\n"
+        "    movq %rax, 0(%rdi)\n"
+        "    leaq 8(%rsp), %rax\n"
+        "    movq %rax, 8(%rdi)\n"
+        "    movq %rbp, 16(%rdi)\n"
+        "    movq %rbx, 24(%rdi)\n"
+        "    movq %r12, 32(%rdi)\n"
+        "    movq %r13, 40(%rdi)\n"
+        "    movq %r14, 48(%rdi)\n"
+        "    movq %r15, 56(%rdi)\n"
+        "    stmxcsr 64(%rdi)\n"
+        "    fnstcw 68(%rdi)\n"
+        "    movl %esi, 72(%rdi)\n"
+        "    testl %esi, %esi\n"
+        "    jz 1f\n"
+        "    subq $8, %rsp\n"
+        "    call jmp_keep_mask\n"
+        "    addq $8, %rsp\n"
+        "1:  xorl %eax, %eax\n"
+        "    ret\n"
+        "mac_longjmp:\n"
+        "    pushq %rdi\n"
+        "    pushq %rsi\n"
+        "    subq $8, %rsp\n"
+        "    call jmp_restore_mask\n"
+        "    addq $8, %rsp\n"
+        "    popq %rsi\n"
+        "    popq %rdi\n"
+        "mac__longjmp:\n"
+        "    movl %esi, %eax\n"
+        "    testl %eax, %eax\n"
+        "    jnz 2f\n"
+        "    incl %eax\n"
+        "2:  movq 16(%rdi), %rbp\n"
+        "    movq 24(%rdi), %rbx\n"
+        "    movq 32(%rdi), %r12\n"
+        "    movq 40(%rdi), %r13\n"
+        "    movq 48(%rdi), %r14\n"
+        "    movq 56(%rdi), %r15\n"
+        "    ldmxcsr 64(%rdi)\n"
+        "    fnclex\n"
+        "    fldcw 68(%rdi)\n"
+        "    movq 8(%rdi), %rsp\n"
+        "    jmpq *0(%rdi)\n");
+
+/* Called when a longjmp would go to a frame that has gone; a Mac's prints
+ * and aborts, and so does this. */
+static void mac_longjmperror(void)
+{
+    fputs("longjmp botch.\n", stderr);
+    abort();
+}
+
 /* ---- statvfs, in a Mac's layout (its counts are 32 bits, so big disks are scaled) - */
 
 struct mac_statvfs {
@@ -500,6 +600,13 @@ const struct ferry_symbol ferry_libc_vlc_symbols[] = {
     {"statvfs", mac_statvfs},
     {"fstatvfs", mac_fstatvfs},
     {"strnstr", mac_strnstr},
+    {"setjmp", mac_setjmp},
+    {"_setjmp", mac__setjmp},
+    {"sigsetjmp", mac_sigsetjmp},
+    {"longjmp", mac_longjmp},
+    {"_longjmp", mac__longjmp},
+    {"siglongjmp", mac_longjmp},
+    {"longjmperror", mac_longjmperror},
     {"__exp10", mac_exp10},
     {"mach_error_string", mac_mach_error_string},
     {"mach_error", mac_mach_error},

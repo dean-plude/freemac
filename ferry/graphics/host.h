@@ -223,6 +223,11 @@ void pango_cairo_context_set_font_options(PangoContext *context, const cairo_fon
 void pango_cairo_show_layout_line(cairo_t *cr, PangoLayoutLine *line);
 void pango_cairo_layout_line_path(cairo_t *cr, PangoLayoutLine *line);
 cairo_scaled_font_t *pango_cairo_font_get_scaled_font(PangoFont *font);
+/* (freemac 1.NEXT) the font a fontset gives for a character, for CTFontCreateForString */
+typedef struct _PangoFontset PangoFontset;
+PangoFontset *pango_context_load_fontset(PangoContext *context, const PangoFontDescription *desc, void *language);
+PangoFont *pango_fontset_get_font(PangoFontset *fontset, unsigned wc);
+PangoFontMap *pango_font_get_font_map(PangoFont *font);
 
 /* ---- HarfBuzz ---------------------------------------------------------------- */
 
@@ -245,6 +250,17 @@ hb_position_t hb_font_get_glyph_h_advance(hb_font_t *font, hb_codepoint_t glyph)
 hb_bool_t hb_font_get_glyph_extents(hb_font_t *font, hb_codepoint_t glyph, hb_glyph_extents_t *extents);
 hb_bool_t hb_font_get_h_extents(hb_font_t *font, hb_font_extents_t *extents);
 hb_bool_t hb_ot_metrics_get_position(hb_font_t *font, uint32_t tag, hb_position_t *position);
+/* (freemac 1.NEXT) reading the names and style of a font file's faces, for
+ * Core Text's font descriptors */
+typedef struct hb_blob_t hb_blob_t;
+hb_blob_t *hb_blob_create_from_file(const char *file_name);
+void hb_blob_destroy(hb_blob_t *blob);
+unsigned hb_face_count(hb_blob_t *blob);
+hb_face_t *hb_face_create(hb_blob_t *blob, unsigned index);
+void hb_face_destroy(hb_face_t *face);
+unsigned hb_ot_name_get_utf8(hb_face_t *face, unsigned name_id, const void *language, unsigned *text_size,
+                             char *text);
+float hb_style_get_value(hb_font_t *font, uint32_t style_tag);
 
 /* ---- GdkPixbuf (decoding image files) and Poppler (PDF) ------------------------- */
 
