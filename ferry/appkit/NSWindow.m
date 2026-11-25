@@ -1253,7 +1253,9 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     [self _destroyGtk];
     [all_windows removeObjectIdenticalTo:self];
     AWindowDidClose(self);
-    if (_released)
+    /* "release when closed" is ignored for a window a window controller
+     * owns, as NSWindow's documentation says: the controller releases it */
+    if (_released && !_windowController)
         [self autorelease];
     [self release];
 }
@@ -1429,6 +1431,13 @@ static int button_index(NSEventType t)
     [self retain];
     NSEventType t = [e type];
     int b = button_index(t);
+    if ((t == NSEventTypeLeftMouseDragged || t == NSEventTypeLeftMouseUp) && ADragSessionTakes(e)) {
+        if (t == NSEventTypeLeftMouseUp) {
+            [_mouseView[0] release];      /* the drag had the release: no mouseUp: */
+            _mouseView[0] = nil;
+        }
+        t = NSEventTypeApplicationDefined;    /* nothing more to do with it */
+    }
     switch (t) {
     case NSEventTypeLeftMouseDown:
     case NSEventTypeRightMouseDown:

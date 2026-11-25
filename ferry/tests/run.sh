@@ -52,10 +52,15 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_document_presenter)
+            # its files in a home of its own
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
+                env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_url*)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_panes|appkit_tables|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
+        appkit_panes|appkit_tables|appkit_table_dragging|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -580,6 +585,13 @@ run_one appkit_scrolling "$here/appkit/scrolling.m" "$here/appkit/scrolling.out"
 # Split views and tab views, built in code and from a nib (after M7).
 run_one appkit_panes "$here/appkit/panes.m" "$here/appkit/panes.out" -fobjc-arc -framework Cocoa
 run_one appkit_tables "$here/appkit/tables.m" "$here/appkit/tables.out" -fobjc-arc -framework Cocoa
+# Dragging table rows and outline items within the app, and drops on them
+# (freemac 1.220, Ferry 0.44.0).
+run_one appkit_table_dragging "$here/appkit/table_dragging.m" "$here/appkit/table_dragging.out" -fobjc-arc \
+    -framework Cocoa
+# A document as a file presenter (freemac 1.220, Ferry 0.44.0).
+run_one appkit_document_presenter "$here/appkit/document_presenter.m" "$here/appkit/document_presenter.out" \
+    -fobjc-arc -fblocks -framework Cocoa
 # Editing table and outline cells in place (Ferry 0.16.0).
 run_one appkit_editing "$here/appkit/editing.m" "$here/appkit/editing.out" -fobjc-arc -framework Cocoa
 # Formatters on text fields, cells and edited table cells (Ferry 0.17.0).
@@ -1034,6 +1046,8 @@ fi
 run_one foundation_encodings "$here/foundation/encodings.m" "$here/foundation/encodings.out" -framework Foundation
 run_one foundation_text "$here/foundation/text.m" "$here/foundation/text.out" -fblocks -framework Foundation
 run_one foundation_cfmore "$here/foundation/cfmore.c" "$here/foundation/cfmore.out" -framework CoreFoundation
+# Sets and bags with callbacks of their own, or none (freemac 1.220, Ferry 0.44.0).
+run_one foundation_cfset "$here/foundation/cfset.c" "$here/foundation/cfset.out" -framework CoreFoundation
 run_one foundation_fileaccess "$here/foundation/fileaccess.m" "$here/foundation/fileaccess.out" -fobjc-arc -fblocks \
     -framework Foundation
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \
@@ -1142,8 +1156,19 @@ if command -v python3 > /dev/null 2>&1; then
         echo "FAIL appkit_accessibility (did not compile)"; sed 's/^/    /' "$build/appkit_accessibility.cc.log"
         fail=$((fail + 1))
     fi
+    # Quartz window and event services (freemac 1.220, Ferry 0.44.0): the
+    # window list, Flycut's Command-V and MacPass's typing as Strata's key
+    # presses, all behind the same say as Accessibility
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/appkit_cgservices" "$here/appkit/cgservices.m" \
+            -framework Cocoa -framework Carbon -framework ApplicationServices 2> "$build/appkit_cgservices.cc.log"
+    then
+        wayfire_test appkit_cgservices "$build/appkit_cgservices" "$here/appkit/cgservices.out"
+    else
+        echo "FAIL appkit_cgservices (did not compile)"; sed 's/^/    /' "$build/appkit_cgservices.cc.log"
+        fail=$((fail + 1))
+    fi
 else
-    echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility (they need python3)"
+    echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility, appkit_cgservices (they need python3)"
 fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

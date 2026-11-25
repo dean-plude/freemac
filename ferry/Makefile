@@ -26,6 +26,7 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h \
                      $(wildcard sdk/include/Foundation/NS*.h) \
                      sdk/include/CoreFoundation/CFSocket.h sdk/include/CoreFoundation/CFStream.h \
+                     sdk/include/CoreFoundation/CFMore.h sdk/include/CoreFoundation/CFSet.h \
                      sdk/include/CFNetwork/CFNetwork.h \
                      foundation/FCurl.h foundation/FURLInternal.h foundation/FExpression.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
@@ -37,6 +38,7 @@ GRAPHICS_SRC = $(wildcard graphics/*.m)
 GRAPHICS_OBJ = $(GRAPHICS_SRC:graphics/%.m=graphics/build/%.o)
 GRAPHICS = frameworks/CoreGraphics.framework/CoreGraphics
 GRAPHICS_HEADERS = graphics/GInternal.h graphics/host.h sdk/include/CoreGraphics/CoreGraphics.h \
+                   sdk/include/CoreGraphics/CGEvent.h sdk/include/CoreGraphics/CGWindow.h \
                    sdk/include/CoreText/CoreText.h sdk/include/ImageIO/ImageIO.h $(FOUNDATION_HEADERS)
 HOST_TBD = graphics/build/libFerryHost.tbd
 
@@ -214,6 +216,9 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
 	@mkdir -p frameworks/UserNotifications.framework
 	sdk/gen-alias-tbd.sh UserNotifications $@ > frameworks/UserNotifications.framework/UserNotifications.tbd
+	# Quartz window and event services live in AppKit's file (CGServices.m),
+	# so ApplicationServices offers them too
+	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
 
 $(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKIT) $(TWIN_TBD)
 	@mkdir -p $(INSTALLER_APP)/Contents/MacOS

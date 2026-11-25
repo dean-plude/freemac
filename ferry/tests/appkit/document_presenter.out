@@ -1,0 +1,11 @@
+read: first (1), a presenter before it is held 0
+held: a presenter 1, its URL its file's 1, on the main queue 1
+written over: second (2), edited 0
+its own write: second (2)
+written over while edited: mine (2), edited 1
+another file written: mine (2)
+moved: follows 1, named moved.txt, fourth (3)
+written over where it went: fifth (4)
+deleted: fifth (4)
+closed: a presenter 0, held 0
+exit=0

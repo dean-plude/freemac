@@ -33,9 +33,31 @@
  * column cell's formatter shows the value being edited and reads what was
  * typed, so the data source gets the value (Ferry 0.17.0).
  *
+ * Dragging rows (freemac 1.220, Ferry 0.44.0), as Sequel Pro and MacPass
+ * do it: when the data source gives pasteboard writers for rows
+ * (tableView:pasteboardWriterForRow:) or writes them itself
+ * (tableView:writeRowsWithIndexes:toPasteboard:), a press on a row and a
+ * move of a few points drags the selected rows if it is one of them, or
+ * that row (a press on a row of a larger selection changes the selection
+ * only if no drag begins); with verticalMotionCanBeginDrag off, a move
+ * straight up or down selects rows instead. The table is the drag's
+ * source, offering draggingSourceOperationMaskForLocal: (everything,
+ * unless setDraggingSourceOperationMask:forLocal: or the nib says
+ * otherwise), and its data source hears the drag begin and end. A table
+ * that registered the drag's types takes drops: the point proposes a row
+ * and an operation (on a row from its middle, above it from its top
+ * quarter, below it from its bottom quarter, below the last row past the
+ * end), the data source's tableView:validateDrop:proposedRow:
+ * proposedDropOperation: answers and may change it with setDropRow:
+ * dropOperation: (-1 and NSTableViewDropOn for the whole table), the
+ * table shows it as a line between rows or a ring round a row, and
+ * tableView:acceptDrop:row:dropOperation: takes it. Drags stay within the
+ * app (see NSDragging.m).
+ *
  * Not done yet: editing after a pause on a click in a selected row,
- * dragging rows and columns, type-to-select, and saving column widths
- * under autosaveName. Animations run instantly.
+ * dragging columns, type-to-select, dragging rows to other apps, promised
+ * files, and saving column widths under autosaveName. Animations run
+ * instantly.
  *
  * Nibs: the table's switches are "NSTvFlags", whose bits (column
  * reordering, column resizing, grid, empty and multiple selection, column
@@ -1002,6 +1024,34 @@ static void pass_background_style(NSView *v, NSBackgroundStyle style)
  * as the control whose text was edited. */
 @interface NSTableView ()
 - (void)_cellEditorPosted:(NSNotificationName)name selector:(SEL)sel movement:(NSInteger)movement;
+- (BOOL)_beginDragOfRows:(NSEvent *)e;
+@end
+
+/* Where a drop on a table would go (freemac 1.220): a line between rows,
+ * with a small ring at its start, or a ring round a row or the table. */
+@interface ATableDropIndicator : NSView {
+@public
+    BOOL ring;
+}
+@end
+@implementation ATableDropIndicator
+- (NSView *)hitTest:(NSPoint)p { return nil; }
+- (BOOL)isFlipped { return YES; }
+- (void)drawRect:(NSRect)dirty
+{
+    NSRect b = [self bounds];
+    [[NSColor controlAccentColor] set];
+    if (ring) {
+        NSBezierPath *p = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(b, 1, 1) xRadius:4 yRadius:4];
+        [p setLineWidth:2];
+        [p stroke];
+        return;
+    }
+    NSBezierPath *dot = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(b.origin.x + 1, b.origin.y + 1, 4, 4)];
+    [dot setLineWidth:1.5];
+    [dot stroke];
+    NSRectFill(NSMakeRect(b.origin.x + 5, NSMidY(b) - 1, b.size.width - 5, 2));
+}
 @end
 
 @interface ATableCellEditor : NSTextField {
@@ -1087,6 +1137,16 @@ enum {
     NSTableColumn *_highlightedColumn;
     NSMutableDictionary *_indicators;
     NSInteger _draggingMaskLocal, _draggingMaskNonLocal;
+    /* dragging rows, and drops on them (freemac 1.220) */
+    NSPoint _dragFrom;        /* where the button went down, in the table */
+    NSInteger _dragRow;       /* the row it went down on */
+    BOOL _dragMaybe;          /* a move from there may begin a drag */
+    BOOL _clickDeferred;      /* the click on a selected row selects it alone on mouseUp */
+    NSIndexSet *_dragRows;    /* the rows being dragged */
+    NSInteger _dropRow;
+    NSTableViewDropOperation _dropOp;
+    BOOL _dropValid;
+    NSView *_dropIndicator;
     /* rows */
     NSInteger _rows;
     BOOL _rowsKnown;
@@ -1130,6 +1190,10 @@ enum {
     _sortDescriptors = [[NSArray alloc] init];
     _indicators = [[NSMutableDictionary alloc] init];
     _fittedWidth = -1;
+    _draggingMaskLocal = (NSInteger)NSDragOperationEvery;
+    _draggingMaskNonLocal = NSDragOperationNone;
+    _verticalDrag = YES;
+    _dropRow = -1;
     [self setAutoresizesSubviews:NO];
 }
 - (instancetype)initWithFrame:(NSRect)frame
@@ -1220,6 +1284,8 @@ enum {
     [_editor release];
     [_editOriginal release];
     free(_offsets);
+    [_dragRows release];
+    [_dropIndicator release];
     [super dealloc];
 }
 
@@ -2819,6 +2885,19 @@ enum {
     }
     if (![self _delegateMakesViews] && [e clickCount] == 1 && [self _toggleCheckAt:row column:column point:p])
         return;
+    _dragMaybe = _clickDeferred = NO;
+    if ([e clickCount] == 1 && row >= 0 && [self _canDragRows]) {
+        _dragMaybe = YES;
+        _dragFrom = p;
+        _dragRow = row;
+        /* a press on a row of a larger selection may drag them all */
+        NSEventModifierFlags f = [e modifierFlags];
+        if ([self isRowSelected:row] && [_selection count] > 1 &&
+            !(f & (NSEventModifierFlagCommand | NSEventModifierFlagShift))) {
+            _clickDeferred = YES;
+            return;
+        }
+    }
     if ([e clickCount] == 1) {
         NSIndexSet *before = [[_selection copy] autorelease];
         [self _clickRow:row flags:[e modifierFlags]];
@@ -2827,6 +2906,19 @@ enum {
 }
 - (void)mouseDragged:(NSEvent *)e
 {
+    if (_dragMaybe) {
+        NSPoint at = [self convertPoint:[e locationInWindow] fromView:nil];
+        CGFloat dx = at.x - _dragFrom.x, dy = at.y - _dragFrom.y;
+        if (hypot(dx, dy) < 4)
+            return;
+        _dragMaybe = NO;
+        if ((_verticalDrag || fabs(dx) > fabs(dy)) && [self _beginDragOfRows:e])
+            return;
+        if (_clickDeferred) {
+            _clickDeferred = NO;
+            [self _clickRow:_dragRow flags:0];
+        }
+    }
     if (!_multiple || _anchor < 0)
         return;
     NSPoint p = [self convertPoint:[e locationInWindow] fromView:nil];
@@ -2843,6 +2935,13 @@ enum {
 }
 - (void)mouseUp:(NSEvent *)e
 {
+    _dragMaybe = NO;
+    if (_clickDeferred) {
+        _clickDeferred = NO;
+        NSIndexSet *before = [[_selection copy] autorelease];
+        [self _clickRow:_dragRow flags:0];
+        _clickChangedSelection = ![before isEqualToIndexSet:_selection];
+    }
     if (_editedOnClick) {
         _editedOnClick = NO;
         return;
@@ -2855,6 +2954,222 @@ enum {
     if ([self action])
         [self sendAction:[self action] to:[self target]];
 }
+
+/* ---- dragging rows (freemac 1.220, Ferry 0.44.0) ---- */
+
+- (BOOL)_canDragRows
+{
+    return [_dataSource respondsToSelector:@selector(tableView:pasteboardWriterForRow:)] ||
+           [_dataSource respondsToSelector:@selector(tableView:writeRowsWithIndexes:toPasteboard:)];
+}
+- (BOOL)_putRows:(NSIndexSet *)rows onPasteboard:(NSPasteboard *)pb
+{
+    if ([_dataSource respondsToSelector:@selector(tableView:pasteboardWriterForRow:)]) {
+        NSMutableArray *writers = [NSMutableArray array];
+        id ds = _dataSource;
+        [rows enumerateIndexesUsingBlock:^(NSUInteger r, BOOL *stop) {
+            id w = [ds tableView:self pasteboardWriterForRow:(NSInteger)r];
+            if (w)
+                [writers addObject:w];
+        }];
+        if ([writers count]) {
+            [pb clearContents];
+            return [pb writeObjects:writers];
+        }
+    }
+    if ([_dataSource respondsToSelector:@selector(tableView:writeRowsWithIndexes:toPasteboard:)]) {
+        [pb clearContents];
+        return [_dataSource tableView:self writeRowsWithIndexes:rows toPasteboard:pb];
+    }
+    return NO;
+}
+- (void)_dragOfRows:(NSIndexSet *)rows session:(NSDraggingSession *)session willBeginAt:(NSPoint)screenPoint
+{
+    if ([_dataSource respondsToSelector:@selector(tableView:draggingSession:willBeginAtPoint:forRowIndexes:)])
+        [_dataSource tableView:self draggingSession:session willBeginAtPoint:screenPoint forRowIndexes:rows];
+}
+- (void)_dragSession:(NSDraggingSession *)session endedAt:(NSPoint)screenPoint operation:(NSDragOperation)op
+{
+    if ([_dataSource respondsToSelector:@selector(tableView:draggingSession:endedAtPoint:operation:)])
+        [_dataSource tableView:self draggingSession:session endedAtPoint:screenPoint operation:op];
+}
+- (BOOL)_beginDragOfRows:(NSEvent *)e
+{
+    NSIndexSet *rows = [self isRowSelected:_dragRow] ? [[_selection copy] autorelease]
+                                                     : [NSIndexSet indexSetWithIndex:(NSUInteger)_dragRow];
+    if (![rows count] || ![self canDragRowsWithIndexes:rows atPoint:_dragFrom])
+        return NO;
+    NSPasteboard *pb = [NSPasteboard pasteboardWithName:NSPasteboardNameDrag];
+    if (![self _putRows:rows onPasteboard:pb])
+        return NO;
+    _clickDeferred = NO;
+    [_dragRows release];
+    _dragRows = [rows retain];
+    NSMutableArray *items = [NSMutableArray array];
+    [rows enumerateIndexesUsingBlock:^(NSUInteger r, BOOL *stop) {
+        NSDraggingItem *item = [[[NSDraggingItem alloc] initWithPasteboardWriter:nil] autorelease];
+        [item setDraggingFrame:[self rectOfRow:(NSInteger)r]];
+        [items addObject:item];
+    }];
+    ABeginDragSession(pb, items, self, e);
+    return YES;
+}
+
+- (NSDragOperation)draggingSession:(NSDraggingSession *)session
+    sourceOperationMaskForDraggingContext:(NSDraggingContext)context
+{
+    return [self draggingSourceOperationMaskForLocal:context == NSDraggingContextWithinApplication];
+}
+- (void)draggingSession:(NSDraggingSession *)session willBeginAtPoint:(NSPoint)screenPoint
+{
+    [self _dragOfRows:_dragRows ?: [NSIndexSet indexSet] session:session willBeginAt:screenPoint];
+}
+- (void)draggingSession:(NSDraggingSession *)session endedAtPoint:(NSPoint)screenPoint
+              operation:(NSDragOperation)operation
+{
+    [self _dragSession:session endedAt:screenPoint operation:operation];
+    [_dragRows release];
+    _dragRows = nil;
+}
+- (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal
+{
+    return (NSDragOperation)(isLocal ? _draggingMaskLocal : _draggingMaskNonLocal);
+}
+- (void)setDraggingSourceOperationMask:(NSDragOperation)mask forLocal:(BOOL)isLocal
+{
+    if (isLocal)
+        _draggingMaskLocal = (NSInteger)mask;
+    else
+        _draggingMaskNonLocal = (NSInteger)mask;
+}
+- (BOOL)canDragRowsWithIndexes:(NSIndexSet *)rows atPoint:(NSPoint)point { return YES; }
+- (NSImage *)dragImageForRowsWithIndexes:(NSIndexSet *)rows tableColumns:(NSArray *)columns event:(NSEvent *)e
+                                  offset:(NSPointPointer)offset
+{
+    return nil;     /* no picture follows the pointer yet */
+}
+
+/* ---- drops on rows ---- */
+
+- (void)_updateDraggingItemsForDrag:(id<NSDraggingInfo>)info
+{
+    if ([_dataSource respondsToSelector:@selector(tableView:updateDraggingItemsForDrag:)])
+        [_dataSource tableView:self updateDraggingItemsForDrag:info];
+}
+- (void)_proposeDropAt:(NSPoint)p
+{
+    NSInteger n = [self numberOfRows], r = [self rowAtPoint:p];
+    if (r < 0) {
+        _dropRow = p.y < 0 && n ? 0 : n;
+        _dropOp = NSTableViewDropAbove;
+        return;
+    }
+    NSRect rr = [self rectOfRow:r];
+    CGFloat f = (p.y - NSMinY(rr)) / fmax(rr.size.height, 1);
+    if (f < 0.25) {
+        _dropRow = r;
+        _dropOp = NSTableViewDropAbove;
+    } else if (f > 0.75) {
+        _dropRow = r + 1;
+        _dropOp = NSTableViewDropAbove;
+    } else {
+        _dropRow = r;
+        _dropOp = NSTableViewDropOn;
+    }
+}
+- (void)setDropRow:(NSInteger)row dropOperation:(NSTableViewDropOperation)op
+{
+    _dropRow = row;
+    _dropOp = op;
+}
+- (NSDragOperation)_validateDrop:(id<NSDraggingInfo>)info
+{
+    if (![_dataSource respondsToSelector:@selector(tableView:validateDrop:proposedRow:proposedDropOperation:)])
+        return NSDragOperationNone;
+    return [_dataSource tableView:self validateDrop:info proposedRow:_dropRow proposedDropOperation:_dropOp];
+}
+- (BOOL)_acceptDrop:(id<NSDraggingInfo>)info
+{
+    if (![_dataSource respondsToSelector:@selector(tableView:acceptDrop:row:dropOperation:)])
+        return NO;
+    return [_dataSource tableView:self acceptDrop:info row:_dropRow dropOperation:_dropOp];
+}
+- (BOOL)_dropFeedbackRow:(NSInteger *)row operation:(NSTableViewDropOperation *)op indent:(CGFloat *)indent
+{
+    *row = _dropRow;
+    *op = _dropOp;
+    *indent = 0;
+    return _dropRow >= 0 || _dropOp == NSTableViewDropOn;
+}
+
+- (void)_hideDropFeedback
+{
+    [_dropIndicator removeFromSuperview];
+    [_dropIndicator release];
+    _dropIndicator = nil;
+}
+- (void)_showDropFeedback
+{
+    NSInteger row, n = [self numberOfRows];
+    NSTableViewDropOperation op;
+    CGFloat indent;
+    if (_feedback == NSTableViewDraggingDestinationFeedbackStyleNone ||
+        ![self _dropFeedbackRow:&row operation:&op indent:&indent]) {
+        [self _hideDropFeedback];
+        return;
+    }
+    NSRect b = [self bounds], r;
+    BOOL ring = op == NSTableViewDropOn;
+    if (ring && (row < 0 || row >= n)) {
+        r = NSInsetRect([self visibleRect], 1, 1);
+    } else if (ring) {
+        r = NSInsetRect([self rectOfRow:row], 2, 0);
+    } else {
+        CGFloat y = row < n ? NSMinY([self rectOfRow:row]) : n ? NSMaxY([self rectOfRow:n - 1]) : 0;
+        r = NSMakeRect(b.origin.x + indent + 2, y - 3, b.size.width - indent - 4, 6);
+    }
+    if (!_dropIndicator)
+        _dropIndicator = [[ATableDropIndicator alloc] initWithFrame:r];
+    ((ATableDropIndicator *)_dropIndicator)->ring = ring;
+    [_dropIndicator setFrame:r];
+    if ([_dropIndicator superview] != self || [[self subviews] lastObject] != _dropIndicator) {
+        [_dropIndicator removeFromSuperview];
+        [self addSubview:_dropIndicator];    /* over the rows */
+    }
+    [_dropIndicator setNeedsDisplay:YES];
+}
+- (NSDragOperation)_dropUpdate:(id<NSDraggingInfo>)info
+{
+    [self _proposeDropAt:[self convertPoint:[info draggingLocation] fromView:nil]];
+    NSDragOperation op = [self _validateDrop:info];
+    _dropValid = op != NSDragOperationNone;
+    if (_dropValid)
+        [self _showDropFeedback];
+    else
+        [self _hideDropFeedback];
+    return op;
+}
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)info
+{
+    [self _updateDraggingItemsForDrag:info];
+    return [self _dropUpdate:info];
+}
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)info { return [self _dropUpdate:info]; }
+- (void)draggingExited:(id<NSDraggingInfo>)info
+{
+    _dropValid = NO;
+    [self _hideDropFeedback];
+}
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)info { return _dropValid; }
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)info
+{
+    BOOL done = _dropValid && [self _acceptDrop:info];
+    _dropValid = NO;
+    [self _hideDropFeedback];
+    return done;
+}
+- (void)concludeDragOperation:(id<NSDraggingInfo>)info {}
+- (void)draggingEnded:(id<NSDraggingInfo>)info { [self _hideDropFeedback]; }
 
 /* ---- views ---- */
 

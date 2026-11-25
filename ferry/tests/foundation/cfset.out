@@ -1,0 +1,20 @@
+words (2): apple pear
+copied in 2, a set of its own 1
+has pear 1, has fig 0, count of apple 1
+the pear it holds is its own copy 1
+after replace and set (3): apple fig pear
+copied in 4, freed 1
+removed apple (2): fig pear
+the copy (3): apple fig pear
+the copy describes its words 1
+emptied: 0
+freed with the copy 3
+numbers: 4, sum 13, smallest 1, largest 5, has 4 1, has 9 0
+a mutable copy: 5, the first still 4
+strings: 2, then 2: a c, a set 1, equal to a copy 1
+bag: 4 values, 7 three times 3, 2 once 1, 5 never 0, a bag 1
+applied 4 times, sum 23
+one 7 taken: 4 values, 7 twice 2, 5 once 1; the copy 4 values, equal 0, to itself 1
+emptied: 0, has 7 0
+strings in a bag: 3, tag twice 2, holds the first tag 1
+exit=0

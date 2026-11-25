@@ -201,6 +201,7 @@ __FERRY_END
 /* Arrays and dictionaries with callbacks, more strings, string encodings,
  * UUIDs, URLs, bundle keys and byte order (Ferry 0.43.0) */
 #include <CoreFoundation/CFMore.h>
+#include <CoreFoundation/CFSet.h>
 /* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */
 #include <CoreFoundation/CFSocket.h>
 #include <CoreFoundation/CFStream.h>

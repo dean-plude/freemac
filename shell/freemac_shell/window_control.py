@@ -21,6 +21,12 @@ that was answered is never asked again. Dials > Privacy & Security >
 Control Other Windows lists the apps, with a switch to turn each off or on
 and a button to forget it (it is then asked again).
 
+From freemac 1.220 (Ferry 0.44.0) the same answer also lets an app list
+other apps' windows (CGWindowListCopyWindowInfo) and press keys in them
+(CGEventPost and CGEventPostToPid, through Strata's press-key), as
+clipboard managers such as Flycut do to paste; CGRequestPostEventAccess
+asks this same question.
+
 The answer is a choice the user makes, not a wall: every program of the
 user's can reach Wayfire's IPC socket. Original freemac code.
 """
@@ -100,8 +106,8 @@ def question(name):
     return f"Allow “{name}” to control other windows?"
 
 
-DETAIL = ("It wants to move and resize the windows of other apps and read their titles. "
-          "You can change this in Dials > Privacy & Security.")
+DETAIL = ("It wants to move and resize the windows of other apps, list them and read their titles, "
+          "and press keys in them. You can change this in Dials > Privacy & Security.")
 
 
 def ask(app_id, name):

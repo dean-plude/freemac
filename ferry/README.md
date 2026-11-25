@@ -287,6 +287,15 @@ their app (`appkit/NSWindow.m`), and an app's login items, through
 (`foundation/LoginItems.m`, served for CoreServices, Carbon, Cocoa and
 ServiceManagement).
 
+From Ferry 0.44.0 (freemac 1.220), Quartz Window Services and Event
+Services are in `appkit/CGServices.m`: an app lists its own windows, and
+other apps' windows through Wayfire's IPC once the user let it control other
+windows; with that same consent, posted keys are pressed through Strata's
+`press-key`. Tables and outlines drag rows within the app
+(`appkit/NSDragging.m`, `appkit/NSTableView.m`, `appkit/NSOutlineView.m`),
+Core Foundation's sets and bags take callbacks (`foundation/CFSet.m`), and a
+document is a file presenter (`appkit/NSDocument.m`).
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

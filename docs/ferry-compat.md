@@ -1182,6 +1182,101 @@ cookie store, request bodies and DOM events), which none of the nine apps
 uses. None of the apps was run again; `docs/ferry-gui.md` lists what a Mac
 would settle.
 
+### Other apps' windows, posted keys, drag and drop (freemac 1.220, Ferry 0.44.0)
+
+What 1.219's search of the nine apps' source found and left for later.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `CGWindowListCopyWindowInfo`, `kCGWindowNumber`, `kCGWindowOwnerPID`, `kCGWindowBounds`, `kCGWindowLayer` | ShiftIt, MacPass | done, behind Control Other Windows for other apps' windows |
+| `CGEventCreateKeyboardEvent`, `CGEventSetFlags`, `CGEventPost` (Flycut's Cmd-V to paste, MacPass's Autotype) | Flycut, MacPass | keys done, behind the same consent; mouse posting and event taps refused |
+| `setDropRow:dropOperation:`, `setDraggingSourceOperationMask:forLocal:`, `tableView:writeRowsWithIndexes:toPasteboard:`, `tableView:validateDrop:…`, `tableView:acceptDrop:…` | Sequel Pro, MacPass | done, within the app |
+| `setDropItem:dropChildIndex:`, `outlineView:writeItems:toPasteboard:`, `outlineView:pasteboardWriterForItem:`, `outlineView:validateDrop:proposedItem:proposedChildIndex:` | MacPass, Sequel Pro, Gas Mask | done, within the app |
+| `CFSetCreateMutable`, `CFBag…` with callbacks | asked for this round; none of the nine apps' source calls them directly | done |
+| `NSFilePresenter`, `presentedItemDidChange` | Hex Fiend, MacPass | `NSDocument` presents its file, for writers in the same program |
+
+**Consent.** Listing other apps' windows and pressing keys in them use the
+answer the user already gave in freemac's question "Allow “App” to control
+other windows?" (freemac 1.215): `AXIsProcessTrusted` reads
+`~/.config/freemac/window-control.json` on every call, so turning an app off
+in Dials takes effect at once. Without that answer:
+
+- `CGWindowListCopyWindowInfo` lists only the app's own windows (an app
+  may always list its own, as on a Mac);
+- `CGEventPost` drops the keys with a warning naming Dials > Privacy &
+  Security > Control Other Windows;
+- `CGEventPostToPid` to the app's own process still works (it goes
+  straight into the app's event queue, never to the compositor);
+- `CGPreflightPostEventAccess` answers NO and `CGRequestPostEventAccess`
+  asks freemac's same question.
+
+`CGPreflightListenEventAccess`, `CGRequestListenEventAccess` and
+`CGPreflightScreenCaptureAccess` always answer NO: Ferry has no way to
+watch other apps' input or their pixels, so it doesn't pretend to.
+
+**Windows.** Other apps' windows are Wayfire's toplevel views (from
+`window-rules/list-views`, the same IPC socket `AWayfire.m` uses for
+Accessibility), newest-focused first, with Strata's `view-pids` for the
+owner's process, the app id's last part for its name, and frames in the
+Mac's top-left screen space. Window numbers for them are
+`0x40000000 | view id`, so they never collide with the app's own.
+`kCGWindowListOptionOnScreenOnly`, `…OnScreenAboveWindow`,
+`…OnScreenBelowWindow` and `…IncludingWindow` are honoured.
+`CGWindowListCreateImage` makes a picture only of one of the app's own
+windows (from its views' drawing) and gives NULL for anything else.
+
+**Keys.** Strata's `press-key` presses and releases keys
+through the compositor's own seat, as if typed, into whichever window has
+the focus. `CGEventPost` turns a Mac virtual key code into a Linux key code,
+presses the flags' modifiers (Command as the Super key, Control, Option as
+Alt, Shift), taps the key and lets the modifiers go, always, even when a
+press fails. A key-down posts the key; the key-up that follows it is
+already done. `CGEventKeyboardSetUnicodeString` text is typed key by key
+only while the keyboard layout is US English (`strata/input-source`), since
+with another layout the same keys type other characters; otherwise it is
+dropped with a warning. `CGEventPostToPid` for another app's process posts
+only when that process owns the focused view. Mouse and scroll events have
+no safe route (Strata's pointer IPC only reads), so they are dropped with a
+warning, and `CGEventTapCreate` gives NULL with a warning: nothing on
+freemac lets an app watch other apps' input.
+
+**Drag and drop.** A drag within the app is a session of Ferry's own: the
+dragging source's operation mask (Option for Copy, Control for Link,
+Command for Generic, unless the source ignores the modifiers), the
+destination under the pointer in any of the app's windows told
+`draggingEntered:`, `draggingUpdated:`, `draggingExited:`,
+`prepareForDragOperation:`, `performDragOperation:` and
+`concludeDragOperation:`, and the source `draggingSession:endedAtPoint:operation:`.
+Tables start one when a selected row is dragged 4 points (vertically, by
+default) and the data source writes it (`tableView:pasteboardWriterForRow:`
+or `tableView:writeRowsWithIndexes:toPasteboard:`); a click on one of
+several selected rows waits for the mouse to come up, so the selection can
+be dragged. A drop is proposed above a row from its top quarter, below it
+from its bottom quarter and on it from the middle (past the last row, at
+the end), and the data source may change it with `setDropRow:dropOperation:`
+in `tableView:validateDrop:proposedRow:proposedDropOperation:`. Outlines
+propose an item and child index the same way and
+`setDropItem:dropChildIndex:` retargets them; a drop between the children of
+a closed item shows on the item. The drop is drawn as a ring around the row
+or a line between rows, in the accent colour, indented to the level in an
+outline.
+
+**Sets and bags.** `CFSet` with `kCFTypeSetCallBacks` is an `NSSet`; with
+other callbacks, or none, it is a hash table of Ferry's own that calls them
+to keep, compare, hash, describe and free values, and still answers
+Foundation's set methods. `CFBag` counts its values.
+
+**Documents.** A document the document controller holds is a file
+presenter: a coordinated write to its file reads the file again when the
+document has no unsaved changes and its modification date moved, and a
+move it is told of sets its `fileURL`. Changes made by other programs
+aren't seen, since Ferry's `NSFileCoordinator` works within one program.
+
+Left out: dragging between apps (Wayland's drag and drop would need the
+pasteboard's types offered across), drag images (rows aren't drawn under
+the pointer), promised files, posting mouse events, event taps, pictures
+of other apps' windows, and typing with a layout other than US English.
+
 ## What the apps need most
 
 Counted over the nine apps:

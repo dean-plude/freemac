@@ -73,6 +73,10 @@ enum {
     kVK_ANSI_M = 0x2E, kVK_Return = 0x24, kVK_Tab = 0x30, kVK_Space = 0x31, kVK_Delete = 0x33,
     kVK_Escape = 0x35, kVK_F1 = 0x7A, kVK_F2 = 0x78, kVK_F3 = 0x63, kVK_F4 = 0x76, kVK_F5 = 0x60,
     kVK_LeftArrow = 0x7B, kVK_RightArrow = 0x7C, kVK_DownArrow = 0x7D, kVK_UpArrow = 0x7E,
+    kVK_Command = 0x37, kVK_Shift = 0x38, kVK_CapsLock = 0x39, kVK_Option = 0x3A, kVK_Control = 0x3B,
+    kVK_RightCommand = 0x36, kVK_RightShift = 0x3C, kVK_RightOption = 0x3D, kVK_RightControl = 0x3E,
+    kVK_Function = 0x3F, kVK_ForwardDelete = 0x75, kVK_Home = 0x73, kVK_End = 0x77, kVK_PageUp = 0x74,
+    kVK_PageDown = 0x79,
 };
 
 EventTargetRef GetApplicationEventTarget(void);

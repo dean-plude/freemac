@@ -30,6 +30,18 @@
  * both ways as index paths; a node the controller selects is shown, its
  * parents opened. A click on a column's title sorts the controller.
  *
+ * Dragging (freemac 1.220, Ferry 0.44.0), as in a table (NSTableView.m)
+ * but with items: the data source's outlineView:pasteboardWriterForItem:
+ * or outlineView:writeItems:toPasteboard: puts them on the drag
+ * pasteboard. A drop is proposed on an item from the middle of its row,
+ * or between items as a parent and child index (from the top quarter of a
+ * row, before its item; from the bottom quarter, after it, or first under
+ * it when it is open; past the last row, at the end of the top level),
+ * for outlineView:validateDrop:proposedItem:proposedChildIndex: to take or
+ * change with setDropItem:dropChildIndex:, and outlineView:acceptDrop:
+ * item:childIndex: to take. A drop between the children of a closed item
+ * is shown on the item.
+ *
  * Nibs: "NSOutlineViewIndentationPerLevelKey" and
  * "NSOutlineViewOutlineTableColumnKey". */
 #import "AInternal.h"
@@ -73,6 +85,8 @@ static const CGFloat disclosure_width = 16;
     AOutlineNode *_root;
     NSMutableArray *_rowNodes;       /* the open part of the tree, as rows */
     BOOL _reloadTree;
+    id _dropItem;                    /* the drop proposed (freemac 1.220), retained */
+    NSInteger _dropChildIndex;
 }
 
 - (void)_setUpOutline
@@ -110,6 +124,7 @@ static const CGFloat disclosure_width = 16;
 {
     [_root release];
     [_rowNodes release];
+    [_dropItem release];
     [super dealloc];
 }
 
@@ -796,6 +811,137 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
         [self collapseItem:n->item collapseChildren:all];
     else
         [self expandItem:n->item expandChildren:all];
+    return YES;
+}
+
+/* ---- dragging items, and drops on them (freemac 1.220, Ferry 0.44.0) ---- */
+
+- (NSArray *)_itemsAtRows:(NSIndexSet *)rows
+{
+    NSMutableArray *items = [NSMutableArray array];
+    [rows enumerateIndexesUsingBlock:^(NSUInteger r, BOOL *stop) {
+        id item = [self itemAtRow:(NSInteger)r];
+        if (item)
+            [items addObject:item];
+    }];
+    return items;
+}
+- (BOOL)_canDragRows
+{
+    id ds = [self dataSource];
+    return [ds respondsToSelector:@selector(outlineView:pasteboardWriterForItem:)] ||
+           [ds respondsToSelector:@selector(outlineView:writeItems:toPasteboard:)];
+}
+- (BOOL)_putRows:(NSIndexSet *)rows onPasteboard:(NSPasteboard *)pb
+{
+    id ds = [self dataSource];
+    NSArray *items = [self _itemsAtRows:rows];
+    if (![items count])
+        return NO;
+    if ([ds respondsToSelector:@selector(outlineView:pasteboardWriterForItem:)]) {
+        NSMutableArray *writers = [NSMutableArray array];
+        for (id item in items) {
+            id w = [ds outlineView:self pasteboardWriterForItem:item];
+            if (w)
+                [writers addObject:w];
+        }
+        if ([writers count]) {
+            [pb clearContents];
+            return [pb writeObjects:writers];
+        }
+    }
+    if ([ds respondsToSelector:@selector(outlineView:writeItems:toPasteboard:)]) {
+        [pb clearContents];
+        return [ds outlineView:self writeItems:items toPasteboard:pb];
+    }
+    return NO;
+}
+- (void)_dragOfRows:(NSIndexSet *)rows session:(NSDraggingSession *)session willBeginAt:(NSPoint)screenPoint
+{
+    id ds = [self dataSource];
+    if ([ds respondsToSelector:@selector(outlineView:draggingSession:willBeginAtPoint:forItems:)])
+        [ds outlineView:self draggingSession:session willBeginAtPoint:screenPoint forItems:[self _itemsAtRows:rows]];
+}
+- (void)_dragSession:(NSDraggingSession *)session endedAt:(NSPoint)screenPoint operation:(NSDragOperation)op
+{
+    id ds = [self dataSource];
+    if ([ds respondsToSelector:@selector(outlineView:draggingSession:endedAtPoint:operation:)])
+        [ds outlineView:self draggingSession:session endedAtPoint:screenPoint operation:op];
+}
+- (void)_updateDraggingItemsForDrag:(id<NSDraggingInfo>)info
+{
+    id ds = [self dataSource];
+    if ([ds respondsToSelector:@selector(outlineView:updateDraggingItemsForDrag:)])
+        [ds outlineView:self updateDraggingItemsForDrag:info];
+}
+- (void)setDropItem:(id)item dropChildIndex:(NSInteger)index
+{
+    [item retain];
+    [_dropItem release];
+    _dropItem = item;
+    _dropChildIndex = index;
+}
+- (void)_proposeDropAt:(NSPoint)p
+{
+    NSInteger n = [self numberOfRows], r = [self rowAtPoint:p];
+    if (r < 0) {
+        [self setDropItem:nil dropChildIndex:p.y < 0 && n ? 0 : [self numberOfChildrenOfItem:nil]];
+        return;
+    }
+    id item = [self itemAtRow:r];
+    NSRect rr = [self rectOfRow:r];
+    CGFloat f = (p.y - NSMinY(rr)) / fmax(rr.size.height, 1);
+    if (f < 0.25)
+        [self setDropItem:[self parentForItem:item] dropChildIndex:[self childIndexForItem:item]];
+    else if (f <= 0.75)
+        [self setDropItem:item dropChildIndex:NSOutlineViewDropOnItemIndex];
+    else if ([self isItemExpanded:item] && [self numberOfChildrenOfItem:item] > 0)
+        [self setDropItem:item dropChildIndex:0];
+    else
+        [self setDropItem:[self parentForItem:item] dropChildIndex:[self childIndexForItem:item] + 1];
+}
+- (NSDragOperation)_validateDrop:(id<NSDraggingInfo>)info
+{
+    id ds = [self dataSource];
+    if (![ds respondsToSelector:@selector(outlineView:validateDrop:proposedItem:proposedChildIndex:)])
+        return NSDragOperationNone;
+    id item = [[_dropItem retain] autorelease];
+    return [ds outlineView:self validateDrop:info proposedItem:item proposedChildIndex:_dropChildIndex];
+}
+- (BOOL)_acceptDrop:(id<NSDraggingInfo>)info
+{
+    id ds = [self dataSource];
+    if (![ds respondsToSelector:@selector(outlineView:acceptDrop:item:childIndex:)])
+        return NO;
+    id item = [[_dropItem retain] autorelease];
+    return [ds outlineView:self acceptDrop:info item:item childIndex:_dropChildIndex];
+}
+- (BOOL)_dropFeedbackRow:(NSInteger *)row operation:(NSTableViewDropOperation *)op indent:(CGFloat *)indent
+{
+    NSInteger at = _dropItem ? [self rowForItem:_dropItem] : -1;
+    *indent = 0;
+    if (_dropItem && at < 0)
+        return NO;      /* an item out of sight */
+    if (_dropChildIndex == NSOutlineViewDropOnItemIndex || (_dropItem && ![self isItemExpanded:_dropItem])) {
+        *row = at;
+        *op = NSTableViewDropOn;
+        return YES;
+    }
+    NSInteger level = _dropItem ? [self levelForRow:at] : -1;
+    *indent = (level + 1) * _indent;
+    *op = NSTableViewDropAbove;
+    if (_dropChildIndex < [self numberOfChildrenOfItem:_dropItem]) {
+        NSInteger r = [self rowForItem:[self child:_dropChildIndex ofItem:_dropItem]];
+        if (r >= 0) {
+            *row = r;
+            return YES;
+        }
+    }
+    /* after the parent's last child, and everything open under it */
+    NSInteger r = at + 1, n = [self numberOfRows];
+    while (r < n && [self levelForRow:r] > level)
+        r++;
+    *row = r;
     return YES;
 }
 

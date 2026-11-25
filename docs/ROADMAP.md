@@ -1183,6 +1183,23 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.220 "Ferry: other apps' windows, posted keys, drag and drop in tables" (done)
+
+Ferry 0.44.0: what 1.219 left over from the nine apps' calls.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Quartz Window Services: `CGWindowListCopyWindowInfo`, `CGWindowListCreate`, `CGWindowListCreateDescriptionFromArray`, the window info keys and `CGWindowLevelForKey`; other apps' windows come from Wayfire's IPC and are listed only for an app the user let control other windows; an app's own windows always; pictures of an app's own windows | Ferry ApplicationServices | done |
+| 2 | Posting events: `CGEventCreateKeyboardEvent`, `CGEventPost`, `CGEventPostToPid`, event sources, flags, fields and the Unicode string; keys go through Strata's `press-key` behind the same consent; mouse and scroll events, and event taps, are refused with a warning | Ferry ApplicationServices, Strata IPC | done |
+| 3 | Dragging rows of a table and items of an outline within the app, with the data source's drag methods, drop proposals retargeted with `setDropRow:dropOperation:` and `setDropItem:dropChildIndex:`, the drop shown as a ring or a line; `NSDraggingSession`, `beginDraggingSessionWithItems:event:source:` and the older `dragImage:at:offset:event:pasteboard:source:slideBack:` | Ferry AppKit | done |
+| 4 | Core Foundation's sets and bags, with callbacks of their own | Ferry Core Foundation | done |
+| 5 | `NSDocument` as a file presenter: it reads its file again after a coordinated write and follows a move | Ferry AppKit | done |
+| 6 | Dials > Privacy & Security > Control Other Windows and its question say the answer also covers listing windows and pressing keys | freemac shell | done |
+| 7 | A window that a window controller owns is no longer released when it closes, as NSWindow's documentation says; it was released twice when its document closed, which crashed `appkit_autosave` at exit for some lengths of the home folder's path | Ferry AppKit | done |
+| 8 | Four new tests; `make check` 223 of 223 | Ferry | done |
+
+Dragging out of the app (or into it from another app), drag images, promised files, mouse posting, event taps, pictures of other apps' windows and typing text with a keyboard layout other than US English aren't done, and none of the apps was run again.
+
 ## 1.219 "Ferry: the calls apps make next" (done)
 
 Ferry 0.43.0: what a search of the nine apps' source found them calling that Ferry didn't have, most-used first.

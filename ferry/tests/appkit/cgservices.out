@@ -1,0 +1,76 @@
+levels: normal 0 floating 3 main menu 24 status 25 pop-up 101 screen saver 1000
+before asking: preflight 0, screen capture 0, listen 0
+on screen, not allowed: 1
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 100,400 size 400x300, on screen 1, alpha 1.0
+all, not allowed: 2
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 100,400 size 400x300, on screen 1, alpha 1.0
+  own 2 "Hidden" of appkit_cgservices (me), layer 3, at 0,800 size 200x100, on screen 0, alpha 1.0
+posted, not allowed: nothing
+asking: 0
+after the user's answer: preflight 1, screen capture 0, listen 0
+on screen, allowed: 5
+  view 10 "Notes" of Editor (4242), layer 0, at 100,60 size 600x400, on screen 1, alpha 1.0
+  view 12 "Web" of Browser (5151), layer 0, at -1920,0 size 1920x1080, on screen 1, alpha 1.0
+  view 11 "Other notes" of Editor (4242), layer 0, at -1870,50 size 500x300, on screen 1, alpha 1.0
+  view 13 "Save changes?" of Editor (4242), layer 0, at 200,100 size 300x120, on screen 1, alpha 1.0
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 100,400 size 400x300, on screen 1, alpha 1.0
+with the app's own window shown: 6
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 40,50 size 400x330, on screen 1, alpha 1.0
+  view 10 "Notes" of Editor (4242), layer 0, at 100,60 size 600x400, on screen 1, alpha 1.0
+  view 12 "Web" of Browser (5151), layer 0, at -1920,0 size 1920x1080, on screen 1, alpha 1.0
+  view 11 "Other notes" of Editor (4242), layer 0, at -1870,50 size 500x300, on screen 1, alpha 1.0
+  view 13 "Save changes?" of Editor (4242), layer 0, at 200,100 size 300x120, on screen 1, alpha 1.0
+  own 2 "Hidden" of appkit_cgservices (me), layer 3, at 0,800 size 200x100, on screen 0, alpha 1.0
+above the browser: 2
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 40,50 size 400x330, on screen 1, alpha 1.0
+  view 10 "Notes" of Editor (4242), layer 0, at 100,60 size 600x400, on screen 1, alpha 1.0
+below the browser, and it: 3
+  view 12 "Web" of Browser (5151), layer 0, at -1920,0 size 1920x1080, on screen 1, alpha 1.0
+  view 11 "Other notes" of Editor (4242), layer 0, at -1870,50 size 500x300, on screen 1, alpha 1.0
+  view 13 "Save changes?" of Editor (4242), layer 0, at 200,100 size 300x120, on screen 1, alpha 1.0
+just the browser: 1
+  view 12 "Web" of Browser (5151), layer 0, at -1920,0 size 1920x1080, on screen 1, alpha 1.0
+no such window: 0
+numbers: 5, the first is mine 1
+described: 2
+  view 12 "Web" of Browser (5151), layer 0, at -1920,0 size 1920x1080, on screen 1, alpha 1.0
+  own 2 "Hidden" of appkit_cgservices (me), layer 3, at 0,800 size 200x100, on screen 0, alpha 1.0
+pictures: mine 400x300, another app's NULL, the screen NULL
+Command-V:
+  wayfire: press-key 125 press
+  wayfire: press-key 47 tap
+  wayfire: press-key 125 release
+down and up arrows:
+  wayfire: press-key 108 tap
+  wayfire: press-key 103 tap
+Command alone:
+  wayfire: press-key 125 tap
+typed Ab1!:
+  wayfire: press-key 42 press
+  wayfire: press-key 30 tap
+  wayfire: press-key 42 release
+  wayfire: press-key 48 tap
+  wayfire: press-key 2 tap
+  wayfire: press-key 42 press
+  wayfire: press-key 2 tap
+  wayfire: press-key 42 release
+typed with a German layout: nothing
+typed what the layout can't: nothing
+a click: nothing
+an event tap NULL, taps 0
+a click: type 1, at 10,20, button 0, clicks 1
+a key: type 10, code 0, flags 0x20000, user data 77, source state 1, same type 1
+a copy: code 1, the first still 0
+as an NSEvent: type 10, "A" ("a"), key code 0, shift 1
+and back: type 10, code 0, same each time 1
+posted to itself: got "A"
+posted to an app without the keyboard: nothing
+posted to the app with the keyboard:
+  wayfire: press-key 42 press
+  wayfire: press-key 30 tap
+  wayfire: press-key 42 release
+turned off: preflight 0
+on screen, turned off: 1
+  own 1 "Mine" of appkit_cgservices (me), layer 0, at 40,50 size 400x330, on screen 1, alpha 1.0
+posted, turned off: nothing
+exit=0
