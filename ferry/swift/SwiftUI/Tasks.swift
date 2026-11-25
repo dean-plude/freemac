@@ -103,9 +103,9 @@ public struct LabeledContent<Label: View, Content: View>: View {
         self.label = label()
     }
     public var body: some View {
+        // the label at the leading edge, taking the room the content leaves
         HStack(alignment: .firstTextBaseline) {
-            label
-            Spacer(minLength: 8)
+            label.frame(maxWidth: .infinity, alignment: .leading)
             content
         }
     }

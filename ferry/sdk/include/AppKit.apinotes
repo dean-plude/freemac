@@ -212,6 +212,33 @@ Classes:
   - Selector: "systemFontOfSize:weight:"
     MethodKind: Class
     NullabilityOfRet: N
+  - Selector: "monospacedSystemFontOfSize:weight:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "monospacedDigitSystemFontOfSize:weight:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "labelFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "messageFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "menuFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "menuBarFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "titleBarFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "controlContentFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: "toolTipsFontOfSize:"
+    MethodKind: Class
+    NullabilityOfRet: N
 - Name: NSControl
   Properties:
   - Name: stringValue

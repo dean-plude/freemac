@@ -75,10 +75,12 @@
     NSStatusBarButton *button = self.timer.button;
     [popover showRelativeToRect:button.bounds ofView:button preferredEdge:NSRectEdgeMinY];
     NSWindow *w = vc.view.window;
-    NSRect screen = [[NSScreen mainScreen] visibleFrame];
-    printf("popover shown %d, in a window %d (%gx%g, visible %d, at the top %d, centred under the click %d)\n",
+    NSRect screen = [[NSScreen mainScreen] visibleFrame], full = [[NSScreen mainScreen] frame];
+    /* its top at the foot of the menu bar (24 points), which the work area
+     * may not leave out (freemac 1.231) */
+    printf("popover shown %d, in a window %d (%gx%g, visible %d, under the menu bar %d, centred under the click %d)\n",
            popover.shown, w != nil, w.frame.size.width, w.frame.size.height, w.isVisible,
-           NSMaxY(w.frame) == NSMaxY(screen), NSMidX(w.frame) == NSMinX([[NSScreen mainScreen] frame]) + 300);
+           NSMaxY(w.frame) == fmin(NSMaxY(screen), NSMaxY(full) - 24), NSMidX(w.frame) == NSMinX(full) + 300);
     [popover performClose:nil];
     printf("popover closed %d, window visible %d\n", !popover.shown, w.isVisible);
     self.timer.visible = NO;

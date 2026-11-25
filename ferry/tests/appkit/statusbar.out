@@ -23,7 +23,7 @@ menu needs update
 toggle: now 0
 open: Fahrenheit
 clicked: the timer's button
-popover shown 1, in a window 1 (208x133, visible 1, at the top 1, centred under the click 1)
+popover shown 1, in a window 1 (208x133, visible 1, under the menu bar 1, centred under the click 1)
 popover closed 1, window visible 0
 quitting
 exit=0

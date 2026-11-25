@@ -565,7 +565,7 @@ static NSAccessibilityRole role_of(id self)
         {"NSSecureTextField", &NSAccessibilityTextFieldRole}, {"NSColorWell", &NSAccessibilityColorWellRole},
         {"NSButton", &NSAccessibilityButtonRole}, {"NSButtonCell", &NSAccessibilityButtonRole},
         {"NSSlider", &NSAccessibilitySliderRole}, {"NSSliderCell", &NSAccessibilitySliderRole},
-        {"NSLevelIndicator", &NSAccessibilityLevelIndicatorRole}, {"NSStepper", &NSAccessibilityIncrementorRole},
+        {"NSLevelIndicator", &NSAccessibilityLevelIndicatorRole}, {"NSStepper", &NSAccessibilityIncrementorRole}, {"NSSwitch", &NSAccessibilityCheckBoxRole},
         {"NSImageView", &NSAccessibilityImageRole}, {"NSImageCell", &NSAccessibilityImageRole},
         {"NSProgressIndicator", &NSAccessibilityProgressIndicatorRole}, {"NSTextView", &NSAccessibilityTextAreaRole},
         {"NSOutlineView", &NSAccessibilityOutlineRole}, {"NSTableView", &NSAccessibilityTableRole},

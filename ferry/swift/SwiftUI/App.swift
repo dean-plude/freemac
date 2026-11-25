@@ -9,6 +9,8 @@
 // views once they are laid out, and FERRY_SWIFTUI_CLICK="A,B,..." then
 // presses the buttons and checkboxes with those titles in turn, printing
 // the views again after each, and quits (unless FERRY_SWIFTUI_STAY is set).
+// A switch is pressed by its label too; "up:N" and "down:N" step the Nth
+// stepper, and "segment:T" picks segment T of a segmented picker.
 
 import AppKit
 
@@ -339,8 +341,13 @@ final class MenuBuilder: NSObject, NSMenuDelegate {
 
     private func add(_ n: RNode, to menu: NSMenu) {
         switch n.kind {
-        case .button(let title, let action):
-            menu.addItem(item(title, action))
+        case .button(let title, let action), .clickArea(let title, let action):
+            let i = item(title, action)
+            if let key = n.keyEquivalent {   // a keyboard shortcut shows in the menu (freemac 1.231)
+                i.keyEquivalent = key
+                i.keyEquivalentModifierMask = n.keyModifiers
+            }
+            menu.addItem(i)
         case .toggle(let title, let binding):
             let i = item(title) { binding.wrappedValue.toggle() }
             i.state = binding.wrappedValue ? .on : .off
@@ -581,6 +588,9 @@ final class AppRunner: NSObject, NSApplicationDelegate {
         if let b = findButton(first) {
             print("click \(first)")
             b.performClick(nil)
+        } else if let c = findControl(first) {
+            print("click \(first)")
+            press(c, first)
         } else if first.hasPrefix("menu:"), click(menuItem: String(first.dropFirst(5))) {
             print("click \(first)")
         } else {
@@ -604,6 +614,42 @@ final class AppRunner: NSObject, NSApplicationDelegate {
             for v in allViews(c) { if let b = v as? NSButton, b.title == title { return b } }
         }
         return nil
+    }
+
+    /// A switch by its label, the Nth stepper ("up:N", "down:N") or the
+    /// segmented control with segment T ("segment:T").
+    func findControl(_ name: String) -> NSControl? {
+        var steppers: [NSStepper] = []
+        for w in drivenWindows.reversed() {
+            guard let c = w.contentView else { continue }
+            for v in allViews(c) {
+                if let sw = v as? NSSwitch, sw.toolTip == name { return sw }
+                if let st = v as? NSStepper { steppers.append(st) }
+                if let seg = v as? NSSegmentedControl, name.hasPrefix("segment:"),
+                   (0..<seg.segmentCount).contains(where: { seg.label(forSegment: $0) == String(name.dropFirst(8)) }) {
+                    return seg
+                }
+            }
+        }
+        for prefix in ["up:", "down:"] where name.hasPrefix(prefix) {
+            if let n = Int(name.dropFirst(prefix.count)), n >= 1, n <= steppers.count { return steppers[n - 1] }
+        }
+        return nil
+    }
+
+    func press(_ c: NSControl, _ name: String) {
+        if let sw = c as? NSSwitch {
+            sw.performClick(nil)
+        } else if let st = c as? NSStepper {
+            st.doubleValue = name.hasPrefix("up:") ? st.doubleValue + 1 : st.doubleValue - 1
+            _ = st.sendAction(st.action, to: st.target)
+        } else if let seg = c as? NSSegmentedControl {
+            let label = String(name.dropFirst(8))
+            if let i = (0..<seg.segmentCount).first(where: { seg.label(forSegment: $0) == label }) {
+                seg.selectedSegment = i
+                _ = seg.sendAction(seg.action, to: seg.target)
+            }
+        }
     }
 
     func click(menuItem title: String) -> Bool {
@@ -647,12 +693,21 @@ final class AppRunner: NSObject, NSApplicationDelegate {
         let at = "at \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))"
         var s: String
         if let b = v as? NSButton {
-            s = "button \"\(b.title)\""
+            s = (b.isTransparent ? "plain button \"" : "button \"") + b.title + "\""
+            if b.keyEquivalent == "\r" { s += " (default)" }
             if b.state == .on { s += " (on)" }
         } else if let t = v as? NSTextField {
             s = (t.isEditable ? "field \"" : "text \"") + t.stringValue + "\""
         } else if let sl = v as? NSSlider {
             s = "slider \(sl.doubleValue)"
+        } else if let sw = v as? NSSwitch {
+            s = "switch \"\(sw.toolTip ?? "")\"" + (sw.state == .on ? " (on)" : "")
+        } else if v is NSStepper {
+            s = "stepper"
+        } else if let seg = v as? NSSegmentedControl {
+            s = "segmented " + (0..<seg.segmentCount).map {
+                "\"\(seg.label(forSegment: $0) ?? "")\"" + ($0 == seg.selectedSegment ? "*" : "")
+            }.joined(separator: " ")
         } else {
             s = String(describing: type(of: v))
         }

@@ -3247,6 +3247,11 @@ enum {
 @property BOOL autorepeat, valueWraps;
 @end
 
+/* A switch, on or off (NSSwitch.m, freemac 1.231). */
+@interface NSSwitch : NSControl
+@property NSControlStateValue state;
+@end
+
 /* Dates and times, shown as a text field with a stepper, a text field
  * alone, or a calendar month (and clock). */
 typedef NS_ENUM(NSUInteger, NSDatePickerStyle) {

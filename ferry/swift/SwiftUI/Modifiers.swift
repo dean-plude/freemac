@@ -177,14 +177,38 @@ extension View {
     }
     public func navigationTitle(_ title: Text) -> some View { navigationTitle(title.string) }
 
-    public func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command) -> some View { self }
+    /// A button's keyboard shortcut is its key equivalent (freemac 1.231),
+    /// so .defaultAction (Return) makes it the window's default button,
+    /// drawn in the accent colour, as on a Mac.
+    public func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command) -> some View {
+        keyboardShortcut(KeyboardShortcut(key, modifiers: modifiers))
+    }
     public func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command,
-                                 localization: KeyboardShortcut.Localization) -> some View { self }
-    public func keyboardShortcut(_ shortcut: KeyboardShortcut) -> some View { self }
-    public func keyboardShortcut(_ shortcut: KeyboardShortcut?) -> some View { self }
+                                 localization: KeyboardShortcut.Localization) -> some View {
+        keyboardShortcut(KeyboardShortcut(key, modifiers: modifiers, localization: localization))
+    }
+    public func keyboardShortcut(_ shortcut: KeyboardShortcut) -> some View {
+        _wrap { n, _ in _markShortcut(n, shortcut); return n }
+    }
+    public func keyboardShortcut(_ shortcut: KeyboardShortcut?) -> some View {
+        _wrap { n, _ in
+            if let shortcut { _markShortcut(n, shortcut) }
+            return n
+        }
+    }
     public func labelsHidden() -> some View { self }
-    public func toggleStyle<S: ToggleStyle>(_ style: S) -> some View { self }
-    public func buttonStyle<S: ButtonStyle>(_ style: S) -> some View { self }
+    /// The switch style shows a switch after the label (freemac 1.231);
+    /// the others a checkbox.
+    public func toggleStyle<S: ToggleStyle>(_ style: S) -> some View {
+        _environment { $0[_ToggleStyleKey.self] = style is SwitchToggleStyle ? "switch" : "" }
+    }
+    /// Plain, borderless and link buttons show their label's views with no
+    /// bezel (freemac 1.231); the others are push buttons.
+    public func buttonStyle<S: ButtonStyle>(_ style: S) -> some View {
+        let name = style is PlainButtonStyle ? "plain" : style is BorderlessButtonStyle ? "borderless"
+            : style is LinkButtonStyle ? "link" : style is BorderedProminentButtonStyle ? "prominent" : ""
+        return _environment { $0[_ButtonStyleKey.self] = name }
+    }
     /// The segmented style shows a picker as a segmented control; the
     /// others as a pop-up button.
     public func pickerStyle<S: PickerStyle>(_ style: S) -> some View {
@@ -192,7 +216,20 @@ extension View {
     }
     public func textFieldStyle<S: TextFieldStyle>(_ style: S) -> some View { self }
     public func listStyle<S: ListStyle>(_ style: S) -> some View { self }
-    public func controlSize(_ size: ControlSize) -> some View { self }
+    public func controlSize(_ size: ControlSize) -> some View { _environment { $0[_ControlSizeKey.self] = size } }
+}
+
+/// The first button in a node takes a keyboard shortcut.
+@discardableResult
+func _markShortcut(_ n: RNode, _ shortcut: KeyboardShortcut) -> Bool {
+    switch n.kind {
+    case .button, .clickArea:
+        n.keyEquivalent = String(shortcut.key.character)
+        n.keyModifiers = shortcut.modifiers.nsFlags
+        return true
+    default:
+        return n.children.contains { _markShortcut($0, shortcut) }
+    }
 }
 
 public struct KeyEquivalent: Hashable, Sendable, ExpressibleByExtendedGraphemeClusterLiteral {
@@ -255,7 +292,24 @@ public struct KeyboardShortcut: Hashable, Sendable {
     public static let cancelAction = KeyboardShortcut(.escape, modifiers: [])
 }
 
-public enum ControlSize: Hashable, Sendable { case mini, small, regular, large }
+public enum ControlSize: Hashable, Sendable { case mini, small, regular, large, extraLarge }
+struct _ControlSizeKey: EnvironmentKey { static let defaultValue = ControlSize.regular }
+struct _ButtonStyleKey: EnvironmentKey { static let defaultValue = "" }
+struct _ToggleStyleKey: EnvironmentKey { static let defaultValue = "" }
+
+extension EventModifiers {
+    /// AppKit's flags for these keys.
+    var nsFlags: NSEvent.ModifierFlags {
+        var f: NSEvent.ModifierFlags = []
+        if contains(.shift) { f.insert(.shift) }
+        if contains(.control) { f.insert(.control) }
+        if contains(.option) { f.insert(.option) }
+        if contains(.command) { f.insert(.command) }
+        if contains(.capsLock) { f.insert(.capsLock) }
+        if contains(.numericPad) { f.insert(.numericPad) }
+        return f
+    }
+}
 
 // The styles Ferry accepts by name, and draws one way.
 

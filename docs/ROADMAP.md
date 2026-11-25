@@ -1183,6 +1183,38 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.231 "Ferry: TomatoBar built by a recipe, and its popover as on a Mac" (done)
+
+Ferry 0.55.0: TomatoBar is built from its source by a recipe in the repo,
+`ferry/apps/tomatobar.sh`, which fetches it and its three packages at
+pinned commits, builds them with `ferry-swiftc` and lays out the bundle.
+Its popover now opens under its menu bar item, and looks and works as on a
+Mac: a wide blue Start button, a segmented picker across its width,
+steppers with arrows, switches, and plain About and Quit rows with their
+shortcuts. About shows the standard About panel. At the end of an interval
+it sends its notification, and its sounds play through the system's sound
+player.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `apps/recipe.sh`, shared helpers for recipes that build an app from its public source: fetch a repository at a pinned commit, bring Ferry's Swift modules up to date, build a Swift package as a library, write a SwiftPM resource accessor. Work goes in `apps/work` (ignored) or a folder given | Ferry apps | done |
+| 2 | `apps/tomatobar.sh`: TomatoBar, SwiftState, LaunchAtLogin and KeyboardShortcuts at the commits TomatoBar's `Package.resolved` pins, built and bundled with its asset catalogue, localizations and KeyboardShortcuts' resource bundle. Rerun from an empty folder, it builds a TomatoBar.app that runs | Ferry apps | done |
+| 3 | A popover from a menu bar item opens with its arrow at the foot of the menu bar, under the item, also where the work area under X doesn't leave the menu bar out | Ferry AppKit | done |
+| 4 | A click on a label in a popover no longer goes round between the label and the popover for ever (TomatoBar quit on such a click): an event passed back up to the popover stops there, as at a window | Ferry AppKit | done |
+| 5 | The standard About panel: the app's icon, name, version and build, credits and copyright, from the options given or the bundle's Info.plist | Ferry AppKit | done |
+| 6 | `NSSwitch`, drawn as a pill with a knob, turned by a click or Space; a large control's bezel is taller; the monospaced and other system fonts are non-optional in Swift | Ferry AppKit, SDK | done |
+| 7 | SwiftUI: plain, borderless and link button styles (the label's views with a transparent button over them), keyboard shortcuts on buttons and in menus, a default button, `controlSize`, buttons that fill their width when their label does, the switch toggle style, steppers with arrows (`NSStepper`), segmented pickers across their width, `LabeledContent` with its label at the leading edge | Ferry SwiftUI | done |
+| 8 | TomatoBar: the popover under its item; Intervals, Settings and Sounds; the steppers step; About; the end-of-interval notification with its Open and Skip actions; windup and ticking sounds through the sound player | Ferry | done |
+| 9 | The SwiftUI test driver presses switches by their label, steps steppers (`up:N`, `down:N`) and picks segments (`segment:T`). New test `swift_swiftui_styles`; `make check` 288 of 288 | Ferry | done |
+
+Not yet: labels in TomatoBar's Settings tab are cut short by a few points
+("Show timer in menu ba…"), as Ferry's text is wider than a Mac's.
+Under X with no compositor the popover's corners show white. Gas Mask
+(MASShortcut and Sparkle from source, `NavigationSplitView`, toolbar items,
+drop delegates and the rest), `@Observable` with the Observation module,
+and Spaceman (Sparkle 2, the window server's spaces calls) were not started
+in this round.
+
 ## 1.230 "Ferry: TomatoBar links and runs" (done)
 
 Ferry 0.54.0: TomatoBar, an open-source SwiftUI menu bar timer, links and

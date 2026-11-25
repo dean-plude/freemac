@@ -861,7 +861,9 @@ static BOOL keeps_state(NSButtonType t)
     }
     /* a rounded push button, drawn in the middle of a taller frame as a Mac
      * does for the classic 32-point button frame */
-    CGFloat h = fmin(b.size.height - 4, 22), inset = b.size.height >= 28 ? 6 : 2;
+    /* a large control's bezel is taller (freemac 1.231) */
+    CGFloat h = fmin(b.size.height - 4, [self controlSize] == NSControlSizeLarge ? 28 : 22);
+    CGFloat inset = b.size.height >= 28 ? 6 : 2;
     if (drawable(_image) && [drawable(_image) size].height > 16)   /* a tall image gets a tall bezel */
         h = fmax(h, fmin(b.size.height - 4, [drawable(_image) size].height + 8));
     NSRect bezel = NSMakeRect(b.origin.x + inset, floor(NSMidY(b) - h / 2), b.size.width - 2 * inset, h);
