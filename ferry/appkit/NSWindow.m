@@ -26,6 +26,7 @@ NSNotificationName const NSWindowDidBecomeMainNotification = @"NSWindowDidBecome
 NSNotificationName const NSWindowDidResignMainNotification = @"NSWindowDidResignMainNotification";
 NSNotificationName const NSWindowDidMiniaturizeNotification = @"NSWindowDidMiniaturizeNotification";
 NSNotificationName const NSWindowDidDeminiaturizeNotification = @"NSWindowDidDeminiaturizeNotification";
+NSNotificationName const NSWindowDidChangeOcclusionStateNotification = @"NSWindowDidChangeOcclusionStateNotification";
 NSNotificationName const NSWindowWillBeginSheetNotification = @"NSWindowWillBeginSheetNotification";
 NSNotificationName const NSWindowDidEndSheetNotification = @"NSWindowDidEndSheetNotification";
 NSNotificationName const NSWindowDidUpdateNotification = @"NSWindowDidUpdateNotification";
@@ -330,6 +331,12 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 }
 - (NSInteger)windowNumber { return _number; }
 - (BOOL)isVisible { return _visible; }
+/* visible while ordered in and not minimized (freemac 1.232) */
+- (NSWindowOcclusionState)occlusionState { return _visible && !_miniaturized ? NSWindowOcclusionStateVisible : 0; }
+- (void)_occlusionChanged
+{
+    [self _post:NSWindowDidChangeOcclusionStateNotification selector:@selector(windowDidChangeOcclusionState:)];
+}
 - (BOOL)isKeyWindow { return key_window == self; }
 - (BOOL)isMainWindow { return main_window == self; }
 - (BOOL)isMiniaturized { return _miniaturized; }
@@ -863,7 +870,7 @@ static BOOL places_own_windows(void)
         [_sheetParent display];
         return;
     }
-    ALayoutConstraintsIfNeeded(_contentView);
+    ALayoutWindowIfNeeded(_contentView);
     [self _ensureBacking];
     _needsDisplay = NO;
     [self _drawWindowInContext:_ctx screen:YES];
@@ -885,7 +892,7 @@ static BOOL places_own_windows(void)
         return;
     }
     /* constraints first: what they move needs drawing too */
-    ALayoutConstraintsIfNeeded(_contentView);
+    ALayoutWindowIfNeeded(_contentView);
     if ([self _rootViewsNeedDisplay] || [_sheet _rootViewsNeedDisplay] || !_backing)
         [self display];
 }
@@ -1033,6 +1040,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
             [self makeFirstResponder:_initialFirst];
         [self _noteNeedsDisplay];
         AWindowsNeedUpdate();
+        if (!_miniaturized)
+            [self _occlusionChanged];
     }
     [self _makeGtk];
     if (_gtk && _alpha > 0)
@@ -1066,6 +1075,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     _visible = NO;
     if (_gtk)
         gtk_widget_hide(_gtk);
+    if (!_miniaturized)
+        [self _occlusionChanged];
     for (NSWindow *c in [[_children copy] autorelease])
         if ([c isVisible]) {
             [c orderOut:nil];
@@ -1424,6 +1435,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     if (_gtk)
         gtk_window_iconify(_gtk);
     [self _post:NSWindowDidMiniaturizeNotification selector:@selector(windowDidMiniaturize:)];
+    if (_visible)
+        [self _occlusionChanged];
 }
 - (void)deminiaturize:(id)sender
 {
@@ -1431,6 +1444,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     if (_gtk)
         gtk_window_deiconify(_gtk);
     [self _post:NSWindowDidDeminiaturizeNotification selector:@selector(windowDidDeminiaturize:)];
+    if (_visible)
+        [self _occlusionChanged];
 }
 - (void)performMiniaturize:(id)sender { [self miniaturize:sender]; }
 - (void)zoom:(id)sender

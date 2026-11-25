@@ -447,6 +447,19 @@ Ferry 0.54.0 (freemac 1.230) runs TomatoBar, an open-source SwiftUI menu bar tim
 
 From Ferry 0.55.0 (freemac 1.231), `apps/` holds recipes that build an app from its public source: `apps/tomatobar.sh [WORK]` fetches TomatoBar and its three Swift packages at pinned commits into `WORK/src` (by default `apps/work`, which git ignores), builds them with `sdk/ferry-swiftc` and lays out `WORK/build/TomatoBar/TomatoBar.app`, which runs with `./ferry`. It needs the same Swift toolchain and runtime as the Swift tests. `apps/recipe.sh` has the helpers a recipe uses: `fetch` (a repository at a commit), `need_swift` (Ferry's Swift modules brought up to date), `swift_lib` (a package built as a library and module) and `resource_bundle` (a SwiftPM `Bundle.module` accessor). The SwiftUI test driver also presses switches by their label, steps the Nth stepper with `up:N` and `down:N`, and picks a segment with `segment:T`.
 
+From Ferry 0.56.0 (freemac 1.232), `eventkit/EventKit.m` is EventKit on
+freemac's own calendar and reminders files, Tide's and Nudge's, with
+access asked per app and kept in `~/.config/freemac/calendar-access.json`,
+and `coreaudio/CoreAudio.c` is Core Audio's default devices through the
+system's sound server, which the AudioToolbox header brings in. Before a
+window draws, the views marked as needing layout are laid out with their
+view controllers told (`appkit/NSStackView.m`, `appkit/NSWindow.m`), and a
+view controller's preferred content size holds its view
+(`appkit/NSViewController.m`). The predicate editor is
+`appkit/NSPredicateEditor.m`, and the newer names menu-bar apps call are
+in `appkit/AppKitNewer.m`. The tests are `appkit_newer_apps` and
+`eventkit`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

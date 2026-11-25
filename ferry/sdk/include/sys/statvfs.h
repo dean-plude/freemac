@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* A file system's sizes, laid out as a Mac lays them out (freemac 1.NEXT, VLC). */
+/* A file system's sizes, laid out as a Mac lays them out (freemac 1.232, VLC). */
 #ifndef _SYS_STATVFS_H_
 #define _SYS_STATVFS_H_
 #include <_ferry.h>

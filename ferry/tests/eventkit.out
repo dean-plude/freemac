@@ -1,0 +1,64 @@
+events: 0, reminders: 0
+granted: 0, now: 0, kept: no
+calendars: 0
+save: 0 EKErrorDomain 29
+events: 3, reminders: 3
+source On My Mac (0): 1 calendars
+source alex@example.org (2): 1 calendars
+calendar Calendar, type 0, in On My Mac
+calendar work, type 1, in alex@example.org
+default: Calendar
+week of 23 November:
+  Mon 2026-11-23 09:30 - Mon 2026-11-23 09:45 Standup [Calendar]
+  Tue 2026-11-24 14:00 - Tue 2026-11-24 15:00 Review [work]
+  Wed 2026-11-25 11:00 - Wed 2026-11-25 11:15 Standup (late) [Calendar] (changed)
+  Sat 2026-11-28 00:00 - Sun 2026-11-29 23:59 (all day) Trip to Lyon, by train [Calendar]
+the rent, first half of 2026:
+  Sat 2026-01-31 00:00 - Sat 2026-01-31 23:59 (all day) Rent [Calendar]
+  Sat 2026-02-28 00:00 - Sat 2026-02-28 23:59 (all day) Rent [Calendar]
+  Tue 2026-03-31 00:00 - Tue 2026-03-31 23:59 (all day) Rent [Calendar]
+  Thu 2026-04-30 00:00 - Thu 2026-04-30 23:59 (all day) Rent [Calendar]
+  Sun 2026-05-31 00:00 - Sun 2026-05-31 23:59 (all day) Rent [Calendar]
+  Tue 2026-06-30 00:00 - Tue 2026-06-30 23:59 (all day) Rent [Calendar]
+standup: freq 1, 3 days, alarm -600, note: unchanged
+review: organizer Sam Lee, attendee Alex Kim (2), me 1, zone UTC
+lunch saved: 1, new now: 0, id: yes
+removing Standup on Mon 2026-11-30 09:30: 1
+week of 30 November:
+  Mon 2026-11-30 00:00 - Mon 2026-11-30 23:59 (all day) Rent [Calendar]
+  Wed 2026-12-02 09:30 - Wed 2026-12-02 09:45 Standup [Calendar]
+  Fri 2026-12-04 09:30 - Fri 2026-12-04 09:45 Standup [Calendar]
+file has X-TIDE-NOTE:kept as it was: yes
+file has EXDATE:20261130T093000: yes
+file has SUMMARY:Lunch\; with Robin: yes
+file has DESCRIPTION:Booked\nfor two: yes
+file has DTSTART:20261126T123000: yes
+file has TRIGGER:-PT15M: yes
+file has X-FREEMAC-SOURCE:acct1 https://dav.example.org/cal/work/: yes
+file has PRODID:-//freemac//Tide//EN: yes
+standup changed: 1
+Friday 4 December:
+  Fri 2026-12-04 10:00 - Fri 2026-12-04 10:15 Standup [Calendar]
+week of 23 November, moved:
+  Mon 2026-11-23 10:00 - Mon 2026-11-23 10:15 Standup [Calendar]
+  Tue 2026-11-24 14:00 - Tue 2026-11-24 15:00 Review [work]
+  Wed 2026-11-25 11:00 - Wed 2026-11-25 11:15 Standup (late) [Calendar] (changed)
+  Thu 2026-11-26 12:30 - Thu 2026-11-26 13:30 Lunch; with Robin [Calendar]
+lunch gone: yes
+list Home (home)
+  Buy milk, due 11-26, priority 1, to do
+  Water the plants, due 0-0, priority 0, done
+call saved: 1
+milk saved: 1
+incomplete, due this week:
+  Call the plumber at 09:00
+completed: 2
+list has X-WR-CALNAME:Home: yes
+list has X-FREEMAC-COLOR:green: yes
+list has X-FREEMAC-FLAGGED:1: yes
+list has DUE:20261127T090000: yes
+list has SUMMARY:Call the plumber: yes
+work list saved: 1, lists now: 2
+event calendar saved: 0 (17)
+changed outside: posted
+exit=0

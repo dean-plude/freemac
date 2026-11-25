@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* flock and its operations: the same numbers on both systems (freemac 1.NEXT, VLC). */
+/* flock and its operations: the same numbers on both systems (freemac 1.232, VLC). */
 #ifndef _SYS_FILE_H_
 #define _SYS_FILE_H_
 #include <_ferry.h>

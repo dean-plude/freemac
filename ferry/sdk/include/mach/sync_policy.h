@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* The policies a Mach semaphore takes (freemac 1.NEXT). */
+/* The policies a Mach semaphore takes (freemac 1.232). */
 #ifndef _FERRY_MACH_SYNC_POLICY_H_
 #define _FERRY_MACH_SYNC_POLICY_H_
 typedef int sync_policy_t;

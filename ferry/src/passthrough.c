@@ -79,7 +79,7 @@ const char *const ferry_passthrough[] = {
     "casinl", "cacos", "cacosf", "cacosl", "catan", "catanf", "catanl", "csinh", "csinhf", "csinhl",
     "ccosh", "ccoshf", "ccoshl", "ctanh", "ctanhf", "ctanhl", "casinh", "casinhf", "casinhl",
     "cacosh", "cacoshf", "cacoshl", "catanh", "catanhf", "catanhl",
-    /* freemac 1.NEXT, for VLC: the same numbers and layouts on both systems
+    /* freemac 1.232, for VLC: the same numbers and layouts on both systems
      * (posix_madvise's advice 0 to 4, twalk's VISIT, TIME_UTC 1) */
     "swab", "nrand48", "jrand48", "seed48", "lcong48", "tsearch", "tfind", "tdelete", "twalk",
     "posix_madvise", "timespec_get", "tempnam", "backtrace", "backtrace_symbols", "backtrace_symbols_fd",

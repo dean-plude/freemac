@@ -1921,6 +1921,43 @@ What was added:
 | an alert run modally kept on the screen | ShiftIt | done |
 | a block as a JavaScript function; `JSManagedValue` holding its object weakly; `JSVirtualMachine`'s managed references | none of the seven | done |
 
+### Itsycal and Gas Mask (freemac 1.232, Ferry 0.56.0)
+
+Itsycal was cloned at its newest commit, with MASShortcut 2.4.0 and
+Sparkle 1.27.1, and built with Ferry's SDK: all 36 of its files compile,
+and Sparkle's with ARC and its build settings, less its binary-delta
+files and with its ed25519 code compiled in. It was run under X with no
+window manager on a 1280 by 800 screen, in a home of its own holding a
+calendar file with ten events and a reminders list, and its status item
+was clicked through a stand-in for freemac's desktop. Gas Mask was cloned
+too; its Growl framework didn't compile, and the round was wound down
+before it was taken further. Hammerspoon, Vienna and CocoaRestClient
+were looked at as later candidates.
+
+| App | What was wrong | Why | Now |
+| --- | --- | --- | --- |
+| Itsycal | It wouldn't link: no EventKit, and newer AppKit, Foundation and Core Animation names missing | Ferry had no EventKit, and the app is written for recent macOS | It links and runs, and its status item shows its window |
+| Itsycal | The window was 16 to 78 points wide, its month cut off | The month title hugs its text at priority 1; the solver held its width at zero while any weaker wish broke, and the window took the width | The window is the width of its month, at the top right of the screen under the menu bar |
+| Itsycal | Clicking the status item raised an exception | It reads an event's `participationStatus` by key, which Ferry's EventKit didn't answer | The status is the user's own among the event's attendees |
+| Itsycal | The agenda never showed | `preferredContentSize` changed nothing, and `viewDidLayout`, where the agenda asks for its height, was never sent | The agenda shows under the month, with each day's events and reminders. It appears a few seconds after the click: the window's constraints, with the agenda's rows in them, take over a second to solve, two or three times |
+| Gas Mask | It doesn't compile | Its Growl framework, built from source, uses `CFPropertyListFormat`, `kCFAllocatorMalloc` and `AliasHandle`, which Ferry's headers lack, and declares a type its own way that the SDK declares another | Not done |
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| EventKit: the event store on Tide's calendar and Nudge's reminders files, calendars and sources, events and reminders with their dates, repeats, alarms and attendees, predicates, saves and removals, change notifications, access asked per app | Itsycal | done; birthdays, subscribed calendars and invitations aren't |
+| the layout pass before a window draws, with `viewWillLayout` and `viewDidLayout`; `preferredContentSize` as constraints; the safe-area guide following its insets | Itsycal | done |
+| the solver letting go of a zero size held against a weaker wish; a constant set to its own value changing nothing | Itsycal | done |
+| `NSPredicateEditor` and `NSPredicateEditorRowTemplate`, in code and in nibs | Gas Mask | done; Gas Mask doesn't link to use it |
+| Core Audio's default devices, their names, volume and mute, through AudioToolbox's header | the surveyed apps | done, through pactl or wpctl |
+| safe areas, display links, window occlusion, symbol configurations, menu section headers, system fill colours, scroll phases, `refusesFirstResponder`, the application's will-become and will-resign notifications, older cell and field calls, a layer's corner curve, `NSDateIntervalFormatter`, `localizedStandardCompare:`, the tags key, reachability flags | Itsycal, Gas Mask | done |
+
+The seven earlier apps weren't rebuilt or run again this round: the
+build scripts and builds they were run from were lost with the round's
+scratch space. The layout pass and the solver changes reach them too, so
+they should be run again in the next round.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1931,7 +1968,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. In 1.226 Sequel Pro became the seventh, with its MySQL framework built against MariaDB Connector/C, built from its source, and the older AppKit, Foundation and keychain names its files stopped at: it shows its connection window, and Connect reaches the client library, which reports that no server answers. Counted over the same clones, 582 of 627 files now compile (543 before), and the table under "Sequel Pro" lists what stops the rest. In 1.228 the seven apps' windows were laid out and drawn as on a Mac: the constraints in their xibs reach their nibs, a window's size gives way to them, and MacDown has its toolbar, Flycut its bezel and KeyCastr its icon (see "The apps' windows"). In 1.229 every element in the seven apps' xibs became its own class, with its attributes (text views, web views, matrices and ten more kinds, 136 elements in all), MacPass's inspector opened at the width of its nib, and under X windows were placed as on a Mac, centred, cascaded or where their nibs put them, rather than at the top left (see "The apps' nibs and windows"). Gas Mask and Hex Fiend also have Swift in them; Ferry builds Swift since 1.227, but neither links yet.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. In 1.225 MacPass and MacDown became the fifth and sixth, with the frameworks they bring built from their source: MacPass opens and unlocks a KeePass database and shows its entries, and MacDown renders Markdown in its preview and opens its preferences window, whose xib, in the older format, `ferry-ibtool` now reads. In 1.226 Sequel Pro became the seventh, with its MySQL framework built against MariaDB Connector/C, built from its source, and the older AppKit, Foundation and keychain names its files stopped at: it shows its connection window, and Connect reaches the client library, which reports that no server answers. Counted over the same clones, 582 of 627 files now compile (543 before), and the table under "Sequel Pro" lists what stops the rest. In 1.228 the seven apps' windows were laid out and drawn as on a Mac: the constraints in their xibs reach their nibs, a window's size gives way to them, and MacDown has its toolbar, Flycut its bezel and KeyCastr its icon (see "The apps' windows"). In 1.229 every element in the seven apps' xibs became its own class, with its attributes (text views, web views, matrices and ten more kinds, 136 elements in all), MacPass's inspector opened at the width of its nib, and under X windows were placed as on a Mac, centred, cascaded or where their nibs put them, rather than at the top left (see "The apps' nibs and windows"). Gas Mask and Hex Fiend also have Swift in them; Ferry builds Swift since 1.227, but neither links yet. In 1.232 Itsycal, a menu-bar calendar, became the ninth (TomatoBar, in 1.230, was the eighth), with MASShortcut and Sparkle built from their source and a new EventKit on freemac's own calendar and reminders: its status item opens the month with today ringed and its events marked, and the agenda under it lists the coming days' events and reminders (see "Itsycal and Gas Mask"). Gas Mask, the tenth, still doesn't link: the Growl framework it brings stopped at older Core Foundation and Carbon names before the round was wound down.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

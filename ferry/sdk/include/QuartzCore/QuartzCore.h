@@ -167,6 +167,10 @@ typedef NS_OPTIONS(NSUInteger, CACornerMask) {
     kCALayerMinXMinYCorner = 1U << 0, kCALayerMaxXMinYCorner = 1U << 1,
     kCALayerMinXMaxYCorner = 1U << 2, kCALayerMaxXMaxYCorner = 1U << 3,
 };
+/* How a rounded corner meets the straight edges (freemac 1.232); kept,
+ * and drawn as a circular corner either way. */
+typedef NSString *CALayerCornerCurve;
+CA_EXTERN CALayerCornerCurve const kCACornerCurveCircular, kCACornerCurveContinuous;
 typedef NS_OPTIONS(unsigned int, CAEdgeAntialiasingMask) {
     kCALayerLeftEdge = 1U << 0, kCALayerRightEdge = 1U << 1, kCALayerBottomEdge = 1U << 2,
     kCALayerTopEdge = 1U << 3,
@@ -242,6 +246,7 @@ typedef NS_OPTIONS(unsigned int, CAEdgeAntialiasingMask) {
 @property CGColorRef backgroundColor;
 @property CGFloat cornerRadius;
 @property CACornerMask maskedCorners;
+@property (copy) CALayerCornerCurve cornerCurve;
 @property CGFloat borderWidth;
 @property CGColorRef borderColor;
 @property float opacity;
@@ -469,6 +474,25 @@ CA_EXTERN CAGradientLayerType const kCAGradientLayerConic;
 @property CGPoint startPoint;
 @property CGPoint endPoint;
 @property (copy) CAGradientLayerType type;
+@end
+
+/* A display link (freemac 1.232): calls its target once a frame, from a
+ * timer on the run loops it is added to, at 60 frames a second; a Mac's
+ * views, windows and screens make them (AppKit's displayLinkWithTarget:). */
+typedef struct CAFrameRateRange {
+    float minimum, maximum, preferred;
+} CAFrameRateRange;
+CA_EXTERN const CAFrameRateRange CAFrameRateRangeDefault;
+CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float preferred);
+@interface CADisplayLink : NSObject
++ (CADisplayLink *)displayLinkWithTarget:(id)target selector:(SEL)sel;
+- (void)addToRunLoop:(NSRunLoop *)runloop forMode:(NSRunLoopMode)mode;
+- (void)removeFromRunLoop:(NSRunLoop *)runloop forMode:(NSRunLoopMode)mode;
+- (void)invalidate;
+@property (readonly) CFTimeInterval timestamp, duration, targetTimestamp;
+@property (getter=isPaused) BOOL paused;
+@property NSInteger preferredFramesPerSecond;
+@property CAFrameRateRange preferredFrameRateRange;
 @end
 
 #endif

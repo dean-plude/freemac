@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  *
- * CFNetworkCopySystemProxySettings (freemac 1.NEXT, for VLC), written from
+ * CFNetworkCopySystemProxySettings (freemac 1.232, for VLC), written from
  * Apple's public CFProxySupport documentation. A Mac keeps its proxies in
  * System Settings; this system keeps them in http_proxy, https_proxy and
  * no_proxy, so those are what a Mac program is told.

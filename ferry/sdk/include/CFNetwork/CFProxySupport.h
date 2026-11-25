@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: the system's proxy settings (freemac 1.NEXT, for VLC), from
+ * Ferry SDK: the system's proxy settings (freemac 1.232, for VLC), from
  * Apple's public CFProxySupport documentation; not Apple's header. Ferry
  * reads them from this system's http_proxy, https_proxy and no_proxy
  * (foundation/CFProxySupport.m). */

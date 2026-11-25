@@ -5,7 +5,7 @@
 # folder, so that "@import Foundation;" works and "#import
 # <AppKit/AppKit.h>" is a module import when modules are on, as on a Mac.
 # Each module links its framework, as a Mac's do; HIServices' is
-# ApplicationServices, and CommonCrypto's is libSystem. The C library's
+# ApplicationServices, AudioToolbox's CoreAudio (1.232), and CommonCrypto's is libSystem. The C library's
 # headers stay outside any module; Darwin's and ObjectiveC's submodules
 # (freemac 1.225, Ferry 0.49.0), for "@import Darwin.C.time;" and
 # "@import ObjectiveC.runtime;", each hold a header of their own folder
@@ -21,13 +21,14 @@ cat << 'EOF'
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 EOF
-for dir in AVFoundation AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics CoreImage \
-           CloudKit CoreServices CoreText Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
+for dir in AVFoundation AppKit ApplicationServices AudioToolbox CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics CoreImage \
+           CloudKit CoreAudio CoreServices CoreText EventKit Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
            ScriptingBridge Security \
            ServiceManagement SystemConfiguration UniformTypeIdentifiers UserNotifications WebKit; do
     [ -d "$inc/$dir" ] || continue
     case $dir in
         HIServices) link=ApplicationServices ;;
+        AudioToolbox) link=CoreAudio ;;
         CommonCrypto) link= ;;
         *) link=$dir ;;
     esac

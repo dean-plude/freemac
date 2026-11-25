@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ferry's own test document for ferry-ibtool (freemac 1.232, Ferry 0.56.0),
+     written by hand in the format Interface Builder saves: a predicate editor
+     with a compound row template and a simple one, as a hosts-file app's
+     filter uses them. -->
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="20000" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="20000"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="PEOwner">
+            <connections>
+                <outlet property="editor" destination="pe" id="o1"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <predicateEditor verticalHuggingPriority="750" nestingMode="compound" canRemoveAllRows="YES" rowHeight="25" id="pe">
+            <rect key="frame" x="0.0" y="0.0" width="480" height="100"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <rowTemplates>
+                <predicateEditorRowTemplate rowType="compound" id="t1">
+                    <popUpMenus>
+                        <menu id="m1">
+                            <items>
+                                <menuItem title="Any" state="on" id="i1">
+                                    <integer key="representedObject" value="2"/>
+                                </menuItem>
+                                <menuItem title="All" id="i2">
+                                    <integer key="representedObject" value="1"/>
+                                </menuItem>
+                            </items>
+                        </menu>
+                        <menu id="m2">
+                            <items>
+                                <menuItem title="of the following are true" state="on" id="i3"/>
+                            </items>
+                        </menu>
+                    </popUpMenus>
+                </predicateEditorRowTemplate>
+                <predicateEditorRowTemplate caseInsensitive="YES" id="t2">
+                    <array key="leftExpressionObject">
+                        <expression type="keyPath">
+                            <string key="keyPath">name</string>
+                        </expression>
+                        <expression type="keyPath">
+                            <string key="keyPath">contents</string>
+                        </expression>
+                    </array>
+                    <integer key="rightExpressionObject" value="700"/>
+                    <popUpMenus>
+                        <menu id="m3">
+                            <items>
+                                <menuItem title="Name" state="on" id="i4"/>
+                                <menuItem title="Contents" id="i5"/>
+                            </items>
+                        </menu>
+                        <menu id="m4">
+                            <items>
+                                <menuItem title="contains" state="on" id="i6">
+                                    <integer key="representedObject" value="99"/>
+                                </menuItem>
+                                <menuItem title="begins with" id="i7">
+                                    <integer key="representedObject" value="8"/>
+                                </menuItem>
+                                <menuItem title="is" id="i8">
+                                    <integer key="representedObject" value="4"/>
+                                </menuItem>
+                            </items>
+                        </menu>
+                    </popUpMenus>
+                </predicateEditorRowTemplate>
+            </rowTemplates>
+        </predicateEditor>
+    </objects>
+</document>

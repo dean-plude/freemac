@@ -82,7 +82,7 @@ __FERRY_BEGIN
 #define SCNuPTR "lu"
 #define SCNxPTR "lx"
 
-/* the least and fast sizes are the exact ones (freemac 1.NEXT, VLC) */
+/* the least and fast sizes are the exact ones (freemac 1.232, VLC) */
 #define PRIdLEAST8 PRId8
 #define PRIiLEAST8 PRIi8
 #define PRIoLEAST8 PRIo8

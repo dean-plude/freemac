@@ -30,6 +30,8 @@ CALayerContentsGravity const kCAGravityResizeAspect = @"resizeAspect";
 CALayerContentsGravity const kCAGravityResizeAspectFill = @"resizeAspectFill";
 CALayerContentsFilter const kCAFilterNearest = @"nearest";
 CALayerContentsFilter const kCAFilterLinear = @"linear";
+CALayerCornerCurve const kCACornerCurveCircular = @"circular";
+CALayerCornerCurve const kCACornerCurveContinuous = @"continuous";
 CALayerContentsFilter const kCAFilterTrilinear = @"trilinear";
 CALayerContentsFormat const kCAContentsFormatRGBA8Uint = @"RGBA8";
 NSString *const kCAOnOrderIn = @"onOrderIn";
@@ -248,7 +250,7 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
     sublayerTransform, masksToBounds, contents, contentsRect, contentsGravity, contentsScale, contentsCenter,
     contentsFormat, minificationFilter, magnificationFilter, minificationFilterBias, opaque,
     needsDisplayOnBoundsChange, drawsAsynchronously, edgeAntialiasingMask, allowsEdgeAntialiasing, backgroundColor,
-    cornerRadius, maskedCorners, borderWidth, borderColor, opacity, allowsGroupOpacity, compositingFilter, filters,
+    cornerRadius, maskedCorners, cornerCurve, borderWidth, borderColor, opacity, allowsGroupOpacity, compositingFilter, filters,
     backgroundFilters, shouldRasterize, rasterizationScale, shadowColor, shadowOpacity, shadowOffset, shadowRadius,
     shadowPath, layoutManager, autoresizingMask, actions, name, style, beginTime, duration, speed, timeOffset,
     repeatCount, repeatDuration, autoreverses, fillMode;
@@ -273,8 +275,8 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
             @"contentsRect", @"contentsGravity", @"contentsScale", @"contentsCenter", @"contentsFormat",
             @"minificationFilter", @"magnificationFilter", @"minificationFilterBias", @"opaque",
             @"needsDisplayOnBoundsChange", @"drawsAsynchronously", @"edgeAntialiasingMask",
-            @"allowsEdgeAntialiasing", @"backgroundColor", @"cornerRadius", @"maskedCorners", @"borderWidth",
-            @"borderColor", @"opacity", @"allowsGroupOpacity", @"compositingFilter", @"filters",
+            @"allowsEdgeAntialiasing", @"backgroundColor", @"cornerRadius", @"maskedCorners", @"cornerCurve",
+            @"borderWidth", @"borderColor", @"opacity", @"allowsGroupOpacity", @"compositingFilter", @"filters",
             @"backgroundFilters", @"shouldRasterize", @"rasterizationScale", @"shadowColor", @"shadowOpacity",
             @"shadowOffset", @"shadowRadius", @"shadowPath", @"layoutManager", @"autoresizingMask", @"actions",
             @"name", @"style", @"beginTime", @"duration", @"speed", @"timeOffset", @"repeatCount",
@@ -328,6 +330,7 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
             @"allowsEdgeAntialiasing" : @NO,
             @"cornerRadius" : @0.0,
             @"maskedCorners" : @15u,
+            @"cornerCurve" : kCACornerCurveCircular,
             @"borderWidth" : @0.0,
             @"borderColor" : (id)black,
             @"opacity" : @1.0f,
