@@ -1,0 +1,6 @@
+cond wait: canceled 1, cleanup ran 1, with the mutex held 1
+timed wait: canceled 1, cleanup ran 1, with the mutex held 1
+cancellation disabled: woken by the signal 1
+run in mode with nothing to do: finished 1
+CFRunLoopRun on the main thread: ran both blocks 1, then returned
+exit=0

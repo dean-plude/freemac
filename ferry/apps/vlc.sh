@@ -105,4 +105,15 @@ if [ ! -f config.status ]; then
         --disable-dbus --disable-vcd --disable-screen --enable-run-as-root \
         lt_cv_prog_gnu_ld=no lt_cv_apple_cc_single_mod=yes
 fi
-make -j"$jobs" XIB=ibtool
+# A few modules (the Mac interface among them) still wait on parts of Ferry
+# (docs/ferry-notes/vlc.md), so the rest is built around them.
+make -j"$jobs" -k XIB=ibtool || echo "vlc.sh: some modules didn't build; see docs/ferry-notes/vlc.md" >&2
+
+# Staged to run in place: vlc-osx, libvlc and libvlccore beside it in lib/,
+# and every plugin that built in plugins/ (VLC_PLUGIN_PATH names it).
+stage="$work/stage"
+rm -rf "$stage"; mkdir -p "$stage/lib" "$stage/plugins"
+cp bin/.libs/vlc-osx "$stage/"
+cp -P lib/.libs/libvlc*.dylib src/.libs/libvlccore*.dylib "$stage/lib/"
+find modules -path '*/.libs/*_plugin.dylib' -exec cp {} "$stage/plugins/" \;
+echo "vlc.sh: staged in $stage ($(ls "$stage/plugins" | wc -l) plugins)"

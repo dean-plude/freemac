@@ -593,6 +593,9 @@ static void drain_wake(int fd)
     return next < 1e15 ? [NSDate dateWithTimeIntervalSinceReferenceDate:next] : [NSDate distantFuture];
 }
 
+/* Set by CFRunLoopRun (CoreFoundation.m) while it runs (freemac 1.NEXT, VLC). */
+__thread BOOL _FerryRunLoopRunForever;
+
 /* For CFRunLoopRunInMode. */
 - (SInt32)runFor:(CFTimeInterval)seconds returnAfterSource:(BOOL)once
 {
@@ -600,7 +603,9 @@ static void drain_wake(int fd)
     _stopped = NO;
     for (;;) {
         BOOL handled = NO;
-        if (![self hasWork])
+        /* A Mac counts the main queue as a source of the main run loop, so
+         * CFRunLoopRun there waits until CFRunLoopStop (VLC's main does). */
+        if (![self hasWork] && !(_FerryRunLoopRunForever && _main && pthread_main_np()))
             return kCFRunLoopRunFinished;
         if (_stopped) {
             _stopped = NO;
