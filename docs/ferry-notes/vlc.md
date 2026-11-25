@@ -78,11 +78,40 @@ from Apple's public documentation:
 
 Test: `tests/appkit/vlc.m`.
 
+## Playing a video without the window (freemac 1.NEXT, Ferry 0.NEXT)
+
+VLC's own `vlc-osx`, with its core, the mp4 demuxer and FFmpeg's H.264
+decoder, now plays a video to its end under Ferry and quits, with no window
+and no sound (`-I dummy --no-audio --vout vdummy`). The test was a 3-second
+320x240 H.264 and AAC file; VLC's scene filter saved its decoded frames as
+BMP, and they match what FFmpeg decodes from the same file. Two things in
+Ferry's core stood in the way:
+
+- `pthread_cancel` never woke a thread waiting on a condition, so VLC hung
+  stopping its decoder threads at the end of the file. Waiting on a
+  condition is now a cancellation point, as POSIX says: the thread ends there
+  with the mutex held again for its cleanup handlers (`src/pthread.c`).
+- `CFRunLoopRun` on the main thread returned at once when the run loop had
+  no sources. On a Mac the main queue counts as one, so it waits until
+  `CFRunLoopStop`, which is how VLC's `main` waits for the interface to quit
+  (`foundation/NSRunLoop.m`, `foundation/CoreFoundation.m`).
+  `CFRunLoopRunInMode` still finishes when there's nothing to do.
+
+`tests/vlc_threads.c` covers both. `apps/vlc.sh` now stages the build in
+`WORK/stage` with every plugin that built; before, a hand-made stage missed
+the file access plugin and VLC quit without a word. To try it (as a user
+other than root, unless VLC was configured with `--enable-run-as-root`):
+
+    cd WORK/stage
+    VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --no-audio \
+        --vout vdummy --play-and-exit video.mp4
+
 ## Still to do
 
 - VLC's interface still needs Core Audio (`NSSound+VLCAdditions.m`), Core
   Video's display link (`VLCSliderCell.m`) and NSOpenGLView's `reshape`
   (`Windows.m`), which are being built in Ferry's core for VLC and OBS
   together. Nothing else in it is missing.
-- Video out and sound out need the same OpenGL, Core Video and Core Audio.
+- Video out and sound out need the same OpenGL, Core Video and AudioUnit;
+  until then a video plays only without its window and sound.
 - The C++ plugins need libc++ linked.

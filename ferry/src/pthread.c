@@ -722,14 +722,75 @@ static int mac_pthread_cond_destroy(struct mac_cond *c)
     return 0;
 }
 
+/* Waits on a condition are cancellation points, as on a Mac (freemac 1.NEXT,
+ * VLC): VLC ends its decoder and output threads with pthread_cancel while
+ * they wait. A thread of the program's own whose cancellation is enabled
+ * waits in tenths of a second, and between them leaves as a cancelled
+ * thread if pthread_cancel has marked it, its mutex held again as a Mac's
+ * would be for its cleanup handlers. The slices are not seen: the wait
+ * returns only when signalled, timed out or cancelled. Other threads, the
+ * main one among them, wait as before. */
+static __thread struct known *self_known;
+static __thread int self_known_looked;
+
+static struct known *known_self(void)
+{
+    if (!self_known_looked) {
+        pthread_t self = pthread_self();
+        pthread_mutex_lock(&known_lock);
+        for (struct known *k = known_threads; k; k = k->next)
+            if (pthread_equal(k->t, self)) {
+                self_known = k;
+                break;
+            }
+        pthread_mutex_unlock(&known_lock);
+        self_known_looked = 1;
+    }
+    return self_known;
+}
+
+static int cancel_marked(struct known *k)
+{
+    pthread_mutex_lock(&known_lock);
+    int marked = k->cancel;
+    pthread_mutex_unlock(&known_lock);
+    return marked;
+}
+
+static int wait_cancellable(pthread_cond_t *c, pthread_mutex_t *m, const struct timespec *deadline)
+{
+    struct known *k = cancel_disabled ? NULL : known_self();
+    if (!k)
+        return deadline ? pthread_cond_timedwait(c, m, deadline) : pthread_cond_wait(c, m);
+    for (;;) {
+        if (!cancel_disabled && cancel_marked(k))
+            mac_pthread_exit(MAC_PTHREAD_CANCELED);
+        struct timespec slice;
+        clock_gettime(CLOCK_REALTIME, &slice);
+        slice.tv_nsec += 100000000;
+        if (slice.tv_nsec >= 1000000000) {
+            slice.tv_sec++;
+            slice.tv_nsec -= 1000000000;
+        }
+        int last = deadline && (deadline->tv_sec < slice.tv_sec ||
+                                (deadline->tv_sec == slice.tv_sec && deadline->tv_nsec <= slice.tv_nsec));
+        int r = pthread_cond_timedwait(c, m, last ? deadline : &slice);
+        if (r != ETIMEDOUT || last) {
+            if (!cancel_disabled && cancel_marked(k))
+                mac_pthread_exit(MAC_PTHREAD_CANCELED);
+            return r;
+        }
+    }
+}
+
 static int mac_pthread_cond_wait(struct mac_cond *c, struct mac_mutex *m)
 {
-    return err(pthread_cond_wait(cond_of(c), mutex_of(m)));
+    return err(wait_cancellable(cond_of(c), mutex_of(m), NULL));
 }
 
 static int mac_pthread_cond_timedwait(struct mac_cond *c, struct mac_mutex *m, const struct timespec *t)
 {
-    return err(pthread_cond_timedwait(cond_of(c), mutex_of(m), t));
+    return err(wait_cancellable(cond_of(c), mutex_of(m), t));
 }
 
 /* macOS's own: a wait for at most a length of time */
