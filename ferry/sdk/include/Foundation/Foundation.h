@@ -2279,6 +2279,10 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
     NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
 /* freemac 1.224: the volume an item is on (its device number) */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
+/* a volume's size and free space, in bytes (freemac OBS work); the free
+ * space is the same for important and opportunistic use */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,
+    NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeAvailableCapacityForOpportunisticUsageKey;
 FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFileResourceTypeCharacterSpecial,
     *const NSURLFileResourceTypeDirectory, *const NSURLFileResourceTypeBlockSpecial,
     *const NSURLFileResourceTypeRegular, *const NSURLFileResourceTypeSymbolicLink,

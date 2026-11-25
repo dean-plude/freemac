@@ -507,6 +507,9 @@ OSStatus SecTrustGetTrustResult(SecTrustRef trust, SecTrustResultType *result);
 CFIndex SecTrustGetCertificateCount(SecTrustRef trust);
 SecCertificateRef SecTrustGetCertificateAtIndex(SecTrustRef trust, CFIndex ix);
 CFArrayRef SecTrustCopyCertificateChain(SecTrustRef trust) CF_RETURNS_RETAINED;
+/* The certificate authorities this system trusts, as certificates
+ * (freemac OBS work): OBS's RTMP output gives them to mbedTLS. */
+OSStatus SecTrustCopyAnchorCertificates(CFArrayRef *anchors);
 
 /* ---- authorization (Authorization.h, AuthorizationTags.h) ------------------------------
  * (freemac 1.223, Ferry 0.47.0) Ferry never runs a program's code as

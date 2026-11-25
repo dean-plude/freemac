@@ -21,6 +21,7 @@
 #define _GNU_SOURCE
 #include <cpuid.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -869,6 +870,9 @@ typedef uint32_t mac_port_t;
 #define MACH_TASK_BASIC_INFO 20
 
 static mac_port_t mach_task_self_ = MAC_TASK_PORT;
+/* an Intel Mac's page size, which programs read as vm_page_size */
+static uintptr_t mac_vm_page_size = 4096, mac_vm_page_mask = 4095;
+static int mac_vm_page_shift = 12;
 
 static mac_port_t mac_mach_host_self(void) { return MAC_HOST_PORT; }
 static mac_port_t mac_mach_task_self(void) { return MAC_TASK_PORT; }
@@ -1056,9 +1060,94 @@ struct mac_task_basic_info {
 } __attribute__((packed, aligned(4)));
 _Static_assert(sizeof(struct mac_task_basic_info) == 48, "mach_task_basic_info");
 
+/* TASK_BASIC_INFO_64: the same figures in the older order, its processor
+ * time only that of threads that have ended; TASK_THREAD_TIMES_INFO: that
+ * of the running threads. A Mac program adds the two to get the total. */
+#define MAC_TASK_THREAD_TIMES_INFO 3
+#define MAC_TASK_BASIC_INFO_64 5
+struct mac_task_basic_info_64 {
+    int32_t suspend_count;
+    uint64_t virtual_size, resident_size;
+    int32_t user_seconds, user_microseconds, system_seconds, system_microseconds;
+    int32_t policy;
+} __attribute__((packed, aligned(4)));
+_Static_assert(sizeof(struct mac_task_basic_info_64) == 40, "task_basic_info_64");
+
+/* The processor time of the threads running now, from each one's
+ * /proc/self/task/N/stat, in microseconds. */
+static void running_threads_time(long long *user_us, long long *system_us)
+{
+    *user_us = *system_us = 0;
+    long tick = sysconf(_SC_CLK_TCK);
+    if (tick <= 0)
+        tick = 100;
+    DIR *d = opendir("/proc/self/task");
+    for (struct dirent *e; d && (e = readdir(d));) {
+        if (e->d_name[0] == '.')
+            continue;
+        char path[64], text[1024];
+        snprintf(path, sizeof path, "/proc/self/task/%.20s/stat", e->d_name);
+        if (read_text(path, text, sizeof text) <= 0)
+            continue;
+        char *p = strrchr(text, ')'); /* the name may hold spaces */
+        unsigned long long ut = 0, st = 0;
+        /* after the name: state, then fields 4 to 13, then utime and stime */
+        if (p && sscanf(p + 1, " %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu", &ut, &st) == 2) {
+            *user_us += (long long)(ut * 1000000ull / (unsigned long long)tick);
+            *system_us += (long long)(st * 1000000ull / (unsigned long long)tick);
+        }
+    }
+    if (d)
+        closedir(d);
+}
+
 static int mac_task_info(mac_port_t task, int flavor, int32_t *info, uint32_t *count)
 {
-    if (task != MAC_TASK_PORT || !info || !count || flavor != MACH_TASK_BASIC_INFO)
+    if (task != MAC_TASK_PORT || !info || !count)
+        return KERN_INVALID_ARGUMENT;
+    if (flavor == MAC_TASK_THREAD_TIMES_INFO || flavor == MAC_TASK_BASIC_INFO_64) {
+        long long ru = 0, rs = 0, lu, ls;
+        struct rusage r;
+        if (getrusage(RUSAGE_SELF, &r) == 0) {
+            ru = (long long)r.ru_utime.tv_sec * 1000000 + r.ru_utime.tv_usec;
+            rs = (long long)r.ru_stime.tv_sec * 1000000 + r.ru_stime.tv_usec;
+        }
+        running_threads_time(&lu, &ls);
+        if (lu > ru)
+            lu = ru;
+        if (ls > rs)
+            ls = rs;
+        if (flavor == MAC_TASK_THREAD_TIMES_INFO) {
+            if (*count < 4)
+                return KERN_FAILURE;
+            int32_t t[4] = {(int32_t)(lu / 1000000), (int32_t)(lu % 1000000), (int32_t)(ls / 1000000),
+                            (int32_t)(ls % 1000000)};
+            memcpy(info, t, sizeof t);
+            *count = 4;
+            return KERN_SUCCESS;
+        }
+        uint32_t need = sizeof(struct mac_task_basic_info_64) / 4;
+        if (*count < need)
+            return KERN_FAILURE;
+        struct mac_task_basic_info_64 b;
+        memset(&b, 0, sizeof b);
+        char text[256];
+        unsigned long long pages = 0, resident = 0;
+        if (read_text("/proc/self/statm", text, sizeof text) > 0)
+            sscanf(text, "%llu %llu", &pages, &resident);
+        long page = sysconf(_SC_PAGESIZE);
+        b.virtual_size = pages * (unsigned long long)page;
+        b.resident_size = resident * (unsigned long long)page;
+        long long du = ru - lu, ds = rs - ls; /* the threads that have ended */
+        b.user_seconds = (int32_t)(du / 1000000);
+        b.user_microseconds = (int32_t)(du % 1000000);
+        b.system_seconds = (int32_t)(ds / 1000000);
+        b.system_microseconds = (int32_t)(ds % 1000000);
+        memcpy(info, &b, sizeof b);
+        *count = need;
+        return KERN_SUCCESS;
+    }
+    if (flavor != MACH_TASK_BASIC_INFO)
         return KERN_INVALID_ARGUMENT;
     uint32_t need = sizeof(struct mac_task_basic_info) / 4;
     if (*count < need)
@@ -1347,6 +1436,9 @@ const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"mach_host_self", mac_mach_host_self},
     {"mach_task_self", mac_mach_task_self},
     {"mach_task_self_", &mach_task_self_},
+    {"vm_page_size", &mac_vm_page_size},
+    {"vm_page_mask", &mac_vm_page_mask},
+    {"vm_page_shift", &mac_vm_page_shift},
     {"mach_port_deallocate", mac_mach_port_deallocate},
     {"host_page_size", mac_host_page_size},
     {"host_statistics", mac_host_statistics},

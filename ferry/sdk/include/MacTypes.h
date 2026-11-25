@@ -35,7 +35,10 @@ typedef uint32_t FourCharCode;
 typedef uint32_t OSType;
 typedef uint32_t ResType;
 /* no error, as every Carbon-era call and Core Audio answers (freemac 1.234) */
+#ifndef _FERRY_NOERR_
+#define _FERRY_NOERR_
 enum { noErr = 0 };
+#endif
 typedef uint16_t UniChar;
 typedef uint8_t UTF8Char;
 typedef uint16_t UTF16Char;

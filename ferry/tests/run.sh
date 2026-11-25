@@ -217,6 +217,8 @@ run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 # Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
 # what VLC's core asks of libSystem (1.232).
 run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
+# uuid(3), the older task_info flavors and vm_page_size, for OBS's libobs
+run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
 # backtrace three calls deep in Mac code (freemac 1.233).
@@ -419,6 +421,9 @@ run_one security_code "$here/security/code.m" "$here/security/code.out" -framewo
 # items from attribute lists, searches and access lists, in a home of its
 # own.
 run_one security_older "$here/security/older.m" "$here/security/older.out" -framework Foundation -framework Security
+# the system's certificate authorities and a volume's free space, for OBS
+run_one security_obs_calls "$here/security/obs_calls.m" "$here/security/obs_calls.out" -fobjc-arc \
+    -framework Foundation -framework Security
 # NSThread, cross-thread performs and run loops, and the locks and the
 # runtime under real threads.
 run_one foundation_threads "$here/foundation/threads.m" "$here/foundation/threads.out" -framework Foundation

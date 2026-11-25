@@ -74,6 +74,12 @@ typedef uint32_t ResType;
 typedef int16_t ScriptCode;
 typedef int16_t LangCode;
 enum { kNilOptions = 0 }; /* no options (MacTypes.h; freemac 1.232) */
+/* no error, as a Mac's CoreFoundation brings it in from MacTypes.h: OBS's
+ * RTMP output checks Security's answers against it (freemac OBS work) */
+#ifndef _FERRY_NOERR_
+#define _FERRY_NOERR_
+enum { noErr = 0 };
+#endif
 typedef int16_t RegionCode;
 typedef struct { uint32_t lo, hi; } UnsignedWide; /* little-endian order */
 typedef UInt32 CFStringEncoding;
