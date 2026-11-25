@@ -2012,6 +2012,47 @@ run. AudioToolbox and AudioUnit are served by the Core Audio library.
 | Audio Format Services' channel layouts | VLC | done |
 | the default devices' volume and mute, from 1.232 | Itsycal | done, through libpulse in place of pactl and wpctl; the null device has no volume |
 
+### OpenGL, Core Video and IOSurface (freemac 1.235, Ferry 0.59.0)
+
+VLC's video output (`modules/video_output/caopengllayer.m` and
+`macosx.m`) and OBS's (`libobs-opengl/gl-cocoa.m`) draw with OpenGL into
+views and layers, and move frames in Core Video pixel buffers on
+IOSurfaces. Ferry now has all of that, drawn with this system's OpenGL.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| CGL: pixel formats (legacy, 3.2 core, 4.1 core), contexts and sharing, current context per thread, locks, parameters (swap interval, backing size), `CGLFlushDrawable`, `CGLTexImageIOSurface2D`; every `gl` call of `<OpenGL/gl.h>`, `<OpenGL/gl3.h>` and their extensions passed to this system's libOpenGL or libGL | VLC, OBS | done, on EGL; the libraries are opened when a program first asks for a pixel format, so programs that don't draw don't need them |
+| `NSOpenGLPixelFormat`, `NSOpenGLContext` (`setView:` from any thread, `update`, `flushBuffer`, `makeCurrentContext`, `CGLContextObj`), `NSOpenGLView` (`prepareOpenGL`, `reshape`, `update`, `drawRect:` with its context current), `wantsBestResolutionOpenGLSurface` | OBS, VLC | done |
+| `CAOpenGLLayer`: `canDrawInCGLContext:`, `drawInCGLContext:` with the viewport set, `copyCGLPixelFormatForDisplayMask:`, `copyCGLContextForPixelFormat:`, `display` from any thread, `asynchronous`; `visibleRect`, `scrollPoint:` | VLC | done |
+| `CVDisplayLink`: create for displays or a display, output callback or handler, start, stop (also from its callback), running, current display, nominal and actual period, time stamps | OBS, VLC | done, at the display's rate (60 Hz, or `FERRY_REFRESH_RATE`), shared with `CADisplayLink` |
+| `CVPixelBuffer` and its pool: create (also with bytes, planar bytes or an IOSurface), lock, base address and planes, extended pixels, IOSurface, attachments, the creation keys, pixel format descriptions; BGRA, ARGB, RGBA, 2vuy, yuvs, 420v, 420f, y420, f420, 2101010, half-float RGBA and more | OBS, VLC | done |
+| `CVOpenGLTextureCache` and `CVOpenGLTexture` (rectangle textures of a buffer, flipped, clean coordinates); `CVImageBuffer` sizes, clean rect and colour space | VLC | done; planar buffers are refused, as on a Mac, so VLC's OpenGL converter uploads planes itself |
+| IOSurface: create, lookup by ID, lock, base address and planes, bytes per row, element sizes, use count, values | OBS | done, in the program's memory: surfaces aren't shared with other processes |
+| `CGDisplay*` calls for display IDs and modes | OBS | being written for OBS in `appkit/CGDirectDisplay.m` |
+
+How it draws: each context renders into an offscreen EGL buffer. A flush
+reads it back with `glReadPixels` (BGRA) and a view or layer paints the
+frame through Core Graphics, so OpenGL's drawing shows in any window,
+under X, Wayland or none. That costs CPU on every frame. On a
+4-core machine with Mesa's llvmpipe, a 1920 by 1080 frame takes about
+3.5 ms to flush (2.4 ms of it the read back) and about 2 ms to paint;
+uploading a 1080p BGRA IOSurface to a texture takes 0.8 ms. So 1080p at
+60 frames a second uses about a third of one core for the copies alone,
+on top of the rendering; 720p uses less than half that. A GPU driver
+makes the rendering quicker but not the copies. `CGLTexImageIOSurface2D`
+copies the surface when it's called, so later writes to the surface need
+another call. Each context's swap interval paces its flushes to the
+display's rate. Without OpenGL (no libEGL.so.1, or no display it can
+use), Ferry says so once on stderr, `CGLChoosePixelFormat` returns
+`kCGLBadDisplay`, the AppKit and Core Animation classes give nil or draw
+nothing, and pixel buffers and display links still work.
+
+Tests: `corevideo_pixelbuffer`, `corevideo_displaylink`, `opengl_cgl`,
+`opengl_iosurface`, `opengl_view`, `opengl_layer` and `opengl_missing`.
+The OpenGL ones run when OpenGL makes contexts here and are skipped
+otherwise. With `FERRY_TEST_SHOTS` set to a folder, `opengl_view` and
+`opengl_layer` save pictures of their windows there.
+
 ## What the apps need most
 
 Counted over the nine apps:

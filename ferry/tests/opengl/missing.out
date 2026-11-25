@@ -1,0 +1,11 @@
+no pixel format: a bad display: yes
+asked again, the same: yes
+no context: yes
+none current: yes
+NSOpenGLPixelFormat: nil: yes
+NSOpenGLContext: nil: yes
+an NSOpenGLView with no context draws as a view: yes
+a CAOpenGLLayer draws nothing: yes
+a 420v pixel buffer still: yes
+no texture cache without a context: yes
+exit=0

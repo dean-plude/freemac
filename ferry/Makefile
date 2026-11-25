@@ -132,7 +132,28 @@ JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
 JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
 JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
+# The GPU layer (freemac 1.235): IOSurface's shared image buffers; OpenGL,
+# whose contexts are made with this system's EGL and whose calls go to this
+# system's OpenGL, both opened only when a program first draws with it; and
+# Core Video's pixel buffers, display links and texture caches. Core
+# Animation (CAOpenGLLayer) and AppKit (NSOpenGLView) show what it draws.
+IOSURFACE_SRC = $(wildcard iosurface/*.m)
+IOSURFACE_OBJ = $(IOSURFACE_SRC:iosurface/%.m=iosurface/build/%.o)
+IOSURFACE = frameworks/IOSurface.framework/IOSurface
+OPENGL_SRC = $(wildcard opengl/*.m)
+OPENGL_OBJ = $(OPENGL_SRC:opengl/%.m=opengl/build/%.o)
+OPENGL = frameworks/OpenGL.framework/OpenGL
+COREVIDEO_SRC = $(wildcard corevideo/*.m)
+COREVIDEO_OBJ = $(COREVIDEO_SRC:corevideo/%.m=corevideo/build/%.o)
+COREVIDEO = frameworks/CoreVideo.framework/CoreVideo
+GPU_HEADERS = opengl/GLInternal.h opengl/FerryGL.h $(wildcard sdk/include/OpenGL/*.h) \
+              $(wildcard sdk/include/IOSurface/*.h) $(wildcard sdk/include/CoreVideo/*.h) $(GRAPHICS_HEADERS)
+QUARTZCORE_HEADERS += $(GPU_HEADERS)
+# OpenGL's own headers (<OpenGL/gl.h>, <OpenGL/gl3.h>) are this system's, laid out by the script
+SDK_GL = sdk/usr/include/GL
+GPU = $(SDK_GL) $(IOSURFACE) $(OPENGL) $(COREVIDEO)
+
+all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -247,10 +268,42 @@ quartzcore/build/%.o: quartzcore/%.m $(QUARTZCORE_HEADERS) sdk/ferry-cc
 	@mkdir -p quartzcore/build
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
-$(QUARTZCORE): $(QUARTZCORE_OBJ) $(GRAPHICS)
+$(QUARTZCORE): $(QUARTZCORE_OBJ) $(GRAPHICS) $(OPENGL) $(COREVIDEO)
 	@mkdir -p frameworks/QuartzCore.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore \
-	    -o $@ $(QUARTZCORE_OBJ) -framework Foundation -framework CoreGraphics
+	    -o $@ $(QUARTZCORE_OBJ) -framework Foundation -framework CoreGraphics \
+	    -framework OpenGL -framework CoreVideo
+
+iosurface/build/%.o: iosurface/%.m $(GPU_HEADERS) sdk/ferry-cc
+	@mkdir -p iosurface/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(IOSURFACE): $(IOSURFACE_OBJ) $(FOUNDATION)
+	@mkdir -p frameworks/IOSurface.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface \
+	    -o $@ $(IOSURFACE_OBJ) -framework Foundation
+
+opengl/build/%.o: opengl/%.m $(GPU_HEADERS) sdk/ferry-cc
+	@mkdir -p opengl/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+opengl/build/GLForward.o: opengl/GLNames.h
+
+$(OPENGL): $(OPENGL_OBJ) $(IOSURFACE)
+	@mkdir -p frameworks/OpenGL.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL \
+	    -o $@ $(OPENGL_OBJ) -framework Foundation -framework IOSurface
+
+corevideo/build/%.o: corevideo/%.m $(GPU_HEADERS) sdk/ferry-cc
+	@mkdir -p corevideo/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(COREVIDEO): $(COREVIDEO_OBJ) $(OPENGL) $(GRAPHICS)
+	@mkdir -p frameworks/CoreVideo.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo \
+	    -o $@ $(COREVIDEO_OBJ) -framework Foundation -framework CoreGraphics -framework IOSurface -framework OpenGL
+
+$(SDK_GL): sdk/gen-opengl-headers.sh
+	sdk/gen-opengl-headers.sh sdk/usr/include
 
 security/build/%.o: security/%.m $(SECURITY_HEADERS) sdk/ferry-cc
 	@mkdir -p security/build
@@ -265,10 +318,10 @@ appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
 	@mkdir -p appkit/build
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
-$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
+$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(OPENGL) $(HOST_TBD)
 	@mkdir -p frameworks/AppKit.framework frameworks/Cocoa.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
-	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore $(HOST_TBD)
+	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore -framework OpenGL $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 	@mkdir -p frameworks/Carbon.framework
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
@@ -355,7 +408,7 @@ $(COREAUDIO): $(COREAUDIO_OBJ) $(FOUNDATION)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
+install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -385,11 +438,15 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUA
 	for f in AudioToolbox AudioUnit; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
+	install -Dm755 $(IOSURFACE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/IOSurface.framework/IOSurface
+	install -Dm755 $(OPENGL) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/OpenGL.framework/OpenGL
+	install -Dm755 $(COREVIDEO) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreVideo.framework/CoreVideo
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build eventkit/build coreaudio/build
+	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build eventkit/build coreaudio/build \
+	    iosurface/build opengl/build corevideo/build
 
 .PHONY: all check install clean

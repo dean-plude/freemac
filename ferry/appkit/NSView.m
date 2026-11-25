@@ -815,9 +815,14 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithCGContext:ctx flipped:[self isFlipped]];
     [gc _setDrawingToScreen:screen];
     [NSGraphicsContext setCurrentContext:gc];
+    /* an OpenGL context's drawing shows over the view's own (NSOpenGL.m, 1.235) */
+    BOOL gl = AGLViewCount > 0, skip = gl && AGLViewWillDraw(self);
     @autoreleasepool {
-        [self drawRect:dirty];
+        if (!skip)
+            [self drawRect:dirty];
     }
+    if (gl)
+        AGLViewDidDraw(self, ctx);
     for (NSView *v in [[_subviews copy] autorelease])
         [v _drawInContext:ctx dirty:dirty screen:screen];
     [NSGraphicsContext setCurrentContext:saved];
@@ -842,9 +847,13 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
       [gc _setDrawingToScreen:screen];
       [NSGraphicsContext setCurrentContext:gc];
       if (!_hostsLayer && !updates && !NSIsEmptyRect(dirty)) {
+          BOOL gl = AGLViewCount > 0, skip = gl && AGLViewWillDraw(self);
           @autoreleasepool {
-              [self drawRect:dirty];
+              if (!skip)
+                  [self drawRect:dirty];
           }
+          if (gl)
+              AGLViewDidDraw(self, c);
       }
       for (NSView *v in [[_subviews copy] autorelease])
           [v _drawInContext:c dirty:dirty screen:screen];

@@ -1,0 +1,40 @@
+no context current at first: yes
+legacy context: yes
+current: yes
+legacy profile has OpenGL 2.1 or later: yes
+legacy profile isn't core: yes
+fixed function calls work: yes
+cleared to red and read back: yes
+a drawable of 64 by 32: yes
+viewport set for the first drawable: yes
+a flush made a frame: yes
+its bottom left corner is yellow: yes
+its top right corner is blue: yes
+a capture top row first: yes
+swap interval 1: yes
+13 flushes with swap interval 1 take about 0.2 s: yes
+surface opacity 0: yes
+virtual screen 0: yes
+locks nest: yes
+one unlock too many: yes
+still current after the lock: yes
+3.2 core context: yes
+core profile has OpenGL 3.2 or later: yes
+core profile is core: yes
+core: cleared to blue and read back: yes
+vertex arrays: yes
+4.1 core context sharing with it: yes
+same share group: yes
+the other thread drew with it in its turn: yes
+this thread draws with it again: yes
+dlsym(RTLD_DEFAULT, glClear): yes
+dlopen of OpenGL.framework: yes
+dlsym of glGenBuffers there: yes
+dlsym of CGLGetCurrentContext there: yes
+APPLE vertex array objects: yes
+APPLE fences: yes
+one renderer: yes
+CGLErrorString(kCGLBadContext): invalid context
+full screen refused: yes
+none current at the end: yes
+exit=0

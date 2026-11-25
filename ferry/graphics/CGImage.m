@@ -71,6 +71,23 @@ static inline uint8_t mul(unsigned v, unsigned a) { return (uint8_t)((v * a + 12
 
 void GToCairo(const struct gfmt *f, const uint8_t *src, uint32_t *dst, size_t width)
 {
+    /* already cairo's own layout, premultiplied BGRA or BGRX in memory, as
+     * OpenGL's frames and Core Video's 32BGRA are (freemac 1.235): copied
+     * a row at a time */
+    if (f->bytes == 4 && f->b == 0 && f->g == 1 && f->r == 2 && !f->gray && !f->alphaOnly) {
+        if (f->a == 3 && f->premultiplied) {
+            memcpy(dst, src, width * 4);
+            return;
+        }
+        if (f->a < 0) {
+            for (size_t x = 0; x < width; x++) {
+                uint32_t p;
+                memcpy(&p, src + x * 4, 4);
+                dst[x] = p | 0xff000000u;
+            }
+            return;
+        }
+    }
     for (size_t x = 0; x < width; x++, src += f->bytes) {
         unsigned r, g, b, a = f->a >= 0 ? src[f->a] : 255;
         if (f->alphaOnly)

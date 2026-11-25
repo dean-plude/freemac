@@ -177,6 +177,13 @@ run_one() {
             env -u WAYLAND_DISPLAY DISPLAY="$webkit_display" GDK_BACKEND=x11 NO_AT_BRIDGE=1 HOME="$build/home_$name" \
                 TMPDIR="$build/home_$name" XDG_RUNTIME_DIR="$build/home_$name" XDG_CONFIG_HOME= XDG_CACHE_HOME= \
                 XDG_DATA_HOME= timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # OpenGL and Core Video (freemac 1.235, Ferry 0.59.0): no display,
+        # threads, so a hang is a failure; one as if OpenGL weren't installed
+        opengl_missing)
+            env -u WAYLAND_DISPLAY -u DISPLAY FERRY_EGL="$build/none/libEGL.so.1" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        opengl_*|corevideo_*)
+            env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -1642,6 +1649,39 @@ if [ -n "$pulse_bin" ] && [ -n "$pulse_pactl" ]; then
 else
     echo "skip coreaudio_pulse (it needs PulseAudio's pulseaudio and pactl)"
 fi
+
+# OpenGL, Core Video and IOSurface (freemac 1.235, Ferry 0.59.0), as
+# VLC's and OBS's video output use them: pixel buffers and display links,
+# which need no OpenGL; then, where this system's OpenGL (EGL, Mesa's
+# llvmpipe will do) makes contexts, CGL's clear and read back, IOSurface
+# textures, an NSOpenGLView's triangle and a core context drawing from a
+# thread of its own, a CAOpenGLLayer; and OpenGL as if it weren't installed.
+# FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
+run_one corevideo_pixelbuffer "$here/corevideo/pixelbuffer.m" "$here/corevideo/pixelbuffer.out" \
+    -framework Foundation -framework CoreVideo -framework IOSurface
+run_one corevideo_displaylink "$here/corevideo/displaylink.m" "$here/corevideo/displaylink.out" -fblocks \
+    -framework Foundation -framework CoreVideo
+gl_found=
+if [ -f "$top/sdk/usr/include/GL/gl.h" ] &&
+        "$top/sdk/ferry-cc" -O1 -o "$build/opengl_probe" "$here/opengl/probe.c" -framework OpenGL \
+            2> "$build/opengl_probe.cc.log" &&
+        env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$build/opengl_probe" 2> "$build/opengl_probe.err"
+then
+    gl_found=1
+fi
+if [ -n "$gl_found" ]; then
+    run_one opengl_cgl "$here/opengl/cgl.m" "$here/opengl/cgl.out" -framework Foundation -framework OpenGL
+    run_one opengl_iosurface "$here/opengl/iosurface.m" "$here/opengl/iosurface.out" -framework Foundation \
+        -framework CoreVideo -framework IOSurface -framework OpenGL
+    run_one opengl_view "$here/opengl/view.m" "$here/opengl/view.out" -framework Cocoa -framework OpenGL
+    run_one opengl_layer "$here/opengl/layer.m" "$here/opengl/layer.out" -framework Cocoa -framework QuartzCore \
+        -framework OpenGL
+else
+    echo "skip opengl_cgl, opengl_iosurface, opengl_view, opengl_layer (need OpenGL through EGL, as Mesa's libEGL.so.1 and llvmpipe give, and its headers, from libgl-dev)"
+fi
+run_one opengl_missing "$here/opengl/missing.m" "$here/opengl/missing.out" -framework Cocoa -framework QuartzCore \
+    -framework CoreVideo -framework OpenGL
+webkit_message opengl_missing "^ferry: this program draws with OpenGL, and this system's OpenGL (libEGL.so.1, Mesa) isn't installed$"
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

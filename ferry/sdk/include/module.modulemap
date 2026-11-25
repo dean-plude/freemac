@@ -34,6 +34,8 @@ module AppKit [system] {
         header "AppKit/NSMenu.h"
         export *
     }
+    header "AppKit/NSOpenGL.h"
+    header "AppKit/NSOpenGLView.h"
     header "AppKit/NSPredicateEditor.h"
     header "AppKit/NSRuleEditor.h"
     header "AppKit/NSRulerView.h"
@@ -364,6 +366,7 @@ module QuartzCore [system] {
     header "QuartzCore/CALayer.h"
     header "QuartzCore/CAMediaTiming.h"
     header "QuartzCore/CAMediaTimingFunction.h"
+    header "QuartzCore/CAOpenGLLayer.h"
     header "QuartzCore/CAShapeLayer.h"
     header "QuartzCore/CATextLayer.h"
     header "QuartzCore/CATransaction.h"
