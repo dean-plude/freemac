@@ -5,8 +5,10 @@
  * that way), with the mutex held again for the cleanup handlers. On the main
  * thread CFRunLoopRun waits for work from the main queue until CFRunLoopStop,
  * as VLC's main does, while CFRunLoopRunInMode still finishes at once with
- * nothing to do. */
+ * nothing to do. And nil is a null pointer in C too, through CoreServices
+ * (VLC's sound out uses it so). */
 #include <CoreFoundation/CoreFoundation.h>
+#include <CoreServices/CoreServices.h>
 #include <dispatch/dispatch.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -110,5 +112,7 @@ int main(void)
     });
     CFRunLoopRun();
     printf("CFRunLoopRun on the main thread: ran both blocks %d, then returned\n", ran == 2);
+    char *none = nil;
+    printf("nil in C: %d\n", none == NULL);
     return 0;
 }

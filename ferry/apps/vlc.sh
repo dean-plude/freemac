@@ -96,14 +96,17 @@ fi
 
 # VLC itself. Libtool would take ld64.lld for GNU ld, and ld64.lld has no
 # -r, so libtool is told both. VLC won't start as root unless built to,
-# and Ferry's test setup runs as root.
+# and Ferry's test setup runs as root. Apple's linker finds CoreFoundation's
+# calls through the frameworks a module links (its sound out names only
+# Core Audio's); ld64.lld looks only in the ones named, so every module
+# names CoreFoundation too.
 cd "$work/vlcbuild"
 if [ ! -f config.status ]; then
     "$top/src/vlc-$vlc_ver/configure" --host=x86_64-apple-darwin --prefix="$work/vlcprefix" \
         --disable-lua --disable-sparkle --disable-nls --disable-qt --disable-skins2 \
         --disable-macosx-avfoundation --disable-a52 --disable-libgcrypt --disable-update-check \
         --disable-dbus --disable-vcd --disable-screen --enable-run-as-root \
-        lt_cv_prog_gnu_ld=no lt_cv_apple_cc_single_mod=yes
+        lt_cv_prog_gnu_ld=no lt_cv_apple_cc_single_mod=yes LDFLAGS="-Wl,-framework,CoreFoundation"
 fi
 # A few modules (the Mac interface among them) still wait on parts of Ferry
 # (docs/ferry-notes/vlc.md), so the rest is built around them.

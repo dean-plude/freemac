@@ -106,12 +106,32 @@ other than root, unless VLC was configured with `--enable-run-as-root`):
     VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --no-audio \
         --vout vdummy --play-and-exit video.mp4
 
+## Sound (freemac 1.NEXT, Ferry 0.NEXT)
+
+VLC's own sound out, its `auhal` module, plays through Ferry's Core Audio
+(freemac 1.234). With no sound server it plays into the null device, and
+with `FERRY_AUDIO=null FERRY_AUDIO_OUTPUT_FILE=out.raw` the test video's
+sound comes out as the same 440 Hz tone, at the same level, that FFmpeg
+decodes from the file. It needed two things:
+
+- `nil` from CoreServices in C (`auhal.c` sets a `char *` to it), as a Mac's
+  MacTypes.h gives it.
+- CoreFoundation named at link time. The module links Core Audio,
+  AudioUnit, AudioToolbox and CoreServices and calls CoreFoundation;
+  Apple's linker finds those calls through the frameworks named, ld64.lld
+  doesn't, so `apps/vlc.sh` adds `-framework CoreFoundation` to every
+  module's link.
+
+    cd WORK/stage
+    VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --aout auhal \
+        --vout vdummy --play-and-exit video.mp4
+
 ## Still to do
 
-- VLC's interface still needs Core Audio (`NSSound+VLCAdditions.m`), Core
-  Video's display link (`VLCSliderCell.m`) and NSOpenGLView's `reshape`
-  (`Windows.m`), which are being built in Ferry's core for VLC and OBS
-  together. Nothing else in it is missing.
-- Video out and sound out need the same OpenGL, Core Video and AudioUnit;
-  until then a video plays only without its window and sound.
+- VLC's interface still needs Core Video's display link (`VLCSliderCell.m`)
+  and NSOpenGLView's `reshape` (`Windows.m`), which are being built in
+  Ferry's core for VLC and OBS together. Nothing else in it is missing; its
+  Core Audio calls (`NSSound+VLCAdditions.m`) build since 1.234.
+- Video out needs the same OpenGL and Core Video; until then a video plays
+  with sound but without its window.
 - The C++ plugins need libc++ linked.

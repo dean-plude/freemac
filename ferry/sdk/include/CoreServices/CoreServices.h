@@ -10,6 +10,16 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CFNetwork/CFNetwork.h>
 
+/* MacTypes.h makes nil a null pointer for C too, through CoreServices
+ * (VLC's audio output passes it for a char *), as objc.h does (freemac
+ * 1.NEXT, VLC). */
+#ifndef nil
+#ifdef __cplusplus
+#define nil __null
+#else
+#define nil ((void *)0)
+#endif
+#endif
 __FERRY_BEGIN
 typedef int16_t OSErr;
 typedef int32_t OSStatus;
