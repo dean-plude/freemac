@@ -217,6 +217,13 @@ SYSTEM_MENUS = {"main": "_NSMainMenu", "apple": "_NSAppleMenu", "window": "_NSWi
 CMD, SHIFT, OPTION, CONTROL_KEY = 1 << 20, 1 << 17, 1 << 19, 1 << 18
 
 
+def custom_cell(c, cls):
+    """A cell's class and the classes it comes from, with the subclass the
+    xib names first (VLC's own slider, stepper and segmented cells)."""
+    custom = c.get("customClass")
+    return (custom, (cls,) + supers(cls)) if custom else (cls, supers(cls))
+
+
 class Compiler:
     def __init__(self, root, warn):
         self.a = Archive()
@@ -1151,7 +1158,7 @@ class Compiler:
         cell = None
         if c is not None:
             cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
-            a.fill(cell, a.obj("NSStepperCell", supers("NSStepperCell"), NSCellFlags=self.cell_flags(c),
+            a.fill(cell, a.obj(*custom_cell(c, "NSStepperCell"), NSCellFlags=self.cell_flags(c),
                                NSCellFlags2=0, NSMinValue=float(c.get("minValue", "0")),
                                NSMaxValue=float(c.get("maxValue", "100")), NSIncrement=float(c.get("increment", "1")),
                                NSValue=float(c.get("doubleValue", "0")), NSAutorepeat=yes(c, "autorepeat", True),
@@ -1165,7 +1172,7 @@ class Compiler:
         cell = None
         if c is not None:
             cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
-            a.fill(cell, a.obj("NSSliderCell", supers("NSSliderCell"), NSCellFlags=self.cell_flags(c),
+            a.fill(cell, a.obj(*custom_cell(c, "NSSliderCell"), NSCellFlags=self.cell_flags(c),
                                NSCellFlags2=0, NSMinValue=float(c.get("minValue", "0")),
                                NSMaxValue=float(c.get("maxValue", "1")), NSValue=float(c.get("doubleValue", "0")),
                                NSNumberOfTickMarks=int(c.get("numberOfTickMarks", "0")),
@@ -1201,7 +1208,7 @@ class Compiler:
                 if s.get("image"):
                     k["NSSegmentItemImage"] = self.image(s.get("image"))
                 segs.append(a.add(a.obj("NSSegmentItem", (), **k)))
-            a.fill(cell, a.obj("NSSegmentedCell", supers("NSSegmentedCell"), NSCellFlags=self.cell_flags(c),
+            a.fill(cell, a.obj(*custom_cell(c, "NSSegmentedCell"), NSCellFlags=self.cell_flags(c),
                                NSCellFlags2=0, NSSegmentImages=a.array(segs),
                                NSSegmentStyle={"rounded": 1, "texturedRounded": 2, "roundRect": 3,
                                                "texturedSquare": 4, "capsule": 5, "smallSquare": 6,
