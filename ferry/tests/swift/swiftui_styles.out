@@ -1,0 +1,96 @@
+window "Styles" 240x201
+  button "Start 0" (default) at 12,12 216x32
+  segmented "One"* "Two" "Three" at 12,52 216x24
+  text "Minutes: 25" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab One, switch off, said nothing" at 12,173 206x16
+click Start 0
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One"* "Two" "Three" at 12,52 216x24
+  text "Minutes: 25" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab One, switch off, said nothing" at 12,173 206x16
+click segment:Three
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 25" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch off, said nothing" at 12,173 216x16
+click up:1
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 26" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch off, said nothing" at 12,173 216x16
+click up:1
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 27" at 12,90 76x16
+  stepper at 94,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch off, said nothing" at 12,173 216x16
+click down:1
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 26" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch off, said nothing" at 12,173 216x16
+click Stop after break
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 26" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" (on) at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch on, said nothing" at 12,173 216x16
+click About ⌘ A
+window "Styles" 240x201
+  button "Start 1" (default) at 12,12 216x32
+  segmented "One" "Two" "Three"* at 12,52 216x24
+  text "Minutes: 26" at 12,90 77x16
+  stepper at 95,84 19x27
+  text "Stop after break" at 12,122 103x16
+  switch "Stop after break" (on) at 190,119 38x22
+  text "About" at 12,149 41x16
+  text "⌘ A" at 198,149 30x16
+  plain button "About ⌘ A" at 12,149 216x16
+  text "Tab Three, switch on, said about" at 12,173 205x16
+exit=0

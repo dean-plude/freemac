@@ -445,6 +445,8 @@ out its panes once its split view is in a window
 
 Ferry 0.54.0 (freemac 1.230) runs TomatoBar, an open-source SwiftUI menu bar timer: its packages are built from their source, its tomato shows in the menu bar, a click opens its popover, and Start starts the countdown.
 
+From Ferry 0.55.0 (freemac 1.231), `apps/` holds recipes that build an app from its public source: `apps/tomatobar.sh [WORK]` fetches TomatoBar and its three Swift packages at pinned commits into `WORK/src` (by default `apps/work`, which git ignores), builds them with `sdk/ferry-swiftc` and lays out `WORK/build/TomatoBar/TomatoBar.app`, which runs with `./ferry`. It needs the same Swift toolchain and runtime as the Swift tests. `apps/recipe.sh` has the helpers a recipe uses: `fetch` (a repository at a commit), `need_swift` (Ferry's Swift modules brought up to date), `swift_lib` (a package built as a library and module) and `resource_bundle` (a SwiftPM `Bundle.module` accessor). The SwiftUI test driver also presses switches by their label, steps the Nth stepper with `up:N` and `down:N`, and picks a segment with `segment:T`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

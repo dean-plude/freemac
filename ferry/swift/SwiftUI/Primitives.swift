@@ -393,7 +393,28 @@ public struct Button<Label: View>: View, _PrimitiveView {
         self.action = action
         self.label = label()
     }
-    func _resolve(_ cx: ResolveContext) -> RNode { RNode(.button(titleOf(label, in: cx), action)) }
+    func _resolve(_ cx: ResolveContext) -> RNode {
+        var labelNode = cx.child("label").resolve(label)
+        let title = (label as? _TitleView)?._title ?? labelNode.allText
+        // a label of several views lays them out side by side, as a Mac's does
+        if labelNode.flattened.count > 1 {
+            labelNode = RNode(.stack(.horizontal, Layout.defaultSpacing, alignment: 0), children: [labelNode])
+        }
+        switch cx.environment[_ButtonStyleKey.self] {
+        case "plain", "borderless", "link":
+            // the label's own views, with a clickable area over them (freemac 1.231)
+            let area = RNode(.clickArea(title, action))
+            area.path = cx.path + "/click"
+            area.enabled = cx.environment.isEnabled
+            return RNode(.layered(primary: 0, alignment: .center), children: [labelNode, area])
+        default:
+            let n = RNode(.button(title, action))
+            n.controlSize = cx.environment[_ControlSizeKey.self]
+            // a label that takes the width it's given gives it to the button
+            n.wide = Layout.flexible(labelNode, .horizontal)
+            return n
+        }
+    }
 }
 
 extension Button where Label == Text {
@@ -426,7 +447,14 @@ public struct Toggle<Label: View>: View, _PrimitiveView {
         self.isOn = isOn
         self.label = label()
     }
-    func _resolve(_ cx: ResolveContext) -> RNode { RNode(.toggle(titleOf(label, in: cx), isOn)) }
+    func _resolve(_ cx: ResolveContext) -> RNode {
+        guard cx.environment[_ToggleStyleKey.self] == "switch" else { return RNode(.toggle(titleOf(label, in: cx), isOn)) }
+        // the switch style: the label's views, and a switch after them (freemac 1.231)
+        let labelNode = cx.child("label").resolve(label)
+        let control = RNode(.switchToggle(labelNode.allText, isOn))
+        control.path = cx.path + "/control"
+        return RNode(.stack(.horizontal, Layout.defaultSpacing, alignment: 0), children: [labelNode, control])
+    }
 }
 
 extension Toggle where Label == Text {

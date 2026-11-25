@@ -24,10 +24,11 @@
  *
  * A menu bar item's button is in no window here (the desktop's menu bar
  * draws the item), so a popover shown from one (freemac 1.230) gets a
- * borderless window of its own, just big enough for the bubble, at the top
- * of the screen under where the menu bar says the item was clicked (at its
- * right when it hasn't said); the window goes when the popover closes. A
- * compositor that places windows itself may put it elsewhere.
+ * borderless window of its own, just big enough for the bubble, with its
+ * arrow at the foot of the menu bar under where the menu bar says the item
+ * was clicked (at its right when it hasn't said); the window goes when the
+ * popover closes. A compositor that places windows itself may put it
+ * elsewhere.
  *
  * A popover in a nib keeps its behaviour under "NSBehavior" and its size
  * under "NSContentSize" (names from developers' descriptions of the
@@ -146,6 +147,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     NSPopover *_popover;   /* not retained: it owns us */
     APopoverFrame *_frame;
     NSView *_target;       /* where the mouse went down */
+    BOOL _passing;         /* an event is being passed on to a view */
 }
 @end
 @implementation APopoverHost
@@ -171,7 +173,12 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
         return v;
     return [[w contentView] hitTest:p];
 }
-- (void)mouseDown:(NSEvent *)e
+/* A view that does not take an event passes it up its superviews, which
+ * leads back here: it stops here then, as it would at a window (freemac
+ * 1.231; a click on a label in a popover went round for ever). */
+#define PASS_ONCE(...) do { if (_passing) return; _passing = YES; __VA_ARGS__; _passing = NO; } while (0)
+- (void)mouseDown:(NSEvent *)e { PASS_ONCE([self _mouseDown:e]); }
+- (void)_mouseDown:(NSEvent *)e
 {
     NSWindow *w = [[[self window] retain] autorelease];
     BOOL inside;
@@ -191,12 +198,12 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
         [w makeFirstResponder:v];
     [v mouseDown:e];
 }
-- (void)mouseDragged:(NSEvent *)e { [_target mouseDragged:e]; }
+- (void)mouseDragged:(NSEvent *)e { PASS_ONCE([_target mouseDragged:e]); }
 - (void)mouseUp:(NSEvent *)e
 {
     NSView *v = [_target autorelease];
     _target = nil;
-    [v mouseUp:e];
+    PASS_ONCE([v mouseUp:e]);
 }
 - (void)rightMouseDown:(NSEvent *)e
 {
@@ -204,12 +211,12 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     NSView *v = [self _viewAt:[e locationInWindow] inside:&inside];
     if (!inside)
         [_popover _clickedOutside];
-    [v rightMouseDown:e];
+    PASS_ONCE([v rightMouseDown:e]);
 }
 - (void)scrollWheel:(NSEvent *)e
 {
     BOOL inside;
-    [[self _viewAt:[e locationInWindow] inside:&inside] scrollWheel:e];
+    PASS_ONCE([[self _viewAt:[e locationInWindow] inside:&inside] scrollWheel:e]);
 }
 - (void)mouseMoved:(NSEvent *)e {}
 - (void)keyDown:(NSEvent *)e
@@ -224,7 +231,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
         return;
     NSResponder *first = [w firstResponder];
     if (first && first != (NSResponder *)self)
-        [first keyDown:e];
+        PASS_ONCE([first keyDown:e]);
 }
 @end
 
@@ -405,7 +412,11 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     NSPoint at = [button _clickedAt];
     CGFloat x = at.x >= 0 ? NSMinX(full) + at.x - w / 2 : NSMaxX(visible) - w - margin;
     x = fmax(NSMinX(visible) + margin, fmin(x, NSMaxX(visible) - margin - w));
-    NSRect frame = NSMakeRect(x, NSMaxY(visible) - h, w, h);
+    /* the arrow's tip at the foot of the menu bar, as on a Mac: under X the
+     * work area may not leave out freemac's menu bar (Topline, 24 points
+     * tall, as a Mac's is), so it is left out here too (freemac 1.231) */
+    CGFloat top = fmin(NSMaxY(visible), NSMaxY(full) - 24);
+    NSRect frame = NSMakeRect(x, top - h, w, h);
     if (!_ownWindow) {
         _ownWindow = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless
                                                    backing:NSBackingStoreBuffered defer:NO];

@@ -29,7 +29,9 @@ final class RNode {
         case empty, group
         case text(String)
         case button(String, () -> Void)
+        case clickArea(String, () -> Void)   // a plain button: its label's views, with this over them
         case toggle(String, Binding<Bool>)
+        case switchToggle(String, Binding<Bool>)   // the switch style's switch, beside its label
         case textField(String, Binding<String>, secure: Bool)
         case slider(Binding<Double>, ClosedRange<Double>)
         case stepper(String, () -> Void, () -> Void)
@@ -63,6 +65,10 @@ final class RNode {
     var help: String?
     var tag: AnyHashable?
     var view: NSView?
+    var keyEquivalent: String?          // a button's keyboard shortcut (freemac 1.231)
+    var keyModifiers: NSEvent.ModifierFlags = []
+    var controlSize: ControlSize = .regular
+    var wide = false                    // a button or picker that takes the width it's given
 
     init(_ kind: Kind, children: [RNode] = []) {
         self.kind = kind
@@ -74,6 +80,17 @@ final class RNode {
         if case .text(let s) = kind { return s }
         for c in children { if let s = c.firstText { return s } }
         return nil
+    }
+
+    /// The words in the node and the nodes in it, in order: a label's title.
+    var allText: String {
+        var words: [String] = []
+        func walk(_ n: RNode) {
+            if case .text(let s) = n.kind, !s.isEmpty { words.append(s) }
+            for c in n.children { walk(c) }
+        }
+        walk(self)
+        return words.joined(separator: " ")
     }
 
     /// The node, its groups opened: what a stack lays out one by one.
@@ -280,6 +297,23 @@ final class HostCore {
             b.target = t
             b.action = #selector(ActionTarget.fire(_:))
             if let font = n.font { b.font = font.nsFont }
+            let key = n.keyEquivalent ?? ""
+            if b.keyEquivalent != key { b.keyEquivalent = key }
+            if b.keyEquivalentModifierMask != n.keyModifiers { b.keyEquivalentModifierMask = n.keyModifiers }
+            let size: NSControl.ControlSize = n.controlSize == .large ? .large : n.controlSize == .small ? .small
+                : n.controlSize == .mini ? .mini : .regular
+            if b.controlSize != size { b.controlSize = size }
+            made = b
+        case .clickArea(let title, let action):
+            // over a plain button's label: takes its clicks, and draws nothing
+            let b = view(p + "@click") { NSButton(title: title, target: nil, action: nil) }
+            b.isTransparent = true
+            if b.title != title { b.title = title }
+            b.target = target(p, action)
+            b.action = #selector(ActionTarget.fire(_:))
+            let key = n.keyEquivalent ?? ""
+            if b.keyEquivalent != key { b.keyEquivalent = key }
+            if b.keyEquivalentModifierMask != n.keyModifiers { b.keyEquivalentModifierMask = n.keyModifiers }
             made = b
         case .toggle(let title, let binding):
             let b = view(p) { NSButton(checkboxWithTitle: title, target: nil, action: nil) }
@@ -288,6 +322,14 @@ final class HostCore {
             let t = target(p) { [weak b] in binding.wrappedValue = b?.state == NSControl.StateValue.on }
             b.target = t
             b.action = #selector(ActionTarget.fire(_:))
+            made = b
+        case .switchToggle(let title, let binding):
+            let b = view(p + "@switch") { NSSwitch(frame: .zero) }
+            b.state = binding.wrappedValue ? .on : .off
+            let t = target(p) { [weak b] in binding.wrappedValue = b?.state == NSControl.StateValue.on }
+            b.target = t
+            b.action = #selector(ActionTarget.fire(_:))
+            b.toolTip = title.isEmpty ? nil : title
             made = b
         case .textField(let placeholder, let binding, let secure):
             let f = view(p) { secure ? NSSecureTextField(frame: .zero) : NSTextField(frame: .zero) }
@@ -307,15 +349,22 @@ final class HostCore {
             s.action = #selector(ActionTarget.fire(_:))
             made = s
         case .stepper(let title, let up, let down):
-            let b = view(p) { NSSegmentedControl(frame: .zero) }
-            b.segmentCount = 2
-            b.setLabel("-", forSegment: 0)
-            b.setLabel("+", forSegment: 1)
-            b.trackingMode = .momentary
-            let t = target(p) { [weak b] in if b?.selectedSegment == 1 { up() } else { down() } }
+            // a Mac's stepper, its arrows up and down (freemac 1.231). It
+            // rests at 1 between 0 and 2, so each press says which way.
+            let b = view(p + "@stepper") { NSStepper(frame: .zero) }
+            b.minValue = 0
+            b.maxValue = 2
+            b.increment = 1
+            b.valueWraps = false
+            b.doubleValue = 1
+            let t = target(p) { [weak b] in
+                guard let b else { return }
+                if b.doubleValue > 1 { up() } else if b.doubleValue < 1 { down() }
+                b.doubleValue = 1
+            }
             b.target = t
             b.action = #selector(ActionTarget.fire(_:))
-            b.toolTip = title
+            b.toolTip = title.isEmpty ? nil : title
             made = b
         case .picker(_, let items, let selected, let choose, true):
             // the segmented style: one segment for each choice
@@ -323,6 +372,8 @@ final class HostCore {
             if b.segmentCount != items.count { b.segmentCount = items.count }
             for (i, t) in items.enumerated() where b.label(forSegment: i) != t { b.setLabel(t, forSegment: i) }
             b.trackingMode = .selectOne
+            // as a Mac's SwiftUI draws it, its segments share the width it's given
+            if b.segmentDistribution != .fillEqually { b.segmentDistribution = .fillEqually }
             if selected >= 0 && selected < items.count { b.selectedSegment = selected }
             let t = target(p) { [weak b] in choose(b?.selectedSegment ?? -1) }
             b.target = t

@@ -668,6 +668,13 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 
 /* ---- NSApplication --------------------------------------------------------------------- */
 
+/* the About panel's content, laid out from the top */
+@interface AAboutView : NSView
+@end
+@implementation AAboutView
+- (BOOL)isFlipped { return YES; }
+@end
+
 @implementation NSApplication {
     id _delegate;
     NSMenu *_mainMenu;
@@ -803,9 +810,77 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 - (void)arrangeInFront:(id)sender {}
 - (void)miniaturizeAll:(id)sender { [self hide:sender]; }
 - (void)orderFrontStandardAboutPanel:(id)sender { [self orderFrontStandardAboutPanelWithOptions:@{}]; }
+/* The standard About panel (freemac 1.231): the app's icon, its name,
+ * its version and build, any credits and its copyright, centred in a small
+ * titled panel, from the options given or else the bundle's Info.plist.
+ * One panel is kept and brought back to the front. */
 - (void)orderFrontStandardAboutPanelWithOptions:(NSDictionary *)options
 {
-    AWarnOnce("the standard About panel");
+    static NSPanel *panel;
+    if (panel) {
+        [panel close];
+        [panel release];
+        panel = nil;
+    }
+    NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+    NSString *name = options[@"ApplicationName"] ?: info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"]
+        ?: [[NSProcessInfo processInfo] processName];
+    NSString *shortVersion = options[@"ApplicationVersion"] ?: info[@"CFBundleShortVersionString"];
+    NSString *build = options[@"Version"] ?: info[@"CFBundleVersion"];
+    NSString *version = shortVersion ? [NSString stringWithFormat:@"Version %@", shortVersion] : nil;
+    if (build && version && ![build isEqual:shortVersion])
+        version = [version stringByAppendingFormat:@" (%@)", build];
+    else if (build && !version)
+        version = [NSString stringWithFormat:@"Version %@", build];
+    id credits = options[@"Credits"];
+    NSString *copyright = options[@"Copyright"] ?: info[@"NSHumanReadableCopyright"];
+    NSImage *icon = options[@"ApplicationIcon"] ?: [self applicationIconImage];
+
+    const CGFloat width = 280, inner = width - 40;
+    NSView *v = [[[AAboutView alloc] initWithFrame:NSMakeRect(0, 0, width, 100)] autorelease];
+    CGFloat y = 20;
+    if (icon) {
+        NSImageView *iv = [NSImageView imageViewWithImage:icon];
+        [iv setImageScaling:NSImageScaleProportionallyUpOrDown];
+        [iv setFrame:NSMakeRect((width - 64) / 2, y, 64, 64)];
+        [v addSubview:iv];
+        y += 64 + 12;
+    }
+    NSArray *rows = @[ @[ name ?: @"", [NSFont boldSystemFontOfSize:14] ],
+                       @[ version ?: @"", [NSFont systemFontOfSize:11] ],
+                       @[ credits ?: @"", [NSFont systemFontOfSize:11] ],
+                       @[ copyright ?: @"", [NSFont systemFontOfSize:10] ] ];
+    for (NSArray *row in rows) {
+        id text = row[0];
+        NSString *plain = [text isKindOfClass:[NSAttributedString class]] ? [text string] : text;
+        if (![plain length])
+            continue;
+        NSFont *font = row[1];
+        NSRect r = [plain boundingRectWithSize:NSMakeSize(inner - 4, 1e6) options:NSStringDrawingUsesLineFragmentOrigin
+                                    attributes:@{NSFontAttributeName : font}];
+        CGFloat h = ceil(r.size.height) + 2;
+        NSTextField *f = [NSTextField wrappingLabelWithString:plain];
+        [f setFont:font];
+        [f setAlignment:NSTextAlignmentCenter];
+        [f setSelectable:YES];
+        if (font != rows[0][1])
+            [f setTextColor:[NSColor secondaryLabelColor]];
+        [f setFrame:NSMakeRect(20, y, inner, h)];
+        [v addSubview:f];
+        y += h + 6;
+    }
+    y += 14;
+    [v setFrame:NSMakeRect(0, 0, width, y)];
+    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, width, y)
+                                       styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                                         backing:NSBackingStoreBuffered defer:YES];
+    [panel setReleasedWhenClosed:NO];
+    [panel setHidesOnDeactivate:NO];
+    [panel setTitle:@""];
+    [panel setContentView:v];
+    [panel center];
+    [self activateIgnoringOtherApps:YES];
+    [panel makeKeyAndOrderFront:nil];
 }
 - (NSInteger)requestUserAttention:(NSInteger)type { return ADockRequestAttention(type); }
 

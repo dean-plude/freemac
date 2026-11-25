@@ -64,6 +64,8 @@ enum Layout {
             let i = n.view?.intrinsicContentSize ?? .zero
             return (a == .horizontal ? i.width : i.height) <= 0
         case .textField, .slider, .progress: return a == .horizontal
+        case .button: return a == .horizontal && n.wide
+        case .picker(_, _, _, _, let segmented): return a == .horizontal && segmented
         case .divider: return a != parentAxis(n)
         case .frame(let w, let h, _, let maxW, _, let maxH, _):
             let fixed = a == .horizontal ? w : h
@@ -86,8 +88,13 @@ enum Layout {
         case .empty: return .zero
         case .group:
             return stackSize(n.children.flatMap { $0.flattened }, .vertical, defaultSpacing, p).size
-        case .text, .button, .toggle, .image, .stepper, .picker:
+        case .button where n.wide, .picker(_, _, _, _, segmented: true):
+            let s = natural(n.view)
+            return CGSize(width: max(p.width ?? s.width, s.width), height: s.height)
+        case .text, .button, .toggle, .switchToggle, .image, .stepper, .picker:
             return natural(n.view)
+        case .clickArea:
+            return CGSize(width: p.width ?? 0, height: p.height ?? 0)
         case .hosted:
             let i = n.view?.intrinsicContentSize ?? .zero
             return CGSize(width: i.width > 0 ? i.width : p.width ?? 100, height: i.height > 0 ? i.height : p.height ?? 100)

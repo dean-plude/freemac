@@ -38,6 +38,10 @@
 #   swiftui_drawing    shapes (a Shape of its own too), an overlay and a
 #                      background by alignment, a GeometryReader, an alert
 #                      and a sheet, their buttons pressed (freemac 1.230)
+#   swiftui_styles     controls by style (freemac 1.231): a large default
+#                      button filling its width, plain buttons with
+#                      shortcuts, a Stepper's arrows, a switch Toggle and a
+#                      segmented Picker, each pressed in turn
 #   mixed              an Objective-C program using a Swift class, through
 #                      the header ferry-swiftc writes (-emit-objc-header-path),
 #                      the Swift built as a library beside it (@rpath)
@@ -47,7 +51,7 @@
 # either missing they are skipped. Ferry's own Swift modules are brought up
 # to date first (swift/build-modules.sh does nothing when they are).
 
-swift_tests="swift_hello swift_foundation swift_appkit_window swift_swiftui_counter swift_swiftui_app swift_swiftui_hosting swift_swiftui_grid swift_dispatch swift_concurrency swift_values swift_combine swift_services swift_appkit_names swift_swiftui_tasks swift_swiftui_drawing swift_mixed"
+swift_tests="swift_hello swift_foundation swift_appkit_window swift_swiftui_counter swift_swiftui_app swift_swiftui_hosting swift_swiftui_grid swift_dispatch swift_concurrency swift_values swift_combine swift_services swift_appkit_names swift_swiftui_tasks swift_swiftui_drawing swift_swiftui_styles swift_mixed"
 swift_tc=${FERRY_SWIFT_TOOLCHAIN:-}
 if [ -z "$swift_tc" ] && command -v swift-frontend > /dev/null 2>&1; then
     swift_tc=$(dirname "$(dirname "$(command -v swift-frontend)")")
@@ -99,6 +103,7 @@ else
     swift_one appkit_names
     swift_one swiftui_tasks "FERRY_SWIFTUI_CLICK=Next,Next"
     swift_one swiftui_drawing "FERRY_SWIFTUI_CLICK=Ask,Now,Sheet,Done"
+    swift_one swiftui_styles "FERRY_SWIFTUI_CLICK=Start 0,segment:Three,up:1,up:1,down:1,Stop after break,About ⌘ A"
 
     # mixed: mixed.swift becomes libMixed.dylib and Mixed-Swift.h, which
     # mixed.m imports and links
