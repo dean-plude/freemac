@@ -1516,6 +1516,11 @@ fi
 # EventKit on freemac's calendar and reminders files (freemac 1.232,
 # Ferry 0.56.0): access, repeats, saves that keep Tide's and Nudge's lines.
 run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -framework Foundation -framework EventKit
+# What VLC's Mac interface calls besides (freemac 1.NEXT, Ferry 0.NEXT):
+# CoreMedia times, media keys and Now Playing, displays, slider cells, and
+# the empty capture devices, address book and I/O Kit registry.
+run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
+    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

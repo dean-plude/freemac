@@ -5,6 +5,7 @@
 
 module AVFoundation [system] {
     header "AVFoundation/AVFoundation.h"
+    header "AVFoundation/AVCaptureDevice.h"
     export *
     link framework "AVFoundation"
 }
@@ -16,6 +17,7 @@ module AppKit [system] {
     header "AppKit/AppKitMore.h"
     header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"
+    header "AppKit/AppKitVLC.h"
     header "AppKit/NSAccessibility.h"
     header "AppKit/NSAlert.h"
     header "AppKit/NSAnimation.h"
@@ -108,6 +110,7 @@ module CoreFoundation [system] {
     header "CoreFoundation/CFMore.h"
     header "CoreFoundation/CFNotificationCenter.h"
     header "CoreFoundation/CFNumber.h"
+    header "CoreFoundation/CFPlugInCOM.h"
     header "CoreFoundation/CFPreferences.h"
     header "CoreFoundation/CFRunLoop.h"
     header "CoreFoundation/CFSet.h"
@@ -129,6 +132,7 @@ module CoreGraphics [system] {
     header "CoreGraphics/CGColorSpace.h"
     header "CoreGraphics/CGContext.h"
     header "CoreGraphics/CGDataProvider.h"
+    header "CoreGraphics/CGDirectDisplay.h"
     header "CoreGraphics/CGEvent.h"
     header "CoreGraphics/CGGeometry.h"
     header "CoreGraphics/CGGradient.h"
@@ -194,6 +198,7 @@ module EventKit [system] {
 module Foundation [system] {
     header "Foundation/Foundation.h"
     header "Foundation/FoundationOlder.h"
+    header "Foundation/FoundationVLC.h"
     header "Foundation/NSAffineTransform.h"
     header "Foundation/NSAppleEventDescriptor.h"
     header "Foundation/NSAppleScript.h"
@@ -279,6 +284,8 @@ module HIServices [system] {
 }
 
 module IOKit [system] {
+    header "IOKit/IOBSD.h"
+    header "IOKit/IOCFPlugIn.h"
     header "IOKit/IOKitLib.h"
     header "IOKit/IOReturn.h"
     export *
