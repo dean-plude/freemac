@@ -468,6 +468,8 @@ From Ferry 0.58.0 (freemac 1.234), `coreaudio/` holds Core Audio, which also ser
 
 From Ferry 0.59.0 (freemac 1.235), `opengl/` is OpenGL.framework, CGL on this system's EGL with every `gl` call passed to its OpenGL library; `appkit/NSOpenGL.m` and `quartzcore/CAOpenGLLayer.m` read a context's frames back and paint them into views and layers, and `corevideo/` and `iosurface/` are Core Video (display links, pixel buffers and pools, texture caches) and IOSurface, for VLC's and OBS's video output; the tests are `opengl_*` and `corevideo_*`.
 
+Mac apps with big windows open without a wait: Ferry's Auto Layout solver now goes again only over what a change reaches, so a window of hundreds of views lays out in a tenth of a second instead of several seconds, with every view in the same place.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
