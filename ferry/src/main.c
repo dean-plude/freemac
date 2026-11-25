@@ -226,5 +226,7 @@ int main(int argc, char **argv, char **envp)
         exit(ferry_run(program, argc - i + 1, args, envp));
     }
     /* The program sees itself as argv[0], as it would on a Mac. */
+    ferry_commpage_init();
+    ferry_thread_tsd_init();
     exit(ferry_run(argv[i], argc - i, argv + i, envp));
 }

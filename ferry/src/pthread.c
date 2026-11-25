@@ -26,6 +26,8 @@
 #include <limits.h>
 #include <linux/futex.h>
 #include <pthread.h>
+#include <asm/prctl.h>
+#include <sys/syscall.h>
 #include <sched.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -198,8 +200,28 @@ static void run_cleanup_handlers(void)
     }
 }
 
+
+/* A Mac thread's own block (freemac 1.232, Ferry 0.56.0). On an Intel Mac
+ * the gs register points at the running thread's block of thread-specific
+ * slots, as xnu's published libsyscall/os/tsd.h lays out: slot 0 holds the
+ * thread itself, and pthread keys and the system's direct keys follow. Code
+ * built for a Mac reads it directly, as Qt's QThread::currentThreadId does
+ * ("mov %gs:0"). Linux leaves gs unused on x86-64 (its threads use fs), so
+ * each thread that runs Mac code gets a block of its own, with gs at it. */
+#define MAC_TSD_SLOTS 768
+static __thread void *mac_tsd[MAC_TSD_SLOTS];
+
+void ferry_thread_tsd_init(void)
+{
+    if (mac_tsd[0])
+        return;
+    mac_tsd[0] = (void *)pthread_self();
+    syscall(SYS_arch_prctl, ARCH_SET_GS, (unsigned long)mac_tsd);
+}
+
 static void *thread_main(void *p)
 {
+    ferry_thread_tsd_init();
     struct start s = *(struct start *)p;
     free(p);
     remember(pthread_self(), gettid_now());

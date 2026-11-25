@@ -1388,6 +1388,107 @@ static int mac_csr_check(uint32_t mask)
     return 0;
 }
 
+/* ---- the commpage --------------------------------------------------------------- */
+/* An Intel Mac maps a read-only page at 0x7fffffe00000 into every program,
+ * laid out as xnu's published osfmk/i386/cpu_capabilities.h describes.
+ * Programs read the processor's features from it directly: Qt reads the
+ * 64-bit capability word at +0x10 to see whether AVX-512 is usable. Ferry
+ * maps the same page, with its signature, version, capabilities, processor
+ * count and cache line size filled in from this machine. If something
+ * already sits at that address the page is left out. */
+#define COMMPAGE_ADDR 0x00007fffffe00000ull
+#define CAP_MMX 0x1ull
+#define CAP_SSE 0x2ull
+#define CAP_SSE2 0x4ull
+#define CAP_SSE3 0x8ull
+#define CAP_CACHE64 0x20ull
+#define CAP_FAST_TLS 0x80ull
+#define CAP_SSSE3 0x100ull
+#define CAP_64BIT 0x200ull
+#define CAP_SSE4_1 0x400ull
+#define CAP_SSE4_2 0x800ull
+#define CAP_AES 0x1000ull
+#define CAP_AVX1 0x01000000ull
+#define CAP_RDRAND 0x02000000ull
+#define CAP_F16C 0x04000000ull
+#define CAP_ENFSTRG 0x08000000ull
+#define CAP_FMA 0x10000000ull
+#define CAP_AVX2 0x20000000ull
+#define CAP_BMI1 0x40000000ull
+#define CAP_BMI2 0x80000000ull
+#define CAP_RTM 0x100000000ull
+#define CAP_HLE 0x200000000ull
+#define CAP_ADX 0x400000000ull
+#define CAP_RDSEED 0x800000000ull
+#define CAP_AVX512F 0x4000000000ull
+
+static uint64_t commpage_capabilities(long ncpus)
+{
+    unsigned a, b, c, d;
+    uint64_t caps = CAP_64BIT | CAP_CACHE64 | CAP_FAST_TLS;
+    if (__get_cpuid(1, &a, &b, &c, &d)) {
+        if (d & (1u << 23)) caps |= CAP_MMX;
+        if (d & (1u << 25)) caps |= CAP_SSE;
+        if (d & (1u << 26)) caps |= CAP_SSE2;
+        if (c & (1u << 0)) caps |= CAP_SSE3;
+        if (c & (1u << 9)) caps |= CAP_SSSE3;
+        if (c & (1u << 19)) caps |= CAP_SSE4_1;
+        if (c & (1u << 20)) caps |= CAP_SSE4_2;
+        if (c & (1u << 25)) caps |= CAP_AES;
+        if (c & (1u << 12)) caps |= CAP_FMA;
+        if (c & (1u << 29)) caps |= CAP_F16C;
+        if (c & (1u << 30)) caps |= CAP_RDRAND;
+        /* AVX counts only when the system saves its registers (OSXSAVE and XCR0) */
+        if ((c & (1u << 27)) && (c & (1u << 28))) {
+            unsigned lo, hi;
+            __asm__("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
+            if ((lo & 6) == 6) {
+                caps |= CAP_AVX1;
+                if (__get_cpuid_count(7, 0, &a, &b, &c, &d)) {
+                    if (b & (1u << 5)) caps |= CAP_AVX2;
+                    if ((b & (1u << 16)) && (lo & 0xe0) == 0xe0) caps |= CAP_AVX512F;
+                }
+            }
+        }
+        if (__get_cpuid_count(7, 0, &a, &b, &c, &d)) {
+            if (b & (1u << 3)) caps |= CAP_BMI1;
+            if (b & (1u << 4)) caps |= CAP_HLE;
+            if (b & (1u << 8)) caps |= CAP_BMI2;
+            if (b & (1u << 9)) caps |= CAP_ENFSTRG;
+            if (b & (1u << 11)) caps |= CAP_RTM;
+            if (b & (1u << 18)) caps |= CAP_RDSEED;
+            if (b & (1u << 19)) caps |= CAP_ADX;
+        }
+    }
+    caps |= (uint64_t)((ncpus > 255 ? 255 : ncpus) & 0xff) << 16;
+    return caps;
+}
+
+void ferry_commpage_init(void)
+{
+    void *p = mmap((void *)COMMPAGE_ADDR, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                   -1, 0);
+    if (p == MAP_FAILED)
+        return;
+    if (p != (void *)COMMPAGE_ADDR) {
+        munmap(p, 4096);
+        return;
+    }
+    unsigned char *page = p;
+    long ncpus = logical_configured();
+    uint64_t caps = commpage_capabilities(ncpus);
+    memcpy(page, "commpage 64-bit", 16);          /* +0x000 signature */
+    memcpy(page + 0x010, &caps, 8);               /* +0x010 capabilities, 64 bits */
+    uint16_t version = 14;
+    memcpy(page + 0x01e, &version, 2);            /* +0x01e version */
+    uint32_t caps32 = (uint32_t)caps;
+    memcpy(page + 0x020, &caps32, 4);             /* +0x020 capabilities, 32 bits */
+    page[0x022] = (unsigned char)(ncpus > 255 ? 255 : ncpus); /* +0x022 processors */
+    uint16_t line = 64;
+    memcpy(page + 0x026, &line, 2);               /* +0x026 cache line size */
+    mprotect(p, 4096, PROT_READ);
+}
+
 const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"__ulock_wait", mac_ulock_wait},
     {"__ulock_wait2", mac_ulock_wait2},

@@ -29,8 +29,12 @@
  * as a Swift enum and NS_OPTIONS as an option set (freemac 1.227). */
 #define NS_ENUM(type, name) enum __attribute__((enum_extensibility(open))) name : type name; \
     enum __attribute__((enum_extensibility(open))) name : type
+#ifdef __cplusplus /* the plain number type in C++, as on a Mac */
+#define NS_OPTIONS(type, name) type name; enum __attribute__((flag_enum, enum_extensibility(open))) : name
+#else
 #define NS_OPTIONS(type, name) enum __attribute__((flag_enum, enum_extensibility(open))) name : type name; \
     enum __attribute__((flag_enum, enum_extensibility(open))) name : type
+#endif
 #define NS_ASSUME_NONNULL_BEGIN _Pragma("clang assume_nonnull begin")
 #define NS_ASSUME_NONNULL_END _Pragma("clang assume_nonnull end")
 #define NS_SWIFT_NAME(x)

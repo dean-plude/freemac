@@ -1503,6 +1503,7 @@ run_one libcurl "$here/libcurl.c" "$here/libcurl.out" -lcurl
 # setjmp, wait4 and waitid, the group database and UCCompareText, for Qt's core
 run_one libc_qt "$here/libc_qt.c" "$here/libc_qt.out" -framework CoreServices
 run_one libc_qt_more "$here/libc_qt_more.c" "$here/libc_qt_more.out"
+run_one mac_thread_block "$here/mac_thread_block.c" "$here/mac_thread_block.out" -fblocks
 run_one media_frameworks "$here/media/frameworks.m" "$here/media/frameworks.out" -fobjc-arc -fblocks \
     -framework Foundation -framework IOSurface -framework Accelerate -framework Metal -framework DiskArbitration \
     -framework Network

@@ -136,8 +136,14 @@ typedef enum {
 /* with a Mac's attributes, for Swift (freemac 1.227) */
 #define CF_ENUM(type, name) enum __attribute__((enum_extensibility(open))) name : type name; \
     enum __attribute__((enum_extensibility(open))) name : type
+/* In C++ a Mac's option sets are the plain number type, so that flags
+ * combine with | into it without a cast (as Qt's code does). */
+#ifdef __cplusplus
+#define CF_OPTIONS(type, name) type name; enum __attribute__((flag_enum, enum_extensibility(open))) : name
+#else
 #define CF_OPTIONS(type, name) enum __attribute__((flag_enum, enum_extensibility(open))) name : type name; \
     enum __attribute__((flag_enum, enum_extensibility(open))) name : type
+#endif
 #define CF_EXPORT extern
 #define CF_INLINE static inline
 

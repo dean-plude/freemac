@@ -64,6 +64,8 @@ extern const struct ferry_symbol ferry_core_symbols[];
 extern const struct ferry_symbol ferry_stdio_symbols[];
 extern const struct ferry_symbol ferry_posix_symbols[];
 extern const struct ferry_symbol ferry_pthread_symbols[];  /* libSystem's pthreads and locks */
+void ferry_commpage_init(void);      /* maps the Mac commpage (sysctl.c) */
+void ferry_thread_tsd_init(void);    /* points gs at the thread's Mac slots */
 int ferry_pthread_live_threads(void);   /* threads the program started, still running */
 int ferry_pthread_is_main(void);
 extern const char *const ferry_passthrough[];

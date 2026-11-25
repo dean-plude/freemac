@@ -478,6 +478,7 @@ static void enqueue(struct work *w)
 static void *worker_main(void *unused)
 {
     (void)unused;
+    ferry_thread_tsd_init();
     pthread_setname_np(pthread_self(), "dispatch-worker");
     pthread_mutex_lock(&dq);
     for (;;) {
@@ -550,6 +551,7 @@ static void move_due_locked(void)
 static void *manager_main(void *unused)
 {
     (void)unused;
+    ferry_thread_tsd_init();
     pthread_setname_np(pthread_self(), "dispatch-manager");
     pthread_mutex_lock(&dq);
     unsigned long seen = progress;
@@ -1597,6 +1599,7 @@ static void fire_ksource(void *ctx)
 static void *ksource_main(void *unused)
 {
     (void)unused;
+    ferry_thread_tsd_init();
     struct kevent64_s ev[16];
     for (;;) {
         int n = ferry_kevent64(kfd, NULL, 0, ev, 16, 0, NULL);

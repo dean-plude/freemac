@@ -165,6 +165,9 @@ extern const CFStringRef kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
 extern const CFStringRef kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly;
 
 extern const CFStringRef kSecAttrProtocolFTP;
+extern const CFStringRef kSecAttrProtocolFTPAccount;
+extern const CFStringRef kSecAttrProtocolFTPS;
+extern const CFStringRef kSecAttrProtocolFTPProxy;
 extern const CFStringRef kSecAttrProtocolHTTP;
 extern const CFStringRef kSecAttrProtocolHTTPS;
 extern const CFStringRef kSecAttrProtocolHTTPProxy;

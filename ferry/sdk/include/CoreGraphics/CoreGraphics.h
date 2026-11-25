@@ -128,24 +128,39 @@ typedef struct CGImage *CGImageRef;
 typedef struct CGGradient *CGGradientRef;
 typedef void (*CGDataProviderReleaseDataCallback)(void *info, const void *data, size_t size);
 
-typedef enum {
+typedef CF_ENUM(uint32_t, CGImageAlphaInfo) {
     kCGImageAlphaNone, kCGImageAlphaPremultipliedLast, kCGImageAlphaPremultipliedFirst, kCGImageAlphaLast,
     kCGImageAlphaFirst, kCGImageAlphaNoneSkipLast, kCGImageAlphaNoneSkipFirst, kCGImageAlphaOnly,
-} CGImageAlphaInfo;
-typedef enum {
+};
+typedef CF_ENUM(uint32_t, CGImageByteOrderInfo) {
+    kCGImageByteOrderMask = 0x7000,
+    kCGImageByteOrderDefault = (0 << 12),
+    kCGImageByteOrder16Little = (1 << 12),
+    kCGImageByteOrder32Little = (2 << 12),
+    kCGImageByteOrder16Big = (3 << 12),
+    kCGImageByteOrder32Big = (4 << 12),
+};
+typedef CF_ENUM(uint32_t, CGImagePixelFormatInfo) {
+    kCGImagePixelFormatMask = 0xF0000,
+    kCGImagePixelFormatPacked = (0 << 16),
+    kCGImagePixelFormatRGB555 = (1 << 16),
+    kCGImagePixelFormatRGB565 = (2 << 16),
+    kCGImagePixelFormatRGB101010 = (3 << 16),
+    kCGImagePixelFormatRGBCIF10 = (4 << 16),
+};
+typedef CF_OPTIONS(uint32_t, CGBitmapInfo) {
     kCGBitmapAlphaInfoMask = 0x1F,
     kCGBitmapFloatInfoMask = 0xF00,
     kCGBitmapFloatComponents = (1 << 8),
-    kCGBitmapByteOrderMask = 0x7000,
-    kCGBitmapByteOrderDefault = (0 << 12),
-    kCGBitmapByteOrder16Little = (1 << 12),
-    kCGBitmapByteOrder32Little = (2 << 12),
-    kCGBitmapByteOrder16Big = (3 << 12),
-    kCGBitmapByteOrder32Big = (4 << 12),
-} CGBitmapInfo;
+    kCGBitmapByteOrderMask = kCGImageByteOrderMask,
+    kCGBitmapByteOrderDefault = kCGImageByteOrderDefault,
+    kCGBitmapByteOrder16Little = kCGImageByteOrder16Little,
+    kCGBitmapByteOrder32Little = kCGImageByteOrder32Little,
+    kCGBitmapByteOrder16Big = kCGImageByteOrder16Big,
+    kCGBitmapByteOrder32Big = kCGImageByteOrder32Big,
+};
 #define kCGBitmapByteOrder32Host kCGBitmapByteOrder32Little
 #define kCGBitmapByteOrder16Host kCGBitmapByteOrder16Little
-typedef uint32_t CGImageByteOrderInfo;
 
 CGDataProviderRef CGDataProviderCreateWithData(void *info, const void *data, size_t size,
                                                CGDataProviderReleaseDataCallback releaseData);
