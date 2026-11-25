@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.237 "Ferry: VLC plays in its own window, and a faster Auto Layout solver" (done)
+
+Ferry 0.61.0: big windows lay out about 70 times faster. The solver is sparse and only goes forward, so trying an inequality in or out goes again only over the rows that change reaches, and a stack view's fitting sizes are worked out once a layout. A window of 245 views and 893 constraints lays out in about a tenth of a second where it took seven, with every frame where it was. VLC's xib windows and Itsycal's popover are the windows this was for. In this release VLC 3.0.24's own Mac app, built from source by `ferry/apps/vlc.sh`, also opens its main window under Ferry and plays a video in it, with the picture, the sound and its control bar (see `docs/ferry-notes/vlc.md`).
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Auto Layout solves big windows about 70 times faster: a window of 245 views and 893 constraints lays out in about a tenth of a second where it took seven, its biggest solve in under 8 ms where it took nearly two seconds, with every frame where it was | Ferry AppKit | done |
+| 2 | The fitting sizes a stack view asks for while a window's constraints are gathered are worked out once each | Ferry AppKit | done |
+| 3 | A benchmark of a big window (a sidebar, a month of 42 days and a list of events, in stack views, with mixed priorities and inequalities) in Ferry's test suite, checking its frames at four sizes | Ferry tests | done |
+| 4 | VLC 3.0.24's Mac app opens its main window and plays a video in it through its `caopengllayer` video out and its `auhal` sound out, its time and position slider moving, to the end; a slider's, stepper's or segmented control's cell keeps the app's own class through `ferry-ibtool`; a cancellable condition wait no longer loses a wake (VLC task) | Ferry | done |
+
 ## 1.236 "Ferry: the Mac apps rebuilt by recipes" (done)
 
 Ferry 0.60.0: the open-source Mac apps that have run under Ferry are

@@ -2092,6 +2092,25 @@ The OpenGL ones run when OpenGL makes contexts here and are skipped
 otherwise. With `FERRY_TEST_SHOTS` set to a folder, `opengl_view` and
 `opengl_layer` save pictures of their windows there.
 
+### A faster Auto Layout solver (freemac 1.237, Ferry 0.61.0)
+
+The solver gives the same answers as before, faster. Rows still go into the
+elimination in priority order, but it is sparse and only goes forward: a row
+never changes once it is in, so when an inequality is made active or let go
+only the rows after it are gone through again, and of those only the ones
+that meet an unknown whose settling row changed. Fitting sizes asked for
+while a window's constraints are gathered (a stack view asks for each of its
+views' sizes and how firmly they hold them, again and again) are worked out
+once each. Answers are rounded to about a millionth of a point, so the order of the
+arithmetic no longer shows in a frame.
+
+| Window | Before | Now |
+| --- | --- | --- |
+| the benchmark (`tests/appkit/layout_bench.m`): 245 views, 893 constraints, 1,396 rows and 480 unknowns an axis, four layouts | 7.2 s, its biggest solve 1.95 s | 0.1 s, its biggest solve 7.5 ms |
+
+Every frame in Ferry's tests, and every fitting size asked for in them, is
+the same as before.
+
 ## What the apps need most
 
 Counted over the nine apps:
