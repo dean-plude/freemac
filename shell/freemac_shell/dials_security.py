@@ -3,7 +3,8 @@
 Mac's FileVault shows it, with Change Disk Password… and New Recovery Key….
 Below it, Control Other Windows: the Mac apps that asked to move and resize
 other apps' windows (window_control.py), each with a switch, and Forget to
-have it asked again (freemac 1.215, Ferry 0.41.0).
+have it asked again (freemac 1.215, Ferry 0.41.0); from freemac 1.220 the
+same answer covers listing other apps' windows and pressing keys in them.
 
 Keel, the installer, encrypts the disk when "Encrypt the disk" is on. The
 changes go through /usr/libexec/freemac-disk-helper with pkexec, so an
@@ -221,6 +222,6 @@ def control_section(window):
 
     fill()
     return [heading, listbox, caption(
-        "These Mac apps asked to move and resize the windows of other apps, as window managers such as "
-        "Spectacle do. An app that is off can't. Forget takes an app off the list, and it asks again "
-        "the next time.")]
+        "These Mac apps asked to move and resize the windows of other apps, list them, and press keys in "
+        "them, as window managers such as Spectacle and clipboard managers such as Flycut do. An app that "
+        "is off can't. Forget takes an app off the list, and it asks again the next time.")]

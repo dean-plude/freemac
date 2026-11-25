@@ -367,4 +367,9 @@ void CGContextSetFontSize(CGContextRef c, CGFloat size);
 
 __FERRY_END
 
+/* Quartz Event Services and Window Services (freemac 1.220, Ferry 0.44.0),
+ * served from AppKit's file. */
+#include <CoreGraphics/CGEvent.h>
+#include <CoreGraphics/CGWindow.h>
+
 #endif

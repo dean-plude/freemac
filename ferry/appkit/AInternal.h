@@ -106,6 +106,12 @@ void AWindowDidClose(NSWindow *window);
 /* Drag and drop (NSDragging.m): makes a window's GTK drawing area a drop
  * target, and the steps of a drop, which GTK's signals call (and tests). */
 void ADragAttach(NSWindow *window, GtkWidget *area);
+/* A drag within the app (freemac 1.220, Ferry 0.44.0): YES when a dragging
+ * session took this left-button drag or release, which the window then
+ * doesn't pass on. */
+BOOL ADragSessionTakes(NSEvent *e);
+/* A dragging session from what is already on the pasteboard pb. */
+NSDraggingSession *ABeginDragSession(NSPasteboard *pb, NSArray *items, id<NSDraggingSource> source, NSEvent *e);
 
 @interface NSWindow (FerryPrivate)
 - (void)_appDidResignActive; /* hidesOnDeactivate, NSWindow.m */
@@ -301,6 +307,11 @@ void ANoteRecentDocumentsMenu(NSMenu *menu);
 /* (NSDocument.m) whether closing autosaves instead of asking: the class
  * autosaves in place and the document has a file */
 - (BOOL)_closesWithoutAsking;
+/* (NSDocument.m) a document the controller holds is one of NSFileCoordinator's
+ * file presenters (freemac 1.220); NSDocumentController's addDocument: and
+ * removeDocument: start and stop it */
+- (void)_startPresenting;
+- (void)_stopPresenting;
 @end
 
 /* (NSToolbar.m) the strip a window's toolbar is drawn in, a root view of the
@@ -384,6 +395,19 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
 - (BOOL)_handleMouseDown:(NSEvent *)event row:(NSInteger)row column:(NSInteger)column point:(NSPoint)p;
 - (void)_drawDecorationsForRow:(NSInteger)row;
 - (void)_drawDecorationsInRowView:(NSTableRowView *)view;
+/* dragging rows and dropping on them (freemac 1.220, Ferry 0.44.0) */
+- (BOOL)_canDragRows;
+- (BOOL)_putRows:(NSIndexSet *)rows onPasteboard:(NSPasteboard *)pb;
+- (void)_dragOfRows:(NSIndexSet *)rows session:(NSDraggingSession *)session willBeginAt:(NSPoint)screenPoint;
+- (void)_dragSession:(NSDraggingSession *)session endedAt:(NSPoint)screenPoint operation:(NSDragOperation)op;
+- (void)_updateDraggingItemsForDrag:(id<NSDraggingInfo>)info;
+- (void)_proposeDropAt:(NSPoint)p;
+- (NSDragOperation)_validateDrop:(id<NSDraggingInfo>)info;
+- (BOOL)_acceptDrop:(id<NSDraggingInfo>)info;
+/* where the drop now proposed is shown: on a row (-1: the whole table), or
+ * above one (the row count: below the last), with a line indent; NO for
+ * nowhere */
+- (BOOL)_dropFeedbackRow:(NSInteger *)row operation:(NSTableViewDropOperation *)op indent:(CGFloat *)indent;
 /* the table's own */
 - (void)_columnWidthChanged:(NSTableColumn *)column from:(CGFloat)old;
 - (void)_userResizedColumn:(NSTableColumn *)column by:(CGFloat)delta;

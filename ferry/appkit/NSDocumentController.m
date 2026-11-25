@@ -147,10 +147,20 @@ static NSArray *parse_types(void)
 - (NSArray *)documents { return [[_documents copy] autorelease]; }
 - (void)addDocument:(NSDocument *)document
 {
-    if (document && ![_documents containsObject:document])
+    if (document && ![_documents containsObject:document]) {
         [_documents addObject:document];
+        if ([document respondsToSelector:@selector(_startPresenting)])
+            [document _startPresenting];
+    }
 }
-- (void)removeDocument:(NSDocument *)document { [_documents removeObjectIdenticalTo:document]; }
+- (void)removeDocument:(NSDocument *)document
+{
+    if (document && [_documents indexOfObjectIdenticalTo:document] != NSNotFound) {
+        if ([document respondsToSelector:@selector(_stopPresenting)])
+            [document _stopPresenting];
+        [_documents removeObjectIdenticalTo:document];
+    }
+}
 - (id)documentForURL:(NSURL *)url
 {
     NSString *want = [[url path] stringByStandardizingPath];

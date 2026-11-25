@@ -1,0 +1,136 @@
+defaults: local every, other apps none, vertical motion 1
+drag row 1 to row 3's top:
+  drag begins with rows 1
+  validate: row 3 above, from the table, mask every
+  shown at 2,54 296x6
+  validate: row 3 above, from the table, mask every
+  accept: row 3 above, "beta"
+  drag ended: move
+  selected 1, clicks 0, shown after 0
+onto row 2, moved to below it:
+  drag begins with rows 0
+  validate: row 1 on, from the table, mask every
+  validate: row 2 on, from the table, mask every
+  shown at 2,54 296x6
+  validate: row 2 on, from the table, mask every
+  accept: row 3 above, "alpha"
+  drag ended: move
+onto the whole table:
+  drag begins with rows 0
+  validate: row 5 above, from the table, mask every
+  shown at 1,1 298x198
+  validate: row 5 above, from the table, mask every
+  accept: row -1 on, "alpha"
+  drag ended: move
+a click on a selected row of two:
+  pressed: 1,2
+  let go: 2
+both dragged, with Option, below the last row:
+  drag begins with rows 1,2
+  validate: row 5 above, from the table, mask copy
+  shown at 2,92 296x6
+  validate: row 5 above, from the table, mask copy
+  accept: row 5 above, "beta, gamma"
+  drag ended: copy
+  selected 1,2
+refused:
+  drag begins with rows 0
+  validate: row 3 on, from the table, mask every
+  nothing shown
+  validate: row 3 on, from the table, mask every
+  drag ended: none
+nothing the source allows:
+  drag begins with rows 0
+  validate: row 3 on, from the table, mask none
+  validate: row 3 on, from the table, mask none
+  drag ended: none
+straight down with verticalMotionCanBeginDrag off:
+  selected 1,2,3
+and sideways:
+  drag begins with rows 1,2,3
+  validate: row 1 on, from the table, mask every
+  validate: row 4 on, from the table, mask every
+  validate: row 4 on, from the table, mask every
+  accept: row 4 on, "beta, gamma, delta"
+  drag ended: move
+into the other window's table:
+  drag begins with rows 4
+  validate: row 5 above, from the table, mask every
+  validate: row 1 on, from the table, mask every
+  shown at 2,19 296x19
+  validate: row 1 on, from the table, mask every
+  accept: row 1 on, "epsilon"
+  drag ended: move
+into the other window's well, by way of its table:
+  drag begins with rows 3
+  validate: row 1 on, from the table, mask every
+  the well: entered from the table, mask every
+  the well: dropped "delta"
+  drag ended: copy
+out of every window:
+  drag begins with rows 3
+  the well: entered from the table, mask every
+  the well: exited
+  drag ended: none
+outline rows 4
+pear onto Veg:
+  drag begins with items pear
+  validate: item Veg, child -1, from the outline
+  shown at 2,57 296x19
+  validate: item Veg, child -1, from the outline
+  accept: item Veg, child -1, "pear"
+  drag ended: move
+pear before apple:
+  drag begins with items pear
+  validate: item Fruit, child 0, from the outline
+  shown at 18,16 280x6
+  validate: item Fruit, child 0, from the outline
+  accept: item Fruit, child 0, "pear"
+  drag ended: move
+pear below Fruit, which is open:
+  drag begins with items pear
+  validate: item Fruit, child 0, from the outline
+  shown at 18,16 280x6
+  validate: item Fruit, child 0, from the outline
+  accept: item Fruit, child 0, "pear"
+  drag ended: move
+apple below Veg, which is closed:
+  drag begins with items apple
+  validate: item (top), child 2, from the outline
+  shown at 2,73 296x6
+  validate: item (top), child 2, from the outline
+  accept: item (top), child 2, "apple"
+  drag ended: move
+onto Veg, moved to the end of Fruit (MacPass's way):
+  drag begins with items apple
+  validate: item Veg, child -1, from the outline
+  shown at 18,54 280x6
+  validate: item Veg, child -1, from the outline
+  accept: item Fruit, child 2, "apple"
+  drag ended: move
+onto Veg, moved between Veg's own children:
+  drag begins with items apple
+  validate: item Veg, child -1, from the outline
+  shown at 2,57 296x19
+  validate: item Veg, child -1, from the outline
+  accept: item Veg, child 0, "apple"
+  drag ended: move
+a dragging session from a view, onto the table:
+  source: begins, pasteboard has "dragged text"
+  source asked, within the app 1
+  validate: row 5 above, from Source, mask copy
+  session: sequence above 0 1, location 105,105
+  source asked, within the app 1
+  validate: row 1 on, from Source, mask copy
+  source asked, within the app 1
+  validate: row 1 on, from Source, mask copy
+  accept: row 1 on, "dragged text"
+  source: ended copy
+the older way, onto the well:
+  old source: began
+  validate: row 5 above, from OldSource, mask copy+generic
+  the well: entered from OldSource, mask copy+generic
+  the well: dropped "old text"
+  old source: ended copy
+the table's clicks: 2
+exit=0

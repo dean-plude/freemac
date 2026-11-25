@@ -24,6 +24,20 @@
  * Browse All Versions) are left out. Classes that don't autosave in place
  * are not autosaved at all.
  *
+ * As a file presenter (freemac 1.220, Ferry 0.44.0): while the document
+ * controller holds it, a document is registered with NSFileCoordinator
+ * (addDocument: to removeDocument:, which close calls), its
+ * presentedItemURL its fileURL and its queue the main queue. When a writer
+ * coordinated through NSFileCoordinator in this program changes the file
+ * and its modification date is no longer the one the document read or
+ * saved, a document with no unsaved changes reads it again
+ * (revertToContentsOfURL:ofType:error:); one with unsaved changes keeps
+ * them, and its next save writes over the other change without asking (a
+ * Mac would ask first). A move told with itemAtURL:didMoveToURL: sets its fileURL; a
+ * coordinated read asks one that autosaves in place to autosave first; a
+ * deletion leaves it as it is, with its contents. Changes made by other
+ * programs, which Ferry's NSFileCoordinator doesn't see, are not noticed.
+ *
  * Printing: each document keeps its own print info (a copy of the shared
  * one until Page Setup changes it). Print… asks the subclass for a print
  * operation (printOperationWithSettings:error:, which NSDocument itself
@@ -112,7 +126,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
     NSString *_fileType, *_displayName, *_lastPanelType;
     NSDate *_modified;
     NSUndoManager *_undo;
-    BOOL _hasUndo, _draft, _closing;
+    BOOL _hasUndo, _draft, _closing, _presenting;
     NSInteger _changes;        /* changes since the last save; 0 is clean */
     NSUInteger _untitled;      /* "Untitled n", once shown */
     NSMutableArray *_controllers;
@@ -190,6 +204,7 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
 
 - (void)dealloc
 {
+    [self _stopPresenting];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     for (NSWindowController *wc in _controllers)
         if ([wc document] == self)
@@ -1266,4 +1281,53 @@ static NSMenu *revert_to_menu(void)
     return YES;
 }
 - (BOOL)validateMenuItem:(NSMenuItem *)item { return [self validateUserInterfaceItem:item]; }
+
+/* ---- a file presenter (freemac 1.220, Ferry 0.44.0) ---- */
+
+- (void)_startPresenting
+{
+    if (_presenting)
+        return;
+    _presenting = YES;
+    [NSFileCoordinator addFilePresenter:self];
+}
+- (void)_stopPresenting
+{
+    if (!_presenting)
+        return;
+    _presenting = NO;
+    [NSFileCoordinator removeFilePresenter:self];
+}
+- (NSURL *)presentedItemURL { return [self fileURL]; }
+- (NSOperationQueue *)presentedItemOperationQueue { return [NSOperationQueue mainQueue]; }
+- (void)relinquishPresentedItemToWriter:(void (^)(void (^reacquirer)(void)))writer { writer(nil); }
+- (void)savePresentedItemChangesWithCompletionHandler:(void (^)(NSError *error))handler
+{
+    if ([[self class] autosavesInPlace] && [self hasUnautosavedChanges] && _fileURL && !_closing)
+        [self autosaveWithImplicitCancellability:NO completionHandler:handler];
+    else
+        handler(nil);
+}
+- (void)accommodatePresentedItemDeletionWithCompletionHandler:(void (^)(NSError *error))handler { handler(nil); }
+- (void)presentedItemDidMoveToURL:(NSURL *)url
+{
+    if (url && !_closing)
+        [self setFileURL:url];
+}
+- (void)presentedItemDidChange
+{
+    NSURL *url = [self fileURL];
+    if (!url || ![url isFileURL] || _closing || _autosaving)
+        return;
+    NSDate *now = [[[NSFileManager defaultManager] attributesOfItemAtPath:[url path] error:NULL]
+        fileModificationDate];
+    if (!now || (_modified && [now isEqualToDate:_modified]))
+        return;     /* gone, or its own save */
+    if ([self isDocumentEdited])
+        return;     /* the changes made here stay, and the next save writes over the file */
+    NSError *e = nil;
+    if (![self revertToContentsOfURL:url ofType:[self fileType] error:&e])
+        fprintf(stderr, "ferry: %s couldn't read its changed file again: %s\n",
+                [NSStringFromClass([self class]) UTF8String], [[e localizedDescription] UTF8String] ?: "no reason given");
+}
 @end

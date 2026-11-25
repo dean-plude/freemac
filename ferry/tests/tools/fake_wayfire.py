@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """A stand-in for Wayfire's IPC socket, with freemac's Strata loaded, for
-Ferry's hotkey and Accessibility tests (freemac 1.215, Ferry 0.41.0).
+Ferry's hotkey, Accessibility and Quartz services tests (freemac 1.215,
+Ferry 0.41.0; window list and posted keys freemac 1.220, Ferry 0.44.0).
 
-    fake_wayfire.py SOCKET LOG [--no-strata]
+    fake_wayfire.py SOCKET LOG [--no-strata] [--layout NAME]
 
 It listens on SOCKET and answers as Wayfire does (a 4-byte little-endian
 length, then JSON {"method": ..., "data": ...}), from two displays and a
@@ -13,13 +14,19 @@ few windows of its own:
   configure-view, focus-view; wm-actions/set-minimized, set-fullscreen;
   strata/view-pids; strata/hotkeys/register, unregister, clear (checked as
   Strata checks them: the app's own socket in $XDG_RUNTIME_DIR/ferry/, a
-  modifier, at most 100 each, no combination twice)
+  modifier, at most 100 each, no combination twice); strata/press-key and
+  strata/release-keys (as screen-keyboard.hpp checks them: evdev keys 1 to
+  255, tap, press or release); strata/input-source (the layouts, NAME first,
+  English (US) unless --layout says otherwise)
 
 and two calls for the test itself:
 
   fake/press {"key": EVDEV, "modifiers": [...]}  as if the user pressed it:
       the matching hotkey's datagram is sent ({"sent": true}), or nothing
   fake/log                                       {"log": [the calls that changed something]}
+  fake/layout {"name": NAME}                     the keyboard's layout is now NAME
+  fake/add-view {"id", "app-id", "title", "pid", "output", "geometry", "focus"}
+                                                 one more window, of process pid
 
 Each call that changes something is also written to LOG, one line each.
 With --no-strata, Strata's calls answer "No such method found!", as a
@@ -60,8 +67,11 @@ MODS = ("command", "option", "control", "shift")
 
 
 class Fake:
-    def __init__(self, log_path, strata):
+    def __init__(self, log_path, strata, layout="English (US)"):
         self.lock = threading.Lock()
+        self.layout = layout
+        self.pids = dict(PIDS)
+        self.held = set()
         self.log_path = log_path
         self.strata = strata
         self.log = []
@@ -121,9 +131,27 @@ class Fake:
             return {"result": "ok", "log": self.log}
         if method == "fake/press":
             return self.press(data)
+        if method == "fake/layout":
+            self.layout = str(data.get("name", ""))
+            return {"result": "ok"}
+        if method == "fake/add-view":
+            v = view(int(data["id"]), data.get("app-id", ""), data.get("title", ""), int(data.get("output", 1)),
+                     data["geometry"], int(data.get("focus", 0)))
+            self.views[v["id"]] = v
+            self.pids[v["id"]] = int(data["pid"])
+            return {"result": "ok"}
         if method.startswith("strata/") and self.strata:
             if method == "strata/view-pids":
-                return {"result": "ok", "views": [{"id": k, "pid": p} for k, p in PIDS.items()]}
+                return {"result": "ok", "views": [{"id": k, "pid": p} for k, p in self.pids.items()]}
+            if method == "strata/press-key":
+                return self.press_key(data)
+            if method == "strata/release-keys":
+                self.held.clear()
+                self.note("release-keys")
+                return {"result": "ok"}
+            if method == "strata/input-source":
+                names = [self.layout] + [n for n in ("English (US)", "German") if n != self.layout]
+                return {"result": "ok", "names": names, "index": 0}
             if method == "strata/hotkeys/register":
                 return self.register(data)
             if method == "strata/hotkeys/unregister":
@@ -176,6 +204,22 @@ class Fake:
         self.note("register %d key %d %s" % (hid, key, "+".join(m for m in MODS if m in mods) or "-"))
         return {"result": "ok", "id": hid}
 
+    def press_key(self, data):
+        key = data.get("key")
+        if not isinstance(key, int) or isinstance(key, bool):
+            return {"error": "key: an evdev key code"}
+        if not 1 <= key <= 255:
+            return {"error": "key out of range"}
+        action = data.get("action", "tap")
+        if action not in ("tap", "press", "release"):
+            action = "tap"
+        if action == "press":
+            self.held.add(key)
+        elif action == "release":
+            self.held.discard(key)
+        self.note("press-key %d %s" % (key, action))
+        return {"result": "ok"}
+
     def press(self, data):
         combo = (data.get("key"), frozenset(data.get("modifiers", [])))
         for hid, h in self.hotkeys.items():
@@ -219,7 +263,9 @@ def serve(conn, fake):
 
 def main():
     path, log_path = sys.argv[1], sys.argv[2]
-    fake = Fake(log_path, "--no-strata" not in sys.argv[3:])
+    args = sys.argv[3:]
+    layout = args[args.index("--layout") + 1] if "--layout" in args[:-1] else "English (US)"
+    fake = Fake(log_path, "--no-strata" not in args, layout)
     open(log_path, "w").close()
     try:
         os.unlink(path)

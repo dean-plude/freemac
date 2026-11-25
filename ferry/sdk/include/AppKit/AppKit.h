@@ -120,6 +120,13 @@ enum {
 @property (readonly) short subtype;
 @property (readonly) NSInteger data1, data2;
 @end
+/* Quartz events (freemac 1.220, Ferry 0.44.0, appkit/CGServices.m): an
+ * event made from one, and one made from an event, which the caller
+ * doesn't release (the NSEvent keeps it). */
+@interface NSEvent (NSEventCGEvent)
++ (NSEvent *)eventWithCGEvent:(CGEventRef)cgEvent;
+@property (readonly) CGEventRef CGEvent;
+@end
 
 /* ---- responders --------------------------------------------------------------------- */
 
@@ -1845,8 +1852,12 @@ typedef NS_OPTIONS(NSUInteger, NSPasteboardContentsOptions) { NSPasteboardConten
 @end
 
 /* ---- Drag and drop (M7) --------------------------------------------------------------
- * Views take files and text dropped on them from other apps. Dragging out
- * of a Ferry window is not done yet. */
+ * Views take files and text dropped on them from other apps. Within the
+ * app (freemac 1.220, Ferry 0.44.0), a drag begun with
+ * beginDraggingSessionWithItems:event:source: or dragImage:at:offset:...,
+ * or from a table's or outline's rows, goes to the app's own views and
+ * windows, whose draggingSource is then the source. Dragging out of the
+ * app's windows into other apps is not done yet. */
 typedef NS_OPTIONS(NSUInteger, NSDragOperation) {
     NSDragOperationNone = 0, NSDragOperationCopy = 1, NSDragOperationLink = 2, NSDragOperationGeneric = 4,
     NSDragOperationPrivate = 8, NSDragOperationMove = 16, NSDragOperationDelete = 32,
@@ -1889,6 +1900,56 @@ typedef NS_ENUM(NSInteger, NSDraggingContext) { NSDraggingContextOutsideApplicat
 @interface NSWindow (NSDragging)
 - (void)registerForDraggedTypes:(NSArray<NSPasteboardType> *)types;
 - (void)unregisterDraggedTypes;
+@end
+
+@class NSDraggingSession;
+@protocol NSDraggingSource <NSObject>
+@required
+- (NSDragOperation)draggingSession:(NSDraggingSession *)session
+    sourceOperationMaskForDraggingContext:(NSDraggingContext)context;
+@optional
+- (void)draggingSession:(NSDraggingSession *)session willBeginAtPoint:(NSPoint)screenPoint;
+- (void)draggingSession:(NSDraggingSession *)session movedToPoint:(NSPoint)screenPoint;
+- (void)draggingSession:(NSDraggingSession *)session endedAtPoint:(NSPoint)screenPoint
+              operation:(NSDragOperation)operation;
+- (BOOL)ignoreModifierKeysForDraggingSession:(NSDraggingSession *)session;
+@end
+/* What the older drag source is asked (dragImage:at:offset:...). */
+@interface NSObject (NSDraggingSourceDeprecated)
+- (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal;
+- (void)draggedImage:(NSImage *)image beganAt:(NSPoint)screenPoint;
+- (void)draggedImage:(NSImage *)image movedTo:(NSPoint)screenPoint;
+- (void)draggedImage:(NSImage *)image endedAt:(NSPoint)screenPoint operation:(NSDragOperation)operation;
+- (BOOL)ignoreModifierKeysWhileDragging;
+@end
+/* One thing dragged: what goes on the drag pasteboard, and where it is
+ * shown (no picture follows the pointer in Ferry yet). */
+@interface NSDraggingItem : NSObject
+- (instancetype)initWithPasteboardWriter:(id<NSPasteboardWriting>)writer;
+@property (readonly, strong) id item;
+@property NSRect draggingFrame;
+@property (copy) NSArray *(^imageComponentsProvider)(void);
+@property (readonly, copy) NSArray *imageComponents;
+- (void)setDraggingFrame:(NSRect)frame contents:(id)contents;
+@end
+@interface NSDraggingSession : NSObject
+@property NSDraggingFormation draggingFormation;
+@property BOOL animatesToStartingPositionsOnCancelOrFail;
+@property NSInteger draggingLeaderIndex;
+@property (readonly) NSPasteboard *draggingPasteboard;
+@property (readonly) NSInteger draggingSequenceNumber;
+@property (readonly) NSPoint draggingLocation;
+- (void)enumerateDraggingItemsWithOptions:(NSUInteger)options forView:(NSView *)view classes:(NSArray *)classes
+                            searchOptions:(NSDictionary *)searchOptions
+                               usingBlock:(void (^)(NSDraggingItem *item, NSInteger index, BOOL *stop))block;
+@end
+/* Begun from a view's mouseDown: or mouseDragged:; the drag follows the
+ * mouse until the button goes up, and the view gets no mouseUp:. */
+@interface NSView (NSDraggingSource)
+- (NSDraggingSession *)beginDraggingSessionWithItems:(NSArray<NSDraggingItem *> *)items event:(NSEvent *)event
+                                              source:(id<NSDraggingSource>)source;
+- (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
+       pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack;
 @end
 
 /* ---- Open and Save panels (M7) -------------------------------------------------------
@@ -2466,6 +2527,16 @@ APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSTableViewRowViewKey;
 - (id<NSPasteboardWriting>)tableView:(NSTableView *)tableView pasteboardWriterForRow:(NSInteger)row;
 - (BOOL)tableView:(NSTableView *)tableView writeRowsWithIndexes:(NSIndexSet *)rows
      toPasteboard:(NSPasteboard *)pasteboard;
+/* dragging rows (freemac 1.220, Ferry 0.44.0) */
+- (void)tableView:(NSTableView *)tableView draggingSession:(NSDraggingSession *)session
+    willBeginAtPoint:(NSPoint)screenPoint forRowIndexes:(NSIndexSet *)rowIndexes;
+- (void)tableView:(NSTableView *)tableView draggingSession:(NSDraggingSession *)session
+     endedAtPoint:(NSPoint)screenPoint operation:(NSDragOperation)operation;
+- (void)tableView:(NSTableView *)tableView updateDraggingItemsForDrag:(id<NSDraggingInfo>)draggingInfo;
+- (NSDragOperation)tableView:(NSTableView *)tableView validateDrop:(id<NSDraggingInfo>)info
+                 proposedRow:(NSInteger)row proposedDropOperation:(NSTableViewDropOperation)dropOperation;
+- (BOOL)tableView:(NSTableView *)tableView acceptDrop:(id<NSDraggingInfo>)info row:(NSInteger)row
+    dropOperation:(NSTableViewDropOperation)dropOperation;
 @end
 
 @protocol NSTableViewDelegate <NSControlTextEditingDelegate>
@@ -2587,6 +2658,22 @@ APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSTableViewRowViewKey;
 - (void)highlightSelectionInClipRect:(NSRect)clip;
 - (NSCell *)preparedCellAtColumn:(NSInteger)column row:(NSInteger)row;
 - (void)editColumn:(NSInteger)column row:(NSInteger)row withEvent:(NSEvent *)event select:(BOOL)select;
+/* Dragging rows (freemac 1.220, Ferry 0.44.0), as the data source allows:
+ * a drag begins once the pointer moves a few points from a row (not
+ * straight up or down unless verticalMotionCanBeginDrag), and carries the
+ * selected rows if that row is one, otherwise that row. A drop on a table
+ * that registered the pasteboard's types is proposed on a row or between
+ * rows, for the data source's validateDrop: to take or change with
+ * setDropRow:dropOperation: (row -1 and NSTableViewDropOn: the whole
+ * table), then acceptDrop:. Within the app only; Option asks to copy. */
+- (void)setDropRow:(NSInteger)row dropOperation:(NSTableViewDropOperation)dropOperation;
+- (void)setDraggingSourceOperationMask:(NSDragOperation)mask forLocal:(BOOL)isLocal;
+- (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal;
+- (BOOL)canDragRowsWithIndexes:(NSIndexSet *)rowIndexes atPoint:(NSPoint)mouseDownPoint;
+- (NSImage *)dragImageForRowsWithIndexes:(NSIndexSet *)dragRows tableColumns:(NSArray<NSTableColumn *> *)tableColumns
+                                   event:(NSEvent *)dragEvent offset:(NSPointPointer)dragImageOffset;
+@end
+@interface NSTableView (NSDraggingSource) <NSDraggingSource>
 @end
 
 /* The row of column titles above a table; click a title to sort, drag a
@@ -2659,6 +2746,17 @@ enum { NSOutlineViewDropOnItemIndex = -1 };
 - (id)outlineView:(NSOutlineView *)outlineView persistentObjectForItem:(id)item;
 - (void)outlineView:(NSOutlineView *)outlineView sortDescriptorsDidChange:(NSArray<NSSortDescriptor *> *)oldDescriptors;
 - (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outlineView pasteboardWriterForItem:(id)item;
+/* dragging items (freemac 1.220, Ferry 0.44.0) */
+- (BOOL)outlineView:(NSOutlineView *)outlineView writeItems:(NSArray *)items toPasteboard:(NSPasteboard *)pasteboard;
+- (void)outlineView:(NSOutlineView *)outlineView draggingSession:(NSDraggingSession *)session
+    willBeginAtPoint:(NSPoint)screenPoint forItems:(NSArray *)draggedItems;
+- (void)outlineView:(NSOutlineView *)outlineView draggingSession:(NSDraggingSession *)session
+       endedAtPoint:(NSPoint)screenPoint operation:(NSDragOperation)operation;
+- (void)outlineView:(NSOutlineView *)outlineView updateDraggingItemsForDrag:(id<NSDraggingInfo>)draggingInfo;
+- (NSDragOperation)outlineView:(NSOutlineView *)outlineView validateDrop:(id<NSDraggingInfo>)info
+                  proposedItem:(id)item proposedChildIndex:(NSInteger)index;
+- (BOOL)outlineView:(NSOutlineView *)outlineView acceptDrop:(id<NSDraggingInfo>)info item:(id)item
+         childIndex:(NSInteger)index;
 @end
 
 @protocol NSOutlineViewDelegate <NSControlTextEditingDelegate>
@@ -2721,6 +2819,10 @@ enum { NSOutlineViewDropOnItemIndex = -1 };
 - (void)removeItemsAtIndexes:(NSIndexSet *)indexes inParent:(id)parent
                withAnimation:(NSTableViewAnimationOptions)options;
 - (void)moveItemAtIndex:(NSInteger)fromIndex inParent:(id)oldParent toIndex:(NSInteger)toIndex inParent:(id)newParent;
+/* A drop is proposed on an item, or between items as a child index of a
+ * parent (nil: the top level); validateDrop: may change it with this
+ * (NSOutlineViewDropOnItemIndex: on the item itself). */
+- (void)setDropItem:(id)item dropChildIndex:(NSInteger)index;
 @end
 
 /* ---- pop-up buttons, segmented controls, search fields, stack views and toolbars ------ */
@@ -3701,7 +3803,10 @@ APPKIT_EXTERN NSString *const NSWorkspaceApplicationKey;
  * answers YES is autosaved autosavingDelay seconds after a change (over its
  * file, or into Autosave Information while untitled), closes without
  * asking, and gets Revert To > Last Saved Version; versions (Browse All
- * Versions) are left out. */
+ * Versions) are left out. A document the controller holds is a file
+ * presenter (freemac 1.220, Ferry 0.44.0): when another NSFileCoordinator
+ * writer in the app changes its file it reads it again if it has no
+ * unsaved changes, and when one moves it, it follows. */
 typedef NS_ENUM(NSUInteger, NSDocumentChangeType) {
     NSChangeDone = 0, NSChangeUndone = 1, NSChangeCleared = 2, NSChangeReadOtherContents = 3,
     NSChangeAutosaved = 4, NSChangeRedone = 5, NSChangeDiscardable = 256,
@@ -3712,7 +3817,7 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
 };
 #define NSAutosaveOperation NSAutosaveElsewhereOperation
 @class NSSavePanel, NSOpenPanel;
-@interface NSDocument : NSObject <NSUserInterfaceValidations, NSMenuItemValidation>
+@interface NSDocument : NSObject <NSUserInterfaceValidations, NSMenuItemValidation, NSFilePresenter>
 - (instancetype)init;
 - (instancetype)initWithType:(NSString *)type error:(NSError **)error;
 - (instancetype)initWithContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
