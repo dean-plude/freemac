@@ -1,0 +1,14 @@
+file: 0, directory 0
+folder (relative): 0, directory 1
+missing: -43, empty: -50
+path back: 0, is the folder 1
+small buffer: -50
+not a reference: -1401
+from URL: 1, same as from path: 0, different: -1420
+not a file URL: 0
+URL back: folder, directory 1
+to the trash: 0, gone 1, in the trash 1, named hosts.txt
+folder to the trash: 0, gone 1, named folder
+again: -43
+wide 11223344 55667788, back 1
+exit=0

@@ -4408,4 +4408,8 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 #import <AppKit/NSEventMonitors.h>
 
+/* ---- names the nine apps use (freemac 1.221, Ferry 0.45.0) ------------------------ */
+
+#import <AppKit/AppKitMore.h>
+
 #endif

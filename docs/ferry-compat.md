@@ -1277,6 +1277,53 @@ pasteboard's types offered across), drag images (rows aren't drawn under
 the pointer), promised files, posting mouse events, event taps, pictures
 of other apps' windows, and typing with a layout other than US English.
 
+### Building the nine apps again (freemac 1.221, Ferry 0.45.0)
+
+Every `.m` file in the nine apps' own targets, compiled with `ferry-cc
+-fsyntax-only` against Ferry's SDK (the apps' prefix headers and include
+paths as their projects set them):
+
+| App | Source files | Compiled before | Compile now |
+| --- | --- | --- | --- |
+| Flycut | 24 | 11 | 19 |
+| ShiftIt | 23 | 4 | 14 |
+| Spectacle | 31 | 18 | 23 |
+| Gas Mask | 43 | 23 | 36 |
+| MacPass | 156 | 53 | 63 |
+| MacDown | 35 | 12 | 23 |
+| Sequel Pro | 204 | 0 | 142 |
+| KeyCastr | 17 | 7 | 12 |
+| Hex Fiend | 104 | 11 | 86 |
+| All nine | 637 | 139 | 418 |
+
+What was missing, by how many apps needed it:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `TargetConditionals.h`, `Availability.h`, `AvailabilityMacros.h`, `sys/cdefs.h`, `PATH_MAX`, `MAXPATHLEN`, `u_int32_t` and the other BSD types | all nine | done |
+| `NSUnarchiver`, `NSArchiver`, `encodeValueOfObjCType:at:`, `decodeObject` | Hex Fiend, KeyCastr, Sequel Pro | done; a Mac's typedstream archives give nil with a note |
+| `Quartz/Quartz.h` (`QLPreviewPanel`, `PDFView`) | MacPass, KeyCastr, Sequel Pro | not done |
+| `NSEventTrackingRunLoopMode`, `NSModalPanelRunLoopMode` | Flycut, Hex Fiend, Sequel Pro | done; Ferry's run loop runs every source in every mode |
+| `NSKeyValueChangeKey`, `NSMappedRead`, `NSAtomicWrite`, `NSRegistrationDomain` and other older or newer names | Hex Fiend, KeyCastr, Sequel Pro, MacDown | done |
+| `initWithArray:copyItems:`, `NSSwapBigIntToHost`, `JSONObjectWithStream:options:error:` | Hex Fiend, Sequel Pro, MacDown | done |
+| `NSTextStorageDelegate`, `editedMask`, `editedRange` | Gas Mask, Sequel Pro | done |
+| `boundingRectForGlyphRange:inTextContainer:` | MacDown, Sequel Pro | done, one glyph for each character |
+| `NSScriptCommand` (in a header 19 of Sequel Pro's files include) | Sequel Pro | done; Ferry receives no Apple events, so it never makes one |
+| `CGFunctionCallbacks`, `CGShadingCreateAxial`, `CGContextDrawShading` (its tab bar) | Sequel Pro | done |
+| `TRUE`, `FALSE`, `boolean_t`, `NSSortStable`, `userCanceledErr`, `NSMenuDidEndTrackingNotification`, `NSImageNameComputer` | Flycut, Spectacle, Hex Fiend, MacPass, Sequel Pro | done |
+| `+windowFrameColor`, `NSSetFocusRingStyle`, `NSFocusRingOnly`, `cancelTracking`, `setHighlightsBy:` | Flycut, Spectacle, Hex Fiend, MacPass, Sequel Pro | done |
+| `NSLeftMouseDraggedMask`, `NSSmallControlSize` and the other older names | Flycut, Sequel Pro | done |
+| `JavaScriptCore/JavaScriptCore.h` | MacDown, Spectacle | not done |
+| `NSLayoutConstraint` | Flycut, MacPass | not done |
+| `Sparkle/SPUUpdater.h` | MacPass, Spectacle | the apps' own updater framework, not Ferry's to provide |
+| `TISCopyCurrentKeyboardInputSource`, `UCKeyTranslate`, `kVK_ANSI_A` and the other key codes | Flycut, Spectacle, KeyCastr, MacPass | done, English (US) |
+| `NSMapTable`, `NSHashTable`, `NSPointerArray` | Hex Fiend, Sequel Pro | done |
+| `FSRef`, `FSPathMakeRef`, `FSMoveObjectToTrashSync` | Hex Fiend, Gas Mask | done |
+| `endEditingFor:`, `currentEditor`, `beginModalSessionForWindow:` | Sequel Pro | done; a text field is its own field editor |
+| `NSAppearance`, `NSAppearanceNameDarkAqua` | Hex Fiend, Sequel Pro | done; Ferry draws in the light appearance only |
+| `+colorNamed:` | Gas Mask | answers nil: an app's colours are in its compiled asset catalogue, which Ferry doesn't read |
+| The accessibility constants (`NSAccessibilityRoleAttribute`, `NSAccessibilityButtonRole` and the rest), `NSRuleEditor`, `NSMatrix`, `NSColorList`, `NSURLComponents`, `NSTitlebarAccessoryViewController`, `FSEventStream…`, `CFNotificationCenter`, `NSConnection`, `NSPICTImageRep` | one app each | not done |
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1287,7 +1334,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). Next is running the apps again to see which views they still miss.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first; 418 of the 637 source files now compile, and the table under "Building the nine apps again" lists what stops the rest. Next is building what the apps bring with them (Sequel Pro's MySQL framework, MacPass's KeePassKit), linking the apps and running them.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

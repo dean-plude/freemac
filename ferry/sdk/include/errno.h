@@ -74,4 +74,5 @@ __FERRY_END
 #define ENOSYS 78
 #define EOVERFLOW 84
 #define EILSEQ 92
+#define ENOATTR 93 /* an extended attribute that isn't there (freemac 1.221, Ferry 0.45.0) */
 #endif

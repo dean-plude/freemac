@@ -253,6 +253,7 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
 
 /* Editing, for the controls that edit text (NSTextField and NSTableView). */
 - (BOOL)abortEditing { return NO; }
+- (NSText *)currentEditor { return nil; }
 - (void)validateEditing {}
 
 - (BOOL)sendAction:(SEL)action to:(id)target
@@ -1174,6 +1175,23 @@ static BOOL keeps_state(NSButtonType t)
     NSUInteger a = MIN(_caret, _anchor), b = MAX(_caret, _anchor);
     return NSMakeRange(a, b - a);
 }
+
+/* The field editor's calls (freemac 1.221, Ferry 0.45.0): a field being
+ * edited is its own editor, so currentEditor answers the field, which takes
+ * NSText's selection calls. */
+- (NSText *)currentEditor { return _editing ? (NSText *)self : nil; }
+- (NSRange)selectedRange { return _editing ? [self _selection] : NSMakeRange(NSNotFound, 0); }
+- (void)setSelectedRange:(NSRange)r
+{
+    if (!_editing)
+        return;
+    NSUInteger n = [_text length], start = MIN(r.location, n);
+    _anchor = start;
+    _caret = start + MIN(r.length, n - start);
+    [self setNeedsDisplay:YES];
+}
+- (NSString *)string { return [self stringValue]; }
+- (void)setString:(NSString *)s { [self setStringValue:s ?: @""]; }
 
 - (void)_changed
 {

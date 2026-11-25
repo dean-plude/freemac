@@ -62,6 +62,12 @@ void ferry_sync_errno(void)
     }
 }
 
+void ferry_set_mac_errno(int e)
+{
+    errno = 0;
+    mac_errno = e;
+}
+
 int *mac_error(void)
 {
     ferry_sync_errno();

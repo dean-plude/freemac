@@ -1,0 +1,16 @@
+modes: NSEventTrackingRunLoopMode, NSModalPanelRunLoopMode; timer in NSEventTrackingRunLoopMode
+version: past 10.10 1, past 11 1
+older names: 1 1 1 1 1 1 1 1 1
+modal session: first turn continues 1, modal 1, after stopping 42, after ending modal 0
+ring only: inside clear, just outside blue, far away clear
+list: bottom left red, top right blue; ring below: inside green, just outside blue; afterwards red
+colours: frame 1, menu item 1, control shadow 1, named nil
+text storage: will mask 2 range {0, 7} delta 2; did mask 2/2 range {0, 7}/{0, 7} "goodbye world"; notified yes; will mask 3 range {0, 9} delta -4; did mask 3/3 range {0, 9}/{0, 9} "bye world"; notified yes; posted 2; after none
+layout: hello wide 1, world below 1, same left 1, both covers 1, clipped {8, 3}, line {6, 5} at 1, rect finds {6, 5}
+button cell: push 6/0, switch 1/1, toggle 3/1, set 0, image 2, title Styled
+cell: menu Cell menu, text cell hit 3, button hit 5, outside 0
+field editor: before none, editing itself, selected {0, 6}, caret {6, 0}, ended yes, first responder the window 1, text Sequel, shared editor none
+menu: open 1, another menu's cancel leaves it 1, closed 1, closed Choices, chosen still Two, tracking 1/1
+small names: a1 a2 b1 b2, TRUE 1 FALSE 0, cancelled -128, NSComputer NSNetwork
+appearance: app NSAppearanceNameAqua, view NSAppearanceNameAqua, under a dark view NSAppearanceNameDarkAqua, the window still NSAppearanceNameAqua, best match NSAppearanceNameDarkAqua, unknown nil, current NSAppearanceNameAqua
+exit=0

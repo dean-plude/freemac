@@ -980,7 +980,7 @@ Boolean CFURLCopyResourcePropertyForKey(CFURLRef u, CFStringRef key, void *value
         *(CFTypeRef *)valuePtr = value ? CFRetain(value) : NULL;
     return true;
 }
-Boolean CFURLGetFSRef(CFURLRef u, struct FSRef *fsRef) { return false; }
+/* CFURLGetFSRef is in FSRefs.m (freemac 1.221, Ferry 0.45.0). */
 
 /* ---- bundles ----------------------------------------------------------------------------- */
 

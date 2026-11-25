@@ -524,7 +524,12 @@ static void paint_with_shadow(GContext *c, cairo_pattern_t *shape, const struct 
         cairo_pattern_destroy(mp);
         cairo_surface_destroy(mask);
     }
-    if (!c->shadowOnly) {
+    if (s->shadowOnly) {
+        /* a focus ring: the shadow outside the shape, none under it */
+        cairo_set_operator(cr, CAIRO_OPERATOR_DEST_OUT);
+        cairo_set_source(cr, shape);
+        cairo_paint(cr);
+    } else if (!c->shadowOnly) {
         cairo_set_source(cr, shape);
         cairo_paint_with_alpha(cr, alpha);
     }
@@ -532,9 +537,11 @@ static void paint_with_shadow(GContext *c, cairo_pattern_t *shape, const struct 
     cairo_paint(cr);
 }
 
+void GContextSetShadowOnly(CGContextRef c, BOOL only) { GSTATE(CTX)->shadowOnly = only; }
+
 BOOL GContextBeginShadow(GContext *c)
 {
-    if (GSTATE(c)->shadowColor[3] <= 0 && !c->shadowOnly)
+    if (GSTATE(c)->shadowColor[3] <= 0 && !c->shadowOnly && !GSTATE(c)->shadowOnly)
         return NO;
     /* the path is carried into the group by hand, in user space */
     cairo_path_t *path = cairo_copy_path(c->cr);
@@ -556,7 +563,7 @@ void GContextEndShadow(GContext *c, BOOL began)
     cairo_pattern_t *shape = cairo_pop_group(c->cr);
     if (GSTATE(c)->shadowColor[3] > 0)
         paint_with_shadow(c, shape, GSTATE(c), 1);
-    else if (!c->shadowOnly) {
+    else if (!c->shadowOnly && !GSTATE(c)->shadowOnly) {
         cairo_set_source(c->cr, shape);
         cairo_paint(c->cr);
     }

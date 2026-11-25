@@ -21,8 +21,13 @@ enum {
 };
 enum { gestaltUndefSelectorErr = -5551 };
 /* The Carbon-era result codes Launch Services answers with (MacErrors.h). */
-enum { noErr = 0, fnfErr = -43, paramErr = -50, memFullErr = -108 };
+enum { noErr = 0, fnfErr = -43, paramErr = -50, memFullErr = -108, userCanceledErr = -128 };
 OSErr Gestalt(OSType selector, SInt32 *response);
 __FERRY_END
 #include <CoreServices/LSSharedFileList.h>
+/* File references and the trash (freemac 1.221, Ferry 0.45.0). */
+#include <CoreServices/Files.h>
+/* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
+ * and Cocoa programs rely on it. */
+#include <unistd.h>
 #endif

@@ -32,6 +32,62 @@
 #define NS_RETURNS_INNER_POINTER __attribute__((objc_returns_inner_pointer))
 #define FOUNDATION_EXPORT extern
 #define FOUNDATION_EXTERN extern
+/* The other markers Foundation's headers use, which programs use too
+ * (freemac 1.221, Ferry 0.45.0). Availability marks nothing here. */
+#define NS_INLINE static __inline__ __attribute__((always_inline))
+#define FOUNDATION_STATIC_INLINE static __inline__
+#define FOUNDATION_EXTERN_INLINE extern __inline__
+#define NS_AVAILABLE(mac, ios)
+#define NS_AVAILABLE_MAC(mac)
+#define NS_AVAILABLE_IOS(ios)
+#define NS_DEPRECATED(macIntro, macDep, iosIntro, iosDep, ...)
+#define NS_DEPRECATED_MAC(macIntro, macDep, ...)
+#define NS_DEPRECATED_IOS(iosIntro, iosDep, ...)
+#define NS_DEPRECATED_WITH_REPLACEMENT_MAC(r, macIntro, macDep)
+#define NS_CLASS_AVAILABLE(mac, ios)
+#define NS_CLASS_AVAILABLE_MAC(mac)
+#define NS_CLASS_AVAILABLE_IOS(ios)
+#define NS_CLASS_DEPRECATED(macIntro, macDep, iosIntro, iosDep, ...)
+#define NS_CLASS_DEPRECATED_MAC(macIntro, macDep, ...)
+#define NS_CLASS_DEPRECATED_IOS(iosIntro, iosDep, ...)
+#define NS_ENUM_AVAILABLE(mac, ios)
+#define NS_ENUM_AVAILABLE_MAC(mac)
+#define NS_ENUM_AVAILABLE_IOS(ios)
+#define NS_ENUM_DEPRECATED(macIntro, macDep, iosIntro, iosDep, ...)
+#define NS_ENUM_DEPRECATED_MAC(macIntro, macDep, ...)
+#define NS_ENUM_DEPRECATED_IOS(iosIntro, iosDep, ...)
+#define NS_UNAVAILABLE_MAC
+#define NS_EXTENSION_UNAVAILABLE(msg)
+#define NS_EXTENSION_UNAVAILABLE_MAC(msg)
+#define NS_EXTENSION_UNAVAILABLE_IOS(msg)
+#define NS_AUTOMATED_REFCOUNT_UNAVAILABLE OBJC_ARC_UNAVAILABLE
+#define NS_AUTOMATED_REFCOUNT_WEAK_UNAVAILABLE
+#define NS_REQUIRES_PROPERTY_DEFINITIONS __attribute__((objc_requires_property_definitions))
+#define NS_REFINED_FOR_SWIFT
+#define NS_SWIFT_UNAVAILABLE(msg)
+#define NS_SWIFT_NOTHROW
+#define NS_SWIFT_SENDABLE
+#define NS_SWIFT_NONSENDABLE
+#define NS_SWIFT_UI_ACTOR
+#define NS_SWIFT_ASYNC(i)
+#define NS_SWIFT_ASYNC_NAME(n)
+#define NS_REFINED_FOR_SWIFT_ASYNC(i)
+#define NS_HEADER_AUDIT_BEGIN(...) NS_ASSUME_NONNULL_BEGIN
+#define NS_HEADER_AUDIT_END(...) NS_ASSUME_NONNULL_END
+#define NS_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#define NS_NONATOMIC_IOSONLY atomic
+#define NS_STRING_ENUM
+#define NS_EXTENSIBLE_STRING_ENUM
+#define NS_TYPED_ENUM
+#define NS_TYPED_EXTENSIBLE_ENUM
+#define NS_CLOSED_ENUM(type, name) NS_ENUM(type, name)
+#define NS_ERROR_ENUM(type, name) NS_ENUM(NSInteger, name)
+#define NS_NOESCAPE_IF(x)
+#define NS_RETURNS_INNER_POINTER_IF(x)
+#define NS_OBJECT_ROOT_CLASS __attribute__((objc_root_class))
+#define NS_FORMAT_ARGUMENT(A) __attribute__((format_arg(A)))
+#define NS_DIRECT __attribute__((objc_direct))
+#define NS_DIRECT_MEMBERS __attribute__((objc_direct_members))
 #define NSNotFound ((NSInteger)__LONG_MAX__)
 
 typedef double NSTimeInterval;
@@ -144,12 +200,16 @@ typedef NS_OPTIONS(NSUInteger, NSStringCompareOptions) {
     NSBackwardsSearch = 4,
     NSAnchoredSearch = 8,
     NSNumericSearch = 64,
+    NSDiacriticInsensitiveSearch = 128, /* freemac 1.221, Ferry 0.45.0: accents on Latin letters */
+    NSWidthInsensitiveSearch = 256,     /* full-width forms are the same as ASCII */
+    NSForcedOrderingSearch = 512,
     NSRegularExpressionSearch = 1024,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
     NSEnumerationConcurrent = 1, NSEnumerationReverse = 2
 };
+typedef NS_OPTIONS(NSUInteger, NSSortOptions) { NSSortConcurrent = 1 << 0, NSSortStable = 1 << 4 };
 
 @class NSString, NSData, NSURL, NSError, NSDate, NSNumber, NSCharacterSet;
 @class NSArray<ObjectType>, NSDictionary<KeyType, ObjectType>, NSEnumerator<ObjectType>;
@@ -246,11 +306,12 @@ typedef NS_ENUM(NSUInteger, NSKeyValueSetMutationKind) {
     NSKeyValueUnionSetMutation = 1, NSKeyValueMinusSetMutation = 2, NSKeyValueIntersectSetMutation = 3,
     NSKeyValueSetSetMutation = 4,
 };
-FOUNDATION_EXPORT NSString *const NSKeyValueChangeKindKey;
-FOUNDATION_EXPORT NSString *const NSKeyValueChangeNewKey;
-FOUNDATION_EXPORT NSString *const NSKeyValueChangeOldKey;
-FOUNDATION_EXPORT NSString *const NSKeyValueChangeIndexesKey;
-FOUNDATION_EXPORT NSString *const NSKeyValueChangeNotificationIsPriorKey;
+typedef NSString *NSKeyValueChangeKey;
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeKindKey;
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNewKey;
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeOldKey;
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeIndexesKey;
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorKey;
 @interface NSObject (NSKeyValueObserverRegistration)
 - (void)addObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath
             options:(NSKeyValueObservingOptions)options context:(void *)context;
@@ -536,6 +597,7 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 - (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
 - (instancetype)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype)initWithArray:(NSArray<ObjectType> *)array copyItems:(BOOL)flag;
 - (ObjectType)objectAtIndexedSubscript:(NSUInteger)index;
 - (void)getObjects:(ObjectType __unsafe_unretained[])objects range:(NSRange)range;
 @property (readonly) ObjectType firstObject;
@@ -551,6 +613,9 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (NSString *)componentsJoinedByString:(NSString *)separator;
 - (NSArray<ObjectType> *)sortedArrayUsingSelector:(SEL)comparator;
 - (NSArray<ObjectType> *)sortedArrayUsingComparator:(NSComparator)cmptr;
+/* Ferry's sorts are always stable and run on the calling thread, so the
+ * options change nothing (freemac 1.221, Ferry 0.45.0) */
+- (NSArray<ObjectType> *)sortedArrayWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr;
 - (NSArray<ObjectType> *)sortedArrayUsingFunction:(NSInteger (*)(ObjectType, ObjectType, void *))fn context:(void *)ctx;
 - (NSArray<ObjectType> *)filteredArrayUsingBlock:(BOOL (^)(ObjectType obj))predicate;
 - (void)makeObjectsPerformSelector:(SEL)sel;
@@ -582,6 +647,7 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (void)exchangeObjectAtIndex:(NSUInteger)a withObjectAtIndex:(NSUInteger)b;
 - (void)sortUsingSelector:(SEL)comparator;
 - (void)sortUsingComparator:(NSComparator)cmptr;
+- (void)sortWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr;
 @end
 
 @interface NSDictionary<__covariant KeyType, __covariant ObjectType> : NSObject <NSCopying, NSMutableCopying, NSFastEnumeration, NSSecureCoding>
@@ -602,6 +668,7 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (instancetype)initWithObjects:(const ObjectType[])objects forKeys:(const KeyType<NSCopying>[])keys
                           count:(NSUInteger)count;
 - (instancetype)initWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict;
+- (instancetype)initWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict copyItems:(BOOL)flag;
 - (instancetype)initWithObjectsAndKeys:(id)first, ... NS_REQUIRES_NIL_TERMINATION;
 - (ObjectType)objectForKeyedSubscript:(KeyType)key;
 - (ObjectType)valueForKey:(NSString *)key;
@@ -637,6 +704,7 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 + (instancetype)setWithArray:(NSArray<ObjectType> *)array;
 + (instancetype)setWithSet:(NSSet<ObjectType> *)set;
 - (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
+- (instancetype)initWithSet:(NSSet<ObjectType> *)set copyItems:(BOOL)flag;
 - (BOOL)containsObject:(ObjectType)obj;
 - (ObjectType)member:(ObjectType)obj;
 - (ObjectType)anyObject;
@@ -794,9 +862,113 @@ typedef NS_ENUM(NSUInteger, NSCompoundPredicateType) {
 - (void)filterUsingPredicate:(NSPredicate *)predicate;
 @end
 
+/* ---- NSMapTable, NSHashTable, NSPointerArray (freemac 1.221, Ferry 0.45.0) ---------
+ * Collections that may hold their objects weakly, compare them by address,
+ * or hold pointers that aren't objects. A weak entry goes when its object
+ * does. Of the memory options, strong, weak (and the old zeroing weak) and
+ * opaque are taken; of the personalities, object, object pointer, opaque,
+ * integer and C string. */
+typedef NS_OPTIONS(NSUInteger, NSPointerFunctionsOptions) {
+    NSPointerFunctionsStrongMemory = 0, NSPointerFunctionsZeroingWeakMemory = 1,
+    NSPointerFunctionsOpaqueMemory = 2, NSPointerFunctionsMallocMemory = 3,
+    NSPointerFunctionsMachVirtualMemory = 4, NSPointerFunctionsWeakMemory = 5,
+    NSPointerFunctionsObjectPersonality = 0 << 8, NSPointerFunctionsOpaquePersonality = 1 << 8,
+    NSPointerFunctionsObjectPointerPersonality = 2 << 8, NSPointerFunctionsCStringPersonality = 3 << 8,
+    NSPointerFunctionsStructPersonality = 4 << 8, NSPointerFunctionsIntegerPersonality = 5 << 8,
+    NSPointerFunctionsCopyIn = 1 << 16,
+};
+typedef NSUInteger NSMapTableOptions;
+enum {
+    NSMapTableStrongMemory = NSPointerFunctionsStrongMemory,
+    NSMapTableZeroingWeakMemory = NSPointerFunctionsZeroingWeakMemory,
+    NSMapTableCopyIn = NSPointerFunctionsCopyIn,
+    NSMapTableObjectPointerPersonality = NSPointerFunctionsObjectPointerPersonality,
+    NSMapTableWeakMemory = NSPointerFunctionsWeakMemory,
+};
+typedef NSUInteger NSHashTableOptions;
+enum {
+    NSHashTableStrongMemory = NSPointerFunctionsStrongMemory,
+    NSHashTableZeroingWeakMemory = NSPointerFunctionsZeroingWeakMemory,
+    NSHashTableCopyIn = NSPointerFunctionsCopyIn,
+    NSHashTableObjectPointerPersonality = NSPointerFunctionsObjectPointerPersonality,
+    NSHashTableWeakMemory = NSPointerFunctionsWeakMemory,
+};
+
+@interface NSMapTable<KeyType, ObjectType> : NSObject <NSCopying, NSFastEnumeration>
+- (instancetype)initWithKeyOptions:(NSPointerFunctionsOptions)keyOptions
+                      valueOptions:(NSPointerFunctionsOptions)valueOptions
+                          capacity:(NSUInteger)initialCapacity;
++ (NSMapTable<KeyType, ObjectType> *)mapTableWithKeyOptions:(NSPointerFunctionsOptions)keyOptions
+                                               valueOptions:(NSPointerFunctionsOptions)valueOptions;
++ (NSMapTable<KeyType, ObjectType> *)strongToStrongObjectsMapTable;
++ (NSMapTable<KeyType, ObjectType> *)weakToStrongObjectsMapTable;
++ (NSMapTable<KeyType, ObjectType> *)strongToWeakObjectsMapTable;
++ (NSMapTable<KeyType, ObjectType> *)weakToWeakObjectsMapTable;
++ (id)mapTableWithStrongToStrongObjects;
++ (id)mapTableWithWeakToStrongObjects;
++ (id)mapTableWithStrongToWeakObjects;
++ (id)mapTableWithWeakToWeakObjects;
+- (ObjectType)objectForKey:(KeyType)aKey;
+- (void)removeObjectForKey:(KeyType)aKey;
+- (void)setObject:(ObjectType)anObject forKey:(KeyType)aKey;
+@property (readonly) NSUInteger count;
+- (NSEnumerator<KeyType> *)keyEnumerator;
+- (NSEnumerator<ObjectType> *)objectEnumerator;
+- (void)removeAllObjects;
+- (NSDictionary<KeyType, ObjectType> *)dictionaryRepresentation;
+@end
+
+@interface NSHashTable<ObjectType> : NSObject <NSCopying, NSFastEnumeration>
+- (instancetype)initWithOptions:(NSPointerFunctionsOptions)options capacity:(NSUInteger)initialCapacity;
++ (NSHashTable<ObjectType> *)hashTableWithOptions:(NSPointerFunctionsOptions)options;
++ (NSHashTable<ObjectType> *)weakObjectsHashTable;
++ (id)hashTableWithWeakObjects;
+@property (readonly) NSUInteger count;
+- (ObjectType)member:(ObjectType)object;
+- (BOOL)containsObject:(ObjectType)anObject;
+- (void)addObject:(ObjectType)object;
+- (void)removeObject:(ObjectType)object;
+- (void)removeAllObjects;
+@property (readonly, copy) NSArray<ObjectType> *allObjects;
+@property (readonly) ObjectType anyObject;
+- (NSEnumerator<ObjectType> *)objectEnumerator;
+@property (readonly, copy) NSSet<ObjectType> *setRepresentation;
+- (BOOL)intersectsHashTable:(NSHashTable<ObjectType> *)other;
+- (BOOL)isSubsetOfHashTable:(NSHashTable<ObjectType> *)other;
+- (BOOL)isEqualToHashTable:(NSHashTable<ObjectType> *)other;
+- (void)unionHashTable:(NSHashTable<ObjectType> *)other;
+- (void)minusHashTable:(NSHashTable<ObjectType> *)other;
+- (void)intersectHashTable:(NSHashTable<ObjectType> *)other;
+@end
+
+@interface NSPointerArray : NSObject <NSCopying, NSFastEnumeration>
+- (instancetype)initWithOptions:(NSPointerFunctionsOptions)options;
++ (NSPointerArray *)pointerArrayWithOptions:(NSPointerFunctionsOptions)options;
++ (NSPointerArray *)strongObjectsPointerArray;
++ (NSPointerArray *)weakObjectsPointerArray;
++ (id)pointerArrayWithStrongObjects;
++ (id)pointerArrayWithWeakObjects;
+- (void *)pointerAtIndex:(NSUInteger)index;
+- (void)addPointer:(void *)pointer;
+- (void)removePointerAtIndex:(NSUInteger)index;
+- (void)insertPointer:(void *)item atIndex:(NSUInteger)index;
+- (void)replacePointerAtIndex:(NSUInteger)index withPointer:(void *)item;
+- (void)compact;
+@property NSUInteger count;
+@property (readonly, copy) NSArray *allObjects;
+@end
+
 /* ---- NSData ------------------------------------------------------------------------- */
 
-typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1 };
+typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1, NSDataWritingWithoutOverwriting = 2 };
+/* How to read a file (mapping is only a hint, and Ferry reads the file in),
+ * with the older names (freemac 1.221, Ferry 0.45.0). */
+typedef NS_OPTIONS(NSUInteger, NSDataReadingOptions) {
+    NSDataReadingMappedIfSafe = 1, NSDataReadingUncached = 2, NSDataReadingMappedAlways = 8,
+    NSDataReadingMapped = NSDataReadingMappedIfSafe, NSMappedRead = NSDataReadingMapped,
+    NSUncachedRead = NSDataReadingUncached,
+};
+enum { NSAtomicWrite = NSDataWritingAtomic };
 
 @interface NSData : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 @property (readonly) NSUInteger length;
@@ -1602,6 +1774,17 @@ typedef struct {
 - (Class)classNamed:(NSString *)className;
 @end
 #define NSLocalizedString(key, comment) [[NSBundle mainBundle] localizedStringForKey:(key) value:@"" table:nil]
+#define NSLocalizedStringFromTable(key, tbl, comment) \
+    [[NSBundle mainBundle] localizedStringForKey:(key) value:@"" table:(tbl)]
+#define NSLocalizedStringFromTableInBundle(key, tbl, bundle, comment) \
+    [(bundle) localizedStringForKey:(key) value:@"" table:(tbl)]
+#define NSLocalizedStringWithDefaultValue(key, tbl, bundle, val, comment) \
+    [(bundle) localizedStringForKey:(key) value:(val) table:(tbl)]
+
+/* The domains the defaults are looked up in (freemac 1.221, Ferry 0.45.0). */
+FOUNDATION_EXPORT NSString *const NSGlobalDomain;
+FOUNDATION_EXPORT NSString *const NSArgumentDomain;
+FOUNDATION_EXPORT NSString *const NSRegistrationDomain;
 
 @interface NSUserDefaults : NSObject
 + (NSUserDefaults *)standardUserDefaults;
@@ -1615,6 +1798,10 @@ typedef struct {
 - (NSArray<NSString *> *)stringArrayForKey:(NSString *)key;
 - (NSDictionary<NSString *, id> *)persistentDomainForName:(NSString *)name;
 - (void)removePersistentDomainForName:(NSString *)name;
+- (NSDictionary<NSString *, id> *)volatileDomainForName:(NSString *)domainName;
+- (void)setVolatileDomain:(NSDictionary<NSString *, id> *)domain forName:(NSString *)domainName;
+- (void)removeVolatileDomainForName:(NSString *)domainName;
+@property (readonly, copy) NSArray<NSString *> *volatileDomainNames;
 - (NSDictionary<NSString *, id> *)dictionaryForKey:(NSString *)key;
 - (NSData *)dataForKey:(NSString *)key;
 - (NSInteger)integerForKey:(NSString *)key;
@@ -1666,8 +1853,27 @@ typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
     NSDirectoryEnumerationSkipsHiddenFiles = 4,
 };
 
+/* What a file manager asks its delegate before it copies, moves or
+ * removes an item (freemac 1.221, Ferry 0.45.0): once for the item it was
+ * given, not for each file inside a folder. */
+@class NSFileManager;
+@protocol NSFileManagerDelegate <NSObject>
+@optional
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldCopyItemAtPath:(NSString *)srcPath toPath:(NSString *)dstPath;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldCopyItemAtURL:(NSURL *)srcURL toURL:(NSURL *)dstURL;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldMoveItemAtPath:(NSString *)srcPath toPath:(NSString *)dstPath;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldMoveItemAtURL:(NSURL *)srcURL toURL:(NSURL *)dstURL;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldRemoveItemAtPath:(NSString *)path;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldRemoveItemAtURL:(NSURL *)URL;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldProceedAfterError:(NSError *)error
+     copyingItemAtPath:(NSString *)srcPath toPath:(NSString *)dstPath;
+- (BOOL)fileManager:(NSFileManager *)fileManager shouldProceedAfterError:(NSError *)error
+     removingItemAtPath:(NSString *)path;
+@end
+
 @interface NSFileManager : NSObject
 + (NSFileManager *)defaultManager;
+@property (assign) id<NSFileManagerDelegate> delegate;
 @property (readonly, copy) NSString *currentDirectoryPath;
 @property (readonly, copy) NSURL *homeDirectoryForCurrentUser;
 @property (readonly, copy) NSURL *temporaryDirectory;
@@ -1836,10 +2042,15 @@ typedef NS_OPTIONS(NSUInteger, NSJSONWritingOptions) {
     NSJSONWritingFragmentsAllowed = 1 << 2,
     NSJSONWritingWithoutEscapingSlashes = 1 << 3,
 };
+@class NSInputStream, NSOutputStream;
 @interface NSJSONSerialization : NSObject
 + (BOOL)isValidJSONObject:(id)obj;
 + (NSData *)dataWithJSONObject:(id)obj options:(NSJSONWritingOptions)opt error:(NSError **)error;
 + (id)JSONObjectWithData:(NSData *)data options:(NSJSONReadingOptions)opt error:(NSError **)error;
+/* Through a stream (freemac 1.221, Ferry 0.45.0): read to its end, or written whole. */
++ (id)JSONObjectWithStream:(NSInputStream *)stream options:(NSJSONReadingOptions)opt error:(NSError **)error;
++ (NSInteger)writeJSONObject:(id)obj toStream:(NSOutputStream *)stream options:(NSJSONWritingOptions)opt
+                       error:(NSError **)error;
 @end
 
 /* ---- archiving (NSCoder, NSKeyedArchiver, NSKeyedUnarchiver) --------------------- */
@@ -1879,8 +2090,65 @@ typedef NS_OPTIONS(NSUInteger, NSJSONWritingOptions) {
 - (NSRect)decodeRectForKey:(NSString *)key;
 - (void)failWithError:(NSError *)error;
 @property (readonly, copy) NSError *error;
+/* Coding without keys, in order (freemac 1.221, Ferry 0.45.0): what
+ * NSArchiver and NSUnarchiver take, and keyed archivers too, which give
+ * each value a key of its own ("$0", "$1"...). */
+- (void)encodeValueOfObjCType:(const char *)type at:(const void *)addr;
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data size:(NSUInteger)size;
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data;
+- (void)encodeValuesOfObjCTypes:(const char *)types, ...;
+- (void)decodeValuesOfObjCTypes:(const char *)types, ...;
+- (void)encodeArrayOfObjCType:(const char *)type count:(NSUInteger)count at:(const void *)array;
+- (void)decodeArrayOfObjCType:(const char *)type count:(NSUInteger)count at:(void *)array;
+- (void)encodeObject:(id)object;
+- (void)encodeRootObject:(id)rootObject;
+- (void)encodeBycopyObject:(id)anObject;
+- (void)encodeByrefObject:(id)anObject;
+- (void)encodeConditionalObject:(id)object;
+- (id)decodeObject;
+- (void)encodeDataObject:(NSData *)data;
+- (NSData *)decodeDataObject;
+- (void)encodeBytes:(const void *)byteaddr length:(NSUInteger)length;
+- (void *)decodeBytesWithReturnedLength:(NSUInteger *)lengthp;
+- (void)encodePropertyList:(id)aPropertyList;
+- (id)decodePropertyList;
+- (void)encodePoint:(NSPoint)point;
+- (NSPoint)decodePoint;
+- (void)encodeSize:(NSSize)size;
+- (NSSize)decodeSize;
+- (void)encodeRect:(NSRect)rect;
+- (NSRect)decodeRect;
+- (NSInteger)versionForClassName:(NSString *)className;
+@property (readonly) unsigned systemVersion;
 @end
 
+/* The sequential archivers (freemac 1.221, Ferry 0.45.0). Ferry writes
+ * their archives in a form of its own, a property list like a keyed
+ * archive's, which this NSUnarchiver reads back; an archive written by a
+ * Mac's NSArchiver isn't read (unarchiveObjectWithData: gives nil). */
+@interface NSArchiver : NSCoder
++ (NSData *)archivedDataWithRootObject:(id)rootObject;
++ (BOOL)archiveRootObject:(id)rootObject toFile:(NSString *)path;
+- (instancetype)initForWritingWithMutableData:(NSMutableData *)mdata;
+@property (readonly, retain) NSMutableData *archiverData;
++ (void)encodeClassName:(NSString *)trueName intoClassName:(NSString *)inArchiveName;
++ (NSString *)classNameEncodedForTrueClassName:(NSString *)trueName;
+- (void)encodeClassName:(NSString *)trueName intoClassName:(NSString *)inArchiveName;
+- (NSString *)classNameEncodedForTrueClassName:(NSString *)trueName;
+@end
+
+@interface NSUnarchiver : NSCoder
++ (id)unarchiveObjectWithData:(NSData *)data;
++ (id)unarchiveObjectWithFile:(NSString *)path;
+- (instancetype)initForReadingWithData:(NSData *)data;
+@property (readonly, getter=isAtEnd) BOOL atEnd;
++ (void)decodeClassName:(NSString *)inArchiveName asClassName:(NSString *)trueName;
++ (NSString *)classNameDecodedForArchiveClassName:(NSString *)inArchiveName;
+- (void)decodeClassName:(NSString *)inArchiveName asClassName:(NSString *)trueName;
+- (NSString *)classNameDecodedForArchiveClassName:(NSString *)inArchiveName;
+@end
+
+FOUNDATION_EXPORT NSString *const NSInconsistentArchiveException;
 FOUNDATION_EXPORT NSString *const NSKeyedArchiveRootObjectKey;
 FOUNDATION_EXPORT NSString *const NSInvalidArchiveOperationException;
 FOUNDATION_EXPORT NSString *const NSInvalidUnarchiveOperationException;
@@ -1925,6 +2193,10 @@ typedef NS_ENUM(NSInteger, NSDecodingFailurePolicy) {
 @interface NSObject (NSArchiving)
 @property (readonly) Class classForCoder;
 @property (readonly) Class classForKeyedArchiver;
+@property (readonly) Class classForArchiver;
+- (id)replacementObjectForArchiver:(NSArchiver *)archiver;
++ (NSInteger)version;
++ (void)setVersion:(NSInteger)aVersion;
 - (id)replacementObjectForCoder:(NSCoder *)coder;
 - (id)replacementObjectForKeyedArchiver:(NSKeyedArchiver *)archiver;
 - (id)awakeAfterUsingCoder:(NSCoder *)coder;
@@ -1997,6 +2269,15 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 - (NSDate *)limitDateForMode:(NSRunLoopMode)mode;
 - (void)acceptInputForMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limit;
 - (CFRunLoopRef)getCFRunLoop;
+@end
+@interface NSRunLoop (NSOrderedPerform)
+/* Messages sent at the start of the run loop's next turn, lowest order
+ * first (freemac 1.221, Ferry 0.45.0). Ferry's run loop has one mode for
+ * these, so the modes aren't looked at. */
+- (void)performSelector:(SEL)aSelector target:(id)target argument:(id)arg order:(NSUInteger)order
+                  modes:(NSArray<NSRunLoopMode> *)modes;
+- (void)cancelPerformSelector:(SEL)aSelector target:(id)target argument:(id)arg;
+- (void)cancelPerformSelectorsWithTarget:(id)target;
 @end
 
 /* A port only keeps a run loop running here (as a Mac program adds one to
@@ -2339,5 +2620,6 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSFileCoordinator.h>
 /* Affine transforms (freemac 1.219, Ferry 0.43.0). */
 #include <Foundation/NSAffineTransform.h>
+#include <Foundation/NSByteOrder.h>
 
 #endif

@@ -1,0 +1,22 @@
+mac 1, iphone 0, x86_64 1, little endian 1
+min required >= 10.13 1, max allowed >= 14.0 1, 10.15 is 101500
+bsd types 7 200 -5, PATH_MAX 1024, MAXPATHLEN 1024, NAME_MAX 255, howmany 3
+inttypes -1234567890123 beef 255 42
+strtoimax -77
+bitstring: 3 1, 4 0, 17 1, first 3
+good sizes 16 32 1008 5120
+malloc_size >= 40 1
+zone test zone, calloc zeroed 1, default zone yes
+basename lib, dirname /usr/local, path still /usr/local/lib/
+basename_r b.txt, dirname_r a, of "" . and .
+scandir 3: a.txt b.txt c.txt
+xattr: set, get 4 "blue", size 4
+xattr list: org.example.colour
+xattr missing: -1, ENOATTR 1 (errno 93)
+xattr at a position: -1, EINVAL 1
+xattr remove 0, then list 0
+fxattr: set 0, get 1
+zlib 0 0, smaller 1, same 1, crc32 352441c2, version 1
+mach-o: magic ok 1, executable 1, x86_64 1
+long double: sqrt 1.414214, pow 1024.0, log2 10.0, floor -5.0, fabs 9.0
+exit=0

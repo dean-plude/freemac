@@ -635,4 +635,45 @@ static BOOL is_container(id v) { return [v isKindOfClass:[NSArray class]] || [v 
     }
     return v;
 }
+
+/* Streams (freemac 1.221, Ferry 0.45.0): the input is read to its end
+ * (opened first if it isn't open), the output written whole. */
++ (id)JSONObjectWithStream:(NSInputStream *)stream options:(NSJSONReadingOptions)opt error:(NSError **)error
+{
+    if (!stream)
+        FRaise(NSInvalidArgumentException, @"+[NSJSONSerialization JSONObjectWithStream:options:error:]: stream is nil");
+    if ([stream streamStatus] == NSStreamStatusNotOpen)
+        [stream open];
+    NSMutableData *data = [NSMutableData data];
+    uint8_t buf[4096];
+    NSInteger n;
+    while ((n = [stream read:buf maxLength:sizeof buf]) > 0)
+        [data appendBytes:buf length:(NSUInteger)n];
+    if (n < 0) {
+        FSetError(error, [stream streamError]);
+        return nil;
+    }
+    return [self JSONObjectWithData:data options:opt error:error];
+}
++ (NSInteger)writeJSONObject:(id)obj toStream:(NSOutputStream *)stream options:(NSJSONWritingOptions)opt
+                       error:(NSError **)error
+{
+    NSData *data = [self dataWithJSONObject:obj options:opt error:error];
+    if (!data)
+        return 0;
+    if ([stream streamStatus] == NSStreamStatusNotOpen)
+        [stream open];
+    const uint8_t *p = [data bytes];
+    NSUInteger left = [data length], done = 0;
+    while (left) {
+        NSInteger n = [stream write:p + done maxLength:left];
+        if (n <= 0) {
+            FSetError(error, [stream streamError]);
+            return 0;
+        }
+        done += (NSUInteger)n;
+        left -= (NSUInteger)n;
+    }
+    return (NSInteger)done;
+}
 @end

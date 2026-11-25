@@ -300,6 +300,34 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
 /* comparing */
 static unichar fold(unichar c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
 
+/* The base letters of the accented Latin letters of U+00C0 to U+017F, for
+ * NSDiacriticInsensitiveSearch (freemac 1.221, Ferry 0.45.0); 0 where a
+ * letter has no one-letter base. */
+static const char latin_base[] =
+    "AAAAAAACEEEEIIII" "DNOOOOO\0OUUUUYTs" "aaaaaaaceeeeiiii" "dnooooo\0ouuuuyty"
+    "AaAaAaCcCcCcCcDd" "DdEeEeEeEeEeGgGg" "GgGgHhHhIiIiIiIi" "IiJjJjKkkLlLlLlL"
+    "lLlNnNnNnnNnOoOo" "OoOoRrRrRrSsSsSs" "SsTtTtTtUuUuUuUu" "UuUuWwYyYZzZzZzs";
+
+/* A character as the options compare it: with case folded (ASCII and
+ * Latin-1), accents taken off Latin letters, and full-width forms as ASCII. */
+static unichar fold_with(unichar c, NSStringCompareOptions mask)
+{
+    if ((mask & NSWidthInsensitiveSearch) && c >= 0xFF01 && c <= 0xFF5E)
+        c = (unichar)(c - 0xFF01 + 0x21);
+    if ((mask & NSDiacriticInsensitiveSearch) && c >= 0xC0 && c <= 0x17F && c != 0xD7 && c != 0xF7) {
+        char b = latin_base[c - 0xC0];
+        if (b)
+            c = (unichar)b;
+    }
+    if (mask & NSCaseInsensitiveSearch) {
+        c = fold(c);
+        if (c >= 0xC0 && c <= 0xDE && c != 0xD7)
+            c += 0x20;
+    }
+    return c;
+}
+#define FOLDING (NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch | NSWidthInsensitiveSearch)
+
 - (NSComparisonResult)compare:(NSString *)other options:(NSStringCompareOptions)mask
 {
     WITH_CHARS(self, a, na);
@@ -317,9 +345,9 @@ static unichar fold(unichar c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
             continue;
         }
         unichar x = a[i++], y = b[j++];
-        if (mask & NSCaseInsensitiveSearch) {
-            x = fold(x);
-            y = fold(y);
+        if (mask & FOLDING) {
+            x = fold_with(x, mask);
+            y = fold_with(y, mask);
         }
         r = x < y ? NSOrderedAscending : x > y ? NSOrderedDescending : NSOrderedSame;
     }
@@ -354,12 +382,12 @@ NSUInteger FRegexReplace(NSMutableString *string, NSString *pattern, NSString *t
         return none;
     }
     NSUInteger first = range.location, last = NSMaxRange(range) - nb;
-    BOOL back = (mask & NSBackwardsSearch) != 0, ci = (mask & NSCaseInsensitiveSearch) != 0;
+    BOOL back = (mask & NSBackwardsSearch) != 0, ci = (mask & FOLDING) != 0;
     NSRange found = none;
     for (NSUInteger k = 0; k <= last - first; k++) {
         NSUInteger i = back ? last - k : first + k;
         NSUInteger j = 0;
-        while (j < nb && (ci ? fold(a[i + j]) == fold(b[j]) : a[i + j] == b[j]))
+        while (j < nb && (ci ? fold_with(a[i + j], mask) == fold_with(b[j], mask) : a[i + j] == b[j]))
             j++;
         if (j == nb) {
             found = NSMakeRange(i, nb);

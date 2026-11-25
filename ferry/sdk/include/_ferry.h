@@ -5,6 +5,8 @@
 #define _FERRY_H_
 #include <stddef.h>
 #include <stdint.h>
+/* Every Mac header brings in the BSD shorthands (freemac 1.221, Ferry 0.45.0). */
+#include <sys/cdefs.h>
 #ifdef __cplusplus
 #define __FERRY_BEGIN extern "C" {
 #define __FERRY_END }

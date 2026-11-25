@@ -26,5 +26,8 @@ long telldir(DIR *) __FERRY_INODE64(telldir);
 void seekdir(DIR *, long) __FERRY_INODE64(seekdir);
 int closedir(DIR *);
 int dirfd(DIR *);
+int scandir(const char *, struct dirent ***, int (*)(const struct dirent *),
+            int (*)(const struct dirent **, const struct dirent **)) __FERRY_INODE64(scandir);
+int alphasort(const struct dirent **, const struct dirent **) __FERRY_INODE64(alphasort);
 __FERRY_END
 #endif

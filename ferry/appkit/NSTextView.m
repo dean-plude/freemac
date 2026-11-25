@@ -16,15 +16,29 @@ NSNotificationName const NSTextViewDidChangeSelectionNotification = @"NSTextView
 @interface NSTextView (FerryLayout)
 - (void)_textStorageChanged;
 - (NSRect)_usedRect;
+- (NSRect)_rectForRange:(NSRange)range;
+- (NSRange)_rangeForRect:(NSRect)rect;
+- (NSRect)_lineRectForIndex:(NSUInteger)index range:(NSRangePointer)range;
 @end
 
 /* ---- NSTextStorage: an attributed string that tells its layout managers when it changes ---- */
 
+NSNotificationName const NSTextStorageWillProcessEditingNotification = @"NSTextStorageWillProcessEditingNotification";
+NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextStorageDidProcessEditingNotification";
+
+/* Each change is recorded with edited:range:changeInLength: (the range is
+ * where the text was before the change); once the outermost endEditing
+ * comes, processEditing tells the delegate, posts the notifications and
+ * has the layout managers' text views lay the text out again. editedMask,
+ * editedRange and changeInLength describe the changes, in the text as it is
+ * now, while that happens (freemac 1.221, Ferry 0.45.0). */
 @implementation NSTextStorage {
     NSMutableArray *_managers;
     id _delegate;
     NSInteger _editing, _change;
     BOOL _pending;
+    NSTextStorageEditActions _mask;
+    NSRange _edited;
 }
 - (void)dealloc
 {
@@ -45,59 +59,97 @@ NSNotificationName const NSTextViewDidChangeSelectionNotification = @"NSTextView
 - (id)delegate { return _delegate; }
 - (void)setDelegate:(id)d { _delegate = d; }
 - (NSInteger)changeInLength { return _change; }
-- (void)_edited:(NSInteger)delta
+- (NSTextStorageEditActions)editedMask { return _mask; }
+- (NSRange)editedRange { return _pending ? _edited : NSMakeRange(NSNotFound, 0); }
+- (BOOL)fixesAttributesLazily { return NO; }
+- (void)ensureAttributesAreFixedInRange:(NSRange)range {}
+- (void)invalidateAttributesInRange:(NSRange)range {}
+- (void)edited:(NSTextStorageEditActions)mask range:(NSRange)range changeInLength:(NSInteger)delta
 {
+    /* the range after the change */
+    NSRange now = NSMakeRange(range.location, (NSUInteger)MAX((NSInteger)range.length + delta, 0));
+    if (!_pending) {
+        _edited = now;
+    } else {
+        /* the earlier edits' range, moved by this change where it lies after it */
+        NSUInteger start = _edited.location, end = NSMaxRange(_edited);
+        if (end > range.location)
+            end = (NSUInteger)MAX((NSInteger)end + delta, (NSInteger)NSMaxRange(now));
+        start = MIN(start, now.location);
+        end = MAX(end, NSMaxRange(now));
+        _edited = NSMakeRange(start, end - start);
+    }
+    _mask |= mask;
     _change += delta;
     _pending = YES;
-    if (_editing)
+    if (!_editing)
+        [self processEditing];
+}
+- (void)processEditing
+{
+    if (!_pending)
         return;
-    _pending = NO;
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    NSRange range = _edited;
+    if ([_delegate respondsToSelector:@selector(textStorage:willProcessEditing:range:changeInLength:)])
+        [_delegate textStorage:self willProcessEditing:_mask range:range changeInLength:_change];
+    NSNotification *will = [NSNotification notificationWithName:NSTextStorageWillProcessEditingNotification object:self];
+    if ([_delegate respondsToSelector:@selector(textStorageWillProcessEditing:)])
+        [_delegate textStorageWillProcessEditing:will];
+    [nc postNotification:will];
+    if ([_delegate respondsToSelector:@selector(textStorage:didProcessEditing:range:changeInLength:)])
+        [_delegate textStorage:self didProcessEditing:_mask range:_edited changeInLength:_change];
+    NSNotification *did = [NSNotification notificationWithName:NSTextStorageDidProcessEditingNotification object:self];
     if ([_delegate respondsToSelector:@selector(textStorageDidProcessEditing:)])
-        [_delegate performSelector:@selector(textStorageDidProcessEditing:) withObject:nil];
+        [_delegate textStorageDidProcessEditing:did];
+    [nc postNotification:did];
+    _pending = NO;
+    _mask = 0;
+    _change = 0;
     for (NSLayoutManager *lm in [[_managers copy] autorelease])
         [[lm firstTextView] _textStorageChanged];
-    _change = 0;
 }
 - (void)beginEditing { _editing++; }
 - (void)endEditing
 {
     if (_editing > 0 && --_editing == 0 && _pending)
-        [self _edited:0];
+        [self processEditing];
 }
 - (void)replaceCharactersInRange:(NSRange)r withString:(NSString *)s
 {
     [super replaceCharactersInRange:r withString:s];
-    [self _edited:(NSInteger)[s length] - (NSInteger)r.length];
+    [self edited:NSTextStorageEditedCharacters range:r changeInLength:(NSInteger)[s length] - (NSInteger)r.length];
 }
 - (void)replaceCharactersInRange:(NSRange)r withAttributedString:(NSAttributedString *)s
 {
     [super replaceCharactersInRange:r withAttributedString:s];
-    [self _edited:(NSInteger)[s length] - (NSInteger)r.length];
+    [self edited:NSTextStorageEditedCharacters | NSTextStorageEditedAttributes range:r
+        changeInLength:(NSInteger)[s length] - (NSInteger)r.length];
 }
 - (void)deleteCharactersInRange:(NSRange)r
 {
     [super deleteCharactersInRange:r];
-    [self _edited:-(NSInteger)r.length];
+    [self edited:NSTextStorageEditedCharacters range:r changeInLength:-(NSInteger)r.length];
 }
 - (void)setAttributes:(NSDictionary *)a range:(NSRange)r
 {
     [super setAttributes:a range:r];
-    [self _edited:0];
+    [self edited:NSTextStorageEditedAttributes range:r changeInLength:0];
 }
 - (void)addAttribute:(NSString *)n value:(id)v range:(NSRange)r
 {
     [super addAttribute:n value:v range:r];
-    [self _edited:0];
+    [self edited:NSTextStorageEditedAttributes range:r changeInLength:0];
 }
 - (void)addAttributes:(NSDictionary *)a range:(NSRange)r
 {
     [super addAttributes:a range:r];
-    [self _edited:0];
+    [self edited:NSTextStorageEditedAttributes range:r changeInLength:0];
 }
 - (void)removeAttribute:(NSString *)n range:(NSRange)r
 {
     [super removeAttribute:n range:r];
-    [self _edited:0];
+    [self edited:NSTextStorageEditedAttributes range:r changeInLength:0];
 }
 @end
 
@@ -214,6 +266,43 @@ NSNotificationName const NSTextViewDidChangeSelectionNotification = @"NSTextView
     return tv ? [tv _usedRect] : NSZeroRect;
 }
 - (NSRange)glyphRangeForTextContainer:(NSTextContainer *)c { return NSMakeRange(0, [_storage length]); }
+/* One glyph for each character (freemac 1.221, Ferry 0.45.0): the text
+ * view that shows the container answers for the rectangles. */
+- (NSRect)boundingRectForGlyphRange:(NSRange)range inTextContainer:(NSTextContainer *)c
+{
+    NSTextView *tv = [c textView] ?: [self firstTextView];
+    return tv ? [tv _rectForRange:range] : NSZeroRect;
+}
+- (NSRange)glyphRangeForCharacterRange:(NSRange)range actualCharacterRange:(NSRangePointer)actual
+{
+    NSUInteger n = [_storage length], start = MIN(range.location, n);
+    NSRange r = NSMakeRange(start, MIN(range.length, n - start));
+    if (actual)
+        *actual = r;
+    return r;
+}
+- (NSRange)characterRangeForGlyphRange:(NSRange)range actualGlyphRange:(NSRangePointer)actual
+{
+    return [self glyphRangeForCharacterRange:range actualCharacterRange:actual];
+}
+- (NSUInteger)glyphIndexForCharacterAtIndex:(NSUInteger)i { return i; }
+- (NSUInteger)characterIndexForGlyphAtIndex:(NSUInteger)i { return i; }
+- (NSRange)glyphRangeForBoundingRect:(NSRect)rect inTextContainer:(NSTextContainer *)c
+{
+    NSTextView *tv = [c textView] ?: [self firstTextView];
+    return tv ? [tv _rangeForRect:rect] : NSMakeRange(0, 0);
+}
+- (NSUInteger)glyphIndexForPoint:(NSPoint)p inTextContainer:(NSTextContainer *)c
+{
+    NSTextView *tv = [c textView] ?: [self firstTextView];
+    NSSize inset = [tv textContainerInset];
+    return tv ? [tv characterIndexForInsertionAtPoint:NSMakePoint(p.x + inset.width, p.y + inset.height)] : 0;
+}
+- (NSRect)lineFragmentRectForGlyphAtIndex:(NSUInteger)i effectiveRange:(NSRangePointer)range
+{
+    NSTextView *tv = [self firstTextView];
+    return tv ? [tv _lineRectForIndex:i range:range] : NSZeroRect;
+}
 - (void)ensureLayoutForTextContainer:(NSTextContainer *)c { [[c textView] _usedRect]; }
 - (NSUInteger)numberOfGlyphs { return [_storage length]; }
 - (CGFloat)defaultLineHeightForFont:(NSFont *)f
@@ -772,6 +861,61 @@ SWITCH(isAutomaticTextCompletionEnabled, setAutomaticTextCompletionEnabled, _com
     while (i + 1 < _lineCount && y >= _lines[i].top + _lines[i].height)
         i++;
     return [self _indexOnLine:i atX:p.x];
+}
+/* The rectangle the characters in a range take, in the text container's
+ * coordinates (the view's, less the inset): the union of each line's part. */
+- (NSRect)_rectForRange:(NSRange)range
+{
+    [self _layout];
+    if (!_lineCount)
+        return NSZeroRect;
+    NSUInteger end = NSMaxRange(range);
+    NSRect all = NSZeroRect;
+    BOOL any = NO;
+    for (NSUInteger i = 0; i < _lineCount; i++) {
+        TVLine *t = &_lines[i];
+        NSUInteger ls = t->range.location, le = NSMaxRange(t->range);
+        BOOL touches = range.length ? (ls < end && le > range.location)
+                                    : (range.location >= ls && (range.location < le || i + 1 == _lineCount));
+        if (!touches)
+            continue;
+        NSUInteger a = MAX(ls, range.location), b = MIN(le, end);
+        CGFloat x0 = [self _xFor:a onLine:i] - _inset.width, x1 = [self _xFor:b onLine:i] - _inset.width;
+        NSRect r = NSMakeRect(fmin(x0, x1), t->top, fabs(x1 - x0), t->height);
+        all = any ? NSUnionRect(all, r) : r;
+        any = YES;
+        if (!range.length)
+            break;
+    }
+    return all;
+}
+/* the characters of the lines a rectangle (in the container's coordinates) crosses */
+- (NSRange)_rangeForRect:(NSRect)rect
+{
+    [self _layout];
+    NSUInteger start = NSNotFound, end = 0;
+    for (NSUInteger i = 0; i < _lineCount; i++) {
+        TVLine *t = &_lines[i];
+        if (t->top + t->height <= NSMinY(rect) || t->top >= NSMaxY(rect))
+            continue;
+        start = MIN(start, t->range.location);
+        end = MAX(end, NSMaxRange(t->range));
+    }
+    return start == NSNotFound ? NSMakeRange(0, 0) : NSMakeRange(start, end - start);
+}
+- (NSRect)_lineRectForIndex:(NSUInteger)index range:(NSRangePointer)range
+{
+    [self _layout];
+    if (!_lineCount) {
+        if (range)
+            *range = NSMakeRange(0, 0);
+        return NSZeroRect;
+    }
+    NSUInteger i = [self _lineFor:index];
+    TVLine *t = &_lines[i];
+    if (range)
+        *range = t->range;
+    return NSMakeRect(0, t->top, [self _containerWidth] + 2 * [_container lineFragmentPadding], t->height);
 }
 - (NSRect)_caretRect
 {

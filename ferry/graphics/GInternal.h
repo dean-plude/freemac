@@ -133,6 +133,7 @@ struct gstate {
     CGSize shadowOffset;
     CGFloat shadowBlur;
     double shadowColor[4];
+    BOOL shadowOnly;    /* only the shadow outside the shape is painted (AppKit's NSFocusRingOnly) */
 };
 
 @interface GContext : NSObject {
@@ -164,6 +165,9 @@ void GContextSetSource(GContext *c, const double rgba[4]);
  * a group, and GContextEndShadow paints its shadow and then the drawing. */
 BOOL GContextBeginShadow(GContext *c);
 void GContextEndShadow(GContext *c, BOOL began);
+/* For AppKit's focus rings: what is drawn next paints only its shadow, and
+ * that only outside the shape, until the graphics state is restored. */
+void GContextSetShadowOnly(CGContextRef c, BOOL only);
 
 /* Draws glyphs or a laid-out line in the context's text space, at (x, y)
  * there, following the text drawing mode. The body draws with Cairo's y

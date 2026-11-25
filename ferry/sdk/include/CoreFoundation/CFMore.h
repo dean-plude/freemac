@@ -309,7 +309,7 @@ CFStringRef CFURLCreateStringByReplacingPercentEscapesUsingEncoding(CFAllocatorR
                                                                     CFStringRef charsToLeaveEscaped,
                                                                     CFStringEncoding encoding);
 struct FSRef;
-Boolean CFURLGetFSRef(CFURLRef url, struct FSRef *fsRef); /* no FSRefs here: always false */
+Boolean CFURLGetFSRef(CFURLRef url, struct FSRef *fsRef); /* a reference to the URL's path (CoreServices/Files.h) */
 
 /* ---- bundles ------------------------------------------------------------------------- */
 extern const CFStringRef kCFBundleInfoDictionaryVersionKey, kCFBundleExecutableKey, kCFBundleIdentifierKey,

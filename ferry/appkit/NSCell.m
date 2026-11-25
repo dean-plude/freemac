@@ -46,6 +46,7 @@ static id coder_value(NSCoder *c, NSString *key)
     NSView *_controlView;
     NSInteger _backgroundStyle;
     NSFormatter *_formatter;
+    NSMenu *_menu;
 }
 
 /* Light or dark ground behind the cell (a selected table row is dark):
@@ -78,6 +79,7 @@ static id coder_value(NSCoder *c, NSString *key)
     [_value release];
     [_font release];
     [_formatter release];
+    [_menu release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone
@@ -282,6 +284,31 @@ static id coder_value(NSCoder *c, NSString *key)
 - (void)setImage:(NSImage *)image { [self setObjectValue:image]; }
 - (NSView *)controlView { return _controlView; }
 - (void)setControlView:(NSView *)v { _controlView = v; }
+
+/* the cell's contextual menu (freemac 1.221, Ferry 0.45.0) */
+- (NSMenu *)menu { return _menu; }
+- (void)setMenu:(NSMenu *)m
+{
+    [m retain];
+    [_menu release];
+    _menu = m;
+}
+- (NSMenu *)menuForEvent:(NSEvent *)event inRect:(NSRect)rect ofView:(NSView *)view { return _menu; }
+/* What a click at the event's point would do, as Apple documents the
+ * default: an editable or selectable text cell's text, an enabled button
+ * cell's tracking, and anything inside the cell is content. */
+- (NSCellHitResult)hitTestForEvent:(NSEvent *)event inRect:(NSRect)rect ofView:(NSView *)view
+{
+    NSPoint p = [view convertPoint:[event locationInWindow] fromView:nil];
+    if (!NSMouseInRect(p, rect, [view isFlipped]))
+        return NSCellHitNone;
+    NSCellHitResult r = NSCellHitContentArea;
+    if (_enabled && (_editable || _selectable) && ![_value isKindOfClass:[NSImage class]])
+        r |= NSCellHitEditableTextArea;
+    if (_enabled && [self isKindOfClass:[NSButtonCell class]])
+        r |= NSCellHitTrackableArea;
+    return r;
+}
 @end
 
 @implementation NSActionCell
@@ -296,6 +323,9 @@ static id coder_value(NSCoder *c, NSString *key)
     NSButtonType _type;
     BOOL _typeKnown, _transparent, _mixed, _imageOnly;
     id _image, _alternateImage;
+    NSCellStyleMask _highlightsBy, _showsStateBy;
+    NSCellImagePosition _imagePosition;
+    NSAttributedString *_attributedTitle;
 }
 - (instancetype)initTextCell:(NSString *)string
 {
@@ -305,6 +335,7 @@ static id coder_value(NSCoder *c, NSString *key)
         _bezel = NSBezelStyleRounded;
         _bordered = YES;
         _alignment = NSTextAlignmentCenter;
+        _highlightsBy = NSPushInCellMask | NSChangeGrayCellMask;
     }
     return self;
 }
@@ -314,6 +345,7 @@ static id coder_value(NSCoder *c, NSString *key)
     [_alternateImage release];
     [_alternate release];
     [_key release];
+    [_attributedTitle release];
     [super dealloc];
 }
 
@@ -367,6 +399,8 @@ static id coder_value(NSCoder *c, NSString *key)
             _typeKnown = YES;
         }
     }
+    if (_typeKnown)
+        [self _setMasksForType:_type];
     if ([coder containsValueForKey:@"NSAllowsMixedState"])
         _mixed = [coder decodeBoolForKey:@"NSAllowsMixedState"];
     _image = [coder_value(coder, @"NSNormalImage") retain];
@@ -419,6 +453,47 @@ static id coder_value(NSCoder *c, NSString *key)
 {
     _type = t;
     _typeKnown = YES;
+    [self _setMasksForType:t];
+}
+/* The highlight and state masks each kind of button has, as Apple's
+ * documentation of setButtonType: lists them (freemac 1.221, Ferry 0.45.0). */
+- (void)_setMasksForType:(NSButtonType)t
+{
+    NSCellStyleMask h = NSPushInCellMask | NSChangeGrayCellMask, shows = NSNoCellMask;
+    switch (t) {
+    case NSButtonTypeMomentaryLight: h = NSChangeBackgroundCellMask; break;
+    case NSButtonTypePushOnPushOff: shows = NSChangeBackgroundCellMask; break;
+    case NSButtonTypeToggle: h = NSPushInCellMask | NSContentsCellMask, shows = NSContentsCellMask; break;
+    case NSButtonTypeSwitch:
+    case NSButtonTypeRadio: h = shows = NSContentsCellMask; break;
+    case NSButtonTypeMomentaryChange: h = NSContentsCellMask; break;
+    case NSButtonTypeOnOff: h = shows = NSChangeBackgroundCellMask; break;
+    default: break;
+    }
+    _highlightsBy = h;
+    _showsStateBy = shows;
+}
+- (NSCellStyleMask)highlightsBy { return _highlightsBy; }
+- (void)setHighlightsBy:(NSCellStyleMask)m { _highlightsBy = m; }
+- (NSCellStyleMask)showsStateBy { return _showsStateBy; }
+- (void)setShowsStateBy:(NSCellStyleMask)m { _showsStateBy = m; }
+- (NSCellImagePosition)imagePosition { return _imagePosition; }
+- (void)setImagePosition:(NSCellImagePosition)p { _imagePosition = p; }
+/* the title in the cell's font, or the attributed title it was given while
+ * the title is still that one's text */
+- (NSAttributedString *)attributedTitle
+{
+    NSString *title = [self title] ?: @"";
+    if (_attributedTitle && [[_attributedTitle string] isEqualToString:title])
+        return _attributedTitle;
+    NSDictionary *attrs = [self font] ? @{NSFontAttributeName : [self font]} : @{};
+    return [[[NSAttributedString alloc] initWithString:title attributes:attrs] autorelease];
+}
+- (void)setAttributedTitle:(NSAttributedString *)t
+{
+    [_attributedTitle release];
+    _attributedTitle = [t copy];
+    [self setTitle:[t string] ?: @""];
 }
 - (BOOL)_hasButtonType { return _typeKnown; }
 - (NSButtonType)_buttonType { return _type; }

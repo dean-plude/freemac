@@ -296,6 +296,18 @@ windows; with that same consent, posted keys are pressed through Strata's
 Core Foundation's sets and bags take callbacks (`foundation/CFSet.m`), and a
 document is a file presenter (`appkit/NSDocument.m`).
 
+From Ferry 0.45.0 (freemac 1.221), the SDK has the headers a Mac
+program's source includes first (`TargetConditionals.h`, `Availability.h`,
+`sys/param.h`, `zlib.h`, `mach-o/loader.h` and the rest, with the Mac's
+limits), and the names the nine apps' source asked for: keyboard layouts
+in `appkit/Carbon.m`, file references in `foundation/FSRefs.m`,
+`NSArchiver` and `NSCoder`'s calls without keys in `foundation/NSCoder.m`,
+`NSMapTable`, `NSHashTable` and `NSPointerArray` in
+`foundation/NSMapTable.m`, shadings in `graphics/CGShading.m`, and AppKit's
+older and smaller names (modal sessions, focus rings, the text storage's
+edits, appearances) declared in `AppKit/AppKitMore.h` and kept with the
+classes they belong to.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:
