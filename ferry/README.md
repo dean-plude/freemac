@@ -464,6 +464,8 @@ From Ferry 0.57.0 (freemac 1.233), FFmpeg's libraries and its `ffmpeg` and `ffpr
 
 From Ferry 0.58.0 (freemac 1.234), `coreaudio/` holds Core Audio, which also serves AudioToolbox and AudioUnit, in place of 1.232's `coreaudio/CoreAudio.c`: the HAL on the sound server through libpulse (`CABackend.m`, `CAHardware.m`), audio units (`CAAudioUnit.m`), audio queues (`CAAudioQueue.m`), converters (`CAConverter.m`) and formats (`CAFormat.m`). With no sound server, or `FERRY_AUDIO=null`, a null device plays into `FERRY_AUDIO_OUTPUT_FILE` and records from `FERRY_AUDIO_INPUT_FILE`; the tests are the `coreaudio_` ones.
 
+From Ferry 0.59.0 (freemac 1.235), `opengl/` is OpenGL.framework, CGL on this system's EGL with every `gl` call passed to its OpenGL library; `appkit/NSOpenGL.m` and `quartzcore/CAOpenGLLayer.m` read a context's frames back and paint them into views and layers, and `corevideo/` and `iosurface/` are Core Video (display links, pixel buffers and pools, texture caches) and IOSurface, for VLC's and OBS's video output; the tests are `opengl_*` and `corevideo_*`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

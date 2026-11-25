@@ -1,0 +1,24 @@
+a link for display 1: yes
+its display: yes
+its type: yes
+no start without a callback: yes
+not running yet: yes
+nominal period a 60th of a second: yes
+started: yes
+started twice refused: yes
+callbacks a second: about 60
+stopped: yes
+no callbacks after the stop: yes
+never on the main thread: yes
+time stamps in order, host and video time valid: yes
+host times a 60th of a second apart: yes
+no actual period while stopped: yes
+no current time while stopped: yes
+stopped by its callback after 5: yes
+started again: yes
+the current time while running: yes
+an actual period about a 60th: yes
+about 12 callbacks in a fifth of a second: yes
+the block handler called: yes
+active displays: a display: yes
+exit=0

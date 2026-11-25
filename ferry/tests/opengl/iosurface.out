@@ -1,0 +1,24 @@
+a legacy context: yes
+a 64 by 32 BGRA surface, 320 bytes a row: yes
+CGLTexImageIOSurface2D: yes
+the unpack state left as it was: yes
+the texture's first row: red on the left: yes
+green on the right: yes
+blue at the left of its last rows: yes
+the surface shows in the drawable: yes
+the surface's new contents after another call: yes
+a plane a packed surface hasn't refused: yes
+2vuy: Cr, Y and Cb in red, green and blue: yes
+refused with no context current: yes
+a core context: yes
+both planes as textures: yes
+Y read back from the R8 texture: yes
+Cb and Cr read back from the RG8 texture: yes
+a texture cache: yes
+a texture from a BGRA buffer: yes
+flipped, with clean coordinates in pixels: yes
+the buffer's attachments passed on: yes
+its pixels: yes
+a planar buffer refused: yes
+no errors left: yes
+exit=0

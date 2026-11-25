@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.235 "Ferry: OpenGL and Core Video, for VLC's and OBS's video" (done)
+
+Ferry 0.59.0: Mac apps draw with OpenGL. CGL makes its contexts on this system's EGL (Mesa's software renderer will do), legacy 2.1 and core 3.2 and 4.1, and NSOpenGLView, NSOpenGLContext and CAOpenGLLayer draw into a window as VLC's and OBS's video output do, from the main thread or a thread of the app's own. Core Video gains display links at the display's rate, pixel buffers and pools on IOSurfaces in the formats video uses, and OpenGL texture caches, and IOSurface textures reach OpenGL with CGLTexImageIOSurface2D. Frames go through a copy on the CPU, about 5.5 ms for each 1080p frame, and surfaces aren't shared between programs. With this, everything VLC's interface was waiting on is in Ferry.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | OpenGL.framework: CGL on this system's EGL (Mesa's llvmpipe will do), every gl call passed to its libOpenGL or libGL, opened only when a program draws; legacy 2.1 and core 3.2 and 4.1 profiles, shared contexts, locks, swap intervals, `CGLTexImageIOSurface2D` | Ferry (opengl/) | done |
+| 2 | `NSOpenGLPixelFormat`, `NSOpenGLContext` and `NSOpenGLView`, drawn offscreen, read back and painted into the view, from drawRect: or from a thread of the program's own | Ferry (appkit/NSOpenGL.m) | done |
+| 3 | `CAOpenGLLayer`, synchronous, from any thread, and asynchronous at the display's rate | Ferry (quartzcore/CAOpenGLLayer.m) | done |
+| 4 | Core Video: display links, pixel buffers and pools (BGRA, 420v, 420f, y420, 2vuy and more, on IOSurfaces), attachments, OpenGL texture caches; IOSurface.framework | Ferry (corevideo/, iosurface/) | done |
+| 5 | Tests with and without OpenGL, pictures, a compat section | Ferry, Docs | done |
+
 ## 1.234 "Ferry: sound, with Core Audio" (done)
 
 Ferry 0.58.0: Mac apps play and record sound. A new Core Audio, which also serves AudioToolbox and AudioUnit, makes each output and input of the desktop's sound server a device, through libpulse, and follows the server's default devices, volume and mute. HALOutput and DefaultOutput units play as VLC's sound out does, a HALOutput unit records as OBS's audio capture does, audio queues play and record as OBS's monitoring does, and converters change PCM formats and rates. With no sound server an app sees one null device and carries on. VLC and OBS themselves weren't run yet, and AAC in converters, which OBS's encoder needs, is next.

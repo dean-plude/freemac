@@ -1,0 +1,26 @@
+a legacy pixel format: yes
+double buffered: yes
+its context draws into it: yes
+drawn once, prepared once, reshaped once: yes
+its context current in drawRect:: yes
+and not after: yes
+a surface of the view's size: yes
+the triangle is red in the middle: yes
+dark blue above it: yes
+the green square at the bottom left: yes
+not at the top left: yes
+drawRect: called for the picture: yes
+a flush of its own has the window draw it again, without drawRect:: yes
+showing the magenta frame: yes
+reshaped after a resize, to a surface of 100 by 80: yes
+a 3.2 core context sharing with the view's: yes
+the thread compiled, linked and drew: yes
+attached to the view: yes
+its flush had the view drawn again: yes
+the core triangle is yellow in the middle: yes
+its green square at the bottom left of the flipped view: yes
+grey at the top left: yes
+both in the window's picture: the red triangle: yes
+and the yellow one: yes
+cleared: no view: yes
+exit=0
