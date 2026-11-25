@@ -21,7 +21,7 @@ cat << 'EOF'
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 EOF
-for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics CoreImage \
+for dir in AVFoundation AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics CoreImage \
            CloudKit CoreServices CoreText Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
            ScriptingBridge Security \
            ServiceManagement SystemConfiguration UniformTypeIdentifiers UserNotifications WebKit; do
@@ -33,15 +33,57 @@ for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreDa
     esac
     echo
     echo "module $dir [system] {"
-    # the umbrella header first, then the rest in order
+    # Carbon's one header is HIToolbox's too, for Swift's "import
+    # Carbon.HIToolbox" (freemac 1.230); a submodule that isn't explicit
+    # comes with "import Carbon"
+    if [ "$dir" = Carbon ]; then
+        echo "    module HIToolbox {"
+        echo "        header \"Carbon/Carbon.h\""
+        echo "        export *"
+        echo "    }"
+        echo "    export *"
+        echo "    link framework \"Carbon\""
+        echo "}"
+        continue
+    fi
+    # the umbrella header first, then the rest in order; a header that only
+    # brings in the umbrella is a submodule of that name, for Swift's
+    # "import AppKit.NSMenu" (freemac 1.230)
     if [ -f "$inc/$dir/$dir.h" ]; then echo "    header \"$dir/$dir.h\""; fi
     for h in $(cd "$inc/$dir" && ls *.h | LC_ALL=C sort); do
-        [ "$h" = "$dir.h" ] || echo "    header \"$dir/$h\""
+        [ "$h" = "$dir.h" ] && continue
+        if grep -q '^/\* Ferry submodule' "$inc/$dir/$h"; then
+            echo "    module ${h%.h} {"
+            echo "        header \"$dir/$h\""
+            echo "        export *"
+            echo "    }"
+        else
+            echo "    header \"$dir/$h\""
+        fi
     done
     echo "    export *"
     if [ -n "$link" ]; then echo "    link framework \"$link\""; fi
     echo "}"
 done
+
+# Dispatch and os.log, which Swift imports by those names (freemac 1.230):
+# Ferry's Dispatch and os overlays sit on them. Both are libSystem's.
+if [ -f "$inc/dispatch/dispatch.h" ]; then
+    echo
+    echo "module Dispatch [system] {"
+    echo "    header \"dispatch/dispatch.h\""
+    echo "    export *"
+    echo "}"
+fi
+if [ -f "$inc/os/log.h" ]; then
+    echo
+    echo "module os [system] {"
+    echo "    module log {"
+    echo "        header \"os/log.h\""
+    echo "        export *"
+    echo "    }"
+    echo "}"
+fi
 
 # Darwin: the C library, which is libSystem, so it links nothing more
 if [ -d "$inc/Darwin" ]; then

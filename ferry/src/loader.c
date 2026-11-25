@@ -931,6 +931,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"Cocoa", "AppKit"},
     {"Carbon", "AppKit"},
     {"UserNotifications", "AppKit"}, /* appkit/UNUserNotificationCenter.m, beside the Dock and D-Bus */
+    {"AVFoundation", "AppKit"},      /* AVAudioPlayer over NSSound, appkit/AVAudioPlayer.m (1.230) */
     {"Quartz", "AppKit"},            /* Quick Look's panel and QCView, appkit/QuickLook.m */
     {"QuickLook", "AppKit"},         /* the generator calls and thumbnails, appkit/QuickLook.m */
     {"CoreImage", "AppKit"},         /* images, CIAffineTransform and detectors, appkit/CoreImage.m (1.225) */

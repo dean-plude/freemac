@@ -76,7 +76,7 @@
 @end
 
 @interface NSAppleEventManager : NSObject
-@property (class, readonly, strong) NSAppleEventManager * FERRY_SWIFT_NONNULL sharedAppleEventManager;
++ (NSAppleEventManager * FERRY_SWIFT_NONNULL)sharedAppleEventManager;
 /* handler is sent handleSelector with the event and its reply, each an
  * NSAppleEventDescriptor */
 - (void)setEventHandler:(id)handler andSelector:(SEL)handleEventSelector forEventClass:(AEEventClass)eventClass

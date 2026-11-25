@@ -1,0 +1,23 @@
+Failed to enable launch at login: no reason
+count 42, hex ff, ratio 0.50, on true
+padded [  x]
+C-style 7 seven
+default log
+enabled: true false
+main app: true
+registered: true true
+unregistered: true
+unregister again fails: SMAppServiceErrorDomain
+missing helper: true
+can't register a missing helper
+agent: true
+jobs: 0
+helper switched on: false
+notification center: true
+category: restStarted 1 Time's up
+empty data can't be played
+duration: 0.5 type: com.microsoft.waveform-audio
+volume: 0.5 prepared: true
+playing: true true
+finished: true loops: 2 still playing: false
+exit=0

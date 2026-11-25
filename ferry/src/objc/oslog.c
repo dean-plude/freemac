@@ -176,16 +176,9 @@ static char *format_message(const char *format, va_list ap)
     return out;
 }
 
-static void mac_ferry_os_log(struct os_log_s *log, uint8_t type, const char *format, ...)
+/* One message, already formatted, to the log. */
+static void write_message(struct os_log_s *log, uint8_t type, const char *text)
 {
-    if (!mac_os_log_type_enabled(log, type) || !format)
-        return;
-    va_list ap;
-    va_start(ap, format);
-    char *text = format_message(format, ap);
-    va_end(ap);
-    if (!text)
-        return;
     int priority = type == TYPE_FAULT ? LOG_CRIT : type == TYPE_ERROR ? LOG_ERR
                  : type == TYPE_INFO  ? LOG_INFO : type == TYPE_DEBUG ? LOG_DEBUG : LOG_NOTICE;
     if (log->subsystem && *log->subsystem)
@@ -194,13 +187,40 @@ static void mac_ferry_os_log(struct os_log_s *log, uint8_t type, const char *for
         syslog(priority, "%s", text);
     if (getenv("OS_ACTIVITY_DT_MODE"))
         fprintf(stderr, "%s\n", text);
+}
+
+static void mac_ferry_os_logv(struct os_log_s *log, uint8_t type, const char *format, va_list ap)
+{
+    if (!mac_os_log_type_enabled(log, type) || !format)
+        return;
+    char *text = format_message(format, ap);
+    if (!text)
+        return;
+    write_message(log, type, text);
     free(text);
+}
+
+static void mac_ferry_os_log(struct os_log_s *log, uint8_t type, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    mac_ferry_os_logv(log, type, format, ap);
+    va_end(ap);
+}
+
+/* Swift's Logger, which formats its message itself (freemac 1.230). */
+static void mac_ferry_os_log_message(struct os_log_s *log, uint8_t type, const char *message)
+{
+    if (mac_os_log_type_enabled(log, type) && message)
+        write_message(log, type, message);
 }
 
 const struct ferry_symbol ferry_oslog_symbols[] = {
     {"os_log_create", mac_os_log_create},
     {"os_log_type_enabled", mac_os_log_type_enabled},
     {"ferry_os_log", mac_ferry_os_log},
+    {"ferry_os_logv", mac_ferry_os_logv},
+    {"ferry_os_log_message", mac_ferry_os_log_message},
     {"_os_log_default", &_os_log_default},
     {"_os_log_disabled", &_os_log_disabled},
     {NULL, NULL},

@@ -8,6 +8,97 @@
 ---
 Name: AppKit
 Classes:
+- Name: NSApplication
+  Methods:
+  - Selector: "activateIgnoringOtherApps:"
+    MethodKind: Instance
+    SwiftName: "activate(ignoringOtherApps:)"
+  - Selector: "postEvent:atStart:"
+    MethodKind: Instance
+    SwiftName: "postEvent(_:atStart:)"
+- Name: NSColor
+  Properties:
+  - Name: labelColor
+    PropertyKind: Class
+    SwiftName: labelColor
+  - Name: secondaryLabelColor
+    PropertyKind: Class
+    SwiftName: secondaryLabelColor
+  - Name: tertiaryLabelColor
+    PropertyKind: Class
+    SwiftName: tertiaryLabelColor
+  - Name: textColor
+    PropertyKind: Class
+    SwiftName: textColor
+  - Name: textBackgroundColor
+    PropertyKind: Class
+    SwiftName: textBackgroundColor
+  - Name: selectedTextColor
+    PropertyKind: Class
+    SwiftName: selectedTextColor
+  - Name: selectedTextBackgroundColor
+    PropertyKind: Class
+    SwiftName: selectedTextBackgroundColor
+  - Name: placeholderTextColor
+    PropertyKind: Class
+    SwiftName: placeholderTextColor
+  - Name: controlColor
+    PropertyKind: Class
+    SwiftName: controlColor
+  - Name: controlBackgroundColor
+    PropertyKind: Class
+    SwiftName: controlBackgroundColor
+  - Name: controlTextColor
+    PropertyKind: Class
+    SwiftName: controlTextColor
+  - Name: disabledControlTextColor
+    PropertyKind: Class
+    SwiftName: disabledControlTextColor
+  - Name: selectedControlColor
+    PropertyKind: Class
+    SwiftName: selectedControlColor
+  - Name: windowBackgroundColor
+    PropertyKind: Class
+    SwiftName: windowBackgroundColor
+  - Name: underPageBackgroundColor
+    PropertyKind: Class
+    SwiftName: underPageBackgroundColor
+  - Name: gridColor
+    PropertyKind: Class
+    SwiftName: gridColor
+  - Name: separatorColor
+    PropertyKind: Class
+    SwiftName: separatorColor
+  - Name: controlAccentColor
+    PropertyKind: Class
+    SwiftName: controlAccentColor
+  - Name: keyboardFocusIndicatorColor
+    PropertyKind: Class
+    SwiftName: keyboardFocusIndicatorColor
+  - Name: alternateSelectedControlColor
+    PropertyKind: Class
+    SwiftName: alternateSelectedControlColor
+  - Name: headerTextColor
+    PropertyKind: Class
+    SwiftName: headerTextColor
+  - Name: linkColor
+    PropertyKind: Class
+    SwiftName: linkColor
+  - Name: selectedContentBackgroundColor
+    PropertyKind: Class
+    SwiftName: selectedContentBackgroundColor
+  - Name: unemphasizedSelectedContentBackgroundColor
+    PropertyKind: Class
+    SwiftName: unemphasizedSelectedContentBackgroundColor
+  - Name: alternateSelectedControlTextColor
+    PropertyKind: Class
+    SwiftName: alternateSelectedControlTextColor
+  - Name: unemphasizedSelectedTextColor
+    PropertyKind: Class
+    SwiftName: unemphasizedSelectedTextColor
+  - Name: selectedControlTextColor
+    PropertyKind: Class
+    SwiftName: selectedControlTextColor
 - Name: NSTextField
   Methods:
   - Selector: "labelWithString:"
@@ -69,8 +160,33 @@ Classes:
     SwiftName: "init(target:action:)"
     NullabilityOfRet: N
     Nullability: [O, O]
+- Name: NSBezierPath
+  Methods:
+  - Selector: "appendBezierPathWithRect:"
+    MethodKind: Instance
+    SwiftName: "appendRect(_:)"
+  - Selector: "appendBezierPathWithOvalInRect:"
+    MethodKind: Instance
+    SwiftName: "appendOval(in:)"
+  - Selector: "appendBezierPathWithRoundedRect:xRadius:yRadius:"
+    MethodKind: Instance
+    SwiftName: "appendRoundedRect(_:xRadius:yRadius:)"
+- Name: NSPopover
+  Methods:
+  - Selector: "showRelativeToRect:ofView:preferredEdge:"
+    MethodKind: Instance
+    SwiftName: "show(relativeTo:of:preferredEdge:)"
 - Name: NSWindow
   Methods:
+  - Selector: "makeKeyWindow"
+    MethodKind: Instance
+    SwiftName: "makeKey()"
+  - Selector: "makeMainWindow"
+    MethodKind: Instance
+    SwiftName: "makeMain()"
+  - Selector: "postEvent:atStart:"
+    MethodKind: Instance
+    SwiftName: "postEvent(_:atStart:)"
   - Selector: "windowWithContentViewController:"
     MethodKind: Class
     SwiftName: "init(contentViewController:)"
@@ -132,6 +248,166 @@ Protocols:
 Tags:
 - Name: NSControlStateValue
   SwiftName: NSControl.StateValue
+- Name: NSColorType
+  SwiftName: NSColor.ColorType
+- Name: NSEventType
+  SwiftName: NSEvent.EventType
+- Name: NSEventMask
+  SwiftName: NSEvent.EventTypeMask
+- Name: NSEventModifierFlags
+  SwiftName: NSEvent.ModifierFlags
+- Name: NSControlSize
+  SwiftName: NSControl.ControlSize
+- Name: NSTextTabType
+  SwiftName: NSTextTab.TabType
+- Name: NSLineCapStyle
+  SwiftName: NSBezierPath.LineCapStyle
+- Name: NSLineJoinStyle
+  SwiftName: NSBezierPath.LineJoinStyle
+- Name: NSWindingRule
+  SwiftName: NSBezierPath.WindingRule
+- Name: NSBezierPathElement
+  SwiftName: NSBezierPath.ElementType
+- Name: NSBitmapImageFileType
+  SwiftName: NSBitmapImageRep.FileType
+- Name: NSBitmapFormat
+  SwiftName: NSBitmapImageRep.Format
+- Name: NSImageCacheMode
+  SwiftName: NSImage.CacheMode
+- Name: NSViewLayerContentsRedrawPolicy
+  SwiftName: NSView.LayerContentsRedrawPolicy
+- Name: NSCellImagePosition
+  SwiftName: NSControl.ImagePosition
+- Name: NSButtonType
+  SwiftName: NSButton.ButtonType
+- Name: NSBezelStyle
+  SwiftName: NSButton.BezelStyle
+- Name: NSBackgroundStyle
+  SwiftName: NSView.BackgroundStyle
+- Name: NSCellType
+  SwiftName: NSCell.CellType
+- Name: NSTextFieldBezelStyle
+  SwiftName: NSTextField.BezelStyle
+- Name: NSWindowStyleMask
+  SwiftName: NSWindow.StyleMask
+- Name: NSBackingStoreType
+  SwiftName: NSWindow.BackingStoreType
+- Name: NSWindowOrderingMode
+  SwiftName: NSWindow.OrderingMode
+- Name: NSWindowCollectionBehavior
+  SwiftName: NSWindow.CollectionBehavior
+- Name: NSWindowAnimationBehavior
+  SwiftName: NSWindow.AnimationBehavior
+- Name: NSApplicationActivationPolicy
+  SwiftName: NSApplication.ActivationPolicy
+- Name: NSApplicationTerminateReply
+  SwiftName: NSApplication.TerminateReply
+- Name: NSScrollerStyle
+  SwiftName: NSScroller.Style
+- Name: NSScrollElasticity
+  SwiftName: NSScrollView.Elasticity
+- Name: NSProgressIndicatorStyle
+  SwiftName: NSProgressIndicator.Style
+- Name: NSBoxType
+  SwiftName: NSBox.BoxType
+- Name: NSTitlePosition
+  SwiftName: NSBox.TitlePosition
+- Name: NSSplitViewDividerStyle
+  SwiftName: NSSplitView.DividerStyle
+- Name: NSTabViewType
+  SwiftName: NSTabView.TabType
+- Name: NSTabPosition
+  SwiftName: NSTabView.TabPosition
+- Name: NSTabViewBorderType
+  SwiftName: NSTabView.TabViewBorderType
+- Name: NSTabState
+  SwiftName: NSTabViewItem.State
+- Name: NSStatusItemBehavior
+  SwiftName: NSStatusItem.Behavior
+- Name: NSTableViewGridLineStyle
+  SwiftName: NSTableView.GridLineStyle
+- Name: NSTableViewColumnAutoresizingStyle
+  SwiftName: NSTableView.ColumnAutoresizingStyle
+- Name: NSTableViewSelectionHighlightStyle
+  SwiftName: NSTableView.SelectionHighlightStyle
+- Name: NSTableViewDraggingDestinationFeedbackStyle
+  SwiftName: NSTableView.DraggingDestinationFeedbackStyle
+- Name: NSTableViewRowSizeStyle
+  SwiftName: NSTableView.RowSizeStyle
+- Name: NSTableViewStyle
+  SwiftName: NSTableView.Style
+- Name: NSTableColumnResizingOptions
+  SwiftName: NSTableColumn.ResizingOptions
+- Name: NSTableViewAnimationOptions
+  SwiftName: NSTableView.AnimationOptions
+- Name: NSTableViewDropOperation
+  SwiftName: NSTableView.DropOperation
+- Name: NSLayoutConstraintOrientation
+  SwiftName: NSLayoutConstraint.Orientation
+- Name: NSLayoutAttribute
+  SwiftName: NSLayoutConstraint.Attribute
+- Name: NSPopUpArrowPosition
+  SwiftName: NSPopUpButton.ArrowPosition
+- Name: NSSegmentSwitchTracking
+  SwiftName: NSSegmentedControl.SwitchTracking
+- Name: NSSegmentStyle
+  SwiftName: NSSegmentedControl.Style
+- Name: NSSegmentDistribution
+  SwiftName: NSSegmentedControl.Distribution
+- Name: NSTickMarkPosition
+  SwiftName: NSSlider.TickMarkPosition
+- Name: NSSliderType
+  SwiftName: NSSlider.SliderType
+- Name: NSDatePickerStyle
+  SwiftName: NSDatePicker.Style
+- Name: NSDatePickerMode
+  SwiftName: NSDatePicker.Mode
+- Name: NSDatePickerElementFlags
+  SwiftName: NSDatePicker.ElementFlags
+- Name: NSColorPanelMode
+  SwiftName: NSColorPanel.Mode
+- Name: NSColorPanelOptions
+  SwiftName: NSColorPanel.Options
+- Name: NSColorWellStyle
+  SwiftName: NSColorWell.Style
+- Name: NSLevelIndicatorStyle
+  SwiftName: NSLevelIndicator.Style
+- Name: NSLevelIndicatorPlaceholderVisibility
+  SwiftName: NSLevelIndicator.PlaceholderVisibility
+- Name: NSPopoverBehavior
+  SwiftName: NSPopover.Behavior
+- Name: NSPathStyle
+  SwiftName: NSPathControl.Style
+- Name: NSTokenStyle
+  SwiftName: NSTokenField.TokenStyle
+- Name: NSStackViewGravity
+  SwiftName: NSStackView.Gravity
+- Name: NSStackViewDistribution
+  SwiftName: NSStackView.Distribution
+- Name: NSToolbarDisplayMode
+  SwiftName: NSToolbar.DisplayMode
+- Name: NSToolbarSizeMode
+  SwiftName: NSToolbar.SizeMode
+- Name: NSWindowToolbarStyle
+  SwiftName: NSWindow.ToolbarStyle
+- Name: NSAlertStyle
+  SwiftName: NSAlert.Style
+- Name: NSDocumentChangeType
+  SwiftName: NSDocument.ChangeType
+- Name: NSSaveOperationType
+  SwiftName: NSDocument.SaveOperationType
+- Name: NSFontPanelModeMask
+  SwiftName: NSFontPanel.ModeMask
+- Name: NSGradientDrawingOptions
+  SwiftName: NSGradient.DrawingOptions
+- Name: NSSplitViewItemBehavior
+  SwiftName: NSSplitViewItem.Behavior
+- Name: NSSplitViewItemCollapseBehavior
+  SwiftName: NSSplitViewItem.CollapseBehavior
+- Name: NSTabViewControllerTabStyle
+  SwiftName: NSTabViewController.TabStyle
+- Name: NSViewControllerTransitionOptions
+  SwiftName: NSViewController.TransitionOptions
 - Name: NSAutoresizingMaskOptions
   SwiftName: NSView.AutoresizingMask
 Enumerators:
@@ -149,3 +425,240 @@ Enumerators:
   SwiftName: height
 - Name: NSViewMaxYMargin
   SwiftName: maxYMargin
+# the attribute keys, as members of NSAttributedString.Key, and the
+# notifications, as members of the classes that post them (freemac 1.230)
+Globals:
+- Name: NSAnimationProgressMarkNotification
+  SwiftName: NSAnimation.progressMarkNotification
+- Name: NSApplicationDidBecomeActiveNotification
+  SwiftName: NSApplication.didBecomeActiveNotification
+- Name: NSApplicationDidFinishLaunchingNotification
+  SwiftName: NSApplication.didFinishLaunchingNotification
+- Name: NSApplicationDidFinishRestoringWindowsNotification
+  SwiftName: NSApplication.didFinishRestoringWindowsNotification
+- Name: NSApplicationDidResignActiveNotification
+  SwiftName: NSApplication.didResignActiveNotification
+- Name: NSApplicationWillFinishLaunchingNotification
+  SwiftName: NSApplication.willFinishLaunchingNotification
+- Name: NSApplicationWillTerminateNotification
+  SwiftName: NSApplication.willTerminateNotification
+- Name: NSColorListDidChangeNotification
+  SwiftName: NSColorList.didChangeNotification
+- Name: NSColorPanelColorDidChangeNotification
+  SwiftName: NSColorPanel.colorDidChangeNotification
+- Name: NSComboBoxSelectionDidChangeNotification
+  SwiftName: NSComboBox.selectionDidChangeNotification
+- Name: NSComboBoxSelectionIsChangingNotification
+  SwiftName: NSComboBox.selectionIsChangingNotification
+- Name: NSComboBoxWillDismissNotification
+  SwiftName: NSComboBox.willDismissNotification
+- Name: NSComboBoxWillPopUpNotification
+  SwiftName: NSComboBox.willPopUpNotification
+- Name: NSControlTextDidBeginEditingNotification
+  SwiftName: NSControl.textDidBeginEditingNotification
+- Name: NSControlTextDidChangeNotification
+  SwiftName: NSControl.textDidChangeNotification
+- Name: NSControlTextDidEndEditingNotification
+  SwiftName: NSControl.textDidEndEditingNotification
+- Name: NSControlTintDidChangeNotification
+  SwiftName: NSControl.tintDidChangeNotification
+- Name: NSMenuDidBeginTrackingNotification
+  SwiftName: NSMenu.didBeginTrackingNotification
+- Name: NSMenuDidEndTrackingNotification
+  SwiftName: NSMenu.didEndTrackingNotification
+- Name: NSMenuDidSendActionNotification
+  SwiftName: NSMenu.didSendActionNotification
+- Name: NSMenuWillSendActionNotification
+  SwiftName: NSMenu.willSendActionNotification
+- Name: NSOutlineViewColumnDidMoveNotification
+  SwiftName: NSOutlineView.columnDidMoveNotification
+- Name: NSOutlineViewColumnDidResizeNotification
+  SwiftName: NSOutlineView.columnDidResizeNotification
+- Name: NSOutlineViewItemDidCollapseNotification
+  SwiftName: NSOutlineView.itemDidCollapseNotification
+- Name: NSOutlineViewItemDidExpandNotification
+  SwiftName: NSOutlineView.itemDidExpandNotification
+- Name: NSOutlineViewItemWillCollapseNotification
+  SwiftName: NSOutlineView.itemWillCollapseNotification
+- Name: NSOutlineViewItemWillExpandNotification
+  SwiftName: NSOutlineView.itemWillExpandNotification
+- Name: NSOutlineViewSelectionDidChangeNotification
+  SwiftName: NSOutlineView.selectionDidChangeNotification
+- Name: NSOutlineViewSelectionIsChangingNotification
+  SwiftName: NSOutlineView.selectionIsChangingNotification
+- Name: NSPopUpButtonCellWillPopUpNotification
+  SwiftName: NSPopUpButtonCell.willPopUpNotification
+- Name: NSPopUpButtonWillPopUpNotification
+  SwiftName: NSPopUpButton.willPopUpNotification
+- Name: NSPopoverDidCloseNotification
+  SwiftName: NSPopover.didCloseNotification
+- Name: NSPopoverDidShowNotification
+  SwiftName: NSPopover.didShowNotification
+- Name: NSPopoverWillCloseNotification
+  SwiftName: NSPopover.willCloseNotification
+- Name: NSPopoverWillShowNotification
+  SwiftName: NSPopover.willShowNotification
+- Name: NSRuleEditorRowsDidChangeNotification
+  SwiftName: NSRuleEditor.rowsDidChangeNotification
+- Name: NSScrollViewDidEndLiveScrollNotification
+  SwiftName: NSScrollView.didEndLiveScrollNotification
+- Name: NSScrollViewDidLiveScrollNotification
+  SwiftName: NSScrollView.didLiveScrollNotification
+- Name: NSScrollViewWillStartLiveScrollNotification
+  SwiftName: NSScrollView.willStartLiveScrollNotification
+- Name: NSSplitViewDidResizeSubviewsNotification
+  SwiftName: NSSplitView.didResizeSubviewsNotification
+- Name: NSSplitViewWillResizeSubviewsNotification
+  SwiftName: NSSplitView.willResizeSubviewsNotification
+- Name: NSTableViewColumnDidMoveNotification
+  SwiftName: NSTableView.columnDidMoveNotification
+- Name: NSTableViewColumnDidResizeNotification
+  SwiftName: NSTableView.columnDidResizeNotification
+- Name: NSTableViewSelectionDidChangeNotification
+  SwiftName: NSTableView.selectionDidChangeNotification
+- Name: NSTableViewSelectionIsChangingNotification
+  SwiftName: NSTableView.selectionIsChangingNotification
+- Name: NSTextDidBeginEditingNotification
+  SwiftName: NSText.didBeginEditingNotification
+- Name: NSTextDidChangeNotification
+  SwiftName: NSText.didChangeNotification
+- Name: NSTextDidEndEditingNotification
+  SwiftName: NSText.didEndEditingNotification
+- Name: NSTextStorageDidProcessEditingNotification
+  SwiftName: NSTextStorage.didProcessEditingNotification
+- Name: NSTextStorageWillProcessEditingNotification
+  SwiftName: NSTextStorage.willProcessEditingNotification
+- Name: NSTextViewDidChangeSelectionNotification
+  SwiftName: NSTextView.didChangeSelectionNotification
+- Name: NSToolbarDidRemoveItemNotification
+  SwiftName: NSToolbar.didRemoveItemNotification
+- Name: NSToolbarWillAddItemNotification
+  SwiftName: NSToolbar.willAddItemNotification
+- Name: NSViewBoundsDidChangeNotification
+  SwiftName: NSView.boundsDidChangeNotification
+- Name: NSViewFrameDidChangeNotification
+  SwiftName: NSView.frameDidChangeNotification
+- Name: NSWindowDidBecomeKeyNotification
+  SwiftName: NSWindow.didBecomeKeyNotification
+- Name: NSWindowDidBecomeMainNotification
+  SwiftName: NSWindow.didBecomeMainNotification
+- Name: NSWindowDidChangeBackingPropertiesNotification
+  SwiftName: NSWindow.didChangeBackingPropertiesNotification
+- Name: NSWindowDidDeminiaturizeNotification
+  SwiftName: NSWindow.didDeminiaturizeNotification
+- Name: NSWindowDidEndSheetNotification
+  SwiftName: NSWindow.didEndSheetNotification
+- Name: NSWindowDidMiniaturizeNotification
+  SwiftName: NSWindow.didMiniaturizeNotification
+- Name: NSWindowDidMoveNotification
+  SwiftName: NSWindow.didMoveNotification
+- Name: NSWindowDidResignKeyNotification
+  SwiftName: NSWindow.didResignKeyNotification
+- Name: NSWindowDidResignMainNotification
+  SwiftName: NSWindow.didResignMainNotification
+- Name: NSWindowDidResizeNotification
+  SwiftName: NSWindow.didResizeNotification
+- Name: NSWindowDidUpdateNotification
+  SwiftName: NSWindow.didUpdateNotification
+- Name: NSWindowWillBeginSheetNotification
+  SwiftName: NSWindow.willBeginSheetNotification
+- Name: NSWindowWillCloseNotification
+  SwiftName: NSWindow.willCloseNotification
+- Name: NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification
+  SwiftName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification
+- Name: NSWorkspaceActiveSpaceDidChangeNotification
+  SwiftName: NSWorkspace.activeSpaceDidChangeNotification
+- Name: NSWorkspaceDidActivateApplicationNotification
+  SwiftName: NSWorkspace.didActivateApplicationNotification
+- Name: NSWorkspaceDidDeactivateApplicationNotification
+  SwiftName: NSWorkspace.didDeactivateApplicationNotification
+- Name: NSWorkspaceDidHideApplicationNotification
+  SwiftName: NSWorkspace.didHideApplicationNotification
+- Name: NSWorkspaceDidLaunchApplicationNotification
+  SwiftName: NSWorkspace.didLaunchApplicationNotification
+- Name: NSWorkspaceDidMountNotification
+  SwiftName: NSWorkspace.didMountNotification
+- Name: NSWorkspaceDidPerformFileOperationNotification
+  SwiftName: NSWorkspace.didPerformFileOperationNotification
+- Name: NSWorkspaceDidTerminateApplicationNotification
+  SwiftName: NSWorkspace.didTerminateApplicationNotification
+- Name: NSWorkspaceDidUnhideApplicationNotification
+  SwiftName: NSWorkspace.didUnhideApplicationNotification
+- Name: NSWorkspaceDidUnmountNotification
+  SwiftName: NSWorkspace.didUnmountNotification
+- Name: NSWorkspaceDidWakeNotification
+  SwiftName: NSWorkspace.didWakeNotification
+- Name: NSWorkspaceScreensDidSleepNotification
+  SwiftName: NSWorkspace.screensDidSleepNotification
+- Name: NSWorkspaceScreensDidWakeNotification
+  SwiftName: NSWorkspace.screensDidWakeNotification
+- Name: NSWorkspaceSessionDidBecomeActiveNotification
+  SwiftName: NSWorkspace.sessionDidBecomeActiveNotification
+- Name: NSWorkspaceSessionDidResignActiveNotification
+  SwiftName: NSWorkspace.sessionDidResignActiveNotification
+- Name: NSWorkspaceWillLaunchApplicationNotification
+  SwiftName: NSWorkspace.willLaunchApplicationNotification
+- Name: NSWorkspaceWillPowerOffNotification
+  SwiftName: NSWorkspace.willPowerOffNotification
+- Name: NSWorkspaceWillSleepNotification
+  SwiftName: NSWorkspace.willSleepNotification
+- Name: NSWorkspaceWillUnmountNotification
+  SwiftName: NSWorkspace.willUnmountNotification
+- Name: NSFontAttributeName
+  SwiftName: font
+- Name: NSForegroundColorAttributeName
+  SwiftName: foregroundColor
+- Name: NSBackgroundColorAttributeName
+  SwiftName: backgroundColor
+- Name: NSParagraphStyleAttributeName
+  SwiftName: paragraphStyle
+- Name: NSKernAttributeName
+  SwiftName: kern
+- Name: NSUnderlineStyleAttributeName
+  SwiftName: underlineStyle
+- Name: NSUnderlineColorAttributeName
+  SwiftName: underlineColor
+- Name: NSStrikethroughStyleAttributeName
+  SwiftName: strikethroughStyle
+- Name: NSLigatureAttributeName
+  SwiftName: ligature
+- Name: NSLinkAttributeName
+  SwiftName: link
+- Name: NSShadowAttributeName
+  SwiftName: shadow
+- Name: NSStrikethroughColorAttributeName
+  SwiftName: strikethroughColor
+- Name: NSCursorAttributeName
+  SwiftName: cursor
+- Name: NSAttachmentAttributeName
+  SwiftName: attachment
+# strings and numbers that are types of their own in Swift (freemac 1.230);
+# AppKit's Swift overlay gives them their members' Swift names
+Typedefs:
+- Name: NSImageName
+  SwiftWrapper: struct
+  SwiftName: NSImage.Name
+- Name: NSNibName
+  SwiftWrapper: none
+  SwiftName: NSNib.Name
+- Name: NSSoundName
+  SwiftWrapper: struct
+  SwiftName: NSSound.Name
+- Name: NSFontWeight
+  SwiftWrapper: struct
+  SwiftName: NSFont.Weight
+- Name: NSModalResponse
+  SwiftWrapper: struct
+  SwiftName: NSApplication.ModalResponse
+- Name: NSUserInterfaceItemIdentifier
+  SwiftWrapper: struct
+  SwiftName: NSUserInterfaceItemIdentifier
+- Name: NSToolbarIdentifier
+  SwiftWrapper: struct
+  SwiftName: NSToolbar.Identifier
+- Name: NSToolbarItemIdentifier
+  SwiftWrapper: struct
+  SwiftName: NSToolbarItem.Identifier
+- Name: NSLayoutPriority
+  SwiftWrapper: struct
+  SwiftName: NSLayoutConstraint.Priority

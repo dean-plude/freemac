@@ -2,9 +2,10 @@
 #
 # Ferry SDK: API notes for Foundation (freemac 1.227), which clang reads
 # beside the module map and Swift's compiler follows. They tell Swift which
-# Foundation classes are its own String, Array, Dictionary and Set in
-# Swift code, and give the Swift names Apple's documentation shows where
-# Swift's own renaming rules don't arrive at them. Written for Ferry from
+# Foundation classes are its own String, Array, Dictionary and Set (and,
+# freemac 1.230, the overlay's Date, Data, URL and UUID) in Swift code,
+# and give the Swift names Apple's documentation shows where Swift's own
+# renaming rules don't arrive at them. Written for Ferry from
 # that documentation; extended as Swift apps need more.
 ---
 Name: Foundation
@@ -17,11 +18,72 @@ Classes:
   SwiftBridge: Swift.Dictionary
 - Name: NSSet
   SwiftBridge: Swift.Set
+- Name: NSDate
+  SwiftBridge: Date
+- Name: NSData
+  SwiftBridge: Data
+- Name: NSURL
+  SwiftBridge: URL
+- Name: NSUUID
+  SwiftBridge: UUID
 - Name: NSUserDefaults
   Methods:
   - Selector: "setObject:forKey:"
     MethodKind: Instance
     SwiftName: "set(_:forKey:)"
+- Name: NSNotificationCenter
+  Methods:
+  - Selector: "postNotificationName:object:"
+    MethodKind: Instance
+    SwiftName: "post(name:object:)"
+  - Selector: "postNotificationName:object:userInfo:"
+    MethodKind: Instance
+    SwiftName: "post(name:object:userInfo:)"
+  - Selector: "addObserverForName:object:queue:usingBlock:"
+    MethodKind: Instance
+    SwiftName: "addObserver(forName:object:queue:using:)"
+- Name: NSTimer
+  Methods:
+  - Selector: "scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:"
+    MethodKind: Class
+    SwiftName: "scheduledTimer(timeInterval:target:selector:userInfo:repeats:)"
+- Name: NSFileHandle
+  Methods:
+  - Selector: "seekToEndReturningOffset:error:"
+    MethodKind: Instance
+    SwiftName: "__seekToEndReturningOffset(_:)"
+  - Selector: "getOffset:error:"
+    MethodKind: Instance
+    SwiftName: "__getOffset(_:)"
+  - Selector: "writeData:error:"
+    MethodKind: Instance
+    SwiftName: "__write(_:)"
+  - Selector: "readDataUpToLength:error:"
+    MethodKind: Instance
+    SwiftName: "__readData(upToLength:)"
+  - Selector: "readDataToEndOfFileAndReturnError:"
+    MethodKind: Instance
+    SwiftName: "__readDataToEndOfFile()"
+  - Selector: "synchronizeAndReturnError:"
+    MethodKind: Instance
+    SwiftName: "synchronize()"
+  - Selector: "closeAndReturnError:"
+    MethodKind: Instance
+    SwiftName: "close()"
+  - Selector: "truncateAtOffset:error:"
+    MethodKind: Instance
+    SwiftName: "truncate(atOffset:)"
+  - Selector: "seekToOffset:error:"
+    MethodKind: Instance
+    SwiftName: "seek(toOffset:)"
+- Name: NSFileManager
+  Methods:
+  - Selector: "URLsForDirectory:inDomains:"
+    MethodKind: Instance
+    SwiftName: "urls(for:in:)"
+  - Selector: "URLForDirectory:inDomain:appropriateForURL:create:error:"
+    MethodKind: Instance
+    SwiftName: "url(for:in:appropriateFor:create:)"
 - Name: NSNumber
   Properties:
   - Name: unsignedIntegerValue
@@ -37,3 +99,45 @@ Enumerators:
   SwiftName: anchored
 - Name: NSNumericSearch
   SwiftName: numeric
+- Name: NSRectEdgeMinX
+  SwiftName: minX
+- Name: NSRectEdgeMinY
+  SwiftName: minY
+- Name: NSRectEdgeMaxX
+  SwiftName: maxX
+- Name: NSRectEdgeMaxY
+  SwiftName: maxY
+- Name: NSMinXEdge
+  SwiftName: minXEdge
+- Name: NSMinYEdge
+  SwiftName: minYEdge
+- Name: NSMaxXEdge
+  SwiftName: maxXEdge
+- Name: NSMaxYEdge
+  SwiftName: maxYEdge
+# The notifications Swift names as members of the classes that post them
+# (freemac 1.230); the others are members of NSNotification.Name.
+Globals:
+- Name: NSFileHandleConnectionAcceptedNotification
+  SwiftName: NSFileHandle.connectionAcceptedNotification
+- Name: NSFileHandleDataAvailableNotification
+  SwiftName: NSFileHandle.dataAvailableNotification
+- Name: NSFileHandleReadCompletionNotification
+  SwiftName: NSFileHandle.readCompletionNotification
+- Name: NSFileHandleReadToEndOfFileCompletionNotification
+  SwiftName: NSFileHandle.readToEndOfFileCompletionNotification
+- Name: NSTaskDidTerminateNotification
+  SwiftName: NSTask.didTerminateNotification
+# A run loop's mode is RunLoop.Mode in Swift and a notification's name
+# Notification.Name, strings wrapped in structs (freemac 1.230); the
+# overlay gives the modes their short member names.
+Typedefs:
+- Name: NSNotificationName
+  SwiftWrapper: struct
+  SwiftName: NSNotification.Name
+- Name: NSRunLoopMode
+  SwiftWrapper: struct
+  SwiftName: NSRunLoop.Mode
+- Name: NSAttributedStringKey
+  SwiftWrapper: struct
+  SwiftName: NSAttributedString.Key

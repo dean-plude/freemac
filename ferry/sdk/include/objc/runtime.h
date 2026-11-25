@@ -18,8 +18,13 @@ typedef struct objc_object Protocol;
 struct objc_method_description { SEL name; char *types; };
 typedef struct { const char *name; const char *value; } objc_property_attribute_t;
 
+#ifdef __swift__
+typedef enum __attribute__((enum_extensibility(open))) objc_AssociationPolicy : uintptr_t objc_AssociationPolicy;
+enum objc_AssociationPolicy : uintptr_t {
+#else
 typedef uintptr_t objc_AssociationPolicy;
 enum {
+#endif
     OBJC_ASSOCIATION_ASSIGN = 0,
     OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1,
     OBJC_ASSOCIATION_COPY_NONATOMIC = 3,

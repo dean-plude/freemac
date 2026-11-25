@@ -22,6 +22,22 @@
 #                      label views, a Button whose label is several views,
 #                      NSLocalizedString, the gesture modifiers, @FocusState
 #                      and an NSViewRepresentable with a coordinator
+#   dispatch           the Dispatch overlay (freemac 1.230): queues, sync and
+#                      async, groups, semaphores, work items, times, and a
+#                      timer source ticking on the main queue
+#   concurrency        Swift's concurrency library: tasks, actors, task
+#                      groups, Task.sleep, cancellation and the main actor
+#   values             Foundation's value types (freemac 1.230): Date, Data,
+#                      URL and UUID to and from their NS classes, JSONEncoder
+#                      and JSONDecoder with Codable, FileHandle's Swift
+#                      methods, String.Encoding, DateComponentsFormatter
+#   swiftui_tasks      .task and .task(id:), .onReceive, a ViewModifier,
+#                      LabeledContent, alignmentGuide, keyboard shortcuts'
+#                      localization, the environment's locale and #Preview
+#                      (freemac 1.230); the driver waits for views' tasks
+#   swiftui_drawing    shapes (a Shape of its own too), an overlay and a
+#                      background by alignment, a GeometryReader, an alert
+#                      and a sheet, their buttons pressed (freemac 1.230)
 #   mixed              an Objective-C program using a Swift class, through
 #                      the header ferry-swiftc writes (-emit-objc-header-path),
 #                      the Swift built as a library beside it (@rpath)
@@ -31,15 +47,15 @@
 # either missing they are skipped. Ferry's own Swift modules are brought up
 # to date first (swift/build-modules.sh does nothing when they are).
 
-swift_tests="swift_hello swift_foundation swift_appkit_window swift_swiftui_counter swift_swiftui_app swift_swiftui_hosting swift_swiftui_grid swift_mixed"
+swift_tests="swift_hello swift_foundation swift_appkit_window swift_swiftui_counter swift_swiftui_app swift_swiftui_hosting swift_swiftui_grid swift_dispatch swift_concurrency swift_values swift_combine swift_services swift_appkit_names swift_swiftui_tasks swift_swiftui_drawing swift_mixed"
 swift_tc=${FERRY_SWIFT_TOOLCHAIN:-}
 if [ -z "$swift_tc" ] && command -v swift-frontend > /dev/null 2>&1; then
     swift_tc=$(dirname "$(dirname "$(command -v swift-frontend)")")
 fi
 if [ -z "$swift_tc" ] || [ ! -x "$swift_tc/usr/bin/swift-frontend" ]; then
     echo "skip $swift_tests (need a Swift toolchain: FERRY_SWIFT_TOOLCHAIN, or swift-frontend on PATH)"
-elif [ ! -f "$top/frameworks/swift/libswiftCore.dylib" ]; then
-    echo "skip $swift_tests (need Swift's runtime built for Ferry: swift/build-runtime.sh)"
+elif [ ! -f "$top/frameworks/swift/libswiftCore.dylib" ] || [ ! -f "$top/frameworks/swift/libswift_Concurrency.dylib" ]; then
+    echo "skip $swift_tests (need Swift's runtime, with its concurrency library, built for Ferry: swift/build-runtime.sh)"
 elif ! FERRY_SWIFT_TOOLCHAIN="$swift_tc" sh "$top/swift/build-modules.sh" > "$build/swift_modules.log" 2>&1; then
     echo "FAIL swift modules (swift/build-modules.sh)"; sed 's/^/    /' "$build/swift_modules.log"
     fail=$((fail + 1))
@@ -75,6 +91,14 @@ else
     swift_one swiftui_app "FERRY_SWIFTUI_CLICK=Add,Grid,menu:Add Figs,menu:Settings…"
     swift_one swiftui_hosting
     swift_one swiftui_grid "FERRY_SWIFTUI_CLICK=Long,Start"
+    swift_one dispatch
+    swift_one concurrency
+    swift_one values
+    swift_one combine
+    swift_one services OS_ACTIVITY_DT_MODE=1 FERRY_SOUND_PLAYER=/bin/true
+    swift_one appkit_names
+    swift_one swiftui_tasks "FERRY_SWIFTUI_CLICK=Next,Next"
+    swift_one swiftui_drawing "FERRY_SWIFTUI_CLICK=Ask,Now,Sheet,Done"
 
     # mixed: mixed.swift becomes libMixed.dylib and Mixed-Swift.h, which
     # mixed.m imports and links

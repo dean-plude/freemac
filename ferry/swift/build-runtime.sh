@@ -14,6 +14,8 @@
 #   frameworks/swift/usr/lib/swift/                    the compiler's resource folder for them:
 #       macosx/Swift.swiftmodule/x86_64-apple-macos.{swiftmodule,swiftinterface}
 #       macosx/SwiftOnoneSupport.swiftmodule/...
+#       macosx/_Concurrency.swiftmodule/...            Swift's concurrency library (freemac 1.230),
+#                                                      with frameworks/swift/libswift_Concurrency.dylib
 #       shims/                                         SwiftShims, as a toolchain lays them out
 #       clang                                          the toolchain's clang headers (a link)
 #
@@ -226,4 +228,52 @@ if [ ! -f "$obj/Darwin.o" ] || [ "$obj/Swift.o" -nt "$obj/Darwin.o" ] ||
 fi
 "$cc" -dynamiclib -install_name /usr/lib/swift/libswiftDarwin.dylib \
     -o "$dest/libswiftDarwin.dylib" "$obj/Darwin.o" -L"$dest" -lswiftCore
+
+# _Concurrency, Swift's concurrency library (stdlib/public/Concurrency,
+# freemac 1.230): tasks, actors, async/await and the main actor. Its jobs
+# run on Ferry's libdispatch, as on a Mac (the global executor puts them on
+# the global queues, the main actor's on the main queue). Vouchers, which
+# it passes along with tasks, are always empty on Ferry. Built unchanged.
+conc=$src/stdlib/public/Concurrency
+cdefs=$(echo "$defs" | sed 's/-DSWIFT_TARGET_LIBRARY_NAME=swiftRuntime/-DSWIFT_TARGET_LIBRARY_NAME=swift_Concurrency/;
+                            s/-DswiftCore_EXPORTS/-Dswift_Concurrency_EXPORTS -DSWIFT_CONCURRENCY_LIBRARY/')
+cdefs="$cdefs -DSWIFT_CONCURRENCY_USES_DISPATCH=1 -DSWIFT_STDLIB_CONCURRENCY_TRACING=0 -D__STDC_WANT_LIB_EXT1__=1"
+mkdir -p "$obj/concurrency"
+cobjs=
+for f in "$src/stdlib/public/CompatibilityOverride/CompatibilityOverride.cpp" "$conc/Actor.cpp" "$conc/AsyncLet.cpp" \
+         "$conc/Clock.cpp" "$conc/GlobalExecutor.cpp" "$conc/ConcurrencyHooks.cpp" "$conc/EmbeddedSupport.cpp" \
+         "$conc/Error.cpp" "$conc/ExecutorChecks.cpp" "$conc/Setup.cpp" "$conc/Task.cpp" "$conc/TaskAlloc.cpp" \
+         "$conc/TaskStatus.cpp" "$conc/TaskGroup.cpp" "$conc/TaskLocal.cpp" "$conc/ThreadingError.cpp" \
+         "$conc/TracingSignpost.cpp" "$conc/AsyncStream.cpp" "$conc/DispatchGlobalExecutor.cpp" \
+         "$conc/linker-support/magic-symbols-for-install-name.c" "$src/lib/Threading/Pthreads.cpp"; do
+    o=$obj/concurrency/$(basename "$f").o
+    cobjs="$cobjs $o"
+    [ "$o" -nt "$f" ] && continue
+    case $f in *.cpp) lang="-std=c++17 -fno-rtti -fno-exceptions" ;; *) lang= ;; esac
+    # shellcheck disable=SC2086
+    "$cc" -c $cflags -fswift-async-fp=always $lang $cdefs $incs -I"$conc" -o "$o" "$f" &
+done
+wait
+for o in $cobjs; do [ -f "$o" ] || { echo "build-runtime: $o didn't compile" >&2; exit 1; }; done
+cfiles=$(sed -n '/^set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES/,/^)/p' "$conc/CMakeLists.txt" | grep -o '[^ ]*\.swift' | sed "s|^|$conc/|")
+cfiles=$(echo $cfiles)
+cmod=$res/macosx/_Concurrency.swiftmodule
+mkdir -p "$cmod"
+if [ ! -f "$obj/_Concurrency.o" ] || [ "$obj/Swift.o" -nt "$obj/_Concurrency.o" ] ||
+   [ -n "$(find "$conc" -newer "$obj/_Concurrency.o" -name '*.swift' | head -1)" ]; then
+    echo "build-runtime: compiling _Concurrency, Swift's concurrency library"
+    # shellcheck disable=SC2086
+    eval "\"$frontend\" -frontend -c $cfiles $common $avail -enable-experimental-feature IsolatedAny \
+        -module-name _Concurrency -module-link-name swift_Concurrency -parse-stdlib -library-level api \
+        -runtime-compatibility-version none -I $conc/InternalShims -I $res/macosx -swift-async-frame-pointer=always \
+        -D SWIFT_ENABLE_REFLECTION -D SWIFT_CONCURRENCY_USES_DISPATCH \
+        -disable-autolinking-runtime-compatibility-dynamic-replacements -disable-autolinking-runtime-compatibility-concurrency \
+        -warn-implicit-overrides -enable-ossa-modules -target-min-inlining-version min -enable-lexical-lifetimes=false \
+        -Xcc -DSWIFT_OBJC_INTEROP=1 -Xcc -Dswift_Concurrency_EXPORTS \
+        -emit-module-path $cmod/x86_64-apple-macos.swiftmodule \
+        -emit-module-interface-path $cmod/x86_64-apple-macos.swiftinterface -o $obj/_Concurrency.o"
+fi
+# shellcheck disable=SC2086
+"$cc" -dynamiclib -install_name /usr/lib/swift/libswift_Concurrency.dylib \
+    -o "$dest/libswift_Concurrency.dylib" "$obj/_Concurrency.o" $cobjs -L"$dest" -lswiftCore -lobjc -lc++
 echo "build-runtime: done; Swift's runtime is in $dest"

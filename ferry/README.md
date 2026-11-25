@@ -443,6 +443,8 @@ out its panes once its split view is in a window
 `JSManagedValue` is weak in `javascriptcore/JSValue.m`. The tests are
 `appkit_ibtool_classes` and `appkit_x11_placement`.
 
+Ferry 0.54.0 (freemac 1.230) runs TomatoBar, an open-source SwiftUI menu bar timer: its packages are built from their source, its tomato shows in the menu bar, a click opens its popover, and Start starts the countdown.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

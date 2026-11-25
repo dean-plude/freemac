@@ -1,0 +1,19 @@
+same loop: 1
+retained on create: 1
+activities all: 1 repeats: 1 order: 0 valid: 1
+context info kept: 1
+contains: 1 1
+timer fired: 1
+entry seen: 1 exit seen: 1
+entries match exits: 1
+before timers and sources: 1 1
+waited: 1 1
+unknown activities: 0
+order: AB
+one-shot told once: 1, still valid: 0, still in loop: 0
+after remove/invalidate: in 0 0, valid 0
+empty loop runs: 0
+empty loop told no one: 1
+silent after: 1, early still told: 1
+released context: 1
+exit=0

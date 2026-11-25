@@ -24,4 +24,16 @@ not a shared file list item (0):
 unknown helper on: 0
 helper off: 1, off again: 1
 autostart entries: (none)
+main app: status 0
+register: 1, status 1
+again: 1
+with the main app (1): [Login Test ~/Apps/LoginTest.app]
+unregister: 1, status 0
+unregister again: 0, SMAppServiceErrorDomain
+helper: status 0
+register: 1, status 1
+jobs: 1, org.freemac.test.helper on demand 1; system jobs: 0
+unregister: 1, status 0
+missing helper: 3, agent: 3, register agent: 0
+autostart entries: (none)
 exit=0

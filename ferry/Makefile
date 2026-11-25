@@ -249,6 +249,8 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 	@mkdir -p frameworks/Carbon.framework
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
+	@mkdir -p frameworks/AVFoundation.framework
+	sdk/gen-alias-tbd.sh AVFoundation $@ > frameworks/AVFoundation.framework/AVFoundation.tbd
 	@mkdir -p frameworks/UserNotifications.framework
 	sdk/gen-alias-tbd.sh UserNotifications $@ > frameworks/UserNotifications.framework/UserNotifications.tbd
 	@mkdir -p frameworks/ScriptingBridge.framework
@@ -323,7 +325,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUA
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

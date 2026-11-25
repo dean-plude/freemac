@@ -412,6 +412,18 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
 - (NSColor *)shadowWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor blackColor]]; }
 - (NSColor *)colorUsingColorSpaceName:(NSString *)name { return self; }
 - (NSColor *)colorUsingColorSpace:(id)space { return self; }
+/* Ferry's colours are all kept as components; one made from a pattern
+ * image is a pattern too. None is a catalog colour. */
+- (NSColorType)type
+{
+    return [self patternImage] ? NSColorTypePattern : NSColorTypeComponentBased;
+}
+- (NSColor *)colorUsingType:(NSColorType)type
+{
+    if (type == NSColorTypeComponentBased) return self;
+    if (type == NSColorTypePattern) return [self patternImage] ? self : nil;
+    return nil;
+}
 - (void)set
 {
     [self setFill];

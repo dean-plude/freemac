@@ -11,7 +11,23 @@
 #include <stdbool.h>
 #include <time.h>
 
-#ifdef __OBJC__
+#if defined(__OBJC__) && defined(__swift__)
+/* Seen from Swift (freemac 1.230), dispatch objects are NSObjects rather
+ * than "id", which Swift would see as Any: Ferry's Dispatch overlay
+ * (swift/overlays/Dispatch) wraps them in DispatchQueue and the like. */
+#include <objc/NSObject.h>
+typedef NSObject *dispatch_object_t;
+typedef NSObject *dispatch_queue_t;
+typedef NSObject *dispatch_queue_global_t;
+typedef NSObject *dispatch_queue_main_t;
+typedef NSObject *dispatch_queue_serial_t;
+typedef NSObject *dispatch_queue_concurrent_t;
+typedef void *dispatch_queue_attr_t;   /* not an object here */
+typedef NSObject *dispatch_group_t;
+typedef NSObject *dispatch_semaphore_t;
+typedef NSObject *dispatch_source_t;
+#define DISPATCH_RETURNS_RETAINED __attribute__((ns_returns_retained))
+#elif defined(__OBJC__)
 /* As a Mac's os/object.h does: dispatch objects are NSObjects, so anything
  * that includes dispatch (Core Services, Carbon) declares NSObject. */
 #include <objc/NSObject.h>
@@ -36,6 +52,17 @@ typedef struct dispatch_queue_attr_s *dispatch_queue_attr_t;
 typedef struct dispatch_group_s *dispatch_group_t;
 typedef struct dispatch_semaphore_s *dispatch_semaphore_t;
 typedef struct dispatch_source_s *dispatch_source_t;
+#ifdef __cplusplus
+/* In C++ (freemac 1.230), as on a Mac, each kind of object is a kind of
+ * dispatch_object_s, so that any of them is a dispatch_object_t. */
+struct dispatch_object_s {};
+struct dispatch_queue_s : public dispatch_object_s {};
+struct dispatch_queue_attr_s : public dispatch_object_s {};
+struct dispatch_group_s : public dispatch_object_s {};
+struct dispatch_semaphore_s : public dispatch_object_s {};
+struct dispatch_source_s : public dispatch_object_s {};
+typedef struct dispatch_object_s *dispatch_object_t;
+#else
 /* Any dispatch object, as C's transparent union lets it be passed. */
 typedef union {
     struct dispatch_object_s *_do;
@@ -45,6 +72,7 @@ typedef union {
     struct dispatch_semaphore_s *_dsema;
     struct dispatch_source_s *_ds;
 } dispatch_object_t __attribute__((transparent_union));
+#endif
 #define DISPATCH_RETURNS_RETAINED
 #endif
 
@@ -91,6 +119,24 @@ __FERRY_END
 #define dispatch_get_main_queue() (&_dispatch_main_q)
 #define DISPATCH_QUEUE_CONCURRENT (&_dispatch_queue_attr_concurrent)
 #endif
+#if defined(__OBJC__) && defined(__swift__)
+/* What the macros above stand for, as functions Swift can call. */
+static inline dispatch_queue_main_t _ferry_dispatch_main_queue(void) { return dispatch_get_main_queue(); }
+static inline dispatch_queue_attr_t _ferry_dispatch_queue_concurrent(void) { return &_dispatch_queue_attr_concurrent; }
+static inline dispatch_source_type_t _ferry_dispatch_source_type(int which) {
+    switch (which) {
+    case 0: return &_dispatch_source_type_timer;
+    case 1: return &_dispatch_source_type_data_add;
+    case 2: return &_dispatch_source_type_data_or;
+    case 3: return &_dispatch_source_type_data_replace;
+    case 4: return &_dispatch_source_type_read;
+    case 5: return &_dispatch_source_type_write;
+    case 6: return &_dispatch_source_type_signal;
+    case 7: return &_dispatch_source_type_proc;
+    default: return &_dispatch_source_type_vnode;
+    }
+}
+#endif
 #define DISPATCH_QUEUE_SERIAL NULL
 #define DISPATCH_QUEUE_SERIAL_INACTIVE dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_SERIAL)
 #define DISPATCH_QUEUE_CONCURRENT_INACTIVE dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_CONCURRENT)
@@ -134,6 +180,11 @@ dispatch_queue_attr_t dispatch_queue_attr_make_with_qos_class(dispatch_queue_att
 dispatch_queue_attr_t dispatch_queue_attr_make_initially_inactive(dispatch_queue_attr_t attr);
 const char *dispatch_queue_get_label(dispatch_queue_t queue);
 dispatch_queue_t dispatch_get_current_queue(void);
+/* stop the program unless the work running now runs on the queue (or, for
+ * _not, unless it doesn't) */
+void dispatch_assert_queue(dispatch_queue_t queue);
+void dispatch_assert_queue_not(dispatch_queue_t queue);
+void dispatch_assert_queue_barrier(dispatch_queue_t queue);
 #define DISPATCH_CURRENT_QUEUE_LABEL NULL
 void dispatch_set_target_queue(dispatch_object_t object, dispatch_queue_t queue);
 void dispatch_suspend(dispatch_object_t object);
@@ -179,6 +230,8 @@ unsigned long dispatch_source_get_data(dispatch_source_t source);
 unsigned long dispatch_source_get_mask(dispatch_source_t source);
 uintptr_t dispatch_source_get_handle(dispatch_source_t source);
 void dispatch_source_merge_data(dispatch_source_t source, unsigned long value);
+void dispatch_source_set_event_handler_f(dispatch_source_t source, dispatch_function_t handler);
+void dispatch_source_set_cancel_handler_f(dispatch_source_t source, dispatch_function_t handler);
 
 #if __BLOCKS__
 void dispatch_async(dispatch_queue_t queue, dispatch_block_t block);

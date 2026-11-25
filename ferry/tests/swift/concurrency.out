@@ -1,0 +1,9 @@
+on the main thread: true
+detached: 49
+actor total: 5050
+squares: [1, 4, 9, 16, 25]
+threw: true
+slept at least 50 ms: true and back on the main thread: true
+cancelled task saw it: true
+log: ["start", "from the main queue", "from a task", "end"]
+exit=0

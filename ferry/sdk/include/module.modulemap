@@ -3,6 +3,12 @@
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 
+module AVFoundation [system] {
+    header "AVFoundation/AVFoundation.h"
+    export *
+    link framework "AVFoundation"
+}
+
 module AppKit [system] {
     header "AppKit/AppKit.h"
     header "AppKit/AppKitApps.h"
@@ -19,6 +25,10 @@ module AppKit [system] {
     header "AppKit/NSFontDescriptor.h"
     header "AppKit/NSGridView.h"
     header "AppKit/NSLayoutConstraint.h"
+    module NSMenu {
+        header "AppKit/NSMenu.h"
+        export *
+    }
     header "AppKit/NSRuleEditor.h"
     header "AppKit/NSRulerView.h"
     header "AppKit/NSRunningApplication.h"
@@ -42,7 +52,10 @@ module CFNetwork [system] {
 }
 
 module Carbon [system] {
-    header "Carbon/Carbon.h"
+    module HIToolbox {
+        header "Carbon/Carbon.h"
+        export *
+    }
     export *
     link framework "Carbon"
 }
@@ -137,6 +150,7 @@ module CoreServices [system] {
     header "CoreServices/LaunchServices.h"
     header "CoreServices/UTCoreTypes.h"
     header "CoreServices/UTType.h"
+    header "CoreServices/UnicodeUtilities.h"
     export *
     link framework "CoreServices"
 }
@@ -369,6 +383,18 @@ module WebKit [system] {
     header "WebKit/WebView.h"
     export *
     link framework "WebKit"
+}
+
+module Dispatch [system] {
+    header "dispatch/dispatch.h"
+    export *
+}
+
+module os [system] {
+    module log {
+        header "os/log.h"
+        export *
+    }
 }
 
 module Darwin [system] {

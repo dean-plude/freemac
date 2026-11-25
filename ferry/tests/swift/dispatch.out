@@ -1,0 +1,16 @@
+label: test.serial
+serial order: [1, 2, 3, 4, 5]
+sync returned: 42
+sync threw: bad
+group: done 5050
+concurrentPerform: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+semaphore: signalled
+semaphore again: timed out
+work item ran
+cancelled: true
+time ordered: true true
+intervals equal: true
+timer ticked 3 times on the main thread: true
+timer cancelled: true
+after: ticks 3
+exit=0

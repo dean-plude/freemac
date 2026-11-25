@@ -99,9 +99,9 @@ typedef NSString *UNNotificationSoundName;
 @property (class, readonly, copy) UNNotificationSound *defaultSound;
 @property (class, readonly, copy) UNNotificationSound *defaultCriticalSound;
 + (UNNotificationSound *)defaultCriticalSoundWithAudioVolume:(float)volume;
-+ (instancetype)soundNamed:(UNNotificationSoundName)name;
-+ (instancetype)criticalSoundNamed:(UNNotificationSoundName)name;
-+ (instancetype)criticalSoundNamed:(UNNotificationSoundName)name withAudioVolume:(float)volume;
++ (instancetype FERRY_SWIFT_NONNULL)soundNamed:(UNNotificationSoundName)name;
++ (instancetype FERRY_SWIFT_NONNULL)criticalSoundNamed:(UNNotificationSoundName)name;
++ (instancetype FERRY_SWIFT_NONNULL)criticalSoundNamed:(UNNotificationSoundName)name withAudioVolume:(float)volume;
 @end
 
 /* Kept with the content; not shown. */
@@ -158,12 +158,12 @@ typedef NSString *UNNotificationSoundName;
 @end
 @interface UNTimeIntervalNotificationTrigger : UNNotificationTrigger
 @property (readonly) NSTimeInterval timeInterval;
-+ (instancetype)triggerWithTimeInterval:(NSTimeInterval)timeInterval repeats:(BOOL)repeats;
++ (instancetype FERRY_SWIFT_NONNULL)triggerWithTimeInterval:(NSTimeInterval)timeInterval repeats:(BOOL)repeats;
 - (NSDate *)nextTriggerDate;
 @end
 @interface UNCalendarNotificationTrigger : UNNotificationTrigger
 @property (readonly, copy) NSDateComponents *dateComponents;
-+ (instancetype)triggerWithDateMatchingComponents:(NSDateComponents *)dateComponents repeats:(BOOL)repeats;
++ (instancetype FERRY_SWIFT_NONNULL)triggerWithDateMatchingComponents:(NSDateComponents *)dateComponents repeats:(BOOL)repeats;
 - (NSDate *)nextTriggerDate;
 @end
 
@@ -171,7 +171,7 @@ typedef NSString *UNNotificationSoundName;
 @property (readonly, copy) NSString *identifier;
 @property (readonly, copy) UNNotificationContent *content;
 @property (readonly, copy) UNNotificationTrigger *trigger;
-+ (instancetype)requestWithIdentifier:(NSString *)identifier content:(UNNotificationContent *)content
++ (instancetype FERRY_SWIFT_NONNULL)requestWithIdentifier:(NSString *)identifier content:(UNNotificationContent *)content
                               trigger:(UNNotificationTrigger *)trigger;
 @end
 
@@ -184,13 +184,13 @@ typedef NSString *UNNotificationSoundName;
 @property (readonly, copy) NSString *identifier;
 @property (readonly, copy) NSString *title;
 @property (readonly) UNNotificationActionOptions options;
-+ (instancetype)actionWithIdentifier:(NSString *)identifier title:(NSString *)title
++ (instancetype FERRY_SWIFT_NONNULL)actionWithIdentifier:(NSString *)identifier title:(NSString *)title
                              options:(UNNotificationActionOptions)options;
 @end
 @interface UNTextInputNotificationAction : UNNotificationAction
 @property (readonly, copy) NSString *textInputButtonTitle;
 @property (readonly, copy) NSString *textInputPlaceholder;
-+ (instancetype)actionWithIdentifier:(NSString *)identifier title:(NSString *)title
++ (instancetype FERRY_SWIFT_NONNULL)actionWithIdentifier:(NSString *)identifier title:(NSString *)title
                              options:(UNNotificationActionOptions)options
                 textInputButtonTitle:(NSString *)textInputButtonTitle
                 textInputPlaceholder:(NSString *)textInputPlaceholder;
@@ -203,14 +203,14 @@ typedef NSString *UNNotificationSoundName;
 @property (readonly) UNNotificationCategoryOptions options;
 @property (readonly, copy) NSString *hiddenPreviewsBodyPlaceholder;
 @property (readonly, copy) NSString *categorySummaryFormat;
-+ (instancetype)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
++ (instancetype FERRY_SWIFT_NONNULL)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
                      intentIdentifiers:(NSArray<NSString *> *)intentIdentifiers
                                options:(UNNotificationCategoryOptions)options;
-+ (instancetype)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
++ (instancetype FERRY_SWIFT_NONNULL)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
                      intentIdentifiers:(NSArray<NSString *> *)intentIdentifiers
          hiddenPreviewsBodyPlaceholder:(NSString *)hiddenPreviewsBodyPlaceholder
                                options:(UNNotificationCategoryOptions)options;
-+ (instancetype)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
++ (instancetype FERRY_SWIFT_NONNULL)categoryWithIdentifier:(NSString *)identifier actions:(NSArray<UNNotificationAction *> *)actions
                      intentIdentifiers:(NSArray<NSString *> *)intentIdentifiers
          hiddenPreviewsBodyPlaceholder:(NSString *)hiddenPreviewsBodyPlaceholder
                  categorySummaryFormat:(NSString *)categorySummaryFormat
@@ -258,7 +258,7 @@ typedef NSString *UNNotificationSoundName;
 /* Kept without being retained, as a weak reference would be. */
 @property (assign) id<UNUserNotificationCenterDelegate> delegate;
 @property (readonly) BOOL supportsContentExtensions;
-+ (UNUserNotificationCenter *)currentNotificationCenter;
++ (UNUserNotificationCenter * FERRY_SWIFT_NONNULL)currentNotificationCenter;
 - (void)requestAuthorizationWithOptions:(UNAuthorizationOptions)options
                       completionHandler:(void (^)(BOOL granted, NSError *error))completionHandler;
 - (void)setNotificationCategories:(NSSet<UNNotificationCategory *> *)categories;

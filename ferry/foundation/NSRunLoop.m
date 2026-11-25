@@ -11,7 +11,9 @@
  * CFRunLoopWakeUp) so that it wakes at once. The main run loop also runs
  * the main dispatch queue's work, which wakes it the same way. A run loop
  * with nothing to wait for (no timer, port, descriptor or block) returns
- * at once from run, as on a Mac. */
+ * at once from run, as on a Mac. Observers (CFRunLoopObserver, freemac
+ * 1.230) are told as a run starts and ends, before each pass's timers and
+ * sources and around its wait; they don't keep a loop running. */
 #import "FInternal.h"
 #include <dispatch/dispatch.h>
 #include <fcntl.h>
@@ -55,7 +57,64 @@ extern int ferry_dispatch_timeout_ms(void);
 extern int ferry_dispatch_busy(void);
 extern void ferry_dispatch_set_main_wakeup(void (*fn)(void));
 
+/* ---- run loop observers --------------------------------------------------------------- */
+
+@interface FRunLoopObserver : NSObject {
+@public
+    CFOptionFlags activities;
+    BOOL repeats, valid;
+    CFIndex order;
+    CFRunLoopObserverCallBack callout;
+    void (^block)(CFRunLoopObserverRef, CFRunLoopActivity);
+    CFRunLoopObserverContext context;
+    NSMutableArray *loops; /* the run loops it is in, not retained */
+}
+@end
+
+@interface NSRunLoop (FObservers)
+- (void)_removeObserver:(FRunLoopObserver *)o;
+@end
+
+@implementation FRunLoopObserver
+- (void)invalidate
+{
+    NSArray *in;
+    @synchronized(self) {
+        if (!valid)
+            return;
+        valid = NO;
+        in = [loops copy];
+        [loops removeAllObjects];
+    }
+    for (NSValue *v in in)
+        [(NSRunLoop *)[v nonretainedObjectValue] _removeObserver:self];
+    [in release];
+}
+- (void)dealloc
+{
+    if (context.release && context.info)
+        context.release(context.info);
+    [block release];
+    [loops release];
+    [super dealloc];
+}
+@end
+
+static FRunLoopObserver *new_observer(CFOptionFlags activities, Boolean repeats, CFIndex order)
+{
+    FRunLoopObserver *o = [[FRunLoopObserver alloc] init];
+    o->activities = activities;
+    o->repeats = repeats;
+    o->order = order;
+    o->valid = YES;
+    o->loops = [[NSMutableArray alloc] init];
+    return o;
+}
+
+#define OBS(x) ((FRunLoopObserver *)(x))
+
 @implementation NSRunLoop {
+    NSMutableArray *_observers;
     NSMutableArray *_timers;
     NSMutableArray *_blocks;
     NSMutableArray *_ports;
@@ -103,6 +162,7 @@ static void wake_main_loop(void) { [main_loop _wakeUp]; }
 - (instancetype)init { return [self _initForMainThread:NO]; }
 - (void)dealloc
 {
+    [_observers release];
     [_timers release];
     [_blocks release];
     [_ports release];
@@ -122,6 +182,73 @@ static void wake_main_loop(void) { [main_loop _wakeUp]; }
     }
 }
 - (NSRunLoopMode)currentMode { return _mode; }
+
+/* Observers, kept in their order; each is told on the thread that runs the loop. */
+- (void)_addObserver:(FRunLoopObserver *)o
+{
+    @synchronized(o) {
+        if (!o->valid)
+            return;
+    }
+    os_unfair_lock_lock(&_lock);
+    if (!_observers)
+        _observers = [[NSMutableArray alloc] init];
+    BOOL added = NO;
+    if ([_observers indexOfObjectIdenticalTo:o] == NSNotFound) {
+        NSUInteger i = 0, n = [_observers count];
+        while (i < n && OBS([_observers objectAtIndex:i])->order <= o->order)
+            i++;
+        [_observers insertObject:o atIndex:i];
+        added = YES;
+    }
+    os_unfair_lock_unlock(&_lock);
+    if (added) {
+        @synchronized(o) {
+            [o->loops addObject:[NSValue valueWithNonretainedObject:self]];
+        }
+    }
+}
+- (void)_removeObserver:(FRunLoopObserver *)o
+{
+    os_unfair_lock_lock(&_lock);
+    [o retain];
+    [_observers removeObjectIdenticalTo:o];
+    os_unfair_lock_unlock(&_lock);
+    @synchronized(o) {
+        for (NSUInteger i = [o->loops count]; i-- > 0;)
+            if ([[o->loops objectAtIndex:i] nonretainedObjectValue] == self)
+                [o->loops removeObjectAtIndex:i];
+    }
+    [o release];
+}
+- (BOOL)_containsObserver:(FRunLoopObserver *)o
+{
+    os_unfair_lock_lock(&_lock);
+    BOOL in = [_observers indexOfObjectIdenticalTo:o] != NSNotFound;
+    os_unfair_lock_unlock(&_lock);
+    return in;
+}
+- (void)_tellObservers:(CFRunLoopActivity)activity
+{
+    if (!_observers)
+        return;
+    os_unfair_lock_lock(&_lock);
+    NSArray *now = [_observers count] ? [_observers copy] : nil;
+    os_unfair_lock_unlock(&_lock);
+    for (FRunLoopObserver *o in now) {
+        if (!(o->activities & activity) || !o->valid)
+            continue;
+        @autoreleasepool {
+            if (o->block)
+                o->block((CFRunLoopObserverRef)o, activity);
+            else if (o->callout)
+                o->callout((CFRunLoopObserverRef)o, activity, o->context.info);
+        }
+        if (!o->repeats)
+            [o invalidate];
+    }
+    [now release];
+}
 - (CFRunLoopRef)getCFRunLoop { return (CFRunLoopRef)self; }
 - (void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode
 {
@@ -304,6 +431,8 @@ static void drain_wake(int fd)
     *handled = NO;
     if (![self hasWork])
         return NO;
+    [self _tellObservers:kCFRunLoopBeforeTimers];
+    [self _tellObservers:kCFRunLoopBeforeSources];
     os_unfair_lock_lock(&_lock);
     NSArray *now = [_blocks count] ? [_blocks copy] : nil;
     [_blocks removeAllObjects];
@@ -389,7 +518,11 @@ static void drain_wake(int fd)
             all += pcount[i];
         }
     }
+    if (ms > 0)
+        [self _tellObservers:kCFRunLoopBeforeWaiting];
     int ready = poll(fds, all, ms);
+    if (ms > 0)
+        [self _tellObservers:kCFRunLoopAfterWaiting];
     if (ready > 0 && fds[0].revents)
         drain_wake(_wake[0]);
     if (_main && hook_dispatch && hook_dispatch(hook_ctx, fds + base, extra))
@@ -422,8 +555,16 @@ static void drain_wake(int fd)
     NSString *saved = _mode;
     _mode = mode;
     BOOL handled = NO, alive = YES;
+    /* a loop with nothing to run returns at once, telling no observer, as a
+     * Mac's does: observers alone don't make a mode worth running */
+    if (![self hasWork]) {
+        _mode = saved;
+        return NO;
+    }
+    [self _tellObservers:kCFRunLoopEntry];
     while (alive && !handled && !_stopped && [NSDate timeIntervalSinceReferenceDate] < limit)
         alive = [self runOnceBefore:limit handled:&handled];
+    [self _tellObservers:kCFRunLoopExit];
     _mode = saved;
     return alive;
 }
@@ -473,6 +614,65 @@ static void drain_wake(int fd)
     }
 }
 @end
+
+/* ---- CFRunLoopObserver ------------------------------------------------------------------ */
+
+CFTypeID CFRunLoopObserverGetTypeID(void) { return 0x46520003; }
+CFRunLoopObserverRef CFRunLoopObserverCreate(CFAllocatorRef allocator, CFOptionFlags activities, Boolean repeats,
+                                             CFIndex order, CFRunLoopObserverCallBack callout,
+                                             CFRunLoopObserverContext *context)
+{
+    (void)allocator;
+    FRunLoopObserver *o = new_observer(activities, repeats, order);
+    o->callout = callout;
+    if (context) {
+        o->context = *context;
+        if (context->retain && context->info)
+            o->context.info = (void *)context->retain(context->info);
+    }
+    return (CFRunLoopObserverRef)o;
+}
+CFRunLoopObserverRef CFRunLoopObserverCreateWithHandler(CFAllocatorRef allocator, CFOptionFlags activities,
+                                                        Boolean repeats, CFIndex order,
+                                                        void (^block)(CFRunLoopObserverRef, CFRunLoopActivity))
+{
+    (void)allocator;
+    FRunLoopObserver *o = new_observer(activities, repeats, order);
+    o->block = [block copy];
+    return (CFRunLoopObserverRef)o;
+}
+CFOptionFlags CFRunLoopObserverGetActivities(CFRunLoopObserverRef observer) { return OBS(observer)->activities; }
+Boolean CFRunLoopObserverDoesRepeat(CFRunLoopObserverRef observer) { return OBS(observer)->repeats; }
+CFIndex CFRunLoopObserverGetOrder(CFRunLoopObserverRef observer) { return OBS(observer)->order; }
+void CFRunLoopObserverInvalidate(CFRunLoopObserverRef observer) { [OBS(observer) invalidate]; }
+Boolean CFRunLoopObserverIsValid(CFRunLoopObserverRef observer)
+{
+    @synchronized(OBS(observer)) {
+        return OBS(observer)->valid;
+    }
+}
+void CFRunLoopObserverGetContext(CFRunLoopObserverRef observer, CFRunLoopObserverContext *context)
+{
+    if (context)
+        *context = OBS(observer)->context;
+}
+void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode)
+{
+    (void)mode;
+    if (rl && observer)
+        [(NSRunLoop *)rl _addObserver:OBS(observer)];
+}
+void CFRunLoopRemoveObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode)
+{
+    (void)mode;
+    if (rl && observer)
+        [(NSRunLoop *)rl _removeObserver:OBS(observer)];
+}
+Boolean CFRunLoopContainsObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode)
+{
+    (void)mode;
+    return rl && observer && [(NSRunLoop *)rl _containsObserver:OBS(observer)];
+}
 
 F_EXPORT void FerryRunLoopAddDescriptor(int fd, void (*callback)(int, void *), void *ctx)
 {

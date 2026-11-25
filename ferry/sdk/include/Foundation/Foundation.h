@@ -75,7 +75,13 @@
 #define NS_SWIFT_NOTHROW
 #define NS_SWIFT_SENDABLE
 #define NS_SWIFT_NONSENDABLE
+/* Classes Swift sees as isolated to the main actor (freemac 1.230), as
+ * AppKit's responders are on a Mac; only under Swift. */
+#ifdef __swift__
+#define NS_SWIFT_UI_ACTOR __attribute__((swift_attr("@UIActor")))
+#else
 #define NS_SWIFT_UI_ACTOR
+#endif
 #define NS_SWIFT_ASYNC(i)
 #define NS_SWIFT_ASYNC_NAME(n)
 #define NS_REFINED_FOR_SWIFT_ASYNC(i)
@@ -1381,7 +1387,9 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnit) {
     NSCalendarUnitDayOfYear = 1UL << 16,
     NSCalendarUnitCalendar = 1UL << 20,
     NSCalendarUnitTimeZone = 1UL << 21,
-    /* the names of Mac OS X 10.4 to 10.9 */
+    /* the names of Mac OS X 10.4 to 10.9, which Swift doesn't see (so that
+     * it names the others .year, .minute and so on; freemac 1.230) */
+#ifndef __swift__
     NSEraCalendarUnit = NSCalendarUnitEra,
     NSYearCalendarUnit = NSCalendarUnitYear,
     NSMonthCalendarUnit = NSCalendarUnitMonth,
@@ -1398,6 +1406,7 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnit) {
     NSYearForWeekOfYearCalendarUnit = NSCalendarUnitYearForWeekOfYear,
     NSCalendarCalendarUnit = NSCalendarUnitCalendar,
     NSTimeZoneCalendarUnit = NSCalendarUnitTimeZone,
+#endif
 };
 
 typedef NS_OPTIONS(NSUInteger, NSCalendarOptions) {
@@ -2544,7 +2553,7 @@ typedef NSString *NSNotificationName;
 @interface NSNotification : NSObject <NSCopying>
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object;
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info;
-@property (readonly, copy) NSNotificationName name;
+@property (readonly, copy) NSNotificationName FERRY_SWIFT_NONNULL name;
 @property (readonly, retain) id object;
 @property (readonly, copy) NSDictionary *userInfo;
 @end
@@ -2555,7 +2564,7 @@ typedef NSString *NSNotificationName;
 @property (class, readonly, strong) NSNotificationCenter * FERRY_SWIFT_NONNULL defaultCenter;
 - (void)addObserver:(id)observer selector:(SEL)sel name:(NSNotificationName)name object:(id)object;
 - (id<NSObject>)addObserverForName:(NSNotificationName)name object:(id)obj queue:(NSOperationQueue *)queue
-                        usingBlock:(void (^)(NSNotification *note))block;
+                        usingBlock:(void (^)(NSNotification * FERRY_SWIFT_NONNULL note))block;
 - (void)postNotification:(NSNotification *)notification;
 - (void)postNotificationName:(NSNotificationName)name object:(id)object;
 - (void)postNotificationName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info;
@@ -2583,7 +2592,7 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 - (void)removePort:(NSPort *)port forMode:(NSRunLoopMode)mode;
 - (NSDate *)limitDateForMode:(NSRunLoopMode)mode;
 - (void)acceptInputForMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limit;
-- (CFRunLoopRef)getCFRunLoop;
+- (CFRunLoopRef)getCFRunLoop CF_RETURNS_NOT_RETAINED;
 @end
 @interface NSRunLoop (NSOrderedPerform)
 /* Messages sent at the start of the run loop's next turn, lowest order

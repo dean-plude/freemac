@@ -107,7 +107,13 @@ typedef const struct CF_BRIDGED_TYPE(NSURL) __CFURL *CFURLRef;
 typedef const struct CF_BRIDGED_TYPE(NSError) __CFError *CFErrorRef;
 typedef struct __CFRunLoop *CFRunLoopRef;
 typedef struct __CFBundle *CFBundleRef;
+/* a string wrapped in a struct of its own in Swift, CFRunLoopMode(rawValue:) (freemac 1.230) */
+#ifdef __swift__
+typedef CFStringRef CFRunLoopMode __attribute__((swift_wrapper(struct)));
+#else
 typedef CFStringRef CFRunLoopMode;
+#endif
+typedef struct __CFRunLoopObserver *CFRunLoopObserverRef;
 
 #define kCFNotFound ((CFIndex)-1)
 #define kCFStringEncodingASCII 0x0600
@@ -217,6 +223,45 @@ void CFRunLoopStop(CFRunLoopRef rl);
 void CFRunLoopWakeUp(CFRunLoopRef rl);
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void));
 enum { kCFRunLoopRunFinished = 1, kCFRunLoopRunStopped = 2, kCFRunLoopRunTimedOut = 3, kCFRunLoopRunHandledSource = 4 };
+
+/* Run loop observers (freemac 1.230): called as a run loop enters and
+ * leaves a run, before it fires timers and handles sources, and before and
+ * after it waits, in their order. Ferry's run loops don't tell modes apart,
+ * so an observer added for any mode sees every pass. */
+typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+    kCFRunLoopEntry = (1UL << 0),
+    kCFRunLoopBeforeTimers = (1UL << 1),
+    kCFRunLoopBeforeSources = (1UL << 2),
+    kCFRunLoopBeforeWaiting = (1UL << 5),
+    kCFRunLoopAfterWaiting = (1UL << 6),
+    kCFRunLoopExit = (1UL << 7),
+    kCFRunLoopAllActivities = 0x0FFFFFFFU
+};
+typedef struct {
+    CFIndex version;
+    void *info;
+    const void *(*retain)(const void *info);
+    void (*release)(const void *info);
+    CFStringRef (*copyDescription)(const void *info);
+} CFRunLoopObserverContext;
+typedef void (*CFRunLoopObserverCallBack)(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info);
+CFTypeID CFRunLoopObserverGetTypeID(void);
+CFRunLoopObserverRef CFRunLoopObserverCreate(CFAllocatorRef allocator, CFOptionFlags activities, Boolean repeats,
+                                             CFIndex order, CFRunLoopObserverCallBack callout,
+                                             CFRunLoopObserverContext *context);
+CFRunLoopObserverRef CFRunLoopObserverCreateWithHandler(CFAllocatorRef allocator, CFOptionFlags activities,
+                                                        Boolean repeats, CFIndex order,
+                                                        void (^block)(CFRunLoopObserverRef observer,
+                                                                      CFRunLoopActivity activity));
+CFOptionFlags CFRunLoopObserverGetActivities(CFRunLoopObserverRef observer);
+Boolean CFRunLoopObserverDoesRepeat(CFRunLoopObserverRef observer);
+CFIndex CFRunLoopObserverGetOrder(CFRunLoopObserverRef observer);
+void CFRunLoopObserverInvalidate(CFRunLoopObserverRef observer);
+Boolean CFRunLoopObserverIsValid(CFRunLoopObserverRef observer);
+void CFRunLoopObserverGetContext(CFRunLoopObserverRef observer, CFRunLoopObserverContext *context);
+void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode);
+void CFRunLoopRemoveObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode);
+Boolean CFRunLoopContainsObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode);
 
 typedef const struct CF_BRIDGED_TYPE(NSAttributedString) __CFAttributedString *CFAttributedStringRef;
 typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableAttributedString) __CFAttributedString *CFMutableAttributedStringRef;

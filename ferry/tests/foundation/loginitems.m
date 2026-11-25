@@ -182,6 +182,33 @@ int main(void)
         printf("helper off: %d, off again: %d\n", SMLoginItemSetEnabled(CFSTR("org.freemac.test.helper"), false),
                SMLoginItemSetEnabled(CFSTR("org.freemac.test.helper"), false));
         files("autostart entries");
+
+        /* SMAppService (freemac 1.230): the main app is a session login
+         * item, a login item a helper. */
+        SMAppService *app = [SMAppService mainAppService];
+        NSError *err = nil;
+        printf("main app: status %ld\n", (long)[app status]);
+        printf("register: %d, status %ld\n", [app registerAndReturnError:&err], (long)[app status]);
+        printf("again: %d\n", [[SMAppService mainAppService] registerAndReturnError:&err]);
+        l = LSSharedFileListCreate(NULL, kLSSharedFileListSessionLoginItems, NULL);
+        list("with the main app", l);
+        CFRelease(l);
+        printf("unregister: %d, status %ld\n", [app unregisterAndReturnError:&err], (long)[app status]);
+        err = nil;
+        printf("unregister again: %d, %s\n", [app unregisterAndReturnError:&err], [[err domain] UTF8String]);
+        SMAppService *helper = [SMAppService loginItemServiceWithIdentifier:@"org.freemac.test.helper"];
+        printf("helper: status %ld\n", (long)[helper status]);
+        printf("register: %d, status %ld\n", [helper registerAndReturnError:&err], (long)[helper status]);
+        NSArray *jobs = CFBridgingRelease(SMCopyAllJobDictionaries(kSMDomainUserLaunchd));
+        printf("jobs: %lu, %s on demand %d; system jobs: %lu\n", (unsigned long)[jobs count],
+               [[jobs.firstObject objectForKey:@"Label"] UTF8String], [[jobs.firstObject objectForKey:@"OnDemand"] boolValue],
+               (unsigned long)[CFBridgingRelease(SMCopyAllJobDictionaries(kSMDomainSystemLaunchd)) count]);
+        printf("unregister: %d, status %ld\n", [helper unregisterAndReturnError:&err], (long)[helper status]);
+        printf("missing helper: %ld, agent: %ld, register agent: %d\n",
+               (long)[[SMAppService loginItemServiceWithIdentifier:@"org.freemac.test.nobody"] status],
+               (long)[[SMAppService agentServiceWithPlistName:@"org.freemac.agent.plist"] status],
+               [[SMAppService agentServiceWithPlistName:@"org.freemac.agent.plist"] registerAndReturnError:NULL]);
+        files("autostart entries");
     }
     return 0;
 }

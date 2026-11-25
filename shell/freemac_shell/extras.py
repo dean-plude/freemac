@@ -401,8 +401,11 @@ class Extra(Gtk.Button):
             self._item_call("ContextMenu", GLib.Variant("(ii)", (0, 0)))
         else:
             # No menu, or an app that opens its window on a click; if it
-            # doesn't answer Activate, its menu opens instead.
-            self._item_call("Activate", GLib.Variant("(ii)", (0, 0)),
+            # doesn't answer Activate, its menu opens instead. Where the
+            # click was on the screen goes with it, as the protocol has it,
+            # so that a popover can open under the item.
+            at = (int(event.x_root), int(event.y_root))
+            self._item_call("Activate", GLib.Variant("(ii)", at),
                             fallback=(lambda: self.open_menu(event)) if self._menu_path() else None)
         return True
 

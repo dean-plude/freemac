@@ -11,6 +11,7 @@
 // As Apple's does on a Mac, importing SwiftUI imports AppKit and Foundation.
 @_exported import AppKit
 @_exported import Foundation
+@_exported import Combine
 
 /// A piece of user interface, described by its body.
 public protocol View {

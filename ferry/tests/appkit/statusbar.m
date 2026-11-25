@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Menu bar items (NSStatusBar): two items, one with a menu and one that is
 // a button, read and clicked over D-Bus by statusbar.sh, as the desktop's
-// menu bar would.
+// menu bar would. The button's click shows a popover from it, in a window
+// of the popover's own (freemac 1.230), and closes it.
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>
 
@@ -65,6 +66,21 @@
 - (void)clicked:(id)sender
 {
     printf("clicked: %s\n", sender == self.timer.button ? "the timer's button" : "something else");
+    NSPopover *popover = [[NSPopover alloc] init];
+    NSViewController *vc = [[NSViewController alloc] init];
+    vc.view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 200, 120)];
+    popover.contentViewController = vc;
+    popover.contentSize = NSMakeSize(200, 120);
+    popover.behavior = NSPopoverBehaviorTransient;
+    NSStatusBarButton *button = self.timer.button;
+    [popover showRelativeToRect:button.bounds ofView:button preferredEdge:NSRectEdgeMinY];
+    NSWindow *w = vc.view.window;
+    NSRect screen = [[NSScreen mainScreen] visibleFrame];
+    printf("popover shown %d, in a window %d (%gx%g, visible %d, at the top %d, centred under the click %d)\n",
+           popover.shown, w != nil, w.frame.size.width, w.frame.size.height, w.isVisible,
+           NSMaxY(w.frame) == NSMaxY(screen), NSMidX(w.frame) == NSMinX([[NSScreen mainScreen] frame]) + 300);
+    [popover performClose:nil];
+    printf("popover closed %d, window visible %d\n", !popover.shown, w.isVisible);
     self.timer.visible = NO;
     fflush(stdout);
 }

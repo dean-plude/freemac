@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The Swift compiler's plugin for the macros Ferry's SwiftUI declares that
+# have nothing to expand to here (freemac 1.230): #Preview, whose canvas
+# is Xcode's, expands to nothing, so the previews a package keeps beside
+# its views compile and leave nothing in the program.
+#
+# ferry-swiftc runs the compiler with -load-plugin-executable naming this
+# file, and the compiler talks to it on its standard input and output in
+# the open-source Swift compiler's plugin protocol (swift-syntax's
+# CompilerPluginMessageHandling): each message is JSON, after its length
+# as eight little-endian bytes. Written for Ferry from that source.
+import json
+import struct
+import sys
+
+PROTOCOL_VERSION = 7
+
+
+def read_message(stream):
+    header = stream.read(8)
+    if len(header) < 8:
+        return None
+    (size,) = struct.unpack('<Q', header)
+    data = stream.read(size)
+    if len(data) < size:
+        return None
+    return json.loads(data)
+
+
+def write_message(stream, message):
+    data = json.dumps(message).encode('utf-8')
+    stream.write(struct.pack('<Q', len(data)))
+    stream.write(data)
+    stream.flush()
+
+
+def answer(message):
+    if 'getCapability' in message:
+        return {'getCapabilityResult': {'capability': {'protocolVersion': PROTOCOL_VERSION}}}
+    if 'expandFreestandingMacro' in message:
+        # #Preview: nothing
+        return {'expandMacroResult': {'expandedSource': '', 'diagnostics': []}}
+    if 'expandAttachedMacro' in message:
+        return {'expandMacroResult': {'expandedSource': '', 'diagnostics': []}}
+    if 'loadPluginLibrary' in message:
+        return {'loadPluginLibraryResult': {'loaded': False, 'diagnostics': []}}
+    return None
+
+
+def main():
+    stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
+    while True:
+        message = read_message(stdin)
+        if message is None:
+            return 0
+        reply = answer(message)
+        if reply is not None:
+            write_message(stdout, reply)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

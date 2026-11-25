@@ -1,0 +1,41 @@
+1970 from the reference date: -978307200.0
+later: 90.0 true true
+as NSDate: 90.0
+and back: true
+now is after 2020: true true
+sorted: [0.0, 30.0, 90.0]
+data: [1, 2, 3, 4, 5, 6] copy unchanged: [1, 2, 3] 6
+slice keeps its indices: 2 [3, 4, 5] 4
+base64: AQIDBAUG true
+utf8: [104, 195, 169, 10] 3
+as NSData: 6 true
+hashes equal: true
+url: tomatobar startStop x=1 top
+file: /tmp/some/file.txt file.txt txt true
+deleting: /tmp/some file
+appending: /tmp/some/other.log
+components: ["/", "tmp", "some", "file.txt"]
+bad url: true
+caches folder is a file URL: true true
+as NSURL: /tmp/some/file.txt true
+uuid: E621E1F8-C36C-495A-93FC-0C247A3E6E5F true
+fresh: 36 true true
+{"count":3,"link":"https:\/\/example.com\/x","payload":"3q0=","ratio":0.25,"tags":["a\/b","c\"d"],"timestamp":1700000000.5,"type":"transition"}
+round trip: true
+{
+  "a" : [],
+  "z" : [
+    1,
+    2
+  ]
+}
+{"some_url_value":1,"plain":true}
+snake back: 7
+mismatch: Int [1]
+corrupted: yes
+unicode: é😀
+log: ["{\"n\":1}", "{\"n\":2}"]
+read back: 16
+rewritten: [9, 8, 7]
+time left: 25:00 01:05
+exit=0

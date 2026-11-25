@@ -53,6 +53,10 @@ public class _HostingViewBase: NSView {
         if core.tree == nil { core.update() }
         return core.fittingSize(nil)
     }
+
+    /// The content's ideal size, as an NSHostingView gives it to Auto
+    /// Layout and to code that sizes a popover or window by it.
+    public override var intrinsicContentSize: NSSize { idealSize }
 }
 
 /// An AppKit view showing a SwiftUI view.
@@ -557,7 +561,14 @@ final class AppRunner: NSObject, NSApplicationDelegate {
 
     // ---- the test driver
 
-    func drive(_ clicks: [String]) {
+    func drive(_ clicks: [String], waited: Int = 0) {
+        // views' tasks first, and the passes they cause, for up to two seconds
+        let busy = _ViewWork.running > 0
+            || (windows + extraWindows).contains { host($0)?.core.pending == true }
+        if busy && waited < 200 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { self.drive(clicks, waited: waited + 1) }
+            return
+        }
         dump()
         guard let first = clicks.first else {
             let env = ProcessInfo.processInfo.environment ?? [:]
@@ -581,9 +592,14 @@ final class AppRunner: NSObject, NSApplicationDelegate {
 
     func allViews(_ v: NSView) -> [NSView] { [v] + (v is NSBox ? [] : v.subviews.flatMap { allViews($0) }) }
 
-    func findButton(_ title: String) -> NSButton? {
+    /// The app's windows and the sheets on them, as the test driver sees them.
+    var drivenWindows: [NSWindow] {
         let ws = windows + extraWindows + (settingsWindow.map { [$0] } ?? [])
-        for w in ws {
+        return ws.flatMap { w in [w] + ((w.sheets as [NSWindow]?) ?? []) }
+    }
+
+    func findButton(_ title: String) -> NSButton? {
+        for w in drivenWindows.reversed() {
             guard let c = w.contentView else { continue }
             for v in allViews(c) { if let b = v as? NSButton, b.title == title { return b } }
         }
@@ -607,9 +623,8 @@ final class AppRunner: NSObject, NSApplicationDelegate {
     }
 
     func dump() {
-        let ws = windows + extraWindows + (settingsWindow.map { [$0] } ?? [])
-        for w in ws where w.isVisible {
-            print("window \"\(w.title)\" \(Int(w.contentView?.frame.width ?? 0))x\(Int(w.contentView?.frame.height ?? 0))")
+        for w in drivenWindows where w.isVisible {
+            print((w.sheetParent != nil ? "sheet" : "window") + " \"\(w.title)\" \(Int(w.contentView?.frame.width ?? 0))x\(Int(w.contentView?.frame.height ?? 0))")
             guard let c = w.contentView else { continue }
             for v in allViews(c) where v !== c { print("  " + describe(v)) }
         }

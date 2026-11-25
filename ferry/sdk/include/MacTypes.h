@@ -27,4 +27,7 @@ typedef uint16_t UniChar;
 typedef uint8_t UTF8Char;
 typedef uint16_t UTF16Char;
 typedef uint32_t UTF32Char;
+/* counts and sizes, which Swift sees as Int (freemac 1.230) */
+typedef unsigned long ItemCount;
+typedef unsigned long ByteCount;
 #endif

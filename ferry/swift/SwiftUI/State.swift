@@ -39,9 +39,23 @@ final class StateLocation<Value> {
     var onChange: [() -> Void] = []
     init(_ value: Value) { self.value = value }
     func set(_ v: Value) {
+        // Views live on the main thread; a change made elsewhere (in a
+        // task's action, say) is made there, as SwiftUI's state may be set
+        // from any thread.
+        guard Thread.isMainThread else {
+            let box = _Unchecked(v)
+            DispatchQueue.main.async { self.set(box.value) }
+            return
+        }
         value = v
         for f in onChange { f() }
     }
+}
+
+/// A value handed to the main thread as it is.
+struct _Unchecked<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
 }
 
 final class StateBox<Value> {
@@ -114,72 +128,10 @@ public struct Binding<Value> {
 }
 
 // ---- observable objects ------------------------------------------------------------
-
-/// What tells the views reading an object that it is about to change. Apple's
-/// is Combine's; Ferry has no Combine yet, so this one only sends.
-public final class ObservableObjectPublisher {
-    var observers: [ObjectIdentifier: () -> Void] = [:]
-    public init() {}
-    public func send() {
-        for f in Array(observers.values) { f() }
-    }
-    func observe(_ owner: AnyObject, _ f: @escaping () -> Void) { observers[ObjectIdentifier(owner)] = f }
-    func remove(_ owner: AnyObject) { observers[ObjectIdentifier(owner)] = nil }
-}
-
-/// An object whose changes views follow.
-public protocol ObservableObject: AnyObject {
-    var objectWillChange: ObservableObjectPublisher { get }
-}
-
-private final class WeakPublisher {
-    weak var object: AnyObject?
-    let publisher = ObservableObjectPublisher()
-    init(_ o: AnyObject) { object = o }
-}
-private var publishers: [ObjectIdentifier: WeakPublisher] = [:]
-
-extension ObservableObject {
-    /// One publisher for each object, made when first asked for.
-    public var objectWillChange: ObservableObjectPublisher {
-        let id = ObjectIdentifier(self)
-        if let p = publishers[id], p.object === self { return p.publisher }
-        if publishers.count > 64 { publishers = publishers.filter { $0.value.object != nil } }
-        let p = WeakPublisher(self)
-        publishers[id] = p
-        return p.publisher
-    }
-}
-
-/// A property of an observable object that tells its views when it changes.
-@propertyWrapper
-public struct Published<Value> {
-    var stored: Value
-
-    public init(wrappedValue: Value) { stored = wrappedValue }
-    public init(initialValue: Value) { stored = initialValue }
-
-    @available(*, unavailable, message: "@Published is only for properties of classes")
-    public var wrappedValue: Value {
-        get { fatalError() }
-        set { fatalError() }
-    }
-
-    public static subscript<Owner: AnyObject>(
-        _enclosingInstance object: Owner,
-        wrapped wrappedKeyPath: ReferenceWritableKeyPath<Owner, Value>,
-        storage storageKeyPath: ReferenceWritableKeyPath<Owner, Published<Value>>
-    ) -> Value {
-        get { object[keyPath: storageKeyPath].stored }
-        set {
-            if let o = object as? any ObservableObject { o.objectWillChange.send() }
-            object[keyPath: storageKeyPath].stored = newValue
-        }
-    }
-}
-
-/// Follow an observable object's changes in a view.
-private final class Follower {}
+//
+// ObservableObject, @Published and their publisher are Combine's
+// (swift/Combine, freemac 1.230), as on a Mac; views follow an object by
+// subscribing to its objectWillChange.
 
 @propertyWrapper @dynamicMemberLookup
 public struct ObservedObject<ObjectType: ObservableObject>: DynamicProperty, _AttachableProperty {
@@ -200,12 +152,15 @@ public struct ObservedObject<ObjectType: ObservableObject>: DynamicProperty, _At
 }
 
 func follow(_ object: any ObservableObject, slot: Slot, key: Int, cx: ResolveContext) {
-    if let kept = slot.tokens[key] as? (AnyObject, Follower), kept.0 === object { return }
-    let token = Follower()
+    if let kept = slot.tokens[key] as? (AnyObject, AnyCancellable), kept.0 === object { return }
     let host = cx.host
-    object.objectWillChange.observe(token) { [weak host] in host?.invalidate() }
+    let token = willChange(object) { [weak host] in host?.invalidate() }
     slot.tokens[key] = (object, token) as AnyObject
     slot.values[-key - 1] = token
+}
+
+private func willChange<O: ObservableObject>(_ o: O, _ f: @escaping () -> Void) -> AnyCancellable {
+    o.objectWillChange.sink { _ in f() }
 }
 
 final class ObjectBox<O> {
@@ -379,6 +334,20 @@ public struct AppStorage<Value>: DynamicProperty, _AttachableProperty {
     public var projectedValue: Binding<Value> {
         let s = self
         return Binding(get: { s.wrappedValue }, set: { s.wrappedValue = $0 })
+    }
+
+    /// In an observable object, setting the value also says that the
+    /// object is about to change, so views reading it update.
+    public static subscript<Owner: AnyObject>(
+        _enclosingInstance object: Owner,
+        wrapped wrappedKeyPath: ReferenceWritableKeyPath<Owner, Value>,
+        storage storageKeyPath: ReferenceWritableKeyPath<Owner, AppStorage<Value>>
+    ) -> Value {
+        get { object[keyPath: storageKeyPath].wrappedValue }
+        set {
+            _sendObjectWillChange(object)
+            object[keyPath: storageKeyPath].wrappedValue = newValue
+        }
     }
 
     func _attach(to slot: Slot, key k: Int, cx: ResolveContext) { state._attach(to: slot, key: k, cx: cx) }

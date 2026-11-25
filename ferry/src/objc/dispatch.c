@@ -81,6 +81,7 @@ struct dobj {
     int source_type;
     uint64_t start, interval;
     void *handler, *cancel_handler; /* blocks */
+    void (*handler_f)(void *), (*cancel_f)(void *); /* or functions, called with the context */
     int cancelled, armed;
     unsigned long data, fired_data;
     /* read, write, signal and process sources: what they watch, and their
@@ -203,6 +204,27 @@ static void d_dealloc(struct dobj *self, SEL _cmd)
 
 void *dispatch_retain(void *o) { return objc_retain(o); }
 void dispatch_release(void *o) { objc_release(o); }
+
+/* os_retain and os_release (freemac 1.230), for any OS object, which here
+ * is an Objective-C object like dispatch's. */
+void *os_retain(void *o) { return o ? objc_retain(o) : o; }
+void os_release(void *o)
+{
+    if (o)
+        objc_release(o);
+}
+
+/* Vouchers (freemac 1.230), which carry a Mac's activity and importance
+ * across queues, and which Swift's concurrency runtime passes along with its
+ * tasks. Ferry has none: there is never a voucher to copy, and adopting one
+ * gives back the one in place before, which is none. */
+void *voucher_copy(void) { return NULL; }
+void *voucher_adopt(void *v)
+{
+    if (v != (void *)-1) /* not the "dead" voucher Swift marks spent ones with */
+        os_release(v);
+    return NULL;
+}
 void *dispatch_get_context(struct dobj *o) { return o ? o->context : NULL; }
 void dispatch_set_context(struct dobj *o, void *ctx)
 {
@@ -772,6 +794,37 @@ const char *dispatch_queue_get_label(struct dobj *q)
 }
 
 struct dobj *dispatch_get_current_queue(void) { return current_or_default(); }
+
+/* dispatch_assert_queue(3) (freemac 1.230), which Swift's concurrency
+ * runtime calls to check an actor's isolation: whether the work running
+ * now runs on the queue, directly or through the queues it targets. The
+ * main queue's work is whatever runs on the main thread outside other
+ * queues. When it isn't, the program stops, as on a Mac. */
+static int on_queue(struct dobj *q)
+{
+    if (q == MAIN_Q && on_main_thread() && (!current_queue || current_queue == MAIN_Q))
+        return 1;
+    for (struct dobj *c = current_queue; c; c = c->target)
+        if (c == q)
+            return 1;
+    return 0;
+}
+void dispatch_assert_queue(struct dobj *q)
+{
+    if (!on_queue(q)) {
+        fprintf(stderr, "ferry: BUG IN CLIENT OF LIBDISPATCH: the work runs on queue \"%s\", not on \"%s\" as expected\n",
+                current_or_default()->label, q->label);
+        abort();
+    }
+}
+void dispatch_assert_queue_not(struct dobj *q)
+{
+    if (on_queue(q)) {
+        fprintf(stderr, "ferry: BUG IN CLIENT OF LIBDISPATCH: the work runs on queue \"%s\", which it shouldn't\n", q->label);
+        abort();
+    }
+}
+void dispatch_assert_queue_barrier(struct dobj *q) { dispatch_assert_queue(q); }
 
 void dispatch_set_target_queue(struct dobj *o, struct dobj *target)
 {
@@ -1372,6 +1425,8 @@ static void call_handler(struct dobj *s, unsigned long data)
     if (s->handler) {
         struct block_header *b = s->handler;
         ((void (*)(void *))b->invoke)(b);
+    } else if (s->handler_f) {
+        s->handler_f(s->context);
     }
 }
 
@@ -1444,6 +1499,28 @@ void dispatch_source_set_event_handler(struct dobj *s, void *block)
     pthread_mutex_lock(&dq);
     void *old = s->handler;
     s->handler = copy;
+    pthread_mutex_unlock(&dq);
+    if (old)
+        _Block_release(old);
+}
+/* The function forms (freemac 1.230), which Swift's concurrency runtime
+ * uses: the function is called with the source's context. */
+void dispatch_source_set_event_handler_f(struct dobj *s, void (*f)(void *))
+{
+    pthread_mutex_lock(&dq);
+    void *old = s->handler;
+    s->handler = NULL;
+    s->handler_f = f;
+    pthread_mutex_unlock(&dq);
+    if (old)
+        _Block_release(old);
+}
+void dispatch_source_set_cancel_handler_f(struct dobj *s, void (*f)(void *))
+{
+    pthread_mutex_lock(&dq);
+    void *old = s->cancel_handler;
+    s->cancel_handler = NULL;
+    s->cancel_f = f;
     pthread_mutex_unlock(&dq);
     if (old)
         _Block_release(old);
@@ -1635,7 +1712,9 @@ void dispatch_source_cancel(struct dobj *s)
     }
     __atomic_store_n(&s->cancelled, 1, __ATOMIC_RELEASE);
     void *handler = s->cancel_handler;
+    void (*handler_f)(void *) = s->cancel_f;
     s->cancel_handler = NULL;
+    s->cancel_f = NULL;
     int unwatch = ksource_forget_locked(s);
     pthread_mutex_unlock(&dq);
     if (unwatch)
@@ -1643,6 +1722,8 @@ void dispatch_source_cancel(struct dobj *s)
     if (handler) {
         dispatch_async(s->target, handler);
         _Block_release(handler);
+    } else if (handler_f) {
+        dispatch_async_f(s->target, s->context, handler_f);
     }
 }
 long dispatch_source_testcancel(struct dobj *s) { return __atomic_load_n(&s->cancelled, __ATOMIC_ACQUIRE); }
@@ -1736,7 +1817,7 @@ const struct ferry_symbol ferry_dispatch_symbols[] = {
     {"_dispatch_source_type_mach_recv", ferry_dispatch_source_type_mach_recv},
     {"_dispatch_source_type_mach_send", ferry_dispatch_source_type_mach_send},
     {"_dispatch_source_type_memorypressure", ferry_dispatch_source_type_memorypressure},
-    F(dispatch_retain), F(dispatch_release), F(dispatch_get_context), F(dispatch_set_context),
+    F(dispatch_retain), F(dispatch_release), F(os_retain), F(os_release), F(voucher_copy), F(voucher_adopt), F(dispatch_get_context), F(dispatch_set_context),
     F(dispatch_set_finalizer_f), F(dispatch_time), F(dispatch_walltime), F(dispatch_get_global_queue),
     F(dispatch_queue_attr_make_with_qos_class), F(dispatch_queue_attr_make_initially_inactive),
     F(dispatch_queue_attr_make_with_autorelease_frequency), F(dispatch_queue_create),
@@ -1751,6 +1832,8 @@ const struct ferry_symbol ferry_dispatch_symbols[] = {
     F(dispatch_group_notify_f), F(dispatch_group_wait), F(dispatch_semaphore_create),
     F(dispatch_semaphore_signal), F(dispatch_semaphore_wait), F(dispatch_source_create),
     F(dispatch_source_set_timer), F(dispatch_source_set_event_handler), F(dispatch_source_set_cancel_handler),
+    F(dispatch_source_set_event_handler_f), F(dispatch_source_set_cancel_handler_f),
+    F(dispatch_assert_queue), F(dispatch_assert_queue_not), F(dispatch_assert_queue_barrier),
     F(dispatch_source_cancel), F(dispatch_source_testcancel), F(dispatch_source_get_data),
     F(dispatch_source_get_mask), F(dispatch_source_get_handle), F(dispatch_source_merge_data),
     F(ferry_dispatch_drain), F(ferry_dispatch_timeout_ms), F(ferry_dispatch_busy),

@@ -53,6 +53,8 @@ __FERRY_END
 /* The Carbon clock calls (freemac 1.226, Ferry 0.50.0). */
 #include <CoreServices/DriverServices.h>
 #include <CoreServices/IconsCore.h>
+/* key codes into characters (freemac 1.230) */
+#include <CoreServices/UnicodeUtilities.h>
 /* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
  * and Cocoa programs rely on it; its file calls bring in open and its
  * flags (freemac 1.223, Ferry 0.47.0). */
