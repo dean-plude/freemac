@@ -1958,6 +1958,39 @@ build scripts and builds they were run from were lost with the round's
 scratch space. The layout pass and the solver changes reach them too, so
 they should be run again in the next round.
 
+### FFmpeg's libraries and tools (freemac 1.233, Ferry 0.57.0)
+
+FFmpeg 8.0.1 and 6.1.1 were built from their release tarballs with
+`ferry/apps/ffmpeg.sh` as Intel Mac dylibs (libavutil, libavcodec,
+libavformat, libavfilter, libavdevice, libswscale, libswresample, with
+`@rpath` install names) and the `ffmpeg` and `ffprobe` tools. OBS needs
+8.0; VLC 3.0.24 builds against 6.1.1. Only FFmpeg's own software codecs
+are in: no VideoToolbox or AudioToolbox, and no x264, libvpx or libopus;
+zlib and bzip2 come from this system. libavutil links CoreFoundation, as
+it does on any Mac.
+
+Run under Ferry, both decode four test clips (H.264 with AAC, VP9 with
+Opus, Theora with Vorbis, VP8 with MP3) with `ffmpeg -i FILE -f framemd5 -`
+to the same frame MD5s, stream by stream, as this system's Linux FFmpeg
+6.1.1; 6.1.1's whole output is byte for byte the same, and 8.0.1's
+differs only in the line naming its version. Each also gives the same
+output as a Linux build of its own version for decoding on 1, 2, 4 and 8
+threads, for eight encoders, for MP4, MOV, Matroska, MPEG-TS, FLV and HLS
+files, for input from a pipe and for `ffprobe -show_frames`, and for a
+lavfi filter graph (with 8.0.1, up to where the Linux build's audio also
+changes from run to run). Ctrl-C ends a recording cleanly, as on Linux.
+
+| Calls | Who | Now |
+| --- | --- | --- |
+| `posix_spawn`, `posix_spawnp`, file actions (open, close, dup2, inherit, chdir, fchdir) and attributes (flags, signal mask and defaults, process group, `POSIX_SPAWN_CLOEXEC_DEFAULT`); a Mac program as the child runs through Ferry | OBS, VLC | done; `POSIX_SPAWN_SETEXEC` and `START_SUSPENDED` answer `ENOTSUP` |
+| `glob`, `globfree`, `fnmatch`, with the Mac's `glob_t` and flag numbers | OBS, VLC | done; `GLOB_ALTDIRFUNC`'s directory calls aren't used |
+| `mach_wait_until` | OBS | done |
+| `backtrace`, `backtrace_symbols`, `backtrace_symbols_fd`: Mac code's frame pointers followed, each frame named by its image and symbol in a Mac's format, in place of this system's, which found no Mac frames | VLC, OBS | done; the walk stops at a frame of Ferry's own without a frame pointer |
+| `tcgetattr`, `tcsetattr` (with `TCSASOFT`), `cfmakeraw`, `cfget`/`cfset` speeds, `tcflush`, `tcflow`, `tcdrain`, `tcsendbreak`, `tcgetpgrp`, `tcsetpgrp`, `tcgetsid`, with a Mac's `struct termios` and BSD's numbers; `posix_openpt`, `grantpt`, `unlockpt`, `ptsname` | FFmpeg's `ffmpeg` (single keys), terminal apps | done; on Linux a pseudo-terminal stays CS8 without parity |
+| `getrusage`, with `ru_maxrss` in bytes as on a Mac | FFmpeg's `-benchmark` | done |
+| `struct rusage` in the SDK's `sys/resource.h` | FFmpeg | done |
+| loading plugins: `dlopen` by path from several threads, `@rpath` and `@loader_path` in plugins, `-undefined dynamic_lookup` bundles, weak imports, `dladdr`, a plugin whose library is gone | VLC, OBS | done, with no change to Ferry's loader; libraries are never unloaded |
+
 ## What the apps need most
 
 Counted over the nine apps:

@@ -1,0 +1,9 @@
+libavcodec 60.31.102, libavformat 60.16.100
+the libraries' versions match the headers: yes
+a.mkv: matroska,webm, 2 streams, 2.00 s
+  stream 0: ffv1 video 160x120, 50 frames, RGB MD5 a6fe09ea1d09990c7bd6267bf6ea97a0
+  stream 1: flac audio 44100 Hz, 20 frames, 88200 samples, PCM MD5 9d4309e372758c5dbf62c7cd034401f5
+b.mov: mov,mp4,m4a,3gp,3g2,mj2, 2 streams, 2.00 s
+  stream 0: mpeg4 video 176x144, 50 frames, RGB MD5 ed37c2ae5cbf1bb40c76b77da2e0c69b
+  stream 1: pcm_s16le audio 48000 Hz, 94 frames, 96000 samples, PCM MD5 e60e67d44b2237f72f104abe4039886b
+exit=0

@@ -40,7 +40,7 @@ CFTypeRef IORegistryEntrySearchCFProperty(io_registry_entry_t entry, const io_na
                                           CFAllocatorRef allocator, IOOptionBits options) CF_RETURNS_RETAINED;
 
 /* the object's class, opening a service and calling its methods, and
- * matching by BSD name (freemac 1.NEXT, Ferry 0.NEXT): with no registry
+ * matching by BSD name (freemac 1.233, Ferry 0.57.0): with no registry
  * there is no object, so these answer as for the null object */
 boolean_t IOObjectConformsTo(io_object_t object, const io_name_t className);
 kern_return_t IOObjectGetClass(io_object_t object, io_name_t className);

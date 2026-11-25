@@ -34,7 +34,7 @@ enum {
     kGenericHardDiskIcon = 'hdsk',
     kGenericNetworkIcon = 'gnet',
     kTrashIcon = 'trsh',
-    /* the alert icons (freemac 1.NEXT, VLC) */
+    /* the alert icons (freemac 1.233, VLC) */
     kAlertStopIcon = 'stop',
     kAlertNoteIcon = 'note',
     kAlertCautionIcon = 'caut',

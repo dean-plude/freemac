@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
  * MediaPlayer's remote commands and Now Playing information (freemac
- * 1.NEXT, Ferry 0.NEXT): see MediaPlayer/MediaPlayer.h. */
+ * 1.233, Ferry 0.57.0): see MediaPlayer/MediaPlayer.h. */
 #import "AInternal.h"
 #import <MediaPlayer/MediaPlayer.h>
 #import <objc/message.h>

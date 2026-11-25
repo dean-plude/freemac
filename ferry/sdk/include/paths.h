@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * The system's well-known paths (freemac 1.NEXT, Ferry 0.NEXT), as BSD's
+ * The system's well-known paths (freemac 1.233, Ferry 0.57.0), as BSD's
  * paths.h names them, pointing where freemac keeps each. */
 #ifndef _FERRY_PATHS_H_
 #define _FERRY_PATHS_H_

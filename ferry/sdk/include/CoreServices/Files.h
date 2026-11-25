@@ -103,7 +103,7 @@ enum { kFSNodeLockedMask = 0x0001, kFSNodeIsDirectoryMask = 0x0010 };
 OSErr FSGetCatalogInfo(const FSRef *ref, FSCatalogInfoBitmap whichInfo, FSCatalogInfo *catalogInfo,
                        HFSUniStr255 *outName, FSSpecPtr fsSpec, FSRef *parentRef);
 
-/* A volume's parameters (Files.h; freemac 1.NEXT, Ferry 0.NEXT, VLC). Ferry
+/* A volume's parameters (Files.h; freemac 1.233, Ferry 0.57.0, VLC). Ferry
  * gives volumes no numbers, so FSGetVolumeParms zeroes the buffer and
  * answers nsvErr, "no such volume". */
 typedef struct GetVolParmsInfoBuffer {

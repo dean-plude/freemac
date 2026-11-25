@@ -460,6 +460,8 @@ view controller's preferred content size holds its view
 in `appkit/AppKitNewer.m`. The tests are `appkit_newer_apps` and
 `eventkit`.
 
+From Ferry 0.57.0 (freemac 1.233), FFmpeg's libraries and its `ffmpeg` and `ffprobe` tools build as Mac programs with `apps/ffmpeg.sh` (8.0.1 or 6.1.1) and decode, encode and filter under Ferry as they do on Linux, and programs can start others with `posix_spawn` and match file names with `glob` and `fnmatch`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

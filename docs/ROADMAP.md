@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.233 "Ferry: FFmpeg as Mac libraries, for VLC and OBS" (done)
+
+Ferry 0.57.0: FFmpeg 8.0.1, which OBS needs, and 6.1.1, which VLC 3.0.24 builds against, are built from their release tarballs as Intel Mac libraries and tools by `ferry/apps/ffmpeg.sh`, and under Ferry they decode, encode, mux and filter to the same output as FFmpeg on Linux. libSystem gains `posix_spawn`, `glob` and `fnmatch`, `mach_wait_until`, a Mac's terminal settings and a `backtrace` that names every Mac frame, and a plugin host test checks the `dlopen` path VLC and OBS take. The release also carries the VLC task's work on what VLC's Mac interface calls (#270): presentation options, alert sheets, slider, button and segmented cell drawing, `CGDirectDisplay.h` on NSScreen, CoreMedia's `CMTime`, MediaPlayer's remote commands and more. VLC's interface now waits only on Core Audio, Core Video's display link and NSOpenGLView.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | FFmpeg 8.0.1 (for OBS) and 6.1.1 (for VLC) built as Intel Mac dylibs and tools by `ferry/apps/ffmpeg.sh`, software codecs only | Ferry recipes | done |
+| 2 | FFmpeg's `ffmpeg` and `ffprobe` run under Ferry and decode H.264/AAC, VP9/Opus, Theora/Vorbis and VP8/MP3 to the same frame MD5s as a Linux FFmpeg | Ferry | done |
+| 3 | A plugin host test: libraries and plugins built in the test, opened with `dlopen` from four threads, `@rpath`/`@loader_path`, flat lookups, weak imports, plugins that fail to load | Ferry tests | done |
+| 4 | `posix_spawn` and `posix_spawnp` with file actions and attributes, Mac children run through Ferry | Ferry libSystem | done |
+| 5 | `glob`, `globfree` and `fnmatch` in the Mac's layout and flag numbers; `mach_wait_until`; `getrusage`'s `ru_maxrss` in bytes | Ferry libSystem | done |
+| 6 | `backtrace` and `backtrace_symbols` follow Mac code's frame pointers and name each frame's image and symbol | Ferry libSystem | done |
+| 7 | Terminal settings (`tcgetattr`, `tcsetattr`, `cfmakeraw`, speeds, flushing) with a Mac's `struct termios`, and `posix_openpt` | Ferry libSystem | done |
+| 8 | Hardware codecs (VideoToolbox, AudioToolbox) and external codec libraries (x264, libvpx, libopus) for FFmpeg | Ferry recipes | not started |
+
 ## 1.232 "Ferry: Itsycal and EventKit" (done)
 
 Ferry 0.56.0: Itsycal, the menu-bar calendar, is the ninth of the

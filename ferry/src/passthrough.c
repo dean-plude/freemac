@@ -56,7 +56,7 @@ const char *const ferry_passthrough[] = {
     /* time */
     "time", "difftime", "mktime", "timegm", "localtime", "localtime_r", "gmtime", "gmtime_r",
     "asctime", "asctime_r", "ctime", "ctime_r", "strftime", "strptime", "gettimeofday",
-    "clock", "tzset", "getrusage",
+    "clock", "tzset",
     /* maths */
     "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh", "tanh", "asinh",
     "acosh", "atanh", "exp", "exp2", "expm1", "log", "log2", "log10", "log1p", "pow", "sqrt",
@@ -82,7 +82,7 @@ const char *const ferry_passthrough[] = {
     /* freemac 1.232, for VLC: the same numbers and layouts on both systems
      * (posix_madvise's advice 0 to 4, twalk's VISIT, TIME_UTC 1) */
     "swab", "nrand48", "jrand48", "seed48", "lcong48", "tsearch", "tfind", "tdelete", "twalk",
-    "posix_madvise", "timespec_get", "tempnam", "backtrace", "backtrace_symbols", "backtrace_symbols_fd",
+    "posix_madvise", "timespec_get", "tempnam",
     /* getopt's variables (getopt itself is converted) */
     "optarg", "optind", "opterr", "optopt",
     NULL,

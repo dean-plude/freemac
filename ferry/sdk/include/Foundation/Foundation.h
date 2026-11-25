@@ -3050,7 +3050,7 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/FoundationOlder.h>
 /* Date intervals, data detectors and other newer names (freemac 1.232, Ferry 0.56.0). */
 #include <Foundation/NSDateIntervalFormatter.h>
-/* What VLC's Mac interface calls besides (freemac 1.NEXT, Ferry 0.NEXT). */
+/* What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0). */
 #include <Foundation/FoundationVLC.h>
 
 #endif

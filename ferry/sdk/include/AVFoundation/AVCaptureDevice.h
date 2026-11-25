@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: AVFoundation's capture devices, as a list (freemac 1.NEXT,
- * Ferry 0.NEXT; appkit/AVCaptureDevice.m). Written for freemac from Apple's
+ * Ferry SDK: AVFoundation's capture devices, as a list (freemac 1.233,
+ * Ferry 0.57.0; appkit/AVCaptureDevice.m). Written for freemac from Apple's
  * public API documentation; not Apple's header. Capture itself (sessions,
  * inputs, outputs) isn't here yet, so no device is listed: an app that
  * offers cameras and microphones (VLC's Open Capture Device) finds none. */

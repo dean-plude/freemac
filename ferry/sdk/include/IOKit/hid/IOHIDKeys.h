@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * The HID Manager's keys and types (freemac 1.NEXT, Ferry 0.NEXT), written
+ * The HID Manager's keys and types (freemac 1.233, Ferry 0.57.0), written
  * from Apple's public IOKit HID documentation; not Apple's header. */
 #ifndef _FERRY_IOKIT_IOHIDKEYS_H_
 #define _FERRY_IOKIT_IOHIDKEYS_H_

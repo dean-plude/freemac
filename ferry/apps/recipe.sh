@@ -8,6 +8,7 @@
 # lays the app out as a bundle that ./ferry runs:
 #
 #   apps/tomatobar.sh [WORK]    TomatoBar, a SwiftUI menu bar timer
+#   apps/ffmpeg.sh [WORK]       FFmpeg's libraries and tools, for VLC and OBS
 #
 # WORK (or FERRY_APPS_WORK; apps/work by default, which git ignores) holds
 # the checkouts in src/ and what is built in build/APP/, with the bundle
@@ -45,6 +46,33 @@ fetch() {
     git -C "$dir" fetch -q --depth 1 origin "$commit"
     git -C "$dir" -c advice.detachedHead=false checkout -q FETCH_HEAD
     [ "$(git -C "$dir" rev-parse HEAD)" = "$commit" ] || die "$name: $url gave another commit"
+}
+
+# fetch_release NAME URL SHA256: a project's release tarball (as its own site
+# publishes it), checked against SHA256 and unpacked into $src/NAME, for
+# projects such as FFmpeg that are built from their releases (freemac
+# 1.233, Ferry 0.57.0). A copy of the tarball already in $src, under its
+# own file name, is used without fetching.
+fetch_release() {
+    name=$1 url=$2 sum=$3 file=$src/$(basename "$2")
+    if [ -f "$src/$name/.release-$sum" ]; then
+        return 0
+    fi
+    if [ ! -f "$file" ] || ! echo "$sum  $file" | sha256sum -c - > /dev/null 2>&1; then
+        say "fetching $name ($url)"
+        curl -fL --proto '=https' -o "$file.part" "$url" || die "$name: $url couldn't be fetched"
+        mv "$file.part" "$file"
+    fi
+    echo "$sum  $file" | sha256sum -c - > /dev/null 2>&1 || die "$name: $file isn't the release pinned (SHA-256)"
+    rm -rf "$src/$name" "$src/$name.unpack"
+    mkdir -p "$src/$name.unpack"
+    tar -C "$src/$name.unpack" -xf "$file"
+    # the tarball's one top folder becomes $src/NAME
+    set -- "$src/$name.unpack"/*
+    [ $# -eq 1 ] && [ -d "$1" ] || die "$name: $file doesn't hold one folder"
+    mv "$1" "$src/$name"
+    rmdir "$src/$name.unpack"
+    touch "$src/$name/.release-$sum"
 }
 
 # need_swift: the toolchain and Ferry's Swift runtime, and Ferry's Swift

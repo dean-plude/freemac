@@ -15,6 +15,8 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
 SRC += src/objc/swift.c src/swiftsupport.c
 # Mach semaphores, for VLC (freemac 1.232)
 SRC += src/libc_vlc.c
+# posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
+SRC += src/libc_apps.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).

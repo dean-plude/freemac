@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
  * What VLC's Mac interface calls besides the rest of Foundation (freemac
- * 1.NEXT, Ferry 0.NEXT): see FoundationVLC.h. */
+ * 1.233, Ferry 0.57.0): see FoundationVLC.h. */
 #import <Foundation/Foundation.h>
 
 @implementation NSString (FerryVLC)
