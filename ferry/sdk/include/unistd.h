@@ -55,8 +55,19 @@ uid_t getuid(void);
 uid_t geteuid(void);
 gid_t getgid(void);
 gid_t getegid(void);
+/* freemac 1.232: VLC's rootwrap */
+int setuid(uid_t);
+int setgid(gid_t);
+int seteuid(uid_t);
+int setegid(gid_t);
+pid_t setsid(void);
+pid_t getsid(pid_t);
+int setpgid(pid_t, pid_t);
+pid_t getpgrp(void);
 pid_t fork(void);
 int execv(const char *, char *const[]);
+int execl(const char *, const char *, ...);
+int execlp(const char *, const char *, ...);
 int execvp(const char *, char *const[]);
 int execve(const char *, char *const[], char *const[]);
 void _exit(int) __attribute__((noreturn));
@@ -65,6 +76,19 @@ int usleep(useconds_t);
 unsigned alarm(unsigned);
 int pause(void);
 long sysconf(int);
+/* freemac 1.232: pathconf, with a Mac's numbers (VLC) */
+#define _PC_LINK_MAX 1
+#define _PC_MAX_CANON 2
+#define _PC_MAX_INPUT 3
+#define _PC_NAME_MAX 4
+#define _PC_PATH_MAX 5
+#define _PC_PIPE_BUF 6
+#define _PC_CHOWN_RESTRICTED 7
+#define _PC_NO_TRUNC 8
+#define _PC_VDISABLE 9
+long pathconf(const char *, int);
+long fpathconf(int, int);
+void swab(const void *, void *, ssize_t);
 int getpagesize(void);
 int gethostname(char *, size_t);
 int chown(const char *, uid_t, gid_t);

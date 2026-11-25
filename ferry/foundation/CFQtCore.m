@@ -635,21 +635,12 @@ CFURLEnumeratorResult CFURLEnumeratorGetNextURL(CFURLEnumeratorRef enumerator, C
 /* ---- CFNetwork's proxies --------------------------------------------------------- */
 
 #define PROXY_KEY(name, string) const CFStringRef name = (CFStringRef)@string;
-PROXY_KEY(kCFNetworkProxiesHTTPEnable, "HTTPEnable")
-PROXY_KEY(kCFNetworkProxiesHTTPPort, "HTTPPort")
-PROXY_KEY(kCFNetworkProxiesHTTPProxy, "HTTPProxy")
-PROXY_KEY(kCFNetworkProxiesHTTPSEnable, "HTTPSEnable")
-PROXY_KEY(kCFNetworkProxiesHTTPSPort, "HTTPSPort")
-PROXY_KEY(kCFNetworkProxiesHTTPSProxy, "HTTPSProxy")
 PROXY_KEY(kCFNetworkProxiesFTPEnable, "FTPEnable")
 PROXY_KEY(kCFNetworkProxiesFTPPort, "FTPPort")
 PROXY_KEY(kCFNetworkProxiesFTPProxy, "FTPProxy")
 PROXY_KEY(kCFNetworkProxiesSOCKSEnable, "SOCKSEnable")
 PROXY_KEY(kCFNetworkProxiesSOCKSPort, "SOCKSPort")
 PROXY_KEY(kCFNetworkProxiesSOCKSProxy, "SOCKSProxy")
-PROXY_KEY(kCFNetworkProxiesProxyAutoConfigEnable, "ProxyAutoConfigEnable")
-PROXY_KEY(kCFNetworkProxiesProxyAutoConfigURLString, "ProxyAutoConfigURLString")
-PROXY_KEY(kCFNetworkProxiesExceptionsList, "ExceptionsList")
 PROXY_KEY(kCFNetworkProxiesExcludeSimpleHostnames, "ExcludeSimpleHostnames")
 PROXY_KEY(kCFProxyTypeKey, "kCFProxyTypeKey")
 PROXY_KEY(kCFProxyHostNameKey, "kCFProxyHostNameKey")
@@ -665,15 +656,8 @@ PROXY_KEY(kCFProxyTypeSOCKS, "kCFProxyTypeSOCKS")
 PROXY_KEY(kCFProxyTypeAutoConfigurationURL, "kCFProxyTypeAutoConfigurationURL")
 #undef PROXY_KEY
 
-CFDictionaryRef CFNetworkCopySystemProxySettings(void)
-{
-    NSNumber *off = [NSNumber numberWithInt:0];
-    return (CFDictionaryRef)[[NSDictionary alloc]
-        initWithObjectsAndKeys:off, OBJ(kCFNetworkProxiesHTTPEnable), off, OBJ(kCFNetworkProxiesHTTPSEnable), off,
-                               OBJ(kCFNetworkProxiesFTPEnable), off, OBJ(kCFNetworkProxiesSOCKSEnable), off,
-                               OBJ(kCFNetworkProxiesProxyAutoConfigEnable), nil];
-}
-
+/* The system settings (CFNetworkCopySystemProxySettings and its keys) are
+ * CFProxySupport.m's, read from the environment. */
 static NSArray *no_proxy(void)
 {
     return [NSArray arrayWithObject:[NSDictionary dictionaryWithObject:OBJ(kCFProxyTypeNone)

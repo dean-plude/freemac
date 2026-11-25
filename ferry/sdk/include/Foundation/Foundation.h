@@ -3065,5 +3065,9 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSAppleEventDescriptor.h>
 /* NSCalendarDate, the scripting execution context and NSConnection (freemac 1.226, Ferry 0.50.0). */
 #include <Foundation/FoundationOlder.h>
+/* Date intervals, data detectors and other newer names (freemac 1.232, Ferry 0.56.0). */
+#include <Foundation/NSDateIntervalFormatter.h>
+/* What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0). */
+#include <Foundation/FoundationVLC.h>
 
 #endif

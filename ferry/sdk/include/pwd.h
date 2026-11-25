@@ -13,5 +13,8 @@ struct passwd {
 };
 struct passwd *getpwuid(uid_t);
 struct passwd *getpwnam(const char *);
+/* freemac 1.232 (VLC) */
+int getpwuid_r(uid_t, struct passwd *, char *, size_t, struct passwd **);
+int getpwnam_r(const char *, struct passwd *, char *, size_t, struct passwd **);
 __FERRY_END
 #endif

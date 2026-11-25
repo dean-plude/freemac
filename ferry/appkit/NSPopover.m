@@ -242,7 +242,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     NSSize _size;
     NSPopoverBehavior _behavior;
     BOOL _animates, _shown;
-    NSPopoverAppearance _appearance;
+    NSAppearance *_appearance;
     id _delegate;
     NSRect _positioningRect;
     NSView *_positioningView;
@@ -289,6 +289,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     [_positioningView release];
     [_window release];
     [_ownWindow release];
+    [_appearance release];
     [super dealloc];
 }
 
@@ -324,8 +325,13 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
 - (void)setBehavior:(NSPopoverBehavior)b { _behavior = b; }
 - (BOOL)animates { return _animates; }
 - (void)setAnimates:(BOOL)f { _animates = f; }
-- (NSPopoverAppearance)appearance { return _appearance; }
-- (void)setAppearance:(NSPopoverAppearance)a { _appearance = a; }
+- (NSAppearance *)appearance { return _appearance; }
+- (void)setAppearance:(NSAppearance *)a
+{
+    [a retain];
+    [_appearance release];
+    _appearance = a;
+}
 - (id)delegate { return _delegate; }
 - (void)setDelegate:(id)d { _delegate = d; }
 - (BOOL)isShown { return _shown; }

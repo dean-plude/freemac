@@ -1183,6 +1183,70 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.233 "Ferry: FFmpeg as Mac libraries, for VLC and OBS" (done)
+
+Ferry 0.57.0: FFmpeg 8.0.1, which OBS needs, and 6.1.1, which VLC 3.0.24 builds against, are built from their release tarballs as Intel Mac libraries and tools by `ferry/apps/ffmpeg.sh`, and under Ferry they decode, encode, mux and filter to the same output as FFmpeg on Linux. libSystem gains `posix_spawn`, `glob` and `fnmatch`, `mach_wait_until`, a Mac's terminal settings and a `backtrace` that names every Mac frame, and a plugin host test checks the `dlopen` path VLC and OBS take. The release also carries the VLC task's work on what VLC's Mac interface calls (#270): presentation options, alert sheets, slider, button and segmented cell drawing, `CGDirectDisplay.h` on NSScreen, CoreMedia's `CMTime`, MediaPlayer's remote commands and more. VLC's interface now waits only on Core Audio, Core Video's display link and NSOpenGLView.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | FFmpeg 8.0.1 (for OBS) and 6.1.1 (for VLC) built as Intel Mac dylibs and tools by `ferry/apps/ffmpeg.sh`, software codecs only | Ferry recipes | done |
+| 2 | FFmpeg's `ffmpeg` and `ffprobe` run under Ferry and decode H.264/AAC, VP9/Opus, Theora/Vorbis and VP8/MP3 to the same frame MD5s as a Linux FFmpeg | Ferry | done |
+| 3 | A plugin host test: libraries and plugins built in the test, opened with `dlopen` from four threads, `@rpath`/`@loader_path`, flat lookups, weak imports, plugins that fail to load | Ferry tests | done |
+| 4 | `posix_spawn` and `posix_spawnp` with file actions and attributes, Mac children run through Ferry | Ferry libSystem | done |
+| 5 | `glob`, `globfree` and `fnmatch` in the Mac's layout and flag numbers; `mach_wait_until`; `getrusage`'s `ru_maxrss` in bytes | Ferry libSystem | done |
+| 6 | `backtrace` and `backtrace_symbols` follow Mac code's frame pointers and name each frame's image and symbol | Ferry libSystem | done |
+| 7 | Terminal settings (`tcgetattr`, `tcsetattr`, `cfmakeraw`, speeds, flushing) with a Mac's `struct termios`, and `posix_openpt` | Ferry libSystem | done |
+| 8 | Hardware codecs (VideoToolbox, AudioToolbox) and external codec libraries (x264, libvpx, libopus) for FFmpeg | Ferry recipes | not started |
+
+## 1.232 "Ferry: Itsycal and EventKit" (done)
+
+Ferry 0.56.0: Itsycal, the menu-bar calendar, is the ninth of the
+open-source Mac apps to link and run, built from its source with
+MASShortcut and Sparkle built from theirs. Its status item opens the
+month with today ringed and the days with events marked, and the agenda
+under it lists the events and reminders of the coming days. They come
+from a new EventKit, which reads and writes freemac's own calendar
+(Tide's) and reminders (Nudge's) files and asks the user before an app
+sees them. Auto Layout gained a layout pass before a window draws, with
+its view controllers told, a view controller's preferred content size
+and a safe-area guide that follows its view's insets. Gas Mask, the
+tenth, still doesn't link: the Growl framework it brings stopped at older
+Core Foundation and Carbon names, and the round was wound down before it
+was taken further. The seven earlier apps weren't rebuilt this round.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Itsycal links and runs from its source, with MASShortcut 2.4.0 and Sparkle 1.27.1 built from theirs: | Ferry | done |
+|   | - its status item opens its window at the top right of the screen, under the menu bar, the full width of its month | | |
+|   | - the month shows today ringed, the weeks outlined and a dot under each day with events | | |
+|   | - the agenda lists today's and the coming days' events and reminders, a day's heading over each, at the height Itsycal asks for | | |
+| 2 | EventKit, new, on freemac's own files: | Ferry EventKit | done |
+|   | - events are Tide's, in `~/.local/share/freemac/calendar.ics`, as the "Calendar" calendar of "On My Mac" or a calendar of the online account that brought them | | |
+|   | - reminders are Nudge's lists, one file of to-dos each, with a "Reminders" list when there is none | | |
+|   | - repeating events expanded from their rules, less their exceptions; a moved date of a series is its own item | | |
+|   | - a save changes only the items saved and keeps every line it doesn't use, so Tide's and Nudge's own lines survive; the store tells apps when the files change | | |
+|   | - an app asks for access first, with an alert, and the answer is kept per app; with no display to ask on the answer is no | | |
+|   | - an event's participation status, the user's own among its attendees, which Itsycal reads by key | | |
+| 3 | Auto Layout: | Ferry AppKit | done |
+|   | - before a window draws, the views marked as needing layout are laid out, their view controllers told before and after (`viewWillLayout`, `viewDidLayout`), and the constraints solved again for what that changed | | |
+|   | - a view controller's `preferredContentSize` holds its view to that size, just above a window's wish to keep its size; a zero dimension holds nothing | | |
+|   | - the safe-area guide follows the view's insets as they change | | |
+|   | - a constraint that held a view at a size of zero is let go of when only a weaker wish breaks without it (Itsycal's month title, which hugs its text at priority 1, had made the window 16 points wide), once a row so the solver can't go back and forth | | |
+|   | - a constraint's constant set to the value it has changes nothing, so a layout that sets the same size again doesn't solve again | | |
+| 4 | `NSPredicateEditor` and its row templates, in code and from compiled nibs, on the rule editor: the rows made from a predicate, the predicate from the rows, and compound rows. `ferry-ibtool` writes a template's row type, attribute type, modifier and options as numbers, which it had written as references | Ferry AppKit, Ferry SDK | done |
+| 5 | Core Audio's audio objects through the AudioToolbox header: the default output and input devices, their names, volume and mute, read and set through this system's sound server; with none, the devices are there and answer that it isn't running | Ferry Core Audio | done |
+| 6 | Newer and older names the apps call: safe areas, `CADisplayLink`, window occlusion, symbol configurations, menu section headers, the system fill colours, full-size popovers, scroll phases, `refusesFirstResponder`, an application's will-become-active and will-resign-active notifications, a button cell's background colour in a table, `setTitleWithMnemonic:`, a layer's corner curve, `NSDateIntervalFormatter`, formatting contexts, `localizedStandardCompare:`, resource specifiers and the tags key, and the reachability flags | Ferry AppKit, Foundation, QuartzCore, SDK | done |
+| 7 | Two new tests, `appkit_newer_apps` and `eventkit`. `make check` 279 of 279, three times | Ferry | done |
+
+Not done: Itsycal's window appears a few seconds after the click, since
+solving the constraints of the agenda's rows takes over a second a time;
+every agenda row shows Itsycal's video-call button, which a Mac shows only
+for an event with a meeting link; its Mow font isn't loaded and its
+`AppIcon.icon` isn't compiled; Sparkle's helper tools aren't built; layer
+masks aren't drawn. Gas Mask doesn't link.
+
+The same release brings the first of the work on VLC 3.0.24 (`ferry/apps/vlc.sh`, which builds it and FFmpeg 6.1.1 from their release tarballs): the libSystem calls VLC's core uses, Mach semaphores, `pathconf`, `getpwuid_r`, `sigwait`, `statvfs`, `strnstr`, `backtrace` and more, in `src/libc_vlc.c`, with `CFNetworkCopySystemProxySettings`. With them libvlccore, libvlc, the `vlc-osx` program and 249 of VLC's plugins build; it doesn't run yet.
+
 ## 1.231 "Ferry: TomatoBar built by a recipe, and its popover as on a Mac" (done)
 
 Ferry 0.55.0: TomatoBar is built from its source by a recipe in the repo,

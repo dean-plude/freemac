@@ -1,25 +1,23 @@
-/* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * A terminal's settings (freemac 1.232, Ferry 0.56.0), from POSIX's
- * <termios.h> with the BSD numbers a Mac uses: a flag word is a long, a
- * speed is the number of bits a second itself, and there are 20 control
- * characters. Ferry translates to and from this system's settings. */
+/* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
+/* A terminal's size (freemac 1.232): VLC's help includes this header for
+ * TIOCGWINSZ, which <sys/ioctl.h> defines.
+ *
+ * The terminal settings calls, with a Mac's struct termios (its flags are
+ * unsigned longs, its 20 control characters in BSD's order) and BSD's flag
+ * numbers, as the termios(4) and tcsetattr(3) pages give them; FFmpeg's
+ * ffmpeg reads single keys this way (freemac 1.233, Ferry 0.57.0). Ferry
+ * converts them to this system's (src/libc_apps.c). Speeds are the baud
+ * rates themselves, as on a Mac. */
 #ifndef _FERRY_TERMIOS_H_
 #define _FERRY_TERMIOS_H_
-#include <_ferry.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
 __FERRY_BEGIN
 typedef unsigned long tcflag_t;
 typedef unsigned char cc_t;
 typedef unsigned long speed_t;
+
 #define NCCS 20
-struct termios {
-    tcflag_t c_iflag;
-    tcflag_t c_oflag;
-    tcflag_t c_cflag;
-    tcflag_t c_lflag;
-    cc_t c_cc[NCCS];
-    speed_t c_ispeed;
-    speed_t c_ospeed;
-};
 #define VEOF 0
 #define VEOL 1
 #define VEOL2 2
@@ -40,6 +38,13 @@ struct termios {
 #define VSTATUS 18
 #define _POSIX_VDISABLE 0xff
 
+struct termios {
+    tcflag_t c_iflag, c_oflag, c_cflag, c_lflag;
+    cc_t c_cc[NCCS];
+    speed_t c_ispeed, c_ospeed;
+};
+
+/* c_iflag */
 #define IGNBRK 0x00000001
 #define BRKINT 0x00000002
 #define IGNPAR 0x00000004
@@ -54,7 +59,7 @@ struct termios {
 #define IXANY 0x00000800
 #define IMAXBEL 0x00002000
 #define IUTF8 0x00004000
-
+/* c_oflag */
 #define OPOST 0x00000001
 #define ONLCR 0x00000002
 #define OXTABS 0x00000004
@@ -62,8 +67,7 @@ struct termios {
 #define OCRNL 0x00000010
 #define ONOCR 0x00000020
 #define ONLRET 0x00000040
-
-#define CIGNORE 0x00000001
+/* c_cflag */
 #define CSIZE 0x00000300
 #define CS5 0x00000000
 #define CS6 0x00000100
@@ -75,10 +79,8 @@ struct termios {
 #define PARODD 0x00002000
 #define HUPCL 0x00004000
 #define CLOCAL 0x00008000
-#define CCTS_OFLOW 0x00010000
-#define CRTS_IFLOW 0x00020000
-#define CRTSCTS (CCTS_OFLOW | CRTS_IFLOW)
-
+#define CRTSCTS 0x00030000
+/* c_lflag */
 #define ECHOKE 0x00000001
 #define ECHOE 0x00000002
 #define ECHOK 0x00000004
@@ -125,26 +127,24 @@ struct termios {
 #define B9600 9600
 #define B19200 19200
 #define B38400 38400
-#define B7200 7200
-#define B14400 14400
-#define B28800 28800
 #define B57600 57600
-#define B76800 76800
 #define B115200 115200
 #define B230400 230400
 
-speed_t cfgetispeed(const struct termios *t);
-speed_t cfgetospeed(const struct termios *t);
-int cfsetispeed(struct termios *t, speed_t speed);
-int cfsetospeed(struct termios *t, speed_t speed);
-int cfsetspeed(struct termios *t, speed_t speed);
-void cfmakeraw(struct termios *t);
-int tcgetattr(int fd, struct termios *t);
-int tcsetattr(int fd, int optional_actions, const struct termios *t);
-int tcdrain(int fd);
-int tcflow(int fd, int action);
-int tcflush(int fd, int queue_selector);
-int tcsendbreak(int fd, int duration);
-pid_t tcgetsid(int fd);
+int tcgetattr(int, struct termios *);
+int tcsetattr(int, int, const struct termios *);
+void cfmakeraw(struct termios *);
+speed_t cfgetispeed(const struct termios *);
+speed_t cfgetospeed(const struct termios *);
+int cfsetispeed(struct termios *, speed_t);
+int cfsetospeed(struct termios *, speed_t);
+int cfsetspeed(struct termios *, speed_t);
+int tcdrain(int);
+int tcflow(int, int);
+int tcflush(int, int);
+int tcsendbreak(int, int);
+pid_t tcgetpgrp(int);
+int tcsetpgrp(int, pid_t);
+pid_t tcgetsid(int);
 __FERRY_END
 #endif

@@ -564,6 +564,9 @@ static const int mac_to_linux_sig[32] = {
     0 /* INFO */, SIGUSR1, SIGUSR2,
 };
 
+/* for posix_spawn's open actions (libc_apps.c; freemac 1.233) */
+int ferry_open_flags_to_linux(int mac) { return open_to_linux(mac); }
+
 int ferry_signal_to_linux(int s) { return s > 0 && s < 32 ? mac_to_linux_sig[s] : 0; }
 
 int ferry_signal_to_mac(int s)
@@ -945,6 +948,17 @@ static int mac_getrlimit(int r, uint64_t lim[2])
     return 0;
 }
 
+/* The same layout as Linux's, but a Mac counts ru_maxrss in bytes and
+ * Linux in kilobytes (FFmpeg's -benchmark prints it; freemac 1.233,
+ * Ferry 0.57.0). RUSAGE_SELF and RUSAGE_CHILDREN are the same numbers. */
+static int mac_getrusage(int who, struct rusage *r)
+{
+    if (getrusage(who, r) < 0)
+        return -1;
+    r->ru_maxrss *= 1024;
+    return 0;
+}
+
 static int mac_setrlimit(int r, const uint64_t lim[2])
 {
     int lr = rlimit_to_linux(r);
@@ -1219,316 +1233,12 @@ static int mac_semctl(int id, int num, int cmd, ...)
 }
 
 
-/* ---- posix_spawn (freemac 1.232, Ferry 0.56.0) -----------------------------------
- * A Mac's posix_spawnattr_t and posix_spawn_file_actions_t are each a
- * pointer to something posix_spawnattr_init and _file_actions_init make.
- * Ferry keeps what the program asks for in its own terms and builds this
- * system's attributes and actions when it spawns. With
- * POSIX_SPAWN_CLOEXEC_DEFAULT, every descriptor the actions don't name (by
- * dup2, open or addinherit_np) is closed in the child, as on a Mac. */
-#define MAC_SPAWN_RESETIDS 0x0001
-#define MAC_SPAWN_SETPGROUP 0x0002
-#define MAC_SPAWN_SETSIGDEF 0x0004
-#define MAC_SPAWN_SETSIGMASK 0x0008
-#define MAC_SPAWN_SETEXEC 0x0040
-#define MAC_SPAWN_START_SUSPENDED 0x0080
-#define MAC_SPAWN_SETSID 0x0400
-#define MAC_SPAWN_CLOEXEC_DEFAULT 0x4000
-
-struct mac_spawnattr {
-    short flags;
-    pid_t pgroup;
-    uint32_t sigdefault, sigmask;
-};
-
-enum { SA_OPEN, SA_CLOSE, SA_DUP2, SA_INHERIT, SA_CHDIR, SA_FCHDIR };
-struct mac_spawn_action {
-    int kind, fd, newfd, oflag;
-    mode_t mode;
-    char *path;
-};
-struct mac_spawn_actions {
-    size_t n, cap;
-    struct mac_spawn_action *a;
-};
-
-static int mac_spawnattr_init(struct mac_spawnattr **attr)
-{
-    *attr = calloc(1, sizeof **attr);
-    return *attr ? 0 : ENOMEM;
-}
-
-static int mac_spawnattr_destroy(struct mac_spawnattr **attr)
-{
-    if (!attr || !*attr)
-        return EINVAL;
-    free(*attr);
-    *attr = NULL;
-    return 0;
-}
-
-#define ATTR_OR_EINVAL(attr) \
-    if (!(attr) || !*(attr)) \
-        return EINVAL
-static int mac_spawnattr_getflags(struct mac_spawnattr *const *attr, short *flags)
-{
-    ATTR_OR_EINVAL(attr);
-    *flags = (*attr)->flags;
-    return 0;
-}
-static int mac_spawnattr_setflags(struct mac_spawnattr **attr, short flags)
-{
-    ATTR_OR_EINVAL(attr);
-    (*attr)->flags = flags;
-    return 0;
-}
-static int mac_spawnattr_getpgroup(struct mac_spawnattr *const *attr, pid_t *pgroup)
-{
-    ATTR_OR_EINVAL(attr);
-    *pgroup = (*attr)->pgroup;
-    return 0;
-}
-static int mac_spawnattr_setpgroup(struct mac_spawnattr **attr, pid_t pgroup)
-{
-    ATTR_OR_EINVAL(attr);
-    (*attr)->pgroup = pgroup;
-    return 0;
-}
-static int mac_spawnattr_getsigdefault(struct mac_spawnattr *const *attr, uint32_t *set)
-{
-    ATTR_OR_EINVAL(attr);
-    *set = (*attr)->sigdefault;
-    return 0;
-}
-static int mac_spawnattr_setsigdefault(struct mac_spawnattr **attr, const uint32_t *set)
-{
-    ATTR_OR_EINVAL(attr);
-    (*attr)->sigdefault = *set;
-    return 0;
-}
-static int mac_spawnattr_getsigmask(struct mac_spawnattr *const *attr, uint32_t *set)
-{
-    ATTR_OR_EINVAL(attr);
-    *set = (*attr)->sigmask;
-    return 0;
-}
-static int mac_spawnattr_setsigmask(struct mac_spawnattr **attr, const uint32_t *set)
-{
-    ATTR_OR_EINVAL(attr);
-    (*attr)->sigmask = *set;
-    return 0;
-}
-
-static int mac_spawn_actions_init(struct mac_spawn_actions **fa)
-{
-    *fa = calloc(1, sizeof **fa);
-    return *fa ? 0 : ENOMEM;
-}
-
-static int mac_spawn_actions_destroy(struct mac_spawn_actions **fa)
-{
-    if (!fa || !*fa)
-        return EINVAL;
-    for (size_t i = 0; i < (*fa)->n; i++)
-        free((*fa)->a[i].path);
-    free((*fa)->a);
-    free(*fa);
-    *fa = NULL;
-    return 0;
-}
-
-static int spawn_add(struct mac_spawn_actions **fa, struct mac_spawn_action act, const char *path)
-{
-    if (!fa || !*fa)
-        return EINVAL;
-    if ((act.kind != SA_CHDIR && act.fd < 0) || (act.kind == SA_DUP2 && act.newfd < 0))
-        return EBADF;
-    struct mac_spawn_actions *f = *fa;
-    if (f->n == f->cap) {
-        size_t cap = f->cap ? f->cap * 2 : 8;
-        struct mac_spawn_action *a = realloc(f->a, cap * sizeof *a);
-        if (!a)
-            return ENOMEM;
-        f->a = a;
-        f->cap = cap;
-    }
-    if (path && !(act.path = strdup(path)))
-        return ENOMEM;
-    f->a[f->n++] = act;
-    return 0;
-}
-
-static int mac_spawn_addopen(struct mac_spawn_actions **fa, int fd, const char *path, int oflag, int mode)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_OPEN, fd, 0, oflag, (mode_t)mode, NULL}, path);
-}
-static int mac_spawn_addclose(struct mac_spawn_actions **fa, int fd)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_CLOSE, fd, 0, 0, 0, NULL}, NULL);
-}
-static int mac_spawn_adddup2(struct mac_spawn_actions **fa, int fd, int newfd)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_DUP2, fd, newfd, 0, 0, NULL}, NULL);
-}
-static int mac_spawn_addinherit(struct mac_spawn_actions **fa, int fd)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_INHERIT, fd, 0, 0, 0, NULL}, NULL);
-}
-static int mac_spawn_addchdir(struct mac_spawn_actions **fa, const char *path)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_CHDIR, 0, 0, 0, 0, NULL}, path);
-}
-static int mac_spawn_addfchdir(struct mac_spawn_actions **fa, int fd)
-{
-    return spawn_add(fa, (struct mac_spawn_action){SA_FCHDIR, fd, 0, 0, 0, NULL}, NULL);
-}
-
-/* The descriptors open now, for POSIX_SPAWN_CLOEXEC_DEFAULT. */
-static int spawn_open_fds(int **out)
-{
-    DIR *d = opendir("/proc/self/fd");
-    if (!d)
-        return -1;
-    int n = 0, cap = 64, *fds = malloc(cap * sizeof *fds), self = dirfd(d);
-    struct dirent *e;
-    while (fds && (e = readdir(d))) {
-        if (e->d_name[0] < '0' || e->d_name[0] > '9')
-            continue;
-        int fd = atoi(e->d_name);
-        if (fd == self)
-            continue;
-        if (n == cap) {
-            int *more = realloc(fds, (cap *= 2) * sizeof *fds);
-            if (!more) {
-                free(fds);
-                fds = NULL;
-                break;
-            }
-            fds = more;
-        }
-        fds[n++] = fd;
-    }
-    closedir(d);
-    *out = fds;
-    return fds ? n : -1;
-}
-
-static int mac_spawn_common(int search, pid_t *pid, const char *path, struct mac_spawn_actions *const *fap,
-                            struct mac_spawnattr *const *attrp, char *const argv[], char *const envp[])
-{
-    struct mac_spawnattr *ma = attrp ? *attrp : NULL;
-    struct mac_spawn_actions *mf = fap ? *fap : NULL;
-    short mflags = ma ? ma->flags : 0;
-    if (mflags & (MAC_SPAWN_SETEXEC | MAC_SPAWN_START_SUSPENDED))
-        return EINVAL;
-    posix_spawnattr_t la;
-    posix_spawn_file_actions_t lf;
-    posix_spawnattr_init(&la);
-    posix_spawn_file_actions_init(&lf);
-    int r = 0;
-    if (ma) {
-        short lflags = 0;
-        if (mflags & MAC_SPAWN_RESETIDS)
-            lflags |= POSIX_SPAWN_RESETIDS;
-        if (mflags & MAC_SPAWN_SETPGROUP)
-            lflags |= POSIX_SPAWN_SETPGROUP;
-        if (mflags & MAC_SPAWN_SETSIGDEF)
-            lflags |= POSIX_SPAWN_SETSIGDEF;
-        if (mflags & MAC_SPAWN_SETSIGMASK)
-            lflags |= POSIX_SPAWN_SETSIGMASK;
-        if (mflags & MAC_SPAWN_SETSID)
-            lflags |= POSIX_SPAWN_SETSID;
-        sigset_t set;
-        set_to_linux(ma->sigdefault, &set);
-        posix_spawnattr_setsigdefault(&la, &set);
-        set_to_linux(ma->sigmask, &set);
-        posix_spawnattr_setsigmask(&la, &set);
-        posix_spawnattr_setpgroup(&la, ma->pgroup);
-        posix_spawnattr_setflags(&la, lflags);
-    }
-    /* which descriptors the child keeps under CLOEXEC_DEFAULT, and which the actions closed */
-    int *open_fds = NULL, nopen = 0;
-    if (mflags & MAC_SPAWN_CLOEXEC_DEFAULT) {
-        nopen = spawn_open_fds(&open_fds);
-        if (nopen < 0) {
-            r = errno ? errno : EMFILE;
-            goto out;
-        }
-    }
-    for (size_t i = 0; mf && i < mf->n && !r; i++) {
-        struct mac_spawn_action *a = &mf->a[i];
-        switch (a->kind) {
-        case SA_OPEN: r = posix_spawn_file_actions_addopen(&lf, a->fd, a->path, open_to_linux(a->oflag), a->mode); break;
-        case SA_CLOSE: r = posix_spawn_file_actions_addclose(&lf, a->fd); break;
-        case SA_DUP2: r = posix_spawn_file_actions_adddup2(&lf, a->fd, a->newfd); break;
-        case SA_CHDIR: r = posix_spawn_file_actions_addchdir_np(&lf, a->path); break;
-        case SA_FCHDIR: r = posix_spawn_file_actions_addfchdir_np(&lf, a->fd); break;
-        /* dup2 onto itself clears close-on-exec here, which is what inheriting means */
-        case SA_INHERIT: r = posix_spawn_file_actions_adddup2(&lf, a->fd, a->fd); break;
-        default: break;
-        }
-    }
-    if (!r && nopen > 0)
-        for (int j = 0; j < nopen && !r; j++) {
-            int fd = open_fds[j], keep = 0;
-            /* the last action that names fd decides whether it is still open and kept */
-            for (size_t i = 0; mf && i < mf->n; i++) {
-                struct mac_spawn_action *a = &mf->a[i];
-                int target = a->kind == SA_DUP2 ? a->newfd : a->fd;
-                if (target != fd || a->kind == SA_CHDIR || a->kind == SA_FCHDIR)
-                    continue;
-                keep = a->kind == SA_CLOSE ? -1 : 1;
-            }
-            if (!keep)
-                r = posix_spawn_file_actions_addclose(&lf, fd);
-        }
-    if (!r)
-        r = search ? posix_spawnp(pid, path, &lf, &la, argv, envp) : posix_spawn(pid, path, &lf, &la, argv, envp);
-out:
-    free(open_fds);
-    posix_spawn_file_actions_destroy(&lf);
-    posix_spawnattr_destroy(&la);
-    return ferry_errno_to_mac(r);
-}
-
-static int mac_posix_spawn(pid_t *pid, const char *path, struct mac_spawn_actions *const *fa,
-                           struct mac_spawnattr *const *attr, char *const argv[], char *const envp[])
-{
-    return mac_spawn_common(0, pid, path, fa, attr, argv, envp);
-}
-
-static int mac_posix_spawnp(pid_t *pid, const char *file, struct mac_spawn_actions *const *fa,
-                            struct mac_spawnattr *const *attr, char *const argv[], char *const envp[])
-{
-    return mac_spawn_common(1, pid, file, fa, attr, argv, envp);
-}
-
 /* vfork as fork: a vfork child may only exec or _exit, and fork serves that too
  * without the parent's stack being shared through a call of Ferry's. */
 static pid_t mac_vfork(void) { return fork(); }
 
 const struct ferry_symbol ferry_posix_symbols[] = {
     {"vfork", mac_vfork},
-    {"posix_spawn", mac_posix_spawn},
-    {"posix_spawnp", mac_posix_spawnp},
-    {"posix_spawnattr_init", mac_spawnattr_init},
-    {"posix_spawnattr_destroy", mac_spawnattr_destroy},
-    {"posix_spawnattr_getflags", mac_spawnattr_getflags},
-    {"posix_spawnattr_setflags", mac_spawnattr_setflags},
-    {"posix_spawnattr_getpgroup", mac_spawnattr_getpgroup},
-    {"posix_spawnattr_setpgroup", mac_spawnattr_setpgroup},
-    {"posix_spawnattr_getsigdefault", mac_spawnattr_getsigdefault},
-    {"posix_spawnattr_setsigdefault", mac_spawnattr_setsigdefault},
-    {"posix_spawnattr_getsigmask", mac_spawnattr_getsigmask},
-    {"posix_spawnattr_setsigmask", mac_spawnattr_setsigmask},
-    {"posix_spawn_file_actions_init", mac_spawn_actions_init},
-    {"posix_spawn_file_actions_destroy", mac_spawn_actions_destroy},
-    {"posix_spawn_file_actions_addopen", mac_spawn_addopen},
-    {"posix_spawn_file_actions_addclose", mac_spawn_addclose},
-    {"posix_spawn_file_actions_adddup2", mac_spawn_adddup2},
-    {"posix_spawn_file_actions_addinherit_np", mac_spawn_addinherit},
-    {"posix_spawn_file_actions_addchdir_np", mac_spawn_addchdir},
-    {"posix_spawn_file_actions_addfchdir_np", mac_spawn_addfchdir},
     {"OSMemoryBarrier", mac_OSMemoryBarrier},
     {"OSAtomicAdd32", mac_OSAtomicAdd32},
     {"OSAtomicAdd32Barrier", mac_OSAtomicAdd32},
@@ -1630,6 +1340,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"daylight", &daylight},
     {"getrlimit", mac_getrlimit},
     {"setrlimit", mac_setrlimit},
+    {"getrusage", mac_getrusage},
     {"setlocale", mac_setlocale},
     {"realpath", mac_realpath},
     {"getopt", mac_getopt},

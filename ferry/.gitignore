@@ -22,3 +22,5 @@
 /sdk/usr/
 /swift/build/
 /media/build/
+/eventkit/build/
+/coreaudio/build/

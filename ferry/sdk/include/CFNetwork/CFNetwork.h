@@ -5,6 +5,7 @@
 #ifndef _FERRY_CFNETWORK_H_
 #define _FERRY_CFNETWORK_H_
 #include <CoreFoundation/CoreFoundation.h>
+#include <CFNetwork/CFProxySupport.h>
 
 __FERRY_BEGIN
 extern const CFStringRef kCFErrorDomainCFNetwork;

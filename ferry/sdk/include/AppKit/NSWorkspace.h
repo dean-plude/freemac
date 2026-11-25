@@ -1,3 +1,4 @@
-/* Ferry submodule: NSWorkspace, which AppKit.h declares (freemac 1.232). This
- * header lets code import <AppKit/NSWorkspace.h> on its own, as on a Mac. */
+/* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
+ * NSWorkspace.h, which some apps import by itself (freemac 1.232): Ferry
+ * declares NSWorkspace in AppKit.h, so this brings in AppKit. */
 #import <AppKit/AppKit.h>

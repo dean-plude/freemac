@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
 #include <_ferry.h>
 #undef assert
+#if !defined(__cplusplus) && !defined(static_assert)
+#define static_assert _Static_assert
+#endif
 #ifdef NDEBUG
 #define assert(e) ((void)0)
 #else

@@ -68,7 +68,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_ibtool|appkit_ibtool_classes)
+        appkit_ibtool|appkit_ibtool_classes|appkit_newer_apps)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/ibtool" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -97,6 +97,11 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY -u FERRY_ALERT_ANSWER HOME="$build/home_$name" XDG_CONFIG_HOME= \
                 XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        eventkit)
+            # the calendar and reminders files in a home of its own, and no display to ask on
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
+                TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_keychain)
             # twice in one home: what the first run keeps, the second finds
@@ -189,7 +194,16 @@ run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
 # fts, statfs, asl, os_log, O_SYMLINK and the wait macros, for Sparkle and
 # the apps (1.223).
 run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
+# Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
+# what VLC's core asks of libSystem (1.232).
+run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
+# mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
+# backtrace three calls deep in Mac code (freemac 1.233).
+run_one libsystem_media "$here/libsystem_media.c" "$here/libsystem_media.out"
+run_one libsystem_backtrace "$here/libsystem_backtrace.c" "$here/libsystem_backtrace.out"
+# a terminal's settings in a Mac's struct termios, on a pseudo-terminal (1.233)
+run_one libsystem_termios "$here/libsystem_termios.c" "$here/libsystem_termios.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
 run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"
@@ -297,6 +311,67 @@ if [ $plugins_ok = 1 ]; then
 else
     echo "FAIL libsystem_plugin (a bundle did not compile)"; sed 's/^/    /' "$build/plugin_bundles.cc.log"
     fail=$((fail + 1))
+fi
+# A plugin host as VLC and OBS are (freemac 1.233, Ferry 0.57.0): a core
+# library the program links, and a folder of plugins opened RTLD_LOCAL that
+# all define the same entry point, called back on the core's threads; one
+# with its own library through @loader_path, a bundle calling into the
+# program, one whose library is gone and one without an entry point.
+papp="$build/plugins_app"
+rm -rf "$papp" "$build/plugins_app.cc.log"; mkdir -p "$papp/lib" "$papp/deps" "$papp/modules" "$papp/gone"
+pcc() { "$top/sdk/ferry-cc" -O1 "$@" 2>> "$build/plugins_app.cc.log"; }
+if pcc -dynamiclib -install_name @rpath/libplugcore.dylib -o "$papp/lib/libplugcore.dylib" "$here/plugins/core.c" &&
+    pcc -dynamiclib -install_name @rpath/libplugdep.dylib -o "$papp/deps/libplugdep.dylib" "$here/plugins/dep.c" &&
+    pcc -dynamiclib -install_name @rpath/libgone.dylib -o "$papp/gone/libgone.dylib" "$here/plugins/broken.c" &&
+    pcc -dynamiclib -o "$papp/modules/alpha.dylib" "$here/plugins/plugin_a.c" -L"$papp/lib" -lplugcore &&
+    pcc -dynamiclib -o "$papp/modules/beta.dylib" "$here/plugins/plugin_b.c" -L"$papp/lib" -lplugcore \
+        -L"$papp/deps" -lplugdep -Wl,-rpath,@loader_path/../deps &&
+    pcc -bundle -undefined dynamic_lookup -o "$papp/modules/gamma.so" "$here/plugins/plugin_c.c" &&
+    pcc -dynamiclib -DWITH_GONE -o "$papp/modules/broken.dylib" "$here/plugins/broken.c" -L"$papp/gone" -lgone &&
+    pcc -dynamiclib -o "$papp/modules/noentry.dylib" "$here/plugins/broken.c"; then
+    rm -rf "$papp/gone"
+    echo "not a plugin" > "$papp/modules/readme.txt"
+    run_one plugins "$here/plugins/host.c" "$here/plugins/host.out" -L"$papp/lib" -lplugcore \
+        -Wl,-rpath,@executable_path/plugins_app/lib
+else
+    echo "FAIL plugins (a library or plugin did not compile)"; sed 's/^/    /' "$build/plugins_app.cc.log"
+    fail=$((fail + 1))
+fi
+# FFmpeg's libraries and tools as Mac programs (freemac 1.233, Ferry
+# 0.57.0), when FERRY_FFMPEG names a folder that ferry/apps/ffmpeg.sh made:
+# its ffmpeg makes two short files from its own test sources, in codecs
+# that decode the same everywhere, and a small player built here decodes
+# them through the libraries on four threads. What it prints is kept for
+# each release's libavcodec (decode-lavc60.out for 6.1, -lavc62 for 8.0).
+ff_major=$(sed -n 's/^#define LIBAVCODEC_VERSION_MAJOR *//p' \
+    "${FERRY_FFMPEG:-/nonexistent}/include/libavcodec/version_major.h" 2> /dev/null)
+if [ -x "${FERRY_FFMPEG:-/nonexistent}/bin/ffmpeg" ] && [ -f "$here/ffmpeg/decode-lavc$ff_major.out" ]; then
+    fm="$build/ffmpeg_media"; rm -rf "$fm"; mkdir -p "$fm"
+    gen() { "$top/ferry" "$FERRY_FFMPEG/bin/ffmpeg" -nostdin -hide_banner -loglevel error -y -threads 1 \
+                -f lavfi -i "$1" -f lavfi -i "$2" -t 2 -fflags +bitexact -flags:v +bitexact -flags:a +bitexact \
+                $3 "$fm/$4" 2>> "$build/ffmpeg_media.log"; }
+    if gen testsrc=size=160x120:rate=25 sine=frequency=440:sample_rate=44100 "-c:v ffv1 -c:a flac" a.mkv &&
+        gen testsrc=size=176x144:rate=25 sine=frequency=330:sample_rate=48000 "-c:v mpeg4 -q:v 3 -c:a pcm_s16le -ac 2" b.mov; then
+        if "$top/sdk/ferry-cc" -O1 -o "$build/ffmpeg_decode" "$here/ffmpeg/decode.c" -I"$FERRY_FFMPEG/include" \
+                -L"$FERRY_FFMPEG/lib" -lavformat -lavcodec -lswscale -lswresample -lavutil \
+                -Wl,-rpath,"$FERRY_FFMPEG/lib" 2> "$build/ffmpeg_decode.cc.log"; then
+            "$top/ferry" "$build/ffmpeg_decode" "$fm/a.mkv" "$fm/b.mov" > "$build/ffmpeg_decode.got" 2> "$build/ffmpeg_decode.err"
+            echo "exit=$?" >> "$build/ffmpeg_decode.got"
+            if diff -u "$here/ffmpeg/decode-lavc$ff_major.out" "$build/ffmpeg_decode.got" > "$build/ffmpeg_decode.diff"; then
+                echo "ok   ffmpeg_decode"; pass=$((pass + 1))
+            else
+                echo "FAIL ffmpeg_decode"; sed 's/^/    /' "$build/ffmpeg_decode.diff"
+                sed 's/^/    stderr: /' "$build/ffmpeg_decode.err"; fail=$((fail + 1))
+            fi
+        else
+            echo "FAIL ffmpeg_decode (did not compile)"; sed 's/^/    /' "$build/ffmpeg_decode.cc.log"; fail=$((fail + 1))
+        fi
+    else
+        echo "FAIL ffmpeg_decode (FFmpeg's ffmpeg couldn't make the test files)"; sed 's/^/    /' "$build/ffmpeg_media.log"
+        fail=$((fail + 1))
+    fi
+else
+    echo "skip ffmpeg_decode (set FERRY_FFMPEG to a folder made by apps/ffmpeg.sh, FFmpeg 6.1 or 8.0)"
 fi
 # Foundation (M2), Ferry's own, loaded as a Mac framework.
 for t in strings collections system runloop runloop_observers exception; do
@@ -1507,6 +1582,25 @@ run_one mac_thread_block "$here/mac_thread_block.c" "$here/mac_thread_block.out"
 run_one media_frameworks "$here/media/frameworks.m" "$here/media/frameworks.out" -fobjc-arc -fblocks \
     -framework Foundation -framework IOSurface -framework Accelerate -framework Metal -framework DiskArbitration \
     -framework Network
+# what Itsycal and Gas Mask need (freemac 1.232): layout, the predicate
+# editor, in code and from a nib the tool compiled (it says nothing of it),
+# older cell calls, Core Audio through AudioToolbox, newer names
+mkdir -p "$build/ibtool"
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/Predicates.nib" "$here/appkit/predicate_editor.xib" \
+        2> "$build/ibtool/predicates.log" && ! [ -s "$build/ibtool/predicates.log" ]; then
+    run_one appkit_newer_apps "$here/appkit/newer_apps.m" "$here/appkit/newer_apps.out" -fobjc-arc -fblocks \
+        -framework Cocoa -framework QuartzCore -framework AudioToolbox -framework CoreAudio
+else
+    echo "FAIL appkit_newer_apps (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/predicates.log"; fail=$((fail + 1))
+fi
+# EventKit on freemac's calendar and reminders files (freemac 1.232,
+# Ferry 0.56.0): access, repeats, saves that keep Tide's and Nudge's lines.
+run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -framework Foundation -framework EventKit
+# What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0):
+# CoreMedia times, media keys and Now Playing, displays, slider cells, and
+# the empty capture devices, address book and I/O Kit registry.
+run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
+    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

@@ -39,5 +39,17 @@ CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t entry, CFStringRef
 CFTypeRef IORegistryEntrySearchCFProperty(io_registry_entry_t entry, const io_name_t plane, CFStringRef key,
                                           CFAllocatorRef allocator, IOOptionBits options) CF_RETURNS_RETAINED;
 
+/* the object's class, opening a service and calling its methods, and
+ * matching by BSD name (freemac 1.233, Ferry 0.57.0): with no registry
+ * there is no object, so these answer as for the null object */
+boolean_t IOObjectConformsTo(io_object_t object, const io_name_t className);
+kern_return_t IOObjectGetClass(io_object_t object, io_name_t className);
+kern_return_t IOServiceOpen(io_service_t service, task_t owningTask, uint32_t type, io_connect_t *connect);
+kern_return_t IOServiceClose(io_connect_t connect);
+kern_return_t IOConnectCallScalarMethod(mach_port_t connection, uint32_t selector, const uint64_t *input,
+                                        uint32_t inputCnt, uint64_t *output, uint32_t *outputCnt);
+CFMutableDictionaryRef IOBSDNameMatching(mach_port_t mainPort, uint32_t options,
+                                         const char *bsdName) CF_RETURNS_RETAINED;
+
 __FERRY_END
 #endif

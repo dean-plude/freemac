@@ -137,6 +137,10 @@ void ferry_set_mac_errno(int mac_errno); /* a Mac number with no Linux twin (ENO
 /* posix.c */
 int ferry_signal_to_linux(int mac_signal);
 int ferry_signal_to_mac(int linux_signal);
+int ferry_open_flags_to_linux(int mac_flags); /* open(2)'s O_ flags (freemac 1.233) */
+
+/* libc_apps.c: posix_spawn, glob, fnmatch, termios and mach_wait_until (freemac 1.233) */
+extern const struct ferry_symbol ferry_libc_apps_symbols[];
 
 /* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
 extern const struct ferry_symbol ferry_socket_symbols[];
@@ -152,10 +156,10 @@ extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: mall
                                                              * fts, statfs, asl */
 extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
 extern const struct ferry_symbol ferry_setjmp_symbols[]; /* setjmp.c: setjmp and longjmp */
-extern const struct ferry_symbol ferry_termios_symbols[]; /* termios.c: a terminal's settings */
 extern const struct ferry_symbol ferry_copyfile_symbols[]; /* copyfile.c: copyfile and fcopyfile */
 /* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
 extern const struct ferry_symbol ferry_swift_symbols[];
+extern const struct ferry_symbol ferry_libc_vlc_symbols[]; /* libc_vlc.c: Mach semaphores (VLC) */
 int ferry_find_swift_library(const char *install_name, char *out, size_t size);
 struct stat;
 /* posix.c: this system's stat as a Mac's 144-byte, 64-bit-inode struct stat */

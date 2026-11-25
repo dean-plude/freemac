@@ -17,7 +17,8 @@ struct rlimit { rlim_t rlim_cur, rlim_max; };
 #define RLIMIT_NOFILE 8
 int getrlimit(int, struct rlimit *);
 /* What a process and its children used (freemac 1.232, Ferry 0.56.0), laid
- * out as on a Mac (and on Linux): two times and fourteen counters. */
+ * out as on a Mac (and on Linux): two times and fourteen counters; FFmpeg's
+ * tools time themselves with it too (freemac 1.233). */
 struct rusage {
     struct timeval ru_utime, ru_stime;
     long ru_maxrss, ru_ixrss, ru_idrss, ru_isrss, ru_minflt, ru_majflt, ru_nswap,

@@ -5,7 +5,14 @@
 #define _FERRY_LIMITS_H_
 #include_next <limits.h>
 #include <sys/syslimits.h>
-/* the least POSIX lets a system give (freemac 1.232, Ferry 0.56.0) */
+/* freemac 1.232, as a Mac's machine/limits.h gives them (VLC) */
+#ifndef SSIZE_MAX
+#define SSIZE_MAX LONG_MAX
+#endif
+#ifndef SIZE_T_MAX
+#define SIZE_T_MAX __SIZE_MAX__
+#endif
+/* the POSIX minimums, which programs read as limits (Qt reads _POSIX_PIPE_BUF) */
 #ifndef _POSIX_ARG_MAX
 #define _POSIX_ARG_MAX 4096
 #endif

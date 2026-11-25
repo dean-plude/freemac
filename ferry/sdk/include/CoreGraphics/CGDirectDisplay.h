@@ -1,15 +1,20 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Quartz Display Services, from Apple's public documentation: the list of
- * displays, their bounds and modes. In Ferry they are the screens AppKit's
- * NSScreen sees (appkit/CGDirectDisplay.m), so a display's ID is the one
- * its NSScreen's deviceDescription gives as NSScreenNumber. Displays can't
- * be captured, mirrored or reconfigured from a program. */
+ * displays, their bounds and modes, and fades. In Ferry they are the
+ * screens AppKit's NSScreen sees (appkit/CGDisplay.m for the list and the
+ * fades, appkit/CGDirectDisplay.m for modes, images and the rest), so a
+ * display's ID is its NSScreen's NSScreenNumber. Displays can't be
+ * captured, mirrored or reconfigured from a program; a fade is drawn as a
+ * window over the screens. */
 #ifndef FERRY_CGDIRECTDISPLAY_H
 #define FERRY_CGDIRECTDISPLAY_H
 #include <CoreGraphics/CGEvent.h>
 #include <mach/boolean.h>
 /* as on a Mac, the display calls bring IOKit's registry types (freemac 1.232) */
 #include <IOKit/IOKitLib.h>
+#include <_ferry.h>
+
+__FERRY_BEGIN
 
 typedef uint32_t CGDirectDisplayID;
 typedef uint32_t CGOpenGLDisplayMask;
@@ -105,4 +110,23 @@ CGImageRef CGDisplayCreateImageForRect(CGDirectDisplayID display, CGRect rect);
 CFUUIDRef CGDisplayCreateUUIDFromDisplayID(CGDirectDisplayID displayID);
 CGDirectDisplayID CGDisplayGetDisplayIDFromUUID(CFUUIDRef uuid);
 
+
+/* fades */
+typedef uint32_t CGDisplayFadeReservationToken;
+typedef float CGDisplayFadeInterval;
+typedef float CGDisplayReservationInterval;
+typedef float CGDisplayBlendFraction;
+#define kCGDisplayFadeReservationInvalidToken (0)
+#define kCGDisplayBlendNormal (0.0f)
+#define kCGDisplayBlendSolidColor (1.0f)
+#define kCGMaxDisplayReservationInterval (15.0f)
+CGError CGAcquireDisplayFadeReservation(CGDisplayReservationInterval seconds,
+                                        CGDisplayFadeReservationToken *token);
+CGError CGReleaseDisplayFadeReservation(CGDisplayFadeReservationToken token);
+CGError CGDisplayFade(CGDisplayFadeReservationToken token, CGDisplayFadeInterval duration,
+                      CGDisplayBlendFraction startBlend, CGDisplayBlendFraction endBlend, float redBlend,
+                      float greenBlend, float blueBlend, boolean_t synchronous);
+boolean_t CGDisplayFadeOperationInProgress(void);
+
+__FERRY_END
 #endif

@@ -73,6 +73,7 @@ typedef uint32_t FourCharCode;
 typedef uint32_t ResType;
 typedef int16_t ScriptCode;
 typedef int16_t LangCode;
+enum { kNilOptions = 0 }; /* no options (MacTypes.h; freemac 1.232) */
 typedef int16_t RegionCode;
 typedef struct { uint32_t lo, hi; } UnsignedWide; /* little-endian order */
 typedef UInt32 CFStringEncoding;

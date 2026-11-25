@@ -107,6 +107,7 @@ static char safe_area_key;
 - (void)setAdditionalSafeAreaInsets:(NSEdgeInsets)insets
 {
     set_assoc(self, &safe_area_key, [NSValue valueWithBytes:&insets objCType:@encode(NSEdgeInsets)]);
+    [self _safeAreaInsetsChanged];   /* the safe-area guide follows (AppKitNewer.m) */
 }
 /* no title bar or notch covers a view here: only what the program adds */
 - (NSEdgeInsets)safeAreaInsets { return [self additionalSafeAreaInsets]; }
@@ -723,14 +724,8 @@ NSWorkspaceLaunchConfigurationKey const NSWorkspaceLaunchConfigurationArchitectu
 
 /* ---- images ------------------------------------------------------------------------------- */
 
-@implementation NSImage (FerrySymbols)
-/* SF Symbols are Apple's artwork, which Ferry hasn't got: no symbol is
- * found, as on a Mac for a name it doesn't know. */
-+ (NSImage *)imageWithSystemSymbolName:(NSString *)symbolName accessibilityDescription:(NSString *)description
-{
-    return nil;
-}
-@end
+/* imageWithSystemSymbolName:accessibilityDescription: is in AppKitNewer.m
+ * (freemac 1.232), with the few symbol images Ferry draws itself. */
 
 /* ---- colour spaces ------------------------------------------------------------------------- */
 

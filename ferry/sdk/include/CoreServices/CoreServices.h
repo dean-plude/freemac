@@ -8,6 +8,7 @@
 #ifndef _FERRY_CORESERVICES_H_
 #define _FERRY_CORESERVICES_H_
 #include <CoreFoundation/CoreFoundation.h>
+#include <CFNetwork/CFNetwork.h>
 
 __FERRY_BEGIN
 typedef int16_t OSErr;
@@ -33,6 +34,10 @@ enum {
     kGenericHardDiskIcon = 'hdsk',
     kGenericNetworkIcon = 'gnet',
     kTrashIcon = 'trsh',
+    /* the alert icons (freemac 1.233, VLC) */
+    kAlertStopIcon = 'stop',
+    kAlertNoteIcon = 'note',
+    kAlertCautionIcon = 'caut',
 };
 enum { coreFoundationUnknownErr = -4960 };
 /* the reference constants callbacks are given back (MacTypes.h) */

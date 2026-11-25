@@ -42,8 +42,6 @@ static CGRect bounds_of(NSScreen *s)
     return CGRectMake(f.origin.x, NSMaxY(main) - NSMaxY(f), f.size.width, f.size.height);
 }
 
-CGDirectDisplayID CGMainDisplayID(void) { return screen_id(all_screens()[0]); }
-
 static CGError list(uint32_t max, CGDirectDisplayID *out, uint32_t *count, BOOL (^keep)(NSScreen *))
 {
     uint32_t n = 0;
@@ -59,17 +57,10 @@ static CGError list(uint32_t max, CGDirectDisplayID *out, uint32_t *count, BOOL 
     return kCGErrorSuccess;
 }
 
-CGError CGGetOnlineDisplayList(uint32_t max, CGDirectDisplayID *out, uint32_t *count) { return list(max, out, count, nil); }
-CGError CGGetActiveDisplayList(uint32_t max, CGDirectDisplayID *out, uint32_t *count) { return list(max, out, count, nil); }
 CGError CGGetDisplaysWithRect(CGRect rect, uint32_t max, CGDirectDisplayID *out, uint32_t *count)
 {
     return list(max, out, count, ^BOOL(NSScreen *s) { return CGRectIntersectsRect(bounds_of(s), rect); });
 }
-CGError CGGetDisplaysWithPoint(CGPoint point, uint32_t max, CGDirectDisplayID *out, uint32_t *count)
-{
-    return list(max, out, count, ^BOOL(NSScreen *s) { return CGRectContainsPoint(bounds_of(s), point); });
-}
-
 /* a display's OpenGL mask is its place in the list, as one bit */
 CGOpenGLDisplayMask CGDisplayIDToOpenGLDisplayMask(CGDirectDisplayID d)
 {
@@ -92,13 +83,6 @@ CGError CGGetDisplaysWithOpenGLDisplayMask(CGOpenGLDisplayMask mask, uint32_t ma
     return list(max, out, count, ^BOOL(NSScreen *s) { return (CGDisplayIDToOpenGLDisplayMask(screen_id(s)) & mask) != 0; });
 }
 
-CGRect CGDisplayBounds(CGDirectDisplayID d)
-{
-    NSScreen *s = screen_for(d);
-    return s ? bounds_of(s) : CGRectZero;
-}
-size_t CGDisplayPixelsWide(CGDirectDisplayID d) { return (size_t)CGDisplayBounds(d).size.width; }
-size_t CGDisplayPixelsHigh(CGDirectDisplayID d) { return (size_t)CGDisplayBounds(d).size.height; }
 /* the size in millimetres, at a Mac's nominal 72 points an inch scaled to
  * a typical desktop display's 96 */
 CGSize CGDisplayScreenSize(CGDirectDisplayID d)
@@ -111,15 +95,10 @@ CGSize CGDisplayScreenSize(CGDirectDisplayID d)
     return CGSizeMake(p.width * mm, p.height * mm);
 }
 double CGDisplayRotation(CGDirectDisplayID d) { return 0; }
-boolean_t CGDisplayIsActive(CGDirectDisplayID d) { return screen_for(d) != nil; }
 boolean_t CGDisplayIsAsleep(CGDirectDisplayID d) { return false; }
-boolean_t CGDisplayIsOnline(CGDirectDisplayID d) { return screen_for(d) != nil; }
-boolean_t CGDisplayIsMain(CGDirectDisplayID d) { return d == CGMainDisplayID(); }
-boolean_t CGDisplayIsBuiltin(CGDirectDisplayID d) { return false; }
 boolean_t CGDisplayIsInMirrorSet(CGDirectDisplayID d) { return false; }
 boolean_t CGDisplayIsAlwaysInMirrorSet(CGDirectDisplayID d) { return false; }
 boolean_t CGDisplayIsInHWMirrorSet(CGDirectDisplayID d) { return false; }
-boolean_t CGDisplayUsesOpenGLAcceleration(CGDirectDisplayID d) { return screen_for(d) != nil; }
 boolean_t CGDisplayIsStereo(CGDirectDisplayID d) { return false; }
 CGDirectDisplayID CGDisplayMirrorsDisplay(CGDirectDisplayID d) { return kCGNullDirectDisplay; }
 CGDirectDisplayID CGDisplayPrimaryDisplay(CGDirectDisplayID d) { return d; }

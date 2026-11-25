@@ -14,7 +14,7 @@ typedef int kern_return_t;
 typedef uint32_t natural_t;
 typedef int32_t integer_t;
 typedef natural_t mach_port_t;
-#define MACH_PORT_NULL ((mach_port_t)0)
+#define MACH_PORT_NULL ((mach_port_t)0) /* freemac 1.232 (VLC) */
 typedef mach_port_t host_t;
 typedef mach_port_t task_t;
 typedef mach_port_t ipc_space_t;

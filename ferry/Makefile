@@ -11,9 +11,13 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
       src/socket.c src/kqueue.c src/libc_more.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/dispatch_io.c src/objc/exception.c \
       src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c \
-      src/setjmp.c src/termios.c src/copyfile.c
+      src/setjmp.c src/copyfile.c
 # what Swift's runtime asks of libobjc and libSystem (freemac 1.227)
 SRC += src/objc/swift.c src/swiftsupport.c
+# Mach semaphores, for VLC (freemac 1.232)
+SRC += src/libc_vlc.c
+# posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
+SRC += src/libc_apps.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
@@ -84,6 +88,19 @@ CLOUDKIT_OBJ = $(CLOUDKIT_SRC:cloudkit/%.m=cloudkit/build/%.o)
 CLOUDKIT = frameworks/CloudKit.framework/CloudKit
 CLOUDKIT_HEADERS = sdk/include/CloudKit/CloudKit.h $(FOUNDATION_HEADERS)
 
+# EventKit: events and reminders kept in freemac's own calendar and
+# reminders files, with access asked of the user (eventkit/EventKit.m).
+EVENTKIT_SRC = $(wildcard eventkit/*.m)
+EVENTKIT_OBJ = $(EVENTKIT_SRC:eventkit/%.m=eventkit/build/%.o)
+EVENTKIT = frameworks/EventKit.framework/EventKit
+EVENTKIT_HEADERS = sdk/include/EventKit/EventKit.h $(FOUNDATION_HEADERS)
+
+# Core Audio: the default devices' names, volume and mute, through this
+# system's sound server (coreaudio/CoreAudio.c); Audio Toolbox's header
+# brings them in.
+COREAUDIO = frameworks/CoreAudio.framework/CoreAudio
+COREAUDIO_HEADERS = sdk/include/CoreAudio/CoreAudio.h sdk/include/CoreFoundation/CoreFoundation.h
+
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
 INSTALLER_APP = installer/Installer.app
@@ -111,7 +128,7 @@ JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
 JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
 JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
 
 include media/media.mk
 
@@ -270,6 +287,10 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh QuickLook $@ > frameworks/QuickLook.framework/QuickLook.tbd
 	@mkdir -p frameworks/CoreImage.framework
 	sdk/gen-alias-tbd.sh CoreImage $@ > frameworks/CoreImage.framework/CoreImage.tbd
+	@mkdir -p frameworks/MediaPlayer.framework frameworks/CoreMedia.framework frameworks/AddressBook.framework
+	sdk/gen-alias-tbd.sh MediaPlayer $@ > frameworks/MediaPlayer.framework/MediaPlayer.tbd
+	sdk/gen-alias-tbd.sh CoreMedia $@ > frameworks/CoreMedia.framework/CoreMedia.tbd
+	sdk/gen-alias-tbd.sh AddressBook $@ > frameworks/AddressBook.framework/AddressBook.tbd
 	# Quartz window and event services live in AppKit's file (CGServices.m),
 	# so ApplicationServices offers them too
 	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ $(FOUNDATION) > frameworks/ApplicationServices.framework/ApplicationServices.tbd
@@ -315,10 +336,30 @@ $(CLOUDKIT): $(CLOUDKIT_OBJ) $(FOUNDATION)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CloudKit.framework/Versions/A/CloudKit \
 	    -o $@ $(CLOUDKIT_OBJ) -framework Foundation
 
+eventkit/build/%.o: eventkit/%.m $(EVENTKIT_HEADERS) sdk/ferry-cc
+	@mkdir -p eventkit/build
+	sdk/ferry-cc $(OBJCFLAGS) -fobjc-arc -fblocks -c -o $@ $<
+
+$(EVENTKIT): $(EVENTKIT_OBJ) $(FOUNDATION) $(GRAPHICS)
+	@mkdir -p frameworks/EventKit.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/EventKit.framework/Versions/A/EventKit \
+	    -o $@ $(EVENTKIT_OBJ) -framework Foundation -framework CoreGraphics
+
+coreaudio/build/CoreAudio.o: coreaudio/CoreAudio.c $(COREAUDIO_HEADERS) sdk/ferry-cc
+	@mkdir -p coreaudio/build
+	sdk/ferry-cc $(OBJCFLAGS) -c -o $@ $<
+
+$(COREAUDIO): coreaudio/build/CoreAudio.o $(FOUNDATION)
+	@mkdir -p frameworks/CoreAudio.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio \
+	    -o $@ coreaudio/build/CoreAudio.o -framework CoreFoundation
+	@mkdir -p frameworks/AudioToolbox.framework
+	sdk/gen-alias-tbd.sh AudioToolbox $@ > frameworks/AudioToolbox.framework/AudioToolbox.tbd
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(MEDIA)
+install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -335,7 +376,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRA
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia AddressBook; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
@@ -344,11 +385,15 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRA
 	install -Dm755 $(JSC) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/JavaScriptCore.framework/JavaScriptCore
 	install -Dm755 $(CLOUDKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CloudKit.framework/CloudKit
 	for f in $(MEDIA_FW); do install -Dm755 frameworks/$$f.framework/$$f $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f; done
+	install -Dm755 $(EVENTKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/EventKit.framework/EventKit
+	install -Dm755 $(COREAUDIO) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreAudio.framework/CoreAudio
+	install -Dm644 frameworks/AudioToolbox.framework/AudioToolbox.tbd \
+	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AudioToolbox.framework/AudioToolbox.tbd
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build media/build
+	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build media/build eventkit/build coreaudio/build
 
 .PHONY: all check install clean

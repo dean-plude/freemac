@@ -67,5 +67,20 @@ void *bsearch(const void *, const void *, size_t, size_t, int (*)(const void *, 
 int mkstemp(char *);
 char *mkdtemp(char *);
 char *realpath(const char *, char *);
+/* freemac 1.232 (VLC): the 48-bit random numbers */
+double drand48(void);
+double erand48(unsigned short[3]);
+long lrand48(void);
+long nrand48(unsigned short[3]);
+long mrand48(void);
+long jrand48(unsigned short[3]);
+void srand48(long);
+unsigned short *seed48(unsigned short[3]);
+void lcong48(unsigned short[7]);
+/* pseudo-terminals (freemac 1.233, Ferry 0.57.0) */
+int posix_openpt(int);
+int grantpt(int);
+int unlockpt(int);
+char *ptsname(int);
 __FERRY_END
 #endif

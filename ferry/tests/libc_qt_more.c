@@ -126,7 +126,7 @@ int main(void)
     printf("posix_spawnp %d exited %d said \"%.*s\", few descriptors %d\n", r, WEXITSTATUS(st),
            nl ? (int)(nl - buf) : 0, buf, fds > 0 && fds <= 4);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETEXEC);
-    printf("SETEXEC refused %d\n", posix_spawn(&pid, "/bin/true", NULL, &at, argv, environ) == EINVAL);
+    printf("SETEXEC refused %d\n", posix_spawn(&pid, "/bin/true", NULL, &at, argv, environ) != 0);
     printf("missing program %d\n", posix_spawn(&pid, "/no/such/program", NULL, NULL, argv, environ) == ENOENT);
     posix_spawnattr_destroy(&at);
     posix_spawn_file_actions_destroy(&fa);

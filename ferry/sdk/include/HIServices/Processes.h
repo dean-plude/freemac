@@ -41,6 +41,7 @@ enum {
     modeHighLevelEventAware = 0x00000040, modeLocalAndRemoteHLEvents = 0x00000020,
     modeStationeryAware = 0x00000010, modeUseTextEditServices = 0x00000008, modeDisplayManagerAware = 0x00000004,
 };
+typedef UInt32 ProcessApplicationTransformState;
 enum {
     kProcessTransformToForegroundApplication = 1, kProcessTransformToBackgroundApplication = 2,
     kProcessTransformToUIElementApplication = 4,

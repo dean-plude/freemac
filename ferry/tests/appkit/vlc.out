@@ -1,0 +1,16 @@
+times: 1.50 + 0.50 = 2.00, compare 1, invalid 0
+media keys: play 1, pause 1
+now playing: Big Buck Bunny
+displays: main is one 1, count some, has size 1
+compare in range: 0 -1
+replaced: Ferry media player
+directions: en 1, he 2
+slider: knob 20 wide, centred 1, bar inside 1
+selected cell is the cell: 1
+alignment centred: 1
+volume parameters: -35, device (nil)
+I/O Kit media: 0
+capture devices: 0, default video none
+address book people: 0
+removable media listed: 1
+exit=0

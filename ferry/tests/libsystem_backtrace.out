@@ -1,0 +1,14 @@
+the main thread: at least 4 frames: yes
+  0: libsystem_backtrace level3, numbered right, an address given, an offset given
+  1: libsystem_backtrace level2, numbered right, an address given, an offset given
+  2: libsystem_backtrace level1, numbered right, an address given, an offset given
+  3: libsystem_backtrace main, numbered right, an address given, an offset given
+  backtrace_symbols_fd: 4 lines, level2 then level1 then main: yes
+another thread: at least 4 frames: yes
+  0: libsystem_backtrace level3, numbered right, an address given, an offset given
+  1: libsystem_backtrace level2, numbered right, an address given, an offset given
+  2: libsystem_backtrace level1, numbered right, an address given, an offset given
+  3: libsystem_backtrace thread_main, numbered right, an address given, an offset given
+  backtrace_symbols_fd: 4 lines, level2 then level1 then thread_main: yes
+backtrace into no room: 0, backtrace_symbols of none: NULL
+exit=0
