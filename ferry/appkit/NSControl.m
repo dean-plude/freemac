@@ -493,6 +493,8 @@ static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]
 }
 - (BOOL)imageHugsTitle { return YES; }
 - (void)setImageHugsTitle:(BOOL)f {}
+/* for its accessibility role (NSAccessibility.m) */
+- (NSButtonType)_buttonType { return _type; }
 - (void)setButtonType:(NSButtonType)type
 {
     _type = type;

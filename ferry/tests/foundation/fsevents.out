@@ -1,0 +1,31 @@
+not started without a run loop or queue: 0
+started: 1
+watching: <root>
+a file and a folder made:
+  <root>/a.txt Created|Modified|IsFile
+  <root>/sub Created|IsDir
+inside the new folder, a rename, a mode and a link:
+  <root>/sub/b.txt Created|Modified|IsFile
+  <root>/a.txt Renamed|IsFile
+  <root>/c.txt Renamed|IsFile
+  <root>/old.txt InodeMetaMod|IsFile
+  <root>/link Created|IsSymlink
+removed, and written twice (one event):
+  <root>/sub/b.txt Removed|IsFile
+  <root>/sub Removed|IsDir
+  <root>/c.txt Modified|IsFile
+nothing more:
+context released: 1
+by folder, on the run loop:
+  <root>/ None
+  <root>/ None
+  <root>/deep/ None
+extended data, on a queue:
+  <root>/f.txt (inode right) Created|Modified|IsFile
+since an earlier id:
+  "" HistoryDone
+the root moved:
+  <root>/ RootChanged
+ids count up: 1, latest is the current one: 1, after the first: 1
+no stream without paths: 1
+exit=0

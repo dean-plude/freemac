@@ -28,11 +28,41 @@ if [ -z "$lddir" ]; then
     exit 1
 fi
 # On a Mac, Foundation re-exports the Objective-C runtime; here programs that
-# use a framework get libobjc directly instead.
+# use a framework, or are written in Objective-C (whose "@import" may link a
+# framework by itself), get libobjc directly instead.
 objc=
+# Objective-C gets modules, as Xcode turns them on (freemac 1.222, Ferry
+# 0.46.0): "@import Foundation;" imports the module that the SDK's
+# module.modulemap describes and links its framework, and "#import
+# <AppKit/AppKit.h>" imports AppKit's module. -fno-modules turns them off;
+# the modules built are kept in FERRY_MODULE_CACHE (by default a folder of
+# this user's in the temporary folder), in a folder for each version of the
+# SDK's module map, so that modules built before a framework was added
+# aren't mixed with ones built after.
+lang= modules= cachepath=
 for arg in "$@"; do
-    if [ "$arg" = -framework ]; then objc=-lobjc; fi
+    case $arg in
+        -framework) objc=-lobjc ;;
+        -x) lang=next ;;
+        objective-c|objective-c++) [ "$lang" = next ] && lang=objc ;;
+        *.m|*.mm) lang=objc ;;
+        -fmodules|-fno-modules|-fcxx-modules) modules=given ;;
+        -fmodules-cache-path=*) cachepath=given ;;
+    esac
+    [ "$lang" = next ] && [ "$arg" != -x ] && lang=
 done
+modflags=
+if [ "$lang" = objc ]; then
+    objc=-lobjc
+    if [ -z "$modules" ]; then modflags=-fmodules; fi
+    if [ -z "$cachepath" ]; then
+        cache=${FERRY_MODULE_CACHE:-${TMPDIR:-/tmp}/ferry-modules-$(id -u)}
+        if [ -f "$sdk/include/module.modulemap" ]; then
+            cache=$cache/$(cksum < "$sdk/include/module.modulemap" | cut -d' ' -f1)
+        fi
+        modflags="$modflags -fmodules-cache-path=$cache"
+    fi
+fi
 # C++ and Objective-C++ sources get LLVM's libc++ headers (package
 # libc++-dev, or libc++-18-dev and the like), ahead of the SDK's C headers,
 # as a Mac's clang++ finds its libc++ headers. Programs link -lc++ as on a
@@ -58,5 +88,5 @@ if [ -n "$cxx" ]; then
     fi
 fi
 exec clang -target x86_64-apple-macos11 -nostdlibinc ${cxxinc:+-nostdinc++ -isystem "$cxxinc"} -isystem "$sdk/include" \
-    -fno-stack-protector -Wno-unused-command-line-argument \
+    -fno-stack-protector -Wno-unused-command-line-argument $modflags \
     -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -F"$fw" -lSystem "$@" $objc

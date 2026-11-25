@@ -82,6 +82,7 @@ void *ferry_network_symbol(const char *name);       /* libcurl, for Foundation's
 void *ferry_crypto_symbol(const char *name);        /* OpenSSL, for CommonCrypto and Security */
 void *ferry_bus_symbol(const char *name);           /* GIO's D-Bus, for distributed notifications */
 void *ferry_webkit_symbol(const char *name);        /* WebKitGTK, for Ferry's WebKit (webkit/) */
+void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry's (javascriptcore/) */
 
 /* servercerts.c: the certificates an https server presents, for Security */
 int ferry_server_certificates(const char *host, int port, int timeout_ms,

@@ -1,0 +1,26 @@
+names: NSFontFamilyAttribute NSCTFontTraitsAttribute NSCTFontSymbolicTrait NSCTFontWeightTrait
+traits: bold 2, italic 1, monospace 1024, old names the same 1
+by name: DejaVu Serif 14, bold weight 9
+name DejaVuSerif-Bold, size 14, its traits bold 1
+family, bold: DejaVu Sans 11, bold weight 9
+family, bold italic: DejaVu Sans 11, bold italic weight 9
+family, monospace: DejaVu Sans Mono 11, fixed weight 5
+family, weight: DejaVu Serif 13, bold weight 9
+family, face: DejaVu Serif 13, bold weight 9
+named, made bold: DejaVu Sans 10, bold weight 9
+made bold: family DejaVu Sans, name dropped 1, traits 2
+a font's own: name DejaVuSerif-Bold, size 16, bold 1
+and back: DejaVu Serif 16, bold weight 9
+another size: DejaVu Serif 9, bold weight 9
+another family: DejaVu Sans 16, bold weight 9
+fontWithSize:: DejaVu Serif 20, bold weight 9
+equal descriptors 1, copies the same 1
+faces of DejaVu Sans: DejaVuSans-Bold DejaVuSans-Regular; family DejaVu Serif, face Bold
+no such family: none
+archived: equal 1
+monospaced design: fixed 1, default design the same 1
+bold two: [one |DejaVu Sans12] [two|DejaVu Sans B12] [ three|DejaVu Sans12]
+italic one two: [one |DejaVu Sans I12] [two|DejaVu Sans B I12] [ three|DejaVu Sans12]
+plain again: [one two three|DejaVu Sans12]
+no font at first: bold 1
+exit=0

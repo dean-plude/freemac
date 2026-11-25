@@ -354,6 +354,18 @@ APPKIT_EXTERN NSAttributedStringKey const NSStrikethroughStyleAttributeName;
 APPKIT_EXTERN NSAttributedStringKey const NSLigatureAttributeName;
 typedef NS_OPTIONS(NSInteger, NSUnderlineStyle) {
     NSUnderlineStyleNone = 0, NSUnderlineStyleSingle = 1, NSUnderlineStyleThick = 2, NSUnderlineStyleDouble = 9,
+    /* the line's pattern and whether it skips spaces, or'ed in (freemac 1.222, Ferry 0.46.0); Ferry
+     * draws every pattern solid */
+    NSUnderlineStylePatternSolid = 0x0000, NSUnderlineStylePatternDot = 0x0100, NSUnderlineStylePatternDash = 0x0200,
+    NSUnderlineStylePatternDashDot = 0x0300, NSUnderlineStylePatternDashDotDot = 0x0400,
+    NSUnderlineStyleByWord = 0x8000,
+};
+/* the older names */
+enum {
+    NSUnderlinePatternSolid = NSUnderlineStylePatternSolid, NSUnderlinePatternDot = NSUnderlineStylePatternDot,
+    NSUnderlinePatternDash = NSUnderlineStylePatternDash, NSUnderlinePatternDashDot = NSUnderlineStylePatternDashDot,
+    NSUnderlinePatternDashDotDot = NSUnderlineStylePatternDashDotDot, NSUnderlineByWord = NSUnderlineStyleByWord,
+    NSUnderlineByWordMask = NSUnderlineStyleByWord,
 };
 typedef NS_OPTIONS(NSInteger, NSStringDrawingOptions) {
     NSStringDrawingUsesLineFragmentOrigin = 1 << 0, NSStringDrawingUsesFontLeading = 1 << 1,
@@ -2191,8 +2203,12 @@ APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRT
 - (BOOL)readRTFDFromFile:(NSString *)path;
 - (void)replaceCharactersInRange:(NSRange)range withRTF:(NSData *)rtf;
 @end
+/* how far a selection made with the mouse reaches (freemac 1.222, Ferry 0.46.0) */
+typedef NS_ENUM(NSUInteger, NSSelectionGranularity) { NSSelectByCharacter = 0, NSSelectByWord = 1, NSSelectByParagraph = 2 };
 @interface NSTextView : NSText
 - (instancetype)initWithFrame:(NSRect)frame textContainer:(NSTextContainer *)container;
+- (NSRange)selectionRangeForProposedRange:(NSRange)proposed granularity:(NSSelectionGranularity)granularity;
+@property NSSelectionGranularity selectionGranularity;
 + (NSScrollView *)scrollableTextView;
 @property (readonly) NSTextStorage *textStorage;
 @property (readonly) NSLayoutManager *layoutManager;
@@ -2828,8 +2844,9 @@ enum { NSOutlineViewDropOnItemIndex = -1 };
 /* ---- pop-up buttons, segmented controls, search fields, stack views and toolbars ------ */
 /* (NSPopUpButton.m, NSSegmentedControl.m, NSSearchField.m, NSStackView.m, NSToolbar.m) */
 
-/* Auto Layout isn't in Ferry; these are what a view says about its own size,
- * which stack views and toolbars use to lay views out by hand. */
+/* What a view says about its own size, which stack views and toolbars use
+ * to lay views out by hand and Auto Layout's solver uses for the views it
+ * places. */
 #define NSViewNoIntrinsicMetric ((CGFloat)-1)
 typedef NS_ENUM(NSInteger, NSUserInterfaceLayoutOrientation) {
     NSUserInterfaceLayoutOrientationHorizontal = 0, NSUserInterfaceLayoutOrientationVertical = 1,
@@ -2857,6 +2874,10 @@ typedef NS_ENUM(NSInteger, NSLayoutAttribute) {
 - (void)setContentCompressionResistancePriority:(NSLayoutPriority)priority
                                  forOrientation:(NSLayoutConstraintOrientation)orientation;
 @end
+
+/* Auto Layout (freemac 1.222, Ferry 0.46.0): constraints and anchors
+ * (NSLayoutConstraint.m). */
+#import <AppKit/NSLayoutConstraint.h>
 
 @interface NSApplication (FerryKeyboardAccess)
 /* Whether Tab reaches every control, not only text fields and lists (the
@@ -4411,5 +4432,17 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- names the nine apps use (freemac 1.221, Ferry 0.45.0) ------------------------ */
 
 #import <AppKit/AppKitMore.h>
+
+/* ---- accessibility (NSAccessibility.m), (freemac 1.222, Ferry 0.46.0) ---------------- */
+
+#import <AppKit/NSAccessibility.h>
+
+/* ---- font descriptors and traits (NSFontDescriptor.m), (freemac 1.222, Ferry 0.46.0) --- */
+
+#import <AppKit/NSFontDescriptor.h>
+
+/* ---- rule editors (NSRuleEditor.m), (freemac 1.222, Ferry 0.46.0) ------------------- */
+
+#import <AppKit/NSRuleEditor.h>
 
 #endif

@@ -170,6 +170,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     NSString *ident = [c containsValueForKey:@"NSIdentifier"] ? [c decodeObjectForKey:@"NSIdentifier"] : nil;
     if ([ident isKindOfClass:[NSString class]])
         [v setIdentifier:ident];
+    AViewDecodeConstraints(v, c);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)coder
@@ -193,6 +194,7 @@ void AViewDecode(NSView *v, NSCoder *c)
 
 - (void)dealloc
 {
+    AConstraintsViewDying(self);
     for (NSView *v in _subviews) {
         v->_superview = nil;
         [v setNextResponder:nil];
@@ -234,6 +236,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     [self _syncLayer];
     [self setNeedsDisplay:YES];
     [self _postFrameChanged];
+    AConstraintsViewChanged(self);
 }
 
 - (void)setFrameSize:(NSSize)size
@@ -251,6 +254,7 @@ void AViewDecode(NSView *v, NSCoder *c)
     [_superview setNeedsDisplay:YES];
     [self setNeedsDisplay:YES];
     [self _postFrameChanged];
+    AConstraintsViewChanged(self);
 }
 
 - (void)setFrame:(NSRect)frame
@@ -553,6 +557,7 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
     [s willRemoveSubview:self];
     [self viewWillMoveToSuperview:nil];
     [s setNeedsDisplay:YES];
+    AConstraintsViewRemoved(self, s);
     _superview = nil;
     [self setNextResponder:nil];
     [s->_subviews removeObjectIdenticalTo:self];

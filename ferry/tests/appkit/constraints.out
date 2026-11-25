@@ -1,0 +1,38 @@
+translates by default: 1, after: 0
+installed on the superview: 4, active 1
+pinned: 30.0,20.0 330.0x270.0
+after the superview grew: 30.0,20.0 430.0x370.0
+centred: 200.0,175.0 100.0x30.0
+format constraints: 4 5 2 1
+left: 20.0,148.0 80.0x40.0
+right: 108.0,168.0 172.0x20.0
+below: 0.0,0.0 300.0x20.0
+limited: 0.0,50.0 200.0x50.0
+a smaller wish, outweighed: 0.0,50.0 200.0x50.0
+without the strong one: 0.0,50.0 150.0x50.0
+deactivated: 0, on the view 2, on the superview 3
+label at its own size: 10.0,73.0 120.0x22.0
+label stretched: 10.0,48.0 280.0x17.0
+label squeezed by a required width: 10.0,73.0 60.0x22.0
+label after its size changed: 10.0,73.0 140.0x22.0
+in a flipped view: 135.0,15.0 40.0x50.0
+inner: 5.0,35.0 30.0x10.0
+filling: 0.0,0.0 200.0x200.0
+inner after: 5.0,185.0 190.0x10.0
+autoresizing view inside: 0.0,0.0 190.0x10.0
+fitting size 88.0x34.0, frame kept 500x500
+under the window's top: 0.0,216.0 80.0x24.0
+guide: {{0, 0}, {320, 240}}, owned by the content view 1
+after the window grew: 0.0,276.0 100.0x24.0
+before the guide: 0.0,40.0 50.0x10.0
+after the guide: 120.0,40.0 180.0x10.0
+guide frame {{50, 49}, {70, 1}}, guides 1
+constraints before 10, after removing a view 6
+conflict: 0.0,95.0 40.0x5.0
+updateConstraints ran 1, needs it now 0
+'half' NSView'e'.width <= 0.5*NSView'root'.width - 4 @600 (inactive)>
+anchors: width NSLayoutYAxisAnchor, first NSLayoutDimension
+H:|-[missing]-|: NSInvalidArgumentException, unable to parse
+H:|-[left: NSInvalidArgumentException, unable to parse
+V:[left]-(>=x)-[right]: NSInvalidArgumentException, unable to parse
+exit=0

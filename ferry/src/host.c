@@ -343,3 +343,38 @@ void *ferry_webkit_symbol(const char *name)
     void *handle = !strncmp(name, "jsc_", 4) ? jsc_handle : webkit_handle;
     return handle ? dlsym(handle, name) : NULL;
 }
+
+/* ---- JavaScriptCore --------------------------------------------------------------
+ * Ferry's JavaScriptCore framework (javascriptcore/) passes each call of
+ * JavaScriptCore's C API to this system's JavaScriptCore
+ * (libjavascriptcoregtk-4.1, the library WebKitGTK uses), which has the same
+ * C API. It asks for each call by name the first time it is made, so a
+ * program that links JavaScriptCore but never runs a script doesn't open
+ * the library. Only the calls javascriptcore/JSCNames.h lists are served.
+ * FERRY_JAVASCRIPTCORE names another library to open in its place (the
+ * tests use it to stand for a system without JavaScriptCore). */
+static const char *const jsc_names[] = {
+#include "jsc_names.h"
+    NULL,
+};
+static void *jsc_c_handle;
+static void open_jsc(void)
+{
+    const char *other = getenv("FERRY_JAVASCRIPTCORE");
+    jsc_c_handle = dlopen(other && *other ? other : "libjavascriptcoregtk-4.1.so.0", RTLD_NOW | RTLD_LOCAL);
+}
+
+void *ferry_jsc_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    const char *const *p;
+    if (!name)
+        return NULL;
+    for (p = jsc_names; *p; p++)
+        if (!strcmp(*p, name))
+            break;
+    if (!*p)
+        return NULL;
+    pthread_once(&once, open_jsc);
+    return jsc_c_handle ? dlsym(jsc_c_handle, name) : NULL;
+}

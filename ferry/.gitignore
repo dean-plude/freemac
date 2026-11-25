@@ -16,3 +16,5 @@
 /coredata/build/
 /webkit/build/
 /src/webkit_names.h
+/javascriptcore/build/
+/src/jsc_names.h

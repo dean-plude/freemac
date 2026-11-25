@@ -340,6 +340,7 @@ typedef struct {
 #pragma clang diagnostic pop
 
 @implementation NSTextView {
+    NSSelectionGranularity _granularity;
     NSTextStorage *_storage;
     NSLayoutManager *_manager;
     NSTextContainer *_container;
@@ -1489,5 +1490,31 @@ MOVE(pageDownAndModifySelection, [self _vertical:[self _linesPerPage] from:head]
     NSAttributedString *a = [[[NSAttributedString alloc] initWithRTF:rtf documentAttributes:NULL] autorelease];
     if (a)
         [_storage replaceCharactersInRange:r withAttributedString:a];
+}
+
+/* the proposed range made whole words or paragraphs (freemac 1.222, Ferry 0.46.0) */
+- (NSSelectionGranularity)selectionGranularity { return _granularity; }
+- (void)setSelectionGranularity:(NSSelectionGranularity)granularity { _granularity = granularity; }
+- (NSRange)selectionRangeForProposedRange:(NSRange)proposed granularity:(NSSelectionGranularity)granularity
+{
+    NSString *text = [_storage string];
+    NSUInteger length = [text length];
+    if (proposed.location > length)
+        proposed = NSMakeRange(length, 0);
+    if (NSMaxRange(proposed) > length)
+        proposed.length = length - proposed.location;
+    if (granularity == NSSelectByParagraph)
+        return [text paragraphRangeForRange:proposed];
+    if (granularity != NSSelectByWord || !length)
+        return proposed;
+    NSCharacterSet *word = [NSCharacterSet alphanumericCharacterSet];
+    NSUInteger start = proposed.location, end = NSMaxRange(proposed);
+    if (!proposed.length && start < length && ![word characterIsMember:[text characterAtIndex:start]])
+        return NSMakeRange(start, 1); /* a space or a mark on its own */
+    while (start > 0 && [word characterIsMember:[text characterAtIndex:start - 1]])
+        start--;
+    while (end < length && [word characterIsMember:[text characterAtIndex:end]])
+        end++;
+    return NSMakeRange(start, end - start);
 }
 @end

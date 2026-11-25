@@ -40,6 +40,17 @@ void FerryCADriveValue(id target, NSString *key, id from, id to, CAAnimation *an
 /* The animator proxy of an object that animates its properties (NSAnimationContext.m). */
 id AAnimatorFor(id target);
 
+/* ---- Auto Layout (NSLayoutConstraint.m) ------------------------------------------- */
+
+/* Set once any constraint is made active: until then none of this costs anything. */
+extern BOOL AConstraintsInUse;
+void ALayoutConstraintsIfNeeded(NSView *view);
+BOOL AConstraintFittingSize(NSView *view, NSSize *size);
+void AConstraintsViewChanged(NSView *view);
+void AConstraintsViewRemoved(NSView *view, NSView *oldSuperview);
+void AConstraintsViewDying(NSView *view);
+void AViewDecodeConstraints(NSView *view, NSCoder *coder);
+
 /* ---- the display ------------------------------------------------------------------ */
 
 /* Connects to the compositor the first time it is asked; NO when there is no
@@ -218,6 +229,10 @@ NSUInteger ABeepCount(void);
 
 @interface NSButtonCell (FerryPrivate)
 - (BOOL)_hasButtonType;
+- (NSButtonType)_buttonType;
+@end
+
+@interface NSButton (FerryPrivate)
 - (NSButtonType)_buttonType;
 @end
 

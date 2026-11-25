@@ -1183,6 +1183,29 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.222 "Ferry: modules, Auto Layout, FSEvents, Quick Look and JavaScriptCore" (done)
+
+Ferry 0.46.0: the next things that stopped the nine apps' sources from
+compiling, most-used first. Counted again with one survey script before and
+after this work, the files that compile went from 369 of 608 to 383 of 608.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Modules: `@import Foundation;` and the rest, as KeyCastr's and Flycut's sources begin. `ferry-cc` turns modules on for Objective-C, using a module map of the SDK (`sdk/gen-modulemap.sh`) in which each module links its own framework. `#import <Cocoa/Cocoa.h>` becomes a module import, and a header's macros still reach the program. Clang's module cache is kept apart for each version of the map | Ferry SDK | done |
+| 2 | Auto Layout. It covers `NSLayoutConstraint`, anchors, layout guides, the visual format language, `NSDictionaryOfVariableBindings`, priorities, intrinsic sizes with hugging and compression resistance, and constraints in nibs. A solver sets the views' frames from the constraints, one axis at a time, higher priorities winning. A required constraint that can't be met is left out with a note, as a Mac logs it | Ferry AppKit | done |
+| 3 | Accessibility. It covers the `NSAccessibility` attribute, role, subrole, action and notification names and the protocol's methods, the older informal methods, and HIServices' `kAX` names. There's no screen reader, so a value an app sets is kept and read back, and views, windows and the application answer what they know of themselves | Ferry AppKit | done |
+| 4 | `NSFontDescriptor`: a font's attributes and traits, descriptors that become fonts through the installed families' faces, a font's own descriptor, and `applyFontTraits:range:` | Ferry AppKit | done |
+| 5 | FSEvents through this system's inotify. A stream watches its folders and the folders inside them, and coalesces what it hears by path over the stream's latency. It hands the events to the callback on a run loop or a dispatch queue, by folder or by file, with the flags for what happened, `FSEventStreamFlushSync` and the extended data | Ferry CoreServices | done |
+| 6 | Quick Look and `Quartz/Quartz.h`. `QLPreviewPanel` finds its controller in the responder chain, moves between items with the arrow keys and closes with Escape or Space. Each preview shows the file's icon, name and size, then its picture, the start of its text or a larger icon; `QLPreviewView` shows the same preview. `QLThumbnailImageCreate` and the generator calls are there too. `QCView` can't run a Quartz Composer composition, and says so once | Ferry Quartz | done |
+| 7 | `NSRuleEditor`: rows from the delegate's criteria, as pop-ups, labels and the delegate's views, with buttons that add and remove rows. It has nested rows, the `rows` binding and the predicate built from the rows. It came with the text view's selection granularity and the underline pattern names | Ferry AppKit | done |
+| 8 | JavaScriptCore. The C API is passed to this system's JavaScriptCore (libjavascriptcoregtk-4.1, which WebKitGTK uses), opened on a program's first call. The Objective-C API is built on it: `JSContext`, `JSValue` with the structure and property calls, `JSExport` and `JSExportAs`, blocks called from scripts, `JSVirtualMachine` and `JSManagedValue`. A system without the library ends the program at its first call, with a message saying so | Ferry JavaScriptCore | done |
+| 9 | Thirteen new tests; `make check` 244 of 244 | Ferry | done |
+
+The apps still don't all compile; the table in `docs/ferry-compat.md` lists
+what stops each one. Most of MacPass's files wait for KeePassKit and HNHUi,
+which are the app's own frameworks and have to be built from its source.
+None of the apps was linked or run.
+
 ## 1.221 "Ferry: building the nine apps again" (done)
 
 Ferry 0.45.0: each of the nine apps' source files compiled against Ferry's

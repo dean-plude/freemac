@@ -110,6 +110,7 @@ extern char _objc_empty_cache_storage[];
     X(protocol_copyProtocolList, protocol_copyProtocolList) \
     X(protocol_copyMethodDescriptionList, protocol_copyMethodDescriptionList) \
     X(protocol_getMethodDescription, protocol_getMethodDescription) \
+    X(_protocol_getMethodTypeEncoding, _protocol_getMethodTypeEncoding) \
     X(protocol_copyPropertyList, protocol_copyPropertyList) \
     X(protocol_addProtocol, protocol_addProtocol) \
     X(protocol_addMethodDescription, protocol_addMethodDescription) \

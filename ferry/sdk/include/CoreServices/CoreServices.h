@@ -27,6 +27,8 @@ __FERRY_END
 #include <CoreServices/LSSharedFileList.h>
 /* File references and the trash (freemac 1.221, Ferry 0.45.0). */
 #include <CoreServices/Files.h>
+/* Folders' changes (freemac 1.222, Ferry 0.46.0). */
+#include <CoreServices/FSEvents.h>
 /* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
  * and Cocoa programs rely on it. */
 #include <unistd.h>

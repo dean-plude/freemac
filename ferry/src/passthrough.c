@@ -49,6 +49,8 @@ const char *const ferry_passthrough[] = {
     "link", "symlink", "readlink", "isatty", "ttyname", "mkstemp", "mkstemps", "mkdtemp",
     "mktemp", "utimes", "futimes", "select", "poll", "gethostname", "getpagesize",
     "getdtablesize", "flock",
+    /* folders' changes, for FSEvents (foundation/FSEvents.m) */
+    "inotify_init1", "inotify_add_watch", "inotify_rm_watch",
     /* memory maps (mmap itself is converted) */
     "munmap", "mprotect", "msync", "madvise", "mlock", "munlock",
     /* time */

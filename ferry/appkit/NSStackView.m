@@ -42,6 +42,10 @@ static NSLayoutPriority stored_priority(NSView *v, char *key, NSLayoutPriority d
 - (NSSize)fittingSize
 {
     NSSize s = [self intrinsicContentSize], f = [self frame].size;
+    /* with constraints inside it, the smallest size they allow (NSLayoutConstraint.m) */
+    NSSize fit;
+    if (AConstraintFittingSize(self, &fit))
+        return fit;
     return NSMakeSize(s.width >= 0 ? s.width : f.width, s.height >= 0 ? s.height : f.height);
 }
 - (BOOL)needsLayout { return [objc_getAssociatedObject(self, &needs_layout_key) boolValue]; }
@@ -49,23 +53,31 @@ static NSLayoutPriority stored_priority(NSView *v, char *key, NSLayoutPriority d
 {
     objc_setAssociatedObject(self, &needs_layout_key, flag ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
-/* There are no constraints to apply; a stack view arranges its views here. */
+/* Constraints are solved for the whole window before layout runs (see
+ * layoutSubtreeIfNeeded); a stack view arranges its views here. */
 - (void)layout {}
+static void layout_subtree(NSView *view)
+{
+    if ([view needsLayout]) {
+        [view setNeedsLayout:NO];
+        [view layout];
+    }
+    for (NSView *v in [[[view subviews] copy] autorelease])
+        layout_subtree(v);
+}
 - (void)layoutSubtreeIfNeeded
 {
-    if ([self needsLayout]) {
-        [self setNeedsLayout:NO];
-        [self layout];
-    }
-    for (NSView *v in [[[self subviews] copy] autorelease])
-        [v layoutSubtreeIfNeeded];
+    ALayoutConstraintsIfNeeded(self);
+    layout_subtree(self);
 }
-/* A stack view the view is in lays its views out again. */
+/* A stack view the view is in lays its views out again, and constraints are
+ * solved again. */
 - (void)invalidateIntrinsicContentSize
 {
     NSView *s = [self superview];
     if ([s isKindOfClass:[NSStackView class]])
         [s layout];
+    AConstraintsViewChanged(self);
 }
 - (NSLayoutPriority)contentHuggingPriorityForOrientation:(NSLayoutConstraintOrientation)o
 {
