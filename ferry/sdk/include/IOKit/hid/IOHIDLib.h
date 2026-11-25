@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * The HID device and queue plug-in interfaces (freemac 1.NEXT, Ferry
- * 0.NEXT), written from Apple's public IOKit HID documentation; not Apple's
+ * The HID device and queue plug-in interfaces (freemac 1.233, Ferry
+ * 0.57.0), written from Apple's public IOKit HID documentation; not Apple's
  * header. Ferry has no I/O Kit registry, so IOCreatePlugInInterfaceForService
  * never hands one out: an app that looks for a device (VLC's Apple Remote)
  * finds none. */

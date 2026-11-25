@@ -938,9 +938,9 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreImage", "AppKit"},         /* images, CIAffineTransform and detectors, appkit/CoreImage.m (1.225) */
     {"ScriptingBridge", "AppKit"},   /* apps that can't be scripted here, appkit/ScriptingBridge.m */
     {"AudioToolbox", "CoreAudio"},   /* the audio objects' calls its header brings in (freemac 1.232) */
-    {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.NEXT) */
-    {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.NEXT) */
-    {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.NEXT) */
+    {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.233) */
+    {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.233) */
+    {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.233) */
     {NULL, NULL},
 };
 

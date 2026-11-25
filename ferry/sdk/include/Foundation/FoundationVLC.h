@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
  * What VLC's Mac interface calls besides the rest of Foundation (freemac
- * 1.NEXT, Ferry 0.NEXT), written from Apple's public documentation. */
+ * 1.233, Ferry 0.57.0), written from Apple's public documentation. */
 #ifndef _FERRY_FOUNDATION_VLC_H_
 #define _FERRY_FOUNDATION_VLC_H_
 /* a Mac's Foundation brings the printf formats in */

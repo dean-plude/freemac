@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
- * AVFoundation's capture devices, none yet (freemac 1.NEXT, Ferry 0.NEXT):
+ * AVFoundation's capture devices, none yet (freemac 1.233, Ferry 0.57.0):
  * see AVFoundation/AVCaptureDevice.h. */
 #import <AVFoundation/AVFoundation.h>
 

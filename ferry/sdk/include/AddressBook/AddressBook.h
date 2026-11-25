@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: the Address Book's shared book (freemac 1.NEXT, Ferry 0.NEXT;
+ * Ferry SDK: the Address Book's shared book (freemac 1.233, Ferry 0.57.0;
  * appkit/AddressBook.m, served from Ferry's AppKit file). Written for
  * freemac from Apple's public API documentation; not Apple's header.
  * freemac doesn't hand an app the user's contacts, so the book is empty:

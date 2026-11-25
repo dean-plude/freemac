@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: MediaPlayer's remote commands and Now Playing information
- * (freemac 1.NEXT, Ferry 0.NEXT; appkit/MediaPlayer.m, served from Ferry's
+ * (freemac 1.233, Ferry 0.57.0; appkit/MediaPlayer.m, served from Ferry's
  * AppKit file). Written for freemac from Apple's public API documentation;
  * not Apple's header. The command center keeps each command's targets and
  * the Now Playing center keeps what the app says is playing; freemac has

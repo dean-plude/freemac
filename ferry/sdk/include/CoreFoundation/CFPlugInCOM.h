@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * The COM-style interfaces of CFPlugIn (freemac 1.NEXT, Ferry 0.NEXT),
+ * The COM-style interfaces of CFPlugIn (freemac 1.233, Ferry 0.57.0),
  * written from Apple's public documentation of CFPlugIn: the IUnknown
  * functions every plug-in interface starts with, and their result codes. */
 #ifndef _FERRY_CFPLUGINCOM_H_

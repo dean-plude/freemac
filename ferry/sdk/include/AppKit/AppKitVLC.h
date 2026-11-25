@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * What VLC's Mac interface calls besides the rest of AppKit (freemac 1.NEXT,
- * Ferry 0.NEXT): the drawing and tracking methods custom cells override
+ * What VLC's Mac interface calls besides the rest of AppKit (freemac 1.233,
+ * Ferry 0.57.0): the drawing and tracking methods custom cells override
  * and call on super, the scroller's arrows, the application's presentation
  * options, alert sheets, the visual effect view, and a few names of
  * windows, views, events, images and screens. Written from Apple's public

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: CoreMedia's times (freemac 1.NEXT, Ferry 0.NEXT;
+ * Ferry SDK: CoreMedia's times (freemac 1.233, Ferry 0.57.0;
  * appkit/CoreMedia.m, served from Ferry's AppKit file). Written for freemac
  * from Apple's public API documentation; not Apple's header. Sample
  * buffers, formats and clocks aren't here. */

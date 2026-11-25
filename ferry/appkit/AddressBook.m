@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
- * The Address Book, empty (freemac 1.NEXT, Ferry 0.NEXT): see AddressBook/AddressBook.h. */
+ * The Address Book, empty (freemac 1.233, Ferry 0.57.0): see AddressBook/AddressBook.h. */
 #import <AddressBook/AddressBook.h>
 
 NSString *const kABFirstNameProperty = @"First";

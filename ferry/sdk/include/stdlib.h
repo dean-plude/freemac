@@ -77,5 +77,10 @@ long jrand48(unsigned short[3]);
 void srand48(long);
 unsigned short *seed48(unsigned short[3]);
 void lcong48(unsigned short[7]);
+/* pseudo-terminals (freemac 1.233, Ferry 0.57.0) */
+int posix_openpt(int);
+int grantpt(int);
+int unlockpt(int);
+char *ptsname(int);
 __FERRY_END
 #endif

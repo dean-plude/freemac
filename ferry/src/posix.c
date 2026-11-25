@@ -556,6 +556,9 @@ static const int mac_to_linux_sig[32] = {
     0 /* INFO */, SIGUSR1, SIGUSR2,
 };
 
+/* for posix_spawn's open actions (libc_apps.c; freemac 1.233) */
+int ferry_open_flags_to_linux(int mac) { return open_to_linux(mac); }
+
 int ferry_signal_to_linux(int s) { return s > 0 && s < 32 ? mac_to_linux_sig[s] : 0; }
 
 int ferry_signal_to_mac(int s)
@@ -895,6 +898,17 @@ static int mac_getrlimit(int r, uint64_t lim[2])
     return 0;
 }
 
+/* The same layout as Linux's, but a Mac counts ru_maxrss in bytes and
+ * Linux in kilobytes (FFmpeg's -benchmark prints it; freemac 1.233,
+ * Ferry 0.57.0). RUSAGE_SELF and RUSAGE_CHILDREN are the same numbers. */
+static int mac_getrusage(int who, struct rusage *r)
+{
+    if (getrusage(who, r) < 0)
+        return -1;
+    r->ru_maxrss *= 1024;
+    return 0;
+}
+
 static int mac_setrlimit(int r, const uint64_t lim[2])
 {
     int lr = rlimit_to_linux(r);
@@ -1120,6 +1134,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"ioctl", mac_ioctl},
     {"getrlimit", mac_getrlimit},
     {"setrlimit", mac_setrlimit},
+    {"getrusage", mac_getrusage},
     {"setlocale", mac_setlocale},
     {"realpath", mac_realpath},
     {"getopt", mac_getopt},

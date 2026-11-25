@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * What VLC's Mac interface calls besides (freemac 1.NEXT, Ferry 0.NEXT):
+ * What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0):
  * CoreMedia's times, the media keys' command center and Now Playing, the
  * displays, string comparison in a range, the writing direction of a
  * language, slider cells' parts, a control's selected cell, paragraph

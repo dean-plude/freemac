@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK)
- * The special keys' numbers (freemac 1.NEXT, Ferry 0.NEXT), as Apple's
+ * The special keys' numbers (freemac 1.233, Ferry 0.57.0), as Apple's
  * public documentation of NSSystemDefined events gives them: a media key
  * arrives as an NX_SYSDEFINED event of subtype NX_SUBTYPE_AUX_CONTROL_BUTTONS
  * whose data1 holds the key in its top 16 bits. Not Apple's header. */

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry)
- * What VLC's Mac interface calls besides the rest of AppKit (freemac 1.NEXT,
- * Ferry 0.NEXT): see AppKitVLC.h. Written from Apple's public
+ * What VLC's Mac interface calls besides the rest of AppKit (freemac 1.233,
+ * Ferry 0.57.0): see AppKitVLC.h. Written from Apple's public
  * documentation; no Apple code was read.
  *
  * Custom cells (VLC's slider, button, pop-up, segmented and stepper cells)
@@ -604,7 +604,7 @@ NSAttributedStringDocumentReadingOptionKey const NSBaseURLDocumentOption = @"Bas
 @end
 
 /* The host's mount table names every mount point; removable disks are the ones
- * mounted where desktops put them (freemac 1.NEXT, VLC). */
+ * mounted where desktops put them (freemac 1.233, VLC). */
 @implementation NSWorkspace (FerryRemovableMedia)
 - (NSArray<NSString *> *)mountedRemovableMedia
 {
