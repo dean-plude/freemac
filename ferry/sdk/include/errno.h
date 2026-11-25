@@ -75,7 +75,7 @@ __FERRY_END
 #define EOVERFLOW 84
 #define EILSEQ 92
 #define ENOATTR 93 /* an extended attribute that isn't there (freemac 1.221, Ferry 0.45.0) */
-/* the rest of a Mac's numbers (freemac 1.NEXT, VLC) */
+/* the rest of a Mac's numbers (freemac 1.232, VLC) */
 #define ETOOMANYREFS 59
 #define EPROCLIM 67
 #define EUSERS 68

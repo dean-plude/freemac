@@ -152,6 +152,12 @@ CFRange CTFrameGetVisibleStringRange(CTFrameRef frame);
 CGPathRef CTFrameGetPath(CTFrameRef frame);
 void CTFrameDraw(CTFrameRef frame, CGContextRef context);
 
+/* Font features by type and selector, as the TrueType feature registry
+ * numbers them (SFNTLayoutTypes.h; freemac 1.232); Ferry's fonts are
+ * drawn without them. */
+enum { kNumberSpacingType = 6, kNumberCaseType = 21, kLowerCaseType = 37, kUpperCaseType = 38 };
+enum { kMonospacedNumbersSelector = 0, kProportionalNumbersSelector = 1 };
+
 __FERRY_END
 
 #endif

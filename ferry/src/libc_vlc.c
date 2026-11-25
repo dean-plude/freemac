@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  *
  * What VLC's core (libvlccore) asks of libSystem that Ferry didn't have
- * (freemac 1.NEXT): Mach semaphores, which VLC uses because a Mac has no
+ * (freemac 1.232): Mach semaphores, which VLC uses because a Mac has no
  * unnamed POSIX semaphores, written from the Mach reference pages; and a
  * few C library calls whose Mac data or numbers differ from this system's
  * (pathconf, getpwuid_r, sigwait, statvfs, sys_errlist), from the Mac's

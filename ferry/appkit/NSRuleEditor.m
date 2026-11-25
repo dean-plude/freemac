@@ -75,6 +75,7 @@ static const CGFloat kIndent = 16, kButton = 22, kGap = 4;
 @interface NSRuleEditor ()
 - (void)_rebuild;
 - (void)_changed;
+- (id)_criteriaSource;
 @end
 
 @implementation NSRuleEditor {
@@ -153,6 +154,9 @@ static const CGFloat kIndent = 16, kButton = 22, kGap = 4;
 /* ---- properties ---- */
 
 - (id<NSRuleEditorDelegate>)delegate { return _delegate; }
+/* who gives the rows' criteria: the delegate (a predicate editor gives its
+ * own, from its row templates; NSPredicateEditor.m) */
+- (id)_criteriaSource { return _delegate; }
 - (void)setDelegate:(id<NSRuleEditorDelegate>)delegate
 {
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
@@ -379,11 +383,11 @@ static void flatten(NSRuleEditor *self, NSArray *rows, NSInteger parent, NSInteg
 
 - (NSInteger)_childCount:(id)criterion type:(NSRuleEditorRowType)type
 {
-    return MAX([_delegate ruleEditor:self numberOfChildrenForCriterion:criterion withRowType:type], 0);
+    return MAX([[self _criteriaSource] ruleEditor:self numberOfChildrenForCriterion:criterion withRowType:type], 0);
 }
 - (id)_child:(NSInteger)i of:(id)criterion type:(NSRuleEditorRowType)type
 {
-    return [_delegate ruleEditor:self child:i forCriterion:criterion withRowType:type];
+    return [[self _criteriaSource] ruleEditor:self child:i forCriterion:criterion withRowType:type];
 }
 /* the criteria kept up to level, then first children */
 - (NSArray *)_criteriaFrom:(NSArray *)kept type:(NSRuleEditorRowType)type
@@ -404,7 +408,7 @@ static void flatten(NSRuleEditor *self, NSArray *rows, NSInteger parent, NSInteg
 {
     NSMutableArray *out = [NSMutableArray array];
     for (id c in criteria)
-        [out addObject:[_delegate ruleEditor:self displayValueForCriterion:c inRow:row] ?: @""];
+        [out addObject:[[self _criteriaSource] ruleEditor:self displayValueForCriterion:c inRow:row] ?: @""];
     return out;
 }
 
@@ -568,12 +572,12 @@ static void flatten(NSRuleEditor *self, NSArray *rows, NSInteger parent, NSInteg
 
 - (NSDictionary *)_partsForRow:(NSInteger)row
 {
-    if (![_delegate respondsToSelector:@selector(ruleEditor:predicatePartsForCriterion:withDisplayValue:inRow:)])
+    if (![[self _criteriaSource] respondsToSelector:@selector(ruleEditor:predicatePartsForCriterion:withDisplayValue:inRow:)])
         return nil;
     NSMutableDictionary *parts = [NSMutableDictionary dictionary];
     NSArray *criteria = [self criteriaForRow:row], *values = [self displayValuesForRow:row];
     for (NSUInteger i = 0; i < [criteria count]; i++) {
-        NSDictionary *p = [_delegate ruleEditor:self predicatePartsForCriterion:criteria[i]
+        NSDictionary *p = [[self _criteriaSource] ruleEditor:self predicatePartsForCriterion:criteria[i]
                                withDisplayValue:i < [values count] ? values[i] : nil
                                           inRow:row];
         if (p)
@@ -660,7 +664,7 @@ static void flatten(NSRuleEditor *self, NSArray *rows, NSInteger parent, NSInteg
             chosen = (NSInteger)[choices count];
         [choices addObject:child];
         id shown = [child isEqual:criteria[level]] ? value
-                                                     : [_delegate ruleEditor:self displayValueForCriterion:child
+                                                     : [[self _criteriaSource] ruleEditor:self displayValueForCriterion:child
                                                                        inRow:row];
         if ([shown isKindOfClass:[NSMenuItem class]]) {
             NSMenuItem *item = [[(NSMenuItem *)shown copy] autorelease];

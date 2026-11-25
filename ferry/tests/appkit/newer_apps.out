@@ -1,0 +1,40 @@
+window content: 177x197
+pinned to the safe area: 0.0,6.0 177.0x178.0
+grid: 2.0,5.0 173.0x150.0
+title as wide as the window allows: yes
+after new insets: 0.0,10.0 177.0x178.0
+safeAreaInsets: 20 0 10 0
+no preferred size: agenda 0 high, window 208
+preferred 80: agenda 80 high, window 288
+preferred nearly 0: agenda 0 high, window 208
+width unchanged: yes
+template: 2 left, 2 operators, type 700, options 1, 3 views
+matches: text yes yes no, compound yes
+shown back: host CONTAINS[c] "example"
+copy keeps its operators: yes
+rows: 3
+predicate: host CONTAINS[c] "example" OR name ==[c] "mail"
+nib instantiated: yes
+from the nib: NSPredicateEditor, 2 templates
+  compound: Any/All
+  simple: Name/Contents | contains/begins with/is
+rows: 3
+predicate: name BEGINSWITH[c] "local" OR contents CONTAINS[c] "127.0.0.1"
+setTitleWithMnemonic: Hosts
+button cell background: none
+button cell background: red
+focus ring mask bounds: 0.0,0.0 40.0x20.0
+notification: NSApplicationWillBecomeActiveNotification
+notification: NSApplicationDidBecomeActiveNotification
+notification: NSApplicationWillResignActiveNotification
+notification: NSApplicationDidResignActiveNotification
+default output: status 0, device 2
+volume with no sound server: not running
+an unknown object: hasn't
+localizedStandardCompare: -1 1
+NSURLTagNamesKey: NSURLTagNamesKey
+resourceSpecifier: someone@example.com
+kSCNetworkFlagsReachable: same
+cornerCurve: circular
+cornerCurve: continuous
+exit=0

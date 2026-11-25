@@ -2,7 +2,7 @@
  * Mach semaphores, as the Mach reference pages describe them
  * (semaphore_create, semaphore_signal, semaphore_wait and the rest), which
  * VLC's threads count on because a Mac has no unnamed POSIX semaphores
- * (freemac 1.NEXT). Ferry serves them from src/libc_vlc.c. */
+ * (freemac 1.232). Ferry serves them from src/libc_vlc.c. */
 #ifndef _FERRY_MACH_SEMAPHORE_H_
 #define _FERRY_MACH_SEMAPHORE_H_
 #include <mach/mach.h>

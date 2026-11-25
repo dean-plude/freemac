@@ -52,23 +52,43 @@ static NSLayoutPriority stored_priority(NSView *v, char *key, NSLayoutPriority d
 - (void)setNeedsLayout:(BOOL)flag
 {
     objc_setAssociatedObject(self, &needs_layout_key, flag ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (flag)
+        [[[self window] contentView] setNeedsDisplay:YES];   /* the pass runs before the window draws */
 }
 /* Constraints are solved for the whole window before layout runs (see
  * layoutSubtreeIfNeeded); a stack view arranges its views here. */
 - (void)layout {}
-static void layout_subtree(NSView *view)
+/* A view marked as needing layout is laid out, its view controller told
+ * before and after (viewWillLayout, viewDidLayout). */
+static BOOL layout_subtree(NSView *view)
 {
+    BOOL any = NO;
     if ([view needsLayout]) {
-        [view setNeedsLayout:NO];
+        NSViewController *vc = [view _viewController];
+        objc_setAssociatedObject(view, &needs_layout_key, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [vc viewWillLayout];
         [view layout];
+        [vc viewDidLayout];
+        any = YES;
     }
     for (NSView *v in [[[view subviews] copy] autorelease])
-        layout_subtree(v);
+        any |= layout_subtree(v);
+    return any;
 }
 - (void)layoutSubtreeIfNeeded
 {
     ALayoutConstraintsIfNeeded(self);
     layout_subtree(self);
+}
+
+/* A window's layout before it draws (NSWindow.m; freemac 1.232): its
+ * constraints solved, then the views marked as needing layout laid out, as
+ * on a Mac, and the constraints solved again for what that changed. */
+void ALayoutWindowIfNeeded(NSView *contentView)
+{
+    ALayoutConstraintsIfNeeded(contentView);
+    if (contentView && layout_subtree(contentView))
+        ALayoutConstraintsIfNeeded(contentView);
 }
 /* A stack view the view is in lays its views out again, and constraints are
  * solved again. */

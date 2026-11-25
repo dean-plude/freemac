@@ -4,7 +4,8 @@
  * chain of criteria its delegate gives, shown as pop-up menus, labels and
  * the delegate's own views, with buttons to add and remove rows; compound
  * rows hold rows of their own. The rows can be bound ("rows") to an array
- * of the model's. Included from AppKit.h. NSPredicateEditor isn't here. */
+ * of the model's. Included from AppKit.h. NSPredicateEditor, which gives
+ * its own criteria, is in NSPredicateEditor.h. */
 #import <Foundation/Foundation.h>
 
 @class NSRuleEditor;

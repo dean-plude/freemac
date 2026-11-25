@@ -22,6 +22,17 @@ typedef CF_OPTIONS(uint32_t, SCNetworkReachabilityFlags) {
     kSCNetworkReachabilityFlagsIsLocalAddress = 1 << 16,
     kSCNetworkReachabilityFlagsIsDirect = 1 << 17,
 };
+/* the same flags under their older names (SCNetwork.h's) */
+typedef SCNetworkReachabilityFlags SCNetworkConnectionFlags;
+enum {
+    kSCNetworkFlagsTransientConnection = kSCNetworkReachabilityFlagsTransientConnection,
+    kSCNetworkFlagsReachable = kSCNetworkReachabilityFlagsReachable,
+    kSCNetworkFlagsConnectionRequired = kSCNetworkReachabilityFlagsConnectionRequired,
+    kSCNetworkFlagsConnectionAutomatic = kSCNetworkReachabilityFlagsConnectionOnTraffic,
+    kSCNetworkFlagsInterventionRequired = kSCNetworkReachabilityFlagsInterventionRequired,
+    kSCNetworkFlagsIsLocalAddress = kSCNetworkReachabilityFlagsIsLocalAddress,
+    kSCNetworkFlagsIsDirect = kSCNetworkReachabilityFlagsIsDirect,
+};
 typedef struct {
     CFIndex version;
     void *info;

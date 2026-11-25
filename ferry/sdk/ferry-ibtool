@@ -20,7 +20,8 @@ controllers, and the app's own objects; since freemac 1.229 (Ferry
 0.53.0) also text views (with their attributed text, flags and colours),
 web views and their preferences, matrices of cells, level indicators,
 date pickers, path controls, collection views and their items, rule
-editors, plain controls, Quartz Composer views, the formatters of cells
+editors (and, since freemac 1.232, predicate editors with their row
+templates), plain controls, Quartz Composer views, the formatters of cells
 (number, date, byte-count, date-components and the app's own), the data
 cells of table columns, cells and formatters at the top level, and a
 window's initial position. Outlets, actions, bindings and
@@ -1697,6 +1698,82 @@ class Compiler:
             NSNestingMode={"single": 0, "list": 1, "compound": 2, "simple": 3}.get(e.get("nestingMode"), 2),
             NSEditable=yes(e, "editable", True), NSCanRemoveAllRows=yes(e, "canRemoveAllRows"))
 
+    def b_predicateEditor(self, e, uid):
+        """A predicate editor: a rule editor with its row templates (freemac
+        1.232, Ferry 0.56.0), each kept as its settings, under the keys
+        appkit/NSPredicateEditor.m reads."""
+        cls, keys = self.b_ruleEditor(e, uid)
+        rows = child(e, "rowTemplates")
+        templates = [self.row_template(t) for t in (rows if rows is not None else [])
+                     if t.tag == "predicateEditorRowTemplate"]
+        keys["NSPredicateTemplates"] = self.a.array(templates)
+        return "NSPredicateEditor", keys
+
+    def row_template(self, t):
+        """One row template: its row type; for a simple row its left key
+        paths, the right side's attribute type or constants, operators,
+        modifier and options; for a compound row its compound types; and the
+        titles of each pop-up menu. The operators and compound types are the
+        represented objects of the menu items when the document lists them
+        nowhere else, as Xcode writes them."""
+        a = self.a
+        uid = self.uid_for(t.get("id")) if t.get("id") else a.reserve()
+        compound = t.get("rowType") == "compound"
+        menus = child(t, "popUpMenus")
+        menus = [m for m in menus if m.tag == "menu"] if menus is not None else []
+
+        def items(m):
+            box = child(m, "items")
+            return [i for i in (box if box is not None else []) if i.tag == "menuItem"]
+
+        def represented(i):
+            for c in i:
+                if c.get("key") == "representedObject":
+                    if c.tag == "integer":
+                        return int(c.get("value", "0"))
+                    if c.tag == "expression":
+                        k = child(c, "string", "keyPath")
+                        return ("keyPath", k.text if k is not None else "")
+            return None
+
+        def key_paths(el):
+            out = []
+            for x in (el if el is not None else []):
+                if x.tag == "expression" and x.get("type") == "keyPath":
+                    k = child(x, "string", "keyPath")
+                    if k is not None and k.text:
+                        out.append(k.text)
+            return out
+
+        keys = dict(NSPredicateTemplateRowType=1 if compound else 0)
+        titles = [a.array([a.string(i.get("title", "")) for i in items(m)]) for m in menus]
+        keys["NSPredicateTemplateTitles"] = a.array(titles)
+        if compound:
+            types = [represented(i) for i in items(menus[0])] if menus else []
+            types = [v for v in types if isinstance(v, int)] or [1]
+            keys["NSPredicateTemplateCompoundTypes"] = a.array([a.add(v) for v in types])
+        else:
+            left = key_paths(child(t, "array", "leftExpressionObject"))
+            if not left and menus:
+                left = [v[1] for v in map(represented, items(menus[0])) if isinstance(v, tuple)]
+            keys["NSPredicateTemplateLeftKeyPaths"] = a.array([a.string(k) for k in left])
+            right = child(t, "integer", "rightExpressionObject")
+            if right is not None:
+                keys["NSPredicateTemplateRightAttributeType"] = int(right.get("value", "0"))
+            ops = [represented(i) for i in items(menus[1])] if len(menus) > 1 else []
+            keys["NSPredicateTemplateOperators"] = a.array([a.add(v) for v in ops if isinstance(v, int)])
+            keys["NSPredicateTemplateModifier"] = {"all": 1, "any": 2}.get(t.get("modifier"), 0)
+            keys["NSPredicateTemplateOptions"] = ((1 if yes(t, "caseInsensitive") else 0) |
+                                                  (2 if yes(t, "diacriticInsensitive") else 0))
+        cls = "NSPredicateEditorRowTemplate"
+        custom = t.get("customClass")
+        if custom and custom != cls:
+            a.fill(uid, a.obj(custom, (cls,), **keys))
+        else:
+            a.fill(uid, a.obj(cls, (), **keys))
+        self.connections_of(t, uid)
+        return uid
+
     def b_control(self, e, uid):
         """A plain control (one of the app's own classes, as a rule) with
         whatever cell it has."""
@@ -1723,6 +1800,7 @@ VIEW_TAGS = {
     "textView": Compiler.b_textView, "webView": Compiler.b_webView, "pathControl": Compiler.b_pathControl,
     "levelIndicator": Compiler.b_levelIndicator, "datePicker": Compiler.b_datePicker, "matrix": Compiler.b_matrix,
     "collectionView": Compiler.b_collectionView, "ruleEditor": Compiler.b_ruleEditor, "control": Compiler.b_control,
+    "predicateEditor": Compiler.b_predicateEditor,
     "qcView": Compiler.b_qcView,
 }
 # A cell's element and what makes it (any_cell); a text cell of another kind is made by text_cell.

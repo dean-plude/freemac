@@ -21,7 +21,7 @@ extern FILE *__stdinp, *__stdoutp, *__stderrp;
 #define _IOFBF 0
 #define _IOLBF 1
 #define _IONBF 2
-/* freemac 1.NEXT (VLC): the error messages by number, old style */
+/* freemac 1.232 (VLC): the error messages by number, old style */
 extern const int sys_nerr;
 extern const char *const sys_errlist[];
 FILE *fopen(const char *, const char *);
@@ -58,7 +58,7 @@ int fputs(const char *, FILE *);
 int puts(const char *);
 int fgetc(FILE *);
 int getc(FILE *);
-/* freemac 1.NEXT (VLC) */
+/* freemac 1.232 (VLC) */
 int getc_unlocked(FILE *);
 int putc_unlocked(int, FILE *);
 char *tempnam(const char *, const char *);

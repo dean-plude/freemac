@@ -68,7 +68,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_ibtool|appkit_ibtool_classes)
+        appkit_ibtool|appkit_ibtool_classes|appkit_newer_apps)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/ibtool" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -97,6 +97,11 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY -u FERRY_ALERT_ANSWER HOME="$build/home_$name" XDG_CONFIG_HOME= \
                 XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        eventkit)
+            # the calendar and reminders files in a home of its own, and no display to ask on
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
+                TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_keychain)
             # twice in one home: what the first run keeps, the second finds
@@ -190,7 +195,7 @@ run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
 # the apps (1.223).
 run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 # Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
-# what VLC's core asks of libSystem (1.NEXT).
+# what VLC's core asks of libSystem (1.232).
 run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
@@ -1497,6 +1502,20 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# what Itsycal and Gas Mask need (freemac 1.232): layout, the predicate
+# editor, in code and from a nib the tool compiled (it says nothing of it),
+# older cell calls, Core Audio through AudioToolbox, newer names
+mkdir -p "$build/ibtool"
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/Predicates.nib" "$here/appkit/predicate_editor.xib" \
+        2> "$build/ibtool/predicates.log" && ! [ -s "$build/ibtool/predicates.log" ]; then
+    run_one appkit_newer_apps "$here/appkit/newer_apps.m" "$here/appkit/newer_apps.out" -fobjc-arc -fblocks \
+        -framework Cocoa -framework QuartzCore -framework AudioToolbox -framework CoreAudio
+else
+    echo "FAIL appkit_newer_apps (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/predicates.log"; fail=$((fail + 1))
+fi
+# EventKit on freemac's calendar and reminders files (freemac 1.232,
+# Ferry 0.56.0): access, repeats, saves that keep Tide's and Nudge's lines.
+run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -framework Foundation -framework EventKit
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

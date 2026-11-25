@@ -428,7 +428,37 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     _represented = o;
 }
 - (NSSize)preferredContentSize { return _preferred; }
-- (void)setPreferredContentSize:(NSSize)s { _preferred = s; }
+/* A view laid out by constraints takes the preferred size as a wish just
+ * stronger than a window holding its size, so a window grows or shrinks
+ * to fit it and anything firmer inside wins (freemac 1.232: Itsycal's
+ * agenda sizes itself this way). A zero dimension is no wish. */
+static char preferred_width_key, preferred_height_key;
+static void prefer_dimension(NSView *v, char *key, NSLayoutDimension *d, CGFloat value)
+{
+    NSLayoutConstraint *c = objc_getAssociatedObject(v, key);
+    if (value <= 0) {
+        [c setActive:NO];
+        return;
+    }
+    if (!c) {
+        c = [d constraintEqualToConstant:value];
+        [c setPriority:NSLayoutPriorityWindowSizeStayPut + 1];
+        [c setIdentifier:@"NSViewController-preferredContentSize"];
+        objc_setAssociatedObject(v, key, c, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if ([c constant] != value)
+        [c setConstant:value];
+    [c setActive:YES];
+}
+- (void)setPreferredContentSize:(NSSize)s
+{
+    _preferred = s;
+    NSView *v = [self viewIfLoaded];
+    if (!v || [v translatesAutoresizingMaskIntoConstraints] || [[v window] contentView] == v)
+        return;
+    prefer_dimension(v, &preferred_width_key, [v widthAnchor], s.width);
+    prefer_dimension(v, &preferred_height_key, [v heightAnchor], s.height);
+}
 
 - (NSArray *)childViewControllers { return [[_children copy] autorelease]; }
 - (void)setChildViewControllers:(NSArray *)children

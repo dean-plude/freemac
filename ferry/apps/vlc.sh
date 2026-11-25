@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Builds VLC 3.0.24's Mac app from VideoLAN's own source, against Ferry's
-# SDK, so it can be run under Ferry (freemac 1.NEXT). Nothing here is
+# SDK, so it can be run under Ferry (freemac 1.232). Nothing here is
 # Apple's: the compiler is clang aimed at x86_64-apple-darwin with Ferry's
 # sysroot (sdk/ferry-cc), the linker ld64.lld, and the nibs come from VLC's
 # .xib files through Ferry's own sdk/ferry-ibtool.
