@@ -20,14 +20,20 @@ typedef signed char BOOL;      /* Intel Macs: a signed char */
 /* As a Mac's (__DARWIN_NULL): a null pointer of no particular type, so nil
  * can be passed for any pointer, a CF or Carbon reference among them. */
 #ifndef nil
-#ifdef __cplusplus
+#if defined(__cplusplus) && __cplusplus >= 201103L
+/* nullptr, as a Mac's C++11 and later: std::exchange(object, nil) and the
+ * like then work on object pointers */
+#define nil nullptr
+#elif defined(__cplusplus)
 #define nil __null
 #else
 #define nil ((void *)0)
 #endif
 #endif
 #ifndef Nil
-#ifdef __cplusplus
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define Nil nullptr
+#elif defined(__cplusplus)
 #define Nil __null
 #else
 #define Nil ((void *)0)

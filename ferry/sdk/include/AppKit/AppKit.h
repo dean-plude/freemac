@@ -22,6 +22,7 @@
 @class NSApplication, NSWindow, NSView, NSEvent, NSColor, NSFont, NSMenu, NSMenuItem, NSScreen;
 @class NSGraphicsContext, NSBitmapImageRep, NSParagraphStyle, NSBezierPath, NSCursor, NSImage;
 @class NSWindowController, NSViewController, NSStoryboard;
+@protocol NSUserActivityRestoring;
 
 /* ---- events ----------------------------------------------------------------------- */
 
@@ -1083,11 +1084,19 @@ typedef NS_ENUM(NSUInteger, NSBackingStoreType) {
 };
 typedef NS_ENUM(NSInteger, NSWindowOrderingMode) { NSWindowAbove = 1, NSWindowBelow = -1, NSWindowOut = 0 };
 typedef NSInteger NSWindowLevel;
+#ifdef __cplusplus
+/* NSWindowLevel constants in C++, as a Mac's, so std::max(level,
+ * NSPopUpMenuWindowLevel) and the like take them as NSIntegers */
+static const NSWindowLevel NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSSubmenuWindowLevel = 3,
+    NSTornOffMenuWindowLevel = 3, NSModalPanelWindowLevel = 8, NSDockWindowLevel = 20, NSMainMenuWindowLevel = 24,
+    NSStatusWindowLevel = 25, NSPopUpMenuWindowLevel = 101, NSScreenSaverWindowLevel = 1000;
+#else
 enum {
     NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSSubmenuWindowLevel = 3, NSTornOffMenuWindowLevel = 3,
     NSModalPanelWindowLevel = 8, NSDockWindowLevel = 20, NSMainMenuWindowLevel = 24, NSStatusWindowLevel = 25,
     NSPopUpMenuWindowLevel = 101, NSScreenSaverWindowLevel = 1000,
 };
+#endif
 typedef NS_OPTIONS(NSUInteger, NSWindowCollectionBehavior) {
     NSWindowCollectionBehaviorDefault = 0,
     NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0,
@@ -1388,6 +1397,15 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (BOOL)applicationOpenUntitledFile:(NSApplication *)sender;
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag;
 - (NSError *)application:(NSApplication *)application willPresentError:(NSError *)error;
+/* Handoff and secure restorable state (AppKitQt.h) */
+- (BOOL)application:(NSApplication *)application willContinueUserActivityWithType:(NSString *)userActivityType;
+- (BOOL)application:(NSApplication *)application
+    continueUserActivity:(NSUserActivity *)userActivity
+      restorationHandler:(void (^)(NSArray<id<NSUserActivityRestoring>> *restorableObjects))restorationHandler;
+- (void)application:(NSApplication *)application
+    didFailToContinueUserActivityWithType:(NSString *)userActivityType error:(NSError *)error;
+- (void)application:(NSApplication *)application didUpdateUserActivity:(NSUserActivity *)userActivity;
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app;
 @end
 
 @interface NSApplication : NSResponder

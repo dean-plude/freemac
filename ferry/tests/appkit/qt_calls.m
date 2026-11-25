@@ -7,6 +7,7 @@
  * activities; and the newer event types' numbers. */
 #import <Cocoa/Cocoa.h>
 #include <ApplicationServices/ApplicationServices.h>
+#include <Carbon/Carbon.h>
 
 static int kept;
 
@@ -175,6 +176,43 @@ int main(void)
                [[act.webpageURL host] UTF8String], layer.wantsExtendedDynamicRangeContent);
         printf("events: magnify %d swipe %d tablet %d gesture mask %d\n", (int)NSEventTypeMagnify,
                (int)NSEventTypeSwipe, (int)NSEventTypeTabletPoint, NSEventMaskGesture == (1ULL << 29));
+
+        /* touches, tablets, window tabs and steps, layer placement, image spaces */
+        NSEvent *key = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:0
+                                       timestamp:0 windowNumber:0 context:nil characters:@"a"
+                     charactersIgnoringModifiers:@"a" isARepeat:NO keyCode:0];
+        printf("touches %lu, device %lu, tablet %d\n",
+               (unsigned long)[key touchesMatchingPhase:NSTouchPhaseAny inView:nil].count,
+               (unsigned long)key.deviceID, (int)key.pointingDeviceType);
+        NSWindow *w3 = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 80, 60) styleMask:NSWindowStyleMaskTitled
+                                                     backing:NSBackingStoreBuffered defer:YES];
+        printf("tabbing %d", (int)w3.tabbingMode);
+        w3.tabbingMode = NSWindowTabbingModeDisallowed;
+        w3.resizeIncrements = NSMakeSize(4, 8);
+        printf(" then %d, steps %.0fx%.0f, modal %d, space is sRGB %d\n", (int)w3.tabbingMode,
+               w3.resizeIncrements.width, w3.resizeIncrements.height, w3.worksWhenModal,
+               [w3.colorSpace isEqual:[NSColorSpace sRGBColorSpace]]);
+        NSView *v3 = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 10, 10)] autorelease];
+        v3.layerContentsPlacement = NSViewLayerContentsPlacementTopLeft;
+        v3.allowedTouchTypes |= NSTouchTypeMaskIndirect;
+        printf("placement %d, touch types %lu\n", (int)v3.layerContentsPlacement,
+               (unsigned long)v3.allowedTouchTypes);
+        [w3 release];
+        CGColorSpaceRef rgb3 = CGColorSpaceCreateDeviceRGB(), srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+        CGContextRef bc = CGBitmapContextCreate(NULL, 4, 4, 8, 16, rgb3, kCGImageAlphaPremultipliedFirst);
+        CGImageRef img = CGBitmapContextCreateImage(bc);
+        CGImageRef in_srgb = CGImageCreateCopyWithColorSpace(img, srgb);
+        CGImageRef in_gray = CGImageCreateCopyWithColorSpace(img, gray);
+        printf("image copy %zux%zu in sRGB %d, in grey %d; enter %d return %d\n", CGImageGetWidth(in_srgb),
+               CGImageGetHeight(in_srgb), CGImageGetColorSpace(in_srgb) == srgb, in_gray == NULL,
+               kEnterCharCode, kReturnCharCode);
+        CGImageRelease(in_srgb);
+        CGImageRelease(img);
+        CGContextRelease(bc);
+        CGColorSpaceRelease(rgb3);
+        CGColorSpaceRelease(srgb);
+        CGColorSpaceRelease(gray);
     }
     return 0;
 }

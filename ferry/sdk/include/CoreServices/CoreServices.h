@@ -14,7 +14,9 @@
  * (VLC's audio output passes it for a char *), as objc.h does (freemac
  * 1.NEXT, VLC). */
 #ifndef nil
-#ifdef __cplusplus
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define nil nullptr
+#elif defined(__cplusplus)
 #define nil __null
 #else
 #define nil ((void *)0)

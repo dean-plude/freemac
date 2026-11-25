@@ -14,4 +14,8 @@ key repeat after 0.50 s, every 0.033 s
 enumerated 1 window and stopped
 activity NSUserActivityTypeBrowsingWeb obsproject.com, layer EDR 1
 events: magnify 30 swipe 31 tablet 23 gesture mask 1
+touches 0, device 0, tablet 0
+tabbing 0 then 2, steps 4x8, modal 0, space is sRGB 1
+placement 11, touch types 3
+image copy 4x4 in sRGB 1, in grey 1; enter 3 return 13
 exit=0

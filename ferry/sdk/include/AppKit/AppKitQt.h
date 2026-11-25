@@ -123,4 +123,126 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidEndLiveResizeNotification;
 - (void)restoreUserActivityState:(NSUserActivity *)userActivity;
 @end
 
+
+/* ---- touches and tablets ----------------------------------------------------------
+ * Ferry gets no touches from trackpads or touch screens, and no tablet
+ * events, so a touch set is always empty; the names are there for programs
+ * that look for them. */
+
+typedef NS_OPTIONS(NSUInteger, NSTouchPhase) {
+    NSTouchPhaseBegan = 1U << 0, NSTouchPhaseMoved = 1U << 1, NSTouchPhaseStationary = 1U << 2,
+    NSTouchPhaseEnded = 1U << 3, NSTouchPhaseCancelled = 1U << 4,
+    NSTouchPhaseTouching = NSTouchPhaseBegan | NSTouchPhaseMoved | NSTouchPhaseStationary,
+    NSTouchPhaseAny = NSUIntegerMax
+};
+typedef NS_ENUM(NSInteger, NSTouchType) { NSTouchTypeDirect = 0, NSTouchTypeIndirect = 1 };
+typedef NS_OPTIONS(NSUInteger, NSTouchTypeMask) {
+    NSTouchTypeMaskDirect = 1U << NSTouchTypeDirect, NSTouchTypeMaskIndirect = 1U << NSTouchTypeIndirect
+};
+
+@interface NSTouch : NSObject <NSCopying>
+@property (readonly, retain) id<NSObject, NSCopying> identity;
+@property (readonly) NSTouchPhase phase;
+@property (readonly) NSPoint normalizedPosition;
+@property (readonly, getter=isResting) BOOL resting;
+@property (readonly, retain) id device;
+@property (readonly) NSSize deviceSize;
+@property (readonly) NSTouchType type;
+- (NSPoint)locationInView:(NSView *)view;
+- (NSPoint)previousLocationInView:(NSView *)view;
+@end
+
+typedef NS_OPTIONS(NSUInteger, NSEventButtonMask) {
+    NSEventButtonMaskPenTip = 1, NSEventButtonMaskPenLowerSide = 2, NSEventButtonMaskPenUpperSide = 4
+};
+typedef NS_ENUM(NSUInteger, NSPointingDeviceType) {
+    NSPointingDeviceTypeUnknown = 0, NSPointingDeviceTypePen = 1, NSPointingDeviceTypeCursor = 2,
+    NSPointingDeviceTypeEraser = 3
+};
+
+@interface NSEvent (FerryTouchesAndTablets)
+- (NSSet<NSTouch *> *)touchesMatchingPhase:(NSTouchPhase)phase inView:(NSView *)view;
+- (NSSet<NSTouch *> *)allTouches;
+- (NSSet<NSTouch *> *)touchesForView:(NSView *)view;
+/* the device an event came from: 0, as Ferry tells its pointers apart by no number */
+@property (readonly) NSUInteger deviceID;
+/* a gesture's turn in degrees, counterclockwise (0 off rotate events) */
+@property (readonly) float rotation;
+/* tablet values: none, as Ferry gets no tablet events */
+@property (readonly) NSInteger absoluteX, absoluteY, absoluteZ;
+@property (readonly) NSEventButtonMask buttonMask;
+@property (readonly) NSPoint tilt;
+@property (readonly) float tangentialPressure;
+@property (readonly, retain) NSArray *vendorDefined;
+@property (readonly) NSUInteger vendorID, tabletID, pointingDeviceID, systemTabletID, vendorPointingDeviceType,
+    pointingDeviceSerialNumber, capabilityMask;
+@property (readonly) unsigned long long uniqueID;
+@property (readonly) NSPointingDeviceType pointingDeviceType;
+@property (readonly, getter=isEnteringProximity) BOOL enteringProximity;
+@end
+
+@interface NSView (FerryTouches)
+@property NSTouchTypeMask allowedTouchTypes;
+@property BOOL wantsRestingTouches;
+@end
+
+/* ---- layers ----------------------------------------------------------------------- */
+
+typedef NS_ENUM(NSInteger, NSViewLayerContentsPlacement) {
+    NSViewLayerContentsPlacementScaleAxesIndependently = 0,
+    NSViewLayerContentsPlacementScaleProportionallyToFit = 1,
+    NSViewLayerContentsPlacementScaleProportionallyToFill = 2,
+    NSViewLayerContentsPlacementCenter = 3,
+    NSViewLayerContentsPlacementTop = 4,
+    NSViewLayerContentsPlacementTopRight = 5,
+    NSViewLayerContentsPlacementRight = 6,
+    NSViewLayerContentsPlacementBottomRight = 7,
+    NSViewLayerContentsPlacementBottom = 8,
+    NSViewLayerContentsPlacementBottomLeft = 9,
+    NSViewLayerContentsPlacementLeft = 10,
+    NSViewLayerContentsPlacementTopLeft = 11
+};
+
+@interface NSView (FerryLayerPlacement)
+@property NSViewLayerContentsPlacement layerContentsPlacement;
+@end
+
+/* ---- windows: colour, resize steps, tabs, full screen ------------------------------ */
+
+typedef NS_ENUM(NSInteger, NSWindowTabbingMode) {
+    NSWindowTabbingModeAutomatic = 0, NSWindowTabbingModePreferred = 1, NSWindowTabbingModeDisallowed = 2
+};
+typedef NSString *NSWindowTabbingIdentifier;
+
+@interface NSWindow (FerryQtWindow)
+/* the screen's colour space, sRGB, unless one is set */
+@property (retain) NSColorSpace *colorSpace;
+@property BOOL displaysWhenScreenProfileChanges;
+/* steps a window's size moves in when the person resizes it; Ferry's window
+ * manager resizes freely, so they are kept but not followed */
+@property NSSize resizeIncrements, contentResizeIncrements;
+/* NO for a window; NSPanel sets its own */
+@property (readonly) BOOL worksWhenModal;
+/* Ferry's windows have no tabs, so tabbing modes are kept and nothing else */
+@property NSWindowTabbingMode tabbingMode;
+@property (copy) NSWindowTabbingIdentifier tabbingIdentifier;
+@property (class) BOOL allowsAutomaticWindowTabbing;
+@property (class, readonly) NSWindowTabbingMode userTabbingPreference;
+@end
+
+APPKIT_EXTERN NSNotificationName const NSWindowWillEnterFullScreenNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowDidEnterFullScreenNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowWillExitFullScreenNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowDidExitFullScreenNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowDidChangeScreenProfileNotification;
+
+/* ---- Services menu ---------------------------------------------------------------- */
+
+@protocol NSServicesMenuRequestor <NSObject>
+@optional
+- (BOOL)writeSelectionToPasteboard:(NSPasteboard *)pboard types:(NSArray<NSPasteboardType> *)types;
+- (BOOL)readSelectionFromPasteboard:(NSPasteboard *)pboard;
+@end
+
+
 #endif

@@ -71,6 +71,17 @@ enum {
     controlKey = 1 << 12,
 };
 
+/* the character codes of the special keys (Events.h) */
+enum {
+    kNullCharCode = 0, kHomeCharCode = 1, kEnterCharCode = 3, kEndCharCode = 4, kHelpCharCode = 5,
+    kBellCharCode = 7, kBackspaceCharCode = 8, kTabCharCode = 9, kLineFeedCharCode = 10,
+    kVerticalTabCharCode = 11, kPageUpCharCode = 11, kFormFeedCharCode = 12, kPageDownCharCode = 12,
+    kReturnCharCode = 13, kFunctionKeyCharCode = 16, kCommandCharCode = 17, kCheckCharCode = 18,
+    kDiamondCharCode = 19, kAppleLogoCharCode = 20, kEscapeCharCode = 27, kClearCharCode = 27,
+    kLeftArrowCharCode = 28, kRightArrowCharCode = 29, kUpArrowCharCode = 30, kDownArrowCharCode = 31,
+    kSpaceCharCode = 32, kDeleteCharCode = 127, kBulletCharCode = 165, kNonBreakingSpaceCharCode = 202
+};
+
 /* the virtual key codes (Events.h); complete from freemac 1.221, Ferry 0.45.0 */
 enum {
     kVK_ANSI_A = 0x00, kVK_ANSI_S = 0x01, kVK_ANSI_D = 0x02, kVK_ANSI_F = 0x03, kVK_ANSI_H = 0x04,

@@ -151,7 +151,9 @@ typedef enum {
 /* nil, as a Mac's MacTypes.h gives it to C and C++ too: the same null as
  * <objc/objc.h>'s (freemac 1.232) */
 #ifndef nil
-#ifdef __cplusplus
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define nil nullptr
+#elif defined(__cplusplus)
 #define nil __null
 #else
 #define nil ((void *)0)

@@ -201,6 +201,7 @@ CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGF
                                              CGColorRenderingIntent intent);
 CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect);
 CGImageRef CGImageCreateCopy(CGImageRef image);
+CGImageRef CGImageCreateCopyWithColorSpace(CGImageRef image, CGColorSpaceRef space);
 CGImageRef CGImageRetain(CGImageRef image);
 void CGImageRelease(CGImageRef image);
 size_t CGImageGetWidth(CGImageRef image);

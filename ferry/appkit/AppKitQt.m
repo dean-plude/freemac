@@ -488,3 +488,137 @@ OSStatus PlotIconRefInContext(CGContextRef ctx, const CGRect *rect, IconAlignmen
 }
 
 Boolean IsIconRefMaskEmpty(IconRef icon) { return icon == NULL; }
+
+/* ---- touches and tablets: none come to Ferry ------------------------------------ */
+
+@implementation NSTouch
+- (id)copyWithZone:(NSZone *)zone { (void)zone; return [self retain]; }
+- (id<NSObject, NSCopying>)identity { return self; }
+- (NSTouchPhase)phase { return NSTouchPhaseCancelled; }
+- (NSPoint)normalizedPosition { return NSZeroPoint; }
+- (BOOL)isResting { return NO; }
+- (id)device { return nil; }
+- (NSSize)deviceSize { return NSZeroSize; }
+- (NSTouchType)type { return NSTouchTypeIndirect; }
+- (NSPoint)locationInView:(NSView *)view { (void)view; return NSZeroPoint; }
+- (NSPoint)previousLocationInView:(NSView *)view { (void)view; return NSZeroPoint; }
+@end
+
+@implementation NSEvent (FerryTouchesAndTablets)
+- (NSSet<NSTouch *> *)touchesMatchingPhase:(NSTouchPhase)phase inView:(NSView *)view
+{
+    (void)phase, (void)view;
+    return [NSSet set];
+}
+- (NSSet<NSTouch *> *)allTouches { return [NSSet set]; }
+- (NSSet<NSTouch *> *)touchesForView:(NSView *)view { (void)view; return [NSSet set]; }
+- (NSUInteger)deviceID { return 0; }
+- (float)rotation { return 0; }
+- (NSInteger)absoluteX { return 0; }
+- (NSInteger)absoluteY { return 0; }
+- (NSInteger)absoluteZ { return 0; }
+- (NSEventButtonMask)buttonMask { return 0; }
+- (NSPoint)tilt { return NSZeroPoint; }
+- (float)tangentialPressure { return 0; }
+- (NSArray *)vendorDefined { return @[]; }
+- (NSUInteger)vendorID { return 0; }
+- (NSUInteger)tabletID { return 0; }
+- (NSUInteger)pointingDeviceID { return 0; }
+- (NSUInteger)systemTabletID { return 0; }
+- (NSUInteger)vendorPointingDeviceType { return 0; }
+- (NSUInteger)pointingDeviceSerialNumber { return 0; }
+- (NSUInteger)capabilityMask { return 0; }
+- (unsigned long long)uniqueID { return 0; }
+- (NSPointingDeviceType)pointingDeviceType { return NSPointingDeviceTypeUnknown; }
+- (BOOL)isEnteringProximity { return NO; }
+@end
+
+static char touch_types_key, resting_key, placement_key;
+
+static NSUInteger assoc_uint(id o, const void *key, NSUInteger fallback)
+{
+    NSNumber *n = objc_getAssociatedObject(o, key);
+    return n ? n.unsignedIntegerValue : fallback;
+}
+static void set_assoc_uint(id o, const void *key, NSUInteger v)
+{
+    objc_setAssociatedObject(o, key, @(v), OBJC_ASSOCIATION_RETAIN);
+}
+
+@implementation NSView (FerryTouches)
+- (NSTouchTypeMask)allowedTouchTypes { return assoc_uint(self, &touch_types_key, NSTouchTypeMaskDirect); }
+- (void)setAllowedTouchTypes:(NSTouchTypeMask)types { set_assoc_uint(self, &touch_types_key, types); }
+- (BOOL)wantsRestingTouches { return (BOOL)assoc_uint(self, &resting_key, NO); }
+- (void)setWantsRestingTouches:(BOOL)flag { set_assoc_uint(self, &resting_key, flag); }
+@end
+
+@implementation NSView (FerryLayerPlacement)
+- (NSViewLayerContentsPlacement)layerContentsPlacement
+{
+    return (NSViewLayerContentsPlacement)assoc_uint(self, &placement_key,
+                                                    NSViewLayerContentsPlacementScaleAxesIndependently);
+}
+- (void)setLayerContentsPlacement:(NSViewLayerContentsPlacement)placement
+{
+    set_assoc_uint(self, &placement_key, (NSUInteger)placement);
+}
+@end
+
+/* ---- windows: colour, resize steps, tabs, full screen ---------------------------- */
+
+static char space_key, profile_key, increments_key, content_increments_key, tabbing_key, tabbing_id_key;
+static BOOL automatic_tabbing = YES;
+
+@implementation NSWindow (FerryQtWindow)
+- (NSColorSpace *)colorSpace
+{
+    return objc_getAssociatedObject(self, &space_key) ?: (self.screen ?: [NSScreen mainScreen]).colorSpace;
+}
+- (void)setColorSpace:(NSColorSpace *)space
+{
+    objc_setAssociatedObject(self, &space_key, space, OBJC_ASSOCIATION_RETAIN);
+}
+- (BOOL)displaysWhenScreenProfileChanges { return (BOOL)assoc_uint(self, &profile_key, NO); }
+- (void)setDisplaysWhenScreenProfileChanges:(BOOL)flag { set_assoc_uint(self, &profile_key, flag); }
+- (NSSize)resizeIncrements
+{
+    NSValue *v = objc_getAssociatedObject(self, &increments_key);
+    return v ? v.sizeValue : NSMakeSize(1, 1);
+}
+- (void)setResizeIncrements:(NSSize)size
+{
+    objc_setAssociatedObject(self, &increments_key, [NSValue valueWithSize:size], OBJC_ASSOCIATION_RETAIN);
+}
+- (NSSize)contentResizeIncrements
+{
+    NSValue *v = objc_getAssociatedObject(self, &content_increments_key);
+    return v ? v.sizeValue : NSMakeSize(1, 1);
+}
+- (void)setContentResizeIncrements:(NSSize)size
+{
+    objc_setAssociatedObject(self, &content_increments_key, [NSValue valueWithSize:size], OBJC_ASSOCIATION_RETAIN);
+}
+- (BOOL)worksWhenModal { return NO; }
+- (NSWindowTabbingMode)tabbingMode
+{
+    return (NSWindowTabbingMode)assoc_uint(self, &tabbing_key, NSWindowTabbingModeAutomatic);
+}
+- (void)setTabbingMode:(NSWindowTabbingMode)mode { set_assoc_uint(self, &tabbing_key, (NSUInteger)mode); }
+- (NSWindowTabbingIdentifier)tabbingIdentifier
+{
+    return objc_getAssociatedObject(self, &tabbing_id_key) ?: NSStringFromClass([self class]);
+}
+- (void)setTabbingIdentifier:(NSWindowTabbingIdentifier)identifier
+{
+    objc_setAssociatedObject(self, &tabbing_id_key, identifier, OBJC_ASSOCIATION_COPY);
+}
++ (BOOL)allowsAutomaticWindowTabbing { return automatic_tabbing; }
++ (void)setAllowsAutomaticWindowTabbing:(BOOL)flag { automatic_tabbing = flag; }
++ (NSWindowTabbingMode)userTabbingPreference { return NSWindowTabbingModeAutomatic; }
+@end
+
+NSNotificationName const NSWindowWillEnterFullScreenNotification = @"NSWindowWillEnterFullScreenNotification";
+NSNotificationName const NSWindowDidEnterFullScreenNotification = @"NSWindowDidEnterFullScreenNotification";
+NSNotificationName const NSWindowWillExitFullScreenNotification = @"NSWindowWillExitFullScreenNotification";
+NSNotificationName const NSWindowDidExitFullScreenNotification = @"NSWindowDidExitFullScreenNotification";
+NSNotificationName const NSWindowDidChangeScreenProfileNotification = @"NSWindowDidChangeScreenProfileNotification";
