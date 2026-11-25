@@ -5,8 +5,12 @@
  * around it. A change made with no transaction open opens an implicit one,
  * committed at the end of the run loop's pass. A completion block runs
  * once its transaction is committed and every animation added while it was
- * open has finished or been removed, at once if there were none. */
+ * open has finished or been removed, at once if there were none.
+ * Transactions are the main thread's (freemac 1.235): on other threads,
+ * as OpenGL layers are displayed on, begin, commit and flush do nothing and
+ * changes made there aren't animated. */
 #import "QInternal.h"
+#include <pthread.h>
 
 NSString *const kCATransactionAnimationDuration = @"animationDuration";
 NSString *const kCATransactionDisableActions = @"disableActions";
@@ -101,6 +105,8 @@ BOOL QTransactionIsOpen(NSUInteger serial)
 
 static id lookup(NSString *key)
 {
+    if (!pthread_main_np())
+        return nil;
     for (QTransaction *t in [QOpenTransactions() reverseObjectEnumerator]) {
         id v = t->values[key];
         if (v)
@@ -111,6 +117,8 @@ static id lookup(NSString *key)
 
 static void store(NSString *key, id value)
 {
+    if (!pthread_main_np())
+        return;
     QTransaction *t = [QOpenTransactions() lastObject];
     if (value)
         t->values[key] = value;
@@ -122,6 +130,8 @@ static void store(NSString *key, id value)
 
 + (void)begin
 {
+    if (!pthread_main_np())
+        return;
     if (!stack)
         stack = [[NSMutableArray alloc] init];
     QTransaction *t = [[QTransaction alloc] init];
@@ -131,6 +141,8 @@ static void store(NSString *key, id value)
 
 + (void)commit
 {
+    if (!pthread_main_np())
+        return;
     if (![stack count])
         return;
     if (((QTransaction *)[stack lastObject])->implicit) {
@@ -140,7 +152,11 @@ static void store(NSString *key, id value)
     commit_top();
 }
 
-+ (void)flush { QCommitImplicitTransaction(); }
++ (void)flush
+{
+    if (pthread_main_np())
+        QCommitImplicitTransaction();
+}
 + (void)lock {}
 + (void)unlock {}
 
@@ -155,10 +171,12 @@ static void store(NSString *key, id value)
 {
     store(kCATransactionAnimationTimingFunction, function);
 }
-+ (BOOL)disableActions { return [lookup(kCATransactionDisableActions) boolValue]; }
++ (BOOL)disableActions { return !pthread_main_np() || [lookup(kCATransactionDisableActions) boolValue]; }
 + (void)setDisableActions:(BOOL)flag { store(kCATransactionDisableActions, @(flag)); }
 + (void (^)(void))completionBlock
 {
+    if (!pthread_main_np())
+        return nil;
     return ((QTransaction *)[QOpenTransactions() lastObject])->values[kCATransactionCompletionBlock];
 }
 + (void)setCompletionBlock:(void (^)(void))block

@@ -4634,4 +4634,10 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 #import <AppKit/AppKitVLC.h>
 
+/* ---- OpenGL: NSOpenGLPixelFormat, NSOpenGLContext, NSOpenGLView (NSOpenGL.m)
+ * (freemac 1.235, Ferry 0.59.0) */
+
+#import <AppKit/NSOpenGL.h>
+#import <AppKit/NSOpenGLView.h>
+
 #endif

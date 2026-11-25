@@ -446,3 +446,45 @@ void *ferry_sound_symbol(const char *name)
         addr = dlsym(sound_simple_handle, name);
     return addr;
 }
+
+/* ---- OpenGL (freemac 1.235) -------------------------------------------------------
+ * Ferry's OpenGL framework (opengl/) makes its contexts with this system's
+ * EGL (libEGL.so.1: Mesa, or another vendor's through GLVND) and passes
+ * each OpenGL call to this system's OpenGL (libOpenGL.so.0, or libGL.so.1
+ * where GLVND's split library isn't installed), whose calls and types are
+ * the same on a Mac. Both are opened the first time a program asks for a
+ * pixel format or makes an OpenGL call, so a program that never draws with
+ * OpenGL doesn't load them, and Ferry runs on a system without them. Only
+ * gl and egl calls are served. FERRY_EGL names another library to open in
+ * libEGL's place (the tests use it to stand for a system without OpenGL). */
+static void *gl_egl_handle, *gl_gl_handle;
+static void *(*gl_get_proc)(const char *);
+static void open_gl(void)
+{
+    const char *other = getenv("FERRY_EGL");
+    gl_egl_handle = dlopen(other && *other ? other : "libEGL.so.1", RTLD_NOW | RTLD_LOCAL);
+    if (!gl_egl_handle)
+        return;
+    gl_gl_handle = dlopen("libOpenGL.so.0", RTLD_NOW | RTLD_LOCAL);
+    if (!gl_gl_handle)
+        gl_gl_handle = dlopen("libGL.so.1", RTLD_NOW | RTLD_LOCAL);
+    gl_get_proc = (void *(*)(const char *))dlsym(gl_egl_handle, "eglGetProcAddress");
+}
+
+void *ferry_gl_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name || (strncmp(name, "gl", 2) && strncmp(name, "egl", 3)))
+        return NULL;
+    pthread_once(&once, open_gl);
+    if (!gl_egl_handle)
+        return NULL;
+    void *p = NULL;
+    if (name[0] == 'e')
+        p = dlsym(gl_egl_handle, name);
+    else if (gl_gl_handle)
+        p = dlsym(gl_gl_handle, name);
+    if (!p && gl_get_proc)
+        p = gl_get_proc(name);
+    return p;
+}

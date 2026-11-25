@@ -265,6 +265,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_jsc_symbol", ferry_jsc_symbol},
     /* Ferry's own: this system's libpulse, for Ferry's Core Audio (host.c, 1.234) */
     {"ferry_sound_symbol", ferry_sound_symbol},
+    /* Ferry's own: this system's EGL and OpenGL, for Ferry's OpenGL (host.c) */
+    {"ferry_gl_symbol", ferry_gl_symbol},
     {NULL, NULL},
 };
 
