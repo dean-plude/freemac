@@ -208,7 +208,15 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
     return [self stringWithContentsOfFile:[url path] encoding:enc error:error];
 }
 
-- (instancetype)init { return [self initWithCharacters:NULL length:0]; }
+- (instancetype)init
+{
+    /* a subclass of the app's own that keeps its characters itself and calls
+     * [super init] is itself, as on a Mac (freemac 1.225) */
+    if ([self methodForSelector:@selector(initWithCharacters:length:)] ==
+        [NSString instanceMethodForSelector:@selector(initWithCharacters:length:)])
+        return self;
+    return [self initWithCharacters:NULL length:0];
+}
 - (instancetype)initWithString:(NSString *)s
 {
     WITH_CHARS(s, c, n);
@@ -423,6 +431,19 @@ NSUInteger FRegexReplace(NSMutableString *string, NSString *pattern, NSString *t
         && [self rangeOfString:s options:NSAnchoredSearch | NSBackwardsSearch].location == [self length] - [s length];
 }
 - (BOOL)containsString:(NSString *)s { return [self rangeOfString:s].location != NSNotFound; }
+/* freemac 1.225: the user's locale changes no letter here */
+- (BOOL)localizedCaseInsensitiveContainsString:(NSString *)s
+{
+    return [self rangeOfString:s options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+- (NSRange)localizedStandardRangeOfString:(NSString *)s
+{
+    return [self rangeOfString:s options:NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch];
+}
+- (BOOL)localizedStandardContainsString:(NSString *)s
+{
+    return [self localizedStandardRangeOfString:s].location != NSNotFound;
+}
 
 /* pieces */
 - (NSString *)substringWithRange:(NSRange)r
@@ -529,9 +550,12 @@ NSUInteger FRegexReplace(NSMutableString *string, NSString *pattern, NSString *t
 static unichar to_upper(unichar c, BOOL w) { return (c >= 'a' && c <= 'z') || (c >= 0xe0 && c <= 0xfe && c != 0xf7) ? c - 32 : c; }
 static unichar to_lower(unichar c, BOOL w) { return (c >= 'A' && c <= 'Z') || (c >= 0xc0 && c <= 0xde && c != 0xd7) ? c + 32 : c; }
 static unichar to_cap(unichar c, BOOL w) { return w ? to_upper(c, w) : to_lower(c, w); }
-- (NSString *)uppercaseString { return [self mapChars:to_upper]; }
-- (NSString *)lowercaseString { return [self mapChars:to_lower]; }
-- (NSString *)capitalizedString { return [self mapChars:to_cap]; }
+/* With ICU, Unicode's full mappings (NSStringText.m, freemac 1.225); this
+ * table, Latin-1's letters, without it. */
+NSString *FStringCaseMapped(NSString *s, int kind);
+- (NSString *)uppercaseString { return FStringCaseMapped(self, 0) ?: [self mapChars:to_upper]; }
+- (NSString *)lowercaseString { return FStringCaseMapped(self, 1) ?: [self mapChars:to_lower]; }
+- (NSString *)capitalizedString { return FStringCaseMapped(self, 2) ?: [self mapChars:to_cap]; }
 /* freemac 1.224: the user's locale changes no letter here */
 - (NSString *)localizedUppercaseString { return [self uppercaseString]; }
 - (NSString *)localizedLowercaseString { return [self lowercaseString]; }

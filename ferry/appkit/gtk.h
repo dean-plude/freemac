@@ -46,8 +46,6 @@ enum { GDK_BUTTON_PRESS = 4, GDK_2BUTTON_PRESS = 5, GDK_3BUTTON_PRESS = 6, GDK_B
 enum { GDK_SCROLL_UP, GDK_SCROLL_DOWN, GDK_SCROLL_LEFT, GDK_SCROLL_RIGHT, GDK_SCROLL_SMOOTH };
 
 /* Cairo, beyond what Core Graphics uses */
-typedef cairo_status_t (*cairo_write_func_t)(void *closure, const unsigned char *data, unsigned int length);
-cairo_status_t cairo_surface_write_to_png_stream(cairo_surface_t *surface, cairo_write_func_t write, void *closure);
 void cairo_surface_set_device_scale(cairo_surface_t *surface, double x, double y);
 
 /* GLib and GObject */

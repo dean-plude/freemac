@@ -624,7 +624,7 @@ FORWARD(NSSize, intercellSpacing, setIntercellSpacing:)
 }
 - (NSSize)intrinsicContentSize
 {
-    NSSize s = [super intrinsicContentSize];
+    NSSize s = [self _textSize];
     return NSMakeSize(fmax(s.width + button_width, 60), fmax(s.height, 22));
 }
 - (void)_drawBezelInRect:(NSRect)b focused:(BOOL)focused

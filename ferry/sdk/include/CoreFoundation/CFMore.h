@@ -150,6 +150,14 @@ void CFStringUppercase(CFMutableStringRef theString, const void *locale);
 void CFStringLowercase(CFMutableStringRef theString, const void *locale);
 void CFStringCapitalize(CFMutableStringRef theString, const void *locale);
 void CFStringTrimWhitespace(CFMutableStringRef theString);
+/* string transforms (freemac 1.225), named by their ICU names */
+Boolean CFStringTransform(CFMutableStringRef string, CFRange *range, CFStringRef transform, Boolean reverse);
+extern const CFStringRef kCFStringTransformToXMLHex, kCFStringTransformFullwidthHalfwidth,
+    kCFStringTransformStripCombiningMarks, kCFStringTransformStripDiacritics, kCFStringTransformToLatin,
+    kCFStringTransformToUnicodeName, kCFStringTransformLatinHiragana, kCFStringTransformLatinKatakana,
+    kCFStringTransformHiraganaKatakana, kCFStringTransformMandarinLatin, kCFStringTransformLatinGreek,
+    kCFStringTransformLatinCyrillic, kCFStringTransformLatinArabic, kCFStringTransformLatinHebrew,
+    kCFStringTransformLatinThai, kCFStringTransformLatinKorean;
 void CFStringTrim(CFMutableStringRef theString, CFStringRef trimString);
 void CFStringNormalize(CFMutableStringRef theString, CFStringNormalizationForm theForm);
 CFArrayRef CFStringCreateArrayBySeparatingStrings(CFAllocatorRef alloc, CFStringRef theString,

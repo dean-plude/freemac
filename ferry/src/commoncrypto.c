@@ -4,7 +4,7 @@
  * message authentication codes, encryption, key derivation and random
  * bytes. Written for freemac from Apple's public documentation of the
  * calls (the CommonCrypto manual pages) and from the published standards:
- * MD5 (RFC 1321), SHA-1 and SHA-2 (FIPS 180-4), HMAC (RFC 2104), PBKDF2
+ * MD2 (RFC 1319), MD4 (RFC 1320), MD5 (RFC 1321), SHA-1 and SHA-2 (FIPS 180-4), HMAC (RFC 2104), PBKDF2
  * (RFC 8018), AES (FIPS 197) and its modes (NIST SP 800-38A), and PKCS #7
  * padding (RFC 5652).
  *
@@ -297,6 +297,154 @@ static unsigned char *cc_md5(const void *data, uint32_t len, unsigned char *md)
     cc_md5_init(&c);
     cc_md5_update(&c, data, len);
     cc_md5_final(md, &c);
+    return md;
+}
+
+/* MD4 (RFC 1320), in MD5's state, as CC_MD4_CTX is laid out like CC_MD5_CTX */
+static void md4_block(uint32_t h[4], const uint8_t *p)
+{
+    static const int order[3][16] = {
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+        {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15},
+        {0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15},
+    };
+    static const int S[3][4] = {{3, 7, 11, 19}, {3, 5, 9, 13}, {3, 9, 11, 15}};
+    static const uint32_t K[3] = {0, 0x5a827999, 0x6ed9eba1};
+    uint32_t m[16];
+    for (int i = 0; i < 16; i++)
+        m[i] = le32(p + 4 * i);
+    uint32_t a = h[0], b = h[1], c = h[2], d = h[3];
+    for (int r = 0; r < 3; r++)
+        for (int i = 0; i < 16; i++) {
+            uint32_t f = r == 0 ? (b & c) | (~b & d) : r == 1 ? (b & c) | (b & d) | (c & d) : b ^ c ^ d;
+            uint32_t t = d;
+            d = c;
+            c = b;
+            b = rol32(a + f + m[order[r][i]] + K[r], S[r][i & 3]);
+            a = t;
+        }
+    h[0] += a, h[1] += b, h[2] += c, h[3] += d;
+}
+
+/* MD2 (RFC 1319). CC_MD2_CTX is 148 bytes: a count, the block being
+ * filled, the checksum and the state, the last two a byte to each word. */
+struct md2_state {
+    int32_t num;
+    uint8_t buf[16];
+    uint32_t cksm[16];
+    uint32_t state[16];
+};
+_Static_assert(sizeof(struct md2_state) == 148, "CC_MD2_CTX is 148 bytes");
+/* RFC 1319's permutation of 0 to 255, made from the digits of pi */
+static const uint8_t md2_S[256] = {
+        41, 46, 67, 201, 162, 216, 124, 1, 61, 54, 84, 161, 236, 240, 6, 19,
+        98, 167, 5, 243, 192, 199, 115, 140, 152, 147, 43, 217, 188, 76, 130, 202,
+        30, 155, 87, 60, 253, 212, 224, 22, 103, 66, 111, 24, 138, 23, 229, 18,
+        190, 78, 196, 214, 218, 158, 222, 73, 160, 251, 245, 142, 187, 47, 238, 122,
+        169, 104, 121, 145, 21, 178, 7, 63, 148, 194, 16, 137, 11, 34, 95, 33,
+        128, 127, 93, 154, 90, 144, 50, 39, 53, 62, 204, 231, 191, 247, 151, 3,
+        255, 25, 48, 179, 72, 165, 181, 209, 215, 94, 146, 42, 172, 86, 170, 198,
+        79, 184, 56, 210, 150, 164, 125, 182, 118, 252, 107, 226, 156, 116, 4, 241,
+        69, 157, 112, 89, 100, 113, 135, 32, 134, 91, 207, 101, 230, 45, 168, 2,
+        27, 96, 37, 173, 174, 176, 185, 246, 28, 70, 97, 105, 52, 64, 126, 15,
+        85, 71, 163, 35, 221, 81, 175, 58, 195, 92, 249, 206, 186, 197, 234, 38,
+        44, 83, 13, 110, 133, 40, 132, 9, 211, 223, 205, 244, 65, 129, 77, 82,
+        106, 220, 55, 200, 108, 193, 171, 250, 36, 225, 123, 8, 12, 189, 177, 74,
+        120, 136, 149, 139, 227, 99, 232, 109, 233, 203, 213, 254, 59, 0, 29, 57,
+        242, 239, 183, 14, 102, 88, 208, 228, 166, 119, 114, 248, 235, 117, 75, 10,
+        49, 68, 80, 180, 143, 237, 31, 26, 219, 153, 141, 51, 159, 17, 131, 20,
+};
+static void md2_block(struct md2_state *c, const uint8_t *p)
+{
+    uint8_t x[48];
+    for (int j = 0; j < 16; j++) {
+        x[j] = (uint8_t)c->state[j];
+        x[16 + j] = p[j];
+        x[32 + j] = x[16 + j] ^ x[j];
+    }
+    uint8_t t = 0;
+    for (int j = 0; j < 18; j++) {
+        for (int k = 0; k < 48; k++)
+            t = x[k] ^= md2_S[t];
+        t = (uint8_t)(t + j);
+    }
+    for (int j = 0; j < 16; j++)
+        c->state[j] = x[j];
+    t = (uint8_t)c->cksm[15];
+    for (int j = 0; j < 16; j++)
+        t = (uint8_t)(c->cksm[j] ^= md2_S[p[j] ^ t]);
+}
+static int cc_md2_init(struct md2_state *c)
+{
+    memset(c, 0, sizeof *c);
+    return 1;
+}
+static int cc_md2_update(struct md2_state *c, const void *data, uint32_t len)
+{
+    const uint8_t *p = data;
+    while (len) {
+        uint32_t take = 16 - (uint32_t)c->num < len ? 16 - (uint32_t)c->num : len;
+        memcpy(c->buf + c->num, p, take);
+        c->num += (int32_t)take, p += take, len -= take;
+        if (c->num == 16) {
+            md2_block(c, c->buf);
+            c->num = 0;
+        }
+    }
+    return 1;
+}
+static int cc_md2_final(unsigned char *md, struct md2_state *c)
+{
+    uint8_t pad[16], sum[16];
+    int n = 16 - c->num;
+    memset(pad, n, sizeof pad);
+    cc_md2_update(c, pad, (uint32_t)n);
+    for (int j = 0; j < 16; j++)
+        sum[j] = (uint8_t)c->cksm[j];
+    cc_md2_update(c, sum, 16);
+    for (int j = 0; j < 16; j++)
+        md[j] = (uint8_t)c->state[j];
+    memset(c, 0, sizeof *c);
+    return 1;
+}
+static unsigned char *cc_md2(const void *data, uint32_t len, unsigned char *md)
+{
+    struct md2_state c;
+    cc_md2_init(&c);
+    cc_md2_update(&c, data, len);
+    cc_md2_final(md, &c);
+    return md;
+}
+static int cc_md4_init(struct md5_state *c) { return cc_md5_init(c); }
+static int cc_md4_update(struct md5_state *c, const void *data, uint32_t len)
+{
+    size_t filled = c->lo & 63;
+    add_count32(&c->lo, &c->hi, len);
+    FEED(md4_block, c, 64, filled, data, len);
+    c->num = c->lo & 63;
+    return 1;
+}
+static int cc_md4_final(unsigned char *md, struct md5_state *c)
+{
+    uint64_t bits = ((uint64_t)c->hi << 32 | c->lo) * 8;
+    uint8_t pad[72] = {0x80};
+    size_t filled = c->lo & 63, padlen = filled < 56 ? 56 - filled : 120 - filled;
+    uint8_t len[8];
+    put_le32(len, (uint32_t)bits);
+    put_le32(len + 4, (uint32_t)(bits >> 32));
+    cc_md4_update(c, pad, (uint32_t)padlen);
+    cc_md4_update(c, len, 8);
+    for (int i = 0; i < 4; i++)
+        put_le32(md + 4 * i, c->h[i]);
+    memset(c, 0, sizeof *c);
+    return 1;
+}
+static unsigned char *cc_md4(const void *data, uint32_t len, unsigned char *md)
+{
+    struct md5_state c;
+    cc_md4_init(&c);
+    cc_md4_update(&c, data, len);
+    cc_md4_final(md, &c);
     return md;
 }
 
@@ -1064,6 +1212,14 @@ static int cc_crypt(uint32_t op, uint32_t alg, uint32_t options, const void *key
 /* ---- the table ------------------------------------------------------------------- */
 
 const struct ferry_symbol ferry_commoncrypto_symbols[] = {
+    {"CC_MD2", cc_md2},
+    {"CC_MD2_Init", cc_md2_init},
+    {"CC_MD2_Update", cc_md2_update},
+    {"CC_MD2_Final", cc_md2_final},
+    {"CC_MD4", cc_md4},
+    {"CC_MD4_Init", cc_md4_init},
+    {"CC_MD4_Update", cc_md4_update},
+    {"CC_MD4_Final", cc_md4_final},
     {"CC_MD5", cc_md5},
     {"CC_MD5_Init", cc_md5_init},
     {"CC_MD5_Update", cc_md5_update},

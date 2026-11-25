@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ferry's own test document for what MacPass's nibs need (freemac 1.225,
+     Ferry 0.49.0), written by hand in the format Interface Builder saves: a
+     window a controller loads by the nib name it overrides, a grid view, and
+     a table of the app's own class whose columns point back at it. -->
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="20000" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="20000"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="UIController">
+            <connections>
+                <outlet property="window" destination="win" id="o1"/>
+                <outlet property="grid" destination="grd" id="o2"/>
+                <outlet property="table" destination="tbl" id="o3"/>
+                <outlet property="nameLabel" destination="lbl1" id="o4"/>
+                <outlet property="nameField" destination="fld1" id="o5"/>
+                <outlet property="noteField" destination="fld2" id="o6"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <window title="Entries" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" animationBehavior="default" id="win">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES"/>
+            <rect key="contentRect" x="100" y="100" width="400" height="300"/>
+            <view key="contentView" id="content">
+                <rect key="frame" x="0.0" y="0.0" width="400" height="300"/>
+                <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <gridView xPlacement="leading" yPlacement="center" rowAlignment="none" rowSpacing="8" columnSpacing="10" id="grd">
+                        <rect key="frame" x="20" y="180" width="300" height="100"/>
+                        <rows>
+                            <gridRow id="r1"/>
+                            <gridRow topPadding="4" id="r2"/>
+                            <gridRow hidden="YES" id="r3"/>
+                        </rows>
+                        <columns>
+                            <gridColumn xPlacement="trailing" id="c1"/>
+                            <gridColumn id="c2"/>
+                        </columns>
+                        <gridCells>
+                            <gridCell row="r1" column="c1" id="g11">
+                                <textField key="contentView" id="lbl1">
+                                    <rect key="frame" x="0.0" y="0.0" width="60" height="16"/>
+                                    <textFieldCell key="cell" lineBreakMode="clipping" title="Name:" id="lbl1cell">
+                                        <font key="font" metaFont="system"/>
+                                    </textFieldCell>
+                                </textField>
+                            </gridCell>
+                            <gridCell row="r1" column="c2" id="g12">
+                                <textField key="contentView" id="fld1">
+                                    <rect key="frame" x="0.0" y="0.0" width="150" height="21"/>
+                                    <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" drawsBackground="YES" id="fld1cell">
+                                        <font key="font" metaFont="system"/>
+                                    </textFieldCell>
+                                </textField>
+                            </gridCell>
+                            <gridCell row="r2" column="c1" xPlacement="leading" id="g21">
+                                <textField key="contentView" id="fld2">
+                                    <rect key="frame" x="0.0" y="0.0" width="200" height="21"/>
+                                    <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" drawsBackground="YES" id="fld2cell">
+                                        <font key="font" metaFont="system"/>
+                                    </textFieldCell>
+                                </textField>
+                            </gridCell>
+                            <gridCell row="r2" column="c2" headOfMergedCell="g21" id="g22"/>
+                            <gridCell row="r3" column="c1" id="g31">
+                                <textField key="contentView" id="lbl3">
+                                    <rect key="frame" x="0.0" y="0.0" width="40" height="16"/>
+                                    <textFieldCell key="cell" lineBreakMode="clipping" title="Hidden" id="lbl3cell">
+                                        <font key="font" metaFont="system"/>
+                                    </textFieldCell>
+                                </textField>
+                            </gridCell>
+                            <gridCell row="r3" column="c2" id="g32"/>
+                        </gridCells>
+                    </gridView>
+                    <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" autosaveColumns="NO" rowHeight="19" id="tbl" customClass="UITable">
+                        <rect key="frame" x="20" y="20" width="360" height="140"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                        <size key="intercellSpacing" width="3" height="2"/>
+                        <tableColumns>
+                            <tableColumn identifier="title" width="200" minWidth="40" maxWidth="1000" id="tc1">
+                                <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" title="Title">
+                                    <font key="font" metaFont="smallSystem"/>
+                                </tableHeaderCell>
+                                <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" editable="YES" title="Text Cell" id="tc1cell">
+                                    <font key="font" metaFont="system"/>
+                                </textFieldCell>
+                                <tableColumnResizingMask key="resizingMask" resizeWithTable="YES" userResizable="YES"/>
+                            </tableColumn>
+                            <tableColumn identifier="user" width="150" minWidth="40" maxWidth="1000" id="tc2">
+                                <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" title="Username">
+                                    <font key="font" metaFont="smallSystem"/>
+                                </tableHeaderCell>
+                                <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" title="Text Cell" id="tc2cell">
+                                    <font key="font" metaFont="system"/>
+                                </textFieldCell>
+                                <tableColumnResizingMask key="resizingMask" userResizable="YES"/>
+                            </tableColumn>
+                        </tableColumns>
+                    </tableView>
+                </subviews>
+            </view>
+        </window>
+    </objects>
+</document>

@@ -94,6 +94,7 @@ typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableArray) __CFArray *CFMutableArray
 typedef const struct CF_BRIDGED_TYPE(NSDictionary) __CFDictionary *CFDictionaryRef;
 typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableDictionary) __CFDictionary *CFMutableDictionaryRef;
 typedef const struct CF_BRIDGED_TYPE(NSData) __CFData *CFDataRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableData) __CFData *CFMutableDataRef;
 typedef const struct CF_BRIDGED_TYPE(NSNumber) __CFNumber *CFNumberRef;
 typedef const struct CF_BRIDGED_TYPE(NSNumber) __CFBoolean *CFBooleanRef;
 typedef const struct CF_BRIDGED_TYPE(NSNull) __CFNull *CFNullRef;
@@ -186,6 +187,17 @@ CFTypeID CFDataGetTypeID(void);
 CFDataRef CFDataCreate(CFAllocatorRef alloc, const UInt8 *bytes, CFIndex length);
 CFIndex CFDataGetLength(CFDataRef d);
 const UInt8 *CFDataGetBytePtr(CFDataRef d);
+/* mutable data (freemac 1.225) */
+CFMutableDataRef CFDataCreateMutable(CFAllocatorRef alloc, CFIndex capacity);
+CFMutableDataRef CFDataCreateMutableCopy(CFAllocatorRef alloc, CFIndex capacity, CFDataRef d);
+CFDataRef CFDataCreateCopy(CFAllocatorRef alloc, CFDataRef d);
+UInt8 *CFDataGetMutableBytePtr(CFMutableDataRef d);
+void CFDataGetBytes(CFDataRef d, CFRange range, UInt8 *buffer);
+void CFDataSetLength(CFMutableDataRef d, CFIndex length);
+void CFDataIncreaseLength(CFMutableDataRef d, CFIndex extraLength);
+void CFDataAppendBytes(CFMutableDataRef d, const UInt8 *bytes, CFIndex length);
+void CFDataReplaceBytes(CFMutableDataRef d, CFRange range, const UInt8 *newBytes, CFIndex newLength);
+void CFDataDeleteBytes(CFMutableDataRef d, CFRange range);
 
 CFAbsoluteTime CFAbsoluteTimeGetCurrent(void);
 extern const CFTimeInterval kCFAbsoluteTimeIntervalSince1970;

@@ -456,6 +456,12 @@ static NSArray *parse_types(void)
     } else {
         doc = [self _openURL:url display:display alreadyOpen:&already error:&error];
     }
+    /* an app may drop the error (MacPass does): under FERRY_VERBOSE it is told (1.225) */
+    if (!doc && getenv("FERRY_VERBOSE")) {
+        fflush(stdout);
+        fprintf(stderr, "AppKit (Ferry): %s wasn't opened: %s\n", [[url path] UTF8String],
+                error ? [[error localizedDescription] UTF8String] : "no error was given");
+    }
     if (handler)
         handler(doc, already, doc ? nil : error);
 }

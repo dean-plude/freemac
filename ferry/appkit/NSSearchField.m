@@ -331,7 +331,7 @@
 
 - (NSSize)intrinsicContentSize
 {
-    NSSize s = [super intrinsicContentSize];
+    NSSize s = [self _textSize];
     return NSMakeSize(fmax(s.width + 44, 96), 22);
 }
 

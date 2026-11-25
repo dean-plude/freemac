@@ -1356,6 +1356,16 @@ enum { UNSEEN, DECODING, DONE };
     _state[index] = DONE;
 }
 - (id)_ferryDecodeObjectAtIndex:(NSUInteger)index { return [self objectForUID:index]; }
+/* An object still being made that hands its place to another (AppKit's
+ * class swapper): references back to it get the other (freemac 1.225). */
+- (void)_ferryReplaceObjectInProgress:(id)old with:(id)object
+{
+    for (NSUInteger i = 1; i < _count; i++)
+        if (_state[i] == DECODING && _decoded[i] == old) {
+            _decoded[i] = object;
+            return;
+        }
+}
 
 /* Values written without a key, in the order they were written. */
 - (NSString *)nextUnkeyed

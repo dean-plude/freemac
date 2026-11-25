@@ -34,6 +34,16 @@ NSImageName const NSImageNameStatusPartiallyAvailable = @"NSStatusPartiallyAvail
 NSImageName const NSImageNameStatusNone = @"NSStatusNone";
 NSImageName const NSImageNameFolder = @"NSFolder";
 NSImageName const NSImageNameTouchBarAddTemplate = @"NSTouchBarAddTemplate";
+NSImageName const NSImageNameLockLockedTemplate = @"NSLockLockedTemplate";
+NSImageName const NSImageNameLockUnlockedTemplate = @"NSLockUnlockedTemplate";
+NSImageName const NSImageNameTouchBarSearchTemplate = @"NSTouchBarSearchTemplate";
+NSImageName const NSImageNameTouchBarGetInfoTemplate = @"NSTouchBarGetInfoTemplate";
+NSImageName const NSImageNameTouchBarFolderTemplate = @"NSTouchBarFolderTemplate";
+NSImageName const NSImageNameTouchBarQuickLookTemplate = @"NSTouchBarQuickLookTemplate";
+NSImageName const NSImageNameTouchBarDeleteTemplate = @"NSTouchBarDeleteTemplate";
+NSImageName const NSImageNameTouchBarShareTemplate = @"NSTouchBarShareTemplate";
+NSImageName const NSImageNameTouchBarHistoryTemplate = @"NSTouchBarHistoryTemplate";
+NSImageName const NSImageNameTouchBarComposeTemplate = @"NSTouchBarComposeTemplate";
 
 static CGContextRef current_cg(void) { return [[NSGraphicsContext currentContext] CGContext]; }
 
@@ -229,6 +239,43 @@ static NSImage *app_icon(void)
 
 static NSImage *standard_image(NSString *name)
 {
+    /* a padlock, shut or open (freemac 1.225) */
+    if ([name isEqualToString:NSImageNameLockLockedTemplate] || [name isEqualToString:NSImageNameLockUnlockedTemplate]) {
+        BOOL shut = [name isEqualToString:NSImageNameLockLockedTemplate];
+        return drawn(NSMakeSize(14, 14), YES, ^(NSRect r) {
+            [[NSColor blackColor] set];
+            [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(2, 1, 10, 7) xRadius:1.5 yRadius:1.5] fill];
+            NSBezierPath *p = stroked(1.6);
+            [p appendBezierPathWithArcWithCenter:NSMakePoint(shut ? 7 : 9.5, 9.5) radius:3 startAngle:0 endAngle:180];
+            [p moveToPoint:NSMakePoint(shut ? 4 : 6.5, 9.5)];
+            [p lineToPoint:NSMakePoint(shut ? 4 : 6.5, shut ? 8 : 9.5)];
+            [p moveToPoint:NSMakePoint(shut ? 10 : 12.5, 9.5)];
+            [p lineToPoint:NSMakePoint(shut ? 10 : 12.5, 8)];
+            [p stroke];
+        });
+    }
+    /* a magnifying glass */
+    if ([name isEqualToString:NSImageNameTouchBarSearchTemplate])
+        return drawn(NSMakeSize(14, 14), YES, ^(NSRect r) {
+            [[NSColor blackColor] set];
+            NSBezierPath *p = stroked(1.6);
+            [p appendBezierPathWithOvalInRect:NSMakeRect(1.5, 4.5, 8, 8)];
+            [p moveToPoint:NSMakePoint(8.3, 5.7)];
+            [p lineToPoint:NSMakePoint(12.5, 1.5)];
+            [p stroke];
+        });
+    /* the other Touch Bar images are their everyday ones' */
+    if ([name isEqualToString:NSImageNameTouchBarGetInfoTemplate])
+        return standard_image(NSImageNameInfo);
+    if ([name isEqualToString:NSImageNameTouchBarFolderTemplate])
+        return standard_image(NSImageNameFolder);
+    if ([name isEqualToString:NSImageNameTouchBarDeleteTemplate])
+        return standard_image(NSImageNameStopProgressTemplate);
+    if ([name isEqualToString:NSImageNameTouchBarQuickLookTemplate] ||
+        [name isEqualToString:NSImageNameTouchBarShareTemplate] ||
+        [name isEqualToString:NSImageNameTouchBarHistoryTemplate] ||
+        [name isEqualToString:NSImageNameTouchBarComposeTemplate])
+        return standard_image(NSImageNameActionTemplate);
     if ([name isEqualToString:NSImageNameAddTemplate] || [name isEqualToString:NSImageNameTouchBarAddTemplate] ||
         [name isEqualToString:NSImageNameRemoveTemplate]) {
         BOOL add = ![name isEqualToString:NSImageNameRemoveTemplate];

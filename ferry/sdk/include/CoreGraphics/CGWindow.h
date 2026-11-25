@@ -56,6 +56,20 @@ CGWindowLevel CGWindowLevelForKey(CGWindowLevelKey key);
 #define kCGModalPanelWindowLevel CGWindowLevelForKey(kCGModalPanelWindowLevelKey)
 #define kCGScreenSaverWindowLevel CGWindowLevelForKey(kCGScreenSaverWindowLevelKey)
 #define kCGDesktopWindowLevel CGWindowLevelForKey(kCGDesktopWindowLevelKey)
+/* the rest of the levels (freemac 1.225, Ferry 0.49.0) */
+#define kCGBaseWindowLevel CGWindowLevelForKey(kCGBaseWindowLevelKey)
+#define kCGMinimumWindowLevel CGWindowLevelForKey(kCGMinimumWindowLevelKey)
+#define kCGBackstopMenuLevel CGWindowLevelForKey(kCGBackstopMenuLevelKey)
+#define kCGTornOffMenuWindowLevel CGWindowLevelForKey(kCGTornOffMenuWindowLevelKey)
+#define kCGDockWindowLevel CGWindowLevelForKey(kCGDockWindowLevelKey)
+#define kCGDraggingWindowLevel CGWindowLevelForKey(kCGDraggingWindowLevelKey)
+#define kCGMaximumWindowLevel CGWindowLevelForKey(kCGMaximumWindowLevelKey)
+#define kCGOverlayWindowLevel CGWindowLevelForKey(kCGOverlayWindowLevelKey)
+#define kCGHelpWindowLevel CGWindowLevelForKey(kCGHelpWindowLevelKey)
+#define kCGUtilityWindowLevel CGWindowLevelForKey(kCGUtilityWindowLevelKey)
+#define kCGDesktopIconWindowLevel CGWindowLevelForKey(kCGDesktopIconWindowLevelKey)
+#define kCGCursorWindowLevel CGWindowLevelForKey(kCGCursorWindowLevelKey)
+#define kCGAssistiveTechHighWindowLevel CGWindowLevelForKey(kCGAssistiveTechHighWindowLevelKey)
 
 /* The keys of a window's description. */
 extern const CFStringRef kCGWindowNumber;               /* CFNumber, the window's CGWindowID */

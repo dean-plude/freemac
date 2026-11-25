@@ -700,6 +700,8 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
 }
 - (instancetype)initWithObjects:(const id[])objects count:(NSUInteger)count
 {
+    if (!count)
+        return self;   /* a subclass of its own that calls [super init] (freemac 1.225) */
     [self release];
     FRaise(NSInvalidArgumentException, @"*** -[NSSet initWithObjects:count:]: method only defined for abstract class");
 }

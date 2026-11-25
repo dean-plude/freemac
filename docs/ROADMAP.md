@@ -1183,6 +1183,40 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.225 "Ferry: MacPass and MacDown" (done)
+
+Ferry 0.49.0: MacPass and MacDown linked into bundles, with the frameworks
+they bring built from their source, and run. MacPass opens a KeePass
+database, unlocks it with its password and shows its groups, entries and
+an entry's details. MacDown opens a Markdown document, highlights it in
+its editor and shows it as HTML in its preview, and its preferences
+window opens. Counted with one survey script over the same clones as
+1.224 (627 files), with MacPass's dependencies now checked out where its
+build puts them, the files that compile went from 496 to 543 (445 in
+1.224, counted before they were checked out).
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | MacPass links and runs. KissXML (on this system's libxml2, whose headers the SDK now lays out where a Mac's SDK has them), TransformerKit, KeePassKit (with Argon2), HNHUi and Sparkle were built from their source as frameworks. Given a database made for the test, MacPass opens it, takes its password, unlocks it, and shows the group in its outline, the entry in its table and the entry's user name, password and URL in its inspector. It doesn't offer Touch ID, since Ferry's Security makes no keys | Ferry AppKit, Foundation, Security | done |
+| 2 | MacDown links and runs, with hoedown, LibYAML, GBCli, handlebars-objc, MASPreferences, PAPreferences, JJPluralForm, M13OrderedDictionary and Sparkle built from their source. It opens a Markdown file, highlights it in its editor, renders it in its web view preview (headings, emphasis, lists, quotes, code and tables) and shows Sparkle's first-launch question. Its preferences window opens with its toolbar and General pane. flex isn't on the build machine, so handlebars-objc's lexer was replaced, in the build script and not in Ferry, by a hand-written one that follows the same rules | Ferry AppKit, Foundation, WebKit | done |
+| 3 | `ferry-ibtool` reads the older xib format (`<archive type="com.apple.InterfaceBuilder3.Cocoa.XIB">`), whose objects are already written out with their keys. MASPreferences ships its window in that format | Ferry SDK | done |
+| 4 | Nib loading. A class swapper or a custom view hands its place to the object it makes before that object is decoded, so an object that refers back to it, such as a table's columns, gets the table. A window controller can name its nib by overriding `windowNibName`. Grid views can come from a nib or be made in code. An editable text field has no width of its own, as on a Mac | Ferry AppKit, Foundation | done |
+| 5 | What MacPass, MacDown and their frameworks call: | Ferry Foundation, AppKit, Security, WebKit, libSystem | done |
+|   | - a small Core Image (images, the affine transform filter, a context, `NSCIImageRep`); a QR code comes out empty and detectors find nothing | | |
+|   | - key-value coding through indexed and unordered accessors, `NSURLComponents`, `getValue:size:` and a boxed `CGSize` | | |
+|   | - Apple event descriptors and the event manager, collections searched with options and among indexes, `mutableString`, string transforms (XML hex, fullwidth, marks removed) and full case mapping (`ß` to `SS`) | | |
+|   | - `UTType`, `CGImageDestination`, Security transforms' Base64 and Base32 encoders, `SecAccessControl`, MD2 and MD4 | | |
+|   | - context menus, titlebar accessories, the window list, file promises and colour spaces | | |
+|   | - the older web view's selection, DOM ranges, computed style and a frame's JavaScriptCore context | | |
+|   | - `@import Darwin` and `@import ObjectiveC` | | |
+| 6 | Two new tests; `make check` 262 of 262 | Ferry | done |
+
+Gas Mask and Hex Fiend still can't be linked, since both have Swift in
+them, and Sequel Pro waits for its MySQL framework. `NSMatrix` wasn't
+needed: in these two apps only a sample program of DDHotKey, which MacPass carries,
+uses it. JavaScript functions as blocks and a weak `JSManagedValue`
+weren't reached.
+
 ## 1.224 "Ferry: shortcuts, asset catalogues and KeyCastr" (done)
 
 Ferry 0.48.0: the running apps' global shortcuts pressed and answered,

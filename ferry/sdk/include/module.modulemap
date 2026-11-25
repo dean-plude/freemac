@@ -6,6 +6,7 @@
 module AppKit [system] {
     header "AppKit/AppKit.h"
     header "AppKit/AppKitApps.h"
+    header "AppKit/AppKitDocumentApps.h"
     header "AppKit/AppKitMore.h"
     header "AppKit/NSAccessibility.h"
     header "AppKit/NSAnimation.h"
@@ -15,6 +16,7 @@ module AppKit [system] {
     header "AppKit/NSDockTile.h"
     header "AppKit/NSEventMonitors.h"
     header "AppKit/NSFontDescriptor.h"
+    header "AppKit/NSGridView.h"
     header "AppKit/NSLayoutConstraint.h"
     header "AppKit/NSRuleEditor.h"
     header "AppKit/NSRulerView.h"
@@ -111,6 +113,12 @@ module CoreGraphics [system] {
     link framework "CoreGraphics"
 }
 
+module CoreImage [system] {
+    header "CoreImage/CoreImage.h"
+    export *
+    link framework "CoreImage"
+}
+
 module CloudKit [system] {
     header "CloudKit/CloudKit.h"
     export *
@@ -146,6 +154,7 @@ module CoreText [system] {
 module Foundation [system] {
     header "Foundation/Foundation.h"
     header "Foundation/NSAffineTransform.h"
+    header "Foundation/NSAppleEventDescriptor.h"
     header "Foundation/NSAppleScript.h"
     header "Foundation/NSArray.h"
     header "Foundation/NSAutoreleasePool.h"
@@ -194,6 +203,7 @@ module Foundation [system] {
     header "Foundation/NSURL.h"
     header "Foundation/NSURLAuthenticationChallenge.h"
     header "Foundation/NSURLCache.h"
+    header "Foundation/NSURLComponents.h"
     header "Foundation/NSURLConnection.h"
     header "Foundation/NSURLCredential.h"
     header "Foundation/NSURLCredentialStorage.h"
@@ -335,6 +345,12 @@ module SystemConfiguration [system] {
     link framework "SystemConfiguration"
 }
 
+module UniformTypeIdentifiers [system] {
+    header "UniformTypeIdentifiers/UniformTypeIdentifiers.h"
+    export *
+    link framework "UniformTypeIdentifiers"
+}
+
 module UserNotifications [system] {
     header "UserNotifications/UserNotifications.h"
     export *
@@ -350,4 +366,101 @@ module WebKit [system] {
     header "WebKit/WebView.h"
     export *
     link framework "WebKit"
+}
+
+module Darwin [system] {
+    module Availability {
+        header "Darwin/Availability.h"
+        export *
+    }
+    module POSIX {
+        header "Darwin/POSIX.h"
+        export *
+    }
+    module C {
+        module assert {
+            header "Darwin/C/assert.h"
+            export *
+        }
+        module ctype {
+            header "Darwin/C/ctype.h"
+            export *
+        }
+        module errno {
+            header "Darwin/C/errno.h"
+            export *
+        }
+        module inttypes {
+            header "Darwin/C/inttypes.h"
+            export *
+        }
+        module limits {
+            header "Darwin/C/limits.h"
+            export *
+        }
+        module locale {
+            header "Darwin/C/locale.h"
+            export *
+        }
+        module math {
+            header "Darwin/C/math.h"
+            export *
+        }
+        module signal {
+            header "Darwin/C/signal.h"
+            export *
+        }
+        module stdio {
+            header "Darwin/C/stdio.h"
+            export *
+        }
+        module stdlib {
+            header "Darwin/C/stdlib.h"
+            export *
+        }
+        module string {
+            header "Darwin/C/string.h"
+            export *
+        }
+        module strings {
+            header "Darwin/C/strings.h"
+            export *
+        }
+        module time {
+            header "Darwin/C/time.h"
+            export *
+        }
+        module wchar {
+            header "Darwin/C/wchar.h"
+            export *
+        }
+        module wctype {
+            header "Darwin/C/wctype.h"
+            export *
+        }
+        module xlocale {
+            header "Darwin/C/xlocale.h"
+            export *
+        }
+    }
+}
+
+module ObjectiveC [system] {
+    module NSObjCRuntime {
+        header "ObjectiveC/NSObjCRuntime.h"
+        export *
+    }
+    module message {
+        header "ObjectiveC/message.h"
+        export *
+    }
+    module objc {
+        header "ObjectiveC/objc.h"
+        export *
+    }
+    module runtime {
+        header "ObjectiveC/runtime.h"
+        export *
+    }
+    link "objc"
 }

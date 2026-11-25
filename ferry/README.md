@@ -365,6 +365,23 @@ the bundles of loaded frameworks and plug-ins. The rename and time calls
 that take the Mac's flags and layout (`renamex_np`, `O_NOFOLLOW_ANY`,
 `utimes`) are converted in `src/posix.c`.
 
+From Ferry 0.49.0 (freemac 1.225), MacPass and MacDown link and run as
+the fifth and sixth apps. `sdk/ferry-ibtool` also reads the older xib
+format (`<archive type="com.apple.InterfaceBuilder3.Cocoa.XIB">`), whose
+objects it carries into the nib with their keys. `sdk/gen-libxml2-headers.sh`
+lays out this system's libxml2 headers under `usr/include/libxml2`, where
+a Mac's SDK has them. Core Image is in `appkit/CoreImage.m`, and
+`NSGridView` in `appkit/NSGridView.m`. What MacPass, MacDown and their
+frameworks call besides is in `appkit/AppKitDocumentApps.m`. The Apple
+event descriptors are in `foundation/NSAppleEvents.m`, `NSURLComponents`
+in `foundation/NSURLComponents.m` and the string transforms in
+`foundation/NSStringTransform.m`. The collection searches are in
+`foundation/NSCollectionsMore.m`, and the older web view's selection,
+ranges and JavaScriptCore context in `webkit/WebEditing.m`. Full case
+mapping uses this system's ICU (`foundation/NSStringText.m`), and the
+Security transforms' encoders and `SecAccessControl` are in
+`security/SecTransform.m`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

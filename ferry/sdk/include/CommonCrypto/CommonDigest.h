@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry SDK: CommonCrypto's digests (MD5, SHA-1 and SHA-2), part of
- * libSystem. Written for freemac from Apple's public documentation of the
- * calls and from RFC 1321 and FIPS 180-4; not Apple's header. The context
+ * Ferry SDK: CommonCrypto's digests (MD2, MD4, MD5, SHA-1 and SHA-2), part
+ * of libSystem. Written for freemac from Apple's public documentation of the
+ * calls and from RFCs 1319, 1320 and 1321 and FIPS 180-4; not Apple's header. The context
  * structures have the documented sizes; what is inside them is private.
  * Implemented in ferry/src/commoncrypto.c. */
 #ifndef _FERRY_COMMONDIGEST_H_
@@ -12,6 +12,26 @@ __FERRY_BEGIN
 
 typedef uint32_t CC_LONG;
 typedef uint64_t CC_LONG64;
+
+#define CC_MD2_DIGEST_LENGTH 16
+#define CC_MD2_BLOCK_BYTES 64
+#define CC_MD2_BLOCK_LONG (CC_MD2_BLOCK_BYTES / sizeof(CC_LONG))
+typedef struct CC_MD2state_st {
+    int num;
+    unsigned char data[CC_MD2_DIGEST_LENGTH];
+    CC_LONG cksm[CC_MD2_BLOCK_LONG];
+    CC_LONG state[CC_MD2_BLOCK_LONG];
+} CC_MD2_CTX;
+
+#define CC_MD4_DIGEST_LENGTH 16
+#define CC_MD4_BLOCK_BYTES 64
+#define CC_MD4_BLOCK_LONG (CC_MD4_BLOCK_BYTES / sizeof(CC_LONG))
+typedef struct CC_MD4state_st {
+    CC_LONG A, B, C, D;
+    CC_LONG Nl, Nh;
+    CC_LONG data[CC_MD4_BLOCK_LONG];
+    unsigned int num;
+} CC_MD4_CTX;
 
 #define CC_MD5_DIGEST_LENGTH 16
 #define CC_MD5_BLOCK_BYTES 64
@@ -58,6 +78,16 @@ typedef struct CC_SHA512state_st {
 typedef CC_SHA512_CTX CC_SHA384_CTX;
 
 /* Each _Init, _Update and _Final returns 1. The one-shot calls return md. */
+int CC_MD2_Init(CC_MD2_CTX *c);
+int CC_MD2_Update(CC_MD2_CTX *c, const void *data, CC_LONG len);
+int CC_MD2_Final(unsigned char *md, CC_MD2_CTX *c);
+unsigned char *CC_MD2(const void *data, CC_LONG len, unsigned char *md);
+
+int CC_MD4_Init(CC_MD4_CTX *c);
+int CC_MD4_Update(CC_MD4_CTX *c, const void *data, CC_LONG len);
+int CC_MD4_Final(unsigned char *md, CC_MD4_CTX *c);
+unsigned char *CC_MD4(const void *data, CC_LONG len, unsigned char *md);
+
 int CC_MD5_Init(CC_MD5_CTX *c);
 int CC_MD5_Update(CC_MD5_CTX *c, const void *data, CC_LONG len);
 int CC_MD5_Final(unsigned char *md, CC_MD5_CTX *c);

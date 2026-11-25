@@ -2774,6 +2774,26 @@ rows. Nothing is drawn under the pointer, and drags don't leave the app. (freema
   - JSON with one comma before a closing bracket or brace is read, as ShortcutRecorder's files need.
   - The input source for each layout is one object for the program's life.
 
+- **MacPass and MacDown, not compared with a Mac** (freemac 1.225, Ferry 0.49.0).
+  - Core Image:
+    - A `CIImage` is a Core Graphics image with an extent.
+    - Of the filters, only the affine transform does anything. The QR code generator gives an empty image, since no QR encoder is written.
+    - A `CIDetector` finds nothing.
+  - Security:
+    - `SecKeyCreateRandomKey` fails with `errSecUnimplemented`, so MacPass doesn't offer Touch ID.
+    - `SecAccessControl` keeps its protection and flags and does nothing with them.
+  - A context menu opens as Ferry's in-window menu, as a pop-up button's does. `popUpContextMenu:` and `popUpMenuPositioningItem:` return once it closes, as on a Mac.
+  - Case mapping:
+    - `uppercaseString`, `lowercaseString` and `capitalizedString` use this system's ICU, so one character can become two (`ß` becomes `SS`, `ﬁ` becomes `FI`).
+    - `capitalizedString` takes a word to be a run between white space.
+  - String transforms: XML hex references, fullwidth to halfwidth and the removal of marks are served. A transform that changes script returns nil, as one a Mac doesn't know does.
+  - `ferry-ibtool` and the older xib format:
+    - Each object is carried into the nib with the keys it has in the xib.
+    - Outlet, action and binding connections are made, and other kinds are named on standard error.
+    - A window is shown at load unless its `visibleAtLaunch` is NO.
+  - A frame's `javaScriptContext` runs its scripts in the page. What comes back is copied as JSON carries it, so numbers, strings, arrays and plain objects come back, but functions and nodes don't.
+  - MacPass's window opens at the size its nib gives, which cuts off its inspector. Its path control is a plain one.
+
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2871,3 +2891,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.46.0 (freemac 1.222): `@import` modules; Auto Layout with a solver; the accessibility names and methods; `NSFontDescriptor`; FSEvents on inotify; Quick Look's panel and previews with `Quartz/Quartz.h`; `NSRuleEditor`; and JavaScriptCore's C and Objective-C APIs on this system's JavaScriptCore, 383 of the apps' 608 files compiling (369 before, counted the same way), `make check` 244/244.
 - 2026-11-25: Ferry 0.47.0 (freemac 1.223): Flycut, Spectacle and ShiftIt link and run, with their status items, menus and windows; `ferry-ibtool` compiles document-format xibs; Apple events, Launch Services, CloudKit with no account, Scripting Bridge, uniform type identifiers, authorization, signature checks with Security transforms and what Sparkle calls; kqueue's vnode filter and `O_EVTONLY`; Foundation brings in Core Services; 428 of the apps' 627 files compiling (395 before, counted the same way), `make check` 256/256.
 - 2026-11-25: Ferry 0.48.0 (freemac 1.224): global shortcuts answered (Spectacle's 18 move and size the focused window, Flycut's opens its bezel); `ferry-actool` compiles asset catalogues, so Spectacle's status item shows its picture; KeyCastr links and runs with ShortcutRecorder, Sparkle 2 and its plug-ins; CoreFoundation's notification centers, `NSXPCConnection` that never connects, bookmarks, `renamex_np`, `O_NOFOLLOW_ANY`, tab stops, three- and nine-part images and the rest of what they call; MacDown's hoedown, LibYAML and GBCli built as frameworks; 445 of the apps' 627 files compiling (435 before, counted the same way), `make check` 260/260.
+- 2026-11-25: Ferry 0.49.0 (freemac 1.225): MacPass links and runs with KissXML, TransformerKit, KeePassKit, HNHUi and Sparkle built from their source, and opens, unlocks and shows a KeePass database; MacDown links and runs with its nine libraries, renders Markdown in its preview and opens its preferences; `ferry-ibtool` reads the older xib format; nib class swappers hand their place over; `NSGridView`, a small Core Image, key-value coding through indexed accessors, `NSURLComponents`, Apple event descriptors, string transforms, full case mapping, `UTType`, Security transforms' encoders, DOM ranges and a frame's JavaScriptCore context; 543 of the apps' 627 files compiling (496 before, counted the same way, with MacPass's dependencies checked out), `make check` 262/262.

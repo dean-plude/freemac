@@ -97,7 +97,7 @@ typedef double NSTimeInterval;
 typedef unsigned short unichar;
 typedef NSUInteger NSStringEncoding;
 
-typedef struct _NSRange { NSUInteger location, length; } NSRange;
+typedef struct CG_BOXABLE _NSRange { NSUInteger location, length; } NSRange;
 typedef NSRange *NSRangePointer;
 static inline NSRange NSMakeRange(NSUInteger loc, NSUInteger len) { NSRange r = {loc, len}; return r; }
 static inline NSUInteger NSMaxRange(NSRange r) { return r.location + r.length; }
@@ -115,7 +115,7 @@ typedef NSRect *NSRectPointer;
 typedef NSPoint *NSPointArray;
 typedef NSSize *NSSizeArray;
 typedef NSRect *NSRectArray;
-typedef struct NSEdgeInsets { CGFloat top, left, bottom, right; } NSEdgeInsets;
+typedef struct CG_BOXABLE NSEdgeInsets { CGFloat top, left, bottom, right; } NSEdgeInsets;
 typedef NS_ENUM(NSUInteger, NSRectEdge) {
     NSRectEdgeMinX = 0, NSRectEdgeMinY = 1, NSRectEdgeMaxX = 2, NSRectEdgeMaxY = 3,
     NSMinXEdge = 0, NSMinYEdge = 1, NSMaxXEdge = 2, NSMaxYEdge = 3,
@@ -165,6 +165,11 @@ typedef NS_ENUM(NSInteger, NSComparisonResult) {
     NSOrderedAscending = -1, NSOrderedSame = 0, NSOrderedDescending = 1
 };
 typedef NSComparisonResult (^NSComparator)(id obj1, id obj2);
+typedef NS_OPTIONS(NSUInteger, NSBinarySearchingOptions) {
+    NSBinarySearchingFirstEqual = 1UL << 8,
+    NSBinarySearchingLastEqual = 1UL << 9,
+    NSBinarySearchingInsertionIndex = 1UL << 10,
+};
 
 enum {
     NSASCIIStringEncoding = 1,
@@ -393,6 +398,9 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 - (BOOL)hasPrefix:(NSString *)s;
 - (BOOL)hasSuffix:(NSString *)s;
 - (BOOL)containsString:(NSString *)s;
+- (BOOL)localizedCaseInsensitiveContainsString:(NSString *)s;
+- (BOOL)localizedStandardContainsString:(NSString *)s;
+- (NSRange)localizedStandardRangeOfString:(NSString *)s;
 - (NSRange)rangeOfString:(NSString *)s;
 - (NSRange)rangeOfString:(NSString *)s options:(NSStringCompareOptions)mask;
 - (NSRange)rangeOfString:(NSString *)s options:(NSStringCompareOptions)mask range:(NSRange)range;
@@ -483,6 +491,18 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
                        freeWhenDone:(BOOL)freeBuffer;
 - (instancetype)initWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;
 @end
+/* string transforms (freemac 1.225), named by their ICU names */
+typedef NSString *NSStringTransform;
+FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTransformFullwidthToHalfwidth,
+    NSStringTransformStripCombiningMarks, NSStringTransformStripDiacritics, NSStringTransformToLatin,
+    NSStringTransformToUnicodeName, NSStringTransformLatinToHiragana, NSStringTransformLatinToKatakana,
+    NSStringTransformHiraganaToKatakana, NSStringTransformMandarinToLatin, NSStringTransformLatinToGreek,
+    NSStringTransformLatinToCyrillic, NSStringTransformLatinToArabic, NSStringTransformLatinToHebrew,
+    NSStringTransformLatinToThai, NSStringTransformLatinToKorean;
+@interface NSString (FerryTransform)
+- (NSString *)stringByApplyingTransform:(NSStringTransform)transform reverse:(BOOL)reverse;
+@end
+
 @interface NSString (FerryText)
 - (void)getLineStart:(NSUInteger *)startPtr end:(NSUInteger *)lineEndPtr contentsEnd:(NSUInteger *)contentsEndPtr
             forRange:(NSRange)range;
@@ -541,6 +561,12 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 + (NSValue *)valueWithSize:(NSSize)size;
 + (NSValue *)valueWithRect:(NSRect)rect;
 + (NSValue *)valueWithEdgeInsets:(NSEdgeInsets)insets;
++ (NSValue *)valueWithBytes:(const void *)value objCType:(const char *)type;
++ (NSValue *)value:(const void *)value withObjCType:(const char *)type;
+- (instancetype)initWithBytes:(const void *)value objCType:(const char *)type;
+- (void)getValue:(void *)value;
+- (void)getValue:(void *)value size:(NSUInteger)size;
+- (BOOL)isEqualToValue:(NSValue *)value;
 @property (readonly) NSRange rangeValue;
 @property (readonly) NSPoint pointValue;
 @property (readonly) NSSize sizeValue;
@@ -642,6 +668,8 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (NSUInteger)indexOfObject:(ObjectType)obj inRange:(NSRange)range;
 - (NSUInteger)indexOfObjectIdenticalTo:(ObjectType)obj inRange:(NSRange)range;
 - (NSUInteger)indexOfObjectPassingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+- (NSUInteger)indexOfObject:(ObjectType)obj inSortedRange:(NSRange)r options:(NSBinarySearchingOptions)opts
+            usingComparator:(NSComparator)cmp;
 - (BOOL)isEqualToArray:(NSArray<ObjectType> *)other;
 - (NSArray<ObjectType> *)arrayByAddingObject:(ObjectType)obj;
 - (NSArray<ObjectType> *)arrayByAddingObjectsFromArray:(NSArray<ObjectType> *)other;
@@ -848,6 +876,28 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 - (NSIndexSet *)indexesOfObjectsPassingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
 - (void)enumerateObjectsAtIndexes:(NSIndexSet *)indexes options:(NSEnumerationOptions)opts
                        usingBlock:(void (^)(ObjectType obj, NSUInteger idx, BOOL *stop))block;
+@end
+/* searching with options and among indexes, sort hints, and observing the
+ * objects at indexes (NSCollectionsMore.m, freemac 1.225) */
+@interface NSArray<ObjectType> (FerrySearching)
+- (ObjectType)firstObjectCommonWithArray:(NSArray<ObjectType> *)other;
+- (NSUInteger)indexOfObjectWithOptions:(NSEnumerationOptions)opts
+                           passingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+- (NSUInteger)indexOfObjectAtIndexes:(NSIndexSet *)indexes options:(NSEnumerationOptions)opts
+                         passingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+- (NSIndexSet *)indexesOfObjectsWithOptions:(NSEnumerationOptions)opts
+                                passingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+- (NSIndexSet *)indexesOfObjectsAtIndexes:(NSIndexSet *)indexes options:(NSEnumerationOptions)opts
+                              passingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
+@property (readonly, copy) NSData *sortedArrayHint;
+- (NSArray<ObjectType> *)sortedArrayUsingFunction:(NSInteger (*)(ObjectType, ObjectType, void *))fn
+                                          context:(void *)ctx
+                                             hint:(NSData *)hint;
+- (void)addObserver:(NSObject *)observer toObjectsAtIndexes:(NSIndexSet *)indexes forKeyPath:(NSString *)keyPath
+            options:(NSKeyValueObservingOptions)options context:(void *)context;
+- (void)removeObserver:(NSObject *)observer fromObjectsAtIndexes:(NSIndexSet *)indexes forKeyPath:(NSString *)keyPath;
+- (void)removeObserver:(NSObject *)observer fromObjectsAtIndexes:(NSIndexSet *)indexes
+            forKeyPath:(NSString *)keyPath context:(void *)context;
 @end
 @interface NSMutableArray<ObjectType> (NSIndexSetAccess)
 - (void)removeObjectsAtIndexes:(NSIndexSet *)indexes;
@@ -1699,7 +1749,7 @@ typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) 
 @property (readonly, copy) NSString *lastPathComponent;
 @property (readonly, copy) NSString *pathExtension;
 @property (readonly, copy) NSArray<NSString *> *pathComponents;
-@property (readonly) BOOL isFileURL;
+@property (readonly, getter=isFileURL) BOOL fileURL;
 @property (readonly, copy) NSURL *URLByDeletingLastPathComponent;
 @property (readonly, copy) NSURL *URLByDeletingPathExtension;
 @property (readonly) const char *fileSystemRepresentation NS_RETURNS_INNER_POINTER;
@@ -2106,6 +2156,15 @@ typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
 - (NSString *)stringWithFileSystemRepresentation:(const char *)s length:(NSUInteger)len;
 @end
 
+/* a dictionary from arrays, and the objects of keys (NSCollectionsMore.m,
+ * freemac 1.225) */
+@interface NSDictionary<KeyType, ObjectType> (FerryFromArrays)
+- (instancetype)initWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType<NSCopying>> *)keys;
+- (NSArray<ObjectType> *)objectsForKeys:(NSArray<KeyType> *)keys notFoundMarker:(ObjectType)marker;
+@end
+/* the one zone there is (NSCollectionsMore.m, freemac 1.225) */
+FOUNDATION_EXPORT NSZone *NSDefaultMallocZone(void);
+FOUNDATION_EXPORT NSZone *NSZoneFromPointer(void *ptr);
 @interface NSDictionary (NSFileAttributes)
 - (unsigned long long)fileSize;
 - (NSString *)fileType;
@@ -2604,6 +2663,10 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringEnumerationOptions) {
 - (void)setAttributedString:(NSAttributedString *)attrString;
 - (void)beginEditing;
 - (void)endEditing;
+/* the characters, as a string that changes the attributed string when it
+ * is changed: what is put in takes the attributes of the character before
+ * (freemac 1.225) */
+@property (readonly, retain) NSMutableString *mutableString;
 @end
 
 /* ---- Markdown (freemac 1.224, Ferry 0.48.0) ----------------------------------------
@@ -2932,6 +2995,8 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSThread.h>
 /* URL loading: NSURLSession, NSURLConnection, requests and responses. */
 #include <Foundation/NSURLSession.h>
+/* A URL's parts (freemac 1.225) */
+#include <Foundation/NSURLComponents.h>
 /* Streams, and the network services of Bonjour. */
 #include <Foundation/NSStream.h>
 #include <Foundation/NSNetServices.h>
@@ -2960,5 +3025,7 @@ enum { NSFormattingError = 2048 };
  * NSAppleEventDescriptor.h): Gestalt, Apple events, Launch Services, the
  * Process Manager's serial numbers and file references. */
 #include <CoreServices/CoreServices.h>
+/* Apple event descriptors as objects, and the handlers (freemac 1.225, Ferry 0.49.0). */
+#include <Foundation/NSAppleEventDescriptor.h>
 
 #endif

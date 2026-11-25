@@ -23,9 +23,11 @@ NSTableView, made empty with -initWithFrame:), with its frame, so the
 window keeps its layout and outlets to it still connect; each such element
 is named once on standard error. Auto Layout constraints, toolbars,
 accessibility descriptions and the document's localization comments are
-left out. Only the newer document format (<document type=
-"com.apple.InterfaceBuilder3.Cocoa.XIB">) is read; the older <archive>
-format is refused with a message.
+left out. Both document formats are read: the newer <document type=
+"com.apple.InterfaceBuilder3.Cocoa.XIB"> as above, and the older <archive
+type="com.apple.InterfaceBuilder3.Cocoa.XIB">, whose objects are already
+written out with their keys and are carried over as they are (see
+compile_archive_xib).
 """
 import base64
 import os
@@ -1065,20 +1067,67 @@ class Compiler:
         return cls, keys
 
     def b_gridView(self, e, uid):
-        """A grid view keeps its cells' views in rows and columns; here they
-        become its subviews where the document placed them."""
-        subs = []
+        """A grid view (freemac 1.225): its rows, its columns and its cells,
+        each cell naming its row, column and content view, and the cell it
+        was merged into; the content views are its subviews."""
+        a = self.a
+        place = {"inherited": 0, "none": 1, "leading": 2, "top": 2, "trailing": 3, "bottom": 3, "center": 4,
+                 "fill": 5}
+        align = {"inherited": 0, "none": 1, "firstBaseline": 2, "lastBaseline": 3}
+
+        def num(el, name):
+            v = el.get(name)
+            return float(v) if v is not None else None
+
+        def part(tag, cls, keys):
+            out = []
+            box = child(e, tag)
+            for el in (box if box is not None else []):
+                if el.get("id") is None:
+                    continue
+                puid = self.uid_for(el.get("id"))
+                a.fill(puid, a.obj(cls, (), **keys(el)))
+                out.append(puid)
+            return out
+
+        rows = part("rows", "NSGridRow", lambda r: dict(
+            NSGridRowYPlacement=place.get(r.get("yPlacement")), NSGridRowAlignment=align.get(r.get("rowAlignment")),
+            NSGridRowHeight=num(r, "height"), NSGridRowTopPadding=num(r, "topPadding"),
+            NSGridRowBottomPadding=num(r, "bottomPadding"), NSGridRowHidden=yes(r, "hidden") or None))
+        columns = part("columns", "NSGridColumn", lambda c: dict(
+            NSGridColumnXPlacement=place.get(c.get("xPlacement")), NSGridColumnWidth=num(c, "width"),
+            NSGridColumnLeadingPadding=num(c, "leadingPadding"), NSGridColumnTrailingPadding=num(c, "trailingPadding"),
+            NSGridColumnHidden=yes(c, "hidden") or None))
+        subs, cells = [], []
         gc = child(e, "gridCells")
         for cell in (gc if gc is not None else []):
-            v = cell.find("*[@key='contentView']")
-            if v is None or v.get("id") is None:
+            if cell.get("id") is None:
                 continue
-            vuid = self.uid_for(v.get("id"))
-            self.view(v, vuid, uid)
-            self.pairs.append((vuid, uid))
-            subs.append(vuid)
-        self.note_unknown("gridView", "a plain view holding its cells' views where they were placed")
-        return "NSView", dict(NSSubviews=self.a.array(subs))
+            cuid = self.uid_for(cell.get("id"))
+            vuid = None
+            v = cell.find("*[@key='contentView']")
+            if v is not None and v.get("id") is not None:
+                vuid = self.uid_for(v.get("id"))
+                self.view(v, vuid, uid)
+                self.pairs.append((vuid, uid))
+                subs.append(vuid)
+            a.fill(cuid, a.obj("NSGridCell", (), NSGridCellContentView=vuid,
+                               NSGridCellRow=self.uid_for(cell.get("row")) if cell.get("row") else None,
+                               NSGridCellColumn=self.uid_for(cell.get("column")) if cell.get("column") else None,
+                               NSGridCellHead=self.uid_for(cell.get("headOfMergedCell"))
+                               if cell.get("headOfMergedCell") else None,
+                               NSGridCellXPlacement=place.get(cell.get("xPlacement")),
+                               NSGridCellYPlacement=place.get(cell.get("yPlacement")),
+                               NSGridCellRowAlignment=align.get(cell.get("rowAlignment"))))
+            self.connections_of(cell, cuid)
+            cells.append(cuid)
+        return "NSGridView", dict(NSSubviews=a.array(subs), NSGridViewRows=a.array(rows),
+                                  NSGridViewColumns=a.array(columns), NSGridViewCells=a.array(cells),
+                                  NSGridViewXPlacement=place.get(e.get("xPlacement")),
+                                  NSGridViewYPlacement=place.get(e.get("yPlacement")),
+                                  NSGridViewRowAlignment=align.get(e.get("rowAlignment")),
+                                  NSGridViewRowSpacing=num(e, "rowSpacing"),
+                                  NSGridViewColumnSpacing=num(e, "columnSpacing"))
 
     def b_tokenField(self, e, uid):
         cls, keys = self.b_textField(e, uid, "NSTokenField", "tokenFieldCell", "NSTokenFieldCell")
@@ -1107,12 +1156,165 @@ COCOA_NAMES = {"webView": "WebView", "wkWebView": "WKWebView", "pdfView": "PDFVi
                "qcView": "QCView"}
 
 
+def compile_archive_xib(root, path, warn):
+    """The older document format (<archive type="com.apple.InterfaceBuilder3.Cocoa.XIB">): the document's objects written out one by one, each with its class and its values under
+    the same keys a nib keeps them under, so each becomes the same object in the nib with its keys as
+    they are. IBDocument.RootObjects holds File's Owner, First Responder, the application and the
+    top-level objects; IBDocument.Objects holds the outlet, action and binding connections, each
+    object's parent and, among the flattened properties, whether a window is visible at launch. The
+    rest (plug-in versions, class descriptions) is Interface Builder's and is left out."""
+    c = Compiler(root, warn)
+    a = c.a
+    data = child(root, "data")
+    if data is None:
+        raise SystemExit("ferry-ibtool: %s has no data" % path)
+
+    def keyed(el, key):
+        for k in el:
+            if k.get("key") == key:
+                return k
+        return None
+
+    # A scalar (an int, a bool, a real) under a key is kept in the object's own
+    # dictionary, as a keyed archiver keeps it; as a member of a collection it
+    # is an object of its own (an NSNumber), referred to by its UID.
+    def number(el, conv):
+        v = el.get("value") if el.get("value") is not None else (el.text or "0")
+        return conv(v.strip())
+
+    def string_of(el):
+        if el.get("type") == "base64-UTF8":
+            return base64.b64decode(el.text or "").decode("utf-8", "replace")
+        return el.text or ""
+
+    def member(el):
+        v = value(el)
+        return a.add(v) if isinstance(v, (bool, int, float)) else v
+
+    def value(el):
+        tag = el.tag
+        if tag == "nil":
+            return None
+        if tag in ("string", "characters"):
+            return a.string(string_of(el))
+        if tag in ("int", "integer"):
+            return number(el, int)
+        if tag in ("bool", "boolean"):
+            return (el.get("value") or el.text or "").strip() == "YES"
+        if tag in ("double", "real", "float"):
+            return number(el, float)
+        if tag == "bytes":
+            return a.add(base64.b64decode(el.text or ""))
+        if tag == "reference":
+            return c.uid_for(el.get("ref")) if el.get("ref") else None
+        if tag == "object":
+            return obj(el)
+        return None
+
+    def items(el):
+        return [v for v in (member(k) for k in el if k.get("key") is None) if v is not None]
+
+    def obj(el):
+        uid = c.uid_for(el.get("id")) if el.get("id") else a.reserve()
+        if a.objects[uid.data] is not None:
+            return uid
+        a.fill(uid, "$null")   # being made: a reference back to it finds it
+        cls = el.get("class") or "NSObject"
+        if cls in ("NSArray", "NSMutableArray"):
+            a.fill(uid, a.obj(cls, ("NSArray",) if cls != "NSArray" else (), **{"NS.objects": items(el)}))
+        elif cls in ("NSSet", "NSMutableSet"):
+            a.fill(uid, a.obj(cls, ("NSSet",) if cls != "NSSet" else (), **{"NS.objects": items(el)}))
+        elif cls in ("NSDictionary", "NSMutableDictionary"):
+            keys, vals = [], []
+            sk, sv = keyed(el, "dict.sortedKeys"), keyed(el, "dict.values")
+            if sk is not None and sv is not None:
+                ku, vu = value(sk), value(sv)
+                ka = a.objects[ku.data] if isinstance(ku, UID) else None
+                va = a.objects[vu.data] if isinstance(vu, UID) else None
+                keys = list(ka.get("NS.objects", [])) if isinstance(ka, dict) else []
+                vals = list(va.get("NS.objects", [])) if isinstance(va, dict) else []
+            else:
+                i = 0
+                while keyed(el, "NS.key.%d" % i) is not None:
+                    keys.append(member(keyed(el, "NS.key.%d" % i)))
+                    vals.append(member(keyed(el, "NS.object.%d" % i)))
+                    i += 1
+            a.fill(uid, a.obj(cls, ("NSDictionary",) if cls != "NSDictionary" else (),
+                              **{"NS.keys": keys, "NS.objects": vals}))
+        elif cls in ("NSString", "NSMutableString"):
+            ch = keyed(el, "NS.bytes")
+            a.fill(uid, string_of(ch) if ch is not None else "")
+        else:
+            keys = {}
+            for k in el:
+                key = k.get("key")
+                if key and key != "EncodedWithXMLCoder":
+                    v = value(k)
+                    if v is not None:
+                        keys[key] = v
+            a.fill(uid, a.obj(cls, supers(cls), **keys))
+        return uid
+
+    roots = child(data, "object", "IBDocument.RootObjects")
+    if roots is None or len([r for r in roots if r.tag == "object"]) == 0:
+        raise SystemExit("ferry-ibtool: %s has no root objects" % path)
+    tops = [r for r in roots if r.tag == "object"]
+    owner = obj(tops[0])
+    for t in tops[1:]:
+        obj(t)
+    container = child(data, "object", "IBDocument.Objects")
+    records, flat = {}, {}
+    if container is not None:
+        conns = child(container, "object", "connectionRecords")
+        for rec in (conns if conns is not None else []):
+            con = child(rec, "object", "connection")
+            if con is None:
+                continue
+            kind = con.get("class")
+            src, dst = child(con, "reference", "source"), child(con, "reference", "destination")
+            label = child(con, "string", "label")
+            if kind in ("IBOutletConnection", "IBActionConnection") and src is not None and dst is not None \
+                    and label is not None:
+                connector = "NSNibOutletConnector" if kind == "IBOutletConnection" else "NSNibControlConnector"
+                c.connections.append((dst.get("ref"), label.text, a.add(a.obj(
+                    connector, ("NSNibConnector",), NSSource=c.uid_for(src.get("ref")),
+                    NSDestination=c.uid_for(dst.get("ref")), NSLabel=a.string(label.text or "")))))
+            elif kind == "IBBindingConnection" and child(con, "object", "connector") is not None:
+                c.connections.append((None, "binding", obj(child(con, "object", "connector"))))
+            else:
+                c.note_unknown(kind or "connection", "nothing (only outlets, actions and bindings are read)")
+        ors = child(container, "object", "objectRecords")
+        ordered = child(ors, "object", "orderedObjects") if ors is not None else None
+        for rec in (ordered if ordered is not None else []):
+            oid, o, p = child(rec, "int", "objectID"), child(rec, "reference", "object"), \
+                child(rec, "reference", "parent")
+            if oid is not None and o is not None and o.get("ref"):
+                records[oid.text.strip()] = (o.get("ref"), p.get("ref") if p is not None else None)
+        fp = child(container, "object", "flattenedProperties")
+        if fp is not None:
+            sk, sv = child(fp, "object", "dict.sortedKeys"), child(fp, "object", "dict.values")
+            if sk is not None and sv is not None:
+                for k, v in zip([k for k in sk if k.get("key") is None], [v for v in sv if v.get("key") is None]):
+                    flat[k.text or ""] = (v.get("value") or v.text or "").strip()
+    root_ref = records.get("0", (None, None))[0]
+    owner_ref = tops[0].get("id")
+    for oid, (o, p) in records.items():
+        if oid == "0" or o == owner_ref:
+            continue
+        parent = c.uid_for(owner_ref) if p in (None, root_ref) else c.uid_for(p)
+        c.pairs.append((c.uid_for(o), parent))
+        made = a.objects[c.uid_for(o).data]
+        if isinstance(made, dict) and a.objects[made["$class"].data]["$classname"] == "NSWindowTemplate" and \
+                flat.get("%s.NSWindowTemplate.visibleAtLaunch" % oid, "YES") == "YES":
+            c.visible.append(c.uid_for(o))
+    return c.finish(owner)
+
+
 def compile_xib(path, warn):
     tree = ET.parse(path)
     root = tree.getroot()
-    if root.tag == "archive":
-        raise SystemExit("ferry-ibtool: %s is in the older Interface Builder archive format, which isn't read; "
-                         "open and save it in a current Xcode to update it" % path)
+    if root.tag == "archive" and root.get("type", "").startswith("com.apple.InterfaceBuilder3.Cocoa"):
+        return compile_archive_xib(root, path, warn)
     if root.tag != "document":
         raise SystemExit("ferry-ibtool: %s isn't an Interface Builder document" % path)
     c = Compiler(root, warn)

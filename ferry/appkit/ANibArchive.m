@@ -549,4 +549,14 @@ static void warn_missing(NSString *name)
     _state[index] = DONE;
 }
 - (id)_ferryDecodeObjectAtIndex:(NSUInteger)index { return [self objectAt:(uint32_t)index]; }
+/* An object still being made that hands its place to another (a class
+ * swapper, NSNib.m): references back to it get the other (1.225). */
+- (void)_ferryReplaceObjectInProgress:(id)old with:(id)object
+{
+    for (uint32_t i = 0; i < _nobjects; i++)
+        if (_state[i] == DECODING && _decoded[i] == old) {
+            _decoded[i] = object;
+            return;
+        }
+}
 @end

@@ -626,6 +626,90 @@ OSStatus SecItemImport(CFDataRef importedData, CFStringRef fileNameOrExtension, 
 /* The key's SubjectPublicKeyInfo, DER-encoded (Ferry keeps a key as that). */
 CFDataRef SecKeyCopyExternalRepresentation(SecKeyRef key, CFErrorRef *error) CF_RETURNS_RETAINED;
 
+/* ---- keys made and used (SecKey.h) and access control (SecAccessControl.h) -------------
+ * (freemac 1.225, Ferry 0.49.0) Ferry makes no keys: SecKeyCreateRandomKey
+ * fails (errSecUnimplemented), no key supports an algorithm, and nothing is
+ * encrypted or decrypted with one. An access control is an object that
+ * keeps its protection and flags; nothing asks for Touch ID, a watch or a
+ * password, as no key it would guard is made. (MacPass's Touch ID unlock is
+ * therefore never offered.) */
+typedef CFStringRef SecKeyAlgorithm;
+typedef CF_ENUM(CFIndex, SecKeyOperationType) {
+    kSecKeyOperationTypeSign = 0, kSecKeyOperationTypeVerify = 1, kSecKeyOperationTypeEncrypt = 2,
+    kSecKeyOperationTypeDecrypt = 3, kSecKeyOperationTypeKeyExchange = 4,
+};
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionRaw;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionPKCS1;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA1;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA224;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA256;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA384;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA512;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA1AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA224AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA256AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA384AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSAEncryptionOAEPSHA512AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA1;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA256;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA512;
+extern const SecKeyAlgorithm kSecKeyAlgorithmRSASignatureMessagePSSSHA256;
+extern const SecKeyAlgorithm kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
+extern const SecKeyAlgorithm kSecKeyAlgorithmECIESEncryptionStandardX963SHA256AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmECIESEncryptionCofactorVariableIVX963SHA256AESGCM;
+extern const SecKeyAlgorithm kSecKeyAlgorithmECDHKeyExchangeStandard;
+extern const CFStringRef kSecAttrApplicationTag;
+extern const CFStringRef kSecAttrApplicationLabel;
+extern const CFStringRef kSecAttrKeyType;
+extern const CFStringRef kSecAttrKeyTypeRSA;
+extern const CFStringRef kSecAttrKeyTypeEC;
+extern const CFStringRef kSecAttrKeyTypeECSECPrimeRandom;
+extern const CFStringRef kSecAttrKeySizeInBits;
+extern const CFStringRef kSecAttrEffectiveKeySize;
+extern const CFStringRef kSecAttrKeyClass;
+extern const CFStringRef kSecAttrKeyClassPublic;
+extern const CFStringRef kSecAttrKeyClassPrivate;
+extern const CFStringRef kSecAttrKeyClassSymmetric;
+extern const CFStringRef kSecAttrIsPermanent;
+extern const CFStringRef kSecPublicKeyAttrs;
+extern const CFStringRef kSecPrivateKeyAttrs;
+extern const CFStringRef kSecAttrAccessControl;
+extern const CFStringRef kSecAttrTokenID;
+extern const CFStringRef kSecAttrTokenIDSecureEnclave;
+extern const CFStringRef kSecUseAuthenticationContext;
+SecKeyRef SecKeyCreateRandomKey(CFDictionaryRef parameters, CFErrorRef *error) CF_RETURNS_RETAINED;
+/* a key's public key: a public key is its own */
+SecKeyRef SecKeyCopyPublicKey(SecKeyRef key) CF_RETURNS_RETAINED;
+CFDictionaryRef SecKeyCopyAttributes(SecKeyRef key) CF_RETURNS_RETAINED;
+size_t SecKeyGetBlockSize(SecKeyRef key);
+Boolean SecKeyIsAlgorithmSupported(SecKeyRef key, SecKeyOperationType operation, SecKeyAlgorithm algorithm);
+CFDataRef SecKeyCreateEncryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef plaintext,
+                                    CFErrorRef *error) CF_RETURNS_RETAINED;
+CFDataRef SecKeyCreateDecryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef ciphertext,
+                                    CFErrorRef *error) CF_RETURNS_RETAINED;
+CFDataRef SecKeyCreateSignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef data,
+                                CFErrorRef *error) CF_RETURNS_RETAINED;
+
+typedef struct __SecAccessControl *SecAccessControlRef;
+typedef CF_OPTIONS(CFOptionFlags, SecAccessControlCreateFlags) {
+    kSecAccessControlUserPresence = 1u << 0,
+    kSecAccessControlBiometryAny = 1u << 1,
+    kSecAccessControlTouchIDAny = 1u << 1,
+    kSecAccessControlBiometryCurrentSet = 1u << 3,
+    kSecAccessControlTouchIDCurrentSet = 1u << 3,
+    kSecAccessControlDevicePasscode = 1u << 4,
+    kSecAccessControlWatch = 1u << 5,
+    kSecAccessControlOr = 1u << 14,
+    kSecAccessControlAnd = 1u << 15,
+    kSecAccessControlPrivateKeyUsage = 1u << 30,
+    kSecAccessControlApplicationPassword = 1u << 31,
+};
+CFTypeID SecAccessControlGetTypeID(void);
+/* protection is one of the kSecAttrAccessible values (errSecParam for anything else) */
+SecAccessControlRef SecAccessControlCreateWithFlags(CFAllocatorRef allocator, CFTypeRef protection,
+                                                    SecAccessControlCreateFlags flags,
+                                                    CFErrorRef *error) CF_RETURNS_RETAINED;
+
 /* ---- transforms (SecTransform.h, SecReadTransform.h, SecDigestTransform.h,
  * SecSignVerifyTransform.h) ----------------------------------------------------------
  * (freemac 1.223, Ferry 0.47.0) A group of transforms connected output to
@@ -699,6 +783,21 @@ extern const CFStringRef kSecInputIsDigest;
 extern const CFStringRef kSecInputIsRaw;
 SecTransformRef SecVerifyTransformCreate(SecKeyRef key, CFDataRef signature, CFErrorRef *error) CF_RETURNS_RETAINED;
 SecTransformRef SecSignTransformCreate(SecKeyRef key, CFErrorRef *error) CF_RETURNS_RETAINED;
+
+/* encoding and decoding (freemac 1.225, Ferry 0.49.0): Base64 and
+ * Base32 as RFC 4648 gives them (Base32 also in its extended-hex
+ * alphabet); a Base64 encoding's line length is kSecEncodeLineLengthAttribute
+ * (0, the default, for one line) */
+extern const CFStringRef kSecEncodeTypeAttribute;
+extern const CFStringRef kSecDecodeTypeAttribute;
+extern const CFStringRef kSecEncodeLineLengthAttribute;
+extern const CFStringRef kSecBase64Encoding;
+extern const CFStringRef kSecBase32Encoding;
+extern const CFStringRef kSecBase32HexEncoding;
+extern const CFStringRef kSecZLibEncoding;   /* not made: the transform answers an error */
+enum { kSecLineLength64 = 64, kSecLineLength76 = 76 };
+SecTransformRef SecEncodeTransformCreate(CFTypeRef encodeType, CFErrorRef *error) CF_RETURNS_RETAINED;
+SecTransformRef SecDecodeTransformCreate(CFTypeRef decodeType, CFErrorRef *error) CF_RETURNS_RETAINED;
 
 __FERRY_END
 #endif

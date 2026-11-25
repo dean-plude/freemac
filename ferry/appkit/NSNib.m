@@ -242,6 +242,19 @@ static int parse_components(NSData *d, CGFloat *out, int max)
 }
 @end
 
+/* A stand-in (a class swapper, a custom view) hands its place in the
+ * archive to the object it makes, before that object decodes, so that the
+ * objects it holds which point back at it (a table's columns) get the new
+ * object, not the stand-in that is gone (freemac 1.225). */
+@interface NSCoder (FerryHandOver)
+- (void)_ferryReplaceObjectInProgress:(id)old with:(id)object;
+@end
+static void hand_over(NSCoder *c, id old, id object)
+{
+    if (object && [c respondsToSelector:@selector(_ferryReplaceObjectInProgress:with:)])
+        [c _ferryReplaceObjectInProgress:old with:object];
+}
+
 /* A view of the app's own class, made with initWithFrame: as on a Mac. */
 @interface NSCustomView : NSView
 @end
@@ -255,8 +268,10 @@ static int parse_components(NSData *d, CGFloat *out, int max)
             warn_class(@"the view class", name);
         cls = [NSView class];
     }
+    NSView *v = [cls alloc];
+    hand_over(c, self, v);
     [self release];
-    NSView *v = [[cls alloc] initWithFrame:AViewFrameFromCoder(c)];
+    v = [v initWithFrame:AViewFrameFromCoder(c)];
     AViewDecode(v, c);
     return (id)v;
 }
@@ -277,8 +292,10 @@ static int parse_components(NSData *d, CGFloat *out, int max)
             warn_class(@"the class", name);
         cls = [original isKindOfClass:[NSString class]] ? NSClassFromString(original) : Nil;
     }
+    id obj = cls ? [cls alloc] : nil;
+    hand_over(c, self, obj);
     [self release];
-    return cls ? [[cls alloc] initWithCoder:c] : nil;
+    return [obj initWithCoder:c];
 }
 - (void)encodeWithCoder:(NSCoder *)c {}
 @end

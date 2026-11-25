@@ -31,6 +31,7 @@ static NSString *list_class(NSString *js)
             @"CSSStyleDeclaration" : @"DOMCSSStyleDeclaration",
             @"CSSStyleProperties" : @"DOMCSSStyleDeclaration",
             @"CSS2Properties" : @"DOMCSSStyleDeclaration",
+            @"Range" : @"DOMRange",
         } retain];
     return names[js];
 }

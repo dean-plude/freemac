@@ -674,6 +674,23 @@ if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/IBTool.nib" "$her
 else
     echo "FAIL appkit_ibtool (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/ibtool.log"; fail=$((fail + 1))
 fi
+# What MacPass's nibs and HNHUi need (freemac 1.225, Ferry 0.49.0): a window
+# controller naming its nib by overriding -windowNibName, a table of the
+# app's own class that its columns point back at, grid views from a nib and
+# in code, Core Image, a text field cell's bezel, a content type's icon and a
+# focused view's bitmap, and a nib from a xib in the older format, an archive
+# of objects with their keys, which MASPreferences (in MacDown) ships. The
+# nibs, compiled from Ferry's own xibs, sit next to the program, in its main
+# bundle.
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/MacPassUI.nib" "$here/appkit/macpass_ui.xib" \
+        2> "$build/macpass_ui.ibtool.log" &&
+   python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ArchiveFormat.nib" "$here/appkit/archive_format.xib" \
+        2>> "$build/macpass_ui.ibtool.log"; then
+    run_one appkit_macpass_ui "$here/appkit/macpass_ui.m" "$here/appkit/macpass_ui.out" -fobjc-arc -fblocks \
+        -framework Cocoa -framework CoreImage -framework UniformTypeIdentifiers
+else
+    echo "FAIL appkit_macpass_ui (ferry-ibtool)"; sed 's/^/    /' "$build/macpass_ui.ibtool.log"; fail=$((fail + 1))
+fi
 run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_controls.out" -fobjc-arc \
     -framework Cocoa
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
@@ -1224,6 +1241,15 @@ run_one foundation_framework_calls "$here/foundation/framework_calls.m" "$here/f
 run_one foundation_keycastr_calls "$here/foundation/keycastr_calls.m" "$here/foundation/keycastr_calls.out" \
     -fobjc-arc -fblocks -framework Foundation -framework ServiceManagement -framework Security \
     -framework SystemConfiguration
+# What MacPass, MacDown and their frameworks call (freemac 1.225, Ferry
+# 0.49.0): the Darwin and ObjectiveC modules, KVC through indexed and set
+# accessors, NSValue's bytes, URL components, binary search, an attributed
+# string's mutableString, string transforms, full case mapping, mutable CF
+# data, Apple event descriptors, uniform types, MD2 and MD4, strptime_l,
+# Security's base64 and base32 transforms (RFC 4648's examples), access
+# control, and keys that aren't made.
+run_one foundation_macpass_calls "$here/foundation/macpass_calls.m" "$here/foundation/macpass_calls.out" \
+    -fobjc-arc -fblocks -framework Foundation -framework Security -framework UniformTypeIdentifiers
 run_one foundation_fsevents "$here/foundation/fsevents.m" "$here/foundation/fsevents.out" -fobjc-arc -fblocks \
     -framework Foundation -framework CoreServices
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \

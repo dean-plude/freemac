@@ -157,6 +157,32 @@ CFDataRef CFDataCreate(CFAllocatorRef alloc, const UInt8 *bytes, CFIndex length)
 }
 CFIndex CFDataGetLength(CFDataRef d) { return (CFIndex)[OBJ(d) length]; }
 const UInt8 *CFDataGetBytePtr(CFDataRef d) { return [OBJ(d) bytes]; }
+/* mutable data (freemac 1.225): an NSMutableData */
+CFMutableDataRef CFDataCreateMutable(CFAllocatorRef alloc, CFIndex capacity)
+{
+    return (CFMutableDataRef)[[NSMutableData alloc] initWithCapacity:capacity];
+}
+CFMutableDataRef CFDataCreateMutableCopy(CFAllocatorRef alloc, CFIndex capacity, CFDataRef d)
+{
+    return (CFMutableDataRef)[OBJ(d) mutableCopy];
+}
+CFDataRef CFDataCreateCopy(CFAllocatorRef alloc, CFDataRef d) { return (CFDataRef)[OBJ(d) copy]; }
+UInt8 *CFDataGetMutableBytePtr(CFMutableDataRef d) { return [OBJ(d) mutableBytes]; }
+void CFDataGetBytes(CFDataRef d, CFRange range, UInt8 *buffer)
+{
+    [OBJ(d) getBytes:buffer range:NSMakeRange(range.location, range.length)];
+}
+void CFDataSetLength(CFMutableDataRef d, CFIndex length) { [OBJ(d) setLength:length]; }
+void CFDataIncreaseLength(CFMutableDataRef d, CFIndex extraLength) { [OBJ(d) increaseLengthBy:extraLength]; }
+void CFDataAppendBytes(CFMutableDataRef d, const UInt8 *bytes, CFIndex length) { [OBJ(d) appendBytes:bytes length:length]; }
+void CFDataReplaceBytes(CFMutableDataRef d, CFRange range, const UInt8 *newBytes, CFIndex newLength)
+{
+    [OBJ(d) replaceBytesInRange:NSMakeRange(range.location, range.length) withBytes:newBytes length:newLength];
+}
+void CFDataDeleteBytes(CFMutableDataRef d, CFRange range)
+{
+    [OBJ(d) replaceBytesInRange:NSMakeRange(range.location, range.length) withBytes:NULL length:0];
+}
 
 CFAbsoluteTime CFAbsoluteTimeGetCurrent(void) { return [NSDate timeIntervalSinceReferenceDate]; }
 
