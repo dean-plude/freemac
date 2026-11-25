@@ -12,11 +12,15 @@ a resizable window:
   top left kept: yes
 a window whose content only prefers a size: 0,0 400x300
   view: 10,10 380x280
-a vertical stack's natural size: 0,0 -1x85
+a vertical stack's natural size: 0,0 140x85
   its fitting size: 0,0 140x85
   hugs vertically at 250
   a field across a 300-wide stack: 0,0 300x22
   a view that hugs its width: 0,30 60x20
+a stack holding a held image view, natural size: 0,0 240x165
+  in a window, the stack: 80,68 240x165
+  the image view: 56,0 128x128
+  the title: 0,136 240x29
 a split view controller's view holding its split view:
   split view pinned: yes, frame: 0,0 700x400
   panes: 0+216 217+216 434+266

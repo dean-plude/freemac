@@ -155,6 +155,7 @@ Q_EXPORT void FerryCAAdvanceTime(CFTimeInterval seconds);
 - (NSArray *)_ferryRunning;
 - (void)_ferryAnimationEnded:(QRunning *)r;
 - (void)_ferryChanged;                          /* tells the host something is to be drawn again */
+- (void)_ferryClearNeedsDisplay;                 /* displayed by a kind's own display (CAOpenGLLayer) */
 + (NSSet *)_ferryAnimatableKeys;
 + (NSSet *)_ferryKnownKeys;
 /* Draws the layer's own content (contents, or a kind's drawing) in its

@@ -4,6 +4,7 @@
  * Apple's public documentation. */
 #import <QuartzCore/QuartzCore.h>
 #import <objc/message.h>
+#include "../opengl/FerryGL.h" /* the display's rate, shared with Core Video's display links (1.235) */
 
 const CAFrameRateRange CAFrameRateRangeDefault = {0, 0, 0};
 CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float preferred)
@@ -57,7 +58,7 @@ CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float prefer
 }
 - (CFTimeInterval)duration
 {
-    NSInteger fps = _fps > 0 ? _fps : _range.preferred > 0 ? (NSInteger)_range.preferred : 60;
+    double fps = _fps > 0 ? _fps : _range.preferred > 0 ? _range.preferred : FerryGLRefreshRate();
     return 1.0 / fps;
 }
 - (CFTimeInterval)timestamp { return _timestamp; }

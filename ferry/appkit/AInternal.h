@@ -111,6 +111,13 @@ void AGlobalMonitorsDeliver(NSEvent *event);
 
 /* ---- windows and views --------------------------------------------------------------- */
 
+/* OpenGL contexts drawing into views (NSOpenGL.m, freemac 1.235): how many
+ * views have one; before a view's drawRect:, whether to skip it (the
+ * context's drawing alone changed); after it, the context's last frame
+ * drawn over it. */
+extern int AGLViewCount;
+BOOL AGLViewWillDraw(NSView *view);
+void AGLViewDidDraw(NSView *view, CGContextRef ctx);
 void AWindowsDisplayIfNeeded(void);
 void AWindowsNeedUpdate(void);
 void AWindowsUpdate(void);

@@ -96,13 +96,53 @@ fi
 
 # VLC itself. Libtool would take ld64.lld for GNU ld, and ld64.lld has no
 # -r, so libtool is told both. VLC won't start as root unless built to,
-# and Ferry's test setup runs as root.
+# and Ferry's test setup runs as root. Apple's linker finds CoreFoundation's
+# and Core Video's calls through the frameworks a module links (its sound
+# out names only Core Audio's, its interface QuartzCore for Core Video's
+# display link); ld64.lld looks only in the ones named, so every module
+# names both, and drops whichever it doesn't call.
 cd "$work/vlcbuild"
+# (a build configured by an earlier recipe, without Core Video, is redone)
+[ ! -f config.status ] || grep -q CoreVideo config.status || rm -f config.status
 if [ ! -f config.status ]; then
     "$top/src/vlc-$vlc_ver/configure" --host=x86_64-apple-darwin --prefix="$work/vlcprefix" \
         --disable-lua --disable-sparkle --disable-nls --disable-qt --disable-skins2 \
         --disable-macosx-avfoundation --disable-a52 --disable-libgcrypt --disable-update-check \
         --disable-dbus --disable-vcd --disable-screen --enable-run-as-root \
-        lt_cv_prog_gnu_ld=no lt_cv_apple_cc_single_mod=yes
+        lt_cv_prog_gnu_ld=no lt_cv_apple_cc_single_mod=yes LDFLAGS="-Wl,-framework,CoreFoundation -Wl,-framework,CoreVideo -Wl,-dead_strip_dylibs"
 fi
-make -j"$jobs" XIB=ibtool
+# A few modules still wait on parts of Ferry (docs/ferry-notes/vlc.md), so
+# the rest is built around them.
+make -j"$jobs" -k XIB=ibtool || echo "vlc.sh: some modules didn't build; see docs/ferry-notes/vlc.md" >&2
+
+# Staged to run in place: vlc-osx, libvlc and libvlccore beside it in lib/,
+# and every plugin that built in plugins/ (VLC_PLUGIN_PATH names it).
+stage="$work/stage"
+rm -rf "$stage"; mkdir -p "$stage/lib" "$stage/plugins"
+cp bin/.libs/vlc-osx "$stage/"
+cp -P lib/.libs/libvlc*.dylib src/.libs/libvlccore*.dylib "$stage/lib/"
+find modules -path '*/.libs/*_plugin.dylib' -exec cp {} "$stage/plugins/" \;
+echo "vlc.sh: staged in $stage ($(ls "$stage/plugins" | wc -l) plugins)"
+
+# VLC.app, laid out as VLC's own "make VLC.app" lays it out
+# (extras/package/macosx/package.mak), from the build tree rather than an
+# install: the Info.plist, the English strings with the nibs ferry-ibtool
+# compiled, every other resource side by side in Resources, and in MacOS
+# the program as VLC with libvlc and libvlccore in lib/ and the plugins in
+# plugins/, where its rpaths look. Run it with: ferry "$work/VLC.app" [file]
+src=$top/src/vlc-$vlc_ver
+app=$work/VLC.app
+if [ -f "$stage/plugins/libmacosx_plugin.dylib" ]; then
+    rm -rf "$app"
+    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+    cp share/macosx/Info.plist "$app/Contents/"
+    printf 'APPLVLC#' > "$app/Contents/PkgInfo"
+    cp -R "$src/modules/gui/macosx/Resources/"*.lproj "$app/Contents/Resources/"
+    cp -R modules/gui/macosx/UI/. "$app/Contents/Resources/English.lproj/"
+    find "$src/modules/gui/macosx/Resources/" -type f -not -path '*.lproj/*' -exec cp {} "$app/Contents/Resources/" \;
+    cp -R "$stage/lib" "$stage/plugins" "$app/Contents/MacOS/"
+    cp "$stage/vlc-osx" "$app/Contents/MacOS/VLC"
+    echo "vlc.sh: VLC.app in $app"
+else
+    echo "vlc.sh: VLC's Mac interface didn't build, so no VLC.app; see docs/ferry-notes/vlc.md" >&2
+fi

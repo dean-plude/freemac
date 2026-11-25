@@ -196,12 +196,19 @@ CFAbsoluteTime CFAbsoluteTimeGetCurrent(void) { return [NSDate timeIntervalSince
 
 CFRunLoopRef CFRunLoopGetCurrent(void) { return (CFRunLoopRef)[NSRunLoop currentRunLoop]; }
 CFRunLoopRef CFRunLoopGetMain(void) { return (CFRunLoopRef)[NSRunLoop mainRunLoop]; }
+/* On the main thread CFRunLoopRun runs until CFRunLoopStop even with
+ * nothing to do, since a Mac counts the main queue as one of its sources
+ * (NSRunLoop.m); CFRunLoopRunInMode still finishes then. */
+extern __thread BOOL _FerryRunLoopRunForever;
 void CFRunLoopRun(void)
 {
     SInt32 r;
+    BOOL was = _FerryRunLoopRunForever;
+    _FerryRunLoopRunForever = YES;
     do
         r = [[NSRunLoop currentRunLoop] runFor:1e10 returnAfterSource:NO];
     while (r == kCFRunLoopRunTimedOut);
+    _FerryRunLoopRunForever = was;
 }
 SInt32 CFRunLoopRunInMode(CFRunLoopMode mode, CFTimeInterval seconds, Boolean returnAfterSourceHandled)
 {

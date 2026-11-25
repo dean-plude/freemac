@@ -481,20 +481,56 @@ static NSLayoutPriority firmness(NSView *v, BOOL vertical)
     return NSLayoutPriorityRequired - 1;
 }
 
-/* A view's size as the stack sees it: a stack's fitting size; an intrinsic
- * size; for a view whose constraints set its length firmly, the length
- * they give; else its frame. */
-static NSSize size_of(NSView *v)
+/* The length a view's own width or height constraints leave it, from the
+ * length it would have: one held to a constant more firmly than its
+ * content holds that length (its hugging when it would grow, its
+ * compression resistance when it would shrink) wins, as on a Mac, where
+ * they are in the same solve (freemac 1.236: MacPass's welcome window,
+ * whose 128-point image view shows a bigger picture). */
+static CGFloat own_length(NSView *v, BOOL vertical, CGFloat length)
+{
+    NSLayoutAttribute attr = vertical ? NSLayoutAttributeHeight : NSLayoutAttributeWidth;
+    NSLayoutConstraintOrientation o = vertical ? NSLayoutConstraintOrientationVertical
+                                               : NSLayoutConstraintOrientationHorizontal;
+    for (NSLayoutConstraint *c in [v constraints]) {
+        if (![c isActive] || [c firstItem] != v || [c secondItem] || [c firstAttribute] != attr)
+            continue;
+        CGFloat k = [c constant];
+        NSLayoutRelation r = [c relation];
+        BOOL grows = k > length;
+        if ((r == NSLayoutRelationLessThanOrEqual && grows) || (r == NSLayoutRelationGreaterThanOrEqual && !grows))
+            continue;
+        NSLayoutPriority holds = grows ? [v contentHuggingPriorityForOrientation:o]
+                                       : [v contentCompressionResistancePriorityForOrientation:o];
+        if (length < 0 || [c priority] > holds)
+            length = k;
+    }
+    return length;
+}
+
+/* A view's size of its own as the stack sees it: a stack's fitting size;
+ * an intrinsic size, unless its own size constraints hold it more firmly;
+ * for a view whose constraints set its length firmly, the length they
+ * give; else no length (-1). */
+static NSSize natural_size(NSView *v)
 {
     if ([v isKindOfClass:[NSStackView class]])
         return [v fittingSize];
-    NSSize s = [v intrinsicContentSize], f = [v frame].size, fit;
+    NSSize s = [v intrinsicContentSize], fit;
+    s.width = own_length(v, NO, s.width);
+    s.height = own_length(v, YES, s.height);
     if ((s.width < 0 || s.height < 0) && AConstraintFittingSize(v, &fit)) {
         if (s.width < 0 && firmness(v, NO) >= NSLayoutPriorityWindowSizeStayPut)
             s.width = fit.width;
         if (s.height < 0 && firmness(v, YES) >= NSLayoutPriorityWindowSizeStayPut)
             s.height = fit.height;
     }
+    return s;
+}
+/* and as it places it: where it has no length of its own, its frame's */
+static NSSize size_of(NSView *v)
+{
+    NSSize s = natural_size(v), f = [v frame].size;
     return NSMakeSize(s.width >= 0 ? s.width : f.width, s.height >= 0 ? s.height : f.height);
 }
 
@@ -508,7 +544,18 @@ static NSSize size_of(NSView *v)
         return NSMakeSize(NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
     BOOL h = [self _horizontal];
     NSSize f = [self fittingSize];
-    return h ? NSMakeSize(f.width, NSViewNoIntrinsicMetric) : NSMakeSize(NSViewNoIntrinsicMetric, f.height);
+    /* across it, as wide as the widest view that has a width of its own
+     * (a Mac's stack keeps its views inside it), so a label longer in
+     * Ferry's font than on a Mac isn't cut off (freemac 1.236: MacPass's
+     * welcome); a view stretched across it adds nothing */
+    CGFloat cross = NSViewNoIntrinsicMetric;
+    for (NSView *v in [self _shown]) {
+        NSSize vs = natural_size(v);
+        cross = fmax(cross, h ? vs.height : vs.width);
+    }
+    if (cross >= 0)
+        cross = ceil(cross + (h ? _insets.top + _insets.bottom : _insets.left + _insets.right));
+    return h ? NSMakeSize(f.width, cross) : NSMakeSize(cross, f.height);
 }
 - (NSLayoutPriority)contentHuggingPriorityForOrientation:(NSLayoutConstraintOrientation)o
 {

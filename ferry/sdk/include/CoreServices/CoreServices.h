@@ -10,6 +10,16 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CFNetwork/CFNetwork.h>
 
+/* MacTypes.h makes nil a null pointer for C too, through CoreServices
+ * (VLC's audio output passes it for a char *), as objc.h does (freemac
+ * 1.NEXT, VLC). */
+#ifndef nil
+#ifdef __cplusplus
+#define nil __null
+#else
+#define nil ((void *)0)
+#endif
+#endif
 __FERRY_BEGIN
 typedef int16_t OSErr;
 typedef int32_t OSStatus;
@@ -22,7 +32,8 @@ enum {
 };
 enum { gestaltUndefSelectorErr = -5551 };
 /* The Carbon-era result codes Launch Services answers with (MacErrors.h). */
-enum { noErr = 0, fnfErr = -43, paramErr = -50, memFullErr = -108, userCanceledErr = -128 };
+/* noErr is MacTypes.h's, as on a Mac (freemac 1.234) */
+enum { fnfErr = -43, paramErr = -50, memFullErr = -108, userCanceledErr = -128 };
 /* freemac 1.226, Ferry 0.50.0: "not implemented", which Sequel Pro answers with */
 enum { unimpErr = -4 };
 /* Generic icons from IconsCore (freemac 1.226, Ferry 0.50.0): their type

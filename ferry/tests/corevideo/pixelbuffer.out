@@ -1,0 +1,44 @@
+a 640 by 480 420v buffer: yes
+its type: yes
+planar, two planes: yes
+Y plane 640 by 480, 640 bytes a row: yes
+CbCr plane 320 by 240, 640 bytes a row: yes
+no plane 2: yes
+bytes per row 0 for a planar buffer: yes
+Y after the plane table: yes
+CbCr after Y: yes
+plane table: Y's offset and row bytes, big-endian: yes
+plane table: CbCr's: yes
+data size covers both planes: yes
+one unlock too many fails: yes
+on an IOSurface: yes
+the surface's planes are the buffer's: yes
+the surface's format and size: yes
+found by its ID: yes
+a buffer made from the surface sees the same pixels: yes
+an attachment and its mode: yes
+the ones not passed on: yes
+propagated: only the propagating ones: yes
+removed: yes
+display size from the pixel aspect ratio: yes
+420f 641 by 481: CbCr 321 by 241, rows of 704 bytes: yes
+y420: three planes, 320, 160 and 160 wide: yes
+BGRA 100 wide: 448 bytes a row, not planar: yes
+BGRA's base address is the surface's: yes
+aligned to 16 when asked: 400 bytes a row: yes
+creation attributes: yes
+2vuy 99 wide: 200 bytes of pixels in a 256-byte row: yes
+an unknown format refused: yes
+no size refused: yes
+a buffer of the program's memory: yes
+its release callback called: yes
+a pool: yes
+two buffers from it, 1280 by 720, different: yes
+the one let go comes back, without its attachments: yes
+the allocation threshold: yes
+the pool's buffer attributes: yes
+420v's description: YCbCr, two planes, the second subsampled: yes
+BGRA's: 32 bits, alpha, OpenGL's BGRA: yes
+every format listed, 420v and y420 among them: yes
+host time runs at its frequency: yes
+exit=0

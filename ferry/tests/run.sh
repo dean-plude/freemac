@@ -150,6 +150,19 @@ run_one() {
             FERRY_JAVASCRIPTCORE="$build/none/libjavascriptcoregtk-4.1.so.0" \
                 timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         javascriptcore_*) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Core Audio (freemac 1.234, Ferry 0.58.0): the null device, with
+        # the samples it plays and records in files; as if libpulse weren't
+        # installed; and run.sh's own PulseAudio
+        coreaudio_missing)
+            env -u FERRY_AUDIO FERRY_PULSE_LIBRARY="$build/none/libpulse.so.0" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_auhal)
+            FERRY_AUDIO=null FERRY_AUDIO_OUTPUT_FILE="$build/$name.played" FERRY_AUDIO_INPUT_FILE="$build/$name.heard" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_pulse)
+            env -u FERRY_AUDIO PULSE_SERVER="unix:$pulse_dir/native" HOME="$pulse_dir/home" XDG_RUNTIME_DIR="$pulse_dir" \
+                FERRY_TEST_PACTL="$pulse_pactl" timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_*) FERRY_AUDIO=null timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         # WebKit (freemac 1.214, Ferry 0.40.0): two tests with no display
         # (one as if WebKitGTK weren't installed), and the others on the X
         # display of run.sh's own Xvfb; each in a home of its own
@@ -164,6 +177,13 @@ run_one() {
             env -u WAYLAND_DISPLAY DISPLAY="$webkit_display" GDK_BACKEND=x11 NO_AT_BRIDGE=1 HOME="$build/home_$name" \
                 TMPDIR="$build/home_$name" XDG_RUNTIME_DIR="$build/home_$name" XDG_CONFIG_HOME= XDG_CACHE_HOME= \
                 XDG_DATA_HOME= timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # OpenGL and Core Video (freemac 1.235, Ferry 0.59.0): no display,
+        # threads, so a hang is a failure; one as if OpenGL weren't installed
+        opengl_missing)
+            env -u WAYLAND_DISPLAY -u DISPLAY FERRY_EGL="$build/none/libEGL.so.1" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        opengl_*|corevideo_*)
+            env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -1604,12 +1624,107 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 # CoreMedia times, media keys and Now Playing, displays, slider cells, and
 # the empty capture devices, address book and I/O Kit registry.
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
-    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
+    -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices \
+    -framework QuartzCore
 # What Qt's Mac platform plugin calls besides, for OBS Studio: the Carbon
 # pasteboard with promises, Icon Services drawing, text input contexts,
 # screen depths and ICC profiles, key repeat, the window list, Handoff.
 run_one appkit_qt_calls "$here/appkit/qt_calls.m" "$here/appkit/qt_calls.out" -fblocks -framework Cocoa \
     -framework ApplicationServices
+# what VLC's core needs (freemac 1.235): condition waits as cancellation
+# points, and CFRunLoopRun on the main thread waiting until it is stopped
+run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
+# Cells of the app's own classes in a nib (freemac 1.NEXT): VLC's sliders,
+# steppers and segmented controls keep theirs through ferry-ibtool
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/VLCCells.nib" "$here/appkit/vlc_cells.xib" \
+        2> "$build/vlc_cells.log" && python3 -I - "$build/VLCCells.nib" >> "$build/vlc_cells.log" 2>&1 <<'PY'
+import plistlib, sys
+objects = plistlib.load(open(sys.argv[1], "rb"))["$objects"]
+classes = [objects[o["$class"].data]["$classes"] for o in objects if isinstance(o, dict) and "$class" in o]
+for name, base in (("TimeSliderCell", "NSSliderCell"), ("CountStepperCell", "NSStepperCell"),
+                   ("HUDSegmentedCell", "NSSegmentedCell")):
+    if not any(c[0] == name and base in c for c in classes):
+        sys.exit("%s isn't kept as a %s" % (name, base))
+PY
+then
+    echo "ok   ibtool_vlc_cells"; pass=$((pass + 1))
+else
+    echo "FAIL ibtool_vlc_cells"; sed 's/^/    /' "$build/vlc_cells.log"; fail=$((fail + 1))
+fi
+
+# Core Audio, Audio Units, Audio Queues and converters (freemac 1.234,
+# Ferry 0.58.0), on no sound hardware: the devices and their formats, set
+# and heard by listeners, an IO proc and PCM converters; the same with no
+# libpulse at all; a HALOutput and a DefaultOutput unit playing sines into
+# the null device's file, and a HALOutput unit recording one from it, as
+# VLC and OBS do; audio queues playing to and recording from the null
+# device's loopback; and, where PulseAudio is installed, a server of the
+# test's own with null sinks, played to and recorded from
+ca_frameworks="-framework AudioToolbox -framework AudioUnit -framework CoreAudio -framework CoreFoundation"
+run_one coreaudio_devices "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fblocks $ca_frameworks
+run_one coreaudio_missing "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fblocks $ca_frameworks
+run_one coreaudio_auhal "$here/coreaudio/auhal.c" "$here/coreaudio/auhal.out" -fblocks $ca_frameworks
+run_one coreaudio_queue "$here/coreaudio/queue.c" "$here/coreaudio/queue.out" -fblocks $ca_frameworks
+pulse_bin=${FERRY_TEST_PULSEAUDIO:-$(command -v pulseaudio || true)}
+pulse_pactl=${FERRY_TEST_PACTL:-$(command -v pactl || true)}
+if [ -n "$pulse_bin" ] && [ -n "$pulse_pactl" ]; then
+    pulse_dir="$build/pulse"
+    rm -rf "$pulse_dir"; mkdir -p "$pulse_dir/home"; chmod 700 "$pulse_dir"
+    HOME="$pulse_dir/home" XDG_RUNTIME_DIR="$pulse_dir" XDG_CONFIG_HOME= "$pulse_bin" -n --daemonize=no \
+        --exit-idle-time=-1 --use-pid-file=no --disable-shm=yes \
+        -L "module-native-protocol-unix socket=$pulse_dir/native auth-anonymous=1" \
+        -L "module-null-sink sink_name=ferry_test_sink" -L "module-null-sink sink_name=ferry_other_sink" \
+        > "$pulse_dir/log" 2>&1 &
+    pulse_pid=$!
+    pulse_up=
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        if PULSE_SERVER="unix:$pulse_dir/native" HOME="$pulse_dir/home" "$pulse_pactl" info > /dev/null 2>&1; then
+            pulse_up=1; break
+        fi
+        sleep 0.5
+    done
+    if [ -n "$pulse_up" ]; then
+        run_one coreaudio_pulse "$here/coreaudio/pulse.c" "$here/coreaudio/pulse.out" -fblocks $ca_frameworks
+    else
+        echo "skip coreaudio_pulse (PulseAudio didn't start; see $pulse_dir/log)"
+    fi
+    kill "$pulse_pid" 2> /dev/null; wait "$pulse_pid" 2> /dev/null
+else
+    echo "skip coreaudio_pulse (it needs PulseAudio's pulseaudio and pactl)"
+fi
+
+# OpenGL, Core Video and IOSurface (freemac 1.235, Ferry 0.59.0), as
+# VLC's and OBS's video output use them: pixel buffers and display links,
+# which need no OpenGL; then, where this system's OpenGL (EGL, Mesa's
+# llvmpipe will do) makes contexts, CGL's clear and read back, IOSurface
+# textures, an NSOpenGLView's triangle and a core context drawing from a
+# thread of its own, a CAOpenGLLayer; and OpenGL as if it weren't installed.
+# FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
+run_one corevideo_pixelbuffer "$here/corevideo/pixelbuffer.m" "$here/corevideo/pixelbuffer.out" \
+    -framework Foundation -framework CoreVideo -framework IOSurface
+run_one corevideo_displaylink "$here/corevideo/displaylink.m" "$here/corevideo/displaylink.out" -fblocks \
+    -framework Foundation -framework CoreVideo
+gl_found=
+if [ -f "$top/sdk/usr/include/GL/gl.h" ] &&
+        "$top/sdk/ferry-cc" -O1 -o "$build/opengl_probe" "$here/opengl/probe.c" -framework OpenGL \
+            2> "$build/opengl_probe.cc.log" &&
+        env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$build/opengl_probe" 2> "$build/opengl_probe.err"
+then
+    gl_found=1
+fi
+if [ -n "$gl_found" ]; then
+    run_one opengl_cgl "$here/opengl/cgl.m" "$here/opengl/cgl.out" -framework Foundation -framework OpenGL
+    run_one opengl_iosurface "$here/opengl/iosurface.m" "$here/opengl/iosurface.out" -framework Foundation \
+        -framework CoreVideo -framework IOSurface -framework OpenGL
+    run_one opengl_view "$here/opengl/view.m" "$here/opengl/view.out" -framework Cocoa -framework OpenGL
+    run_one opengl_layer "$here/opengl/layer.m" "$here/opengl/layer.out" -framework Cocoa -framework QuartzCore \
+        -framework OpenGL
+else
+    echo "skip opengl_cgl, opengl_iosurface, opengl_view, opengl_layer (need OpenGL through EGL, as Mesa's libEGL.so.1 and llvmpipe give, and its headers, from libgl-dev)"
+fi
+run_one opengl_missing "$here/opengl/missing.m" "$here/opengl/missing.out" -framework Cocoa -framework QuartzCore \
+    -framework CoreVideo -framework OpenGL
+webkit_message opengl_missing "^ferry: this program draws with OpenGL, and this system's OpenGL (libEGL.so.1, Mesa) isn't installed$"
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

@@ -24,3 +24,6 @@
 /media/build/
 /eventkit/build/
 /coreaudio/build/
+/iosurface/build/
+/opengl/build/
+/corevideo/build/

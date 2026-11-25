@@ -45,7 +45,7 @@ Test: `tests/libsystem_vlc.c`.
 With these, libvlccore, libvlc, the `vlc-osx` program and 249 of VLC's
 plugins build.
 
-## VLC's Mac interface (freemac 1.NEXT, Ferry 0.NEXT)
+## VLC's Mac interface (freemac 1.233, Ferry 0.57)
 
 What VLC's Cocoa interface (`modules/gui/macosx`) calls besides, written
 from Apple's public documentation:
@@ -78,11 +78,90 @@ from Apple's public documentation:
 
 Test: `tests/appkit/vlc.m`.
 
+## Playing a video without the window (freemac 1.235, Ferry 0.59)
+
+VLC's own `vlc-osx`, with its core, the mp4 demuxer and FFmpeg's H.264
+decoder, now plays a video to its end under Ferry and quits, with no window
+and no sound (`-I dummy --no-audio --vout vdummy`). The test was a 3-second
+320x240 H.264 and AAC file; VLC's scene filter saved its decoded frames as
+BMP, and they match what FFmpeg decodes from the same file. Two things in
+Ferry's core stood in the way:
+
+- `pthread_cancel` never woke a thread waiting on a condition, so VLC hung
+  stopping its decoder threads at the end of the file. Waiting on a
+  condition is now a cancellation point, as POSIX says: the thread ends there
+  with the mutex held again for its cleanup handlers (`src/pthread.c`).
+- `CFRunLoopRun` on the main thread returned at once when the run loop had
+  no sources. On a Mac the main queue counts as one, so it waits until
+  `CFRunLoopStop`, which is how VLC's `main` waits for the interface to quit
+  (`foundation/NSRunLoop.m`, `foundation/CoreFoundation.m`).
+  `CFRunLoopRunInMode` still finishes when there's nothing to do.
+
+`tests/vlc_threads.c` covers both. `apps/vlc.sh` now stages the build in
+`WORK/stage` with every plugin that built; before, a hand-made stage missed
+the file access plugin and VLC quit without a word. To try it (as a user
+other than root, unless VLC was configured with `--enable-run-as-root`):
+
+    cd WORK/stage
+    VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --no-audio \
+        --vout vdummy --play-and-exit video.mp4
+
+## Sound (freemac 1.NEXT, Ferry 0.NEXT)
+
+VLC's own sound out, its `auhal` module, plays through Ferry's Core Audio
+(freemac 1.234). With no sound server it plays into the null device, and
+with `FERRY_AUDIO=null FERRY_AUDIO_OUTPUT_FILE=out.raw` the test video's
+sound comes out as the same 440 Hz tone, at the same level, that FFmpeg
+decodes from the file. It needed two things:
+
+- `nil` from CoreServices in C (`auhal.c` sets a `char *` to it), as a Mac's
+  MacTypes.h gives it.
+- CoreFoundation named at link time. The module links Core Audio,
+  AudioUnit, AudioToolbox and CoreServices and calls CoreFoundation;
+  Apple's linker finds those calls through the frameworks named, ld64.lld
+  doesn't, so `apps/vlc.sh` adds `-framework CoreFoundation` to every
+  module's link.
+
+    cd WORK/stage
+    VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --aout auhal \
+        --vout vdummy --play-and-exit video.mp4
+
+## VLC's window, with the picture in it (freemac 1.NEXT, Ferry 0.NEXT)
+
+With Ferry's OpenGL, Core Video and CAOpenGLLayer (freemac 1.235), VLC's
+whole Mac interface builds, and `apps/vlc.sh` lays out
+`WORK/build/vlc/VLC.app` as VLC's own `make VLC.app` does. Run as itself,
+VLC opens its main window, with its own control bar, and plays a video in
+it: the picture through its `caopengllayer` video out, the sound through
+`auhal`, the time and the position slider moving, to the end. Its first-run
+question about album art shows as VLC's own dialog. It needed:
+
+- Core Video named at link time too (the interface's display link), and
+  `-dead_strip_dylibs`, so a module that doesn't call a framework named for
+  all of them doesn't load it.
+- `kCGDirectMainDisplay`, `-[NSWindow disableScreenUpdatesUntilFlush]` and
+  the `NSViewLayerContentScaleDelegate` protocol, which the video outs use.
+- ferry-ibtool keeping a slider's, a stepper's or a segmented control's
+  cell of the app's own class (`VLCSliderCell` and the HUD cells): before,
+  they came out as plain cells, and `VLCSlider` stopped on its assertion.
+- The decoding threads not hanging. A cancellable wait (above) waited in
+  slices and went back to waiting at the end of each; glibc may report a
+  wait it was also signalled in as timed out, and that wake was then lost,
+  so FFmpeg's frame threads could wait on each other for ever. The end of a
+  slice now returns as a spurious wakeup would, and the waiter looks at its
+  condition again.
+
+`tests/appkit/vlc.m`, `tests/vlc_threads.c` and the `ibtool_vlc_cells`
+check (`tests/appkit/vlc_cells.xib`) cover these. To try it, as a user
+other than root (see above):
+
+    ferry WORK/build/vlc/VLC.app video.mp4
+
 ## Still to do
 
-- VLC's interface still needs Core Audio (`NSSound+VLCAdditions.m`), Core
-  Video's display link (`VLCSliderCell.m`) and NSOpenGLView's `reshape`
-  (`Windows.m`), which are being built in Ferry's core for VLC and OBS
-  together. Nothing else in it is missing.
-- Video out and sound out need the same OpenGL, Core Video and Core Audio.
-- The C++ plugins need libc++ linked.
+- Menus, the playlist and the other windows are still to be tried.
+- The C++ plugins (adaptive streaming among them) need libc++ linked.
+- VideoToolbox decoding, the keychain, speech, the CD module and
+  SecureTransport don't build yet.
+- The download doesn't include Ferry's VLC build yet; this is Ferry's test
+  setup only.

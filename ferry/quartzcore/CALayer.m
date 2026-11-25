@@ -872,6 +872,9 @@ static CGAffineTransform to_root(CALayer *l)
 
 - (void)setNeedsDisplayInRect:(CGRect)r { [self setNeedsDisplay]; }
 
+/* for a layer kind whose display draws without CALayer's (CAOpenGLLayer, 1.235) */
+- (void)_ferryClearNeedsDisplay { _needsDisplay = NO; }
+
 - (void)displayIfNeeded
 {
     if (_needsDisplay)

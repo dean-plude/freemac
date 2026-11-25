@@ -14,6 +14,16 @@
 #import <IOKit/storage/IOMedia.h>
 #import <CoreServices/CoreServices.h>
 
+/* VLC's video layer asks to keep its own contents scale */
+@interface ScaleKeeper : NSObject <NSViewLayerContentScaleDelegate>
+@end
+@implementation ScaleKeeper
+- (BOOL)layer:(CALayer *)layer shouldInheritContentsScale:(CGFloat)newScale fromWindow:(NSWindow *)window
+{
+    return NO;
+}
+@end
+
 @interface Player : NSObject
 @property NSInteger plays;
 @end
@@ -90,6 +100,15 @@ int main(void)
                [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo] ? "some" : "none");
         printf("address book people: %lu\n", (unsigned long)[[[ABAddressBook sharedAddressBook] people] count]);
         printf("removable media listed: %d\n", [[NSWorkspace sharedWorkspace] mountedRemovableMedia] != nil);
+        printf("main display by its older name: %d\n", kCGDirectMainDisplay == CGMainDisplayID());
+        NSWindow *video = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 320, 240)
+                                                      styleMask:NSWindowStyleMaskTitled
+                                                        backing:NSBackingStoreBuffered
+                                                          defer:YES];
+        [video disableScreenUpdatesUntilFlush];
+        ScaleKeeper *keeper = [ScaleKeeper new];
+        printf("screen updates held until flush, scale delegate keeps its own: %d\n",
+               ![keeper layer:[CALayer layer] shouldInheritContentsScale:2 fromWindow:video]);
     }
     return 0;
 }

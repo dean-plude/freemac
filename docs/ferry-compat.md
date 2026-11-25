@@ -1939,7 +1939,7 @@ were looked at as later candidates.
 | Itsycal | It wouldn't link: no EventKit, and newer AppKit, Foundation and Core Animation names missing | Ferry had no EventKit, and the app is written for recent macOS | It links and runs, and its status item shows its window |
 | Itsycal | The window was 16 to 78 points wide, its month cut off | The month title hugs its text at priority 1; the solver held its width at zero while any weaker wish broke, and the window took the width | The window is the width of its month, at the top right of the screen under the menu bar |
 | Itsycal | Clicking the status item raised an exception | It reads an event's `participationStatus` by key, which Ferry's EventKit didn't answer | The status is the user's own among the event's attendees |
-| Itsycal | The agenda never showed | `preferredContentSize` changed nothing, and `viewDidLayout`, where the agenda asks for its height, was never sent | The agenda shows under the month, with each day's events and reminders. It appears a few seconds after the click: the window's constraints, with the agenda's rows in them, take over a second to solve, two or three times |
+| Itsycal | The agenda never showed | `preferredContentSize` changed nothing, and `viewDidLayout`, where the agenda asks for its height, was never sent | The agenda shows under the month, with each day's events and reminders. It appears a few seconds after the click: the window's constraints, with the agenda's rows in them, are solved 22 times, 3.9 seconds in all (see "The apps rebuilt by recipes") |
 | Gas Mask | It doesn't compile | Its Growl framework, built from source, uses `CFPropertyListFormat`, `kCFAllocatorMalloc` and `AliasHandle`, which Ferry's headers lack, and declares a type its own way that the SDK declares another | Not done |
 
 What was added:
@@ -1953,10 +1953,49 @@ What was added:
 | Core Audio's default devices, their names, volume and mute, through AudioToolbox's header | the surveyed apps | done, through pactl or wpctl |
 | safe areas, display links, window occlusion, symbol configurations, menu section headers, system fill colours, scroll phases, `refusesFirstResponder`, the application's will-become and will-resign notifications, older cell and field calls, a layer's corner curve, `NSDateIntervalFormatter`, `localizedStandardCompare:`, the tags key, reachability flags | Itsycal, Gas Mask | done |
 
-The seven earlier apps weren't rebuilt or run again this round: the
-build scripts and builds they were run from were lost with the round's
-scratch space. The layout pass and the solver changes reach them too, so
-they should be run again in the next round.
+### The apps rebuilt by recipes (freemac 1.236, Ferry 0.60.0)
+
+Each app that has run under Ferry is built by a script in `ferry/apps/`,
+which fetches it and what it uses at pinned commits and builds them with
+Ferry's SDK (see `ferry/apps/README.md`). The Objective-C apps are built
+from their Xcode projects by `ferry/apps/xcode.py`, Ferry's own reader of
+the project file. Each app was built that way and run under X with no
+window manager on a 1280 by 800 screen, with freemac's Topline as the menu
+bar, given input with XTest.
+
+| App | Built from | What it shows | Changed this round |
+| --- | --- | --- | --- |
+| Flycut | its source, with MJCloudKitUserDefaultsSync | the accessibility alert; its status menu (Search, Clear All, Merge All, Preferences, About, Quit); its preferences with their toolbar | nothing |
+| Spectacle | its source, with Sparkle 1.22.0 | with the accessibility grant, its status menu of moves; its preferences with the shortcut recorders | nothing |
+| ShiftIt | its "ShiftIt NoX11" target, Sparkle 1.22.0 and the ShortcutRecorder its repository carries | "Start ShiftIt automatically?", then its status menu of positions | nothing |
+| KeyCastr | its source, with ShortcutRecorder, Sparkle 2 (its submodules) and its three visualizer plug-ins | Sparkle's "Check for updates automatically?" at 437 by 171, and its status item. Its key display, a clear window, is a light bar across the foot of the screen: with no compositor, X can't show it through | nothing |
+| MacPass | its source, with KeePassKit, KissXML, TransformerKit, HNHUi, DDHotKey and Sparkle 2.6.4 | its plug-in update question; its welcome window with the icon, "Welcome to MacPass", Open Database and Create Database, and its recent documents; Create Database opens the document window with its groups, entries and inspector | the welcome window had only its icon, too big: a stack view sized the 128-point image view to its picture, and its title, cut off, was wider in Ferry's font than the stack. Now as on a Mac |
+| MacDown | its source, with hoedown, LibYAML, handlebars-objc (its parser made with bison and flex), MASPreferences, PAPreferences, JJPluralForm, M13OrderedDictionary, Prism and Sparkle 1.22.0 | its contributing guide, highlighted in the editor and rendered in the preview, with its toolbar | nothing |
+| Itsycal | its 0.29.0 source, with MASShortcut 2.4.0 and Sparkle 1.27.1 | the month with today ringed and the agenda of the coming days | the video-call button showed on every agenda row: Itsycal hides it in a grid view's cell, and the grid view unhid every view of a row it showed. It shows now only for an event with a meeting link |
+| TomatoBar | its source and its three Swift packages | its popover with Start, the intervals and the menu | nothing |
+| Sequel Pro | no recipe yet | not run | |
+
+Sequel Pro's recipe needs MariaDB Connector/C built for Ferry, with its
+hashes over CommonCrypto, and its preference defaults written again with
+Ferry's archiver, as freemac 1.226's build did; that build's scripts were
+lost with its scratch space.
+
+Itsycal's window still appears seconds after the click. Opening it solves
+the window's constraints 22 times, 3.9 seconds in all. The large solves
+are of 1064 rows over 450 variables, and each takes 80 rounds that hold
+one broken inequality at a time, then a pass that tries letting go of
+each: about 160 eliminations of some 2 milliseconds, 300 to 420
+milliseconds a solve. Starting from the inequalities held in the window's
+last solve, or holding all the broken ones of a priority at once, would
+cut the rounds; solving the window fewer times as the agenda's rows come
+in would cut the rest.
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| a stack view's views held to their own width and height constraints; its width across from the widest view with a width of its own | MacPass | done |
+| a grid view hiding and showing only the views of the rows and columns it hides | Itsycal | done |
 
 ### FFmpeg's libraries and tools (freemac 1.233, Ferry 0.57.0)
 
@@ -1990,6 +2029,68 @@ changes from run to run). Ctrl-C ends a recording cleanly, as on Linux.
 | `getrusage`, with `ru_maxrss` in bytes as on a Mac | FFmpeg's `-benchmark` | done |
 | `struct rusage` in the SDK's `sys/resource.h` | FFmpeg | done |
 | loading plugins: `dlopen` by path from several threads, `@rpath` and `@loader_path` in plugins, `-undefined dynamic_lookup` bundles, weak imports, `dladdr`, a plugin whose library is gone | VLC, OBS | done, with no change to Ferry's loader; libraries are never unloaded |
+
+### Sound: Core Audio and Audio Toolbox (freemac 1.234, Ferry 0.58.0)
+
+Ferry's Core Audio plays and records through this system's sound server,
+PulseAudio or PipeWire's PulseAudio server, which it reaches through
+libpulse when a program first asks for a device. VLC's sound out (its
+`auhal` module) and OBS's audio capture and monitoring were read for
+the calls and properties they use, from their source; neither app was
+run. AudioToolbox and AudioUnit are served by the Core Audio library.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| the HAL's objects and properties: the system object, its devices and their streams, with names, UIDs, formats, rates, buffer sizes, latency, channel layouts, data sources, hog mode, volume and mute; listeners as procs and blocks | VLC, OBS | done; a device's rate and buffer size are what the program asks for, and the server converts to its own |
+| devices from the server: sinks as outputs, sources as inputs, monitors as inputs that are never the default; devices that come and go, and default devices set and followed | VLC, OBS | done |
+| a null device when there is no server, which plays into a file or to its own loopback in real time | tests | done |
+| IO procs, host time | VLC (pass-through) | done for linear PCM; no compressed formats reach a device |
+| HALOutput and DefaultOutput units with render callbacks, HALOutput recording with `AudioUnitRender`, channel maps, the volume parameter | VLC, OBS | done |
+| audio queues for output and input | OBS (monitoring) | done for linear PCM, interleaved |
+| audio converters | OBS | done for linear PCM to linear PCM; AAC and other compressed formats answer `kAudioConverterErr_FormatNotSupported` |
+| Audio Format Services' channel layouts | VLC | done |
+| the default devices' volume and mute, from 1.232 | Itsycal | done, through libpulse in place of pactl and wpctl; the null device has no volume |
+
+### OpenGL, Core Video and IOSurface (freemac 1.235, Ferry 0.59.0)
+
+VLC's video output (`modules/video_output/caopengllayer.m` and
+`macosx.m`) and OBS's (`libobs-opengl/gl-cocoa.m`) draw with OpenGL into
+views and layers, and move frames in Core Video pixel buffers on
+IOSurfaces. Ferry now has all of that, drawn with this system's OpenGL.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| CGL: pixel formats (legacy, 3.2 core, 4.1 core), contexts and sharing, current context per thread, locks, parameters (swap interval, backing size), `CGLFlushDrawable`, `CGLTexImageIOSurface2D`; every `gl` call of `<OpenGL/gl.h>`, `<OpenGL/gl3.h>` and their extensions passed to this system's libOpenGL or libGL | VLC, OBS | done, on EGL; the libraries are opened when a program first asks for a pixel format, so programs that don't draw don't need them |
+| `NSOpenGLPixelFormat`, `NSOpenGLContext` (`setView:` from any thread, `update`, `flushBuffer`, `makeCurrentContext`, `CGLContextObj`), `NSOpenGLView` (`prepareOpenGL`, `reshape`, `update`, `drawRect:` with its context current), `wantsBestResolutionOpenGLSurface` | OBS, VLC | done |
+| `CAOpenGLLayer`: `canDrawInCGLContext:`, `drawInCGLContext:` with the viewport set, `copyCGLPixelFormatForDisplayMask:`, `copyCGLContextForPixelFormat:`, `display` from any thread, `asynchronous`; `visibleRect`, `scrollPoint:` | VLC | done |
+| `CVDisplayLink`: create for displays or a display, output callback or handler, start, stop (also from its callback), running, current display, nominal and actual period, time stamps | OBS, VLC | done, at the display's rate (60 Hz, or `FERRY_REFRESH_RATE`), shared with `CADisplayLink` |
+| `CVPixelBuffer` and its pool: create (also with bytes, planar bytes or an IOSurface), lock, base address and planes, extended pixels, IOSurface, attachments, the creation keys, pixel format descriptions; BGRA, ARGB, RGBA, 2vuy, yuvs, 420v, 420f, y420, f420, 2101010, half-float RGBA and more | OBS, VLC | done |
+| `CVOpenGLTextureCache` and `CVOpenGLTexture` (rectangle textures of a buffer, flipped, clean coordinates); `CVImageBuffer` sizes, clean rect and colour space | VLC | done; planar buffers are refused, as on a Mac, so VLC's OpenGL converter uploads planes itself |
+| IOSurface: create, lookup by ID, lock, base address and planes, bytes per row, element sizes, use count, values | OBS | done, in the program's memory: surfaces aren't shared with other processes |
+| `CGDisplay*` calls for display IDs and modes | OBS | being written for OBS in `appkit/CGDirectDisplay.m` |
+
+How it draws: each context renders into an offscreen EGL buffer. A flush
+reads it back with `glReadPixels` (BGRA) and a view or layer paints the
+frame through Core Graphics, so OpenGL's drawing shows in any window,
+under X, Wayland or none. That costs CPU on every frame. On a
+4-core machine with Mesa's llvmpipe, a 1920 by 1080 frame takes about
+3.5 ms to flush (2.4 ms of it the read back) and about 2 ms to paint;
+uploading a 1080p BGRA IOSurface to a texture takes 0.8 ms. So 1080p at
+60 frames a second uses about a third of one core for the copies alone,
+on top of the rendering; 720p uses less than half that. A GPU driver
+makes the rendering quicker but not the copies. `CGLTexImageIOSurface2D`
+copies the surface when it's called, so later writes to the surface need
+another call. Each context's swap interval paces its flushes to the
+display's rate. Without OpenGL (no libEGL.so.1, or no display it can
+use), Ferry says so once on stderr, `CGLChoosePixelFormat` returns
+`kCGLBadDisplay`, the AppKit and Core Animation classes give nil or draw
+nothing, and pixel buffers and display links still work.
+
+Tests: `corevideo_pixelbuffer`, `corevideo_displaylink`, `opengl_cgl`,
+`opengl_iosurface`, `opengl_view`, `opengl_layer` and `opengl_missing`.
+The OpenGL ones run when OpenGL makes contexts here and are skipped
+otherwise. With `FERRY_TEST_SHOTS` set to a folder, `opengl_view` and
+`opengl_layer` save pictures of their windows there.
 
 ## What the apps need most
 

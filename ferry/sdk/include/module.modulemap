@@ -16,6 +16,7 @@ module AppKit [system] {
     header "AppKit/AppKitMore.h"
     header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"
+    header "AppKit/AppKitQt.h"
     header "AppKit/AppKitVLC.h"
     header "AppKit/NSAccessibility.h"
     module NSAccessibilityElement {
@@ -58,6 +59,8 @@ module AppKit [system] {
         header "AppKit/NSMenu.h"
         export *
     }
+    header "AppKit/NSOpenGL.h"
+    header "AppKit/NSOpenGLView.h"
     module NSPanel {
         header "AppKit/NSPanel.h"
         export *
@@ -94,6 +97,27 @@ module ApplicationServices [system] {
 
 module AudioToolbox [system] {
     header "AudioToolbox/AudioToolbox.h"
+    header "AudioToolbox/AUComponent.h"
+    header "AudioToolbox/AudioComponent.h"
+    header "AudioToolbox/AudioConverter.h"
+    header "AudioToolbox/AudioFormat.h"
+    header "AudioToolbox/AudioOutputUnit.h"
+    header "AudioToolbox/AudioQueue.h"
+    header "AudioToolbox/AudioServices.h"
+    header "AudioToolbox/AudioUnit.h"
+    header "AudioToolbox/AudioUnitParameters.h"
+    header "AudioToolbox/AudioUnitProperties.h"
+    export *
+    link framework "CoreAudio"
+}
+
+module AudioUnit [system] {
+    header "AudioUnit/AudioUnit.h"
+    header "AudioUnit/AUComponent.h"
+    header "AudioUnit/AudioComponent.h"
+    header "AudioUnit/AudioOutputUnit.h"
+    header "AudioUnit/AudioUnitParameters.h"
+    header "AudioUnit/AudioUnitProperties.h"
     export *
     link framework "CoreAudio"
 }
@@ -146,6 +170,16 @@ module CommonCrypto [system] {
 
 module CoreAudio [system] {
     header "CoreAudio/CoreAudio.h"
+    header "CoreAudio/AudioHardware.h"
+    header "CoreAudio/AudioHardwareBase.h"
+    header "CoreAudio/CoreAudioTypes.h"
+    header "CoreAudio/HostTime.h"
+    export *
+    link framework "CoreAudio"
+}
+
+module CoreAudioTypes [system] {
+    header "CoreAudioTypes/CoreAudioTypes.h"
     export *
     link framework "CoreAudio"
 }
@@ -316,6 +350,7 @@ module Foundation [system] {
     header "Foundation/NSURLResponse.h"
     header "Foundation/NSURLSession.h"
     header "Foundation/NSUUID.h"
+    header "Foundation/NSUserActivity.h"
     header "Foundation/NSUserDefaults.h"
     header "Foundation/NSUserNotification.h"
     header "Foundation/NSValue.h"
@@ -334,6 +369,8 @@ module Foundation [system] {
 
 module HIServices [system] {
     header "HIServices/Accessibility.h"
+    header "HIServices/Icons.h"
+    header "HIServices/Pasteboard.h"
     header "HIServices/Processes.h"
     export *
     link framework "ApplicationServices"
@@ -357,8 +394,10 @@ module IOKit [system] {
 module IOSurface [system] {
     header "IOSurface/IOSurface.h"
     header "IOSurface/IOSurfaceAPI.h"
+    header "IOSurface/IOSurfaceBase.h"
     header "IOSurface/IOSurfaceObjC.h"
     header "IOSurface/IOSurfaceRef.h"
+    header "IOSurface/IOSurfaceTypes.h"
     export *
     link framework "IOSurface"
 }
@@ -417,6 +456,7 @@ module QuartzCore [system] {
     header "QuartzCore/CAMediaTiming.h"
     header "QuartzCore/CAMediaTimingFunction.h"
     header "QuartzCore/CAMetalLayer.h"
+    header "QuartzCore/CAOpenGLLayer.h"
     header "QuartzCore/CAShapeLayer.h"
     header "QuartzCore/CATextLayer.h"
     header "QuartzCore/CATransaction.h"

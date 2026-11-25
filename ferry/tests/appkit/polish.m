@@ -3,7 +3,9 @@
  * small program of Ferry's own, with no display: a window that grows or
  * shrinks to its content's required constraints keeping its top left
  * corner, a stack view's size along its axis from its views' fitting
- * sizes and a field stretched across it, a split view's panes kept where
+ * sizes and across it from the widest, a field stretched across it, an
+ * image view in one held to its own size constraints (MacPass's welcome,
+ * freemac 1.236), a split view's panes kept where
  * the split view put them whatever their own constraints say, a split view
  * controller's split view pinned to its view and a pane kept to its minimum
  * thickness, the buttons a Mac draws its own way (a source list's badge, a
@@ -125,6 +127,37 @@ static void stacks(void)
     [column layoutSubtreeIfNeeded];
     show("  a field across a 300-wide stack", field.frame);
     show("  a view that hugs its width", fixed.frame);
+
+    /* MacPass's welcome: an image view held at 128 by 128 by its own
+     * constraints shows a 512-point picture; above a title wider than the
+     * stack was made, which the stack grows to hold */
+    Sized *icon = [[Sized alloc] initWithFrame:NSZeroRect];
+    icon.natural = NSMakeSize(512, 512);
+    icon.translatesAutoresizingMaskIntoConstraints = NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [icon.widthAnchor constraintEqualToConstant:128], [icon.heightAnchor constraintEqualToConstant:128],
+    ]];
+    Sized *title = [[Sized alloc] initWithFrame:NSZeroRect];
+    title.natural = NSMakeSize(240, 29);
+    NSStackView *welcome = [NSStackView stackViewWithViews:@[ icon, title ]];
+    welcome.orientation = NSUserInterfaceLayoutOrientationVertical;
+    welcome.spacing = 8;
+    show("a stack holding a held image view, natural size", (NSRect){NSZeroPoint, welcome.intrinsicContentSize});
+    NSWindow *w = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 400, 300) styleMask:NSWindowStyleMaskTitled
+                                                backing:NSBackingStoreBuffered defer:NO];
+    w.releasedWhenClosed = NO;
+    [welcome setFrame:NSMakeRect(90, 40, 222, 222)];
+    welcome.translatesAutoresizingMaskIntoConstraints = NO;
+    [w.contentView addSubview:welcome];
+    [NSLayoutConstraint activateConstraints:@[
+        [welcome.centerXAnchor constraintEqualToAnchor:[w.contentView centerXAnchor]],
+        [welcome.centerYAnchor constraintEqualToAnchor:[w.contentView centerYAnchor]],
+    ]];
+    [w layoutIfNeeded];
+    show("  in a window, the stack", welcome.frame);
+    show("  the image view", icon.frame);
+    show("  the title", title.frame);
+    [w close];
 }
 
 /* MacPass's document window: a split view's panes keep the frames the

@@ -1,0 +1,44 @@
+devices: 1
+default output is the listed device: 1, input too: 1, system output too: 1
+system class: system
+name: Null Audio Device
+uid: FerryNullAudioDevice
+manufacturer: Ferry
+old name: Null Audio Device (18 bytes)
+class: device
+alive: 1, running: 0
+transport: virtual
+stream bytes: output 4, input 4, global 8
+latency: 0, safety offset: 0
+data source: 'ispk'
+hog mode: -1
+supports mixing: 1
+buffer frames: 512
+has hog mode: 1, has 'zzzz': 0
+input configuration: 1 buffer(s), 2 channels
+preferred layout: tag 0, 2 descriptions: 1 2
+input channel 2: Right
+stream format: 48000 Hz, 2 channels, 32 bits, float 1, interleaved 1
+stream direction: 0, terminal speaker: 1, owner is the device: 1
+available physical formats: 11
+available rates: 11
+device for UID: 0 1
+translate UID: 0 1
+rate settable 1, set 0, now 44100, listener heard 1 (in time)
+unsupported rate: 1
+buffer frames set 0, now 256
+uid settable: 0
+listener block heard 1 (in time), removed: 0
+io proc: 0
+running while started: 1
+cycles in 250 ms of 512 frames at 48 kHz: about 23, sample time grew: 1
+still after stop: 1, running: 0
+destroy: 0
+older calls: 1, rate 8 bytes, writable 1
+5.1 (A): tag 0, 6 descriptions: 1 2 3 4 5 6
+bitmap L R LFE: tag 0, 3 descriptions: 1 2 4
+channels in stereo: 2
+convert: 0 0, 16 bytes: 0.250 -1.000 0.500 0.250
+resample: 0 0, 4800 frames (about 4800), 88 zero crossings (about 88)
+to AAC: 1
+exit=0

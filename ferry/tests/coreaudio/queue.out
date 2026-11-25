@@ -1,0 +1,17 @@
+new input: 0
+input format: 48000 Hz, 2 channels, 16 bits
+input device: the default
+device rate: 48000
+new output: 0
+buffer: 9600 bytes of room, 0 used
+start input: 0
+recording: yes
+start output: 0
+output: about 8 callbacks on the run loop, none elsewhere: 1, all played: 1
+running heard: started, then stopped
+input: 20 callbacks off the main thread: 1, times rising: 1
+heard: half a second of sound, about 600 Hz, peak 12000, right the left negated: 1
+new output on a dispatch queue: 0
+both played: yes, current time 0 at two buffers or more
+AAC: unsupported
+exit=0

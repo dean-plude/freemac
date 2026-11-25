@@ -17,7 +17,6 @@ int main(void)
         NSDictionary *props = @{
             (__bridge NSString *)kIOSurfaceWidth : @641, (__bridge NSString *)kIOSurfaceHeight : @480,
             (__bridge NSString *)kIOSurfaceBytesPerElement : @4, (__bridge NSString *)kIOSurfacePixelFormat : @(0x42475241),
-            @"FerryNote" : @"hello",
         };
         IOSurfaceRef s = IOSurfaceCreate((__bridge CFDictionaryRef)props);
         printf("surface %zux%zu bpe %zu row %zu aligned %d format %08x\n", IOSurfaceGetWidth(s), IOSurfaceGetHeight(s),
@@ -36,6 +35,7 @@ int main(void)
         IOSurfaceRef found = IOSurfaceLookup(IOSurfaceGetID(s));
         printf("lookup finds it %d byte %02x\n", (int)(found == s), ((unsigned char *)IOSurfaceGetBaseAddress(found))[3]);
         CFRelease(found);
+        IOSurfaceSetValue(s, CFSTR("FerryNote"), CFSTR("hello"));
         CFTypeRef note = IOSurfaceCopyValue(s, CFSTR("FerryNote"));
         printf("value %s\n", [(__bridge NSString *)note UTF8String]);
         CFRelease(note);

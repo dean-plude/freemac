@@ -47,6 +47,8 @@ typedef void (*CGDisplayReconfigurationCallBack)(CGDirectDisplayID display, CGDi
 extern const CFStringRef kCGDisplayShowDuplicateLowResolutionModes;
 
 CGDirectDisplayID CGMainDisplayID(void);
+/* the main display, as older code names it (freemac 1.NEXT, VLC) */
+#define kCGDirectMainDisplay CGMainDisplayID()
 CGError CGGetOnlineDisplayList(uint32_t maxDisplays, CGDirectDisplayID *onlineDisplays, uint32_t *displayCount);
 CGError CGGetActiveDisplayList(uint32_t maxDisplays, CGDirectDisplayID *activeDisplays, uint32_t *displayCount);
 CGError CGGetDisplaysWithRect(CGRect rect, uint32_t maxDisplays, CGDirectDisplayID *displays, uint32_t *matchingDisplayCount);

@@ -6,7 +6,9 @@
  * rows, built in code and from a nib ferry-ibtool compiled
  * (predicate_editor.xib), a few older cell and field calls, the application's will-become and
  * will-resign notifications, Core Audio's objects through AudioToolbox with
- * no sound server, and a few newer Foundation names. */
+ * no sound server, and a few newer Foundation names; and (freemac 1.236)
+ * a grid view leaving hidden a view the app hid, as Itsycal's agenda hides
+ * its video button, while hiding and showing the views of a row it hides. */
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 #import <AudioToolbox/AudioToolbox.h>
@@ -193,20 +195,23 @@ static void older_calls(void)
 
 static void core_audio(void)
 {
-    /* no pactl or wpctl to find: the devices are there, not running */
-    setenv("PATH", "/nonexistent", 1);
+    /* no sound server, whatever this system has (freemac 1.234): the
+     * default devices are Ferry's null device, which has no volume */
+    setenv("FERRY_AUDIO", "null", 1);
     AudioObjectPropertyAddress a = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
                                     kAudioObjectPropertyElementMain};
     AudioDeviceID dev = 0;
     UInt32 size = sizeof dev;
     OSStatus s = AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &size, &dev);
-    printf("default output: status %d, device %u\n", (int)s, (unsigned)dev);
+    printf("default output: status %d, device %s\n", (int)s, dev != kAudioObjectUnknown ? "found" : "none");
     a.mSelector = kAudioDevicePropertyVolumeScalar;
     a.mScope = kAudioObjectPropertyScopeOutput;
     Float32 volume = -1;
     size = sizeof volume;
     s = AudioObjectGetPropertyData(dev, &a, 0, NULL, &size, &volume);
-    printf("volume with no sound server: %s\n", s == kAudioHardwareNotRunningError ? "not running" : "answered");
+    printf("volume with no sound server: %s\n", s == kAudioHardwareUnknownPropertyError && !AudioObjectHasProperty(dev, &a)
+                                                     ? "no volume control"
+                                                     : "answered");
     printf("an unknown object: %s\n", AudioObjectHasProperty(99, &a) ? "has it" : "hasn't");
 }
 
@@ -223,6 +228,28 @@ static void foundation(void)
     printf("cornerCurve: %s\n", l.cornerCurve.UTF8String);
 }
 
+/* Itsycal's agenda cell: a grid of a label and a button the app hides
+ * when the event has no meeting link */
+static void grid_hidden(void)
+{
+    NSTextField *label = [NSTextField labelWithString:@"9:30 AM - 10 AM"];
+    NSButton *video = [NSButton buttonWithTitle:@"V" target:nil action:NULL];
+    NSGridView *grid = [NSGridView gridViewWithViews:@[ @[ label, video ] ]];
+    video.hidden = YES;
+    [grid setFrame:NSMakeRect(0, 0, 200, 30)];
+    [grid layoutSubtreeIfNeeded];
+    printf("a grid's button the app hid: hidden %d\n", video.hidden);
+    [grid rowAtIndex:0].hidden = YES;
+    [grid layoutSubtreeIfNeeded];
+    printf("  its row hidden: label hidden %d, button hidden %d\n", label.hidden, video.hidden);
+    [grid rowAtIndex:0].hidden = NO;
+    [grid layoutSubtreeIfNeeded];
+    printf("  its row shown again: label hidden %d, button hidden %d\n", label.hidden, video.hidden);
+    video.hidden = NO;
+    [grid layoutSubtreeIfNeeded];
+    printf("  shown by the app: button hidden %d\n", video.hidden);
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -233,6 +260,7 @@ int main(void)
         older_calls();
         core_audio();
         foundation();
+        grid_hidden();
     }
     return 0;
 }

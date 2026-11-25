@@ -501,4 +501,7 @@ CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float prefer
 @property CAFrameRateRange preferredFrameRateRange;
 @end
 
+/* OpenGL layers (freemac 1.235) */
+#import <QuartzCore/CAOpenGLLayer.h>
+
 #endif

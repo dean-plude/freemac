@@ -447,6 +447,8 @@ Ferry 0.54.0 (freemac 1.230) runs TomatoBar, an open-source SwiftUI menu bar tim
 
 From Ferry 0.55.0 (freemac 1.231), `apps/` holds recipes that build an app from its public source: `apps/tomatobar.sh [WORK]` fetches TomatoBar and its three Swift packages at pinned commits into `WORK/src` (by default `apps/work`, which git ignores), builds them with `sdk/ferry-swiftc` and lays out `WORK/build/TomatoBar/TomatoBar.app`, which runs with `./ferry`. It needs the same Swift toolchain and runtime as the Swift tests. `apps/recipe.sh` has the helpers a recipe uses: `fetch` (a repository at a commit), `need_swift` (Ferry's Swift modules brought up to date), `swift_lib` (a package built as a library and module) and `resource_bundle` (a SwiftPM `Bundle.module` accessor). The SwiftUI test driver also presses switches by their label, steps the Nth stepper with `up:N` and `down:N`, and picks a segment with `segment:T`.
 
+From Ferry 0.60.0 (freemac 1.236), every Mac app that has run under Ferry has a recipe, listed in `apps/README.md`: `flycut.sh`, `spectacle.sh`, `shiftit.sh`, `keycastr.sh`, `macpass.sh`, `macdown.sh`, `itsycal.sh` and `tomatobar.sh` (Sequel Pro's is still to come). The Objective-C apps are built from their Xcode projects by `apps/xcode.py`, Ferry's own reader of the project file: `xcode.py build PROJECT.xcodeproj TARGET OUT` builds one target for its Release configuration, with its .xcconfig files, prefix header, definitions, search paths, ARC setting and each file's own flags, compiling its sources with `sdk/ferry-cc`, its xibs with `sdk/ferry-ibtool` and its asset catalogues with `sdk/ferry-actool`, and lays out an app, a framework with its headers, a plug-in bundle or a library; `xcode.py list PROJECT` lists the targets. `apps/recipe.sh` gained `submodule` (a submodule at the commit its parent pins), `xcbuild`, `embed`, and `sparkle1` and `sparkle2`, which build Sparkle 1 and 2 from source for the apps that bring it; `apps/sparkle-nodelta.m` stands in for Sparkle 1's binary-delta code, which needs xar. Builds go in the work folder given, never in the repository.
+
 From Ferry 0.56.0 (freemac 1.232), `eventkit/EventKit.m` is EventKit on
 freemac's own calendar and reminders files, Tide's and Nudge's, with
 access asked per app and kept in `~/.config/freemac/calendar-access.json`,
@@ -461,6 +463,10 @@ in `appkit/AppKitNewer.m`. The tests are `appkit_newer_apps` and
 `eventkit`.
 
 From Ferry 0.57.0 (freemac 1.233), FFmpeg's libraries and its `ffmpeg` and `ffprobe` tools build as Mac programs with `apps/ffmpeg.sh` (8.0.1 or 6.1.1) and decode, encode and filter under Ferry as they do on Linux, and programs can start others with `posix_spawn` and match file names with `glob` and `fnmatch`.
+
+From Ferry 0.58.0 (freemac 1.234), `coreaudio/` holds Core Audio, which also serves AudioToolbox and AudioUnit, in place of 1.232's `coreaudio/CoreAudio.c`: the HAL on the sound server through libpulse (`CABackend.m`, `CAHardware.m`), audio units (`CAAudioUnit.m`), audio queues (`CAAudioQueue.m`), converters (`CAConverter.m`) and formats (`CAFormat.m`). With no sound server, or `FERRY_AUDIO=null`, a null device plays into `FERRY_AUDIO_OUTPUT_FILE` and records from `FERRY_AUDIO_INPUT_FILE`; the tests are the `coreaudio_` ones.
+
+From Ferry 0.59.0 (freemac 1.235), `opengl/` is OpenGL.framework, CGL on this system's EGL with every `gl` call passed to its OpenGL library; `appkit/NSOpenGL.m` and `quartzcore/CAOpenGLLayer.m` read a context's frames back and paint them into views and layers, and `corevideo/` and `iosurface/` are Core Video (display links, pixel buffers and pools, texture caches) and IOSurface, for VLC's and OBS's video output; the tests are `opengl_*` and `corevideo_*`.
 
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and

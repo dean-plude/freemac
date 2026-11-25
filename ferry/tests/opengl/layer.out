@@ -1,0 +1,21 @@
+a context of the program's own: yes
+the view's backing layer is the OpenGL layer: yes
+not asynchronous at first: yes
+not drawn while it can't draw: yes
+drawn on the main thread once it can: yes
+its context current, with a time stamp: yes
+the viewport the layer's size in pixels: yes
+its drawing is the layer's contents: yes
+the context put back after: yes
+orange in the view: yes
+the white band at the bottom: yes
+not at the top: yes
+drawn on the other thread: yes
+its new contents shown on the main thread: yes
+a window draw doesn't draw the layer again: yes
+resized: drawn again at 320 by 200 pixels: yes
+asynchronous: yes
+asynchronous for half a second: about 30 draws
+not after: yes
+visibleRect: the part inside the clipping superlayer: yes
+exit=0

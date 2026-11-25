@@ -32,6 +32,8 @@ typedef int32_t OSStatus;
 typedef uint32_t FourCharCode;
 typedef uint32_t OSType;
 typedef uint32_t ResType;
+/* no error, as every Carbon-era call and Core Audio answers (freemac 1.234) */
+enum { noErr = 0 };
 typedef uint16_t UniChar;
 typedef uint8_t UTF8Char;
 typedef uint16_t UTF16Char;

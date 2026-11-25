@@ -28,8 +28,8 @@ notification: NSApplicationWillBecomeActiveNotification
 notification: NSApplicationDidBecomeActiveNotification
 notification: NSApplicationWillResignActiveNotification
 notification: NSApplicationDidResignActiveNotification
-default output: status 0, device 2
-volume with no sound server: not running
+default output: status 0, device found
+volume with no sound server: no volume control
 an unknown object: hasn't
 localizedStandardCompare: -1 1
 NSURLTagNamesKey: NSURLTagNamesKey
@@ -37,4 +37,8 @@ resourceSpecifier: someone@example.com
 kSCNetworkFlagsReachable: same
 cornerCurve: circular
 cornerCurve: continuous
+a grid's button the app hid: hidden 1
+  its row hidden: label hidden 1, button hidden 1
+  its row shown again: label hidden 0, button hidden 1
+  shown by the app: button hidden 0
 exit=0
