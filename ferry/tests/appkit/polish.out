@@ -1,0 +1,60 @@
+a fixed window:
+  content shrunk to fit: 100,380 320x220
+  top left kept: yes
+  view: 10,10 300x200
+  content grown to fit: 100,280 320x320
+  top left kept: yes
+a resizable window:
+  content shrunk to fit: 100,380 320x220
+  top left kept: yes
+  view: 10,10 300x200
+  content grown to fit: 100,280 320x320
+  top left kept: yes
+a window whose content only prefers a size: 0,0 400x300
+  view: 10,10 380x280
+a vertical stack's natural size: 0,0 -1x85
+  its fitting size: 0,0 140x85
+  hugs vertically at 250
+  a field across a 300-wide stack: 0,0 300x22
+  a view that hugs its width: 0,30 60x20
+a split view controller's view holding its split view:
+  split view pinned: yes, frame: 0,0 700x400
+  panes: 0+216 217+216 434+266
+  each pane at least its minimum thickness: yes
+  narrow: 0+162 163+162 326+214
+  wider: 0+282 283+282 566+334
+an inline badge's natural size: 0,0 26x18
+a help button's natural size: 0,0 25x25
+a button made in code and given an image: title "Button", image only
+one given a title too: image left of the title
+a field made in code: bezeled 1, bordered 0
+  told it has no border: bezeled 0, bordered 0
+  given a border: bezeled 0, bordered 1
+  given a bezel: bezeled 1, bordered 0
+toolbar item bold: image its view's, view NSButton, view: 8,6 37x27
+toolbar item group: image none, view NSSegmentedControl, view: 51,7 37x24
+  the group's segment shows its subitem's image: yes
+a window whose -update marks it for display, updated once it is shown: yes
+  and not again with no event: yes
+  updated once after an event: yes
+  and once when the app says its windows need it: yes
+  its pattern background: corner alpha 0.00, middle alpha 0.60 white 0.10
+the nib: instantiated yes
+  toolbar: yes, the window's yes, delegate the owner, display mode 2, size mode 1, customizable 0
+  the delegate hears of 7B1D0000-0000-4000-8000-000000000002
+  the delegate hears of NSToolbarFlexibleSpaceItem
+  the delegate hears of 7B1D0000-0000-4000-8000-000000000003
+  item 7B1D0000-0000-4000-8000-000000000002: label "Refresh" palette "Refresh Items" tip "Refresh the list" tag 4 view none
+  item NSToolbarFlexibleSpaceItem: label "" palette "" tip "" tag 0 view none
+  item 7B1D0000-0000-4000-8000-000000000003: label "Search" palette "Search" tip "" tag 0 view NSSearchField min 96x22 max 200x22
+  refresh: from NSToolbarItem
+  label: translates its mask 0, hugs 251,750, resists 752,750, 4 constraints in the window
+  the window's content, grown to the content view's height: 100,22 400x240
+  label from the top left: 20,20
+  spinner shown while stopped: 0, bar: 1
+a JPEG 2000 icon: read, 512x512 pixels
+  at 128,128 from the top left: 255 0 0 alpha 255
+  at 384,128 from the top left: 0 0 255 alpha 255
+  at 128,384 from the top left: 0 159 0 alpha 128
+  at 384,384 from the top left: 0 0 0 alpha 0
+exit=0

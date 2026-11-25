@@ -266,6 +266,15 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t);
         [sv setFrame:[v bounds]];
         [sv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
         [v addSubview:sv];
+        /* held to the view's edges by constraints, as on a Mac, so it still
+         * fills the view when the app has it stop translating its mask */
+        [sv setTranslatesAutoresizingMaskIntoConstraints:NO];
+        [NSLayoutConstraint activateConstraints:@[
+            [[sv leadingAnchor] constraintEqualToAnchor:[v leadingAnchor]],
+            [[sv trailingAnchor] constraintEqualToAnchor:[v trailingAnchor]],
+            [[sv topAnchor] constraintEqualToAnchor:[v topAnchor]],
+            [[sv bottomAnchor] constraintEqualToAnchor:[v bottomAnchor]],
+        ]];
     }
     [sv setDelegate:self];
     _installed = YES;
@@ -459,6 +468,10 @@ static CGFloat clamp_thickness(NSSplitViewItem *item, CGFloat t)
     for (NSUInteger i = 0; i < n; i++) {
         NSView *v = [subviews objectAtIndex:i];
         sizes[i] = [self _thickness:v];
+        /* a pane is never left outside its item's limits */
+        NSSplitViewItem *item = [self _itemForView:v];
+        if (item && ![v isHidden])
+            sizes[i] = clamp_thickness(item, sizes[i]);
         held[i] = [v isHidden] || v == keep;
         if ([v isHidden])
             continue;

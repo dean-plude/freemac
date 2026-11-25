@@ -21,13 +21,15 @@ user-defined runtime attributes are connected. A view element this tool
 doesn't know becomes a custom view of its Cocoa class (a "tableView" an
 NSTableView, made empty with -initWithFrame:), with its frame, so the
 window keeps its layout and outlets to it still connect; each such element
-is named once on standard error. Auto Layout constraints, toolbars,
-accessibility descriptions and the document's localization comments are
-left out. Both document formats are read: the newer <document type=
-"com.apple.InterfaceBuilder3.Cocoa.XIB"> as above, and the older <archive
-type="com.apple.InterfaceBuilder3.Cocoa.XIB">, whose objects are already
-written out with their keys and are carried over as they are (see
-compile_archive_xib).
+is named once on standard error. Auto Layout constraints (with each
+view's hugging and compression resistance) and window toolbars (their
+items, the allowed and default lists, the delegate and the items' actions)
+are carried over; accessibility descriptions and the document's
+localization comments are left out. Both document formats are read: the
+newer <document type="com.apple.InterfaceBuilder3.Cocoa.XIB"> as above,
+and the older <archive type="com.apple.InterfaceBuilder3.Cocoa.XIB">,
+whose objects are already written out with their keys and are carried
+over as they are (see compile_archive_xib).
 """
 import base64
 import os
@@ -93,6 +95,11 @@ class Archive:
         doc = {"$archiver": "NSKeyedArchiver", "$version": 100000, "$top": top, "$objects": self.objects}
         return plistlib.dumps(doc, fmt=plistlib.FMT_BINARY, sort_keys=True)
 
+
+# NSLayoutAttribute by the names Interface Builder writes ("baseline" is the last baseline).
+LAYOUT_ATTRIBUTES = {"left": 1, "right": 2, "top": 3, "bottom": 4, "leading": 5, "trailing": 6, "width": 7,
+                     "height": 8, "centerX": 9, "centerY": 10, "baseline": 11, "lastBaseline": 11,
+                     "firstBaseline": 12}
 
 # Each class's superclasses, for the archive's class chains.
 RESPONDER = ("NSResponder",)
@@ -568,11 +575,99 @@ class Compiler:
                 keys[nkey] = size_string(v)
         if e.get("frameAutosaveName"):
             keys["NSFrameAutosaveName"] = a.string(e.get("frameAutosaveName"))
-        if child(e, "toolbar", "toolbar") is not None:
-            self.note_unknown("toolbar", "nothing (toolbars in a xib are left out)")
+        tb = child(e, "toolbar", "toolbar")
+        if tb is not None:
+            tuid = self.uid_for(tb.get("id")) if tb.get("id") else a.reserve()
+            self.toolbar(tb, tuid)
+            self.pairs.append((tuid, uid))
+            keys["NSToolbar"] = tuid
         a.fill(uid, a.obj("NSWindowTemplate", (), **keys))
         if yes(e, "visibleAtLaunch", True):
             self.visible.append(uid)
+
+    def toolbar(self, e, uid):
+        """A window's toolbar: its items as NSToolbarItems, the allowed and
+        default lists as Interface Builder wrote them (a default item is a
+        reference to an allowed one), and its delegate and the items' actions
+        as connections."""
+        a = self.a
+        made = {}
+
+        def item(it):
+            xid = it.get("reference") or it.get("id")
+            if xid in made:
+                return made[xid]
+            iuid = self.uid_for(xid) if xid else a.reserve()
+            made[xid] = iuid
+            if it.get("reference"):
+                return iuid
+            ident = it.get("identifier") or it.get("implicitItemIdentifier") or (xid or "")
+            keys = dict(NSToolbarItemIdentifier=a.string(ident))
+            for xkey, nkey in (("label", "NSToolbarItemLabel"), ("paletteLabel", "NSToolbarItemPaletteLabel"),
+                               ("toolTip", "NSToolbarItemToolTip"), ("title", "NSToolbarItemTitle")):
+                if it.get(xkey) is not None:
+                    keys[nkey] = a.string(it.get(xkey))
+            if it.get("image"):
+                keys["NSToolbarItemImage"] = self.image(it.get("image"))
+            if it.get("tag"):
+                keys["NSToolbarItemTag"] = int(it.get("tag"))
+            if it.get("visibilityPriority"):
+                keys["NSToolbarItemVisibilityPriority"] = int(it.get("visibilityPriority"))
+            for xkey, nkey in (("minSize", "NSToolbarItemMinSize"), ("maxSize", "NSToolbarItemMaxSize")):
+                v = child(it, "size", xkey)
+                if v is not None:
+                    keys[nkey] = size_string(v)
+            if it.get("autovalidates") is not None:
+                keys["NSToolbarItemAutovalidates"] = yes(it, "autovalidates")
+            if it.get("enabled") is not None:
+                keys["NSToolbarItemEnabled"] = yes(it, "enabled")
+            if it.get("bordered") is not None:
+                keys["NSToolbarItemBordered"] = yes(it, "bordered")
+            v = None
+            for c in it:
+                if c.get("key") == "view" and c.get("id"):
+                    v = c
+            if v is not None:
+                vuid = self.uid_for(v.get("id"))
+                self.view(v, vuid, UID(0))
+                self.pairs.append((vuid, iuid))
+                keys["NSToolbarItemView"] = vuid
+            cls = it.get("customClass") or "NSToolbarItem"
+            a.fill(iuid, a.obj(cls, () if cls == "NSToolbarItem" else ("NSToolbarItem",), **keys))
+            self.pairs.append((iuid, uid))
+            self.connections_of(it, iuid)
+            self.runtime_attributes(it, iuid)
+            return iuid
+
+        def items(key):
+            lst = child(e, key)
+            if lst is None:
+                return None
+            return a.array([item(it) for it in lst if it.tag == "toolbarItem"])
+
+        allowed = items("allowedToolbarItems")
+        default = items("defaultToolbarItems")
+        keys = dict(NSToolbarIdentifier=a.string(e.get("identifier") or e.get("implicitIdentifier") or ""),
+                    NSToolbarDisplayMode={"iconAndLabel": 1, "iconOnly": 2, "labelOnly": 3}.get(
+                        e.get("displayMode"), 0),
+                    NSToolbarSizeMode={"regular": 1, "small": 2}.get(e.get("sizeMode"), 0),
+                    NSToolbarPrefersToBeShown=yes(e, "visible", True),
+                    NSToolbarShowsBaselineSeparator=yes(e, "showsBaselineSeparator", True),
+                    NSToolbarAllowsUserCustomization=yes(e, "allowsUserCustomization", True),
+                    NSToolbarAutosavesConfiguration=yes(e, "autosavesConfiguration"))
+        if allowed is not None:
+            keys["NSToolbarIBAllowedItems"] = allowed
+        if default is not None:
+            keys["NSToolbarIBDefaultItems"] = default
+        if made:
+            pairs = []
+            for xid, iuid in made.items():
+                o = a.objects[iuid.data]
+                if isinstance(o, dict) and "NSToolbarItemIdentifier" in o:
+                    pairs.append((a.objects[o["NSToolbarItemIdentifier"].data], iuid))
+            keys["NSToolbarIBIdentifiedItems"] = a.dictionary(pairs)
+        a.fill(uid, a.obj("NSToolbar", (), **keys))
+        self.connections_of(e, uid)
 
     def subviews(self, e, uid):
         out = []
@@ -593,6 +688,7 @@ class Compiler:
         subs = self.subviews(e, uid)
         if subs:
             keys["NSSubviews"] = a.array(subs)
+        keys.update(self.layout_keys(e, uid))
         custom = e.get("customClass")
         builder = VIEW_TAGS.get(tag)
         if tag in ("view", "customView"):
@@ -616,6 +712,64 @@ class Compiler:
             a.fill(uid, a.obj("NSCustomView", supers("NSCustomView"), **keys))
         self.connections_of(e, uid)
         self.runtime_attributes(e, uid)
+
+    # -- Auto Layout -------------------------------------------------------------
+
+    def layout_keys(self, e, uid):
+        """A view's Auto Layout: whether its autoresizing mask is translated
+        into constraints, its content hugging and compression resistance
+        priorities ("{horizontal, vertical}") and the constraints it holds."""
+        a = self.a
+        keys = {}
+        if e.get("translatesAutoresizingMaskIntoConstraints") == "NO":
+            keys["NSDoNotTranslateAutoresizingMask"] = True
+        for key, prefix, suffix, dflt in (("NSHuggingPriority", "", "HuggingPriority", 250),
+                                          ("NSAntiCompressionPriority", "", "CompressionResistancePriority", 750)):
+            h, v = e.get("horizontal" + suffix), e.get("vertical" + suffix)
+            if h is not None or v is not None:
+                keys[key] = a.string("{%s, %s}" % (fmt(float(h or dflt)), fmt(float(v or dflt))))
+        cons = []
+        cs = child(e, "constraints")
+        for c in (cs if cs is not None else []):
+            if c.tag != "constraint" or yes(c, "placeholder"):
+                continue
+            cons.append(self.constraint(c, uid))
+        if cons:
+            keys["NSViewConstraints"] = a.array(cons)
+        return keys
+
+    def constraint(self, c, holder):
+        """One constraint, as Interface Builder writes it: an item left out
+        is the view that holds the constraint (for the first item) or
+        nothing (for the second, a constant size); a multiplier may be a
+        ratio ("16:9")."""
+        a = self.a
+        uid = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+        first = self.uid_for(c.get("firstItem")) if c.get("firstItem") else holder
+        keys = dict(NSFirstItem=first, NSFirstAttribute=LAYOUT_ATTRIBUTES.get(c.get("firstAttribute"), 0),
+                    NSRelation={"lessThanOrEqual": -1, "greaterThanOrEqual": 1}.get(c.get("relation"), 0),
+                    NSShouldBeArchived=True)
+        if c.get("secondAttribute") and c.get("secondAttribute") != "notAnAttribute":
+            keys["NSSecondItem"] = self.uid_for(c.get("secondItem")) if c.get("secondItem") else holder
+            keys["NSSecondAttribute"] = LAYOUT_ATTRIBUTES.get(c.get("secondAttribute"), 0)
+        m = c.get("multiplier")
+        if m:
+            if ":" in m:
+                x, y = m.split(":", 1)
+                keys["NSMultiplier"] = float(x) / float(y) if float(y) else 1.0
+            else:
+                keys["NSMultiplier"] = float(m)
+        constant = c.get("constant")
+        if constant is not None:
+            keys["NSConstant"] = float(constant)
+        elif yes(c, "symbolic"):
+            keys["NSConstant"] = 8.0
+        if c.get("priority"):
+            keys["NSPriority"] = int(round(float(c.get("priority"))))
+        if c.get("identifier"):
+            keys["NSLayoutIdentifier"] = a.string(c.get("identifier"))
+        a.fill(uid, a.obj("NSLayoutConstraint", (), **keys))
+        return uid
 
     # -- controls and their cells ----------------------------------------------
 
@@ -813,8 +967,8 @@ class Compiler:
             flags |= 0x1000
         if yes(e, "indeterminate"):
             flags |= 0x2
-        if yes(e, "displayedWhenStopped", True):
-            flags |= 0x2000
+        if not yes(e, "displayedWhenStopped", True):
+            flags |= 0x2000     # hidden while stopped, as AppKit's decoder reads the bit
         return "NSProgressIndicator", dict(NSpiFlags=flags, NSMinValue=float(e.get("minValue", "0")),
                                            NSMaxValue=float(e.get("maxValue", "100")))
 

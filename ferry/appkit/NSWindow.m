@@ -65,6 +65,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     CGFloat _scale;
     int _backingW, _backingH;
     GtkWidget *_gtk, *_area;
+    NSSize _gtkWanted;                /* a size asked of GTK and not yet given */
+    int _gtkWantedTries;
     NSMutableSet *_keysDown;
     NSInteger _lastButton, _clicks;
     NSTimeInterval _lastClickTime;
@@ -567,9 +569,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
         _frame.size.height = fmax(_frame.size.height + delta, 1);
         _frame.origin.y -= delta;
         if (_gtk) {
-            if (!(_style & NSWindowStyleMaskResizable))
-                gtk_widget_set_size_request(_area, (int)_frame.size.width, (int)_frame.size.height);
-            gtk_window_resize(_gtk, (int)_frame.size.width, (int)_frame.size.height);
+            _gtkWanted = _frame.size, _gtkWantedTries = 0;
+            [self _askSize];
         }
         NSSize wanted = _frame.size;
         _frame.size = old;
@@ -620,6 +621,37 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [self _post:NSWindowDidResizeNotification selector:@selector(windowDidResize:)];
 }
 
+/* Asks GTK for the window's size. A window that can't be resized is held
+ * to its size by its drawing area's size request, which would keep it
+ * from shrinking. */
+- (void)_askSize
+{
+    if (!_gtk || _gtkWanted.width <= 0)
+        return;
+    if (!(_style & NSWindowStyleMaskResizable)) {
+        /* nor smaller than its default size */
+        gtk_widget_set_size_request(_area, (int)_gtkWanted.width, (int)_gtkWanted.height);
+        gtk_window_set_default_size(_gtk, (int)_gtkWanted.width, (int)_gtkWanted.height);
+    }
+    gtk_window_resize(_gtk, (int)_gtkWanted.width, (int)_gtkWanted.height);
+}
+/* GTK gives the window a size: until it gives the one asked for (a resize
+ * asked while drawing, as when constraints resize the window, comes a
+ * little later), an older size is not taken, but asked over again. */
+- (void)_allocated:(NSSize)size
+{
+    if (_gtkWanted.width > 0) {
+        if (NSEqualSizes(size, _gtkWanted) || ++_gtkWantedTries > 20) {
+            _gtkWanted = NSZeroSize;
+        } else {
+            [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(_askSize) object:nil];
+            [self performSelector:@selector(_askSize) withObject:nil afterDelay:0];
+            return;
+        }
+    }
+    [self _resizedTo:size];
+}
+
 - (void)setFrame:(NSRect)frame display:(BOOL)display
 {
     if ([_delegate respondsToSelector:@selector(windowWillResize:toSize:)] && !NSEqualSizes(frame.size, _frame.size))
@@ -632,8 +664,10 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     if (moved) /* child windows move with their parent */
         for (NSWindow *c in [[_children copy] autorelease])
             [c setFrameOrigin:NSMakePoint(c->_frame.origin.x + dx, c->_frame.origin.y + dy)];
-    if (_gtk && !NSEqualSizes(frame.size, _frame.size))
-        gtk_window_resize(_gtk, (int)frame.size.width, (int)frame.size.height);
+    if (_gtk && !NSEqualSizes(frame.size, _frame.size)) {
+        _gtkWanted = frame.size, _gtkWantedTries = 0;
+        [self _askSize];
+    }
     [self _resizedTo:frame.size];
     if (moved)
         [self _post:NSWindowDidMoveNotification selector:@selector(windowDidMove:)];
@@ -719,9 +753,24 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     CGContextSaveGState(ctx);
     CGContextSetBlendMode(ctx, kCGBlendModeCopy);
     CGFloat c[4];
-    AColorRGBA([self backgroundColor], c);
-    CGContextSetRGBFillColor(ctx, c[0], c[1], c[2], _opaque ? 1 : c[3]);
-    CGContextFillRect(ctx, all);
+    NSColor *background = [self backgroundColor];
+    AColorRGBA(background, c);
+    /* a pattern colour (Flycut's bezel is a rounded rectangle drawn into an
+     * image) is its image, tiled from the window's bottom left corner, over
+     * nothing (or, in an opaque window, over its average colour) */
+    NSImage *pattern = [background patternImage];
+    CGImageRef tile = pattern ? [pattern CGImageForProposedRect:NULL context:nil hints:nil] : NULL;
+    NSSize ts = pattern ? [pattern size] : NSZeroSize;
+    if (tile && ts.width >= 1 && ts.height >= 1) {
+        CGContextSetRGBFillColor(ctx, c[0], c[1], c[2], _opaque ? 1 : 0);
+        CGContextFillRect(ctx, all);
+        CGContextSetBlendMode(ctx, kCGBlendModeNormal);
+        CGContextClipToRect(ctx, all);
+        CGContextDrawTiledImage(ctx, CGRectMake(0, 0, ts.width, ts.height), tile);
+    } else {
+        CGContextSetRGBFillColor(ctx, c[0], c[1], c[2], _opaque ? 1 : c[3]);
+        CGContextFillRect(ctx, all);
+    }
     CGContextRestoreGState(ctx);
     [_contentView _drawInContext:ctx dirty:all screen:screen];
     [_toolbarView _drawInContext:ctx dirty:all screen:screen];
@@ -900,6 +949,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
         if (!_first && _initialFirst)
             [self makeFirstResponder:_initialFirst];
         [self _noteNeedsDisplay];
+        AWindowsNeedUpdate();
     }
     [self _makeGtk];
     if (_gtk && _alpha > 0)
@@ -1594,7 +1644,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
     @autoreleasepool {
         NSWindow *win = data;
         int width = gtk_widget_get_allocated_width(w), height = gtk_widget_get_allocated_height(w);
-        A_REPORTING([win _resizedTo:NSMakeSize(width, height)]; [win _ensureBacking]; [win displayIfNeeded];)
+        A_REPORTING([win _allocated:NSMakeSize(width, height)]; [win _ensureBacking]; [win displayIfNeeded];)
         if (win->_backing) {
             cairo_set_source_surface(cr, win->_backing, 0, 0);
             cairo_paint(cr);
@@ -1606,7 +1656,7 @@ static int on_draw(GtkWidget *w, cairo_t *cr, void *data)
 static void on_size(GtkWidget *w, GdkRectangle *r, void *data)
 {
     @autoreleasepool {
-        A_REPORTING([(NSWindow *)data _resizedTo:NSMakeSize(r->width, r->height)];)
+        A_REPORTING([(NSWindow *)data _allocated:NSMakeSize(r->width, r->height)];)
     }
 }
 
@@ -1817,11 +1867,31 @@ static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
 NSWindow *AKeyWindow(void) { return key_window; }
 NSWindow *AMainWindow(void) { return main_window; }
 
+/* As on a Mac, the windows are sent -update once after each event the
+ * app handles (and after one is shown, or a hotkey is pressed), not on
+ * every turn of the run loop: a window whose -update marks it for display
+ * (Flycut's bezel sets its background colour there) would otherwise be
+ * updated again by its own redraw, without end. */
+static BOOL windows_need_update = YES;
+void AWindowsNeedUpdate(void) { windows_need_update = YES; }
+void AWindowsUpdate(void)
+{
+    windows_need_update = NO;
+    for (NSWindow *w in [[all_windows copy] autorelease])
+        if ([w isVisible])
+            [w update];
+}
+/* Ferry's own parts that follow the windows on every turn (WebKit's
+ * embedded pages, placed over their views) hear this, once a turn for each
+ * window shown, whether or not the windows were sent -update. */
+static NSNotificationName const AWindowTurnNotification = @"AWindowTurnNotification";
 void AWindowsDisplayIfNeeded(void)
 {
+    if (windows_need_update)
+        AWindowsUpdate();
     for (NSWindow *w in [[all_windows copy] autorelease])
         if ([w isVisible]) {
-            [w update];
+            [[NSNotificationCenter defaultCenter] postNotificationName:AWindowTurnNotification object:w];
             [w displayIfNeeded];
         }
 }

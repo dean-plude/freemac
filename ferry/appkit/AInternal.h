@@ -48,6 +48,7 @@ extern BOOL AConstraintsInUse;
 void ASendMenuItemAction(NSMenuItem *item);
 void ALayoutConstraintsIfNeeded(NSView *view);
 BOOL AConstraintFittingSize(NSView *view, NSSize *size);
+BOOL AConstraintStretches(NSView *view, BOOL vertical, NSLayoutPriority priority);
 void AConstraintsViewChanged(NSView *view);
 void AConstraintsViewRemoved(NSView *view, NSView *oldSuperview);
 void AConstraintsViewDying(NSView *view);
@@ -105,6 +106,8 @@ void AGlobalMonitorsDeliver(NSEvent *event);
 /* ---- windows and views --------------------------------------------------------------- */
 
 void AWindowsDisplayIfNeeded(void);
+void AWindowsNeedUpdate(void);
+void AWindowsUpdate(void);
 void AGlibAttach(void);
 NSWindow *AKeyWindow(void);
 NSWindow *AMainWindow(void);

@@ -1183,6 +1183,46 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.228 "Ferry: the apps' windows" (done)
+
+Ferry 0.52.0: the seven apps' windows laid out and drawn as on a Mac.
+The constraints in their xibs now reach the nibs `ferry-ibtool` compiles,
+and a window's size gives way to them, so MacPass's panes, inspector
+included, fill its window, and KeyCastr's Sparkle window opens at the
+size of its content.
+MacDown shows its toolbar, with its editor and preview filling the
+window. Flycut's bezel shows when its shortcut is pressed, Sequel Pro's
+spinner goes away when "Connection failed!" comes up, and KeyCastr's
+icon, which is JPEG 2000, is drawn.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `ferry-ibtool` carries a xib's constraints into the nib, with each view's hugging and compression resistance and whether it translates its autoresizing mask. It left them all out, so MacPass's panes, MacDown's split view and Sparkle's prompt in KeyCastr stayed at the frames the xib drew them at | Ferry SDK, AppKit | done |
+| 2 | A window's content holds its size only at `NSLayoutPriorityWindowSizeStayPut`, as on a Mac. Stronger constraints inside it make the window grow or shrink, within its content's minimum and maximum, keeping its top left corner. Ferry held it at its size as required, so KeyCastr's prompt opened tall with its content at the bottom | Ferry AppKit | done |
+| 3 | Split and stack views with constraints: | Ferry AppKit | done |
+|   | - a split view controller's split view is held to its view's edges, and a pane is kept within its item's minimum and maximum thickness, so MacPass's inspector is no longer pushed out of its window | | |
+|   | - the solver leaves a split view's panes and a stack view's views where their container put them | | |
+|   | - a stack view is as long as its views, hugs as firmly as the loosest of them, measures a view laid out by constraints by its fitting size and stretches across it a view that hugs less firmly than the stack | | |
+| 4 | `ferry-ibtool` compiles a window's toolbar: its items with their labels, images, tags, tool tips, views, sizes and actions, its default items and its delegate. It made none before, which left a grey band at the top of MacDown's window. A toolbar item shows its view's image when it has none of its own, and an item made from a view with no size given is the size of the view's frame | Ferry SDK, AppKit | done |
+| 5 | Windows are sent `-update` once after each event, hotkey or window shown, and on `setWindowsNeedUpdate:`, not on every turn of the run loop. Flycut's bezel sets its background there, which asked for another redraw and update without end, until the app was killed for its memory. A window whose background is a pattern colour draws the pattern image, tiled (Flycut's rounded bezel), rather than its average colour | Ferry AppKit, WebKit | done |
+| 6 | A progress indicator's `displayedWhenStopped` was read the wrong way round from xibs, so Sequel Pro's spinner stayed in its connection form after Connect failed | Ferry SDK | done |
+| 7 | Buttons and fields: a button with an image and no title set is image-only, as on a Mac, where Ferry gave it its default title. A help button is drawn round, with its question mark, at 25 by 25 points, and an inline button as a small badge, as MacPass's entry counts are. Setting a text field bordered turns its bezel off, and the reverse | Ferry AppKit | done |
+| 8 | A window size asked of GTK while a window is drawn is asked again until GTK gives it, so an older size isn't taken. A window that can't be resized can now get smaller | Ferry AppKit | done |
+| 9 | `.icns` files with only JPEG 2000 pictures are read by this system's OpenJPEG, at no more than 512 pixels across, so KeyCastr's icon shows | Ferry Core Graphics, loader | done |
+| 10 | One new test; `make check` 267 of 267 | Ferry | done |
+
+ShiftIt showed `AUTHORIZATION_INFORMATIVE_TEXT_10_9` because the target
+that was built, "ShiftIt NoX11", copies no `Localizable.strings` in its
+Xcode project. The build script now takes it from the other target;
+Ferry's lookup was right. Spectacle's accessibility window is 780 by 360
+points in its nib, unresizable, with the picture under its buttons
+reaching past its bottom edge, and Ferry shows it as a Mac does. MacPass's
+inspector opens at its 200-point minimum, narrower than its tabs and its
+password row need, which a Mac would widen it for. MacDown's layout pull-down in its toolbar shows no
+picture, because MacDown takes out the empty item that holds it.
+JavaScript functions as blocks and a weak `JSManagedValue` weren't
+reached.
+
 ## 1.227 "Ferry: Swift programs and a first SwiftUI" (done)
 
 Ferry 0.51.0: programs written in Swift are built for an Intel Mac with

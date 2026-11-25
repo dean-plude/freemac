@@ -72,6 +72,10 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/ibtool" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_polish)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/polish" env -u WAYLAND_DISPLAY -u DISPLAY \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_more_controls)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" FERRY_TEST_DATA="$here/appkit" \
@@ -697,6 +701,20 @@ if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/MacPassUI.nib" "$here/ap
         -framework Cocoa -framework CoreImage -framework UniformTypeIdentifiers
 else
     echo "FAIL appkit_macpass_ui (ferry-ibtool)"; sed 's/^/    /' "$build/macpass_ui.ibtool.log"; fail=$((fail + 1))
+fi
+# What the seven apps' windows needed in freemac's polish round: windows
+# sized by their content's constraints, stack and split views, buttons a
+# Mac draws its own way, toolbar items, -update once after each event and
+# a pattern background; a toolbar, constraints and progress indicators
+# from a nib ferry-ibtool compiled from Ferry's own polish.xib; and an icon
+# with only a JPEG 2000 picture, read by this system's OpenJPEG.
+rm -rf "$build/polish"; mkdir -p "$build/polish"
+cp "$here/appkit/polish-j2k.icns" "$build/polish/"
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/polish/Polish.nib" "$here/appkit/polish.xib" \
+        2> "$build/polish/ibtool.log" && ! [ -s "$build/polish/ibtool.log" ]; then
+    run_one appkit_polish "$here/appkit/polish.m" "$here/appkit/polish.out" -fobjc-arc -framework Cocoa
+else
+    echo "FAIL appkit_polish (ferry-ibtool)"; sed 's/^/    /' "$build/polish/ibtool.log"; fail=$((fail + 1))
 fi
 run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_controls.out" -fobjc-arc \
     -framework Cocoa

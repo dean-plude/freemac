@@ -312,8 +312,10 @@ static GtkWidget *overlay_of(GtkWidget *window)
     static BOOL observing;
     if (!observing) {
         observing = YES;
+        /* AppKit's notice of each turn of the event loop, for each window
+         * shown (AWindowsDisplayIfNeeded, NSWindow.m) */
         [[NSNotificationCenter defaultCenter] addObserver:[WKEmbed class] selector:@selector(_windowsUpdated:)
-                                                     name:NSWindowDidUpdateNotification object:nil];
+                                                     name:@"AWindowTurnNotification" object:nil];
     }
     if (nembeds == embeds_cap) {
         embeds_cap = embeds_cap ? embeds_cap * 2 : 8;

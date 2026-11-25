@@ -317,7 +317,7 @@ static id coded(NSCoder *c, NSString *key)
     [_gravities insertObject:@(g) atIndex:(NSUInteger)index];
     if ([view superview] != self)
         [super addSubview:view];
-    [self _relayout];
+    [self _arrangedChanged];
 }
 /* A view added to the end goes with the views now last. */
 - (void)addArrangedSubview:(NSView *)view
@@ -346,7 +346,7 @@ static id coded(NSCoder *c, NSString *key)
     [_dropped removeObjectIdenticalTo:view];
     [_priorities removeObjectForKey:key_of(view)];
     [_custom removeObjectForKey:key_of(view)];
-    [self _relayout];
+    [self _arrangedChanged];
 }
 - (void)addView:(NSView *)view inGravity:(NSStackViewGravity)gravity
 {
@@ -433,20 +433,86 @@ static id coded(NSCoder *c, NSString *key)
 - (void)_arrangedSubviewVisibilityChanged:(NSView *)view
 {
     if ([_views indexOfObjectIdenticalTo:view] != NSNotFound)
-        [self _relayout];
+        [self _arrangedChanged];
 }
 
 /* ---- layout ---- */
 
 - (BOOL)_horizontal { return _orientation == NSUserInterfaceLayoutOrientationHorizontal; }
 
-/* A view's size as the stack sees it. */
+/* How firmly a view's content sets its length along one axis, as a
+ * priority: its hugging when it has an intrinsic size; for a view laid
+ * out by constraints inside it, whether they let it grow against a window
+ * holding its size (NSLayoutPriorityWindowSizeStayPut) or against
+ * anything short of required. */
+static NSLayoutPriority firmness(NSView *v, BOOL vertical)
+{
+    NSLayoutConstraintOrientation o = vertical ? NSLayoutConstraintOrientationVertical
+                                               : NSLayoutConstraintOrientationHorizontal;
+    NSLayoutPriority hug = [v contentHuggingPriorityForOrientation:o];
+    NSSize is = [v intrinsicContentSize];
+    if ((vertical ? is.height : is.width) >= 0 || [v isKindOfClass:[NSStackView class]])
+        return hug;
+    NSSize fit;
+    if (!AConstraintFittingSize(v, &fit) || AConstraintStretches(v, vertical, NSLayoutPriorityWindowSizeStayPut))
+        return hug;
+    if (AConstraintStretches(v, vertical, NSLayoutPriorityRequired - 1))
+        return fmax(hug, NSLayoutPriorityDefaultHigh);
+    return NSLayoutPriorityRequired - 1;
+}
+
+/* A view's size as the stack sees it: a stack's fitting size; an intrinsic
+ * size; for a view whose constraints set its length firmly, the length
+ * they give; else its frame. */
 static NSSize size_of(NSView *v)
 {
     if ([v isKindOfClass:[NSStackView class]])
         return [v fittingSize];
-    NSSize s = [v intrinsicContentSize], f = [v frame].size;
+    NSSize s = [v intrinsicContentSize], f = [v frame].size, fit;
+    if ((s.width < 0 || s.height < 0) && AConstraintFittingSize(v, &fit)) {
+        if (s.width < 0 && firmness(v, NO) >= NSLayoutPriorityWindowSizeStayPut)
+            s.width = fit.width;
+        if (s.height < 0 && firmness(v, YES) >= NSLayoutPriorityWindowSizeStayPut)
+            s.height = fit.height;
+    }
     return NSMakeSize(s.width >= 0 ? s.width : f.width, s.height >= 0 ? s.height : f.height);
+}
+
+/* As on a Mac, where a stack's own constraints tie it to its views: along
+ * the stack it is as long as its views, held as firmly as the loosest of
+ * them holds its length when they fill it, else by the stack's hugging
+ * priority. */
+- (NSSize)intrinsicContentSize
+{
+    if (!_views)
+        return NSMakeSize(NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
+    BOOL h = [self _horizontal];
+    NSSize f = [self fittingSize];
+    return h ? NSMakeSize(f.width, NSViewNoIntrinsicMetric) : NSMakeSize(NSViewNoIntrinsicMetric, f.height);
+}
+- (NSLayoutPriority)contentHuggingPriorityForOrientation:(NSLayoutConstraintOrientation)o
+{
+    BOOL along = (o == NSLayoutConstraintOrientationHorizontal) == [self _horizontal];
+    if (!along || objc_getAssociatedObject(self, &hugging_key[o ? 1 : 0]))
+        return [super contentHuggingPriorityForOrientation:o];
+    NSLayoutPriority p = _hugging[o ? 1 : 0];
+    if (_distribution == NSStackViewDistributionFill || _distribution == NSStackViewDistributionFillEqually ||
+        _distribution == NSStackViewDistributionFillProportionally) {
+        NSArray *shown = [self _shown];
+        if ([shown count]) {
+            p = NSLayoutPriorityRequired - 1;
+            for (NSView *v in shown)
+                p = fmin(p, firmness(v, o == NSLayoutConstraintOrientationVertical));
+        }
+    }
+    return p;
+}
+
+/* The views or their spacing changed: the stack's length may have. */
+- (void)_arrangedChanged
+{
+    AConstraintsViewChanged(self);
+    [self _relayout];
 }
 
 - (CGFloat)_spacingAfter:(NSView *)v
@@ -571,24 +637,18 @@ static NSSize size_of(NSView *v)
     case NSStackViewDistributionFill: {
         /* the room left over goes to the views that hug least; short of
          * room, the ones that resist least give it up */
-        NSLayoutPriority best = 1e9;
+        NSLayoutPriority best = 1e9, pr[n ? n : 1];
         for (NSUInteger i = 0; i < n; i++) {
-            NSLayoutPriority p = extra >= 0 ? [shown[i] contentHuggingPriorityForOrientation:o]
-                                            : [shown[i] contentCompressionResistancePriorityForOrientation:o];
-            best = fmin(best, p);
+            pr[i] = extra >= 0 ? firmness(shown[i], !h)
+                               : [shown[i] contentCompressionResistancePriorityForOrientation:o];
+            best = fmin(best, pr[i]);
         }
         NSUInteger k = 0;
-        for (NSUInteger i = 0; i < n; i++) {
-            NSLayoutPriority p = extra >= 0 ? [shown[i] contentHuggingPriorityForOrientation:o]
-                                            : [shown[i] contentCompressionResistancePriorityForOrientation:o];
-            k += p == best;
-        }
-        for (NSUInteger i = 0; i < n && k; i++) {
-            NSLayoutPriority p = extra >= 0 ? [shown[i] contentHuggingPriorityForOrientation:o]
-                                            : [shown[i] contentCompressionResistancePriorityForOrientation:o];
-            if (p == best)
+        for (NSUInteger i = 0; i < n; i++)
+            k += pr[i] == best;
+        for (NSUInteger i = 0; i < n && k; i++)
+            if (pr[i] == best)
                 len[i] = fmax(len[i] + extra / k, 0);
-        }
         break;
     }
     case NSStackViewDistributionFillEqually:
@@ -658,6 +718,19 @@ static NSSize size_of(NSView *v)
         NSView *v = shown[i];
         NSSize s = size_of(v);
         CGFloat c = h ? s.height : s.width, at = crossStart;
+        /* as on a Mac, where the stack's edges hug its views across it at
+         * the stack's hugging priority: a view that hugs its content less
+         * firmly than that is stretched across the stack (so is one with
+         * no size of its own across it that hugs as firmly, which a Mac
+         * leaves to chance), and none is wider than the stack */
+        NSLayoutConstraintOrientation cross = h ? NSLayoutConstraintOrientationVertical
+                                                : NSLayoutConstraintOrientationHorizontal;
+        NSLayoutPriority hug = [v contentHuggingPriorityForOrientation:cross];
+        NSSize is = [v intrinsicContentSize];
+        if (hug < _hugging[h ? 1 : 0] || (hug == _hugging[h ? 1 : 0] && (h ? is.height : is.width) < 0 &&
+                                          ![v isKindOfClass:[NSStackView class]]))
+            c = crossRoom;
+        c = fmin(c, fmax(crossRoom, 0));
         switch (_alignment) {
         case NSLayoutAttributeTop:
         case NSLayoutAttributeLeading:

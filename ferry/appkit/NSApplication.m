@@ -1139,17 +1139,25 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
                 [queue removeObjectIdenticalTo:e];
             return e;
         }
-        AWindowsDisplayIfNeeded();
-        NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
-        if (now >= limit)
-            return nil;
-        NSDate *until = [NSDate dateWithTimeIntervalSinceReferenceDate:limit];
-        if (![[NSRunLoop currentRunLoop] runMode:mode ?: NSDefaultRunLoopMode beforeDate:until]) {
-            /* nothing could ever wake the loop; wait as a Mac would, in slices */
-            NSTimeInterval wait = fmin(limit - now, 0.05);
-            if (wait > 0)
-                usleep((useconds_t)(wait * 1e6));
+        BOOL done = NO;
+        /* each turn has a pool of its own: the loop can turn many times (timers, redraws) before an event */
+        @autoreleasepool {
+            AWindowsDisplayIfNeeded();
+            NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+            if (now >= limit) {
+                done = YES;
+            } else {
+                NSDate *until = [NSDate dateWithTimeIntervalSinceReferenceDate:limit];
+                if (![[NSRunLoop currentRunLoop] runMode:mode ?: NSDefaultRunLoopMode beforeDate:until]) {
+                    /* nothing could ever wake the loop; wait as a Mac would, in slices */
+                    NSTimeInterval wait = fmin(limit - now, 0.05);
+                    if (wait > 0)
+                        usleep((useconds_t)(wait * 1e6));
+                }
+            }
         }
+        if (done)
+            return nil;
     }
 }
 
@@ -1194,6 +1202,7 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
         [w sendEvent:e];
     }
     _current = saved;
+    AWindowsNeedUpdate();
 }
 
 /* The responder that will take action: the key window's responder chain,
@@ -1258,7 +1267,16 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
     return NO;
 }
 
-- (void)updateWindows { AWindowsDisplayIfNeeded(); }
+- (void)updateWindows
+{
+    AWindowsUpdate();
+    AWindowsDisplayIfNeeded();
+}
+- (void)setWindowsNeedUpdate:(BOOL)flag
+{
+    if (flag)
+        AWindowsNeedUpdate();
+}
 
 /* A modal loop: only events for the modal window are handled (and those
  * that aren't for any window), until stopModal. */

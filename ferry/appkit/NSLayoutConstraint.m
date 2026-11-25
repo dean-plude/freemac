@@ -40,6 +40,9 @@
 
 BOOL AConstraintsInUse;
 static BOOL solving;
+static int fit_depth;                 /* fitting solves inside one another */
+static double fit_pull;               /* > 0: the fitting root is pulled to grow at this priority */
+static BOOL fit_pull_vertical;
 static unsigned long generation = 1;
 static NSMutableSet *all_active;      /* every active constraint */
 static BOOL updates_pending;          /* some view's needsUpdateConstraints is set */
@@ -1060,6 +1063,28 @@ static NSRect current_rect(id item, NSView *root)
     return inRoot;
 }
 
+/* A view that doesn't translate its autoresizing mask but is placed by
+ * its superview all the same: a split view's pane or a stack view's
+ * arranged view, which Ferry's split and stack views size and place by
+ * frame where a Mac's do it with constraints of their own. */
+static BOOL in_container(NSView *v)
+{
+    NSView *s = [v superview];
+    if ([s isKindOfClass:[NSSplitView class]])
+        return YES;
+    return [s isKindOfClass:[NSStackView class]] &&
+           [[(NSStackView *)s arrangedSubviews] indexOfObjectIdenticalTo:v] != NSNotFound;
+}
+
+/* A view its superview places by frame whatever its constraints say. */
+static BOOL placed_by_superview(id item)
+{
+    if (![item isKindOfClass:[NSView class]])
+        return NO;
+    NSView *v = item;
+    return [v translatesAutoresizingMaskIntoConstraints] || in_container(v);
+}
+
 /* The item's parent in the layout: a view's superview, a guide's owning view. */
 static NSView *parent_of(id item)
 {
@@ -1248,11 +1273,36 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
         double size = vertical ? now.size.height : now.size.width;
         int i = (int)k;
         if (item == root) {
+            NSWindow *w = [root window];
             if (fitting) {
                 pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
                 a->a[2 * i] = 1;
-                pending *b = new_row(p, NSLayoutPriorityFittingSizeCompression, NSLayoutRelationEqual, nil);
+                pending *b = new_row(p, fit_pull > 0 && vertical == fit_pull_vertical ? fit_pull
+                                                                                     : NSLayoutPriorityFittingSizeCompression,
+                                     NSLayoutRelationEqual, nil);
                 b->a[2 * i + 1] = 1;
+                if (fit_pull > 0 && vertical == fit_pull_vertical)
+                    b->rhs = 10000;
+            } else if (w && [w contentView] == root) {
+                /* a window's content view: as on a Mac, the window holds its
+                 * size only at NSLayoutPriorityWindowSizeStayPut, so stronger
+                 * constraints inside it make it bigger or smaller (within
+                 * its minimum and maximum content size) */
+                pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+                a->a[2 * i] = 1;
+                pending *b = new_row(p, NSLayoutPriorityWindowSizeStayPut, NSLayoutRelationEqual, nil);
+                b->a[2 * i + 1] = 1;
+                b->rhs = vertical ? rootRect.size.height : rootRect.size.width;
+                NSSize lo = [w contentMinSize], hi = [w contentMaxSize];
+                double mn = vertical ? lo.height : lo.width, mx = vertical ? hi.height : hi.width;
+                if (mn > 0) {
+                    pending *m = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationGreaterThanOrEqual, nil);
+                    m->a[2 * i + 1] = 1, m->rhs = mn;
+                }
+                if (mx > 0 && mx < 100000) {
+                    pending *m = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationLessThanOrEqual, nil);
+                    m->a[2 * i + 1] = 1, m->rhs = mx;
+                }
             } else {
                 mask_rows(p, item, -1, 0, vertical ? rootRect.size.height : rootRect.size.width, 0, NO, NO, NO, 0);
             }
@@ -1269,6 +1319,12 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
             a->a[2 * i] = 1, a->a[2 * pi] = -1;
             pending *b = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
             b->a[2 * i + 1] = 1, b->a[2 * pi + 1] = -1;
+            continue;
+        }
+        if ([item isKindOfClass:[NSView class]] && ![(NSView *)item translatesAutoresizingMaskIntoConstraints] &&
+            in_container(item)) {
+            /* a split view's pane, a stack view's view: where it was put */
+            mask_rows(p, item, pi, start - pstart, size, psize - (start - pstart) - size, NO, NO, NO, psize);
             continue;
         }
         if ([item isKindOfClass:[NSView class]] && [(NSView *)item translatesAutoresizingMaskIntoConstraints]) {
@@ -1381,9 +1437,11 @@ static void add_item(problem *p, id item, NSView *root)
     [p->items addObject:item];
 }
 
-/* Solves the constraints of root's subtree. With fitting, answers the
- * smallest size of root they allow and moves nothing. */
-static NSSize solve(NSView *root, BOOL fitting)
+/* Solves the constraints of root's subtree once. With fitting, answers the
+ * smallest size of root they allow and moves nothing. *again is set when a
+ * view the solver doesn't place (one placed by a stack view, say) came out
+ * another size than the solver took it to be. */
+static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
 {
     NSMutableArray *constraints = [NSMutableArray array], *guides = [NSMutableArray array];
     collect(root, constraints, guides);
@@ -1409,15 +1467,28 @@ static NSSize solve(NSView *root, BOOL fitting)
     }
     NSUInteger n = [p.items count];
     double *hx = calloc(2 * n, sizeof(double)), *vx = calloc(2 * n, sizeof(double));
+    BOOL wasSolving = solving;
     solving = YES;
     @try {
         solve_axis(&p, usable, root, NO, fitting, hx);
         solve_axis(&p, usable, root, YES, fitting, vx);
         if (!fitting) {
+            /* a window whose content the constraints make bigger or smaller
+             * grows or shrinks to fit, keeping its top left corner */
+            NSWindow *w = [root window];
+            NSSize now = [root frame].size;
+            if (w && [w contentView] == root && (fabs(hx[1] - now.width) >= 0.5 || fabs(vx[1] - now.height) >= 0.5)) {
+                NSRect f = [w frame];
+                NSRect c = [w contentRectForFrameRect:f];
+                c.size = NSMakeSize(round(fmax(1, hx[1])), round(fmax(1, vx[1])));
+                NSRect nf = [w frameRectForContentRect:c];
+                nf.origin.y = NSMaxY(f) - nf.size.height;
+                [w setFrame:nf display:NO];
+            }
             /* outermost first, so a view's frame is set after its superview's */
             for (NSUInteger k = 1; k < n; k++) {
                 id item = p.items[k];
-                if ([item isKindOfClass:[NSView class]] && [(NSView *)item translatesAutoresizingMaskIntoConstraints])
+                if (placed_by_superview(item))
                     continue;
                 int pi = item_index(&p, parent_of(item));
                 double px = pi >= 0 ? hx[2 * pi] : 0, py = pi >= 0 ? vx[2 * pi] : 0;
@@ -1433,14 +1504,36 @@ static NSSize solve(NSView *root, BOOL fitting)
                     [(NSLayoutGuide *)item _setFrame:f];
                 }
             }
+            for (NSUInteger k = 1; k < n && again; k++) {
+                id item = p.items[k];
+                if (!placed_by_superview(item))
+                    continue;
+                NSSize now = [(NSView *)item frame].size;
+                if (fabs(now.width - hx[2 * k + 1]) >= 0.5 || fabs(now.height - vx[2 * k + 1]) >= 0.5)
+                    *again = YES;
+            }
         }
     } @finally {
-        solving = NO;
+        solving = wasSolving;
     }
     NSSize size = NSMakeSize(fmax(0, hx[1]), fmax(0, vx[1]));
     free(hx);
     free(vx);
     free(p.rows);
+    return size;
+}
+
+/* Solves the constraints of root's subtree, again while what the solver
+ * doesn't place settles (a few times at most). */
+static NSSize solve(NSView *root, BOOL fitting)
+{
+    NSSize size = NSZeroSize;
+    for (int i = 0; i < 4; i++) {
+        BOOL again = NO;
+        size = solve_once(root, fitting, fitting || i == 3 ? NULL : &again);
+        if (!again)
+            break;
+    }
     return size;
 }
 
@@ -1475,18 +1568,44 @@ void ALayoutConstraintsIfNeeded(NSView *v)
     objc_setAssociatedObject(root, &solved_key, @(generation), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/* The smallest size v's own constraints allow; NO when it has none. */
+/* The smallest size v's own constraints allow; NO when it has none. A
+ * fitting solve moves nothing, so one may run while the window's
+ * constraints are being solved (a stack view measuring its views). */
 BOOL AConstraintFittingSize(NSView *v, NSSize *size)
 {
-    if (!AConstraintsInUse || solving)
+    if (!AConstraintsInUse || fit_depth > 8)
         return NO;
     NSMutableArray *cs = [NSMutableArray array], *gs = [NSMutableArray array];
     collect(v, cs, gs);
     if (![cs count])
         return NO;
-    update_subtree(v);
-    *size = solve(v, YES);
+    if (!solving)
+        update_subtree(v);
+    fit_depth++;
+    @try {
+        *size = solve(v, YES);
+    } @finally {
+        fit_depth--;
+    }
     return YES;
+}
+
+/* Whether the constraints inside v let it grow along one axis when pulled
+ * at priority pr: how firmly its content sets its length. */
+BOOL AConstraintStretches(NSView *v, BOOL vertical, NSLayoutPriority pr)
+{
+    NSSize fit, pulled;
+    if (!AConstraintFittingSize(v, &fit))
+        return YES;
+    double oldPull = fit_pull;
+    BOOL oldVertical = fit_pull_vertical;
+    fit_pull = pr, fit_pull_vertical = vertical;
+    @try {
+        AConstraintFittingSize(v, &pulled);
+    } @finally {
+        fit_pull = oldPull, fit_pull_vertical = oldVertical;
+    }
+    return vertical ? pulled.height > fit.height + 0.5 : pulled.width > fit.width + 0.5;
 }
 
 /* A view's frame or intrinsic size changed (NSView.m, NSStackView.m). */
@@ -1673,6 +1792,23 @@ void AViewDecodeConstraints(NSView *v, NSCoder *c)
     if ([c containsValueForKey:@"NSDoNotTranslateAutoresizingMask"] &&
         [c decodeBoolForKey:@"NSDoNotTranslateAutoresizingMask"])
         [v setTranslatesAutoresizingMaskIntoConstraints:NO];
+    /* content hugging and compression resistance, each "{horizontal, vertical}" */
+    static NSString *const priority_keys[2] = {@"NSHuggingPriority", @"NSAntiCompressionPriority"};
+    for (int k = 0; k < 2; k++) {
+        NSString *pair = [c containsValueForKey:priority_keys[k]] ? [c decodeObjectForKey:priority_keys[k]] : nil;
+        if (![pair isKindOfClass:[NSString class]])
+            continue;
+        NSSize p = NSSizeFromString(pair);
+        if (k == 0) {
+            [v setContentHuggingPriority:(NSLayoutPriority)p.width forOrientation:NSLayoutConstraintOrientationHorizontal];
+            [v setContentHuggingPriority:(NSLayoutPriority)p.height forOrientation:NSLayoutConstraintOrientationVertical];
+        } else {
+            [v setContentCompressionResistancePriority:(NSLayoutPriority)p.width
+                                        forOrientation:NSLayoutConstraintOrientationHorizontal];
+            [v setContentCompressionResistancePriority:(NSLayoutPriority)p.height
+                                        forOrientation:NSLayoutConstraintOrientationVertical];
+        }
+    }
     if (![c containsValueForKey:@"NSViewConstraints"])
         return;
     id list = [c decodeObjectForKey:@"NSViewConstraints"];

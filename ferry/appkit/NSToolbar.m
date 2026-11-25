@@ -247,7 +247,16 @@ static BOOL is_space(NSString *ident)
     _enabled = f;
     [self _changed];
 }
-- (NSImage *)image { return _image; }
+/* An item with a view and no image of its own answers its view's image,
+ * as on a Mac, where a group's segments are often drawn from the images
+ * of subitems whose views are buttons. */
+- (NSImage *)image
+{
+    if (_image || !_view || ![_view respondsToSelector:@selector(image)])
+        return _image;
+    id image = [(id)_view image];
+    return [image isKindOfClass:[NSImage class]] ? image : nil;
+}
 - (void)setImage:(NSImage *)image
 {
     [image retain];
@@ -989,6 +998,18 @@ static NSFont *label_font(NSToolbar *t) { return [NSFont systemFontOfSize:[t _sm
         tiled = NO;
 }
 
+/* The size a view item asks for. A view laid out by frame, in an item
+ * given no maximum size, keeps the size it was made at, as on a Mac (a
+ * toolbar button made 37 points wide is 37 wide whatever its image);
+ * otherwise the view's fitting size. */
+static NSSize view_size(NSToolbarItem *item, NSView *v)
+{
+    NSSize fr = [v frame].size;
+    if ([v translatesAutoresizingMaskIntoConstraints] && fr.width > 0 && fr.height > 0 && [item maxSize].width <= 0)
+        return fr;
+    return [v fittingSize];
+}
+
 /* How wide an item is at least, and at most (a flexible one can grow). */
 - (void)_widthOf:(NSToolbarItem *)item min:(CGFloat *)min max:(CGFloat *)max
 {
@@ -1018,7 +1039,7 @@ static NSFont *label_font(NSToolbar *t) { return [NSFont systemFontOfSize:[t _sm
     NSView *v = [item view];
     if (v) {
         NSSize mn = [item minSize], mx = [item maxSize];
-        NSSize f = [v fittingSize];
+        NSSize f = view_size(item, v);
         CGFloat w = mn.width > 0 ? mn.width : f.width;
         *min = fmax(w, label);
         *max = mx.width > *min ? mx.width : *min;
@@ -1134,7 +1155,7 @@ static NSFont *label_font(NSToolbar *t) { return [NSFont systemFontOfSize:[t _sm
         if (is_space([item itemIdentifier]))
             continue;
         if (v) {
-            NSSize f = [v fittingSize];
+            NSSize f = view_size(item, v);
             CGFloat vh = fmin(f.height > 0 ? f.height : side, mode == NSToolbarDisplayModeIconAndLabel ? side + 4 : h - 4);
             CGFloat top = mode == NSToolbarDisplayModeIconAndLabel ? 4 + round((side - vh) / 2) : round((h - vh) / 2);
             [v setFrame:NSMakeRect(slot.origin.x, top, slot.size.width, vh)];
