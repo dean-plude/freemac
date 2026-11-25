@@ -683,7 +683,16 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     }
     if ((self = [super init])) {
         NSApp = self;
-        _policy = NSApplicationActivationPolicyRegular;
+        /* As on a Mac, an agent app (LSUIElement) has no Dock icon or menu
+         * bar of its own, and one that is only a background program
+         * (LSBackgroundOnly) none at all (freemac 1.224, Ferry 0.48.0). */
+        NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+        if ([info[@"LSBackgroundOnly"] respondsToSelector:@selector(boolValue)] && [info[@"LSBackgroundOnly"] boolValue])
+            _policy = NSApplicationActivationPolicyProhibited;
+        else if ([info[@"LSUIElement"] respondsToSelector:@selector(boolValue)] && [info[@"LSUIElement"] boolValue])
+            _policy = NSApplicationActivationPolicyAccessory;
+        else
+            _policy = NSApplicationActivationPolicyRegular;
     }
     return self;
 }
@@ -765,7 +774,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 - (void)hide:(id)sender
 {
     for (NSWindow *w in AAllWindows())
-        if ([w isVisible])
+        if ([w isVisible] && [w canHide])
             [w miniaturize:sender];
 }
 - (void)unhide:(id)sender
@@ -900,7 +909,10 @@ static void register_app_icon(void)
     id types = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDocumentTypes"];
     if ([types isKindOfClass:[NSArray class]] && [types count])
         [NSDocumentController sharedDocumentController];
-    [self activateIgnoringOtherApps:YES];
+    /* An agent app isn't made active by starting, as on a Mac: the app in
+     * front stays in front (freemac 1.224, Ferry 0.48.0). */
+    if (_policy == NSApplicationActivationPolicyRegular)
+        [self activateIgnoringOtherApps:YES];
     [self _openLaunchFiles];
     [self _post:NSApplicationDidFinishLaunchingNotification selector:@selector(applicationDidFinishLaunching:)];
     ADockLaunched();

@@ -146,3 +146,27 @@ S_EXPORT OSStatus AuthorizationCopyPrivilegedReference(AuthorizationRef *authori
         *authorization = NULL;
     return errAuthorizationDenied;
 }
+
+/* the rights database, which holds none (freemac 1.224, Ferry 0.48.0) */
+S_EXPORT OSStatus AuthorizationRightGet(const char *rightName, CFDictionaryRef *rightDefinition)
+{
+    if (rightDefinition)
+        *rightDefinition = NULL;
+    return errAuthorizationDenied;
+}
+
+S_EXPORT OSStatus AuthorizationRightSet(AuthorizationRef authorization, const char *rightName,
+                                        CFTypeRef rightDefinition, CFStringRef descriptionKey, CFBundleRef bundle,
+                                        CFStringRef localeTableName)
+{
+    if (!valid(authorization))
+        return errAuthorizationInvalidRef;
+    return deny("AuthorizationRightSet");
+}
+
+S_EXPORT OSStatus AuthorizationRightRemove(AuthorizationRef authorization, const char *rightName)
+{
+    if (!valid(authorization))
+        return errAuthorizationInvalidRef;
+    return deny("AuthorizationRightRemove");
+}

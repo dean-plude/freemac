@@ -19,6 +19,8 @@ __FERRY_BEGIN
 #define O_DIRECTORY 0x100000
 #define O_SYMLINK 0x200000
 #define O_CLOEXEC 0x1000000
+/* follow no symbolic link anywhere in the path (freemac 1.224) */
+#define O_NOFOLLOW_ANY 0x20000000
 #define AT_FDCWD -2
 #define AT_SYMLINK_NOFOLLOW 0x0020
 #define AT_REMOVEDIR 0x0080

@@ -322,6 +322,23 @@ typedef NS_ENUM(NSInteger, NSWritingDirection) {
     NSWritingDirectionNatural = -1, NSWritingDirectionLeftToRight = 0, NSWritingDirectionRightToLeft = 1,
 };
 
+/* A tab stop (freemac 1.224): kept with a paragraph style and read back;
+ * text is drawn with the system's own tab stops. */
+typedef NS_ENUM(NSUInteger, NSTextTabType) {
+    NSLeftTabStopType = 0, NSRightTabStopType, NSCenterTabStopType, NSDecimalTabStopType,
+};
+typedef NSString *NSTextTabOptionKey;
+APPKIT_EXTERN NSTextTabOptionKey const NSTabColumnTerminatorsAttributeName;
+@interface NSTextTab : NSObject <NSCopying, NSCoding>
+- (instancetype)initWithTextAlignment:(NSTextAlignment)alignment location:(CGFloat)loc
+                              options:(NSDictionary<NSTextTabOptionKey, id> *)options;
+- (instancetype)initWithType:(NSTextTabType)type location:(CGFloat)loc;
+@property (readonly) CGFloat location;
+@property (readonly) NSTextAlignment alignment;
+@property (readonly) NSTextTabType tabStopType;
+@property (readonly, copy) NSDictionary<NSTextTabOptionKey, id> *options;
+@end
+
 #ifdef FERRY_APPKIT_BUILD
 @interface NSParagraphStyle : GParagraphStyle <NSCopying, NSMutableCopying, NSCoding>
 #else
@@ -334,6 +351,10 @@ typedef NS_ENUM(NSInteger, NSWritingDirection) {
 @property (readonly) CGFloat lineSpacing, paragraphSpacing, paragraphSpacingBefore;
 @property (readonly) CGFloat headIndent, tailIndent, firstLineHeadIndent;
 @property (readonly) CGFloat minimumLineHeight, maximumLineHeight, lineHeightMultiple;
+/* the distance between tab stops after the last one set; 0, none (freemac 1.224) */
+@property (readonly) CGFloat defaultTabInterval;
+/* twelve left tabs 28 points apart unless set */
+@property (readonly, copy) NSArray<NSTextTab *> *tabStops;
 @end
 @interface NSMutableParagraphStyle : NSParagraphStyle
 @property NSTextAlignment alignment;
@@ -342,6 +363,10 @@ typedef NS_ENUM(NSInteger, NSWritingDirection) {
 @property CGFloat lineSpacing, paragraphSpacing, paragraphSpacingBefore;
 @property CGFloat headIndent, tailIndent, firstLineHeadIndent;
 @property CGFloat minimumLineHeight, maximumLineHeight, lineHeightMultiple;
+@property CGFloat defaultTabInterval;
+@property (copy) NSArray<NSTextTab *> *tabStops;
+- (void)addTabStop:(NSTextTab *)tab;
+- (void)removeTabStop:(NSTextTab *)tab;
 - (void)setParagraphStyle:(NSParagraphStyle *)style;
 @end
 
@@ -530,9 +555,10 @@ APPKIT_EXTERN NSString *const NSImageCompressionFactor;
 
 /* Images: read from PNG, JPEG, GIF, TIFF, BMP, ICO and ICNS files (by this
  * system's GdkPixbuf) and from PDF files (vector, by Poppler), drawn by a
- * block, or drawn into with lockFocus. Images named in an app's resources
- * are found by imageNamed:, as are a few standard template images, which
- * Ferry draws itself. */
+ * block, or drawn into with lockFocus. Images named in an app's asset
+ * catalogue (as ferry-actool compiles it, from freemac 1.224, Ferry
+ * 0.48.0) and in its resources are found by imageNamed:, as are a few
+ * standard template images, which Ferry draws itself. */
 @interface NSImage : NSObject <NSCopying, NSCoding>
 + (NSImage *)imageNamed:(NSImageName)name;
 + (instancetype)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
@@ -2227,11 +2253,18 @@ typedef NS_ENUM(NSUInteger, NSSelectionGranularity) { NSSelectByCharacter = 0, N
 @property (readonly) NSPoint textContainerOrigin;
 @property (copy) NSDictionary<NSAttributedStringKey, id> *typingAttributes, *selectedTextAttributes,
     *linkTextAttributes, *markedTextAttributes;
-@property BOOL allowsUndo, usesFindBar, usesFindPanel, usesRuler, rulerVisible, smartInsertDeleteEnabled;
-@property BOOL continuousSpellCheckingEnabled, grammarCheckingEnabled, automaticQuoteSubstitutionEnabled,
-    automaticDashSubstitutionEnabled, automaticLinkDetectionEnabled, automaticTextReplacementEnabled,
-    automaticSpellingCorrectionEnabled, automaticDataDetectionEnabled, displaysLinkToolTips,
-    allowsImageEditing, allowsDocumentBackgroundColorChange, usesInspectorBar;
+@property BOOL allowsUndo, usesFindBar, usesFindPanel, usesRuler, smartInsertDeleteEnabled;
+/* read with the "is" names, as on a Mac (freemac 1.224) */
+@property (getter=isRulerVisible) BOOL rulerVisible;
+@property (getter=isContinuousSpellCheckingEnabled) BOOL continuousSpellCheckingEnabled;
+@property (getter=isGrammarCheckingEnabled) BOOL grammarCheckingEnabled;
+@property (getter=isAutomaticQuoteSubstitutionEnabled) BOOL automaticQuoteSubstitutionEnabled;
+@property (getter=isAutomaticDashSubstitutionEnabled) BOOL automaticDashSubstitutionEnabled;
+@property (getter=isAutomaticLinkDetectionEnabled) BOOL automaticLinkDetectionEnabled;
+@property (getter=isAutomaticTextReplacementEnabled) BOOL automaticTextReplacementEnabled;
+@property (getter=isAutomaticSpellingCorrectionEnabled) BOOL automaticSpellingCorrectionEnabled;
+@property (getter=isAutomaticDataDetectionEnabled) BOOL automaticDataDetectionEnabled;
+@property BOOL displaysLinkToolTips, allowsImageEditing, allowsDocumentBackgroundColorChange, usesInspectorBar;
 @property (getter=isAutomaticTextCompletionEnabled) BOOL automaticTextCompletionEnabled;
 @property (copy) NSColor *insertionPointColor;
 @property (copy) NSParagraphStyle *defaultParagraphStyle;
@@ -4487,5 +4520,9 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- the Touch Bar, which a PC hasn't got (NSTouchBar.m), (freemac 1.223, Ferry 0.47.0) */
 
 #import <AppKit/NSTouchBar.h>
+
+/* ---- data from the app's asset catalogue (NSAssets.m), (freemac 1.224, Ferry 0.48.0) */
+
+#import <AppKit/NSDataAsset.h>
 
 #endif

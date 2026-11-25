@@ -1,0 +1,36 @@
+window frames by name
+  saved: yes
+  as a string matches: yes
+  read back: 1, same frame yes
+  removed: yes, unknown name read: 0
+  from a string: 10 20 200 150
+  a fixed window from it: 10 20 300 200
+paths and looks
+  relative curve: element curve, to 30,10 via 15,20 and 25,20
+  layout direction 0, control tint 1
+  System/controlTextColor is controlTextColor: yes; System/nope: nil; Other/controlTextColor: nil
+tab stops
+  default: 12 stops, first at 28, last at 336, interval 0
+  a stop at 30, type 0, alignment 0
+  a stop at 60, type 3, alignment 1
+  the copy's interval 36
+menus and tool tips
+  Open's parent: File; File's parent: nil
+  two tags, different: yes
+  the view answers as an owner: whole view
+  needs to draw inside: 1, outside: 0
+  a text view has marked text: 0, marked range none; the cursor attribute: NSCursor
+  quote substitution read by its is-name: 1, spelling: 0
+strings with a drawing context
+  same size as without: yes, scale 1.0
+three- and nine-part images
+  across: red green blue green, above: clear
+  corners red red red red, edges green green, middle blue
+the process and the input source
+  policy at start: 0
+  to a UI element: 0, policy 1
+  to the foreground: 0, policy 0
+  another process: -600
+  the current input source twice is one object: yes
+  and still is after both are released: yes, id com.apple.keylayout.US
+exit=0

@@ -138,9 +138,9 @@ void NSRectFillListUsingOperation(const NSRect *rects, NSInteger count, NSCompos
 void NSRectFillListWithColorsUsingOperation(const NSRect *rects, NSColor *const *colors, NSInteger count,
                                             NSCompositingOperation op);
 
-/* ---- more system colours; colorNamed: finds colours an app's asset
- * catalogue holds only once Ferry reads compiled catalogues, so it answers
- * nil for any name it doesn't know */
+/* ---- more system colours; colorNamed: finds the colours of the app's asset
+ * catalogue that ferry-actool compiled (freemac 1.224, Ferry 0.48.0), and
+ * answers nil for any name it doesn't know */
 @interface NSColor (FerryMoreSystemColors)
 @property (class, readonly) NSColor *windowFrameColor, *windowFrameTextColor, *scrollBarColor, *knobColor;
 @property (class, readonly) NSColor *selectedKnobColor, *highlightColor, *shadowColor, *controlHighlightColor;
@@ -280,4 +280,236 @@ APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastDa
 @end
 @interface NSWindow (FerryAppearance) <NSAppearanceCustomization>
 @end
+
+/* ---- the calls KeyCastr and its ShortcutRecorder make (freemac 1.224,
+ * Ferry 0.48.0) */
+/* Text runs left to right in the languages Ferry lays out. */
+typedef NS_ENUM(NSInteger, NSUserInterfaceLayoutDirection) {
+    NSUserInterfaceLayoutDirectionLeftToRight = 0, NSUserInterfaceLayoutDirectionRightToLeft = 1,
+};
+@interface NSApplication (FerryLayoutDirection)
+@property (readonly) NSUserInterfaceLayoutDirection userInterfaceLayoutDirection;
+@end
+@interface NSView (FerryLayoutDirection)
+@property NSUserInterfaceLayoutDirection userInterfaceLayoutDirection;
+@end
+/* Ferry's controls have one tint, the blue one */
+typedef NS_ENUM(NSUInteger, NSControlTint) {
+    NSDefaultControlTint = 0, NSBlueControlTint = 1, NSGraphiteControlTint = 6, NSClearControlTint = 7,
+};
+@interface NSColor (FerryControlTint)
+@property (class, readonly) NSControlTint currentControlTint;
++ (NSColor *)colorForControlTint:(NSControlTint)tint;
+/* whether colour wells and the colour panel leave out opacity */
+@property (class) BOOL ignoresAlpha;
+@end
+@interface NSCell (FerryControlTint)
+@property NSControlTint controlTint;
+@end
+/* A controller that edits (a binding's controller, for one): asked to end
+ * or drop its editing. */
+@protocol NSEditor <NSObject>
+- (BOOL)commitEditing;
+@optional
+- (void)discardEditing;
+- (void)commitEditingWithDelegate:(id)delegate didCommitSelector:(SEL)didCommitSelector contextInfo:(void *)contextInfo;
+- (BOOL)commitEditingAndReturnError:(NSError **)error;
+@end
+@protocol NSEditorRegistration <NSObject>
+@optional
+- (void)objectDidBeginEditing:(id<NSEditor>)editor;
+- (void)objectDidEndEditing:(id<NSEditor>)editor;
+@end
+/* A window's frame kept in the user defaults under "NSWindow Frame NAME",
+ * as a Mac keeps it; the desktop places the window, so only its size is
+ * used when it is read back. */
+@interface NSWindow (FerryFrameNames)
+- (BOOL)setFrameUsingName:(NSString *)name force:(BOOL)force;
+- (void)saveFrameUsingName:(NSString *)name;
++ (void)removeFrameUsingName:(NSString *)name;
+@property (readonly, copy) NSString *stringWithSavedFrame;
+- (void)setFrameFromString:(NSString *)string;
+/* whether hiding the app hides this window */
+@property BOOL canHide;
+@end
+/* Tool tips for parts of a view: the view's own tool tip is the text of the
+ * last one added (an owner that is a string, or the owner's answer for the
+ * rectangle's middle); a view has one tool tip here. */
+typedef NSInteger NSToolTipTag;
+@protocol NSViewToolTipOwner <NSObject>
+- (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data;
+@end
+@interface NSView (FerryToolTipRects)
+- (NSToolTipTag)addToolTipRect:(NSRect)rect owner:(id)owner userData:(void *)data;
+- (void)removeToolTip:(NSToolTipTag)tag;
+- (void)removeAllToolTips;
+@end
+@interface NSBezierPath (FerryRelativeCurve)
+- (void)relativeCurveToPoint:(NSPoint)endPoint controlPoint1:(NSPoint)controlPoint1
+               controlPoint2:(NSPoint)controlPoint2;
+@end
+/* Drawing the text a layout manager holds, its origin at the point given:
+ * the text is drawn as its attributed string draws in the first text
+ * container's width. */
+@interface NSLayoutManager (FerryDrawing)
+- (void)drawGlyphsForGlyphRange:(NSRange)glyphsToShow atPoint:(NSPoint)origin;
+- (void)drawBackgroundForGlyphRange:(NSRange)glyphsToShow atPoint:(NSPoint)origin;
+@end
+/* Launching an app: this app again (KeyCastr's restart) starts a new copy
+ * of it under Ferry; another Mac app isn't launched, as launchApplication:
+ * says. */
+typedef NS_OPTIONS(NSUInteger, NSWorkspaceLaunchOptions) {
+    NSWorkspaceLaunchAndPrint = 0x2, NSWorkspaceLaunchWithErrorPresentation = 0x40,
+    NSWorkspaceLaunchInhibitingBackgroundOnly = 0x80, NSWorkspaceLaunchWithoutAddingToRecents = 0x100,
+    NSWorkspaceLaunchWithoutActivation = 0x200, NSWorkspaceLaunchAsync = 0x10000,
+    NSWorkspaceLaunchNewInstance = 0x80000, NSWorkspaceLaunchAndHide = 0x100000,
+    NSWorkspaceLaunchAndHideOthers = 0x200000, NSWorkspaceLaunchDefault = NSWorkspaceLaunchAsync,
+};
+typedef NSString *NSWorkspaceLaunchConfigurationKey;
+APPKIT_EXTERN NSWorkspaceLaunchConfigurationKey const NSWorkspaceLaunchConfigurationArguments;
+APPKIT_EXTERN NSWorkspaceLaunchConfigurationKey const NSWorkspaceLaunchConfigurationEnvironment;
+@interface NSWorkspace (FerryLaunching)
+- (NSRunningApplication *)launchApplicationAtURL:(NSURL *)url options:(NSWorkspaceLaunchOptions)options
+                                   configuration:(NSDictionary<NSWorkspaceLaunchConfigurationKey, id> *)configuration
+                                           error:(NSError **)error;
+- (void)openApplicationAtURL:(NSURL *)applicationURL configuration:(NSWorkspaceOpenConfiguration *)configuration
+           completionHandler:(void (^)(NSRunningApplication *app, NSError *error))completionHandler;
+@end
+/* The other characters of keys that don't type one, by the values Apple's
+ * documentation of NSEvent gives them. */
+enum {
+    NSF13FunctionKey = 0xF710, NSF14FunctionKey = 0xF711, NSF15FunctionKey = 0xF712, NSF16FunctionKey = 0xF713,
+    NSF17FunctionKey = 0xF714, NSF18FunctionKey = 0xF715, NSF19FunctionKey = 0xF716, NSF20FunctionKey = 0xF717,
+    NSF21FunctionKey = 0xF718, NSF22FunctionKey = 0xF719, NSF23FunctionKey = 0xF71A, NSF24FunctionKey = 0xF71B,
+    NSF25FunctionKey = 0xF71C, NSF26FunctionKey = 0xF71D, NSF27FunctionKey = 0xF71E, NSF28FunctionKey = 0xF71F,
+    NSF29FunctionKey = 0xF720, NSF30FunctionKey = 0xF721, NSF31FunctionKey = 0xF722, NSF32FunctionKey = 0xF723,
+    NSF33FunctionKey = 0xF724, NSF34FunctionKey = 0xF725, NSF35FunctionKey = 0xF726,
+    NSPrintScreenFunctionKey = 0xF72E, NSScrollLockFunctionKey = 0xF72F, NSPauseFunctionKey = 0xF730,
+    NSSysReqFunctionKey = 0xF731, NSBreakFunctionKey = 0xF732, NSResetFunctionKey = 0xF733,
+    NSStopFunctionKey = 0xF734, NSMenuFunctionKey = 0xF735, NSUserFunctionKey = 0xF736,
+    NSSystemFunctionKey = 0xF737, NSPrintFunctionKey = 0xF738, NSClearLineFunctionKey = 0xF739,
+    NSClearDisplayFunctionKey = 0xF73A, NSInsertLineFunctionKey = 0xF73B, NSDeleteLineFunctionKey = 0xF73C,
+    NSInsertCharFunctionKey = 0xF73D, NSDeleteCharFunctionKey = 0xF73E, NSPrevFunctionKey = 0xF73F,
+    NSNextFunctionKey = 0xF740, NSSelectFunctionKey = 0xF741, NSExecuteFunctionKey = 0xF742,
+    NSUndoFunctionKey = 0xF743, NSRedoFunctionKey = 0xF744, NSFindFunctionKey = 0xF745,
+    NSHelpFunctionKey = 0xF746, NSModeSwitchFunctionKey = 0xF747,
+};
+/* Binding names and options, as the binding calls take them. A class's
+ * option descriptions (Core Data attribute descriptions) are none unless
+ * the class gives its own. */
+typedef NSString *NSBindingName;
+typedef NSString *NSBindingOption;
+typedef NSString *NSBindingInfoKey;
+@class NSAttributeDescription;
+@interface NSObject (FerryBindingOptions)
+- (NSArray<NSAttributeDescription *> *)optionDescriptionsForBinding:(NSBindingName)binding;
+@end
+/* posted when the control tint and the accessibility display options
+ * change, which they don't here: the desktop's own settings aren't read
+ * yet, so each option is NO, as on a Mac with none of them turned on */
+APPKIT_EXTERN NSNotificationName const NSControlTintDidChangeNotification;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification;
+@interface NSWorkspace (FerryAccessibilityDisplay)
+@property (readonly) BOOL accessibilityDisplayShouldIncreaseContrast;
+@property (readonly) BOOL accessibilityDisplayShouldDifferentiateWithoutColor;
+@property (readonly) BOOL accessibilityDisplayShouldReduceTransparency;
+@property (readonly) BOOL accessibilityDisplayShouldReduceMotion;
+@property (readonly) BOOL accessibilityDisplayShouldInvertColors;
+@end
+/* A view: being reused (by a table), its appearance changed, whether a
+ * rectangle is to be drawn (one that meets the visible rectangle), its
+ * focus ring's shape changed (the ring is drawn round the frame here), and
+ * the tool tip a view that owns its own tool tip rectangles gives (its own
+ * tool tip). */
+@interface NSView (FerryReuse)
+- (void)prepareForReuse;
+- (void)viewDidChangeEffectiveAppearance;
+- (BOOL)needsToDrawRect:(NSRect)rect;
+- (void)noteFocusRingMaskChanged;
+- (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data;
+@end
+/* Drawing a string with a context, which nothing here uses: as
+ * drawInRect:withAttributes: and boundingRectWithSize:options:attributes:. */
+@interface NSStringDrawingContext : NSObject
+@property CGFloat minimumScaleFactor;
+@property (readonly) CGFloat actualScaleFactor;
+@property (readonly) NSRect totalBounds;
+@end
+@interface NSString (FerryDrawingContext)
+- (void)drawWithRect:(NSRect)rect options:(NSStringDrawingOptions)options
+          attributes:(NSDictionary<NSAttributedStringKey, id> *)attributes context:(NSStringDrawingContext *)context;
+- (NSRect)boundingRectWithSize:(NSSize)size options:(NSStringDrawingOptions)options
+                    attributes:(NSDictionary<NSAttributedStringKey, id> *)attributes
+                       context:(NSStringDrawingContext *)context;
+@end
+@interface NSAttributedString (FerryDrawingContext)
+- (void)drawWithRect:(NSRect)rect options:(NSStringDrawingOptions)options context:(NSStringDrawingContext *)context;
+- (NSRect)boundingRectWithSize:(NSSize)size options:(NSStringDrawingOptions)options
+                       context:(NSStringDrawingContext *)context;
+@end
+/* A colour from a colour list: the "System" list holds the colours NSColor
+ * names (controlTextColor and the like); there are no other lists here,
+ * so any other gives nil, as an unknown colour does. */
+@interface NSColor (FerryCatalog)
++ (NSColor *)colorWithCatalogName:(NSString *)listName colorName:(NSString *)colorName;
+@end
+/* the item whose submenu holds this item's menu */
+@interface NSMenuItem (FerryParentItem)
+@property (readonly, assign) NSMenuItem *parentItem;
+@end
+/* The actions of the find bar, as a text view's performTextFinderAction:
+ * takes them from a menu item's tag. */
+typedef NS_ENUM(NSInteger, NSTextFinderAction) {
+    NSTextFinderActionShowFindInterface = 1, NSTextFinderActionNextMatch = 2,
+    NSTextFinderActionPreviousMatch = 3, NSTextFinderActionReplaceAll = 4, NSTextFinderActionReplace = 5,
+    NSTextFinderActionReplaceAndFind = 6, NSTextFinderActionSetSearchString = 7,
+    NSTextFinderActionReplaceAllInSelection = 8, NSTextFinderActionSelectAll = 9,
+    NSTextFinderActionSelectAllInSelection = 10, NSTextFinderActionHideFindInterface = 11,
+    NSTextFinderActionShowReplaceInterface = 12, NSTextFinderActionHideReplaceInterface = 13,
+};
+/* Whether a window shows its title, as its titleVisibility says */
+typedef NS_ENUM(NSInteger, NSWindowTitleVisibility) { NSWindowTitleVisible = 0, NSWindowTitleHidden = 1 };
+/* A constraint changed through its animator changes at once. */
+@interface NSLayoutConstraint (FerryAnimator) <NSAnimatablePropertyContainer>
+@end
+/* A text view's colours stay as they are in a dark appearance. */
+@interface NSTextView (FerryAdaptiveColor)
+@property BOOL usesAdaptiveColorMappingForDarkAppearance;
+@end
+/* TextKit 2's layout manager and content storage, which only hold their
+ * container and each other here: a text view made with such a container
+ * lays out as with TextKit 1 (Sparkle makes one only on macOS 16 and
+ * later, which this system doesn't say it is). */
+@interface NSTextLayoutManager : NSObject
+@property (retain) NSTextContainer *textContainer;
+@property (readonly, assign) id textContentManager;
+@end
+@interface NSTextContentManager : NSObject
+@property (readonly, copy) NSArray<NSTextLayoutManager *> *textLayoutManagers;
+- (void)addTextLayoutManager:(NSTextLayoutManager *)textLayoutManager;
+- (void)removeTextLayoutManager:(NSTextLayoutManager *)textLayoutManager;
+@end
+@interface NSTextContentStorage : NSTextContentManager
+@property (retain) NSTextStorage *textStorage;
+@end
+/* Drawing a frame from caps and a middle (and, for nine parts, corners and
+ * edges): the caps and corners keep their size, and the middle and edges
+ * are stretched over the rest (they aren't tiled here). */
+APPKIT_EXTERN void NSDrawThreePartImage(NSRect frame, NSImage *startCap, NSImage *centerFill, NSImage *endCap,
+                                        BOOL vertical, NSCompositingOperation op, CGFloat alphaFraction,
+                                        BOOL flipped);
+APPKIT_EXTERN void NSDrawNinePartImage(NSRect frame, NSImage *topLeftCorner, NSImage *topEdgeFill,
+                                       NSImage *topRightCorner, NSImage *leftEdgeFill, NSImage *centerFill,
+                                       NSImage *rightEdgeFill, NSImage *bottomLeftCorner, NSImage *bottomEdgeFill,
+                                       NSImage *bottomRightCorner, NSCompositingOperation op, CGFloat alphaFraction,
+                                       BOOL flipped);
+/* MacDown (freemac 1.224): there's no input method composing text here,
+ * so a text view never has marked text; and the cursor a range of text
+ * shows, kept as an attribute */
+@interface NSTextView (FerryMarkedText)
+- (BOOL)hasMarkedText;
+- (NSRange)markedRange;
+- (void)unmarkText;
+@end
+APPKIT_EXTERN NSAttributedStringKey const NSCursorAttributeName;
 #endif

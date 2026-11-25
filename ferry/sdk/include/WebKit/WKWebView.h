@@ -22,6 +22,9 @@ typedef NS_ENUM(NSInteger, WKErrorCode) {
     WKErrorWebViewInvalidated = 3,
     WKErrorJavaScriptExceptionOccurred = 4,
     WKErrorJavaScriptResultTypeIsUnsupported = 5,
+    WKErrorContentRuleListStoreCompileFailed = 6,
+    WKErrorContentRuleListStoreLookUpFailed = 7,
+    WKErrorContentRuleListStoreRemoveFailed = 8,
 };
 /* NSError user info keys of a JavaScript exception (macOS 10.15.4) */
 WK_EXTERN NSString *const WKJavaScriptExceptionMessage;
@@ -103,6 +106,32 @@ typedef NS_ENUM(NSInteger, WKUserScriptInjectionTime) {
 - (void)removeScriptMessageHandlerForName:(NSString *)name;
 - (void)removeScriptMessageHandlerForName:(NSString *)name contentWorld:(WKContentWorld *)contentWorld;
 - (void)removeAllScriptMessageHandlers;
+@end
+
+/* Content rule lists (freemac 1.224, Ferry 0.48.0) aren't compiled yet:
+ * compiling one completes with no list and a WKErrorContentRuleListStoreCompileFailed
+ * error, and looking one up finds none, so nothing is blocked; a program
+ * that blocks a page's outside resources this way (Sparkle, for signed
+ * release notes) logs the error and shows the page with them. */
+@interface WKContentRuleList : NSObject
+@property (readonly, copy) NSString *identifier;
+@end
+@interface WKContentRuleListStore : NSObject
++ (instancetype)defaultStore;
++ (instancetype)storeWithURL:(NSURL *)url;
+- (void)compileContentRuleListForIdentifier:(NSString *)identifier
+                     encodedContentRuleList:(NSString *)encodedContentRuleList
+                          completionHandler:(void (^)(WKContentRuleList *list, NSError *error))completionHandler;
+- (void)lookUpContentRuleListForIdentifier:(NSString *)identifier
+                         completionHandler:(void (^)(WKContentRuleList *list, NSError *error))completionHandler;
+- (void)removeContentRuleListForIdentifier:(NSString *)identifier
+                         completionHandler:(void (^)(NSError *error))completionHandler;
+- (void)getAvailableContentRuleListIdentifiers:(void (^)(NSArray<NSString *> *identifiers))completionHandler;
+@end
+@interface WKUserContentController (FerryContentRuleLists)
+- (void)addContentRuleList:(WKContentRuleList *)contentRuleList;
+- (void)removeContentRuleList:(WKContentRuleList *)contentRuleList;
+- (void)removeAllContentRuleLists;
 @end
 
 /* Kinds of website data */

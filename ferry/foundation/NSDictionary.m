@@ -264,6 +264,40 @@ static unsigned long never_mutated;
     return [self initWithDictionary:d];
 }
 - (instancetype)initWithContentsOfURL:(NSURL *)url { return [self initWithContentsOfFile:[url path]]; }
+/* freemac 1.224: a property list (of this class) read from a file URL */
+static id plist_at_url(NSURL *url, Class cls, NSError **error)
+{
+    NSData *data = [url isFileURL] ? [NSData dataWithContentsOfFile:[url path] options:0 error:error] : nil;
+    if (!data) {
+        if (error && ![url isFileURL])
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnsupportedSchemeError userInfo:nil];
+        return nil;
+    }
+    id plist = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:error];
+    if (plist && ![plist isKindOfClass:cls]) {
+        plist = nil;
+        if (error)
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSPropertyListReadCorruptError userInfo:nil];
+    }
+    return plist;
+}
+- (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error
+{
+    NSDictionary *o = plist_at_url(url, [NSDictionary class], error);
+    if (!o) {
+        [self release];
+        return nil;
+    }
+    return [self initWithDictionary:o];
+}
++ (id)dictionaryWithContentsOfURL:(NSURL *)url
+{
+    return [[[self alloc] initWithContentsOfURL:url error:NULL] autorelease];
+}
++ (id)dictionaryWithContentsOfURL:(NSURL *)url error:(NSError **)error
+{
+    return [[[self alloc] initWithContentsOfURL:url error:error] autorelease];
+}
 /* The values are copied; keys always are (freemac 1.221, Ferry 0.45.0). */
 - (instancetype)initWithDictionary:(NSDictionary *)dict copyItems:(BOOL)flag
 {
@@ -404,6 +438,20 @@ static unsigned long never_mutated;
 {
     NSData *d = FWriteXMLPlist(self);
     return d && [d writeToFile:path atomically:atomically];
+}
+- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically
+{
+    NSData *d = FWriteXMLPlist(self);
+    return d && [d writeToURL:url options:atomically ? NSDataWritingAtomic : 0 error:NULL];
+}
+- (BOOL)writeToURL:(NSURL *)url error:(NSError **)error
+{
+    NSData *d = FWriteXMLPlist(self);
+    if (!d) {
+        FSetError(error, [NSError errorWithDomain:NSCocoaErrorDomain code:NSPropertyListWriteInvalidError userInfo:nil]);
+        return NO;
+    }
+    return [d writeToURL:url options:NSDataWritingAtomic error:error];
 }
 - (NSString *)description { return FDescribe(self, 0); }
 - (NSString *)descriptionInStringsFileFormat { return FDescribe(self, 0); }
@@ -616,6 +664,28 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
     return [self setWithArray:tmp];
 }
 - (instancetype)init { return [self initWithObjects:NULL count:0]; }
+/* The other initialisers, as the class methods (freemac 1.224, Ferry
+ * 0.48.0). */
+- (instancetype)initWithObjects:(id)first, ...
+{
+    NSMutableArray *tmp = [NSMutableArray array];
+    va_list ap;
+    va_start(ap, first);
+    for (id o = first; o; o = va_arg(ap, id))
+        [tmp addObject:o];
+    va_end(ap);
+    return [self initWithArray:tmp];
+}
+- (instancetype)initWithArray:(NSArray *)array
+{
+    NSUInteger n = [array count];
+    id *objs = malloc((n ? n : 1) * sizeof(id));
+    [array getObjects:objs range:NSMakeRange(0, n)];
+    self = [self initWithObjects:objs count:n];
+    free(objs);
+    return self;
+}
+- (instancetype)initWithSet:(NSSet *)set { return [self initWithSet:set copyItems:NO]; }
 - (instancetype)initWithSet:(NSSet *)set copyItems:(BOOL)flag
 {
     NSArray *all = [set allObjects];

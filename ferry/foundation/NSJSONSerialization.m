@@ -263,8 +263,13 @@ static id read_array(struct reader *r)
         if (*r->p == ',') {
             r->p++;
             skip_space(r);
-            if (r->p < r->end && *r->p == ']')
-                return fail(r, r->p, @"Trailing comma in array");
+            /* a comma before the close is let through, as a Mac's reader
+             * does: ShortcutRecorder's own style files have them (freemac
+             * 1.224) */
+            if (r->p < r->end && *r->p == ']') {
+                r->p++;
+                return a;
+            }
             continue;
         }
         if (*r->p == ']') {
@@ -308,8 +313,10 @@ static id read_object(struct reader *r)
         if (*r->p == ',') {
             r->p++;
             skip_space(r);
-            if (r->p < r->end && *r->p == '}')
-                return fail(r, r->p, @"Trailing comma in object");
+            if (r->p < r->end && *r->p == '}') {
+                r->p++;
+                return d;
+            }
             continue;
         }
         if (*r->p == '}') {

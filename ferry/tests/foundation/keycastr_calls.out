@@ -1,0 +1,55 @@
+notification centers
+  the local center is the default center: yes
+  local: FerryLocalNote, observer first, user info {
+    k = v;
+}
+  local: FerryLocalNote, observer first, user info (null)
+  local calls: 2
+  darwin: org.freemac.ferry.note, object NULL, user info NULL
+  darwin calls: 1
+  CFMachPortCreate: NULL
+os_trace and os_activity
+  info enabled 1, debug enabled 0
+XPC
+  async proxy: error NSCocoaErrorDomain 4099, reply no, invalidated 1
+  synchronous proxy: returned 0, error 4099 (before the call returned), invalidated 1
+data searches
+  forwards 0+2, backwards 6+2, anchored 0+2, anchored backwards 6+2, anchored bc not found
+  in 2+4: 3+2, backwards in 0+5: 3+2
+plists at URLs
+  dictionary Ferry 3, array 2 items
+  missing file: nil, error NSCocoaErrorDomain 260
+bookmarks
+  resolved to the same file: yes, stale 0, scope started 1
+  after the file went: nil, error 4
+  junk: nil, error 259
+  volume identifier: set
+strings and errors
+  CAFÉ À LA CARTE / ferry boat / The Ferry Boat
+  NSMultipleUnderlyingErrorsKey: NSMultipleUnderlyingErrorsKey
+  NSHomeDirectoryForUser(me) is the home: yes, for no one: nil
+  Markdown: nil, error 3328 Markdown isn't read here yet.
+  a paragraph intent: kind 0, identity 1
+defaults suites
+  before: registered
+  added: from the suite, and my own still wins: mine
+  removed: registered
+launchd, authorization and the console user
+  SMJobRemove: 0, kSMErrorDomainLaunchd 6
+  SMJobBless: 0, 7
+  SMJobCopyDictionary: NULL
+  AuthorizationRightGet: -60005
+  console user is this user: yes, uid matches 1, gid matches 1
+files
+  RENAME_SWAP: 0, a now holds B
+  RENAME_EXCL onto a file: -1, EEXIST 1
+  O_NOFOLLOW_ANY with no link: opened
+  O_NOFOLLOW_ANY through a link: refused, ELOOP 1
+  futimes: 0, modified 1200000000
+  utimes: 0, modified 1300000000
+bundles
+  frameworks folder ends Frameworks, shared support ends SharedSupport
+  a missing helper: nil
+  an unknown identifier: nil
+  allBundles starts with the main bundle: yes
+exit=0

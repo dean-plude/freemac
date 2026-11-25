@@ -47,7 +47,7 @@ const char *const ferry_passthrough[] = {
     "pipe", "fsync", "fdatasync", "ftruncate", "truncate", "unlink", "rmdir", "mkdir",
     "chdir", "fchdir", "getcwd", "chmod", "fchmod", "chown", "lchown",
     "link", "symlink", "readlink", "isatty", "ttyname", "mkstemp", "mkstemps", "mkdtemp",
-    "mktemp", "utimes", "futimes", "select", "poll", "gethostname", "getpagesize",
+    "mktemp", "select", "poll", "gethostname", "getpagesize",
     "getdtablesize", "flock",
     /* folders' changes, for FSEvents (foundation/FSEvents.m) */
     "inotify_init1", "inotify_add_watch", "inotify_rm_watch",

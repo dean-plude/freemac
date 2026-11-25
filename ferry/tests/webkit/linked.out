@@ -9,6 +9,7 @@ schemes: http 1, file 1, about 1, ferry 0
 constants: WKErrorDomain, WebViewProgressFinishedNotification, WebActionNavigationTypeKey
 WebPreferences: Helvetica, Courier, 16, JavaScript 1, page cache 1
 WebUndefined: undefined, one object 1
+content rule lists: compile gave no list 1, error 6; look-up 1, error 7; 0 available
 a web view that can't be shown: load nil, title nil, URL nil, loading 0, back-forward list 1
 its script: WKErrorDomain 1; its snapshot: WKErrorDomain 1
 data removed: 1

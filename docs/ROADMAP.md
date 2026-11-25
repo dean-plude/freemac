@@ -1183,6 +1183,36 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.224 "Ferry: shortcuts, asset catalogues and KeyCastr" (done)
+
+Ferry 0.48.0: the running apps' global shortcuts pressed and answered,
+asset catalogues compiled, and a fourth app, KeyCastr, linked and run.
+Counted with one survey script over the same clones as 1.223 (627 files),
+the files that compile went from 435 to 445.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Global shortcuts reach the running apps. Each of Spectacle's 18 shortcuts, pressed through freemac's desktop, moves and sizes the focused window as on a Mac, and Flycut's opens its bezel. An agent app (`LSUIElement`) isn't made active by starting. `frontmostApplication` is the app whose window Wayfire has focused, so Spectacle acts on that app's window. A control whose class keeps its state in a cell of the app's own (ShortcutRecorder's recorder) gets that cell. `TransformProcessType` changes the activation policy | Ferry AppKit, Carbon | done |
+| 2 | `ferry-actool`, which compiles an Xcode asset catalogue (`.xcassets`) into an index of Ferry's own beside the image, colour and data files, and the app icon into an `.icns` file named in Info.plist. `imageNamed:`, `colorNamed:` and `NSDataAsset` look there first. Spectacle's status item shows its picture. A Mac's compiled catalogue (`Assets.car`) isn't read, and image stacks and symbol sets aren't compiled | Ferry SDK, AppKit | done |
+| 3 | KeyCastr links and runs, with ShortcutRecorder and Sparkle 2 built from their source and its three visualizer plug-ins. It shows its status item and Sparkle's first-launch question. It shows no keystrokes, because Wayland lets no app read another app's keys, so its event tap is never made | Ferry AppKit, Foundation | done |
+| 4 | What KeyCastr, Sparkle 2 and ShortcutRecorder call: | Ferry Foundation, AppKit, libSystem | done |
+|   | - CoreFoundation's notification centers (`CFMachPortCreate` gives `NULL`), `os_trace` and `os_activity` | | |
+|   | - an `NSXPCConnection` that never connects: its error handler gets `NSXPCConnectionInvalid` | | |
+|   | - bookmarks, plists read from URLs and data searched backwards and anchored | | |
+|   | - window frames saved by name, tool-tip rects, tab stops, catalogue colours and three- and nine-part images | | |
+|   | - `renamex_np`, `O_NOFOLLOW_ANY`, the Mac's `struct timeval` in `utimes` and `futimes` | | |
+|   | - launchd's job calls and authorization rights, all refused | | |
+|   | - `+[NSBundle bundleWithIdentifier:]` for loaded frameworks | | |
+|   | - JSON with a comma before a closing bracket, as ShortcutRecorder's style files have | | |
+|   | - one object for each input source | | |
+| 5 | MacDown's libraries, hoedown, LibYAML and GBCli, built into frameworks from their source and run: Markdown becomes HTML, YAML is parsed and options are read. With them in place, 21 of MacDown's 36 files compile. MacDown doesn't link yet: handlebars-objc's lexer needs flex, and its other libraries aren't built | Ferry Foundation, AppKit | done |
+| 6 | Four new tests and three extended; `make check` 260 of 260 | Ferry | done |
+
+Gas Mask and Hex Fiend still can't be linked, since both have Swift in
+them. MacPass waits for KeePassKit, KissXML (on libxml2) and HNHUi, and
+Sequel Pro for its MySQL framework. `@import Darwin`, JavaScript functions
+as blocks and a weak `JSManagedValue` weren't reached.
+
 ## 1.223 "Ferry: linking the apps and running them" (done)
 
 Ferry 0.47.0: three of the nine apps linked into bundles with Ferry's SDK

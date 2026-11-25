@@ -61,10 +61,47 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
     _lineBreak = NSLineBreakByClipping;
 }
 
+/* A cell class the app's own code chose: one set with +setCellClass:, or
+ * an +cellClass of the app's own control class that answers a cell class
+ * of the app's own. Ferry's controls keep their state themselves, but an
+ * app's control that keeps its state in its own cell (ShortcutRecorder's
+ * recorder, for one) needs the cell made, as a Mac's -initWithFrame: makes
+ * it (freemac 1.224, Ferry 0.48.0). */
+static NSMutableDictionary *chosen_cell_classes;
+
+static Class apps_cell_class(Class control)
+{
+    for (Class c = control; c && c != [NSControl class]; c = class_getSuperclass(c)) {
+        Class chosen = nil;
+        @synchronized([NSControl class]) {
+            chosen = chosen_cell_classes[NSStringFromClass(c)];
+        }
+        if (chosen)
+            return chosen;
+    }
+    Class cls = [control cellClass];
+    if (!cls || ![cls isSubclassOfClass:[NSCell class]])
+        return nil;
+    /* class_getImageName answers in a buffer of its own, so the first answer
+     * is kept before the second is asked for */
+    const char *image = class_getImageName([NSControl class]);
+    char *mine = image ? strdup(image) : NULL;
+    const char *theirs = class_getImageName(cls);
+    BOOL apps = mine && theirs && strcmp(mine, theirs);
+    free(mine);
+    return apps ? cls : nil;
+}
+
 - (instancetype)initWithFrame:(NSRect)frame
 {
-    if ((self = [super initWithFrame:frame]))
+    if ((self = [super initWithFrame:frame])) {
         [self _setDefaults];
+        Class cls = _cell ? nil : apps_cell_class([self class]);
+        if (cls) {
+            _cell = [[cls alloc] init];
+            [_cell setControlView:self];
+        }
+    }
     return self;
 }
 
@@ -110,8 +147,25 @@ static CTLineRef make_line(NSString *s, NSFont *font, NSColor *color)
         [self setFormatter:[cell formatter]];
 }
 
-+ (Class)cellClass { return [NSActionCell class]; }
-+ (void)setCellClass:(Class)cls {}
++ (Class)cellClass
+{
+    Class chosen = nil;
+    @synchronized([NSControl class]) {
+        chosen = chosen_cell_classes[NSStringFromClass(self)];
+    }
+    return chosen ?: [NSActionCell class];
+}
++ (void)setCellClass:(Class)cls
+{
+    @synchronized([NSControl class]) {
+        if (!chosen_cell_classes)
+            chosen_cell_classes = [[NSMutableDictionary alloc] init];
+        if (cls)
+            chosen_cell_classes[NSStringFromClass(self)] = cls;
+        else
+            [chosen_cell_classes removeObjectForKey:NSStringFromClass(self)];
+    }
+}
 - (NSCell *)cell { return _cell; }
 - (void)setCell:(NSCell *)cell
 {

@@ -98,7 +98,7 @@ int main(void)
         printf("\n");
 
         printf("mistakes\n");
-        const char *bad[] = {"", "   ", "\"fragment\"", "[1, 2", "[1 2]", "[1,]", "{\"a\" 1}", "{\"a\":1,}", "{1:2}",
+        const char *bad[] = {"", "   ", "\"fragment\"", "[1, 2", "[1 2]", "[1,,]", "[,]", "{\"a\" 1}", "{,}", "{1:2}",
                              "[01]", "[1.]", "[1e]", "[-]", "[tru]", "[\"\\x\"]", "[\"\\ud800\"]", "[\"a\nb\"]",
                              "[\"open]", "[1] x", "{\"a\":\n  [1,\n   nope]}", "[1e999]"};
         for (unsigned i = 0; i < sizeof bad / sizeof bad[0]; i++)
@@ -107,6 +107,12 @@ int main(void)
         for (int i = 0; i < 600; i++)
             [deep appendString:@"["];
         parse([deep UTF8String], 0);
+        /* one comma before the close is read, as a Mac reads it */
+        printf("trailing commas: ");
+        show(parse("[1,]", 0));
+        printf(", ");
+        show(parse("{\"a\":[1,2,],}", 0));
+        printf("\n");
 
         printf("writing\n");
         NSDictionary *obj = @{

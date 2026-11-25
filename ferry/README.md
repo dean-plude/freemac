@@ -347,6 +347,24 @@ libSystem has kqueue's vnode filter (`src/kqueue.c`), `fts`, `statfs` and
 Sparkle and the apps' own frameworks make are in `foundation/NSOlderCalls.m`
 and `foundation/NSFrameworkCalls.m`.
 
+From Ferry 0.48.0 (freemac 1.224), KeyCastr links and runs as a fourth
+app, and the running apps' global shortcuts answer their presses.
+`sdk/ferry-actool` compiles an Xcode asset catalogue
+(`ferry-actool --compile Resources [--app-icon AppIcon]
+[--output-partial-info-plist P] Assets.xcassets`). It writes
+`Resources/Assets.ferryassets`, an index of Ferry's own with the files
+beside it, and the app icon as an `.icns` file. `appkit/NSAssets.m` reads
+the index for `imageNamed:`, `colorNamed:` and `NSDataAsset`. A Mac's
+compiled `Assets.car` isn't read. CoreFoundation's notification centers are
+in `foundation/CFNotificationCenter.m`. `NSXPCConnection`, which never
+connects, is in `foundation/NSXPCConnection.m`, and the attributed string
+presentation intents are in `foundation/NSPresentationIntent.m`.
+KeyCastr's and ShortcutRecorder's AppKit calls are in
+`appkit/NSKeyCastrCalls.m`. `+[NSBundle bundleWithIdentifier:]` also finds
+the bundles of loaded frameworks and plug-ins. The rename and time calls
+that take the Mac's flags and layout (`renamex_np`, `O_NOFOLLOW_ANY`,
+`utimes`) are converted in `src/posix.c`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

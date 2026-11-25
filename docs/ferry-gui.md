@@ -2755,6 +2755,25 @@ rows. Nothing is drawn under the pointer, and drags don't leave the app. (freema
   - `statfs` reports the kind of file system by this system's name for it (ext4, btrfs), and its flags as far as this system's mount options say.
   - A uniform type the table doesn't know gets a dynamic identifier of Ferry's own form, which conforms to public.data.
 
+- **Shortcuts, asset catalogues and KeyCastr, not compared with a Mac** (freemac 1.224, Ferry 0.48.0).
+  - Asset catalogues:
+    - `ferry-actool` reads only the `mac` and `universal` idioms and the `any` and `dark` appearances.
+    - Ferry draws in the light appearance, so an asset's dark variant is used only when it has no other.
+    - Image stacks, symbol sets and the other kinds are left out with a note.
+    - The app icon's `.icns` holds each size's PNG, and Ferry shows the largest.
+  - `frontmostApplication`, when another app is in front, is the app whose window Wayfire has focused. That is a Ferry program found by its process, or another program named by its window's app id. Its name is the app id's last part.
+  - `NSXPCConnection` never connects. A proxy's error handler is called on a background queue (at once for a synchronous proxy), then the invalidation handler, once. Each call through the proxy returns zero.
+  - launchd's job calls and authorization rights are always refused, with the Mac's error codes. Content rule lists are never compiled, so nothing in a web view is blocked. Markdown isn't read into attributed strings.
+  - Bookmarks:
+    - A bookmark holds only the file's path, in a property list of Ferry's own.
+    - It resolves while the file is at that path.
+    - It is never stale.
+    - Security scopes always start.
+  - Window frames are saved under the Mac's "NSWindow Frame" keys in Ferry's own preferences. A window that can't be resized keeps its size.
+  - A nine-part image's edges and middle are stretched, not tiled. Tab stops are kept and read back, but text is drawn with the system's own tab stops.
+  - JSON with one comma before a closing bracket or brace is read, as ShortcutRecorder's files need.
+  - The input source for each layout is one object for the program's life.
+
 **What's next.** Freemac 1.219 added the calls a search of the nine apps' source found missing. Running the nine apps again to see where they stop now
 that the views every app's nibs use are in (`NSSplitView` and `NSTabView`
 came in freemac 1.155, see `appkit_panes`; `NSStatusBar` in 1.157, see
@@ -2851,3 +2870,4 @@ bridge in the `ferry` binary.
 - 2026-11-25: Ferry 0.45.0 (freemac 1.221): the nine apps' source compiled against Ferry's SDK and what stopped it added: the headers and BSD names every app includes first, keyboard layouts, file references, `NSArchiver` and coding without keys, `NSMapTable` and its kin, shadings, `NSScriptCommand`, and Foundation's and AppKit's older and smaller names, 418 of the apps' 637 files compiling, `make check` 231/231.
 - 2026-11-25: Ferry 0.46.0 (freemac 1.222): `@import` modules; Auto Layout with a solver; the accessibility names and methods; `NSFontDescriptor`; FSEvents on inotify; Quick Look's panel and previews with `Quartz/Quartz.h`; `NSRuleEditor`; and JavaScriptCore's C and Objective-C APIs on this system's JavaScriptCore, 383 of the apps' 608 files compiling (369 before, counted the same way), `make check` 244/244.
 - 2026-11-25: Ferry 0.47.0 (freemac 1.223): Flycut, Spectacle and ShiftIt link and run, with their status items, menus and windows; `ferry-ibtool` compiles document-format xibs; Apple events, Launch Services, CloudKit with no account, Scripting Bridge, uniform type identifiers, authorization, signature checks with Security transforms and what Sparkle calls; kqueue's vnode filter and `O_EVTONLY`; Foundation brings in Core Services; 428 of the apps' 627 files compiling (395 before, counted the same way), `make check` 256/256.
+- 2026-11-25: Ferry 0.48.0 (freemac 1.224): global shortcuts answered (Spectacle's 18 move and size the focused window, Flycut's opens its bezel); `ferry-actool` compiles asset catalogues, so Spectacle's status item shows its picture; KeyCastr links and runs with ShortcutRecorder, Sparkle 2 and its plug-ins; CoreFoundation's notification centers, `NSXPCConnection` that never connects, bookmarks, `renamex_np`, `O_NOFOLLOW_ANY`, tab stops, three- and nine-part images and the rest of what they call; MacDown's hoedown, LibYAML and GBCli built as frameworks; 445 of the apps' 627 files compiling (435 before, counted the same way), `make check` 260/260.

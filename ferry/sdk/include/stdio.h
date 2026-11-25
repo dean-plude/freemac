@@ -79,6 +79,15 @@ void flockfile(FILE *);
 void funlockfile(FILE *);
 int remove(const char *);
 int rename(const char *, const char *);
+int renameat(int, const char *, int, const char *);
+/* renaming with flags (freemac 1.224, Ferry 0.48.0): swapping two items,
+ * keeping an existing destination, following no symbolic link */
+#define RENAME_SECLUDE 0x00000001
+#define RENAME_SWAP 0x00000002
+#define RENAME_EXCL 0x00000004
+#define RENAME_NOFOLLOW_ANY 0x00000010
+int renamex_np(const char *, const char *, unsigned int);
+int renameatx_np(int, const char *, int, const char *, unsigned int);
 void perror(const char *);
 __FERRY_END
 #endif

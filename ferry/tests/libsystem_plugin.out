@@ -29,5 +29,10 @@ Broken.bundle, whose program is missing
   load: no, error NSCocoaErrorDomain 4
   principal class: Nil
   a folder that isn't there: nil
+Quiet.bundle, opened with dlopen
+  by identifier before: nil
+  dlopen: yes
+  by identifier after: found, its folder Quiet.bundle
+  in allBundles: yes, in allFrameworks: no
 main bundle loaded: yes
 exit=0

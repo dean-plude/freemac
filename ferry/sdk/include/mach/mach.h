@@ -8,6 +8,7 @@
 #include <mach/mach_time.h>
 #include <mach/boolean.h>
 #include <mach/machine.h>
+#include <mach/message.h>
 __FERRY_BEGIN
 typedef int kern_return_t;
 typedef uint32_t natural_t;

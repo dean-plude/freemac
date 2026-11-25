@@ -10,10 +10,14 @@
  * identifier and name. Programs this system runs without Ferry aren't
  * listed. Terminating another program sends it SIGTERM, forcing it
  * SIGKILL; it can't be hidden or activated from here. The frontmost
- * application is this one while it is active, and none otherwise, since
- * Ferry can't tell which other program the desktop has in front. Built
- * without ARC. */
+ * application is this one while it is active. Otherwise, on freemac's
+ * desktop, it is the app whose window Wayfire has focused (freemac 1.224,
+ * Ferry 0.48.0): the Ferry program of that window's process, or, for a
+ * program of this system's, one named by the window's Wayland app id (its
+ * bundle identifier) and the app id's last part. Without Wayfire there is
+ * none, as before. Built without ARC. */
 #import "AInternal.h"
+#import "AWayfire.h"
 #include <fcntl.h>
 #include <signal.h>
 
@@ -22,7 +26,7 @@
     NSURL *_bundleURL, *_executableURL;
     NSString *_identifier, *_name;
     NSDate *_launched;
-    BOOL _current;
+    BOOL _current, _front;
 }
 
 /* The whole of a /proc file, which reports no size of its own. */
@@ -205,6 +209,43 @@ static NSArray *all_running(void)
     return out;
 }
 
+/* The app whose window Wayfire has focused, or nil (no Wayfire, or nothing
+ * focused). */
+static NSRunningApplication *wayfire_frontmost(void)
+{
+    if (!AWayfireAvailable())
+        return nil;
+    id reply = AWayfireCall(@"window-rules/get-focused-view", nil);
+    NSDictionary *info = [reply isKindOfClass:[NSDictionary class]] ? reply[@"info"] : nil;
+    if (![info isKindOfClass:[NSDictionary class]] || !info[@"id"])
+        return nil;
+    pid_t pid = 0;
+    id pids = AWayfireCall(@"strata/view-pids", nil);
+    id views = [pids isKindOfClass:[NSDictionary class]] ? pids[@"views"] : nil;
+    for (id v in [views isKindOfClass:[NSArray class]] ? views : @[])
+        if ([v isKindOfClass:[NSDictionary class]] && [v[@"id"] longLongValue] == [info[@"id"] longLongValue])
+            pid = [v[@"pid"] intValue];
+    if (pid == getpid())
+        return [NSRunningApplication currentApplication];
+    NSRunningApplication *app = pid > 0 ? from_process(pid, proc_link(0, "exe")) : nil;
+    if (!app) {
+        NSString *appID = [info[@"app-id"] isKindOfClass:[NSString class]] ? info[@"app-id"] : nil;
+        if (![appID length] && pid <= 0)
+            return nil;
+        app = [[[NSRunningApplication alloc] init] autorelease];
+        app->_pid = pid > 0 ? pid : -1;
+        app->_identifier = [appID copy];
+        NSString *name = [[appID componentsSeparatedByString:@"."] lastObject];
+        app->_name = [([name length] ? name : [info[@"title"] description]) copy];
+        NSString *exe = pid > 0 ? proc_link(pid, "exe") : nil;
+        if (exe)
+            app->_executableURL = [[NSURL fileURLWithPath:exe] copy];
+        app->_launched = [(pid > 0 ? started(pid) : nil) retain];
+    }
+    app->_front = YES;
+    return app;
+}
+
 + (instancetype)runningApplicationWithProcessIdentifier:(pid_t)pid
 {
     if (pid <= 0)
@@ -260,7 +301,7 @@ static NSArray *all_running(void)
 }
 - (BOOL)isFinishedLaunching { return YES; }
 - (BOOL)isHidden { return NO; }
-- (BOOL)isActive { return _current && [NSApp isActive]; }
+- (BOOL)isActive { return _current ? [NSApp isActive] : _front; }
 - (BOOL)ownsMenuBar { return [self isActive]; }
 - (NSApplicationActivationPolicy)activationPolicy
 {
@@ -310,7 +351,9 @@ static NSArray *all_running(void)
 - (NSArray *)runningApplications { return all_running(); }
 - (NSRunningApplication *)frontmostApplication
 {
-    return [NSApp isActive] ? [NSRunningApplication currentApplication] : nil;
+    if ([NSApp isActive])
+        return [NSRunningApplication currentApplication];
+    return wayfire_frontmost();
 }
 - (NSRunningApplication *)menuBarOwningApplication { return [self frontmostApplication]; }
 @end

@@ -62,6 +62,11 @@ BOOL ADisplayAvailable(void);
 NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
 void AWarnOnce(const char *what);
+
+/* An image or colour from a bundle's asset catalogue, as ferry-actool
+ * compiled it (NSAssets.m); nil when the bundle has none of that name. */
+NSImage *AAssetImage(NSBundle *bundle, NSString *name);
+NSColor *AAssetColor(NSBundle *bundle, NSString *name);
 /* AppKit is for the main thread only, as on a Mac. Ferry doesn't stop a
  * program that calls it from another thread, but says so, once. */
 void AMainThreadOnly(const char *what);

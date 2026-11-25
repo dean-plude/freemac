@@ -81,6 +81,14 @@ CFStringRef SCDynamicStoreCopyComputerName(SCDynamicStoreRef store, CFStringEnco
         *nameEncoding = kCFStringEncodingUTF8;
     return (CFStringRef)[[[NSProcessInfo processInfo] hostName] copy];
 }
+CFStringRef SCDynamicStoreCopyConsoleUser(SCDynamicStoreRef store, uid_t *uid, gid_t *gid)
+{
+    if (uid)
+        *uid = getuid();
+    if (gid)
+        *gid = getgid();
+    return (CFStringRef)[NSUserName() copy];
+}
 CFStringRef SCDynamicStoreCopyLocalHostName(SCDynamicStoreRef store)
 {
     NSString *name = [[NSProcessInfo processInfo] hostName];

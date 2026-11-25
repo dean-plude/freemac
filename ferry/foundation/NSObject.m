@@ -25,6 +25,7 @@ NSString *const NSOSStatusErrorDomain = @"NSOSStatusErrorDomain";
 NSString *const NSLocalizedDescriptionKey = @"NSLocalizedDescription";
 NSString *const NSFilePathErrorKey = @"NSFilePath";
 NSString *const NSUnderlyingErrorKey = @"NSUnderlyingError";
+NSString *const NSMultipleUnderlyingErrorsKey = @"NSMultipleUnderlyingErrorsKey";
 NSString *const NSGenericException = @"NSGenericException";
 NSString *const NSRangeException = @"NSRangeException";
 NSString *const NSInvalidArgumentException = @"NSInvalidArgumentException";
@@ -1289,6 +1290,14 @@ static NSString *xdg_dir(const char *var, NSString *fallback)
 }
 
 NSString *NSHomeDirectory(void) { return FHome(); }
+NSString *NSHomeDirectoryForUser(NSString *name)
+{
+    /* this user's is the one NSHomeDirectory gives, which follows $HOME */
+    if (!name || [name isEqualToString:NSUserName()])
+        return NSHomeDirectory();
+    struct passwd *pw = getpwnam([name UTF8String]);
+    return pw && pw->pw_dir ? [NSString stringWithUTF8String:pw->pw_dir] : nil;
+}
 NSString *NSTemporaryDirectory(void)
 {
     const char *t = getenv("TMPDIR");

@@ -26,6 +26,7 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h \
                      $(wildcard sdk/include/Foundation/NS*.h) \
                      sdk/include/CoreFoundation/CFSocket.h sdk/include/CoreFoundation/CFStream.h \
+                     sdk/include/CoreFoundation/CFNotificationCenter.h \
                      sdk/include/CoreFoundation/CFMore.h sdk/include/CoreFoundation/CFSet.h sdk/include/CoreFoundation/CFLocale.h sdk/include/CoreFoundation/CFDate.h \
                      sdk/include/CoreFoundation/CFError.h \
                      sdk/include/CFNetwork/CFNetwork.h $(wildcard sdk/include/CoreServices/*.h) foundation/UTCoreTypes.inc \
@@ -301,6 +302,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
 	install -Dm755 sdk/ferry-ibtool $(DESTDIR)$(PREFIX)/bin/ferry-ibtool
+	install -Dm755 sdk/ferry-actool $(DESTDIR)$(PREFIX)/bin/ferry-actool
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
 	cp -r sdk/include sdk/lib $(DESTDIR)$(PREFIX)/share/ferry/sdk/
 	install -Dm755 $(FOUNDATION) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Foundation.framework/Foundation

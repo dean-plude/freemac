@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <pwd.h>
 
-int utimes(const char *path, const void *times); /* two {long seconds, long microseconds} */
+#include <sys/time.h>
 
 NSString *const NSFileCreationDate = @"NSFileCreationDate";
 NSString *const NSFileOwnerAccountID = @"NSFileOwnerAccountID";
@@ -62,6 +62,7 @@ NSString *const NSURLTypeIdentifierKey = @"NSURLTypeIdentifierKey";
 NSString *const NSURLLocalizedTypeDescriptionKey = @"NSURLLocalizedTypeDescriptionKey";
 NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
+NSString *const NSURLVolumeIdentifierKey = @"NSURLVolumeIdentifierKey";
 NSString *const NSURLFileResourceTypeKey = @"NSURLFileResourceTypeKey";
 NSString *const NSURLFileResourceTypeNamedPipe = @"NSURLFileResourceTypeNamedPipe";
 NSString *const NSURLFileResourceTypeCharacterSpecial = @"NSURLFileResourceTypeCharacterSpecial";
@@ -305,8 +306,8 @@ NSString *const NSUbiquityIdentityDidChangeNotification = @"NSUbiquityIdentityDi
             return NO;
         }
         NSTimeInterval t = [mod timeIntervalSince1970];
-        long times[4] = {(long)st.st_atimespec.tv_sec, (long)(st.st_atimespec.tv_nsec / 1000), (long)floor(t),
-                         (long)((t - floor(t)) * 1e6)};
+        struct timeval times[2] = {{st.st_atimespec.tv_sec, (suseconds_t)(st.st_atimespec.tv_nsec / 1000)},
+                                   {(time_t)floor(t), (suseconds_t)((t - floor(t)) * 1e6)}};
         if (utimes(p, times) != 0) {
             FSetError(error, FPosixError(errno, path));
             return NO;
@@ -447,6 +448,17 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
         p = [[base path] stringByAppendingPathComponent:p];
     return [NSURL fileURLWithPath:p isDirectory:isDir];
 }
+- (instancetype)initFileURLWithFileSystemRepresentation:(const char *)path isDirectory:(BOOL)isDir
+                                          relativeToURL:(NSURL *)base
+{
+    NSURL *url = [NSURL fileURLWithFileSystemRepresentation:path isDirectory:isDir relativeToURL:base];
+    [self release];
+    return [url retain];
+}
+- (BOOL)getFileSystemRepresentation:(char *)buffer maxLength:(NSUInteger)maxLength
+{
+    return [self isFileURL] && [[self path] getFileSystemRepresentation:buffer maxLength:maxLength];
+}
 - (BOOL)isFileReferenceURL { return NO; }
 - (NSURL *)fileReferenceURL { return [self isFileURL] ? self : nil; }
 - (NSURL *)filePathURL { return [self isFileURL] ? self : nil; }
@@ -547,6 +559,8 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
         v = date_of(st.st_ctimespec);
     else if (IS(NSURLLinkCountKey))
         v = [NSNumber numberWithUnsignedLong:(unsigned long)st.st_nlink];
+    else if (IS(NSURLVolumeIdentifierKey))
+        v = [NSNumber numberWithUnsignedLongLong:(unsigned long long)st.st_dev];
     else if (IS(NSURLFileResourceIdentifierKey))
         v = [NSString stringWithFormat:@"%llu:%llu", (unsigned long long)st.st_dev, (unsigned long long)st.st_ino];
     else if (IS(NSURLFileResourceTypeKey))
@@ -594,6 +608,59 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
             return NO;
     return YES;
 }
+@end
+
+/* Bookmarks (freemac 1.224): a property list holding the item's absolute
+ * path, under a key of Ferry's own; resolving one finds whatever is at that
+ * path now. */
+static NSString *const bookmark_path_key = @"FerryBookmarkPath";
+@implementation NSURL (FerryBookmarks)
+- (NSData *)bookmarkDataWithOptions:(NSURLBookmarkCreationOptions)options
+     includingResourceValuesForKeys:(NSArray *)keys
+                      relativeToURL:(NSURL *)relativeURL
+                              error:(NSError **)error
+{
+    if (![self isFileURL] || ![self checkResourceIsReachableAndReturnError:error]) {
+        if (error && ![self isFileURL])
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnsupportedSchemeError userInfo:nil];
+        return nil;
+    }
+    NSDictionary *plist = [NSDictionary dictionaryWithObject:[[self path] stringByStandardizingPath] forKey:bookmark_path_key];
+    return [NSPropertyListSerialization dataWithPropertyList:plist format:NSPropertyListBinaryFormat_v1_0
+                                                     options:0 error:error];
+}
+- (instancetype)initByResolvingBookmarkData:(NSData *)data options:(NSURLBookmarkResolutionOptions)options
+                              relativeToURL:(NSURL *)relativeURL bookmarkDataIsStale:(BOOL *)isStale
+                                      error:(NSError **)error
+{
+    [self release];
+    id plist = data ? [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:NULL] : nil;
+    NSString *path = [plist isKindOfClass:[NSDictionary class]] ? [plist objectForKey:bookmark_path_key] : nil;
+    if (![path isKindOfClass:[NSString class]]) {
+        if (error)
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:nil];
+        return nil;
+    }
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        if (error)
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileNoSuchFileError
+                                     userInfo:[NSDictionary dictionaryWithObject:path forKey:NSFilePathErrorKey]];
+        return nil;
+    }
+    if (isStale)
+        *isStale = NO;
+    return [[NSURL fileURLWithPath:path] retain];
+}
++ (instancetype)URLByResolvingBookmarkData:(NSData *)data options:(NSURLBookmarkResolutionOptions)options
+                             relativeToURL:(NSURL *)relativeURL bookmarkDataIsStale:(BOOL *)isStale
+                                     error:(NSError **)error
+{
+    return [[[NSURL alloc] initByResolvingBookmarkData:data options:options relativeToURL:relativeURL
+                                   bookmarkDataIsStale:isStale error:error] autorelease];
+}
+/* there is no sandbox to step out of */
+- (BOOL)startAccessingSecurityScopedResource { return YES; }
+- (void)stopAccessingSecurityScopedResource {}
 @end
 
 @implementation NSData (FerryFileAccess)
