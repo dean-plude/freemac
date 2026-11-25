@@ -5,7 +5,7 @@
  * that way), with the mutex held again for the cleanup handlers. On the main
  * thread CFRunLoopRun waits for work from the main queue until CFRunLoopStop,
  * as VLC's main does, while CFRunLoopRunInMode still finishes at once with
- * nothing to do. Since freemac 1.NEXT: nil is a null pointer in C too,
+ * nothing to do. Since freemac 1.237: nil is a null pointer in C too,
  * through CoreServices (VLC's sound out uses it so), and a cancellable wait
  * comes back now and then to look at its condition again, as POSIX lets a
  * wait do, so a wake taken at the end of one of its slices isn't lost:

@@ -18,7 +18,7 @@ typedef uint32_t CGDirectDisplayID;
 #define kCGNullDirectDisplay ((CGDirectDisplayID)0)
 
 CGDirectDisplayID CGMainDisplayID(void);
-/* the main display, as older code names it (freemac 1.NEXT, VLC) */
+/* the main display, as older code names it (freemac 1.237, VLC) */
 #define kCGDirectMainDisplay CGMainDisplayID()
 CGError CGGetOnlineDisplayList(uint32_t maxDisplays, CGDirectDisplayID *onlineDisplays, uint32_t *displayCount);
 CGError CGGetActiveDisplayList(uint32_t maxDisplays, CGDirectDisplayID *activeDisplays, uint32_t *displayCount);

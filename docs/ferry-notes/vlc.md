@@ -106,7 +106,7 @@ other than root, unless VLC was configured with `--enable-run-as-root`):
     VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --no-audio \
         --vout vdummy --play-and-exit video.mp4
 
-## Sound (freemac 1.NEXT, Ferry 0.NEXT)
+## Sound (freemac 1.237, Ferry 0.61)
 
 VLC's own sound out, its `auhal` module, plays through Ferry's Core Audio
 (freemac 1.234). With no sound server it plays into the null device, and
@@ -126,7 +126,7 @@ decodes from the file. It needed two things:
     VLC_PLUGIN_PATH=$PWD/plugins ferry ./vlc-osx -I dummy --aout auhal \
         --vout vdummy --play-and-exit video.mp4
 
-## VLC's window, with the picture in it (freemac 1.NEXT, Ferry 0.NEXT)
+## VLC's window, with the picture in it (freemac 1.237, Ferry 0.61)
 
 With Ferry's OpenGL, Core Video and CAOpenGLLayer (freemac 1.235), VLC's
 whole Mac interface builds, and `apps/vlc.sh` lays out

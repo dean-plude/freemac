@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Ferry's own test document for ferry-ibtool (freemac 1.NEXT), written by
+<!-- Ferry's own test document for ferry-ibtool (freemac 1.237), written by
      hand in the format Interface Builder saves: a slider, a stepper and a
      segmented control whose cells are of the app's own classes, as VLC's
      are. -->

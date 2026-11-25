@@ -849,6 +849,7 @@ run_one appkit_archiver "$here/appkit/archiver.m" "$here/appkit/archiver.out" -f
 run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.out" -fobjc-arc -framework Cocoa
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
+run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
 # NSAccessibility: the names, the protocol's methods and the older API
 run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
     -framework Cocoa -framework ApplicationServices
@@ -1612,7 +1613,7 @@ run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa 
 # what VLC's core needs (freemac 1.235): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
-# Cells of the app's own classes in a nib (freemac 1.NEXT): VLC's sliders,
+# Cells of the app's own classes in a nib (freemac 1.237): VLC's sliders,
 # steppers and segmented controls keep theirs through ferry-ibtool
 if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/VLCCells.nib" "$here/appkit/vlc_cells.xib" \
         2> "$build/vlc_cells.log" && python3 -I - "$build/VLCCells.nib" >> "$build/vlc_cells.log" 2>&1 <<'PY'
