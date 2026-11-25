@@ -1,0 +1,1717 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Ferry's AppKit: Auto Layout (freemac 1.222, Ferry 0.46.0). Constraints,
+ * anchors, layout guides, the visual format language and a solver that sets
+ * views' frames from them. Ferry's own code, written from Apple's public API
+ * documentation (the NSLayoutConstraint, NSLayoutAnchor and NSLayoutGuide
+ * references and the Auto Layout Guide's description of the visual format
+ * language).
+ *
+ * The solver. A window's (or a detached hierarchy's) constraints are solved
+ * together, one axis at a time. Each view or guide taking part has two
+ * unknowns on each axis, where it starts and its size, measured from the top
+ * left of the topmost view in its own points; every attribute is a sum of
+ * those (a trailing edge is start + size, a centre start + size / 2), so a
+ * constraint is a linear equation or inequality. Rows go into a running
+ * Gaussian elimination in priority order, required ones first; a row that
+ * contradicts the rows already there is left out (a required one with a
+ * note, as a Mac logs it), so higher priorities win. Below the app's own
+ * constraints come a view's intrinsic size (its content hugging and
+ * compression resistance, as inequalities at their priorities) and, last of
+ * all, "stays" that keep each view where and as big as it was, which settle
+ * whatever the constraints leave open. Inequalities start out inactive and
+ * are made equalities, highest priority first, only while the answer breaks
+ * them. Views that translate their autoresizing mask into constraints stay
+ * as their mask says against their superview, and are left to autoresizing;
+ * the frames of the others are set, outermost first.
+ *
+ * Layout runs when a window displays, after anything has changed (a
+ * constraint added, removed or changed, a view taking part resized, an
+ * intrinsic size invalidated), and whenever an app asks
+ * (layoutSubtreeIfNeeded, layoutIfNeeded, fittingSize).
+ *
+ * Nibs: a view's constraints under "NSViewConstraints" and its
+ * "NSDoNotTranslateAutoresizingMask", and a constraint's "NSFirstItem",
+ * "NSFirstAttribute", "NSRelation", "NSSecondItem", "NSSecondAttribute",
+ * "NSMultiplier", "NSConstant", "NSPriority" and "NSShouldBeArchived", as the
+ * GNUstep project's description of the format names them. */
+#import "AInternal.h"
+#include <objc/runtime.h>
+#include <stdarg.h>
+
+BOOL AConstraintsInUse;
+static BOOL solving;
+static unsigned long generation = 1;
+static NSMutableSet *all_active;      /* every active constraint */
+static BOOL updates_pending;          /* some view's needsUpdateConstraints is set */
+static char constraints_key, guides_key, solved_key, update_key, guide_key;
+
+static NSView *root_of(NSView *v)
+{
+    while ([v superview])
+        v = [v superview];
+    return v;
+}
+
+/* Something layout depends on has changed: the next pass solves again. */
+static void changed(NSView *v)
+{
+    generation++;
+    if (v && !solving) {
+        NSWindow *w = [v window];
+        [w ? [w contentView] : root_of(v) setNeedsDisplay:YES];
+    }
+}
+
+/* ---- attributes ------------------------------------------------------------------------- */
+
+static BOOL horizontal(NSLayoutAttribute a)
+{
+    return a == NSLayoutAttributeLeft || a == NSLayoutAttributeRight || a == NSLayoutAttributeLeading ||
+           a == NSLayoutAttributeTrailing || a == NSLayoutAttributeWidth || a == NSLayoutAttributeCenterX;
+}
+static BOOL is_size(NSLayoutAttribute a) { return a == NSLayoutAttributeWidth || a == NSLayoutAttributeHeight; }
+
+static NSString *attribute_name(NSLayoutAttribute a)
+{
+    switch (a) {
+    case NSLayoutAttributeLeft: return @"left";
+    case NSLayoutAttributeRight: return @"right";
+    case NSLayoutAttributeTop: return @"top";
+    case NSLayoutAttributeBottom: return @"bottom";
+    case NSLayoutAttributeLeading: return @"leading";
+    case NSLayoutAttributeTrailing: return @"trailing";
+    case NSLayoutAttributeWidth: return @"width";
+    case NSLayoutAttributeHeight: return @"height";
+    case NSLayoutAttributeCenterX: return @"centerX";
+    case NSLayoutAttributeCenterY: return @"centerY";
+    case NSLayoutAttributeLastBaseline: return @"lastBaseline";
+    case NSLayoutAttributeFirstBaseline: return @"firstBaseline";
+    default: return @"notAnAttribute";
+    }
+}
+
+/* ---- anchors ---------------------------------------------------------------------------- */
+
+@interface NSLayoutConstraint ()
+- (instancetype)_initWithItem:(id)i1 attribute:(NSLayoutAttribute)a1 minus:(id)i1b attribute:(NSLayoutAttribute)a1b
+                     relation:(NSLayoutRelation)r
+                         item:(id)i2 attribute:(NSLayoutAttribute)a2 minus:(id)i2b attribute:(NSLayoutAttribute)a2b
+                   multiplier:(CGFloat)m constant:(CGFloat)c;
+@end
+
+@implementation NSLayoutAnchor {
+@public
+    id _item;                 /* not retained, as a constraint's items aren't */
+    NSLayoutAttribute _attr;
+    id _minusItem;            /* a dimension between two anchors: _item._attr - _minusItem._minusAttr */
+    NSLayoutAttribute _minusAttr;
+}
++ (instancetype)_anchorFor:(id)item attribute:(NSLayoutAttribute)a
+{
+    NSLayoutAnchor *x = [[[self alloc] init] autorelease];
+    x->_item = item;
+    x->_attr = a;
+    return x;
+}
+- (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+- (instancetype)initWithCoder:(NSCoder *)c { return [self init]; }
+- (void)encodeWithCoder:(NSCoder *)c {}
+- (id)item { return _item; }
+- (NSString *)name
+{
+    return _minusItem ? [NSString stringWithFormat:@"%@ - %@", attribute_name(_attr), attribute_name(_minusAttr)]
+                      : attribute_name(_attr);
+}
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<%@ %@.%@>", [self class], [_item class], [self name]];
+}
+- (BOOL)isEqual:(id)o
+{
+    if (![o isKindOfClass:[NSLayoutAnchor class]])
+        return NO;
+    NSLayoutAnchor *a = o;
+    return a->_item == _item && a->_attr == _attr && a->_minusItem == _minusItem && a->_minusAttr == _minusAttr;
+}
+- (NSUInteger)hash { return (NSUInteger)_item ^ (NSUInteger)_attr; }
+- (NSLayoutConstraint *)_to:(NSLayoutAnchor *)o relation:(NSLayoutRelation)r multiplier:(CGFloat)m constant:(CGFloat)c
+{
+    return [[[NSLayoutConstraint alloc] _initWithItem:_item attribute:_attr minus:_minusItem attribute:_minusAttr
+                                             relation:r
+                                                 item:o ? o->_item : nil attribute:o ? o->_attr : NSLayoutAttributeNotAnAttribute
+                                                minus:o ? o->_minusItem : nil
+                                            attribute:o ? o->_minusAttr : NSLayoutAttributeNotAnAttribute
+                                           multiplier:m constant:c] autorelease];
+}
+- (NSLayoutConstraint *)constraintEqualToAnchor:(NSLayoutAnchor *)a
+{
+    return [self _to:a relation:NSLayoutRelationEqual multiplier:1 constant:0];
+}
+- (NSLayoutConstraint *)constraintGreaterThanOrEqualToAnchor:(NSLayoutAnchor *)a
+{
+    return [self _to:a relation:NSLayoutRelationGreaterThanOrEqual multiplier:1 constant:0];
+}
+- (NSLayoutConstraint *)constraintLessThanOrEqualToAnchor:(NSLayoutAnchor *)a
+{
+    return [self _to:a relation:NSLayoutRelationLessThanOrEqual multiplier:1 constant:0];
+}
+- (NSLayoutConstraint *)constraintEqualToAnchor:(NSLayoutAnchor *)a constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationEqual multiplier:1 constant:c];
+}
+- (NSLayoutConstraint *)constraintGreaterThanOrEqualToAnchor:(NSLayoutAnchor *)a constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationGreaterThanOrEqual multiplier:1 constant:c];
+}
+- (NSLayoutConstraint *)constraintLessThanOrEqualToAnchor:(NSLayoutAnchor *)a constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationLessThanOrEqual multiplier:1 constant:c];
+}
+- (BOOL)hasAmbiguousLayout { return NO; }
+- (NSArray *)constraintsAffectingLayout
+{
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSLayoutConstraint *c in all_active)
+        if (([c firstItem] == _item || [c secondItem] == _item) && horizontal([c firstAttribute]) == horizontal(_attr))
+            [out addObject:c];
+    return out;
+}
+@end
+
+@implementation NSLayoutXAxisAnchor
+- (NSLayoutDimension *)anchorWithOffsetToAnchor:(NSLayoutXAxisAnchor *)other
+{
+    NSLayoutDimension *d = [NSLayoutDimension _anchorFor:other->_item attribute:other->_attr];
+    ((NSLayoutAnchor *)d)->_minusItem = _item;
+    ((NSLayoutAnchor *)d)->_minusAttr = _attr;
+    return d;
+}
+@end
+@implementation NSLayoutYAxisAnchor
+- (NSLayoutDimension *)anchorWithOffsetToAnchor:(NSLayoutYAxisAnchor *)other
+{
+    NSLayoutDimension *d = [NSLayoutDimension _anchorFor:other->_item attribute:other->_attr];
+    ((NSLayoutAnchor *)d)->_minusItem = _item;
+    ((NSLayoutAnchor *)d)->_minusAttr = _attr;
+    return d;
+}
+@end
+@implementation NSLayoutDimension
+- (NSLayoutConstraint *)constraintEqualToConstant:(CGFloat)c
+{
+    return [self _to:nil relation:NSLayoutRelationEqual multiplier:0 constant:c];
+}
+- (NSLayoutConstraint *)constraintGreaterThanOrEqualToConstant:(CGFloat)c
+{
+    return [self _to:nil relation:NSLayoutRelationGreaterThanOrEqual multiplier:0 constant:c];
+}
+- (NSLayoutConstraint *)constraintLessThanOrEqualToConstant:(CGFloat)c
+{
+    return [self _to:nil relation:NSLayoutRelationLessThanOrEqual multiplier:0 constant:c];
+}
+- (NSLayoutConstraint *)constraintEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m
+{
+    return [self _to:a relation:NSLayoutRelationEqual multiplier:m constant:0];
+}
+- (NSLayoutConstraint *)constraintGreaterThanOrEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m
+{
+    return [self _to:a relation:NSLayoutRelationGreaterThanOrEqual multiplier:m constant:0];
+}
+- (NSLayoutConstraint *)constraintLessThanOrEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m
+{
+    return [self _to:a relation:NSLayoutRelationLessThanOrEqual multiplier:m constant:0];
+}
+- (NSLayoutConstraint *)constraintEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationEqual multiplier:m constant:c];
+}
+- (NSLayoutConstraint *)constraintGreaterThanOrEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m
+                                                    constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationGreaterThanOrEqual multiplier:m constant:c];
+}
+- (NSLayoutConstraint *)constraintLessThanOrEqualToAnchor:(NSLayoutDimension *)a multiplier:(CGFloat)m
+                                                 constant:(CGFloat)c
+{
+    return [self _to:a relation:NSLayoutRelationLessThanOrEqual multiplier:m constant:c];
+}
+@end
+
+/* ---- constraints ------------------------------------------------------------------------ */
+
+static NSView *view_of(id item)
+{
+    if ([item isKindOfClass:[NSView class]])
+        return item;
+    if ([item isKindOfClass:[NSLayoutGuide class]])
+        return [(NSLayoutGuide *)item owningView];
+    return nil;
+}
+
+/* The closest view holding both items (a guide counts as its owning view). */
+static NSView *common_ancestor(NSView *a, NSView *b)
+{
+    if (!a)
+        return b;
+    if (!b)
+        return a;
+    for (NSView *x = a; x; x = [x superview])
+        if (b == x || [b isDescendantOf:x])
+            return x;
+    return nil;
+}
+
+static NSMutableArray *installed(NSView *v, BOOL make)
+{
+    NSMutableArray *a = objc_getAssociatedObject(v, &constraints_key);
+    if (!a && make) {
+        a = [NSMutableArray array];
+        objc_setAssociatedObject(v, &constraints_key, a, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return a;
+}
+
+NSDictionary *_NSDictionaryOfVariableBindings(NSString *keys, id first, ...)
+{
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    NSArray *names = [keys componentsSeparatedByString:@","];
+    NSCharacterSet *space = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+    va_list ap;
+    va_start(ap, first);
+    id v = first;
+    for (NSString *name in names) {
+        if (!v) break;
+        d[[name stringByTrimmingCharactersInSet:space]] = v;
+        v = va_arg(ap, id);
+    }
+    va_end(ap);
+    return d;
+}
+
+@implementation NSLayoutConstraint {
+    id _first, _firstMinus, _second, _secondMinus;   /* not retained */
+    NSLayoutAttribute _a1, _a1b, _a2, _a2b;
+    NSLayoutRelation _relation;
+    CGFloat _multiplier, _constant;
+    NSLayoutPriority _priority;
+    NSView *_container;                               /* the view it is installed on, not retained */
+    NSString *_identifier;
+    BOOL _archived;
+@public
+    BOOL _noted;                                      /* its conflict has been reported */
+}
+
+- (instancetype)_initWithItem:(id)i1 attribute:(NSLayoutAttribute)a1 minus:(id)i1b attribute:(NSLayoutAttribute)a1b
+                     relation:(NSLayoutRelation)r
+                         item:(id)i2 attribute:(NSLayoutAttribute)a2 minus:(id)i2b attribute:(NSLayoutAttribute)a2b
+                   multiplier:(CGFloat)m constant:(CGFloat)c
+{
+    if ((self = [super init])) {
+        _first = i1;
+        _a1 = a1;
+        _firstMinus = i1b;
+        _a1b = a1b;
+        _relation = r;
+        _second = i2;
+        _a2 = i2 ? a2 : NSLayoutAttributeNotAnAttribute;
+        _secondMinus = i2b;
+        _a2b = a2b;
+        _multiplier = i2 ? m : 0;
+        _constant = c;
+        _priority = NSLayoutPriorityRequired;
+        _archived = YES;
+    }
+    return self;
+}
+
++ (instancetype)constraintWithItem:(id)view1 attribute:(NSLayoutAttribute)attr1 relatedBy:(NSLayoutRelation)relation
+                            toItem:(id)view2 attribute:(NSLayoutAttribute)attr2 multiplier:(CGFloat)multiplier
+                          constant:(CGFloat)c
+{
+    if (!view1 || attr1 == NSLayoutAttributeNotAnAttribute)
+        [NSException raise:NSInvalidArgumentException
+                    format:@"NSLayoutConstraint needs a first item and attribute"];
+    if (view2 && attr2 != NSLayoutAttributeNotAnAttribute && horizontal(attr1) != horizontal(attr2))
+        [NSException raise:NSInvalidArgumentException
+                    format:@"NSLayoutConstraint: a constraint can't relate %@ to %@", attribute_name(attr1),
+                           attribute_name(attr2)];
+    if (attr2 == NSLayoutAttributeNotAnAttribute)
+        view2 = nil;
+    return [[[self alloc] _initWithItem:view1 attribute:attr1 minus:nil attribute:NSLayoutAttributeNotAnAttribute
+                               relation:relation
+                                   item:view2 attribute:attr2 minus:nil attribute:NSLayoutAttributeNotAnAttribute
+                             multiplier:multiplier constant:c] autorelease];
+}
+
+- (void)dealloc
+{
+    [_identifier release];
+    [super dealloc];
+}
+
+- (id)firstItem { return _first; }
+- (id)secondItem { return _second; }
+- (NSLayoutAttribute)firstAttribute { return _a1; }
+- (NSLayoutAttribute)secondAttribute { return _a2; }
+- (NSLayoutRelation)relation { return _relation; }
+- (CGFloat)multiplier { return _multiplier; }
+- (CGFloat)constant { return _constant; }
+- (void)setConstant:(CGFloat)c
+{
+    _constant = c;
+    if (_container)
+        changed(_container);
+}
+- (NSLayoutPriority)priority { return _priority; }
+- (void)setPriority:(NSLayoutPriority)p
+{
+    if (_container && ((_priority == NSLayoutPriorityRequired) != (p == NSLayoutPriorityRequired)))
+        [NSException raise:NSInternalInconsistencyException
+                    format:@"NSLayoutConstraint: an installed constraint can't change between required and not"];
+    _priority = p < 1 ? 1 : p > NSLayoutPriorityRequired ? NSLayoutPriorityRequired : p;
+    if (_container)
+        changed(_container);
+}
+- (NSString *)identifier { return _identifier; }
+- (void)setIdentifier:(NSString *)identifier
+{
+    [_identifier release];
+    _identifier = [identifier copy];
+}
+- (BOOL)shouldBeArchived { return _archived; }
+- (void)setShouldBeArchived:(BOOL)flag { _archived = flag; }
+
+static Class anchor_class(NSLayoutAttribute a)
+{
+    return is_size(a) ? [NSLayoutDimension class] : horizontal(a) ? [NSLayoutXAxisAnchor class]
+                                                                   : [NSLayoutYAxisAnchor class];
+}
+- (NSLayoutAnchor *)firstAnchor
+{
+    NSLayoutAnchor *a = [anchor_class(_a1) _anchorFor:_first attribute:_a1];
+    a->_minusItem = _firstMinus;
+    a->_minusAttr = _a1b;
+    return a;
+}
+- (NSLayoutAnchor *)secondAnchor
+{
+    if (!_second)
+        return nil;
+    NSLayoutAnchor *a = [anchor_class(_a2) _anchorFor:_second attribute:_a2];
+    a->_minusItem = _secondMinus;
+    a->_minusAttr = _a2b;
+    return a;
+}
+
+- (NSView *)_container { return _container; }
+- (void)_setContainer:(NSView *)v { _container = v; }
+- (BOOL)_involves:(id)item
+{
+    return _first == item || _second == item || _firstMinus == item || _secondMinus == item;
+}
+- (NSArray *)_items
+{
+    NSMutableArray *a = [NSMutableArray array];
+    id all[4] = {_first, _firstMinus, _second, _secondMinus};
+    for (int k = 0; k < 4; k++)
+        if (all[k] && [a indexOfObjectIdenticalTo:all[k]] == NSNotFound)
+            [a addObject:all[k]];
+    return a;
+}
+- (void)_getFirst:(id *)i1 attr:(NSLayoutAttribute *)a1 minus:(id *)i1b attr:(NSLayoutAttribute *)a1b
+           second:(id *)i2 attr:(NSLayoutAttribute *)a2 minus:(id *)i2b attr:(NSLayoutAttribute *)a2b
+{
+    *i1 = _first, *a1 = _a1, *i1b = _firstMinus, *a1b = _a1b;
+    *i2 = _second, *a2 = _a2, *i2b = _secondMinus, *a2b = _a2b;
+}
+
+/* The view a constraint belongs on: the closest one holding both items. */
+- (NSView *)_naturalContainer
+{
+    NSView *v = view_of(_first);
+    id rest[3] = {_firstMinus, _second, _secondMinus};
+    for (int k = 0; k < 3; k++)
+        if (rest[k])
+            v = common_ancestor(v, view_of(rest[k]));
+    return v;
+}
+
+- (BOOL)isActive { return _container != nil; }
+- (void)setActive:(BOOL)active
+{
+    if (active == (_container != nil))
+        return;
+    if (active) {
+        NSView *v = [self _naturalContainer];
+        if (!v)
+            [NSException raise:NSGenericException
+                        format:@"NSLayoutConstraint: %@ relates items with no common ancestor", self];
+        [v addConstraint:self];
+    } else {
+        [_container removeConstraint:self];
+    }
+}
+
++ (void)activateConstraints:(NSArray *)constraints
+{
+    for (NSLayoutConstraint *c in constraints)
+        [c setActive:YES];
+}
++ (void)deactivateConstraints:(NSArray *)constraints
+{
+    for (NSLayoutConstraint *c in constraints)
+        [c setActive:NO];
+}
+
+static NSString *item_name(id item)
+{
+    if (!item)
+        return @"nil";
+    NSString *ident = [item respondsToSelector:@selector(identifier)] ? [item identifier] : nil;
+    return ident ? [NSString stringWithFormat:@"%@'%@'", [item class], ident]
+                 : [NSString stringWithFormat:@"%@:%p", [item class], item];
+}
+- (NSString *)description
+{
+    NSMutableString *s = [NSMutableString stringWithFormat:@"<NSLayoutConstraint:%p ", self];
+    if (_identifier)
+        [s appendFormat:@"'%@' ", _identifier];
+    [s appendFormat:@"%@.%@", item_name(_first), attribute_name(_a1)];
+    if (_firstMinus)
+        [s appendFormat:@" - %@.%@", item_name(_firstMinus), attribute_name(_a1b)];
+    [s appendString:_relation == NSLayoutRelationEqual ? @" == " : _relation < 0 ? @" <= " : @" >= "];
+    if (_second) {
+        if (_multiplier != 1)
+            [s appendFormat:@"%g*", (double)_multiplier];
+        [s appendFormat:@"%@.%@", item_name(_second), attribute_name(_a2)];
+        if (_secondMinus)
+            [s appendFormat:@" - %@.%@", item_name(_secondMinus), attribute_name(_a2b)];
+        if (_constant)
+            [s appendFormat:@" %@ %g", _constant < 0 ? @"-" : @"+", fabs((double)_constant)];
+    } else {
+        [s appendFormat:@"%g", (double)_constant];
+    }
+    if (_priority != NSLayoutPriorityRequired)
+        [s appendFormat:@" @%g", (double)_priority];
+    [s appendString:_container ? @" (active)>" : @" (inactive)>"];
+    return s;
+}
+
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    id i1 = [c decodeObjectForKey:@"NSFirstItem"];
+    id i2 = [c containsValueForKey:@"NSSecondItem"] ? [c decodeObjectForKey:@"NSSecondItem"] : nil;
+    NSLayoutAttribute a1 = [c decodeIntegerForKey:@"NSFirstAttribute"];
+    NSLayoutAttribute a2 = [c decodeIntegerForKey:@"NSSecondAttribute"];
+    CGFloat m = [c containsValueForKey:@"NSMultiplier"] ? [c decodeDoubleForKey:@"NSMultiplier"] : 1;
+    self = [self _initWithItem:i1 attribute:a1 minus:nil attribute:0
+                      relation:[c decodeIntegerForKey:@"NSRelation"]
+                          item:i2 attribute:a2 minus:nil attribute:0
+                    multiplier:m constant:[c decodeDoubleForKey:@"NSConstant"]];
+    if ([c containsValueForKey:@"NSPriority"])
+        _priority = (NSLayoutPriority)[c decodeIntegerForKey:@"NSPriority"];
+    if ([c containsValueForKey:@"NSShouldBeArchived"])
+        _archived = [c decodeBoolForKey:@"NSShouldBeArchived"];
+    if ([c containsValueForKey:@"NSLayoutIdentifier"])
+        [self setIdentifier:[c decodeObjectForKey:@"NSLayoutIdentifier"]];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c
+{
+    [c encodeConditionalObject:_first forKey:@"NSFirstItem"];
+    [c encodeInteger:_a1 forKey:@"NSFirstAttribute"];
+    [c encodeInteger:_relation forKey:@"NSRelation"];
+    if (_second) {
+        [c encodeConditionalObject:_second forKey:@"NSSecondItem"];
+        [c encodeInteger:_a2 forKey:@"NSSecondAttribute"];
+    }
+    [c encodeDouble:_multiplier forKey:@"NSMultiplier"];
+    [c encodeDouble:_constant forKey:@"NSConstant"];
+    [c encodeInteger:(NSInteger)_priority forKey:@"NSPriority"];
+    [c encodeBool:_archived forKey:@"NSShouldBeArchived"];
+    if (_identifier)
+        [c encodeObject:_identifier forKey:@"NSLayoutIdentifier"];
+}
+
+/* ---- the visual format language ---------------------------------------------------------- */
+
+/* One predicate: (relation)(constant or view)(@priority). */
+typedef struct {
+    NSLayoutRelation relation;
+    CGFloat constant;
+    id view;
+    NSLayoutPriority priority;
+} predicate;
+
+static void vfl_fail(NSString *format, NSUInteger at, NSString *why)
+{
+    [NSException raise:NSInvalidArgumentException
+                format:@"Unable to parse constraint format: \n%@\n%@\n%@^", why, format,
+                       [@"" stringByPaddingToLength:at withString:@" " startingAtIndex:0]];
+}
+
+typedef struct {
+    NSString *s;
+    NSUInteger i, n;
+    NSDictionary *metrics, *views;
+} vfl;
+
+static unichar peek(vfl *p) { return p->i < p->n ? [p->s characterAtIndex:p->i] : 0; }
+static BOOL take(vfl *p, unichar c)
+{
+    if (peek(p) == c) {
+        p->i++;
+        return YES;
+    }
+    return NO;
+}
+static BOOL name_char(unichar c, BOOL first)
+{
+    return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (!first && c >= '0' && c <= '9');
+}
+static NSString *read_name(vfl *p)
+{
+    NSUInteger start = p->i;
+    if (!name_char(peek(p), YES))
+        return nil;
+    while (name_char(peek(p), NO))
+        p->i++;
+    return [p->s substringWithRange:NSMakeRange(start, p->i - start)];
+}
+static BOOL read_number(vfl *p, CGFloat *out)
+{
+    NSUInteger start = p->i;
+    if (peek(p) == '-' || peek(p) == '+')
+        p->i++;
+    BOOL digits = NO;
+    while ((peek(p) >= '0' && peek(p) <= '9') || peek(p) == '.') {
+        digits = YES;
+        p->i++;
+    }
+    if (!digits) {
+        p->i = start;
+        return NO;
+    }
+    *out = [[p->s substringWithRange:NSMakeRange(start, p->i - start)] doubleValue];
+    return YES;
+}
+/* A number or a metric's name. */
+static BOOL read_constant(vfl *p, CGFloat *out)
+{
+    if (read_number(p, out))
+        return YES;
+    NSUInteger start = p->i;
+    NSString *name = read_name(p);
+    if (name && [p->metrics[name] respondsToSelector:@selector(doubleValue)]) {
+        *out = [p->metrics[name] doubleValue];
+        return YES;
+    }
+    p->i = start;
+    return NO;
+}
+static predicate read_predicate(vfl *p, BOOL views_allowed)
+{
+    predicate pr = {NSLayoutRelationEqual, 0, nil, NSLayoutPriorityRequired};
+    if (take(p, '=')) {
+        if (!take(p, '='))
+            vfl_fail(p->s, p->i, @"Expected '=='");
+    } else if (take(p, '<')) {
+        if (!take(p, '='))
+            vfl_fail(p->s, p->i, @"Expected '<='");
+        pr.relation = NSLayoutRelationLessThanOrEqual;
+    } else if (take(p, '>')) {
+        if (!take(p, '='))
+            vfl_fail(p->s, p->i, @"Expected '>='");
+        pr.relation = NSLayoutRelationGreaterThanOrEqual;
+    }
+    if (!read_constant(p, &pr.constant)) {
+        NSUInteger start = p->i;
+        NSString *name = read_name(p);
+        if (!name || !views_allowed || !p->views[name])
+            vfl_fail(p->s, start, name ? [NSString stringWithFormat:@"%@ is not a key in the views or metrics dictionary", name]
+                                       : @"Expected a number, metric or view");
+        pr.view = p->views[name];
+    }
+    if (take(p, '@')) {
+        CGFloat pri;
+        if (!read_constant(p, &pri))
+            vfl_fail(p->s, p->i, @"Expected a priority");
+        pr.priority = (NSLayoutPriority)pri;
+    }
+    return pr;
+}
+/* "(pred, pred...)" or a single simple predicate. */
+static NSUInteger read_predicates(vfl *p, predicate *out, NSUInteger max, BOOL views_allowed)
+{
+    NSUInteger n = 0;
+    if (take(p, '(')) {
+        do {
+            if (n < max)
+                out[n++] = read_predicate(p, views_allowed);
+            else
+                read_predicate(p, views_allowed);
+        } while (take(p, ','));
+        if (!take(p, ')'))
+            vfl_fail(p->s, p->i, @"Expected ')'");
+    } else {
+        predicate pr = {NSLayoutRelationEqual, 0, nil, NSLayoutPriorityRequired};
+        if (!read_constant(p, &pr.constant))
+            vfl_fail(p->s, p->i, @"Expected a number or metric");
+        out[n++] = pr;
+    }
+    return n;
+}
+
++ (NSArray *)constraintsWithVisualFormat:(NSString *)format options:(NSLayoutFormatOptions)opts
+                                 metrics:(NSDictionary *)metrics
+                                   views:(NSDictionary *)views
+{
+    vfl p = {[format stringByReplacingOccurrencesOfString:@" " withString:@""], 0, 0, metrics ?: @{}, views ?: @{}};
+    p.n = [p.s length];
+    BOOL vertical = NO;
+    if ([p.s hasPrefix:@"V:"]) {
+        vertical = YES;
+        p.i = 2;
+    } else if ([p.s hasPrefix:@"H:"]) {
+        p.i = 2;
+    }
+    BOOL ltr = (opts & NSLayoutFormatDirectionMask) == NSLayoutFormatDirectionLeftToRight;
+    NSLayoutAttribute lead = vertical ? NSLayoutAttributeTop : ltr ? NSLayoutAttributeLeft : NSLayoutAttributeLeading;
+    NSLayoutAttribute trail = vertical ? NSLayoutAttributeBottom : ltr ? NSLayoutAttributeRight : NSLayoutAttributeTrailing;
+    NSLayoutAttribute size = vertical ? NSLayoutAttributeHeight : NSLayoutAttributeWidth;
+    NSMutableArray *out = [NSMutableArray array];
+    NSMutableArray *chain = [NSMutableArray array];
+    id previous = nil;            /* the view before the connection, or nil */
+    BOOL previous_superview = NO; /* the connection starts at the superview */
+    NSView *superview = nil;
+
+    if (take(&p, '|'))
+        previous_superview = YES;
+    for (;;) {
+        /* a connection: nothing, "-", or "-predicates-" */
+        predicate space[8];
+        NSUInteger nspace = 0;
+        BOOL connected = NO, standard = NO;
+        if (take(&p, '-')) {
+            connected = YES;
+            if (peek(&p) == '[' || peek(&p) == '|') {
+                standard = YES;
+            } else {
+                nspace = read_predicates(&p, space, 8, NO);
+                if (!take(&p, '-'))
+                    vfl_fail(p.s, p.i, @"Expected '-'");
+            }
+        }
+        BOOL to_superview = NO;
+        id view = nil;
+        if (take(&p, '|')) {
+            to_superview = YES;
+        } else if (take(&p, '[')) {
+            NSUInteger start = p.i;
+            NSString *name = read_name(&p);
+            view = name ? p.views[name] : nil;
+            if (!view)
+                vfl_fail(p.s, start, [NSString stringWithFormat:@"%@ is not a key in the views dictionary", name ?: @"(nothing)"]);
+            if (!superview && [view respondsToSelector:@selector(superview)])
+                superview = [view superview];
+            if (peek(&p) == '(') {
+                predicate preds[8];
+                NSUInteger n = read_predicates(&p, preds, 8, YES);
+                for (NSUInteger k = 0; k < n; k++) {
+                    NSLayoutConstraint *c = [self constraintWithItem:view attribute:size relatedBy:preds[k].relation
+                                                              toItem:preds[k].view
+                                                           attribute:preds[k].view ? size : NSLayoutAttributeNotAnAttribute
+                                                          multiplier:1 constant:preds[k].constant];
+                    [c setPriority:preds[k].priority];
+                    [out addObject:c];
+                }
+            }
+            if (!take(&p, ']'))
+                vfl_fail(p.s, p.i, @"Expected ']'");
+        } else if (p.i >= p.n && !connected) {
+            break;
+        } else {
+            vfl_fail(p.s, p.i, @"Expected a view or '|'");
+        }
+
+        /* the spacing between what came before and this */
+        if ((previous || previous_superview) && (view || to_superview)) {
+            if (previous_superview && to_superview)
+                vfl_fail(p.s, p.i, @"The superview can't be spaced from itself");
+            if (connected && standard) {
+                space[0] = (predicate){NSLayoutRelationEqual,
+                                       (previous_superview || to_superview) ? NSLayoutConstraintStandardSuperviewSpacing
+                                                                            : NSLayoutConstraintStandardSiblingSpacing,
+                                       nil, NSLayoutPriorityRequired};
+                nspace = 1;
+            } else if (!connected) {
+                space[0] = (predicate){NSLayoutRelationEqual, 0, nil, NSLayoutPriorityRequired};
+                nspace = 1;
+            }
+            for (NSUInteger k = 0; k < nspace; k++) {
+                NSLayoutConstraint *c;
+                if (previous_superview) {
+                    if (!superview)
+                        vfl_fail(p.s, p.i, @"The view has no superview");
+                    c = [self constraintWithItem:view attribute:lead relatedBy:space[k].relation toItem:superview
+                                       attribute:lead multiplier:1 constant:space[k].constant];
+                } else if (to_superview) {
+                    if (!superview)
+                        vfl_fail(p.s, p.i, @"The view has no superview");
+                    c = [self constraintWithItem:superview attribute:trail relatedBy:space[k].relation toItem:previous
+                                       attribute:trail multiplier:1 constant:space[k].constant];
+                } else {
+                    c = [self constraintWithItem:view attribute:lead relatedBy:space[k].relation toItem:previous
+                                       attribute:trail multiplier:1 constant:space[k].constant];
+                }
+                [c setPriority:space[k].priority];
+                [out addObject:c];
+            }
+        } else if (connected) {
+            vfl_fail(p.s, p.i, @"A connection needs something on each side");
+        }
+        if (view)
+            [chain addObject:view];
+        previous = view;
+        previous_superview = NO;
+        if (to_superview) {
+            if (p.i < p.n)
+                vfl_fail(p.s, p.i, @"Nothing may follow the superview");
+            break;
+        }
+        if (p.i >= p.n)
+            break;
+    }
+    /* views lined up across the direction of the format */
+    NSUInteger align = opts & NSLayoutFormatAlignmentMask;
+    for (NSLayoutAttribute a = NSLayoutAttributeLeft; a <= NSLayoutAttributeFirstBaseline; a++) {
+        if (!(align & (1u << a)))
+            continue;
+        if (horizontal(a) == !vertical)
+            [NSException raise:NSInvalidArgumentException
+                        format:@"Unable to parse constraint format: alignment along the format's own direction"];
+        for (NSUInteger k = 1; k < [chain count]; k++)
+            [out addObject:[self constraintWithItem:chain[k - 1] attribute:a relatedBy:NSLayoutRelationEqual
+                                             toItem:chain[k] attribute:a multiplier:1 constant:0]];
+    }
+    return out;
+}
+@end
+
+/* ---- layout guides ---------------------------------------------------------------------- */
+
+@implementation NSLayoutGuide {
+    NSRect _frame;
+    NSView *_owner;      /* not retained */
+    NSString *_identifier;
+    BOOL _content;       /* a window's content layout guide: the content view's bounds */
+}
+- (void)dealloc
+{
+    [_identifier release];
+    [super dealloc];
+}
+- (instancetype)initWithCoder:(NSCoder *)c { return [self init]; }
+- (void)encodeWithCoder:(NSCoder *)c {}
+- (NSRect)frame { return _frame; }
+- (void)_setFrame:(NSRect)f { _frame = f; }
+- (BOOL)_isContentGuide { return _content; }
+- (void)_setContentGuide:(BOOL)flag { _content = flag; }
+- (NSView *)owningView { return _owner; }
+- (void)setOwningView:(NSView *)v
+{
+    _owner = v;
+    _frame = v ? [v bounds] : NSZeroRect;
+}
+- (NSUserInterfaceItemIdentifier)identifier { return _identifier; }
+- (void)setIdentifier:(NSUserInterfaceItemIdentifier)identifier
+{
+    [_identifier release];
+    _identifier = [identifier copy];
+}
+#define ANCHOR(name, cls, attr) \
+    -(cls *)name { return [cls _anchorFor:self attribute:attr]; }
+ANCHOR(leadingAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeLeading)
+ANCHOR(trailingAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeTrailing)
+ANCHOR(leftAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeLeft)
+ANCHOR(rightAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeRight)
+ANCHOR(centerXAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeCenterX)
+ANCHOR(topAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeTop)
+ANCHOR(bottomAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeBottom)
+ANCHOR(centerYAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeCenterY)
+ANCHOR(widthAnchor, NSLayoutDimension, NSLayoutAttributeWidth)
+ANCHOR(heightAnchor, NSLayoutDimension, NSLayoutAttributeHeight)
+- (BOOL)hasAmbiguousLayout { return NO; }
+- (NSArray *)constraintsAffectingLayoutForOrientation:(NSLayoutConstraintOrientation)o
+{
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSLayoutConstraint *c in all_active)
+        if ([c _involves:self] && horizontal([c firstAttribute]) == (o == NSLayoutConstraintOrientationHorizontal))
+            [out addObject:c];
+    return out;
+}
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<NSLayoutGuide:%p %@ %@>", self, _identifier ?: @"",
+                                      NSStringFromRect(_frame)];
+}
+@end
+
+/* ---- the solver ------------------------------------------------------------------------- */
+
+#define EPS 1e-7
+
+typedef struct {
+    double *a;       /* coefficients, nvars of them */
+    double rhs;
+    int pivot;
+} row;
+
+typedef struct {
+    int nvars;
+    row *rows;
+    int nrows, cap;
+    double *scratch;
+} system_t;
+
+static void sys_init(system_t *s, int nvars)
+{
+    s->nvars = nvars;
+    s->rows = NULL;
+    s->nrows = s->cap = 0;
+    s->scratch = calloc((size_t)nvars + 1, sizeof(double));
+}
+static void sys_free(system_t *s)
+{
+    for (int i = 0; i < s->nrows; i++)
+        free(s->rows[i].a);
+    free(s->rows);
+    free(s->scratch);
+}
+/* Adds a·x = rhs if it agrees with the rows already there: YES when it was
+ * added or was already implied, NO when it contradicts them. */
+static BOOL sys_add(system_t *s, const double *a, double rhs)
+{
+    double *r = s->scratch;
+    memcpy(r, a, sizeof(double) * (size_t)s->nvars);
+    for (int i = 0; i < s->nrows; i++) {
+        double f = r[s->rows[i].pivot];
+        if (fabs(f) > EPS) {
+            double *p = s->rows[i].a;
+            for (int j = 0; j < s->nvars; j++)
+                r[j] -= f * p[j];
+            rhs -= f * s->rows[i].rhs;
+        }
+    }
+    int best = -1;
+    double big = 0;
+    for (int j = 0; j < s->nvars; j++)
+        if (fabs(r[j]) > big) {
+            big = fabs(r[j]);
+            best = j;
+        }
+    if (big < 1e-9)
+        return fabs(rhs) < 1e-6;
+    double f = r[best];
+    for (int j = 0; j < s->nvars; j++)
+        r[j] /= f;
+    rhs /= f;
+    r[best] = 1;
+    /* keep the rows reduced: the new pivot leaves every other row */
+    for (int i = 0; i < s->nrows; i++) {
+        double g = s->rows[i].a[best];
+        if (fabs(g) > EPS) {
+            double *p = s->rows[i].a;
+            for (int j = 0; j < s->nvars; j++)
+                p[j] -= g * r[j];
+            p[best] = 0;
+            s->rows[i].rhs -= g * rhs;
+        }
+    }
+    if (s->nrows == s->cap) {
+        s->cap = s->cap ? s->cap * 2 : 16;
+        s->rows = realloc(s->rows, sizeof(row) * (size_t)s->cap);
+    }
+    double *copy = malloc(sizeof(double) * (size_t)s->nvars);
+    memcpy(copy, r, sizeof(double) * (size_t)s->nvars);
+    s->rows[s->nrows++] = (row){copy, rhs, best};
+    return YES;
+}
+/* Every unknown has a stay, so each is some row's pivot. */
+static void sys_solution(system_t *s, double *x)
+{
+    for (int j = 0; j < s->nvars; j++)
+        x[j] = 0;
+    for (int i = 0; i < s->nrows; i++)
+        x[s->rows[i].pivot] = s->rows[i].rhs;
+}
+
+/* A row waiting to be solved: a·x (relation) rhs, at a priority. */
+typedef struct {
+    double *a;
+    double rhs;
+    NSLayoutRelation relation;
+    double priority;
+    NSLayoutConstraint *source;   /* nil for the solver's own rows */
+    int order;
+} pending;
+
+typedef struct {
+    NSMutableArray *items;        /* views and guides, each with a start and a size on each axis */
+    NSMapTable *index;            /* item -> NSNumber */
+    pending *rows;
+    int nrows, cap;
+    int nvars;                    /* 2 per item on the axis being solved */
+} problem;
+
+static int item_index(problem *p, id item)
+{
+    NSNumber *n = [p->index objectForKey:item];
+    return n ? [n intValue] : -1;
+}
+
+static pending *new_row(problem *p, double priority, NSLayoutRelation rel, NSLayoutConstraint *src)
+{
+    if (p->nrows == p->cap) {
+        p->cap = p->cap ? p->cap * 2 : 64;
+        p->rows = realloc(p->rows, sizeof(pending) * (size_t)p->cap);
+    }
+    pending *r = &p->rows[p->nrows];
+    r->a = calloc((size_t)p->nvars, sizeof(double));
+    r->rhs = 0;
+    r->relation = rel;
+    r->priority = priority;
+    r->source = src;
+    r->order = p->nrows++;
+    return r;
+}
+
+/* coefficient * attribute of an item, added to a row's left side; what isn't
+ * an unknown goes to the right. */
+static void add_attr(problem *p, pending *r, id item, NSLayoutAttribute a, double k, BOOL flipped_x)
+{
+    int i = item_index(p, item);
+    if (i < 0 || a == NSLayoutAttributeNotAnAttribute)
+        return;
+    int start = 2 * i, size = 2 * i + 1;
+    switch (a) {
+    case NSLayoutAttributeLeft:
+    case NSLayoutAttributeTop:
+        r->a[start] += k;
+        break;
+    case NSLayoutAttributeLeading:
+        r->a[start] += k;
+        if (flipped_x)
+            r->a[size] += k;
+        break;
+    case NSLayoutAttributeTrailing:
+        r->a[start] += k;
+        if (!flipped_x)
+            r->a[size] += k;
+        break;
+    case NSLayoutAttributeRight:
+    case NSLayoutAttributeBottom:
+        r->a[start] += k;
+        r->a[size] += k;
+        break;
+    case NSLayoutAttributeCenterX:
+    case NSLayoutAttributeCenterY:
+        r->a[start] += k;
+        r->a[size] += k / 2;
+        break;
+    case NSLayoutAttributeWidth:
+    case NSLayoutAttributeHeight:
+        r->a[size] += k;
+        break;
+    case NSLayoutAttributeLastBaseline:
+    case NSLayoutAttributeFirstBaseline: {
+        /* from the bottom (or the top for the first baseline) by the view's own offset */
+        r->a[start] += k;
+        if ([item isKindOfClass:[NSView class]]) {
+            if (a == NSLayoutAttributeFirstBaseline) {
+                r->rhs -= k * [(NSView *)item firstBaselineOffsetFromTop];
+            } else {
+                r->a[size] += k;
+                r->rhs += k * [(NSView *)item lastBaselineOffsetFromBottom];
+            }
+        } else {
+            r->a[size] += k;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* Where an item is now, in the root's top-down points. */
+static NSRect current_rect(id item, NSView *root)
+{
+    NSView *v = view_of(item);
+    NSRect r = [item isKindOfClass:[NSView class]] ? [v bounds] : [(NSLayoutGuide *)item frame];
+    if (!v)
+        return NSZeroRect;
+    NSRect inRoot = [v convertRect:r toView:root];
+    if (![root isFlipped])
+        inRoot.origin.y = [root bounds].size.height - NSMaxY(inRoot);
+    inRoot.origin.x -= [root bounds].origin.x;
+    if ([root isFlipped])
+        inRoot.origin.y -= [root bounds].origin.y;
+    return inRoot;
+}
+
+/* The item's parent in the layout: a view's superview, a guide's owning view. */
+static NSView *parent_of(id item)
+{
+    return [item isKindOfClass:[NSView class]] ? [(NSView *)item superview] : [(NSLayoutGuide *)item owningView];
+}
+
+/* An item's frame from its start and size, in its parent's coordinates. */
+static NSRect frame_from(id item, double x, double w, double y, double h, double px, double py, double ph)
+{
+    NSView *parent = parent_of(item);
+    NSRect b = [parent bounds];
+    NSRect f;
+    f.origin.x = b.origin.x + (x - px);
+    f.size.width = w;
+    f.size.height = h;
+    if ([parent isFlipped])
+        f.origin.y = b.origin.y + (y - py);
+    else
+        f.origin.y = b.origin.y + ph - (y - py) - h;
+    return f;
+}
+
+static void collect(NSView *v, NSMutableArray *constraints, NSMutableArray *guides)
+{
+    NSArray *mine = installed(v, NO);
+    if (mine)
+        [constraints addObjectsFromArray:mine];
+    NSArray *g = objc_getAssociatedObject(v, &guides_key);
+    if (g)
+        [guides addObjectsFromArray:g];
+    for (NSView *s in [v subviews])
+        collect(s, constraints, guides);
+}
+
+static int compare_rows(const void *x, const void *y)
+{
+    const pending *a = x, *b = y;
+    if (a->priority != b->priority)
+        return a->priority > b->priority ? -1 : 1;
+    return a->order - b->order;
+}
+
+static double evaluate(const pending *r, const double *x, int n)
+{
+    double v = 0;
+    for (int j = 0; j < n; j++)
+        v += r->a[j] * x[j];
+    return v;
+}
+
+/* The rows of a mask that translates into constraints, on one axis, in
+ * top-down terms: margins before and after, size, and which of them flex. */
+static void mask_rows(problem *p, id item, int pi, double m1, double s, double m2, BOOL flex1, BOOL flexSize,
+                      BOOL flex2, double parentSize)
+{
+    int i = item_index(p, item);
+    int x = 2 * i, w = 2 * i + 1;
+    int px = 2 * pi, pw = 2 * pi + 1;
+    pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+    pending *b = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+    double ps = parentSize > 0 ? parentSize : 1;
+    int nflex = flex1 + flexSize + flex2;
+    if (pi < 0) {
+        /* the root: where it is */
+        a->a[x] = 1, a->rhs = m1;
+        b->a[w] = 1, b->rhs = s;
+        return;
+    }
+    if (nflex == 0 || (nflex == 1 && flex2)) {          /* pinned before, fixed size */
+        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
+        b->a[w] = 1, b->rhs = s;
+    } else if (nflex == 1 && flex1) {                  /* pinned after, fixed size */
+        a->a[x] = 1, a->a[w] = 1, a->a[px] = -1, a->a[pw] = -1, a->rhs = -m2;
+        b->a[w] = 1, b->rhs = s;
+    } else if (nflex == 1) {                           /* both margins pinned */
+        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
+        b->a[x] = 1, b->a[w] = 1, b->a[px] = -1, b->a[pw] = -1, b->rhs = -m2;
+    } else if (flex1 && flex2 && !flexSize) {          /* centred in proportion, fixed size */
+        a->a[x] = 1, a->a[w] = 0.5, a->a[px] = -1, a->a[pw] = -(m1 + s / 2) / ps;
+        b->a[w] = 1, b->rhs = s;
+    } else if (flexSize && flex2 && !flex1) {          /* pinned before, size in proportion */
+        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
+        b->a[w] = 1, b->a[pw] = -s / ps;
+    } else if (flexSize && flex1 && !flex2) {          /* pinned after, size in proportion */
+        a->a[x] = 1, a->a[w] = 1, a->a[px] = -1, a->a[pw] = -1, a->rhs = -m2;
+        b->a[w] = 1, b->a[pw] = -s / ps;
+    } else {                                           /* everything in proportion */
+        a->a[x] = 1, a->a[px] = -1, a->a[pw] = -m1 / ps;
+        b->a[w] = 1, b->a[pw] = -s / ps;
+    }
+}
+
+static void note_required_failure(NSLayoutConstraint *c)
+{
+    static int notes;
+    /* once for each constraint, as layout runs again and again */
+    if (c && !c->_noted && notes < 20) {
+        c->_noted = YES;
+        notes++;
+        fprintf(stderr, "ferry: Auto Layout can't satisfy every required constraint at once; leaving out %s\n",
+                [[c description] UTF8String]);
+    }
+}
+
+static BOOL breaks(pending *r, double *x, int nvars)
+{
+    double v = evaluate(r, x, nvars);
+    return (r->relation < 0 && v > r->rhs + 1e-6) || (r->relation > 0 && v < r->rhs - 1e-6);
+}
+
+/* The first inequality, in priority order, that x breaks and that isn't held. */
+static int first_broken(problem *p, char *active, double *x)
+{
+    for (int k = 0; k < p->nrows; k++) {
+        pending *r = &p->rows[k];
+        if (r->relation == NSLayoutRelationEqual || active[k])
+            continue;
+        if (breaks(r, x, p->nvars))
+            return k;
+    }
+    return -1;
+}
+
+/* Solves the equalities and the held inequalities, in priority order;
+ * failed marks the rows that couldn't be kept. */
+static void solve_rows(problem *p, char *active, char *failed, double *x)
+{
+    system_t s;
+    sys_init(&s, p->nvars);
+    for (int k = 0; k < p->nrows; k++) {
+        pending *r = &p->rows[k];
+        failed[k] = 0;
+        if (r->relation != NSLayoutRelationEqual && !active[k])
+            continue;
+        if (!sys_add(&s, r->a, r->rhs))
+            failed[k] = 1;
+    }
+    /* anything still open (an item no row mentions) stays at zero */
+    double *unit = calloc((size_t)p->nvars, sizeof(double));
+    for (int j = 0; j < p->nvars; j++) {
+        memset(unit, 0, sizeof(double) * (size_t)p->nvars);
+        unit[j] = 1;
+        sys_add(&s, unit, 0);
+    }
+    free(unit);
+    sys_solution(&s, x);
+    sys_free(&s);
+}
+
+/* Solves one axis. fitting: the root's size is free, pulled towards nothing. */
+static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vertical, BOOL fitting, double *out)
+{
+    NSUInteger n = [p->items count];
+    p->nvars = (int)(2 * n);
+    p->nrows = 0;
+    BOOL rtl = NO;
+    NSRect rootRect = NSMakeRect(0, 0, [root bounds].size.width, [root bounds].size.height);
+
+    /* the app's constraints on this axis */
+    for (NSLayoutConstraint *c in constraints) {
+        id i1, i1b, i2, i2b;
+        NSLayoutAttribute a1, a1b, a2, a2b;
+        [c _getFirst:&i1 attr:&a1 minus:&i1b attr:&a1b second:&i2 attr:&a2 minus:&i2b attr:&a2b];
+        if (horizontal(a1) == vertical)
+            continue;
+        if (!i2 && !is_size(a1) && !i1b)
+            continue;   /* a position against nothing means nothing */
+        pending *r = new_row(p, [c priority], [c relation], c);
+        add_attr(p, r, i1, a1, 1, rtl);
+        if (i1b)
+            add_attr(p, r, i1b, a1b, -1, rtl);
+        if (i2) {
+            double m = [c multiplier];
+            add_attr(p, r, i2, a2, -m, rtl);
+            if (i2b)
+                add_attr(p, r, i2b, a2b, m, rtl);
+        }
+        r->rhs += [c constant];
+    }
+
+    /* each item's place against its parent */
+    for (NSUInteger k = 0; k < n; k++) {
+        id item = p->items[k];
+        NSRect now = current_rect(item, root);
+        double start = vertical ? now.origin.y : now.origin.x;
+        double size = vertical ? now.size.height : now.size.width;
+        int i = (int)k;
+        if (item == root) {
+            if (fitting) {
+                pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+                a->a[2 * i] = 1;
+                pending *b = new_row(p, NSLayoutPriorityFittingSizeCompression, NSLayoutRelationEqual, nil);
+                b->a[2 * i + 1] = 1;
+            } else {
+                mask_rows(p, item, -1, 0, vertical ? rootRect.size.height : rootRect.size.width, 0, NO, NO, NO, 0);
+            }
+            continue;
+        }
+        id parent = parent_of(item);
+        int pi = item_index(p, parent);
+        NSRect pnow = current_rect(parent, root);
+        double pstart = vertical ? pnow.origin.y : pnow.origin.x;
+        double psize = vertical ? pnow.size.height : pnow.size.width;
+        if ([item isKindOfClass:[NSLayoutGuide class]] && [(NSLayoutGuide *)item _isContentGuide]) {
+            /* the window's content layout guide is its content view's bounds */
+            pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+            a->a[2 * i] = 1, a->a[2 * pi] = -1;
+            pending *b = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
+            b->a[2 * i + 1] = 1, b->a[2 * pi + 1] = -1;
+            continue;
+        }
+        if ([item isKindOfClass:[NSView class]] && [(NSView *)item translatesAutoresizingMaskIntoConstraints]) {
+            NSAutoresizingMaskOptions m = [(NSView *)item autoresizingMask];
+            NSView *pv = parent;
+            BOOL flexMin, flexSize, flexMax;
+            if (!vertical) {
+                flexMin = (m & NSViewMinXMargin) != 0, flexSize = (m & NSViewWidthSizable) != 0;
+                flexMax = (m & NSViewMaxXMargin) != 0;
+            } else if ([pv isFlipped]) {
+                flexMin = (m & NSViewMinYMargin) != 0, flexSize = (m & NSViewHeightSizable) != 0;
+                flexMax = (m & NSViewMaxYMargin) != 0;
+            } else {
+                /* a superview that isn't flipped measures from the bottom */
+                flexMin = (m & NSViewMaxYMargin) != 0, flexSize = (m & NSViewHeightSizable) != 0;
+                flexMax = (m & NSViewMinYMargin) != 0;
+            }
+            if (![pv autoresizesSubviews])
+                flexMin = flexSize = flexMax = NO;
+            mask_rows(p, item, pi, start - pstart, size, psize - (start - pstart) - size, flexMin, flexSize, flexMax,
+                      psize);
+            continue;
+        }
+        /* a view placed by constraints: its intrinsic size, then where it was */
+        if ([item isKindOfClass:[NSView class]]) {
+            NSSize is = [(NSView *)item intrinsicContentSize];
+            double want = vertical ? is.height : is.width;
+            if (want >= 0) {
+                NSLayoutConstraintOrientation o = vertical ? NSLayoutConstraintOrientationVertical
+                                                           : NSLayoutConstraintOrientationHorizontal;
+                pending *hug = new_row(p, [(NSView *)item contentHuggingPriorityForOrientation:o],
+                                       NSLayoutRelationLessThanOrEqual, nil);
+                hug->a[2 * i + 1] = 1, hug->rhs = want;
+                pending *resist = new_row(p, [(NSView *)item contentCompressionResistancePriorityForOrientation:o],
+                                          NSLayoutRelationGreaterThanOrEqual, nil);
+                resist->a[2 * i + 1] = 1, resist->rhs = want;
+            }
+        }
+        pending *stayStart = new_row(p, 0.02, NSLayoutRelationEqual, nil);
+        stayStart->a[2 * i] = 1;
+        if (pi >= 0)
+            stayStart->a[2 * pi] = -1;
+        stayStart->rhs = pi >= 0 ? start - pstart : start;
+        pending *staySize = new_row(p, fitting ? 0.01 : 0.03, NSLayoutRelationEqual, nil);
+        staySize->a[2 * i + 1] = 1;
+        staySize->rhs = fitting ? 0 : size;
+    }
+    /* a size is never negative */
+    for (NSUInteger k = 0; k < n; k++) {
+        pending *r = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationGreaterThanOrEqual, nil);
+        r->a[2 * k + 1] = 1;
+    }
+
+    qsort(p->rows, (size_t)p->nrows, sizeof(pending), compare_rows);
+    /* inequalities are active (held as equalities) only while the answer
+     * would break them otherwise */
+    char *active = calloc((size_t)p->nrows, 1), *failed = calloc((size_t)p->nrows, 1);
+    double *x = calloc((size_t)p->nvars, sizeof(double));
+    int limit = 4 * p->nrows + 8;
+    for (int round = 0; round < limit; round++) {
+        solve_rows(p, active, failed, x);
+        int broken = first_broken(p, active, x);
+        if (broken >= 0) {
+            active[broken] = 1;
+            continue;
+        }
+        /* an inequality held earlier may no longer be needed, and may be in
+         * the way of a weaker wish that keeps it anyway (a size held at zero
+         * blocking an intrinsic width): let go of each one that the answer
+         * keeps without it. The rows before it in priority order come out
+         * the same, so nothing stronger loses. */
+        BOOL released = NO;
+        for (int k = p->nrows - 1; k >= 0; k--) {
+            if (!active[k])
+                continue;
+            active[k] = 0;
+            solve_rows(p, active, failed, x);
+            if (first_broken(p, active, x) < 0 && !breaks(&p->rows[k], x, p->nvars))
+                released = YES;
+            else
+                active[k] = 1;
+        }
+        if (!released)
+            break;
+    }
+    solve_rows(p, active, failed, x);
+    for (int k = 0; k < p->nrows; k++)
+        if (failed[k] && p->rows[k].priority >= NSLayoutPriorityRequired)
+            note_required_failure(p->rows[k].source);
+    memcpy(out, x, sizeof(double) * (size_t)p->nvars);
+    free(x);
+    free(active);
+    free(failed);
+    for (int k = 0; k < p->nrows; k++)
+        free(p->rows[k].a);
+}
+
+static void add_item(problem *p, id item, NSView *root)
+{
+    if (!item || [p->index objectForKey:item])
+        return;
+    /* its parents first, up to the root */
+    if (item != root) {
+        NSView *parent = parent_of(item);
+        if (!parent || (parent != root && ![parent isDescendantOf:root]))
+            return;
+        add_item(p, parent, root);
+    }
+    [p->index setObject:@([p->items count]) forKey:item];
+    [p->items addObject:item];
+}
+
+/* Solves the constraints of root's subtree. With fitting, answers the
+ * smallest size of root they allow and moves nothing. */
+static NSSize solve(NSView *root, BOOL fitting)
+{
+    NSMutableArray *constraints = [NSMutableArray array], *guides = [NSMutableArray array];
+    collect(root, constraints, guides);
+    if (![constraints count])
+        return [root frame].size;
+    problem p = {0};
+    p.items = [NSMutableArray array];
+    p.index = [NSMapTable strongToStrongObjectsMapTable];
+    add_item(&p, root, root);
+    for (NSLayoutConstraint *c in constraints)
+        for (id item in [c _items])
+            add_item(&p, item, root);
+    /* constraints reaching outside root (fitting a view inside a window) leave
+     * those items as they are */
+    NSMutableArray *usable = [NSMutableArray array];
+    for (NSLayoutConstraint *c in constraints) {
+        BOOL inside = YES;
+        for (id item in [c _items])
+            if (![p.index objectForKey:item])
+                inside = NO;
+        if (inside)
+            [usable addObject:c];
+    }
+    NSUInteger n = [p.items count];
+    double *hx = calloc(2 * n, sizeof(double)), *vx = calloc(2 * n, sizeof(double));
+    solving = YES;
+    @try {
+        solve_axis(&p, usable, root, NO, fitting, hx);
+        solve_axis(&p, usable, root, YES, fitting, vx);
+        if (!fitting) {
+            /* outermost first, so a view's frame is set after its superview's */
+            for (NSUInteger k = 1; k < n; k++) {
+                id item = p.items[k];
+                if ([item isKindOfClass:[NSView class]] && [(NSView *)item translatesAutoresizingMaskIntoConstraints])
+                    continue;
+                int pi = item_index(&p, parent_of(item));
+                double px = pi >= 0 ? hx[2 * pi] : 0, py = pi >= 0 ? vx[2 * pi] : 0;
+                double ph = pi >= 0 ? vx[2 * pi + 1] : [parent_of(item) bounds].size.height;
+                double w = fmax(0, hx[2 * k + 1]), h = fmax(0, vx[2 * k + 1]);
+                NSRect f = frame_from(item, hx[2 * k], w, vx[2 * k], h, px, py, ph);
+                f = NSMakeRect(round(f.origin.x * 2) / 2, round(f.origin.y * 2) / 2, round(w * 2) / 2,
+                               round(h * 2) / 2);
+                if ([item isKindOfClass:[NSView class]]) {
+                    if (!NSEqualRects(f, [(NSView *)item frame]))
+                        [(NSView *)item setFrame:f];
+                } else {
+                    [(NSLayoutGuide *)item _setFrame:f];
+                }
+            }
+        }
+    } @finally {
+        solving = NO;
+    }
+    NSSize size = NSMakeSize(fmax(0, hx[1]), fmax(0, vx[1]));
+    free(hx);
+    free(vx);
+    free(p.rows);
+    return size;
+}
+
+/* ---- updating constraints --------------------------------------------------------------- */
+
+static void update_subtree(NSView *v)
+{
+    for (NSView *s in [[[v subviews] copy] autorelease])
+        update_subtree(s);
+    if ([objc_getAssociatedObject(v, &update_key) boolValue])
+        [v updateConstraints];
+}
+
+/* For the layout pass (NSStackView.m's layoutSubtreeIfNeeded and the
+ * window's display): solves root's constraints when anything has changed. */
+void ALayoutConstraintsIfNeeded(NSView *v)
+{
+    if (!AConstraintsInUse || solving || !v)
+        return;
+    NSView *root = root_of(v);
+    NSWindow *w = [root window];
+    if (w && [w contentView] && ([[w contentView] isDescendantOf:root] || root == [w contentView]))
+        root = [w contentView];
+    if (updates_pending) {
+        updates_pending = NO;
+        update_subtree(root);
+    }
+    NSNumber *done = objc_getAssociatedObject(root, &solved_key);
+    if (done && [done unsignedLongValue] == generation)
+        return;
+    solve(root, NO);
+    objc_setAssociatedObject(root, &solved_key, @(generation), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+/* The smallest size v's own constraints allow; NO when it has none. */
+BOOL AConstraintFittingSize(NSView *v, NSSize *size)
+{
+    if (!AConstraintsInUse || solving)
+        return NO;
+    NSMutableArray *cs = [NSMutableArray array], *gs = [NSMutableArray array];
+    collect(v, cs, gs);
+    if (![cs count])
+        return NO;
+    update_subtree(v);
+    *size = solve(v, YES);
+    return YES;
+}
+
+/* A view's frame or intrinsic size changed (NSView.m, NSStackView.m). */
+void AConstraintsViewChanged(NSView *v)
+{
+    if (AConstraintsInUse && !solving)
+        changed(v);
+}
+
+/* A view left its superview: the constraints between it (or what is inside
+ * it) and views outside go, as on a Mac. */
+void AConstraintsViewRemoved(NSView *v, NSView *oldSuperview)
+{
+    if (!AConstraintsInUse || ![all_active count])
+        return;
+    for (NSLayoutConstraint *c in [[all_active allObjects] copy]) {
+        NSView *container = [c _container];
+        BOOL containerInside = container == v || [container isDescendantOf:v];
+        if (containerInside)
+            continue;
+        for (id item in [c _items]) {
+            NSView *iv = view_of(item);
+            if (iv == v || [iv isDescendantOf:v]) {
+                [c setActive:NO];
+                break;
+            }
+        }
+    }
+    changed(oldSuperview);
+}
+
+/* A view is going away: its constraints, and the ones naming it, go too. */
+void AConstraintsViewDying(NSView *v)
+{
+    if (!AConstraintsInUse)
+        return;
+    for (NSLayoutConstraint *c in [[[all_active allObjects] copy] autorelease])
+        if ([c _container] == v || [c _involves:v])
+            [[c _container] removeConstraint:c];
+    for (NSLayoutGuide *g in objc_getAssociatedObject(v, &guides_key))
+        [g setOwningView:nil];
+}
+
+/* ---- NSView ----------------------------------------------------------------------------- */
+
+@implementation NSView (NSConstraintBasedLayoutInstallingConstraints)
+- (NSArray *)constraints { return [[installed(self, NO) copy] autorelease] ?: @[]; }
+- (void)addConstraint:(NSLayoutConstraint *)c
+{
+    if (!c)
+        return;
+    if ([c _container] == self)
+        return;
+    if ([c _container])
+        [[c _container] removeConstraint:c];
+    for (id item in [c _items]) {
+        NSView *iv = view_of(item);
+        if (iv && iv != self && ![iv isDescendantOf:self])
+            [NSException raise:NSGenericException
+                        format:@"NSView: %@ can't hold %@, which names a view outside it", self, c];
+    }
+    AConstraintsInUse = YES;
+    if (!all_active)
+        all_active = [[NSMutableSet alloc] init];
+    [installed(self, YES) addObject:c];
+    [all_active addObject:c];
+    [c _setContainer:self];
+    changed(self);
+}
+- (void)addConstraints:(NSArray *)constraints
+{
+    for (NSLayoutConstraint *c in constraints)
+        [self addConstraint:c];
+}
+- (void)removeConstraint:(NSLayoutConstraint *)c
+{
+    if ([c _container] != self)
+        return;
+    [c retain];
+    [c _setContainer:nil];
+    [all_active removeObject:c];
+    [installed(self, NO) removeObjectIdenticalTo:c];
+    [c release];
+    changed(self);
+}
+- (void)removeConstraints:(NSArray *)constraints
+{
+    for (NSLayoutConstraint *c in [[constraints copy] autorelease])
+        [self removeConstraint:c];
+}
+ANCHOR(leadingAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeLeading)
+ANCHOR(trailingAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeTrailing)
+ANCHOR(leftAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeLeft)
+ANCHOR(rightAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeRight)
+ANCHOR(centerXAnchor, NSLayoutXAxisAnchor, NSLayoutAttributeCenterX)
+ANCHOR(topAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeTop)
+ANCHOR(bottomAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeBottom)
+ANCHOR(centerYAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeCenterY)
+ANCHOR(firstBaselineAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeFirstBaseline)
+ANCHOR(lastBaselineAnchor, NSLayoutYAxisAnchor, NSLayoutAttributeLastBaseline)
+ANCHOR(widthAnchor, NSLayoutDimension, NSLayoutAttributeWidth)
+ANCHOR(heightAnchor, NSLayoutDimension, NSLayoutAttributeHeight)
+- (NSArray *)layoutGuides { return [[objc_getAssociatedObject(self, &guides_key) copy] autorelease] ?: @[]; }
+- (void)addLayoutGuide:(NSLayoutGuide *)g
+{
+    NSMutableArray *a = objc_getAssociatedObject(self, &guides_key);
+    if (!a) {
+        a = [NSMutableArray array];
+        objc_setAssociatedObject(self, &guides_key, a, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if ([a indexOfObjectIdenticalTo:g] == NSNotFound) {
+        [[g owningView] removeLayoutGuide:g];
+        [a addObject:g];
+        [g setOwningView:self];
+        changed(self);
+    }
+}
+- (void)removeLayoutGuide:(NSLayoutGuide *)g
+{
+    NSMutableArray *a = objc_getAssociatedObject(self, &guides_key);
+    if ([a indexOfObjectIdenticalTo:g] == NSNotFound)
+        return;
+    for (NSLayoutConstraint *c in [[[all_active allObjects] copy] autorelease])
+        if ([c _involves:g])
+            [[c _container] removeConstraint:c];
+    [g setOwningView:nil];
+    [a removeObjectIdenticalTo:g];
+    changed(self);
+}
+@end
+
+@implementation NSView (NSConstraintBasedLayoutCoreMethods)
+- (void)updateConstraintsForSubtreeIfNeeded { update_subtree(self); }
+- (void)updateConstraints
+{
+    objc_setAssociatedObject(self, &update_key, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+- (BOOL)needsUpdateConstraints { return [objc_getAssociatedObject(self, &update_key) boolValue]; }
+- (void)setNeedsUpdateConstraints:(BOOL)flag
+{
+    objc_setAssociatedObject(self, &update_key, flag ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (flag) {
+        AConstraintsInUse = YES;
+        updates_pending = YES;
+        changed(self);
+    }
+}
++ (BOOL)requiresConstraintBasedLayout { return NO; }
+- (NSEdgeInsets)alignmentRectInsets { return NSEdgeInsetsMake(0, 0, 0, 0); }
+- (NSRect)alignmentRectForFrame:(NSRect)f
+{
+    NSEdgeInsets e = [self alignmentRectInsets];
+    return NSMakeRect(f.origin.x + e.left, f.origin.y + e.bottom, f.size.width - e.left - e.right,
+                      f.size.height - e.top - e.bottom);
+}
+- (NSRect)frameForAlignmentRect:(NSRect)r
+{
+    NSEdgeInsets e = [self alignmentRectInsets];
+    return NSMakeRect(r.origin.x - e.left, r.origin.y - e.bottom, r.size.width + e.left + e.right,
+                      r.size.height + e.top + e.bottom);
+}
+- (CGFloat)baselineOffsetFromBottom { return 0; }
+- (CGFloat)lastBaselineOffsetFromBottom { return [self baselineOffsetFromBottom]; }
+- (CGFloat)firstBaselineOffsetFromTop { return [self frame].size.height - [self baselineOffsetFromBottom]; }
+@end
+
+@implementation NSView (NSConstraintBasedLayoutDebugging)
+- (NSArray *)constraintsAffectingLayoutForOrientation:(NSLayoutConstraintOrientation)o
+{
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSLayoutConstraint *c in all_active)
+        if ([c _involves:self] && horizontal([c firstAttribute]) == (o == NSLayoutConstraintOrientationHorizontal))
+            [out addObject:c];
+    return out;
+}
+- (BOOL)hasAmbiguousLayout { return NO; }
+- (void)exerciseAmbiguityInLayout {}
+@end
+
+/* NSView (NSConstraintBasedLayoutCoreMethods) declares nothing else here;
+ * decoding a nib's constraints (NSView.m calls this). */
+void AViewDecodeConstraints(NSView *v, NSCoder *c)
+{
+    if ([c containsValueForKey:@"NSDoNotTranslateAutoresizingMask"] &&
+        [c decodeBoolForKey:@"NSDoNotTranslateAutoresizingMask"])
+        [v setTranslatesAutoresizingMaskIntoConstraints:NO];
+    if (![c containsValueForKey:@"NSViewConstraints"])
+        return;
+    id list = [c decodeObjectForKey:@"NSViewConstraints"];
+    if ([list isKindOfClass:[NSArray class]])
+        for (id x in list)
+            if ([x isKindOfClass:[NSLayoutConstraint class]] && [x firstItem])
+                [v addConstraint:x];
+}
+
+/* ---- NSWindow --------------------------------------------------------------------------- */
+
+@implementation NSWindow (NSConstraintBasedLayout)
+- (void)updateConstraintsIfNeeded { [[self contentView] updateConstraintsForSubtreeIfNeeded]; }
+- (void)layoutIfNeeded { [[self contentView] layoutSubtreeIfNeeded]; }
+- (void)setNeedsLayout:(BOOL)flag
+{
+    if (flag)
+        [[self contentView] setNeedsLayout:YES];
+}
+- (void)setNeedsUpdateConstraints:(BOOL)flag { [[self contentView] setNeedsUpdateConstraints:flag]; }
+- (void)visualizeConstraints:(NSArray *)constraints {}
+- (id)contentLayoutGuide
+{
+    NSView *content = [self contentView];
+    if (!content)
+        return nil;
+    NSLayoutGuide *g = objc_getAssociatedObject(self, &guide_key);
+    if (!g || [g owningView] != content) {
+        g = [[[NSLayoutGuide alloc] init] autorelease];
+        [g _setContentGuide:YES];
+        [g setIdentifier:@"NSWindow-contentLayoutGuide"];
+        [content addLayoutGuide:g];
+        objc_setAssociatedObject(self, &guide_key, g, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return g;
+}
+- (NSRect)contentLayoutRect { return [[self contentView] bounds]; }
+- (NSLayoutAttribute)anchorAttributeForOrientation:(NSLayoutConstraintOrientation)o
+{
+    return o == NSLayoutConstraintOrientationHorizontal ? NSLayoutAttributeLeft : NSLayoutAttributeTop;
+}
+@end

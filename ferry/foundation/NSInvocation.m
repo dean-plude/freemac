@@ -823,6 +823,16 @@ static BOOL is_object(const struct FArg *a) { return a->code == '@'; }
                                            @"target and selector");
     if (target != [self target])
         [self setTarget:target];
+    [self _invokeFunction:NULL];
+}
+
+/* Ferry's own: makes the call with function in place of objc_msgSend, with
+ * the arguments as they stand, the first in the first argument register. A
+ * block's invocation (its signature from _Block_signature) passes the block
+ * there and the block's invoke function here; JavaScriptCore's ObjC layer
+ * calls blocks this way (javascriptcore/JSValue.m). NULL sends the message. */
+- (void)_invokeFunction:(void *)function
+{
     const struct FArg *r = [_sig _result];
     BOOL hidden = [_sig _returnsInMemory];
     NSUInteger n = [_sig numberOfArguments];
@@ -869,7 +879,8 @@ static BOOL is_object(const struct FArg *a) { return a->code == '@'; }
         [self _retainResult:NO];
     _retSet = NO;
     memset(_ret, 0, _retCap);
-    void *fn = hidden        ? (void *)objc_msgSend_stret
+    void *fn = function      ? function
+               : hidden      ? (void *)objc_msgSend_stret
                : f.x87 == 2 ? (void *)FMsgSendFp2ret
                : f.x87      ? (void *)objc_msgSend_fpret
                             : (void *)objc_msgSend;

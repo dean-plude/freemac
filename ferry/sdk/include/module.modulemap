@@ -1,0 +1,312 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Ferry SDK: a module for each of Ferry's frameworks, for "@import
+// Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
+// sdk/gen-modulemap.sh; run it again after adding a header.
+
+module AppKit [system] {
+    header "AppKit/AppKit.h"
+    header "AppKit/AppKitMore.h"
+    header "AppKit/NSAccessibility.h"
+    header "AppKit/NSAnimation.h"
+    header "AppKit/NSBezierPath.h"
+    header "AppKit/NSCollectionView.h"
+    header "AppKit/NSDockTile.h"
+    header "AppKit/NSEventMonitors.h"
+    header "AppKit/NSFontDescriptor.h"
+    header "AppKit/NSLayoutConstraint.h"
+    header "AppKit/NSRuleEditor.h"
+    header "AppKit/NSRulerView.h"
+    header "AppKit/NSRunningApplication.h"
+    header "AppKit/NSTextAttachment.h"
+    header "AppKit/NSTrackingArea.h"
+    export *
+    link framework "AppKit"
+}
+
+module ApplicationServices [system] {
+    header "ApplicationServices/ApplicationServices.h"
+    export *
+    link framework "ApplicationServices"
+}
+
+module CFNetwork [system] {
+    header "CFNetwork/CFNetwork.h"
+    export *
+    link framework "CFNetwork"
+}
+
+module Carbon [system] {
+    header "Carbon/Carbon.h"
+    export *
+    link framework "Carbon"
+}
+
+module Cocoa [system] {
+    header "Cocoa/Cocoa.h"
+    export *
+    link framework "Cocoa"
+}
+
+module CommonCrypto [system] {
+    header "CommonCrypto/CommonCrypto.h"
+    header "CommonCrypto/CommonCryptoError.h"
+    header "CommonCrypto/CommonCryptor.h"
+    header "CommonCrypto/CommonDigest.h"
+    header "CommonCrypto/CommonHMAC.h"
+    header "CommonCrypto/CommonKeyDerivation.h"
+    header "CommonCrypto/CommonRandom.h"
+    export *
+}
+
+module CoreData [system] {
+    header "CoreData/CoreData.h"
+    export *
+    link framework "CoreData"
+}
+
+module CoreFoundation [system] {
+    header "CoreFoundation/CoreFoundation.h"
+    header "CoreFoundation/CFArray.h"
+    header "CoreFoundation/CFBase.h"
+    header "CoreFoundation/CFBundle.h"
+    header "CoreFoundation/CFData.h"
+    header "CoreFoundation/CFDictionary.h"
+    header "CoreFoundation/CFMore.h"
+    header "CoreFoundation/CFNumber.h"
+    header "CoreFoundation/CFPreferences.h"
+    header "CoreFoundation/CFRunLoop.h"
+    header "CoreFoundation/CFSet.h"
+    header "CoreFoundation/CFSocket.h"
+    header "CoreFoundation/CFStream.h"
+    header "CoreFoundation/CFString.h"
+    header "CoreFoundation/CFURL.h"
+    header "CoreFoundation/CFUUID.h"
+    export *
+    link framework "CoreFoundation"
+}
+
+module CoreGraphics [system] {
+    header "CoreGraphics/CoreGraphics.h"
+    header "CoreGraphics/CGAffineTransform.h"
+    header "CoreGraphics/CGBase.h"
+    header "CoreGraphics/CGBitmapContext.h"
+    header "CoreGraphics/CGColor.h"
+    header "CoreGraphics/CGColorSpace.h"
+    header "CoreGraphics/CGContext.h"
+    header "CoreGraphics/CGDataProvider.h"
+    header "CoreGraphics/CGEvent.h"
+    header "CoreGraphics/CGGeometry.h"
+    header "CoreGraphics/CGGradient.h"
+    header "CoreGraphics/CGImage.h"
+    header "CoreGraphics/CGPath.h"
+    header "CoreGraphics/CGWindow.h"
+    export *
+    link framework "CoreGraphics"
+}
+
+module CoreServices [system] {
+    header "CoreServices/CoreServices.h"
+    header "CoreServices/FSEvents.h"
+    header "CoreServices/Files.h"
+    header "CoreServices/LSSharedFileList.h"
+    export *
+    link framework "CoreServices"
+}
+
+module CoreText [system] {
+    header "CoreText/CoreText.h"
+    header "CoreText/CTFont.h"
+    header "CoreText/CTFrame.h"
+    header "CoreText/CTFramesetter.h"
+    header "CoreText/CTLine.h"
+    header "CoreText/CTParagraphStyle.h"
+    header "CoreText/CTStringAttributes.h"
+    export *
+    link framework "CoreText"
+}
+
+module Foundation [system] {
+    header "Foundation/Foundation.h"
+    header "Foundation/NSAffineTransform.h"
+    header "Foundation/NSAppleScript.h"
+    header "Foundation/NSArray.h"
+    header "Foundation/NSAutoreleasePool.h"
+    header "Foundation/NSBundle.h"
+    header "Foundation/NSByteOrder.h"
+    header "Foundation/NSCache.h"
+    header "Foundation/NSCharacterSet.h"
+    header "Foundation/NSComparisonPredicate.h"
+    header "Foundation/NSData.h"
+    header "Foundation/NSDate.h"
+    header "Foundation/NSDecimal.h"
+    header "Foundation/NSDecimalNumber.h"
+    header "Foundation/NSDictionary.h"
+    header "Foundation/NSDistributedNotificationCenter.h"
+    header "Foundation/NSEnumerator.h"
+    header "Foundation/NSError.h"
+    header "Foundation/NSException.h"
+    header "Foundation/NSExpression.h"
+    header "Foundation/NSFileCoordinator.h"
+    header "Foundation/NSFileManager.h"
+    header "Foundation/NSFilePresenter.h"
+    header "Foundation/NSGarbageCollector.h"
+    header "Foundation/NSHTTPCookie.h"
+    header "Foundation/NSHTTPCookieStorage.h"
+    header "Foundation/NSNetServices.h"
+    header "Foundation/NSNotification.h"
+    header "Foundation/NSNumber.h"
+    header "Foundation/NSObjCRuntime.h"
+    header "Foundation/NSObject.h"
+    header "Foundation/NSOperation.h"
+    header "Foundation/NSOrderedSet.h"
+    header "Foundation/NSPathUtilities.h"
+    header "Foundation/NSProcessInfo.h"
+    header "Foundation/NSProgress.h"
+    header "Foundation/NSPropertyList.h"
+    header "Foundation/NSRange.h"
+    header "Foundation/NSRegularExpression.h"
+    header "Foundation/NSRunLoop.h"
+    header "Foundation/NSScanner.h"
+    header "Foundation/NSSet.h"
+    header "Foundation/NSStream.h"
+    header "Foundation/NSString.h"
+    header "Foundation/NSTask.h"
+    header "Foundation/NSThread.h"
+    header "Foundation/NSTimer.h"
+    header "Foundation/NSURL.h"
+    header "Foundation/NSURLAuthenticationChallenge.h"
+    header "Foundation/NSURLCache.h"
+    header "Foundation/NSURLConnection.h"
+    header "Foundation/NSURLCredential.h"
+    header "Foundation/NSURLCredentialStorage.h"
+    header "Foundation/NSURLError.h"
+    header "Foundation/NSURLProtectionSpace.h"
+    header "Foundation/NSURLRequest.h"
+    header "Foundation/NSURLResponse.h"
+    header "Foundation/NSURLSession.h"
+    header "Foundation/NSUUID.h"
+    header "Foundation/NSUserDefaults.h"
+    header "Foundation/NSUserNotification.h"
+    header "Foundation/NSValue.h"
+    header "Foundation/NSXMLDTD.h"
+    header "Foundation/NSXMLDTDNode.h"
+    header "Foundation/NSXMLDocument.h"
+    header "Foundation/NSXMLElement.h"
+    header "Foundation/NSXMLNode.h"
+    header "Foundation/NSXMLNodeOptions.h"
+    header "Foundation/NSXMLParser.h"
+    header "Foundation/NSZone.h"
+    export *
+    link framework "Foundation"
+}
+
+module HIServices [system] {
+    header "HIServices/Accessibility.h"
+    export *
+    link framework "ApplicationServices"
+}
+
+module ImageIO [system] {
+    header "ImageIO/ImageIO.h"
+    export *
+    link framework "ImageIO"
+}
+
+module JavaScriptCore [system] {
+    header "JavaScriptCore/JavaScriptCore.h"
+    header "JavaScriptCore/JSBase.h"
+    header "JavaScriptCore/JSContext.h"
+    header "JavaScriptCore/JSContextRef.h"
+    header "JavaScriptCore/JSExport.h"
+    header "JavaScriptCore/JSManagedValue.h"
+    header "JavaScriptCore/JSObjectRef.h"
+    header "JavaScriptCore/JSStringRef.h"
+    header "JavaScriptCore/JSStringRefCF.h"
+    header "JavaScriptCore/JSTypedArray.h"
+    header "JavaScriptCore/JSValue.h"
+    header "JavaScriptCore/JSValueRef.h"
+    header "JavaScriptCore/JSVirtualMachine.h"
+    header "JavaScriptCore/JavaScript.h"
+    export *
+    link framework "JavaScriptCore"
+}
+
+module Quartz [system] {
+    header "Quartz/Quartz.h"
+    header "Quartz/QCView.h"
+    header "Quartz/QLPreviewPanel.h"
+    export *
+    link framework "Quartz"
+}
+
+module QuartzCore [system] {
+    header "QuartzCore/QuartzCore.h"
+    header "QuartzCore/CAAnimation.h"
+    header "QuartzCore/CABase.h"
+    header "QuartzCore/CAGradientLayer.h"
+    header "QuartzCore/CALayer.h"
+    header "QuartzCore/CAMediaTiming.h"
+    header "QuartzCore/CAMediaTimingFunction.h"
+    header "QuartzCore/CAShapeLayer.h"
+    header "QuartzCore/CATextLayer.h"
+    header "QuartzCore/CATransaction.h"
+    header "QuartzCore/CATransform3D.h"
+    header "QuartzCore/CoreAnimation.h"
+    export *
+    link framework "QuartzCore"
+}
+
+module QuickLook [system] {
+    header "QuickLook/QuickLook.h"
+    export *
+    link framework "QuickLook"
+}
+
+module Security [system] {
+    header "Security/Security.h"
+    header "Security/CSCommon.h"
+    header "Security/CodeSigning.h"
+    header "Security/SecBase.h"
+    header "Security/SecCertificate.h"
+    header "Security/SecCode.h"
+    header "Security/SecItem.h"
+    header "Security/SecKeychain.h"
+    header "Security/SecKeychainItem.h"
+    header "Security/SecPolicy.h"
+    header "Security/SecRandom.h"
+    header "Security/SecRequirement.h"
+    header "Security/SecStaticCode.h"
+    header "Security/SecTrust.h"
+    export *
+    link framework "Security"
+}
+
+module ServiceManagement [system] {
+    header "ServiceManagement/ServiceManagement.h"
+    export *
+    link framework "ServiceManagement"
+}
+
+module SystemConfiguration [system] {
+    header "SystemConfiguration/SystemConfiguration.h"
+    header "SystemConfiguration/SCNetworkReachability.h"
+    export *
+    link framework "SystemConfiguration"
+}
+
+module UserNotifications [system] {
+    header "UserNotifications/UserNotifications.h"
+    export *
+    link framework "UserNotifications"
+}
+
+module WebKit [system] {
+    header "WebKit/WebKit.h"
+    header "WebKit/DOM.h"
+    header "WebKit/WKWebView.h"
+    header "WebKit/WebFrameView.h"
+    header "WebKit/WebResourceLoadDelegate.h"
+    header "WebKit/WebView.h"
+    export *
+    link framework "WebKit"
+}

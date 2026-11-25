@@ -1,0 +1,54 @@
+no panel yet: 0
+the same panel each time: 1, now there's one: 1, a panel 1, floating 1
+no controller while hidden: 1
+asked to control
+begins: controller is me 1
+visible 1, controller 1
+item 0, title "notes.txt"
+  NSImageView an image, 48x48
+  NSTextField "notes.txt"
+  NSTextField "23 bytes"
+  NSScrollView text "first line\nsecond line\n", editable 0
+item 1, title "picture.png"
+  NSImageView an image, 48x48
+  NSTextField "picture.png"
+  NSTextField "110 bytes"
+  NSImageView an image, 496x364, picture 80x40
+item 2, title "data.bin"
+  NSImageView an image, 48x48
+  NSTextField "data.bin"
+  NSTextField "5 bytes"
+  NSImageView an image, 128x128, picture 32x32
+item 3, title "folder"
+  NSImageView an image, 48x48
+  NSTextField "folder"
+  NSTextField "Folder"
+  NSImageView an image, 128x128, picture 32x32
+item 4, title "My notes"
+  NSImageView an image, 48x48
+  NSTextField "My notes"
+  NSTextField "23 bytes"
+  NSScrollView text "first line\nsecond line\n", editable 0
+past the end: item 4
+before the start: item 0
+after reloading one item: item 0, notes.txt
+the delegate had the key
+still visible after the delegate's key: 1
+ends
+Escape put it away: visible 0, controller 0, data source 0
+asked to control
+begins: controller is me 1
+shown again: controller 1
+ends
+closed: visible 0, still the shared one 1
+full screen 1, then not 1, frame back 1
+a compact view:
+  NSScrollView text "first line\nsecond line\n", editable 0
+closes with its window 1, URL's item is itself 1
+thumbnail of the picture: 40x20
+never larger: 80x40
+an icon: 64x64
+text without icon mode: none, a missing file: none
+generator keys: 1, no request cancelled: 1
+a composition loads: 0, renders: 0, rendering 0, a snapshot 50x50
+exit=0

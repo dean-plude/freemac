@@ -29,7 +29,7 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      sdk/include/CoreFoundation/CFMore.h sdk/include/CoreFoundation/CFSet.h \
                      sdk/include/CFNetwork/CFNetwork.h \
                      foundation/FCurl.h foundation/FURLInternal.h foundation/FExpression.h
-OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter
+OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter -fno-modules
 
 # Core Graphics and Core Text (M3), one Mac library that draws with this
 # system's Cairo and Pango. CoreText, ApplicationServices and ImageIO are served from
@@ -66,7 +66,7 @@ APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(Q
                  appkit/ANotify.h sdk/include/AppKit/NSDockTile.h sdk/include/UserNotifications/UserNotifications.h \
                  sdk/include/AppKit/NSCollectionView.h sdk/include/AppKit/NSRulerView.h \
                  appkit/AWayfire.h sdk/include/AppKit/NSEventMonitors.h sdk/include/HIServices/Accessibility.h \
-                 sdk/include/Carbon/Carbon.h sdk/include/AppKit/AppKitMore.h
+                 sdk/include/Carbon/Carbon.h $(wildcard sdk/include/AppKit/*.h)
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
@@ -87,7 +87,15 @@ WEBKIT_OBJ = $(WEBKIT_SRC:webkit/%.m=webkit/build/%.o)
 WEBKIT = frameworks/WebKit.framework/WebKit
 WEBKIT_HEADERS = webkit/WKInternal.h webkit/WKHost.h $(wildcard sdk/include/WebKit/*.h) $(APPKIT_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT)
+# JavaScriptCore: its C API passed to this system's JavaScriptCore, which is
+# opened when a program first makes a call (src/host.c), and the
+# Objective-C API built on it.
+JSC_SRC = $(wildcard javascriptcore/*.m)
+JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
+JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
+JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
+
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -103,12 +111,17 @@ src/cxx.o src/cxx_unwind.o src/cxx_threads.o src/lookup.o src/loader.o src/objc/
 src/host_names.h: graphics/host.h appkit/gtk.h webkit/WKHost.h
 	cat $^ | grep -oE '\b(cairo|pango|g|hb|gtk|gdk|poppler)_[a-z0-9_]+\(' | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
 
-src/host.o: src/host_names.h src/webkit_names.h
+src/host.o: src/host_names.h src/webkit_names.h src/jsc_names.h
 
 # The WebKitGTK and JavaScriptCore calls Ferry's WebKit may look up by name:
 # exactly the ones webkit/WKHost.h declares.
 src/webkit_names.h: webkit/WKHost.h
 	grep -oE '\b(webkit|jsc)_[a-z0-9_]+\(' $^ | tr -d '(' | sort -u | sed 's/.*/    "&",/' > $@
+
+# The JavaScriptCore calls Ferry's JavaScriptCore may look up by name:
+# exactly the ones javascriptcore/JSCNames.h lists.
+src/jsc_names.h: javascriptcore/JSCNames.h
+	grep -oE 'X\(JS[A-Za-z0-9]+\)' $^ | sed 's/X(\(.*\))/    "\1",/' > $@
 
 src/objc/%.o: src/objc/%.S
 	$(CC) -c -o $@ $<
@@ -216,6 +229,9 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
 	@mkdir -p frameworks/UserNotifications.framework
 	sdk/gen-alias-tbd.sh UserNotifications $@ > frameworks/UserNotifications.framework/UserNotifications.tbd
+	@mkdir -p frameworks/Quartz.framework frameworks/QuickLook.framework
+	sdk/gen-alias-tbd.sh Quartz $@ > frameworks/Quartz.framework/Quartz.tbd
+	sdk/gen-alias-tbd.sh QuickLook $@ > frameworks/QuickLook.framework/QuickLook.tbd
 	# Quartz window and event services live in AppKit's file (CGServices.m),
 	# so ApplicationServices offers them too
 	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
@@ -243,10 +259,19 @@ $(WEBKIT): $(WEBKIT_OBJ) $(APPKIT) $(HOST_TBD)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/WebKit.framework/Versions/A/WebKit \
 	    -o $@ $(WEBKIT_OBJ) -framework Foundation -framework CoreGraphics -framework AppKit $(HOST_TBD)
 
+javascriptcore/build/%.o: javascriptcore/%.m $(JSC_HEADERS) sdk/ferry-cc
+	@mkdir -p javascriptcore/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(JSC): $(JSC_OBJ) $(FOUNDATION) $(GRAPHICS)
+	@mkdir -p frameworks/JavaScriptCore.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore \
+	    -o $@ $(JSC_OBJ) -framework Foundation -framework CoreGraphics
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -261,16 +286,17 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement UserNotifications; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement UserNotifications Quartz QuickLook; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 	install -Dm755 $(COREDATA) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreData.framework/CoreData
 	install -Dm755 $(WEBKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/WebKit.framework/WebKit
+	install -Dm755 $(JSC) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/JavaScriptCore.framework/JavaScriptCore
 
 clean:
-	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h
+	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build webkit/build
+	    installer/Installer.app coredata/build webkit/build javascriptcore/build
 
 .PHONY: all check install clean

@@ -928,6 +928,8 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"Cocoa", "AppKit"},
     {"Carbon", "AppKit"},
     {"UserNotifications", "AppKit"}, /* appkit/UNUserNotificationCenter.m, beside the Dock and D-Bus */
+    {"Quartz", "AppKit"},            /* Quick Look's panel and QCView, appkit/QuickLook.m */
+    {"QuickLook", "AppKit"},         /* the generator calls and thumbnails, appkit/QuickLook.m */
     {NULL, NULL},
 };
 

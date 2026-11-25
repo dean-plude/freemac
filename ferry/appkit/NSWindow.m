@@ -720,6 +720,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
         [_sheetParent display];
         return;
     }
+    ALayoutConstraintsIfNeeded(_contentView);
     [self _ensureBacking];
     _needsDisplay = NO;
     [self _drawWindowInContext:_ctx screen:YES];
@@ -740,6 +741,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
         [_sheetParent displayIfNeeded];
         return;
     }
+    /* constraints first: what they move needs drawing too */
+    ALayoutConstraintsIfNeeded(_contentView);
     if ([self _rootViewsNeedDisplay] || [_sheet _rootViewsNeedDisplay] || !_backing)
         [self display];
 }

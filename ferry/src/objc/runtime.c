@@ -1434,6 +1434,41 @@ struct objc_method_description protocol_getMethodDescription(Protocol *p, SEL se
     return d;
 }
 
+/* A method's extended type encoding, which names its object arguments'
+ * classes (@"JSValue"), as the compiler keeps it in the protocol: one entry
+ * for each method of the four lists, in their order. JavaScriptCore's
+ * Objective-C API reads it, as on a Mac (freemac 1.222, Ferry 0.46.0). */
+const char *_protocol_getMethodTypeEncoding(Protocol *p, SEL sel, BOOL required, BOOL instance)
+{
+    if (!p || !sel)
+        return NULL;
+    const struct c_method_list *lists[4] = {p->instance_methods, p->class_methods, p->opt_instance_methods,
+                                            p->opt_class_methods};
+    int want = required ? (instance ? 0 : 1) : (instance ? 2 : 3);
+    BOOL extended = p->size >= offsetof(struct c_protocol, extended_types) + sizeof(void *) && p->extended_types;
+    unsigned before = 0;
+    for (int k = 0; k < 4; k++) {
+        struct fmlist *l = convert_methods(lists[k]);
+        unsigned n = l ? l->count : 0;
+        if (k == want)
+            for (unsigned i = 0; i < n; i++)
+                if (l->m[i].name == sel) {
+                    const char *types = extended ? p->extended_types[before + i] : l->m[i].types;
+                    free(l);
+                    return types;
+                }
+        free(l);
+        before += n;
+    }
+    if (p->protocols)
+        for (uint64_t i = 0; i < p->protocols->count; i++) {
+            const char *t = _protocol_getMethodTypeEncoding(p->protocols->list[i], sel, required, instance);
+            if (t)
+                return t;
+        }
+    return NULL;
+}
+
 struct fprop **protocol_copyPropertyList(Protocol *p, unsigned *out)
 {
     struct fplist *l = p ? convert_props(p->properties) : NULL;

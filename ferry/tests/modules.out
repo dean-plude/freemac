@@ -1,0 +1,9 @@
+modules: on
+Foundation: 9 apps
+AppKit: {{10, 5}, {80, 40}}, NSView
+QuartzCore: 4x3
+CoreGraphics: 3x3
+a macro from a module: 1343
+Quartz: QLPreviewPanel, CoreServices: no events yet
+JavaScriptCore: JSContext, its C types
+exit=0

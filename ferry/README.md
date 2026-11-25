@@ -308,6 +308,28 @@ older and smaller names (modal sessions, focus rings, the text storage's
 edits, appearances) declared in `AppKit/AppKitMore.h` and kept with the
 classes they belong to.
 
+From Ferry 0.46.0 (freemac 1.222), `ferry-cc` compiles Objective-C with
+modules, so `@import Foundation;` works. The module map is
+`sdk/include/module.modulemap`, made by `sdk/gen-modulemap.sh`, and each
+module links its own framework. AppKit has:
+
+- Auto Layout, with constraints, anchors, layout guides, the visual format
+  language and a solver that sets frames (`appkit/NSLayoutConstraint.m`)
+- the accessibility names and methods (`appkit/NSAccessibility.m`)
+- font descriptors (`appkit/NSFontDescriptor.m`)
+- `NSRuleEditor` (`appkit/NSRuleEditor.m`)
+
+FSEvents streams hear folders' changes through inotify
+(`foundation/FSEvents.m`). `Quartz.framework` and `QuickLook.framework` are
+served from AppKit's file: the shared Quick Look panel, preview views and
+thumbnails (`appkit/QuickLook.m`). `JavaScriptCore.framework`
+(`javascriptcore/`) passes the C API to this system's JavaScriptCore
+(libjavascriptcoregtk-4.1), opened on a program's first call through
+`ferry_jsc_symbol()` in `src/host.c`. It adds `JSContext`, `JSValue`,
+`JSExport` and the rest of the Objective-C API on top. `FERRY_JAVASCRIPTCORE`
+names another library to open instead; the tests use it to stand for a
+system without JavaScriptCore.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

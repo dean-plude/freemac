@@ -1,0 +1,22 @@
+names: AXRole AXButton AXPress AXCloseButton AXFocusedUIElementChanged
+kAX: AXPress AXZoomButton AXSheet AXChildren
+roles: view AXGroup, button AXButton, checkbox AXCheckBox, label AXStaticText, field AXTextField, image AXImage
+follows the protocol: 1, ignored: view 1, button 0
+button title Save, image label a padlock
+children of the root, past the plain view: AXButton AXCheckBox AXStaticText AXTextField AXImage
+the button's parent: nil
+unignored ancestor of the plain view: none
+button frame with no window: 15,15 80x24; AXPosition {15, 15}, AXSize {80, 24}
+AXDescription Save the document, AXHelp Saves, AXEnabled 1, AXFocused 1, settable 1 0
+disabled: 0
+overridden: heading, listed 1
+a view made an element: ignored 0, the button's parent now, past the plain view: 1
+child count 5, index of the field 3
+actions AXPress, clicks 2, pressed 1, described press
+descriptions: pop up button; standard window; checkbox; button; show menu; show alternate UI
+window: AXWindow Inspector, children AXButton, parent is the app 1, app role AXApplication, window listed 1
+button on the screen at 110,120, its window 1, hit the button
+element: tabs, child AXRadioButton at 230,302, parent 1, ignored 0, hit the tab
+unignored cells: 1 of 2, role AXButton, ancestor of the hidden one none
+bad argument: NSAccessibilityException
+exit=0

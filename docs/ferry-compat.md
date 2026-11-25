@@ -1324,6 +1324,52 @@ What was missing, by how many apps needed it:
 | `+colorNamed:` | Gas Mask | answers nil: an app's colours are in its compiled asset catalogue, which Ferry doesn't read |
 | The accessibility constants (`NSAccessibilityRoleAttribute`, `NSAccessibilityButtonRole` and the rest), `NSRuleEditor`, `NSMatrix`, `NSColorList`, `NSURLComponents`, `NSTitlebarAccessoryViewController`, `FSEventStream…`, `CFNotificationCenter`, `NSConnection`, `NSPICTImageRep` | one app each | not done |
 
+### Building the nine apps, 1.222 (freemac 1.222, Ferry 0.46.0)
+
+Every `.m` file in the nine apps' own targets was compiled with `ferry-cc
+-fsyntax-only` against Ferry's SDK. Each target's prefix header was used, and
+KeyCastr's ARC targets were built with `-fobjc-arc`. This survey script
+finds 608 files, not the 637 that 1.221 counted, so both columns below come
+from the same script, before and after this work.
+
+| App | Source files | Compiled before | Compile now |
+| --- | --- | --- | --- |
+| Flycut | 23 | 18 | 20 |
+| ShiftIt | 23 | 17 | 18 |
+| Spectacle | 31 | 23 | 26 |
+| Gas Mask | 43 | 35 | 36 |
+| MacPass | 159 | 55 | 58 |
+| MacDown | 35 | 12 | 13 |
+| Sequel Pro | 172 | 128 | 131 |
+| KeyCastr | 17 | 11 | 11 |
+| Hex Fiend | 105 | 70 | 70 |
+| All nine | 608 | 369 | 383 |
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `@import Foundation;`, `@import AppKit;` and the other modules | KeyCastr, Flycut | done |
+| `NSLayoutConstraint`, anchors, `NSDictionaryOfVariableBindings`, the visual format language | Flycut, MacPass | done, with a solver |
+| `NSAccessibility` names and protocol methods, `kAX` names | Spectacle, MacPass, Sequel Pro | done; values are kept, since there's no screen reader |
+| `NSFontDescriptor`, `NSFontSymbolicTraits` | MacPass, MacDown, Sequel Pro | done |
+| `FSEventStreamCreate` and the rest of FSEvents | Hex Fiend, Gas Mask | done, on inotify; no history from before a stream starts |
+| `Quartz/Quartz.h`, `QLPreviewPanel`, `QLPreviewView` | MacPass, KeyCastr, Sequel Pro | done; `QCView` loads nothing |
+| `NSRuleEditor` | Gas Mask, Sequel Pro | done |
+| `JavaScriptCore/JavaScriptCore.h` (the C API, `JSContext`, `JSValue`, `JSExport`) | MacDown, Spectacle | done, on this system's JavaScriptCore |
+
+What still stops each app's files (the first error in each file):
+
+- **Flycut (3)**: the app's own `MJCloudKitUserDefaultsSync`; `IOKit/hidsystem/IOLLEvent.h`; a dictionary read into an `NSUInteger` (an error under the newer compiler).
+- **ShiftIt (5)**: `X11/Xlib.h` (its X11 driver); `ScriptingBridge/ScriptingBridge.h`; `GetIconRefFromFileInfo`; `ProcessSerialNumber`; a hotkey macro.
+- **Spectacle (5)**: the app's own Sparkle; `LSSharedFileListRef` named as an identifier; `NSPreferencePanesDirectory`; two files that subclass `NSObject` with only `Carbon/Carbon.h` imported.
+- **Gas Mask (7)**: its Swift bridging header; kqueue's `NOTE_WRITE` and `O_EVTONLY`; `AuthorizationRef`; `SMAppService`; `kSCNetworkFlagsReachable`; `alloca` without `alloca.h`.
+- **MacPass (101)**: KeePassKit (60 files) and HNHUi (16), the app's own frameworks; TransformerKit and Sparkle; `kSecClass`; `windowNumbersWithOptions:`; `NSTitlebarAccessoryViewController`; `LSCopyAllHandlersForURLScheme`; `kUTTypeFileURL`; and a dozen single calls (`getValue:size:`, `popUpMenuPositioningItem:atLocation:inView:`, `openURLs:withApplicationAtURL:options:configuration:error:`, `eventWithEventRef:` and others).
+- **MacDown (22)**: the app's own frameworks and libraries (MASPreferences, PAPreferences, HBHandlebars, GBCli, JJPluralForm, hoedown, libyaml); a header named in the wrong case (`MPDOcument.h`); `version.h`, made by its build; `base64Encoding`; `hasMarkedText`; `NSCursorAttributeName`; `addSuiteNamed:`.
+- **Sequel Pro (41)**: `NSConnection` (3); `NSTokenFieldCellDelegate` (3); `complex.h` (3); `NSCalendarDate`; `NSPersistentStoreCoordinator` in its own headers; `NSPrintPanelAccessorizing`; `NSTextTab`; `NSAppleEventManager`; `SecTrustedApplicationRef`; `NSPICTImageRep`; `NSColorSpace` and `NSColorList`; `WebHistoryItem`; `bzlib.h`; `CFXMLCreateStringByEscapingEntities`; `getlogin`; `object_getInstanceVariable`; `NSFileTypeForHFSTypeCode`; and a few older names (`unimpErr`, `Nanoseconds`, `NSThickSquareBezelStyle`).
+- **KeyCastr (6)**: `CFNotificationCenterRef`; `CFMachPortCreateRunLoopSource`; `setFrameUsingName:force:`; `relativeCurveToPoint:controlPoint1:controlPoint2:`; a `__weak` in a file built without ARC; the app's own ShortcutRecorder.
+- **Hex Fiend (35)**: its Swift bridging header and generated `version.h`; headers named in the wrong case or missing from the checkout (`HFFUnctions.h`, `HFTest.h`, `HFBTree.h`, `FortunateSonIPCTypes.h`); `OSMemoryBarrier` and `OSQueueHead`; `DiskArbitration` and `sys/disk.h`; `PAGE_SIZE`; the remaining Mac text encodings (`kCFStringEncodingMacDevanagari`); `initWithUnsignedInteger:`; `UTTypeEqual`; `NSClickGestureRecognizer`; `CGContextShowGlyphsAtPositions`; `NSFrameRectWithWidthUsingOperation`; bridged casts the newer compiler requires; and a file that uses FSEvents having imported only Foundation (on a Mac, Foundation brings in CoreServices).
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1334,7 +1380,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first; 418 of the 637 source files now compile, and the table under "Building the nine apps again" lists what stops the rest. Next is building what the apps bring with them (Sequel Pro's MySQL framework, MacPass's KeePassKit), linking the apps and running them.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first; 418 of the 637 source files compiled then. In 1.222 modules, Auto Layout, the accessibility names, font descriptors, FSEvents, Quick Look, `NSRuleEditor` and JavaScriptCore came next. Counted again with one survey script, 383 of 608 files now compile (369 before), and the table under "Building the nine apps, 1.222" lists what stops the rest. Next is building what the apps bring with them (Sequel Pro's MySQL framework, MacPass's KeePassKit), linking the apps and running them.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

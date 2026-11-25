@@ -1,0 +1,62 @@
+defaults: nesting 2, row height 25, editable 1, can remove all 0, row class NSMutableDictionary
+two rows added: 2 rows
+  0: compound, parent -1, [all, of these are true]
+  1: simple, parent 0, [name, is, NSTextField]
+  row 0 at y 0: pop-up(all of all|any) label(of these are true) button(−) button(+)
+  row 1 at y 25: pop-up(name of name|size) pop-up(is of is|contains) NSTextField button(−) button(+)
+the field is in row 1
+predicate: name == "Ferry"
+size chosen: 2 rows
+  0: compound, parent -1, [all, of these are true]
+  1: simple, parent 0, [size, is more than, NSTextField]
+  row 1 at y 25: pop-up(size of name|size) label(is more than) NSTextField button(−) button(+)
+contains: name CONTAINS[c] "mac", row's own name CONTAINS[c] "mac"
+added after row 1, and under row 0: 4 rows
+  0: compound, parent -1, [all, of these are true]
+  1: simple, parent 0, [name, contains, NSTextField]
+  2: simple, parent 0, [name, is, NSTextField]
+  3: simple, parent 0, [name, is, NSTextField]
+row 2 removed: 3 rows
+  0: compound, parent -1, [all, of these are true]
+  1: simple, parent 0, [name, contains, NSTextField]
+  2: simple, parent 0, [name, is, NSTextField]
+subrows of row 0: 2, changes so far 8
+any: name CONTAINS[c] "mac" OR name == "x"
+a compound row inside: 5 rows
+  0: compound, parent -1, [any, of these are true]
+  1: simple, parent 0, [name, contains, NSTextField]
+  2: simple, parent 0, [name, is, NSTextField]
+  3: compound, parent 0, [all, of these are true]
+  4: simple, parent 3, [name, is, NSTextField]
+  row 4 at y 100: pop-up(name of name|size) pop-up(is of is|contains) NSTextField button(−) button(+)
+a subrow of a simple row: NSInvalidArgumentException
+no row 9: NSRangeException
+the top row removed: 4 rows
+  0: simple, parent -1, [name, contains, NSTextField]
+  1: simple, parent -1, [name, is, NSTextField]
+  2: compound, parent -1, [all, of these are true]
+  3: simple, parent 2, [name, is, NSTextField]
+a compound row removed with its subrow: 2 rows
+  0: simple, parent -1, [name, contains, NSTextField]
+  1: simple, parent -1, [name, is, NSTextField]
+size no longer offered: 2 rows
+  0: simple, parent -1, [name, is, NSTextField]
+  1: simple, parent -1, [name, is, NSTextField]
+  row 0 at y 0: label(name) pop-up(is of is|contains) NSTextField button(−) button(+)
+selected: 1 rows, first 1
+bound: info 1
+the model has 2 rows; the first's criteria name is field, type 0
+a list: 2 rows
+  0: simple, parent -1, [name, is, NSTextField]
+  1: simple, parent -1, [name, is, NSTextField]
+  row 0 at y 0: label(name) pop-up(is of is|contains) NSTextField button(−) button(+)
+the model set from outside: 1 rows
+  0: simple, parent -1, [name, is, NSTextField]
+the model emptied: 0 rows
+unbound: info 0
+single, not editable: 1 rows
+  0: simple, parent -1, [name, is, NSTextField]
+  row 0 at y 0: label(name) pop-up(is of is|contains) NSTextField
+changes: 18
+by word {4, 3}, by paragraph {0, 14}, by character {5, 1}, a space {3, 1}, dots
+exit=0

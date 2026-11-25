@@ -8,6 +8,8 @@ top=$(dirname "$here")
 build="$here/build"
 mkdir -p "$build"
 export FERRY_SDK="$top/sdk"
+# ferry-cc's module cache, in the build folder rather than the system's
+export FERRY_MODULE_CACHE="$build/module-cache"
 pass=0
 fail=0
 # For the URL loading tests: the test server on 127.0.0.1, reached directly,
@@ -47,12 +49,12 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
-        foundation_fileaccess|foundation_fsrefs|foundation_more_names)
+        foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_document_presenter)
+        appkit_document_presenter|appkit_quicklook)
             # its files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -120,6 +122,12 @@ run_one() {
             HOME="$build/home_$name" TMPDIR="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
                 env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
+        # JavaScriptCore (freemac 1.222, Ferry 0.46.0): with this system's
+        # JavaScriptCore, and as if it weren't installed
+        javascriptcore_missing)
+            FERRY_JAVASCRIPTCORE="$build/none/libjavascriptcoregtk-4.1.so.0" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        javascriptcore_*) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         # WebKit (freemac 1.214, Ferry 0.40.0): two tests with no display
         # (one as if WebKitGTK weren't installed), and the others on the X
         # display of run.sh's own Xvfb; each in a home of its own
@@ -183,6 +191,14 @@ run_one objc_basic_chained "$here/objc_basic.m" "$here/objc_basic.out" -lobjc -W
 run_one objc_arc_chained "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc -Wl,-fixup_chains
 # Unoptimized code sends messages differently (no tail calls, more stack).
 run_one objc_basic_O0 "$here/objc_basic.m" "$here/objc_basic.out" -O0 -lobjc
+# "@import Foundation;" and the rest, with no -framework flags
+run_one modules "$here/modules.m" "$here/modules.out" -fobjc-arc
+if "$top/sdk/gen-modulemap.sh" "$top/sdk/include" | cmp -s - "$top/sdk/include/module.modulemap"; then
+    echo "ok   module.modulemap matches its headers"; pass=$((pass + 1))
+else
+    echo "FAIL module.modulemap is out of date (run sdk/gen-modulemap.sh sdk/include > sdk/include/module.modulemap)"
+    fail=$((fail + 1))
+fi
 # A program using a Mac library (dylib) of its own, found through @rpath,
 # with both relocation formats.
 for fmt in classic chained; do
@@ -644,6 +660,18 @@ run_one appkit_archiver "$here/appkit/archiver.m" "$here/appkit/archiver.out" -f
 # rings, text storage edits, cell masks, field editors, menus, appearances
 # (freemac 1.221, Ferry 0.45.0).
 run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.out" -fobjc-arc -framework Cocoa
+# Auto Layout: constraints, anchors, the visual format and the solver
+run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
+# NSAccessibility: the names, the protocol's methods and the older API
+run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
+    -framework Cocoa -framework ApplicationServices
+# Quick Look's panel and view, thumbnails, and QCView, through Quartz
+# (freemac 1.222, Ferry 0.46.0), in a home of the test's own
+run_one appkit_quicklook "$here/appkit/quicklook.m" "$here/appkit/quicklook.out" -fobjc-arc -framework Cocoa \
+    -framework Quartz
+# NSRuleEditor's rows, criteria, buttons, predicate and binding, and
+# NSTextView's selection by word (freemac 1.222, Ferry 0.46.0)
+run_one appkit_rule_editor "$here/appkit/rule_editor.m" "$here/appkit/rule_editor.out" -fobjc-arc -framework Cocoa
 run_one appkit_report "$here/appkit/report.m" "$here/appkit/report.out" -fobjc-arc -framework Cocoa
 # Layer-backed and layer-hosting views, NSAnimationContext and animator
 # proxies, on Core Animation's test clock.
@@ -808,6 +836,20 @@ if grep -q "raised NSInternalInconsistencyException (timer 2 went wrong) and did
 else
     echo "FAIL appkit_report message"; sed 's/^/    stderr: /' "$build/appkit_report.err"; fail=$((fail + 1))
 fi
+# required constraints that can't all hold are reported once each
+if [ "$(grep -c "can't satisfy every required constraint at once; leaving out .*width == 60" \
+        "$build/appkit_constraints.err" 2>/dev/null)" = 1 ]; then
+    echo "ok   appkit_constraints message"; pass=$((pass + 1))
+else
+    echo "FAIL appkit_constraints message"; sed 's/^/    stderr: /' "$build/appkit_constraints.err"; fail=$((fail + 1))
+fi
+# a composition that can't be run is said once
+if [ "$(grep -c "running a Quartz Composer composition (QCView) isn't supported yet" \
+        "$build/appkit_quicklook.err" 2>/dev/null)" = 1 ]; then
+    echo "ok   appkit_quicklook message"; pass=$((pass + 1))
+else
+    echo "FAIL appkit_quicklook message"; sed 's/^/    stderr: /' "$build/appkit_quicklook.err"; fail=$((fail + 1))
+fi
 # The missing framework, class and function are each named.
 if grep -q "uses Imaginary, which Ferry doesn't provide yet; carrying on" "$build/foundation_missing.err" 2>/dev/null &&
         grep -q "the class MyThing is built on a class Ferry doesn't have yet" "$build/foundation_missing.err" &&
@@ -856,6 +898,9 @@ run_one appkit_print_pdfdata "$here/appkit/print_pdfdata.m" "$here/appkit/print_
 run_one appkit_print_document "$here/appkit/print_document.m" "$here/appkit/print_document.out" -fobjc-arc \
     -framework Cocoa
 run_one appkit_fonts "$here/appkit/fonts.m" "$here/appkit/fonts.out" -fobjc-arc -framework Cocoa
+# font descriptors and traits, and applyFontTraits:range:
+run_one appkit_font_descriptors "$here/appkit/font_descriptors.m" "$here/appkit/font_descriptors.out" -fobjc-arc \
+    -framework Cocoa
 if command -v weston > /dev/null 2>&1; then
     xdg="$build/xdg"
     rm -rf "$xdg"; mkdir -p "$xdg"; chmod 700 "$xdg"
@@ -1082,6 +1127,10 @@ run_one foundation_more_names "$here/foundation/more_names.m" "$here/foundation/
 # 1.221, Ferry 0.45.0), in a home of the test's own.
 run_one foundation_fsrefs "$here/foundation/fsrefs.m" "$here/foundation/fsrefs.out" -fobjc-arc -framework Foundation \
     -framework CoreServices
+# Folders' changes through FSEvents, heard with inotify (freemac 1.222,
+# Ferry 0.46.0), in a home of the test's own.
+run_one foundation_fsevents "$here/foundation/fsevents.m" "$here/foundation/fsevents.out" -fobjc-arc -fblocks \
+    -framework Foundation -framework CoreServices
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \
     -framework Foundation
 if [ -f "$build/foundation_asserts.err" ] &&
@@ -1146,6 +1195,22 @@ if [ -n "$webkit_found" ] && command -v Xvfb > /dev/null 2>&1; then
 else
     echo "skip webkit_wkwebview, webkit_ui, webkit_legacy, webkit_embed, webkit_dom, webkit_frames (need WebKitGTK, libwebkit2gtk-4.1, and Xvfb)"
 fi
+# JavaScriptCore (freemac 1.222, Ferry 0.46.0): its C API passed to this
+# system's JavaScriptCore (libjavascriptcoregtk-4.1), and the Objective-C
+# API on it, as MacDown and Spectacle use them; then the same program as
+# if the library weren't installed, which stops at its first call.
+jsc_flags="-fobjc-arc -fblocks -framework Foundation -framework JavaScriptCore"
+jsc_found=
+for d in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib /usr/local/lib; do
+    [ -e "$d/libjavascriptcoregtk-4.1.so.0" ] && jsc_found=1
+done
+if [ -n "$jsc_found" ]; then
+    run_one javascriptcore_apis "$here/javascriptcore/jsc.m" "$here/javascriptcore/jsc.out" $jsc_flags
+else
+    echo "skip javascriptcore_apis (needs JavaScriptCore, libjavascriptcoregtk-4.1)"
+fi
+run_one javascriptcore_missing "$here/javascriptcore/jsc.m" "$here/javascriptcore/missing.out" $jsc_flags
+webkit_message javascriptcore_missing "^ferry: this program runs JavaScript with JavaScriptCore, and this system's JavaScriptCore (libjavascriptcoregtk-4.1) isn't installed$"
 # Global hotkeys and the Accessibility API (freemac 1.215, Ferry 0.41.0),
 # against a stand-in Wayfire with Strata's calls (tests/tools/
 # fake_wayfire.py), each in a home and runtime folder of its own
