@@ -112,19 +112,13 @@ double CFStringGetDoubleValue(CFStringRef s);
 
 CFIndex CFArrayGetCount(CFArrayRef a);
 const void *CFArrayGetValueAtIndex(CFArrayRef a, CFIndex i);
-CFMutableArrayRef CFArrayCreateMutable(CFAllocatorRef alloc, CFIndex capacity, const void *callbacks);
 void CFArrayAppendValue(CFMutableArrayRef a, const void *value);
-extern const char kCFTypeArrayCallBacks[];
 
 CFIndex CFDictionaryGetCount(CFDictionaryRef d);
 const void *CFDictionaryGetValue(CFDictionaryRef d, const void *key);
 Boolean CFDictionaryContainsKey(CFDictionaryRef d, const void *key);
-CFMutableDictionaryRef CFDictionaryCreateMutable(CFAllocatorRef alloc, CFIndex capacity, const void *keyCallBacks,
-                                                 const void *valueCallBacks);
 void CFDictionarySetValue(CFMutableDictionaryRef d, const void *key, const void *value);
 void CFDictionaryRemoveValue(CFMutableDictionaryRef d, const void *key);
-extern const char kCFTypeDictionaryKeyCallBacks[];
-extern const char kCFTypeDictionaryValueCallBacks[];
 
 CFNumberRef CFNumberCreate(CFAllocatorRef alloc, CFNumberType type, const void *value);
 Boolean CFNumberGetValue(CFNumberRef n, CFNumberType type, void *value);
@@ -204,6 +198,9 @@ CFDictionaryRef CFPreferencesCopyMultiple(CFArrayRef keysToFetch, CFStringRef ap
 Boolean CFPreferencesSynchronize(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 CFArrayRef CFPreferencesCopyKeyList(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 __FERRY_END
+/* Arrays and dictionaries with callbacks, more strings, string encodings,
+ * UUIDs, URLs, bundle keys and byte order (Ferry 0.43.0) */
+#include <CoreFoundation/CFMore.h>
 /* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */
 #include <CoreFoundation/CFSocket.h>
 #include <CoreFoundation/CFStream.h>

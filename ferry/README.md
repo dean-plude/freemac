@@ -271,6 +271,22 @@ and their loads, the resources a page loads and the user style sheet.
 `window.open` gives the page the new window. Downloads and the cookie
 store aren't there yet.
 
+From Ferry 0.43.0 (freemac 1.219), strings convert to and from some
+seventy-five encodings (`foundation/NSStringEncodings.m`, ICU for most),
+text can be walked by line, word, sentence and composed character
+(`foundation/NSStringText.m`), and Core Foundation's arrays and
+dictionaries take callbacks of their own (`foundation/CFMore.m`). The file
+calls apps make next are in `foundation/NSFileAccess.m`: directory
+enumerators, resource values, the freedesktop.org trash and
+`NSFileCoordinator`. `NSAssert` raises as on a Mac
+(`foundation/NSAssertionHandler.m`), `NSAffineTransform` transforms points,
+paths and drawing, windows have child windows and panels that hide with
+their app (`appkit/NSWindow.m`), and an app's login items, through
+`LSSharedFileList` or `SMLoginItemSetEnabled`, are autostart entries in
+`~/.config/autostart` that freemac's Dials > Login Items lists
+(`foundation/LoginItems.m`, served for CoreServices, Carbon, Cocoa and
+ServiceManagement).
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

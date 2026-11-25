@@ -1111,6 +1111,77 @@ failed loads aren't told. The work was written from Apple's
 documentation, WebKitGTK's and the DOM standards, and not compared with
 a Mac; `docs/ferry-gui.md` lists what a Mac would settle.
 
+### What the apps call next (freemac 1.219, Ferry 0.43.0)
+
+A search of the nine apps' public source for the calls Ferry didn't have
+came up with these, and this round adds them.
+
+The public source of the nine apps (MacPass, MacDown, Sequel Pro, Gas Mask,
+Flycut, ShiftIt, Spectacle, Hex Fiend, KeyCastr) was searched for the calls
+they make that Ferry didn't have. Counted by app:
+
+| Calls | Apps |
+| --- | --- |
+| `addChildWindow:ordered:` (4), `removeChildWindow:` (3), `setCollectionBehavior:` (3), `ignoresMouseEvents`, `hidesOnDeactivate` | Flycut, KeyCastr, Hex Fiend, Sequel Pro, Spectacle, ShiftIt |
+| Login items: `LSSharedFileList` and `SMLoginItemSetEnabled` | Gas Mask, ShiftIt, Spectacle, Flycut |
+| `checkResourceIsReachableAndReturnError:`, `enumeratorAtPath:`/`NSDirectoryEnumerator`, `displayNameAtPath:` (3 each) | Gas Mask, MacDown, Sequel Pro, MacPass |
+| `enumerateSubstringsInRange:options:usingBlock:`, `lineRangeForRange:` (3 each) | MacDown, Sequel Pro, Flycut |
+| `NSAffineTransform` (3) | ShiftIt, Hex Fiend, MacDown |
+| `NSAssertionHandler`, `NSAssert` and the garbage-collection calls (3) | Sequel Pro, Hex Fiend, KeyCastr |
+| String encodings past UTF-8 and Latin-1 | Hex Fiend, Sequel Pro, Flycut |
+| `CFArrayRemoveAllValues`, `CFArrayReplaceValues`, `kCFBundleVersionKey` (3), and the Core Foundation string calls RegexKitLite makes | Sequel Pro, MacDown, Hex Fiend |
+| `NSFileCoordinator` (2) | MacPass, MacDown |
+| `setDropItem:dropChildIndex:`, `setDraggingSourceOperationMask:forLocal:` (3) | not done this round |
+| `NSArchiver`/`NSUnarchiver` (3) | not done: the old typed-stream format isn't publicly documented |
+| `CGWindowListCopyWindowInfo` (3), posting `CGEvent`s (2) | not done this round |
+
+The WebKit items suggested for this round (downloads, the cookie store,
+request bodies, DOM events) are used by none of the nine apps, so they
+ranked last and weren't done.
+
+Strings now convert to and from some seventy-five encodings: Ferry's own
+for ASCII, Latin-1, the UTF forms and the non-lossy ASCII escapes, and
+ICU's for the rest (Mac Roman, the Windows code pages, Shift JIS, EUC,
+GB 18030, Big5, KOI8 and their kin), with their names, IANA names and
+Windows code pages on Core Foundation's side, and a file's encoding found
+from its bytes. Hex Fiend, Sequel Pro and Flycut need these. Text can be
+walked by line, paragraph, word, sentence and composed character
+(`enumerateSubstringsInRange:options:usingBlock:`, `lineRangeForRange:`),
+normalized in the four Unicode forms, and searched for characters from a
+set in any direction, as MacDown, Sequel Pro and Flycut do.
+
+Core Foundation's arrays and dictionaries take callbacks of their own, as
+Sequel Pro and Hex Fiend use them from C for plain pointers and C strings,
+with the rest of their calls (binary search, sorting, replacing ranges,
+applying functions), `CFUUID`, more of `CFURL` and `CFString`, and the
+bundle keys.
+
+The file calls Gas Mask, MacDown, Sequel Pro and MacPass make are in:
+directory enumerators, display names, setting attributes, links, URL
+resource values and reachability, the trash (freedesktop.org's, so the
+desktop's own trash shows what an app throws away), bundle resources by
+URL, and `NSFileCoordinator` with file presenters within one program.
+`NSAssert` and its kin raise as on a Mac, and the garbage-collection calls
+of older apps do nothing harmful.
+
+Windows can have child windows that move, hide and close with their
+parent, panels hide while their app isn't active, and the window
+properties menu-bar apps set (ignoring the mouse, collection behaviour,
+levels) are kept. `NSAffineTransform` transforms points, paths and
+drawing, and paths give their elements back.
+
+Login items, which Gas Mask, ShiftIt, Spectacle and Flycut offer, are
+freemac's own: an app the user asks to open at login gets an entry in
+`~/.config/autostart` that runs it through Ferry, and it shows in Dials >
+Login Items, where it can be taken off. `SMLoginItemSetEnabled` does the
+same for a helper inside the app, without listing it.
+
+Left out: table views' drop retargeting, `NSArchiver`, listing other
+programs' windows and posting events, and the WebKit items (downloads, the
+cookie store, request bodies and DOM events), which none of the nine apps
+uses. None of the apps was run again; `docs/ferry-gui.md` lists what a Mac
+would settle.
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1121,7 +1192,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. Next is running the apps again to see which views they still miss.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). Next is running the apps again to see which views they still miss.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

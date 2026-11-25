@@ -1,0 +1,23 @@
+identity: 1 0 0 1 0 0
+translate then scale (1, 1): (12, 22)
+rotate 90: 0 1 -1 0 0 0
+rotated (1, 0): (0, 1)
+append rotation (1, 1): (-22, 12)
+prepend rotation (1, 1): (8, 22)
+inverse undoes it: (3, -4)
+a flat transform isn't inverted: 0 0 0 1 0 0
+size (1, 1) scaled: (2, 3), translation ignored
+scale then translate: 2 0 0 3 10 15
+archived and back equal: yes, copy equal: yes
+set from a struct (0, 0): (7, 8)
+copy moved to (100, 50), original still at (0, 0)
+rotated in place: (-10, 0) 10 x 10
+rectangle (5): M 1,2 L 4,2 L 4,6 L 1,6 Z
+curve (3): M 0,0 C 0,5 10,5 10,0 Z
+element 0 of the curve is a move: yes
+past the end: NSRangeException
+polyline (3): M 0,0 L 5,0 L 5,5
+rounded corner: 3 elements, ends at (10, 2), bounds to x 10
+an arc with no current point: NSGenericException
+concat drew red at the shifted place: yes; set put blue back at the origin: yes; elsewhere clear: yes
+exit=0

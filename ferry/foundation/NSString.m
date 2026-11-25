@@ -198,19 +198,6 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
 {
     return [[[self alloc] initWithContentsOfFile:path encoding:enc error:error] autorelease];
 }
-+ (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error
-{
-    NSData *d = [NSData dataWithContentsOfFile:path options:0 error:error];
-    if (!d)
-        return nil;
-    const unsigned char *b = [d bytes];
-    NSStringEncoding e = NSUTF8StringEncoding;
-    if ([d length] >= 2 && ((b[0] == 0xff && b[1] == 0xfe) || (b[0] == 0xfe && b[1] == 0xff)))
-        e = NSUTF16StringEncoding;
-    if (enc)
-        *enc = e;
-    return [[[self alloc] initWithData:d encoding:e] autorelease];
-}
 + (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error
 {
     NSString *scheme = [[url scheme] lowercaseString];
@@ -235,36 +222,15 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
         [self release];
         FRaise(NSInvalidArgumentException, @"-[NSString initWithUTF8String:]: NULL cString");
     }
-    return [self initWithBytes:s length:strlen(s) encoding:NSUTF8StringEncoding];
+    NSUInteger n;
+    unichar *c = FDecodeUTF8(s, strlen(s), &n);   /* lenient: a bad byte reads as U+FFFD */
+    id r = [self initWithCharacters:c length:n];
+    free(c);
+    return r;
 }
 - (instancetype)initWithCString:(const char *)s encoding:(NSStringEncoding)enc
 {
     return [self initWithBytes:s length:s ? strlen(s) : 0 encoding:enc];
-}
-- (instancetype)initWithBytes:(const void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)enc
-{
-    unichar *c;
-    NSUInteger n;
-    if (enc == NSUnicodeStringEncoding) {
-        const unsigned char *b = bytes;
-        int swap = 0;
-        if (len >= 2 && b[0] == 0xfe && b[1] == 0xff) { swap = 1; b += 2; len -= 2; }
-        else if (len >= 2 && b[0] == 0xff && b[1] == 0xfe) { b += 2; len -= 2; }
-        n = len / 2;
-        c = malloc((n + 1) * sizeof(unichar));
-        for (NSUInteger i = 0; i < n; i++)
-            c[i] = swap ? (b[2 * i] << 8) | b[2 * i + 1] : b[2 * i] | (b[2 * i + 1] << 8);
-    } else if (enc == NSISOLatin1StringEncoding || enc == NSASCIIStringEncoding) {
-        n = len;
-        c = malloc((n + 1) * sizeof(unichar));
-        for (NSUInteger i = 0; i < n; i++)
-            c[i] = ((const unsigned char *)bytes)[i];
-    } else {
-        c = FDecodeUTF8(bytes, len, &n);
-    }
-    id r = [self initWithCharacters:c length:n];
-    free(c);
-    return r;
 }
 - (instancetype)initWithData:(NSData *)data encoding:(NSStringEncoding)enc
 {
@@ -290,7 +256,11 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
         [self release];
         return nil;
     }
-    return [self initWithData:d encoding:enc];
+    id r = [self initWithData:d encoding:enc];
+    if (!r)   /* the bytes aren't in that encoding */
+        FSetError(error, [NSError errorWithDomain:NSCocoaErrorDomain code:261
+                                         userInfo:[NSDictionary dictionaryWithObject:path forKey:NSFilePathErrorKey]]);
+    return r;
 }
 
 - (id)copyWithZone:(NSZone *)zone { return [[NSString allocWithZone:zone] initWithString:self]; }
@@ -326,60 +296,7 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
     [NSData dataWithBytesNoCopy:s length:strlen(s) + 1 freeWhenDone:YES];   /* frees it later */
     return s;
 }
-- (const char *)cStringUsingEncoding:(NSStringEncoding)enc { return [self UTF8String]; }
 - (const char *)fileSystemRepresentation { return [self UTF8String]; }
-- (BOOL)getCString:(char *)buffer maxLength:(NSUInteger)max encoding:(NSStringEncoding)enc
-{
-    const char *s = [self UTF8String];
-    size_t n = strlen(s);
-    if (n + 1 > max)
-        return NO;
-    memcpy(buffer, s, n + 1);
-    return YES;
-}
-- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)enc
-{
-    if (enc == NSUnicodeStringEncoding)
-        return [self length] * 2;
-    return strlen([self UTF8String]);
-}
-- (NSData *)dataUsingEncoding:(NSStringEncoding)enc
-{
-    return [self dataUsingEncoding:enc allowLossyConversion:NO];
-}
-/* ASCII and ISO Latin 1 give one byte a character; a character either lacks
- * gives nil, or '?' when a lossy conversion is allowed, as on a Mac. Every
- * other encoding but UTF-16 is written as UTF-8. */
-- (NSData *)dataUsingEncoding:(NSStringEncoding)enc allowLossyConversion:(BOOL)lossy
-{
-    if (enc == NSASCIIStringEncoding || enc == NSISOLatin1StringEncoding) {
-        unichar top = enc == NSASCIIStringEncoding ? 0x7f : 0xff;
-        WITH_CHARS(self, c, n);
-        NSMutableData *d = [NSMutableData dataWithLength:n];
-        unsigned char *out = [d mutableBytes];
-        for (NSUInteger i = 0; i < n; i++) {
-            if (c[i] <= top) {
-                out[i] = (unsigned char)c[i];
-            } else if (lossy) {
-                out[i] = '?';
-            } else {
-                d = nil;
-                break;
-            }
-        }
-        DONE_CHARS(c);
-        return d;
-    }
-    if (enc == NSUnicodeStringEncoding) {
-        WITH_CHARS(self, c, n);
-        NSData *d = [NSData dataWithBytes:c length:n * 2];
-        DONE_CHARS(c);
-        return d;
-    }
-    const char *s = [self UTF8String];
-    return [NSData dataWithBytes:s length:strlen(s)];
-}
-
 /* comparing */
 static unichar fold(unichar c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
 

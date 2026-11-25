@@ -237,6 +237,7 @@ typedef struct _GIcon GIcon;
 enum { GTK_ICON_LOOKUP_FORCE_SIZE = 1 << 4 };
 enum { G_SPAWN_SEARCH_PATH = 1 << 2, G_SPAWN_STDOUT_TO_DEV_NULL = 1 << 3, G_SPAWN_STDERR_TO_DEV_NULL = 1 << 4 };
 void gtk_window_set_transient_for(GtkWidget *window, GtkWidget *parent);
+void gtk_window_set_keep_above(GtkWidget *window, gboolean setting);
 void gtk_window_set_modal(GtkWidget *window, gboolean modal);
 GtkIconTheme *gtk_icon_theme_get_default(void);
 GtkIconTheme *gtk_icon_theme_new(void);

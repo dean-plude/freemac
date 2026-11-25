@@ -695,6 +695,8 @@ static NSUserDefaults *standard_defaults;
 
 /* ---- NSFileManager ------------------------------------------------------------------------ */
 
+NSDictionary *FFileAttributes(NSString *path, NSError **error);
+
 @implementation NSFileManager
 + (NSFileManager *)defaultManager
 {
@@ -931,18 +933,7 @@ static NSUserDefaults *standard_defaults;
 }
 - (NSDictionary *)attributesOfItemAtPath:(NSString *)path error:(NSError **)error
 {
-    struct stat st;
-    if (lstat([path fileSystemRepresentation], &st) != 0) {
-        FSetError(error, FPosixError(errno, path));
-        return nil;
-    }
-    NSString *type = S_ISDIR(st.st_mode) ? NSFileTypeDirectory : S_ISLNK(st.st_mode) ? NSFileTypeSymbolicLink
-                                                                                    : NSFileTypeRegular;
-    NSDate *mod = [NSDate dateWithTimeIntervalSince1970:st.st_mtimespec.tv_sec + st.st_mtimespec.tv_nsec / 1e9];
-    return [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithUnsignedLongLong:(unsigned long long)st.st_size],
-                                                      NSFileSize, type, NSFileType, mod, NSFileModificationDate,
-                                                      [NSNumber numberWithUnsignedShort:st.st_mode & 07777],
-                                                      NSFilePosixPermissions, nil];
+    return FFileAttributes(path, error); /* NSFileAccess.m */
 }
 - (NSArray *)URLsForDirectory:(NSSearchPathDirectory)directory inDomains:(NSSearchPathDomainMask)mask
 {

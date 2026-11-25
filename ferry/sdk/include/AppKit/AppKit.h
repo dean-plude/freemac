@@ -8,6 +8,9 @@
 #import <Foundation/Foundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
+/* Launch Services' login items and Gestalt, which a Mac's AppKit brings in through
+ * ApplicationServices (freemac 1.219, Ferry 0.43.0). */
+#include <CoreServices/CoreServices.h>
 #import <QuartzCore/QuartzCore.h>
 
 #define APPKIT_EXTERN extern
@@ -401,7 +404,12 @@ typedef NS_ENUM(NSUInteger, NSBezierPathElement) {
 - (void)addClip;
 - (void)setClip;
 - (BOOL)containsPoint:(NSPoint)p;
-- (void)transformUsingAffineTransform:(id)transform;
+- (void)transformUsingAffineTransform:(NSAffineTransform *)transform;
+/* Elements, points and arcs (freemac 1.219, Ferry 0.43.0). */
+- (NSBezierPathElement)elementAtIndex:(NSInteger)index associatedPoints:(NSPointArray)points;
+- (NSBezierPathElement)elementAtIndex:(NSInteger)index;
+- (void)appendBezierPathWithPoints:(NSPointArray)points count:(NSInteger)count;
+- (void)appendBezierPathWithArcFromPoint:(NSPoint)point1 toPoint:(NSPoint)point2 radius:(CGFloat)radius;
 - (void)setLineDash:(const CGFloat *)pattern count:(NSInteger)count phase:(CGFloat)phase;
 @property CGFloat lineWidth, miterLimit, flatness;
 @property NSLineCapStyle lineCapStyle;
@@ -412,6 +420,14 @@ typedef NS_ENUM(NSUInteger, NSBezierPathElement) {
 @property (readonly) NSRect bounds, controlPointBounds;
 @property (readonly) NSInteger elementCount;
 @property (readonly) CGPathRef CGPath;
+@end
+
+/* AppKit's part of NSAffineTransform (freemac 1.219, Ferry 0.43.0): -set
+ * makes it the current context's transform, -concat multiplies it in. */
+@interface NSAffineTransform (NSAppKitAdditions)
+- (NSBezierPath *)transformBezierPath:(NSBezierPath *)path;
+- (void)set;
+- (void)concat;
 @end
 
 void NSRectFill(NSRect rect);
@@ -949,7 +965,31 @@ typedef NS_ENUM(NSUInteger, NSBackingStoreType) {
 };
 typedef NS_ENUM(NSInteger, NSWindowOrderingMode) { NSWindowAbove = 1, NSWindowBelow = -1, NSWindowOut = 0 };
 typedef NSInteger NSWindowLevel;
-enum { NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSModalPanelWindowLevel = 8, NSMainMenuWindowLevel = 24 };
+enum {
+    NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSSubmenuWindowLevel = 3, NSTornOffMenuWindowLevel = 3,
+    NSModalPanelWindowLevel = 8, NSDockWindowLevel = 20, NSMainMenuWindowLevel = 24, NSStatusWindowLevel = 25,
+    NSPopUpMenuWindowLevel = 101, NSScreenSaverWindowLevel = 1000,
+};
+typedef NS_OPTIONS(NSUInteger, NSWindowCollectionBehavior) {
+    NSWindowCollectionBehaviorDefault = 0,
+    NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0,
+    NSWindowCollectionBehaviorMoveToActiveSpace = 1 << 1,
+    NSWindowCollectionBehaviorManaged = 1 << 2,
+    NSWindowCollectionBehaviorTransient = 1 << 3,
+    NSWindowCollectionBehaviorStationary = 1 << 4,
+    NSWindowCollectionBehaviorParticipatesInCycle = 1 << 5,
+    NSWindowCollectionBehaviorIgnoresCycle = 1 << 6,
+    NSWindowCollectionBehaviorFullScreenPrimary = 1 << 7,
+    NSWindowCollectionBehaviorFullScreenAuxiliary = 1 << 8,
+    NSWindowCollectionBehaviorFullScreenNone = 1 << 9,
+    NSWindowCollectionBehaviorFullScreenAllowsTiling = 1 << 11,
+    NSWindowCollectionBehaviorFullScreenDisallowsTiling = 1 << 12,
+};
+typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
+    NSWindowAnimationBehaviorDefault = 0, NSWindowAnimationBehaviorNone = 2,
+    NSWindowAnimationBehaviorDocumentWindow = 3, NSWindowAnimationBehaviorUtilityWindow = 4,
+    NSWindowAnimationBehaviorAlertPanel = 5,
+};
 
 @protocol NSWindowDelegate <NSObject>
 @optional
@@ -1080,6 +1120,32 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidBecomeMainNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidResignMainNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidMiniaturizeNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidDeminiaturizeNotification;
+
+/* Child windows and the window behaviours (freemac 1.219, Ferry 0.43.0):
+ * a child moves, hides and comes back with its parent; the collection and
+ * animation behaviours are kept; a window that ignores mouse events drops
+ * them, and one that hides on deactivation (every panel, unless told not
+ * to) is put away while the application isn't active. */
+@interface NSWindow (FerryChildWindows)
+- (void)addChildWindow:(NSWindow *)childWin ordered:(NSWindowOrderingMode)place;
+- (void)removeChildWindow:(NSWindow *)childWin;
+@property (readonly, copy) NSArray<NSWindow *> *childWindows;
+@property (assign) NSWindow *parentWindow;
+@property BOOL ignoresMouseEvents;
+@property BOOL hidesOnDeactivate;
+@property (getter=isExcludedFromWindowsMenu) BOOL excludedFromWindowsMenu;
+@property NSWindowCollectionBehavior collectionBehavior;
+@property NSWindowAnimationBehavior animationBehavior;
+- (void)disableFlushWindow;
+- (void)enableFlushWindow;
+@property (getter=isFlushWindowDisabled, readonly) BOOL flushWindowDisabled;
+- (void)flushWindow;
+- (void)flushWindowIfNeeded;
+- (NSPoint)convertBaseToScreen:(NSPoint)point;
+- (NSPoint)convertScreenToBase:(NSPoint)point;
+@end
+APPKIT_EXTERN void NSDisableScreenUpdates(void);
+APPKIT_EXTERN void NSEnableScreenUpdates(void);
 
 @interface NSPanel : NSWindow
 @property (getter=isFloatingPanel) BOOL floatingPanel;

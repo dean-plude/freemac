@@ -10,7 +10,7 @@ int main(void)
     CFStringGetCString(s, buf, sizeof buf, kCFStringEncodingUTF8);
     printf("string \"%s\" length %ld, equal to literal %d\n", buf, (long)CFStringGetLength(s),
            CFEqual(s, CFSTR("plain C")));
-    CFMutableArrayRef a = CFArrayCreateMutable(NULL, 0, kCFTypeArrayCallBacks);
+    CFMutableArrayRef a = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
     CFArrayAppendValue(a, s);
     CFArrayAppendValue(a, CFSTR("second"));
     CFRelease(s);

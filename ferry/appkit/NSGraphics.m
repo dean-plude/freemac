@@ -1003,7 +1003,124 @@ static void apply_style(NSBezierPath *p, CGContextRef cg)
     [self addClip];
 }
 - (BOOL)containsPoint:(NSPoint)p { return CGPathContainsPoint(_path, NULL, p, _rule == NSWindingRuleEvenOdd); }
-- (void)transformUsingAffineTransform:(id)transform { AWarnOnce("-[NSBezierPath transformUsingAffineTransform:]"); }
+static CGAffineTransform cg_transform(NSAffineTransform *t)
+{
+    NSAffineTransformStruct s = [t transformStruct];
+    return (CGAffineTransform){s.m11, s.m12, s.m21, s.m22, s.tX, s.tY};
+}
+- (void)transformUsingAffineTransform:(NSAffineTransform *)transform
+{
+    if (!transform)
+        return;
+    CGAffineTransform m = cg_transform(transform);
+    CGMutablePathRef p = CGPathCreateMutableCopyByTransformingPath(_path, &m);
+    if (!p)
+        return;
+    CGPathRelease(_path);
+    _path = p;
+}
+
+/* Elements as NSBezierPath reports them: a quadratic piece of the CGPath comes
+ * back as the equivalent cubic curve, since NSBezierPath has no quadratic
+ * element. */
+struct element_walk {
+    NSInteger want, at;
+    BOOL found;
+    NSBezierPathElement type;
+    NSPoint pts[3];
+    NSPoint cur, start;
+};
+static void walk_element(void *info, const CGPathElement *e)
+{
+    struct element_walk *w = info;
+    BOOL mine = w->at == w->want && !w->found;
+    NSPoint q, p;
+    switch (e->type) {
+    case kCGPathElementMoveToPoint:
+        if (mine) {
+            w->type = NSBezierPathElementMoveTo;
+            w->pts[0] = e->points[0];
+        }
+        w->cur = w->start = e->points[0];
+        break;
+    case kCGPathElementAddLineToPoint:
+        if (mine) {
+            w->type = NSBezierPathElementLineTo;
+            w->pts[0] = e->points[0];
+        }
+        w->cur = e->points[0];
+        break;
+    case kCGPathElementAddQuadCurveToPoint:
+        q = e->points[0];
+        p = e->points[1];
+        if (mine) {
+            w->type = NSBezierPathElementCurveTo;
+            w->pts[0] = NSMakePoint(w->cur.x + 2.0 / 3.0 * (q.x - w->cur.x), w->cur.y + 2.0 / 3.0 * (q.y - w->cur.y));
+            w->pts[1] = NSMakePoint(p.x + 2.0 / 3.0 * (q.x - p.x), p.y + 2.0 / 3.0 * (q.y - p.y));
+            w->pts[2] = p;
+        }
+        w->cur = p;
+        break;
+    case kCGPathElementAddCurveToPoint:
+        if (mine) {
+            w->type = NSBezierPathElementCurveTo;
+            w->pts[0] = e->points[0];
+            w->pts[1] = e->points[1];
+            w->pts[2] = e->points[2];
+        }
+        w->cur = e->points[2];
+        break;
+    case kCGPathElementCloseSubpath:
+        if (mine) {
+            w->type = NSBezierPathElementClosePath;
+            w->pts[0] = w->start;
+        }
+        w->cur = w->start;
+        break;
+    }
+    if (mine)
+        w->found = YES;
+    w->at++;
+}
+- (NSBezierPathElement)elementAtIndex:(NSInteger)index associatedPoints:(NSPointArray)points
+{
+    struct element_walk w = {0};
+    w.want = index;
+    CGPathApply(_path, &w, walk_element);
+    if (!w.found)
+        @throw [NSException exceptionWithName:NSRangeException
+                                       reason:[NSString stringWithFormat:@"-[NSBezierPath elementAtIndex:]: index %ld beyond bounds", (long)index]
+                                     userInfo:nil];
+    if (points) {
+        int n = w.type == NSBezierPathElementCurveTo ? 3 : w.type == NSBezierPathElementClosePath ? 0 : 1;
+        for (int i = 0; i < n; i++)
+            points[i] = w.pts[i];
+    }
+    return w.type;
+}
+- (NSBezierPathElement)elementAtIndex:(NSInteger)index { return [self elementAtIndex:index associatedPoints:NULL]; }
+- (void)appendBezierPathWithPoints:(NSPointArray)points count:(NSInteger)count
+{
+    if (!points || count <= 0)
+        return;
+    /* As documented: a line to each point, starting with a move when the path
+     * is empty. */
+    NSInteger i = 0;
+    if (CGPathIsEmpty(_path)) {
+        CGPathMoveToPoint(_path, NULL, points[0].x, points[0].y);
+        i = 1;
+    }
+    for (; i < count; i++)
+        CGPathAddLineToPoint(_path, NULL, points[i].x, points[i].y);
+}
+- (void)appendBezierPathWithArcFromPoint:(NSPoint)p1 toPoint:(NSPoint)p2 radius:(CGFloat)radius
+{
+    if (CGPathIsEmpty(_path))
+        @throw [NSException exceptionWithName:NSGenericException
+                                       reason:@"-[NSBezierPath appendBezierPathWithArcFromPoint:toPoint:radius:]: no current point"
+                                     userInfo:nil];
+    CGPathAddArcToPoint(_path, NULL, p1.x, p1.y, p2.x, p2.y, radius);
+}
 - (void)setLineDash:(const CGFloat *)pattern count:(NSInteger)count phase:(CGFloat)phase
 {
     free(_dash);
@@ -1039,6 +1156,32 @@ static void count_element(void *info, const CGPathElement *e) { (*(NSInteger *)i
     return n;
 }
 - (CGPathRef)CGPath { return _path; }
+@end
+
+/* ---- NSAffineTransform's AppKit part ------------------------------------------------ */
+
+@implementation NSAffineTransform (NSAppKitAdditions)
+- (NSBezierPath *)transformBezierPath:(NSBezierPath *)path
+{
+    NSBezierPath *p = [[path copy] autorelease];
+    [p transformUsingAffineTransform:self];
+    return p;
+}
+- (void)set
+{
+    CGContextRef cg = current_cg();
+    if (!cg)
+        return;
+    /* There is no CGContextSetCTM: undo the current transform, then apply ours. */
+    CGContextConcatCTM(cg, CGAffineTransformInvert(CGContextGetCTM(cg)));
+    CGContextConcatCTM(cg, cg_transform(self));
+}
+- (void)concat
+{
+    CGContextRef cg = current_cg();
+    if (cg)
+        CGContextConcatCTM(cg, cg_transform(self));
+}
 @end
 
 /* ---- rectangle drawing ------------------------------------------------------------- */

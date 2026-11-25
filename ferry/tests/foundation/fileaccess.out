@@ -1,0 +1,31 @@
+a.txt is a regular file of 1 bytes
+by path: .hidden(1) Thing.app(1) Thing.app/Contents(2) Thing.app/Contents/Info.plist(3) Thing.app/Contents/Resources(3) Thing.app/Contents/Resources/sub(4) Thing.app/Contents/Resources/sub/r.txt(5) a.txt(1) b(1) b/deep(2) b/deep/two.txt(3) b/one.txt(2)
+skipping b: .hidden Thing.app Thing.app/Contents Thing.app/Contents/Info.plist Thing.app/Contents/Resources Thing.app/Contents/Resources/sub Thing.app/Contents/Resources/sub/r.txt a.txt b
+by URL, no hidden files or package contents: Thing.app a.txt b b/deep b/deep/two.txt b/one.txt
+top level only: .hidden Thing.app a.txt b
+missing directory: first object nil, errors 1
+display names: Thing, a.txt, components ok
+last components: tree > b > one.txt
+set: yes, permissions 640, modified 1000000000, links 1, owner is me yes
+hard link: yes, links now 2, same file number yes
+symbolic link: yes, points at a.txt yes
+size 1, directory 0, name a.txt, Thing.app a package 1, .hidden hidden 1, sym a link 1
+parent is tree: yes
+several: regular 1, modified 1000000000
+reachable: yes, missing: no (NSCocoaErrorDomain 260), web: no (262)
+file path URL is itself: yes, reference URL: no
+from components: file:///tmp/x%20y
+a resource value Ferry does not keep (hidden extension) accepted: yes
+wrote through a URL: yes, then hello
+into a missing folder: no, an error yes
+trashed: yes, gone yes, now in the trash yes, info written yes
+info names the old path: yes
+a second one.txt goes in as one 2.txt
+resource by URL found: yes
+resources with the extension: 1
+presenters: 1
+write ran: yes, presenter let go 1 time(s) and heard of 1 change(s)
+its own coordinator's write isn't told to it: 1 change(s)
+read: new
+presenters after removing: 0
+exit=0

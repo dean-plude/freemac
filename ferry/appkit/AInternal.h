@@ -108,6 +108,8 @@ void AWindowDidClose(NSWindow *window);
 void ADragAttach(NSWindow *window, GtkWidget *area);
 
 @interface NSWindow (FerryPrivate)
+- (void)_appDidResignActive; /* hidesOnDeactivate, NSWindow.m */
+- (void)_appDidBecomeActive;
 - (void)_enableDrops;
 - (NSArray *)_registeredDraggedTypes;
 - (NSDragOperation)_dragUpdateAt:(NSPoint)point pasteboard:(NSPasteboard *)pb operations:(NSDragOperation)mask;

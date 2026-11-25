@@ -114,8 +114,8 @@ int main(void)
         /* toll-free bridging: CF calls on Foundation objects and back */
         CFStringRef cs = (CFStringRef)@"bridged";
         printf("CFStringGetLength %ld, prefix %d\n", (long)CFStringGetLength(cs), CFStringHasPrefix(cs, CFSTR("bri")));
-        CFMutableDictionaryRef cd = CFDictionaryCreateMutable(NULL, 0, kCFTypeDictionaryKeyCallBacks,
-                                                              kCFTypeDictionaryValueCallBacks);
+        CFMutableDictionaryRef cd = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                                                              &kCFTypeDictionaryValueCallBacks);
         int v = 99;
         CFNumberRef num = CFNumberCreate(NULL, kCFNumberIntType, &v);
         CFDictionarySetValue(cd, CFSTR("answer"), num);

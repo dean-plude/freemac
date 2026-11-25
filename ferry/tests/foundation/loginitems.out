@@ -1,0 +1,27 @@
+running as ~/Apps/LoginTest.app
+at first (0):
+inserted: mine, theirs; seed moved on: yes; observer heard 2 change(s)
+two items (2): [Other ~/Apps/Other Thing.app] [Login Test ~/Apps/LoginTest.app]
+autostart entries: ferry-Other_Thing.desktop ferry-org.freemac.test.loginitems.desktop
+entry: name Login Test, runs ferry yes, with the app yes, starts at login true
+the other's entry: name Other, hidden at launch true
+its property: hidden
+found again with the same ID: yes
+inserted again first (2): [Login Test ~/Apps/LoginTest.app] [Other ~/Apps/Other Thing.app]
+resolving a moved app: -43
+copying its URL: none, error -43
+one switched off (1): [Login Test ~/Apps/LoginTest.app]
+removed: 0, observer heard 1; removing again: -43
+after removing (0):
+autostart entries: (none)
+recent documents seen from a second list: 1
+after removing all: 0
+autostart entries: (none)
+helper on: 1
+autostart entries: ferry-login-org.freemac.test.helper.desktop
+helper entry: name Login Helper, runs the helper yes, kind org.freemac.test.helper, listed no
+not a shared file list item (0):
+unknown helper on: 0
+helper off: 1, off again: 1
+autostart entries: (none)
+exit=0

@@ -1,0 +1,34 @@
+line around 5: start 4 end 9 contents end 7
+line range of {2, 4}: {0, 9}
+line range at the end: {20, 4}
+line range of four: {15, 5}
+paragraph range of four: {15, 9}
+paragraph of one: start 0 end 4 contents end 3
+lines: [one]0+3/0+4 [two]4+3/4+5 [three]9+5/9+6 [four]15+4/15+5 [five]20+4/20+4
+paragraphs: [one]0+3/0+4 [two]4+3/4+5 [three]9+5/9+6 [four<2028>five]15+9/15+9
+lines backwards: [c]4+1/4+1 [b]2+1/2+2 [a]0+1/0+2
+words: [Hello]0+5/0+7 [wide]7+4/7+5 [world]12+5/12+7 [It's]19+4/19+5 [3.5]24+3/24+4 [o'clock]28+7/28+8
+sentences: [First one.]0+10/0+11 [Second?]11+7/11+8 [Third!]19+6/19+6
+composed: [e<0301>]0+2/0+2 [a]2+1/2+1 [<D83D><DE00>]3+2/3+2
+stopped after 2 words
+substring not required gives nil: yes
+composed at 1: {1, 2}
+composed at 2: {1, 2}
+composed at 4 (inside the pair): {3, 2}
+composed for {2, 2}: {1, 4}
+NFC: <U+00E9> <U+00E9> <U+FB01> <U+2460>
+NFD: e<U+0301> e<U+0301> <U+FB01> <U+2460>
+NFKC: <U+00E9> <U+00E9> fi 1
+NFKD: e<U+0301> e<U+0301> fi 1
+CFStringNormalize D: A<U+030A>
+first digit: {2, 1}
+last digit: {7, 1}
+anchored digit: {9223372036854775807, 0}
+anchored backwards: {7, 1}
+digit in {4, 4}: {6, 1}
+percent escapes added: a%20b/c?d=%C3%A9#x%
+percent escapes replaced: a b<U+00E9>
+a bad escape gives nil: yes
+CF escapes with &= too: a%20b%26c%3Dd
+CF unescape all but &: a b%26c
+exit=0

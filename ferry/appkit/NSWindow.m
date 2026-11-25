@@ -85,6 +85,14 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     BOOL _hostedSheet, _endingSheet, _legacySheet;
     NSURL *_representedURL;
     NSUndoManager *_undo;
+    /* child windows (retained) and the parent (not retained), and the
+     * behaviours that are kept and partly acted on (freemac 1.219) */
+    NSMutableArray *_children;
+    NSWindow *_parent;
+    BOOL _hiddenWithParent, _ignoresMouse, _hidesOnDeactivate, _hiddenByDeactivate, _excludedFromMenu;
+    NSWindowCollectionBehavior _collection;
+    NSWindowAnimationBehavior _animation;
+    NSInteger _flushDisabled;
 }
 
 /* Drag and drop (NSDragging.m): the window's own types, whose drops go to
@@ -177,6 +185,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     _released = ![self isKindOfClass:[NSPanel class]];
     _opaque = _shadow = _autoKeyLoop = YES;
     _alpha = 1;
+    _hidesOnDeactivate = [self isKindOfClass:[NSPanel class]];   /* as on a Mac */
     _minSize = NSMakeSize(1, 1);
     _maxSize = NSMakeSize(3.40282347e+38, 3.40282347e+38);   /* FLT_MAX, as on a Mac */
     _keysDown = [[NSMutableSet alloc] init];
@@ -359,7 +368,14 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (NSSize)contentMaxSize { return _maxSize; }
 - (void)setContentMaxSize:(NSSize)size { _maxSize = size; }
 - (NSWindowLevel)level { return _level; }
-- (void)setLevel:(NSWindowLevel)level { _level = level; }
+/* A window above the normal level stays above the others, as far as the
+ * compositor lets a program say so. */
+- (void)setLevel:(NSWindowLevel)level
+{
+    _level = level;
+    if (_gtk)
+        gtk_window_set_keep_above(_gtk, level > NSNormalWindowLevel);
+}
 - (BOOL)isOpaque { return _opaque; }
 - (void)setOpaque:(BOOL)flag { _opaque = flag; }
 - (BOOL)hasShadow { return _shadow; }
@@ -594,7 +610,11 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     frame.size.width = fmax(frame.size.width, 1);
     frame.size.height = fmax(frame.size.height, 1);
     BOOL moved = !NSEqualPoints(frame.origin, _frame.origin);
+    CGFloat dx = frame.origin.x - _frame.origin.x, dy = frame.origin.y - _frame.origin.y;
     _frame.origin = frame.origin;
+    if (moved) /* child windows move with their parent */
+        for (NSWindow *c in [[_children copy] autorelease])
+            [c setFrameOrigin:NSMakePoint(c->_frame.origin.x + dx, c->_frame.origin.y + dy)];
     if (_gtk && !NSEqualSizes(frame.size, _frame.size))
         gtk_window_resize(_gtk, (int)frame.size.width, (int)frame.size.height);
     [self _resizedTo:frame.size];
@@ -628,6 +648,8 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (NSRect)convertRectFromScreen:(NSRect)r { return NSOffsetRect(r, -_frame.origin.x, -_frame.origin.y); }
 - (NSPoint)convertPointToScreen:(NSPoint)p { return NSMakePoint(p.x + _frame.origin.x, p.y + _frame.origin.y); }
 - (NSPoint)convertPointFromScreen:(NSPoint)p { return NSMakePoint(p.x - _frame.origin.x, p.y - _frame.origin.y); }
+- (NSPoint)convertBaseToScreen:(NSPoint)p { return [self convertPointToScreen:p]; }
+- (NSPoint)convertScreenToBase:(NSPoint)p { return [self convertPointFromScreen:p]; }
 - (NSPoint)mouseLocationOutsideOfEventStream { return [self convertPointFromScreen:[NSEvent mouseLocation]]; }
 
 /* ---- drawing ----------------------------------------------------------------------- */
@@ -805,7 +827,11 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
          * may show attached to it */
         gtk_window_set_transient_for(_gtk, _sheetParent->_gtk);
         gtk_window_set_modal(_gtk, 1);
+    } else if (_parent && _parent->_gtk) {
+        gtk_window_set_transient_for(_gtk, _parent->_gtk);
     }
+    if (_level > NSNormalWindowLevel)
+        gtk_window_set_keep_above(_gtk, 1);
     gtk_window_set_default_size(_gtk, (int)_frame.size.width, (int)_frame.size.height);
     gtk_window_set_resizable(_gtk, (_style & NSWindowStyleMaskResizable) != 0);
     gtk_window_set_decorated(_gtk, _style != NSWindowStyleMaskBorderless);
@@ -853,6 +879,12 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     [self _makeGtk];
     if (_gtk)
         gtk_window_present(_gtk);
+    /* the children put away with it come back, above it */
+    for (NSWindow *c in [[_children copy] autorelease])
+        if (c->_hiddenWithParent || !was) {
+            c->_hiddenWithParent = NO;
+            [c orderFront:nil];
+        }
 }
 - (void)orderFrontRegardless { [self orderFront:nil]; }
 - (void)orderBack:(id)sender { [self orderFront:sender]; }
@@ -876,11 +908,104 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     _visible = NO;
     if (_gtk)
         gtk_widget_hide(_gtk);
+    for (NSWindow *c in [[_children copy] autorelease])
+        if ([c isVisible]) {
+            [c orderOut:nil];
+            c->_hiddenWithParent = YES;
+        }
     if (key_window == self)
         [self resignKeyWindow];
     if (main_window == self)
         [self resignMainWindow];
 }
+
+/* ---- child windows and window behaviour (freemac 1.219, Ferry 0.43.0) ------------------- */
+
+/* A child keeps its place against its parent: it moves when the parent
+ * moves, is put away and brought back with it, and is shown above it (GTK's
+ * transient-for, which a compositor may use to keep it there). Where on
+ * screen a window goes is the compositor's to say under Wayland, so there
+ * the frames are Ferry's own bookkeeping. */
+- (void)addChildWindow:(NSWindow *)child ordered:(NSWindowOrderingMode)place
+{
+    if (!child || child == self)
+        return;
+    if (child->_parent == self)
+        return;
+    [child retain];
+    [child->_parent removeChildWindow:child];
+    if (!_children)
+        _children = [[NSMutableArray alloc] init];
+    [_children addObject:child];
+    child->_parent = self;
+    if (child->_gtk && _gtk)
+        gtk_window_set_transient_for(child->_gtk, _gtk);
+    if (_visible && place != NSWindowOut)
+        [child orderFront:nil];
+    [child release];
+}
+- (void)removeChildWindow:(NSWindow *)child
+{
+    if (!child || child->_parent != self)
+        return;
+    child->_parent = nil;
+    child->_hiddenWithParent = NO;
+    if (child->_gtk)
+        gtk_window_set_transient_for(child->_gtk, NULL);
+    [_children removeObjectIdenticalTo:child];
+}
+- (NSArray *)childWindows { return _children ? [[_children copy] autorelease] : nil; }
+- (NSWindow *)parentWindow { return _parent; }
+- (void)setParentWindow:(NSWindow *)parent
+{
+    if (parent)
+        [parent addChildWindow:self ordered:NSWindowAbove];
+    else
+        [_parent removeChildWindow:self];
+}
+/* Mouse events that reach a window that ignores them are dropped; the
+ * compositor still gives the window the clicks, so they don't pass through
+ * to what is under it. */
+- (BOOL)ignoresMouseEvents { return _ignoresMouse; }
+- (void)setIgnoresMouseEvents:(BOOL)flag { _ignoresMouse = flag; }
+- (BOOL)hidesOnDeactivate { return _hidesOnDeactivate; }
+- (void)setHidesOnDeactivate:(BOOL)flag { _hidesOnDeactivate = flag; }
+- (void)_appDidResignActive
+{
+    if (_hidesOnDeactivate && _visible && !_parent) {
+        [self orderOut:nil];
+        _hiddenByDeactivate = YES;
+    }
+}
+- (void)_appDidBecomeActive
+{
+    if (_hiddenByDeactivate) {
+        _hiddenByDeactivate = NO;
+        [self orderFront:nil];
+    }
+}
+- (BOOL)isExcludedFromWindowsMenu { return _excludedFromMenu; }
+- (void)setExcludedFromWindowsMenu:(BOOL)flag { _excludedFromMenu = flag; }
+- (NSWindowCollectionBehavior)collectionBehavior { return _collection; }
+- (void)setCollectionBehavior:(NSWindowCollectionBehavior)behavior { _collection = behavior; }
+- (NSWindowAnimationBehavior)animationBehavior { return _animation; }
+- (void)setAnimationBehavior:(NSWindowAnimationBehavior)behavior { _animation = behavior; }
+/* While flushing is off, flushWindow does nothing; the window still shows
+ * what it draws, since it puts each whole frame on screen at once. */
+- (void)disableFlushWindow { _flushDisabled++; }
+- (void)enableFlushWindow
+{
+    if (_flushDisabled > 0)
+        _flushDisabled--;
+}
+- (BOOL)isFlushWindowDisabled { return _flushDisabled > 0; }
+- (void)flushWindow
+{
+    if (!_flushDisabled)
+        [self displayIfNeeded];
+}
+- (void)flushWindowIfNeeded { [self flushWindow]; }
+- (BOOL)_ferryIgnoresMouse { return _ignoresMouse; }
 
 /* ---- sheets --------------------------------------------------------------------------- */
 
@@ -1118,6 +1243,11 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     [_pendingSheets removeAllObjects];
     if (_sheetParent)
         [_sheetParent _detachSheet:self];
+    [_parent removeChildWindow:self];
+    for (NSWindow *c in [[_children copy] autorelease]) {
+        [self removeChildWindow:c];
+        [c orderOut:nil];
+    }
     [self _post:NSWindowWillCloseNotification selector:@selector(windowWillClose:)];
     [self orderOut:nil];
     [self _destroyGtk];
@@ -1472,6 +1602,8 @@ static int on_button(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
+        if ([win _ferryIgnoresMouse])
+            return 1;
         int type = gdk_event_get_event_type(e);
         if (type == GDK_2BUTTON_PRESS || type == GDK_3BUTTON_PRESS)
             return 1;   /* counted below from the single presses */
@@ -1510,6 +1642,8 @@ static int on_motion(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
+        if ([win _ferryIgnoresMouse])
+            return 1;
         unsigned state = 0;
         NSPoint p = location(win, e, &state);
         ASetMouseLocation([win convertPointToScreen:p], buttons_from(state));
@@ -1538,6 +1672,8 @@ static int on_scroll(GtkWidget *w, GdkEvent *e, void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
+        if ([win _ferryIgnoresMouse])
+            return 1;
         unsigned state = 0;
         NSPoint p = location(win, e, &state);
         int direction = GDK_SCROLL_SMOOTH;
@@ -1660,7 +1796,11 @@ void AWindowsDisplayIfNeeded(void)
     BOOL _floating, _keyOnlyIfNeeded, _worksWhenModal;
 }
 - (BOOL)isFloatingPanel { return _floating; }
-- (void)setFloatingPanel:(BOOL)flag { _floating = flag; }
+- (void)setFloatingPanel:(BOOL)flag
+{
+    _floating = flag;
+    [self setLevel:flag ? NSFloatingWindowLevel : NSNormalWindowLevel];   /* as on a Mac */
+}
 - (BOOL)becomesKeyOnlyIfNeeded { return _keyOnlyIfNeeded; }
 - (void)setBecomesKeyOnlyIfNeeded:(BOOL)flag { _keyOnlyIfNeeded = flag; }
 - (BOOL)worksWhenModal { return _worksWhenModal; }
@@ -1793,3 +1933,13 @@ static int button_of(NSEventType t)
         [self _forward:e];
 }
 @end
+
+/* Screen updates: counted, and nothing waits on them here, since each
+ * window shows its whole frame at once. */
+static int screen_updates_disabled;
+void NSDisableScreenUpdates(void) { screen_updates_disabled++; }
+void NSEnableScreenUpdates(void)
+{
+    if (screen_updates_disabled > 0)
+        screen_updates_disabled--;
+}
