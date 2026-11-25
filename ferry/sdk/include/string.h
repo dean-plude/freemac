@@ -20,6 +20,8 @@ size_t strlcat(char *, const char *, size_t);
 void memset_pattern4(void *, const void *, size_t);
 void memset_pattern8(void *, const void *, size_t);
 void memset_pattern16(void *, const void *, size_t);
+/* C11's bounds-checked memset, which is never optimised away (freemac 1.230) */
+int memset_s(void *, size_t, int, size_t);
 char *strcat(char *, const char *);
 char *strncat(char *, const char *, size_t);
 int strcmp(const char *, const char *);

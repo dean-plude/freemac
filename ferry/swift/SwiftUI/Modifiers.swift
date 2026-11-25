@@ -35,7 +35,7 @@ extension View {
 public protocol ViewModifier {
     associatedtype Body: View
     typealias Content = _ViewModifier_Content<Self>
-    @ViewBuilder func body(content: Content) -> Body
+    @ViewBuilder @MainActor func body(content: Content) -> Body
 }
 
 /// The view a ViewModifier is given to change.
@@ -56,7 +56,11 @@ public struct ModifiedContent<Content: View, Modifier: ViewModifier>: View, _Pri
     }
     func _resolve(_ cx: ResolveContext) -> RNode {
         cx.attachProperties(of: modifier)
-        return cx.resolve(modifier.body(content: _ViewModifier_Content(view: content)), at: 0)
+        // Views are resolved on the main thread, where the main actor runs.
+        let body: @MainActor () -> RNode = {
+            cx.resolve(modifier.body(content: _ViewModifier_Content(view: content)), at: 0)
+        }
+        return unsafeBitCast(body, to: (() -> RNode).self)()
     }
 }
 
@@ -127,10 +131,6 @@ extension View {
     public func background(_ color: Color) -> some View {
         _wrap { n, _ in RNode(.background(color), children: [n]) }
     }
-    public func background<B: View>(_ view: B) -> some View {
-        if let c = view as? Color { return AnyView(background(c)) }
-        return AnyView(self)
-    }
     public func opacity(_ o: Double) -> some View { self }
     public func cornerRadius(_ r: CGFloat) -> some View { self }
     public func shadow(radius: CGFloat) -> some View { self }
@@ -178,11 +178,18 @@ extension View {
     public func navigationTitle(_ title: Text) -> some View { navigationTitle(title.string) }
 
     public func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command) -> some View { self }
+    public func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command,
+                                 localization: KeyboardShortcut.Localization) -> some View { self }
     public func keyboardShortcut(_ shortcut: KeyboardShortcut) -> some View { self }
+    public func keyboardShortcut(_ shortcut: KeyboardShortcut?) -> some View { self }
     public func labelsHidden() -> some View { self }
     public func toggleStyle<S: ToggleStyle>(_ style: S) -> some View { self }
     public func buttonStyle<S: ButtonStyle>(_ style: S) -> some View { self }
-    public func pickerStyle<S: PickerStyle>(_ style: S) -> some View { self }
+    /// The segmented style shows a picker as a segmented control; the
+    /// others as a pop-up button.
+    public func pickerStyle<S: PickerStyle>(_ style: S) -> some View {
+        _environment { $0[_PickerStyleKey.self] = style is SegmentedPickerStyle ? "segmented" : "" }
+    }
     public func textFieldStyle<S: TextFieldStyle>(_ style: S) -> some View { self }
     public func listStyle<S: ListStyle>(_ style: S) -> some View { self }
     public func controlSize(_ size: ControlSize) -> some View { self }
@@ -195,25 +202,54 @@ public struct KeyEquivalent: Hashable, Sendable, ExpressibleByExtendedGraphemeCl
     public static let `return` = KeyEquivalent("\r")
     public static let escape = KeyEquivalent("\u{1b}")
     public static let delete = KeyEquivalent("\u{8}")
+    public static let deleteForward = KeyEquivalent("\u{F728}")
     public static let space = KeyEquivalent(" ")
     public static let tab = KeyEquivalent("\t")
+    public static let clear = KeyEquivalent("\u{F739}")
+    public static let upArrow = KeyEquivalent("\u{F700}")
+    public static let downArrow = KeyEquivalent("\u{F701}")
+    public static let leftArrow = KeyEquivalent("\u{F702}")
+    public static let rightArrow = KeyEquivalent("\u{F703}")
+    public static let home = KeyEquivalent("\u{F729}")
+    public static let end = KeyEquivalent("\u{F72B}")
+    public static let pageUp = KeyEquivalent("\u{F72C}")
+    public static let pageDown = KeyEquivalent("\u{F72D}")
 }
 
+/// The modifier keys, with the bits Apple's SwiftUI gives them (freemac 1.230).
 public struct EventModifiers: OptionSet, Hashable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
-    public static let shift = EventModifiers(rawValue: 1)
-    public static let control = EventModifiers(rawValue: 2)
-    public static let option = EventModifiers(rawValue: 4)
-    public static let command = EventModifiers(rawValue: 8)
+    public static let capsLock = EventModifiers(rawValue: 1 << 0)
+    public static let shift = EventModifiers(rawValue: 1 << 1)
+    public static let control = EventModifiers(rawValue: 1 << 2)
+    public static let option = EventModifiers(rawValue: 1 << 3)
+    public static let command = EventModifiers(rawValue: 1 << 4)
+    public static let numericPad = EventModifiers(rawValue: 1 << 5)
+    public static let all = EventModifiers(rawValue: 0x7F)
 }
 
 public struct KeyboardShortcut: Hashable, Sendable {
     public let key: KeyEquivalent
     public let modifiers: EventModifiers
+    public let localization: Localization
     public init(_ key: KeyEquivalent, modifiers: EventModifiers = .command) {
         self.key = key
         self.modifiers = modifiers
+        self.localization = .automatic
+    }
+    public init(_ key: KeyEquivalent, modifiers: EventModifiers = .command, localization: Localization) {
+        self.key = key
+        self.modifiers = modifiers
+        self.localization = localization
+    }
+    /// Whether a shortcut moves to other keys on other keyboard layouts;
+    /// kept only, as Ferry's shortcuts stay where they are.
+    public struct Localization: Hashable, Sendable {
+        let kind: Int
+        public static let automatic = Localization(kind: 0)
+        public static let withoutMirroring = Localization(kind: 1)
+        public static let custom = Localization(kind: 2)
     }
     public static let defaultAction = KeyboardShortcut(.return, modifiers: [])
     public static let cancelAction = KeyboardShortcut(.escape, modifiers: [])
@@ -248,6 +284,7 @@ public struct LinkButtonStyle: ButtonStyle { public init() {} }
 extension ButtonStyle where Self == LinkButtonStyle { public static var link: LinkButtonStyle { .init() } }
 
 public protocol PickerStyle {}
+struct _PickerStyleKey: EnvironmentKey { static let defaultValue = "" }
 public struct DefaultPickerStyle: PickerStyle { public init() {} }
 extension PickerStyle where Self == DefaultPickerStyle { public static var automatic: DefaultPickerStyle { .init() } }
 public struct MenuPickerStyle: PickerStyle { public init() {} }

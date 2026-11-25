@@ -1836,7 +1836,7 @@ counted by one script, and the code was compiled where it could be):
 
 | App | Swift files | SwiftUI names Ferry has | How far it got |
 | --- | --- | --- | --- |
-| TomatoBar | 7 | 40 of 42 (no `GeometryReader`, `overlay`) | compiled with SwiftState built as its own module. Its other packages (LaunchAtLogin, KeyboardShortcuts) and the AVFoundation player were replaced by stand-ins for the test. 94 errors are left, all outside SwiftUI: `DispatchQueue` and `DispatchSource`, `JSONEncoder` and `Codable`, `FileHandle`, `DateComponentsFormatter`, `UNUserNotificationCenter.current()` being optional, and AppKit's Swift names (`NSImage.Name`, `NSFont.Weight`, `NSAttributedString.Key`, `NSStatusItem.variableLength`, `NSRectEdge.minY`, `makeKey()`, the popover's `show`) |
+| TomatoBar | 7 | 42 of 42 | links and runs (freemac 1.230). SwiftState, LaunchAtLogin and KeyboardShortcuts are built from their source as libraries, and TomatoBar is bundled with its asset catalogue, icon and localizations. Its menu bar item shows in Topline with its icon; a click opens its popover (Start, the Intervals, Settings and Sounds tabs, the interval steppers, About and Quit); Start starts the timer, and the time left counts down in the menu bar. The popover opens in a window of its own, not placed under the item. Its sounds need `pw-play`, `paplay` or `aplay` on the system. Screenshot: `docs/screenshots/ferry-tomatobar.png` |
 | Spaceman | 14 | 35 of 39 (no `scaledToFit`, `offset`, `ignoresSafeArea`, `Link`) | not compiled: KeyboardShortcuts, LaunchAtLogin and Sparkle are Swift packages that would have to be built first |
 | Gas Mask (current source) | 23 | 51 of 57 (no `alert`, `Circle`, `onDrop`, `Link`, `NavigationSplitView`, `safeAreaInset`) | not compiled: it imports Combine (3 files), MASShortcut, Sparkle and UniformTypeIdentifiers |
 | Maccy | 120 | 71 of 97 | not tried: `@Observable` and the Observation module, SwiftData, Defaults and seven other packages, animations and shapes |
@@ -1846,13 +1846,10 @@ The Swift in the two apps of the nine that have it:
 
 - **Hex Fiend** (4 files in the app, Cocoa and Foundation only):
   compiled with its bridging header, which brings in all of the HexFiend
-  framework's headers and the app's. They are all read; the Swift stops
-  at 14 places: `@MainActor` (2), which needs Swift's concurrency library;
-  `DispatchQueue`; `JSONSerialization`; `NSColor.usingType`;
-  `NSPredicate.evaluate(with:substitutionVariables:)`; the interface item
-  identifiers as a type of their own (`.rawValue`, 3); `NSControl.StateValue`
-  as an `NSNumber` (2); and `NSWindowController`'s designated
-  initializers, so that its `init()` needs no `override`.
+  framework's headers and the app's. Since freemac 1.230 all four files
+  compile with no errors and no warnings (in 1.227 the Swift stopped at 14
+  places, among them `@MainActor`, `DispatchQueue`, `JSONSerialization`
+  and `NSColor.usingType`). The app as a whole has not been linked or run.
 - **Gas Mask** (23 files in its current source, 16 of them SwiftUI): its
   windows are SwiftUI views that its Objective-C opens through
   `NSHostingController`, which Ferry has. It also needs Combine, its

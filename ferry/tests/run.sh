@@ -76,7 +76,7 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/polish" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_more_controls)
+        appkit_more_controls|appkit_avaudioplayer)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" FERRY_TEST_DATA="$here/appkit" \
                 FERRY_SOUND_PLAYER="$here/appkit/fake_player.sh" FERRY_FAKE_PLAYER_LOG="$build/home_$name/player.log" \
@@ -297,7 +297,7 @@ else
     fail=$((fail + 1))
 fi
 # Foundation (M2), Ferry's own, loaded as a Mac framework.
-for t in strings collections system runloop exception; do
+for t in strings collections system runloop runloop_observers exception; do
     run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -framework Foundation
 done
 # CoreFoundation from plain C, linked under CoreFoundation's own Mac name.
@@ -728,6 +728,8 @@ else
 fi
 run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_controls.out" -fobjc-arc \
     -framework Cocoa
+run_one appkit_avaudioplayer "$here/appkit/avaudioplayer.m" "$here/appkit/avaudioplayer.out" -fobjc-arc \
+    -framework Cocoa -framework AVFoundation
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 # What Flycut calls as it starts: the Process Manager for itself, remote

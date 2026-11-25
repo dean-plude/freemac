@@ -674,3 +674,164 @@ Boolean SMJobBless(CFStringRef domain, CFStringRef label, AuthorizationRef auth,
     return no_launchd(outError, kSMErrorServiceUnavailable);
 }
 CFDictionaryRef SMJobCopyDictionary(CFStringRef domain, CFStringRef label) { return NULL; }
+
+/* The helpers SMLoginItemSetEnabled turned on, as the user's launchd jobs a
+ * Mac would list for them (freemac 1.230): each labelled with the
+ * helper's identifier and started on demand. The system domain has none. */
+CFArrayRef SMCopyAllJobDictionaries(CFStringRef domain)
+{
+    NSMutableArray *jobs = [[NSMutableArray alloc] init];
+    NSString *dir = autostart_dir();
+    if (domain && [(NSString *)domain isEqualToString:(NSString *)kSMDomainUserLaunchd] && dir) {
+        for (NSString *f in [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:NULL]
+                 sortedArrayUsingSelector:@selector(compare:)]) {
+            if (![f hasPrefix:@"ferry-login-"] || ![f hasSuffix:@".desktop"])
+                continue;
+            NSDictionary *e = read_entry([dir stringByAppendingPathComponent:f]);
+            NSString *ident = [e objectForKey:@"X-Ferry-Login-Helper"], *app = [e objectForKey:@"X-Ferry-App"];
+            if (!ident || entry_switched_off(e))
+                continue;
+            [jobs addObject:[NSDictionary dictionaryWithObjectsAndKeys:ident, @"Label", (id)kCFBooleanTrue, @"OnDemand",
+                                                                       app ?: @"", @"Program", nil]];
+        }
+    }
+    return (CFArrayRef)jobs;
+}
+
+/* ---- SMAppService (freemac 1.230) ---------------------------------------------
+ *
+ * The main app registers as one of the session's login items, the list
+ * LSSharedFileList keeps above, so it is the same entry an older app would
+ * add and Dials > Login Items lists it. A login item is a helper in the
+ * bundle's Contents/Library/LoginItems, turned on as SMLoginItemSetEnabled
+ * turns one on. Agents and daemons are launchd jobs, which this system
+ * doesn't have, so they are never found. Nothing needs the user's approval
+ * here. */
+
+NSString *const SMAppServiceErrorDomain = @"SMAppServiceErrorDomain";
+
+enum { SERVICE_MAIN, SERVICE_LOGIN_ITEM, SERVICE_AGENT, SERVICE_DAEMON };
+
+static NSString *main_app_path(void) { return [[[NSBundle mainBundle] bundlePath] stringByStandardizingPath]; }
+
+/* The session's login item for the main app, if there is one. */
+static FSharedFileListItem *main_app_item(FSharedFileList *l)
+{
+    NSString *path = main_app_path();
+    for (FSharedFileListItem *it in [l items])
+        if ([[[it->_url path] stringByStandardizingPath] isEqualToString:path])
+            return it;
+    return nil;
+}
+
+/* The helper in the main bundle with this identifier. */
+static BOOL has_helper(NSString *ident)
+{
+    NSString *items = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Contents/Library/LoginItems"];
+    for (NSString *f in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:items error:NULL])
+        if ([[f pathExtension] isEqualToString:@"app"] &&
+            [[[NSBundle bundleWithPath:[items stringByAppendingPathComponent:f]] bundleIdentifier] isEqualToString:ident])
+            return YES;
+    return NO;
+}
+
+static BOOL service_error(NSError **error, NSInteger code)
+{
+    if (error)
+        *error = [NSError errorWithDomain:SMAppServiceErrorDomain code:code userInfo:nil];
+    return NO;
+}
+
+@implementation SMAppService {
+    int _kind;
+    NSString *_name;
+}
+static SMAppService *service(int kind, NSString *name)
+{
+    SMAppService *s = [[[SMAppService alloc] init] autorelease];
+    s->_kind = kind;
+    s->_name = [name copy];
+    return s;
+}
++ (SMAppService *)mainAppService { return service(SERVICE_MAIN, nil); }
++ (SMAppService *)loginItemServiceWithIdentifier:(NSString *)identifier
+{
+    return service(SERVICE_LOGIN_ITEM, identifier);
+}
++ (SMAppService *)agentServiceWithPlistName:(NSString *)plistName { return service(SERVICE_AGENT, plistName); }
++ (SMAppService *)daemonServiceWithPlistName:(NSString *)plistName { return service(SERVICE_DAEMON, plistName); }
++ (SMAppServiceStatus)statusForLegacyURL:(NSURL *)url { return SMAppServiceStatusNotFound; }
++ (void)openSystemSettingsLoginItems {}
+- (void)dealloc
+{
+    [_name release];
+    [super dealloc];
+}
+- (SMAppServiceStatus)status
+{
+    switch (_kind) {
+    case SERVICE_MAIN: {
+        LSSharedFileListRef l = LSSharedFileListCreate(NULL, kLSSharedFileListSessionLoginItems, NULL);
+        BOOL on = main_app_item(as_list(l)) != nil;
+        CFRelease(l);
+        return on ? SMAppServiceStatusEnabled : SMAppServiceStatusNotRegistered;
+    }
+    case SERVICE_LOGIN_ITEM: {
+        for (NSDictionary *job in [(NSArray *)SMCopyAllJobDictionaries(kSMDomainUserLaunchd) autorelease])
+            if ([[job objectForKey:@"Label"] isEqualToString:_name])
+                return SMAppServiceStatusEnabled;
+        return has_helper(_name) ? SMAppServiceStatusNotRegistered : SMAppServiceStatusNotFound;
+    }
+    default:
+        return SMAppServiceStatusNotFound;
+    }
+}
+- (BOOL)registerAndReturnError:(NSError **)error
+{
+    switch (_kind) {
+    case SERVICE_MAIN: {
+        NSURL *app = [NSURL fileURLWithPath:main_app_path()];
+        LSSharedFileListRef l = LSSharedFileListCreate(NULL, kLSSharedFileListSessionLoginItems, NULL);
+        LSSharedFileListItemRef it =
+            main_app_item(as_list(l)) ? NULL
+                                      : LSSharedFileListInsertItemURL(l, kLSSharedFileListItemLast, NULL, NULL,
+                                                                      (CFURLRef)app, NULL, NULL);
+        BOOL ok = it || main_app_item(as_list(l));
+        if (it)
+            CFRelease(it);
+        CFRelease(l);
+        return ok ? YES : service_error(error, kSMErrorInternalFailure);
+    }
+    case SERVICE_LOGIN_ITEM:
+        if (!has_helper(_name))
+            return service_error(error, kSMErrorJobNotFound);
+        return SMLoginItemSetEnabled((CFStringRef)_name, true) ? YES : service_error(error, kSMErrorInternalFailure);
+    default:
+        return service_error(error, kSMErrorJobNotFound);
+    }
+}
+- (BOOL)unregisterAndReturnError:(NSError **)error
+{
+    switch (_kind) {
+    case SERVICE_MAIN: {
+        LSSharedFileListRef l = LSSharedFileListCreate(NULL, kLSSharedFileListSessionLoginItems, NULL);
+        FSharedFileListItem *it = main_app_item(as_list(l));
+        OSStatus st = it ? LSSharedFileListItemRemove(l, (LSSharedFileListItemRef)it) : fnfErr;
+        CFRelease(l);
+        return st == noErr ? YES : service_error(error, kSMErrorJobNotFound);
+    }
+    case SERVICE_LOGIN_ITEM:
+        if ([self status] != SMAppServiceStatusEnabled)
+            return service_error(error, kSMErrorJobNotFound);
+        return SMLoginItemSetEnabled((CFStringRef)_name, false) ? YES : service_error(error, kSMErrorInternalFailure);
+    default:
+        return service_error(error, kSMErrorJobNotFound);
+    }
+}
+- (NSString *)description
+{
+    static const char *kinds[] = {"main app", "login item", "agent", "daemon"};
+    return [NSString stringWithFormat:@"<SMAppService %s%@%@: %ld>", kinds[_kind], _name ? @" " : @"", _name ?: @"",
+                                      (long)[self status]];
+}
+@end

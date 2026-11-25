@@ -825,6 +825,25 @@ static void mac_memset_pattern4(void *b, const void *pattern, size_t len) { fill
 static void mac_memset_pattern8(void *b, const void *pattern, size_t len) { fill_pattern(b, pattern, 8, len); }
 static void mac_memset_pattern16(void *b, const void *pattern, size_t len) { fill_pattern(b, pattern, 16, len); }
 
+/* memset_s (freemac 1.230), C11's bounds-checked memset, which Swift's
+ * concurrency runtime calls: the store is made through a volatile pointer,
+ * so it isn't optimised away. It answers 0, or EINVAL when the destination
+ * is missing, or ERANGE (filling what fits) when n is more than smax. */
+static int mac_memset_s(void *s, size_t smax, int c, size_t n)
+{
+    if (!s)
+        return EINVAL;
+    int err = 0;
+    if (n > smax) {
+        n = smax;
+        err = ERANGE;
+    }
+    volatile unsigned char *p = s;
+    while (n--)
+        *p++ = (unsigned char)c;
+    return err;
+}
+
 /* the log can't be searched: no results */
 static void *mac_asl_search(void *c, void *q)
 {
@@ -851,6 +870,7 @@ const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"memset_pattern4", mac_memset_pattern4},
     {"memset_pattern8", mac_memset_pattern8},
     {"memset_pattern16", mac_memset_pattern16},
+    {"memset_s", mac_memset_s},
     {"malloc_default_zone", mac_malloc_default_zone},
     {"malloc_default_purgeable_zone", mac_malloc_default_purgeable_zone},
     {"malloc_create_zone", mac_malloc_create_zone},

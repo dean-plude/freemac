@@ -33,7 +33,7 @@ final class RNode {
         case textField(String, Binding<String>, secure: Bool)
         case slider(Binding<Double>, ClosedRange<Double>)
         case stepper(String, () -> Void, () -> Void)
-        case picker(String, [String], Int, (Int) -> Void)
+        case picker(String, [String], Int, (Int) -> Void, segmented: Bool)
         case progress(Double?)
         case spacer(CGFloat?)
         case divider
@@ -49,6 +49,9 @@ final class RNode {
         case section(String?)
         case menu(String)
         case hosted(make: () -> NSView, update: (NSView) -> Void)   // an NSViewRepresentable's view
+        case shape(ShapeSpec)
+        case layered(primary: Int, alignment: Alignment)   // an overlay or background: the primary child sets the size
+        case geometry((CGSize) -> Void)                    // a GeometryReader, told the size it is given
     }
 
     var kind: Kind
@@ -268,7 +271,7 @@ final class HostCore {
             let f = view(p) { NSTextField(labelWithString: s) }
             if f.stringValue != s { f.stringValue = s }
             f.font = n.font?.nsFont ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
-            f.textColor = n.foreground?.nsColor ?? NSColor.label
+            f.textColor = n.foreground?.nsColor ?? NSColor.labelColor
             made = f
         case .button(let title, let action):
             let b = view(p) { NSButton(title: title, target: nil, action: nil) }
@@ -314,7 +317,18 @@ final class HostCore {
             b.action = #selector(ActionTarget.fire(_:))
             b.toolTip = title
             made = b
-        case .picker(_, let items, let selected, let choose):
+        case .picker(_, let items, let selected, let choose, true):
+            // the segmented style: one segment for each choice
+            let b = view(p + "@segments") { NSSegmentedControl(frame: .zero) }
+            if b.segmentCount != items.count { b.segmentCount = items.count }
+            for (i, t) in items.enumerated() where b.label(forSegment: i) != t { b.setLabel(t, forSegment: i) }
+            b.trackingMode = .selectOne
+            if selected >= 0 && selected < items.count { b.selectedSegment = selected }
+            let t = target(p) { [weak b] in choose(b?.selectedSegment ?? -1) }
+            b.target = t
+            b.action = #selector(ActionTarget.fire(_:))
+            made = b
+        case .picker(_, let items, let selected, let choose, false):
             let b = view(p) { NSPopUpButton(frame: .zero, pullsDown: false) }
             let titles = (b.itemTitles as [Any]? ?? []).compactMap { $0 as? String }
             if titles != items {
@@ -343,8 +357,13 @@ final class HostCore {
             let f = view(p) { NSTextField(labelWithString: name) }
             f.stringValue = Image.glyph(name)
             f.font = n.font?.nsFont ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
-            f.textColor = n.foreground?.nsColor ?? NSColor.label
+            f.textColor = n.foreground?.nsColor ?? NSColor.labelColor
             made = f
+        case .shape(let spec):
+            let v = view(p + "@shape") { ShapeView(frame: .zero) }
+            v.spec = spec
+            v.defaultColor = n.foreground?.nsColor ?? NSColor.labelColor
+            made = v
         case .hosted(let make, let update):
             let v = view(p + "@hosted") { make() }
             update(v)
@@ -353,7 +372,7 @@ final class HostCore {
             let f = view(p + "@header") { NSTextField(labelWithString: header) }
             f.stringValue = header
             f.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-            f.textColor = NSColor.secondaryLabel
+            f.textColor = NSColor.secondaryLabelColor
             made = f
         default:
             break

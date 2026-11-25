@@ -133,6 +133,7 @@ enum {
 
 /* ---- responders --------------------------------------------------------------------- */
 
+NS_SWIFT_UI_ACTOR
 @interface NSResponder : NSObject <NSCoding>
 @property (assign) NSResponder *nextResponder;
 @property (readonly) NSUndoManager *undoManager;
@@ -196,6 +197,10 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 - (void)flushGraphics;
 @end
 
+typedef NS_ENUM(NSInteger, NSColorType) {
+    NSColorTypeComponentBased = 0, NSColorTypePattern = 1, NSColorTypeCatalog = 2,
+};
+
 @interface NSColor : NSObject <NSCopying, NSCoding>
 + (NSColor *)colorWithRed:(CGFloat)r green:(CGFloat)g blue:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithSRGBRed:(CGFloat)r green:(CGFloat)g blue:(CGFloat)b alpha:(CGFloat)a;
@@ -239,6 +244,8 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 - (NSColor *)shadowWithLevel:(CGFloat)level;
 - (NSColor *)colorUsingColorSpaceName:(NSString *)name;
 - (NSColor *)colorUsingColorSpace:(id)space;
+@property (readonly) NSColorType type;
+- (NSColor *)colorUsingType:(NSColorType)type;
 - (void)set;
 - (void)setFill;
 - (void)setStroke;
@@ -372,7 +379,6 @@ APPKIT_EXTERN NSTextTabOptionKey const NSTabColumnTerminatorsAttributeName;
 - (void)setParagraphStyle:(NSParagraphStyle *)style;
 @end
 
-typedef NSString *NSAttributedStringKey;
 APPKIT_EXTERN NSAttributedStringKey const NSFontAttributeName;
 APPKIT_EXTERN NSAttributedStringKey const NSForegroundColorAttributeName;
 APPKIT_EXTERN NSAttributedStringKey const NSBackgroundColorAttributeName;
@@ -1262,10 +1268,10 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @interface NSMenuItem : NSObject <NSCopying>
 + (NSMenuItem *)separatorItem;
 - (instancetype FERRY_SWIFT_NONNULL)initWithTitle:(NSString *)title action:(SEL)action keyEquivalent:(NSString *)key;
-@property (copy) NSString *title;
+@property (copy) NSString * FERRY_SWIFT_NONNULL title;
 @property SEL action;
 @property (assign) id target;
-@property (copy) NSString *keyEquivalent;
+@property (copy) NSString * FERRY_SWIFT_NONNULL keyEquivalent;
 @property NSEventModifierFlags keyEquivalentModifierMask;
 @property NSInteger tag;
 @property NSControlStateValue state;
@@ -1280,12 +1286,16 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @property NSInteger indentationLevel;
 @property (copy) NSString *toolTip;
 @property (retain) NSView *view;
+/* kept only: Ferry doesn't move key equivalents for other keyboard layouts (freemac 1.230) */
+@property BOOL allowsAutomaticKeyEquivalentLocalization;
+@property BOOL allowsAutomaticKeyEquivalentMirroring;
 @end
 
 @interface NSMenu : NSObject <NSCopying>
 - (instancetype FERRY_SWIFT_NONNULL)initWithTitle:(NSString *)title;
-@property (copy) NSString *title;
-@property (copy) NSArray<NSMenuItem *> *itemArray;   /* settable (freemac 1.225) */
+@property (copy) NSString * FERRY_SWIFT_NONNULL title;
+@property (copy) NSArray<NSMenuItem *> * FERRY_SWIFT_NONNULL itemArray;   /* settable (freemac 1.225) */
+@property (copy) NSArray<NSMenuItem *> * FERRY_SWIFT_NONNULL items;       /* the same (freemac 1.230) */
 @property (readonly) NSInteger numberOfItems;
 @property (assign) NSMenu *supermenu;
 @property BOOL autoenablesItems;
@@ -1431,8 +1441,16 @@ typedef NSString *NSNibName;
 
 /* Loads its window from a nib (as File's Owner) the first time the window
  * is asked for, and follows the window in the responder chain. */
+/* Swift sees its designated initializers, as on a Mac, so that init() in a
+ * Swift subclass is its own and not an override of NSObject's. */
+#ifdef __swift__
+#define FERRY_SWIFT_DESIGNATED NS_DESIGNATED_INITIALIZER
+#else
+#define FERRY_SWIFT_DESIGNATED
+#endif
 @interface NSWindowController : NSResponder <NSCoding>
-- (instancetype FERRY_SWIFT_NONNULL)initWithWindow:(NSWindow *)window;
+- (instancetype FERRY_SWIFT_NONNULL)initWithWindow:(NSWindow *)window FERRY_SWIFT_DESIGNATED;
+- (instancetype)initWithCoder:(NSCoder *)coder FERRY_SWIFT_DESIGNATED;
 - (instancetype)initWithWindowNibName:(NSNibName)name;
 - (instancetype)initWithWindowNibName:(NSNibName)name owner:(id)owner;
 - (instancetype)initWithWindowNibPath:(NSString *)path owner:(id)owner;

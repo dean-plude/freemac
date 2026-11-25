@@ -1,0 +1,27 @@
+window "Tasks" 124x192
+  text "Started: yes" at 16,16 78x16
+  text "Rounds: 0" at 16,40 66x16
+  text "Received: 0" at 16,64 77x16
+  text "Locale" at 16,88 45x16
+  text "set" at 85,88 23x16
+  text "Guided" at 20,116 49x16
+  button "Next" at 16,144 60x32
+click Next
+window "Tasks" 124x192
+  text "Started: yes" at 16,16 78x16
+  text "Rounds: 0,1" at 16,40 74x16
+  text "Received: 10" at 16,64 82x16
+  text "Locale" at 16,88 45x16
+  text "set" at 85,88 23x16
+  text "Guided" at 20,116 49x16
+  button "Next" at 16,144 60x32
+click Next
+window "Tasks" 124x192
+  text "Started: yes" at 16,16 78x16
+  text "Rounds: 0,1,2" at 16,40 86x16
+  text "Received: 20" at 16,64 85x16
+  text "Locale" at 16,88 45x16
+  text "set" at 85,88 23x16
+  text "Guided" at 20,116 49x16
+  button "Next" at 16,144 60x32
+exit=0

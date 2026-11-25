@@ -81,7 +81,7 @@ public struct Font: Hashable, Sendable {
         if design == .monospaced, let f = NSFont.userFixedPitchFont(ofSize: size) { return f }
         if weight == .regular { return NSFont.systemFont(ofSize: size) }
         if weight == .bold { return NSFont.boldSystemFont(ofSize: size) }
-        return NSFont.systemFont(ofSize: size, weight: weight.value)
+        return NSFont.systemFont(ofSize: size, weight: NSFont.Weight(rawValue: weight.value))
     }
 }
 
@@ -136,9 +136,9 @@ public struct Color: View, _PrimitiveView, Hashable, Sendable {
             case "green": return NSColor.systemGreen
             case "blue": return NSColor.systemBlue
             case "orange": return NSColor.systemOrange
-            case "secondaryLabel": return NSColor.secondaryLabel
-            case "accent": return NSColor.controlAccent
-            default: return NSColor.label
+            case "secondaryLabel": return NSColor.secondaryLabelColor
+            case "accent": return NSColor.controlAccentColor
+            default: return NSColor.labelColor
             }
         }
     }
@@ -160,14 +160,49 @@ public struct Alignment: Hashable, Sendable {
     public static let bottomTrailing = Alignment(h: 1, v: 1)
 }
 
-public enum HorizontalAlignment: Hashable, Sendable {
-    case leading, center, trailing
-    var value: Int { self == .leading ? -1 : self == .center ? 0 : 1 }
+/// Where views line up across a vertical stack: their leading edges,
+/// centres or trailing edges. One of an app's own (an AlignmentID's) lines
+/// them up on their centres here (freemac 1.230).
+public struct HorizontalAlignment: Hashable, Sendable {
+    let value: Int
+    let name: String
+    init(value: Int, name: String) { self.value = value; self.name = name }
+    public init(_ id: any AlignmentID.Type) { value = 0; name = String(reflecting: id) }
+    public static let leading = HorizontalAlignment(value: -1, name: "leading")
+    public static let center = HorizontalAlignment(value: 0, name: "center")
+    public static let trailing = HorizontalAlignment(value: 1, name: "trailing")
+    public static let listRowSeparatorLeading = HorizontalAlignment(value: -1, name: "listRowSeparatorLeading")
+    public static let listRowSeparatorTrailing = HorizontalAlignment(value: 1, name: "listRowSeparatorTrailing")
 }
 
-public enum VerticalAlignment: Hashable, Sendable {
-    case top, center, bottom, firstTextBaseline, lastTextBaseline
-    var value: Int { switch self { case .top: return -1; case .bottom: return 1; default: return 0 } }
+/// Where views line up across a horizontal stack; the text baselines line
+/// up as centres do here.
+public struct VerticalAlignment: Hashable, Sendable {
+    let value: Int
+    let name: String
+    init(value: Int, name: String) { self.value = value; self.name = name }
+    public init(_ id: any AlignmentID.Type) { value = 0; name = String(reflecting: id) }
+    public static let top = VerticalAlignment(value: -1, name: "top")
+    public static let center = VerticalAlignment(value: 0, name: "center")
+    public static let bottom = VerticalAlignment(value: 1, name: "bottom")
+    public static let firstTextBaseline = VerticalAlignment(value: 0, name: "firstTextBaseline")
+    public static let lastTextBaseline = VerticalAlignment(value: 0, name: "lastTextBaseline")
+}
+
+/// A kind of alignment of an app's own, and where it falls in a view by default.
+public protocol AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat
+}
+
+/// A view's size, and where its alignments fall in it.
+public struct ViewDimensions {
+    public let width: CGFloat
+    public let height: CGFloat
+    init(width: CGFloat, height: CGFloat) { self.width = width; self.height = height }
+    public subscript(guide: HorizontalAlignment) -> CGFloat { width * CGFloat(guide.value + 1) / 2 }
+    public subscript(guide: VerticalAlignment) -> CGFloat { height * CGFloat(guide.value + 1) / 2 }
+    public subscript(explicit guide: HorizontalAlignment) -> CGFloat? { nil }
+    public subscript(explicit guide: VerticalAlignment) -> CGFloat? { nil }
 }
 
 public enum Edge: Hashable, Sendable {
@@ -216,6 +251,44 @@ func titleOf(_ v: any View, in cx: ResolveContext) -> String {
     return words.joined(separator: " ")
 }
 
+/// The key of a text in an app's strings tables (freemac 1.230). A key
+/// written with values in it, "\(n) left", is looked up as "%lld left",
+/// and the values go in the text the table gives.
+public struct LocalizedStringKey: Equatable, ExpressibleByStringInterpolation {
+    var key: String
+    var arguments: [CVarArg] = []
+
+    public init(_ value: String) { key = value }
+    public init(stringLiteral value: String) { key = value }
+    public init(stringInterpolation: StringInterpolation) {
+        key = stringInterpolation.key
+        arguments = stringInterpolation.arguments
+    }
+
+    public struct StringInterpolation: StringInterpolationProtocol {
+        var key = ""
+        var arguments: [CVarArg] = []
+        public init(literalCapacity: Int, interpolationCount: Int) {}
+        public mutating func appendLiteral(_ literal: String) { key += literal.replacingOccurrences(of: "%", with: "%%") }
+        public mutating func appendInterpolation(_ string: String) { key += "%@"; arguments.append(string as NSString) }
+        public mutating func appendInterpolation<T: BinaryInteger>(_ n: T) { key += "%lld"; arguments.append(Int64(n)) }
+        public mutating func appendInterpolation(_ d: Double) { key += "%lf"; arguments.append(d) }
+        public mutating func appendInterpolation(_ f: Float) { key += "%f"; arguments.append(Double(f)) }
+        public mutating func appendInterpolation(_ text: Text) { key += "%@"; arguments.append(text.string as NSString) }
+        public mutating func appendInterpolation<T>(_ value: T) {
+            key += "%@"
+            arguments.append(String(describing: value) as NSString)
+        }
+    }
+
+    func resolved(table: String?, bundle: Bundle) -> String {
+        let found = bundle.localizedString(forKey: key, value: key, table: table) ?? key
+        return arguments.isEmpty ? found.replacingOccurrences(of: "%%", with: "%") : String(format: found, arguments: arguments)
+    }
+
+    public static func == (a: LocalizedStringKey, b: LocalizedStringKey) -> Bool { a.key == b.key }
+}
+
 /// Words on the screen.
 public struct Text: View, _PrimitiveView, _TitleView {
     public typealias Body = Never
@@ -226,6 +299,11 @@ public struct Text: View, _PrimitiveView, _TitleView {
     public init(_ s: String) { string = s }
     public init<S: StringProtocol>(_ s: S) { string = String(s) }
     public init(verbatim s: String) { string = s }
+    /// The text a key gives in a strings table of the bundle (the main
+    /// one unless another is given), or the key itself.
+    public init(_ key: LocalizedStringKey, tableName: String? = nil, bundle: Bundle? = nil, comment: StaticString? = nil) {
+        string = key.resolved(table: tableName, bundle: bundle ?? Bundle.main)
+    }
 
     var _title: String { string }
 
@@ -493,7 +571,7 @@ public struct Picker<Label: View, SelectionValue: Hashable, Content: View>: View
         let sel = selection
         let node = RNode(.picker(title, titles, selected, { i in
             if i >= 0 && i < tags.count, let v = tags[i].base as? SelectionValue { sel.wrappedValue = v }
-        }))
+        }, segmented: cx.environment[_PickerStyleKey.self] == "segmented"))
         if title.isEmpty { return node }
         node.path = cx.path + "/control"
         return RNode(.stack(.horizontal, 6, alignment: 0), children: [cx.child("label").resolve(Text(title)), node])
@@ -660,11 +738,6 @@ extension Section where Parent == EmptyView, Footer == EmptyView {
         header = nil
         self.content = content()
     }
-}
-
-/// A view and a size it reads its room with. (Ferry proposes its own room.)
-public struct GeometryProxy {
-    public let size: CGSize
 }
 
 // ---- the views kept from Apple's API that Ferry shows plainly ------------------------------

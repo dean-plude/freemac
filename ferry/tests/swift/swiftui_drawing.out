@@ -1,0 +1,79 @@
+window "Drawing" 212x222
+  ShapeView at 16,16 20x20
+  ShapeView at 44,16 40x20
+  ShapeView at 92,20 30x12
+  ShapeView at 130,16 20x20
+  ShapeView at 16,44 56x28
+  text "Badge" at 22,50 44x16
+  text "3" at 61,44 11x13
+  text "Room: 180x30" at 16,80 93x16
+  NSSegmentedControl at 16,118 100x24
+  text "Answer: none" at 16,150 89x16
+  button "Ask" at 16,174 60x32
+  button "Sheet" at 84,174 64x32
+click Ask
+window "Drawing" 212x222
+  ShapeView at 16,16 20x20
+  ShapeView at 44,16 40x20
+  ShapeView at 92,20 30x12
+  ShapeView at 130,16 20x20
+  ShapeView at 16,44 56x28
+  text "Badge" at 22,50 44x16
+  text "3" at 61,44 11x13
+  text "Room: 180x30" at 16,80 93x16
+  NSSegmentedControl at 16,118 100x24
+  text "Answer: none" at 16,150 89x16
+  button "Ask" at 16,174 60x32
+  button "Sheet" at 84,174 64x32
+sheet "" 260x194
+  NSImageView at 98,20 64x64
+  text "Start a break?" at 20,96 220x18
+  text "Your work interval is over." at 20,120 220x16
+  button "Later" at 128,149 118x28
+  button "Now" at 14,149 118x28
+click Now
+window "Drawing" 212x222
+  ShapeView at 16,16 20x20
+  ShapeView at 44,16 40x20
+  ShapeView at 92,20 30x12
+  ShapeView at 130,16 20x20
+  ShapeView at 16,44 56x28
+  text "Badge" at 22,50 44x16
+  text "3" at 61,44 11x13
+  text "Room: 180x30" at 16,80 93x16
+  NSSegmentedControl at 16,118 100x24
+  text "Answer: now" at 16,150 84x16
+  button "Ask" at 16,174 60x32
+  button "Sheet" at 84,174 64x32
+click Sheet
+window "Drawing" 212x222
+  ShapeView at 16,16 20x20
+  ShapeView at 44,16 40x20
+  ShapeView at 92,20 30x12
+  ShapeView at 130,16 20x20
+  ShapeView at 16,44 56x28
+  text "Badge" at 22,50 44x16
+  text "3" at 61,44 11x13
+  text "Room: 180x30" at 16,80 93x16
+  NSSegmentedControl at 16,118 100x24
+  text "Answer: now" at 16,150 84x16
+  button "Ask" at 16,174 60x32
+  button "Sheet" at 84,174 64x32
+sheet "" 120x88
+  text "In the sheet" at 22,16 76x16
+  button "Done" at 30,40 61x32
+click Done
+window "Drawing" 212x222
+  ShapeView at 16,16 20x20
+  ShapeView at 44,16 40x20
+  ShapeView at 92,20 30x12
+  ShapeView at 130,16 20x20
+  ShapeView at 16,44 56x28
+  text "Badge" at 22,50 44x16
+  text "3" at 61,44 11x13
+  text "Room: 180x30" at 16,80 93x16
+  NSSegmentedControl at 16,118 100x24
+  text "Answer: sheet closed" at 16,150 137x16
+  button "Ask" at 16,174 60x32
+  button "Sheet" at 84,174 64x32
+exit=0

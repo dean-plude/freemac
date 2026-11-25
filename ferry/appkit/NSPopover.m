@@ -22,6 +22,13 @@
  * popoverDidClose: (with NSPopoverCloseReasonStandard). There is no
  * animation and no detaching into a window of its own.
  *
+ * A menu bar item's button is in no window here (the desktop's menu bar
+ * draws the item), so a popover shown from one (freemac 1.230) gets a
+ * borderless window of its own, just big enough for the bubble, at the top
+ * of the screen under where the menu bar says the item was clicked (at its
+ * right when it hasn't said); the window goes when the popover closes. A
+ * compositor that places windows itself may put it elsewhere.
+ *
  * A popover in a nib keeps its behaviour under "NSBehavior" and its size
  * under "NSContentSize" (names from developers' descriptions of the
  * format; no Apple code was read); its content view controller is an
@@ -235,6 +242,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     NSRectEdge _preferredEdge;
     APopoverHost *_host;
     NSWindow *_window;
+    NSWindow *_ownWindow; /* for a popover from a menu bar item */
 }
 
 - (instancetype)init
@@ -273,6 +281,7 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     [_content release];
     [_positioningView release];
     [_window release];
+    [_ownWindow release];
     [super dealloc];
 }
 
@@ -386,8 +395,40 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     [_host setNeedsDisplay:YES];
 }
 
+/* A window of the popover's own under a menu bar item, and the bubble in it. */
+- (void)_showUnderStatusItem:(NSStatusBarButton *)button
+{
+    NSSize size = [self contentSize];
+    CGFloat w = size.width + 2 * margin, h = size.height + arrow_length + margin;
+    NSScreen *screen = [NSScreen mainScreen];
+    NSRect full = [screen frame], visible = [screen visibleFrame];
+    NSPoint at = [button _clickedAt];
+    CGFloat x = at.x >= 0 ? NSMinX(full) + at.x - w / 2 : NSMaxX(visible) - w - margin;
+    x = fmax(NSMinX(visible) + margin, fmin(x, NSMaxX(visible) - margin - w));
+    NSRect frame = NSMakeRect(x, NSMaxY(visible) - h, w, h);
+    if (!_ownWindow) {
+        _ownWindow = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless
+                                                   backing:NSBackingStoreBuffered defer:NO];
+        [_ownWindow setReleasedWhenClosed:NO];
+        [_ownWindow setOpaque:NO];
+        [_ownWindow setBackgroundColor:[NSColor clearColor]];
+        [_ownWindow setLevel:NSPopUpMenuWindowLevel];
+    } else {
+        [_ownWindow setFrame:frame display:NO];
+    }
+    CGFloat arrowX = at.x >= 0 ? NSMinX(full) + at.x - x : w / 2;
+    arrowX = fmax(corner + arrow_half, fmin(arrowX, w - corner - arrow_half));
+    [_ownWindow makeKeyAndOrderFront:nil];
+    [self showRelativeToRect:NSMakeRect(arrowX - 1, h - 1, 2, 1) ofView:[_ownWindow contentView]
+               preferredEdge:NSRectEdgeMinY];
+}
+
 - (void)showRelativeToRect:(NSRect)rect ofView:(NSView *)view preferredEdge:(NSRectEdge)edge
 {
+    if (view && ![view window] && [view isKindOfClass:[NSStatusBarButton class]] && _content) {
+        [self _showUnderStatusItem:(NSStatusBarButton *)view];
+        return;
+    }
     NSWindow *window = [view window];
     if (!view || !window)
         [NSException raise:NSInternalInconsistencyException
@@ -446,6 +487,8 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
     _shown = NO;
     [_window release];
     _window = nil;
+    if (_ownWindow && w == _ownWindow)
+        [_ownWindow orderOut:nil];
     [_content viewDidDisappear];
     [self _post:NSPopoverDidCloseNotification selector:@selector(popoverDidClose:)];
 }

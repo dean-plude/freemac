@@ -41,6 +41,12 @@ cache=$build/module-cache-$(cat "$sdk/include/module.modulemap" "$sdk"/include/*
 # module NAME LINK-FLAGS SOURCES...: compile one module and link its library,
 # unless it is newer than its sources and the modules before it.
 stamp=$build/.none
+# Swift's concurrency library, when build-runtime.sh has built it, is
+# imported by itself, as on a Mac; the modules are rebuilt when it is new.
+noconc=-disable-implicit-concurrency-module-import
+if [ -f "$res/macosx/_Concurrency.swiftmodule/x86_64-apple-macos.swiftmodule" ]; then
+    noconc= stamp=$dest/libswift_Concurrency.dylib
+fi
 module() {
     name=$1 link=$2
     shift 2
@@ -59,7 +65,7 @@ module() {
         -swift-version 5 -Xcc -nostdlibinc -Xcc -isystem -Xcc "$sdk/include" \
         -Xcc -fmodules-validate-system-headers -I "$res/macosx" \
         -module-cache-path "$cache" -runtime-compatibility-version none \
-        -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import \
+        $noconc $plugins -disable-implicit-string-processing-module-import \
         -disable-autolinking-runtime-compatibility-dynamic-replacements \
         -disable-autolinking-runtime-compatibility-concurrency \
         -enable-library-evolution -emit-module-path "$mod/x86_64-apple-macos.swiftmodule" \
@@ -72,16 +78,28 @@ module() {
     stamp=$lib
 }
 
+# SwiftUI declares #Preview, whose plugin (sdk/ferry-swift-macros) the
+# compiler looks for when it reads the declaration
+plugins=
+if [ -x "$sdk/ferry-swift-macros" ] && command -v python3 > /dev/null 2>&1; then
+    plugins="-load-plugin-executable $sdk/ferry-swift-macros#FerrySwiftMacros"
+fi
+
 o=$here/overlays
 module ObjectiveC "-lswiftCore" "$o"/ObjectiveC/*.swift
 module CoreGraphics "-lswiftCore -framework CoreGraphics" "$o"/CoreGraphics/*.swift
+module Dispatch "-lswiftCore -lswiftObjectiveC" "$o"/Dispatch/*.swift
 if [ -d "$o/Foundation" ] && [ -n "$(ls "$o/Foundation")" ]; then
-    module Foundation "-lswiftCore -framework Foundation" "$o"/Foundation/*.swift
+    module Foundation "-lswiftCore -lswiftDispatch -framework Foundation" "$o"/Foundation/*.swift
 fi
 if [ -d "$o/AppKit" ] && [ -n "$(ls "$o/AppKit")" ]; then
-    module AppKit "-lswiftCore -framework AppKit" "$o"/AppKit/*.swift
+    module AppKit "-lswiftCore -lswiftObjectiveC -lswiftFoundation -framework AppKit" "$o"/AppKit/*.swift
+fi
+module os "-lswiftCore -lswiftFoundation -framework Foundation" "$o"/os/*.swift
+if [ -d "$here/Combine" ]; then
+    module Combine "-lswiftCore -lswiftObjectiveC -lswiftDispatch -lswiftFoundation -lswiftDarwin -framework Foundation" "$here"/Combine/*.swift
 fi
 if [ -d "$here/SwiftUI" ]; then
-    module SwiftUI "-lswiftCore -lswiftObjectiveC -lswiftCoreGraphics -lswiftFoundation -lswiftDarwin -framework AppKit" "$here"/SwiftUI/*.swift
+    module SwiftUI "-lswiftCore -lswiftObjectiveC -lswiftCoreGraphics -lswiftFoundation -lswiftAppKit -lswiftCombine -lswiftDarwin -framework AppKit" "$here"/SwiftUI/*.swift
 fi
 echo "build-modules: done; Ferry's Swift modules are in $res/macosx"

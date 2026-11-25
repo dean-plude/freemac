@@ -132,7 +132,7 @@ static BOOL is_target(void *target)
     return target && (target == application_target || target == dispatcher_target || target == monitor_target);
 }
 
-OSStatus InstallEventHandler(EventTargetRef target, EventHandlerUPP proc, UInt32 count, const EventTypeSpec *types,
+OSStatus InstallEventHandler(EventTargetRef target, EventHandlerUPP proc, ItemCount count, const EventTypeSpec *types,
                              void *userData, EventHandlerRef *outRef)
 {
     ACarbonHandler *h = [[ACarbonHandler alloc] init];
@@ -161,14 +161,14 @@ OSStatus RemoveEventHandler(EventHandlerRef ref)
         [h release];
     return noErr;
 }
-OSStatus AddEventTypesToHandler(EventHandlerRef ref, UInt32 count, const EventTypeSpec *types)
+OSStatus AddEventTypesToHandler(EventHandlerRef ref, ItemCount count, const EventTypeSpec *types)
 {
     if (!ref || (count && !types))
         return paramErr;
     [((ACarbonHandler *)ref)->types appendBytes:types length:count * sizeof *types];
     return noErr;
 }
-OSStatus RemoveEventTypesFromHandler(EventHandlerRef ref, UInt32 count, const EventTypeSpec *types)
+OSStatus RemoveEventTypesFromHandler(EventHandlerRef ref, ItemCount count, const EventTypeSpec *types)
 {
     if (!ref || (count && !types))
         return paramErr;
@@ -234,7 +234,7 @@ static void send_carbon_event(ACarbonEvent *event, ACarbonTarget *target)
 }
 
 OSStatus GetEventParameter(EventRef ref, EventParamName name, EventParamType type, EventParamType *outType,
-                           unsigned long size, unsigned long *outSize, void *data)
+                           ByteCount size, ByteCount *outSize, void *data)
 {
     ACarbonEvent *event = (ACarbonEvent *)ref;
     if (!event || ![(id)event isKindOfClass:[ACarbonEvent class]])

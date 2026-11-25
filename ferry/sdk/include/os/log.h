@@ -7,6 +7,8 @@
 #define _OS_LOG_H_
 #include <_ferry.h>
 #include <stdbool.h>
+#include <stdarg.h>
+#include <stdint.h>
 __FERRY_BEGIN
 
 typedef struct os_log_s *os_log_t;
@@ -26,6 +28,10 @@ extern struct os_log_s _os_log_disabled;
 os_log_t os_log_create(const char *subsystem, const char *category);
 bool os_log_type_enabled(os_log_t log, os_log_type_t type);
 void ferry_os_log(os_log_t log, os_log_type_t type, const char *format, ...);
+/* The same with the arguments in a va_list, and a message already
+ * formatted, for Swift's os_log and Logger (freemac 1.230). */
+void ferry_os_logv(os_log_t log, os_log_type_t type, const char *format, va_list ap);
+void ferry_os_log_message(os_log_t log, os_log_type_t type, const char *message);
 
 #define os_log_with_type(log, type, format, ...) ferry_os_log((log), (type), format, ##__VA_ARGS__)
 #define os_log(log, format, ...) os_log_with_type(log, OS_LOG_TYPE_DEFAULT, format, ##__VA_ARGS__)

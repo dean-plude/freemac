@@ -42,8 +42,12 @@ typedef struct AEKeyDesc {
     AEDesc descContent;
 } AEKeyDesc;
 
-/* descriptor types (AEDataModel.h) */
+/* descriptor types (AEDataModel.h), DescType values in Swift (freemac 1.230) */
+#ifdef __swift__
+enum : DescType {
+#else
 enum {
+#endif
     typeBoolean = 'bool', typeChar = 'TEXT', typeSInt16 = 'shor', typeSInt32 = 'long', typeUInt16 = 'ushr',
     typeUInt32 = 'magn', typeSInt64 = 'comp', typeUInt64 = 'ucom', typeIEEE32BitFloatingPoint = 'sing',
     typeIEEE64BitFloatingPoint = 'doub', type128BitFloatingPoint = 'ldbl', typeDecimalStruct = 'decm',

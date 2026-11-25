@@ -7,7 +7,8 @@
 #import <AppKit/AppKit.h>
 
 @interface NSEvent (FerryMonitors)
-+ (id)addLocalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(NSEvent * (^)(NSEvent *event))block;
-+ (id)addGlobalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(void (^)(NSEvent *event))block;
++ (id)addLocalMonitorForEventsMatchingMask:(NSEventMask)mask
+                                   handler:(NSEvent * FERRY_SWIFT_NULLABLE (^)(NSEvent * FERRY_SWIFT_NONNULL event))block;
++ (id)addGlobalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(void (^)(NSEvent * FERRY_SWIFT_NONNULL event))block;
 + (void)removeMonitor:(id)eventMonitor;
 @end

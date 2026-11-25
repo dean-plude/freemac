@@ -21,10 +21,27 @@ extension String {
     /// The string an NSString holds.
     public init(_ cocoaString: NSString) { self = cocoaString as String }
 
+    /// A string made from a format in the user's language, such as one
+    /// NSLocalizedString found (numbers are written as in C here).
+    public static func localizedStringWithFormat(_ format: String, _ arguments: CVarArg...) -> String {
+        String(format: format, arguments: arguments)
+    }
+
+    /// The string of so many UTF-16 code units.
+    public init(utf16CodeUnits: UnsafePointer<unichar>, count: Int) {
+        self = String(decoding: UnsafeBufferPointer(start: utf16CodeUnits, count: count), as: UTF16.self)
+    }
+
     public init?(utf8String: UnsafePointer<CChar>) {
         guard let s = NSString(utf8String: utf8String) else { return nil }
         self = s as String
     }
+}
+
+/// A Swift string passed to a C-style format (%@) as the NSString it
+/// bridges to, which lives until the autorelease pool drains (freemac 1.230).
+extension String: CVarArg {
+    public var _cVarArgEncoding: [Int] { (self as NSString)._cVarArgEncoding }
 }
 
 extension StringProtocol {
@@ -50,6 +67,12 @@ extension StringProtocol {
 
     public func caseInsensitiveCompare<T: StringProtocol>(_ other: T) -> ComparisonResult {
         nsSelf.caseInsensitiveCompare(String(other))
+    }
+
+    /// Whether the other string is found in this one.
+    public func contains<T: StringProtocol>(_ other: T) -> Bool {
+        let o = String(other)
+        return o.isEmpty || nsSelf.range(of: o).location != NSNotFound
     }
 
     public func localizedCaseInsensitiveContains<T: StringProtocol>(_ other: T) -> Bool {

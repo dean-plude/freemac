@@ -56,7 +56,9 @@ enum Layout {
     static func flexible(_ n: RNode, _ a: Axis2) -> Bool {
         switch n.kind {
         case .spacer: return a == parentAxis(n)
-        case .color, .scroll: return true
+        case .color, .scroll, .shape, .geometry: return true
+        case .layered(let primary, _):
+            return primary < n.children.count && flexible(n.children[primary], a)
         case .hosted:
             // an AppKit view with no size of its own takes the room it's given
             let i = n.view?.intrinsicContentSize ?? .zero
@@ -102,8 +104,10 @@ enum Layout {
         case .divider:
             return parentAxis(n) == .vertical ? CGSize(width: p.width ?? 1, height: 1)
                                               : CGSize(width: 1, height: p.height ?? 1)
-        case .color:
+        case .color, .shape, .geometry:
             return CGSize(width: p.width ?? 10, height: p.height ?? 10)
+        case .layered(let primary, _):
+            return primary < n.children.count ? size(n.children[primary], p) : .zero
         case .stack(let axis, let spacing, _):
             return stackSize(n.children.flatMap { $0.flattened }, axis, spacing, p).size
         case .zstack:
@@ -223,6 +227,20 @@ enum Layout {
         case .background:
             set(n.view, r)
             placeChildren(n, r)
+        case .layered(let primary, let alignment):
+            for (i, c) in n.children.enumerated() {
+                if i == primary { place(c, r); continue }
+                let s = size(c, Proposal(r.width, r.height))
+                place(c, CGRect(x: r.minX + (r.width - s.width) * CGFloat(alignment.h + 1) / 2,
+                                y: r.minY + (r.height - s.height) * CGFloat(alignment.v + 1) / 2,
+                                width: s.width, height: s.height))
+            }
+        case .geometry(let told):
+            told(r.size)
+            for c in n.children.flatMap({ $0.flattened }) {
+                let s = size(c, Proposal(r.width, r.height))
+                place(c, CGRect(origin: r.origin, size: s))
+            }
         case .section(let header):
             var top = r.minY
             if header != nil {

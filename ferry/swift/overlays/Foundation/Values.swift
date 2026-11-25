@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Foundation's value types (freemac 1.227). On a Mac, Swift sees Date,
-// URL, Data, Notification and the like as structs of their own, each
-// bridged to its NS class. Ferry's overlay doesn't have those structs yet:
-// each name is the NS class itself, so code that only makes one, passes it
-// along and reads its properties compiles and runs as it would on a Mac,
-// while code that relies on value semantics (copying on change, ==, <)
-// doesn't compile yet. Written for Ferry.
+// Foundation's Swift names for its classes (freemac 1.227). On a Mac,
+// Swift sees Notification, Locale, IndexSet and the like as structs of
+// their own, each bridged to its NS class; Date, Data, URL and UUID are
+// such structs here too (Date.swift, Data.swift, freemac 1.230). For the
+// rest each name is still the NS class itself, so code that only makes
+// one, passes it along and reads its properties compiles and runs as it
+// would on a Mac, while code that relies on value semantics (copying on
+// change, ==, <) doesn't compile yet. Written for Ferry.
 
 public typealias Notification = NSNotification
-public typealias Date = NSDate
-public typealias URL = NSURL
-public typealias Data = NSData
-public typealias UUID = NSUUID
 public typealias Locale = NSLocale
 public typealias IndexSet = NSIndexSet
 public typealias ProcessInfo = NSProcessInfo
@@ -22,15 +19,19 @@ public typealias FileManager = NSFileManager
 public typealias NotificationCenter = NSNotificationCenter
 public typealias Timer = NSTimer
 public typealias RunLoop = NSRunLoop
+public typealias Thread = NSThread
 
-extension NSNotification {
-    /// A notification's name, as Swift spells NSNotificationName.
-    public typealias Name = NSString
+extension NSRunLoop.Mode {
+    /// The modes by the names Swift code uses (the headers' names, such as
+    /// NSRunLoopCommonModes, arrive as .commonModes and the like).
+    public static var `default`: NSRunLoop.Mode { .defaultRunLoopMode }
+    public static var common: NSRunLoop.Mode { .commonModes }
 }
 
-extension NSDate {
-    /// The date now.
-    public static var now: NSDate { NSDate() }
+extension NSLocale {
+    /// The locale of an identifier such as "en_US".
+    public convenience init(identifier: String) { self.init(localeIdentifier: identifier) }
+    public var identifier: String { localeIdentifier }
 }
 
 extension NSDictionary {

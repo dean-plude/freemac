@@ -12,6 +12,7 @@
 
 @_spi(Foundation) import Swift
 @_exported import Darwin
+@_exported import Dispatch
 @_exported import ObjectiveC
 @_exported import Foundation
 @_exported import CoreGraphics

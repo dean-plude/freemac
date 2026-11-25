@@ -22,9 +22,6 @@ OSStatus UnregisterEventHotKey(void *ref);
 void *TISCopyCurrentKeyboardInputSource(void);
 void *TISGetInputSourceProperty(void *source, CFStringRef key);
 extern const CFStringRef kTISPropertyUnicodeKeyLayoutData;
-OSStatus UCKeyTranslate(const void *layout, uint16_t keyCode, uint16_t action, uint32_t modifiers, uint32_t kbdType,
-                        uint32_t options, uint32_t *deadKeyState, unsigned long max, unsigned long *actualLength,
-                        uint16_t *chars);
 
 int main(void)
 {

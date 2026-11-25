@@ -29,10 +29,11 @@ case $framework in
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
     CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
     CoreServices) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo)' ;;
-    ServiceManagement) pattern='^_(SM|kSM)' ;;
+    ServiceManagement) pattern='^_(OBJC_(METACLASS|CLASS)_\$_SM|SM|kSM)' ;;
     IOKit) pattern='^_(IO[A-Z]|kIO)' ;;
     Cocoa) pattern='.' ;;
     Carbon) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
+    AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;
     ScriptingBridge) pattern='^_OBJC_(METACLASS|CLASS)_\$_SB(Object|Application|ElementArray)$' ;;

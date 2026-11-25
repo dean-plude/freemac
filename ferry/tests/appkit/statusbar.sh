@@ -44,7 +44,7 @@ menu Event 7 clicked '<0>' 0 > /dev/null
 python3 -c "import time; time.sleep(0.3)"
 echo "after toggle: $(menu GetGroupProperties '[3]' '[]')"
 call -o /StatusNotifierItem/1 -m org.kde.StatusNotifierItem.Activate 0 0 > /dev/null
-call -o /StatusNotifierItem/2 -m org.kde.StatusNotifierItem.Activate 0 0 > /dev/null
+call -o /StatusNotifierItem/2 -m org.kde.StatusNotifierItem.Activate 300 5 > /dev/null
 python3 -c "import time; time.sleep(0.3)"
 echo "item 2 Status after click: $(prop /StatusNotifierItem/2 Status)"
 menu Event 9 clicked '<0>' 0 > /dev/null

@@ -1,0 +1,15 @@
+no data: no player, error given
+file types: com.microsoft.waveform-audio public.mp3
+duration 0.25, volume 1.0, loops 0, prepared 1
+play: 1, playing 1
+delegate: finished successfully
+playing after three plays: 0
+played: --volume=0.50 ferry-sound.wav; --volume=0.50 ferry-sound.wav; --volume=0.50 ferry-sound.wav
+volume kept between 0 and 1: 1.0
+still ticking: 1
+paused: playing 0
+resumed: playing 1
+stopped: playing 0
+ticked again: yes
+after stop: (none)
+exit=0

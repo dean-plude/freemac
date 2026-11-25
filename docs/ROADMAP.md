@@ -1183,6 +1183,37 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.230 "Ferry: TomatoBar links and runs" (done)
+
+Ferry 0.54.0: TomatoBar, an open-source SwiftUI menu bar timer, links and
+runs. Its three packages (SwiftState, LaunchAtLogin and KeyboardShortcuts)
+are built from their source as libraries with `ferry-swiftc`. Its menu bar
+item shows in Topline with its icon. A click opens its popover, with the
+whole of its window: Start, the Intervals, Settings and Sounds tabs, the
+interval steppers, About and Quit. Start starts the timer, and the time
+left counts down in the menu bar. Swift now has Dispatch, the concurrency
+library, Combine, Foundation's value types and an AppKit overlay. The
+Swift in Hex Fiend compiles too.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Dispatch for Swift: an overlay with `DispatchQueue`, groups, semaphores, work items, times and sources (timers among them), over Ferry's libdispatch. libdispatch gains the function handlers, queue assertions, `os_retain` and vouchers that Swift's concurrency runtime calls | Ferry Dispatch, libdispatch | done |
+| 2 | Swift's concurrency library (`_Concurrency`), built from Swift's source by `build-runtime.sh`: `async`, `await`, `Task`, actors and `@MainActor`. AppKit's responders are the main actor's, as on a Mac | Ferry runtime, SDK | done |
+| 3 | Foundation's value types: `Date`, `Data`, `URL` and `UUID` are structs bridged to their NS classes, with `Codable`. `JSONEncoder` and `JSONDecoder`, `String.Encoding`, `FileHandle`'s throwing methods, the formatters' Swift names, key-value observing with key paths, `NSPredicate(format:)` | Ferry Foundation | done |
+| 4 | A Combine module (subjects, sinks, `assign`, the common operators, `Just`, `Future`, schedulers, and the notification, key-value and timer publishers); `ObservableObject` and `@Published` moved into it | Ferry Combine | done |
+| 5 | An AppKit overlay and AppKit's nested Swift names: `NSEvent.ModifierFlags`, `NSWindow.StyleMask`, `NSImage.Name`, `NSFont.Weight`, the notification names (`NSWindow.didBecomeKeyNotification`), run loop modes, attributed-string keys, status item lengths, `NSEvent.SpecialKey`, `NSColor.ColorType`. `NSNib.Name` is a plain String, as on a Mac | Ferry SDK, AppKit overlay | done |
+| 6 | Run loop observers (`CFRunLoopObserver`); Carbon's key event constants and `UCKeyTranslate`'s header; `SMAppService` (a login item, shown in Dials > Login Items); os's `Logger`; `AVAudioPlayer` over `NSSound`; `UNUserNotificationCenter.current()` non-optional | Ferry Foundation, AppKit, ServiceManagement, os | done |
+| 7 | A popover shown from a menu bar item opens in a window of its own, under where Topline says the item was clicked. Topline sends that point with `Activate` | Ferry AppKit, Topline | done |
+| 8 | SwiftUI: shapes (`Rectangle`, `RoundedRectangle`, `Circle`, `Ellipse`, `Capsule`, and an app's own `Shape` with `Path`), filled or stroked; `overlay` and `background` placed by alignment; `GeometryReader`; `alert` with its actions; `sheet`; the segmented picker style; `task`, `onReceive`, `LabeledContent`; `#Preview` expands to nothing | Ferry SwiftUI | done |
+| 9 | TomatoBar links with its three packages built from source, runs, and its popover's Start starts its timer. Hex Fiend's Swift compiles against its headers | Ferry | done |
+| 10 | New tests: `swift_dispatch`, `swift_concurrency`, `swift_values`, `swift_combine`, `swift_services`, `swift_appkit_names`, `swift_swiftui_tasks`, `swift_swiftui_drawing` and `foundation_runloop_observers`; `make check` 284 of 284 | Ferry | done |
+
+Not yet: the popover isn't placed under its menu bar item (it was built before
+Ferry placed windows itself in 1.229, and wasn't checked again), and TomatoBar's sounds need a sound player on the system
+(`pw-play`, `paplay` or `aplay`). Spaceman needs Sparkle 2 and the window
+server's private spaces calls. Gas Mask's Swift needs MASShortcut,
+Sparkle, `NavigationSplitView`, toolbar items and drop delegates.
+
 ## 1.229 "Ferry: the apps' nibs whole, and windows placed" (done)
 
 Ferry 0.53.0: every element in the seven apps' xibs is made as its own

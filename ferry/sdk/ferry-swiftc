@@ -99,6 +99,18 @@ if [ -n "$sources" ]; then
     # an @main type (a SwiftUI App's) starts the program instead
     # shellcheck disable=SC2086
     if grep -qs '^@main' $sources; then asmain=-parse-as-library; fi
+    # Swift's concurrency library (Task, actors, async/await) is imported
+    # by itself, as Xcode's is, once Ferry's build of it is there
+    # (swift/build-runtime.sh, freemac 1.230).
+    noconc=
+    [ -f "$res/macosx/_Concurrency.swiftmodule/x86_64-apple-macos.swiftmodule" ] ||
+        noconc=-disable-implicit-concurrency-module-import
+    # SwiftUI's #Preview expands to nothing, through the plugin beside this
+    # script (freemac 1.230), which needs python3.
+    plugins=
+    if [ -x "$here/ferry-swift-macros" ] && command -v python3 >/dev/null 2>&1; then
+        plugins="-load-plugin-executable $here/ferry-swift-macros#FerrySwiftMacros"
+    fi
     # The SDK's headers are system headers, whose clang modules clang doesn't
     # check against them unless told to.
     # shellcheck disable=SC2086
@@ -106,10 +118,10 @@ if [ -n "$sources" ]; then
         -module-name "$module" $asmain $opt -enable-objc-interop -swift-version 5 \
         -Xcc -nostdlibinc -Xcc -isystem -Xcc "$sdk/include" -Xcc -fmodules-validate-system-headers -I "$res/macosx" \
         -module-cache-path "$cache" -runtime-compatibility-version none \
-        -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import \
+        $noconc -disable-implicit-string-processing-module-import \
         -disable-autolinking-runtime-compatibility-dynamic-replacements \
         -disable-autolinking-runtime-compatibility-concurrency \
-        $fflags -o "$obj"
+        $plugins $fflags -o "$obj"
     objects="$obj $objects"
 fi
 [ -z "$compile_only" ] || exit 0

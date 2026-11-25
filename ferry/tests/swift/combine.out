@@ -1,0 +1,15 @@
+map/filter/removeDuplicates: ["10", "30", "40", "done"]
+current value: ["a", "b", "c"] d
+just: 8
+merge: [1, 2, 3]
+combineLatest: ["10-20", "11-20"]
+replaceError: -1 finished
+dropFirst: [3, 4]
+willChange: 3 published values: [false, true, false] y
+assign(to: &$copy): true
+assign(to:on:): 5
+notifications: ["FerryCombineTest"]
+key-value observing: [5, 9]
+receive(on:): ["sent", "main 1"]
+timer ticks: 3
+exit=0

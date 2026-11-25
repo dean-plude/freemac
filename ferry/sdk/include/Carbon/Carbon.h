@@ -54,6 +54,10 @@ enum {
 
 enum { kEventClassKeyboard = 'keyb', kEventClassApplication = 'appl' };
 enum { kEventHotKeyPressed = 5, kEventHotKeyReleased = 6 };
+/* the raw keyboard events and their parameters, which Ferry doesn't send yet (freemac 1.230) */
+enum { kEventRawKeyDown = 1, kEventRawKeyRepeat = 2, kEventRawKeyUp = 3, kEventRawKeyModifiersChanged = 4 };
+enum { kEventParamKeyCode = 'kcod', kEventParamKeyMacCharCodes = 'kchr', kEventParamKeyModifiers = 'kmod',
+       kEventParamKeyUnicodes = 'kuni', kEventParamKeyboardType = 'kbdt' };
 enum { kEventParamDirectObject = '----', typeEventHotKeyID = 'hkid' }; /* typeWildCard: AppleEvents.h */
 enum { kEventHotKeyNoOptions = 0, kEventHotKeyExclusive = 1 };
 
@@ -144,17 +148,17 @@ EventTargetRef GetEventMonitorTarget(void);
 EventHandlerUPP NewEventHandlerUPP(EventHandlerProcPtr proc);
 void DisposeEventHandlerUPP(EventHandlerUPP upp);
 OSStatus InvokeEventHandlerUPP(EventHandlerCallRef call, EventRef event, void *userData, EventHandlerUPP upp);
-OSStatus InstallEventHandler(EventTargetRef target, EventHandlerUPP handler, UInt32 numTypes, const EventTypeSpec *list,
+OSStatus InstallEventHandler(EventTargetRef target, EventHandlerUPP handler, ItemCount numTypes, const EventTypeSpec *list,
                              void *userData, EventHandlerRef *outRef);
 OSStatus RemoveEventHandler(EventHandlerRef handler);
-OSStatus AddEventTypesToHandler(EventHandlerRef handler, UInt32 numTypes, const EventTypeSpec *list);
-OSStatus RemoveEventTypesFromHandler(EventHandlerRef handler, UInt32 numTypes, const EventTypeSpec *list);
+OSStatus AddEventTypesToHandler(EventHandlerRef handler, ItemCount numTypes, const EventTypeSpec *list);
+OSStatus RemoveEventTypesFromHandler(EventHandlerRef handler, ItemCount numTypes, const EventTypeSpec *list);
 OSStatus CallNextEventHandler(EventHandlerCallRef call, EventRef event);
 OSStatus RegisterEventHotKey(UInt32 keyCode, UInt32 modifiers, EventHotKeyID hotKeyID, EventTargetRef target,
                              OptionBits options, EventHotKeyRef *outRef);
 OSStatus UnregisterEventHotKey(EventHotKeyRef hotKey);
 OSStatus GetEventParameter(EventRef event, EventParamName name, EventParamType desiredType, EventParamType *actualType,
-                           unsigned long bufferSize, unsigned long *actualSize, void *data);
+                           ByteCount bufferSize, ByteCount *actualSize, void *data);
 UInt32 GetEventClass(EventRef event);
 UInt32 GetEventKind(EventRef event);
 EventTime GetEventTime(EventRef event);
@@ -172,8 +176,6 @@ void ReleaseEvent(EventRef event);
  * Caps Lock and Control. Option types the same as without it, and there
  * are no dead keys. Other layouts have no key layout data. */
 typedef struct __TISInputSource *TISInputSourceRef;
-typedef struct UCKeyboardLayout UCKeyboardLayout;
-typedef unsigned long UniCharCount;
 
 extern const CFStringRef kTISPropertyUnicodeKeyLayoutData;
 extern const CFStringRef kTISPropertyInputSourceID;
@@ -202,20 +204,19 @@ CFArrayRef TISCreateASCIICapableInputSourceList(void);
 void *TISGetInputSourceProperty(TISInputSourceRef source, CFStringRef key);
 OSStatus TISSelectInputSource(TISInputSourceRef source);
 
-enum { kUCKeyActionDown = 0, kUCKeyActionUp = 1, kUCKeyActionAutoKey = 2, kUCKeyActionDisplay = 3 };
-enum { kUCKeyTranslateNoDeadKeysBit = 0, kUCKeyTranslateNoDeadKeysMask = 1 << 0 };
-enum { kUCKeyLayoutHeaderFormat = 0x1002 };
-OSStatus UCKeyTranslate(const UCKeyboardLayout *keyLayoutPtr, UInt16 virtualKeyCode, UInt16 keyAction,
-                        UInt32 modifierKeyState, UInt32 keyboardType, OptionBits keyTranslateOptions,
-                        UInt32 *deadKeyState, UniCharCount maxStringLength, UniCharCount *actualStringLength,
-                        UniChar unicodeString[]);
-UInt8 LMGetKbdType(void);
+/* UCKeyTranslate and LMGetKbdType: CoreServices/UnicodeUtilities.h */
 
 /* ---- the system's own hotkeys (CarbonEvents.h) ---------------------------------------
  * There are none Ferry knows of, and turning them off changes nothing. */
+#ifdef __swift__
+#define kHISymbolicHotKeyCode CFSTR("kHISymbolicHotKeyCode")
+#define kHISymbolicHotKeyModifiers CFSTR("kHISymbolicHotKeyModifiers")
+#define kHISymbolicHotKeyEnabled CFSTR("kHISymbolicHotKeyEnabled")
+#else
 extern const CFStringRef kHISymbolicHotKeyCode;
 extern const CFStringRef kHISymbolicHotKeyModifiers;
 extern const CFStringRef kHISymbolicHotKeyEnabled;
+#endif
 enum {
     kHIHotKeyModeAllEnabled = 0,
     kHIHotKeyModeAllDisabled = 1 << 0,

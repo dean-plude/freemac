@@ -1,0 +1,31 @@
+modifiers true false
+mask true false
+style true false
+policy 1
+responses 1 0 1001
+lengths -1.0 -2.0
+edge true false
+image name tomato
+weight true
+colors true true 1.0
+policy enum 1 0
+special true true true true
+attributed 8 13.0 NSFont
+monitor true
+observed [25, 5]
+notes NSWindowDidBecomeKeyNotification NSApplicationDidFinishLaunchingNotification
+pinged 1
+Tomato has 25 used by Quit
+Pom
+locale en_US
+modes true
+menu 1 Start s
+carbon 1 true true
+main actor true
+apple events true
+popover false true
+colour true true
+predicate true
+states [1, 0]
+controller Chooser
+exit=0

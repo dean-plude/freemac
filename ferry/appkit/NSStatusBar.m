@@ -73,6 +73,8 @@ static const char *const MENU_XML =
 - (void)_gone;
 - (GVariant *)_property:(const char *)name;
 - (void)_activate;
+- (NSPoint)_clickedAt;
+- (void)_setClickedAt:(NSPoint)p;
 - (GVariant *)_layoutFrom:(int)parent depth:(int)depth;
 - (BOOL)_aboutToShow:(int)ident;
 - (BOOL)_event:(int)ident;
@@ -99,8 +101,18 @@ static void item_method(GDBusConnection *c, const char *sender, const char *path
                         const char *method, GVariant *params, GDBusMethodInvocation *inv, void *data)
 {
     NSStatusItem *item = item_for(data);
-    if (item && !strcmp(method, "Activate"))
+    if (item && !strcmp(method, "Activate")) {
+        int32_t x = -1, y = -1;
+        if (params && g_variant_is_of_type(params, "(ii)")) {
+            GVariant *vx = g_variant_get_child_value(params, 0), *vy = g_variant_get_child_value(params, 1);
+            x = g_variant_get_int32(vx);
+            y = g_variant_get_int32(vy);
+            g_variant_unref(vx);
+            g_variant_unref(vy);
+        }
+        [item _setClickedAt:NSMakePoint(x, y)];
         [item _activate];
+    }
     /* SecondaryActivate (middle-click), ContextMenu and Scroll mean nothing to a Mac app. */
     g_dbus_method_invocation_return_value(inv, NULL);
 }
@@ -471,6 +483,9 @@ static void menu_will_open(NSMenu *menu)
     NSStatusItem *_item;
 }
 - (void)_setItem:(NSStatusItem *)item { _item = item; }
+/* Where the menu bar last said the item was clicked, in the screen's
+ * pixels from its top left; negative when it hasn't said. */
+- (NSPoint)_clickedAt { return _item ? [_item _clickedAt] : NSMakePoint(-1, -1); }
 - (BOOL)appearsDisabled { return _appearsDisabled; }
 - (void)setAppearsDisabled:(BOOL)f { _appearsDisabled = f; [_item _changed]; }
 - (void)setImage:(NSImage *)image { [super setImage:image]; [_item _changed]; }
@@ -485,6 +500,7 @@ static void menu_will_open(NSMenu *menu)
 /* ---- NSStatusItem -------------------------------------------------------------------------- */
 
 @implementation NSStatusItem {
+    NSPoint _clickedAt;
     NSStatusBar *_bar;
     CGFloat _length;
     NSMenu *_menu;
@@ -512,6 +528,7 @@ static void menu_will_open(NSMenu *menu)
     _visible = YES;
     _revision = 1;
     _ids = [[NSMutableArray alloc] init];
+    _clickedAt = NSMakePoint(-1, -1);
     _button = [[NSStatusBarButton alloc] initWithFrame:NSMakeRect(0, 0, length > 0 ? length : 22, 22)];
     [_button setBordered:NO];
     [_button setTitle:@""]; /* a menu bar button has no title until given one */
@@ -784,6 +801,8 @@ static void menu_will_open(NSMenu *menu)
     [self _changed];
 }
 - (NSStatusBarButton *)button { return _button; }
+- (NSPoint)_clickedAt { return _clickedAt; }
+- (void)_setClickedAt:(NSPoint)p { _clickedAt = p; }
 - (NSStatusItemBehavior)behavior { return _behavior; }
 - (void)setBehavior:(NSStatusItemBehavior)b { _behavior = b; }
 - (BOOL)isVisible { return _visible; }

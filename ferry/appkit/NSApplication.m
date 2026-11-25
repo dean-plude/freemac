@@ -285,7 +285,12 @@ BOOL AValidateItem(id target, id item)
     NSMenu *_submenu, *_menu;
     NSImage *_image;
     NSView *_view;
+    BOOL _noAutoLocalize, _noAutoMirror;
 }
+- (BOOL)allowsAutomaticKeyEquivalentLocalization { return !_noAutoLocalize; }
+- (void)setAllowsAutomaticKeyEquivalentLocalization:(BOOL)on { _noAutoLocalize = !on; }
+- (BOOL)allowsAutomaticKeyEquivalentMirroring { return !_noAutoMirror; }
+- (void)setAllowsAutomaticKeyEquivalentMirroring:(BOOL)on { _noAutoMirror = !on; }
 + (NSMenuItem *)separatorItem
 {
     NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"" action:NULL keyEquivalent:@""];
@@ -595,6 +600,8 @@ BOOL AValidateItem(id target, id item)
     for (NSMenuItem *item in items)
         [self addItem:item];
 }
+- (NSArray *)items { return [self itemArray]; }
+- (void)setItems:(NSArray *)items { [self setItemArray:items]; }
 - (void)setSubmenu:(NSMenu *)menu forItem:(NSMenuItem *)item { [item setSubmenu:menu]; }
 
 /* With autoenablesItems (the default), each item is enabled when something

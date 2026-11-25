@@ -566,6 +566,13 @@ NSEvent *ATrackingWindowExitEvent(NSWindow *window, NSPoint location);
  * areas are updated and its window's cursor rectangles built again. */
 void ATrackingGeometryChanged(NSView *view);
 void ATrackingViewMoving(NSView *view, NSWindow *from, NSWindow *to);
+/* Where the menu bar last said a menu bar item was clicked, in the
+ * screen's pixels from its top left; negative when it hasn't said
+ * (NSStatusBar.m, for NSPopover.m). */
+@interface NSStatusBarButton (FerryClick)
+- (NSPoint)_clickedAt;
+@end
+
 /* Shows the current cursor (hidden or not) on a window that has a display. */
 void ACursorApply(NSWindow *window);
 BOOL ACursorMouseMoved(void);
