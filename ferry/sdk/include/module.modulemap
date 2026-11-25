@@ -47,6 +47,7 @@ module ApplicationServices [system] {
 
 module CFNetwork [system] {
     header "CFNetwork/CFNetwork.h"
+    header "CFNetwork/CFProxySupport.h"
     export *
     link framework "CFNetwork"
 }

@@ -70,6 +70,10 @@ int sigaddset(sigset_t *, int);
 int sigdelset(sigset_t *, int);
 int sigismember(const sigset_t *, int);
 int sigprocmask(int, const sigset_t *, sigset_t *);
+/* freemac 1.NEXT (VLC) */
+int sigwait(const sigset_t *, int *);
+int sigpending(sigset_t *);
+int sigsuspend(const sigset_t *);
 int kill(pid_t, int);
 int killpg(pid_t, int);
 int raise(int);

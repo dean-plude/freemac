@@ -8,6 +8,7 @@
 #ifndef _FERRY_CORESERVICES_H_
 #define _FERRY_CORESERVICES_H_
 #include <CoreFoundation/CoreFoundation.h>
+#include <CFNetwork/CFNetwork.h>
 
 __FERRY_BEGIN
 typedef int16_t OSErr;

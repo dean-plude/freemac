@@ -1,0 +1,22 @@
+create 0
+timedwait on 0: 49
+signal 0
+woke 1
+timedwait on 1: 0
+destroy 0, again 1
+name max 255, path max 4096
+bad name -1 1
+root 0 root uid 0 dir /root
+nobody 0 1
+pending usr1 1 usr2 0
+sigwait 0 sig 30
+statvfs 0, sizes 1, namemax 255
+strnstr found no
+errors 1: No such file or directory / Connection timed out
+tfind a -
+nrand48 same 1
+swab badc
+timespec_get 1
+backtrace 1
+SSIZE_MAX 1
+exit=0

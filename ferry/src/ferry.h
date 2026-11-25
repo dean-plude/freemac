@@ -148,6 +148,7 @@ extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: mall
 extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
 /* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
 extern const struct ferry_symbol ferry_swift_symbols[];
+extern const struct ferry_symbol ferry_libc_vlc_symbols[]; /* libc_vlc.c: Mach semaphores (VLC) */
 int ferry_find_swift_library(const char *install_name, char *out, size_t size);
 struct stat;
 /* posix.c: this system's stat as a Mac's 144-byte, 64-bit-inode struct stat */

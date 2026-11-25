@@ -20,6 +20,9 @@ size_t strlcat(char *, const char *, size_t);
 void memset_pattern4(void *, const void *, size_t);
 void memset_pattern8(void *, const void *, size_t);
 void memset_pattern16(void *, const void *, size_t);
+/* freemac 1.NEXT: served from this system, as VLC finds it */
+void *memrchr(const void *, int, size_t);
+char *strnstr(const char *, const char *, size_t);
 /* C11's bounds-checked memset, which is never optimised away (freemac 1.230) */
 int memset_s(void *, size_t, int, size_t);
 char *strcat(char *, const char *);
@@ -49,4 +52,5 @@ void memset_pattern4(void *, const void *, size_t);
 void memset_pattern8(void *, const void *, size_t);
 void memset_pattern16(void *, const void *, size_t);
 __FERRY_END
+#include <strings.h> /* as a Mac's string.h does (VLC: ffsll) */
 #endif

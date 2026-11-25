@@ -31,6 +31,9 @@ char *strptime(const char *, const char *, struct tm *);
 clock_t clock(void);
 int nanosleep(const struct timespec *, struct timespec *);
 int clock_gettime(clockid_t, struct timespec *);
+/* freemac 1.NEXT (VLC) */
+#define TIME_UTC 1
+int timespec_get(struct timespec *, int);
 int clock_getres(clockid_t, struct timespec *);
 uint64_t clock_gettime_nsec_np(clockid_t);
 void tzset(void);
