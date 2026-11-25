@@ -1,0 +1,10 @@
+/hello: began, response 200, suggested "hello", created hello, finished
+  14 bytes, the file holds "Hello, Ferry!"
+/hello: began, response 200, suggested "hello", created hello-2, finished
+  a second file beside it: yes
+/hello: began, response 200, suggested "hello", created hello, finished
+  overwritten in place: yes
+/big?n=300000: began, response 200, suggested "big.bin", created big.bin, finished
+/status/404: began, response 404, suggested "404", created 404, finished
+can resume: no, from resume data: no
+exit=0

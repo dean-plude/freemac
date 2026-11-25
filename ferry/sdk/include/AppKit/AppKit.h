@@ -9,8 +9,11 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
 /* Launch Services' login items and Gestalt, which a Mac's AppKit brings in through
- * ApplicationServices (freemac 1.219, Ferry 0.43.0). */
+ * ApplicationServices (freemac 1.219, Ferry 0.43.0); and the rest of
+ * ApplicationServices, the Accessibility API and the Process Manager, as a
+ * Mac's AppKit brings them in too (freemac 1.223, Ferry 0.47.0). */
 #include <CoreServices/CoreServices.h>
+#include <ApplicationServices/ApplicationServices.h>
 #import <QuartzCore/QuartzCore.h>
 
 #define APPKIT_EXTERN extern
@@ -726,6 +729,8 @@ typedef NS_ENUM(NSInteger, NSControlStateValue) {
 #define NSMixedState NSControlStateValueMixed
 #define NSOffState NSControlStateValueOff
 #define NSOnState NSControlStateValueOn
+/* the older name, which Sequel Pro's sources use (freemac 1.223, Ferry 0.47.0) */
+typedef NSControlStateValue NSCellStateValue;
 
 @class NSCell;
 typedef NS_ENUM(NSUInteger, NSImageScaling) {
@@ -843,6 +848,8 @@ typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
 @property NSBackgroundStyle backgroundStyle;
 @property (readonly) NSBackgroundStyle interiorBackgroundStyle;
 @property (retain) __kindof NSFormatter *formatter;
+@property BOOL showsFirstResponder;
+- (void)performClick:(id)sender;
 @end
 
 @interface NSActionCell : NSCell
@@ -1207,6 +1214,7 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @property (retain) NSImage *image;
 @property NSInteger indentationLevel;
 @property (copy) NSString *toolTip;
+@property (retain) NSView *view;
 @end
 
 @interface NSMenu : NSObject <NSCopying>
@@ -1217,6 +1225,7 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @property (assign) NSMenu *supermenu;
 @property BOOL autoenablesItems;
 @property (assign) id delegate;
+@property BOOL menuChangedMessagesEnabled;
 - (void)addItem:(NSMenuItem *)item;
 - (NSMenuItem *)addItemWithTitle:(NSString *)title action:(SEL)action keyEquivalent:(NSString *)key;
 - (void)insertItem:(NSMenuItem *)item atIndex:(NSInteger)index;
@@ -1317,6 +1326,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (void)deactivate;
 - (void)hide:(id)sender;
 - (void)unhide:(id)sender;
+@property (readonly, getter=isHidden) BOOL hidden;
 - (void)hideOtherApplications:(id)sender;
 - (void)unhideAllApplications:(id)sender;
 - (void)arrangeInFront:(id)sender;
@@ -3814,6 +3824,31 @@ APPKIT_EXTERN NSString *const NSWorkspaceApplicationKey;
 - (void)noteFileSystemChanged:(NSString *)path;
 @end
 
+/* The workspace's file operations (freemac 1.223, Ferry 0.47.0): each file
+ * in files, a name inside source, is moved, copied, linked, destroyed or
+ * moved to the Trash, by NSFileManager. tag, if given, is set to a number
+ * for the operation; it answers NO if any file failed. */
+typedef NSString *NSWorkspaceFileOperationName;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceMoveOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceCopyOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceLinkOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceCompressOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceDecompressOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceEncryptOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceDecryptOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceDestroyOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceRecycleOperation;
+APPKIT_EXTERN NSWorkspaceFileOperationName const NSWorkspaceDuplicateOperation;
+APPKIT_EXTERN NSNotificationName const NSWorkspaceDidPerformFileOperationNotification;
+@interface NSWorkspace (NSWorkspaceFileOperations)
+- (BOOL)performFileOperation:(NSWorkspaceFileOperationName)operation source:(NSString *)source
+                 destination:(NSString *)destination files:(NSArray<NSString *> *)files tag:(NSInteger *)tag;
+- (void)recycleURLs:(NSArray<NSURL *> *)urls
+    completionHandler:(void (^)(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error))handler;
+- (void)duplicateURLs:(NSArray<NSURL *> *)urls
+    completionHandler:(void (^)(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error))handler;
+@end
+
 /* ---- documents ----------------------------------------------------------------------
  * The document architecture, as Apple documents it: the Info.plist's
  * CFBundleDocumentTypes say which types the app reads and writes and which
@@ -4444,5 +4479,13 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- rule editors (NSRuleEditor.m), (freemac 1.222, Ferry 0.46.0) ------------------- */
 
 #import <AppKit/NSRuleEditor.h>
+
+/* ---- names the apps need to link and start (AppKitApps.m) ----------------------------- */
+
+#import <AppKit/AppKitApps.h>
+
+/* ---- the Touch Bar, which a PC hasn't got (NSTouchBar.m), (freemac 1.223, Ferry 0.47.0) */
+
+#import <AppKit/NSTouchBar.h>
 
 #endif

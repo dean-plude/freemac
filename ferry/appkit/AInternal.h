@@ -44,6 +44,8 @@ id AAnimatorFor(id target);
 
 /* Set once any constraint is made active: until then none of this costs anything. */
 extern BOOL AConstraintsInUse;
+/* a menu item chosen: its action, with the menu's will and did send notifications (AppKitMore.m) */
+void ASendMenuItemAction(NSMenuItem *item);
 void ALayoutConstraintsIfNeeded(NSView *view);
 BOOL AConstraintFittingSize(NSView *view, NSSize *size);
 void AConstraintsViewChanged(NSView *view);

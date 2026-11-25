@@ -67,6 +67,42 @@ static int open_to_mac(int lnx)
 
 static int at_fd(int fd) { return fd == MAC_AT_FDCWD ? AT_FDCWD : fd; }
 
+/* O_EVTONLY opens a file only to watch it (with kqueue's EVFILT_VNODE):
+ * read-only, or, where the file can't be read, as a path (O_PATH), which
+ * fstat and inotify still take. */
+#define MAC_O_EVTONLY 0x8000
+static int evtonly_open(int fd, const char *path, int flags)
+{
+    int lf = open_to_linux(flags & ~(MAC_O_EVTONLY | O_ACCMODE));
+    int r = openat(fd, path, lf | O_RDONLY);
+    if (r < 0 && (errno == EACCES || errno == EPERM))
+        r = openat(fd, path, (lf & (O_NOFOLLOW | O_CLOEXEC | O_DIRECTORY)) | O_PATH);
+    return r;
+}
+
+/* O_SYMLINK opens a symbolic link itself rather than what it points to
+ * (freemac 1.223, Ferry 0.47.0): anything else is opened as asked, and a
+ * link, which Linux can't open for reading or writing, as a path
+ * (O_PATH), which fstat and fchown take. */
+#define MAC_O_SYMLINK 0x200000
+static int symlink_open(int fd, const char *path, int flags, mode_t mode)
+{
+    int lf = open_to_linux(flags & ~MAC_O_SYMLINK);
+    int r = openat(fd, path, lf | O_NOFOLLOW, mode);
+    if (r < 0 && errno == ELOOP)
+        r = openat(fd, path, (lf & O_CLOEXEC) | O_PATH | O_NOFOLLOW);
+    return r;
+}
+
+/* fchown takes a descriptor opened as a path (above) too, as a Mac's takes a link's. */
+static int mac_fchown(int fd, uid_t owner, gid_t group)
+{
+    int r = fchown(fd, owner, group);
+    if (r < 0 && errno == EBADF)
+        r = fchownat(fd, "", owner, group, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+    return r;
+}
+
 static int mac_open(const char *path, int flags, ...)
 {
     mode_t mode = 0;
@@ -78,6 +114,10 @@ static int mac_open(const char *path, int flags, ...)
     }
     if (ferry_is_virtual(path))
         return ferry_virtual_open(path, open_to_linux(flags));
+    if (flags & MAC_O_EVTONLY)
+        return evtonly_open(AT_FDCWD, path, flags);
+    if (flags & MAC_O_SYMLINK)
+        return symlink_open(AT_FDCWD, path, flags, mode);
     return open(path, open_to_linux(flags), mode);
 }
 
@@ -92,6 +132,10 @@ static int mac_openat(int fd, const char *path, int flags, ...)
     }
     if (ferry_is_virtual(path))
         return ferry_virtual_open(path, open_to_linux(flags));
+    if (flags & MAC_O_EVTONLY)
+        return evtonly_open(at_fd(fd), path, flags);
+    if (flags & MAC_O_SYMLINK)
+        return symlink_open(at_fd(fd), path, flags, mode);
     return openat(at_fd(fd), path, open_to_linux(flags), mode);
 }
 
@@ -199,6 +243,9 @@ static void to_mac_stat(const struct stat *s, struct mac_stat *m)
     m->blocks = s->st_blocks;
     m->blksize = s->st_blksize;
 }
+
+/* For the calls elsewhere that answer a Mac struct stat (fts in libc_more.c). */
+void ferry_to_mac_stat(const struct stat *s, void *out) { to_mac_stat(s, out); }
 
 #define STAT_WRAPPER(name, call)                                   \
     static int name                                                \
@@ -919,6 +966,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"open", mac_open},
     {"openat", mac_openat},
     {"creat", mac_creat},
+    {"fchown", mac_fchown},
     {"access", mac_access},
     {"unlinkat", mac_unlinkat},
     {"mkdirat", mac_mkdirat},

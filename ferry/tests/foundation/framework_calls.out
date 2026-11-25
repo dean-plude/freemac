@@ -1,0 +1,13 @@
+counted set: 2 objects, a 3, b 2, c 0, member of b is the first yes
+  objects a,b, contains a yes, a copy counts a 3
+  enumerated counts add up to 5
+replaced 2 bytes with 3: 01 aa bb cc 04 05
+3 with 1: ee cc 04 05
+2 of its own bytes inserted: ee cc ee cc 04 05
+longer by 2, first zeroed: 00 cc ee cc 04 05 00 00
+numbers: -7 18446744073709551615 1.5 200, equal to numberWithLong: yes
+set with capacity: 1
+indexes in 4..12: 6 9 12; reversed: 12 9 6
+string from characters: KPK, found at 3 with a locale
+uuid_t: 16 bytes, first 68 last 67, back 68753A44-4D6F-1226-9C60-0050E4C00067
+exit=0

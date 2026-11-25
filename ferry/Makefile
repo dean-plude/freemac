@@ -10,7 +10,7 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
       src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/socket.c src/kqueue.c src/libc_more.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
-      src/objc/symbols.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c
+      src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
@@ -26,8 +26,10 @@ FOUNDATION_HEADERS = foundation/FInternal.h sdk/include/Foundation/Foundation.h 
                      sdk/include/CoreFoundation/CoreFoundation.h sdk/include/SystemConfiguration/SystemConfiguration.h \
                      $(wildcard sdk/include/Foundation/NS*.h) \
                      sdk/include/CoreFoundation/CFSocket.h sdk/include/CoreFoundation/CFStream.h \
-                     sdk/include/CoreFoundation/CFMore.h sdk/include/CoreFoundation/CFSet.h \
-                     sdk/include/CFNetwork/CFNetwork.h \
+                     sdk/include/CoreFoundation/CFMore.h sdk/include/CoreFoundation/CFSet.h sdk/include/CoreFoundation/CFLocale.h sdk/include/CoreFoundation/CFDate.h \
+                     sdk/include/CoreFoundation/CFError.h \
+                     sdk/include/CFNetwork/CFNetwork.h $(wildcard sdk/include/CoreServices/*.h) foundation/UTCoreTypes.inc \
+                     sdk/include/IOKit/IOKitLib.h sdk/include/IOKit/IOReturn.h sdk/include/IOKit/pwr_mgt/IOPMLib.h \
                      foundation/FCurl.h foundation/FURLInternal.h foundation/FExpression.h
 OBJCFLAGS = -O2 -g -Wall -Wno-unused-parameter -fno-modules
 
@@ -66,7 +68,15 @@ APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(Q
                  appkit/ANotify.h sdk/include/AppKit/NSDockTile.h sdk/include/UserNotifications/UserNotifications.h \
                  sdk/include/AppKit/NSCollectionView.h sdk/include/AppKit/NSRulerView.h \
                  appkit/AWayfire.h sdk/include/AppKit/NSEventMonitors.h sdk/include/HIServices/Accessibility.h \
-                 sdk/include/Carbon/Carbon.h $(wildcard sdk/include/AppKit/*.h)
+                 sdk/include/Carbon/Carbon.h sdk/include/ScriptingBridge/ScriptingBridge.h \
+                 $(wildcard sdk/include/AppKit/*.h)
+
+# CloudKit: records, zones and subscriptions as plain objects, with no
+# iCloud account behind them (cloudkit/CloudKit.m).
+CLOUDKIT_SRC = $(wildcard cloudkit/*.m)
+CLOUDKIT_OBJ = $(CLOUDKIT_SRC:cloudkit/%.m=cloudkit/build/%.o)
+CLOUDKIT = frameworks/CloudKit.framework/CloudKit
+CLOUDKIT_HEADERS = sdk/include/CloudKit/CloudKit.h $(FOUNDATION_HEADERS)
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
@@ -95,7 +105,7 @@ JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
 JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
 JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC)
+all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -180,6 +190,8 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	sdk/gen-alias-tbd.sh ServiceManagement $@ > frameworks/ServiceManagement.framework/ServiceManagement.tbd
 	@mkdir -p frameworks/CFNetwork.framework
 	sdk/gen-alias-tbd.sh CFNetwork $@ > frameworks/CFNetwork.framework/CFNetwork.tbd
+	@mkdir -p frameworks/IOKit.framework
+	sdk/gen-alias-tbd.sh IOKit $@ > frameworks/IOKit.framework/IOKit.tbd
 
 $(HOST_TBD): ferry sdk/gen-tbd.sh
 	@mkdir -p graphics/build
@@ -229,12 +241,14 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
 	@mkdir -p frameworks/UserNotifications.framework
 	sdk/gen-alias-tbd.sh UserNotifications $@ > frameworks/UserNotifications.framework/UserNotifications.tbd
+	@mkdir -p frameworks/ScriptingBridge.framework
+	sdk/gen-alias-tbd.sh ScriptingBridge $@ > frameworks/ScriptingBridge.framework/ScriptingBridge.tbd
 	@mkdir -p frameworks/Quartz.framework frameworks/QuickLook.framework
 	sdk/gen-alias-tbd.sh Quartz $@ > frameworks/Quartz.framework/Quartz.tbd
 	sdk/gen-alias-tbd.sh QuickLook $@ > frameworks/QuickLook.framework/QuickLook.tbd
 	# Quartz window and event services live in AppKit's file (CGServices.m),
 	# so ApplicationServices offers them too
-	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ > frameworks/ApplicationServices.framework/ApplicationServices.tbd
+	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ $(FOUNDATION) > frameworks/ApplicationServices.framework/ApplicationServices.tbd
 
 $(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKIT) $(TWIN_TBD)
 	@mkdir -p $(INSTALLER_APP)/Contents/MacOS
@@ -268,15 +282,25 @@ $(JSC): $(JSC_OBJ) $(FOUNDATION) $(GRAPHICS)
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore \
 	    -o $@ $(JSC_OBJ) -framework Foundation -framework CoreGraphics
 
+cloudkit/build/%.o: cloudkit/%.m $(CLOUDKIT_HEADERS) sdk/ferry-cc
+	@mkdir -p cloudkit/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(CLOUDKIT): $(CLOUDKIT_OBJ) $(FOUNDATION)
+	@mkdir -p frameworks/CloudKit.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CloudKit.framework/Versions/A/CloudKit \
+	    -o $@ $(CLOUDKIT_OBJ) -framework Foundation
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC)
+install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
 	install -Dm755 ferry $(DESTDIR)$(PREFIX)/bin/ferry
 	install -Dm755 sdk/ferry-cc $(DESTDIR)$(PREFIX)/bin/ferry-cc
+	install -Dm755 sdk/ferry-ibtool $(DESTDIR)$(PREFIX)/bin/ferry-ibtool
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
 	cp -r sdk/include sdk/lib $(DESTDIR)$(PREFIX)/share/ferry/sdk/
 	install -Dm755 $(FOUNDATION) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Foundation.framework/Foundation
@@ -286,17 +310,18 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement UserNotifications Quartz QuickLook; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit UserNotifications ScriptingBridge Quartz QuickLook; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
 	install -Dm755 $(COREDATA) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreData.framework/CoreData
 	install -Dm755 $(WEBKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/WebKit.framework/WebKit
 	install -Dm755 $(JSC) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/JavaScriptCore.framework/JavaScriptCore
+	install -Dm755 $(CLOUDKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CloudKit.framework/CloudKit
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build webkit/build javascriptcore/build
+	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build
 
 .PHONY: all check install clean

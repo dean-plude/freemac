@@ -213,6 +213,27 @@ CFURLRef CFBundleCopyBuiltInPlugInsURL(CFBundleRef bundle)
     return (CFURLRef)[[OBJ(bundle) builtInPlugInsURL] retain];
 }
 CFDictionaryRef CFBundleGetInfoDictionary(CFBundleRef bundle) { return (CFDictionaryRef)[OBJ(bundle) infoDictionary]; }
+CFDictionaryRef CFBundleCopyInfoDictionaryInDirectory(CFURLRef bundleURL)
+{
+    NSString *dir = [OBJ(bundleURL) path];
+    if (!dir)
+        return NULL;
+    for (NSString *rel in @[ @"Contents/Info.plist", @"Resources/Info.plist", @"Info.plist" ]) {
+        NSData *d = [NSData dataWithContentsOfFile:[dir stringByAppendingPathComponent:rel]];
+        id plist = d ? [NSPropertyListSerialization propertyListWithData:d options:0 format:NULL error:NULL] : nil;
+        if ([plist isKindOfClass:[NSDictionary class]])
+            return (CFDictionaryRef)[plist retain];
+    }
+    return NULL;
+}
+CFDictionaryRef CFBundleCopyInfoDictionaryForURL(CFURLRef url)
+{
+    BOOL isDir = NO;
+    NSString *path = [OBJ(url) path];
+    if (path && [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] && isDir)
+        return CFBundleCopyInfoDictionaryInDirectory(url);
+    return NULL; /* a plain program's embedded __info_plist section isn't read */
+}
 Boolean CFBundleLoadExecutable(CFBundleRef bundle) { return [OBJ(bundle) load]; }
 Boolean CFBundleLoadExecutableAndReturnError(CFBundleRef bundle, CFErrorRef *error)
 {

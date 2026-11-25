@@ -22,6 +22,10 @@ enum {
 enum { gestaltUndefSelectorErr = -5551 };
 /* The Carbon-era result codes Launch Services answers with (MacErrors.h). */
 enum { noErr = 0, fnfErr = -43, paramErr = -50, memFullErr = -108, userCanceledErr = -128 };
+enum { coreFoundationUnknownErr = -4960 };
+/* the reference constants callbacks are given back (MacTypes.h) */
+typedef void *SRefCon;
+typedef void *URefCon;
 OSErr Gestalt(OSType selector, SInt32 *response);
 __FERRY_END
 #include <CoreServices/LSSharedFileList.h>
@@ -29,7 +33,15 @@ __FERRY_END
 #include <CoreServices/Files.h>
 /* Folders' changes (freemac 1.222, Ferry 0.46.0). */
 #include <CoreServices/FSEvents.h>
+/* Apple events' descriptors and Launch Services' application lookups. */
+#include <CoreServices/AppleEvents.h>
+#include <CoreServices/LaunchServices.h>
+/* Uniform type identifiers and icon references (freemac 1.223, Ferry 0.47.0). */
+#include <CoreServices/UTType.h>
+#include <CoreServices/IconsCore.h>
 /* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
- * and Cocoa programs rely on it. */
+ * and Cocoa programs rely on it; its file calls bring in open and its
+ * flags (freemac 1.223, Ferry 0.47.0). */
 #include <unistd.h>
+#include <sys/fcntl.h>
 #endif

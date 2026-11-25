@@ -1,0 +1,34 @@
+nib read: yes
+instantiated: yes
+top level: IBHelper, IBWindow, NSMenu, NSPanel, NSUserDefaultsController
+window: IBWindow "Settings" style 0x3 content 480x360 autosave "IBToolWindow" min 300x200 visible yes
+panel: NSPanel "Hidden Panel" utility yes visible no
+content subviews: 9
+name: "Ada" placeholder "Name" editable yes bezeled yes alignment 2 bold yes tip "Your name" mask 10 in window yes
+name bound to NSUserDefaultsController, keyPath values.IBToolName
+password field: NSSecureTextField font 11
+ok: "OK" key Return tag 12 bezel 1 target IBOwner action confirm:
+confirm: from NSButton "OK"
+check: "Show the thing" state 0 (the defaults say no)
+check after the default changed: state 1
+pop-up: 3 items, selected "Medium" tag 2, pulls down no
+box: "Details" holds 2 views
+stepper: 10 in 0..50 by 5, in the box yes
+level indicator: NSLevelIndicator
+table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes, header yes
+  column name "Name" width 150 editable yes
+  column size "Size" width 120 editable no
+  multiple selection no, alternating rows yes
+  rows 2
+stack: NSStackView orientation 1, 2 views: "First" (1) "Second" (0)
+drawing: IBDrawingView fill white 0.50 mask 1
+helper: "from the document" count 7 enabled yes owner yes
+menu "Status":
+  "Open" key "o" mask 0x100000 tag 0 state 0 hidden no action openThing: target IBOwner
+  "Save As…" key "s" mask 0x120000 tag 4 state 0 hidden no action saveThing: target nil
+  -----
+  "More" key "" mask 0 tag 0 state 0 hidden no action submenuAction: target nil
+    "Hidden one" key "" mask 0 tag 0 state 0 hidden yes action - target nil
+    "Turned on" key "" mask 0 tag 0 state 1 hidden no action - target nil
+openThing:
+exit=0

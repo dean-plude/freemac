@@ -34,12 +34,6 @@
 #include <math.h>
 #include <unistd.h>
 
-typedef struct {
-    uint32_t highLongOfPSN, lowLongOfPSN;
-} ProcessSerialNumber;
-
-enum { procNotFound = -600 };
-
 /* Something to hand out where Carbon hands out an opaque reference. */
 @interface ACarbonRef : NSObject
 @end
@@ -746,20 +740,37 @@ int16_t GetMBarHeight(void) { return 0; }
 
 /* ---- processes ----------------------------------------------------------------- */
 
-OSStatus GetCurrentProcess(ProcessSerialNumber *psn)
+/* The one process an app sees is itself, numbered kCurrentProcess. */
+static BOOL is_self(const ProcessSerialNumber *psn)
+{
+    return psn && psn->highLongOfPSN == 0 && psn->lowLongOfPSN == kCurrentProcess;
+}
+OSErr GetCurrentProcess(ProcessSerialNumber *psn)
 {
     if (!psn)
         return paramErr;
     psn->highLongOfPSN = 0;
-    psn->lowLongOfPSN = 2;    /* kCurrentProcess */
+    psn->lowLongOfPSN = kCurrentProcess;
     return noErr;
 }
-OSStatus GetFrontProcess(ProcessSerialNumber *psn) { return GetCurrentProcess(psn); }
-OSStatus GetNextProcess(ProcessSerialNumber *psn) { return procNotFound; }
+OSErr GetFrontProcess(ProcessSerialNumber *psn) { return GetCurrentProcess(psn); }
+/* From kNoProcess, the app itself; after it, no more. */
+OSErr GetNextProcess(ProcessSerialNumber *psn)
+{
+    if (!psn)
+        return paramErr;
+    if (psn->highLongOfPSN == 0 && psn->lowLongOfPSN == kNoProcess)
+        return GetCurrentProcess(psn);
+    psn->highLongOfPSN = 0;
+    psn->lowLongOfPSN = kNoProcess;
+    return procNotFound;
+}
 OSStatus GetProcessPID(const ProcessSerialNumber *psn, pid_t *pid)
 {
     if (!pid)
         return paramErr;
+    if (!is_self(psn))
+        return procNotFound;
     *pid = getpid();
     return noErr;
 }
@@ -767,9 +778,109 @@ OSStatus GetProcessForPID(pid_t pid, ProcessSerialNumber *psn)
 {
     return pid == getpid() ? GetCurrentProcess(psn) : procNotFound;
 }
-OSStatus TransformProcessType(const ProcessSerialNumber *psn, uint32_t type) { return noErr; }
-OSStatus SetFrontProcess(const ProcessSerialNumber *psn) { return noErr; }
-CFDictionaryRef ProcessInformationCopyDictionary(const ProcessSerialNumber *psn, uint32_t mask) { return NULL; }
+OSErr SameProcess(const ProcessSerialNumber *a, const ProcessSerialNumber *b, Boolean *result)
+{
+    if (!a || !b || !result)
+        return paramErr;
+    *result = a->highLongOfPSN == b->highLongOfPSN && a->lowLongOfPSN == b->lowLongOfPSN;
+    return noErr;
+}
+static NSString *process_name(void)
+{
+    NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+    for (NSString *k in @[ @"CFBundleName", @"CFBundleExecutable" ])
+        if ([info[k] isKindOfClass:[NSString class]] && [info[k] length])
+            return info[k];
+    return [[NSProcessInfo processInfo] processName];
+}
+/* The app's name (as a Pascal string, if asked for), its type 'APPL' and
+ * the creator code in its Info.plist ('????' when it has none). */
+OSErr GetProcessInformation(const ProcessSerialNumber *psn, ProcessInfoRec *info)
+{
+    if (!info)
+        return paramErr;
+    if (!is_self(psn))
+        return procNotFound;
+    @autoreleasepool {
+        if (info->processName) {
+            const char *name = [process_name() UTF8String] ?: "";
+            size_t n = strlen(name);
+            if (n > 31)
+                n = 31;
+            info->processName[0] = (unsigned char)n;
+            memcpy(info->processName + 1, name, n);
+        }
+        info->processNumber = *psn;
+        info->processType = 'APPL';
+        NSString *creator = [[NSBundle mainBundle] infoDictionary][@"CFBundleSignature"];
+        OSType sig = 0x3f3f3f3f; /* '????' */
+        if ([creator isKindOfClass:[NSString class]] && [creator length] == 4) {
+            const char *c = [creator UTF8String];
+            if (strlen(c) == 4)
+                sig = ((OSType)(unsigned char)c[0] << 24) | ((OSType)(unsigned char)c[1] << 16) |
+                      ((OSType)(unsigned char)c[2] << 8) | (unsigned char)c[3];
+        }
+        info->processSignature = sig;
+        info->processMode = modeCanBackground | modeHighLevelEventAware | modeNeedSuspendResume;
+        info->processLocation = NULL;
+        info->processSize = info->processFreeMem = 0;
+        info->processLauncher.highLongOfPSN = 0;
+        info->processLauncher.lowLongOfPSN = kNoProcess;
+        info->processLaunchDate = info->processActiveTime = 0;
+        if (info->processAppRef) {
+            NSString *path = [[NSBundle mainBundle] bundlePath];
+            if (FSPathMakeRef((const UInt8 *)[path fileSystemRepresentation], info->processAppRef, NULL) != noErr)
+                memset(info->processAppRef, 0, sizeof(FSRef));
+        }
+    }
+    return noErr;
+}
+OSStatus CopyProcessName(const ProcessSerialNumber *psn, CFStringRef *name)
+{
+    if (!name)
+        return paramErr;
+    if (!is_self(psn))
+        return procNotFound;
+    *name = (CFStringRef)[process_name() copy];
+    return noErr;
+}
+OSStatus TransformProcessType(const ProcessSerialNumber *psn, UInt32 type) { return noErr; }
+OSErr SetFrontProcess(const ProcessSerialNumber *psn) { return is_self(psn) ? noErr : procNotFound; }
+OSErr SetFrontProcessWithOptions(const ProcessSerialNumber *psn, OptionBits options) { return SetFrontProcess(psn); }
+OSErr ShowHideProcess(const ProcessSerialNumber *psn, Boolean visible)
+{
+    if (!is_self(psn))
+        return procNotFound;
+    if (visible)
+        [NSApp unhide:nil];
+    else
+        [NSApp hide:nil];
+    return noErr;
+}
+Boolean IsProcessVisible(const ProcessSerialNumber *psn) { return is_self(psn) && ![NSApp isHidden]; }
+/* The keys a Mac answers for the app itself. */
+CFDictionaryRef ProcessInformationCopyDictionary(const ProcessSerialNumber *psn, UInt32 mask)
+{
+    if (!is_self(psn))
+        return NULL;
+    @autoreleasepool {
+        NSBundle *b = [NSBundle mainBundle];
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        d[@"pid"] = @(getpid());
+        d[@"CFBundleName"] = process_name();
+        if ([b bundleIdentifier])
+            d[@"CFBundleIdentifier"] = [b bundleIdentifier];
+        if ([b executablePath])
+            d[@"CFBundleExecutable"] = [b executablePath];
+        if ([b bundlePath])
+            d[@"BundlePath"] = [b bundlePath];
+        d[@"FileType"] = @"APPL";
+        return (CFDictionaryRef)[d copy];
+    }
+}
+/* No other application can be launched or ended this way here. */
+OSErr LaunchApplication(LaunchPBPtr params) { return procNotFound; }
+OSErr KillProcess(const ProcessSerialNumber *psn) { return procNotFound; }
 const char *GetMacOSStatusCommentString(OSStatus err) { return ""; }
 const char *GetMacOSStatusErrorString(OSStatus err) { return ""; }
 

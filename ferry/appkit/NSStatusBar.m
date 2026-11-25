@@ -762,7 +762,7 @@ static void menu_will_open(NSMenu *menu)
         return NO;
     SEL action = [mi action];
     if (action)
-        [NSApp sendAction:action to:[mi target] from:mi];
+        ASendMenuItemAction(mi);
     id d = [_menu delegate];
     if ([d respondsToSelector:@selector(menuDidClose:)])
         ((void (*)(id, SEL, id))objc_msgSend)(d, @selector(menuDidClose:), _menu);

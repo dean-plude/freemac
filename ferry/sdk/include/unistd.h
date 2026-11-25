@@ -62,6 +62,8 @@ long sysconf(int);
 int getpagesize(void);
 int gethostname(char *, size_t);
 int chown(const char *, uid_t, gid_t);
+int fchown(int, uid_t, gid_t);
+int lchown(const char *, uid_t, gid_t);
 extern char *optarg;
 extern int optind, opterr, optopt, optreset;
 int getopt(int, char *const[], const char *);

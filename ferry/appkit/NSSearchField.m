@@ -21,6 +21,11 @@
  * was read. A nib that names them differently loads with the defaults. */
 #import "AInternal.h"
 
+@interface NSSearchField (FerrySearchButtons)
+- (void)_ferryClear;
+- (void)_ferrySearchAgain;
+@end
+
 /* ---- NSSearchFieldCell ---------------------------------------------------------------- */
 
 @implementation NSSearchFieldCell {
@@ -51,6 +56,17 @@
         _maxRecents = [c decodeIntegerForKey:@"NSMaximumRecents"];
     _whole = [c decodeBoolForKey:@"NSSendsWholeSearchString"];
     _immediately = [c decodeBoolForKey:@"NSSendsSearchStringImmediately"];
+    /* A nib's buttons, sending _searchFieldSearch: and _searchFieldCancel: to this cell. */
+    NSButtonCell *search = [c decodeObjectForKey:@"NSSearchButtonCell"];
+    NSButtonCell *cancel = [c decodeObjectForKey:@"NSCancelButtonCell"];
+    if ([search isKindOfClass:[NSButtonCell class]])
+        [self setSearchButtonCell:search];
+    else
+        [self resetSearchButtonCell];
+    if ([cancel isKindOfClass:[NSButtonCell class]])
+        [self setCancelButtonCell:cancel];
+    else
+        [self resetCancelButtonCell];
     NSString *name = [c containsValueForKey:@"NSRecentsAutosaveName"] ? [c decodeObjectForKey:@"NSRecentsAutosaveName"] : nil;
     if ([name isKindOfClass:[NSString class]])
         [self setRecentsAutosaveName:name];
@@ -106,6 +122,8 @@
 {
     NSButtonCell *b = [[NSButtonCell alloc] initTextCell:@""];
     [b setBordered:NO];
+    [b setTarget:self];
+    [b setAction:@selector(_searchFieldSearch:)];
     [self setSearchButtonCell:b];
     [b release];
 }
@@ -113,8 +131,26 @@
 {
     NSButtonCell *b = [[NSButtonCell alloc] initTextCell:@""];
     [b setBordered:NO];
+    [b setTarget:self];
+    [b setAction:@selector(_searchFieldCancel:)];
     [self setCancelButtonCell:b];
     [b release];
+}
+/* What the two buttons send, as on a Mac: the search button searches
+ * again, the cancel button empties the field and searches. */
+- (void)_searchFieldSearch:(id)sender
+{
+    NSSearchField *field = (NSSearchField *)[self controlView];
+    if ([field isKindOfClass:[NSSearchField class]])
+        [field _ferrySearchAgain];
+}
+- (void)_searchFieldCancel:(id)sender
+{
+    NSSearchField *field = (NSSearchField *)[self controlView];
+    if ([field isKindOfClass:[NSSearchField class]])
+        [field _ferryClear];
+    else
+        [self setStringValue:@""];
 }
 
 /* The parts of a field of these bounds: the glass at the start, the clear
@@ -348,6 +384,8 @@
     [[self _searchCell] _noteRecent:[self stringValue]];
 }
 
+- (void)_ferryClear { [self _clear]; }
+- (void)_ferrySearchAgain { [self _sendSearch]; }
 /* Escape, or a click on the clear button: empty and searched again. */
 - (void)_clear
 {

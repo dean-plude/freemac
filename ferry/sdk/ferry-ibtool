@@ -1,0 +1,1172 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""ferry-ibtool: compiles an Interface Builder document (.xib, the XML that
+Xcode saves) into a nib that Ferry's AppKit loads (freemac 1.223, Ferry
+0.47.0). Ferry's own tool, written for freemac; it is not Apple's ibtool
+and uses none of Apple's code.
+
+    ferry-ibtool --compile Out.nib In.xib
+
+The nib is a keyed archive laid out as compiled Mac nibs are described
+publicly (docs/ferry-gui.md, "What a nib is"): an NSIBObjectData under
+"IB.objectdata" holding File's Owner, every object and its parent, the
+windows to show at launch and the connections. The xib's elements become
+the classes Ferry's AppKit decodes: windows and panels (as window
+templates), views and custom views, text fields, secure fields, buttons,
+check boxes and radio buttons, pop-up buttons, image views, boxes,
+steppers, sliders, progress indicators, segmented controls, search fields,
+tab views, menus and their items, user-defaults, object and array
+controllers, and the app's own objects. Outlets, actions, bindings and
+user-defined runtime attributes are connected. A view element this tool
+doesn't know becomes a custom view of its Cocoa class (a "tableView" an
+NSTableView, made empty with -initWithFrame:), with its frame, so the
+window keeps its layout and outlets to it still connect; each such element
+is named once on standard error. Auto Layout constraints, toolbars,
+accessibility descriptions and the document's localization comments are
+left out. Only the newer document format (<document type=
+"com.apple.InterfaceBuilder3.Cocoa.XIB">) is read; the older <archive>
+format is refused with a message.
+"""
+import base64
+import os
+import plistlib
+import sys
+import xml.etree.ElementTree as ET
+from plistlib import UID
+
+# ---- the archive ----------------------------------------------------------------
+
+
+class Archive:
+    def __init__(self):
+        self.objects = ["$null"]
+        self.classes = {}
+        self.strings = {}
+
+    def add(self, obj):
+        self.objects.append(obj)
+        return UID(len(self.objects) - 1)
+
+    def string(self, s):
+        if s not in self.strings:
+            self.strings[s] = self.add(s)
+        return self.strings[s]
+
+    def reserve(self):
+        self.objects.append(None)
+        return UID(len(self.objects) - 1)
+
+    def fill(self, uid, obj):
+        self.objects[uid.data] = obj
+
+    def cls(self, name, supers):
+        key = (name,) + tuple(supers)
+        if key not in self.classes:
+            chain = [name] + [s for s in supers if s != name]
+            if chain[-1] != "NSObject":
+                chain.append("NSObject")
+            self.classes[key] = self.add({"$classname": name, "$classes": chain})
+        return self.classes[key]
+
+    def obj(self, cls, supers=(), **keys):
+        d = {"$class": self.cls(cls, supers)}
+        d.update({k: v for k, v in keys.items() if v is not None})
+        return d
+
+    def array(self, items):
+        return self.add(self.obj("NSMutableArray", ("NSArray",), **{"NS.objects": list(items)}))
+
+    def set(self, items):
+        return self.add(self.obj("NSMutableSet", ("NSSet",), **{"NS.objects": list(items)}))
+
+    def dictionary(self, pairs):
+        return self.add(self.obj("NSMutableDictionary", ("NSDictionary",),
+                                 **{"NS.keys": [self.string(k) for k, _ in pairs],
+                                    "NS.objects": [v for _, v in pairs]}))
+
+    def number(self, v):
+        return self.add(v)
+
+    def data(self, top):
+        doc = {"$archiver": "NSKeyedArchiver", "$version": 100000, "$top": top, "$objects": self.objects}
+        return plistlib.dumps(doc, fmt=plistlib.FMT_BINARY, sort_keys=True)
+
+
+# Each class's superclasses, for the archive's class chains.
+RESPONDER = ("NSResponder",)
+VIEW = ("NSView",) + RESPONDER
+CONTROL = ("NSControl",) + VIEW
+CELL = ("NSCell",)
+ACTION_CELL = ("NSActionCell",) + CELL
+SUPERS = {
+    "NSView": RESPONDER, "NSCustomView": VIEW, "NSControl": VIEW,
+    "NSTextField": CONTROL, "NSSecureTextField": ("NSTextField",) + CONTROL,
+    "NSSearchField": ("NSTextField",) + CONTROL, "NSComboBox": ("NSTextField",) + CONTROL,
+    "NSTokenField": ("NSTextField",) + CONTROL,
+    "NSButton": CONTROL, "NSPopUpButton": ("NSButton",) + CONTROL, "NSImageView": CONTROL,
+    "NSBox": VIEW, "NSStepper": CONTROL, "NSSlider": CONTROL, "NSSegmentedControl": CONTROL,
+    "NSProgressIndicator": VIEW, "NSTabView": VIEW, "NSColorWell": CONTROL, "NSLevelIndicator": CONTROL,
+    "NSDatePicker": CONTROL, "NSPathControl": CONTROL,
+    "NSTextFieldCell": ACTION_CELL, "NSSecureTextFieldCell": ("NSTextFieldCell",) + ACTION_CELL,
+    "NSSearchFieldCell": ("NSTextFieldCell",) + ACTION_CELL,
+    "NSButtonCell": ACTION_CELL, "NSPopUpButtonCell": ("NSMenuItemCell", "NSButtonCell") + ACTION_CELL,
+    "NSImageCell": CELL, "NSStepperCell": ACTION_CELL, "NSSliderCell": ACTION_CELL,
+    "NSSegmentedCell": ACTION_CELL, "NSComboBoxCell": ("NSTextFieldCell",) + ACTION_CELL,
+    "NSTableHeaderCell": ("NSTextFieldCell",) + ACTION_CELL,
+    "NSTableView": CONTROL, "NSTokenFieldCell": ("NSTextFieldCell",) + ACTION_CELL,
+    "NSTokenField": ("NSTextField",) + CONTROL, "NSOutlineView": ("NSTableView",) + CONTROL,
+    "NSWindowTemplate": (), "NSMenu": (), "NSMenuItem": (), "NSTabViewItem": (),
+    "NSUserDefaultsController": ("NSController",),
+    "NSObjectController": ("NSController",), "NSArrayController": ("NSObjectController", "NSController"),
+    "NSTreeController": ("NSObjectController", "NSController"),
+    "NSDictionaryController": ("NSArrayController", "NSObjectController", "NSController"),
+}
+
+
+def supers(cls):
+    return SUPERS.get(cls, VIEW if cls.endswith("View") else ())
+
+
+# ---- reading the xib's values ---------------------------------------------------
+
+def yes(e, name, default=False):
+    v = e.get(name)
+    return default if v is None else v == "YES"
+
+
+def child(e, tag, key=None):
+    for c in e:
+        if c.tag == tag and (key is None or c.get("key") == key):
+            return c
+    return None
+
+
+def rect_string(r):
+    if r is None:
+        return "{{0, 0}, {0, 0}}"
+    f = lambda k: fmt(float(r.get(k, "0")))
+    return "{{%s, %s}, {%s, %s}}" % (f("x"), f("y"), f("width"), f("height"))
+
+
+def size_string(e):
+    f = lambda k: fmt(float(e.get(k, "0")))
+    return "{%s, %s}" % (f("width"), f("height"))
+
+
+def fmt(v):
+    return ("%d" % v) if v == int(v) else repr(v)
+
+
+def text(e, name, default=""):
+    """A string the document keeps as an attribute or, when it holds
+    characters an attribute can't (a Return as a key equivalent, say), as a
+    <string key=...> element, perhaps in base 64."""
+    v = e.get(name)
+    if v is not None:
+        return v
+    for c in e:
+        if c.tag == "string" and c.get("key") == name:
+            t = c.text or ""
+            if c.get("base64-UTF8") == "YES":
+                t = "".join(t.split())
+                t = base64.b64decode(t + "=" * (-len(t) % 4)).decode("utf-8", "replace")
+            return t
+    return default
+
+
+ALIGN = {"left": 0, "right": 1, "center": 2, "justified": 3, "natural": 4}
+LINE_BREAK = {"wordWrapping": 0, "charWrapping": 1, "clipping": 2, "truncatingHead": 3, "truncatingTail": 4,
+              "truncatingMiddle": 5}
+CONTROL_SIZE = {"regular": 0, "small": 1, "mini": 2, "large": 0}
+BEZEL = {"rounded": 1, "regularSquare": 2, "thick": 3, "thicker": 4, "disclosure": 5, "shadowlessSquare": 6,
+         "circular": 7, "texturedSquare": 8, "helpButton": 9, "smallSquare": 10, "texturedRounded": 11,
+         "roundRect": 12, "recessed": 13, "roundedDisclosure": 14, "inline": 15}
+META_FONTS = {"system": (".AppleSystemUIFont", 13), "systemBold": (".AppleSystemUIFont-Bold", 13),
+              "smallSystem": (".AppleSystemUIFont", 11), "smallSystemBold": (".AppleSystemUIFont-Bold", 11),
+              "miniSystem": (".AppleSystemUIFont", 9), "miniSystemBold": (".AppleSystemUIFont-Bold", 9),
+              "label": (".AppleSystemUIFont", 10), "menu": (".AppleSystemUIFont", 14),
+              "menuBar": (".AppleSystemUIFont", 14), "message": (".AppleSystemUIFont", 13),
+              "toolTip": (".AppleSystemUIFont", 11), "titleBar": (".AppleSystemUIFont-Bold", 13),
+              "palette": (".AppleSystemUIFont", 11), "controlContent": (".AppleSystemUIFont", 13),
+              "user": ("Helvetica", 12), "userFixedPitch": ("Menlo-Regular", 11),
+              "cellTitle": (".AppleSystemUIFont", 13)}
+SYSTEM_MENUS = {"main": "_NSMainMenu", "apple": "_NSAppleMenu", "window": "_NSWindowsMenu",
+                "services": "_NSServicesMenu", "recentDocuments": "_NSRecentDocumentsMenu",
+                "font": "_NSFontMenu", "help": "_NSHelpMenu"}
+CMD, SHIFT, OPTION, CONTROL_KEY = 1 << 20, 1 << 17, 1 << 19, 1 << 18
+
+
+class Compiler:
+    def __init__(self, root, warn):
+        self.a = Archive()
+        self.root = root
+        self.warn = warn
+        self.ids = {}          # xib id -> UID
+        self.pairs = []        # (object, parent)
+        self.connections = []
+        self.visible = []
+        self.names = []
+        self.unknown = set()
+
+    def finish(self, owner, quiet=False):
+        """The archive's bytes, once every object is made. A connection to an
+        object this tool didn't make (one inside a toolbar, say) is left out,
+        and named."""
+        a = self.a
+        made = set(xid for xid, uid in self.ids.items() if a.objects[uid.data] is not None)
+        conns = []
+        for xid, label, uid in self.connections:
+            if xid is None or xid in made:
+                conns.append(uid)
+            elif not quiet:
+                self.warn("the connection %s to id %s is left out (that object isn't made)" % (label, xid))
+        for xid, uid in self.ids.items():
+            if a.objects[uid.data] is None:
+                a.fill(uid, a.obj("NSCustomObject", (), NSClassName=a.string("NSObject")))
+        for i, o in enumerate(a.objects):
+            if o is None:
+                a.objects[i] = "$null"
+        pairs = [(owner, owner)] + self.pairs
+        keys = [o for o, _ in pairs]
+        data = a.add(a.obj("NSIBObjectData", (), NSRoot=owner,
+                           NSObjectsKeys=a.array(keys), NSObjectsValues=a.array([p for _, p in pairs]),
+                           NSOidsKeys=a.array(keys), NSOidsValues=a.array([a.add(i + 1) for i in range(len(keys))]),
+                           NSNamesKeys=a.array([o for o, _ in self.names]),
+                           NSNamesValues=a.array([a.string(n) for _, n in self.names]),
+                           NSConnections=a.array(conns), NSVisibleWindows=a.set(self.visible),
+                           NSNextOid=len(keys) + 1, NSFramework=a.string("IBCocoaFramework")))
+        return a.data({"IB.objectdata": data, "IB.systemFontUpdateVersion": 1})
+
+    # -- shared pieces -----------------------------------------------------------
+
+    def uid_for(self, xid):
+        if xid not in self.ids:
+            self.ids[xid] = self.a.reserve()
+        return self.ids[xid]
+
+    def font(self, e):
+        if e is None:
+            return self.font_of(".AppleSystemUIFont", 13)
+        name, size = META_FONTS.get(e.get("metaFont", ""), (e.get("name") or ".AppleSystemUIFont", 13))
+        if e.get("size"):
+            size = float(e.get("size"))
+        return self.font_of(name, size)
+
+    def font_of(self, name, size):
+        return self.a.add(self.a.obj("NSFont", (), NSName=self.a.string(name), NSSize=float(size), NSfFlags=1044))
+
+    def color(self, e):
+        if e is None:
+            return None
+        a = self.a
+        if e.get("catalog") or e.get("colorSpace") == "catalog":
+            white = 0.0 if "Text" in (e.get("name") or "") else 1.0
+            fallback = a.add(a.obj("NSColor", (), NSColorSpace=3, NSWhite=b"%g\x00" % white))
+            return a.add(a.obj("NSColor", (), NSColorSpace=6, NSCatalogName=a.string(e.get("catalog", "System")),
+                               NSColorName=a.string(e.get("name", "controlColor")), NSColor=fallback))
+        if e.get("white") is not None:
+            return a.add(a.obj("NSColor", (), NSColorSpace=3,
+                               NSWhite=b"%g %g\x00" % (float(e.get("white")), float(e.get("alpha", "1")))))
+        comps = [float(e.get(k, "0")) for k in ("red", "green", "blue")] + [float(e.get("alpha", "1"))]
+        return a.add(a.obj("NSColor", (), NSColorSpace=1, NSRGB=b"%g %g %g %g\x00" % tuple(comps)))
+
+    def image(self, name):
+        if not name:
+            return None
+        if name in ("NSSwitch", "NSRadioButton"):
+            return self.a.add(self.a.obj("NSButtonImageSource", (), NSImageName=self.a.string(name)))
+        return self.a.add(self.a.obj("NSCustomResource", (), NSClassName=self.a.string("NSImage"),
+                                     NSResourceName=self.a.string(name)))
+
+    def frame_keys(self, e, superview):
+        r = child(e, "rect", "frame")
+        mask = 0
+        m = child(e, "autoresizingMask", "autoresizingMask")
+        if m is not None:
+            for bit, name in ((1, "flexibleMinX"), (2, "widthSizable"), (4, "flexibleMaxX"),
+                              (8, "flexibleMinY"), (16, "heightSizable"), (32, "flexibleMaxY")):
+                if yes(m, name):
+                    mask |= bit
+        if yes(e, "autoresizesSubviews", True):
+            mask |= 0x100
+        if yes(e, "hidden"):
+            mask |= 0x80000000
+        keys = dict(NSFrame=rect_string(r), NSvFlags=mask, NSSuperview=superview)
+        if yes(e, "hidden"):
+            keys["NSHidden"] = True
+        if e.get("toolTip"):
+            keys["NSToolTip"] = self.a.string(e.get("toolTip"))
+        if e.get("identifier"):
+            keys["NSIdentifier"] = self.a.string(e.get("identifier"))
+        return keys
+
+    def cell_flags(self, cell, base=0x04000000, text_cell=False):
+        f = base
+        if yes(cell, "editable"):
+            f |= 0x10000000
+        if yes(cell, "selectable"):
+            f |= 0x00200000
+        if cell.get("borderStyle") == "bezel" or yes(cell, "bezeled"):
+            f |= 0x00400000
+        if cell.get("borderStyle") == "border" or yes(cell, "bordered"):
+            f |= 0x00800000
+        if yes(cell, "scrollable"):
+            f |= 0x00100000
+        if yes(cell, "continuous"):
+            f |= 0x00080000
+        # a text cell with no line break mode wraps: Interface Builder writes the mode only when it isn't
+        # word wrapping, and a scrolling or single-line cell keeps to one line
+        breaks = cell.get("lineBreakMode", "wordWrapping" if text_cell else None)
+        if breaks in ("wordWrapping", "charWrapping") and not yes(cell, "scrollable") and \
+                not yes(cell, "usesSingleLineMode"):
+            f |= 0x40
+        if not yes(cell, "enabled", True):
+            f |= 0x20000000
+        if cell.get("state") == "on":
+            f |= 0x80000000
+        return f
+
+    def cell_flags2(self, cell, default_align):
+        align = ALIGN.get(cell.get("alignment"), default_align)
+        lb = LINE_BREAK.get(cell.get("lineBreakMode"), 0)
+        size = CONTROL_SIZE.get(cell.get("controlSize"), 0)
+        return (align << 26) | (lb << 9) | (size << 17) | (0x400000 if yes(cell, "sendsActionOnEndEditing") else 0)
+
+    # -- connections ---------------------------------------------------------------
+
+    def connections_of(self, e, source):
+        con = child(e, "connections")
+        if con is None:
+            return
+        a = self.a
+        for c in con:
+            if c.tag == "outlet":
+                dst = c.get("destination")
+                if dst is None or c.get("property") is None:
+                    continue
+                self.connections.append((dst, c.get("property"), a.add(a.obj(
+                    "NSNibOutletConnector", ("NSNibConnector",), NSSource=source, NSDestination=self.uid_for(dst),
+                    NSLabel=a.string(c.get("property"))))))
+            elif c.tag == "action":
+                target = c.get("target") or "-1"
+                self.connections.append((target, c.get("selector"), a.add(a.obj(
+                    "NSNibControlConnector", ("NSNibConnector",), NSSource=source, NSDestination=self.uid_for(target),
+                    NSLabel=a.string(c.get("selector"))))))
+            elif c.tag == "binding":
+                opts = []
+                d = child(c, "dictionary", "options")
+                if d is not None:
+                    for o in d:
+                        v = self.plain_value(o)
+                        if v is not None and o.get("key"):
+                            opts.append((o.get("key"), v))
+                keys = dict(NSSource=source, NSDestination=self.uid_for(c.get("destination")),
+                            NSLabel=a.string("%s: %s" % (c.get("name"), c.get("keyPath"))),
+                            NSBinding=a.string(c.get("name")), NSKeyPath=a.string(c.get("keyPath")),
+                            NSNibBindingConnectorVersion=2)
+                if opts:
+                    keys["NSOptions"] = a.dictionary(opts)
+                self.connections.append((c.get("destination"), c.get("name"),
+                                         a.add(a.obj("NSNibBindingConnector", ("NSNibConnector",), **keys))))
+
+    def plain_value(self, o):
+        a = self.a
+        if o.tag == "bool":
+            return a.add(o.get("value") == "YES")
+        if o.tag == "string":
+            return a.string(o.text or o.get("value") or "")
+        if o.tag in ("integer", "int"):
+            return a.add(int(o.get("value", "0")))
+        if o.tag in ("real", "double"):
+            return a.add(float(o.get("value", "0")))
+        if o.tag == "color":
+            return self.color(o)
+        if o.tag == "nil":
+            return None
+        return None
+
+    def runtime_attributes(self, e, source):
+        ra = child(e, "userDefinedRuntimeAttributes")
+        if ra is None:
+            return
+        paths, values = [], []
+        for r in ra:
+            t, v = r.get("type"), r.get("value")
+            val = None
+            if t == "string" or t == "localizedString":
+                val = self.a.string(v or "")
+            elif t == "number":
+                n = child(r, "real")
+                if n is None:
+                    n = child(r, "integer")
+                if n is not None:
+                    val = self.plain_value(n)
+                elif v is not None:
+                    val = self.a.add(float(v) if "." in v else int(v))
+            elif t == "boolean":
+                val = self.a.add(v == "YES")
+            elif t == "color":
+                val = self.color(child(r, "color"))
+            if val is not None:
+                paths.append(self.a.string(r.get("keyPath")))
+                values.append(val)
+        if paths:
+            self.connections.append((None, None, self.a.add(self.a.obj(
+                "NSIBUserDefinedRuntimeAttributesConnector", ("NSNibConnector",), NSObject=source,
+                NSKeyPaths=self.a.array(paths), NSValues=self.a.array(values)))))
+
+    # -- objects ---------------------------------------------------------------------
+
+    def top_object(self, e, owner):
+        tag = e.tag
+        xid = e.get("id")
+        if xid is None:
+            return
+        uid = self.uid_for(xid)
+        a = self.a
+        if tag in ("customObject", "placeholder"):
+            cls = {"-1": "FirstResponder", "-3": "NSApplication"}.get(xid, e.get("customClass") or "NSObject")
+            a.fill(uid, a.obj("NSCustomObject", (), NSClassName=a.string(cls)))
+            label = {"-2": "File's Owner", "-1": "First Responder", "-3": "Application"}.get(xid)
+            if label:
+                self.names.append((uid, label))
+        elif tag == "menu":
+            self.menu(e, uid, None)
+            if e.get("systemMenu") == "main":
+                self.names.append((uid, "MainMenu"))
+        elif tag == "menuItem":
+            self.menu_item(e, uid, None)
+        elif tag == "window" or tag == "panel":
+            self.window(e, uid)
+        elif tag == "userDefaultsController":
+            a.fill(uid, a.obj("NSUserDefaultsController", supers("NSUserDefaultsController"),
+                              NSSharedInstance=yes(e, "representsSharedInstance", True),
+                              NSAppliesImmediately=yes(e, "appliesImmediately", True)))
+        elif tag in ("objectController", "arrayController", "treeController", "dictionaryController"):
+            cls = e.get("customClass") or "NS" + tag[0].upper() + tag[1:]
+            base = "NS" + tag[0].upper() + tag[1:]
+            keys = dict(NSEditable=yes(e, "editable", True),
+                        NSAutomaticallyPreparesContent=yes(e, "automaticallyPreparesContent"))
+            if e.get("objectClassName"):
+                keys["NSObjectClassName"] = a.string(e.get("objectClassName"))
+            dk = child(e, "declaredKeys")
+            if dk is not None:
+                keys["NSDeclaredKeys"] = a.array([a.string(s.text or "") for s in dk if s.tag == "string"])
+            if tag == "arrayController":
+                keys.update(NSAvoidsEmptySelection=yes(e, "avoidsEmptySelection", True),
+                            NSPreservesSelection=yes(e, "preservesSelection", True),
+                            NSSelectsInsertedObjects=yes(e, "selectsInsertedObjects", True),
+                            NSClearsFilterPredicateOnInsertion=yes(e, "clearsFilterPredicateOnInsertion", True),
+                            NSAutomaticallyRearrangesObjects=yes(e, "automaticallyRearrangesObjects"))
+            chain = supers(base)
+            a.fill(uid, a.obj(cls, ((base,) if cls != base else ()) + chain, **keys))
+        elif tag in ("view", "customView") or tag in VIEW_TAGS or tag.endswith("View"):
+            self.view(e, uid, UID(0))
+        else:
+            cls = e.get("customClass") or "NS" + tag[0].upper() + tag[1:]
+            self.note_unknown(tag, "an object made with -init")
+            a.fill(uid, a.obj("NSCustomObject", (), NSClassName=a.string(cls)))
+        if xid != "-2":
+            self.pairs.append((uid, owner))
+        self.connections_of(e, uid)
+        self.runtime_attributes(e, uid)
+
+    def note_unknown(self, tag, what):
+        if tag not in self.unknown:
+            self.unknown.add(tag)
+            self.warn("<%s> is made as %s" % (tag, what))
+
+    def menu(self, e, uid, parent_item):
+        a = self.a
+        items = []
+        its = child(e, "items")
+        for it in (its if its is not None else []):
+            if it.tag != "menuItem":
+                continue
+            iuid = self.uid_for(it.get("id")) if it.get("id") else a.reserve()
+            self.menu_item(it, iuid, uid)
+            items.append(iuid)
+            self.pairs.append((iuid, uid))
+        keys = dict(NSTitle=a.string(text(e, "title")), NSMenuItems=a.array(items))
+        if e.get("systemMenu") in SYSTEM_MENUS:
+            keys["NSName"] = a.string(SYSTEM_MENUS[e.get("systemMenu")])
+        if yes(e, "autoenablesItems", True) is False:
+            keys["NSNoAutoenable"] = True
+        a.fill(uid, a.obj("NSMenu", (), **keys))
+
+    def menu_item(self, it, uid, menu):
+        a = self.a
+        mask_e = child(it, "modifierMask", "keyEquivalentModifierMask")
+        key = text(it, "keyEquivalent")
+        if mask_e is None:
+            mask = CMD if key else 0
+        else:
+            mask = ((CMD if yes(mask_e, "command", False) else 0) | (SHIFT if yes(mask_e, "shift") else 0) |
+                    (OPTION if yes(mask_e, "option") else 0) | (CONTROL_KEY if yes(mask_e, "control") else 0))
+        keys = dict(NSMenu=menu, NSTitle=a.string(text(it, "title")), NSKeyEquiv=a.string(key),
+                    NSKeyEquivModMask=mask, NSMnemonicLoc=0x7fffffff)
+        if it.get("tag"):
+            keys["NSTag"] = int(it.get("tag"))
+        if it.get("state"):
+            keys["NSState"] = {"on": 1, "mixed": -1}.get(it.get("state"), 0)
+        if yes(it, "isSeparatorItem"):
+            keys.update(NSIsSeparator=True, NSIsDisabled=True)
+        if not yes(it, "enabled", True):
+            keys["NSIsDisabled"] = True
+        if yes(it, "hidden"):
+            keys["NSIsHidden"] = True
+        if yes(it, "alternate"):
+            keys["NSIsAlternate"] = True
+        if it.get("indentationLevel"):
+            keys["NSIndent"] = int(it.get("indentationLevel"))
+        if it.get("image"):
+            keys["NSImage"] = self.image(it.get("image"))
+        sub = child(it, "menu", "submenu")
+        if sub is not None:
+            suid = self.uid_for(sub.get("id")) if sub.get("id") else a.reserve()
+            self.menu(sub, suid, uid)
+            self.pairs.append((suid, uid))
+            keys.update(NSSubmenu=suid, NSAction=a.string("submenuAction:"))
+            self.connections_of(sub, suid)
+        a.fill(uid, a.obj("NSMenuItem", (), **keys))
+        self.connections_of(it, uid)
+        self.runtime_attributes(it, uid)
+
+    def window(self, e, uid):
+        a = self.a
+        style = 15
+        sm = child(e, "windowStyleMask", "styleMask")
+        if sm is not None:
+            style = 0
+            for bit, name in ((1, "titled"), (2, "closable"), (4, "miniaturizable"), (8, "resizable"),
+                              (16, "utility"), (128, "nonactivatingPanel"), (256, "texturedBackground"),
+                              (1 << 13, "hud"), (1 << 14, "fullScreen"), (1 << 15, "fullSizeContentView"),
+                              (1 << 12, "unifiedTitleAndToolbar"), (64, "docModal")):
+                if yes(sm, name):
+                    style |= bit
+        content = child(e, "view", "contentView")
+        cuid = None
+        if content is not None:
+            cuid = self.uid_for(content.get("id")) if content.get("id") else a.reserve()
+            self.view(content, cuid, UID(0))
+            self.pairs.append((cuid, uid))
+        cls = e.get("customClass") or ("NSPanel" if e.tag == "panel" else "NSWindow")
+        keys = dict(NSWindowStyleMask=style, NSWindowBacking=2,
+                    NSWindowRect=rect_string(child(e, "rect", "contentRect")),
+                    NSWindowTitle=a.string(text(e, "title", "Window")), NSWindowClass=a.string(cls),
+                    NSWindowView=cuid, NSWTFlags=0x78000000)
+        if child(e, "rect", "screenRect") is not None:
+            keys["NSScreenRect"] = rect_string(child(e, "rect", "screenRect"))
+        for xkey, nkey in (("minSize", "NSMinSize"), ("maxSize", "NSMaxSize"),
+                           ("contentMinSize", "NSWindowContentMinSize")):
+            v = child(e, "value", xkey)
+            if v is None:
+                v = child(e, "size", xkey)
+            if v is not None:
+                keys[nkey] = size_string(v)
+        if e.get("frameAutosaveName"):
+            keys["NSFrameAutosaveName"] = a.string(e.get("frameAutosaveName"))
+        if child(e, "toolbar", "toolbar") is not None:
+            self.note_unknown("toolbar", "nothing (toolbars in a xib are left out)")
+        a.fill(uid, a.obj("NSWindowTemplate", (), **keys))
+        if yes(e, "visibleAtLaunch", True):
+            self.visible.append(uid)
+
+    def subviews(self, e, uid):
+        out = []
+        sv = child(e, "subviews")
+        for s in (sv if sv is not None else []):
+            if s.get("id") is None:
+                continue
+            suid = self.uid_for(s.get("id"))
+            self.view(s, suid, uid)
+            self.pairs.append((suid, uid))
+            out.append(suid)
+        return out
+
+    def view(self, e, uid, superview):
+        a = self.a
+        tag = e.tag
+        keys = self.frame_keys(e, superview)
+        subs = self.subviews(e, uid)
+        if subs:
+            keys["NSSubviews"] = a.array(subs)
+        custom = e.get("customClass")
+        builder = VIEW_TAGS.get(tag)
+        if tag in ("view", "customView"):
+            if custom:
+                keys["NSClassName"] = a.string(custom)
+                a.fill(uid, a.obj("NSCustomView", supers("NSCustomView"), **keys))
+            else:
+                a.fill(uid, a.obj("NSView", supers("NSView"), **keys))
+        elif builder is not None:
+            cls, extra = builder(self, e, uid)
+            keys.update(extra)
+            if custom and custom != cls:
+                keys.update(NSClassName=a.string(custom), NSOriginalClassName=a.string(cls))
+                a.fill(uid, a.obj("NSClassSwapper", (), **keys))
+            else:
+                a.fill(uid, a.obj(cls, supers(cls), **keys))
+        else:
+            cls = custom or COCOA_NAMES.get(tag) or "NS" + tag[0].upper() + tag[1:]
+            self.note_unknown(tag, "a plain %s, made with -initWithFrame:" % cls)
+            keys["NSClassName"] = a.string(cls)
+            a.fill(uid, a.obj("NSCustomView", supers("NSCustomView"), **keys))
+        self.connections_of(e, uid)
+        self.runtime_attributes(e, uid)
+
+    # -- controls and their cells ----------------------------------------------
+
+    def control_keys(self, e, cell):
+        k = dict(NSCell=cell, NSEnabled=yes(e, "enabled", True))
+        if e.get("tag"):
+            k["NSTag"] = int(e.get("tag"))
+        return k
+
+    def cell_common(self, c, cell_uid):
+        self.connections_of(c, cell_uid)
+        self.runtime_attributes(c, cell_uid)
+
+    def text_cell(self, c, cls):
+        a = self.a
+        uid = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+        keys = dict(NSContents=a.string(text(c, "title")), NSCellFlags=self.cell_flags(c, text_cell=True),
+                    NSCellFlags2=self.cell_flags2(c, 4), NSSupport=self.font(child(c, "font", "font")),
+                    NSDrawsBackground=yes(c, "drawsBackground"),
+                    NSBackgroundColor=self.color(child(c, "color", "backgroundColor")),
+                    NSTextColor=self.color(child(c, "color", "textColor")))
+        if c.get("placeholderString"):
+            keys["NSPlaceholderString"] = a.string(c.get("placeholderString"))
+        if c.get("tag"):
+            keys["NSTag"] = int(c.get("tag"))
+        a.fill(uid, a.obj(c.get("customClass") or cls, (cls,) + supers(cls) if c.get("customClass") else supers(cls),
+                          **keys))
+        self.cell_common(c, uid)
+        return uid
+
+    def button_cell_keys(self, c, kind):
+        a = self.a
+        btype = c.get("type", "push")
+        beh = child(c, "behavior", "behavior")
+        behaviour = set(k for k, v in (beh.attrib.items() if beh is not None else []) if v == "YES")
+        if btype == "check":
+            aux = 3
+        elif btype == "radio":
+            aux = 4
+        elif "changeContents" in behaviour or "lightByContents" in behaviour:
+            aux = 2 if "changeContents" in behaviour else 5
+        elif "changeBackground" in behaviour or "changeGray" in behaviour:
+            aux = 1 if "pushIn" in behaviour else 6
+        elif "pushIn" in behaviour:
+            aux = 7
+        else:
+            aux = 0
+        bezel = BEZEL.get(c.get("bezelStyle"), 1 if btype == "push" else 2)
+        bordered = c.get("borderStyle") == "border" or yes(c, "bordered")
+        flags = (0x00800000 if bordered else 0) | (0x8000 if yes(c, "transparent") else 0) | 0x04000000
+        mask = 0
+        m = child(c, "modifierMask", "keyEquivalentModifierMask")
+        if m is not None:
+            mask = ((CMD if yes(m, "command", False) else 0) | (SHIFT if yes(m, "shift") else 0) |
+                    (OPTION if yes(m, "option") else 0) | (CONTROL_KEY if yes(m, "control") else 0))
+        flags2 = (bezel & 7) | (0x20 if bezel > 7 else 0) | (mask >> 16 << 8 if mask else 0)
+        keys = dict(NSContents=a.string(text(c, "title")), NSAlternateContents=a.string(text(c, "alternateTitle")),
+                    NSCellFlags=self.cell_flags(c), NSCellFlags2=self.cell_flags2(c, 2),
+                    NSSupport=self.font(child(c, "font", "font")), NSButtonFlags=flags, NSButtonFlags2=flags2,
+                    NSBezelStyle=bezel, NSAuxButtonType=aux, NSKeyEquivalent=a.string(text(c, "keyEquivalent")),
+                    NSPeriodicDelay=400, NSPeriodicInterval=75, NSAlignment=ALIGN.get(c.get("alignment"), 2))
+        if btype in ("check", "radio") and not c.get("image"):
+            keys["NSNormalImage"] = self.image("NSSwitch" if btype == "check" else "NSRadioButton")
+        elif c.get("image"):
+            keys["NSNormalImage"] = self.image(c.get("image"))
+        if c.get("alternateImage"):
+            keys["NSAlternateImage"] = self.image(c.get("alternateImage"))
+        if c.get("tag"):
+            keys["NSTag"] = int(c.get("tag"))
+        return keys
+
+    def button_cell(self, c, cls="NSButtonCell", extra=None):
+        a = self.a
+        uid = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+        keys = self.button_cell_keys(c, cls)
+        keys.update(extra or {})
+        a.fill(uid, a.obj(c.get("customClass") or cls, ((cls,) if c.get("customClass") else ()) + supers(cls),
+                          **keys))
+        self.cell_common(c, uid)
+        return uid
+
+    def b_textField(self, e, uid, cls="NSTextField", cell_tag="textFieldCell", cell_cls="NSTextFieldCell"):
+        c = child(e, cell_tag, "cell")
+        cell = self.text_cell(c, cell_cls) if c is not None else None
+        keys = self.control_keys(e, cell)
+        if e.get("placeholderString"):
+            keys["NSPlaceholderString"] = self.a.string(e.get("placeholderString"))
+        return cls, keys
+
+    def b_secureTextField(self, e, uid):
+        return self.b_textField(e, uid, "NSSecureTextField", "secureTextFieldCell", "NSSecureTextFieldCell")
+
+    def b_searchField(self, e, uid):
+        return self.b_textField(e, uid, "NSSearchField", "searchFieldCell", "NSSearchFieldCell")
+
+    def b_button(self, e, uid):
+        c = child(e, "buttonCell", "cell")
+        return "NSButton", self.control_keys(e, self.button_cell(c) if c is not None else None)
+
+    def b_popUpButton(self, e, uid):
+        a = self.a
+        c = child(e, "popUpButtonCell", "cell")
+        if c is None:
+            return "NSPopUpButton", self.control_keys(e, None)
+        extra = dict(NSPullDown=yes(c, "pullsDown"), NSUsesItemFromMenu=yes(c, "usesItemFromMenu", True),
+                     NSAltersState=yes(c, "altersStateOfSelectedItem", True),
+                     NSPreferredEdge={"minX": 0, "minY": 1, "maxX": 2, "maxY": 3}.get(c.get("preferredEdge"), 1),
+                     NSArrowPosition={"noArrow": 0, "arrowAtCenter": 1, "arrowAtBottom": 2}.get(
+                         c.get("arrowPosition"), 2))
+        m = child(c, "menu", "menu")
+        if m is not None:
+            muid = self.uid_for(m.get("id")) if m.get("id") else a.reserve()
+            self.menu(m, muid, None)
+            self.pairs.append((muid, uid))
+            extra["NSMenu"] = muid
+            self.connections_of(m, muid)
+        if c.get("selectedItem"):
+            extra["NSMenuItem"] = self.uid_for(c.get("selectedItem"))
+        return "NSPopUpButton", self.control_keys(e, self.button_cell(c, "NSPopUpButtonCell", extra))
+
+    def b_imageView(self, e, uid):
+        a = self.a
+        c = child(e, "imageCell", "cell")
+        cell = None
+        if c is not None:
+            cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+            keys = dict(NSCellFlags=self.cell_flags(c, 0), NSCellFlags2=0,
+                        NSAlign={"center": 0, "top": 1, "topLeft": 2, "topRight": 3, "left": 4, "bottom": 5,
+                                 "bottomLeft": 6, "bottomRight": 7, "right": 8}.get(c.get("imageAlignment"), 0),
+                        NSScale={"proportionallyDown": 0, "axesIndependently": 1, "none": 2,
+                                 "proportionallyUpOrDown": 3}.get(c.get("imageScaling"), 0),
+                        NSStyle={"none": 0, "photo": 1, "grayBezel": 2, "groove": 3, "button": 4}.get(
+                            c.get("imageFrameStyle"), 0),
+                        NSAnimates=yes(c, "animates"))
+            if c.get("image"):
+                keys["NSContents"] = self.image(c.get("image"))
+            a.fill(cell, a.obj("NSImageCell", supers("NSImageCell"), **keys))
+            self.cell_common(c, cell)
+        keys = self.control_keys(e, cell)
+        keys["NSEditable"] = yes(e, "editable")
+        return "NSImageView", keys
+
+    def b_box(self, e, uid):
+        a = self.a
+        title_cell = a.add(a.obj("NSTextFieldCell", supers("NSTextFieldCell"),
+                                 NSContents=a.string(text(e, "title")), NSCellFlags=0x04000000,
+                                 NSCellFlags2=0, NSSupport=self.font(child(e, "font", "titleFont"))))
+        keys = dict(NSBoxType={"primary": 0, "secondary": 1, "separator": 2, "oldStyle": 3, "custom": 4}.get(
+                        e.get("boxType"), 0),
+                    NSTitlePosition={"noTitle": 0, "aboveTop": 1, "atTop": 2, "belowTop": 3, "aboveBottom": 4,
+                                     "atBottom": 5, "belowBottom": 6}.get(e.get("titlePosition"), 2),
+                    NSTitleCell=title_cell, NSTransparent=yes(e, "transparent"), NSOffsets="{5, 5}")
+        cv = child(e, "view", "contentView")
+        if cv is not None:
+            cuid = self.uid_for(cv.get("id")) if cv.get("id") else a.reserve()
+            self.view(cv, cuid, uid)
+            self.pairs.append((cuid, uid))
+            keys["NSContentView"] = cuid
+            # the content view is the box's one subview, as in a compiled nib
+            keys["NSSubviews"] = a.array([cuid])
+        return "NSBox", keys
+
+    def b_stepper(self, e, uid):
+        a = self.a
+        c = child(e, "stepperCell", "cell")
+        cell = None
+        if c is not None:
+            cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+            a.fill(cell, a.obj("NSStepperCell", supers("NSStepperCell"), NSCellFlags=self.cell_flags(c),
+                               NSCellFlags2=0, NSMinValue=float(c.get("minValue", "0")),
+                               NSMaxValue=float(c.get("maxValue", "100")), NSIncrement=float(c.get("increment", "1")),
+                               NSValue=float(c.get("doubleValue", "0")), NSAutorepeat=yes(c, "autorepeat", True),
+                               NSValueWraps=yes(c, "valueWraps")))
+            self.cell_common(c, cell)
+        return "NSStepper", self.control_keys(e, cell)
+
+    def b_slider(self, e, uid):
+        a = self.a
+        c = child(e, "sliderCell", "cell")
+        cell = None
+        if c is not None:
+            cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+            a.fill(cell, a.obj("NSSliderCell", supers("NSSliderCell"), NSCellFlags=self.cell_flags(c),
+                               NSCellFlags2=0, NSMinValue=float(c.get("minValue", "0")),
+                               NSMaxValue=float(c.get("maxValue", "1")), NSValue=float(c.get("doubleValue", "0")),
+                               NSNumberOfTickMarks=int(c.get("numberOfTickMarks", "0")),
+                               NSAllowsTickMarkValuesOnly=yes(c, "allowsTickMarkValuesOnly"),
+                               NSVertical=yes(c, "vertical")))
+            self.cell_common(c, cell)
+        return "NSSlider", self.control_keys(e, cell)
+
+    def b_progressIndicator(self, e, uid):
+        flags = 0
+        if e.get("style") == "spinning":
+            flags |= 0x1000
+        if yes(e, "indeterminate"):
+            flags |= 0x2
+        if yes(e, "displayedWhenStopped", True):
+            flags |= 0x2000
+        return "NSProgressIndicator", dict(NSpiFlags=flags, NSMinValue=float(e.get("minValue", "0")),
+                                           NSMaxValue=float(e.get("maxValue", "100")))
+
+    def b_segmentedControl(self, e, uid):
+        a = self.a
+        c = child(e, "segmentedCell", "cell")
+        cell = None
+        if c is not None:
+            cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
+            segs = []
+            sg = child(c, "segments")
+            for i, s in enumerate(sg if sg is not None else []):
+                k = dict(NSSegmentItemLabel=a.string(s.get("label", "")),
+                         NSSegmentItemWidth=float(s.get("width", "0")),
+                         NSSegmentItemSelected=yes(s, "selected"), NSSegmentItemEnabled=yes(s, "enabled", True),
+                         NSSegmentItemTag=int(s.get("tag", "0")))
+                if s.get("image"):
+                    k["NSSegmentItemImage"] = self.image(s.get("image"))
+                segs.append(a.add(a.obj("NSSegmentItem", (), **k)))
+            a.fill(cell, a.obj("NSSegmentedCell", supers("NSSegmentedCell"), NSCellFlags=self.cell_flags(c),
+                               NSCellFlags2=0, NSSegmentImages=a.array(segs),
+                               NSSegmentStyle={"rounded": 1, "texturedRounded": 2, "roundRect": 3,
+                                               "texturedSquare": 4, "capsule": 5, "smallSquare": 6,
+                                               "separated": 8}.get(c.get("style"), 0),
+                               NSTrackingMode={"selectOne": 0, "selectAny": 1, "momentary": 2}.get(
+                                   c.get("trackingMode"), 0),
+                               NSSupport=self.font(child(c, "font", "font"))))
+            self.cell_common(c, cell)
+        return "NSSegmentedControl", self.control_keys(e, cell)
+
+    def b_tabView(self, e, uid):
+        a = self.a
+        items, selected = [], None
+        tv = child(e, "tabViewItems")
+        for t in (tv if tv is not None else []):
+            if t.tag != "tabViewItem":
+                continue
+            tuid = self.uid_for(t.get("id")) if t.get("id") else a.reserve()
+            keys = dict(NSLabel=a.string(t.get("label", "")), NSIdentifier=a.string(t.get("identifier", "")),
+                        NSTabView=uid)
+            v = child(t, "view", "view")
+            if v is not None:
+                vuid = self.uid_for(v.get("id")) if v.get("id") else a.reserve()
+                self.view(v, vuid, UID(0))
+                self.pairs.append((vuid, tuid))
+                keys["NSView"] = vuid
+            a.fill(tuid, a.obj("NSTabViewItem", (), **keys))
+            self.pairs.append((tuid, uid))
+            self.connections_of(t, tuid)
+            items.append(tuid)
+            if selected is None:
+                selected = tuid
+        keys = dict(NSTabViewItems=a.array(items), NSSupport=self.font(child(e, "font", "font")),
+                    NSTvFlags={"topTabsBezelBorder": 0, "noTabsBezelBorder": 4, "noTabsLineBorder": 5,
+                               "noTabsNoBorder": 6}.get(e.get("type"), 0))
+        if selected is not None:
+            keys["NSSelectedTabViewItem"] = selected
+        return "NSTabView", keys
+
+
+    # -- scroll views, tables, split views and stacks -----------------------------
+
+    def b_scrollView(self, e, uid):
+        a = self.a
+        subs = []
+        keys = dict(NSsFlags=0x20032 if yes(e, "hasVerticalScroller", True) else 0x20030,
+                    NSAutohidesScrollers=yes(e, "autohidesScrollers"))
+        cv = child(e, "clipView", "contentView")
+        if cv is not None:
+            cuid = self.uid_for(cv.get("id")) if cv.get("id") else a.reserve()
+            self.view(cv, cuid, uid)
+            self.pairs.append((cuid, uid))
+            keys["NSContentView"] = cuid
+            subs.append(cuid)
+        hv = child(e, "tableHeaderView", "headerView")
+        if hv is not None:
+            hclip = a.reserve()
+            huid = self.uid_for(hv.get("id")) if hv.get("id") else a.reserve()
+            self.view(hv, huid, hclip)
+            r = child(hv, "rect", "frame")
+            a.fill(hclip, a.obj("NSClipView", supers("NSView"), NSFrame=rect_string(r), NSvFlags=0x100 | 2,
+                                NSSuperview=uid, NSSubviews=a.array([huid]), NSDocView=huid,
+                                NSDrawsBackground=False))
+            self.pairs += [(hclip, uid), (huid, hclip)]
+            keys["NSHeaderClipView"] = hclip
+            subs.append(hclip)
+        keys["NSSubviews"] = a.array(subs)
+        return "NSScrollView", keys
+
+    def b_clipView(self, e, uid):
+        sv = child(e, "subviews")
+        doc = [s for s in (sv if sv is not None else []) if s.get("id")]
+        keys = dict(NSDrawsBackground=yes(e, "drawsBackground", True),
+                    NSBGColor=self.color(child(e, "color", "backgroundColor")))
+        if doc:
+            keys["NSDocView"] = self.uid_for(doc[0].get("id"))
+        return "NSClipView", keys
+
+    def b_tableHeaderView(self, e, uid):
+        return "NSTableHeaderView", {}
+
+    def b_tableView(self, e, uid, cls="NSTableView"):
+        a = self.a
+        columns, prototypes = [], []
+        tc = child(e, "tableColumns")
+        for col in (tc if tc is not None else []):
+            if col.tag != "tableColumn":
+                continue
+            cuid = self.uid_for(col.get("id")) if col.get("id") else a.reserve()
+            keys = dict(NSIdentifier=a.string(col.get("identifier", "")), NSWidth=float(col.get("width", "100")),
+                        NSMinWidth=float(col.get("minWidth", "10")), NSMaxWidth=float(col.get("maxWidth", "3.4e38")),
+                        NSIsEditable=yes(col, "editable", True), NSIsHidden=yes(col, "hidden"), NSTableView=uid)
+            hc = child(col, "tableHeaderCell", "headerCell")
+            if hc is not None:
+                keys["NSHeaderCell"] = self.text_cell(hc, "NSTableHeaderCell")
+            dc = child(col, "textFieldCell", "dataCell")
+            if dc is not None:
+                keys["NSDataCell"] = self.text_cell(dc, "NSTextFieldCell")
+            elif child(col, "buttonCell", "dataCell") is not None:
+                keys["NSDataCell"] = self.button_cell(child(col, "buttonCell", "dataCell"))
+            rm = child(col, "tableColumnResizingMask", "resizingMask")
+            if rm is not None:
+                keys["NSResizingMask"] = (1 if yes(rm, "resizeWithTable") else 0) | (2 if yes(rm, "userResizable") else 0)
+            sd = child(col, "sortDescriptor", "sortDescriptorPrototype")
+            if sd is not None:
+                keys["NSSortDescriptorPrototype"] = a.add(a.obj(
+                    "NSSortDescriptor", (), NSKey=a.string(sd.get("key", "")),
+                    NSAscending=yes(sd, "ascending", True), NSSelector=a.string(sd.get("selector", "compare:"))))
+            a.fill(cuid, a.obj("NSTableColumn", (), **keys))
+            self.pairs.append((cuid, uid))
+            self.connections_of(col, cuid)
+            pv = child(col, "prototypeCellViews")
+            for cell_view in (pv if pv is not None else []):
+                ident = cell_view.get("identifier") or col.get("identifier") or ""
+                prototypes.append((ident, self.prototype(cell_view)))
+            columns.append(cuid)
+        f = 0
+        if yes(e, "columnReordering", True):
+            f |= 0x80000000
+        if yes(e, "columnResizing", True):
+            f |= 0x40000000
+        if e.get("gridStyleMask") not in (None, "none"):
+            f |= 0x20000000
+        if yes(e, "emptySelection", True):
+            f |= 0x10000000
+        if yes(e, "multipleSelection", True):
+            f |= 0x08000000
+        if yes(e, "columnSelection"):
+            f |= 0x04000000
+        if yes(e, "autosaveColumns", True):
+            f |= 0x01000000
+        if yes(e, "alternatingRowBackgroundColors"):
+            f |= 0x00800000
+        spacing = child(e, "size", "intercellSpacing")
+        keys = dict(NSTableColumns=a.array(columns), NSRowHeight=float(e.get("rowHeight", "17")),
+                    NSIntercellSpacingWidth=float(spacing.get("width", "3")) if spacing is not None else 3.0,
+                    NSIntercellSpacingHeight=float(spacing.get("height", "2")) if spacing is not None else 2.0,
+                    NSTvFlags=f, NSEnabled=yes(e, "enabled", True), NSAllowsTypeSelect=yes(e, "typeSelect", True),
+                    NSColumnAutoresizingStyle={"none": 0, "uniform": 1, "sequential": 2, "reverseSequential": 3,
+                                               "lastColumnOnly": 4, "firstColumnOnly": 5}.get(
+                                                   e.get("columnAutoresizingStyle"), 1),
+                    NSBackgroundColor=self.color(child(e, "color", "backgroundColor")),
+                    NSGridColor=self.color(child(e, "color", "gridColor")))
+        if e.get("headerView"):
+            keys["NSHeaderView"] = self.uid_for(e.get("headerView"))
+        if prototypes:
+            nibs = [(k, a.add(a.obj("NSNib", (), NSNibFileData=data))) for k, data in prototypes]
+            keys["NSTableViewArchivedReusableViewsKey"] = a.add(a.obj(
+                "NSDictionary", (), **{"NS.keys": [a.string(k) for k, _ in nibs], "NS.objects": [v for _, v in nibs]}))
+        if cls == "NSOutlineView":
+            keys["NSOutlineViewIndentationPerLevelKey"] = float(e.get("indentationPerLevel", "16"))
+            if e.get("outlineTableColumn"):
+                keys["NSOutlineViewOutlineTableColumnKey"] = self.uid_for(e.get("outlineTableColumn"))
+            elif columns:
+                keys["NSOutlineViewOutlineTableColumnKey"] = columns[0]
+        return cls, keys
+
+    def b_outlineView(self, e, uid):
+        return self.b_tableView(e, uid, "NSOutlineView")
+
+    def prototype(self, cell_view):
+        """A view-based table's cell view, as the nib of its own that the table
+        keeps for -makeViewWithIdentifier:owner:. Its outlets to File's Owner
+        go to that call's owner; a connection to anything else outside the
+        cell view is left out."""
+        sub = Compiler(self.root, self.warn)
+        sub.unknown = self.unknown
+        owner = sub.uid_for("-2")
+        sub.a.fill(owner, sub.a.obj("NSCustomObject", (), NSClassName=sub.a.string("NSObject")))
+        first = sub.uid_for("-1")
+        sub.a.fill(first, sub.a.obj("NSCustomObject", (), NSClassName=sub.a.string("FirstResponder")))
+        sub.pairs.append((first, owner))
+        vuid = sub.uid_for(cell_view.get("id")) if cell_view.get("id") else sub.a.reserve()
+        sub.view(cell_view, vuid, UID(0))
+        sub.pairs.append((vuid, owner))
+        return sub.finish(owner, quiet=True)
+
+    def b_tableCellView(self, e, uid):
+        return "NSTableCellView", {}
+
+    def b_splitView(self, e, uid):
+        return "NSSplitView", dict(NSIsVertical=yes(e, "vertical"),
+                                   NSDividerStyle={"thick": 1, "thin": 2, "paneSplitter": 3}.get(
+                                       e.get("dividerStyle"), 1),
+                                   NSAutosaveName=self.a.string(e.get("autosaveName"))
+                                   if e.get("autosaveName") else None)
+
+    def b_stackView(self, e, uid):
+        a = self.a
+        orientation = 1 if e.get("orientation") == "vertical" else 0
+        align = {"leading": 5, "trailing": 6, "top": 3, "bottom": 4, "left": 1, "right": 2, "centerX": 9,
+                 "centerY": 10, "firstBaseline": 12, "lastBaseline": 11}
+        keys = dict(NSStackViewOrientation=orientation, NSStackViewSpacing=float(e.get("spacing", "8")),
+                    NSStackViewDetachesHiddenViews=yes(e, "detachesHiddenViews"),
+                    NSStackViewDistribution={"gravityAreas": -1, "fill": 0, "fillEqually": 1,
+                                             "fillProportionally": 2, "equalSpacing": 3, "equalCentering": 4}.get(
+                                                 e.get("distribution"), -1))
+        if e.get("alignment") in align:
+            keys["NSStackViewAlignment"] = align[e.get("alignment")]
+        # the older form keeps its views in three gravity areas
+        for tag, key in (("beginningViews", "NSStackViewBeginningContainer"),
+                         ("middleViews", "NSStackViewMiddleContainer"), ("endViews", "NSStackViewEndContainer")):
+            g = child(e, tag)
+            if g is None:
+                continue
+            views = []
+            for v in g:
+                if v.get("id") is None:
+                    continue
+                vuid = self.uid_for(v.get("id"))
+                if a.objects[vuid.data] is None:
+                    self.view(v, vuid, uid)
+                    self.pairs.append((vuid, uid))
+                views.append(vuid)
+            keys[key] = a.add(a.obj("NSStackViewContainer", (), NSStackViewContainerNonDroppedViews=a.array(views)))
+        return "NSStackView", keys
+
+    def b_comboBox(self, e, uid):
+        a = self.a
+        cls, keys = self.b_textField(e, uid, "NSComboBox", "comboBoxCell", "NSComboBoxCell")
+        c = child(e, "comboBoxCell", "cell")
+        if c is not None:
+            vals = child(c, "objectValues", "objectValues")
+            items = [a.string(s.text or s.get("value") or "") for s in (vals if vals is not None else [])
+                     if s.tag == "string"]
+            keys.update(NSPopUpListData=a.array(items), NSUsesDataSource=yes(c, "usesDataSource"),
+                        NSCompletes=yes(c, "completes", True),
+                        NSVisibleItemCount=int(c.get("numberOfVisibleItems", "5")),
+                        NSHasVerticalScroller=yes(c, "hasVerticalScroller", True))
+        return cls, keys
+
+    def b_gridView(self, e, uid):
+        """A grid view keeps its cells' views in rows and columns; here they
+        become its subviews where the document placed them."""
+        subs = []
+        gc = child(e, "gridCells")
+        for cell in (gc if gc is not None else []):
+            v = cell.find("*[@key='contentView']")
+            if v is None or v.get("id") is None:
+                continue
+            vuid = self.uid_for(v.get("id"))
+            self.view(v, vuid, uid)
+            self.pairs.append((vuid, uid))
+            subs.append(vuid)
+        self.note_unknown("gridView", "a plain view holding its cells' views where they were placed")
+        return "NSView", dict(NSSubviews=self.a.array(subs))
+
+    def b_tokenField(self, e, uid):
+        cls, keys = self.b_textField(e, uid, "NSTokenField", "tokenFieldCell", "NSTokenFieldCell")
+        return cls, keys
+
+    def b_colorWell(self, e, uid):
+        return "NSColorWell", dict(NSColor=self.color(child(e, "color", "color")),
+                                   NSIsBordered=yes(e, "bordered", True), NSEnabled=yes(e, "enabled", True))
+
+
+VIEW_TAGS = {
+    "textField": Compiler.b_textField, "secureTextField": Compiler.b_secureTextField,
+    "searchField": Compiler.b_searchField, "button": Compiler.b_button, "popUpButton": Compiler.b_popUpButton,
+    "imageView": Compiler.b_imageView, "box": Compiler.b_box, "stepper": Compiler.b_stepper,
+    "slider": Compiler.b_slider, "progressIndicator": Compiler.b_progressIndicator,
+    "segmentedControl": Compiler.b_segmentedControl, "tabView": Compiler.b_tabView,
+    "scrollView": Compiler.b_scrollView, "clipView": Compiler.b_clipView,
+    "tableHeaderView": Compiler.b_tableHeaderView, "tableView": Compiler.b_tableView,
+    "outlineView": Compiler.b_outlineView, "tableCellView": Compiler.b_tableCellView,
+    "splitView": Compiler.b_splitView, "stackView": Compiler.b_stackView, "comboBox": Compiler.b_comboBox,
+    "colorWell": Compiler.b_colorWell, "gridView": Compiler.b_gridView, "tokenField": Compiler.b_tokenField,
+}
+# Elements whose Cocoa class isn't "NS" and the element's name.
+COCOA_NAMES = {"webView": "WebView", "wkWebView": "WKWebView", "pdfView": "PDFView", "mtkView": "MTKView",
+               "openGLView": "NSOpenGLView", "sceneView": "SCNView", "avPlayerView": "AVPlayerView"}
+
+
+def compile_xib(path, warn):
+    tree = ET.parse(path)
+    root = tree.getroot()
+    if root.tag == "archive":
+        raise SystemExit("ferry-ibtool: %s is in the older Interface Builder archive format, which isn't read; "
+                         "open and save it in a current Xcode to update it" % path)
+    if root.tag != "document":
+        raise SystemExit("ferry-ibtool: %s isn't an Interface Builder document" % path)
+    c = Compiler(root, warn)
+    objs = child(root, "objects")
+    if objs is None:
+        raise SystemExit("ferry-ibtool: %s has no objects" % path)
+    owner = c.uid_for("-2")
+    if not any(o.get("id") == "-2" for o in objs):
+        c.a.fill(owner, c.a.obj("NSCustomObject", (), NSClassName=c.a.string("NSObject")))
+    for o in objs:
+        c.top_object(o, owner)
+    return c.finish(owner)
+
+
+def main(argv):
+    out = None
+    inputs = []
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg in ("--compile", "-o"):
+            i += 1
+            out = argv[i] if i < len(argv) else None
+        elif arg in ("--errors", "--warnings", "--notices", "--flatten"):
+            pass
+        elif arg.startswith("--output-format") or arg in ("--minimum-deployment-target", "--module",
+                                                          "--target-device", "--output-partial-info-plist"):
+            if "=" not in arg:
+                i += 1
+        elif arg in ("-h", "--help"):
+            print(__doc__.strip())
+            return 0
+        else:
+            inputs.append(arg)
+        i += 1
+    if len(inputs) != 1 or not out:
+        sys.stderr.write("usage: ferry-ibtool --compile Out.nib In.xib\n")
+        return 2
+    name = os.path.basename(inputs[0])
+    if name.endswith(".storyboard"):
+        sys.stderr.write("ferry-ibtool: storyboards aren't compiled yet: %s\n" % inputs[0])
+        return 1
+    warn = lambda m: sys.stderr.write("ferry-ibtool: %s: %s\n" % (name, m))
+    try:
+        data = compile_xib(inputs[0], warn)
+    except ET.ParseError as e:
+        sys.stderr.write("ferry-ibtool: %s: %s\n" % (inputs[0], e))
+        return 1
+    d = os.path.dirname(out)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(out, "wb") as f:
+        f.write(data)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

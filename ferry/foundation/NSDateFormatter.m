@@ -18,6 +18,8 @@
 
 @implementation NSFormatter
 - (id)copyWithZone:(NSZone *)zone { return [[[self class] alloc] init]; }
+- (instancetype)initWithCoder:(NSCoder *)coder { return [self init]; }
+- (void)encodeWithCoder:(NSCoder *)coder {}
 - (NSString *)stringForObjectValue:(id)obj { return nil; }
 - (NSString *)editingStringForObjectValue:(id)obj { return [self stringForObjectValue:obj]; }
 - (BOOL)getObjectValue:(id *)obj forString:(NSString *)string errorDescription:(NSString **)error
@@ -1268,5 +1270,33 @@ static NSUInteger read_zone(NSString *s, const unichar *c, NSUInteger len, NSUIn
     NSString *f = [NSDateFormatter dateFormatFromTemplate:tmpl options:0 locale:[self locale]];
     if (f)
         [self setDateFormat:f];
+}
+
+/* A nib's date formatter keeps its settings in "NS.attributes", named as
+ * the properties are; older ones have their format in "NS.format". */
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [self init]))
+        return nil;
+    NSDictionary *attrs = [coder decodeObjectForKey:@"NS.attributes"];
+    if ([attrs isKindOfClass:[NSDictionary class]] && [attrs count]) {
+        FApplyFormatterAttributes(self, attrs, @[ @"formatterBehavior", @"dateStyle", @"timeStyle" ]);
+        return self;
+    }
+    NSString *format = [coder decodeObjectForKey:@"NS.format"];
+    if ([format isKindOfClass:[NSString class]])
+        [self setDateFormat:format];
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
+    [attrs setObject:@([self formatterBehavior]) forKey:@"formatterBehavior"];
+    [attrs setObject:@([self dateStyle]) forKey:@"dateStyle"];
+    [attrs setObject:@([self timeStyle]) forKey:@"timeStyle"];
+    if ([self dateFormat])
+        [attrs setObject:[self dateFormat] forKey:@"dateFormat"];
+    [attrs setObject:@([self isLenient]) forKey:@"lenient"];
+    [coder encodeObject:attrs forKey:@"NS.attributes"];
 }
 @end

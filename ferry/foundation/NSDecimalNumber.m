@@ -1156,9 +1156,29 @@ static NSDecimalNumber *operate(NSDecimalNumber *l, NSDecimalNumber *r, SEL sel,
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (Class)classForCoder { return [NSDecimalNumber class]; }
 - (void)encodeWithCoder:(NSCoder *)coder { [coder encodeObject:[self description] forKey:@"NS.decimal"]; }
+/* Ferry writes the number as a string; a Mac's archives, nibs among them,
+ * hold its parts: the mantissa as eight little-endian 16-bit words, the
+ * exponent, the word count and the sign. No words with the sign set is
+ * "not a number". */
 - (instancetype)initWithCoder:(NSCoder *)coder
 {
     NSString *s = [coder decodeObjectForKey:@"NS.decimal"];
+    if (![s isKindOfClass:[NSString class]] && [coder containsValueForKey:@"NS.mantissa"]) {
+        NSDecimal d;
+        memset(&d, 0, sizeof d);
+        NSUInteger n = 0;
+        const uint8_t *m = [coder decodeBytesForKey:@"NS.mantissa" returnedLength:&n];
+        BOOL big = [coder containsValueForKey:@"NS.mantissa.bo"] && [coder decodeIntForKey:@"NS.mantissa.bo"] == 0;
+        for (NSUInteger i = 0; m && i < NSDecimalMaxSize && 2 * i + 1 < n; i++)
+            d._mantissa[i] = big ? (unsigned short)(m[2 * i] << 8 | m[2 * i + 1])
+                                 : (unsigned short)(m[2 * i] | m[2 * i + 1] << 8);
+        int length = [coder decodeIntForKey:@"NS.length"];
+        d._length = (unsigned)(length < 0 ? 0 : length > NSDecimalMaxSize ? NSDecimalMaxSize : length);
+        d._exponent = [coder decodeIntForKey:@"NS.exponent"];
+        d._isNegative = [coder decodeBoolForKey:@"NS.negative"];
+        d._isCompact = [coder decodeBoolForKey:@"NS.compact"];
+        return [self initWithDecimal:d];
+    }
     return [self initWithString:[s isKindOfClass:[NSString class]] ? s : @"NaN" locale:nil];
 }
 @end

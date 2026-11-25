@@ -1409,6 +1409,87 @@ static BOOL take(NSString *s, NSUInteger *pos, NSUInteger end, NSString *word, B
 {
     return [NSString stringWithFormat:@"<%s: %p> %@", object_getClassName(self), self, [self positiveFormat]];
 }
+
+/* ---- archiving, for nibs ---------------------------------------------------------------------------- */
+
+/* A nib's formatter keeps its settings in "NS.attributes", named as the
+ * properties are; older ones have a few keys of their own. The behavior and
+ * style go first, since a style sets the formats it implies. */
+void FApplyFormatterAttributes(id formatter, NSDictionary *attrs, NSArray *first)
+{
+    NSMutableArray *keys = [NSMutableArray arrayWithArray:first];
+    for (NSString *k in attrs)
+        if (![keys containsObject:k])
+            [keys addObject:k];
+    for (NSString *k in keys) {
+        id v = [attrs objectForKey:k];
+        if (!v || ![k isKindOfClass:[NSString class]] || ![k length])
+            continue;
+        NSString *setter = [NSString stringWithFormat:@"set%@%@:", [[k substringToIndex:1] uppercaseString],
+                                                      [k substringFromIndex:1]];
+        if (![formatter respondsToSelector:NSSelectorFromString(setter)])
+            continue;
+        if ([v isKindOfClass:[NSAttributedString class]])
+            v = [v string];
+        @try {
+            [formatter setValue:v forKey:k];
+        } @catch (NSException *e) {
+        }
+    }
+}
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [self init]))
+        return nil;
+    NSDictionary *attrs = [coder decodeObjectForKey:@"NS.attributes"];
+    if ([attrs isKindOfClass:[NSDictionary class]] && [attrs count]) {
+        FApplyFormatterAttributes(self, attrs, @[ @"formatterBehavior", @"numberStyle" ]);
+        return self;
+    }
+    NSString *pos = [coder decodeObjectForKey:@"NS.positiveformat"];
+    NSString *neg = [coder decodeObjectForKey:@"NS.negativeformat"];
+    if ([pos isKindOfClass:[NSString class]])
+        [self setPositiveFormat:pos];
+    if ([neg isKindOfClass:[NSString class]])
+        [self setNegativeFormat:neg];
+    NSString *dec = [coder decodeObjectForKey:@"NS.decimal"];
+    NSString *thou = [coder decodeObjectForKey:@"NS.thousand"];
+    if ([dec isKindOfClass:[NSString class]])
+        [self setDecimalSeparator:dec];
+    if ([thou isKindOfClass:[NSString class]])
+        [self setGroupingSeparator:thou];
+    [self setUsesGroupingSeparator:[coder decodeBoolForKey:@"NS.hasthousands"]];
+    if ([coder containsValueForKey:@"NS.allowsfloats"])
+        [self setAllowsFloats:[coder decodeBoolForKey:@"NS.allowsfloats"]];
+    /* A limit of no digits is "not a number": no limit. */
+    NSNumber *min = [coder decodeObjectForKey:@"NS.min"], *max = [coder decodeObjectForKey:@"NS.max"];
+    if ([min isKindOfClass:[NSNumber class]] && ![min isEqual:[NSDecimalNumber notANumber]])
+        [self setMinimum:min];
+    if ([max isKindOfClass:[NSNumber class]] && ![max isEqual:[NSDecimalNumber notANumber]])
+        [self setMaximum:max];
+    return self;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
+    [attrs setObject:@([self formatterBehavior]) forKey:@"formatterBehavior"];
+    [attrs setObject:@([self numberStyle]) forKey:@"numberStyle"];
+    static NSString *const keys[] = {@"positiveFormat", @"negativeFormat", @"decimalSeparator", @"groupingSeparator",
+                                     @"minimum", @"maximum", @"nilSymbol", @"zeroSymbol", nil};
+    for (int i = 0; keys[i]; i++) {
+        id v = [self valueForKey:keys[i]];
+        if (v)
+            [attrs setObject:v forKey:keys[i]];
+    }
+    [attrs setObject:@([self usesGroupingSeparator]) forKey:@"usesGroupingSeparator"];
+    [attrs setObject:@([self allowsFloats]) forKey:@"allowsFloats"];
+    [attrs setObject:@([self minimumFractionDigits]) forKey:@"minimumFractionDigits"];
+    [attrs setObject:@([self maximumFractionDigits]) forKey:@"maximumFractionDigits"];
+    [attrs setObject:@([self generatesDecimalNumbers]) forKey:@"generatesDecimalNumbers"];
+    [coder encodeObject:attrs forKey:@"NS.attributes"];
+}
 @end
 
 /* ---- NSByteCountFormatter ---------------------------------------------------------------------- */

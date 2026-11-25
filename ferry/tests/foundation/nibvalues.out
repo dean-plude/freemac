@@ -1,0 +1,18 @@
+decimal from a Mac archive: NSDecimalNumber -1234.5
+  with big-endian words: -1234.5
+Ferry's own, read back: 98.76
+old nib formatter: NSNumberFormatter, format #,##0.00, decimal ',', grouping '.' 1, maximum 100000, minimum none
+  formats 1234.5 as 1.234,50
+newer nib formatter: style 1, fraction digits 1-1, grouping 0
+  formats 1234.56 as 1234.6
+archived and read back: style 3, maximum 2
+nib date formatter: yyyy/MM/dd, 1970/01/01
+date formatter read back: styles 3 0
+propertyList: a dictionary 1, 2 keys, sizes 3
+strings file: 2 entries, Quit is Quitter
+bad property list: NSParseErrorException
+indexOfObject:inRange: 3 1 NSNotFound
+indexOfObjectIdenticalTo:inRange: 1 NSNotFound
+out of range: NSRangeException
+iCloud: token none, container none, ubiquitous 0, notification NSUbiquityIdentityDidChangeNotification
+exit=0

@@ -1314,7 +1314,7 @@ long dispatch_semaphore_wait(struct dobj *s, uint64_t timeout)
 /* ---- sources ---------------------------------------------------------------- */
 
 /* DISPATCH_SOURCE_TYPE_TIMER and the others are addresses of variables. */
-enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_READ, S_WRITE, S_SIGNAL, S_PROC, S_OTHER };
+enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_READ, S_WRITE, S_SIGNAL, S_PROC, S_VNODE, S_OTHER };
 char ferry_dispatch_source_type_timer[16], ferry_dispatch_source_type_data_add[16],
     ferry_dispatch_source_type_data_or[16], ferry_dispatch_source_type_data_replace[16],
     ferry_dispatch_source_type_read[16], ferry_dispatch_source_type_write[16],
@@ -1335,7 +1335,7 @@ static const struct {
     {"write", ferry_dispatch_source_type_write, S_WRITE},
     {"signal", ferry_dispatch_source_type_signal, S_SIGNAL},
     {"proc", ferry_dispatch_source_type_proc, S_PROC},
-    {"vnode", ferry_dispatch_source_type_vnode, S_OTHER},
+    {"vnode", ferry_dispatch_source_type_vnode, S_VNODE},
     {"mach_recv", ferry_dispatch_source_type_mach_recv, S_OTHER},
     {"mach_send", ferry_dispatch_source_type_mach_send, S_OTHER},
     {"memorypressure", ferry_dispatch_source_type_memorypressure, S_OTHER},
@@ -1354,7 +1354,7 @@ struct dobj *dispatch_source_create(const void *type, uintptr_t handle, unsigned
                         source_types[i].name);
         }
     /* what a Mac refuses: a signal that isn't one, a descriptor that can't be */
-    if ((t == S_SIGNAL && (handle == 0 || handle >= 32)) || ((t == S_READ || t == S_WRITE) && handle > INT32_MAX) ||
+    if ((t == S_SIGNAL && (handle == 0 || handle >= 32)) || ((t == S_READ || t == S_WRITE || t == S_VNODE) && handle > INT32_MAX) ||
         (t == S_PROC && (handle == 0 || handle > INT32_MAX)))
         return NULL;
     struct dobj *s = new_object(K_SOURCE);
@@ -1474,10 +1474,16 @@ static uint64_t next_kid;
 static int ksource_change(struct dobj *s, int flags)
 {
     int16_t filter = s->source_type == S_READ ? FERRY_EVFILT_READ : s->source_type == S_WRITE ? FERRY_EVFILT_WRITE
-                   : s->source_type == S_SIGNAL ? FERRY_EVFILT_SIGNAL : FERRY_EVFILT_PROC;
+                   : s->source_type == S_SIGNAL ? FERRY_EVFILT_SIGNAL
+                   : s->source_type == S_VNODE ? FERRY_EVFILT_VNODE : FERRY_EVFILT_PROC;
     struct kevent64_s k = {.ident = s->handle, .filter = filter, .flags = (uint16_t)flags, .udata = s->kid};
     if (s->source_type == S_PROC)
         k.fflags = (uint32_t)(s->mask | FERRY_NOTE_EXIT);
+    if (s->source_type == S_VNODE) {
+        k.fflags = (uint32_t)s->mask;
+        if (flags & FERRY_EV_ADD)
+            k.flags |= FERRY_EV_CLEAR;
+    }
     return ferry_kevent64(kfd, &k, 1, NULL, 0, 0, NULL);
 }
 
@@ -1526,6 +1532,7 @@ static void *ksource_main(void *unused)
             case S_READ:
             case S_WRITE: s->data = ev[i].data > 0 ? (unsigned long)ev[i].data : 0; break;
             case S_SIGNAL: s->data += (unsigned long)ev[i].data; break;
+            case S_VNODE: s->data |= ev[i].fflags & s->mask; break;
             case S_PROC:
                 s->data |= ev[i].fflags & s->mask;
                 if ((ev[i].flags & FERRY_EV_EOF) && !s->kdone) {
@@ -1568,7 +1575,7 @@ static void ksource_start_locked(struct dobj *s)
         int e = errno;
         fprintf(stderr, "ferry: a dispatch %s source for %lu can't be watched (%s); it won't fire\n",
                 s->source_type == S_READ ? "read" : s->source_type == S_WRITE ? "write"
-                : s->source_type == S_SIGNAL ? "signal" : "process",
+                : s->source_type == S_SIGNAL ? "signal" : s->source_type == S_VNODE ? "vnode" : "process",
                 (unsigned long)s->handle, strerror(e));
         s->kregistered = -1;
         return;
@@ -1584,7 +1591,7 @@ static void ksource_start_locked(struct dobj *s)
 static void ksource_resumed_locked(struct dobj *s)
 {
     if (s->source_type != S_READ && s->source_type != S_WRITE && s->source_type != S_SIGNAL &&
-        s->source_type != S_PROC)
+        s->source_type != S_PROC && s->source_type != S_VNODE)
         return;
     if (s->cancelled)
         return;

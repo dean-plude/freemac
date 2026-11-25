@@ -1326,8 +1326,8 @@ NSString *FUserFolder(NSSearchPathDirectory dir)
     case NSMusicDirectory: return [FHome() stringByAppendingPathComponent:@"Music"];
     case NSPicturesDirectory: return [FHome() stringByAppendingPathComponent:@"Pictures"];
     case NSUserDirectory: return [FHome() stringByDeletingLastPathComponent];
+    default: return nil; /* a Mac folder with no counterpart here */
     }
-    return nil;
 }
 
 NSArray *NSSearchPathForDirectoriesInDomains(NSSearchPathDirectory dir, NSSearchPathDomainMask mask, BOOL expandTilde)

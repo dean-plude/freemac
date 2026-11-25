@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry SDK: the root class NSObject, as provided by Ferry's Objective-C
  * runtime. Written for freemac from Apple's public documentation; not
- * Apple's header. Methods that need Foundation (description, NSString,
- * NSMethodSignature) come with Ferry's Foundation. */
+ * Apple's header. Methods that need Foundation (description, which the
+ * protocol declares, and NSMethodSignature) come with Ferry's Foundation. */
 #ifndef _FERRY_OBJC_NSOBJECT_H_
 #define _FERRY_OBJC_NSOBJECT_H_
 #include <objc/objc.h>
@@ -10,6 +10,7 @@
 
 #ifdef __OBJC__
 @class Protocol;
+@class NSString;
 typedef struct _NSZone NSZone;
 
 @protocol NSObject
@@ -31,6 +32,11 @@ typedef struct _NSZone NSZone;
 - (instancetype)autorelease OBJC_ARC_UNAVAILABLE;
 - (NSUInteger)retainCount OBJC_ARC_UNAVAILABLE;
 - (NSZone *)zone OBJC_ARC_UNAVAILABLE;
+/* as on a Mac, so an object known only by the protocol (id<NSObject>)
+ * can be described */
+- (NSString *)description;
+@optional
+- (NSString *)debugDescription;
 @end
 
 OBJC_ROOT_CLASS

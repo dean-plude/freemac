@@ -1,0 +1,26 @@
+fts_open: yes
+  level 0 dir (root)
+  level 1 file a.txt 5 bytes
+  level 1 dir b
+  level 2 file two.txt 9 bytes
+  level 1 dir (after) b
+  level 1 dir c
+  level 1 dir (after) c
+  level 1 link link
+  level 0 dir (after) (root)
+fts_close: 0
+statfs: 0, block size set yes, blocks yes, type named yes, mounted on a path yes, same from fstatfs yes
+statfs of a missing path: -1 ENOENT yes
+asl_add_log_file: 0
+asl_get: "sent as a message"
+  log: AppsTest[pid] <Error>: an error 42
+  log: AppsTest[pid] <Warning>: sent as a message
+debug enabled: no, info enabled: yes
+public seen, private 7
+an error to the default log: ok
+O_SYMLINK: opened yes, a link yes, fchown to itself 0
+system: exited yes, status 3
+CPU_TYPE_X86_64 0x1000007, CPU_TYPE_ARM64 0x100000c, CPU_SUBTYPE_X86_64_ALL 3
+ENOATTR 93
+strings.h: strcasecmp 0, ffs(8) 4, rindex "/c"
+exit=0

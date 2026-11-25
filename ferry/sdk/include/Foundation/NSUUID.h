@@ -4,6 +4,7 @@
 #ifndef _FERRY_FOUNDATION_NSUUID_H_
 #define _FERRY_FOUNDATION_NSUUID_H_
 #include <Foundation/Foundation.h>
+#include <uuid/uuid.h>
 
 /* A universally unique identifier: random (version 4, RFC 4122) when made
  * with UUID or init, or read from its string or bytes. */

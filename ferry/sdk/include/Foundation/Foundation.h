@@ -211,7 +211,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 };
 typedef NS_OPTIONS(NSUInteger, NSSortOptions) { NSSortConcurrent = 1 << 0, NSSortStable = 1 << 4 };
 
-@class NSString, NSData, NSURL, NSError, NSDate, NSNumber, NSCharacterSet;
+@class NSString, NSData, NSURL, NSError, NSDate, NSNumber, NSCharacterSet, NSLocale;
 @class NSArray<ObjectType>, NSDictionary<KeyType, ObjectType>, NSEnumerator<ObjectType>;
 
 /* ---- protocols ------------------------------------------------------------ */
@@ -431,6 +431,16 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 - (NSString *)stringByAppendingPathComponent:(NSString *)component;
 - (NSString *)stringByAppendingPathExtension:(NSString *)ext;
 @end
+@interface NSString (NSStringFrameworkCalls)
+- (instancetype)initWithCharactersNoCopy:(unichar *)chars length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer;
+- (NSRange)rangeOfString:(NSString *)s
+               options:(NSStringCompareOptions)mask
+                 range:(NSRange)range
+                locale:(NSLocale *)locale;
+@end
+@interface NSString (FerryFileSystemBuffer)
+- (BOOL)getFileSystemRepresentation:(char *)buffer maxLength:(NSUInteger)maxLength;
+@end
 
 /* Encodings, and the text calls: lines, paragraphs, words, sentences, composed
  * characters and normalization (freemac 1.219, Ferry 0.43.0). */
@@ -574,6 +584,19 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (NSComparisonResult)compare:(NSNumber *)other;
 - (BOOL)isEqualToNumber:(NSNumber *)number;
 @end
+@interface NSNumber (NSNumberCreation)
+- (instancetype)initWithChar:(char)v;
+- (instancetype)initWithUnsignedChar:(unsigned char)v;
+- (instancetype)initWithShort:(short)v;
+- (instancetype)initWithUnsignedShort:(unsigned short)v;
+- (instancetype)initWithUnsignedInt:(unsigned int)v;
+- (instancetype)initWithLong:(long)v;
+- (instancetype)initWithUnsignedLong:(unsigned long)v;
+- (instancetype)initWithLongLong:(long long)v;
+- (instancetype)initWithUnsignedLongLong:(unsigned long long)v;
+- (instancetype)initWithFloat:(float)v;
+- (instancetype)initWithUnsignedInteger:(NSUInteger)v;
+@end
 
 /* ---- collections -------------------------------------------------------------------- */
 
@@ -605,6 +628,8 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (BOOL)containsObject:(ObjectType)obj;
 - (NSUInteger)indexOfObject:(ObjectType)obj;
 - (NSUInteger)indexOfObjectIdenticalTo:(ObjectType)obj;
+- (NSUInteger)indexOfObject:(ObjectType)obj inRange:(NSRange)range;
+- (NSUInteger)indexOfObjectIdenticalTo:(ObjectType)obj inRange:(NSRange)range;
 - (NSUInteger)indexOfObjectPassingTest:(BOOL (^)(ObjectType obj, NSUInteger idx, BOOL *stop))predicate;
 - (BOOL)isEqualToArray:(NSArray<ObjectType> *)other;
 - (NSArray<ObjectType> *)arrayByAddingObject:(ObjectType)obj;
@@ -729,6 +754,24 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (void)intersectSet:(NSSet<ObjectType> *)other;
 - (void)setSet:(NSSet<ObjectType> *)other;
 @end
+/* The calls the apps' own frameworks make, below and with NSNumber, NSData,
+ * NSIndexSet and NSString (freemac 1.223, Ferry 0.47.0,
+ * foundation/NSFrameworkCalls.m). */
+@interface NSMutableSet<ObjectType> (NSMutableSetCreation)
+- (instancetype)initWithCapacity:(NSUInteger)capacity;
+@end
+
+/* A set that counts how many times each object is in it (freemac 1.223,
+ * Ferry 0.47.0). */
+@interface NSCountedSet<ObjectType> : NSMutableSet<ObjectType>
+- (instancetype)initWithCapacity:(NSUInteger)capacity;
+- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype)initWithSet:(NSSet<ObjectType> *)set;
+- (NSUInteger)countForObject:(ObjectType)object;
+- (NSEnumerator<ObjectType> *)objectEnumerator;
+- (void)addObject:(ObjectType)object;
+- (void)removeObject:(ObjectType)object;
+@end
 
 /* Index sets: sorted, non-overlapping ranges of indexes (a table's selection). */
 NSRange NSIntersectionRange(NSRange a, NSRange b);
@@ -760,6 +803,11 @@ NSRange NSUnionRange(NSRange a, NSRange b);
 - (void)enumerateRangesWithOptions:(NSEnumerationOptions)opts usingBlock:(void (^)(NSRange range, BOOL *stop))block;
 - (NSUInteger)indexPassingTest:(BOOL (^)(NSUInteger idx, BOOL *stop))predicate;
 - (NSIndexSet *)indexesPassingTest:(BOOL (^)(NSUInteger idx, BOOL *stop))predicate;
+@end
+@interface NSIndexSet (NSIndexSetRanges)
+- (void)enumerateIndexesInRange:(NSRange)range
+                        options:(NSEnumerationOptions)opts
+                     usingBlock:(void (^)(NSUInteger idx, BOOL *stop))block;
 @end
 @interface NSMutableIndexSet : NSIndexSet
 - (void)addIndex:(NSUInteger)index;
@@ -970,6 +1018,20 @@ typedef NS_OPTIONS(NSUInteger, NSDataReadingOptions) {
 };
 enum { NSAtomicWrite = NSDataWritingAtomic };
 
+/* Base64's options (freemac 1.223, Ferry 0.47.0): lines of 64 or 76
+ * characters ended as asked (CR LF unless one is named), and, decoding,
+ * whether characters outside the alphabet are passed over. White space is
+ * always passed over. */
+typedef NS_OPTIONS(NSUInteger, NSDataBase64EncodingOptions) {
+    NSDataBase64Encoding64CharacterLineLength = 1UL << 0,
+    NSDataBase64Encoding76CharacterLineLength = 1UL << 1,
+    NSDataBase64EncodingEndLineWithCarriageReturn = 1UL << 4,
+    NSDataBase64EncodingEndLineWithLineFeed = 1UL << 5,
+};
+typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
+    NSDataBase64DecodingIgnoreUnknownCharacters = 1UL << 0,
+};
+
 @interface NSData : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 @property (readonly) NSUInteger length;
 @property (readonly) const void *bytes NS_RETURNS_INNER_POINTER;
@@ -991,6 +1053,8 @@ enum { NSAtomicWrite = NSDataWritingAtomic };
 - (NSRange)rangeOfData:(NSData *)data options:(NSUInteger)opts range:(NSRange)range;
 - (NSString *)base64EncodedStringWithOptions:(NSUInteger)opts;
 - (instancetype)initWithBase64EncodedString:(NSString *)string options:(NSUInteger)opts;
+- (instancetype)initWithBase64EncodedData:(NSData *)data options:(NSUInteger)opts;
+- (NSData *)base64EncodedDataWithOptions:(NSUInteger)opts;
 - (BOOL)isEqualToData:(NSData *)other;
 - (BOOL)writeToFile:(NSString *)path atomically:(BOOL)atomically;
 - (BOOL)writeToFile:(NSString *)path options:(NSDataWritingOptions)opts error:(NSError **)error;
@@ -1008,6 +1072,11 @@ enum { NSAtomicWrite = NSDataWritingAtomic };
 - (void)appendData:(NSData *)data;
 - (void)replaceBytesInRange:(NSRange)range withBytes:(const void *)bytes;
 - (void)setData:(NSData *)data;
+@end
+@interface NSMutableData (NSExtendedMutableData)
+- (void)increaseLengthBy:(NSUInteger)extraLength;
+- (void)replaceBytesInRange:(NSRange)range withBytes:(const void *)bytes length:(NSUInteger)length;
+- (void)resetBytesInRange:(NSRange)range;
 @end
 
 /* ---- NSDate ------------------------------------------------------------------------- */
@@ -1116,7 +1185,7 @@ FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
 
 @class NSCalendar;
 
-@interface NSFormatter : NSObject <NSCopying>
+@interface NSFormatter : NSObject <NSCopying, NSCoding>
 - (NSString *)stringForObjectValue:(id)obj;
 - (NSString *)editingStringForObjectValue:(id)obj;
 - (BOOL)getObjectValue:(id *)obj forString:(NSString *)string errorDescription:(NSString **)error;
@@ -1634,17 +1703,38 @@ FOUNDATION_EXPORT NSString *const NSStringEncodingErrorKey;
 
 enum {
     NSFileNoSuchFileError = 4,
+    NSFileLockingError = 255,
     NSFileReadUnknownError = 256,
     NSFileReadNoPermissionError = 257,
+    NSFileReadInvalidFileNameError = 258,
     NSFileReadCorruptFileError = 259,
     NSFileReadNoSuchFileError = 260,
+    NSFileReadInapplicableStringEncodingError = 261,
     NSFileReadUnsupportedSchemeError = 262,
+    NSFileReadTooLargeError = 263,
+    NSFileReadUnknownStringEncodingError = 264,
     NSFileWriteUnknownError = 512,
     NSFileWriteNoPermissionError = 513,
+    NSFileWriteInvalidFileNameError = 514,
     NSFileWriteFileExistsError = 516,
+    NSFileWriteInapplicableStringEncodingError = 517,
+    NSFileWriteUnsupportedSchemeError = 518,
+    NSFileWriteOutOfSpaceError = 640,
     NSFileWriteVolumeReadOnlyError = 642,
+    NSFileManagerUnmountUnknownError = 768,
+    NSFileManagerUnmountBusyError = 769,
+    NSKeyValueValidationError = 1024,
     NSUserCancelledError = 3072,
     NSFeatureUnsupportedError = 3328,
+    NSExecutableNotLoadableError = 3584,
+    NSExecutableLoadError = 3587,
+    NSPropertyListReadCorruptError = 3840,
+    NSPropertyListReadUnknownVersionError = 3841,
+    NSPropertyListReadStreamError = 3842,
+    NSPropertyListWriteStreamError = 3851,
+    NSPropertyListWriteInvalidError = 3852,
+    NSCoderReadCorruptError = 4864,
+    NSCoderValueNotFoundError = 4865,
 };
 
 @interface NSError : NSObject <NSCopying>
@@ -1723,6 +1813,27 @@ typedef struct {
     NSInteger patchVersion;
 } NSOperatingSystemVersion;
 
+/* What a program is doing, for the system's power management (freemac 1.223,
+ * Ferry 0.47.0). freemac doesn't end idle programs or put the machine to
+ * sleep on a program's say, so an activity is a token to end, and the
+ * counts of sudden and automatic termination are kept and answered only. */
+typedef NS_OPTIONS(uint64_t, NSActivityOptions) {
+    NSActivityIdleDisplaySleepDisabled = (1ULL << 40),
+    NSActivityIdleSystemSleepDisabled = (1ULL << 20),
+    NSActivitySuddenTerminationDisabled = (1ULL << 14),
+    NSActivityAutomaticTerminationDisabled = (1ULL << 15),
+    NSActivityUserInitiated = (0x00FFFFFFULL | NSActivityIdleSystemSleepDisabled),
+    NSActivityUserInitiatedAllowingIdleSystemSleep = (NSActivityUserInitiated & ~NSActivityIdleSystemSleepDisabled),
+    NSActivityBackground = 0x000000FFULL,
+    NSActivityLatencyCritical = 0xFF00000000ULL,
+};
+typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
+    NSProcessInfoThermalStateNominal,
+    NSProcessInfoThermalStateFair,
+    NSProcessInfoThermalStateSerious,
+    NSProcessInfoThermalStateCritical,
+};
+
 @interface NSProcessInfo : NSObject
 + (NSProcessInfo *)processInfo;
 @property (readonly) NSOperatingSystemVersion operatingSystemVersion;
@@ -1738,6 +1849,24 @@ typedef struct {
 @property (readonly) unsigned long long physicalMemory;
 @property (readonly) NSTimeInterval systemUptime;
 @property (readonly, copy) NSString *operatingSystemVersionString;
+@end
+@interface NSProcessInfo (FerryPower)
+- (void)disableSuddenTermination;
+- (void)enableSuddenTermination;
+- (void)disableAutomaticTermination:(NSString *)reason;
+- (void)enableAutomaticTermination:(NSString *)reason;
+@property BOOL automaticTerminationSupportEnabled;
+- (id<NSObject>)beginActivityWithOptions:(NSActivityOptions)options reason:(NSString *)reason;
+- (void)endActivity:(id<NSObject>)activity;
+- (void)performActivityWithOptions:(NSActivityOptions)options
+                            reason:(NSString *)reason
+                        usingBlock:(void (^)(void))block;
+@property (readonly) NSProcessInfoThermalState thermalState;
+@property (readonly, getter=isLowPowerModeEnabled) BOOL lowPowerModeEnabled;
+@property (readonly, getter=isMacCatalystApp) BOOL macCatalystApp;
+@property (readonly, getter=isiOSAppOnMac) BOOL iOSAppOnMac;
+@property (readonly, copy) NSString *userName;
+@property (readonly, copy) NSString *fullUserName;
 @end
 
 @interface NSBundle : NSObject
@@ -1772,6 +1901,16 @@ typedef struct {
 - (BOOL)unload;
 @property (readonly) Class principalClass;
 - (Class)classNamed:(NSString *)className;
+@end
+@interface NSBundle (FerryLocalizations)
+/* The bundle's localizations (its .lproj folders), and those of a list the
+ * user's languages pick, best first (freemac 1.223, Ferry 0.47.0). */
+@property (readonly, copy) NSArray<NSString *> *localizations;
+@property (readonly, copy) NSArray<NSString *> *preferredLocalizations;
+@property (readonly, copy) NSString *developmentLocalization;
++ (NSArray<NSString *> *)preferredLocalizationsFromArray:(NSArray<NSString *> *)localizations;
++ (NSArray<NSString *> *)preferredLocalizationsFromArray:(NSArray<NSString *> *)localizations
+                                          forPreferences:(NSArray<NSString *> *)preferences;
 @end
 #define NSLocalizedString(key, comment) [[NSBundle mainBundle] localizedStringForKey:(key) value:@"" table:nil]
 #define NSLocalizedStringFromTable(key, tbl, comment) \
@@ -1841,6 +1980,14 @@ typedef NS_ENUM(NSUInteger, NSSearchPathDirectory) {
     NSMoviesDirectory = 17,
     NSMusicDirectory = 18,
     NSPicturesDirectory = 19,
+    /* folders freemac has no counterpart for: NSSearchPathForDirectoriesInDomains
+     * answers no path for them */
+    NSDemoApplicationDirectory = 2, NSDeveloperApplicationDirectory = 3, NSAdminApplicationDirectory = 4,
+    NSDeveloperDirectory = 6, NSDocumentationDirectory = 8, NSCoreServiceDirectory = 10,
+    NSAutosavedInformationDirectory = 11, NSInputMethodsDirectory = 16, NSPrinterDescriptionDirectory = 20,
+    NSSharedPublicDirectory = 21, NSPreferencePanesDirectory = 22, NSApplicationScriptsDirectory = 23,
+    NSItemReplacementDirectory = 99, NSAllApplicationsDirectory = 100, NSAllLibrariesDirectory = 101,
+    NSTrashDirectory = 102,
 };
 typedef NS_OPTIONS(NSUInteger, NSSearchPathDomainMask) {
     NSUserDomainMask = 1, NSLocalDomainMask = 2, NSNetworkDomainMask = 4, NSSystemDomainMask = 8,
@@ -1948,7 +2095,14 @@ FOUNDATION_EXPORT NSString *const NSFileTypeCharacterSpecial, *const NSFileTypeB
 - (BOOL)linkItemAtPath:(NSString *)srcPath toPath:(NSString *)dstPath error:(NSError **)error;
 - (BOOL)createSymbolicLinkAtURL:(NSURL *)url withDestinationURL:(NSURL *)destURL error:(NSError **)error;
 - (BOOL)trashItemAtURL:(NSURL *)url resultingItemURL:(NSURL **)outResultingURL error:(NSError **)error;
+/* iCloud: freemac has no iCloud account, so there is no identity token,
+ * no ubiquity container and no item is ubiquitous, as on a Mac signed out
+ * of iCloud. */
+@property (readonly, copy) id<NSObject, NSCopying, NSCoding> ubiquityIdentityToken;
+- (NSURL *)URLForUbiquityContainerIdentifier:(NSString *)containerIdentifier;
+- (BOOL)isUbiquitousItemAtURL:(NSURL *)url;
 @end
+FOUNDATION_EXPORT NSString *const NSUbiquityIdentityDidChangeNotification;
 
 @interface NSDictionary (FerryFileAttributes)
 - (NSUInteger)filePosixPermissions;
@@ -1989,6 +2143,12 @@ FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFi
 - (BOOL)setResourceValues:(NSDictionary<NSURLResourceKey, id> *)keyedValues error:(NSError **)error;
 @end
 
+/* the older base64 names, without options (freemac 1.223, Ferry 0.47.0) */
+@interface NSData (NSDeprecated)
+- (instancetype)initWithBase64Encoding:(NSString *)string;
+- (NSString *)base64Encoding;
+@end
+
 @interface NSData (FerryFileAccess)
 - (BOOL)writeToURL:(NSURL *)url options:(NSDataWritingOptions)writeOptionsMask error:(NSError **)error;
 @end
@@ -2015,6 +2175,13 @@ typedef NS_OPTIONS(NSUInteger, NSPropertyListMutabilityOptions) {
 };
 typedef NSUInteger NSPropertyListReadOptions;
 typedef NSUInteger NSPropertyListWriteOptions;
+
+/* A string's text as a property list, in any of the formats the class
+ * below reads; propertyList raises NSParseErrorException when it isn't one. */
+@interface NSString (NSExtendedStringPropertyListParsing)
+- (id)propertyList;
+- (NSDictionary *)propertyListFromStringsFileFormat;
+@end
 
 @interface NSPropertyListSerialization : NSObject
 + (id)propertyListWithData:(NSData *)data options:(NSPropertyListReadOptions)opt
@@ -2621,5 +2788,9 @@ enum { NSFormattingError = 2048 };
 /* Affine transforms (freemac 1.219, Ferry 0.43.0). */
 #include <Foundation/NSAffineTransform.h>
 #include <Foundation/NSByteOrder.h>
+/* CoreServices, which a Mac's Foundation brings in (through
+ * NSAppleEventDescriptor.h): Gestalt, Apple events, Launch Services, the
+ * Process Manager's serial numbers and file references. */
+#include <CoreServices/CoreServices.h>
 
 #endif

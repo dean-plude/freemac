@@ -9,7 +9,10 @@ __FERRY_BEGIN
 typedef uint32_t attrgroup_t;
 typedef uint32_t fsobj_type_t;
 typedef struct fsobj_id { uint32_t fid_objno, fid_generation; } fsobj_id_t;
+#ifndef _FERRY_FSID_T
+#define _FERRY_FSID_T
 typedef struct fsid { int32_t val[2]; } fsid_t;
+#endif
 typedef struct attrreference { int32_t attr_dataoffset; uint32_t attr_length; } attrreference_t;
 typedef struct attribute_set { attrgroup_t commonattr, volattr, dirattr, fileattr, forkattr; } attribute_set_t;
 struct attrlist {

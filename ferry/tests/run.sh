@@ -39,7 +39,8 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= \
                 "$top/ferry" "$exe" -Mode fast > "$build/$name.got" 2> "$build/$name.err" ;;
-        foundation_dates|foundation_calendar|foundation_numbers|foundation_iso8601)
+        foundation_dates|foundation_calendar|foundation_numbers|foundation_iso8601|foundation_cflocale|\
+        foundation_nibvalues)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 LC_ALL= LC_MESSAGES= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -49,12 +50,12 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
-        foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents)
+        foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents|foundation_apps_more)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_document_presenter|appkit_quicklook)
+        appkit_document_presenter|appkit_quicklook|appkit_apps_more)
             # its files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -65,6 +66,10 @@ run_one() {
         appkit_panes|appkit_tables|appkit_table_dragging|appkit_controls|appkit_binding_controls|appkit_array_controller|appkit_tree_controller|appkit_nib_controllers|appkit_binding_validation)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$here/appkit" env -u WAYLAND_DISPLAY -u DISPLAY \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_ibtool)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_TEST_DATA="$build/ibtool" env -u WAYLAND_DISPLAY -u DISPLAY \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_more_controls)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
@@ -105,10 +110,14 @@ run_one() {
             url_env env FERRY_TEST_TLS_CERT="$build/tls.der" "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
         twins) "$top/ferry" "$exe" < /dev/null > "$build/$name.got" 2>&1 ;;
-        libsystem_more)
+        libsystem_more|libsystem_apps)
             # its files, and their extended attributes, in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             TMPDIR="$build/home_$name" "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # its files in a directory of its own; a hang is a failure
+        libsystem_kqueue_vnode)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            TMPDIR="$build/home_$name" timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         atomics) "$top/ferry" "$exe" > "$build/$name.got" 2>&1 ;;
         # threads: a hang is a failure, not a stuck run
         tlv_*|cxx_thread_local) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
@@ -169,6 +178,9 @@ run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore
 # 0.45.0): the SDK's availability, target and BSD headers, zlib's and
 # Mach-O's, and malloc zones, basename, extended attributes and scandir.
 run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
+# fts, statfs, asl, os_log, O_SYMLINK and the wait macros, for Sparkle and
+# the apps (1.223).
+run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
@@ -227,6 +239,9 @@ fi
 run_one libsystem_sockets "$here/libsystem_sockets.c" "$sockets_out"
 # kqueue and kevent: descriptors, timers, signals, processes and user events.
 run_one libsystem_kqueue "$here/libsystem_kqueue.c" "$here/libsystem_kqueue.out"
+# EVFILT_VNODE and O_EVTONLY, for file watchers such as Gas Mask's: a file's
+# changes, through inotify, and dispatch vnode sources.
+run_one libsystem_kqueue_vnode "$here/libsystem_kqueue_vnode.c" "$here/libsystem_kqueue_vnode.out" -fblocks
 # dlopen, dlsym, dladdr and the _dyld calls: a library found through @rpath
 # and a bundle opened RTLD_LOCAL, both built here.
 mkdir -p "$build/dlfcn_lib"
@@ -422,8 +437,8 @@ if command -v python3 > /dev/null 2>&1; then
     run_one foundation_urlconnection "$here/foundation/urlconnection.m" "$here/foundation/urlconnection.out" \
         -framework Foundation
     # redirects, authentication, cookies and caching decided as a Mac does,
-    # data: URLs, and a server's certificate as a challenge
-    for t in urlredirects urlauth urlcookies urlcache urldata; do
+    # data: URLs and NSURLDownload (1.223), and a server's certificate as a challenge
+    for t in urlredirects urlauth urlcookies urlcache urldata urldownload; do
         run_one "foundation_$t" "$here/foundation/$t.m" "$here/foundation/$t.out" -fobjc-arc -framework Foundation
     done
     if [ -n "$tls_port" ]; then
@@ -645,10 +660,29 @@ run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -f
 # Pop-up buttons, segmented controls, search fields, stack views and
 # toolbars, built in code and from a nib (1.161).
 run_one appkit_controls "$here/appkit/controls.m" "$here/appkit/controls.out" -fobjc-arc -framework Cocoa
+# A nib that ferry-ibtool compiled from a xib, Ferry's own document in the
+# format Interface Builder saves (1.223). What the tool says of an element
+# it makes as a plain view goes to its log.
+rm -rf "$build/ibtool"; mkdir -p "$build/ibtool"
+if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/ibtool/IBTool.nib" "$here/appkit/ibtool.xib" \
+        2> "$build/ibtool/ibtool.log" && grep -q "<levelIndicator> is made as a plain NSLevelIndicator" "$build/ibtool/ibtool.log"; then
+    run_one appkit_ibtool "$here/appkit/ibtool.m" "$here/appkit/ibtool.out" -fobjc-arc -framework Cocoa
+else
+    echo "FAIL appkit_ibtool (ferry-ibtool)"; sed 's/^/    /' "$build/ibtool/ibtool.log"; fail=$((fail + 1))
+fi
 run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_controls.out" -fobjc-arc \
     -framework Cocoa
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
+# What Flycut calls as it starts: the Process Manager for itself, remote
+# notifications that fail, cell clicks, menu item views and search buttons.
+run_one appkit_flycut_bits "$here/appkit/flycut_bits.m" "$here/appkit/flycut_bits.out" -fobjc-arc -framework Cocoa \
+    -framework Carbon
+# What ShiftIt, Spectacle and Sparkle call (1.223): Scripting Bridge, the
+# Touch Bar, NSWorkspace's file operations, the Cocoa error codes and
+# objc_msgSend with the old prototypes; without ARC, in a home of its own.
+run_one appkit_apps_more "$here/appkit/apps_more.m" "$here/appkit/apps_more.out" -fblocks -framework Cocoa \
+    -framework ScriptingBridge
 # Keyboard layouts (freemac 1.221, Ferry 0.45.0): input sources and
 # UCKeyTranslate with the English (US) layout, with no Strata to ask.
 run_one appkit_keylayout "$here/appkit/keylayout.m" "$here/appkit/keylayout.out" -fobjc-arc -framework Cocoa \
@@ -1129,6 +1163,30 @@ run_one foundation_fsrefs "$here/foundation/fsrefs.m" "$here/foundation/fsrefs.o
     -framework CoreServices
 # Folders' changes through FSEvents, heard with inotify (freemac 1.222,
 # Ferry 0.46.0), in a home of the test's own.
+# Apple events (descriptors, object specifiers, events to the program's own
+# handlers) and Launch Services, which Foundation brings in through Core
+# Services as on a Mac; CFLocale, CFDate, CFDateFormatter and CFError.
+run_one foundation_appleevents "$here/foundation/appleevents.m" "$here/foundation/appleevents.out" -framework Foundation \
+    -framework CoreServices
+run_one foundation_cflocale "$here/foundation/cflocale.c" "$here/foundation/cflocale.out" -framework CoreFoundation
+# Formatters and decimal numbers as a Mac's nibs hold them, old-style
+# property list strings, range searches and iCloud with no account.
+# CloudKit with no iCloud account, and SecTask's entitlements.
+run_one cloudkit "$here/cloudkit.m" "$here/cloudkit.out" -fobjc-arc -fblocks -framework Foundation \
+    -framework CloudKit -framework Security
+run_one foundation_nibvalues "$here/foundation/nibvalues.m" "$here/foundation/nibvalues.out" -fobjc-arc \
+    -framework Foundation
+# What Sparkle and the apps carrying it call (1.223): uniform type
+# identifiers, process activities, a bundle's localizations, base64's
+# options, the File Manager's copy, icon references, IOKit's power
+# assertions, a DSA signature checked by verify transforms, an
+# authorization that grants nothing and ARC's casts of CF types; in a home
+# of the test's own.
+run_one foundation_apps_more "$here/foundation/apps_more.m" "$here/foundation/apps_more.out" -fobjc-arc -fblocks \
+    -framework Foundation -framework CoreServices -framework IOKit -framework Security
+# Foundation calls KeePassKit and the apps' other frameworks make (1.223).
+run_one foundation_framework_calls "$here/foundation/framework_calls.m" "$here/foundation/framework_calls.out" \
+    -fobjc-arc -fblocks -framework Foundation
 run_one foundation_fsevents "$here/foundation/fsevents.m" "$here/foundation/fsevents.out" -fobjc-arc -fblocks \
     -framework Foundation -framework CoreServices
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \

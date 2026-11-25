@@ -38,6 +38,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -90,6 +91,13 @@
 #define NOTE_NSECONDS_ 0x4u
 #define NOTE_ABSOLUTE_ 0x8u
 #define NOTE_MACHTIME_ 0x100u
+#define NOTE_DELETE_ 0x1u
+#define NOTE_WRITE_ 0x2u
+#define NOTE_EXTEND_ 0x4u
+#define NOTE_ATTRIB_ 0x8u
+#define NOTE_LINK_ 0x10u
+#define NOTE_RENAME_ 0x20u
+#define NOTE_REVOKE_ 0x40u
 
 #define KEVENT_FLAG_IMMEDIATE_ 0x1u
 
@@ -103,6 +111,14 @@ struct knote {
     int always;            /* a regular file: pfd is an eventfd that stays readable */
     int lsig;              /* EVFILT_SIGNAL: the Linux signal */
     uint32_t ufflags;      /* EVFILT_USER: its flags */
+    /* EVFILT_VNODE: pfd is an epoll set of an inotify watch on the file
+     * and an eventfd that keeps it ready while a level-triggered knote has
+     * changes to report */
+    int ino, sticky;
+    int isdir;
+    uint32_t vpend;        /* the NOTE_ changes seen and not yet reported */
+    int64_t vsize;         /* its size and links when last seen, for NOTE_EXTEND and NOTE_LINK */
+    int64_t vnlink;
 };
 
 struct kq {
@@ -271,6 +287,12 @@ static void free_knote(struct kq *kq, struct knote *kn)
         unwatch_signal(kn->lsig, kn->pfd);
     if (kn->pfd >= 0)
         close(kn->pfd);
+    if (kn->kev.filter == EVFILT_VNODE_) {
+        if (kn->ino >= 0)
+            close(kn->ino);
+        if (kn->sticky >= 0)
+            close(kn->sticky);
+    }
     if (is_fd_filter(kn->kev.filter))
         __atomic_sub_fetch(&fd_knotes, 1, __ATOMIC_SEQ_CST);
     free(kn);
@@ -334,9 +356,109 @@ static void user_fflags(struct knote *kn, uint32_t f)
 static int fd_events(const struct knote *kn)
 {
     uint32_t e = kn->kev.filter == EVFILT_READ_ ? EPOLLIN | EPOLLRDHUP : EPOLLOUT;
+    if (kn->kev.filter == EVFILT_VNODE_)
+        return EPOLLIN; /* its own epoll set; the knote decides when it stays ready */
     if (kn->always)
         e = EPOLLIN;
     return (int)(e | (kn->kev.flags & EV_CLEAR_ ? EPOLLET : 0));
+}
+
+/* ---- vnodes --------------------------------------------------------------------
+ * EVFILT_VNODE watches the file a descriptor is open on, through inotify:
+ * a watch on /proc/self/fd/N follows the file itself, wherever it moves.
+ *   NOTE_WRITE   the file was written (IN_MODIFY), or a directory's
+ *                entries changed (IN_CREATE, IN_DELETE, IN_MOVED_*)
+ *   NOTE_EXTEND  a write made the file larger
+ *   NOTE_ATTRIB  its attributes changed (IN_ATTRIB, its links the same)
+ *   NOTE_LINK    its count of links changed, or a directory gained or lost
+ *                a subdirectory
+ *   NOTE_DELETE  it was unlinked: IN_ATTRIB with no links left (while the
+ *                program holds it open, inotify sends no IN_DELETE_SELF
+ *                until the close), or IN_DELETE_SELF
+ *   NOTE_RENAME  it was renamed (IN_MOVE_SELF)
+ *   NOTE_REVOKE  its file system was unmounted (IN_UNMOUNT)
+ * Without EV_CLEAR the knote stays ready with what it saw, as on a Mac,
+ * until the program deletes it or adds it again. */
+#define VNODE_WATCH (IN_MODIFY | IN_ATTRIB | IN_MOVE_SELF | IN_DELETE_SELF | IN_CREATE | IN_DELETE | IN_MOVED_FROM | \
+                     IN_MOVED_TO)
+
+static int vnode_setup(struct knote *kn)
+{
+    struct stat st;
+    kn->ino = kn->sticky = -1;
+    if (kn->kev.ident > INT32_MAX || fstat((int)kn->kev.ident, &st) < 0)
+        return EBADF;
+    kn->isdir = S_ISDIR(st.st_mode);
+    kn->vsize = st.st_size;
+    kn->vnlink = (int64_t)st.st_nlink;
+    char path[64];
+    snprintf(path, sizeof path, "/proc/self/fd/%d", (int)kn->kev.ident);
+    struct epoll_event a = {.events = EPOLLIN}, b = {.events = EPOLLIN};
+    int e = 0;
+    if ((kn->ino = inotify_init1(IN_NONBLOCK | IN_CLOEXEC)) < 0)
+        e = errno;
+    else if (inotify_add_watch(kn->ino, path, VNODE_WATCH) < 0)
+        e = errno == ENOENT ? EBADF : errno;
+    else if ((kn->sticky = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)) < 0 || (kn->pfd = epoll_create1(EPOLL_CLOEXEC)) < 0)
+        e = errno;
+    else if ((a.data.fd = kn->ino, epoll_ctl(kn->pfd, EPOLL_CTL_ADD, kn->ino, &a)) < 0 ||
+             (b.data.fd = kn->sticky, epoll_ctl(kn->pfd, EPOLL_CTL_ADD, kn->sticky, &b)) < 0)
+        e = errno;
+    if (e) { /* the caller closes pfd */
+        if (kn->ino >= 0)
+            close(kn->ino);
+        if (kn->sticky >= 0)
+            close(kn->sticky);
+        return e;
+    }
+    kn->events = EPOLLIN;
+    return 0;
+}
+
+/* Reads what inotify saw into kn->vpend (only the changes the knote asked for). */
+static void vnode_read(struct knote *kn)
+{
+    char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+    uint32_t seen = 0;
+    for (;;) {
+        ssize_t n = read(kn->ino, buf, sizeof buf);
+        if (n <= 0)
+            break;
+        for (char *p = buf; p < buf + n;) {
+            const struct inotify_event *ie = (const struct inotify_event *)p;
+            uint32_t m = ie->mask;
+            if (ie->len) /* a directory's entry: only its coming and going count */
+                m &= IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_ISDIR;
+            if (m & IN_MODIFY)
+                seen |= NOTE_WRITE_;
+            if (m & (IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO)) {
+                seen |= NOTE_WRITE_;
+                if (m & IN_ISDIR)
+                    seen |= NOTE_LINK_;
+            }
+            if (m & IN_ATTRIB)
+                seen |= NOTE_ATTRIB_;
+            if (m & IN_MOVE_SELF)
+                seen |= NOTE_RENAME_;
+            if (m & IN_DELETE_SELF)
+                seen |= NOTE_DELETE_;
+            if (m & IN_UNMOUNT)
+                seen |= NOTE_REVOKE_;
+            p += sizeof *ie + ie->len;
+        }
+    }
+    if (!seen)
+        return;
+    struct stat st;
+    if (fstat((int)kn->kev.ident, &st) == 0) {
+        if ((seen & NOTE_ATTRIB_) && !kn->isdir && (int64_t)st.st_nlink != kn->vnlink)
+            seen = (seen & ~NOTE_ATTRIB_) | (st.st_nlink == 0 ? NOTE_DELETE_ : NOTE_LINK_);
+        if ((seen & NOTE_WRITE_) && !kn->isdir && st.st_size > kn->vsize)
+            seen |= NOTE_EXTEND_;
+        kn->vsize = st.st_size;
+        kn->vnlink = (int64_t)st.st_nlink;
+    }
+    kn->vpend |= seen & kn->kev.fflags;
 }
 
 static int pidfd_open_(pid_t pid) { return (int)syscall(SYS_pidfd_open, pid, 0); }
@@ -417,13 +539,13 @@ static int knote_setup(struct kq *kq, struct knote *kn)
         user_fflags(kn, k->fflags);
         return 0;
     case EVFILT_VNODE_:
+        return vnode_setup(kn);
     case EVFILT_EXCEPT_:
     case EVFILT_FS_:
     case EVFILT_VM_:
     case EVFILT_MACHPORT_: {
-        static const char *const names[] = {"VNODE", "EXCEPT", "FS", "VM", "MACHPORT"};
-        int which = k->filter == EVFILT_VNODE_ ? 0 : k->filter == EVFILT_EXCEPT_ ? 1 : k->filter == EVFILT_FS_ ? 2
-                  : k->filter == EVFILT_VM_ ? 3 : 4;
+        static const char *const names[] = {"EXCEPT", "FS", "VM", "MACHPORT"};
+        int which = k->filter == EVFILT_EXCEPT_ ? 0 : k->filter == EVFILT_FS_ ? 1 : k->filter == EVFILT_VM_ ? 2 : 3;
         if (!(__atomic_fetch_or(&once_notes, 1u << which, __ATOMIC_RELAXED) & (1u << which)))
             fprintf(stderr, "ferry: kevent's EVFILT_%s isn't supported yet; its events won't fire\n", names[which]);
         return 0;
@@ -487,6 +609,9 @@ static int apply_change(struct kq *kq, const struct kevent64_s *c)
         } else {
             kn->kev.fflags = c->fflags;
             kn->kev.data = c->data;
+        }
+        if (c->filter == EVFILT_VNODE_) {
+            kn->vpend &= c->fflags; /* what it no longer asks for isn't reported */
         }
         if (c->filter == EVFILT_TIMER_) {
             drain(kn->pfd);
@@ -614,6 +739,23 @@ static int knote_event(struct knote *kn, uint32_t rev, struct kevent64_s *out)
         }
         out->flags |= EV_EOF_ | EV_ONESHOT_;
         break;
+    case EVFILT_VNODE_: {
+        vnode_read(kn);
+        uint64_t v = 1;
+        if (kn->vpend && !(kn->kev.flags & (EV_CLEAR_ | EV_ONESHOT_ | EV_DISPATCH_))) {
+            out->fflags = kn->vpend;
+            if (write(kn->sticky, &v, sizeof v) < 0) /* stays ready with what it saw */
+                v = 0;
+            break;
+        }
+        if (read(kn->sticky, &v, sizeof v) < 0)
+            v = 0;
+        if (!kn->vpend)
+            return 0;
+        out->fflags = kn->vpend;
+        kn->vpend = 0;
+        break;
+    }
     case EVFILT_USER_:
         out->fflags = kn->ufflags;
         out->data = kn->kev.data;

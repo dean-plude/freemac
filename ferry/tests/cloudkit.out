@@ -1,0 +1,18 @@
+record: Clipping clip-1 in Clippings, text hello, keys 2
+copy: its own values 1, same ID 1
+archived: Clipping, clip-1, index 3
+a new record's name: 36 characters, default zone _defaultZone
+reference: clip-1, action 1
+default container: iCloud.cloudkit
+named container: iCloud.org.example
+account status: 3 (no account 1), error none
+user record: none, error CKErrorDomain 9
+private database scope: 2
+save: nothing, error 9 (not authenticated 1)
+query: 0 results, error 9
+modify operation: 0 saved, error CKErrorDomain 9
+  per-record blocks: 1
+cancelled fetch: 0 records, error 20 (cancelled 1)
+SecTask: some, type 1
+its iCloud entitlement: none
+exit=0

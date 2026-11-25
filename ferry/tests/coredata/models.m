@@ -44,7 +44,7 @@ static NSString *const contents_v2 =
     @"    <fetchRequest name=\"Long\" entity=\"Book\" predicateString=\"pages &gt; 300\"/>\n"
     @"</model>\n";
 
-static void write(NSString *path, NSString *text)
+static void write_text(NSString *path, NSString *text)
 {
     [[NSFileManager defaultManager] createDirectoryAtPath:[path stringByDeletingLastPathComponent]
                               withIntermediateDirectories:YES attributes:nil error:NULL];
@@ -84,8 +84,8 @@ int main(void)
 
         /* a model's source, in a bundle */
         NSString *source = [tmp stringByAppendingPathComponent:@"Source.bundle/Contents/Resources/Library.xcdatamodeld"];
-        write([source stringByAppendingPathComponent:@"Library.xcdatamodel/contents"], contents_v1);
-        write([source stringByAppendingPathComponent:@"Library 2.xcdatamodel/contents"], contents_v2);
+        write_text([source stringByAppendingPathComponent:@"Library.xcdatamodel/contents"], contents_v1);
+        write_text([source stringByAppendingPathComponent:@"Library 2.xcdatamodel/contents"], contents_v2);
         [@{ @"_XCCurrentVersionName" : @"Library 2.xcdatamodel" }
             writeToFile:[source stringByAppendingPathComponent:@".xccurrentversion"] atomically:YES];
         NSDictionary *info = @{ @"CFBundleIdentifier" : @"org.freemac.test.models", @"CFBundlePackageType" : @"BNDL" };
@@ -121,15 +121,15 @@ int main(void)
         NSString *main = [[NSBundle mainBundle] resourcePath];
         NSString *inMain = [main stringByAppendingPathComponent:@"CDTestShelf.xcdatamodeld"];
         [[NSFileManager defaultManager] removeItemAtPath:inMain error:NULL];
-        write([inMain stringByAppendingPathComponent:@"CDTestShelf.xcdatamodel/contents"], contents_v2);
+        write_text([inMain stringByAppendingPathComponent:@"CDTestShelf.xcdatamodel/contents"], contents_v2);
         NSPersistentContainer *c = [NSPersistentContainer persistentContainerWithName:@"CDTestShelf"];
         describe("the container's model", c.managedObjectModel);
         [[NSFileManager defaultManager] removeItemAtPath:inMain error:NULL];
 
         /* compiled models aren't read */
         NSString *compiled = [tmp stringByAppendingPathComponent:@"Compiled.bundle/Contents/Resources"];
-        write([compiled stringByAppendingPathComponent:@"Shop.momd/Shop.mom"], @"not ours to read");
-        write([compiled stringByAppendingPathComponent:@"Shop.momd/VersionInfo.plist"], @"<plist/>");
+        write_text([compiled stringByAppendingPathComponent:@"Shop.momd/Shop.mom"], @"not ours to read");
+        write_text([compiled stringByAppendingPathComponent:@"Shop.momd/VersionInfo.plist"], @"<plist/>");
         [info writeToFile:[tmp stringByAppendingPathComponent:@"Compiled.bundle/Contents/Info.plist"] atomically:YES];
         NSBundle *cb = [NSBundle bundleWithPath:[tmp stringByAppendingPathComponent:@"Compiled.bundle"]];
         describe("merged from a bundle with only a .momd", [NSManagedObjectModel mergedModelFromBundles:@[ cb ]]);
@@ -138,7 +138,7 @@ int main(void)
         describe("a .mom's URL", [[NSManagedObjectModel alloc]
                                      initWithContentsOfURL:[NSURL fileURLWithPath:[compiled stringByAppendingPathComponent:@"Shop.momd/Shop.mom"]]]);
         NSString *mom = [main stringByAppendingPathComponent:@"CDTestShop.momd"];
-        write([mom stringByAppendingPathComponent:@"CDTestShop.mom"], @"not ours to read");
+        write_text([mom stringByAppendingPathComponent:@"CDTestShop.mom"], @"not ours to read");
         NSPersistentContainer *shop = [[NSPersistentContainer alloc] initWithName:@"CDTestShop"];
         describe("a container named for a .momd", shop.managedObjectModel);
         [shop loadPersistentStoresWithCompletionHandler:^(NSPersistentStoreDescription *d, NSError *e) {

@@ -34,6 +34,74 @@ CFURLRef CFURLCreateFromFSRef(CFAllocatorRef allocator, const FSRef *fsRef);
 OSStatus FSMoveObjectToTrashSync(const FSRef *source, FSRef *target, OptionBits options);
 OSStatus FSPathMoveObjectToTrashSync(const char *sourcePath, char **targetPath, OptionBits options);
 OSErr FSCompareFSRefs(const FSRef *ref1, const FSRef *ref2);
+/* Copying and moving into a folder (freemac 1.223, Ferry 0.47.0), by
+ * NSFileManager; destName NULL keeps the name. An item already there is
+ * replaced only with kFSFileOperationOverwrite (otherwise dupFNErr). */
+OSStatus FSCopyObjectSync(const FSRef *source, const FSRef *destDir, CFStringRef destName, FSRef *target,
+                          OptionBits options);
+OSStatus FSMoveObjectSync(const FSRef *source, const FSRef *destDir, CFStringRef destName, FSRef *target,
+                          OptionBits options);
+OSStatus FSPathCopyObjectSync(const char *sourcePath, const char *destDirPath, CFStringRef destName,
+                              char **targetPath, OptionBits options);
+OSStatus FSPathMoveObjectSync(const char *sourcePath, const char *destDirPath, CFStringRef destName,
+                              char **targetPath, OptionBits options);
+
+/* A file's catalog information (Files.h): its kind, sizes and dates, from
+ * stat. Volumes, Finder information and permissions read as zero, and the
+ * old FSSpec is never filled (64-bit Mac programs can't use one either). */
+typedef int16_t FSVolumeRefNum;
+typedef uint32_t FSCatalogInfoBitmap;
+typedef struct HFSUniStr255 {
+    UInt16 length;
+    UniChar unicode[255];
+} HFSUniStr255;
+typedef struct FSSpec {
+    FSVolumeRefNum vRefNum;
+    SInt32 parID;
+    Str63 name;
+} FSSpec;
+typedef FSSpec *FSSpecPtr;
+typedef struct UTCDateTime {
+    UInt16 highSeconds;
+    UInt32 lowSeconds;
+    UInt16 fraction;
+} __attribute__((packed, aligned(2))) UTCDateTime;
+typedef struct FSCatalogInfo {
+    UInt16 nodeFlags;
+    FSVolumeRefNum volume;
+    UInt32 parentDirID;
+    UInt32 nodeID;
+    UInt8 sharingFlags;
+    UInt8 userPrivileges;
+    UInt8 reserved1;
+    UInt8 reserved2;
+    UTCDateTime createDate;
+    UTCDateTime contentModDate;
+    UTCDateTime attributeModDate;
+    UTCDateTime accessDate;
+    UTCDateTime backupDate;
+    UInt32 permissions[4];
+    UInt8 finderInfo[16];
+    UInt8 extFinderInfo[16];
+    UInt64 dataLogicalSize;
+    UInt64 dataPhysicalSize;
+    UInt64 rsrcLogicalSize;
+    UInt64 rsrcPhysicalSize;
+    UInt32 valence;
+    UInt32 textEncodingHint;
+} FSCatalogInfo;
+enum {
+    kFSCatInfoNone = 0, kFSCatInfoTextEncoding = 0x1, kFSCatInfoNodeFlags = 0x2, kFSCatInfoVolume = 0x4,
+    kFSCatInfoParentDirID = 0x8, kFSCatInfoNodeID = 0x10, kFSCatInfoCreateDate = 0x20,
+    kFSCatInfoContentMod = 0x40, kFSCatInfoAttrMod = 0x80, kFSCatInfoAccessDate = 0x100,
+    kFSCatInfoBackupDate = 0x200, kFSCatInfoPermissions = 0x400, kFSCatInfoFinderInfo = 0x800,
+    kFSCatInfoFinderXInfo = 0x1000, kFSCatInfoValence = 0x2000, kFSCatInfoDataSizes = 0x4000,
+    kFSCatInfoRsrcSizes = 0x8000, kFSCatInfoSharingFlags = 0x10000, kFSCatInfoUserPrivs = 0x20000,
+    kFSCatInfoUserAccess = 0x80000, kFSCatInfoAllDates = 0x3E0, kFSCatInfoGettableInfo = 0x3FFFF,
+};
+enum { kFSNodeLockedMask = 0x0001, kFSNodeIsDirectoryMask = 0x0010 };
+OSErr FSGetCatalogInfo(const FSRef *ref, FSCatalogInfoBitmap whichInfo, FSCatalogInfo *catalogInfo,
+                       HFSUniStr255 *outName, FSSpecPtr fsSpec, FSRef *parentRef);
 
 /* Math64.h, which these days is a cast. */
 static inline UInt64 UnsignedWideToUInt64(UnsignedWide w) { return ((UInt64)w.hi << 32) | w.lo; }

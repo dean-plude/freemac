@@ -1,0 +1,42 @@
+initialized: null
+create: 0 type long size 4
+coerce long to utf8: 0
+  "42"
+coerce it back: 0 42
+duplicate: long, a record 0
+disposed: null
+list: 3 items, type list
+item 2: utf8 size 3
+item 9: -1719
+after a delete: 2
+record: a record 1
+key name: 0 "Flycut"
+missing key: -1701
+after deleting a key: 1
+offset: long
+specifier: 0 type obj , index disposed 1
+  want cwin from null form indx seld 2
+nested: container obj , name kept utf8
+comparison: cmpd operator =   
+logical: logi with 2 terms
+range: rang, inputs disposed 1
+install: 0
+get handler: 0, the same 1 refcon 7
+create event: 0 type aevt
+its class: Test
+handler: refcon 7, direct object utf8 (0) "clip", it is the current event 1
+send to itself: 0
+reply: 0 "CLIP"
+a handler that declines: -1708
+a handler that fails: 0, its reply's error -1728
+no handler: -1708
+handler: refcon 7, direct object utf8 (0) "pid", it is the current event 1
+send by pid: 0
+send to another program: -600
+permission for it: -600
+remove: 0, again -1717
+find an app that isn't there: -10814
+its URLs: none, error -10814
+default handler for a scheme nothing handles: none
+set one: -10823
+exit=0

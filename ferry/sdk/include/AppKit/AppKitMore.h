@@ -242,6 +242,13 @@ typedef NS_OPTIONS(NSUInteger, NSCellHitResult) {
 APPKIT_EXTERN NSNotificationName const NSMenuDidBeginTrackingNotification;
 APPKIT_EXTERN NSNotificationName const NSMenuDidEndTrackingNotification;
 APPKIT_EXTERN NSNotificationName const NSSystemColorsDidChangeNotification;
+/* A menu item's action is sent between these two, with the item's menu and
+ * the item as "MenuItem" in the user info. */
+APPKIT_EXTERN NSNotificationName const NSMenuWillSendActionNotification;
+APPKIT_EXTERN NSNotificationName const NSMenuDidSendActionNotification;
+/* the keyboard layout changing; freemac's layout is fixed while an app runs,
+ * so it isn't posted */
+APPKIT_EXTERN NSNotificationName const NSTextInputContextKeyboardSelectionDidChangeNotification;
 
 /* ---- more image names, which imageNamed: answers nil for until Ferry has
  * pictures of its own for them */

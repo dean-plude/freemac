@@ -4,14 +4,15 @@
  * available), SystemConfiguration's network reachability, and a few AppKit
  * and Foundation methods (services provider, paragraph styles in archives,
  * content borders, cell background styles, resolving links in a URL). The
- * Carbon declarations are written here from Apple's public documentation. */
+ * Carbon declarations are written here from Apple's public documentation;
+ * the Process Manager's and Accessibility's come with Cocoa, through
+ * Application Services, as on a Mac (freemac 1.223, Ferry 0.47.0). */
 #import <Cocoa/Cocoa.h>
 #include <SystemConfiguration/SystemConfiguration.h>
 #include <unistd.h>
 
 typedef int32_t OSStatus;
 typedef struct { uint32_t signature, id; } EventHotKeyID;
-typedef struct { uint32_t high, low; } ProcessSerialNumber;
 void *GetApplicationEventTarget(void);
 OSStatus InstallEventHandler(void *target, void *handler, unsigned long count, const void *types, void *userData,
                              void **outRef);
@@ -24,14 +25,6 @@ extern const CFStringRef kTISPropertyUnicodeKeyLayoutData;
 OSStatus UCKeyTranslate(const void *layout, uint16_t keyCode, uint16_t action, uint32_t modifiers, uint32_t kbdType,
                         uint32_t options, uint32_t *deadKeyState, unsigned long max, unsigned long *actualLength,
                         uint16_t *chars);
-OSStatus GetCurrentProcess(ProcessSerialNumber *psn);
-OSStatus GetProcessPID(const ProcessSerialNumber *psn, pid_t *pid);
-OSStatus TransformProcessType(const ProcessSerialNumber *psn, uint32_t type);
-Boolean AXIsProcessTrusted(void);
-Boolean AXIsProcessTrustedWithOptions(CFDictionaryRef options);
-extern const CFStringRef kAXTrustedCheckOptionPrompt;
-void *AXUIElementCreateApplication(pid_t pid);
-OSStatus AXUIElementCopyAttributeValue(void *element, CFStringRef attribute, CFTypeRef *value);
 
 int main(void)
 {
@@ -58,7 +51,7 @@ int main(void)
         printf("current process is this one: %d, transform %d\n", pid == getpid(), TransformProcessType(&psn, 1));
         NSDictionary *opts = @{(__bridge id)kAXTrustedCheckOptionPrompt : @YES};
         CFTypeRef value = (CFTypeRef)1;
-        void *app = AXUIElementCreateApplication(getpid());
+        AXUIElementRef app = AXUIElementCreateApplication(getpid());
         printf("trusted %d, with options %d, attribute %d, value %s\n", AXIsProcessTrusted(),
                AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)opts),
                AXUIElementCopyAttributeValue(app, CFSTR("AXWindows"), &value), value ? "set" : "NULL");

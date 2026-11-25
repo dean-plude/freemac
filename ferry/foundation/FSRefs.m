@@ -149,6 +149,94 @@ OSStatus FSMoveObjectToTrashSync(const FSRef *source, FSRef *target, OptionBits 
     return r;
 }
 
+/* ---- copying and moving (freemac 1.223, Ferry 0.47.0) ------------------------ */
+
+static OSStatus status_of(NSError *error)
+{
+    NSError *posix = [error userInfo][NSUnderlyingErrorKey];
+    NSInteger code = [[posix domain] isEqual:NSPOSIXErrorDomain] ? [posix code] : 0;
+    if (code == EACCES || code == EPERM || [error code] == NSFileReadNoPermissionError ||
+        [error code] == NSFileWriteNoPermissionError)
+        return permErr;
+    if (code == ENOENT || [error code] == NSFileNoSuchFileError || [error code] == NSFileReadNoSuchFileError)
+        return fnfErr;
+    if ([error code] == NSFileWriteFileExistsError || code == EEXIST)
+        return dupFNErr;
+    return ioErr;
+}
+
+static OSStatus copy_or_move(BOOL move, const char *from, const char *dir, CFStringRef name, NSString **where,
+                             OptionBits options)
+{
+    if (!from || !dir)
+        return errFSBadFSRef;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *src = [fm stringWithFileSystemRepresentation:from length:strlen(from)];
+    NSString *folder = [fm stringWithFileSystemRepresentation:dir length:strlen(dir)];
+    BOOL isDir = NO;
+    if (![fm fileExistsAtPath:folder isDirectory:&isDir] || !isDir)
+        return dirNFErr;
+    NSString *leaf = name ? (NSString *)name : [src lastPathComponent];
+    if (![leaf length] || [leaf rangeOfString:@"/"].location != NSNotFound)
+        return bdNamErr;
+    NSString *dest = [folder stringByAppendingPathComponent:leaf];
+    NSDictionary *there = [fm attributesOfItemAtPath:dest error:NULL];
+    if (there) {
+        if (!(options & kFSFileOperationOverwrite))
+            return dupFNErr;
+        NSError *error = nil;
+        if (![fm removeItemAtPath:dest error:&error])
+            return status_of(error);
+    }
+    NSError *error = nil;
+    BOOL ok = move ? [fm moveItemAtPath:src toPath:dest error:&error] : [fm copyItemAtPath:src toPath:dest error:&error];
+    if (!ok)
+        return status_of(error);
+    if (where)
+        *where = dest;
+    return noErr;
+}
+
+OSStatus FSCopyObjectSync(const FSRef *source, const FSRef *destDir, CFStringRef destName, FSRef *target,
+                          OptionBits options)
+{
+    NSString *where = nil;
+    OSStatus r = copy_or_move(NO, ref_path(source), ref_path(destDir), destName, &where, options);
+    if (r == noErr && target)
+        fill([where fileSystemRepresentation], NO, target, NULL);
+    return r;
+}
+
+OSStatus FSMoveObjectSync(const FSRef *source, const FSRef *destDir, CFStringRef destName, FSRef *target,
+                          OptionBits options)
+{
+    NSString *where = nil;
+    OSStatus r = copy_or_move(YES, ref_path(source), ref_path(destDir), destName, &where, options);
+    if (r == noErr && target)
+        fill([where fileSystemRepresentation], NO, target, NULL);
+    return r;
+}
+
+OSStatus FSPathCopyObjectSync(const char *sourcePath, const char *destDirPath, CFStringRef destName,
+                              char **targetPath, OptionBits options)
+{
+    NSString *where = nil;
+    OSStatus r = copy_or_move(NO, sourcePath, destDirPath, destName, &where, options);
+    if (r == noErr && targetPath)
+        *targetPath = strdup([where fileSystemRepresentation]);
+    return r;
+}
+
+OSStatus FSPathMoveObjectSync(const char *sourcePath, const char *destDirPath, CFStringRef destName,
+                              char **targetPath, OptionBits options)
+{
+    NSString *where = nil;
+    OSStatus r = copy_or_move(YES, sourcePath, destDirPath, destName, &where, options);
+    if (r == noErr && targetPath)
+        *targetPath = strdup([where fileSystemRepresentation]);
+    return r;
+}
+
 OSStatus FSPathMoveObjectToTrashSync(const char *sourcePath, char **targetPath, OptionBits options)
 {
     FSRef ref;
@@ -160,4 +248,98 @@ OSStatus FSPathMoveObjectToTrashSync(const char *sourcePath, char **targetPath, 
     if (r == noErr && targetPath)
         *targetPath = strdup([where fileSystemRepresentation]);
     return r;
+}
+
+/* ---- catalog information ---------------------------------------------------
+ * A file's kind, sizes and dates from stat. Mac dates count seconds from
+ * 1904; the fraction is in 65536ths. */
+static UTCDateTime utc(struct timespec t)
+{
+    UTCDateTime d;
+    uint64_t secs = (uint64_t)t.tv_sec + 2082844800ull;
+    d.highSeconds = (UInt16)(secs >> 32);
+    d.lowSeconds = (UInt32)secs;
+    d.fraction = (UInt16)(((uint64_t)t.tv_nsec << 16) / 1000000000ull);
+    return d;
+}
+
+OSErr FSGetCatalogInfo(const FSRef *ref, FSCatalogInfoBitmap whichInfo, FSCatalogInfo *info, HFSUniStr255 *outName,
+                       FSSpecPtr fsSpec, FSRef *parentRef)
+{
+    const char *p = ref_path(ref);
+    if (!p)
+        return errFSBadFSRef;
+    struct stat st;
+    if (stat(p, &st) != 0)
+        return errno == ENOENT ? fnfErr : ioErr;
+    @autoreleasepool {
+        if (info) {
+            memset(info, 0, sizeof *info);
+            if (S_ISDIR(st.st_mode))
+                info->nodeFlags |= kFSNodeIsDirectoryMask;
+            info->nodeID = (UInt32)st.st_ino;
+            info->createDate = utc(st.st_birthtimespec.tv_sec ? st.st_birthtimespec : st.st_mtimespec);
+            info->contentModDate = utc(st.st_mtimespec);
+            info->attributeModDate = utc(st.st_ctimespec);
+            info->accessDate = utc(st.st_atimespec);
+            info->permissions[0] = st.st_uid;
+            info->permissions[1] = st.st_gid;
+            info->permissions[2] = st.st_mode & 07777;
+            if (!S_ISDIR(st.st_mode)) {
+                info->dataLogicalSize = (UInt64)st.st_size;
+                info->dataPhysicalSize = (UInt64)st.st_blocks * 512;
+            } else if (whichInfo & kFSCatInfoValence) {
+                NSArray *items = [[NSFileManager defaultManager]
+                    contentsOfDirectoryAtPath:[NSString stringWithUTF8String:p] error:NULL];
+                info->valence = (UInt32)[items count];
+            }
+        }
+        if (outName) {
+            NSString *name = [[NSString stringWithUTF8String:p] lastPathComponent] ?: @"";
+            NSUInteger n = MIN([name length], (NSUInteger)255);
+            [name getCharacters:outName->unicode range:NSMakeRange(0, n)];
+            outName->length = (UInt16)n;
+        }
+        if (fsSpec)
+            memset(fsSpec, 0, sizeof *fsSpec);
+        if (parentRef) {
+            NSString *parent = [[NSString stringWithUTF8String:p] stringByDeletingLastPathComponent];
+            fill([parent fileSystemRepresentation], YES, parentRef, NULL);
+        }
+    }
+    return noErr;
+}
+
+/* ---- icon references (freemac 1.223, Ferry 0.47.0) ------------------------------ */
+
+/* An icon reference keeps the path of the file it was asked for, counted
+ * as AcquireIconRef and ReleaseIconRef count it. */
+OSErr GetIconRefFromFileInfo(const FSRef *ref, UniCharCount nameLength, const UniChar *name,
+                             FSCatalogInfoBitmap whichInfo, const FSCatalogInfo *catalogInfo,
+                             IconServicesUsageFlags flags, IconRef *out, SInt16 *label)
+{
+    if (!out)
+        return paramErr;
+    *out = NULL;
+    const char *p = ref_path(ref);
+    if (!p)
+        return errFSBadFSRef;
+    if (label)
+        *label = 0;
+    *out = (IconRef)[[NSString alloc] initWithUTF8String:p];
+    return noErr;
+}
+OSErr AcquireIconRef(IconRef icon)
+{
+    if (!icon)
+        return paramErr;
+    [(id)icon retain];
+    return noErr;
+}
+OSErr ReleaseIconRef(IconRef icon)
+{
+    if (!icon)
+        return paramErr;
+    [(id)icon release];
+    return noErr;
 }

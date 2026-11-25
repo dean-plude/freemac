@@ -1014,6 +1014,21 @@ static NSData *write_binary(id plist)
     return w.out;
 }
 
+@implementation NSString (NSExtendedStringPropertyListParsing)
+- (id)propertyList
+{
+    id v = FParsePlist([self dataUsingEncoding:NSUTF8StringEncoding], NSPropertyListImmutable, NULL);
+    if (!v && [self length])
+        [NSException raise:NSParseErrorException format:@"-[NSString propertyList]: the string isn't a property list"];
+    return v;
+}
+- (NSDictionary *)propertyListFromStringsFileFormat
+{
+    id v = FParsePlist([self dataUsingEncoding:NSUTF8StringEncoding], NSPropertyListImmutable, NULL);
+    return [v isKindOfClass:[NSDictionary class]] ? v : nil;
+}
+@end
+
 @implementation NSPropertyListSerialization
 + (id)propertyListWithData:(NSData *)data options:(NSPropertyListReadOptions)opt format:(NSPropertyListFormat *)format
                      error:(NSError **)error

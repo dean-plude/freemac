@@ -13,6 +13,24 @@ NSRunLoopMode const NSModalPanelRunLoopMode = @"NSModalPanelRunLoopMode";
 NSNotificationName const NSMenuDidBeginTrackingNotification = @"NSMenuDidBeginTrackingNotification";
 NSNotificationName const NSMenuDidEndTrackingNotification = @"NSMenuDidEndTrackingNotification";
 NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsDidChangeNotification";
+NSNotificationName const NSMenuWillSendActionNotification = @"NSMenuWillSendActionNotification";
+NSNotificationName const NSMenuDidSendActionNotification = @"NSMenuDidSendActionNotification";
+NSNotificationName const NSTextInputContextKeyboardSelectionDidChangeNotification =
+    @"NSTextInputContextKeyboardSelectionDidChangeNotification";
+
+/* A menu item chosen: its action, between the menu's two notifications. */
+void ASendMenuItemAction(NSMenuItem *item)
+{
+    SEL action = [item action];
+    if (!action)
+        return;
+    NSMenu *menu = [item menu];
+    NSDictionary *info = @{@"MenuItem" : item};
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc postNotificationName:NSMenuWillSendActionNotification object:menu userInfo:info];
+    [NSApp sendAction:action to:[item target] from:item];
+    [nc postNotificationName:NSMenuDidSendActionNotification object:menu userInfo:info];
+}
 
 NSImageName const NSImageNameComputer = @"NSComputer";
 NSImageName const NSImageNameNetwork = @"NSNetwork";

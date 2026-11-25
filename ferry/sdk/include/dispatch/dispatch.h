@@ -12,6 +12,9 @@
 #include <time.h>
 
 #ifdef __OBJC__
+/* As a Mac's os/object.h does: dispatch objects are NSObjects, so anything
+ * that includes dispatch (Core Services, Carbon) declares NSObject. */
+#include <objc/NSObject.h>
 typedef id dispatch_object_t;
 typedef id dispatch_queue_t;
 typedef id dispatch_queue_global_t;
@@ -77,7 +80,8 @@ extern struct dispatch_queue_s _dispatch_main_q;
 extern struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent;
 extern const struct dispatch_source_type_s _dispatch_source_type_timer, _dispatch_source_type_data_add,
     _dispatch_source_type_data_or, _dispatch_source_type_data_replace, _dispatch_source_type_read,
-    _dispatch_source_type_write, _dispatch_source_type_signal, _dispatch_source_type_proc;
+    _dispatch_source_type_write, _dispatch_source_type_signal, _dispatch_source_type_proc,
+    _dispatch_source_type_vnode;
 __FERRY_END
 
 #ifdef __OBJC__
@@ -105,6 +109,16 @@ typedef unsigned long dispatch_source_proc_flags_t;
 #define DISPATCH_PROC_FORK 0x40000000ul
 #define DISPATCH_PROC_EXEC 0x20000000ul
 #define DISPATCH_PROC_SIGNAL 0x08000000ul
+#define DISPATCH_SOURCE_TYPE_VNODE (&_dispatch_source_type_vnode)
+typedef unsigned long dispatch_source_vnode_flags_t;
+#define DISPATCH_VNODE_DELETE 0x1ul
+#define DISPATCH_VNODE_WRITE 0x2ul
+#define DISPATCH_VNODE_EXTEND 0x4ul
+#define DISPATCH_VNODE_ATTRIB 0x8ul
+#define DISPATCH_VNODE_LINK 0x10ul
+#define DISPATCH_VNODE_RENAME 0x20ul
+#define DISPATCH_VNODE_REVOKE 0x40ul
+#define DISPATCH_VNODE_FUNLOCK 0x100ul
 
 __FERRY_BEGIN
 dispatch_time_t dispatch_time(dispatch_time_t when, int64_t delta);
