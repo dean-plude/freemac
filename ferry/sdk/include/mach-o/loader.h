@@ -58,6 +58,11 @@ struct load_command { uint32_t cmd, cmdsize; };
 #define LC_DYLD_INFO 0x22
 #define LC_DYLD_INFO_ONLY (0x22 | LC_REQ_DYLD)
 #define LC_VERSION_MIN_MACOSX 0x24
+#define LC_VERSION_MIN_IPHONEOS 0x25
+#define LC_VERSION_MIN_TVOS 0x2f
+#define LC_VERSION_MIN_WATCHOS 0x30
+#define LC_ENCRYPTION_INFO 0x21
+#define LC_ENCRYPTION_INFO_64 0x2C
 #define LC_FUNCTION_STARTS 0x26
 #define LC_MAIN (0x28 | LC_REQ_DYLD)
 #define LC_DATA_IN_CODE 0x29
@@ -106,6 +111,9 @@ struct dylib {
 struct dylib_command { uint32_t cmd, cmdsize; struct dylib dylib; };
 struct rpath_command { uint32_t cmd, cmdsize; union lc_str path; };
 struct linkedit_data_command { uint32_t cmd, cmdsize, dataoff, datasize; };
+/* where an encrypted program's encrypted part lies; cryptid 0 is not encrypted */
+struct encryption_info_command { uint32_t cmd, cmdsize, cryptoff, cryptsize, cryptid; };
+struct encryption_info_command_64 { uint32_t cmd, cmdsize, cryptoff, cryptsize, cryptid, pad; };
 struct build_version_command { uint32_t cmd, cmdsize, platform, minos, sdk, ntools; };
 /* the dynamic symbol table, and the types of sections (freemac 1.227) */
 struct dysymtab_command {

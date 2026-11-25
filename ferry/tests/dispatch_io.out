@@ -1,0 +1,12 @@
+sizes 7 5 12, empty 0
+map "Hello, world"
+region at 0: "world"
+regions 1, bytes 5
+custom destructor ran 1
+write done 1 error 0 rest 1
+read at 7: done 1 error 0 "world"
+read all: 12 bytes
+barrier 1, cleanup error 0
+read after close: error is ECANCELED 1
+dispatch_read 5 bytes error 0
+exit=0

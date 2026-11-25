@@ -104,7 +104,7 @@ typedef const struct CF_BRIDGED_TYPE(NSNumber) __CFBoolean *CFBooleanRef;
 typedef const struct CF_BRIDGED_TYPE(NSNull) __CFNull *CFNullRef;
 typedef const struct CF_BRIDGED_TYPE(NSDate) __CFDate *CFDateRef;
 typedef const struct CF_BRIDGED_TYPE(NSURL) __CFURL *CFURLRef;
-typedef const struct CF_BRIDGED_TYPE(NSError) __CFError *CFErrorRef;
+typedef struct CF_BRIDGED_TYPE(NSError) __CFError *CFErrorRef;
 typedef struct __CFRunLoop *CFRunLoopRef;
 typedef struct __CFBundle *CFBundleRef;
 /* a string wrapped in a struct of its own in Swift, CFRunLoopMode(rawValue:) (freemac 1.230) */
@@ -141,6 +141,15 @@ typedef enum {
 #define CF_EXPORT extern
 #define CF_INLINE static inline
 
+/* nil, as a Mac's MacTypes.h gives it to C and C++ too: the same null as
+ * <objc/objc.h>'s (freemac 1.232) */
+#ifndef nil
+#ifdef __cplusplus
+#define nil __null
+#else
+#define nil ((void *)0)
+#endif
+#endif
 __FERRY_BEGIN
 CF_IMPLICIT_BRIDGING_ENABLED
 extern const CFAllocatorRef kCFAllocatorDefault;
@@ -223,6 +232,39 @@ void CFRunLoopStop(CFRunLoopRef rl);
 void CFRunLoopWakeUp(CFRunLoopRef rl);
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void));
 enum { kCFRunLoopRunFinished = 1, kCFRunLoopRunStopped = 2, kCFRunLoopRunTimedOut = 3, kCFRunLoopRunHandledSource = 4 };
+
+/* Run loop timers (freemac 1.232, Ferry 0.56.0): NSTimers, as on a Mac. An
+ * interval of 0 fires once. */
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSTimer) __CFRunLoopTimer *CFRunLoopTimerRef;
+typedef struct {
+    CFIndex version;
+    void *info;
+    const void *(*retain)(const void *info);
+    void (*release)(const void *info);
+    CFStringRef (*copyDescription)(const void *info);
+} CFRunLoopTimerContext;
+typedef void (*CFRunLoopTimerCallBack)(CFRunLoopTimerRef timer, void *info);
+CFTypeID CFRunLoopTimerGetTypeID(void);
+CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator, CFAbsoluteTime fireDate, CFTimeInterval interval,
+                                       CFOptionFlags flags, CFIndex order, CFRunLoopTimerCallBack callout,
+                                       CFRunLoopTimerContext *context);
+CFRunLoopTimerRef CFRunLoopTimerCreateWithHandler(CFAllocatorRef allocator, CFAbsoluteTime fireDate,
+                                                  CFTimeInterval interval, CFOptionFlags flags, CFIndex order,
+                                                  void (^block)(CFRunLoopTimerRef timer));
+void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode);
+void CFRunLoopRemoveTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode);
+Boolean CFRunLoopContainsTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode);
+void CFRunLoopTimerInvalidate(CFRunLoopTimerRef timer);
+Boolean CFRunLoopTimerIsValid(CFRunLoopTimerRef timer);
+CFAbsoluteTime CFRunLoopTimerGetNextFireDate(CFRunLoopTimerRef timer);
+void CFRunLoopTimerSetNextFireDate(CFRunLoopTimerRef timer, CFAbsoluteTime fireDate);
+CFTimeInterval CFRunLoopTimerGetInterval(CFRunLoopTimerRef timer);
+Boolean CFRunLoopTimerDoesRepeat(CFRunLoopTimerRef timer);
+CFIndex CFRunLoopTimerGetOrder(CFRunLoopTimerRef timer);
+void CFRunLoopTimerGetContext(CFRunLoopTimerRef timer, CFRunLoopTimerContext *context);
+CFTimeInterval CFRunLoopTimerGetTolerance(CFRunLoopTimerRef timer);
+void CFRunLoopTimerSetTolerance(CFRunLoopTimerRef timer, CFTimeInterval tolerance);
+void CFRunLoopAddCommonMode(CFRunLoopRef rl, CFRunLoopMode mode);
 
 /* Run loop observers (freemac 1.230): called as a run loop enters and
  * leaves a run, before it fires timers and handles sources, and before and
@@ -334,6 +376,8 @@ __FERRY_END
 /* locales, which are NSLocales (foundation/CFLocale.m) */
 #include <CoreFoundation/CFLocale.h>
 #include <CoreFoundation/CFDate.h>
+/* property lists as data, number formatters, calendars, URL keys (freemac 1.232) */
+#include <CoreFoundation/CFPropertyList.h>
 /* errors, which are NSErrors (foundation/CFError.m) */
 #include <CoreFoundation/CFError.h>
 /* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */

@@ -214,6 +214,10 @@ void os_release(void *o)
         objc_release(o);
 }
 
+/* The global activities <os/activity.h> names (freemac 1.232): only their
+ * addresses mean anything, since an activity only groups log messages. */
+static char ferry_os_activity_current[16], ferry_os_activity_none[16];
+
 /* Vouchers (freemac 1.230), which carry a Mac's activity and importance
  * across queues, and which Swift's concurrency runtime passes along with its
  * tasks. Ferry has none: there is never a voucher to copy, and adopting one
@@ -1798,6 +1802,7 @@ void ferry_dispatch_init(void)
     pthread_condattr_destroy(&a);
     long cpus = sysconf(_SC_NPROCESSORS_ONLN);
     soft_max_workers = cpus > 4 ? (int)cpus : 4;
+    ferry_dispatch_io_init();
 }
 
 /* What libSystem exports for dispatch. */
@@ -1817,6 +1822,8 @@ const struct ferry_symbol ferry_dispatch_symbols[] = {
     {"_dispatch_source_type_mach_recv", ferry_dispatch_source_type_mach_recv},
     {"_dispatch_source_type_mach_send", ferry_dispatch_source_type_mach_send},
     {"_dispatch_source_type_memorypressure", ferry_dispatch_source_type_memorypressure},
+    {"_os_activity_current", ferry_os_activity_current},
+    {"_os_activity_none", ferry_os_activity_none},
     F(dispatch_retain), F(dispatch_release), F(os_retain), F(os_release), F(voucher_copy), F(voucher_adopt), F(dispatch_get_context), F(dispatch_set_context),
     F(dispatch_set_finalizer_f), F(dispatch_time), F(dispatch_walltime), F(dispatch_get_global_queue),
     F(dispatch_queue_attr_make_with_qos_class), F(dispatch_queue_attr_make_initially_inactive),

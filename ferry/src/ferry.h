@@ -69,6 +69,9 @@ int ferry_pthread_is_main(void);
 extern const char *const ferry_passthrough[];
 extern const struct ferry_symbol ferry_blocks_symbols[];   /* libSystem's blocks */
 extern const struct ferry_symbol ferry_dispatch_symbols[]; /* libSystem's libdispatch */
+extern const struct ferry_symbol ferry_dispatch_io_symbols[]; /* its data objects and I/O channels */
+void ferry_dispatch_io_init(void);
+int ferry_open_flags_from_mac(int mac);
 extern const struct ferry_symbol ferry_objc_symbols[];     /* libobjc.A.dylib */
 
 /* host.c: this system's drawing libraries, for Ferry's own frameworks */
@@ -146,6 +149,9 @@ extern const struct ferry_symbol ferry_kqueue_symbols[];
 extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs,
                                                              * fts, statfs, asl */
 extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
+extern const struct ferry_symbol ferry_setjmp_symbols[]; /* setjmp.c: setjmp and longjmp */
+extern const struct ferry_symbol ferry_termios_symbols[]; /* termios.c: a terminal's settings */
+extern const struct ferry_symbol ferry_copyfile_symbols[]; /* copyfile.c: copyfile and fcopyfile */
 /* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
 extern const struct ferry_symbol ferry_swift_symbols[];
 int ferry_find_swift_library(const char *install_name, char *out, size_t size);

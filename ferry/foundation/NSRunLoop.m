@@ -689,6 +689,118 @@ F_EXPORT void FerryRunLoopSetPollHook(int (*prepare)(void *, int *, struct pollf
     hook_ctx = ctx;
 }
 
+/* ---- CFRunLoopTimer ------------------------------------------------------------------ */
+
+/* A CFRunLoopTimer is an NSTimer, as on a Mac (freemac 1.232, Ferry 0.56.0;
+ * Qt's event dispatcher drives its timers with one). An interval of 0 fires
+ * once. The context's info is retained for the timer's life. */
+@interface FCFRunLoopTimer : NSTimer {
+@public
+    CFRunLoopTimerContext _context;
+    CFIndex _order;
+}
+@end
+
+@implementation FCFRunLoopTimer
+- (void)dealloc
+{
+    if (_context.release && _context.info)
+        _context.release(_context.info);
+    [super dealloc];
+}
+@end
+
+static FCFRunLoopTimer *new_cf_timer(CFAbsoluteTime fireDate, CFTimeInterval interval, CFIndex order)
+{
+    FCFRunLoopTimer *t = (FCFRunLoopTimer *)[[FCFRunLoopTimer timerWithTimeInterval:interval > 0 ? interval : 0
+                                                           target:nil
+                                                         selector:NULL
+                                                         userInfo:nil
+                                                          repeats:interval > 0] retain];
+    t->_fire = fireDate;
+    t->_order = order;
+    return t;
+}
+
+CFTypeID CFRunLoopTimerGetTypeID(void) { return 0x46520004; }
+
+CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator, CFAbsoluteTime fireDate, CFTimeInterval interval,
+                                       CFOptionFlags flags, CFIndex order, CFRunLoopTimerCallBack callout,
+                                       CFRunLoopTimerContext *context)
+{
+    FCFRunLoopTimer *t = new_cf_timer(fireDate, interval, order);
+    if (context) {
+        t->_context = *context;
+        if (context->retain && context->info)
+            t->_context.info = (void *)context->retain(context->info);
+    }
+    void *info = t->_context.info;
+    t->_block = [^(NSTimer *timer) {
+      if (callout)
+          callout((CFRunLoopTimerRef)timer, info);
+    } copy];
+    return (CFRunLoopTimerRef)t;
+}
+
+CFRunLoopTimerRef CFRunLoopTimerCreateWithHandler(CFAllocatorRef allocator, CFAbsoluteTime fireDate,
+                                                  CFTimeInterval interval, CFOptionFlags flags, CFIndex order,
+                                                  void (^block)(CFRunLoopTimerRef timer))
+{
+    FCFRunLoopTimer *t = new_cf_timer(fireDate, interval, order);
+    void (^b)(CFRunLoopTimerRef) = [block copy];
+    t->_block = [^(NSTimer *timer) {
+      b((CFRunLoopTimerRef)timer);
+    } copy];
+    [b release];
+    return (CFRunLoopTimerRef)t;
+}
+
+#define TIMER(t) ((NSTimer *)(t))
+void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode)
+{
+    [(NSRunLoop *)rl addTimer:TIMER(timer) forMode:(NSString *)mode];
+}
+void CFRunLoopRemoveTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode)
+{
+    [(NSRunLoop *)rl removeTimer:TIMER(timer)];
+    TIMER(timer)->_scheduled = NO;
+}
+Boolean CFRunLoopContainsTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFRunLoopMode mode)
+{
+    return TIMER(timer)->_valid && TIMER(timer)->_scheduled && TIMER(timer)->_loop == (NSRunLoop *)rl;
+}
+void CFRunLoopTimerInvalidate(CFRunLoopTimerRef timer) { [TIMER(timer) invalidate]; }
+Boolean CFRunLoopTimerIsValid(CFRunLoopTimerRef timer) { return TIMER(timer)->_valid; }
+CFAbsoluteTime CFRunLoopTimerGetNextFireDate(CFRunLoopTimerRef timer) { return TIMER(timer)->_fire; }
+void CFRunLoopTimerSetNextFireDate(CFRunLoopTimerRef timer, CFAbsoluteTime fireDate)
+{
+    TIMER(timer)->_fire = fireDate;
+    [TIMER(timer)->_loop _wakeUp];
+}
+CFTimeInterval CFRunLoopTimerGetInterval(CFRunLoopTimerRef timer) { return [TIMER(timer) timeInterval]; }
+Boolean CFRunLoopTimerDoesRepeat(CFRunLoopTimerRef timer) { return TIMER(timer)->_repeats; }
+CFIndex CFRunLoopTimerGetOrder(CFRunLoopTimerRef timer)
+{
+    return [TIMER(timer) isKindOfClass:[FCFRunLoopTimer class]] ? ((FCFRunLoopTimer *)(id)timer)->_order : 0;
+}
+void CFRunLoopTimerGetContext(CFRunLoopTimerRef timer, CFRunLoopTimerContext *context)
+{
+    if (!context)
+        return;
+    if ([TIMER(timer) isKindOfClass:[FCFRunLoopTimer class]])
+        *context = ((FCFRunLoopTimer *)(id)timer)->_context;
+    else
+        memset(context, 0, sizeof *context);
+}
+CFTimeInterval CFRunLoopTimerGetTolerance(CFRunLoopTimerRef timer) { return TIMER(timer)->_tolerance; }
+void CFRunLoopTimerSetTolerance(CFRunLoopTimerRef timer, CFTimeInterval tolerance)
+{
+    TIMER(timer)->_tolerance = tolerance;
+}
+/* Ferry's run loops don't tell modes apart, so every mode is already common. */
+void CFRunLoopAddCommonMode(CFRunLoopRef rl, CFRunLoopMode mode) {}
+#undef TIMER
+
 /* ---- NSPort ------------------------------------------------------------------------- */
 
 @implementation NSPort {

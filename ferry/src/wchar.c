@@ -288,7 +288,61 @@ extern void __cxa_finalize(void *dso);
 #define SAME(name) {#name, (void *)name}
 #define MAC(name) {#name, (void *)mac_##name}
 
+
+/* ---- nl_langinfo: a Mac's item numbers ------------------------------------------- */
+
+static nl_item langinfo_to_linux(int mac)
+{
+    static const nl_item first[] = {CODESET, D_T_FMT, D_FMT, T_FMT, T_FMT_AMPM, AM_STR, PM_STR};
+    if (mac >= 0 && mac <= 6)
+        return first[mac];
+    if (mac >= 7 && mac <= 13)
+        return DAY_1 + (mac - 7);
+    if (mac >= 14 && mac <= 20)
+        return ABDAY_1 + (mac - 14);
+    if (mac >= 21 && mac <= 32)
+        return MON_1 + (mac - 21);
+    if (mac >= 33 && mac <= 44)
+        return ABMON_1 + (mac - 33);
+    static const nl_item rest[] = {ERA,     ERA_D_FMT, ERA_D_T_FMT, ERA_T_FMT, ALT_DIGITS, RADIXCHAR,
+                                   THOUSEP, YESEXPR,   NOEXPR,      YESSTR,    NOSTR,      CRNCYSTR};
+    if (mac >= 45 && mac <= 56)
+        return rest[mac - 45];
+    return -1;
+}
+
+/* D_MD_ORDER, a Mac's own: "md" where the day follows the month in D_FMT. */
+static char *item_under(nl_item n, locale_t l)
+{
+    return l == LC_GLOBAL_LOCALE ? nl_langinfo(n) : nl_langinfo_l(n, l);
+}
+
+static char *md_order(locale_t l)
+{
+    const char *f = item_under(D_FMT, l);
+    const char *m = strpbrk(f, "mbB"), *d = strpbrk(f, "de");
+    return (char *)(d && m && d < m ? "dm" : "md");
+}
+
+static char *mac_nl_langinfo_l(int item, locale_t loc)
+{
+    /* the thread's own locale, which may be the global one */
+    locale_t l = loc == LC_GLOBAL_LOCALE ? uselocale((locale_t)0) : to_linux(loc);
+    if (item == 57)
+        return md_order(l);
+    nl_item n = langinfo_to_linux(item);
+    if (n == -1)
+        return (char *)"";
+    char *v = item_under(n, l);
+    /* a Mac names plain ASCII "US-ASCII" */
+    return n == CODESET && !strcmp(v, "ANSI_X3.4-1968") ? (char *)"US-ASCII" : v;
+}
+
+static char *mac_nl_langinfo(int item) { return mac_nl_langinfo_l(item, LC_GLOBAL_LOCALE); }
+
 const struct ferry_symbol ferry_wchar_symbols[] = {
+    {"nl_langinfo", mac_nl_langinfo},
+    {"nl_langinfo_l", mac_nl_langinfo_l},
     /* wide strings: the same calls */
     SAME(wcslen), SAME(wcsnlen), SAME(wcscpy), SAME(wcsncpy), SAME(wcscat), SAME(wcsncat), SAME(wcscmp),
     SAME(wcsncmp), SAME(wcscoll), SAME(wcsxfrm), SAME(wcschr), SAME(wcsrchr), SAME(wcsstr), SAME(wcsspn),

@@ -204,6 +204,8 @@ run_one pthreads "$here/pthreads.c" "$here/pthreads.out"
 run_one dispatch_concurrent "$here/dispatch_concurrent.c" "$here/dispatch_concurrent.out" -fblocks
 # read, write, signal and process sources on real descriptors, signals and a child
 run_one dispatch_sources "$here/dispatch_sources.c" "$here/dispatch_sources.out" -fblocks
+# dispatch data and dispatch I/O: channels on a file and dispatch_read on a pipe (QRandomAccessAsyncFile)
+run_one dispatch_io "$here/dispatch_io.c" "$here/dispatch_io.out" -fblocks
 run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
 run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
 run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
@@ -1494,6 +1496,16 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
+# DiskArbitration (no disks) and Network's path monitor, and a Mac's
+# __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)
+run_one libcurl "$here/libcurl.c" "$here/libcurl.out" -lcurl
+# setjmp, wait4 and waitid, the group database and UCCompareText, for Qt's core
+run_one libc_qt "$here/libc_qt.c" "$here/libc_qt.out" -framework CoreServices
+run_one libc_qt_more "$here/libc_qt_more.c" "$here/libc_qt_more.out"
+run_one media_frameworks "$here/media/frameworks.m" "$here/media/frameworks.out" -fobjc-arc -fblocks \
+    -framework Foundation -framework IOSurface -framework Accelerate -framework Metal -framework DiskArbitration \
+    -framework Network
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

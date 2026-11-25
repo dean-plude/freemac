@@ -1,0 +1,4 @@
+libcurl 8, with TLS 1
+refused 1: Couldn't connect to server
+headers Accept: application/json, X-Ferry: 1
+exit=0

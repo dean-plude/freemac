@@ -395,5 +395,6 @@ __FERRY_END
  * served from AppKit's file. */
 #include <CoreGraphics/CGEvent.h>
 #include <CoreGraphics/CGWindow.h>
+#include <CoreGraphics/CGDirectDisplay.h>
 
 #endif

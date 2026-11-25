@@ -73,5 +73,24 @@ int lchown(const char *, uid_t, gid_t);
 extern char *optarg;
 extern int optind, opterr, optopt, optreset;
 int getopt(int, char *const[], const char *);
+/* who a process runs as, its group and session, and a little more
+ * (freemac 1.232, Ferry 0.56.0); vfork is served as fork */
+int setuid(uid_t);
+int setgid(gid_t);
+int seteuid(uid_t);
+int setegid(gid_t);
+pid_t getpgrp(void);
+int setpgid(pid_t, pid_t);
+pid_t setsid(void);
+pid_t getsid(pid_t);
+int getgroups(int, gid_t[]);
+int nice(int);
+int fchdir(int);
+int fdatasync(int);
+int getdtablesize(void);
+pid_t vfork(void);
+int unlinkat(int, const char *, int);
+int execl(const char *, const char *, ...);
+int execlp(const char *, const char *, ...);
 __FERRY_END
 #endif

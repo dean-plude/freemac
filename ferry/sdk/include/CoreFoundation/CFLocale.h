@@ -23,6 +23,12 @@ extern const CFLocaleKey kCFLocaleUsesMetricSystem;
 extern const CFLocaleKey kCFLocaleCalendar;
 extern const CFLocaleKey kCFLocaleCurrencyCode;
 extern const CFLocaleKey kCFLocaleCurrencySymbol;
+/* "Metric" or "U.S." (freemac 1.232) */
+extern const CFLocaleKey kCFLocaleMeasurementSystem;
+extern const CFLocaleKey kCFLocaleQuotationBeginDelimiterKey;
+extern const CFLocaleKey kCFLocaleQuotationEndDelimiterKey;
+extern const CFLocaleKey kCFLocaleAlternateQuotationBeginDelimiterKey;
+extern const CFLocaleKey kCFLocaleAlternateQuotationEndDelimiterKey;
 extern const CFStringRef kCFLocaleCurrentLocaleDidChangeNotification;
 
 CFTypeID CFLocaleGetTypeID(void);

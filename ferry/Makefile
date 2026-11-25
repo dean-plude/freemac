@@ -9,16 +9,18 @@ DESTDIR ?=
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/pthread.c src/passthrough.c src/host.c \
       src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/socket.c src/kqueue.c src/libc_more.c \
-      src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/exception.c \
-      src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c
+      src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/dispatch_io.c src/objc/exception.c \
+      src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c \
+      src/setjmp.c src/termios.c src/copyfile.c
 # what Swift's runtime asks of libobjc and libSystem (freemac 1.227)
 SRC += src/objc/swift.c src/swiftsupport.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
-           sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd
+           sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd sdk/lib/libcurl.tbd
 SDK_LIBXML2 = sdk/usr/include/libxml2
+SDK_CURL = sdk/usr/include/curl
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
 # and lld, as the tests do). CoreFoundation is served from the same file.
@@ -109,7 +111,9 @@ JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
 JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
 JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+
+include media/media.mk
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -166,6 +170,12 @@ sdk/lib/libsqlite3.tbd: sdk/gen-twin-tbd.sh
 sdk/lib/libicucore.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-twin-tbd.sh /usr/lib/libicucore.A.dylib icu > $@
+# libcurl, for OBS (freemac 1.232), and its headers where a Mac's SDK has them
+sdk/lib/libcurl.tbd: sdk/gen-twin-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-twin-tbd.sh /usr/lib/libcurl.4.dylib libcurl.so.4 > $@
+$(SDK_CURL): sdk/gen-curl-headers.sh
+	sdk/gen-curl-headers.sh $@
 
 # A Mac's libc++ and libc++abi, served by this system's LLVM libc++ (empty
 # when it isn't installed: C++ programs can't be built then).
@@ -308,7 +318,7 @@ $(CLOUDKIT): $(CLOUDKIT_OBJ) $(FOUNDATION)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(MEDIA)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -333,11 +343,12 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUA
 	install -Dm755 $(WEBKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/WebKit.framework/WebKit
 	install -Dm755 $(JSC) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/JavaScriptCore.framework/JavaScriptCore
 	install -Dm755 $(CLOUDKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CloudKit.framework/CloudKit
+	for f in $(MEDIA_FW); do install -Dm755 frameworks/$$f.framework/$$f $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f; done
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
-	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build
+	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build media/build
 
 .PHONY: all check install clean

@@ -7,6 +7,7 @@
 #define _OS_ACTIVITY_H_
 #include <_ferry.h>
 #include <stdint.h>
+#include <os/object.h>
 __FERRY_BEGIN
 
 typedef struct os_activity_s *os_activity_t;
@@ -19,7 +20,10 @@ typedef uint32_t os_activity_flag_t;
 #define OS_ACTIVITY_FLAG_DETACHED ((os_activity_flag_t)1)
 #define OS_ACTIVITY_FLAG_IF_NONE_PRESENT ((os_activity_flag_t)2)
 #define OS_ACTIVITY_NONE ((os_activity_t)0)
-#define OS_ACTIVITY_CURRENT ((os_activity_t)0)
+/* the current activity is a global object, as on a Mac (freemac 1.232) */
+extern struct os_activity_s _os_activity_current;
+extern struct os_activity_s _os_activity_none;
+#define OS_ACTIVITY_CURRENT ((os_activity_t)&_os_activity_current)
 
 static inline os_activity_t ferry_os_activity_create(const char *description, os_activity_t parent,
                                                      os_activity_flag_t flags)

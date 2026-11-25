@@ -35,5 +35,41 @@ enum {
     kCFHostErrorUnknown = 2,
     kCFErrorHTTPConnectionLost = -1005,
 };
+/* ---- proxies (freemac 1.232): this system's settings have none, so every
+ * URL goes direct; a proxy auto-configuration script answers the same ---- */
+extern const CFStringRef kCFNetworkProxiesHTTPEnable;
+extern const CFStringRef kCFNetworkProxiesHTTPPort;
+extern const CFStringRef kCFNetworkProxiesHTTPProxy;
+extern const CFStringRef kCFNetworkProxiesHTTPSEnable;
+extern const CFStringRef kCFNetworkProxiesHTTPSPort;
+extern const CFStringRef kCFNetworkProxiesHTTPSProxy;
+extern const CFStringRef kCFNetworkProxiesFTPEnable;
+extern const CFStringRef kCFNetworkProxiesFTPPort;
+extern const CFStringRef kCFNetworkProxiesFTPProxy;
+extern const CFStringRef kCFNetworkProxiesSOCKSEnable;
+extern const CFStringRef kCFNetworkProxiesSOCKSPort;
+extern const CFStringRef kCFNetworkProxiesSOCKSProxy;
+extern const CFStringRef kCFNetworkProxiesProxyAutoConfigEnable;
+extern const CFStringRef kCFNetworkProxiesProxyAutoConfigURLString;
+extern const CFStringRef kCFNetworkProxiesExceptionsList;
+extern const CFStringRef kCFNetworkProxiesExcludeSimpleHostnames;
+extern const CFStringRef kCFProxyTypeKey;
+extern const CFStringRef kCFProxyHostNameKey;
+extern const CFStringRef kCFProxyPortNumberKey;
+extern const CFStringRef kCFProxyUsernameKey;
+extern const CFStringRef kCFProxyPasswordKey;
+extern const CFStringRef kCFProxyAutoConfigurationURLKey;
+extern const CFStringRef kCFProxyTypeNone;
+extern const CFStringRef kCFProxyTypeHTTP;
+extern const CFStringRef kCFProxyTypeHTTPS;
+extern const CFStringRef kCFProxyTypeFTP;
+extern const CFStringRef kCFProxyTypeSOCKS;
+extern const CFStringRef kCFProxyTypeAutoConfigurationURL;
+typedef void (*CFProxyAutoConfigurationResultCallback)(void *client, CFArrayRef proxyList, CFErrorRef error);
+CFDictionaryRef CFNetworkCopySystemProxySettings(void);
+CFArrayRef CFNetworkCopyProxiesForURL(CFURLRef url, CFDictionaryRef proxySettings);
+CFRunLoopSourceRef CFNetworkExecuteProxyAutoConfigurationURL(CFURLRef proxyAutoConfigURL, CFURLRef targetURL,
+                                                            CFProxyAutoConfigurationResultCallback cb,
+                                                            CFStreamClientContext *clientContext);
 __FERRY_END
 #endif

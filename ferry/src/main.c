@@ -158,12 +158,12 @@ int main(int argc, char **argv, char **envp)
              * description of libSystem is generated from this. */
             const struct ferry_symbol *tables[] = {ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols,
                                                    ferry_pthread_symbols, ferry_blocks_symbols,
-                                                   ferry_dispatch_symbols, ferry_commoncrypto_symbols,
+                                                   ferry_dispatch_symbols, ferry_dispatch_io_symbols, ferry_commoncrypto_symbols,
                                                    ferry_sysversion_symbols, ferry_sysctl_symbols,
                                                    ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
                                                    ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols,
                                                    ferry_libc_more_symbols, ferry_oslog_symbols,
-                                                   ferry_swift_symbols};
+                                                   ferry_swift_symbols, ferry_setjmp_symbols, ferry_termios_symbols, ferry_copyfile_symbols};
             for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);

@@ -5,6 +5,15 @@
 #ifndef _FERRY_MACTYPES_H_
 #define _FERRY_MACTYPES_H_
 #include <stdint.h>
+/* nil, as a Mac's MacTypes.h gives it to C and C++ too: the same null as
+ * <objc/objc.h>'s (freemac 1.232) */
+#ifndef nil
+#ifdef __cplusplus
+#define nil __null
+#else
+#define nil ((void *)0)
+#endif
+#endif
 typedef uint8_t UInt8;
 typedef int8_t SInt8;
 typedef uint16_t UInt16;

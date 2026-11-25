@@ -45,7 +45,7 @@ typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskOtherMouseUp = 1ULL << 26, NSEventMaskOtherMouseDragged = 1ULL << 27,
     NSEventMaskAny = ~0ULL,
 };
-static inline NSEventMask NSEventMaskFromType(NSEventType type) { return 1ULL << type; }
+static inline NSEventMask NSEventMaskFromType(NSEventType type) { return (NSEventMask)(1ULL << type); }
 typedef NS_OPTIONS(NSUInteger, NSEventModifierFlags) {
     NSEventModifierFlagCapsLock = 1 << 16, NSEventModifierFlagShift = 1 << 17,
     NSEventModifierFlagControl = 1 << 18, NSEventModifierFlagOption = 1 << 19,
@@ -583,7 +583,13 @@ APPKIT_EXTERN NSString *const NSImageCompressionFactor;
 - (BOOL)setName:(NSImageName)name;
 - (NSImageName)name;
 @property NSSize size;
+#ifdef __cplusplus
+/* "template" is a keyword in Objective-C++, so it is spelt as its methods there */
+- (BOOL)isTemplate;
+- (void)setTemplate:(BOOL)isTemplate;
+#else
 @property (getter=isTemplate) BOOL template;
+#endif
 @property (readonly, getter=isValid) BOOL valid;
 @property (copy) NSString *accessibilityDescription;
 @property (copy) NSColor *backgroundColor;

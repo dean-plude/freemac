@@ -1,0 +1,22 @@
+semaphore made 1
+timed wait on 0 times out 1
+signalled, then taken 1
+signal_all woke 3
+none left after signal_all 1
+destroyed 1, then unknown 1
+vm_remap 1 copy "Resource" original "resource" writable 1
+vm_allocate 1 zeroed 1
+flags kept 1
+posix_spawnp 0 exited 0 said "spawned", few descriptors 1
+SETEXEC refused 1
+missing program 1
+CODESET "US-ASCII" DAY_1 "Sunday" ABMON_12 "Dec" RADIXCHAR "." D_MD_ORDER "md"
+struct termios 72 bytes, not a terminal 1
+raw: no echo 1, not canonical 1, 8 bits 1, VMIN 1, speed 115200
+flock: first 0, second blocked 1, after unlock 0
+fcopyfile 0 "copied data" mode 640
+copyfile EXCL onto it refused 1
+copyfile MOVE 0, original gone 1
+times 1
+tzname "CET" "CEST", daylight 1, timezone -3600
+exit=0

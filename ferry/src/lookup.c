@@ -130,6 +130,16 @@ struct mac_sincos { double s, c; };
 struct mac_sincosf { float s, c; };
 static struct mac_sincos mac_sincos_stret(double x) { return (struct mac_sincos){sin(x), cos(x)}; }
 static struct mac_sincosf mac_sincosf_stret(float x) { return (struct mac_sincosf){sinf(x), cosf(x)}; }
+/* A Mac's math library also has 10^x and sin, cos and tan of pi times x
+   under these names (its <math.h> declares them for FFmpeg and others). */
+static double mac_exp10(double x) { return pow(10.0, x); }
+static float mac_exp10f(float x) { return powf(10.0f, x); }
+static double mac_sinpi(double x) { double r = fmod(x, 2.0); return (r == 0.0 || r == 1.0 || r == -1.0) ? copysign(0.0, x) : sin(M_PI * r); }
+static float mac_sinpif(float x) { return (float)mac_sinpi(x); }
+static double mac_cospi(double x) { double r = fmod(fabs(x), 2.0); return (r == 0.5 || r == 1.5) ? 0.0 : cos(M_PI * r); }
+static float mac_cospif(float x) { return (float)mac_cospi(x); }
+static double mac_tanpi(double x) { return mac_sinpi(x) / mac_cospi(x); }
+static float mac_tanpif(float x) { return (float)mac_tanpi(x); }
 
 static size_t mac_malloc_size(const void *p) { return p ? malloc_usable_size((void *)p) : 0; }
 
@@ -248,6 +258,14 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"atexit", atexit},
     {"__sincos_stret", mac_sincos_stret},
     {"__sincosf_stret", mac_sincosf_stret},
+    {"__exp10", mac_exp10},
+    {"__exp10f", mac_exp10f},
+    {"__sinpi", mac_sinpi},
+    {"__sinpif", mac_sinpif},
+    {"__cospi", mac_cospi},
+    {"__cospif", mac_cospif},
+    {"__tanpi", mac_tanpi},
+    {"__tanpif", mac_tanpif},
     /* Ferry's Foundation reaches ICU and libxml2 through this (src/host.c) */
     {"ferry_twin_symbol", ferry_twin_symbol},
     /* Ferry's own: this system's libcurl, for Foundation (host.c) */
@@ -268,10 +286,10 @@ const struct ferry_symbol ferry_core_symbols[] = {
 
 static const struct ferry_symbol *const tables[] = {
     ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols, ferry_pthread_symbols, ferry_blocks_symbols,
-    ferry_dispatch_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
+    ferry_dispatch_symbols, ferry_dispatch_io_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
     ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
     ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols, ferry_libc_more_symbols, ferry_oslog_symbols,
-    ferry_swift_symbols,
+    ferry_swift_symbols, ferry_setjmp_symbols, ferry_termios_symbols, ferry_copyfile_symbols,
 };
 
 static void *find_own(const char *name)

@@ -23,10 +23,12 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -1083,7 +1085,230 @@ static int mac_task_info(mac_port_t task, int flavor, int32_t *info, uint32_t *c
     return KERN_SUCCESS;
 }
 
+
+/* ---- Mach semaphores (freemac 1.232, Ferry 0.56.0) -------------------------------
+ * semaphore_create and its calls, from the Mach reference pages. A
+ * semaphore's name is a port number, so each is kept in a table and named
+ * 0x10000 plus its place there. semaphore_timedwait's time is how long to
+ * wait, not a time of day. */
+#define MAC_KERN_NO_SPACE 3
+#define MAC_KERN_INVALID_ARGUMENT 4
+#define MAC_KERN_RESOURCE_SHORTAGE 6
+#define MAC_KERN_OPERATION_TIMED_OUT 49
+#define SEM_BASE 0x10000u
+
+struct mach_sem {
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+    long count;
+    unsigned long wake_all; /* bumped by semaphore_signal_all */
+    long waiters;
+};
+
+static pthread_mutex_t sem_table_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct mach_sem **sem_table;
+static size_t sem_table_size;
+
+static struct mach_sem *sem_find(mac_port_t name)
+{
+    struct mach_sem *s = NULL;
+    pthread_mutex_lock(&sem_table_lock);
+    if (name >= SEM_BASE && name - SEM_BASE < sem_table_size)
+        s = sem_table[name - SEM_BASE];
+    pthread_mutex_unlock(&sem_table_lock);
+    return s;
+}
+
+static int mac_semaphore_create(mac_port_t task, mac_port_t *out, int policy, int value)
+{
+    (void)task;
+    (void)policy;
+    if (!out || value < 0)
+        return MAC_KERN_INVALID_ARGUMENT;
+    struct mach_sem *s = calloc(1, sizeof *s);
+    if (!s)
+        return MAC_KERN_RESOURCE_SHORTAGE;
+    pthread_mutex_init(&s->lock, NULL);
+    pthread_condattr_t ca;
+    pthread_condattr_init(&ca);
+    pthread_condattr_setclock(&ca, CLOCK_MONOTONIC);
+    pthread_cond_init(&s->cond, &ca);
+    pthread_condattr_destroy(&ca);
+    s->count = value;
+    pthread_mutex_lock(&sem_table_lock);
+    size_t i = 0;
+    while (i < sem_table_size && sem_table[i])
+        i++;
+    if (i == sem_table_size) {
+        size_t n = sem_table_size ? sem_table_size * 2 : 64;
+        struct mach_sem **t = n < 0xffff0000u ? realloc(sem_table, n * sizeof *t) : NULL;
+        if (!t) {
+            pthread_mutex_unlock(&sem_table_lock);
+            free(s);
+            return MAC_KERN_NO_SPACE;
+        }
+        memset(t + sem_table_size, 0, (n - sem_table_size) * sizeof *t);
+        sem_table = t;
+        sem_table_size = n;
+    }
+    sem_table[i] = s;
+    pthread_mutex_unlock(&sem_table_lock);
+    *out = SEM_BASE + (mac_port_t)i;
+    return 0;
+}
+
+static int mac_semaphore_destroy(mac_port_t task, mac_port_t name)
+{
+    (void)task;
+    struct mach_sem *s = NULL;
+    pthread_mutex_lock(&sem_table_lock);
+    if (name >= SEM_BASE && name - SEM_BASE < sem_table_size) {
+        s = sem_table[name - SEM_BASE];
+        sem_table[name - SEM_BASE] = NULL;
+    }
+    pthread_mutex_unlock(&sem_table_lock);
+    if (!s)
+        return MAC_KERN_INVALID_ARGUMENT;
+    pthread_cond_destroy(&s->cond);
+    pthread_mutex_destroy(&s->lock);
+    free(s);
+    return 0;
+}
+
+static int mac_semaphore_signal(mac_port_t name)
+{
+    struct mach_sem *s = sem_find(name);
+    if (!s)
+        return MAC_KERN_INVALID_ARGUMENT;
+    pthread_mutex_lock(&s->lock);
+    s->count++;
+    pthread_cond_signal(&s->cond);
+    pthread_mutex_unlock(&s->lock);
+    return 0;
+}
+
+/* Wakes every thread waiting now; the count doesn't grow when none waits. */
+static int mac_semaphore_signal_all(mac_port_t name)
+{
+    struct mach_sem *s = sem_find(name);
+    if (!s)
+        return MAC_KERN_INVALID_ARGUMENT;
+    pthread_mutex_lock(&s->lock);
+    if (s->waiters) {
+        s->wake_all++;
+        pthread_cond_broadcast(&s->cond);
+    }
+    pthread_mutex_unlock(&s->lock);
+    return 0;
+}
+
+static int sem_wait_until(mac_port_t name, const struct timespec *deadline)
+{
+    struct mach_sem *s = sem_find(name);
+    if (!s)
+        return MAC_KERN_INVALID_ARGUMENT;
+    int r = 0;
+    pthread_mutex_lock(&s->lock);
+    unsigned long round = s->wake_all;
+    s->waiters++;
+    while (s->count == 0 && s->wake_all == round) {
+        int e = deadline ? pthread_cond_timedwait(&s->cond, &s->lock, deadline) : pthread_cond_wait(&s->cond, &s->lock);
+        if (e == ETIMEDOUT) {
+            r = MAC_KERN_OPERATION_TIMED_OUT;
+            break;
+        }
+    }
+    if (!r && s->wake_all == round)
+        s->count--;
+    s->waiters--;
+    pthread_mutex_unlock(&s->lock);
+    return r;
+}
+
+static int mac_semaphore_wait(mac_port_t name) { return sem_wait_until(name, NULL); }
+
+struct mac_mach_timespec {
+    unsigned int tv_sec;
+    int tv_nsec;
+};
+
+static int mac_semaphore_timedwait(mac_port_t name, struct mac_mach_timespec wait)
+{
+    if (wait.tv_nsec < 0 || wait.tv_nsec >= 1000000000)
+        return MAC_KERN_INVALID_ARGUMENT;
+    struct timespec d;
+    clock_gettime(CLOCK_MONOTONIC, &d);
+    d.tv_sec += wait.tv_sec;
+    d.tv_nsec += wait.tv_nsec;
+    if (d.tv_nsec >= 1000000000) {
+        d.tv_sec++;
+        d.tv_nsec -= 1000000000;
+    }
+    return sem_wait_until(name, &d);
+}
+
+/* ---- the task's own memory: vm_allocate, vm_deallocate, vm_remap ----------------- */
+#define MAC_VM_PROT_READ 1
+#define MAC_VM_PROT_WRITE 2
+#define MAC_VM_PROT_EXECUTE 4
+#define MAC_VM_FLAGS_ANYWHERE 1
+
+static int mac_vm_allocate(mac_port_t task, uintptr_t *addr, uintptr_t size, int flags)
+{
+    if (task != MAC_TASK_PORT || !addr)
+        return MAC_KERN_INVALID_ARGUMENT;
+    void *want = (flags & MAC_VM_FLAGS_ANYWHERE) ? NULL : (void *)*addr;
+    void *p = mmap(want, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | (want ? MAP_FIXED_NOREPLACE : 0),
+                   -1, 0);
+    if (p == MAP_FAILED)
+        return MAC_KERN_NO_SPACE;
+    *addr = (uintptr_t)p;
+    return 0;
+}
+
+static int mac_vm_deallocate(mac_port_t task, uintptr_t addr, uintptr_t size)
+{
+    if (task != MAC_TASK_PORT)
+        return MAC_KERN_INVALID_ARGUMENT;
+    if (size)
+        munmap((void *)(addr & ~(uintptr_t)(getpagesize() - 1)), size + (addr & (uintptr_t)(getpagesize() - 1)));
+    return 0;
+}
+
+/* Only a copy, into fresh memory anywhere: the new pages hold what the old
+ * ones held and may be read and written. */
+static int mac_vm_remap(mac_port_t task, uintptr_t *addr, uintptr_t size, uintptr_t mask, int flags,
+                        mac_port_t src_task, uintptr_t src, unsigned int copy, int *cur, int *max,
+                        unsigned int inherit)
+{
+    (void)mask;
+    (void)inherit;
+    if (task != MAC_TASK_PORT || src_task != MAC_TASK_PORT || !addr || !copy || !(flags & MAC_VM_FLAGS_ANYWHERE))
+        return MAC_KERN_INVALID_ARGUMENT;
+    uintptr_t page = (uintptr_t)getpagesize();
+    uintptr_t start = src & ~(page - 1), len = ((src + size + page - 1) & ~(page - 1)) - start;
+    void *p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (p == MAP_FAILED)
+        return MAC_KERN_NO_SPACE;
+    memcpy(p, (void *)start, len);
+    *addr = (uintptr_t)p + (src - start);
+    if (cur)
+        *cur = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE;
+    if (max)
+        *max = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE | MAC_VM_PROT_EXECUTE;
+    return 0;
+}
+
 const struct ferry_symbol ferry_sysctl_symbols[] = {
+    {"semaphore_create", mac_semaphore_create},
+    {"semaphore_destroy", mac_semaphore_destroy},
+    {"semaphore_signal", mac_semaphore_signal},
+    {"semaphore_signal_all", mac_semaphore_signal_all},
+    {"semaphore_wait", mac_semaphore_wait},
+    {"semaphore_timedwait", mac_semaphore_timedwait},
+    {"vm_allocate", mac_vm_allocate},
+    {"vm_deallocate", mac_vm_deallocate},
+    {"vm_remap", mac_vm_remap},
     {"sysctl", mac_sysctl},
     {"sysctlbyname", mac_sysctlbyname},
     {"sysctlnametomib", mac_sysctlnametomib},

@@ -21,6 +21,12 @@ const CFLocaleKey kCFLocaleUsesMetricSystem = (CFStringRef)@"locale:uses metric"
 const CFLocaleKey kCFLocaleCalendar = (CFStringRef)@"locale:calendar";
 const CFLocaleKey kCFLocaleCurrencyCode = (CFStringRef)@"locale:currency code";
 const CFLocaleKey kCFLocaleCurrencySymbol = (CFStringRef)@"locale:currency symbol";
+/* quotation marks and the measurement system (freemac 1.232), which Qt's QLocale reads */
+const CFLocaleKey kCFLocaleQuotationBeginDelimiterKey = (CFStringRef)@"locale:quotation begin";
+const CFLocaleKey kCFLocaleQuotationEndDelimiterKey = (CFStringRef)@"locale:quotation end";
+const CFLocaleKey kCFLocaleAlternateQuotationBeginDelimiterKey = (CFStringRef)@"locale:alternate quotation begin";
+const CFLocaleKey kCFLocaleAlternateQuotationEndDelimiterKey = (CFStringRef)@"locale:alternate quotation end";
+const CFLocaleKey kCFLocaleMeasurementSystem = (CFStringRef)@"locale:measurement system";
 const CFStringRef kCFLocaleCurrentLocaleDidChangeNotification =
     (CFStringRef)@"kCFLocaleCurrentLocaleDidChangeNotification";
 

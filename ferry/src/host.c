@@ -110,6 +110,9 @@ static const struct twin {
     {"/usr/lib/libxml2.dylib", "libxml2.so.2"},
     {"/usr/lib/libsqlite3.dylib", "libsqlite3.so.0"},
     {"/usr/lib/libsqlite3.0.dylib", "libsqlite3.so.0"},
+    /* libcurl (OBS, freemac 1.232): the same calls and layouts on 64-bit Intel */
+    {"/usr/lib/libcurl.4.dylib", "libcurl.so.4"},
+    {"/usr/lib/libcurl.dylib", "libcurl.so.4"},
     /* ICU's C calls (regular expressions, collation, breaking), which
      * Linux builds name with the version, as uregex_open_74 */
     {"/usr/lib/libicucore.A.dylib", "icu"},

@@ -1230,6 +1230,19 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 - (NSDate *)nextDaylightSavingTimeTransitionAfterDate:(NSDate *)date;
 - (BOOL)isEqualToTimeZone:(NSTimeZone *)other;
 @end
+/* a zone's name for people (freemac 1.232, Ferry 0.56.0) */
+typedef NS_ENUM(NSInteger, NSTimeZoneNameStyle) {
+    NSTimeZoneNameStyleStandard,
+    NSTimeZoneNameStyleShortStandard,
+    NSTimeZoneNameStyleDaylightSaving,
+    NSTimeZoneNameStyleShortDaylightSaving,
+    NSTimeZoneNameStyleGeneric,
+    NSTimeZoneNameStyleShortGeneric,
+};
+@class NSLocale;
+@interface NSTimeZone (NSTimeZoneNames)
+- (NSString *)localizedName:(NSTimeZoneNameStyle)style locale:(NSLocale *)locale;
+@end
 FOUNDATION_EXPORT NSString *const NSSystemTimeZoneDidChangeNotification;
 
 typedef NSString *NSLocaleKey;

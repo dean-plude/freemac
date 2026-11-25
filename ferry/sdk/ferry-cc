@@ -88,7 +88,10 @@ if [ -n "$cxx" ]; then
     fi
 fi
 # The macOS a program is built for is 11 unless FERRY_MACOS_MIN names
-# another (ferry-swiftc links Swift objects, built for 14, with 14).
+# another (ferry-swiftc links Swift objects, built for 14, with 14). The
+# SDK's usr/include, where a Mac's SDK has libcurl's headers, is searched
+# after its own include folder.
 exec clang -target x86_64-apple-macos${FERRY_MACOS_MIN:-11} -nostdlibinc ${cxxinc:+-nostdinc++ -isystem "$cxxinc"} -isystem "$sdk/include" \
+    -idirafter "$sdk/usr/include" \
     -fno-stack-protector -Wno-unused-command-line-argument $modflags \
     -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -F"$fw" -lSystem "$@" $objc

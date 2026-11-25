@@ -14,6 +14,7 @@ typedef int kern_return_t;
 typedef uint32_t natural_t;
 typedef int32_t integer_t;
 typedef natural_t mach_port_t;
+#define MACH_PORT_NULL ((mach_port_t)0)
 typedef mach_port_t host_t;
 typedef mach_port_t task_t;
 typedef mach_port_t ipc_space_t;
@@ -32,6 +33,10 @@ typedef integer_t cpu_type_t, cpu_subtype_t, cpu_threadtype_t;
 #define KERN_SUCCESS 0
 #define KERN_INVALID_ARGUMENT 4
 #define KERN_FAILURE 5
+#define KERN_NO_SPACE 3
+#define KERN_RESOURCE_SHORTAGE 6
+#define KERN_ABORTED 14
+#define KERN_OPERATION_TIMED_OUT 49
 
 extern mach_port_t mach_task_self_;
 #define mach_task_self() mach_task_self_
@@ -109,4 +114,6 @@ typedef struct mach_task_basic_info mach_task_basic_info_data_t;
 #define MACH_TASK_BASIC_INFO_COUNT ((mach_msg_type_number_t)(sizeof(mach_task_basic_info_data_t) / sizeof(natural_t)))
 kern_return_t task_info(task_t task, task_flavor_t flavor, task_info_t info, mach_msg_type_number_t *count);
 __FERRY_END
+#include <mach/semaphore.h>
+#include <mach/vm_map.h>
 #endif
