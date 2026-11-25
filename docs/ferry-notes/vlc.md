@@ -157,9 +157,43 @@ other than root (see above):
 
     ferry WORK/build/vlc/VLC.app video.mp4
 
+## Preferences and the subtitle fonts (freemac 1.NEXT, Ferry 0.NEXT)
+
+VLC's menus now answer their Command-key equivalents, and its Preferences
+window opens, with every pane (Interface, Audio, Video, Subtitles / OSD,
+Input / Codecs, Hotkeys). Before, Preferences stopped on an assertion: its
+Subtitles pane reads the settings of VLC's subtitle renderer, the
+`freetype` module, which hadn't built. It builds now, against FreeType
+2.13.3, which `apps/vlc.sh` fetches from Ubuntu's archive (checked against
+its SHA-256) and builds static. That needed, in Ferry:
+
+- `setjmp`, `longjmp`, `sigsetjmp`, `siglongjmp` and the underscore forms,
+  in a Mac's `jmp_buf` (37 ints; `sigjmp_buf` one more), with the signal
+  mask saved and put back as a Mac does (`src/libc_vlc.c`, `setjmp.h`).
+- Core Text's font descriptors, collections and
+  `CTFontManagerCreateFontDescriptorsFromURL`, and `CTFontCreateForString`,
+  which VLC's `darwin.c` uses to find a font's file and its fallbacks.
+  Ferry answers from the fonts installed under `/usr/share/fonts` and the
+  user's own, read with HarfBuzz; a font without a character falls back to
+  the one Pango would pick (`graphics/CoreTextFonts.m`).
+- `libkern/OSByteOrder.h`, which a Mac's CoreFoundation brings in.
+
+VLC also showed "No document class is set for the type" at every launch,
+and that alert, being modal, kept every click from its other windows. VLC
+keeps the shared document controller only for its recent files and has no
+document class, so a Mac opens nothing untitled for it; Ferry now opens an
+untitled document at launch only for an app with a type it edits and a
+class for it (`appkit/NSApplication.m`).
+
+Tests: `tests/setjmp.c`, `tests/graphics/fonts.c`, `tests/byteorder.c`,
+`tests/appkit/viewer_launch.m`.
+
 ## Still to do
 
-- Menus, the playlist and the other windows are still to be tried.
+- The playlist after stopping, Open and the other windows are still to be
+  tried. The Preferences window opens with its title bar above the top of
+  the screen, and its percentage fields show 10000%.
+- The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
 - The C++ plugins (adaptive streaming among them) need libc++ linked.
 - VideoToolbox decoding, the keychain, speech, the CD module and
   SecureTransport don't build yet.

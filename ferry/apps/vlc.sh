@@ -32,8 +32,14 @@ ff_ver=6.1.1
 ff_tar=ffmpeg_$ff_ver.orig.tar.xz
 ff_url=http://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/$ff_tar
 ff_sha=8684f4b00f94b85461884c3719382f1261f0d9eb3d59640a1f4ac0873616f968
+# FreeType, for VLC's subtitle and on-screen text (Debian's repack of the
+# release, as Ubuntu's archive carries it)
+ft_ver=2.13.3
+ft_tar=freetype_$ft_ver+dfsg.orig.tar.xz
+ft_url=http://archive.ubuntu.com/ubuntu/pool/main/f/freetype/$ft_tar
+ft_sha=686ec73cbf6783b245dd068a09ce807b729ac0f8a46dd70f7867923c32fdf4de
 
-mkdir -p "$work/bin" "$work/prefix" "$work/ffbuild" "$work/vlcbuild"
+mkdir -p "$work/bin" "$work/prefix" "$work/ffbuild" "$work/ftbuild" "$work/vlcbuild"
 
 fetch() { # tarball url sha256
     if [ ! -f "$top/src/$1" ]; then
@@ -44,8 +50,10 @@ fetch() { # tarball url sha256
 }
 fetch "$vlc_tar" "$vlc_url" "$vlc_sha"
 fetch "$ff_tar" "$ff_url" "$ff_sha"
+fetch "$ft_tar" "$ft_url" "$ft_sha"
 [ -d "$top/src/vlc-$vlc_ver" ] || tar -C "$top/src" -xJf "$top/src/$vlc_tar"
 [ -d "$top/src/ffmpeg-$ff_ver" ] || tar -C "$top/src" -xJf "$top/src/$ff_tar"
+[ -d "$top/src/freetype-$ft_ver" ] || tar -C "$top/src" -xJf "$top/src/$ft_tar"
 
 # The tools a Mac build expects, by their Mac names.
 b=$work/bin
@@ -94,6 +102,15 @@ if [ ! -f "$work/prefix/lib/libavcodec.a" ]; then
         make -j"$jobs" && make install)
 fi
 
+# FreeType, as a static library for VLC's freetype module, which VLC's
+# preferences need (they read its options) as well as its subtitles.
+if [ ! -f "$work/prefix/lib/libfreetype.a" ]; then
+    (cd "$work/ftbuild" && "$top/src/freetype-$ft_ver/configure" --host=x86_64-apple-darwin \
+        --prefix="$work/prefix" --enable-static --disable-shared --with-pic --without-zlib \
+        --without-bzip2 --without-png --without-harfbuzz --without-brotli &&
+        make -j"$jobs" && make install)
+fi
+
 # VLC itself. Libtool would take ld64.lld for GNU ld, and ld64.lld has no
 # -r, so libtool is told both. VLC won't start as root unless built to,
 # and Ferry's test setup runs as root. Apple's linker finds CoreFoundation's
@@ -102,8 +119,9 @@ fi
 # display link); ld64.lld looks only in the ones named, so every module
 # names both, and drops whichever it doesn't call.
 cd "$work/vlcbuild"
-# (a build configured by an earlier recipe, without Core Video, is redone)
-[ ! -f config.status ] || grep -q CoreVideo config.status || rm -f config.status
+# (a build configured by an earlier recipe, without Core Video or FreeType, is redone)
+[ ! -f config.status ] || { grep -q CoreVideo config.status && grep -q freetype2 config.status; } ||
+    rm -f config.status
 if [ ! -f config.status ]; then
     "$top/src/vlc-$vlc_ver/configure" --host=x86_64-apple-darwin --prefix="$work/vlcprefix" \
         --disable-lua --disable-sparkle --disable-nls --disable-qt --disable-skins2 \

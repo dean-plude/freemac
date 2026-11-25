@@ -1065,7 +1065,11 @@ static void register_app_icon(void)
     }
     if (opened)
         return;
-    BOOL untitled = documents != nil;
+    /* Only a document-based app, one with a type it edits and a document
+     * class for it, opens an untitled document by itself. An app that
+     * keeps the shared controller only for its recent documents, as
+     * VLC does, opens nothing (and shows no error). */
+    BOOL untitled = documents != nil && [documents defaultType] != nil;
     if ([_delegate respondsToSelector:@selector(applicationShouldOpenUntitledFile:)])
         untitled = [_delegate applicationShouldOpenUntitledFile:self];
     if (!untitled)

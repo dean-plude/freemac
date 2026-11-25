@@ -24,7 +24,7 @@ many files compile at once (2 by default).
 | `macdown.sh` | MacDown, a Markdown editor | hoedown, LibYAML, handlebars-objc, MASPreferences, PAPreferences, JJPluralForm, M13OrderedDictionary, Prism, Sparkle 1.22.0 | freemac 1.225 |
 | `itsycal.sh` | Itsycal, a menu bar calendar | MASShortcut 2.4.0, Sparkle 1.27.1 | freemac 1.232 |
 | `tomatobar.sh` | TomatoBar, a SwiftUI menu bar timer | its three Swift packages | freemac 1.230 |
-| `vlc.sh` | VLC, the media player (its menus and other windows still to be tried) | VLC 3.0.24 and FFmpeg, from release tarballs checked by checksum | freemac 1.237 |
+| `vlc.sh` | VLC, the media player, with its Preferences (its playlist and other windows still to be tried) | VLC 3.0.24, FFmpeg and FreeType, from release tarballs checked by checksum | freemac 1.237 |
 
 Sequel Pro (freemac 1.226) has no recipe yet: it needs MariaDB
 Connector/C built for Ferry, with its hashes over CommonCrypto.
