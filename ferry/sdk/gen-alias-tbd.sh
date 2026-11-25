@@ -27,7 +27,7 @@ case $framework in
     ImageIO) pattern='^_(CGImageSource|CGImageDestination|kCGImage)' ;;
     UniformTypeIdentifiers) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UTType$|UTType[A-Z][A-Za-z0-9]*$|UTTagClass)' ;;
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
-    CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
+    CFNetwork) pattern='^_(kCFNetworkProxies|CFNetworkCopySystemProxySettings$|kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
     CoreServices) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo)' ;;
     ServiceManagement) pattern='^_(OBJC_(METACLASS|CLASS)_\$_SM|SM|kSM)' ;;
     IOKit) pattern='^_(IO[A-Z]|kIO)' ;;

@@ -189,6 +189,9 @@ run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
 # fts, statfs, asl, os_log, O_SYMLINK and the wait macros, for Sparkle and
 # the apps (1.223).
 run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
+# Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
+# what VLC's core asks of libSystem (1.NEXT).
+run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
