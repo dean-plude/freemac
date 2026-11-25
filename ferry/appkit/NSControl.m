@@ -1157,7 +1157,7 @@ static BOOL keeps_state(NSButtonType t)
 
 /* ---- editing ------------------------------------------------------------------------- */
 
-- (BOOL)acceptsFirstResponder { return _editable || _selectable; }
+- (BOOL)acceptsFirstResponder { return (_editable || _selectable) && ![self refusesFirstResponder]; }
 
 - (BOOL)becomeFirstResponder
 {

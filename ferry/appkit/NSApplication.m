@@ -17,6 +17,8 @@ NSNotificationName const NSApplicationDidFinishRestoringWindowsNotification =
 NSNotificationName const NSApplicationWillTerminateNotification = @"NSApplicationWillTerminateNotification";
 NSNotificationName const NSApplicationDidBecomeActiveNotification = @"NSApplicationDidBecomeActiveNotification";
 NSNotificationName const NSApplicationDidResignActiveNotification = @"NSApplicationDidResignActiveNotification";
+NSNotificationName const NSApplicationWillBecomeActiveNotification = @"NSApplicationWillBecomeActiveNotification";
+NSNotificationName const NSApplicationWillResignActiveNotification = @"NSApplicationWillResignActiveNotification";
 
 /* ---- the display ---------------------------------------------------------------------- */
 
@@ -778,6 +780,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 {
     if (_active)
         return;
+    [self _post:NSApplicationWillBecomeActiveNotification selector:@selector(applicationWillBecomeActive:)];
     _active = YES;
     for (NSWindow *w in [[AAllWindows() copy] autorelease])
         [w _appDidBecomeActive];
@@ -788,6 +791,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 {
     if (!_active)
         return;
+    [self _post:NSApplicationWillResignActiveNotification selector:@selector(applicationWillResignActive:)];
     _active = NO;
     for (NSWindow *w in [[AAllWindows() copy] autorelease])   /* panels that hide on deactivation */
         [w _appDidResignActive];

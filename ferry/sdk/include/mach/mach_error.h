@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* The text for a Mach error number (freemac 1.NEXT, VLC). */
+/* The text for a Mach error number (freemac 1.232, VLC). */
 #ifndef _FERRY_MACH_ERROR_H_
 #define _FERRY_MACH_ERROR_H_
 #include <mach/mach.h>

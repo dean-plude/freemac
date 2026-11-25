@@ -5,7 +5,7 @@
 #define _FERRY_LIMITS_H_
 #include_next <limits.h>
 #include <sys/syslimits.h>
-/* freemac 1.NEXT, as a Mac's machine/limits.h gives them (VLC) */
+/* freemac 1.232, as a Mac's machine/limits.h gives them (VLC) */
 #ifndef SSIZE_MAX
 #define SSIZE_MAX LONG_MAX
 #endif

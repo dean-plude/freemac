@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* A terminal's size (freemac 1.NEXT): VLC's help includes this header for
+/* A terminal's size (freemac 1.232): VLC's help includes this header for
  * TIOCGWINSZ, which <sys/ioctl.h> defines. The terminal settings calls
  * aren't served yet. */
 #ifndef _FERRY_TERMIOS_H_

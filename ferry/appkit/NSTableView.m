@@ -335,6 +335,11 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
                            NSTextAlignmentLeft, flipped);
         return;
     }
+    NSColor *background = [self backgroundColor];
+    if (background && ![self isTransparent]) {
+        [background set];
+        NSRectFillUsingOperation(frame, NSCompositingOperationSourceOver);
+    }
     if ([self isBordered] && ![self isTransparent]) {
         CGFloat h = fmin(frame.size.height - 2, 20);
         NSRect bezel = NSMakeRect(frame.origin.x + 2, floor(NSMidY(frame) - h / 2), frame.size.width - 4, h);
@@ -1291,7 +1296,7 @@ enum {
 
 - (BOOL)isFlipped { return YES; }
 - (BOOL)isOpaque { return YES; }
-- (BOOL)acceptsFirstResponder { return YES; }
+- (BOOL)acceptsFirstResponder { return ![self refusesFirstResponder]; }
 - (BOOL)becomeFirstResponder
 {
     [self setNeedsDisplay:YES];

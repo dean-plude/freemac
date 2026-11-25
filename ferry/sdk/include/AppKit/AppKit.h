@@ -1099,6 +1099,7 @@ typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
 - (void)windowDidBecomeMain:(NSNotification *)notification;
 - (void)windowDidResignMain:(NSNotification *)notification;
 - (void)windowDidMiniaturize:(NSNotification *)notification;
+- (void)windowDidChangeOcclusionState:(NSNotification *)notification; /* freemac 1.232 */
 - (void)windowDidDeminiaturize:(NSNotification *)notification;
 - (NSSize)windowWillResize:(NSWindow *)sender toSize:(NSSize)size;
 /* zooming (freemac 1.NEXT, VLC); Ferry zooms by maximizing */
@@ -1357,6 +1358,8 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (void)applicationWillTerminate:(NSNotification *)notification;
 - (void)applicationDidBecomeActive:(NSNotification *)notification;
 - (void)applicationDidResignActive:(NSNotification *)notification;
+- (void)applicationWillBecomeActive:(NSNotification *)notification;
+- (void)applicationWillResignActive:(NSNotification *)notification;
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename;
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames;
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls;
@@ -1425,6 +1428,8 @@ APPKIT_EXTERN NSNotificationName const NSApplicationDidFinishLaunchingNotificati
 APPKIT_EXTERN NSNotificationName const NSApplicationWillTerminateNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidBecomeActiveNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidResignActiveNotification;
+APPKIT_EXTERN NSNotificationName const NSApplicationWillBecomeActiveNotification;
+APPKIT_EXTERN NSNotificationName const NSApplicationWillResignActiveNotification;
 
 /* ---- nibs ---------------------------------------------------------------------------- */
 
@@ -2805,6 +2810,8 @@ APPKIT_EXTERN NSUserInterfaceItemIdentifier const NSTableViewRowViewKey;
 @end
 @interface NSTableView (NSDraggingSource) <NSDraggingSource>
 @end
+@interface NSTableView (NSDraggingDestination) <NSDraggingDestination>
+@end
 
 /* The row of column titles above a table; click a title to sort, drag a
  * divider to resize. */
@@ -3501,12 +3508,15 @@ APPKIT_EXTERN NSNotificationName const NSPopoverWillCloseNotification, NSPopover
 - (void)popoverWillClose:(NSNotification *)notification;
 - (void)popoverDidClose:(NSNotification *)notification;
 @end
+@class NSAppearance;
 @interface NSPopover : NSResponder <NSCoding>
 @property (retain) NSViewController *contentViewController;
 @property NSSize contentSize;
 @property NSPopoverBehavior behavior;
 @property BOOL animates;
-@property NSPopoverAppearance appearance;
+/* the appearance, as NSAppearanceCustomization has it (freemac 1.232);
+ * NSPopoverAppearance's values are the older names */
+@property (retain) NSAppearance *appearance;
 @property (assign) id<NSPopoverDelegate> delegate;
 @property (readonly, getter=isShown) BOOL shown;
 @property (readonly, getter=isDetached) BOOL detached;
@@ -4591,6 +4601,7 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- rule editors (NSRuleEditor.m), (freemac 1.222, Ferry 0.46.0) ------------------- */
 
 #import <AppKit/NSRuleEditor.h>
+#import <AppKit/NSPredicateEditor.h>
 
 /* ---- names the apps need to link and start (AppKitApps.m) ----------------------------- */
 
@@ -4615,6 +4626,10 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 #import <AppKit/AppKitOlder.h>
 
+/* ---- newer names: safe areas, display links, occlusion, symbol configurations,
+ * section headers (AppKitNewer.m) (freemac 1.232, Ferry 0.56.0) */
+
+#import <AppKit/AppKitNewer.h>
 /* ---- what VLC's Mac interface calls besides (AppKitVLC.m), (freemac 1.NEXT, Ferry 0.NEXT) */
 
 #import <AppKit/AppKitVLC.h>

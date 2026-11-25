@@ -382,8 +382,6 @@ static char arrows_key;
 
 /* ---- views, controls and windows ----------------------------------------------------- */
 
-static char clips_key;
-
 @implementation NSView (FerryVLC)
 - (NSView *)ancestorSharedWithView:(NSView *)view
 {
@@ -392,12 +390,6 @@ static char clips_key;
             return a;
     return nil;
 }
-- (BOOL)clipsToBounds
-{
-    NSNumber *n = assoc(self, &clips_key);
-    return n ? [n boolValue] : YES;
-}
-- (void)setClipsToBounds:(BOOL)flag { set_assoc(self, &clips_key, @(flag)); }
 @end
 
 @implementation NSControl (FerryNeedsDisplay)

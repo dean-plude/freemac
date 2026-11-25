@@ -15,9 +15,11 @@ module AppKit [system] {
     header "AppKit/AppKitApps.h"
     header "AppKit/AppKitDocumentApps.h"
     header "AppKit/AppKitMore.h"
+    header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"
     header "AppKit/AppKitVLC.h"
     header "AppKit/NSAccessibility.h"
+    header "AppKit/NSAlert.h"
     header "AppKit/NSAnimation.h"
     header "AppKit/NSBezierPath.h"
     header "AppKit/NSCollectionView.h"
@@ -25,18 +27,21 @@ module AppKit [system] {
     header "AppKit/NSDockTile.h"
     header "AppKit/NSEventMonitors.h"
     header "AppKit/NSFontDescriptor.h"
+    header "AppKit/NSGraphics.h"
     header "AppKit/NSGridView.h"
     header "AppKit/NSLayoutConstraint.h"
     module NSMenu {
         header "AppKit/NSMenu.h"
         export *
     }
+    header "AppKit/NSPredicateEditor.h"
     header "AppKit/NSRuleEditor.h"
     header "AppKit/NSRulerView.h"
     header "AppKit/NSRunningApplication.h"
     header "AppKit/NSTextAttachment.h"
     header "AppKit/NSTouchBar.h"
     header "AppKit/NSTrackingArea.h"
+    header "AppKit/NSWorkspace.h"
     export *
     link framework "AppKit"
 }
@@ -45,6 +50,12 @@ module ApplicationServices [system] {
     header "ApplicationServices/ApplicationServices.h"
     export *
     link framework "ApplicationServices"
+}
+
+module AudioToolbox [system] {
+    header "AudioToolbox/AudioToolbox.h"
+    export *
+    link framework "CoreAudio"
 }
 
 module CFNetwork [system] {
@@ -144,6 +155,12 @@ module CloudKit [system] {
     link framework "CloudKit"
 }
 
+module CoreAudio [system] {
+    header "CoreAudio/CoreAudio.h"
+    export *
+    link framework "CoreAudio"
+}
+
 module CoreServices [system] {
     header "CoreServices/CoreServices.h"
     header "CoreServices/AppleEvents.h"
@@ -172,6 +189,12 @@ module CoreText [system] {
     link framework "CoreText"
 }
 
+module EventKit [system] {
+    header "EventKit/EventKit.h"
+    export *
+    link framework "EventKit"
+}
+
 module Foundation [system] {
     header "Foundation/Foundation.h"
     header "Foundation/FoundationOlder.h"
@@ -188,6 +211,7 @@ module Foundation [system] {
     header "Foundation/NSComparisonPredicate.h"
     header "Foundation/NSData.h"
     header "Foundation/NSDate.h"
+    header "Foundation/NSDateIntervalFormatter.h"
     header "Foundation/NSDecimal.h"
     header "Foundation/NSDecimalNumber.h"
     header "Foundation/NSDictionary.h"

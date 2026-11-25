@@ -67,7 +67,7 @@ void *bsearch(const void *, const void *, size_t, size_t, int (*)(const void *, 
 int mkstemp(char *);
 char *mkdtemp(char *);
 char *realpath(const char *, char *);
-/* freemac 1.NEXT (VLC): the 48-bit random numbers */
+/* freemac 1.232 (VLC): the 48-bit random numbers */
 double drand48(void);
 double erand48(unsigned short[3]);
 long lrand48(void);

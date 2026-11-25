@@ -129,8 +129,7 @@ typedef NS_ENUM(NSUInteger, NSScrollArrowPosition) {
 @interface NSView (FerryVLC)
 /* the closest view both are inside, or nil */
 - (NSView *)ancestorSharedWithView:(NSView *)view;
-/* Ferry clips every view to its bounds; kept as set */
-@property BOOL clipsToBounds;
+/* clipsToBounds is in AppKitNewer.h */
 @end
 
 @interface NSControl (FerryNeedsDisplay)

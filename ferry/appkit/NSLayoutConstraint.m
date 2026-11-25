@@ -361,6 +361,8 @@ NSDictionary *_NSDictionaryOfVariableBindings(NSString *keys, id first, ...)
 - (CGFloat)constant { return _constant; }
 - (void)setConstant:(CGFloat)c
 {
+    if (c == _constant)
+        return;
     _constant = c;
     if (_container)
         changed(_container);
@@ -1382,6 +1384,7 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
     /* inequalities are active (held as equalities) only while the answer
      * would break them otherwise */
     char *active = calloc((size_t)p->nrows, 1), *failed = calloc((size_t)p->nrows, 1);
+    char *let_go = calloc((size_t)p->nrows, 1);
     double *x = calloc((size_t)p->nvars, sizeof(double));
     int limit = 4 * p->nrows + 8;
     for (int round = 0; round < limit; round++) {
@@ -1395,17 +1398,27 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
          * the way of a weaker wish that keeps it anyway (a size held at zero
          * blocking an intrinsic width): let go of each one that the answer
          * keeps without it. The rows before it in priority order come out
-         * the same, so nothing stronger loses. */
+         * the same, so nothing stronger loses. A weaker wish the answer then
+         * breaks (a label hugging its text at priority 1 once a zero width
+         * no longer holds it) is taken up in the rounds that follow
+         * (freemac 1.232: Itsycal's month title). */
         BOOL released = NO;
         for (int k = p->nrows - 1; k >= 0; k--) {
             if (!active[k])
                 continue;
             active[k] = 0;
             solve_rows(p, active, failed, x);
-            if (first_broken(p, active, x) < 0 && !breaks(&p->rows[k], x, p->nvars))
+            int fb = first_broken(p, active, x);
+            /* letting go while a weaker wish breaks happens once a row, so
+             * the rounds can't go back and forth between the two */
+            BOOL weaker = fb >= 0 && p->rows[fb].priority < p->rows[k].priority && !let_go[k];
+            if ((fb < 0 || weaker) && !breaks(&p->rows[k], x, p->nvars)) {
                 released = YES;
-            else
+                if (weaker)
+                    let_go[k] = 1;
+            } else {
                 active[k] = 1;
+            }
         }
         if (!released)
             break;
@@ -1418,6 +1431,7 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
     free(x);
     free(active);
     free(failed);
+    free(let_go);
     for (int k = 0; k < p->nrows; k++)
         free(p->rows[k].a);
 }

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * What VLC's core asks of libSystem (freemac 1.NEXT): Mach semaphores,
+ * What VLC's core asks of libSystem (freemac 1.232): Mach semaphores,
  * pathconf with a Mac's numbers, the reentrant user lookups, sigpending and
  * sigwait with a Mac's signal sets, statvfs in a Mac's layout, strnstr,
  * sys_errlist by a Mac's numbers, tsearch, nrand48, swab and timespec_get. */

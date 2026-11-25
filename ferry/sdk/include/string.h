@@ -20,7 +20,7 @@ size_t strlcat(char *, const char *, size_t);
 void memset_pattern4(void *, const void *, size_t);
 void memset_pattern8(void *, const void *, size_t);
 void memset_pattern16(void *, const void *, size_t);
-/* freemac 1.NEXT: served from this system, as VLC finds it */
+/* freemac 1.232: served from this system, as VLC finds it */
 void *memrchr(const void *, int, size_t);
 char *strnstr(const char *, const char *, size_t);
 /* C11's bounds-checked memset, which is never optimised away (freemac 1.230) */

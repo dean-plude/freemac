@@ -4,7 +4,9 @@
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
 # SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
 # UniformTypeIdentifiers in Foundation's,
-# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia and AddressBook in AppKit's): the calls the files export for that framework, under
+# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia and
+# AddressBook in AppKit's, AudioToolbox in CoreAudio's): the calls the files export
+# for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
 # from the file. Cocoa, an umbrella, offers everything AppKit, Foundation and
@@ -41,6 +43,7 @@ case $framework in
     QuickLook) pattern='^_(QL|kQL)' ;;
     ScriptingBridge) pattern='^_OBJC_(METACLASS|CLASS)_\$_SB(Object|Application|ElementArray)$' ;;
     CoreImage) pattern='^_(OBJC_(METACLASS|CLASS)_\$_CI[A-Z][A-Za-z]*$|kCI|CI(Detector|Feature)[A-Z])' ;;
+    AudioToolbox) pattern='^_(AudioObject|AudioHardware)' ;;
     Quartz) pattern='^_(OBJC_(METACLASS|CLASS)_\$_(QL|QC)|QL|kQL|QC)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

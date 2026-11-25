@@ -17,6 +17,7 @@ __FERRY_BEGIN
 #define M_SQRT2 1.41421356237309504880
 #define M_SQRT1_2 0.70710678118654752440
 #define HUGE_VAL __builtin_huge_val()
+#define MAXFLOAT 0x1.fffffep+127f /* the largest float (freemac 1.232) */
 #define INFINITY __builtin_inff()
 #define NAN __builtin_nanf("")
 #define isnan(x) __builtin_isnan(x)

@@ -55,7 +55,7 @@ uid_t getuid(void);
 uid_t geteuid(void);
 gid_t getgid(void);
 gid_t getegid(void);
-/* freemac 1.NEXT: VLC's rootwrap */
+/* freemac 1.232: VLC's rootwrap */
 int setuid(uid_t);
 int setgid(gid_t);
 int seteuid(uid_t);
@@ -76,7 +76,7 @@ int usleep(useconds_t);
 unsigned alarm(unsigned);
 int pause(void);
 long sysconf(int);
-/* freemac 1.NEXT: pathconf, with a Mac's numbers (VLC) */
+/* freemac 1.232: pathconf, with a Mac's numbers (VLC) */
 #define _PC_LINK_MAX 1
 #define _PC_MAX_CANON 2
 #define _PC_MAX_INPUT 3

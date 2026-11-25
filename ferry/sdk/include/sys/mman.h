@@ -17,7 +17,7 @@ __FERRY_BEGIN
 void *mmap(void *, size_t, int, int, int, off_t);
 int munmap(void *, size_t);
 int mprotect(void *, size_t, int);
-/* freemac 1.NEXT (VLC): advice on how memory will be used */
+/* freemac 1.232 (VLC): advice on how memory will be used */
 #define MADV_NORMAL 0
 #define MADV_RANDOM 1
 #define MADV_SEQUENTIAL 2

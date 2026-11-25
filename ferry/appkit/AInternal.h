@@ -47,6 +47,7 @@ extern BOOL AConstraintsInUse;
 /* a menu item chosen: its action, with the menu's will and did send notifications (AppKitMore.m) */
 void ASendMenuItemAction(NSMenuItem *item);
 void ALayoutConstraintsIfNeeded(NSView *view);
+void ALayoutWindowIfNeeded(NSView *contentView);   /* constraints, then views marked as needing layout */
 BOOL AConstraintFittingSize(NSView *view, NSSize *size);
 BOOL AConstraintStretches(NSView *view, BOOL vertical, NSLayoutPriority priority);
 void AConstraintsViewChanged(NSView *view);
@@ -381,6 +382,7 @@ void AViewDecode(NSView *view, NSCoder *coder);
 @interface NSView (FerryControllers)
 - (NSViewController *)_viewController;
 - (void)_setViewController:(NSViewController *)vc;
+- (void)_safeAreaInsetsChanged;   /* AppKitNewer.m */
 @end
 @interface NSImage (FerryPrivate)
 /* In rect, upright in flipped views; a template is filled with color. */

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* Binary search trees and linear search (freemac 1.NEXT, VLC). */
+/* Binary search trees and linear search (freemac 1.232, VLC). */
 #ifndef _FERRY_SEARCH_H_
 #define _FERRY_SEARCH_H_
 #include <_ferry.h>
