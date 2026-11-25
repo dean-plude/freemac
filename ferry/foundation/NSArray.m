@@ -268,6 +268,46 @@ static void check_range(NSArray *a, NSRange r)
             return i;
     return NSNotFound;
 }
+/* A binary search of a sorted range (freemac 1.225): the first or last of the
+ * equal objects, or any of them, or where obj would go to keep the order. */
+- (NSUInteger)indexOfObject:(id)obj inSortedRange:(NSRange)r options:(NSBinarySearchingOptions)opts
+            usingComparator:(NSComparator)cmp
+{
+    if ((opts & NSBinarySearchingFirstEqual) && (opts & NSBinarySearchingLastEqual))
+        FRaise(NSInvalidArgumentException, @"-[NSArray indexOfObject:inSortedRange:options:usingComparator:]: "
+                                           @"both NSBinarySearchingFirstEqual and NSBinarySearchingLastEqual");
+    if (NSMaxRange(r) > [self count])
+        FRaise(NSRangeException, @"-[NSArray indexOfObject:inSortedRange:options:usingComparator:]: range %@ "
+                                 @"beyond bounds [0 .. %lu]",
+               NSStringFromRange(r), (unsigned long)[self count]);
+    if (!cmp)
+        FRaise(NSInvalidArgumentException, @"-[NSArray indexOfObject:inSortedRange:options:usingComparator:]: "
+                                           @"no comparator");
+    BOOL insertion = (opts & NSBinarySearchingInsertionIndex) != 0;
+    NSUInteger lo = r.location, hi = NSMaxRange(r), found = NSNotFound;
+    while (lo < hi) {
+        NSUInteger mid = lo + (hi - lo) / 2;
+        NSComparisonResult c = cmp([self objectAtIndex:mid], obj);
+        if (c == NSOrderedSame) {
+            found = mid;
+            if (opts & NSBinarySearchingLastEqual)
+                lo = mid + 1;
+            else if (opts & NSBinarySearchingFirstEqual || insertion)
+                hi = mid;
+            else
+                break;
+        } else if (c == NSOrderedAscending)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    if (insertion) {
+        if (found == NSNotFound)
+            return lo;
+        return (opts & NSBinarySearchingLastEqual) ? found + 1 : found;
+    }
+    return found;
+}
 - (NSUInteger)indexOfObjectPassingTest:(BOOL (^)(id, NSUInteger, BOOL *))predicate
 {
     NSUInteger n = [self count];

@@ -1246,7 +1246,7 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @interface NSMenu : NSObject <NSCopying>
 - (instancetype)initWithTitle:(NSString *)title;
 @property (copy) NSString *title;
-@property (readonly, copy) NSArray<NSMenuItem *> *itemArray;
+@property (copy) NSArray<NSMenuItem *> *itemArray;   /* settable (freemac 1.225) */
 @property (readonly) NSInteger numberOfItems;
 @property (assign) NSMenu *supermenu;
 @property BOOL autoenablesItems;
@@ -2241,6 +2241,8 @@ APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRT
 @end
 /* how far a selection made with the mouse reaches (freemac 1.222, Ferry 0.46.0) */
 typedef NS_ENUM(NSUInteger, NSSelectionGranularity) { NSSelectByCharacter = 0, NSSelectByWord = 1, NSSelectByParagraph = 2 };
+/* which side of a line break the insertion point is on (freemac 1.225) */
+typedef NS_ENUM(NSUInteger, NSSelectionAffinity) { NSSelectionAffinityUpstream = 0, NSSelectionAffinityDownstream = 1 };
 @interface NSTextView : NSText
 - (instancetype)initWithFrame:(NSRect)frame textContainer:(NSTextContainer *)container;
 - (NSRange)selectionRangeForProposedRange:(NSRange)proposed granularity:(NSSelectionGranularity)granularity;
@@ -2274,6 +2276,10 @@ typedef NS_ENUM(NSUInteger, NSSelectionGranularity) { NSSelectByCharacter = 0, N
 - (BOOL)shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)string;
 - (void)didChangeText;
 - (NSUInteger)characterIndexForInsertionAtPoint:(NSPoint)point;
+/* freemac 1.225 */
+- (NSAttributedString *)attributedString;   /* the text storage */
+- (BOOL)validateMenuItem:(NSMenuItem *)item;
+@property (readonly) NSSelectionAffinity selectionAffinity;
 @end
 APPKIT_EXTERN NSNotificationName const NSTextDidBeginEditingNotification;
 APPKIT_EXTERN NSNotificationName const NSTextDidEndEditingNotification;
@@ -2287,6 +2293,8 @@ APPKIT_EXTERN NSNotificationName const NSTextViewDidChangeSelectionNotification;
 - (void)textViewDidChangeSelection:(NSNotification *)note;
 - (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)string;
 - (BOOL)textView:(NSTextView *)tv doCommandBySelector:(SEL)sel;
+/* the menu a right click shows, for the character at charIndex (freemac 1.225, Ferry 0.49.0) */
+- (NSMenu *)textView:(NSTextView *)tv menu:(NSMenu *)menu forEvent:(NSEvent *)event atIndex:(NSUInteger)charIndex;
 @end
 
 typedef NS_ENUM(NSUInteger, NSProgressIndicatorStyle) {
@@ -3457,6 +3465,9 @@ typedef NS_ENUM(NSInteger, NSPathStyle) { NSPathStyleStandard = 0, NSPathStyleNa
 @protocol NSPathControlDelegate <NSObject>
 @optional
 - (void)pathControl:(NSPathControl *)pathControl willPopUpMenu:(NSMenu *)menu;
+/* (freemac 1.225, Ferry 0.49.0) */
+- (void)pathControl:(NSPathControl *)pathControl willDisplayOpenPanel:(NSOpenPanel *)openPanel;
+- (BOOL)pathControl:(NSPathControl *)pathControl shouldDragItem:(NSPathControlItem *)pathItem withPasteboard:(NSPasteboard *)pasteboard;
 @end
 @interface NSPathCell : NSActionCell
 + (Class)pathComponentCellClass;
@@ -4009,7 +4020,7 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
 - (void)setWindow:(NSWindow *)window;
 - (void)addWindowController:(NSWindowController *)controller;
 - (void)removeWindowController:(NSWindowController *)controller;
-@property (readonly, copy) NSArray<NSWindowController *> *windowControllers;
+@property (readonly, copy) NSArray<__kindof NSWindowController *> *windowControllers;
 - (void)showWindows;
 @property (readonly) NSWindow *windowForSheet;
 @property (readonly, getter=isLocked) BOOL locked;
@@ -4524,5 +4535,11 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- data from the app's asset catalogue (NSAssets.m), (freemac 1.224, Ferry 0.48.0) */
 
 #import <AppKit/NSDataAsset.h>
+
+/* ---- what MacPass and MacDown call besides (AppKitDocumentApps.m), (freemac 1.225, Ferry 0.49.0) */
+
+#import <AppKit/AppKitDocumentApps.h>
+/* the grid view (NSGridView.m) (freemac 1.225, Ferry 0.49.0) */
+#import <AppKit/NSGridView.h>
 
 #endif

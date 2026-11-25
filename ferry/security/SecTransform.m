@@ -20,6 +20,7 @@
  * isn't done: SecSignTransformCreate answers NULL with an error. */
 #include "SInternal.h"
 #include <string.h>
+#include <ctype.h>
 
 /* ---- libcrypto, from OpenSSL's published API documentation -------------------------- */
 
@@ -192,7 +193,7 @@ K(kSecInputIsDigest, "Digest")
 K(kSecInputIsRaw, "Raw")
 #undef K
 
-typedef enum { T_GROUP, T_READ, T_DIGEST, T_VERIFY } TKind;
+typedef enum { T_GROUP, T_READ, T_DIGEST, T_VERIFY, T_ENCODE, T_DECODE } TKind;
 
 @interface STransform : NSObject {
 @public
@@ -219,7 +220,7 @@ typedef enum { T_GROUP, T_READ, T_DIGEST, T_VERIFY } TKind;
 - (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_SECTRANSFORM; }
 - (NSString *)description
 {
-    static const char *names[] = {"group", "read", "digest", "verify"};
+    static const char *names[] = {"group", "read", "digest", "verify", "encode", "decode"};
     return [NSString stringWithFormat:@"<SecTransform %p %s>", self, names[kind]];
 }
 @end
@@ -430,6 +431,118 @@ static int verify_digest(SKey *key, NSData *signature, NSData *hash, NSString *t
     return result;
 }
 
+/* ---- encoding (freemac 1.225, Ferry 0.49.0) ---- */
+
+#define K(name, value) S_EXPORT const CFStringRef name = (CFStringRef)@value;
+K(kSecEncodeTypeAttribute, "EncodeType")
+K(kSecDecodeTypeAttribute, "DecodeType")
+K(kSecEncodeLineLengthAttribute, "LineLength")
+K(kSecBase64Encoding, "base64")
+K(kSecBase32Encoding, "base32")
+K(kSecBase32HexEncoding, "base32FDE")
+K(kSecZLibEncoding, "zlib")
+#undef K
+
+static BOOL known_encoding(id type)
+{
+    return [type isEqual:(id)kSecBase64Encoding] || [type isEqual:(id)kSecBase32Encoding] ||
+           [type isEqual:(id)kSecBase32HexEncoding];
+}
+
+S_EXPORT SecTransformRef SecEncodeTransformCreate(CFTypeRef type, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    if (!known_encoding((id)type)) {
+        set_error(error, kSecTransformErrorInvalidAlgorithm, @"Not an encoding Ferry has.");
+        return NULL;
+    }
+    STransform *t = new_transform(T_ENCODE);
+    t->attributes[(id)kSecEncodeTypeAttribute] = (id)type;
+    return t;
+}
+S_EXPORT SecTransformRef SecDecodeTransformCreate(CFTypeRef type, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    if (!known_encoding((id)type)) {
+        set_error(error, kSecTransformErrorInvalidAlgorithm, @"Not an encoding Ferry has.");
+        return NULL;
+    }
+    STransform *t = new_transform(T_DECODE);
+    t->attributes[(id)kSecDecodeTypeAttribute] = (id)type;
+    return t;
+}
+
+static const char b32[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", b32hex[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+
+static NSData *base32_encode(NSData *in, const char *alphabet)
+{
+    const uint8_t *p = [in bytes];
+    NSUInteger n = [in length];
+    NSMutableData *out = [NSMutableData dataWithCapacity:(n + 4) / 5 * 8];
+    for (NSUInteger i = 0; i < n; i += 5) {
+        uint8_t b[5] = {0};
+        NSUInteger k = MIN(5, n - i);
+        memcpy(b, p + i, k);
+        uint64_t v = ((uint64_t)b[0] << 32) | ((uint64_t)b[1] << 24) | ((uint64_t)b[2] << 16) | ((uint64_t)b[3] << 8) | b[4];
+        static const int chars_for[6] = {0, 2, 4, 5, 7, 8};
+        char c[8];
+        for (int j = 0; j < 8; j++)
+            c[j] = j < chars_for[k] ? alphabet[(v >> (35 - 5 * j)) & 31] : '=';
+        [out appendBytes:c length:8];
+    }
+    return out;
+}
+
+static NSData *base32_decode(NSData *in, const char *alphabet)
+{
+    const uint8_t *p = [in bytes];
+    NSMutableData *out = [NSMutableData data];
+    uint64_t acc = 0;
+    int bits = 0;
+    for (NSUInteger i = 0; i < [in length]; i++) {
+        int c = toupper(p[i]);
+        if (c == '=' || c == '\n' || c == '\r' || c == ' ' || c == '\t')
+            continue;
+        const char *at = strchr(alphabet, c);
+        if (!at || !c)
+            return nil;
+        acc = (acc << 5) | (uint64_t)(at - alphabet);
+        bits += 5;
+        if (bits >= 8) {
+            uint8_t byte = (uint8_t)(acc >> (bits - 8));
+            [out appendBytes:&byte length:1];
+            bits -= 8;
+        }
+    }
+    return out;
+}
+
+static id code(STransform *t, NSData *input, CFErrorRef *error)
+{
+    BOOL encode = t->kind == T_ENCODE;
+    id type = t->attributes[encode ? (id)kSecEncodeTypeAttribute : (id)kSecDecodeTypeAttribute];
+    NSData *out = nil;
+    if ([type isEqual:(id)kSecBase64Encoding]) {
+        if (encode) {
+            NSInteger len = [t->attributes[(id)kSecEncodeLineLengthAttribute] integerValue];
+            NSDataBase64EncodingOptions opts = len >= 76 ? NSDataBase64Encoding76CharacterLineLength
+                                               : len >= 64 ? NSDataBase64Encoding64CharacterLineLength
+                                                           : 0;
+            out = [[input base64EncodedStringWithOptions:opts] dataUsingEncoding:NSASCIIStringEncoding];
+        } else
+            out = [[[NSData alloc] initWithBase64EncodedData:input options:NSDataBase64DecodingIgnoreUnknownCharacters]
+                autorelease];
+    } else {
+        const char *alphabet = [type isEqual:(id)kSecBase32HexEncoding] ? b32hex : b32;
+        out = encode ? base32_encode(input, alphabet) : base32_decode(input, alphabet);
+    }
+    if (!out)
+        set_error(error, kSecTransformErrorInvalidInput, @"The input isn't in that encoding.");
+    return out;
+}
+
 /* A transform's output, or nil with *error set. */
 static id run(STransform *t, CFErrorRef *error, int depth)
 {
@@ -494,6 +607,9 @@ static id run(STransform *t, CFErrorRef *error, int depth)
         }
         return ok ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
     }
+    case T_ENCODE:
+    case T_DECODE:
+        return code(t, input, error);
     case T_GROUP:
         break;
     }
@@ -547,4 +663,133 @@ S_EXPORT void SecTransformExecuteAsync(SecTransformRef transform, dispatch_queue
             CFRelease(transform);
         });
     });
+}
+
+/* ---- keys made and used, access control (freemac 1.225, Ferry 0.49.0) ------------------- */
+
+#define FERRY_TYPE_SECACCESSCONTROL 0x46520043
+#define K(name, value) S_EXPORT const CFStringRef name = (CFStringRef)@value;
+K(kSecKeyAlgorithmRSAEncryptionRaw, "algid:RSAEncryptionRaw")
+K(kSecKeyAlgorithmRSAEncryptionPKCS1, "algid:RSAEncryptionPKCS1")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA1, "algid:RSAEncryptionOAEPSHA1")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA224, "algid:RSAEncryptionOAEPSHA224")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA256, "algid:RSAEncryptionOAEPSHA256")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA384, "algid:RSAEncryptionOAEPSHA384")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA512, "algid:RSAEncryptionOAEPSHA512")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA1AESGCM, "algid:RSAEncryptionOAEPSHA1AESGCM")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA224AESGCM, "algid:RSAEncryptionOAEPSHA224AESGCM")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA256AESGCM, "algid:RSAEncryptionOAEPSHA256AESGCM")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA384AESGCM, "algid:RSAEncryptionOAEPSHA384AESGCM")
+K(kSecKeyAlgorithmRSAEncryptionOAEPSHA512AESGCM, "algid:RSAEncryptionOAEPSHA512AESGCM")
+K(kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA1, "algid:RSASignatureMessagePKCS1v15SHA1")
+K(kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA256, "algid:RSASignatureMessagePKCS1v15SHA256")
+K(kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA512, "algid:RSASignatureMessagePKCS1v15SHA512")
+K(kSecKeyAlgorithmRSASignatureMessagePSSSHA256, "algid:RSASignatureMessagePSSSHA256")
+K(kSecKeyAlgorithmECDSASignatureMessageX962SHA256, "algid:ECDSASignatureMessageX962SHA256")
+K(kSecKeyAlgorithmECIESEncryptionStandardX963SHA256AESGCM, "algid:ECIESEncryptionStandardX963SHA256AESGCM")
+K(kSecKeyAlgorithmECIESEncryptionCofactorVariableIVX963SHA256AESGCM, "algid:ECIESEncryptionCofactorVariableIVX963SHA256AESGCM")
+K(kSecKeyAlgorithmECDHKeyExchangeStandard, "algid:ECDHKeyExchangeStandard")
+K(kSecAttrApplicationTag, "atag")
+K(kSecAttrApplicationLabel, "klbl")
+K(kSecAttrKeyType, "type")
+K(kSecAttrKeyTypeRSA, "42")
+K(kSecAttrKeyTypeEC, "73")
+K(kSecAttrKeyTypeECSECPrimeRandom, "73")
+K(kSecAttrKeySizeInBits, "bsiz")
+K(kSecAttrEffectiveKeySize, "esiz")
+K(kSecAttrKeyClass, "kcls")
+K(kSecAttrKeyClassPublic, "0")
+K(kSecAttrKeyClassPrivate, "1")
+K(kSecAttrKeyClassSymmetric, "2")
+K(kSecAttrIsPermanent, "perm")
+K(kSecPublicKeyAttrs, "public")
+K(kSecPrivateKeyAttrs, "private")
+K(kSecAttrAccessControl, "accc")
+K(kSecAttrTokenID, "tkid")
+K(kSecAttrTokenIDSecureEnclave, "com.apple.setoken")
+K(kSecUseAuthenticationContext, "u_AuthCtx")
+#undef K
+
+static void key_error(CFErrorRef *error, OSStatus status, NSString *message)
+{
+    if (error)
+        *error = (CFErrorRef)SCopyError(status, message);
+}
+
+S_EXPORT SecKeyRef SecKeyCreateRandomKey(CFDictionaryRef parameters, CFErrorRef *error)
+{
+    key_error(error, errSecUnimplemented, @"Ferry's Security doesn't make keys.");
+    return NULL;
+}
+S_EXPORT SecKeyRef SecKeyCopyPublicKey(SecKeyRef key)
+{
+    return [(id)key isKindOfClass:[SKey class]] ? (SecKeyRef)[(id)key retain] : NULL;
+}
+S_EXPORT CFDictionaryRef SecKeyCopyAttributes(SecKeyRef key)
+{
+    if (![(id)key isKindOfClass:[SKey class]])
+        return NULL;
+    return (CFDictionaryRef)[@{(id)kSecAttrKeyClass : (id)kSecAttrKeyClassPublic, (id)kSecClass : (id)kSecClassKey}
+        copy];
+}
+S_EXPORT size_t SecKeyGetBlockSize(SecKeyRef key) { return 0; }
+S_EXPORT Boolean SecKeyIsAlgorithmSupported(SecKeyRef key, SecKeyOperationType operation, SecKeyAlgorithm algorithm)
+{
+    return false;
+}
+S_EXPORT CFDataRef SecKeyCreateEncryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef plaintext,
+                                             CFErrorRef *error)
+{
+    key_error(error, errSecUnimplemented, @"Ferry's Security doesn't encrypt with keys.");
+    return NULL;
+}
+S_EXPORT CFDataRef SecKeyCreateDecryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef ciphertext,
+                                             CFErrorRef *error)
+{
+    key_error(error, errSecUnimplemented, @"Ferry's Security doesn't decrypt with keys.");
+    return NULL;
+}
+S_EXPORT CFDataRef SecKeyCreateSignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef data, CFErrorRef *error)
+{
+    key_error(error, errSecUnimplemented, @"Ferry's Security doesn't sign.");
+    return NULL;
+}
+
+@interface SAccessControl : NSObject {
+@public
+    id protection;
+    SecAccessControlCreateFlags flags;
+}
+@end
+@implementation SAccessControl
+- (void)dealloc
+{
+    [protection release];
+    [super dealloc];
+}
+- (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_SECACCESSCONTROL; }
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<SecAccessControl %p %@ flags 0x%lx>", self, protection, (unsigned long)flags];
+}
+@end
+
+S_EXPORT CFTypeID SecAccessControlGetTypeID(void) { return FERRY_TYPE_SECACCESSCONTROL; }
+S_EXPORT SecAccessControlRef SecAccessControlCreateWithFlags(CFAllocatorRef allocator, CFTypeRef protection,
+                                                             SecAccessControlCreateFlags flags, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    NSArray *known = @[ (id)kSecAttrAccessibleWhenUnlocked, (id)kSecAttrAccessibleAfterFirstUnlock,
+                        (id)kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                        (id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                        (id)kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly ];
+    if (![known containsObject:(id)protection]) {
+        key_error(error, errSecParam, @"Not a kSecAttrAccessible value.");
+        return NULL;
+    }
+    SAccessControl *a = [[SAccessControl alloc] init];
+    a->protection = [(id)protection copy];
+    a->flags = flags;
+    return (SecAccessControlRef)a;
 }

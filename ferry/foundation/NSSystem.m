@@ -495,6 +495,10 @@ static NSArray *loaded_bundles(BOOL frameworks)
 - (NSString *)pathForResource:(NSString *)name ofType:(NSString *)ext inDirectory:(NSString *)subpath
 {
     NSString *file = name;
+    /* a type written with its dot (".handlebars", as MacDown asks) is the
+     * same type, as on a Mac (freemac 1.225) */
+    if ([ext hasPrefix:@"."])
+        ext = [ext substringFromIndex:1];
     if ([ext length])
         file = [name stringByAppendingPathExtension:ext];
     NSString *base = subpath ? [_resources stringByAppendingPathComponent:subpath] : _resources;
@@ -516,6 +520,8 @@ static NSArray *loaded_bundles(BOOL frameworks)
 }
 - (NSArray *)pathsForResourcesOfType:(NSString *)ext inDirectory:(NSString *)subpath
 {
+    if ([ext hasPrefix:@"."])
+        ext = [ext substringFromIndex:1];
     NSString *base = subpath ? [_resources stringByAppendingPathComponent:subpath] : _resources;
     NSMutableArray *out = [NSMutableArray array];
     for (NSString *f in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:base error:NULL])

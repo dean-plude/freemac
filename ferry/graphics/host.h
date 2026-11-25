@@ -33,6 +33,7 @@ typedef union {
 } cairo_path_data_t;
 typedef struct { cairo_status_t status; cairo_path_data_t *data; int num_data; } cairo_path_t;
 typedef cairo_status_t (*cairo_read_func_t)(void *closure, unsigned char *data, unsigned int length);
+typedef cairo_status_t (*cairo_write_func_t)(void *closure, const unsigned char *data, unsigned int length);
 
 enum { CAIRO_FORMAT_ARGB32 = 0, CAIRO_FORMAT_RGB24 = 1, CAIRO_FORMAT_A8 = 2 };
 enum {
@@ -63,6 +64,7 @@ int cairo_image_surface_get_stride(cairo_surface_t *surface);
 int cairo_image_surface_get_format(cairo_surface_t *surface);
 int cairo_format_stride_for_width(int format, int width);
 void cairo_surface_flush(cairo_surface_t *surface);
+cairo_status_t cairo_surface_write_to_png_stream(cairo_surface_t *surface, cairo_write_func_t write, void *closure);
 void cairo_surface_mark_dirty(cairo_surface_t *surface);
 void cairo_surface_destroy(cairo_surface_t *surface);
 cairo_surface_t *cairo_surface_reference(cairo_surface_t *surface);

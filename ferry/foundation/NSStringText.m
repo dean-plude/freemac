@@ -32,6 +32,11 @@ static struct {
         *(*nfkd)(UErrorCode *err);
     int32_t (*normalize)(const UNormalizer2 *n, const unichar *src, int32_t len, unichar *dest, int32_t cap,
                          UErrorCode *err);
+    int32_t (*toUpper)(unichar *dest, int32_t cap, const unichar *src, int32_t len, const char *locale,
+                       UErrorCode *err);
+    int32_t (*toLower)(unichar *dest, int32_t cap, const unichar *src, int32_t len, const char *locale,
+                       UErrorCode *err);
+    int32_t (*toTitleChar)(int32_t c);
 } icu;
 
 static BOOL load_icu(void)
@@ -51,6 +56,9 @@ static BOOL load_icu(void)
     LOAD(nfkc, "unorm2_getNFKCInstance");
     LOAD(nfkd, "unorm2_getNFKDInstance");
     LOAD(normalize, "unorm2_normalize");
+    LOAD(toUpper, "u_strToUpper");
+    LOAD(toLower, "u_strToLower");
+    LOAD(toTitleChar, "u_totitle");
 #undef LOAD
     icu.ok = icu.open && icu.close && icu.first && icu.next && icu.ruleStatus && icu.nfc && icu.nfd && icu.nfkc &&
              icu.nfkd && icu.normalize;
@@ -384,6 +392,62 @@ static NSString *normalized(NSString *self, int form)
     free(out);
     return r;
 }
+/* Case mapping with Unicode's full mappings, from ICU (freemac 1.225):
+ * "ß" upper-cases to "SS" and "ﬁ" to "FI", so a string can grow. kind 0
+ * upper-cases, 1 lower-cases, 2 capitalizes: as on a Mac, the first
+ * character of each word (a run between white space) in its title case and
+ * the rest in lower case. nil without ICU, for NSString's own table. */
+static NSString *icu_case(const unichar *c, int32_t n, int kind)
+{
+    int32_t cap = n * 3 + 16;
+    unichar *out = malloc((size_t)cap * sizeof(unichar));
+    UErrorCode err = 0;
+    int32_t got = (kind == 0 ? icu.toUpper : icu.toLower)(out, cap, c, n, "", &err);
+    NSString *r = U_FAILURE(err) || got > cap ? nil : FStringFromChars(out, (NSUInteger)got);
+    free(out);
+    return r;
+}
+NSString *FStringCaseMapped(NSString *self, int kind)
+{
+    if (!load_icu() || !icu.toUpper || !icu.toLower || !icu.toTitleChar)
+        return nil;
+    NSUInteger n;
+    unichar *c = copy_chars(self, &n);
+    NSString *r;
+    if (kind != 2) {
+        r = icu_case(c, (int32_t)n, kind);
+    } else {
+        NSMutableString *m = [NSMutableString stringWithCapacity:n];
+        NSCharacterSet *ws = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+        NSUInteger i = 0;
+        while (i < n) {
+            NSUInteger start = i;
+            BOOL space = [ws characterIsMember:c[i]];
+            while (i < n && [ws characterIsMember:c[i]] == space)
+                i++;
+            if (space) {
+                [m appendString:FStringFromChars(c + start, i - start)];
+                continue;
+            }
+            /* the word's first character (a surrogate pair as one) */
+            NSUInteger first = (c[start] >= 0xd800 && c[start] < 0xdc00 && start + 1 < i &&
+                                c[start + 1] >= 0xdc00 && c[start + 1] < 0xe000) ? 2 : 1;
+            int32_t cp = first == 2 ? 0x10000 + ((c[start] - 0xd800) << 10) + (c[start + 1] - 0xdc00) : c[start];
+            cp = icu.toTitleChar(cp);
+            if (cp >= 0x10000)
+                [m appendFormat:@"%C%C", (unichar)(0xd800 + ((cp - 0x10000) >> 10)),
+                                         (unichar)(0xdc00 + ((cp - 0x10000) & 0x3ff))];
+            else
+                [m appendFormat:@"%C", (unichar)cp];
+            NSString *rest = icu_case(c + start + first, (int32_t)(i - start - first), 1);
+            [m appendString:rest ?: FStringFromChars(c + start + first, i - start - first)];
+        }
+        r = m;
+    }
+    free(c);
+    return r;
+}
+
 - (NSString *)precomposedStringWithCanonicalMapping { return normalized(self, 0); }
 - (NSString *)decomposedStringWithCanonicalMapping { return normalized(self, 1); }
 - (NSString *)precomposedStringWithCompatibilityMapping { return normalized(self, 2); }

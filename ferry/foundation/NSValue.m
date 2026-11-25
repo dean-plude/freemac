@@ -7,8 +7,12 @@
 
 @interface FValue : NSValue {
 @public
-    char _kind; /* 'r' range, 'p' pointer, 'P' point, 'S' size, 'R' rect, 'E' edge insets */
+    char _kind; /* 'r' range, 'p' pointer, 'P' point, 'S' size, 'R' rect, 'E' edge insets,
+                 * 'B' any other bytes, of the type in _type */
     NSRange _range;
+    void *_bytes;
+    NSUInteger _size;
+    char *_type;
     void *_ptr;
     NSRect _rect;           /* a point or size is kept in its first half */
     NSEdgeInsets _insets;
@@ -78,6 +82,57 @@ static NSValue *geometry_value(char kind, NSRect rect)
     v->_insets = e;
     return [v autorelease];
 }
+/* Any value of a C type, kept as its bytes (freemac 1.225, Ferry 0.49.0); a
+ * range, point, size, rect, edge insets, pointer or object is kept as the
+ * value its own call makes, so that rangeValue and the rest answer it. */
+- (instancetype)initWithBytes:(const void *)value objCType:(const char *)type
+{
+    [self release];
+    return [[NSValue valueWithBytes:value objCType:type] retain];
+}
++ (NSValue *)valueWithBytes:(const void *)value objCType:(const char *)type
+{
+    if (!type)
+        FRaise(NSInvalidArgumentException, @"+[NSValue valueWithBytes:objCType:]: no type");
+    if (!strcmp(type, @encode(NSRange)))
+        return [self valueWithRange:*(const NSRange *)value];
+    if (!strcmp(type, @encode(NSPoint)))
+        return [self valueWithPoint:*(const NSPoint *)value];
+    if (!strcmp(type, @encode(NSSize)))
+        return [self valueWithSize:*(const NSSize *)value];
+    if (!strcmp(type, @encode(NSRect)))
+        return [self valueWithRect:*(const NSRect *)value];
+    if (!strcmp(type, @encode(NSEdgeInsets)))
+        return [self valueWithEdgeInsets:*(const NSEdgeInsets *)value];
+    if (!strcmp(type, @encode(void *)))
+        return [self valueWithPointer:*(void *const *)value];
+    if (!strcmp(type, @encode(id)))
+        return [self valueWithNonretainedObject:*(const id *)value];
+    NSUInteger size = 0;
+    NSGetSizeAndAlignment(type, &size, NULL);
+    FValue *v = [[FValue alloc] init];
+    v->_kind = 'B';
+    v->_size = size;
+    v->_bytes = malloc(size ? size : 1);
+    memcpy(v->_bytes, value, size);
+    v->_type = strdup(type);
+    return [v autorelease];
+}
++ (NSValue *)value:(const void *)value withObjCType:(const char *)type
+{
+    return [self valueWithBytes:value objCType:type];
+}
+- (void)getValue:(void *)value { }
+- (void)getValue:(void *)value size:(NSUInteger)size
+{
+    NSUInteger have = 0;
+    NSGetSizeAndAlignment([self objCType], &have, NULL);
+    if (size != have)
+        FRaise(NSInvalidArgumentException, @"-[NSValue getValue:size:]: %lu bytes asked, the value has %lu",
+               (unsigned long)size, (unsigned long)have);
+    [self getValue:value];
+}
+- (BOOL)isEqualToValue:(NSValue *)value { return [self isEqual:value]; }
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (NSRange)rangeValue { return NSMakeRange(0, 0); }
 - (void *)pointerValue { return NULL; }
@@ -98,8 +153,27 @@ static NSValue *geometry_value(char kind, NSRect rect)
     case 'R': return @encode(NSRect);
     case 'E': return @encode(NSEdgeInsets);
     case 'o': return @encode(id);
+    case 'B': return _type;
     }
     return @encode(void *);
+}
+- (void)getValue:(void *)value
+{
+    switch (_kind) {
+    case 'r': *(NSRange *)value = _range; break;
+    case 'P': *(NSPoint *)value = _rect.origin; break;
+    case 'S': *(NSSize *)value = [self sizeValue]; break;
+    case 'R': *(NSRect *)value = _rect; break;
+    case 'E': *(NSEdgeInsets *)value = _insets; break;
+    case 'B': memcpy(value, _bytes, _size); break;
+    default: *(void **)value = _ptr; break;
+    }
+}
+- (void)dealloc
+{
+    free(_bytes);
+    free(_type);
+    [super dealloc];
 }
 - (NSRange)rangeValue { return _range; }
 - (void *)pointerValue { return _ptr; }
@@ -121,6 +195,7 @@ static NSValue *geometry_value(char kind, NSRect rect)
     case 'p':
     case 'o': return o->_ptr == _ptr;
     case 'E': return !memcmp(&o->_insets, &_insets, sizeof _insets);
+    case 'B': return o->_size == _size && !strcmp(o->_type, _type) && !memcmp(o->_bytes, _bytes, _size);
     default: return NSEqualRects(o->_rect, _rect);
     }
 }
@@ -131,6 +206,12 @@ static NSValue *geometry_value(char kind, NSRect rect)
     case 'p':
     case 'o': return (NSUInteger)_ptr;
     case 'E': return (NSUInteger)(_insets.top * 31 + _insets.left);
+    case 'B': {
+        NSUInteger h = _size;
+        for (NSUInteger i = 0; i < _size; i++)
+            h = h * 31 + ((unsigned char *)_bytes)[i];
+        return h;
+    }
     default: return (NSUInteger)(_rect.origin.x * 31 + _rect.origin.y * 17 + _rect.size.width);
     }
 }
@@ -146,6 +227,16 @@ static NSValue *geometry_value(char kind, NSRect rect)
     case 'E':
         return [NSString stringWithFormat:@"NSEdgeInsets: {%g, %g, %g, %g}", _insets.top, _insets.left,
                                           _insets.bottom, _insets.right];
+    case 'B': {
+        NSMutableString *m = [NSMutableString stringWithString:@"<"];
+        for (NSUInteger i = 0; i < _size; i++) {
+            if (i && !(i % 4))
+                [m appendString:@" "];
+            [m appendFormat:@"%02x", ((unsigned char *)_bytes)[i]];
+        }
+        [m appendString:@">"];
+        return m;
+    }
     }
     return [NSString stringWithFormat:@"<%p>", _ptr];
 }
@@ -313,6 +404,21 @@ static NSString *format_double(double d, BOOL single)
     if (_type == 'B')
         return "c";
     return types[strchr(letters, _type) - letters];
+}
+- (void)getValue:(void *)value
+{
+    switch (_type) {
+    case 'c':
+    case 'B': *(char *)value = (char)_v.i; break;
+    case 'C': *(unsigned char *)value = (unsigned char)_v.u; break;
+    case 's': *(short *)value = (short)_v.i; break;
+    case 'S': *(unsigned short *)value = (unsigned short)_v.u; break;
+    case 'i': *(int *)value = (int)_v.i; break;
+    case 'I': *(unsigned int *)value = (unsigned int)_v.u; break;
+    case 'f': *(float *)value = (float)_v.d; break;
+    case 'd': *(double *)value = _v.d; break;
+    default: *(long long *)value = _v.i; break;
+    }
 }
 - (NSString *)description
 {

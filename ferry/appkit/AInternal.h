@@ -251,6 +251,10 @@ NSUInteger ABeepCount(void);
 - (NSRect)_clipRect;
 - (void)_drawBezelInRect:(NSRect)rect focused:(BOOL)focused;
 - (NSAttributedString *)_shownPlaceholder;
+/* the size of what it shows, which an editable field doesn't give as its
+ * intrinsic width (freemac 1.225) but a search field, combo box or token
+ * field grows by */
+- (NSSize)_textSize;
 - (void)_changed;
 - (void)_post:(NSNotificationName)name selector:(SEL)sel;
 /* editing in a table's cell (NSTableView.m) */

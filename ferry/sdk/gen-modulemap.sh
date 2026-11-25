@@ -6,7 +6,11 @@
 # <AppKit/AppKit.h>" is a module import when modules are on, as on a Mac.
 # Each module links its framework, as a Mac's do; HIServices' is
 # ApplicationServices, and CommonCrypto's is libSystem. The C library's
-# headers stay outside any module.
+# headers stay outside any module; Darwin's and ObjectiveC's submodules
+# (freemac 1.225, Ferry 0.49.0), for "@import Darwin.C.time;" and
+# "@import ObjectiveC.runtime;", each hold a header of their own folder
+# that includes the C one, so that a plain "#include <time.h>" stays
+# textual.
 #
 #   sdk/gen-modulemap.sh sdk/include > sdk/include/module.modulemap
 set -eu
@@ -17,10 +21,10 @@ cat << 'EOF'
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 EOF
-for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics \
+for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics CoreImage \
            CloudKit CoreServices CoreText Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
            ScriptingBridge Security \
-           ServiceManagement SystemConfiguration UserNotifications WebKit; do
+           ServiceManagement SystemConfiguration UniformTypeIdentifiers UserNotifications WebKit; do
     [ -d "$inc/$dir" ] || continue
     case $dir in
         HIServices) link=ApplicationServices ;;
@@ -38,3 +42,38 @@ for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreDa
     if [ -n "$link" ]; then echo "    link framework \"$link\""; fi
     echo "}"
 done
+
+# Darwin: the C library, which is libSystem, so it links nothing more
+if [ -d "$inc/Darwin" ]; then
+    echo
+    echo "module Darwin [system] {"
+    for h in $(cd "$inc/Darwin" && ls *.h | LC_ALL=C sort); do
+        echo "    module ${h%.h} {"
+        echo "        header \"Darwin/$h\""
+        echo "        export *"
+        echo "    }"
+    done
+    echo "    module C {"
+    for h in $(cd "$inc/Darwin/C" && ls *.h | LC_ALL=C sort); do
+        echo "        module ${h%.h} {"
+        echo "            header \"Darwin/C/$h\""
+        echo "            export *"
+        echo "        }"
+    done
+    echo "    }"
+    echo "}"
+fi
+
+# ObjectiveC: the runtime's headers, which link libobjc
+if [ -d "$inc/ObjectiveC" ]; then
+    echo
+    echo "module ObjectiveC [system] {"
+    for h in $(cd "$inc/ObjectiveC" && ls *.h | LC_ALL=C sort); do
+        echo "    module ${h%.h} {"
+        echo "        header \"ObjectiveC/$h\""
+        echo "        export *"
+        echo "    }"
+    done
+    echo "    link \"objc\""
+    echo "}"
+fi

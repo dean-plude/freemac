@@ -19,11 +19,20 @@ typedef double CGFloat;
 #define CGFLOAT_IS_DOUBLE 1
 #define CGFLOAT_MIN 2.2250738585072014e-308
 #define CGFLOAT_MAX 1.7976931348623157e+308
-typedef struct CGPoint { CGFloat x, y; } CGPoint;
-typedef struct CGSize { CGFloat width, height; } CGSize;
-typedef struct CGVector { CGFloat dx, dy; } CGVector;
-typedef struct CGRect { CGPoint origin; CGSize size; } CGRect;
-typedef struct CGAffineTransform { CGFloat a, b, c, d, tx, ty; } CGAffineTransform;
+/* boxable, so that @(rect) makes an NSValue, as on a Mac */
+#if defined(__OBJC__) && defined(__has_attribute)
+#if __has_attribute(objc_boxable)
+#define CG_BOXABLE __attribute__((objc_boxable))
+#endif
+#endif
+#ifndef CG_BOXABLE
+#define CG_BOXABLE
+#endif
+typedef struct CG_BOXABLE CGPoint { CGFloat x, y; } CGPoint;
+typedef struct CG_BOXABLE CGSize { CGFloat width, height; } CGSize;
+typedef struct CG_BOXABLE CGVector { CGFloat dx, dy; } CGVector;
+typedef struct CG_BOXABLE CGRect { CGPoint origin; CGSize size; } CGRect;
+typedef struct CG_BOXABLE CGAffineTransform { CGFloat a, b, c, d, tx, ty; } CGAffineTransform;
 typedef enum { CGRectMinXEdge, CGRectMinYEdge, CGRectMaxXEdge, CGRectMaxYEdge } CGRectEdge;
 
 extern const CGPoint CGPointZero;

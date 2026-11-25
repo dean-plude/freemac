@@ -1685,3 +1685,30 @@ const CFStringRef kTISTypeKeyboardLayout = (CFStringRef)@"TISTypeKeyboardLayout"
 const CFStringRef kHISymbolicHotKeyCode = (CFStringRef)@"kHISymbolicHotKeyCode";
 const CFStringRef kHISymbolicHotKeyModifiers = (CFStringRef)@"kHISymbolicHotKeyModifiers";
 const CFStringRef kHISymbolicHotKeyEnabled = (CFStringRef)@"kHISymbolicHotKeyEnabled";
+
+/* ---- a Carbon event as an NSEvent (freemac 1.225, Ferry 0.49.0) ----------------------- */
+
+/* A hot key's event is a key down of the hot key's key and modifiers, at
+ * the moment it came; any other Carbon event has no NSEvent. */
+@implementation NSEvent (FerryCarbonEvents)
+static char carbon_ref_key;
++ (NSEvent *)eventWithEventRef:(const void *)ref
+{
+    ACarbonEvent *event = (ACarbonEvent *)ref;
+    if (!event || ![(id)event isKindOfClass:[ACarbonEvent class]] || event->cls != kEventClassKeyboard)
+        return nil;
+    for (ACarbonHotKey *hk in [hotkeys allValues]) {
+        if (hk->hotKeyID.signature != event->hotKey.signature || hk->hotKeyID.id != event->hotKey.id)
+            continue;
+        NSString *chars = characters_for(hk->keyCode);
+        NSEventType type = event->kind == kEventHotKeyReleased ? NSEventTypeKeyUp : NSEventTypeKeyDown;
+        NSEvent *e = [NSEvent keyEventWithType:type location:NSZeroPoint modifierFlags:flags_for(hk->modifiers)
+                                     timestamp:event->time windowNumber:0 context:nil characters:chars
+                   charactersIgnoringModifiers:chars isARepeat:NO keyCode:(unsigned short)hk->keyCode];
+        objc_setAssociatedObject(e, &carbon_ref_key, event, OBJC_ASSOCIATION_RETAIN);
+        return e;
+    }
+    return nil;
+}
+- (const void *)eventRef { return objc_getAssociatedObject(self, &carbon_ref_key); }
+@end

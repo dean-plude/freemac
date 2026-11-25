@@ -153,6 +153,21 @@ NSString *FDescribe(id obj, int indent)
 }
 - (instancetype)_initWithObject:(id)object key:(NSString *)key;
 @end
+/* The arrays and sets valueForKey: answers for a key an object gives only
+ * through indexed or set accessors (countOf<Key> and the like), read
+ * through them each time (freemac 1.225). */
+@interface FKVCIndexedArray : NSArray {
+    id _object;
+    SEL _count, _at, _atIndexes;
+}
+- (instancetype)_initWithObject:(id)object count:(SEL)count at:(SEL)at atIndexes:(SEL)atIndexes;
+@end
+@interface FKVCAccessorSet : NSSet {
+    id _object;
+    SEL _count, _enumerator, _member;
+}
+- (instancetype)_initWithObject:(id)object count:(SEL)count enumerator:(SEL)enumerator member:(SEL)member;
+@end
 
 
 @implementation NSObject (NSObjectFoundation)
@@ -392,6 +407,26 @@ static BOOL send_setter(id self, SEL sel, const char *t, id value)
         method_getReturnType(m, t, sizeof t);
         return box(self, sel, t);
     }
+    /* Then, as Apple's guide orders it, countOf<Key> with objectIn<Key>AtIndex:
+     * or <key>AtIndexes: makes an array, and countOf<Key> with
+     * enumeratorOf<Key> and memberOf<Key>: a set. */
+    NSString *Key = capitalized(key);
+    SEL count = NSSelectorFromString([@"countOf" stringByAppendingString:Key]);
+    if (class_respondsToSelector(cls, count)) {
+        SEL at = NSSelectorFromString([NSString stringWithFormat:@"objectIn%@AtIndex:", Key]);
+        SEL atIndexes = NSSelectorFromString([key stringByAppendingString:@"AtIndexes:"]);
+        BOOL hasAt = class_respondsToSelector(cls, at), hasAtIndexes = class_respondsToSelector(cls, atIndexes);
+        if (hasAt || hasAtIndexes)
+            return [[[FKVCIndexedArray alloc] _initWithObject:self
+                                                        count:count
+                                                           at:hasAt ? at : NULL
+                                                    atIndexes:hasAtIndexes ? atIndexes : NULL] autorelease];
+        SEL enumerator = NSSelectorFromString([@"enumeratorOf" stringByAppendingString:Key]);
+        SEL member = NSSelectorFromString([NSString stringWithFormat:@"memberOf%@:", Key]);
+        if (class_respondsToSelector(cls, enumerator) && class_respondsToSelector(cls, member))
+            return [[[FKVCAccessorSet alloc] _initWithObject:self count:count enumerator:enumerator
+                                                      member:member] autorelease];
+    }
     Ivar v = kvc_ivar(cls, key);
     if (v)
         return box_at((char *)self + ivar_getOffset(v), ivar_getTypeEncoding(v));
@@ -543,6 +578,57 @@ static BOOL send_setter(id self, SEL sel, const char *t, id value)
     return [[self valueForKeyPath:[path substringToIndex:dot.location]]
         mutableSetValueForKey:[path substringFromIndex:dot.location + 1]];
 }
+@end
+
+/* ---- valueForKey: through indexed and set accessors ------------------------------- */
+@implementation FKVCIndexedArray
+- (instancetype)_initWithObject:(id)object count:(SEL)count at:(SEL)at atIndexes:(SEL)atIndexes
+{
+    if ((self = [super init])) {
+        _object = [object retain];
+        _count = count;
+        _at = at;
+        _atIndexes = atIndexes;
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_object release];
+    [super dealloc];
+}
+- (NSUInteger)count { return ((NSUInteger (*)(id, SEL))objc_msgSend)(_object, _count); }
+- (id)objectAtIndex:(NSUInteger)i
+{
+    if (i >= [self count])
+        FRaise(NSRangeException, @"-[NSArray objectAtIndex:]: index %lu beyond bounds [0 .. %lu]", (unsigned long)i,
+               (unsigned long)[self count] - 1);
+    if (_at)
+        return ((id (*)(id, SEL, NSUInteger))objc_msgSend)(_object, _at, i);
+    NSArray *one = ((id (*)(id, SEL, id))objc_msgSend)(_object, _atIndexes, [NSIndexSet indexSetWithIndex:i]);
+    return [one objectAtIndex:0];
+}
+@end
+
+@implementation FKVCAccessorSet
+- (instancetype)_initWithObject:(id)object count:(SEL)count enumerator:(SEL)enumerator member:(SEL)member
+{
+    if ((self = [super init])) {
+        _object = [object retain];
+        _count = count;
+        _enumerator = enumerator;
+        _member = member;
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [_object release];
+    [super dealloc];
+}
+- (NSUInteger)count { return ((NSUInteger (*)(id, SEL))objc_msgSend)(_object, _count); }
+- (NSEnumerator *)objectEnumerator { return ((id (*)(id, SEL))objc_msgSend)(_object, _enumerator); }
+- (id)member:(id)obj { return ((id (*)(id, SEL, id))objc_msgSend)(_object, _member, obj); }
 @end
 
 /* ---- mutableArrayValueForKey: -----------------------------------------------------

@@ -1082,6 +1082,23 @@ static BOOL keeps_state(NSButtonType t)
 
 - (NSSize)intrinsicContentSize
 {
+    NSSize s = [self _textSize];
+    /* an editable field has no width of its own, as on a Mac: its frame or
+     * its constraints give it one, not what is typed (freemac 1.225) */
+    if (_editable)
+        s.width = -1;
+    return s;
+}
+/* sizing to fit is to what it shows, editable or not */
+- (void)sizeToFit
+{
+    NSSize s = [self intrinsicContentSize];
+    if (s.width < 0)
+        s.width = [self _textSize].width;
+    [self setFrameSize:s];
+}
+- (NSSize)_textSize
+{
     NSAttributedString *s = AAttributed([self _shown:[self stringValue]], [self font], nil);
     NSSize t;
     if (_lineBreak == NSLineBreakByWordWrapping && _maxLines != 1) {

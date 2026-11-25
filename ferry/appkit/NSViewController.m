@@ -106,9 +106,11 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 {
     if (_nibPath)
         return _nibPath;
-    return _nibName ? [[NSBundle bundleForClass:[_owner class]] pathForResource:_nibName ofType:@"nib"] : nil;
+    NSString *name = [self windowNibName];
+    return name ? [[NSBundle bundleForClass:[[self owner] class]] pathForResource:name ofType:@"nib"] : nil;
 }
-- (id)owner { return _owner; }
+/* a controller made with -initWithWindow: owns the nib a subclass names (1.225) */
+- (id)owner { return _owner ?: self; }
 - (BOOL)isWindowLoaded { return _window != nil; }
 
 - (void)windowWillLoad {}
@@ -117,26 +119,30 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 /* The nib connects its window to the owner's "window" outlet. */
 - (void)loadWindow
 {
-    if (_window || !_nibName)
+    /* the nib's name is the controller's -windowNibName, which a subclass
+     * may give instead of initWithWindowNibName: (MacPass's do) (1.225) */
+    NSString *name = [self windowNibName];
+    if (_window || !name)
         return;
-    NSBundle *bundle = [NSBundle bundleForClass:[_owner class]];
-    NSArray *top = load_nib(_nibName, _nibPath, bundle, _owner);
+    id owner = [self owner];
+    NSBundle *bundle = [NSBundle bundleForClass:[owner class]];
+    NSArray *top = load_nib(name, _nibPath, bundle, owner);
     if (!top && bundle != [NSBundle mainBundle])
-        top = load_nib(_nibName, nil, [NSBundle mainBundle], _owner);
+        top = load_nib(name, nil, [NSBundle mainBundle], owner);
     if (!top) {
-        fprintf(stderr, "ferry: a window controller couldn't load its window nib \"%s\"\n", [_nibName UTF8String]);
+        fprintf(stderr, "ferry: a window controller couldn't load its window nib \"%s\"\n", [name UTF8String]);
         return;
     }
     [_topLevel release];
     _topLevel = [top retain];
     if (!_window)
         fprintf(stderr, "ferry: the nib \"%s\" didn't connect a window to its window controller\n",
-                [_nibName UTF8String]);
+                [name UTF8String]);
 }
 
 - (NSWindow *)window
 {
-    if (!_window && _nibName && !_loading) {
+    if (!_window && !_loading && (_nibName || [self windowNibName])) {
         _loading = YES;
         [self windowWillLoad];
         if ([_document respondsToSelector:@selector(windowControllerWillLoadNib:)])

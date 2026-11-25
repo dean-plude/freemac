@@ -360,7 +360,7 @@ static const CGFloat token_gap = 3, token_pad = 6;
 }
 - (NSSize)intrinsicContentSize
 {
-    NSSize s = [super intrinsicContentSize];
+    NSSize s = [self _textSize];
     return NSMakeSize(fmax(s.width, 60), s.height);
 }
 - (NSAttributedString *)_shownPlaceholder { return [_tokens count] ? nil : [super _shownPlaceholder]; }

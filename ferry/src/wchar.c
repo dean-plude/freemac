@@ -207,6 +207,11 @@ static size_t mac_wcsxfrm_l(wchar_t *d, const wchar_t *s, size_t n, locale_t loc
 {
     return wcsxfrm_l(d, s, n, to_linux(loc));
 }
+/* strptime_l (freemac 1.225, Ferry 0.49.0; TransformerKit's date transformers) */
+static char *mac_strptime_l(const char *s, const char *f, struct tm *tm, locale_t loc)
+{
+    return strptime_l(s, f, tm, to_linux(loc));
+}
 static size_t mac_strftime_l(char *s, size_t n, const char *f, const struct tm *tm, locale_t loc)
 {
     return strftime_l(s, n, f, tm, to_linux(loc));
@@ -310,7 +315,7 @@ const struct ferry_symbol ferry_wchar_symbols[] = {
     MAC(iswlower_l), MAC(iswprint_l), MAC(iswpunct_l), MAC(iswspace_l), MAC(iswupper_l), MAC(iswxdigit_l),
     MAC(towlower_l), MAC(towupper_l), MAC(iswctype_l), MAC(wctype_l),
     MAC(strtol_l), MAC(strtoul_l), MAC(strtoll_l), MAC(strtoull_l), MAC(strtod_l), MAC(strtof_l),
-    MAC(strtold_l), MAC(strcoll_l), MAC(strxfrm_l), MAC(wcscoll_l), MAC(wcsxfrm_l), MAC(strftime_l),
+    MAC(strtold_l), MAC(strcoll_l), MAC(strxfrm_l), MAC(wcscoll_l), MAC(wcsxfrm_l), MAC(strftime_l), MAC(strptime_l),
     MAC(snprintf_l), MAC(asprintf_l), MAC(sscanf_l),
     MAC(btowc_l), MAC(wctob_l), MAC(mbrtowc_l), MAC(wcrtomb_l), MAC(mbrlen_l), MAC(mbtowc_l), MAC(wctomb_l),
     MAC(mbsrtowcs_l), MAC(wcsrtombs_l), MAC(mbsnrtowcs_l), MAC(wcsnrtombs_l), MAC(mbstowcs_l),

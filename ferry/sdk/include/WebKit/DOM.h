@@ -14,7 +14,7 @@
 
 @class DOMDocument, DOMElement, DOMHTMLElement, DOMHTMLCollection, DOMNodeList, DOMNamedNodeMap, DOMAttr,
     DOMCSSStyleDeclaration, DOMDocumentFragment, DOMText, DOMComment, DOMCDATASection, DOMDocumentType,
-    DOMHTMLFormElement, DOMHTMLHeadElement;
+    DOMHTMLFormElement, DOMHTMLHeadElement, DOMRange;
 
 /* the name of the exceptions DOM calls raise, with the page's message as the reason */
 WEBKIT_EXTERN NSString *const DOMException;
@@ -548,6 +548,117 @@ enum {
 @property (copy) NSString *align;
 @property (copy) NSString *headers;
 @property (copy) NSString *scope;
+@end
+
+/* ---- ranges, computed style and the CSS properties (freemac 1.225, Ferry 0.49.0) ---- */
+
+enum { DOM_START_TO_START = 0, DOM_START_TO_END = 1, DOM_END_TO_END = 2, DOM_END_TO_START = 3 };
+
+@interface DOMRange : DOMObject
+@property (readonly, retain) DOMNode *startContainer;
+@property (readonly) int startOffset;
+@property (readonly, retain) DOMNode *endContainer;
+@property (readonly) int endOffset;
+@property (readonly) BOOL collapsed;
+@property (readonly, retain) DOMNode *commonAncestorContainer;
+@property (readonly, copy) NSString *text;
+@property (readonly, copy) NSString *markupString;   /* the HTML of what the range holds */
+- (void)setStart:(DOMNode *)refNode offset:(int)offset;
+- (void)setEnd:(DOMNode *)refNode offset:(int)offset;
+- (void)setStartBefore:(DOMNode *)refNode;
+- (void)setStartAfter:(DOMNode *)refNode;
+- (void)setEndBefore:(DOMNode *)refNode;
+- (void)setEndAfter:(DOMNode *)refNode;
+- (void)collapse:(BOOL)toStart;
+- (void)selectNode:(DOMNode *)refNode;
+- (void)selectNodeContents:(DOMNode *)refNode;
+- (short)compareBoundaryPoints:(unsigned short)how sourceRange:(DOMRange *)sourceRange;
+- (void)deleteContents;
+- (DOMDocumentFragment *)extractContents;
+- (DOMDocumentFragment *)cloneContents;
+- (void)insertNode:(DOMNode *)newNode;
+- (void)surroundContents:(DOMNode *)newParent;
+- (DOMRange *)cloneRange;
+- (NSString *)toString;
+- (void)detach;
+@end
+
+@interface DOMDocument (DOMDocumentRangeAndStyle)
+- (DOMRange *)createRange;
+- (DOMCSSStyleDeclaration *)getComputedStyle:(DOMElement *)element pseudoElement:(NSString *)pseudoElement;
+@end
+
+/* each CSS property by its name in camel case: backgroundColor is
+ * background-color, cssFloat is float */
+@interface DOMCSSStyleDeclaration (DOMCSS2Properties)
+@property (copy) NSString *background;
+@property (copy) NSString *backgroundAttachment;
+@property (copy) NSString *backgroundColor;
+@property (copy) NSString *backgroundImage;
+@property (copy) NSString *backgroundPosition;
+@property (copy) NSString *backgroundRepeat;
+@property (copy) NSString *border;
+@property (copy) NSString *borderBottom;
+@property (copy) NSString *borderCollapse;
+@property (copy) NSString *borderColor;
+@property (copy) NSString *borderLeft;
+@property (copy) NSString *borderRight;
+@property (copy) NSString *borderSpacing;
+@property (copy) NSString *borderStyle;
+@property (copy) NSString *borderTop;
+@property (copy) NSString *borderWidth;
+@property (copy) NSString *bottom;
+@property (copy) NSString *clear;
+@property (copy) NSString *clip;
+@property (copy) NSString *color;
+@property (copy) NSString *content;
+@property (copy) NSString *cursor;
+@property (copy) NSString *direction;
+@property (copy) NSString *display;
+@property (copy) NSString *cssFloat;
+@property (copy) NSString *font;
+@property (copy) NSString *fontFamily;
+@property (copy) NSString *fontSize;
+@property (copy) NSString *fontStyle;
+@property (copy) NSString *fontVariant;
+@property (copy) NSString *fontWeight;
+@property (copy) NSString *height;
+@property (copy) NSString *left;
+@property (copy) NSString *letterSpacing;
+@property (copy) NSString *lineHeight;
+@property (copy) NSString *listStyle;
+@property (copy) NSString *listStyleType;
+@property (copy) NSString *margin;
+@property (copy) NSString *marginBottom;
+@property (copy) NSString *marginLeft;
+@property (copy) NSString *marginRight;
+@property (copy) NSString *marginTop;
+@property (copy) NSString *maxHeight;
+@property (copy) NSString *maxWidth;
+@property (copy) NSString *minHeight;
+@property (copy) NSString *minWidth;
+@property (copy) NSString *opacity;
+@property (copy) NSString *outline;
+@property (copy) NSString *overflow;
+@property (copy) NSString *padding;
+@property (copy) NSString *paddingBottom;
+@property (copy) NSString *paddingLeft;
+@property (copy) NSString *paddingRight;
+@property (copy) NSString *paddingTop;
+@property (copy) NSString *position;
+@property (copy) NSString *right;
+@property (copy) NSString *tableLayout;
+@property (copy) NSString *textAlign;
+@property (copy) NSString *textDecoration;
+@property (copy) NSString *textIndent;
+@property (copy) NSString *textTransform;
+@property (copy) NSString *top;
+@property (copy) NSString *verticalAlign;
+@property (copy) NSString *visibility;
+@property (copy) NSString *whiteSpace;
+@property (copy) NSString *width;
+@property (copy) NSString *wordSpacing;
+@property (copy) NSString *zIndex;
 @end
 
 #endif

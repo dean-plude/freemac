@@ -172,6 +172,7 @@ Class WSClassFor(NSString *jsClass, int kind);
 
 @interface WebFrame (FerryPrivate)
 - (NSString *)_windowExpression;      /* this frame's window, from the main frame's */
+- (GtkWidget *)_web;                  /* the GTK view of its web view */
 - (NSArray *)_path;                   /* the indexes of window.frames from the main frame */
 @end
 

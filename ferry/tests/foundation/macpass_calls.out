@@ -1,0 +1,41 @@
+Darwin: 5, ObjectiveC: NSObject
+titles: 2, Emma, Emma+Persuasion
+after adding: Emma+Persuasion+Sanditon
+authors: 1, member Austen, isSet 1
+pages: 1,2,3
+titles copy: same
+nothing: NSUnknownKeyException
+value: {CGRect={CGPoint=dd}{CGSize=dd}} 1 2 3 4, equal 1, boxed equal 1
+array value: [2i] 7 9
+components: https user pw example.com 8080 /a b/c /a%20b/c x=1&y=two words frag
+  item x = 1
+  item y = two words
+  host at 16+11, port at 28+4
+made: http://localhost/a%20b?q=x%26y
+search: first 1, last 2, insert 4 at 3, insert 3 after at 3, 2 not found
+common: 5, 3 odd from 0 to 4
+objects for keys: two - one
+mutableString: Abc, attribute at 2 v over 3
+transforms: Angstrom cafe | ABC123 | &#x3C;&#xE9;&#x3E; | <é> | to latin not made
+case: STRASSE FIX ǆ σοφία ÿ | Hello World	Ñandú-bird
+CFStringUppercase: MASS
+CFStringTransform: 1 naive
+CFMutableData: 12 "HELLO!world" last 0
+list: 2 items, 1 first, 2 42
+record: 1, 1, no none
+types: public.plain-text, txt, conforms to text 1, plain text public.plain-text, png public.png
+MD2("") 8350e5a3e24c153df2275c9f80692773
+MD2("abc") da853b0d3f88d99b30283a69e6ded6bb
+MD4("") 31d6cfe0d16ae931b73c59d7e0c089c0
+MD4("abc") a448017aaf21d8525fc10ae87aa6729d
+MD4("message digest") d9130a8164549fe818874806e1c7014b
+strptime_l: 2026-11-25 13:45, rest " rest"
+base64: "" "Zg==" "Zm8=" "Zm9v" "Zm9vYg==" "Zm9vYmE=" "Zm9vYmFy"
+base32: "" "MY======" "MZXQ====" "MZXW6===" "MZXW6YQ=" "MZXW6YTB" "MZXW6YTBOI======"
+base32hex: "" "CO======" "CPNG====" "CPNMU===" "CPNMUOG=" "CPNMUOJ1" "CPNMUOJ1E8======"
+unknown encoding: refused, error set
+64-column lines: 2, first 64 wide, 80 characters in all
+access control: made, type SecAccessControl
+bad protection: refused, error set
+random key: none, error -4
+exit=0

@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Writes the link stub for a Mac framework that one of Ferry's own framework
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
-# SystemConfiguration, CoreServices, CFNetwork, ServiceManagement and IOKit in Foundation's,
-# Cocoa, Quartz, QuickLook and ScriptingBridge in AppKit's): the calls the files export for that framework, under
+# SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
+# UniformTypeIdentifiers in Foundation's,
+# Cocoa, Quartz, QuickLook, ScriptingBridge and CoreImage in AppKit's): the calls the files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
 # from the file. Cocoa, an umbrella, offers everything AppKit, Foundation and
@@ -23,7 +24,8 @@ version=A
 case $framework in
     CoreText) pattern='^_(CT|kCT)' ;;
     ApplicationServices) pattern='^_(CG|kCG|CT|kCT|GetCurrentProcess$|GetFrontProcess$|GetNextProcess$|GetProcess|SameProcess$|SetFrontProcess|ShowHideProcess$|IsProcessVisible$|TransformProcessType$|CopyProcessName$|ProcessInformationCopyDictionary$|LaunchApplication$|KillProcess$|AX|kAX|Gestalt$|LS[A-Z]|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$)' ;;
-    ImageIO) pattern='^_(CGImageSource|kCGImage)' ;;
+    ImageIO) pattern='^_(CGImageSource|CGImageDestination|kCGImage)' ;;
+    UniformTypeIdentifiers) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UTType$|UTType[A-Z][A-Za-z0-9]*$|UTTagClass)' ;;
     SystemConfiguration) pattern='^_(SC|kSC)' ;;
     CFNetwork) pattern='^_(kCFStreamProperty|kCFStreamSSL|kCFStreamSocketSecurityLevel|kCFStreamErrorDomain(SSL|NetDB)$|kCFErrorDomainCFNetwork$|CFStreamCreatePairWithSocket)' ;;
     CoreServices) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$)' ;;
@@ -34,6 +36,7 @@ case $framework in
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;
     ScriptingBridge) pattern='^_OBJC_(METACLASS|CLASS)_\$_SB(Object|Application|ElementArray)$' ;;
+    CoreImage) pattern='^_(OBJC_(METACLASS|CLASS)_\$_CI[A-Z][A-Za-z]*$|kCI|CI(Detector|Feature)[A-Z])' ;;
     Quartz) pattern='^_(OBJC_(METACLASS|CLASS)_\$_(QL|QC)|QL|kQL|QC)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

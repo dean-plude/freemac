@@ -23,6 +23,12 @@ typedef NS_OPTIONS(uint64_t, NSTextCheckingType) {
     NSTextCheckingTypePhoneNumber = 1ULL << 11,
     NSTextCheckingTypeTransitInformation = 1ULL << 12,
 };
+/* every kind there is (freemac 1.225) */
+typedef NS_OPTIONS(uint64_t, NSTextCheckingTypes) {
+    NSTextCheckingAllSystemTypes = 0xffffffffULL,
+    NSTextCheckingAllCustomTypes = 0xffffffffULL << 32,
+    NSTextCheckingAllTypes = NSTextCheckingAllSystemTypes | NSTextCheckingAllCustomTypes,
+};
 
 @interface NSTextCheckingResult : NSObject <NSCopying>
 @property (readonly) NSTextCheckingType resultType;

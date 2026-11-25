@@ -14,6 +14,7 @@
 
 @class WebView, WebFrame, WebDataSource, WebPreferences, WebScriptObject;
 @class WebFrameView, DOMDocument, DOMHTMLElement;   /* WebFrameView.h, DOM.h (freemac 1.217, Ferry 0.42.0) */
+@class DOMRange, JSContext;   /* DOM.h, JavaScriptCore (freemac 1.225) */
 
 /* ---- preferences -------------------------------------------------------------------- */
 
@@ -111,6 +112,11 @@ WEBKIT_EXTERN NSString *const WebPreferencesChangedNotification;
 - (void)reload;
 - (void)reloadFromOrigin;
 - (WebFrame *)findFrameNamed:(NSString *)name;
+@end
+@interface WebFrame (FerryJavaScriptContext)
+/* a JavaScriptCore context whose scripts run in the frame's page; what
+ * they give back comes as a copy, as JSON carries it (freemac 1.225) */
+@property (readonly) JSContext *javaScriptContext;
 @end
 
 /* ---- the delegates ------------------------------------------------------------------ */
@@ -249,6 +255,49 @@ enum {
      initiatedByFrame:(WebFrame *)frame;
 @end
 
+/* the editing delegate and dragging (freemac 1.225, Ferry 0.49.0) */
+typedef NS_OPTIONS(NSUInteger, WebDragDestinationAction) {
+    WebDragDestinationActionNone = 0,
+    WebDragDestinationActionDHTML = 1,
+    WebDragDestinationActionEdit = 2,
+    WebDragDestinationActionLoad = 4,
+    WebDragDestinationActionAny = NSUIntegerMax,
+};
+typedef NS_OPTIONS(NSUInteger, WebDragSourceAction) {
+    WebDragSourceActionNone = 0,
+    WebDragSourceActionDHTML = 1,
+    WebDragSourceActionImage = 2,
+    WebDragSourceActionLink = 4,
+    WebDragSourceActionSelection = 8,
+    WebDragSourceActionAny = NSUIntegerMax,
+};
+typedef NS_ENUM(NSInteger, WebViewInsertAction) {
+    WebViewInsertActionTyped,
+    WebViewInsertActionPasted,
+    WebViewInsertActionDropped,
+};
+WEBKIT_EXTERN NSString *const WebViewDidBeginEditingNotification;
+WEBKIT_EXTERN NSString *const WebViewDidChangeNotification;
+WEBKIT_EXTERN NSString *const WebViewDidEndEditingNotification;
+WEBKIT_EXTERN NSString *const WebViewDidChangeSelectionNotification;
+
+@protocol WebEditingDelegate <NSObject>
+@optional
+- (BOOL)webView:(WebView *)webView shouldBeginEditingInDOMRange:(DOMRange *)range;
+- (BOOL)webView:(WebView *)webView shouldEndEditingInDOMRange:(DOMRange *)range;
+- (BOOL)webView:(WebView *)webView shouldInsertText:(NSString *)text replacingDOMRange:(DOMRange *)range
+    givenAction:(WebViewInsertAction)action;
+- (BOOL)webView:(WebView *)webView shouldChangeSelectedDOMRange:(DOMRange *)currentRange
+              toDOMRange:(DOMRange *)proposedRange
+                affinity:(NSSelectionAffinity)selectionAffinity
+          stillSelecting:(BOOL)flag;
+- (BOOL)webView:(WebView *)webView doCommandBySelector:(SEL)selector;
+- (void)webViewDidBeginEditing:(NSNotification *)notification;
+- (void)webViewDidChange:(NSNotification *)notification;
+- (void)webViewDidEndEditing:(NSNotification *)notification;
+- (void)webViewDidChangeSelection:(NSNotification *)notification;
+@end
+
 /* ---- the web view ------------------------------------------------------------------- */
 
 WEBKIT_EXTERN NSString *const WebViewProgressStartedNotification;
@@ -292,7 +341,6 @@ WEBKIT_EXTERN NSString *const WebViewProgressFinishedNotification;
 @property (readonly, retain) WebScriptObject *windowScriptObject;
 @property (readonly) DOMDocument *mainFrameDocument;
 - (NSString *)stringByEvaluatingJavaScriptFromString:(NSString *)script;
-
 - (IBAction)takeStringURLFrom:(id)sender;
 - (IBAction)stopLoading:(id)sender;
 - (IBAction)reload:(id)sender;
@@ -305,6 +353,15 @@ WEBKIT_EXTERN NSString *const WebViewProgressFinishedNotification;
 @property (readonly) BOOL canMakeTextLarger;
 @property (readonly) BOOL canMakeTextSmaller;
 @property (readonly) BOOL canMakeTextStandardSize;
+@end
+
+/* the page's selection (freemac 1.225, Ferry 0.49.0) */
+@interface WebView (FerryEditing)
+@property (readonly, retain) DOMRange *selectedDOMRange;
+@property (readonly) NSSelectionAffinity selectionAffinity;
+- (void)setSelectedDOMRange:(DOMRange *)range affinity:(NSSelectionAffinity)selectionAffinity;
+- (DOMRange *)editableDOMRangeForPoint:(NSPoint)point;
+@property (readonly) BOOL hasSelectedRange;
 @end
 
 #endif

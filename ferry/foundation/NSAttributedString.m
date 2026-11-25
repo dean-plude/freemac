@@ -335,7 +335,39 @@ static void replace_text(NSAttributedString *s, NSRange range, NSString *str, NS
 
 @end
 
+/* An attributed string's characters as a mutable string (freemac 1.225):
+ * each change is the attributed string's own. */
+@interface FAttributedMutableString : NSMutableString {
+    NSMutableAttributedString *_owner;   /* retained */
+}
+- (instancetype)_initWithOwner:(NSMutableAttributedString *)owner;
+@end
+@implementation FAttributedMutableString
+- (instancetype)_initWithOwner:(NSMutableAttributedString *)owner
+{
+    if ((self = [super init]))
+        _owner = [owner retain];
+    return self;
+}
+- (void)dealloc
+{
+    [_owner release];
+    [super dealloc];
+}
+- (NSUInteger)length { return [[_owner string] length]; }
+- (unichar)characterAtIndex:(NSUInteger)i { return [[_owner string] characterAtIndex:i]; }
+- (void)getCharacters:(unichar *)buffer range:(NSRange)range { [[_owner string] getCharacters:buffer range:range]; }
+- (void)replaceCharactersInRange:(NSRange)range withString:(NSString *)s
+{
+    [_owner replaceCharactersInRange:range withString:s ?: @""];
+}
+@end
+
 @implementation NSMutableAttributedString
+- (NSMutableString *)mutableString
+{
+    return [[[FAttributedMutableString alloc] _initWithOwner:self] autorelease];
+}
 
 - (void)replaceCharactersInRange:(NSRange)range withString:(NSString *)str
 {

@@ -24,6 +24,191 @@ const CFStringRef kCGImageSourceThumbnailMaxPixelSize = (CFStringRef)@"kCGImageS
 const CFStringRef kCGImageSourceCreateThumbnailWithTransform =
     (CFStringRef)@"kCGImageSourceCreateThumbnailWithTransform";
 
+/* ---- image destinations (freemac 1.225, Ferry 0.49.0) ------------------------------ */
+
+/* The images added are kept, and the file is written when the destination
+ * is finalized: PNG by Cairo, JPEG, TIFF and BMP by this system's
+ * GdkPixbuf. A file holds one image, the first; a type that can't be
+ * written (GIF and the rest) gives no destination, as on a Mac. */
+const CFStringRef kCGImageDestinationLossyCompressionQuality =
+    (CFStringRef)@"kCGImageDestinationLossyCompressionQuality";
+const CFStringRef kCGImageDestinationBackgroundColor = (CFStringRef)@"kCGImageDestinationBackgroundColor";
+
+@interface GImageDestination : NSObject {
+@public
+    NSMutableData *data;
+    NSURL *url;
+    NSString *type;
+    NSMutableArray *images;
+    NSNumber *quality;
+    size_t count;
+    BOOL done;
+}
+@end
+@implementation GImageDestination
+- (void)dealloc
+{
+    [data release];
+    [url release];
+    [type release];
+    [images release];
+    [quality release];
+    [super dealloc];
+}
+@end
+
+static const char *pixbuf_type(NSString *uti)
+{
+    if ([uti isEqualToString:@"public.png"])
+        return "png";
+    if ([uti isEqualToString:@"public.jpeg"])
+        return "jpeg";
+    if ([uti isEqualToString:@"public.tiff"])
+        return "tiff";
+    if ([uti isEqualToString:@"com.microsoft.bmp"])
+        return "bmp";
+    return NULL;
+}
+
+CFTypeID CGImageDestinationGetTypeID(void) { return (CFTypeID)[GImageDestination class]; }
+CFArrayRef CGImageDestinationCopyTypeIdentifiers(void)
+{
+    return (CFArrayRef)[@[ @"public.png", @"public.jpeg", @"public.tiff", @"com.microsoft.bmp" ] retain];
+}
+
+static CGImageDestinationRef destination_for(NSString *type, size_t count)
+{
+    if (!pixbuf_type(type) || !count)
+        return NULL;
+    GImageDestination *d = [[GImageDestination alloc] init];
+    d->type = [type copy];
+    d->count = count;
+    d->images = [[NSMutableArray alloc] init];
+    return (CGImageDestinationRef)d;
+}
+CGImageDestinationRef CGImageDestinationCreateWithData(CFMutableDataRef data, CFStringRef type, size_t count,
+                                                       CFDictionaryRef options)
+{
+    if (!data)
+        return NULL;
+    GImageDestination *d = (GImageDestination *)destination_for((NSString *)type, count);
+    if (d)
+        d->data = [(NSMutableData *)data retain];
+    return (CGImageDestinationRef)d;
+}
+CGImageDestinationRef CGImageDestinationCreateWithURL(CFURLRef url, CFStringRef type, size_t count,
+                                                      CFDictionaryRef options)
+{
+    if (!url || ![(NSURL *)url isFileURL])
+        return NULL;
+    GImageDestination *d = (GImageDestination *)destination_for((NSString *)type, count);
+    if (d)
+        d->url = [(NSURL *)url retain];
+    return (CGImageDestinationRef)d;
+}
+static void take_properties(GImageDestination *d, CFDictionaryRef properties)
+{
+    NSNumber *q = [(NSDictionary *)properties objectForKey:(NSString *)kCGImageDestinationLossyCompressionQuality];
+    if (q) {
+        [d->quality release];
+        d->quality = [q retain];
+    }
+}
+void CGImageDestinationSetProperties(CGImageDestinationRef dest, CFDictionaryRef properties)
+{
+    if (dest)
+        take_properties((GImageDestination *)dest, properties);
+}
+void CGImageDestinationAddImage(CGImageDestinationRef dest, CGImageRef image, CFDictionaryRef properties)
+{
+    GImageDestination *d = (GImageDestination *)dest;
+    if (!d || !image || d->done || [d->images count] >= d->count)
+        return;
+    [d->images addObject:(id)image];
+    take_properties(d, properties);
+}
+void CGImageDestinationAddImageFromSource(CGImageDestinationRef dest, CGImageSourceRef source, size_t index,
+                                          CFDictionaryRef properties)
+{
+    CGImageRef image = CGImageSourceCreateImageAtIndex(source, index, NULL);
+    CGImageDestinationAddImage(dest, image, properties);
+    CGImageRelease(image);
+}
+
+static cairo_status_t append_bytes(void *closure, const unsigned char *bytes, unsigned int length)
+{
+    [(NSMutableData *)closure appendBytes:bytes length:length];
+    return 0;
+}
+
+/* The image's pixels, un-premultiplied, through GdkPixbuf */
+static NSData *pixbuf_file(cairo_surface_t *s, const char *type, NSNumber *quality)
+{
+    int w = cairo_image_surface_get_width(s), h = cairo_image_surface_get_height(s);
+    int stride = cairo_image_surface_get_stride(s);
+    BOOL alpha = strcmp(type, "jpeg") && strcmp(type, "bmp");
+    int ch = alpha ? 4 : 3;
+    unsigned char *plain = malloc((size_t)w * ch * (h ? h : 1) + 1);
+    cairo_surface_flush(s);
+    const unsigned char *src = cairo_image_surface_get_data(s);
+    for (int y = 0; y < h; y++) {
+        const uint32_t *row = (const uint32_t *)(src + (size_t)y * stride);
+        unsigned char *q = plain + (size_t)y * w * ch;
+        for (int x = 0; x < w; x++, q += ch) {
+            uint32_t p = row[x];
+            unsigned a = p >> 24, c[3] = {(p >> 16) & 255, (p >> 8) & 255, p & 255};
+            for (int i = 0; i < 3; i++)
+                q[i] = (unsigned char)(a == 255 ? c[i] : a ? (c[i] * 255 + a / 2) / a : 0);
+            if (alpha)
+                q[3] = (unsigned char)a;
+        }
+    }
+    GdkPixbuf *pb = gdk_pixbuf_new_from_data(plain, 0, alpha, 8, w, h, w * ch, NULL, NULL);
+    char *buffer = NULL;
+    unsigned long size = 0;
+    GError *error = NULL;
+    char qv[8];
+    char *keys[2] = {"quality", NULL}, *values[2] = {qv, NULL};
+    snprintf(qv, sizeof qv, "%d", quality ? (int)lround(fmin(fmax([quality doubleValue], 0), 1) * 100) : 90);
+    BOOL jpeg = !strcmp(type, "jpeg");
+    BOOL ok = pb && gdk_pixbuf_save_to_bufferv(pb, &buffer, &size, type, jpeg ? keys : NULL, jpeg ? values : NULL,
+                                               &error);
+    if (error)
+        g_error_free(error);
+    NSData *out = ok ? [NSData dataWithBytes:buffer length:size] : nil;
+    g_free(buffer);
+    if (pb)
+        g_object_unref(pb);
+    free(plain);
+    return out;
+}
+
+bool CGImageDestinationFinalize(CGImageDestinationRef dest)
+{
+    GImageDestination *d = (GImageDestination *)dest;
+    if (!d || d->done || ![d->images count])
+        return false;
+    d->done = YES;
+    cairo_surface_t *s = GImageSurface((GImage *)[d->images objectAtIndex:0]);
+    if (!s)
+        return false;
+    const char *type = pixbuf_type(d->type);
+    NSData *file = nil;
+    if (!strcmp(type, "png")) {
+        NSMutableData *m = [NSMutableData data];
+        if (cairo_surface_write_to_png_stream(s, append_bytes, m) == 0)
+            file = m;
+    } else
+        file = pixbuf_file(s, type, d->quality);
+    if (!file)
+        return false;
+    if (d->data) {
+        [d->data appendData:file];
+        return true;
+    }
+    return [file writeToURL:d->url atomically:YES];
+}
+
 /* ---- image sources ------------------------------------------------------------------ */
 
 /* The file is read when the source is made; a file GdkPixbuf can't read

@@ -46,6 +46,7 @@ int toupper_l(int, locale_t);
 int strcoll_l(const char *, const char *, locale_t);
 size_t strxfrm_l(char *, const char *, size_t, locale_t);
 size_t strftime_l(char *, size_t, const char *, const struct tm *, locale_t);
+char *strptime_l(const char *, const char *, struct tm *, locale_t);
 long strtol_l(const char *, char **, int, locale_t);
 unsigned long strtoul_l(const char *, char **, int, locale_t);
 long long strtoll_l(const char *, char **, int, locale_t);

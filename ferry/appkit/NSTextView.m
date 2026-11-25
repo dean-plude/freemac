@@ -464,6 +464,8 @@ typedef struct {
 - (BOOL)isFlipped { return YES; }
 - (BOOL)isOpaque { return _drawsBackground; }
 - (NSTextStorage *)textStorage { return _storage; }
+- (NSAttributedString *)attributedString { return _storage; }
+- (NSSelectionAffinity)selectionAffinity { return NSSelectionAffinityDownstream; }
 - (NSLayoutManager *)layoutManager { return _manager; }
 - (NSTextContainer *)textContainer { return _container; }
 - (void)setTextContainer:(NSTextContainer *)c

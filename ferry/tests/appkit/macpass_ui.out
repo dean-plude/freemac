@@ -1,0 +1,36 @@
+window: loaded, "Entries", owner's outlet set
+table: UITable, 2 columns, each column's table is it: 1
+grid: 3 rows, 2 columns, spacing 8 10, row 3 hidden 1
+  label at the column's trailing edge, field 10 after it, 150 wide (its own width, as editable)
+  note: x 0, 200 wide, 12 below the first row (spacing and padding)
+  note's cell: row 1 column 0
+made grid: 2 x 2, flipped 1
+  a: 0 10 50 20
+  b: 90 0 100 30
+  c: 0 80 80 20
+  d: 90 90 40 10
+trailing column 0, centred row 0, column 1 120 wide:
+  a: 30 5 50 20
+  c: 0 80 80 20
+  d: 90 90 40 10
+row 1 at its top:
+  c: 0 35 80 20
+row 0 hidden:
+  a: 30 5 50 20 hidden
+  c: 0 0 80 20
+added row: 3 rows, empty cell's view none, e's cell in row 2
+removed row 0: 2 rows, a in grid 0
+CIImage: 10 x 20
+scaled: 30 x 40, cropped: 5 x 5
+rendered: 30 x 40
+filters: unknown nil, QR generator made
+detector: made, 0 features
+NSCIImageRep: 10 x 20
+bezel: field 1, cell 1
+bezel set on cell: field 0
+icon: made
+focused view: 8 x 8, top right red 1, bottom left blue 1
+older format: loaded 1, window "Older Format" 420 x 180, visible 0, delegate is owner 1
+  style mask 3; toolbar: outlet NSToolbar, "OldFormatToolbar", window's toolbar is it 1
+  display mode 2, size mode 1, shown 1, customizable 0
+exit=0

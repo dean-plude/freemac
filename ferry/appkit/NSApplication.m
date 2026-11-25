@@ -12,6 +12,8 @@
 NSApplication *NSApp;
 NSNotificationName const NSApplicationWillFinishLaunchingNotification = @"NSApplicationWillFinishLaunchingNotification";
 NSNotificationName const NSApplicationDidFinishLaunchingNotification = @"NSApplicationDidFinishLaunchingNotification";
+NSNotificationName const NSApplicationDidFinishRestoringWindowsNotification =
+    @"NSApplicationDidFinishRestoringWindowsNotification";
 NSNotificationName const NSApplicationWillTerminateNotification = @"NSApplicationWillTerminateNotification";
 NSNotificationName const NSApplicationDidBecomeActiveNotification = @"NSApplicationDidBecomeActiveNotification";
 NSNotificationName const NSApplicationDidResignActiveNotification = @"NSApplicationDidResignActiveNotification";
@@ -587,6 +589,12 @@ BOOL AValidateItem(id target, id item)
     NSMenuItem *i = [self itemWithTitle:title];
     return i ? [self indexOfItem:i] : -1;
 }
+- (void)setItemArray:(NSArray *)items
+{
+    [self removeAllItems];
+    for (NSMenuItem *item in items)
+        [self addItem:item];
+}
 - (void)setSubmenu:(NSMenu *)menu forItem:(NSMenuItem *)item { [item setSubmenu:menu]; }
 
 /* With autoenablesItems (the default), each item is enabled when something
@@ -914,6 +922,11 @@ static void register_app_icon(void)
     if (_policy == NSApplicationActivationPolicyRegular)
         [self activateIgnoringOtherApps:YES];
     [self _openLaunchFiles];
+    /* No windows are restored, so restoring them is done at once
+     * (freemac 1.225, Ferry 0.49.0): MacPass waits for this and for the
+     * launch before it shows its welcome window. */
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSApplicationDidFinishRestoringWindowsNotification
+                                                        object:self];
     [self _post:NSApplicationDidFinishLaunchingNotification selector:@selector(applicationDidFinishLaunching:)];
     ADockLaunched();
 }

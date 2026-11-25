@@ -16,6 +16,7 @@ TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
            sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd
+SDK_LIBXML2 = sdk/usr/include/libxml2
 
 # Ferry's own Foundation, built as a Mac library with ferry-cc (needs clang
 # and lld, as the tests do). CoreFoundation is served from the same file.
@@ -106,7 +107,7 @@ JSC_OBJ = $(JSC_SRC:javascriptcore/%.m=javascriptcore/build/%.o)
 JSC = frameworks/JavaScriptCore.framework/JavaScriptCore
 JSC_HEADERS = javascriptcore/JSCNames.h $(wildcard sdk/include/JavaScriptCore/*.h) $(FOUNDATION_HEADERS)
 
-all: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
 
 ferry: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -153,6 +154,10 @@ sdk/lib/liblzma.tbd: sdk/gen-twin-tbd.sh
 sdk/lib/libxml2.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-twin-tbd.sh /usr/lib/libxml2.2.dylib libxml2.so.2 > $@
+# libxml2's headers where a Mac's SDK has them (this system's copy, as the
+# library is), for $(SDKROOT)/usr/include/libxml2.
+$(SDK_LIBXML2): sdk/gen-libxml2-headers.sh
+	sdk/gen-libxml2-headers.sh $@
 sdk/lib/libsqlite3.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-twin-tbd.sh /usr/lib/libsqlite3.dylib libsqlite3.so.0 > $@
@@ -193,6 +198,8 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	sdk/gen-alias-tbd.sh CFNetwork $@ > frameworks/CFNetwork.framework/CFNetwork.tbd
 	@mkdir -p frameworks/IOKit.framework
 	sdk/gen-alias-tbd.sh IOKit $@ > frameworks/IOKit.framework/IOKit.tbd
+	@mkdir -p frameworks/UniformTypeIdentifiers.framework
+	sdk/gen-alias-tbd.sh UniformTypeIdentifiers $@ > frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers.tbd
 
 $(HOST_TBD): ferry sdk/gen-tbd.sh
 	@mkdir -p graphics/build
@@ -247,6 +254,8 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(HOST_TBD)
 	@mkdir -p frameworks/Quartz.framework frameworks/QuickLook.framework
 	sdk/gen-alias-tbd.sh Quartz $@ > frameworks/Quartz.framework/Quartz.tbd
 	sdk/gen-alias-tbd.sh QuickLook $@ > frameworks/QuickLook.framework/QuickLook.tbd
+	@mkdir -p frameworks/CoreImage.framework
+	sdk/gen-alias-tbd.sh CoreImage $@ > frameworks/CoreImage.framework/CoreImage.tbd
 	# Quartz window and event services live in AppKit's file (CGServices.m),
 	# so ApplicationServices offers them too
 	sdk/gen-alias-tbd.sh ApplicationServices $(GRAPHICS) $@ $(FOUNDATION) > frameworks/ApplicationServices.framework/ApplicationServices.tbd
@@ -295,7 +304,7 @@ $(CLOUDKIT): $(CLOUDKIT_OBJ) $(FOUNDATION)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
+install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -304,7 +313,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 sdk/ferry-ibtool $(DESTDIR)$(PREFIX)/bin/ferry-ibtool
 	install -Dm755 sdk/ferry-actool $(DESTDIR)$(PREFIX)/bin/ferry-actool
 	install -d $(DESTDIR)$(PREFIX)/share/ferry/sdk
-	cp -r sdk/include sdk/lib $(DESTDIR)$(PREFIX)/share/ferry/sdk/
+	cp -r sdk/include sdk/lib sdk/usr $(DESTDIR)$(PREFIX)/share/ferry/sdk/
 	install -Dm755 $(FOUNDATION) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Foundation.framework/Foundation
 	install -Dm644 frameworks/CoreFoundation.framework/CoreFoundation.tbd \
 	    $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreFoundation.framework/CoreFoundation.tbd
@@ -312,7 +321,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit UserNotifications ScriptingBridge Quartz QuickLook; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf
@@ -323,6 +332,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(FOUNDATION) $(GRAPHICS) $(QUARTZCORE) $(SECU
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
+	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
 	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build
 
