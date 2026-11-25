@@ -4617,5 +4617,7 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
  * (freemac 1.226, Ferry 0.50.0) */
 
 #import <AppKit/AppKitOlder.h>
+/* picking a colour off the screen (NSColorSampler.m) (freemac 1.232, Ferry 0.56.0) */
+#import <AppKit/NSColorSampler.h>
 
 #endif

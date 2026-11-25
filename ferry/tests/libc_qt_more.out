@@ -19,4 +19,5 @@ copyfile EXCL onto it refused 1
 copyfile MOVE 0, original gone 1
 times 1
 tzname "CET" "CEST", daylight 1, timezone -3600
+ulock: changed 0, timed out 1, no waiter 1, woken 1, 64-bit compare 0, csr 0 0
 exit=0

@@ -1,5 +1,5 @@
 /* More of what Qt's core asks of a Mac's C library and Mach (freemac 1.232,
- * Ferry 0.56.0): Mach semaphores (QMutex), vm_remap (QResource),
+ * Ferry 0.56.0): Mach semaphores and address waits (QMutex), vm_remap (QResource),
  * posix_spawn, nl_langinfo, a terminal's settings, flock (QLockFile),
  * times, tzname and copyfile (QFile::copy). */
 #include <copyfile.h>
@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/mman.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/times.h>
 #include <sys/wait.h>
@@ -33,6 +34,20 @@ static void *waiter(void *arg)
     (void)arg;
     if (semaphore_wait(sem) == KERN_SUCCESS)
         __atomic_add_fetch(&woke, 1, __ATOMIC_SEQ_CST);
+    return NULL;
+}
+
+/* the Darwin kernel's address waits, declared as Qt does (xnu's sys/ulock.h) */
+extern int __ulock_wait2(uint32_t operation, void *addr, uint64_t value, uint64_t timeout_ns, uint64_t value2);
+extern int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
+extern int csr_get_active_config(uint32_t *config);
+static _Atomic uint32_t word;
+static void *ulock_waker(void *arg)
+{
+    (void)arg;
+    usleep(20000);
+    word = 1;
+    __ulock_wake(0x01000001, (void *)&word, 0);
     return NULL;
 }
 
@@ -172,5 +187,23 @@ int main(void)
     setenv("TZ", "Europe/Paris", 1);
     tzset();
     printf("tzname \"%s\" \"%s\", daylight %d, timezone %ld\n", tzname[0], tzname[1], daylight, timezone);
+    {
+        word = 5;
+        int changed = __ulock_wait2(0x01000001, (void *)&word, 4, 0, 0);
+        int timed = __ulock_wait2(0x01000001, (void *)&word, 5, 10000000, 0);
+        int nobody = __ulock_wake(0x01000001, (void *)&word, 0);
+        word = 0;
+        pthread_t t;
+        pthread_create(&t, NULL, ulock_waker, NULL);
+        while (word == 0)
+            __ulock_wait2(0x01000001, (void *)&word, 0, 0, 0);
+        pthread_join(t, NULL);
+        uint64_t big = 0x100000000ull;
+        int wide = __ulock_wait2(0x01000005, &big, 0, 0, 0);
+        uint32_t csr = 7;
+        int c = csr_get_active_config(&csr);
+        printf("ulock: changed %d, timed out %d, no waiter %d, woken %d, 64-bit compare %d, csr %d %u\n", changed,
+               timed == -ETIMEDOUT, nobody == -ENOENT, word == 1, wide, c, csr);
+    }
     return 0;
 }

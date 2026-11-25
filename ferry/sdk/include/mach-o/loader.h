@@ -115,6 +115,20 @@ struct linkedit_data_command { uint32_t cmd, cmdsize, dataoff, datasize; };
 struct encryption_info_command { uint32_t cmd, cmdsize, cryptoff, cryptsize, cryptid; };
 struct encryption_info_command_64 { uint32_t cmd, cmdsize, cryptoff, cryptsize, cryptid, pad; };
 struct build_version_command { uint32_t cmd, cmdsize, platform, minos, sdk, ntools; };
+/* the older form of the system version a program was built for and against (freemac 1.232) */
+struct version_min_command { uint32_t cmd, cmdsize, version, sdk; };
+#define PLATFORM_MACOS 1
+#define PLATFORM_IOS 2
+#define PLATFORM_TVOS 3
+#define PLATFORM_WATCHOS 4
+#define PLATFORM_BRIDGEOS 5
+#define PLATFORM_MACCATALYST 6
+#define PLATFORM_IOSSIMULATOR 7
+#define PLATFORM_TVOSSIMULATOR 8
+#define PLATFORM_WATCHOSSIMULATOR 9
+#define PLATFORM_DRIVERKIT 10
+#define PLATFORM_VISIONOS 11
+#define PLATFORM_VISIONOSSIMULATOR 12
 /* the dynamic symbol table, and the types of sections (freemac 1.227) */
 struct dysymtab_command {
     uint32_t cmd, cmdsize;

@@ -24,6 +24,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
+#include <linux/futex.h>
+#include <sys/syscall.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1299,7 +1301,99 @@ static int mac_vm_remap(mac_port_t task, uintptr_t *addr, uintptr_t size, uintpt
     return 0;
 }
 
+/* ---- waiting on an address: __ulock_wait, __ulock_wait2, __ulock_wake ---------- */
+/* The Darwin kernel's address waits, as its published sys/ulock.h (part of
+ * the open-source xnu) describes them: Qt's QMutex and QSemaphore wait this
+ * way on a Mac. A wait sleeps while the 32- or 64-bit word at addr still
+ * holds value; a wake rouses one waiter, or all with ULF_WAKE_ALL. Here
+ * each is a Linux futex on the word (for a 64-bit word, on its low half,
+ * after checking the whole word, which callers loop around anyway). With
+ * ULF_NO_ERRNO an error comes back as minus a Mac errno, otherwise as -1
+ * with errno set. Only waits within one process are served. */
+#define MAC_UL_COMPARE_AND_WAIT 1
+#define MAC_UL_UNFAIR_LOCK 2
+#define MAC_UL_COMPARE_AND_WAIT_SHARED 3
+#define MAC_UL_COMPARE_AND_WAIT64 5
+#define MAC_UL_COMPARE_AND_WAIT64_SHARED 6
+#define MAC_ULF_WAKE_ALL 0x100
+#define MAC_ULF_NO_ERRNO 0x01000000
+
+static int ulock_fail(uint32_t op, int err)
+{
+    if (op & MAC_ULF_NO_ERRNO)
+        return -ferry_errno_to_mac(err);
+    errno = err;
+    return -1;
+}
+
+static int ulock_is_64(uint32_t op)
+{
+    uint32_t kind = op & 0xff;
+    return kind == MAC_UL_COMPARE_AND_WAIT64 || kind == MAC_UL_COMPARE_AND_WAIT64_SHARED;
+}
+
+static int mac_ulock_wait2(uint32_t op, void *addr, uint64_t value, uint64_t timeout_ns, uint64_t value2)
+{
+    (void)value2;
+    uint32_t kind = op & 0xff;
+    if (!addr || ((uintptr_t)addr & 3) || kind == 0 || kind > MAC_UL_COMPARE_AND_WAIT64_SHARED)
+        return ulock_fail(op, EINVAL);
+    uint32_t low = (uint32_t)value;
+    if (ulock_is_64(op)) {
+        if (__atomic_load_n((uint64_t *)addr, __ATOMIC_SEQ_CST) != value)
+            return 0;
+    } else if (__atomic_load_n((uint32_t *)addr, __ATOMIC_SEQ_CST) != low)
+        return 0;
+    struct timespec ts, *tp = NULL;
+    if (timeout_ns) {
+        ts.tv_sec = (time_t)(timeout_ns / 1000000000u);
+        ts.tv_nsec = (long)(timeout_ns % 1000000000u);
+        tp = &ts;
+    }
+    long r = syscall(SYS_futex, (uint32_t *)addr, FUTEX_WAIT_PRIVATE, low, tp, NULL, 0);
+    if (r == 0 || errno == EAGAIN)
+        return 0;
+    return ulock_fail(op, errno);
+}
+
+static int mac_ulock_wait(uint32_t op, void *addr, uint64_t value, uint32_t timeout_us)
+{
+    return mac_ulock_wait2(op, addr, value, (uint64_t)timeout_us * 1000u, 0);
+}
+
+static int mac_ulock_wake(uint32_t op, void *addr, uint64_t wake_value)
+{
+    (void)wake_value;
+    if (!addr || ((uintptr_t)addr & 3))
+        return ulock_fail(op, EINVAL);
+    int n = (op & MAC_ULF_WAKE_ALL) ? INT_MAX : 1;
+    long r = syscall(SYS_futex, (uint32_t *)addr, FUTEX_WAKE_PRIVATE, n, NULL, NULL, 0);
+    if (r < 0)
+        return ulock_fail(op, errno);
+    /* no one was waiting: the kernel's answer is ENOENT */
+    return r == 0 ? ulock_fail(op, ENOENT) : 0;
+}
+
+/* System Integrity Protection's settings: none are on under Ferry. */
+static int mac_csr_get_active_config(uint32_t *config)
+{
+    if (config)
+        *config = 0;
+    return 0;
+}
+
+static int mac_csr_check(uint32_t mask)
+{
+    (void)mask;
+    return 0;
+}
+
 const struct ferry_symbol ferry_sysctl_symbols[] = {
+    {"__ulock_wait", mac_ulock_wait},
+    {"__ulock_wait2", mac_ulock_wait2},
+    {"__ulock_wake", mac_ulock_wake},
+    {"csr_get_active_config", mac_csr_get_active_config},
+    {"csr_check", mac_csr_check},
     {"semaphore_create", mac_semaphore_create},
     {"semaphore_destroy", mac_semaphore_destroy},
     {"semaphore_signal", mac_semaphore_signal},

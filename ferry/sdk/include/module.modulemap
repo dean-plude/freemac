@@ -41,10 +41,7 @@ module AppKit [system] {
         export *
     }
     header "AppKit/NSCollectionView.h"
-    module NSColorSampler {
-        header "AppKit/NSColorSampler.h"
-        export *
-    }
+    header "AppKit/NSColorSampler.h"
     header "AppKit/NSDataAsset.h"
     header "AppKit/NSDockTile.h"
     module NSDragging {
