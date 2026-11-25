@@ -12,7 +12,7 @@
 
 /* MacTypes.h makes nil a null pointer for C too, through CoreServices
  * (VLC's audio output passes it for a char *), as objc.h does (freemac
- * 1.NEXT, VLC). */
+ * 1.237, VLC). */
 #ifndef nil
 #ifdef __cplusplus
 #define nil __null

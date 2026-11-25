@@ -20,7 +20,14 @@
  * all, "stays" that keep each view where and as big as it was, which settle
  * whatever the constraints leave open. Inequalities start out inactive and
  * are made equalities, highest priority first, only while the answer breaks
- * them. Views that translate their autoresizing mask into constraints stay
+ * them.
+ *
+ * The elimination is sparse and only ever goes forward (freemac 1.NEXT,
+ * Ferry 0.NEXT): a row in it never changes once in, so when an inequality
+ * is made active or let go only the rows after it are gone through again,
+ * and of those only the ones that meet an unknown whose settling row
+ * changed. The answer is the same as working it all out anew each time.
+ * Views that translate their autoresizing mask into constraints stay
  * as their mask says against their superview, and are left to autoresizing;
  * the frames of the others are set, outermost first.
  *
@@ -37,6 +44,7 @@
 #import "AInternal.h"
 #include <objc/runtime.h>
 #include <stdarg.h>
+#include <time.h>
 
 BOOL AConstraintsInUse;
 static BOOL solving;
@@ -866,94 +874,340 @@ ANCHOR(heightAnchor, NSLayoutDimension, NSLayoutAttributeHeight)
 
 #define EPS 1e-7
 
+/* The elimination (freemac 1.NEXT, Ferry 0.NEXT). Rows go in one at a
+ * time, in priority order, each reduced by the rows already in and kept
+ * when it says something new; one that contradicts them is left out. Rows
+ * are sparse, as constraints are (a few unknowns each), and reduced only
+ * forwards: a row never changes once it is in, so the elimination after
+ * the first k pending rows is its first depth[k] rows, and a row names
+ * only the pivots of rows after it. */
 typedef struct {
-    double *a;       /* coefficients, nvars of them */
+    int pivot;                   /* the unknown it settles, with coefficient 1 */
+    int n;                       /* its other unknowns */
+    const int *col;
+    const double *val;
     double rhs;
-    int pivot;
-} row;
+} erow;
+
+/* What a pending row did when it was last held: whether it went in, and
+ * the unknowns it met on the way (its own and those of the rows that
+ * reduced it). While none of those has a different row settling it, it
+ * would do the same again. */
+typedef struct {
+    char held, result;           /* result: 0 contradicted, 1 implied, 2 went in */
+    int pivot, n, met;
+    double rhs;
+    int *col;
+    double *val;
+    int *touched;
+    int room;
+} rowcache;
 
 typedef struct {
-    int nvars;
-    row *rows;
-    int nrows, cap;
-    double *scratch;
-} system_t;
+    int nvars, nrows;
+    erow *rows;
+    int *pivot_row;              /* unknown -> the row it is the pivot of, or -1 */
+    int *refs;                   /* unknown -> how many rows name it besides */
+    double *r;                   /* the row being added, dense; zero between rows */
+    int *nz, nnz;                /* the unknowns it has met */
+    char *seen;
+    int *heap, nheap;            /* rows still to reduce it by, first first */
+    int best;                    /* after el_reduce: its pivot */
+    double rhs;                  /* and its right side, before dividing */
+    /* across the solves of one axis */
+    rowcache *cache;             /* one for each pending row */
+    rowcache *units;             /* and for each unit row */
+    int *changed, stamp;         /* unknown -> stamp: settled by another row than last time */
+    int *depth;                  /* pending row k: rows in before it; [npending]: before the unit rows */
+    double *x;                   /* the last answer */
+    BOOL valid;
+    struct chunk *chunks;        /* the memory of it all, given back at once */
+} elim;
 
-static void sys_init(system_t *s, int nvars)
+typedef struct chunk {
+    struct chunk *next;
+    size_t used, room;
+    double align;
+} chunk;
+
+/* Zeroed memory that lasts as long as e. */
+static void *el_alloc(elim *e, size_t bytes)
 {
-    s->nvars = nvars;
-    s->rows = NULL;
-    s->nrows = s->cap = 0;
-    s->scratch = calloc((size_t)nvars + 1, sizeof(double));
-}
-static void sys_free(system_t *s)
-{
-    for (int i = 0; i < s->nrows; i++)
-        free(s->rows[i].a);
-    free(s->rows);
-    free(s->scratch);
-}
-/* Adds a·x = rhs if it agrees with the rows already there: YES when it was
- * added or was already implied, NO when it contradicts them. */
-static BOOL sys_add(system_t *s, const double *a, double rhs)
-{
-    double *r = s->scratch;
-    memcpy(r, a, sizeof(double) * (size_t)s->nvars);
-    for (int i = 0; i < s->nrows; i++) {
-        double f = r[s->rows[i].pivot];
-        if (fabs(f) > EPS) {
-            double *p = s->rows[i].a;
-            for (int j = 0; j < s->nvars; j++)
-                r[j] -= f * p[j];
-            rhs -= f * s->rows[i].rhs;
-        }
+    bytes = (bytes + 15) & ~(size_t)15;
+    chunk *c = e->chunks;
+    if (!c || c->used + bytes > c->room) {
+        size_t room = c ? 2 * c->room : 0;
+        if (room < bytes)
+            room = bytes;
+        if (room < 4096)
+            room = 4096;
+        c = malloc(sizeof(chunk) + room);
+        c->next = e->chunks;
+        c->used = 0;
+        c->room = room;
+        e->chunks = c;
     }
+    void *at = (char *)(c + 1) + c->used;
+    c->used += bytes;
+    memset(at, 0, bytes);
+    return at;
+}
+
+static void el_init(elim *e, int nvars, int npending)
+{
+    memset(e, 0, sizeof(*e));
+    e->nvars = nvars;
+    size_t n = (size_t)nvars + 1, m = (size_t)npending + 1;
+    /* one piece for the fixed parts, with room for the rows' own */
+    size_t room = n * (sizeof(erow) + 6 * sizeof(int) + 2 * sizeof(double) + sizeof(rowcache) + 64) +
+                  m * (sizeof(rowcache) + sizeof(int) + 160) + 512;
+    chunk *c = malloc(sizeof(chunk) + room);
+    c->next = NULL;
+    c->used = 0;
+    c->room = room;
+    e->chunks = c;
+    e->rows = el_alloc(e, sizeof(erow) * n);
+    e->pivot_row = el_alloc(e, sizeof(int) * n);
+    for (int j = 0; j < nvars; j++)
+        e->pivot_row[j] = -1;
+    e->refs = el_alloc(e, sizeof(int) * n);
+    e->r = el_alloc(e, sizeof(double) * n);
+    e->nz = el_alloc(e, sizeof(int) * n);
+    e->seen = el_alloc(e, n);
+    e->heap = el_alloc(e, sizeof(int) * n);
+    e->cache = el_alloc(e, sizeof(rowcache) * m);
+    e->units = el_alloc(e, sizeof(rowcache) * n);
+    e->changed = el_alloc(e, sizeof(int) * n);
+    e->depth = el_alloc(e, sizeof(int) * m);
+    e->x = el_alloc(e, sizeof(double) * n);
+}
+
+static void el_free(elim *e)
+{
+    while (e->chunks) {
+        chunk *c = e->chunks;
+        e->chunks = c->next;
+        free(c);
+    }
+}
+
+static void heap_push(elim *e, int i)
+{
+    int k = e->nheap++;
+    while (k > 0 && e->heap[(k - 1) / 2] > i) {
+        e->heap[k] = e->heap[(k - 1) / 2];
+        k = (k - 1) / 2;
+    }
+    e->heap[k] = i;
+}
+
+static int heap_pop(elim *e)
+{
+    int top = e->heap[0], last = e->heap[--e->nheap], k = 0;
+    for (;;) {
+        int c = 2 * k + 1;
+        if (c >= e->nheap)
+            break;
+        if (c + 1 < e->nheap && e->heap[c + 1] < e->heap[c])
+            c++;
+        if (e->heap[c] >= last)
+            break;
+        e->heap[k] = e->heap[c];
+        k = c;
+    }
+    e->heap[k] = last;
+    return top;
+}
+
+/* The row being added meets unknown j: the row among the first limit that
+ * settles j, if any, is to reduce it. */
+static void el_touch(elim *e, int j, int limit)
+{
+    if (e->seen[j])
+        return;
+    e->seen[j] = 1;
+    e->nz[e->nnz++] = j;
+    int i = e->pivot_row[j];
+    if (i >= 0 && i < limit)
+        heap_push(e, i);
+}
+
+/* Reduces a·x = rhs by the first limit rows: 0 when it contradicts them,
+ * 1 when they imply it, 2 when it says something new, and then e->best is
+ * the unknown it would settle. el_clear afterwards. */
+static int el_reduce(elim *e, const int *col, const double *val, int n, double rhs, int limit)
+{
+    double *r = e->r;
+    e->nnz = e->nheap = 0;
+    for (int t = 0; t < n; t++) {
+        el_touch(e, col[t], limit);
+        r[col[t]] += val[t];
+    }
+    /* by the rows in their order, as a row names only the pivots of rows after it */
+    while (e->nheap) {
+        const erow *q = &e->rows[heap_pop(e)];
+        double f = r[q->pivot];
+        r[q->pivot] = 0;
+        if (fabs(f) <= EPS)
+            continue;
+        for (int t = 0; t < q->n; t++) {
+            el_touch(e, q->col[t], limit);
+            r[q->col[t]] -= f * q->val[t];
+        }
+        rhs -= f * q->rhs;
+    }
+    e->rhs = rhs;
     int best = -1;
     double big = 0;
-    for (int j = 0; j < s->nvars; j++)
-        if (fabs(r[j]) > big) {
-            big = fabs(r[j]);
-            best = j;
-        }
+    for (int t = 0; t < e->nnz; t++) {
+        int j = e->nz[t];
+        double v = fabs(r[j]);
+        if (v > big)
+            big = v, best = j;
+    }
     if (big < 1e-9)
         return fabs(rhs) < 1e-6;
-    double f = r[best];
-    for (int j = 0; j < s->nvars; j++)
-        r[j] /= f;
-    rhs /= f;
-    r[best] = 1;
-    /* keep the rows reduced: the new pivot leaves every other row */
-    for (int i = 0; i < s->nrows; i++) {
-        double g = s->rows[i].a[best];
-        if (fabs(g) > EPS) {
-            double *p = s->rows[i].a;
-            for (int j = 0; j < s->nvars; j++)
-                p[j] -= g * r[j];
-            p[best] = 0;
-            s->rows[i].rhs -= g * rhs;
-        }
+    /* of the unknowns it names with a coefficient near the biggest, the
+     * one fewest rows name, so that rows reduce in fewer steps */
+    for (int t = 0; t < e->nnz; t++) {
+        int j = e->nz[t];
+        if (fabs(r[j]) >= 0.5 * big && (e->refs[j] < e->refs[best] || (e->refs[j] == e->refs[best] && j > best)))
+            best = j;
     }
-    if (s->nrows == s->cap) {
-        s->cap = s->cap ? s->cap * 2 : 16;
-        s->rows = realloc(s->rows, sizeof(row) * (size_t)s->cap);
-    }
-    double *copy = malloc(sizeof(double) * (size_t)s->nvars);
-    memcpy(copy, r, sizeof(double) * (size_t)s->nvars);
-    s->rows[s->nrows++] = (row){copy, rhs, best};
-    return YES;
-}
-/* Every unknown has a stay, so each is some row's pivot. */
-static void sys_solution(system_t *s, double *x)
-{
-    for (int j = 0; j < s->nvars; j++)
-        x[j] = 0;
-    for (int i = 0; i < s->nrows; i++)
-        x[s->rows[i].pivot] = s->rows[i].rhs;
+    e->best = best;
+    return 2;
 }
 
-/* A row waiting to be solved: a·x (relation) rhs, at a priority. */
+static void el_clear(elim *e)
+{
+    for (int t = 0; t < e->nnz; t++) {
+        e->r[e->nz[t]] = 0;
+        e->seen[e->nz[t]] = 0;
+    }
+}
+
+/* The reduced row, divided by its pivot's coefficient, into col and val
+ * (room for nnz entries): how many. */
+static int el_entries(elim *e, int *col, double *val)
+{
+    double f = e->r[e->best];
+    int n = 0;
+    for (int t = 0; t < e->nnz; t++) {
+        int j = e->nz[t];
+        double v = e->r[j] / f;
+        if (j != e->best && fabs(v) > 1e-12) {
+            col[n] = j;
+            val[n++] = v;
+        }
+    }
+    return n;
+}
+
+static void el_push(elim *e, int pivot, int n, const int *col, const double *val, double rhs)
+{
+    erow *q = &e->rows[e->nrows];
+    *q = (erow){pivot, n, col, val, rhs};
+    for (int t = 0; t < n; t++)
+        e->refs[col[t]]++;
+    e->pivot_row[pivot] = e->nrows++;
+}
+
+/* Back to the first n rows. */
+static void el_truncate(elim *e, int n)
+{
+    while (e->nrows > n) {
+        const erow *q = &e->rows[--e->nrows];
+        e->pivot_row[q->pivot] = -1;
+        for (int t = 0; t < q->n; t++)
+            e->refs[q->col[t]]--;
+    }
+}
+
+/* Every unknown is some row's pivot, and a row names only the pivots of
+ * rows after it: the answer comes from the last row back. */
+static void el_solution(elim *e, double *x)
+{
+    for (int j = 0; j < e->nvars; j++)
+        x[j] = 0;
+    for (int i = e->nrows - 1; i >= 0; i--) {
+        const erow *q = &e->rows[i];
+        double v = q->rhs;
+        for (int t = 0; t < q->n; t++)
+            v -= q->val[t] * x[q->col[t]];
+        x[q->pivot] = v;
+    }
+}
+
+/* The reduced row just made into pending row k's cache; whether what goes
+ * in has changed (a row in where there was none or the other way, or
+ * another row). */
+static BOOL el_keep(elim *e, rowcache *c, int result)
+{
+    BOOL was = c->held && c->result == 2;
+    BOOL differs = was != (result == 2);
+    if (c->room < e->nnz) {
+        int room = e->nnz + 4;
+        int *col = el_alloc(e, sizeof(int) * (size_t)room), *touched = el_alloc(e, sizeof(int) * (size_t)room);
+        double *val = el_alloc(e, sizeof(double) * (size_t)room);
+        if (c->n) {
+            memcpy(col, c->col, sizeof(int) * (size_t)c->n);
+            memcpy(val, c->val, sizeof(double) * (size_t)c->n);
+        }
+        c->col = col, c->val = val, c->touched = touched, c->room = room;
+    }
+    if (result == 2) {
+        double f = e->r[e->best], rhs = e->rhs / f;
+        if (was && e->best == c->pivot && rhs == c->rhs) {
+            /* the same row again? */
+            int n = 0;
+            BOOL same = YES;
+            for (int t = 0; t < e->nnz && same; t++) {
+                int j = e->nz[t];
+                double v = e->r[j] / f;
+                if (j != e->best && fabs(v) > 1e-12) {
+                    same = n < c->n && c->col[n] == j && c->val[n] == v;
+                    n++;
+                }
+            }
+            differs = !same || n != c->n;
+        } else if (was) {
+            differs = YES;
+        }
+        if (differs && was)
+            e->changed[c->pivot] = e->stamp;
+        if (differs)
+            e->changed[e->best] = e->stamp;
+        c->n = el_entries(e, c->col, c->val);
+        c->pivot = e->best;
+        c->rhs = rhs;
+    } else if (was) {
+        e->changed[c->pivot] = e->stamp;
+    }
+    memcpy(c->touched, e->nz, sizeof(int) * (size_t)e->nnz);
+    c->met = e->nnz;
+    c->held = 1;
+    c->result = (char)result;
+    return differs;
+}
+
+/* Whether a held row would do the same as last time. */
+static BOOL el_unchanged(elim *e, const rowcache *c)
+{
+    if (!c->held)
+        return NO;
+    for (int t = 0; t < c->met; t++)
+        if (e->changed[c->touched[t]] == e->stamp)
+            return NO;
+    return YES;
+}
+
+/* A row waiting to be solved: a·x (relation) rhs, at a priority. A
+ * constraint names at most four attributes, each at most two unknowns. */
+#define ROW_TERMS 8
 typedef struct {
-    double *a;
+    int col[ROW_TERMS];           /* the unknowns it names, in order once sorted */
+    double val[ROW_TERMS];
+    int n;
     double rhs;
     NSLayoutRelation relation;
     double priority;
@@ -982,13 +1236,43 @@ static pending *new_row(problem *p, double priority, NSLayoutRelation rel, NSLay
         p->rows = realloc(p->rows, sizeof(pending) * (size_t)p->cap);
     }
     pending *r = &p->rows[p->nrows];
-    r->a = calloc((size_t)p->nvars, sizeof(double));
+    r->n = 0;
     r->rhs = 0;
     r->relation = rel;
     r->priority = priority;
     r->source = src;
     r->order = p->nrows++;
     return r;
+}
+
+/* A row's coefficient of unknown j. */
+static double *coef(pending *r, int j)
+{
+    static double spare;
+    for (int t = 0; t < r->n; t++)
+        if (r->col[t] == j)
+            return &r->val[t];
+    if (r->n == ROW_TERMS) {
+        spare = 0;
+        return &spare;
+    }
+    r->col[r->n] = j;
+    r->val[r->n] = 0;
+    return &r->val[r->n++];
+}
+#define A(r, j) (*coef((r), (j)))
+
+/* Its terms in the order of their unknowns, so that evaluating it adds
+ * them up in the order the dense rows of earlier versions did. */
+static void sort_terms(pending *r)
+{
+    for (int t = 1; t < r->n; t++)
+        for (int u = t; u > 0 && r->col[u - 1] > r->col[u]; u--) {
+            int c = r->col[u];
+            double v = r->val[u];
+            r->col[u] = r->col[u - 1], r->val[u] = r->val[u - 1];
+            r->col[u - 1] = c, r->val[u - 1] = v;
+        }
 }
 
 /* coefficient * attribute of an item, added to a row's left side; what isn't
@@ -1002,45 +1286,45 @@ static void add_attr(problem *p, pending *r, id item, NSLayoutAttribute a, doubl
     switch (a) {
     case NSLayoutAttributeLeft:
     case NSLayoutAttributeTop:
-        r->a[start] += k;
+        A(r, start) += k;
         break;
     case NSLayoutAttributeLeading:
-        r->a[start] += k;
+        A(r, start) += k;
         if (flipped_x)
-            r->a[size] += k;
+            A(r, size) += k;
         break;
     case NSLayoutAttributeTrailing:
-        r->a[start] += k;
+        A(r, start) += k;
         if (!flipped_x)
-            r->a[size] += k;
+            A(r, size) += k;
         break;
     case NSLayoutAttributeRight:
     case NSLayoutAttributeBottom:
-        r->a[start] += k;
-        r->a[size] += k;
+        A(r, start) += k;
+        A(r, size) += k;
         break;
     case NSLayoutAttributeCenterX:
     case NSLayoutAttributeCenterY:
-        r->a[start] += k;
-        r->a[size] += k / 2;
+        A(r, start) += k;
+        A(r, size) += k / 2;
         break;
     case NSLayoutAttributeWidth:
     case NSLayoutAttributeHeight:
-        r->a[size] += k;
+        A(r, size) += k;
         break;
     case NSLayoutAttributeLastBaseline:
     case NSLayoutAttributeFirstBaseline: {
         /* from the bottom (or the top for the first baseline) by the view's own offset */
-        r->a[start] += k;
+        A(r, start) += k;
         if ([item isKindOfClass:[NSView class]]) {
             if (a == NSLayoutAttributeFirstBaseline) {
                 r->rhs -= k * [(NSView *)item firstBaselineOffsetFromTop];
             } else {
-                r->a[size] += k;
+                A(r, size) += k;
                 r->rhs += k * [(NSView *)item lastBaselineOffsetFromBottom];
             }
         } else {
-            r->a[size] += k;
+            A(r, size) += k;
         }
         break;
     }
@@ -1129,11 +1413,11 @@ static int compare_rows(const void *x, const void *y)
     return a->order - b->order;
 }
 
-static double evaluate(const pending *r, const double *x, int n)
+static double evaluate(const pending *r, const double *x)
 {
     double v = 0;
-    for (int j = 0; j < n; j++)
-        v += r->a[j] * x[j];
+    for (int t = 0; t < r->n; t++)
+        v += r->val[t] * x[r->col[t]];
     return v;
 }
 
@@ -1151,31 +1435,31 @@ static void mask_rows(problem *p, id item, int pi, double m1, double s, double m
     int nflex = flex1 + flexSize + flex2;
     if (pi < 0) {
         /* the root: where it is */
-        a->a[x] = 1, a->rhs = m1;
-        b->a[w] = 1, b->rhs = s;
+        A(a, x) = 1, a->rhs = m1;
+        A(b, w) = 1, b->rhs = s;
         return;
     }
     if (nflex == 0 || (nflex == 1 && flex2)) {          /* pinned before, fixed size */
-        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
-        b->a[w] = 1, b->rhs = s;
+        A(a, x) = 1, A(a, px) = -1, a->rhs = m1;
+        A(b, w) = 1, b->rhs = s;
     } else if (nflex == 1 && flex1) {                  /* pinned after, fixed size */
-        a->a[x] = 1, a->a[w] = 1, a->a[px] = -1, a->a[pw] = -1, a->rhs = -m2;
-        b->a[w] = 1, b->rhs = s;
+        A(a, x) = 1, A(a, w) = 1, A(a, px) = -1, A(a, pw) = -1, a->rhs = -m2;
+        A(b, w) = 1, b->rhs = s;
     } else if (nflex == 1) {                           /* both margins pinned */
-        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
-        b->a[x] = 1, b->a[w] = 1, b->a[px] = -1, b->a[pw] = -1, b->rhs = -m2;
+        A(a, x) = 1, A(a, px) = -1, a->rhs = m1;
+        A(b, x) = 1, A(b, w) = 1, A(b, px) = -1, A(b, pw) = -1, b->rhs = -m2;
     } else if (flex1 && flex2 && !flexSize) {          /* centred in proportion, fixed size */
-        a->a[x] = 1, a->a[w] = 0.5, a->a[px] = -1, a->a[pw] = -(m1 + s / 2) / ps;
-        b->a[w] = 1, b->rhs = s;
+        A(a, x) = 1, A(a, w) = 0.5, A(a, px) = -1, A(a, pw) = -(m1 + s / 2) / ps;
+        A(b, w) = 1, b->rhs = s;
     } else if (flexSize && flex2 && !flex1) {          /* pinned before, size in proportion */
-        a->a[x] = 1, a->a[px] = -1, a->rhs = m1;
-        b->a[w] = 1, b->a[pw] = -s / ps;
+        A(a, x) = 1, A(a, px) = -1, a->rhs = m1;
+        A(b, w) = 1, A(b, pw) = -s / ps;
     } else if (flexSize && flex1 && !flex2) {          /* pinned after, size in proportion */
-        a->a[x] = 1, a->a[w] = 1, a->a[px] = -1, a->a[pw] = -1, a->rhs = -m2;
-        b->a[w] = 1, b->a[pw] = -s / ps;
+        A(a, x) = 1, A(a, w) = 1, A(a, px) = -1, A(a, pw) = -1, a->rhs = -m2;
+        A(b, w) = 1, A(b, pw) = -s / ps;
     } else {                                           /* everything in proportion */
-        a->a[x] = 1, a->a[px] = -1, a->a[pw] = -m1 / ps;
-        b->a[w] = 1, b->a[pw] = -s / ps;
+        A(a, x) = 1, A(a, px) = -1, A(a, pw) = -m1 / ps;
+        A(b, w) = 1, A(b, pw) = -s / ps;
     }
 }
 
@@ -1191,9 +1475,9 @@ static void note_required_failure(NSLayoutConstraint *c)
     }
 }
 
-static BOOL breaks(pending *r, double *x, int nvars)
+static BOOL breaks(pending *r, double *x)
 {
-    double v = evaluate(r, x, nvars);
+    double v = evaluate(r, x);
     return (r->relation < 0 && v > r->rhs + 1e-6) || (r->relation > 0 && v < r->rhs - 1e-6);
 }
 
@@ -1204,36 +1488,91 @@ static int first_broken(problem *p, char *active, double *x)
         pending *r = &p->rows[k];
         if (r->relation == NSLayoutRelationEqual || active[k])
             continue;
-        if (breaks(r, x, p->nvars))
+        if (breaks(r, x))
             return k;
     }
     return -1;
 }
 
+static int stat_calls, stat_solves;   /* for FERRY_LAYOUT_STATS */
 /* Solves the equalities and the held inequalities, in priority order;
- * failed marks the rows that couldn't be kept. */
-static void solve_rows(problem *p, char *active, char *failed, double *x)
+ * failed marks the rows that couldn't be kept. e holds what the last solve
+ * of the same rows did. The solve starts again at the first row held then
+ * and not now, or now and not then (a row taken up that the rows before it
+ * already settle, or let go of that never went in, changes nothing), and
+ * of the rows after that does again only those that meet an unknown that
+ * some row before them now settles differently. */
+static void solve_rows(problem *p, elim *e, char *active, char *failed, double *x)
 {
-    system_t s;
-    sys_init(&s, p->nvars);
-    for (int k = 0; k < p->nrows; k++) {
+    stat_calls++;
+    int start = 0;
+    if (e->valid) {
+        for (; start < p->nrows; start++) {
+            pending *r = &p->rows[start];
+            rowcache *c = &e->cache[start];
+            char held = r->relation == NSLayoutRelationEqual || active[start];
+            if (held == c->held)
+                continue;
+            if (!held && c->result != 2) {
+                c->held = 0;
+                failed[start] = 0;
+                continue;
+            }
+            if (held) {
+                int k = el_reduce(e, r->col, r->val, r->n, r->rhs, e->depth[start]);
+                if (k < 2) {
+                    el_keep(e, c, k);
+                    el_clear(e);
+                    failed[start] = k == 0;
+                    continue;
+                }
+                el_clear(e);
+            }
+            break;
+        }
+        if (start == p->nrows) {
+            memcpy(x, e->x, sizeof(double) * (size_t)p->nvars);
+            return;
+        }
+        el_truncate(e, e->depth[start]);
+    }
+    stat_solves++;
+    e->stamp++;
+    for (int k = start; k < p->nrows; k++) {
         pending *r = &p->rows[k];
-        failed[k] = 0;
-        if (r->relation != NSLayoutRelationEqual && !active[k])
+        rowcache *c = &e->cache[k];
+        e->depth[k] = e->nrows;
+        if (r->relation != NSLayoutRelationEqual && !active[k]) {
+            if (c->held && c->result == 2)
+                e->changed[c->pivot] = e->stamp;
+            c->held = 0;
+            failed[k] = 0;
             continue;
-        if (!sys_add(&s, r->a, r->rhs))
-            failed[k] = 1;
+        }
+        if (!el_unchanged(e, c)) {
+            int result = el_reduce(e, r->col, r->val, r->n, r->rhs, e->nrows);
+            el_keep(e, c, result);
+            el_clear(e);
+        }
+        if (c->result == 2)
+            el_push(e, c->pivot, c->n, c->col, c->val, c->rhs);
+        failed[k] = c->result == 0;
     }
+    e->depth[p->nrows] = e->nrows;
     /* anything still open (an item no row mentions) stays at zero */
-    double *unit = calloc((size_t)p->nvars, sizeof(double));
-    for (int j = 0; j < p->nvars; j++) {
-        memset(unit, 0, sizeof(double) * (size_t)p->nvars);
-        unit[j] = 1;
-        sys_add(&s, unit, 0);
+    for (int j = 0; j < p->nvars && e->nrows < p->nvars; j++) {
+        double one = 1;
+        rowcache *c = &e->units[j];
+        if (el_reduce(e, &j, &one, 1, 0, e->nrows) == 2) {
+            c->held = 0;
+            el_keep(e, c, 2);
+            el_push(e, c->pivot, c->n, c->col, c->val, c->rhs);
+        }
+        el_clear(e);
     }
-    free(unit);
-    sys_solution(&s, x);
-    sys_free(&s);
+    el_solution(e, e->x);
+    e->valid = YES;
+    memcpy(x, e->x, sizeof(double) * (size_t)p->nvars);
 }
 
 /* Solves one axis. fitting: the root's size is free, pulled towards nothing. */
@@ -1242,6 +1581,13 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
     NSUInteger n = [p->items count];
     p->nvars = (int)(2 * n);
     p->nrows = 0;
+    /* room for every row up front, so that a pointer to a row stays good
+     * while the next is made (an item has five rows at most) */
+    int need = (int)([constraints count] + 5 * n + 8);
+    if (p->cap < need) {
+        p->cap = need;
+        p->rows = realloc(p->rows, sizeof(pending) * (size_t)p->cap);
+    }
     BOOL rtl = NO;
     NSRect rootRect = NSMakeRect(0, 0, [root bounds].size.width, [root bounds].size.height);
 
@@ -1278,11 +1624,11 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
             NSWindow *w = [root window];
             if (fitting) {
                 pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
-                a->a[2 * i] = 1;
+                A(a, 2 * i) = 1;
                 pending *b = new_row(p, fit_pull > 0 && vertical == fit_pull_vertical ? fit_pull
                                                                                      : NSLayoutPriorityFittingSizeCompression,
                                      NSLayoutRelationEqual, nil);
-                b->a[2 * i + 1] = 1;
+                A(b, 2 * i + 1) = 1;
                 if (fit_pull > 0 && vertical == fit_pull_vertical)
                     b->rhs = 10000;
             } else if (w && [w contentView] == root) {
@@ -1291,19 +1637,19 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
                  * constraints inside it make it bigger or smaller (within
                  * its minimum and maximum content size) */
                 pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
-                a->a[2 * i] = 1;
+                A(a, 2 * i) = 1;
                 pending *b = new_row(p, NSLayoutPriorityWindowSizeStayPut, NSLayoutRelationEqual, nil);
-                b->a[2 * i + 1] = 1;
+                A(b, 2 * i + 1) = 1;
                 b->rhs = vertical ? rootRect.size.height : rootRect.size.width;
                 NSSize lo = [w contentMinSize], hi = [w contentMaxSize];
                 double mn = vertical ? lo.height : lo.width, mx = vertical ? hi.height : hi.width;
                 if (mn > 0) {
                     pending *m = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationGreaterThanOrEqual, nil);
-                    m->a[2 * i + 1] = 1, m->rhs = mn;
+                    A(m, 2 * i + 1) = 1, m->rhs = mn;
                 }
                 if (mx > 0 && mx < 100000) {
                     pending *m = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationLessThanOrEqual, nil);
-                    m->a[2 * i + 1] = 1, m->rhs = mx;
+                    A(m, 2 * i + 1) = 1, m->rhs = mx;
                 }
             } else {
                 mask_rows(p, item, -1, 0, vertical ? rootRect.size.height : rootRect.size.width, 0, NO, NO, NO, 0);
@@ -1318,9 +1664,9 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
         if ([item isKindOfClass:[NSLayoutGuide class]] && [(NSLayoutGuide *)item _isContentGuide]) {
             /* the window's content layout guide is its content view's bounds */
             pending *a = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
-            a->a[2 * i] = 1, a->a[2 * pi] = -1;
+            A(a, 2 * i) = 1, A(a, 2 * pi) = -1;
             pending *b = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationEqual, nil);
-            b->a[2 * i + 1] = 1, b->a[2 * pi + 1] = -1;
+            A(b, 2 * i + 1) = 1, A(b, 2 * pi + 1) = -1;
             continue;
         }
         if ([item isKindOfClass:[NSView class]] && ![(NSView *)item translatesAutoresizingMaskIntoConstraints] &&
@@ -1359,28 +1705,35 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
                                                            : NSLayoutConstraintOrientationHorizontal;
                 pending *hug = new_row(p, [(NSView *)item contentHuggingPriorityForOrientation:o],
                                        NSLayoutRelationLessThanOrEqual, nil);
-                hug->a[2 * i + 1] = 1, hug->rhs = want;
+                A(hug, 2 * i + 1) = 1, hug->rhs = want;
                 pending *resist = new_row(p, [(NSView *)item contentCompressionResistancePriorityForOrientation:o],
                                           NSLayoutRelationGreaterThanOrEqual, nil);
-                resist->a[2 * i + 1] = 1, resist->rhs = want;
+                A(resist, 2 * i + 1) = 1, resist->rhs = want;
             }
         }
         pending *stayStart = new_row(p, 0.02, NSLayoutRelationEqual, nil);
-        stayStart->a[2 * i] = 1;
+        A(stayStart, 2 * i) = 1;
         if (pi >= 0)
-            stayStart->a[2 * pi] = -1;
+            A(stayStart, 2 * pi) = -1;
         stayStart->rhs = pi >= 0 ? start - pstart : start;
         pending *staySize = new_row(p, fitting ? 0.01 : 0.03, NSLayoutRelationEqual, nil);
-        staySize->a[2 * i + 1] = 1;
+        A(staySize, 2 * i + 1) = 1;
         staySize->rhs = fitting ? 0 : size;
     }
     /* a size is never negative */
     for (NSUInteger k = 0; k < n; k++) {
         pending *r = new_row(p, NSLayoutPriorityRequired, NSLayoutRelationGreaterThanOrEqual, nil);
-        r->a[2 * k + 1] = 1;
+        A(r, 2 * k + 1) = 1;
     }
 
     qsort(p->rows, (size_t)p->nrows, sizeof(pending), compare_rows);
+    for (int k = 0; k < p->nrows; k++)
+        sort_terms(&p->rows[k]);
+    elim e;
+    el_init(&e, p->nvars, p->nrows);
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    stat_calls = stat_solves = 0;
     /* inequalities are active (held as equalities) only while the answer
      * would break them otherwise */
     char *active = calloc((size_t)p->nrows, 1), *failed = calloc((size_t)p->nrows, 1);
@@ -1388,7 +1741,7 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
     double *x = calloc((size_t)p->nvars, sizeof(double));
     int limit = 4 * p->nrows + 8;
     for (int round = 0; round < limit; round++) {
-        solve_rows(p, active, failed, x);
+        solve_rows(p, &e, active, failed, x);
         int broken = first_broken(p, active, x);
         if (broken >= 0) {
             active[broken] = 1;
@@ -1407,12 +1760,12 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
             if (!active[k])
                 continue;
             active[k] = 0;
-            solve_rows(p, active, failed, x);
+            solve_rows(p, &e, active, failed, x);
             int fb = first_broken(p, active, x);
             /* letting go while a weaker wish breaks happens once a row, so
              * the rounds can't go back and forth between the two */
             BOOL weaker = fb >= 0 && p->rows[fb].priority < p->rows[k].priority && !let_go[k];
-            if ((fb < 0 || weaker) && !breaks(&p->rows[k], x, p->nvars)) {
+            if ((fb < 0 || weaker) && !breaks(&p->rows[k], x)) {
                 released = YES;
                 if (weaker)
                     let_go[k] = 1;
@@ -1423,17 +1776,28 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
         if (!released)
             break;
     }
-    solve_rows(p, active, failed, x);
+    solve_rows(p, &e, active, failed, x);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    /* FERRY_LAYOUT_STATS: a line for each axis of a window's solve */
+    static int stats = -1;
+    if (stats < 0)
+        stats = getenv("FERRY_LAYOUT_STATS") != NULL;
+    if (stats && !fitting)
+        fprintf(stderr, "ferry: layout %s: %d rows, %d unknowns, %d solves, %d of them anew, %.2f ms\n",
+                vertical ? "V" : "H", p->nrows, p->nvars, stat_calls, stat_solves,
+                (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6);
     for (int k = 0; k < p->nrows; k++)
         if (failed[k] && p->rows[k].priority >= NSLayoutPriorityRequired)
             note_required_failure(p->rows[k].source);
-    memcpy(out, x, sizeof(double) * (size_t)p->nvars);
+    /* what the order of the arithmetic leaves (a hair either side of a
+     * quarter point, a zero below zero) doesn't count */
+    for (int j = 0; j < p->nvars; j++)
+        out[j] = round(x[j] * 1048576) / 1048576 + 0.0;
     free(x);
     free(active);
     free(failed);
     free(let_go);
-    for (int k = 0; k < p->nrows; k++)
-        free(p->rows[k].a);
+    el_free(&e);
 }
 
 static void add_item(problem *p, id item, NSView *root)
@@ -1449,6 +1813,78 @@ static void add_item(problem *p, id item, NSView *root)
     }
     [p->index setObject:@([p->items count]) forKey:item];
     [p->items addObject:item];
+}
+
+/* Fitting sizes asked for while a window's rows are made (freemac 1.NEXT,
+ * Ferry 0.NEXT). A stack view asks how big each of its views wants to be
+ * and how firmly, for its own size and hugging, again and again, and
+ * nothing moves until the window's rows are solved: each is worked out
+ * once. */
+typedef struct {
+    NSView *view;
+    double pull;
+    BOOL pullVertical, ok;
+    int depth;
+    NSSize size;
+} fitted;
+static fitted *fit_memo;
+static int fit_memo_count, fit_memo_room;
+static BOOL fit_memo_on;
+
+static unsigned fit_slot(NSView *v, int mask)
+{
+    uintptr_t h = (uintptr_t)v;
+    h ^= h >> 17;
+    h *= 0x9e3779b1u;
+    return (unsigned)(h ^ ((unsigned)fit_depth * 31u) ^ (fit_pull > 0 ? (unsigned)fit_pull * 7u + fit_pull_vertical : 0u)) &
+           (unsigned)mask;
+}
+static fitted *remembered(NSView *v)
+{
+    if (!fit_memo_on || !fit_memo_room)
+        return NULL;
+    for (unsigned i = fit_slot(v, fit_memo_room - 1);; i = (i + 1) & (unsigned)(fit_memo_room - 1)) {
+        fitted *f = &fit_memo[i];
+        if (!f->view)
+            return NULL;
+        if (f->view == v && f->depth == fit_depth && f->pull == fit_pull &&
+            (fit_pull <= 0 || f->pullVertical == fit_pull_vertical))
+            return f;
+    }
+}
+static void remember(NSView *v, BOOL ok, NSSize size)
+{
+    if (!fit_memo_on)
+        return;
+    if (2 * (fit_memo_count + 1) > fit_memo_room) {
+        fitted *old = fit_memo;
+        int oldRoom = fit_memo_room;
+        fit_memo_room = oldRoom ? 2 * oldRoom : 256;
+        fit_memo = calloc((size_t)fit_memo_room, sizeof(fitted));
+        fit_memo_count = 0;
+        double pull = fit_pull;
+        BOOL pullVertical = fit_pull_vertical;
+        int depth = fit_depth;
+        for (int k = 0; k < oldRoom; k++)
+            if (old[k].view) {
+                fit_pull = old[k].pull, fit_pull_vertical = old[k].pullVertical, fit_depth = old[k].depth;
+                remember(old[k].view, old[k].ok, old[k].size);
+            }
+        fit_pull = pull, fit_pull_vertical = pullVertical, fit_depth = depth;
+        free(old);
+    }
+    unsigned i = fit_slot(v, fit_memo_room - 1);
+    while (fit_memo[i].view)
+        i = (i + 1) & (unsigned)(fit_memo_room - 1);
+    fit_memo[i] = (fitted){v, fit_pull, fit_pull_vertical, ok, fit_depth, size};
+    fit_memo_count++;
+}
+static void forget_fitted(void)
+{
+    fit_memo_on = NO;
+    if (fit_memo_count)
+        memset(fit_memo, 0, sizeof(fitted) * (size_t)fit_memo_room);
+    fit_memo_count = 0;
 }
 
 /* Solves the constraints of root's subtree once. With fitting, answers the
@@ -1484,8 +1920,12 @@ static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
     BOOL wasSolving = solving;
     solving = YES;
     @try {
+        if (!fitting)
+            fit_memo_on = YES;
         solve_axis(&p, usable, root, NO, fitting, hx);
         solve_axis(&p, usable, root, YES, fitting, vx);
+        if (!fitting)
+            forget_fitted();
         if (!fitting) {
             /* a window whose content the constraints make bigger or smaller
              * grows or shrinks to fit, keeping its top left corner */
@@ -1528,6 +1968,8 @@ static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
             }
         }
     } @finally {
+        if (!fitting)
+            forget_fitted();
         solving = wasSolving;
     }
     NSSize size = NSMakeSize(fmax(0, hx[1]), fmax(0, vx[1]));
@@ -1589,10 +2031,17 @@ BOOL AConstraintFittingSize(NSView *v, NSSize *size)
 {
     if (!AConstraintsInUse || fit_depth > 8)
         return NO;
+    fitted *known = remembered(v);
+    if (known) {
+        *size = known->size;
+        return known->ok;
+    }
     NSMutableArray *cs = [NSMutableArray array], *gs = [NSMutableArray array];
     collect(v, cs, gs);
-    if (![cs count])
+    if (![cs count]) {
+        remember(v, NO, NSZeroSize);
         return NO;
+    }
     if (!solving)
         update_subtree(v);
     fit_depth++;
@@ -1601,6 +2050,7 @@ BOOL AConstraintFittingSize(NSView *v, NSSize *size)
     } @finally {
         fit_depth--;
     }
+    remember(v, YES, *size);
     return YES;
 }
 
