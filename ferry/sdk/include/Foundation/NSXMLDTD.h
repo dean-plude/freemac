@@ -8,7 +8,7 @@
 #include <Foundation/NSXMLDTDNode.h>
 
 @interface NSXMLDTD : NSXMLNode
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithContentsOfURL:(NSURL *)url options:(NSXMLNodeOptions)mask error:(NSError **)error;
 - (instancetype)initWithData:(NSData *)data options:(NSXMLNodeOptions)mask error:(NSError **)error;
 @property (copy) NSString *publicID;

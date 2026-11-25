@@ -397,6 +397,25 @@ searches, access lists and trusted applications) are in
 Thread cancellation and its cleanup handlers are in `src/pthread.c`, and
 libbz2's calls on a Mac `FILE` in `src/host.c`.
 
+From Ferry 0.51.0 (freemac 1.227), Swift programs are built with
+`sdk/ferry-swiftc`, given a Swift toolchain for Linux from swift.org
+(`FERRY_SWIFT_TOOLCHAIN`, or `swift-frontend` on `PATH`). Swift's runtime
+and standard library are built from the Swift project's own source by
+`swift/build-runtime.sh SWIFT_SOURCE` into `frameworks/swift`, and Ferry's
+overlays (`swift/overlays`) and SwiftUI (`swift/SwiftUI`) by
+`swift/build-modules.sh`. Neither is part of `make`, and the Swift tests
+(`tests/swift`) skip when they aren't there. Ferry loads that runtime for
+programs that link `/usr/lib/swift/libswiftCore.dylib`
+(`src/swiftsupport.c`), and answers what it asks of the Objective-C
+runtime in `src/objc/swift.c`. The SDK's API notes
+(`sdk/include/*.apinotes`) give Swift its names for Foundation and AppKit.
+Ferry's SwiftUI is drawn with Ferry's AppKit. It has stacks, grids, lists
+and forms; the controls; `@State`, observable objects and `@AppStorage`;
+windows, settings and menu bar extras; and `NSHostingView` and
+`NSViewRepresentable`. With `FERRY_SWIFTUI_DUMP=1` it describes its windows
+on standard output, and `FERRY_SWIFTUI_CLICK` names buttons and menu items
+to press in turn, as the tests do.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

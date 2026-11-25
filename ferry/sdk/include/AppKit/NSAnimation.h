@@ -27,7 +27,7 @@ APPKIT_EXTERN NSString *const NSAnimationProgressMark;
 @protocol NSAnimationDelegate;
 
 @interface NSAnimation : NSObject <NSCopying, NSCoding>
-- (instancetype)initWithDuration:(NSTimeInterval)duration animationCurve:(NSAnimationCurve)animationCurve;
+- (instancetype FERRY_SWIFT_NONNULL)initWithDuration:(NSTimeInterval)duration animationCurve:(NSAnimationCurve)animationCurve;
 - (void)startAnimation;
 - (void)stopAnimation;
 @property (readonly, getter=isAnimating) BOOL animating;
@@ -67,7 +67,7 @@ APPKIT_EXTERN NSViewAnimationEffectName const NSViewAnimationFadeInEffect;
 APPKIT_EXTERN NSViewAnimationEffectName const NSViewAnimationFadeOutEffect;
 
 @interface NSViewAnimation : NSAnimation
-- (instancetype)initWithViewAnimations:(NSArray<NSDictionary<NSViewAnimationKey, id> *> *)viewAnimations;
+- (instancetype FERRY_SWIFT_NONNULL)initWithViewAnimations:(NSArray<NSDictionary<NSViewAnimationKey, id> *> *)viewAnimations;
 @property (copy) NSArray<NSDictionary<NSViewAnimationKey, id> *> *viewAnimations;
 @end
 

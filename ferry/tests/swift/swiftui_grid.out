@@ -1,0 +1,42 @@
+window "Grid" 192x285
+  text "Intervals" at 16,16 57x16
+  ColorView at 16,36 160x84
+  button "Work" at 28,44 61x32
+  button "Short" at 103,44 62x32
+  button "Long" at 28,80 60x32
+  button "Off" at 104,80 60x32
+  text "Minutes: 25" at 16,132 77x16
+  NSSegmentedControl at 99,128 55x24
+  slider 0.5 at 16,160 160x21
+  button "Start" at 16,189 60x32
+  text "Picked: none" at 16,229 84x16
+  text "AppKit: none, pass 1" at 16,253 129x16
+click Long
+window "Grid" 192x285
+  text "Intervals" at 16,16 57x16
+  ColorView at 16,36 160x84
+  button "Work" at 28,44 61x32
+  button "Short" at 103,44 62x32
+  button "Long" at 28,80 60x32
+  button "Off" at 104,80 60x32
+  text "Minutes: 25" at 16,132 77x16
+  NSSegmentedControl at 99,128 55x24
+  slider 0.5 at 16,160 160x21
+  button "Start" at 16,189 60x32
+  text "Picked: Long" at 16,229 84x16
+  text "AppKit: Long, pass 2" at 16,253 132x16
+click Start
+window "Grid" 192x285
+  text "Intervals" at 16,16 57x16
+  ColorView at 16,36 160x84
+  button "Work" at 28,44 61x32
+  button "Short" at 103,44 62x32
+  button "Long" at 28,80 60x32
+  button "Off" at 104,80 60x32
+  text "Minutes: 25" at 16,132 77x16
+  NSSegmentedControl at 99,128 55x24
+  slider 0.5 at 16,160 160x21
+  button "Start" at 16,189 60x32
+  text "Picked: started" at 16,229 96x16
+  text "AppKit: started, pass 3" at 16,253 145x16
+exit=0

@@ -450,19 +450,23 @@ module Darwin [system] {
 
 module ObjectiveC [system] {
     module NSObjCRuntime {
-        header "ObjectiveC/NSObjCRuntime.h"
+        header "objc/NSObjCRuntime.h"
+        export *
+    }
+    module NSObject {
+        header "objc/NSObject.h"
         export *
     }
     module message {
-        header "ObjectiveC/message.h"
+        header "objc/message.h"
         export *
     }
     module objc {
-        header "ObjectiveC/objc.h"
+        header "objc/objc.h"
         export *
     }
     module runtime {
-        header "ObjectiveC/runtime.h"
+        header "objc/runtime.h"
         export *
     }
     link "objc"

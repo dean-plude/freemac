@@ -64,7 +64,7 @@ FOUNDATION_EXPORT NSString *const NSUserNotificationDefaultSoundName;
 @end
 
 @interface NSUserNotificationCenter : NSObject
-@property (class, readonly, strong) NSUserNotificationCenter *defaultUserNotificationCenter;
+@property (class, readonly, strong) NSUserNotificationCenter * FERRY_SWIFT_NONNULL defaultUserNotificationCenter;
 @property (assign) id<NSUserNotificationCenterDelegate> delegate;
 @property (copy) NSArray<NSUserNotification *> *scheduledNotifications;
 - (void)scheduleNotification:(NSUserNotification *)notification;

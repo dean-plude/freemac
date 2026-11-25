@@ -490,6 +490,10 @@ static const char *mac_dyld_get_image_name(uint32_t i) { return ferry_image_path
 
 /* Called at once for every image already loaded, then for each one dlopen
  * adds. Images are never removed, so the removal callbacks never run. */
+/* Whether an address is one of dyld's shared-cache Objective-C constants
+ * (freemac 1.227): Ferry has no shared cache, so never. */
+static int mac_dyld_is_objc_constant(int kind, const void *addr) { return 0; }
+
 static void mac_dyld_register_func_for_add_image(add_image_fn fn)
 {
     if (!fn)
@@ -506,6 +510,89 @@ static void mac_dyld_register_func_for_add_image(add_image_fn fn)
 }
 
 static void mac_dyld_register_func_for_remove_image(add_image_fn fn) { (void)fn; }
+
+/* ---- sections of a loaded image (mach-o/getsect.h) ------------------------------
+ * From the getsectiondata(3) man page: a section's or segment's address in
+ * memory, found by walking the image's load commands, which the loader
+ * maps with the image (freemac 1.227: Swift's runtime finds its metadata
+ * sections this way). */
+
+struct mac_seg64 { uint32_t cmd, cmdsize; char segname[16]; uint64_t vmaddr, vmsize, fileoff, filesize;
+                   int32_t maxprot, initprot; uint32_t nsects, flags; };
+struct mac_sect64 { char sectname[16], segname[16]; uint64_t addr, size;
+                    uint32_t offset, align, reloff, nreloc, flags, reserved1, reserved2, reserved3; };
+#define MAC_LC_SEGMENT_64 0x19
+
+/* The image's 64-bit segments in order, and its slide (where __TEXT was
+ * mapped, less the address it asks for). */
+static int mac_segments(const void *mh, const struct mac_seg64 **segs, int max, intptr_t *slide)
+{
+    const uint32_t *h = mh;
+    *slide = 0;
+    if (!h || h[0] != 0xfeedfacfu)
+        return 0;
+    const char *p = (const char *)mh + 32;
+    int n = 0;
+    for (uint32_t i = 0; i < h[4]; i++) {
+        const struct mac_seg64 *seg = (const void *)p;
+        if (seg->cmd == MAC_LC_SEGMENT_64) {
+            if (!strncmp(seg->segname, "__TEXT", 16))
+                *slide = (intptr_t)mh - (intptr_t)seg->vmaddr;
+            if (n < max)
+                segs[n++] = seg;
+        }
+        p += seg->cmdsize;
+    }
+    return n;
+}
+
+static uint8_t *mac_getsegmentdata(const void *mh, const char *segname, unsigned long *size)
+{
+    const struct mac_seg64 *segs[64];
+    intptr_t slide;
+    int n = mac_segments(mh, segs, 64, &slide);
+    for (int i = 0; i < n; i++)
+        if (!strncmp(segs[i]->segname, segname, 16)) {
+            if (size)
+                *size = (unsigned long)segs[i]->vmsize;
+            return (uint8_t *)(uintptr_t)(segs[i]->vmaddr + (uint64_t)slide);
+        }
+    return NULL;
+}
+
+static const struct mac_sect64 *mac_find_section(const void *mh, const char *segname, const char *sectname,
+                                                 intptr_t *slide)
+{
+    const struct mac_seg64 *segs[64];
+    int n = mac_segments(mh, segs, 64, slide);
+    for (int i = 0; i < n; i++) {
+        if (strncmp(segs[i]->segname, segname, 16))
+            continue;
+        const struct mac_sect64 *sect = (const void *)(segs[i] + 1);
+        for (uint32_t k = 0; k < segs[i]->nsects; k++)
+            if (!strncmp(sect[k].sectname, sectname, 16))
+                return &sect[k];
+    }
+    return NULL;
+}
+
+static uint8_t *mac_getsectiondata(const void *mh, const char *segname, const char *sectname, unsigned long *size)
+{
+    intptr_t slide;
+    const struct mac_sect64 *sect = mac_find_section(mh, segname, sectname, &slide);
+    if (!sect)
+        return NULL;
+    if (size)
+        *size = (unsigned long)sect->size;
+    return (uint8_t *)(uintptr_t)(sect->addr + (uint64_t)slide);
+}
+
+/* The section's own record, with its unslid address, as the man page says. */
+static const void *mac_getsectbynamefromheader_64(const void *mh, const char *segname, const char *sectname)
+{
+    intptr_t slide;
+    return mac_find_section(mh, segname, sectname, &slide);
+}
 
 /* Ferry's own, for Foundation's NSBundle: the first class a loaded bundle
  * defines (its principal class when Info.plist names none). */
@@ -527,7 +614,11 @@ const struct ferry_symbol ferry_dyld_symbols[] = {
     {"_dyld_get_image_vmaddr_slide", mac_dyld_get_image_vmaddr_slide},
     {"_dyld_get_image_name", mac_dyld_get_image_name},
     {"_dyld_register_func_for_add_image", mac_dyld_register_func_for_add_image},
+    {"_dyld_is_objc_constant", mac_dyld_is_objc_constant},
     {"_dyld_register_func_for_remove_image", mac_dyld_register_func_for_remove_image},
+    {"getsectiondata", mac_getsectiondata},
+    {"getsegmentdata", mac_getsegmentdata},
+    {"getsectbynamefromheader_64", mac_getsectbynamefromheader_64},
     {"ferry_dl_first_class", ferry_dl_first_class},
     {NULL, NULL},
 };

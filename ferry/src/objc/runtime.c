@@ -297,7 +297,7 @@ static void realize_compiled(Class cls)
     const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
     struct fclass_rt *rt = calloc(1, sizeof *rt);
     rt->cls = cls;
-    rt->name = ro->name;
+    rt->name = ro->name ? ro->name : ferry_objc_lazy_class_name(cls);   /* Swift's generic classes (swift.c) */
     rt->image = NULL;
     if (ro->flags & RO_META)
         rt->flags |= RT_META | RT_STATIC_INSTANCES;
@@ -489,9 +489,25 @@ static void attach_category(struct c_category *cat, uint32_t imageinfo_flags)
         prepend_props(mrt, convert_props(cat->class_properties));
 }
 
+/* Swift marks its classes in the low bits of the data word: bit 1 on a Mac
+ * since Swift's stable ABI, bit 0 in code built for an older macOS, which
+ * is how Swift's own libraries are built. Swift's runtime only takes bit 1
+ * as "a Swift class", so classes with the older bit get the newer one, as
+ * the Swift runtime's own comments say a Mac's does (freemac 1.227). */
+static void swift_stable_bit(Class cls)
+{
+    if (cls && (cls->bits & 3) == 1)
+        cls->bits ^= 3;
+}
+
 void ferry_objc_map_image(struct ferry_objc_image *im)
 {
     LOCK();
+    for (size_t i = 0; i < im->nclasses; i++)
+        if (im->classlist[i]) {
+            swift_stable_bit(im->classlist[i]);
+            swift_stable_bit(im->classlist[i]->isa);
+        }
     for (size_t i = 0; i < im->nselrefs; i++)
         im->selrefs[i] = register_sel(im->selrefs[i], 0);
     for (size_t i = 0; i + 1 < im->nmsgrefs; i += 2)
@@ -739,7 +755,27 @@ Class objc_getClass(const char *name)
     LOCK();
     Class c = ferry_table_get(&classes, name);
     UNLOCK();
+    if (!c)
+        c = ferry_objc_class_from_hook(name);   /* Swift's classes made on first use (swift.c) */
     return c;
+}
+
+/* For swift.c: a class whose description Swift's runtime filled in while
+ * the program runs, realized as a compiled one is. */
+Class ferry_objc_realize_runtime_class(Class cls, const char *image)
+{
+    if (!cls)
+        return NULL;
+    LOCK();
+    int fresh = !class_is_realized(cls);
+    if (fresh)
+        realize_class(cls);
+    if (image && fresh) {
+        class_rt(cls)->image = image;
+        class_rt(cls->isa)->image = image;
+    }
+    UNLOCK();
+    return cls;
 }
 
 Class objc_lookUpClass(const char *name) { return objc_getClass(name); }

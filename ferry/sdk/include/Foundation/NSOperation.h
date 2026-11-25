@@ -48,7 +48,7 @@ typedef NS_ENUM(NSInteger, NSOperationQueuePriority) {
 @end
 
 @interface NSBlockOperation : NSOperation
-+ (instancetype)blockOperationWithBlock:(void (^)(void))block;
++ (instancetype FERRY_SWIFT_NONNULL)blockOperationWithBlock:(void (^)(void))block;
 - (void)addExecutionBlock:(void (^)(void))block;
 @property (readonly, copy) NSArray<void (^)(void)> *executionBlocks;
 @end
@@ -57,8 +57,8 @@ FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationVoidResultException
 FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationCancelledException;
 
 @interface NSInvocationOperation : NSOperation
-- (instancetype)initWithTarget:(id)target selector:(SEL)sel object:(id)arg;
-- (instancetype)initWithInvocation:(NSInvocation *)inv;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTarget:(id)target selector:(SEL)sel object:(id)arg;
+- (instancetype FERRY_SWIFT_NONNULL)initWithInvocation:(NSInvocation *)inv;
 @property (readonly, retain) NSInvocation *invocation;
 @property (readonly, retain) id result;
 @end
@@ -66,8 +66,8 @@ FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationCancelledException;
 #define NSOperationQueueDefaultMaxConcurrentOperationCount (-1)
 
 @interface NSOperationQueue : NSObject
-+ (NSOperationQueue *)currentQueue;
-+ (NSOperationQueue *)mainQueue;
+@property (class, readonly, strong) NSOperationQueue *currentQueue;
+@property (class, readonly, strong) NSOperationQueue * FERRY_SWIFT_NONNULL mainQueue;
 - (void)addOperation:(NSOperation *)op;
 - (void)addOperations:(NSArray<NSOperation *> *)ops waitUntilFinished:(BOOL)wait;
 - (void)addOperationWithBlock:(void (^)(void))block;
@@ -112,7 +112,7 @@ FOUNDATION_EXPORT NSExceptionName const NSInvocationOperationCancelledException;
 @end
 
 @interface NSConditionLock : NSObject <NSLocking>
-- (instancetype)initWithCondition:(NSInteger)condition;
+- (instancetype FERRY_SWIFT_NONNULL)initWithCondition:(NSInteger)condition;
 @property (readonly) NSInteger condition;
 - (void)lockWhenCondition:(NSInteger)condition;
 - (BOOL)tryLock;

@@ -500,7 +500,7 @@ APPKIT_EXTERN NSString *const NSAccessibilityErrorCodeExceptionInfo;
 
 /* An element of the app's own, for something that isn't a view. */
 @interface NSAccessibilityElement : NSObject <NSAccessibility>
-+ (instancetype)accessibilityElementWithRole:(NSAccessibilityRole)role frame:(NSRect)frame
++ (instancetype FERRY_SWIFT_NONNULL)accessibilityElementWithRole:(NSAccessibilityRole)role frame:(NSRect)frame
                                        label:(NSString *)label parent:(id)parent;
 - (void)accessibilityAddChildElement:(NSAccessibilityElement *)childElement;
 @end

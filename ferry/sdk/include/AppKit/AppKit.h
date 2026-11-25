@@ -179,7 +179,7 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 #define NSCompositeSourceOver NSCompositingOperationSourceOver
 
 @interface NSGraphicsContext : NSObject
-+ (NSGraphicsContext *)currentContext;
+@property (class, readonly, strong) NSGraphicsContext *currentContext;
 + (void)setCurrentContext:(NSGraphicsContext *)context;
 + (NSGraphicsContext *)graphicsContextWithCGContext:(CGContextRef)context flipped:(BOOL)flipped;
 + (NSGraphicsContext *)graphicsContextWithBitmapImageRep:(NSBitmapImageRep *)rep;
@@ -211,19 +211,21 @@ typedef NS_ENUM(NSUInteger, NSCompositingOperation) {
 + (NSColor *)colorWithCalibratedHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithDeviceHue:(CGFloat)h saturation:(CGFloat)s brightness:(CGFloat)b alpha:(CGFloat)a;
 + (NSColor *)colorWithCGColor:(CGColorRef)color;
-@property (class, readonly) NSColor *blackColor, *darkGrayColor, *lightGrayColor, *whiteColor, *grayColor;
-@property (class, readonly) NSColor *redColor, *greenColor, *blueColor, *cyanColor, *yellowColor;
-@property (class, readonly) NSColor *magentaColor, *orangeColor, *purpleColor, *brownColor, *clearColor;
-@property (class, readonly) NSColor *systemRedColor, *systemGreenColor, *systemBlueColor, *systemOrangeColor;
-@property (class, readonly) NSColor *systemYellowColor, *systemPurpleColor, *systemGrayColor, *systemPinkColor;
-@property (class, readonly) NSColor *labelColor, *secondaryLabelColor, *tertiaryLabelColor;
-@property (class, readonly) NSColor *textColor, *textBackgroundColor, *selectedTextColor;
-@property (class, readonly) NSColor *selectedTextBackgroundColor, *placeholderTextColor;
-@property (class, readonly) NSColor *controlColor, *controlBackgroundColor, *controlTextColor;
-@property (class, readonly) NSColor *disabledControlTextColor, *selectedControlColor;
-@property (class, readonly) NSColor *windowBackgroundColor, *underPageBackgroundColor, *gridColor;
-@property (class, readonly) NSColor *separatorColor, *controlAccentColor, *keyboardFocusIndicatorColor;
-@property (class, readonly) NSColor *alternateSelectedControlColor, *headerTextColor, *linkColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL blackColor, * FERRY_SWIFT_NONNULL darkGrayColor, * FERRY_SWIFT_NONNULL lightGrayColor, * FERRY_SWIFT_NONNULL whiteColor, * FERRY_SWIFT_NONNULL grayColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL redColor, * FERRY_SWIFT_NONNULL greenColor, * FERRY_SWIFT_NONNULL blueColor, * FERRY_SWIFT_NONNULL cyanColor, * FERRY_SWIFT_NONNULL yellowColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL magentaColor, * FERRY_SWIFT_NONNULL orangeColor, * FERRY_SWIFT_NONNULL purpleColor, * FERRY_SWIFT_NONNULL brownColor, * FERRY_SWIFT_NONNULL clearColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL systemRedColor, * FERRY_SWIFT_NONNULL systemGreenColor, * FERRY_SWIFT_NONNULL systemBlueColor, * FERRY_SWIFT_NONNULL systemOrangeColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL systemYellowColor, * FERRY_SWIFT_NONNULL systemPurpleColor, * FERRY_SWIFT_NONNULL systemGrayColor, * FERRY_SWIFT_NONNULL systemPinkColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL systemBrownColor, * FERRY_SWIFT_NONNULL systemTealColor, * FERRY_SWIFT_NONNULL systemMintColor, * FERRY_SWIFT_NONNULL systemCyanColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL systemIndigoColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL labelColor, * FERRY_SWIFT_NONNULL secondaryLabelColor, * FERRY_SWIFT_NONNULL tertiaryLabelColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL textColor, * FERRY_SWIFT_NONNULL textBackgroundColor, * FERRY_SWIFT_NONNULL selectedTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedTextBackgroundColor, * FERRY_SWIFT_NONNULL placeholderTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL controlColor, * FERRY_SWIFT_NONNULL controlBackgroundColor, * FERRY_SWIFT_NONNULL controlTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL disabledControlTextColor, * FERRY_SWIFT_NONNULL selectedControlColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL windowBackgroundColor, * FERRY_SWIFT_NONNULL underPageBackgroundColor, * FERRY_SWIFT_NONNULL gridColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL separatorColor, * FERRY_SWIFT_NONNULL controlAccentColor, * FERRY_SWIFT_NONNULL keyboardFocusIndicatorColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL alternateSelectedControlColor, * FERRY_SWIFT_NONNULL headerTextColor, * FERRY_SWIFT_NONNULL linkColor;
 @property (readonly) CGFloat redComponent, greenComponent, blueComponent, alphaComponent, whiteComponent;
 @property (readonly) CGFloat hueComponent, saturationComponent, brightnessComponent;
 @property (readonly) NSInteger numberOfComponents;
@@ -330,7 +332,7 @@ typedef NS_ENUM(NSUInteger, NSTextTabType) {
 typedef NSString *NSTextTabOptionKey;
 APPKIT_EXTERN NSTextTabOptionKey const NSTabColumnTerminatorsAttributeName;
 @interface NSTextTab : NSObject <NSCopying, NSCoding>
-- (instancetype)initWithTextAlignment:(NSTextAlignment)alignment location:(CGFloat)loc
+- (instancetype FERRY_SWIFT_NONNULL)initWithTextAlignment:(NSTextAlignment)alignment location:(CGFloat)loc
                               options:(NSDictionary<NSTextTabOptionKey, id> *)options;
 - (instancetype)initWithType:(NSTextTabType)type location:(CGFloat)loc;
 @property (readonly) CGFloat location;
@@ -344,7 +346,7 @@ APPKIT_EXTERN NSTextTabOptionKey const NSTabColumnTerminatorsAttributeName;
 #else
 @interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying, NSCoding>
 #endif
-@property (class, readonly) NSParagraphStyle *defaultParagraphStyle;
+@property (class, readonly) NSParagraphStyle * FERRY_SWIFT_NONNULL defaultParagraphStyle;
 @property (readonly) NSTextAlignment alignment;
 @property (readonly) NSLineBreakMode lineBreakMode;
 @property (readonly) NSWritingDirection baseWritingDirection;
@@ -508,7 +510,7 @@ APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 /* Bitmaps of 8-bit RGB or RGBA (premultiplied, alpha last), as a view's
  * cacheDisplayInRect:toBitmapImageRep: makes them. */
 @interface NSBitmapImageRep : NSImageRep
-- (instancetype)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
+- (instancetype FERRY_SWIFT_NONNULL)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
                               pixelsHigh:(NSInteger)height bitsPerSample:(NSInteger)bps
                          samplesPerPixel:(NSInteger)spp hasAlpha:(BOOL)alpha isPlanar:(BOOL)planar
                           colorSpaceName:(NSString *)space bytesPerRow:(NSInteger)bpr
@@ -535,7 +537,7 @@ APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 
 /* An image drawn by a block each time it is drawn. */
 @interface NSCustomImageRep : NSImageRep
-- (instancetype)initWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
 @property (readonly) BOOL (^drawingHandler)(NSRect dstRect);
 @end
 
@@ -561,11 +563,11 @@ APPKIT_EXTERN NSString *const NSImageCompressionFactor;
  * standard template images, which Ferry draws itself. */
 @interface NSImage : NSObject <NSCopying, NSCoding>
 + (NSImage *)imageNamed:(NSImageName)name;
-+ (instancetype)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
++ (instancetype FERRY_SWIFT_NONNULL)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
 + (NSArray<NSString *> *)imageTypes;
 + (NSArray<NSString *> *)imageUnfilteredTypes;
 + (NSArray<NSString *> *)imageFileTypes;
-- (instancetype)initWithSize:(NSSize)size;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSize:(NSSize)size;
 - (instancetype)initWithContentsOfFile:(NSString *)path;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (instancetype)initByReferencingFile:(NSString *)path;
@@ -645,14 +647,14 @@ typedef NS_ENUM(NSInteger, NSViewLayerContentsRedrawPolicy) {
  * through [object animator] inside an NSAnimationContext group (or alone,
  * over a quarter of a second) moves it there over the group's duration. */
 @protocol NSAnimatablePropertyContainer
-- (instancetype)animator;
+- (instancetype FERRY_SWIFT_NONNULL)animator;
 @property (copy) NSDictionary<NSString *, id> *animations;
 - (id)animationForKey:(NSString *)key;
 + (id)defaultAnimationForKey:(NSString *)key;
 @end
 
 @interface NSView : NSResponder <NSAnimatablePropertyContainer>
-- (instancetype)initWithFrame:(NSRect)frame NS_DESIGNATED_INITIALIZER;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFrame:(NSRect)frame NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
 @property NSRect frame, bounds;
 @property NSPoint frameOrigin;
@@ -737,7 +739,7 @@ typedef NS_ENUM(NSInteger, NSViewLayerContentsRedrawPolicy) {
 + (void)runAnimationGroup:(void (^)(NSAnimationContext *context))changes;
 + (void)beginGrouping;
 + (void)endGrouping;
-+ (NSAnimationContext *)currentContext;
+@property (class, readonly, strong) NSAnimationContext *currentContext;
 @property NSTimeInterval duration;
 @property (strong) CAMediaTimingFunction *timingFunction;
 @property (copy) void (^completionHandler)(void);
@@ -847,7 +849,7 @@ typedef NS_ENUM(NSInteger, NSBackgroundStyle) {
 @class NSText;
 typedef NS_ENUM(NSUInteger, NSCellType) { NSNullCellType = 0, NSTextCellType = 1, NSImageCellType = 2 };
 @interface NSCell : NSObject <NSCopying, NSCoding>
-- (instancetype)initTextCell:(NSString *)string;
+- (instancetype FERRY_SWIFT_NONNULL)initTextCell:(NSString *)string;
 - (instancetype)initImageCell:(NSImage *)image;
 @property (copy) id objectValue;
 @property (copy) NSString *stringValue, *title;
@@ -938,9 +940,9 @@ typedef NS_ENUM(NSUInteger, NSCellType) { NSNullCellType = 0, NSTextCellType = 1
 @end
 
 @interface NSButton : NSControl
-+ (instancetype)buttonWithTitle:(NSString *)title target:(id)target action:(SEL)action;
-+ (instancetype)checkboxWithTitle:(NSString *)title target:(id)target action:(SEL)action;
-+ (instancetype)radioButtonWithTitle:(NSString *)title target:(id)target action:(SEL)action;
++ (instancetype FERRY_SWIFT_NONNULL)buttonWithTitle:(NSString *)title target:(id FERRY_SWIFT_NULLABLE)target action:(SEL FERRY_SWIFT_NULLABLE)action;
++ (instancetype FERRY_SWIFT_NONNULL)checkboxWithTitle:(NSString *)title target:(id FERRY_SWIFT_NULLABLE)target action:(SEL FERRY_SWIFT_NULLABLE)action;
++ (instancetype FERRY_SWIFT_NONNULL)radioButtonWithTitle:(NSString *)title target:(id FERRY_SWIFT_NULLABLE)target action:(SEL FERRY_SWIFT_NULLABLE)action;
 @property (copy) NSString *title, *alternateTitle;
 @property (copy) NSAttributedString *attributedTitle;
 @property NSBezelStyle bezelStyle;
@@ -956,7 +958,7 @@ typedef NS_ENUM(NSUInteger, NSCellType) { NSNullCellType = 0, NSTextCellType = 1
 @property NSImageScaling imageScaling;
 @property BOOL imageHugsTitle;
 + (instancetype)buttonWithImage:(NSImage *)image target:(id)target action:(SEL)action;
-+ (instancetype)buttonWithTitle:(NSString *)title image:(NSImage *)image target:(id)target action:(SEL)action;
++ (instancetype FERRY_SWIFT_NONNULL)buttonWithTitle:(NSString *)title image:(NSImage *)image target:(id FERRY_SWIFT_NULLABLE)target action:(SEL FERRY_SWIFT_NULLABLE)action;
 - (void)setButtonType:(NSButtonType)type;
 - (void)setNextState;
 - (void)highlight:(BOOL)flag;
@@ -1100,9 +1102,9 @@ typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
 @end
 
 @interface NSWindow : NSResponder
-- (instancetype)initWithContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style
+- (instancetype FERRY_SWIFT_NONNULL)initWithContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style
                             backing:(NSBackingStoreType)backing defer:(BOOL)defer;
-- (instancetype)initWithContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style
+- (instancetype FERRY_SWIFT_NONNULL)initWithContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style
                             backing:(NSBackingStoreType)backing defer:(BOOL)defer screen:(NSScreen *)screen;
 + (NSRect)frameRectForContentRect:(NSRect)rect styleMask:(NSWindowStyleMask)style;
 + (NSRect)contentRectForFrameRect:(NSRect)rect styleMask:(NSWindowStyleMask)style;
@@ -1191,7 +1193,7 @@ typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
 - (BOOL)setFrameAutosaveName:(NSString *)name;
 - (void)setTitleWithRepresentedFilename:(NSString *)path;
 - (NSPoint)cascadeTopLeftFromPoint:(NSPoint)point;
-+ (instancetype)windowWithContentViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)windowWithContentViewController:(NSViewController *)vc;
 @property (assign) NSWindowController *windowController;
 @property (retain) NSViewController *contentViewController;
 @property (getter=isDocumentEdited) BOOL documentEdited;
@@ -1259,7 +1261,7 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
  * Ferry doesn't show a menu bar yet. */
 @interface NSMenuItem : NSObject <NSCopying>
 + (NSMenuItem *)separatorItem;
-- (instancetype)initWithTitle:(NSString *)title action:(SEL)action keyEquivalent:(NSString *)key;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTitle:(NSString *)title action:(SEL)action keyEquivalent:(NSString *)key;
 @property (copy) NSString *title;
 @property SEL action;
 @property (assign) id target;
@@ -1281,7 +1283,7 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @end
 
 @interface NSMenu : NSObject <NSCopying>
-- (instancetype)initWithTitle:(NSString *)title;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTitle:(NSString *)title;
 @property (copy) NSString *title;
 @property (copy) NSArray<NSMenuItem *> *itemArray;   /* settable (freemac 1.225) */
 @property (readonly) NSInteger numberOfItems;
@@ -1352,7 +1354,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @end
 
 @interface NSApplication : NSResponder
-+ (NSApplication *)sharedApplication;
+@property (class, readonly, strong) NSApplication * FERRY_SWIFT_NONNULL sharedApplication;
 @property (assign) id<NSApplicationDelegate> delegate;
 @property (retain) NSMenu *mainMenu;
 @property (assign) NSMenu *windowsMenu, *servicesMenu, *helpMenu;
@@ -1429,7 +1431,7 @@ typedef NSString *NSNibName;
 /* Loads its window from a nib (as File's Owner) the first time the window
  * is asked for, and follows the window in the responder chain. */
 @interface NSWindowController : NSResponder <NSCoding>
-- (instancetype)initWithWindow:(NSWindow *)window;
+- (instancetype FERRY_SWIFT_NONNULL)initWithWindow:(NSWindow *)window;
 - (instancetype)initWithWindowNibName:(NSNibName)name;
 - (instancetype)initWithWindowNibName:(NSNibName)name owner:(id)owner;
 - (instancetype)initWithWindowNibPath:(NSString *)path owner:(id)owner;
@@ -1468,8 +1470,8 @@ typedef NSString *NSNibName;
 - (void)objectDidEndEditing:(id)editor;
 @end
 @interface NSUserDefaultsController : NSController
-@property (class, readonly) NSUserDefaultsController *sharedUserDefaultsController;
-- (instancetype)initWithDefaults:(NSUserDefaults *)defaults initialValues:(NSDictionary *)initialValues;
+@property (class, readonly) NSUserDefaultsController * FERRY_SWIFT_NONNULL sharedUserDefaultsController;
+- (instancetype FERRY_SWIFT_NONNULL)initWithDefaults:(NSUserDefaults *)defaults initialValues:(NSDictionary *)initialValues;
 @property (readonly) NSUserDefaults *defaults;
 @property (readonly) id values;
 @property (copy) NSDictionary *initialValues;
@@ -1482,7 +1484,7 @@ typedef NSString *NSNibName;
 /* Holds one content object; bind to "selection.someKey" to reach its keys
  * (NSNoSelectionMarker while there is no content). */
 @interface NSObjectController : NSController
-- (instancetype)initWithContent:(id)content;
+- (instancetype FERRY_SWIFT_NONNULL)initWithContent:(id)content;
 @property (retain) id content;
 @property (readonly, retain) id selection;
 @property (readonly, copy) NSArray *selectedObjects;
@@ -1546,8 +1548,8 @@ typedef NSString *NSNibName;
  * its children. A tree controller's arrangedObjects are made of them, and
  * an outline view bound to one shows them as its items. */
 @interface NSTreeNode : NSObject
-+ (instancetype)treeNodeWithRepresentedObject:(id)modelObject;
-- (instancetype)initWithRepresentedObject:(id)modelObject;
++ (instancetype FERRY_SWIFT_NONNULL)treeNodeWithRepresentedObject:(id)modelObject;
+- (instancetype FERRY_SWIFT_NONNULL)initWithRepresentedObject:(id)modelObject;
 @property (readonly, retain) id representedObject;
 @property (readonly, copy) NSIndexPath *indexPath;
 @property (readonly, getter=isLeaf) BOOL leaf;
@@ -1809,7 +1811,7 @@ typedef NS_OPTIONS(NSUInteger, NSPasteboardContentsOptions) { NSPasteboardConten
 @end
 
 @interface NSPasteboard : NSObject
-@property (class, readonly, strong) NSPasteboard *generalPasteboard;
+@property (class, readonly, strong) NSPasteboard * FERRY_SWIFT_NONNULL generalPasteboard;
 + (NSPasteboard *)pasteboardWithName:(NSPasteboardName)name;
 + (NSPasteboard *)pasteboardWithUniqueName;
 @property (readonly, copy) NSPasteboardName name;
@@ -2201,9 +2203,9 @@ APPKIT_EXTERN NSAttributedStringDocumentReadingOptionKey const NSCharacterEncodi
 APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRTFTextDocumentType,
     NSRTFDTextDocumentType, NSHTMLTextDocumentType;
 @interface NSAttributedString (NSAttributedStringDocumentFormats)
-- (instancetype)initWithRTF:(NSData *)data documentAttributes:(NSDictionary **)attributes;
-- (instancetype)initWithRTFD:(NSData *)data documentAttributes:(NSDictionary **)attributes;
-- (instancetype)initWithHTML:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype FERRY_SWIFT_NONNULL)initWithRTF:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype FERRY_SWIFT_NONNULL)initWithRTFD:(NSData *)data documentAttributes:(NSDictionary **)attributes;
+- (instancetype FERRY_SWIFT_NONNULL)initWithHTML:(NSData *)data documentAttributes:(NSDictionary **)attributes;
 - (instancetype)initWithHTML:(NSData *)data baseURL:(NSURL *)base documentAttributes:(NSDictionary **)attributes;
 - (instancetype)initWithData:(NSData *)data options:(NSDictionary *)options
           documentAttributes:(NSDictionary **)attributes error:(NSError **)error;
@@ -2227,8 +2229,8 @@ APPKIT_EXTERN NSAttributedStringDocumentType const NSPlainTextDocumentType, NSRT
 - (void)removeLayoutManager:(NSLayoutManager *)lm;
 @end
 @interface NSTextContainer : NSObject <NSCoding>
-- (instancetype)initWithSize:(NSSize)size;
-- (instancetype)initWithContainerSize:(NSSize)size;
+- (instancetype FERRY_SWIFT_NONNULL)initWithSize:(NSSize)size;
+- (instancetype FERRY_SWIFT_NONNULL)initWithContainerSize:(NSSize)size;
 @property NSSize size, containerSize;
 @property (assign) NSTextView *textView;
 @property (assign) NSLayoutManager *layoutManager;
@@ -2283,7 +2285,7 @@ typedef NS_ENUM(NSUInteger, NSSelectionGranularity) { NSSelectByCharacter = 0, N
 /* which side of a line break the insertion point is on (freemac 1.225) */
 typedef NS_ENUM(NSUInteger, NSSelectionAffinity) { NSSelectionAffinityUpstream = 0, NSSelectionAffinityDownstream = 1 };
 @interface NSTextView : NSText
-- (instancetype)initWithFrame:(NSRect)frame textContainer:(NSTextContainer *)container;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFrame:(NSRect)frame textContainer:(NSTextContainer *)container;
 - (NSRange)selectionRangeForProposedRange:(NSRange)proposed granularity:(NSSelectionGranularity)granularity;
 @property NSSelectionGranularity selectionGranularity;
 + (NSScrollView *)scrollableTextView;
@@ -2444,7 +2446,7 @@ typedef NS_ENUM(NSUInteger, NSTabState) { NSSelectedTab = 0, NSBackgroundTab = 1
 @class NSTabView;
 @interface NSTabViewItem : NSObject <NSCoding>
 - (instancetype)initWithIdentifier:(id)identifier;
-+ (instancetype)tabViewItemWithViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)tabViewItemWithViewController:(NSViewController *)vc;
 @property (retain) id identifier;
 @property (copy) NSString *label;
 @property (copy) NSString *toolTip;
@@ -2504,7 +2506,7 @@ typedef NS_OPTIONS(NSUInteger, NSStatusItemBehavior) {
     NSStatusItemBehaviorRemovalAllowed = 1 << 1, NSStatusItemBehaviorTerminationOnRemoval = 1 << 2,
 };
 @interface NSStatusBar : NSObject
-+ (NSStatusBar *)systemStatusBar;
+@property (class, readonly, strong) NSStatusBar * FERRY_SWIFT_NONNULL systemStatusBar;
 - (NSStatusItem *)statusItemWithLength:(CGFloat)length;
 - (void)removeStatusItem:(NSStatusItem *)item;
 @property (readonly, getter=isVertical) BOOL vertical;
@@ -2552,9 +2554,9 @@ typedef NS_OPTIONS(NSUInteger, NSStatusItemBehavior) {
 @interface NSColor (NSTableViewColors)
 @property (class, readonly) NSArray<NSColor *> *alternatingContentBackgroundColors;
 @property (class, readonly) NSArray<NSColor *> *controlAlternatingRowBackgroundColors;
-@property (class, readonly) NSColor *selectedContentBackgroundColor, *unemphasizedSelectedContentBackgroundColor;
-@property (class, readonly) NSColor *alternateSelectedControlTextColor, *unemphasizedSelectedTextColor;
-@property (class, readonly) NSColor *selectedControlTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedContentBackgroundColor, * FERRY_SWIFT_NONNULL unemphasizedSelectedContentBackgroundColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL alternateSelectedControlTextColor, * FERRY_SWIFT_NONNULL unemphasizedSelectedTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedControlTextColor;
 @end
 
 @class NSTableView, NSTableColumn, NSTableHeaderView, NSTableRowView, NSOutlineView;
@@ -2985,7 +2987,7 @@ typedef NS_ENUM(NSUInteger, NSPopUpArrowPosition) {
 @property (retain) NSMenuItem *menuItem;
 @end
 @interface NSPopUpButtonCell : NSMenuItemCell
-- (instancetype)initTextCell:(NSString *)string pullsDown:(BOOL)pullDown;
+- (instancetype FERRY_SWIFT_NONNULL)initTextCell:(NSString *)string pullsDown:(BOOL)pullDown;
 @property (retain) NSMenu *menu;
 @property BOOL pullsDown, autoenablesItems, usesItemFromMenu, altersStateOfSelectedItem;
 @property NSRectEdge preferredEdge;
@@ -3022,9 +3024,9 @@ typedef NS_ENUM(NSUInteger, NSPopUpArrowPosition) {
 - (void)performClickWithFrame:(NSRect)frame inView:(NSView *)view;
 @end
 @interface NSPopUpButton : NSButton
-+ (instancetype)popUpButtonWithMenu:(NSMenu *)menu target:(id)target action:(SEL)action;
-+ (instancetype)pullDownButtonWithTitle:(NSString *)title menu:(NSMenu *)menu;
-- (instancetype)initWithFrame:(NSRect)frame pullsDown:(BOOL)flag;
++ (instancetype FERRY_SWIFT_NONNULL)popUpButtonWithMenu:(NSMenu *)menu target:(id)target action:(SEL)action;
++ (instancetype FERRY_SWIFT_NONNULL)pullDownButtonWithTitle:(NSString *)title menu:(NSMenu *)menu;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFrame:(NSRect)frame pullsDown:(BOOL)flag;
 @property (retain) NSMenu *menu;
 @property BOOL pullsDown, autoenablesItems, usesItemFromMenu;
 @property NSRectEdge preferredEdge;
@@ -3101,7 +3103,7 @@ typedef NS_ENUM(NSInteger, NSSegmentDistribution) {
 - (NSInteger)tagForSegment:(NSInteger)segment;
 @end
 @interface NSSegmentedControl : NSControl
-+ (instancetype)segmentedControlWithLabels:(NSArray<NSString *> *)labels trackingMode:(NSSegmentSwitchTracking)mode
++ (instancetype FERRY_SWIFT_NONNULL)segmentedControlWithLabels:(NSArray<NSString *> *)labels trackingMode:(NSSegmentSwitchTracking)mode
                                     target:(id)target action:(SEL)action;
 + (instancetype)segmentedControlWithImages:(NSArray<NSImage *> *)images trackingMode:(NSSegmentSwitchTracking)mode
                                     target:(id)target action:(SEL)action;
@@ -3155,8 +3157,8 @@ typedef NS_ENUM(NSUInteger, NSSliderType) { NSSliderTypeLinear = 0, NSSliderType
 @property (getter=isVertical) BOOL vertical;
 @end
 @interface NSSlider : NSControl
-+ (instancetype)sliderWithTarget:(id)target action:(SEL)action;
-+ (instancetype)sliderWithValue:(double)value minValue:(double)min maxValue:(double)max target:(id)target
++ (instancetype FERRY_SWIFT_NONNULL)sliderWithTarget:(id)target action:(SEL)action;
++ (instancetype FERRY_SWIFT_NONNULL)sliderWithValue:(double)value minValue:(double)min maxValue:(double)max target:(id)target
                          action:(SEL)action;
 @property double minValue, maxValue, altIncrementValue;
 @property (readonly) double knobThickness;
@@ -3383,7 +3385,7 @@ APPKIT_EXTERN NSNotificationName const NSColorPanelColorDidChangeNotification;
 - (void)changeColor:(NSColorPanel *)sender;
 @end
 @interface NSColorPanel : NSPanel
-@property (class, readonly) NSColorPanel *sharedColorPanel;
+@property (class, readonly) NSColorPanel * FERRY_SWIFT_NONNULL sharedColorPanel;
 @property (class, readonly) BOOL sharedColorPanelExists;
 + (void)setPickerMask:(NSColorPanelOptions)mask;
 + (void)setPickerMode:(NSColorPanelMode)mode;
@@ -3427,7 +3429,7 @@ typedef NS_ENUM(NSInteger, NSLevelIndicatorPlaceholderVisibility) {
     NSLevelIndicatorPlaceholderVisibilityWhileEditing = 2,
 };
 @interface NSLevelIndicatorCell : NSActionCell
-- (instancetype)initWithLevelIndicatorStyle:(NSLevelIndicatorStyle)style;
+- (instancetype FERRY_SWIFT_NONNULL)initWithLevelIndicatorStyle:(NSLevelIndicatorStyle)style;
 @property NSLevelIndicatorStyle levelIndicatorStyle;
 @property double minValue, maxValue, warningValue, criticalValue;
 @property NSTickMarkPosition tickMarkPosition;
@@ -3590,14 +3592,14 @@ typedef NS_ENUM(NSUInteger, NSTokenStyle) {
 @property NSTokenStyle tokenStyle;
 @property (copy) NSCharacterSet *tokenizingCharacterSet;
 @property NSTimeInterval completionDelay;
-+ (NSCharacterSet *)defaultTokenizingCharacterSet;
+@property (class, readonly, strong) NSCharacterSet * FERRY_SWIFT_NONNULL defaultTokenizingCharacterSet;
 + (NSTimeInterval)defaultCompletionDelay;
 @end
 @interface NSTokenField : NSTextField
 @property NSTokenStyle tokenStyle;
 @property (copy) NSCharacterSet *tokenizingCharacterSet;
 @property NSTimeInterval completionDelay;
-+ (NSCharacterSet *)defaultTokenizingCharacterSet;
+@property (class, readonly, strong) NSCharacterSet * FERRY_SWIFT_NONNULL defaultTokenizingCharacterSet;
 + (NSTimeInterval)defaultCompletionDelay;
 @end
 
@@ -3625,7 +3627,7 @@ static const NSStackViewVisibilityPriority NSStackViewVisibilityPriorityNotVisib
 - (void)stackView:(NSStackView *)stackView didReattachViews:(NSArray<NSView *> *)views;
 @end
 @interface NSStackView : NSView
-+ (instancetype)stackViewWithViews:(NSArray<NSView *> *)views;
++ (instancetype FERRY_SWIFT_NONNULL)stackViewWithViews:(NSArray<NSView *> *)views;
 @property (assign) id<NSStackViewDelegate> delegate;
 @property NSUserInterfaceLayoutOrientation orientation;
 @property NSLayoutAttribute alignment;
@@ -3874,12 +3876,12 @@ APPKIT_EXTERN NSNotificationName const NSWorkspaceDidUnmountNotification;
 APPKIT_EXTERN NSNotificationName const NSWorkspaceActiveSpaceDidChangeNotification;
 APPKIT_EXTERN NSString *const NSWorkspaceApplicationKey;
 @interface NSWorkspaceOpenConfiguration : NSObject <NSCopying>
-+ (instancetype)configuration;
++ (instancetype FERRY_SWIFT_NONNULL)configuration;
 @property BOOL activates, promptsUserIfNeeded, addsToRecentItems, hides, createsNewApplicationInstance;
 @property (copy) NSArray<NSString *> *arguments;
 @end
 @interface NSWorkspace : NSObject
-@property (class, readonly) NSWorkspace *sharedWorkspace;
+@property (class, readonly) NSWorkspace * FERRY_SWIFT_NONNULL sharedWorkspace;
 @property (readonly) NSNotificationCenter *notificationCenter;
 - (BOOL)openURL:(NSURL *)url;
 - (void)openURL:(NSURL *)url configuration:(NSWorkspaceOpenConfiguration *)configuration
@@ -3957,7 +3959,7 @@ typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
 #define NSAutosaveOperation NSAutosaveElsewhereOperation
 @class NSSavePanel, NSOpenPanel;
 @interface NSDocument : NSObject <NSUserInterfaceValidations, NSMenuItemValidation, NSFilePresenter>
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithType:(NSString *)type error:(NSError **)error;
 - (instancetype)initWithContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
 - (instancetype)initForURL:(NSURL *)url withContentsOfURL:(NSURL *)contentsURL ofType:(NSString *)type
@@ -4183,8 +4185,8 @@ APPKIT_EXTERN NSPrintJobDispositionValue const NSPrintSpoolJob, NSPrintPreviewJo
 @end
 
 @interface NSPrintInfo : NSObject <NSCopying, NSCoding>
-@property (class, retain) NSPrintInfo *sharedPrintInfo;
-@property (class, readonly) NSPrinter *defaultPrinter;
+@property (class, retain) NSPrintInfo * FERRY_SWIFT_NONNULL sharedPrintInfo;
+@property (class, readonly) NSPrinter * FERRY_SWIFT_NONNULL defaultPrinter;
 + (NSSize)sizeForPaperName:(NSPrinterPaperName)name;
 - (instancetype)initWithDictionary:(NSDictionary<NSPrintInfoAttributeKey, id> *)attributes;
 @property (readonly, retain) NSMutableDictionary<NSPrintInfoAttributeKey, id> *dictionary;
@@ -4251,7 +4253,7 @@ APPKIT_EXTERN NSPrintJobDispositionValue const NSPrintSpoolJob, NSPrintPreviewJo
                                  printInfo:(NSPrintInfo *)printInfo;
 + (NSPrintOperation *)EPSOperationWithView:(NSView *)view insideRect:(NSRect)rect toPath:(NSString *)path
                                  printInfo:(NSPrintInfo *)printInfo;
-@property (class, retain) NSPrintOperation *currentOperation;
+@property (class, retain) NSPrintOperation * FERRY_SWIFT_NONNULL currentOperation;
 @property (readonly, getter=isCopyingOperation) BOOL copyingOperation;
 @property (readonly) NSPrintRenderingQuality preferredRenderingQuality;
 @property (copy) NSString *jobTitle;
@@ -4345,7 +4347,7 @@ typedef NS_OPTIONS(NSUInteger, NSFontPanelModeMask) {
 @end
 
 @interface NSFontManager : NSObject <NSMenuItemValidation>
-@property (class, readonly) NSFontManager *sharedFontManager;
+@property (class, readonly) NSFontManager * FERRY_SWIFT_NONNULL sharedFontManager;
 + (void)setFontManagerFactory:(Class)factoryClass;
 + (void)setFontPanelFactory:(Class)factoryClass;
 @property (readonly, copy) NSArray<NSString *> *availableFonts;
@@ -4387,7 +4389,7 @@ typedef NS_OPTIONS(NSUInteger, NSFontPanelModeMask) {
 @end
 
 @interface NSFontPanel : NSPanel
-@property (class, readonly) NSFontPanel *sharedFontPanel;
+@property (class, readonly) NSFontPanel * FERRY_SWIFT_NONNULL sharedFontPanel;
 @property (class, readonly) BOOL sharedFontPanelExists;
 - (void)setPanelFont:(NSFont *)font isMultiple:(BOOL)flag;
 - (NSFont *)panelConvertFont:(NSFont *)font;
@@ -4454,10 +4456,10 @@ typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
     NSTitlebarSeparatorStyleShadow = 3,
 };
 @interface NSSplitViewItem : NSObject <NSCoding>
-+ (instancetype)splitViewItemWithViewController:(NSViewController *)vc;
-+ (instancetype)sidebarWithViewController:(NSViewController *)vc;
-+ (instancetype)contentListWithViewController:(NSViewController *)vc;
-+ (instancetype)inspectorWithViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)splitViewItemWithViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)sidebarWithViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)contentListWithViewController:(NSViewController *)vc;
++ (instancetype FERRY_SWIFT_NONNULL)inspectorWithViewController:(NSViewController *)vc;
 @property (retain) NSViewController *viewController;
 @property (readonly) NSSplitViewItemBehavior behavior;
 @property (getter=isCollapsed) BOOL collapsed;

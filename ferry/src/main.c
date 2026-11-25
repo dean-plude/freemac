@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.50.0"
+#define FERRY_VERSION "0.51.0"
 
 static void usage(FILE *out)
 {
@@ -162,7 +162,8 @@ int main(int argc, char **argv, char **envp)
                                                    ferry_sysversion_symbols, ferry_sysctl_symbols,
                                                    ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
                                                    ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols,
-                                                   ferry_libc_more_symbols, ferry_oslog_symbols};
+                                                   ferry_libc_more_symbols, ferry_oslog_symbols,
+                                                   ferry_swift_symbols};
             for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);

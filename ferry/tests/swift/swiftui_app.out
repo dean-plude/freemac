@@ -1,0 +1,105 @@
+window "Groceries" 320x214
+  text "2 items, mode List, appeared 1" at 16,16 196x16
+  text "★" at 16,40 18x16
+  text "Apples" at 42,40 47x16
+  text "★" at 16,60 18x16
+  text "Pears" at 42,60 39x16
+  field "Plums" at 16,89 220x22
+  button "Add" at 244,84 60x32
+  text "Mode" at 16,129 40x16
+  button "List" at 62,124 68x25
+  NSBox at 16,157 288x1
+  button "Grid" at 16,166 60x32
+status item "☆"
+  item "Add Figs"
+  ---
+  item "2 items" (disabled)
+click Add
+window "Groceries" 320x258
+  text "3 items, mode List, appeared 1" at 16,16 196x16
+  text "★" at 16,40 18x16
+  text "Apples" at 42,40 47x16
+  text "★" at 16,60 18x16
+  text "Pears" at 42,60 39x16
+  text "★" at 16,80 18x16
+  text "Plums" at 42,80 42x16
+  field "Plums" at 16,109 220x22
+  button "Add" at 244,104 60x32
+  text "Mode" at 16,149 40x16
+  button "List" at 62,144 68x25
+  text "more than two" at 16,177 93x16
+  NSBox at 16,201 288x1
+  button "Grid" at 16,210 60x32
+status item "☆"
+  item "Add Figs"
+  ---
+  item "3 items" (disabled)
+click Grid
+window "Groceries" 320x258
+  text "3 items, mode Grid, appeared 1" at 16,16 200x16
+  text "★" at 16,40 18x16
+  text "Apples" at 42,40 47x16
+  text "★" at 16,60 18x16
+  text "Pears" at 42,60 39x16
+  text "★" at 16,80 18x16
+  text "Plums" at 42,80 42x16
+  field "Plums" at 16,109 220x22
+  button "Add" at 244,104 60x32
+  text "Mode" at 16,149 40x16
+  button "Grid" at 62,144 68x25
+  text "more than two" at 16,177 93x16
+  NSBox at 16,201 288x1
+  button "Grid" at 16,210 60x32
+status item "☆"
+  item "Add Figs"
+  ---
+  item "3 items" (disabled)
+click menu:Add Figs
+window "Groceries" 320x278
+  text "4 items, mode Grid, appeared 1" at 16,16 200x16
+  text "★" at 16,40 18x16
+  text "Apples" at 42,40 47x16
+  text "★" at 16,60 18x16
+  text "Pears" at 42,60 39x16
+  text "★" at 16,80 18x16
+  text "Plums" at 42,80 42x16
+  text "★" at 16,100 18x16
+  text "Figs" at 42,100 30x16
+  field "Plums" at 16,129 220x22
+  button "Add" at 244,124 60x32
+  text "Mode" at 16,169 40x16
+  button "Grid" at 62,164 68x25
+  text "more than two" at 16,197 93x16
+  NSBox at 16,221 288x1
+  button "Grid" at 16,230 60x32
+status item "☆"
+  item "Add Figs"
+  ---
+  item "4 items" (disabled)
+click menu:Settings…
+window "Groceries" 320x278
+  text "4 items, mode Grid, appeared 1" at 16,16 200x16
+  text "★" at 16,40 18x16
+  text "Apples" at 42,40 47x16
+  text "★" at 16,60 18x16
+  text "Pears" at 42,60 39x16
+  text "★" at 16,80 18x16
+  text "Plums" at 42,80 42x16
+  text "★" at 16,100 18x16
+  text "Figs" at 42,100 30x16
+  field "Plums" at 16,129 220x22
+  button "Add" at 244,124 60x32
+  text "Mode" at 16,169 40x16
+  button "Grid" at 62,164 68x25
+  text "more than two" at 16,197 93x16
+  NSBox at 16,221 288x1
+  button "Grid" at 16,230 60x32
+window "Settings" 200x101
+  text "Sound" at 20,20 39x14
+  slider 0.5 at 20,38 160x21
+  text "volume 0.5" at 20,65 72x16
+status item "☆"
+  item "Add Figs"
+  ---
+  item "4 items" (disabled)
+exit=0

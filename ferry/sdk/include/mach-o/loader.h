@@ -107,5 +107,26 @@ struct dylib_command { uint32_t cmd, cmdsize; struct dylib dylib; };
 struct rpath_command { uint32_t cmd, cmdsize; union lc_str path; };
 struct linkedit_data_command { uint32_t cmd, cmdsize, dataoff, datasize; };
 struct build_version_command { uint32_t cmd, cmdsize, platform, minos, sdk, ntools; };
+/* the dynamic symbol table, and the types of sections (freemac 1.227) */
+struct dysymtab_command {
+    uint32_t cmd, cmdsize;
+    uint32_t ilocalsym, nlocalsym, iextdefsym, nextdefsym, iundefsym, nundefsym;
+    uint32_t tocoff, ntoc, modtaboff, nmodtab, extrefsymoff, nextrefsyms;
+    uint32_t indirectsymoff, nindirectsyms, extreloff, nextrel, locreloff, nlocrel;
+};
+#define LC_ROUTINES 0x11
+#define LC_ROUTINES_64 0x1a
+#define INDIRECT_SYMBOL_LOCAL 0x80000000
+#define INDIRECT_SYMBOL_ABS 0x40000000
+#define SECTION_TYPE 0x000000ff
+#define SECTION_ATTRIBUTES 0xffffff00
+#define S_REGULAR 0x0
+#define S_ZEROFILL 0x1
+#define S_CSTRING_LITERALS 0x2
+#define S_NON_LAZY_SYMBOL_POINTERS 0x6
+#define S_LAZY_SYMBOL_POINTERS 0x7
+#define S_SYMBOL_STUBS 0x8
+#define S_MOD_INIT_FUNC_POINTERS 0x9
+#define S_THREAD_LOCAL_VARIABLES 0x13
 __FERRY_END
 #endif

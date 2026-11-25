@@ -43,5 +43,8 @@ char *strerror(int);
 int strerror_r(int, char *, size_t);
 char *strsignal(int);
 void bzero(void *, size_t);
+void memset_pattern4(void *, const void *, size_t);
+void memset_pattern8(void *, const void *, size_t);
+void memset_pattern16(void *, const void *, size_t);
 __FERRY_END
 #endif

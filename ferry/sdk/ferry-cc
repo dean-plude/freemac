@@ -87,6 +87,8 @@ if [ -n "$cxx" ]; then
         exit 1
     fi
 fi
-exec clang -target x86_64-apple-macos11 -nostdlibinc ${cxxinc:+-nostdinc++ -isystem "$cxxinc"} -isystem "$sdk/include" \
+# The macOS a program is built for is 11 unless FERRY_MACOS_MIN names
+# another (ferry-swiftc links Swift objects, built for 14, with 14).
+exec clang -target x86_64-apple-macos${FERRY_MACOS_MIN:-11} -nostdlibinc ${cxxinc:+-nostdinc++ -isystem "$cxxinc"} -isystem "$sdk/include" \
     -fno-stack-protector -Wno-unused-command-line-argument $modflags \
     -nostdlib -B"$lddir" -fuse-ld=lld -L"$sdk/lib" -F"$fw" -lSystem "$@" $objc

@@ -73,7 +73,7 @@ typedef NS_OPTIONS(NSUInteger, NSLayoutFormatOptions) {
 
 /* firstItem.firstAttribute (relation) secondItem.secondAttribute * multiplier + constant */
 @interface NSLayoutConstraint : NSObject <NSCoding>
-+ (instancetype)constraintWithItem:(id)view1 attribute:(NSLayoutAttribute)attr1 relatedBy:(NSLayoutRelation)relation
++ (instancetype FERRY_SWIFT_NONNULL)constraintWithItem:(id)view1 attribute:(NSLayoutAttribute)attr1 relatedBy:(NSLayoutRelation)relation
                             toItem:(id)view2 attribute:(NSLayoutAttribute)attr2 multiplier:(CGFloat)multiplier
                           constant:(CGFloat)c;
 + (NSArray<NSLayoutConstraint *> *)constraintsWithVisualFormat:(NSString *)format options:(NSLayoutFormatOptions)opts

@@ -146,6 +146,9 @@ extern const struct ferry_symbol ferry_kqueue_symbols[];
 extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs,
                                                              * fts, statfs, asl */
 extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
+/* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
+extern const struct ferry_symbol ferry_swift_symbols[];
+int ferry_find_swift_library(const char *install_name, char *out, size_t size);
 struct stat;
 /* posix.c: this system's stat as a Mac's 144-byte, 64-bit-inode struct stat */
 void ferry_to_mac_stat(const struct stat *s, void *out);

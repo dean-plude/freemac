@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Ferry SDK: API notes for Foundation (freemac 1.227), which clang reads
+# beside the module map and Swift's compiler follows. They tell Swift which
+# Foundation classes are its own String, Array, Dictionary and Set in
+# Swift code, and give the Swift names Apple's documentation shows where
+# Swift's own renaming rules don't arrive at them. Written for Ferry from
+# that documentation; extended as Swift apps need more.
+---
+Name: Foundation
+Classes:
+- Name: NSString
+  SwiftBridge: Swift.String
+- Name: NSArray
+  SwiftBridge: Swift.Array
+- Name: NSDictionary
+  SwiftBridge: Swift.Dictionary
+- Name: NSSet
+  SwiftBridge: Swift.Set
+- Name: NSUserDefaults
+  Methods:
+  - Selector: "setObject:forKey:"
+    MethodKind: Instance
+    SwiftName: "set(_:forKey:)"
+- Name: NSNumber
+  Properties:
+  - Name: unsignedIntegerValue
+    SwiftName: uintValue
+Enumerators:
+- Name: NSCaseInsensitiveSearch
+  SwiftName: caseInsensitive
+- Name: NSLiteralSearch
+  SwiftName: literal
+- Name: NSBackwardsSearch
+  SwiftName: backwards
+- Name: NSAnchoredSearch
+  SwiftName: anchored
+- Name: NSNumericSearch
+  SwiftName: numeric

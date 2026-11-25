@@ -9,8 +9,8 @@
 /* A universally unique identifier: random (version 4, RFC 4122) when made
  * with UUID or init, or read from its string or bytes. */
 @interface NSUUID : NSObject <NSCopying, NSSecureCoding>
-+ (instancetype)UUID;
-- (instancetype)init;
++ (instancetype FERRY_SWIFT_NONNULL)UUID;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithUUIDString:(NSString *)string;
 - (instancetype)initWithUUIDBytes:(const unsigned char *)bytes;
 - (void)getUUIDBytes:(unsigned char *)uuid;

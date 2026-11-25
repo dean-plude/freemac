@@ -80,9 +80,9 @@ typedef NS_ENUM(NSInteger, NSCollectionViewScrollDirection) {
 @interface NSCollectionViewLayoutAttributes : NSObject <NSCopying>
 + (instancetype)layoutAttributesForItemWithIndexPath:(NSIndexPath *)indexPath;
 + (instancetype)layoutAttributesForInterItemGapBeforeIndexPath:(NSIndexPath *)indexPath;
-+ (instancetype)layoutAttributesForSupplementaryViewOfKind:(NSCollectionViewSupplementaryElementKind)kind
++ (instancetype FERRY_SWIFT_NONNULL)layoutAttributesForSupplementaryViewOfKind:(NSCollectionViewSupplementaryElementKind)kind
                                              withIndexPath:(NSIndexPath *)indexPath;
-+ (instancetype)layoutAttributesForDecorationViewOfKind:(NSCollectionViewDecorationElementKind)kind
++ (instancetype FERRY_SWIFT_NONNULL)layoutAttributesForDecorationViewOfKind:(NSCollectionViewDecorationElementKind)kind
                                           withIndexPath:(NSIndexPath *)indexPath;
 @property NSRect frame;
 @property NSSize size;

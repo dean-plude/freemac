@@ -985,6 +985,11 @@ static void dir_of(const char *path, char *out, size_t size)
 static int expand_path(struct image *loader, const char *name, char *out, size_t size)
 {
     char dir[4096];
+    /* an rpath may be the folder itself, with no slash after it */
+    if (!strcmp(name, "@executable_path") || !strcmp(name, "@loader_path")) {
+        dir_of(name[1] == 'e' && main_image ? main_image->path : loader->path, out, size);
+        return 1;
+    }
     if (!strncmp(name, "@executable_path/", 17)) {
         dir_of(main_image ? main_image->path : loader->path, dir, sizeof dir);
         snprintf(out, size, "%s/%s", dir, name + 17);
@@ -1035,8 +1040,12 @@ static struct image *load_library(struct image *loader, const char *install_name
         const char *base = strrchr(install_name, '/');
         if (fw && base)
             found = find_framework(base + 1, path, sizeof path);
+        else if (!strncmp(install_name, "/usr/lib/swift/", 15))
+            found = ferry_find_swift_library(install_name, path, sizeof path);   /* swiftsupport.c */
     } else {
         found = expand_path(loader, install_name, path, sizeof path) && file_exists(path);
+        if (!found)     /* an app that expects its own copy of Swift's libraries */
+            found = ferry_find_swift_library(install_name, path, sizeof path);
     }
     if (!found) {
         if (weak)

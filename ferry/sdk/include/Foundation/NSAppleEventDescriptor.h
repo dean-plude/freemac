@@ -24,7 +24,7 @@
 + (NSAppleEventDescriptor *)descriptorWithFileURL:(NSURL *)fileURL;
 + (NSAppleEventDescriptor *)descriptorWithBundleIdentifier:(NSString *)bundleIdentifier;
 + (NSAppleEventDescriptor *)descriptorWithProcessIdentifier:(pid_t)processIdentifier;
-+ (NSAppleEventDescriptor *)currentProcessDescriptor;
+@property (class, readonly, strong) NSAppleEventDescriptor * FERRY_SWIFT_NONNULL currentProcessDescriptor;
 + (NSAppleEventDescriptor *)appleEventWithEventClass:(AEEventClass)eventClass eventID:(AEEventID)eventID
                                     targetDescriptor:(NSAppleEventDescriptor *)target
                                             returnID:(AEReturnID)returnID
@@ -32,7 +32,7 @@
 + (NSAppleEventDescriptor *)listDescriptor;
 + (NSAppleEventDescriptor *)recordDescriptor;
 
-- (instancetype)initWithAEDescNoCopy:(const AEDesc *)aeDesc;   /* takes the descriptor over */
+- (instancetype FERRY_SWIFT_NONNULL)initWithAEDescNoCopy:(const AEDesc *)aeDesc;   /* takes the descriptor over */
 - (instancetype)initWithDescriptorType:(DescType)type bytes:(const void *)bytes length:(NSUInteger)length;
 - (instancetype)initWithDescriptorType:(DescType)type data:(NSData *)data;
 - (instancetype)initListDescriptor;
@@ -76,7 +76,7 @@
 @end
 
 @interface NSAppleEventManager : NSObject
-+ (NSAppleEventManager *)sharedAppleEventManager;
+@property (class, readonly, strong) NSAppleEventManager * FERRY_SWIFT_NONNULL sharedAppleEventManager;
 /* handler is sent handleSelector with the event and its reply, each an
  * NSAppleEventDescriptor */
 - (void)setEventHandler:(id)handler andSelector:(SEL)handleEventSelector forEventClass:(AEEventClass)eventClass

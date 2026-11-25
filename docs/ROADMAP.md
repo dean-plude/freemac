@@ -1183,6 +1183,44 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.227 "Ferry: Swift programs and a first SwiftUI" (done)
+
+Ferry 0.51.0: programs written in Swift are built for an Intel Mac with
+Ferry's SDK and run, Swift and Objective-C call each other in one
+program, and SwiftUI programs open their windows. The SwiftUI is Ferry's
+own, drawn with Ferry's AppKit. Swift's runtime and standard library are
+the open-source Swift project's (swift-6.1.3-RELEASE), built unchanged
+for a Mac by a script, with a swift.org toolchain for Linux. Neither the
+toolchain nor that build is needed to build or run Ferry itself, and the
+Swift tests skip without them. Four open-source SwiftUI apps were
+surveyed, along with the Swift in Gas Mask and Hex Fiend; none links yet.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Swift's runtime and standard library. `swift/build-runtime.sh` builds them from Swift's own source with `ferry-cc` and the toolchain's compiler, aimed at `x86_64-apple-macosx`, into `frameworks/swift`. Ferry serves that copy to a program that links `/usr/lib/swift/libswiftCore.dylib`. Ferry's Objective-C runtime does what Swift's runtime asks of a Mac's: classes made while the program runs (generic ones included) are realized, a class can be looked up before Swift has made it, and generic classes get their names when asked. The Swift-class bit in an older build's class data is moved to where the stable ABI keeps it | Ferry runtime, Objective-C runtime | done |
+| 2 | `sdk/ferry-swiftc` builds Swift programs and libraries as `ferry-cc` builds C, with Objective-C interoperability on, so `import AppKit` reads the SDK's module map. An `@main` type starts the program. `-import-objc-header` takes an app's bridging header, and `-emit-objc-header-path` writes the header that shows its `@objc` classes to Objective-C (Xcode's `App-Swift.h`). An rpath of `@executable_path` or `@loader_path` with nothing after it now works | Ferry SDK, loader | done |
+| 3 | The SDK as Swift reads it. API notes for Foundation and AppKit give Swift's names where its own rules don't arrive at Apple's, and give nullability: `NSControl.StateValue`, `NSView.AutoresizingMask` (`.width`, `.height`), `UserDefaults.set(_:forKey:)`, `uintValue`, `separator()`, `statusItem(withLength:)` and others. Some class methods became class properties (`systemStatusBar`, `mainBundle`). `NS_ENUM` and `NS_OPTIONS` carry the attributes that make them Swift enums and option sets. The Bessel functions are left out of `math.h` for Swift, which has its own | Ferry SDK | done |
+| 4 | The overlays, Ferry's own: ObjectiveC (`Bool`, selectors, `==` and hashing); CoreGraphics (`CGFloat`, geometry); and Foundation, where `String`, `Array`, `Dictionary`, `Set` and numbers bridge to and from their NS classes, `Error` meets `NSError`, and `NSLocalizedString`, `TimeInterval` and `NSDictionary`'s subscript are given. `Date`, `URL`, `Data`, `UserDefaults` and the like are still the NS classes. Swift's own strings hash as Ferry's do, so they work as `NSDictionary` keys (`foundation/SwiftSupport.m`) | Ferry Foundation | done |
+| 5 | Ferry's SwiftUI, written from Apple's documentation and drawn with AppKit controls: | Ferry SwiftUI | done |
+|   | - views: `Text`, `Image(systemName:)` (as a text symbol), `Label`, `Button`, `Toggle`, `TextField`, `SecureField`, `Slider`, `Stepper`, `Picker`, `ProgressView`, `Spacer`, `Divider`, `Menu` and `Color` | | |
+|   | - containers: `VStack`, `HStack`, `ZStack`, the lazy stacks, `LazyVGrid`, `Grid`, `GroupBox`, `ScrollView`, `List`, `Form`, `Section`, `ForEach` and `NavigationStack` | | |
+|   | - state: `@State`, `@Binding`, `ObservableObject` with `@Published`, `@ObservedObject`, `@StateObject`, `@EnvironmentObject`, `@Environment` and `@AppStorage` | | |
+|   | - modifiers: padding, frames, fonts, colours, `disabled`, `onAppear`, `onChange`, `help` and `keyboardShortcut`. The styles are accepted. Gestures, hover and `@FocusState` are accepted but don't act yet | | |
+|   | - scenes: `WindowGroup`, `Window`, `Settings` (Command-comma) and `MenuBarExtra` (a status item and its menu), with `commands` and `CommandMenu` | | |
+|   | - AppKit both ways: `NSHostingView` and `NSHostingController` put SwiftUI in an AppKit program; `NSViewRepresentable`, with its coordinator, puts an AppKit view in SwiftUI; `@NSApplicationDelegateAdaptor` | | |
+|   | Each pass works out the views' bodies again and turns them into a tree, and the AppKit views are kept from pass to pass by their place in it. Layout follows SwiftUI's proposal rules, in Swift. A window grows to fit its content | | |
+| 6 | A survey of open-source SwiftUI apps (TomatoBar, Spaceman, Maccy, Ice) and of the Swift in Gas Mask and Hex Fiend. Of the SwiftUI names they use, Ferry now has 40 of TomatoBar's 42, 35 of Spaceman's 39, 51 of Gas Mask's 57, 71 of Maccy's 97 and 82 of Ice's 106. TomatoBar was compiled, with its two packages' calls stubbed; all 94 of the errors left are in Foundation, AppKit, Dispatch and UserNotifications, and none is in SwiftUI. Hex Fiend's Swift reads all of Hex Fiend's headers through its bridging header and stops at 14 places | Ferry | done |
+| 7 | Eight new tests (Swift's standard library, Foundation bridging, an AppKit window, three SwiftUI programs with their buttons pressed, NSHostingView, and Objective-C using a Swift class); `make check` 270 of 270 | Ferry | done |
+
+SwiftUI next: Swift's concurrency library (`@MainActor`, `Task`) and a
+Dispatch overlay, built for Ferry as the runtime is. Then Foundation's
+value types (`Date`, `URL` and `Data` as structs) and `Codable` with
+`JSONEncoder`, and Combine (OpenCombine). In SwiftUI, shapes,
+`GeometryReader`, `overlay`, alerts, sheets and popovers, and
+`@Observable`. AppKit's Swift names (`NSImage.Name`,
+`NSFont.Weight`, `NSAttributedString.Key`) in an AppKit overlay. Then
+TomatoBar and Gas Mask.
+
 ## 1.226 "Ferry: Sequel Pro" (done)
 
 Ferry 0.50.0: Sequel Pro linked into a bundle and run, the seventh app.

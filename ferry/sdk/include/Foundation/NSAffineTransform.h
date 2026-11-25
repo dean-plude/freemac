@@ -14,8 +14,8 @@ typedef struct {
 
 @interface NSAffineTransform : NSObject <NSCopying, NSSecureCoding>
 + (NSAffineTransform *)transform;
-- (instancetype)init;
-- (instancetype)initWithTransform:(NSAffineTransform *)transform;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTransform:(NSAffineTransform *)transform;
 - (void)translateXBy:(CGFloat)deltaX yBy:(CGFloat)deltaY;
 - (void)rotateByDegrees:(CGFloat)angle;
 - (void)rotateByRadians:(CGFloat)angle;

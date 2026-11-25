@@ -30,7 +30,7 @@
 - (NSMenu *)menuForEvent:(NSEvent *)event;
 - (void)willOpenMenu:(NSMenu *)menu withEvent:(NSEvent *)event;
 - (void)didCloseMenu:(NSMenu *)menu withEvent:(NSEvent *)event;
-+ (NSMenu *)defaultMenu;
+@property (class, readonly, strong) NSMenu * FERRY_SWIFT_NONNULL defaultMenu;
 /* as on a Mac; the view leaves its window, which draws again anyway */
 - (void)removeFromSuperviewWithoutNeedingDisplay;
 @property NSEdgeInsets additionalSafeAreaInsets;
@@ -191,7 +191,7 @@ APPKIT_EXTERN NSAttributedStringKey const NSStrikethroughColorAttributeName,
 /* the pixels in a rectangle of what is being drawn: an image's while its
  * focus is locked, or any bitmap context's (TransformerKit's image
  * transformers); nil when the context is not a bitmap's */
-- (instancetype)initWithFocusedViewRect:(NSRect)rect;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFocusedViewRect:(NSRect)rect;
 @end
 
 /* ---- the application and documents ------------------------------------------------------ */

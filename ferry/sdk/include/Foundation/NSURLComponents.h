@@ -17,7 +17,7 @@
 @interface NSURLComponents : NSObject <NSCopying>
 + (instancetype)componentsWithURL:(NSURL *)url resolvingAgainstBaseURL:(BOOL)resolve;
 + (instancetype)componentsWithString:(NSString *)string;
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithURL:(NSURL *)url resolvingAgainstBaseURL:(BOOL)resolve;
 - (instancetype)initWithString:(NSString *)string;
 @property (readonly, copy) NSURL *URL;

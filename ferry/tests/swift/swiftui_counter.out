@@ -1,0 +1,36 @@
+window "Counter" 160x133
+  text "Count: 0" at 34,16 93x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" at 43,99 74x18
+click +
+window "Counter" 160x133
+  text "Count: 1" at 36,16 88x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" at 43,99 74x18
+click +
+window "Counter" 160x133
+  text "Count: 2" at 34,16 93x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" at 43,99 74x18
+click +
+window "Counter" 160x133
+  text "Count: 3" at 34,16 93x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" at 43,99 74x18
+click Doubled
+window "Counter" 160x133
+  text "Count: 6" at 34,16 93x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" (on) at 43,99 74x18
+click -
+window "Counter" 160x133
+  text "Count: 4" at 33,16 94x27
+  button "-" at 16,55 60x32
+  button "+" at 84,55 60x32
+  button "Doubled" (on) at 43,99 74x18
+exit=0

@@ -18,9 +18,9 @@ FOUNDATION_EXPORT NSString *const NSFileHandleNotificationFileHandleItem;
 FOUNDATION_EXPORT NSString *const NSFileHandleNotificationMonitorModes;
 
 @interface NSFileHandle : NSObject
-+ (NSFileHandle *)fileHandleWithStandardInput;
-+ (NSFileHandle *)fileHandleWithStandardOutput;
-+ (NSFileHandle *)fileHandleWithStandardError;
+@property (class, readonly, strong) NSFileHandle * FERRY_SWIFT_NONNULL fileHandleWithStandardInput;
+@property (class, readonly, strong) NSFileHandle * FERRY_SWIFT_NONNULL fileHandleWithStandardOutput;
+@property (class, readonly, strong) NSFileHandle * FERRY_SWIFT_NONNULL fileHandleWithStandardError;
 + (NSFileHandle *)fileHandleWithNullDevice;
 + (instancetype)fileHandleForReadingAtPath:(NSString *)path;
 + (instancetype)fileHandleForWritingAtPath:(NSString *)path;
@@ -83,7 +83,7 @@ typedef NS_ENUM(NSInteger, NSTaskTerminationReason) {
 FOUNDATION_EXPORT NSNotificationName const NSTaskDidTerminateNotification;
 
 @interface NSTask : NSObject
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 @property (copy) NSURL *executableURL;
 @property (copy) NSString *launchPath;
 @property (copy) NSArray<NSString *> *arguments;

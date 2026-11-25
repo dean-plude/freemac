@@ -8,8 +8,8 @@
 #include <Foundation/NSOperation.h>
 
 @interface NSThread : NSObject
-@property (class, readonly, retain) NSThread *currentThread;
-@property (class, readonly, retain) NSThread *mainThread;
+@property (class, readonly, retain) NSThread * FERRY_SWIFT_NONNULL currentThread;
+@property (class, readonly, retain) NSThread * FERRY_SWIFT_NONNULL mainThread;
 @property (class, readonly) BOOL isMainThread;
 + (void)detachNewThreadWithBlock:(void (^)(void))block;
 + (void)detachNewThreadSelector:(SEL)selector toTarget:(id)target withObject:(id)argument;
@@ -22,9 +22,9 @@
 @property (class, readonly, copy) NSArray<NSNumber *> *callStackReturnAddresses;
 @property (class, readonly, copy) NSArray<NSString *> *callStackSymbols;
 
-- (instancetype)init;
-- (instancetype)initWithTarget:(id)target selector:(SEL)selector object:(id)argument;
-- (instancetype)initWithBlock:(void (^)(void))block;
+- (instancetype FERRY_SWIFT_NONNULL)init;
+- (instancetype FERRY_SWIFT_NONNULL)initWithTarget:(id)target selector:(SEL)selector object:(id)argument;
+- (instancetype FERRY_SWIFT_NONNULL)initWithBlock:(void (^)(void))block;
 @property (readonly, retain) NSMutableDictionary *threadDictionary;
 @property double threadPriority;
 @property NSQualityOfService qualityOfService;

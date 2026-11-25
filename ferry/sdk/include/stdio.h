@@ -4,7 +4,9 @@
 #include <_ferry.h>
 #include <stdarg.h>
 __FERRY_BEGIN
-typedef struct __sFILE FILE;
+/* A complete type, as on a Mac, so that Swift imports FILE (freemac 1.227);
+ * only Ferry's stdio looks inside one. 152 bytes, as on a 64-bit Mac. */
+typedef struct __sFILE { unsigned char __opaque[152]; } FILE;
 extern FILE *__stdinp, *__stdoutp, *__stderrp;
 #define stdin __stdinp
 #define stdout __stdoutp
@@ -34,6 +36,7 @@ int fprintf(FILE *, const char *, ...) __attribute__((format(printf, 2, 3)));
 int sprintf(char *, const char *, ...) __attribute__((format(printf, 2, 3)));
 int snprintf(char *, size_t, const char *, ...) __attribute__((format(printf, 3, 4)));
 int dprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
+int vdprintf(int, const char *, __builtin_va_list);
 int asprintf(char **, const char *, ...) __attribute__((format(printf, 2, 3)));
 int vprintf(const char *, va_list);
 int vfprintf(FILE *, const char *, va_list);

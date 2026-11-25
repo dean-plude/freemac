@@ -34,7 +34,7 @@ APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierOtherItemsP
 @end
 
 @interface NSTouchBar : NSObject <NSCoding>
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 - (instancetype)initWithCoder:(NSCoder *)coder;
 @property (copy) NSTouchBarCustomizationIdentifier customizationIdentifier;
 @property (copy) NSArray<NSTouchBarItemIdentifier> *customizationAllowedItemIdentifiers;

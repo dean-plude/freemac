@@ -34,7 +34,7 @@ typedef NS_OPTIONS(NSUInteger, NSApplicationActivationOptions) {
 - (BOOL)forceTerminate;
 + (instancetype)runningApplicationWithProcessIdentifier:(pid_t)pid;
 + (NSArray<NSRunningApplication *> *)runningApplicationsWithBundleIdentifier:(NSString *)bundleIdentifier;
-@property (class, readonly) NSRunningApplication *currentApplication;
+@property (class, readonly) NSRunningApplication * FERRY_SWIFT_NONNULL currentApplication;
 + (void)terminateAutomaticallyTerminableApplications;
 @end
 

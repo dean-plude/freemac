@@ -25,7 +25,7 @@ typedef NS_OPTIONS(NSUInteger, NSTrackingAreaOptions) {
 typedef NSInteger NSTrackingRectTag;
 
 @interface NSTrackingArea : NSObject <NSCopying, NSCoding>
-- (instancetype)initWithRect:(NSRect)rect options:(NSTrackingAreaOptions)options owner:(id)owner
+- (instancetype FERRY_SWIFT_NONNULL)initWithRect:(NSRect)rect options:(NSTrackingAreaOptions)options owner:(id)owner
                     userInfo:(NSDictionary *)userInfo;
 @property (readonly) NSRect rect;
 @property (readonly) NSTrackingAreaOptions options;
@@ -70,26 +70,26 @@ typedef NSInteger NSTrackingRectTag;
 @end
 
 @interface NSCursor : NSObject <NSCoding>
-@property (class, readonly, retain) NSCursor *currentCursor;
-@property (class, readonly, retain) NSCursor *currentSystemCursor;
-@property (class, readonly, retain) NSCursor *arrowCursor;
-@property (class, readonly, retain) NSCursor *IBeamCursor;
-@property (class, readonly, retain) NSCursor *IBeamCursorForVerticalLayout;
-@property (class, readonly, retain) NSCursor *pointingHandCursor;
-@property (class, readonly, retain) NSCursor *closedHandCursor;
-@property (class, readonly, retain) NSCursor *openHandCursor;
-@property (class, readonly, retain) NSCursor *resizeLeftCursor;
-@property (class, readonly, retain) NSCursor *resizeRightCursor;
-@property (class, readonly, retain) NSCursor *resizeLeftRightCursor;
-@property (class, readonly, retain) NSCursor *resizeUpCursor;
-@property (class, readonly, retain) NSCursor *resizeDownCursor;
-@property (class, readonly, retain) NSCursor *resizeUpDownCursor;
-@property (class, readonly, retain) NSCursor *crosshairCursor;
-@property (class, readonly, retain) NSCursor *disappearingItemCursor;
-@property (class, readonly, retain) NSCursor *operationNotAllowedCursor;
-@property (class, readonly, retain) NSCursor *dragLinkCursor;
-@property (class, readonly, retain) NSCursor *dragCopyCursor;
-@property (class, readonly, retain) NSCursor *contextualMenuCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL currentCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL currentSystemCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL arrowCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL IBeamCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL IBeamCursorForVerticalLayout;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL pointingHandCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL closedHandCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL openHandCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeLeftCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeRightCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeLeftRightCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeUpCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeDownCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL resizeUpDownCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL crosshairCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL disappearingItemCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL operationNotAllowedCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL dragLinkCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL dragCopyCursor;
+@property (class, readonly, retain) NSCursor * FERRY_SWIFT_NONNULL contextualMenuCursor;
 + (void)hide;
 + (void)unhide;
 + (void)setHiddenUntilMouseMoves:(BOOL)flag;

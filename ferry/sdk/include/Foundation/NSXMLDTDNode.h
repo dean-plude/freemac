@@ -31,7 +31,7 @@ typedef NS_ENUM(NSUInteger, NSXMLDTDNodeKind) {
 
 @interface NSXMLDTDNode : NSXMLNode
 - (instancetype)initWithXMLString:(NSString *)string;
-- (instancetype)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
+- (instancetype FERRY_SWIFT_NONNULL)initWithKind:(NSXMLNodeKind)kind options:(NSXMLNodeOptions)options;
 @property NSXMLDTDNodeKind DTDKind;
 @property (readonly, getter=isExternal) BOOL external;
 @property (copy) NSString *publicID;

@@ -90,7 +90,7 @@ typedef NS_OPTIONS(NSUInteger, NSNetServiceOptions) {
 @end
 
 @interface NSNetServiceBrowser : NSObject
-- (instancetype)init;
+- (instancetype FERRY_SWIFT_NONNULL)init;
 @property (assign) id<NSNetServiceBrowserDelegate> delegate;
 @property BOOL includesPeerToPeer;
 - (void)scheduleInRunLoop:(NSRunLoop *)aRunLoop forMode:(NSRunLoopMode)mode;

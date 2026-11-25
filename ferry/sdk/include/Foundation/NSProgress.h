@@ -17,12 +17,12 @@ FOUNDATION_EXPORT NSProgressUserInfoKey const NSProgressFileTotalCountKey;
 FOUNDATION_EXPORT NSProgressUserInfoKey const NSProgressFileCompletedCountKey;
 
 @interface NSProgress : NSObject
-+ (NSProgress *)currentProgress;
+@property (class, readonly, strong) NSProgress *currentProgress;
 + (NSProgress *)progressWithTotalUnitCount:(int64_t)unitCount;
 + (NSProgress *)discreteProgressWithTotalUnitCount:(int64_t)unitCount;
 + (NSProgress *)progressWithTotalUnitCount:(int64_t)unitCount parent:(NSProgress *)parent
                           pendingUnitCount:(int64_t)portionOfParentTotalUnitCount;
-- (instancetype)initWithParent:(NSProgress *)parentProgressOrNil userInfo:(NSDictionary *)userInfoOrNil;
+- (instancetype FERRY_SWIFT_NONNULL)initWithParent:(NSProgress *)parentProgressOrNil userInfo:(NSDictionary *)userInfoOrNil;
 - (void)becomeCurrentWithPendingUnitCount:(int64_t)unitCount;
 - (void)performAsCurrentWithPendingUnitCount:(int64_t)unitCount usingBlock:(void (^)(void))work;
 - (void)resignCurrent;
