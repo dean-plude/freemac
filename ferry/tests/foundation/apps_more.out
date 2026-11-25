@@ -1,0 +1,35 @@
+png: public.png, an image yes, data yes, text no
+  its MIME type image/png, declared yes, dynamic no
+application/zip: com.pkware.zip-archive, an archive yes
+an unknown extension: dynamic yes, data yes, equal to itself in other case yes
+UTTypeEqual(public.PNG, public.png): yes
+OSType 'TEXT' as a string: TEXT
+activity: <activity: checking for updates>
+performActivity ran its block: yes
+automatic termination support: yes, thermal state nominal yes, low power no
+localizations: Base en fr pt_BR, development English
+for fr-CA: fr; for pt-PT: pt_BR; for de: en
+CFBundleCopyInfoDictionaryInDirectory: org.example.test version 1.5
+of a folder with no bundle: yes
+base64 in lines of 64: 2 lines, the first 64 long
+in lines of 76 ended CR LF: yes
+decoded past an unknown character: yes; without the option: yes
+the older names: yes
+getFileSystemRepresentation into 8 bytes: "short" yes, "much too long" no
+FSPathCopyObjectSync: 0, "copied", to copy.txt
+again, without overwriting: -48 (dupFNErr -48)
+and with: 0
+GetIconRefFromFileInfo: 0, an icon yes, acquired 0, released 0 0, of NULL -50
+IOServiceGetMatchingService: 0
+assertions: 0 0, different ids yes, no idle sleep held yes
+released: 0 0, again yes
+SecItemImport: 0, 1 item(s)
+verified on the data: yes, through a digest: yes
+on changed data: no, through a digest: no
+a signing transform: yes
+AuthorizationCreate: 0
+AuthorizationCopyRights: -60005 (denied -60005)
+external form: 0, back 0, same no
+AuthorizationFree: 0
+bridged: "made by CF" length 10, array of 1
+exit=0

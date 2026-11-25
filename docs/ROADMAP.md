@@ -1183,6 +1183,31 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.223 "Ferry: linking the apps and running them" (done)
+
+Ferry 0.47.0: three of the nine apps linked into bundles with Ferry's SDK
+and run, and what they and their updater needed added. Counted with one
+survey script over fresh clones of the apps (627 files), the files that
+compile went from 395 to 428. Flycut, Spectacle and ShiftIt start, put
+their status items and menus in the menu bar and open their windows.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Flycut links and runs. It needed Core Services' Apple events (descriptors, lists, records, object specifiers, and events sent to the app's own handlers), Launch Services, the Process Manager for the app itself, `FSGetCatalogInfo`, `SecTask`, a CloudKit framework with no iCloud account, `CFLocale`, `CFDate`, `CFDateFormatter` and `CFError`, and number and date formatters and decimal numbers in nibs. It shows its first-launch alert, then its status item with its icon, and its menu | Ferry CoreServices, CloudKit, AppKit | done |
+| 2 | Spectacle and ShiftIt link and run, each with Sparkle built from Sparkle's own source. They needed Scripting Bridge (which finds no scriptable app), icon references, `objc_msgSend` with the old dispatch prototypes, Cocoa bringing in Application Services, and the Touch Bar's classes (never shown). Both show their status items, menus and preferences windows. Without the accessibility say, Spectacle opens its own window asking for it, and ShiftIt asks again with each Recheck, as on a Mac | Ferry AppKit | done |
+| 3 | What Sparkle calls: `fts`, `statfs`, `asl` and `os_log`; uniform type identifiers; `NSURLDownload`; process activities; a bundle's localizations; base64's line options; the File Manager's copy; IOKit's power assertions (its registry is empty); NSWorkspace's file operations; authorization, which never grants a right; and public keys from PEM with Security's verify transforms, which check an update's DSA signature. Delta updates need xar, Apple's own library, which isn't built | Ferry libSystem, Foundation, Security | done |
+| 4 | `ferry-ibtool`, which compiles a xib in the document format Interface Builder saves into a nib Ferry's AppKit loads. It covers windows and panels, menus, the common controls and cells, boxes, tab, split, stack, scroll, table and outline views, cell-based and view-based, custom views, the app's own classes, outlets, actions, bindings and runtime attributes. An element it doesn't know is made as a plain view of its class, with a warning. It compiled 108 of the apps' xibs; the two in the older archive format are refused, and storyboards aren't compiled | Ferry SDK | done |
+| 5 | kqueue's `EVFILT_VNODE` (`NOTE_WRITE`, `NOTE_DELETE`, `NOTE_RENAME`, `NOTE_ATTRIB`, `NOTE_EXTEND`, `NOTE_LINK`, `NOTE_REVOKE`), dispatch's vnode sources on top, and `O_EVTONLY`, on inotify, for Gas Mask's file watcher. `O_SYMLINK` opens a link itself | Ferry libSystem | done |
+| 6 | Foundation brings in Core Services, as on a Mac. The Core Data models test, which had a `write` of its own, renamed it | Ferry Foundation | done |
+| 7 | The apps' own frameworks, compiled from their source: KeePassKit, which MacPass is built on, went from 54 to 68 of its 96 files with `NSCountedSet`, `uuid_t` and a few `NSData`, `NSNumber`, `NSIndexSet` and `NSString` calls. hoedown, libyaml and GBCli, which MacDown uses, compile whole, hoedown once `strings.h` was added | Ferry Foundation, SDK | done |
+| 8 | Twelve new tests; `make check` 256 of 256 | Ferry | done |
+
+The other six apps aren't linked yet: the table in `docs/ferry-compat.md`
+lists what stops each. MacPass and MacDown wait for their own frameworks,
+Gas Mask and Hex Fiend have Swift in them, and Sequel Pro waits for its
+MySQL framework. Global shortcuts are kept but never pressed, so none of
+the three running apps answers its keys yet.
+
 ## 1.222 "Ferry: modules, Auto Layout, FSEvents, Quick Look and JavaScriptCore" (done)
 
 Ferry 0.46.0: the next things that stopped the nine apps' sources from

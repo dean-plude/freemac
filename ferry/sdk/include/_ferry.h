@@ -14,6 +14,17 @@
 #define __FERRY_BEGIN
 #define __FERRY_END
 #endif
+/* CoreFoundation's calls are "audited" for ARC, as on a Mac: ARC knows by
+ * their names which return a retained object, and lets an object be cast
+ * to a CF type without __bridge as one of their arguments (freemac 1.223,
+ * Ferry 0.47.0). No #include may come between the two. */
+#if defined(__has_feature) && __has_feature(arc_cf_code_audited)
+#define CF_IMPLICIT_BRIDGING_ENABLED _Pragma("clang arc_cf_code_audited begin")
+#define CF_IMPLICIT_BRIDGING_DISABLED _Pragma("clang arc_cf_code_audited end")
+#else
+#define CF_IMPLICIT_BRIDGING_ENABLED
+#define CF_IMPLICIT_BRIDGING_DISABLED
+#endif
 /* Calls whose Intel symbol carries the 64-bit-inode variant suffix. */
 #define __FERRY_INODE64(name) __asm("_" #name "$INODE64")
 typedef uint32_t __uint32_t;

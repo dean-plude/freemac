@@ -330,6 +330,23 @@ thumbnails (`appkit/QuickLook.m`). `JavaScriptCore.framework`
 names another library to open instead; the tests use it to stand for a
 system without JavaScriptCore.
 
+From Ferry 0.47.0 (freemac 1.223), Flycut, Spectacle and ShiftIt link and
+run. `sdk/ferry-ibtool` compiles a xib, in the document format Interface
+Builder saves, into a nib (`ferry-ibtool --compile Out.nib In.xib`). Core
+Services has Apple events, Launch Services and the Process Manager
+(`foundation/AppleEvents.m`), uniform type identifiers
+(`foundation/UTType.m`, its table written by `sdk/gen-uttypes.py`) and icon
+references (`foundation/FSRefs.m`). IOKit's power assertions are served
+from Foundation (`foundation/IOKit.m`), and Scripting Bridge and the Touch
+Bar from AppKit (`appkit/ScriptingBridge.m`, `appkit/NSTouchBar.m`).
+`CloudKit.framework` (`cloudkit/`) has no iCloud account. Security imports
+public keys and checks signatures with transforms (`security/SecTransform.m`),
+and its authorization never grants a right (`security/Authorization.m`).
+libSystem has kqueue's vnode filter (`src/kqueue.c`), `fts`, `statfs` and
+`asl` (`src/libc_more.c`) and `os_log` (`src/objc/oslog.c`). The calls
+Sparkle and the apps' own frameworks make are in `foundation/NSOlderCalls.m`
+and `foundation/NSFrameworkCalls.m`.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

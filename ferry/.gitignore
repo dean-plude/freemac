@@ -17,4 +17,5 @@
 /webkit/build/
 /src/webkit_names.h
 /javascriptcore/build/
+/cloudkit/build/
 /src/jsc_names.h

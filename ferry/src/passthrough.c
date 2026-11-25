@@ -45,7 +45,7 @@ const char *const ferry_passthrough[] = {
     /* files */
     "read", "write", "pread", "pwrite", "readv", "writev", "close", "lseek", "dup", "dup2",
     "pipe", "fsync", "fdatasync", "ftruncate", "truncate", "unlink", "rmdir", "mkdir",
-    "chdir", "fchdir", "getcwd", "chmod", "fchmod", "chown", "fchown", "lchown",
+    "chdir", "fchdir", "getcwd", "chmod", "fchmod", "chown", "lchown",
     "link", "symlink", "readlink", "isatty", "ttyname", "mkstemp", "mkstemps", "mkdtemp",
     "mktemp", "utimes", "futimes", "select", "poll", "gethostname", "getpagesize",
     "getdtablesize", "flock",

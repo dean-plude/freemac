@@ -165,8 +165,74 @@ WEBKIT_EXTERN NSString *const WebActionOriginalURLKey;
 - (void)webView:(WebView *)webView windowScriptObjectAvailable:(WebScriptObject *)windowScriptObject;
 @end
 
+/* The tags of the items of a web view's context menu, as WebUIDelegate's
+ * contextMenuItemsForElement: sees them (freemac 1.223, Ferry 0.47.0).
+ * Ferry's web view makes its own menu, so the delegate isn't asked. */
+enum {
+    WebMenuItemTagOpenLinkInNewWindow = 1,
+    WebMenuItemTagDownloadLinkToDisk,
+    WebMenuItemTagCopyLinkToClipboard,
+    WebMenuItemTagOpenImageInNewWindow,
+    WebMenuItemTagDownloadImageToDisk,
+    WebMenuItemTagCopyImageToClipboard,
+    WebMenuItemTagOpenFrameInNewWindow,
+    WebMenuItemTagCopy,
+    WebMenuItemTagGoBack,
+    WebMenuItemTagGoForward,
+    WebMenuItemTagStop,
+    WebMenuItemTagReload,
+    WebMenuItemTagCut,
+    WebMenuItemTagPaste,
+    WebMenuItemTagSpellingGuess,
+    WebMenuItemTagNoGuessesFound,
+    WebMenuItemTagIgnoreSpelling,
+    WebMenuItemTagLearnSpelling,
+    WebMenuItemTagOther,
+    WebMenuItemTagSearchInSpotlight,
+    WebMenuItemTagSearchWeb,
+    WebMenuItemTagLookUpInDictionary,
+    WebMenuItemTagOpenWithDefaultApplication,
+    WebMenuItemPDFActualSize,
+    WebMenuItemPDFZoomIn,
+    WebMenuItemPDFZoomOut,
+    WebMenuItemPDFAutoSize,
+    WebMenuItemPDFSinglePage,
+    WebMenuItemPDFFacingPages,
+    WebMenuItemPDFContinuous,
+    WebMenuItemPDFNextPage,
+    WebMenuItemPDFPreviousPage,
+    WebMenuItemTagOpenLink = 2000,
+    WebMenuItemTagIgnoreGrammar,
+    WebMenuItemTagSpellingMenu,
+    WebMenuItemTagShowSpellingPanel,
+    WebMenuItemTagCheckSpelling,
+    WebMenuItemTagCheckSpellingWhileTyping,
+    WebMenuItemTagCheckGrammarWithSpelling,
+    WebMenuItemTagFontMenu,
+    WebMenuItemTagShowFonts,
+    WebMenuItemTagBold,
+    WebMenuItemTagItalic,
+    WebMenuItemTagUnderline,
+    WebMenuItemTagOutline,
+    WebMenuItemTagStyles,
+    WebMenuItemTagShowColors,
+    WebMenuItemTagSpeechMenu,
+    WebMenuItemTagStartSpeaking,
+    WebMenuItemTagStopSpeaking,
+    WebMenuItemTagWritingDirectionMenu,
+    WebMenuItemTagDefaultDirection,
+    WebMenuItemTagLeftToRight,
+    WebMenuItemTagRightToLeft,
+    WebMenuItemTagPDFSinglePageScrolling,
+    WebMenuItemTagPDFFacingPagesScrolling,
+    WebMenuItemTagInspectElement,
+};
+
 @protocol WebUIDelegate <NSObject>
 @optional
+- (NSArray *)webView:(WebView *)sender
+    contextMenuItemsForElement:(NSDictionary *)element
+              defaultMenuItems:(NSArray *)defaultMenuItems;
 - (WebView *)webView:(WebView *)sender createWebViewWithRequest:(NSURLRequest *)request;
 - (void)webViewShow:(WebView *)sender;
 - (void)webViewClose:(WebView *)sender;

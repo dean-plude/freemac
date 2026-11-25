@@ -5,6 +5,7 @@
 
 module AppKit [system] {
     header "AppKit/AppKit.h"
+    header "AppKit/AppKitApps.h"
     header "AppKit/AppKitMore.h"
     header "AppKit/NSAccessibility.h"
     header "AppKit/NSAnimation.h"
@@ -18,6 +19,7 @@ module AppKit [system] {
     header "AppKit/NSRulerView.h"
     header "AppKit/NSRunningApplication.h"
     header "AppKit/NSTextAttachment.h"
+    header "AppKit/NSTouchBar.h"
     header "AppKit/NSTrackingArea.h"
     export *
     link framework "AppKit"
@@ -70,7 +72,10 @@ module CoreFoundation [system] {
     header "CoreFoundation/CFBase.h"
     header "CoreFoundation/CFBundle.h"
     header "CoreFoundation/CFData.h"
+    header "CoreFoundation/CFDate.h"
     header "CoreFoundation/CFDictionary.h"
+    header "CoreFoundation/CFError.h"
+    header "CoreFoundation/CFLocale.h"
     header "CoreFoundation/CFMore.h"
     header "CoreFoundation/CFNumber.h"
     header "CoreFoundation/CFPreferences.h"
@@ -104,11 +109,22 @@ module CoreGraphics [system] {
     link framework "CoreGraphics"
 }
 
+module CloudKit [system] {
+    header "CloudKit/CloudKit.h"
+    export *
+    link framework "CloudKit"
+}
+
 module CoreServices [system] {
     header "CoreServices/CoreServices.h"
+    header "CoreServices/AppleEvents.h"
     header "CoreServices/FSEvents.h"
     header "CoreServices/Files.h"
+    header "CoreServices/IconsCore.h"
     header "CoreServices/LSSharedFileList.h"
+    header "CoreServices/LaunchServices.h"
+    header "CoreServices/UTCoreTypes.h"
+    header "CoreServices/UTType.h"
     export *
     link framework "CoreServices"
 }
@@ -202,8 +218,16 @@ module Foundation [system] {
 
 module HIServices [system] {
     header "HIServices/Accessibility.h"
+    header "HIServices/Processes.h"
     export *
     link framework "ApplicationServices"
+}
+
+module IOKit [system] {
+    header "IOKit/IOKitLib.h"
+    header "IOKit/IOReturn.h"
+    export *
+    link framework "IOKit"
 }
 
 module ImageIO [system] {
@@ -262,20 +286,34 @@ module QuickLook [system] {
     link framework "QuickLook"
 }
 
+module ScriptingBridge [system] {
+    header "ScriptingBridge/ScriptingBridge.h"
+    export *
+    link framework "ScriptingBridge"
+}
+
 module Security [system] {
     header "Security/Security.h"
+    header "Security/Authorization.h"
+    header "Security/AuthorizationTags.h"
     header "Security/CSCommon.h"
     header "Security/CodeSigning.h"
     header "Security/SecBase.h"
     header "Security/SecCertificate.h"
     header "Security/SecCode.h"
+    header "Security/SecDigestTransform.h"
+    header "Security/SecImportExport.h"
     header "Security/SecItem.h"
+    header "Security/SecKey.h"
     header "Security/SecKeychain.h"
     header "Security/SecKeychainItem.h"
     header "Security/SecPolicy.h"
     header "Security/SecRandom.h"
+    header "Security/SecReadTransform.h"
     header "Security/SecRequirement.h"
+    header "Security/SecSignVerifyTransform.h"
     header "Security/SecStaticCode.h"
+    header "Security/SecTransform.h"
     header "Security/SecTrust.h"
     export *
     link framework "Security"

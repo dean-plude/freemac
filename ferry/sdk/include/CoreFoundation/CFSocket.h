@@ -6,6 +6,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 __FERRY_BEGIN
+CF_IMPLICIT_BRIDGING_ENABLED
 /* ---- run loop sources ------------------------------------------------------------- */
 
 typedef struct __CFRunLoopSource *CFRunLoopSourceRef;
@@ -100,5 +101,6 @@ void CFSocketDisableCallBacks(CFSocketRef s, CFOptionFlags callBackTypes);
 void CFSocketInvalidate(CFSocketRef s);
 Boolean CFSocketIsValid(CFSocketRef s);
 CFRunLoopSourceRef CFSocketCreateRunLoopSource(CFAllocatorRef allocator, CFSocketRef s, CFIndex order);
+CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 #endif

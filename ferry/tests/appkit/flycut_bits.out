@@ -1,0 +1,25 @@
+hidden: 0
+GetCurrentProcess: 0, a number 1
+its pid is ours: 0 1
+the same as kCurrentProcess: 1
+GetProcessForPID: 0
+GetNextProcess: 0, then -600
+CopyProcessName: 0 appkit_flycut_bits
+GetProcessInformation: 0, type APPL, name length 18
+its dictionary: pid ours 1
+another process: -600
+SetFrontProcess: 0
+performClick: 1 click, state 1, sender is the cell 1
+disabled: still 1
+showsFirstResponder: 1
+a button's cell: 2 clicks, sender is the button 1
+menu change messages: 1 -> 0
+item view: 1, width 200
+view removed: 1
+search button cell: 1, cancel button cell: 1
+cancel button clears: ""
+after a reset: 1, has an action 1
+registered: 0, types 0 (the answer comes later)
+remote notifications failed: NSCocoaErrorDomain 3010
+done
+exit=0

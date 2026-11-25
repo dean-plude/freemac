@@ -210,6 +210,30 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
             return i;
     return NSNotFound;
 }
+/* The same, searching only the range; a range past the end raises. */
+static void check_range(NSArray *a, NSRange r)
+{
+    if (r.location > [a count] || r.length > [a count] - r.location)
+        [NSException raise:NSRangeException format:@"-[NSArray indexOfObject:inRange:]: range {%lu, %lu} extends beyond bounds [0 .. %lu]",
+                                                    (unsigned long)r.location, (unsigned long)r.length,
+                                                    (unsigned long)[a count]];
+}
+- (NSUInteger)indexOfObject:(id)obj inRange:(NSRange)range
+{
+    check_range(self, range);
+    for (NSUInteger i = range.location; i < NSMaxRange(range); i++)
+        if ([[self objectAtIndex:i] isEqual:obj])
+            return i;
+    return NSNotFound;
+}
+- (NSUInteger)indexOfObjectIdenticalTo:(id)obj inRange:(NSRange)range
+{
+    check_range(self, range);
+    for (NSUInteger i = range.location; i < NSMaxRange(range); i++)
+        if ([self objectAtIndex:i] == obj)
+            return i;
+    return NSNotFound;
+}
 - (NSUInteger)indexOfObjectPassingTest:(BOOL (^)(id, NSUInteger, BOOL *))predicate
 {
     NSUInteger n = [self count];

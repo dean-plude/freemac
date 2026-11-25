@@ -913,7 +913,7 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
  * directory named by $FERRY_FRAMEWORKS, next to the ferry program
  * (frameworks/), or in /usr/lib/ferry/frameworks. A few Apple libraries are
  * served by one of Ferry's: CoreFoundation, SystemConfiguration and
- * CoreServices (Gestalt and login items) and ServiceManagement live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
+ * CoreServices (Gestalt and login items), ServiceManagement and IOKit (foundation/IOKit.m) live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
  * (the few calls Cocoa apps still make, appkit/Carbon.m) inside AppKit. */
 
 static const struct { const char *name, *served_by; } framework_aliases[] = {
@@ -922,6 +922,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CFNetwork", "Foundation"},        /* the socket streams' properties, next to CFStream */
     {"CoreServices", "Foundation"}, /* Gestalt, next to NSProcessInfo, and login items (LoginItems.m) */
     {"ServiceManagement", "Foundation"}, /* SMLoginItemSetEnabled, foundation/LoginItems.m */
+    {"IOKit", "Foundation"},             /* the registry and power assertions, foundation/IOKit.m */
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},
     {"ImageIO", "CoreGraphics"},
@@ -930,6 +931,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"UserNotifications", "AppKit"}, /* appkit/UNUserNotificationCenter.m, beside the Dock and D-Bus */
     {"Quartz", "AppKit"},            /* Quick Look's panel and QCView, appkit/QuickLook.m */
     {"QuickLook", "AppKit"},         /* the generator calls and thumbnails, appkit/QuickLook.m */
+    {"ScriptingBridge", "AppKit"},   /* apps that can't be scripted here, appkit/ScriptingBridge.m */
     {NULL, NULL},
 };
 

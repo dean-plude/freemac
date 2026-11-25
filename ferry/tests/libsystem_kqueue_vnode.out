@@ -1,0 +1,32 @@
+O_EVTONLY open: ok
+O_EVTONLY can't write: 1
+nothing yet: none
+appended: WRITE|EXTEND
+cleared: none
+overwritten: WRITE
+chmod: ATTRIB
+linked: LINK
+one link removed: LINK
+renamed: RENAME
+written after the rename: WRITE|EXTEND
+deleted: DELETE
+after close: none
+replaced by a rename: DELETE
+level-triggered: WRITE
+  and again: WRITE
+added again for DELETE only: none
+written, not asked for: none
+deleted knote: 0
+directory, file created: WRITE
+directory, its file written: none
+directory, subdirectory made: WRITE|LINK
+directory, both removed: WRITE|LINK
+a closed descriptor: -1 errno EBADF
+O_EVTONLY of a file it can't read: ok
+  its chmod: ATTRIB
+source mask: DELETE|WRITE
+dispatch source, written: WRITE
+dispatch source, deleted: DELETE
+cancelled: 0
+done
+exit=0

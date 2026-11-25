@@ -6,23 +6,10 @@
 #ifndef _FERRY_MACH_O_LOADER_H_
 #define _FERRY_MACH_O_LOADER_H_
 #include <_ferry.h>
+/* the processor types a header names */
+#include <mach/machine.h>
 __FERRY_BEGIN
-typedef int cpu_type_t;
-typedef int cpu_subtype_t;
 typedef int vm_prot_t;
-/* the processor types a header names (mach/machine.h) */
-#ifndef CPU_TYPE_X86_64
-#define CPU_ARCH_ABI64 0x01000000
-#define CPU_TYPE_X86 7
-#define CPU_TYPE_I386 CPU_TYPE_X86
-#define CPU_TYPE_X86_64 (CPU_TYPE_X86 | CPU_ARCH_ABI64)
-#define CPU_TYPE_ARM 12
-#define CPU_TYPE_ARM64 (CPU_TYPE_ARM | CPU_ARCH_ABI64)
-#define CPU_TYPE_POWERPC 18
-#define CPU_SUBTYPE_X86_ALL 3
-#define CPU_SUBTYPE_X86_64_ALL 3
-#define CPU_SUBTYPE_ARM64_ALL 0
-#endif
 
 struct mach_header {
     uint32_t magic;

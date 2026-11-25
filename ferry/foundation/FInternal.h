@@ -71,6 +71,9 @@ void FRunLoopAddPoller(int (*prepare)(void *ctx, int *timeout_ms, struct pollfd 
 @end
 /* Prints a note on standard error once, when FERRY_VERBOSE is set (CFSocket.m). */
 void FVerboseOnce(NSString *message);
+/* Sets a formatter's properties from a nib's "NS.attributes", the keys in
+ * first before the rest (NSNumberFormatter.m). */
+void FApplyFormatterAttributes(id formatter, NSDictionary *attrs, NSArray *first);
 
 /* Blocks the calling thread on a pthread condition until it is signalled
  * or limit (seconds since the reference date) passes; returns 0 or

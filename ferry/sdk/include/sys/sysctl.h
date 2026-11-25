@@ -6,6 +6,7 @@
 #define _SYS_SYSCTL_H_
 #include <_ferry.h>
 #include <sys/time.h>
+#include <mach/machine.h>
 __FERRY_BEGIN
 #define CTL_MAXNAME 12
 #define CTL_UNSPEC 0

@@ -7,3 +7,5 @@
 #include <CoreServices/CoreServices.h>
 /* The Accessibility API (freemac 1.215, Ferry 0.41.0); served from AppKit's file. */
 #include <HIServices/Accessibility.h>
+/* The Process Manager (HIServices); served from AppKit's file. */
+#include <HIServices/Processes.h>

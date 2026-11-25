@@ -12,8 +12,9 @@
 #define _FERRY_CFSET_H_
 
 __FERRY_BEGIN
-typedef const struct __CFSet *CFSetRef;
-typedef struct __CFSet *CFMutableSetRef;
+CF_IMPLICIT_BRIDGING_ENABLED
+typedef const struct CF_BRIDGED_TYPE(NSSet) __CFSet *CFSetRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableSet) __CFSet *CFMutableSetRef;
 typedef const struct __CFBag *CFBagRef;
 typedef struct __CFBag *CFMutableBagRef;
 
@@ -86,6 +87,7 @@ void CFBagReplaceValue(CFMutableBagRef bag, const void *value);
 void CFBagSetValue(CFMutableBagRef bag, const void *value);
 void CFBagRemoveValue(CFMutableBagRef bag, const void *value);   /* once */
 void CFBagRemoveAllValues(CFMutableBagRef bag);
+CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 
 #endif

@@ -1,0 +1,25 @@
+an app Launch Services doesn't know: yes
+by URL to no bundle: yes
+by our own process: yes, SBApplication, running yes, timeout 7200
+  delegate: event failed, NSOSStatusErrorDomain -1708
+its name: nil
+  delegate: event failed, NSOSStatusErrorDomain -1708
+its windows: 0, by name yes, get 0
+  delegate: event failed, NSOSStatusErrorDomain -1708
+lastError: NSOSStatusErrorDomain -1708, failures told 3
+  delegate: event failed, NSOSStatusErrorDomain -1708
+a property's get: nil
+class for a scripting class: yes
+touch bar: 3 items, visible no, template item yes, made "Made by the delegate", unknown yes
+copy: yes tag 1, in b yes yes, notified 1 (operation 1)
+move onto a file that's there: no
+duplicate: yes, "one copy.txt" yes
+again: "one copy 2.txt" yes
+link into b over its copy: no
+destroy: yes, gone yes
+recycle: yes, gone yes
+compress: no, notified 8 times
+duplicateURLs: called yes, 1 made, "two copy.txt" yes
+errors: locking 255, too large 263, out of space 640, unsupported scheme 518, unmount 768
+objc_msgSend: left+right, 2.5, ABC
+exit=0

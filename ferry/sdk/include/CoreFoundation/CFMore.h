@@ -9,6 +9,7 @@
 #define _FERRY_CFMORE_H_
 
 __FERRY_BEGIN
+CF_IMPLICIT_BRIDGING_ENABLED
 CFTypeRef CFMakeCollectable(CFTypeRef cf); /* there is no garbage collector: gives cf back */
 extern const double kCFCoreFoundationVersionNumber;
 #define kCFCoreFoundationVersionNumber10_9 855.11
@@ -319,6 +320,7 @@ CFURLRef CFBundleCopyResourceURL(CFBundleRef bundle, CFStringRef resourceName, C
 CFStringRef CFBundleCopyLocalizedString(CFBundleRef bundle, CFStringRef key, CFStringRef value, CFStringRef tableName);
 #define CFCopyLocalizedString(key, comment) \
     CFBundleCopyLocalizedString(CFBundleGetMainBundle(), (key), (key), NULL)
+CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 
 /* ---- byte order (CFByteOrder) ---------------------------------------------------------- */

@@ -9,6 +9,7 @@
 #include <dispatch/dispatch.h>
 
 __FERRY_BEGIN
+CF_IMPLICIT_BRIDGING_ENABLED
 typedef struct __CFReadStream *CFReadStreamRef;
 typedef struct __CFWriteStream *CFWriteStreamRef;
 typedef CFStringRef CFStreamPropertyKey;
@@ -104,5 +105,6 @@ void CFReadStreamSetDispatchQueue(CFReadStreamRef stream, dispatch_queue_t q);
 void CFWriteStreamSetDispatchQueue(CFWriteStreamRef stream, dispatch_queue_t q);
 dispatch_queue_t CFReadStreamCopyDispatchQueue(CFReadStreamRef stream);
 dispatch_queue_t CFWriteStreamCopyDispatchQueue(CFWriteStreamRef stream);
+CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 #endif

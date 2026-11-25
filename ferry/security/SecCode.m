@@ -332,3 +332,44 @@ S_EXPORT OSStatus SecRequirementCopyString(SecRequirementRef requirement, SecCSF
     *text = (CFStringRef)[r->text copy];
     return errSecSuccess;
 }
+
+/* ---- tasks (SecTask.h) ----------------------------------------------------------------
+ * The running program as a task. It has no entitlements and no signing
+ * identifier, since Ferry reads no signature (see the top of this file). */
+#define FERRY_TYPE_SECTASK 0x46520040
+@interface STask : NSObject
+@end
+@implementation STask
+- (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_SECTASK; }
+@end
+
+S_EXPORT CFTypeID SecTaskGetTypeID(void) { return FERRY_TYPE_SECTASK; }
+
+S_EXPORT SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator)
+{
+    return (SecTaskRef)[[STask alloc] init];
+}
+
+S_EXPORT CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    if (task && entitlement)
+        SVerboseOnce([NSString stringWithFormat:@"the program has no entitlement %@ (Ferry reads no signature)",
+                                                (NSString *)entitlement]);
+    return NULL;
+}
+
+S_EXPORT CFDictionaryRef SecTaskCopyValuesForEntitlements(SecTaskRef task, CFArrayRef entitlements, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    return task ? (CFDictionaryRef)[[NSDictionary alloc] init] : NULL;
+}
+
+S_EXPORT CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    return NULL;
+}

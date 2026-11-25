@@ -282,6 +282,7 @@ BOOL AValidateItem(id target, id item)
     BOOL _enabled, _hidden, _separator;
     NSMenu *_submenu, *_menu;
     NSImage *_image;
+    NSView *_view;
 }
 + (NSMenuItem *)separatorItem
 {
@@ -356,6 +357,7 @@ BOOL AValidateItem(id target, id item)
     [_represented release];
     [_submenu release];
     [_image release];
+    [_view release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone
@@ -427,6 +429,14 @@ BOOL AValidateItem(id target, id item)
     [(id)_image release];
     _image = image;
 }
+/* A view shown in place of the title (AMenuView draws it). */
+- (NSView *)view { return _view; }
+- (void)setView:(NSView *)view
+{
+    [view retain];
+    [_view release];
+    _view = view;
+}
 - (NSInteger)indentationLevel { return _indent; }
 - (void)setIndentationLevel:(NSInteger)i { _indent = i; }
 - (NSString *)toolTip { return _tip; }
@@ -442,9 +452,14 @@ BOOL AValidateItem(id target, id item)
     NSMutableArray *_items;
     NSMenu *_supermenu;
     BOOL _autoenables;
+    BOOL _noChangeMessages;
     id _delegate;
 }
 - (instancetype)init { return [self initWithTitle:@""]; }
+/* Whether changes post NSMenuDid...ItemNotifications; Ferry posts none, so
+ * this is only kept. */
+- (BOOL)menuChangedMessagesEnabled { return !_noChangeMessages; }
+- (void)setMenuChangedMessagesEnabled:(BOOL)flag { _noChangeMessages = !flag; }
 
 /* From a nib: the title, the items, and a name for the special menus
  * ("_NSMainMenu", "_NSWindowsMenu"...). */
@@ -629,7 +644,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
             if (!target || !AValidateItem(target, item))
                 return NO;
         }
-        [NSApp sendAction:action to:[item target] from:item];
+        ASendMenuItemAction(item);
         return YES;
     }
     return NO;

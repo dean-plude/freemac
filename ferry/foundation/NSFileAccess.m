@@ -241,7 +241,12 @@ static NSError *cocoa_error(NSInteger code, NSString *path, int posix)
 
 /* ---- the file manager ---------------------------------------------------------------------- */
 
+NSString *const NSUbiquityIdentityDidChangeNotification = @"NSUbiquityIdentityDidChangeNotification";
+
 @implementation NSFileManager (FerryFileAccess)
+- (id<NSObject, NSCopying, NSCoding>)ubiquityIdentityToken { return nil; }
+- (NSURL *)URLForUbiquityContainerIdentifier:(NSString *)containerIdentifier { return nil; }
+- (BOOL)isUbiquitousItemAtURL:(NSURL *)url { return NO; }
 - (NSDirectoryEnumerator *)enumeratorAtPath:(NSString *)path
 {
     return [[[NSDirectoryEnumerator alloc] _initWithPath:path URLs:NO options:0 errorHandler:nil] autorelease];

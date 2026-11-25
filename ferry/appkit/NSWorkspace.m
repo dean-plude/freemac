@@ -456,7 +456,9 @@ static NSString *app_with(BOOL (^match)(NSBundle *))
     if (![identifier length])
         return nil;
     NSString *path = app_with(^BOOL(NSBundle *b) {
-        return [[b bundleIdentifier] caseInsensitiveCompare:identifier] == NSOrderedSame;
+        /* a bundle with no identifier (a bare program's) matches none */
+        NSString *ident = [b bundleIdentifier];
+        return [ident length] && [ident caseInsensitiveCompare:identifier] == NSOrderedSame;
     });
     return path ? [NSURL fileURLWithPath:path] : nil;
 }
@@ -563,4 +565,116 @@ static NSString *app_with(BOOL (^match)(NSBundle *))
     return NO;
 }
 - (void)noteFileSystemChanged:(NSString *)path {}
+@end
+
+/* ---- file operations (freemac 1.223, Ferry 0.47.0) ----
+ * Done at once by NSFileManager. Compressing, encrypting and their reverses
+ * have no meaning here and answer NO. A duplicate is named "name copy" (then
+ * "name copy 2" and on) beside the original, as the Finder names one. */
+NSWorkspaceFileOperationName const NSWorkspaceMoveOperation = @"move";
+NSWorkspaceFileOperationName const NSWorkspaceCopyOperation = @"copy";
+NSWorkspaceFileOperationName const NSWorkspaceLinkOperation = @"link";
+NSWorkspaceFileOperationName const NSWorkspaceCompressOperation = @"compress";
+NSWorkspaceFileOperationName const NSWorkspaceDecompressOperation = @"decompress";
+NSWorkspaceFileOperationName const NSWorkspaceEncryptOperation = @"encrypt";
+NSWorkspaceFileOperationName const NSWorkspaceDecryptOperation = @"decrypt";
+NSWorkspaceFileOperationName const NSWorkspaceDestroyOperation = @"destroy";
+NSWorkspaceFileOperationName const NSWorkspaceRecycleOperation = @"recycle";
+NSWorkspaceFileOperationName const NSWorkspaceDuplicateOperation = @"duplicate";
+NSNotificationName const NSWorkspaceDidPerformFileOperationNotification =
+    @"NSWorkspaceDidPerformFileOperationNotification";
+
+static NSString *duplicate_path(NSString *path)
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *dir = [path stringByDeletingLastPathComponent], *ext = [path pathExtension];
+    NSString *base = [[path lastPathComponent] stringByDeletingPathExtension];
+    for (int n = 1; n < 10000; n++) {
+        NSString *name = n == 1 ? [NSString stringWithFormat:@"%@ copy", base]
+                                : [NSString stringWithFormat:@"%@ copy %d", base, n];
+        if ([ext length])
+            name = [name stringByAppendingPathExtension:ext];
+        NSString *candidate = [dir stringByAppendingPathComponent:name];
+        if (![fm fileExistsAtPath:candidate])
+            return candidate;
+    }
+    return nil;
+}
+
+@implementation NSWorkspace (NSWorkspaceFileOperations)
+- (BOOL)performFileOperation:(NSWorkspaceFileOperationName)operation source:(NSString *)source
+                 destination:(NSString *)destination files:(NSArray<NSString *> *)files tag:(NSInteger *)tag
+{
+    static NSInteger next_tag;
+    NSInteger this_tag = ++next_tag;
+    if (tag)
+        *tag = this_tag;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL ok = YES;
+    for (NSString *name in files) {
+        NSString *from = [source stringByAppendingPathComponent:name];
+        NSString *to = [destination length] ? [destination stringByAppendingPathComponent:name] : nil;
+        BOOL done = NO;
+        if ([operation isEqualToString:NSWorkspaceMoveOperation])
+            done = to && [fm moveItemAtPath:from toPath:to error:NULL];
+        else if ([operation isEqualToString:NSWorkspaceCopyOperation])
+            done = to && [fm copyItemAtPath:from toPath:to error:NULL];
+        else if ([operation isEqualToString:NSWorkspaceLinkOperation])
+            done = to && [fm createSymbolicLinkAtPath:to withDestinationPath:from error:NULL];
+        else if ([operation isEqualToString:NSWorkspaceDestroyOperation])
+            done = [fm removeItemAtPath:from error:NULL];
+        else if ([operation isEqualToString:NSWorkspaceRecycleOperation])
+            done = [fm trashItemAtURL:[NSURL fileURLWithPath:from] resultingItemURL:NULL error:NULL];
+        else if ([operation isEqualToString:NSWorkspaceDuplicateOperation]) {
+            NSString *copy = duplicate_path(from);
+            done = copy && [fm copyItemAtPath:from toPath:copy error:NULL];
+        }
+        ok = ok && done;
+    }
+    [[self notificationCenter] postNotificationName:NSWorkspaceDidPerformFileOperationNotification object:self
+                                           userInfo:@{@"NSOperationNumber" : @(this_tag)}];
+    return ok;
+}
+
+/* The block-based forms: the work is done at once, and the handler is
+ * called on the main queue, as a Mac calls it. */
+static void file_operation(BOOL recycle, NSArray<NSURL *> *urls,
+                           void (^handler)(NSDictionary<NSURL *, NSURL *> *, NSError *))
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableDictionary *done = [NSMutableDictionary dictionary];
+    NSError *firstError = nil;
+    for (NSURL *url in urls) {
+        NSError *error = nil;
+        NSURL *result = nil;
+        BOOL ok;
+        if (recycle)
+            ok = [fm trashItemAtURL:url resultingItemURL:&result error:&error];
+        else {
+            NSString *copy = duplicate_path([url path]);
+            ok = copy && [fm copyItemAtPath:[url path] toPath:copy error:&error];
+            result = ok ? [NSURL fileURLWithPath:copy] : nil;
+        }
+        if (ok && result)
+            done[url] = result;
+        else if (!firstError)
+            firstError = error ? error
+                               : [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError
+                                                 userInfo:@{NSURLErrorKey : url}];
+    }
+    if (handler)
+        dispatch_async(dispatch_get_main_queue(), ^{
+            handler(done, firstError);
+        });
+}
+- (void)recycleURLs:(NSArray<NSURL *> *)urls
+    completionHandler:(void (^)(NSDictionary<NSURL *, NSURL *> *, NSError *))handler
+{
+    file_operation(YES, urls, handler);
+}
+- (void)duplicateURLs:(NSArray<NSURL *> *)urls
+    completionHandler:(void (^)(NSDictionary<NSURL *, NSURL *> *, NSError *))handler
+{
+    file_operation(NO, urls, handler);
+}
 @end

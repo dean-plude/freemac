@@ -43,11 +43,19 @@ const CFDictionaryValueCallBacks kCFTypeDictionaryValueCallBacks = {0, cftype_re
 #define FERRY_TYPE_STRING 0x46520012
 #define FERRY_TYPE_URL 0x46520013
 #define FERRY_TYPE_UUID 0x46520014
+#define FERRY_TYPE_BOOLEAN 0x46520015
+#define FERRY_TYPE_NUMBER 0x46520016
+#define FERRY_TYPE_DATA 0x46520017
 CFTypeID CFArrayGetTypeID(void) { return FERRY_TYPE_ARRAY; }
 CFTypeID CFDictionaryGetTypeID(void) { return FERRY_TYPE_DICTIONARY; }
 CFTypeID CFStringGetTypeID(void) { return FERRY_TYPE_STRING; }
 CFTypeID CFURLGetTypeID(void) { return FERRY_TYPE_URL; }
 CFTypeID CFUUIDGetTypeID(void) { return FERRY_TYPE_UUID; }
+/* freemac 1.223, Ferry 0.47.0: the two booleans are numbers of a type of
+ * their own, as on a Mac (Sparkle tells a verify transform's answer by it) */
+CFTypeID CFBooleanGetTypeID(void) { return FERRY_TYPE_BOOLEAN; }
+CFTypeID CFNumberGetTypeID(void) { return FERRY_TYPE_NUMBER; }
+CFTypeID CFDataGetTypeID(void) { return FERRY_TYPE_DATA; }
 @implementation NSArray (FerryCFType)
 - (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_ARRAY; }
 @end
@@ -62,6 +70,15 @@ CFTypeID CFUUIDGetTypeID(void) { return FERRY_TYPE_UUID; }
 @end
 @implementation NSUUID (FerryCFType)
 - (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_UUID; }
+@end
+@implementation NSNumber (FerryCFType)
+- (CFTypeID)_ferryCFTypeID
+{
+    return self == (id)kCFBooleanTrue || self == (id)kCFBooleanFalse ? FERRY_TYPE_BOOLEAN : FERRY_TYPE_NUMBER;
+}
+@end
+@implementation NSData (FerryCFType)
+- (CFTypeID)_ferryCFTypeID { return FERRY_TYPE_DATA; }
 @end
 
 /* ---- arrays with callbacks --------------------------------------------------------------- */

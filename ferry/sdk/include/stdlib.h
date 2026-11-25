@@ -2,6 +2,8 @@
 #ifndef _STDLIB_H_
 #define _STDLIB_H_
 #include <_ferry.h>
+/* A Mac's stdlib.h brings in wait's status macros (freemac 1.223, Ferry 0.47.0). */
+#include <sys/wait.h>
 __FERRY_BEGIN
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1

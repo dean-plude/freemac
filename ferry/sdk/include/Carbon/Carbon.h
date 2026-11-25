@@ -8,6 +8,11 @@
 #include <ApplicationServices/ApplicationServices.h>
 /* noErr and paramErr come from CoreServices, as on a Mac. */
 #include <CoreServices/CoreServices.h>
+/* In Objective-C a Mac's Carbon.h brings Foundation's classes with it
+ * (window managers such as Spectacle import Carbon alone). */
+#ifdef __OBJC__
+#import <Foundation/Foundation.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,10 +54,11 @@ enum {
 
 enum { kEventClassKeyboard = 'keyb', kEventClassApplication = 'appl' };
 enum { kEventHotKeyPressed = 5, kEventHotKeyReleased = 6 };
-enum { kEventParamDirectObject = '----', typeEventHotKeyID = 'hkid', typeWildCard = '****' };
+enum { kEventParamDirectObject = '----', typeEventHotKeyID = 'hkid' }; /* typeWildCard: AppleEvents.h */
 enum { kEventHotKeyNoOptions = 0, kEventHotKeyExclusive = 1 };
 
 /* modifier bits (Events.h) */
+typedef UInt16 EventModifiers;
 enum {
     cmdKey = 1 << 8,
     shiftKey = 1 << 9,

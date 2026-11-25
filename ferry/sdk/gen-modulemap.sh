@@ -18,7 +18,8 @@ cat << 'EOF'
 // sdk/gen-modulemap.sh; run it again after adding a header.
 EOF
 for dir in AppKit ApplicationServices CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation CoreGraphics \
-           CoreServices CoreText Foundation HIServices ImageIO JavaScriptCore Quartz QuartzCore QuickLook Security \
+           CloudKit CoreServices CoreText Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
+           ScriptingBridge Security \
            ServiceManagement SystemConfiguration UserNotifications WebKit; do
     [ -d "$inc/$dir" ] || continue
     case $dir in

@@ -142,7 +142,12 @@ void ferry_socket_closed(int fd);
 /* kqueue.c: kqueue and kevent on epoll, select and poll with the Mac's
  * structures, and the close that forgets a descriptor's events */
 extern const struct ferry_symbol ferry_kqueue_symbols[];
-extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs */
+extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs,
+                                                             * fts, statfs, asl */
+extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
+struct stat;
+/* posix.c: this system's stat as a Mac's 144-byte, 64-bit-inode struct stat */
+void ferry_to_mac_stat(const struct stat *s, void *out);
 struct sigaction;
 /* sigaction for posix.c: while a kqueue watches a signal, the program's
  * handler is kept here and called from the watcher's. */
@@ -159,6 +164,7 @@ struct kevent64_s {
 };
 #define FERRY_EVFILT_READ (-1)
 #define FERRY_EVFILT_WRITE (-2)
+#define FERRY_EVFILT_VNODE (-4)
 #define FERRY_EVFILT_PROC (-5)
 #define FERRY_EVFILT_SIGNAL (-6)
 #define FERRY_EVFILT_TIMER (-7)

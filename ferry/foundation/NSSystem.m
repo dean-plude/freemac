@@ -156,17 +156,8 @@ static uint64_t FSysctlNumber(const char *name)
  * link stub lists it too. Written from Apple's documentation of the
  * selectors. */
 
-typedef int16_t OSErr;
-typedef uint32_t OSType;
-enum {
-    gestaltSystemVersion = 'sysv',
-    gestaltSystemVersionMajor = 'sys1',
-    gestaltSystemVersionMinor = 'sys2',
-    gestaltSystemVersionBugFix = 'sys3',
-    gestaltUndefSelectorErr = -5551,
-};
-
-F_EXPORT OSErr Gestalt(OSType selector, int32_t *response)
+/* The selectors come from CoreServices.h, which Foundation.h includes. */
+F_EXPORT OSErr Gestalt(OSType selector, SInt32 *response)
 {
     NSOperatingSystemVersion v = FSystemVersion(NULL);
     int32_t value;

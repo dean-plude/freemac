@@ -11,7 +11,11 @@
  * - code signing (SecCode, SecStaticCode, SecRequirement): Ferry can't
  *   check Apple's signatures; see security/SecCode.m for what it answers;
  * - certificates, policies and trust (SecCertificate, SecPolicy, SecTrust),
- *   checked by this system's OpenSSL against its certificate authorities.
+ *   checked by this system's OpenSSL against its certificate authorities;
+ * - public keys imported from PEM or DER (SecItemImport), and the
+ *   transforms that read, digest and check a signature (SecTransform),
+ *   also by this system's OpenSSL;
+ * - authorization (Authorization.h), which never grants a right.
  *
  * In Ferry every Security object is also an Objective-C object, so
  * CFRetain, CFRelease and CFEqual work on them. */
@@ -20,6 +24,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 __FERRY_BEGIN
 
@@ -425,6 +430,19 @@ OSStatus SecRequirementCreateWithStringAndErrors(CFStringRef text, SecCSFlags fl
                                                  SecRequirementRef *requirement);
 OSStatus SecRequirementCopyString(SecRequirementRef requirement, SecCSFlags flags, CFStringRef *text);
 
+/* ---- tasks and their entitlements (SecTask.h) ---------------------------------------
+ * A program run by Ferry carries no entitlements: Ferry reads no code
+ * signature, so SecTaskCopyValueForEntitlement answers NULL for every
+ * entitlement, as on a Mac for a program signed without any. */
+typedef struct __SecTask *SecTaskRef;
+CFTypeID SecTaskGetTypeID(void);
+SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator) CF_RETURNS_RETAINED;
+CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error)
+    CF_RETURNS_RETAINED;
+CFDictionaryRef SecTaskCopyValuesForEntitlements(SecTaskRef task, CFArrayRef entitlements, CFErrorRef *error)
+    CF_RETURNS_RETAINED;
+CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error) CF_RETURNS_RETAINED;
+
 /* ---- certificates, policies and trust (SecCertificate.h, SecPolicy.h, SecTrust.h) -------- */
 
 SecCertificateRef SecCertificateCreateWithData(CFAllocatorRef allocator, CFDataRef data) CF_RETURNS_RETAINED;
@@ -465,6 +483,204 @@ OSStatus SecTrustGetTrustResult(SecTrustRef trust, SecTrustResultType *result);
 CFIndex SecTrustGetCertificateCount(SecTrustRef trust);
 SecCertificateRef SecTrustGetCertificateAtIndex(SecTrustRef trust, CFIndex ix);
 CFArrayRef SecTrustCopyCertificateChain(SecTrustRef trust) CF_RETURNS_RETAINED;
+
+/* ---- authorization (Authorization.h, AuthorizationTags.h) ------------------------------
+ * (freemac 1.223, Ferry 0.47.0) Ferry never runs a program's code as
+ * another user: an authorization can be made and freed, and asking it for
+ * rights answers errAuthorizationDenied, so a program falls back to what
+ * it can do as the user (Sparkle then updates only an app the user can
+ * write to). Running a tool with privileges answers the same. */
+
+typedef const struct AuthorizationOpaqueRef *AuthorizationRef;
+typedef const char *AuthorizationString;
+typedef uint32_t AuthorizationFlags;
+enum {
+    kAuthorizationFlagDefaults = 0,
+    kAuthorizationFlagInteractionAllowed = (1 << 0),
+    kAuthorizationFlagExtendRights = (1 << 1),
+    kAuthorizationFlagPartialRights = (1 << 2),
+    kAuthorizationFlagDestroyRights = (1 << 3),
+    kAuthorizationFlagPreAuthorize = (1 << 4),
+    kAuthorizationFlagSkipInternalAuth = (1 << 9),
+    kAuthorizationFlagNoData = (1 << 20),
+};
+enum { kAuthorizationFlagCanNotPreAuthorize = (1 << 0) };
+typedef struct {
+    AuthorizationString name;
+    size_t valueLength;
+    void *value;
+    uint32_t flags;
+} AuthorizationItem;
+typedef struct {
+    uint32_t count;
+    AuthorizationItem *items;
+} AuthorizationItemSet;
+typedef AuthorizationItemSet AuthorizationRights;
+typedef AuthorizationItemSet AuthorizationEnvironment;
+enum { kAuthorizationExternalFormLength = 32 };
+typedef struct {
+    char bytes[kAuthorizationExternalFormLength];
+} AuthorizationExternalForm;
+#define kAuthorizationEmptyEnvironment NULL
+#define kAuthorizationRightExecute "system.privilege.admin"
+#define kAuthorizationEnvironmentUsername "username"
+#define kAuthorizationEnvironmentPassword "password"
+#define kAuthorizationEnvironmentPrompt "prompt"
+#define kAuthorizationEnvironmentIcon "icon"
+enum {
+    errAuthorizationSuccess = 0,
+    errAuthorizationInvalidSet = -60001,
+    errAuthorizationInvalidRef = -60002,
+    errAuthorizationInvalidTag = -60003,
+    errAuthorizationInvalidPointer = -60004,
+    errAuthorizationDenied = -60005,
+    errAuthorizationCanceled = -60006,
+    errAuthorizationInteractionNotAllowed = -60007,
+    errAuthorizationInternal = -60008,
+    errAuthorizationExternalizeNotAllowed = -60009,
+    errAuthorizationInternalizeNotAllowed = -60010,
+    errAuthorizationInvalidFlags = -60011,
+    errAuthorizationToolExecuteFailure = -60031,
+    errAuthorizationToolEnvironmentError = -60032,
+    errAuthorizationBadAddress = -60033,
+};
+
+OSStatus AuthorizationCreate(const AuthorizationRights *rights, const AuthorizationEnvironment *environment,
+                             AuthorizationFlags flags, AuthorizationRef *authorization);
+OSStatus AuthorizationFree(AuthorizationRef authorization, AuthorizationFlags flags);
+OSStatus AuthorizationCopyRights(AuthorizationRef authorization, const AuthorizationRights *rights,
+                                 const AuthorizationEnvironment *environment, AuthorizationFlags flags,
+                                 AuthorizationRights **authorizedRights);
+void AuthorizationCopyRightsAsync(AuthorizationRef authorization, const AuthorizationRights *rights,
+                                  const AuthorizationEnvironment *environment, AuthorizationFlags flags,
+                                  void (^callbackBlock)(OSStatus err, AuthorizationRights *blockAuthorizedRights));
+OSStatus AuthorizationCopyInfo(AuthorizationRef authorization, AuthorizationString tag, AuthorizationItemSet **info);
+OSStatus AuthorizationMakeExternalForm(AuthorizationRef authorization, AuthorizationExternalForm *extForm);
+OSStatus AuthorizationCreateFromExternalForm(const AuthorizationExternalForm *extForm,
+                                             AuthorizationRef *authorization);
+OSStatus AuthorizationFreeItemSet(AuthorizationItemSet *set);
+OSStatus AuthorizationExecuteWithPrivileges(AuthorizationRef authorization, const char *pathToTool,
+                                            AuthorizationFlags options, char *const *arguments,
+                                            FILE **communicationsPipe);
+OSStatus AuthorizationCopyPrivilegedReference(AuthorizationRef *authorization, AuthorizationFlags flags);
+
+/* ---- importing keys (SecImportExport.h) ---------------------------------------------
+ * (freemac 1.223, Ferry 0.47.0) A public key in PEM ("-----BEGIN PUBLIC
+ * KEY-----") or DER (SubjectPublicKeyInfo), RSA, DSA or EC, read by this
+ * system's OpenSSL; the result is an array of one SecKeyRef. Private keys,
+ * certificates and PKCS#12 files are not imported (errSecUnsupportedFormat). */
+
+typedef uint32_t SecExternalFormat;
+enum {
+    kSecFormatUnknown = 0,
+    kSecFormatOpenSSL = 1,
+    kSecFormatSSH = 2,
+    kSecFormatBSAFE = 3,
+    kSecFormatRawKey = 4,
+    kSecFormatWrappedPKCS8 = 5,
+    kSecFormatWrappedOpenSSL = 6,
+    kSecFormatWrappedSSH = 7,
+    kSecFormatWrappedLSH = 8,
+    kSecFormatX509Cert = 9,
+    kSecFormatPEMSequence = 10,
+    kSecFormatPKCS7 = 11,
+    kSecFormatPKCS12 = 12,
+    kSecFormatNetscapeCertSequence = 13,
+    kSecFormatSSHv2 = 14,
+};
+typedef uint32_t SecExternalItemType;
+enum {
+    kSecItemTypeUnknown = 0,
+    kSecItemTypePrivateKey = 1,
+    kSecItemTypePublicKey = 2,
+    kSecItemTypeSessionKey = 3,
+    kSecItemTypeCertificate = 4,
+    kSecItemTypeAggregate = 5,
+};
+typedef uint32_t SecItemImportExportFlags;
+enum { kSecItemPemArmour = 0x00000001 };
+typedef struct SecItemImportExportKeyParameters SecItemImportExportKeyParameters;
+
+OSStatus SecItemImport(CFDataRef importedData, CFStringRef fileNameOrExtension, SecExternalFormat *inputFormat,
+                       SecExternalItemType *itemType, SecItemImportExportFlags flags,
+                       const SecItemImportExportKeyParameters *keyParams, SecKeychainRef importKeychain,
+                       CFArrayRef *outItems);
+/* The key's SubjectPublicKeyInfo, DER-encoded (Ferry keeps a key as that). */
+CFDataRef SecKeyCopyExternalRepresentation(SecKeyRef key, CFErrorRef *error) CF_RETURNS_RETAINED;
+
+/* ---- transforms (SecTransform.h, SecReadTransform.h, SecDigestTransform.h,
+ * SecSignVerifyTransform.h) ----------------------------------------------------------
+ * (freemac 1.223, Ferry 0.47.0) A group of transforms connected output to
+ * input, run by SecTransformExecute: a stream read whole, a digest (MD5,
+ * SHA-1, SHA-2), and the check of a signature by a public key (OpenSSL's
+ * EVP_PKEY_verify), whose output is kCFBooleanTrue or kCFBooleanFalse. A
+ * transform runs once, when executed; the dispatch-queue form calls its
+ * block once with the final result. Signing is not done here. */
+
+typedef CFTypeRef SecTransformRef;
+typedef CFTypeRef SecGroupTransformRef;
+typedef void (^SecMessageBlock)(CFTypeRef message, CFErrorRef error, Boolean isFinal);
+
+extern const CFStringRef kSecTransformErrorDomain;
+extern const CFStringRef kSecTransformInputAttributeName;
+extern const CFStringRef kSecTransformOutputAttributeName;
+extern const CFStringRef kSecTransformDebugAttributeName;
+extern const CFStringRef kSecTransformTransformName;
+extern const CFStringRef kSecTransformAbortAttributeName;
+enum {
+    kSecTransformErrorAttributeNotFound = 1,
+    kSecTransformErrorInvalidOperation = 2,
+    kSecTransformErrorNotInitializedCorrectly = 3,
+    kSecTransformErrorMoreThanOneOutput = 4,
+    kSecTransformErrorInvalidInputDictionary = 5,
+    kSecTransformErrorInvalidAlgorithm = 6,
+    kSecTransformErrorInvalidLength = 7,
+    kSecTransformErrorInvalidType = 8,
+    kSecTransformErrorInvalidInput = 10,
+    kSecTransformErrorNameAlreadyRegistered = 11,
+    kSecTransformErrorUnsupportedAttribute = 12,
+    kSecTransformOperationNotSupportedOnGroup = 13,
+    kSecTransformErrorMissingParameter = 14,
+    kSecTransformErrorInvalidConnection = 15,
+    kSecTransformTransformIsExecuting = 16,
+    kSecTransformInvalidOverride = 17,
+    kSecTransformTransformIsNotRegistered = 18,
+    kSecTransformErrorAbortInProgress = 19,
+    kSecTransformErrorAborted = 20,
+    kSecTransformInvalidArgument = 21,
+};
+
+SecGroupTransformRef SecTransformCreateGroupTransform(void) CF_RETURNS_RETAINED;
+SecGroupTransformRef SecTransformConnectTransforms(SecTransformRef sourceTransform, CFStringRef sourceAttributeName,
+                                                   SecTransformRef destinationTransform,
+                                                   CFStringRef destinationAttributeName, SecGroupTransformRef group,
+                                                   CFErrorRef *error);
+Boolean SecTransformSetAttribute(SecTransformRef transform, CFStringRef key, CFTypeRef value, CFErrorRef *error);
+CFTypeRef SecTransformGetAttribute(SecTransformRef transform, CFStringRef key);
+CFTypeRef SecTransformExecute(SecTransformRef transform, CFErrorRef *errorRef) CF_RETURNS_RETAINED;
+void SecTransformExecuteAsync(SecTransformRef transform, dispatch_queue_t deliveryQueue,
+                              SecMessageBlock deliveryBlock);
+CFTypeID SecTransformGetTypeID(void);
+
+SecTransformRef SecTransformCreateReadTransformWithReadStream(CFReadStreamRef inputStream) CF_RETURNS_RETAINED;
+
+extern const CFStringRef kSecDigestMD5;
+extern const CFStringRef kSecDigestSHA1;
+extern const CFStringRef kSecDigestSHA2;
+extern const CFStringRef kSecDigestTypeAttribute;
+extern const CFStringRef kSecDigestLengthAttribute;
+extern const CFStringRef kSecDigestHMACKeyAttribute;
+SecTransformRef SecDigestTransformCreate(CFTypeRef digestType, CFIndex digestLength, CFErrorRef *error)
+    CF_RETURNS_RETAINED;
+
+extern const CFStringRef kSecKeyAttributeName;
+extern const CFStringRef kSecSignatureAttributeName;
+extern const CFStringRef kSecInputIsAttributeName;
+extern const CFStringRef kSecInputIsPlainText;
+extern const CFStringRef kSecInputIsDigest;
+extern const CFStringRef kSecInputIsRaw;
+SecTransformRef SecVerifyTransformCreate(SecKeyRef key, CFDataRef signature, CFErrorRef *error) CF_RETURNS_RETAINED;
+SecTransformRef SecSignTransformCreate(SecKeyRef key, CFErrorRef *error) CF_RETURNS_RETAINED;
 
 __FERRY_END
 #endif

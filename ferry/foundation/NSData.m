@@ -205,9 +205,23 @@ fail:;
     static const char abc[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     const unsigned char *b = [self bytes];
     NSUInteger n = [self length], k = 0;
-    char *out = malloc((n + 2) / 3 * 4 + 1);
+    NSUInteger line = (opts & NSDataBase64Encoding64CharacterLineLength)   ? 64
+                      : (opts & NSDataBase64Encoding76CharacterLineLength) ? 76
+                                                                          : 0;
+    BOOL cr = (opts & NSDataBase64EncodingEndLineWithCarriageReturn) != 0;
+    BOOL lf = (opts & NSDataBase64EncodingEndLineWithLineFeed) != 0;
+    if (!cr && !lf)
+        cr = lf = YES;
+    NSUInteger plain = (n + 2) / 3 * 4;
+    char *out = malloc(plain + (line ? plain / line * 2 : 0) + 1);
     for (NSUInteger i = 0; i < n; i += 3) {
         unsigned v = b[i] << 16 | (i + 1 < n ? b[i + 1] << 8 : 0) | (i + 2 < n ? b[i + 2] : 0);
+        if (line && i && (i / 3 * 4) % line == 0) {
+            if (cr)
+                out[k++] = '\r';
+            if (lf)
+                out[k++] = '\n';
+        }
         out[k++] = abc[v >> 18];
         out[k++] = abc[(v >> 12) & 63];
         out[k++] = i + 1 < n ? abc[(v >> 6) & 63] : '=';
@@ -226,7 +240,8 @@ fail:;
     int bits = 0;
     for (size_t i = 0; i < n; i++) {
         const char *at = strchr("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", s[i]);
-        if (s[i] == '=' || isspace((unsigned char)s[i]))
+        if (s[i] == '=' || isspace((unsigned char)s[i]) ||
+            ((!at || !s[i]) && (opts & NSDataBase64DecodingIgnoreUnknownCharacters)))
             continue;
         if (!at || !s[i]) {
             free(out);
@@ -241,6 +256,17 @@ fail:;
         }
     }
     return [self initWithBytesNoCopy:out length:k freeWhenDone:YES];
+}
+- (instancetype)initWithBase64EncodedData:(NSData *)data options:(NSUInteger)opts
+{
+    NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    self = s ? [self initWithBase64EncodedString:s options:opts] : nil;
+    [s release];
+    return self;
+}
+- (NSData *)base64EncodedDataWithOptions:(NSUInteger)opts
+{
+    return [[self base64EncodedStringWithOptions:opts] dataUsingEncoding:NSUTF8StringEncoding];
 }
 @end
 

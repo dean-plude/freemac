@@ -145,15 +145,11 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 
 @class NSURLSessionTask, NSURLAuthenticationChallenge;
 
-/* The Security framework's trust and identity objects (also declared by
- * <Security/Security.h>). A protection space's serverTrust works with the
- * Security framework's SecTrust calls and NSURLCredential's
- * credentialForTrust:. */
-#ifndef _FERRY_SECURITY_TYPES_
-#define _FERRY_SECURITY_TYPES_
-typedef struct __SecTrust *SecTrustRef;
-typedef struct __SecIdentity *SecIdentityRef;
-#endif
+/* The Security framework, which a Mac's Foundation brings in here (through
+ * NSURLCredential.h) for its trust and identity objects (freemac 1.223,
+ * Ferry 0.47.0). A protection space's serverTrust works with the Security
+ * framework's SecTrust calls and NSURLCredential's credentialForTrust:. */
+#include <Security/Security.h>
 
 FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTP;
 FOUNDATION_EXPORT NSString *const NSURLProtectionSpaceHTTPS;
@@ -595,6 +591,41 @@ FOUNDATION_EXPORT const float NSURLSessionTaskPriorityHigh;
 + (void)sendAsynchronousRequest:(NSURLRequest *)request
                           queue:(NSOperationQueue *)queue
               completionHandler:(void (^)(NSURLResponse *response, NSData *data, NSError *connectionError))handler;
+@end
+
+/* ---- NSURLDownload (deprecated on a Mac; freemac 1.223, Ferry 0.47.0) ------------ */
+
+/* A URL's contents saved to a file, with the delegate told on the run loop
+ * of the thread that started it, as NSURLConnection's is. A download can't
+ * be resumed: resumeData is nil and initWithResumeData:delegate:path:
+ * answers nil. */
+@class NSURLDownload;
+
+@protocol NSURLDownloadDelegate <NSObject>
+@optional
+- (void)downloadDidBegin:(NSURLDownload *)download;
+- (NSURLRequest *)download:(NSURLDownload *)download
+           willSendRequest:(NSURLRequest *)request
+          redirectResponse:(NSURLResponse *)redirectResponse;
+- (void)download:(NSURLDownload *)download didReceiveResponse:(NSURLResponse *)response;
+- (void)download:(NSURLDownload *)download decideDestinationWithSuggestedFilename:(NSString *)filename;
+- (void)download:(NSURLDownload *)download didCreateDestination:(NSString *)path;
+- (void)download:(NSURLDownload *)download didReceiveDataOfLength:(NSUInteger)length;
+- (BOOL)download:(NSURLDownload *)download shouldDecodeSourceDataOfMIMEType:(NSString *)encodingType;
+- (void)downloadDidFinish:(NSURLDownload *)download;
+- (void)download:(NSURLDownload *)download didFailWithError:(NSError *)error;
+- (void)download:(NSURLDownload *)download didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+@end
+
+@interface NSURLDownload : NSObject
++ (BOOL)canResumeDownloadDecodedWithEncodingMIMEType:(NSString *)MIMEType;
+- (instancetype)initWithRequest:(NSURLRequest *)request delegate:(id<NSURLDownloadDelegate>)delegate;
+- (instancetype)initWithResumeData:(NSData *)resumeData delegate:(id<NSURLDownloadDelegate>)delegate path:(NSString *)path;
+- (void)cancel;
+- (void)setDestination:(NSString *)path allowOverwrite:(BOOL)allowOverwrite;
+@property (readonly, copy) NSURLRequest *request;
+@property (readonly, copy) NSData *resumeData;
+@property BOOL deletesFileUponFailure;
 @end
 
 /* ---- reading URLs into data and strings -------------------------------------------- */

@@ -47,6 +47,7 @@ static id coder_value(NSCoder *c, NSString *key)
     NSInteger _backgroundStyle;
     NSFormatter *_formatter;
     NSMenu *_menu;
+    BOOL _showsFirstResponder;
 }
 
 /* Light or dark ground behind the cell (a selected table row is dark):
@@ -284,6 +285,24 @@ static id coder_value(NSCoder *c, NSString *key)
 - (void)setImage:(NSImage *)image { [self setObjectValue:image]; }
 - (NSView *)controlView { return _controlView; }
 - (void)setControlView:(NSView *)v { _controlView = v; }
+- (BOOL)showsFirstResponder { return _showsFirstResponder; }
+- (void)setShowsFirstResponder:(BOOL)flag { _showsFirstResponder = flag; }
+/* A click with no mouse: a cell that keeps a state takes its next one,
+ * then the action goes to the target, from the control the cell is in. */
+- (void)performClick:(id)sender
+{
+    if (!_enabled)
+        return;
+    /* a control's own cell: the control holds the state, target and action */
+    if ([_controlView isKindOfClass:[NSControl class]] && [(NSControl *)_controlView cell] == self) {
+        [(NSControl *)_controlView performClick:sender];
+        return;
+    }
+    if ([self respondsToSelector:@selector(setNextState)])
+        [self performSelector:@selector(setNextState)];
+    if (_action)
+        [NSApp sendAction:_action to:_target from:_controlView ?: (id)self];
+}
 
 /* the cell's contextual menu (freemac 1.221, Ferry 0.45.0) */
 - (NSMenu *)menu { return _menu; }
@@ -501,6 +520,25 @@ static id coder_value(NSCoder *c, NSString *key)
 - (void)setTransparent:(BOOL)f { _transparent = f; }
 - (BOOL)allowsMixedState { return _mixed; }
 - (void)setAllowsMixedState:(BOOL)f { _mixed = f; }
+/* A cell on its own keeps its state as NSButton does: switches, radio
+ * buttons and toggles change it when clicked. */
+- (void)setNextState
+{
+    NSButtonType t = _type;
+    if (t != NSButtonTypeSwitch && t != NSButtonTypeRadio && t != NSButtonTypeToggle &&
+        t != NSButtonTypePushOnPushOff && t != NSButtonTypeOnOff)
+        return;
+    NSControlStateValue s = [self state];
+    if (t == NSButtonTypeRadio)
+        s = NSControlStateValueOn;
+    else if (s == NSControlStateValueOff)
+        s = NSControlStateValueOn;
+    else if (s == NSControlStateValueOn && _mixed)
+        s = NSControlStateValueMixed;
+    else
+        s = s == NSControlStateValueMixed ? NSControlStateValueOn : NSControlStateValueOff;
+    [self setState:s];
+}
 @end
 
 /* ---- NSTextFieldCell ------------------------------------------------------------------ */

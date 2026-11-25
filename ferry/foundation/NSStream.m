@@ -86,8 +86,8 @@ __attribute__((constructor)) static void null_init(void) { ferry_null = (CFNullR
 enum {
     errSSLClosedAbort = -9806,        /* the handshake failed */
     errSSLXCertChainInvalid = -9807,  /* the server's certificates aren't trusted */
-    errSecParam = -50,                /* asked for what isn't offered (a TLS server) */
 };
+/* errSecParam (Security.h, which Foundation brings in): asked for what isn't offered (a TLS server) */
 
 /* ---- the common part: status, delegate, CF client, run loops and queues ------------------ */
 

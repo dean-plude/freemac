@@ -76,20 +76,30 @@ typedef struct { CFIndex location, length; } CFRange;
 static inline CFRange CFRangeMake(CFIndex loc, CFIndex len) { CFRange r = {loc, len}; return r; }
 typedef enum { kCFCompareLessThan = -1, kCFCompareEqualTo = 0, kCFCompareGreaterThan = 1 } CFComparisonResult;
 
+/* The CF types that are Foundation's objects say so, as on a Mac, so that
+ * ARC lets a message's or property's result be cast to them without
+ * __bridge (freemac 1.223, Ferry 0.47.0). */
+#if defined(__has_attribute) && __has_attribute(objc_bridge)
+#define CF_BRIDGED_TYPE(T) __attribute__((objc_bridge(T)))
+#define CF_BRIDGED_MUTABLE_TYPE(T) __attribute__((objc_bridge_mutable(T)))
+#else
+#define CF_BRIDGED_TYPE(T)
+#define CF_BRIDGED_MUTABLE_TYPE(T)
+#endif
 typedef const struct __CFAllocator *CFAllocatorRef;
-typedef const struct __CFString *CFStringRef;
-typedef struct __CFString *CFMutableStringRef;
-typedef const struct __CFArray *CFArrayRef;
-typedef struct __CFArray *CFMutableArrayRef;
-typedef const struct __CFDictionary *CFDictionaryRef;
-typedef struct __CFDictionary *CFMutableDictionaryRef;
-typedef const struct __CFData *CFDataRef;
-typedef const struct __CFNumber *CFNumberRef;
-typedef const struct __CFBoolean *CFBooleanRef;
-typedef const struct __CFNull *CFNullRef;
-typedef const struct __CFDate *CFDateRef;
-typedef const struct __CFURL *CFURLRef;
-typedef const struct __CFError *CFErrorRef;
+typedef const struct CF_BRIDGED_TYPE(NSString) __CFString *CFStringRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableString) __CFString *CFMutableStringRef;
+typedef const struct CF_BRIDGED_TYPE(NSArray) __CFArray *CFArrayRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableArray) __CFArray *CFMutableArrayRef;
+typedef const struct CF_BRIDGED_TYPE(NSDictionary) __CFDictionary *CFDictionaryRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableDictionary) __CFDictionary *CFMutableDictionaryRef;
+typedef const struct CF_BRIDGED_TYPE(NSData) __CFData *CFDataRef;
+typedef const struct CF_BRIDGED_TYPE(NSNumber) __CFNumber *CFNumberRef;
+typedef const struct CF_BRIDGED_TYPE(NSNumber) __CFBoolean *CFBooleanRef;
+typedef const struct CF_BRIDGED_TYPE(NSNull) __CFNull *CFNullRef;
+typedef const struct CF_BRIDGED_TYPE(NSDate) __CFDate *CFDateRef;
+typedef const struct CF_BRIDGED_TYPE(NSURL) __CFURL *CFURLRef;
+typedef const struct CF_BRIDGED_TYPE(NSError) __CFError *CFErrorRef;
 typedef struct __CFRunLoop *CFRunLoopRef;
 typedef struct __CFBundle *CFBundleRef;
 typedef CFStringRef CFRunLoopMode;
@@ -110,9 +120,6 @@ typedef enum {
 
 #define CFSTR(s) ((CFStringRef)__builtin___CFStringMakeConstantString("" s ""))
 
-#ifdef __OBJC__
-#define CF_BRIDGED_TYPE(T)
-#endif
 #define CF_RETURNS_RETAINED __attribute__((cf_returns_retained))
 #define CF_RETURNS_NOT_RETAINED __attribute__((cf_returns_not_retained))
 #define CF_ENUM(type, name) enum name : type name; enum name : type
@@ -121,6 +128,7 @@ typedef enum {
 #define CF_INLINE static inline
 
 __FERRY_BEGIN
+CF_IMPLICIT_BRIDGING_ENABLED
 extern const CFAllocatorRef kCFAllocatorDefault;
 extern const CFAllocatorRef kCFAllocatorSystemDefault;
 extern const CFAllocatorRef kCFAllocatorNull;
@@ -171,6 +179,9 @@ void CFDictionaryRemoveValue(CFMutableDictionaryRef d, const void *key);
 CFNumberRef CFNumberCreate(CFAllocatorRef alloc, CFNumberType type, const void *value);
 Boolean CFNumberGetValue(CFNumberRef n, CFNumberType type, void *value);
 Boolean CFBooleanGetValue(CFBooleanRef b);
+CFTypeID CFBooleanGetTypeID(void);
+CFTypeID CFNumberGetTypeID(void);
+CFTypeID CFDataGetTypeID(void);
 
 CFDataRef CFDataCreate(CFAllocatorRef alloc, const UInt8 *bytes, CFIndex length);
 CFIndex CFDataGetLength(CFDataRef d);
@@ -188,8 +199,8 @@ void CFRunLoopWakeUp(CFRunLoopRef rl);
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void));
 enum { kCFRunLoopRunFinished = 1, kCFRunLoopRunStopped = 2, kCFRunLoopRunTimedOut = 3, kCFRunLoopRunHandledSource = 4 };
 
-typedef const struct __CFAttributedString *CFAttributedStringRef;
-typedef struct __CFAttributedString *CFMutableAttributedStringRef;
+typedef const struct CF_BRIDGED_TYPE(NSAttributedString) __CFAttributedString *CFAttributedStringRef;
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSMutableAttributedString) __CFAttributedString *CFMutableAttributedStringRef;
 
 CFAttributedStringRef CFAttributedStringCreate(CFAllocatorRef alloc, CFStringRef str, CFDictionaryRef attributes);
 CFAttributedStringRef CFAttributedStringCreateCopy(CFAllocatorRef alloc, CFAttributedStringRef str);
@@ -220,6 +231,11 @@ CFURLRef CFBundleCopyExecutableURL(CFBundleRef bundle);
 CFURLRef CFBundleCopyResourcesDirectoryURL(CFBundleRef bundle);
 CFURLRef CFBundleCopyBuiltInPlugInsURL(CFBundleRef bundle);
 CFDictionaryRef CFBundleGetInfoDictionary(CFBundleRef bundle);
+/* A bundle folder's Info.plist, read afresh from the disk (Contents/Info.plist,
+ * Resources/Info.plist or Info.plist), and a folder's or file's
+ * (freemac 1.223, Ferry 0.47.0). */
+CFDictionaryRef CFBundleCopyInfoDictionaryInDirectory(CFURLRef bundleURL);
+CFDictionaryRef CFBundleCopyInfoDictionaryForURL(CFURLRef url);
 Boolean CFBundleLoadExecutable(CFBundleRef bundle);
 Boolean CFBundleLoadExecutableAndReturnError(CFBundleRef bundle, CFErrorRef *error);
 Boolean CFBundleIsExecutableLoaded(CFBundleRef bundle);
@@ -245,11 +261,17 @@ CFDictionaryRef CFPreferencesCopyMultiple(CFArrayRef keysToFetch, CFStringRef ap
                                           CFStringRef hostName);
 Boolean CFPreferencesSynchronize(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
 CFArrayRef CFPreferencesCopyKeyList(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName);
+CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 /* Arrays and dictionaries with callbacks, more strings, string encodings,
  * UUIDs, URLs, bundle keys and byte order (Ferry 0.43.0) */
 #include <CoreFoundation/CFMore.h>
 #include <CoreFoundation/CFSet.h>
+/* locales, which are NSLocales (foundation/CFLocale.m) */
+#include <CoreFoundation/CFLocale.h>
+#include <CoreFoundation/CFDate.h>
+/* errors, which are NSErrors (foundation/CFError.m) */
+#include <CoreFoundation/CFError.h>
 /* run loop sources, sockets and streams (foundation/CFSocket.m, NSStream.m) */
 #include <CoreFoundation/CFSocket.h>
 #include <CoreFoundation/CFStream.h>

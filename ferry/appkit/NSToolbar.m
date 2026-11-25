@@ -1050,7 +1050,7 @@ static NSFont *label_font(NSToolbar *t) { return [NSFont systemFontOfSize:[t _sm
     if (tiled || !toolbar)
         return;
     tiled = YES;
-    NSArray *items = [self _flatItems];
+    NSArray<NSToolbarItem *> *items = [self _flatItems];
     NSUInteger n = [items count];
     CGFloat mins[n ? n : 1], maxs[n ? n : 1], widths[n ? n : 1];
     BOOL shown[n ? n : 1];

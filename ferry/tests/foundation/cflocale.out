@@ -1,0 +1,37 @@
+locale type: 1
+identifier: fr_FR
+language: fr
+country: FR
+currency: EUR
+metric: 1
+copy: fr_FR
+current: en_US
+system: 1
+canonical en-GB: en_GB
+de_CH language: de
+de_CH country: CH
+ISO languages: some 1
+available locales: some 1
+preferred languages: some 1
+date type: 1
+absolute time: 31536000
+interval: 31536000
+compare: -1 1 0
+since 1904: 3061152000
+formatter type: 1, styles 2 1
+its locale: en_US
+medium, short (Paris): Jan 1, 2002, 1:00 AM
+format: yyyy-MM-dd HH:mm
+formatted: 2001-01-01 02:00
+parsed: 86400
+template yMMMd: MMM d, y
+error type: 1
+domain: NSPOSIXErrorDomain
+code: 2
+description: The clipping store can't be read.
+its file: /tmp/clips
+failure reason: none
+plain domain: NSOSStatusErrorDomain
+plain user info: 0 entries
+no domain: 1
+exit=0
