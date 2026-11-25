@@ -6,6 +6,7 @@
 #import <Foundation/Foundation.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <objc/runtime.h>
+#include <dlfcn.h>
 
 /* Greeter's method, which this program only knows by name. */
 @interface NSObject (Greeting)
@@ -83,6 +84,21 @@ int main(void)
         printf("  principal class: %s\n", [b principalClass] ? "found" : "Nil");
         printf("  a folder that isn't there: %s\n",
                [NSBundle bundleWithPath:[dir stringByAppendingPathComponent:@"Nothing.bundle"]] ? "found" : "nil");
+
+        /* a bundle whose program was opened with dlopen, never through
+         * NSBundle, is still known by its identifier, as a Mac knows a
+         * loaded framework's (freemac 1.224) */
+        printf("Quiet.bundle, opened with dlopen\n");
+        NSString *quiet = [dir stringByAppendingPathComponent:@"Quiet.bundle"];
+        printf("  by identifier before: %s\n",
+               [NSBundle bundleWithIdentifier:@"org.freemac.ferry.quiet"] ? "found" : "nil");
+        void *h = dlopen([[quiet stringByAppendingPathComponent:@"Contents/MacOS/Quiet"] fileSystemRepresentation],
+                         RTLD_NOW);
+        printf("  dlopen: %s\n", yes(h != NULL));
+        b = [NSBundle bundleWithIdentifier:@"org.freemac.ferry.quiet"];
+        printf("  by identifier after: %s, its folder %s\n", b ? "found" : "nil", [[[b bundlePath] lastPathComponent] UTF8String]);
+        printf("  in allBundles: %s, in allFrameworks: %s\n", yes([[NSBundle allBundles] containsObject:b]),
+               [[NSBundle allFrameworks] containsObject:b] ? "yes" : "no");
         printf("main bundle loaded: %s\n", yes([main isLoaded]));
     }
     return 0;

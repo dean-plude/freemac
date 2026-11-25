@@ -1103,7 +1103,8 @@ VIEW_TAGS = {
 }
 # Elements whose Cocoa class isn't "NS" and the element's name.
 COCOA_NAMES = {"webView": "WebView", "wkWebView": "WKWebView", "pdfView": "PDFView", "mtkView": "MTKView",
-               "openGLView": "NSOpenGLView", "sceneView": "SCNView", "avPlayerView": "AVPlayerView"}
+               "openGLView": "NSOpenGLView", "sceneView": "SCNView", "avPlayerView": "AVPlayerView",
+               "qcView": "QCView"}
 
 
 def compile_xib(path, warn):

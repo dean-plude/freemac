@@ -289,10 +289,55 @@ CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGF
     return (CGImageRef)im;
 }
 
+/* The largest PNG picture in an .icns file, in the file format's published
+ * layout ("icns", its length, then entries of a four-character type, a
+ * length and the data), or nil. */
+static NSData *icns_largest_png(NSData *data)
+{
+    const uint8_t *b = data.bytes;
+    size_t n = data.length, at = 8, best = 0;
+    NSData *found = nil;
+    if (n < 8 || memcmp(b, "icns", 4))
+        return nil;
+    while (at + 8 <= n) {
+        size_t len = ((size_t)b[at + 4] << 24) | ((size_t)b[at + 5] << 16) | ((size_t)b[at + 6] << 8) | b[at + 7];
+        if (len < 8 || len > n - at)
+            break;
+        const uint8_t *d = b + at + 8;
+        size_t dl = len - 8;
+        if (dl >= 24 && !memcmp(d, "\x89PNG\r\n\x1a\n", 8) && !memcmp(d + 12, "IHDR", 4)) {
+            size_t w = ((size_t)d[16] << 24) | ((size_t)d[17] << 16) | ((size_t)d[18] << 8) | d[19];
+            if (w > best) {
+                best = w;
+                found = [NSData dataWithBytes:d length:dl];
+            }
+        }
+        at += len;
+    }
+    return found;
+}
+
+static GImage *pixbuf_decode(NSData *data, NSString **type);
+
 /* Any image file this system's GdkPixbuf reads (PNG, JPEG, GIF, TIFF, BMP,
  * ICO, ICNS and more), as 8-bit RGB or RGBA, not premultiplied. *type is
- * set to the file's kind as a uniform type identifier. */
+ * set to the file's kind as a uniform type identifier. GdkPixbuf reads an
+ * .icns file only at the sizes it looks for, so an icon it can't read, such
+ * as one ferry-actool made from an app's icon set with only small sizes, is
+ * read from its largest PNG picture (freemac 1.224, Ferry 0.48.0). */
 GImage *GImageDecode(NSData *data, NSString **type)
+{
+    GImage *im = pixbuf_decode(data, type);
+    if (!im && data.length >= 8 && !memcmp(data.bytes, "icns", 4)) {
+        NSData *png = icns_largest_png(data);
+        im = png ? pixbuf_decode(png, NULL) : nil;
+        if (im && type)
+            *type = @"com.apple.icns";
+    }
+    return im;
+}
+
+static GImage *pixbuf_decode(NSData *data, NSString **type)
 {
     if (type)
         *type = nil;

@@ -1,0 +1,24 @@
+StatusIcon: 14x16 points, template 1, reps 14x16@14x16 28x32@14x16, first pixel 0 0 0
+Badge: 20x10 points, template 0, reps 20x10@20x10, first pixel 255 0 0
+ArrowTemplate: 8x8 points, template 1, reps 8x8@8x8, first pixel 0 0 0
+Toolbar/Star: 12x12 points, template 0, reps 24x24@12x12, first pixel 255 200 0
+Star: none
+Dot: 4x4 points, template 0, reps 4x4@4x4, first pixel 0 128 0
+Group/Dot: none
+Gear: none
+NoSuchImage: none
+bundle StatusIcon: 14x16 points, template 1, reps 14x16@14x16 28x32@14x16, first pixel 0 0 0
+same image each time 1
+color AccentColor: 0.200 0.400 0.600 alpha 1.00
+color Brand: 1.000 0.502 0.000 alpha 0.50
+color Hex: 0.000 0.502 1.000 alpha 1.00
+color Shade: 0.250 0.250 0.250 alpha 1.00
+color NoSuchColor: none
+color LinkColor is the system blue 1
+color in another bundle: none
+data Notes, public.plain-text: hello from a data asset
+data NoSuchData: none
+icon file AppIcon, icon name AppIcon
+icns icns, length right, entries ic07 ic11 ic12 icp4 icp5
+application icon from the icns 1
+exit=0

@@ -408,6 +408,8 @@ extern const CFStringRef kSecCodeInfoTimestamp;
 extern const CFStringRef kSecCodeInfoTrust;
 extern const CFStringRef kSecCodeInfoUnique;
 extern const CFStringRef kSecGuestAttributePid;
+/* freemac 1.224: a guest named by its audit token, which here is never found */
+extern const CFStringRef kSecGuestAttributeAudit;
 
 OSStatus SecCodeCopySelf(SecCSFlags flags, SecCodeRef *self);
 OSStatus SecCodeCopyStaticCode(SecCodeRef code, SecCSFlags flags, SecStaticCodeRef *staticCode);
@@ -491,7 +493,10 @@ CFArrayRef SecTrustCopyCertificateChain(SecTrustRef trust) CF_RETURNS_RETAINED;
  * it can do as the user (Sparkle then updates only an app the user can
  * write to). Running a tool with privileges answers the same. */
 
+#ifndef _FERRY_AUTHORIZATIONREF_
+#define _FERRY_AUTHORIZATIONREF_
 typedef const struct AuthorizationOpaqueRef *AuthorizationRef;
+#endif
 typedef const char *AuthorizationString;
 typedef uint32_t AuthorizationFlags;
 enum {
@@ -563,6 +568,19 @@ OSStatus AuthorizationExecuteWithPrivileges(AuthorizationRef authorization, cons
                                             AuthorizationFlags options, char *const *arguments,
                                             FILE **communicationsPipe);
 OSStatus AuthorizationCopyPrivilegedReference(AuthorizationRef *authorization, AuthorizationFlags flags);
+/* The rights database (freemac 1.224, Ferry 0.48.0): it holds no rights,
+ * so reading one answers errAuthorizationDenied, as for a right that isn't
+ * defined, and defining or removing one is denied too. */
+#define kAuthorizationRuleClassAllow "allow"
+#define kAuthorizationRuleClassDeny "deny"
+#define kAuthorizationRuleIsAdmin "is-admin"
+#define kAuthorizationRuleAuthenticateAsSessionUser "authenticate-session-owner"
+#define kAuthorizationRuleAuthenticateAsAdmin "authenticate-admin"
+#define kAuthorizationRightRule "rule"
+OSStatus AuthorizationRightGet(const char *rightName, CFDictionaryRef *rightDefinition);
+OSStatus AuthorizationRightSet(AuthorizationRef authRef, const char *rightName, CFTypeRef rightDefinition,
+                               CFStringRef descriptionKey, CFBundleRef bundle, CFStringRef localeTableName);
+OSStatus AuthorizationRightRemove(AuthorizationRef authRef, const char *rightName);
 
 /* ---- importing keys (SecImportExport.h) ---------------------------------------------
  * (freemac 1.223, Ferry 0.47.0) A public key in PEM ("-----BEGIN PUBLIC

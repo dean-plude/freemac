@@ -532,6 +532,10 @@ static unichar to_cap(unichar c, BOOL w) { return w ? to_upper(c, w) : to_lower(
 - (NSString *)uppercaseString { return [self mapChars:to_upper]; }
 - (NSString *)lowercaseString { return [self mapChars:to_lower]; }
 - (NSString *)capitalizedString { return [self mapChars:to_cap]; }
+/* freemac 1.224: the user's locale changes no letter here */
+- (NSString *)localizedUppercaseString { return [self uppercaseString]; }
+- (NSString *)localizedLowercaseString { return [self lowercaseString]; }
+- (NSString *)localizedCapitalizedString { return [self capitalizedString]; }
 
 /* numbers */
 - (int)intValue { return (int)[self longLongValue]; }

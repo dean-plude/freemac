@@ -159,6 +159,40 @@ static void range_check(id self, SEL _cmd, NSUInteger index, NSUInteger count)
     return [self initWithArray:a];
 }
 - (instancetype)initWithContentsOfURL:(NSURL *)url { return [self initWithContentsOfFile:[url path]]; }
+/* freemac 1.224: a property list (of this class) read from a file URL */
+static id plist_at_url(NSURL *url, Class cls, NSError **error)
+{
+    NSData *data = [url isFileURL] ? [NSData dataWithContentsOfFile:[url path] options:0 error:error] : nil;
+    if (!data) {
+        if (error && ![url isFileURL])
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnsupportedSchemeError userInfo:nil];
+        return nil;
+    }
+    id plist = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:error];
+    if (plist && ![plist isKindOfClass:cls]) {
+        plist = nil;
+        if (error)
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSPropertyListReadCorruptError userInfo:nil];
+    }
+    return plist;
+}
+- (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error
+{
+    NSArray *o = plist_at_url(url, [NSArray class], error);
+    if (!o) {
+        [self release];
+        return nil;
+    }
+    return [self initWithArray:o];
+}
++ (id)arrayWithContentsOfURL:(NSURL *)url
+{
+    return [[[self alloc] initWithContentsOfURL:url error:NULL] autorelease];
+}
++ (id)arrayWithContentsOfURL:(NSURL *)url error:(NSError **)error
+{
+    return [[[self alloc] initWithContentsOfURL:url error:error] autorelease];
+}
 - (instancetype)initWithArray:(NSArray *)array
 {
     NSUInteger n = [array count];
@@ -367,6 +401,20 @@ static void check_range(NSArray *a, NSRange r)
 {
     NSData *d = FWriteXMLPlist(self);
     return d && [d writeToFile:path atomically:atomically];
+}
+- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically
+{
+    NSData *d = FWriteXMLPlist(self);
+    return d && [d writeToURL:url options:atomically ? NSDataWritingAtomic : 0 error:NULL];
+}
+- (BOOL)writeToURL:(NSURL *)url error:(NSError **)error
+{
+    NSData *d = FWriteXMLPlist(self);
+    if (!d) {
+        FSetError(error, [NSError errorWithDomain:NSCocoaErrorDomain code:NSPropertyListWriteInvalidError userInfo:nil]);
+        return NO;
+    }
+    return [d writeToURL:url options:NSDataWritingAtomic error:error];
 }
 - (NSString *)description { return FDescribe(self, 0); }
 - (NSString *)descriptionWithLocale:(id)locale { return FDescribe(self, 0); }

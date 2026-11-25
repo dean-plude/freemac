@@ -401,7 +401,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     _autosaveName = [name copy];
     return YES;
 }
-- (BOOL)setFrameUsingName:(NSString *)name { return NO; }
+/* the frame kept under that name (appkit/NSKeyCastrCalls.m, freemac 1.224,
+ * Ferry 0.48.0) */
+- (BOOL)setFrameUsingName:(NSString *)name { return [self setFrameUsingName:name force:NO]; }
 
 /* ---- controllers ---- */
 - (NSWindowController *)windowController { return _windowController; }

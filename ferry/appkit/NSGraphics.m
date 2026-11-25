@@ -317,13 +317,13 @@ NAMED(selectedMenuItemTextColor, 1, 1, 1, 1)
 NAMED(quaternaryLabelColor, 0, 0, 0, 0.1)
 NAMED(unemphasizedSelectedTextBackgroundColor, 0.86, 0.86, 0.86, 1)
 NAMED(findHighlightColor, 1, 0.9, 0, 1)
-/* An app's named colours are in its compiled asset catalogue, which Ferry
- * doesn't read: nil, as a Mac answers for a name it has no colour for. */
+/* An app's named colours are in the asset catalogue ferry-actool compiled
+ * into its bundle (NSAssets.m, freemac 1.224, Ferry 0.48.0); nil, as on a
+ * Mac, for a name it has no colour for. */
 + (NSColor *)colorNamed:(NSString *)name { return [self colorNamed:name bundle:nil]; }
 + (NSColor *)colorNamed:(NSString *)name bundle:(NSBundle *)bundle
 {
-    AWarnOnce("colorNamed: (an app's own colours, from its asset catalogue)");
-    return nil;
+    return AAssetColor(bundle ?: [NSBundle mainBundle], name);
 }
 
 - (void)dealloc
@@ -534,6 +534,9 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
 
 /* ---- NSParagraphStyle ------------------------------------------------------------------- */
 
+/* the tab stops a style was given (freemac 1.224) */
+static char tab_stops_key;
+
 @implementation NSParagraphStyle
 + (NSParagraphStyle *)defaultParagraphStyle
 {
@@ -577,7 +580,25 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
     p->lineBreakMode = lineBreakMode;
     p->writingDirection = writingDirection;
     memcpy(p->values, values, sizeof values);
+    objc_setAssociatedObject(p, &tab_stops_key, objc_getAssociatedObject(self, &tab_stops_key),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return p;
+}
+- (NSArray *)tabStops
+{
+    NSArray *tabs = objc_getAssociatedObject(self, &tab_stops_key);
+    if (tabs)
+        return tabs;
+    static NSArray *standard;
+    @synchronized([NSParagraphStyle class]) {
+        if (!standard) {
+            NSMutableArray *a = [NSMutableArray array];
+            for (int i = 1; i <= 12; i++)
+                [a addObject:[[[NSTextTab alloc] initWithType:NSLeftTabStopType location:28.0 * i] autorelease]];
+            standard = [a copy];
+        }
+    }
+    return standard;
 }
 - (id)mutableCopyWithZone:(NSZone *)zone
 {
@@ -597,6 +618,7 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
 - (CGFloat)minimumLineHeight { return values[kCTParagraphStyleSpecifierMinimumLineHeight]; }
 - (CGFloat)maximumLineHeight { return values[kCTParagraphStyleSpecifierMaximumLineHeight]; }
 - (CGFloat)lineHeightMultiple { return values[kCTParagraphStyleSpecifierLineHeightMultiple]; }
+- (CGFloat)defaultTabInterval { return values[kCTParagraphStyleSpecifierDefaultTabInterval]; }
 @end
 
 @implementation NSMutableParagraphStyle
@@ -613,8 +635,30 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
 - (void)setMinimumLineHeight:(CGFloat)v { values[kCTParagraphStyleSpecifierMinimumLineHeight] = v; }
 - (void)setMaximumLineHeight:(CGFloat)v { values[kCTParagraphStyleSpecifierMaximumLineHeight] = v; }
 - (void)setLineHeightMultiple:(CGFloat)v { values[kCTParagraphStyleSpecifierLineHeightMultiple] = v; }
+- (void)setDefaultTabInterval:(CGFloat)v { values[kCTParagraphStyleSpecifierDefaultTabInterval] = v; }
+- (void)setTabStops:(NSArray *)tabs
+{
+    NSArray *sorted = [tabs sortedArrayUsingComparator:^NSComparisonResult(NSTextTab *a, NSTextTab *b) {
+        return [a location] < [b location] ? NSOrderedAscending : [a location] > [b location] ? NSOrderedDescending
+                                                                                            : NSOrderedSame;
+    }];
+    objc_setAssociatedObject(self, &tab_stops_key, sorted ?: @[], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+- (void)addTabStop:(NSTextTab *)tab
+{
+    if (tab)
+        [self setTabStops:[[self tabStops] arrayByAddingObject:tab]];
+}
+- (void)removeTabStop:(NSTextTab *)tab
+{
+    NSMutableArray *a = [[[self tabStops] mutableCopy] autorelease];
+    [a removeObject:tab];
+    [self setTabStops:a];
+}
 - (void)setParagraphStyle:(NSParagraphStyle *)style
 {
+    objc_setAssociatedObject(self, &tab_stops_key, style ? objc_getAssociatedObject(style, &tab_stops_key) : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     GParagraphStyle *s = (GParagraphStyle *)style;
     alignment = s ? s->alignment : kCTTextAlignmentNatural;
     lineBreakMode = s ? s->lineBreakMode : 0;
@@ -623,6 +667,71 @@ NSFont *ADefaultFont(void) { return [NSFont systemFontOfSize:13]; }
         memcpy(values, s->values, sizeof values);
     else
         memset(values, 0, sizeof values);
+}
+@end
+
+/* ---- tab stops (freemac 1.224) ---- */
+
+NSTextTabOptionKey const NSTabColumnTerminatorsAttributeName = @"NSTabColumnTerminatorsAttributeName";
+
+@implementation NSTextTab {
+    CGFloat _location;
+    NSTextAlignment _alignment;
+    NSDictionary *_options;
+}
+- (instancetype)initWithTextAlignment:(NSTextAlignment)alignment location:(CGFloat)loc options:(NSDictionary *)options
+{
+    if ((self = [super init])) {
+        _alignment = alignment;
+        _location = loc;
+        _options = [options copy] ?: [[NSDictionary alloc] init];
+    }
+    return self;
+}
+- (instancetype)initWithType:(NSTextTabType)type location:(CGFloat)loc
+{
+    NSTextAlignment a = type == NSRightTabStopType    ? NSTextAlignmentRight
+                        : type == NSCenterTabStopType ? NSTextAlignmentCenter
+                                                      : NSTextAlignmentLeft;
+    NSDictionary *o = type == NSDecimalTabStopType
+                          ? @{NSTabColumnTerminatorsAttributeName: [NSCharacterSet characterSetWithCharactersInString:@"."]}
+                          : nil;
+    if (type == NSDecimalTabStopType)
+        a = NSTextAlignmentRight;
+    return [self initWithTextAlignment:a location:loc options:o];
+}
+- (void)dealloc
+{
+    [_options release];
+    [super dealloc];
+}
+- (CGFloat)location { return _location; }
+- (NSTextAlignment)alignment { return _alignment; }
+- (NSDictionary *)options { return _options; }
+- (NSTextTabType)tabStopType
+{
+    if ([_options objectForKey:NSTabColumnTerminatorsAttributeName])
+        return NSDecimalTabStopType;
+    return _alignment == NSTextAlignmentRight    ? NSRightTabStopType
+           : _alignment == NSTextAlignmentCenter ? NSCenterTabStopType
+                                                 : NSLeftTabStopType;
+}
+- (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+- (BOOL)isEqual:(id)o
+{
+    return [o isKindOfClass:[NSTextTab class]] && [o location] == _location && [o alignment] == _alignment;
+}
+- (NSUInteger)hash { return (NSUInteger)(_location * 16) ^ (NSUInteger)_alignment; }
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeDouble:_location forKey:@"NSLocation"];
+    [coder encodeInteger:_alignment forKey:@"NSAlignment"];
+}
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    return [self initWithTextAlignment:[coder decodeIntegerForKey:@"NSAlignment"]
+                              location:[coder decodeDoubleForKey:@"NSLocation"]
+                               options:nil];
 }
 @end
 

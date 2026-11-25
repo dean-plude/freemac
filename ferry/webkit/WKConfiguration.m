@@ -844,3 +844,64 @@ static NSArray *items_of(GList *list)
     [super dealloc];
 }
 @end
+
+/* ---- content rule lists, which aren't compiled (freemac 1.224, Ferry 0.48.0) ---- */
+
+@implementation WKContentRuleList
+- (NSString *)identifier { return nil; }
+@end
+
+static NSError *rule_list_error(WKErrorCode code)
+{
+    return [NSError errorWithDomain:WKErrorDomain code:code
+                           userInfo:@{NSLocalizedDescriptionKey: @"Content rule lists aren't compiled here."}];
+}
+
+@implementation WKContentRuleListStore
++ (instancetype)defaultStore
+{
+    static WKContentRuleListStore *store;
+    @synchronized(self) {
+        if (!store)
+            store = [[WKContentRuleListStore alloc] init];
+    }
+    return store;
+}
++ (instancetype)storeWithURL:(NSURL *)url { return [[[WKContentRuleListStore alloc] init] autorelease]; }
+- (void)compileContentRuleListForIdentifier:(NSString *)identifier encodedContentRuleList:(NSString *)rules
+                          completionHandler:(void (^)(WKContentRuleList *, NSError *))handler
+{
+    if (handler)
+        dispatch_async(dispatch_get_main_queue(), ^{
+            handler(nil, rule_list_error(WKErrorContentRuleListStoreCompileFailed));
+        });
+}
+- (void)lookUpContentRuleListForIdentifier:(NSString *)identifier
+                         completionHandler:(void (^)(WKContentRuleList *, NSError *))handler
+{
+    if (handler)
+        dispatch_async(dispatch_get_main_queue(), ^{
+            handler(nil, rule_list_error(WKErrorContentRuleListStoreLookUpFailed));
+        });
+}
+- (void)removeContentRuleListForIdentifier:(NSString *)identifier completionHandler:(void (^)(NSError *))handler
+{
+    if (handler)
+        dispatch_async(dispatch_get_main_queue(), ^{
+            handler(rule_list_error(WKErrorContentRuleListStoreRemoveFailed));
+        });
+}
+- (void)getAvailableContentRuleListIdentifiers:(void (^)(NSArray<NSString *> *))handler
+{
+    if (handler)
+        dispatch_async(dispatch_get_main_queue(), ^{
+            handler(@[]);
+        });
+}
+@end
+
+@implementation WKUserContentController (FerryContentRuleLists)
+- (void)addContentRuleList:(WKContentRuleList *)list {}
+- (void)removeContentRuleList:(WKContentRuleList *)list {}
+- (void)removeAllContentRuleLists {}
+@end

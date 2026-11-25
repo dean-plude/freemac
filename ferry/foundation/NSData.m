@@ -116,15 +116,34 @@
                (unsigned long)range.location, (unsigned long)range.length, (unsigned long)[self length]);
     return [NSData dataWithBytes:(const char *)[self bytes] + range.location length:range.length];
 }
-- (NSRange)rangeOfData:(NSData *)needle options:(NSUInteger)opts range:(NSRange)range
+/* NSDataSearchBackwards finds the last match; NSDataSearchAnchored only one
+ * at the range's start (or, searching backwards, its end) (freemac 1.224) */
+- (NSRange)rangeOfData:(NSData *)needle options:(NSDataSearchOptions)opts range:(NSRange)range
 {
     const unsigned char *h = [self bytes], *n = [needle bytes];
     NSUInteger nl = [needle length];
+    if (range.location > [self length])
+        return NSMakeRange(NSNotFound, 0);
+    if (NSMaxRange(range) > [self length])
+        range.length = [self length] - range.location;
     if (nl == 0 || nl > range.length)
         return NSMakeRange(NSNotFound, 0);
-    for (NSUInteger i = range.location; i + nl <= NSMaxRange(range); i++)
-        if (memcmp(h + i, n, nl) == 0)
-            return NSMakeRange(i, nl);
+    NSUInteger first = range.location, last = NSMaxRange(range) - nl;
+    if (opts & NSDataSearchBackwards) {
+        for (NSUInteger i = last + 1; i-- > first;) {
+            if (memcmp(h + i, n, nl) == 0)
+                return NSMakeRange(i, nl);
+            if (opts & NSDataSearchAnchored)
+                break;
+        }
+    } else {
+        for (NSUInteger i = first; i <= last; i++) {
+            if (memcmp(h + i, n, nl) == 0)
+                return NSMakeRange(i, nl);
+            if (opts & NSDataSearchAnchored)
+                break;
+        }
+    }
     return NSMakeRange(NSNotFound, 0);
 }
 - (BOOL)isEqualToData:(NSData *)other

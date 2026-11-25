@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""ferry-actool: compiles Xcode asset catalogues (.xcassets folders) into
+assets that Ferry's AppKit reads (freemac 1.224, Ferry 0.48.0). Ferry's
+own tool, written for freemac from the asset catalogue format's public
+description; it is not Apple's actool, uses none of Apple's code and
+doesn't write Apple's compiled catalogue (Assets.car).
+
+    ferry-actool --compile RESOURCES [--app-icon NAME]
+                 [--output-partial-info-plist PLIST] CATALOG.xcassets ...
+
+A catalogue is a folder of folders, each with a Contents.json (plain JSON)
+saying what it holds. What is compiled, into RESOURCES:
+
+- Assets.ferryassets/Index.plist, a property list of Ferry's own, and
+  beside it a copy of each file the index names:
+    Images: {name: {template: bool?, files: [{file, scale, appearance}]}}
+    Colors: {name: [{appearance, space, red, green, blue, alpha}] or
+             [{appearance, system: "systemBlueColor"}]}
+    Data:   {name: [{file, type}]}
+  from .imageset, .colorset and .dataset folders. A folder whose
+  Contents.json says "provides-namespace" puts its folder's name and a
+  slash before its assets' names, as on a Mac.
+- NAME.icns, from the .appiconset named by --app-icon, an icon file in the
+  publicly documented .icns layout with each size's PNG in it; with
+  --output-partial-info-plist, a property list giving CFBundleIconFile and
+  CFBundleIconName for the app's Info.plist.
+
+Only the "mac" and "universal" idioms are read (the "mac" one wins), and an
+appearance is "any" or "dark". Image stacks, symbol sets, AR resources and
+the other kinds are left out with a note on standard error; so is an
+asset of the same name as one already compiled.
+"""
+import json
+import os
+import plistlib
+import shutil
+import struct
+import sys
+import zlib
+
+INDEX_FORMAT = 1
+KNOWN_SKIPPED = ('.imagestack', '.symbolset', '.arresourcegroup', '.brandassets', '.launchimage',
+                 '.cubetextureset', '.mipmapset', '.spriteatlas', '.textureset', '.sticker',
+                 '.stickerpack', '.stickersequence', '.iconset', '.complicationset', '.solidimagestack')
+
+
+def note(msg):
+    sys.stderr.write("ferry-actool: %s\n" % msg)
+
+
+def read_contents(folder):
+    path = os.path.join(folder, "Contents.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            value = json.load(f)
+    except (OSError, ValueError) as e:
+        note("%s: %s" % (path, e))
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def scale_of(entry):
+    s = str(entry.get("scale", "1x")).rstrip("x")
+    try:
+        return float(s)
+    except ValueError:
+        return 1.0
+
+
+def appearance_of(entry):
+    for a in entry.get("appearances") or []:
+        if isinstance(a, dict) and a.get("appearance") == "luminosity":
+            return "dark" if a.get("value") == "dark" else ("light" if a.get("value") == "light" else "any")
+        if isinstance(a, dict) and a.get("appearance") == "contrast":
+            return "skip"          # high-contrast variants aren't used
+    return "any"
+
+
+def usable_idiom(entry):
+    return entry.get("idiom", "universal") in ("mac", "universal")
+
+
+def pick_idiom(entries):
+    """The "mac" entries where there are some, else the "universal" ones."""
+    entries = [e for e in entries if isinstance(e, dict) and usable_idiom(e)]
+    mac = [e for e in entries if e.get("idiom") == "mac"]
+    return mac if mac else entries
+
+
+def component(value, is_alpha=False):
+    """A colour component as Contents.json writes it: "0.502", "128" (0 to
+    255) or "0x80"; an alpha of "1" is whole."""
+    s = str(value).strip().lower()
+    try:
+        if s.startswith("0x"):
+            return int(s, 16) / 255.0
+        if "." in s or "e" in s:
+            return float(s)
+        v = int(s)
+    except ValueError:
+        return 0.0
+    if is_alpha and v <= 1:
+        return float(v)
+    return v / 255.0
+
+
+class Compiler:
+    def __init__(self, out_dir):
+        self.out = out_dir
+        self.store = os.path.join(out_dir, "Assets.ferryassets")
+        self.images = {}
+        self.colors = {}
+        self.data = {}
+        self.icons = {}       # app icon sets: name -> folder
+        self.used_files = set()
+
+    def copy_in(self, src, name):
+        """Copies src into the store, under a name of its own."""
+        base = name.replace("/", "_") + "." + os.path.basename(src)
+        dest = base
+        n = 2
+        while dest in self.used_files:
+            dest = "%d.%s" % (n, base)
+            n += 1
+        self.used_files.add(dest)
+        os.makedirs(self.store, exist_ok=True)
+        shutil.copyfile(src, os.path.join(self.store, dest))
+        return dest
+
+    def taken(self, name):
+        if name in self.images or name in self.colors or name in self.data:
+            note("%s is in more than one catalogue; the first is kept" % name)
+            return True
+        return False
+
+    def walk(self, folder, prefix=""):
+        for entry in sorted(os.listdir(folder)):
+            path = os.path.join(folder, entry)
+            if not os.path.isdir(path):
+                continue
+            stem, ext = os.path.splitext(entry)
+            if ext == ".imageset":
+                self.imageset(path, prefix + stem)
+            elif ext == ".colorset":
+                self.colorset(path, prefix + stem)
+            elif ext == ".dataset":
+                self.dataset(path, prefix + stem)
+            elif ext == ".appiconset":
+                self.icons.setdefault(stem, path)
+            elif ext in KNOWN_SKIPPED:
+                note("%s: %s isn't compiled" % (prefix + entry, ext[1:]))
+            else:
+                props = read_contents(path).get("properties") or {}
+                more = prefix + entry + "/" if props.get("provides-namespace") else prefix
+                self.walk(path, more)
+
+    def imageset(self, folder, name):
+        c = read_contents(folder)
+        if self.taken(name):
+            return
+        files = []
+        for e in pick_idiom(c.get("images") or []):
+            fn = e.get("filename")
+            app = appearance_of(e)
+            if not fn or app == "skip":
+                continue
+            src = os.path.join(folder, fn)
+            if not os.path.exists(src):
+                note("%s: %s is missing" % (name, fn))
+                continue
+            files.append({"file": self.copy_in(src, name), "scale": scale_of(e), "appearance": app})
+        if not files:
+            return
+        files.sort(key=lambda f: (f["appearance"] != "any", f["scale"]))
+        image = {"files": files}
+        intent = (c.get("properties") or {}).get("template-rendering-intent")
+        if intent in ("template", "original"):
+            image["template"] = intent == "template"
+        self.images[name] = image
+
+    def colorset(self, folder, name):
+        c = read_contents(folder)
+        if self.taken(name):
+            return
+        out = []
+        for e in pick_idiom(c.get("colors") or []):
+            app = appearance_of(e)
+            color = e.get("color") or {}
+            if app == "skip" or not isinstance(color, dict):
+                continue
+            if color.get("reference"):
+                out.append({"appearance": app, "system": str(color["reference"])})
+                continue
+            comps = color.get("components") or {}
+            alpha = component(comps.get("alpha", "1"), True)
+            if "white" in comps:
+                w = component(comps["white"])
+                rgb = (w, w, w)
+            else:
+                rgb = tuple(component(comps.get(k, "0")) for k in ("red", "green", "blue"))
+            space = str(color.get("color-space", "srgb"))
+            out.append({"appearance": app, "space": space, "red": rgb[0], "green": rgb[1], "blue": rgb[2],
+                        "alpha": alpha})
+        if out:
+            out.sort(key=lambda x: x["appearance"] != "any")
+            self.colors[name] = out
+
+    def dataset(self, folder, name):
+        c = read_contents(folder)
+        if self.taken(name):
+            return
+        out = []
+        for e in pick_idiom(c.get("data") or []):
+            fn = e.get("filename")
+            src = os.path.join(folder, fn) if fn else None
+            if not src or not os.path.isfile(src):
+                continue
+            out.append({"file": self.copy_in(src, name),
+                        "type": str(e.get("universal-type-identifier", "public.data"))})
+        if out:
+            self.data[name] = out
+
+    def write_index(self):
+        if not (self.images or self.colors or self.data):
+            return False
+        os.makedirs(self.store, exist_ok=True)
+        index = {"Format": INDEX_FORMAT, "Images": self.images, "Colors": self.colors, "Data": self.data}
+        with open(os.path.join(self.store, "Index.plist"), "wb") as f:
+            plistlib.dump(index, f, sort_keys=True)
+        return True
+
+
+# ---- the app icon ---------------------------------------------------------------
+
+def png_size(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    return struct.unpack(">II", head[16:24])
+
+
+# The .icns entry types for PNG data, by the picture's size in pixels and
+# whether it is the double-size version of a smaller point size.
+ICNS_TYPES = {
+    (16, False): b"icp4", (32, False): b"icp5", (64, False): b"icp6", (128, False): b"ic07",
+    (256, False): b"ic08", (512, False): b"ic09", (1024, True): b"ic10",
+    (32, True): b"ic11", (64, True): b"ic12", (256, True): b"ic13", (512, True): b"ic14",
+}
+
+
+def write_icns(folder, dest):
+    c = read_contents(folder)
+    entries = {}
+    for e in pick_idiom(c.get("images") or []):
+        fn = e.get("filename")
+        if not fn:
+            continue
+        src = os.path.join(folder, fn)
+        size = png_size(src) if os.path.exists(src) else None
+        if not size or size[0] != size[1]:
+            if fn:
+                note("%s: %s isn't a square PNG and is left out" % (os.path.basename(folder), fn))
+            continue
+        double = scale_of(e) >= 2
+        t = ICNS_TYPES.get((size[0], double)) or ICNS_TYPES.get((size[0], not double))
+        if t and t not in entries:
+            with open(src, "rb") as f:
+                entries[t] = f.read()
+    if not entries:
+        return False
+    body = b"".join(t + struct.pack(">I", len(d) + 8) + d for t, d in sorted(entries.items()))
+    with open(dest, "wb") as f:
+        f.write(b"icns" + struct.pack(">I", len(body) + 8) + body)
+    return True
+
+
+def main(argv):
+    out = icon = partial = None
+    catalogues = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--compile", "--app-icon", "--output-partial-info-plist", "--platform",
+                 "--minimum-deployment-target", "--target-device", "--output-format"):
+            if i + 1 >= len(argv):
+                note("%s needs a value" % a)
+                return 2
+            v = argv[i + 1]
+            if a == "--compile":
+                out = v
+            elif a == "--app-icon":
+                icon = v
+            elif a == "--output-partial-info-plist":
+                partial = v
+            i += 2
+            continue
+        if a.startswith("--"):
+            i += 1
+            continue
+        catalogues.append(a)
+        i += 1
+    if not out or not catalogues:
+        sys.stderr.write(__doc__)
+        return 2
+    os.makedirs(out, exist_ok=True)
+    shutil.rmtree(os.path.join(out, "Assets.ferryassets"), ignore_errors=True)
+    comp = Compiler(out)
+    for cat in catalogues:
+        if not os.path.isdir(cat):
+            note("%s isn't a folder" % cat)
+            return 1
+        comp.walk(cat)
+    comp.write_index()
+    info = {}
+    if icon:
+        folder = comp.icons.get(icon)
+        if not folder:
+            note("no app icon set named %s" % icon)
+        elif write_icns(folder, os.path.join(out, icon + ".icns")):
+            info = {"CFBundleIconFile": icon, "CFBundleIconName": icon}
+    if partial:
+        with open(partial, "wb") as f:
+            plistlib.dump(info, f)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

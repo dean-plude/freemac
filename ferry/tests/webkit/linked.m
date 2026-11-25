@@ -55,6 +55,32 @@ int main(int argc, char **argv)
                [p.fixedFontFamily UTF8String], p.defaultFontSize, p.isJavaScriptEnabled, p.usesPageCache);
         printf("WebUndefined: %s, one object %d\n", [[[WebUndefined undefined] description] UTF8String],
                [WebUndefined undefined] == [WebUndefined undefined]);
+        /* content rule lists (freemac 1.224): none is compiled, so each
+         * request fails on the main queue and nothing is blocked */
+        WKContentRuleListStore *store = [WKContentRuleListStore defaultStore];
+        __block NSError *compileError = nil, *lookError = nil;
+        __block BOOL compiled = NO, looked = NO, listed = NO;
+        __block NSUInteger available = 99;
+        [store compileContentRuleListForIdentifier:@"ferry"
+                            encodedContentRuleList:@"[{\"trigger\":{\"url-filter\":\".*\"},\"action\":{\"type\":\"block\"}}]"
+                                 completionHandler:^(WKContentRuleList *list, NSError *error) {
+                                     compiled = list == nil;
+                                     compileError = error;
+                                 }];
+        [store lookUpContentRuleListForIdentifier:@"ferry"
+                                completionHandler:^(WKContentRuleList *list, NSError *error) {
+                                    looked = list == nil;
+                                    lookError = error;
+                                }];
+        [store getAvailableContentRuleListIdentifiers:^(NSArray<NSString *> *ids) {
+            available = [ids count];
+            listed = YES;
+        }];
+        spin_until(^BOOL {
+            return compileError && lookError && listed;
+        });
+        printf("content rule lists: compile gave no list %d, error %ld; look-up %d, error %ld; %lu available\n",
+               compiled, (long)[compileError code], looked, (long)[lookError code], (unsigned long)available);
         if (argc > 1 && !strcmp(argv[1], "classes"))
             return 0;
 

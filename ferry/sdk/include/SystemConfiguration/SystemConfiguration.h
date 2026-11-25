@@ -46,6 +46,8 @@ Boolean SCNetworkReachabilityUnscheduleFromRunLoop(SCNetworkReachabilityRef targ
 Boolean SCNetworkReachabilitySetDispatchQueue(SCNetworkReachabilityRef target, void *queue);
 CFStringRef SCDynamicStoreCopyComputerName(SCDynamicStoreRef store, CFStringEncoding *nameEncoding);
 CFStringRef SCDynamicStoreCopyLocalHostName(SCDynamicStoreRef store);
+/* the user at the console, which here is the user this program runs as (freemac 1.224) */
+CFStringRef SCDynamicStoreCopyConsoleUser(SCDynamicStoreRef store, uid_t *uid, gid_t *gid);
 #ifdef __cplusplus
 }
 #endif

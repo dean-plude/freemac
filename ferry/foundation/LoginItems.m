@@ -647,3 +647,30 @@ Boolean SMLoginItemSetEnabled(CFStringRef identifier, Boolean enabled)
     }
     return false;
 }
+
+/* Launchd jobs, which there is no launchd to run (freemac 1.224, Ferry 0.48.0). */
+const CFStringRef kSMDomainSystemLaunchd = (CFStringRef)@"kSMDomainSystemLaunchd";
+const CFStringRef kSMDomainUserLaunchd = (CFStringRef)@"kSMDomainUserLaunchd";
+const CFStringRef kSMErrorDomainIPC = (CFStringRef)@"kSMErrorDomainIPC";
+const CFStringRef kSMErrorDomainFramework = (CFStringRef)@"kSMErrorDomainFramework";
+const CFStringRef kSMErrorDomainLaunchd = (CFStringRef)@"kSMErrorDomainLaunchd";
+
+static Boolean no_launchd(CFErrorRef *outError, CFIndex code)
+{
+    if (outError)
+        *outError = (CFErrorRef)[[NSError alloc] initWithDomain:(NSString *)kSMErrorDomainLaunchd code:code userInfo:nil];
+    return false;
+}
+Boolean SMJobSubmit(CFStringRef domain, CFDictionaryRef job, AuthorizationRef auth, CFErrorRef *outError)
+{
+    return no_launchd(outError, kSMErrorServiceUnavailable);
+}
+Boolean SMJobRemove(CFStringRef domain, CFStringRef label, AuthorizationRef auth, Boolean wait, CFErrorRef *outError)
+{
+    return no_launchd(outError, kSMErrorJobNotFound);
+}
+Boolean SMJobBless(CFStringRef domain, CFStringRef label, AuthorizationRef auth, CFErrorRef *outError)
+{
+    return no_launchd(outError, kSMErrorServiceUnavailable);
+}
+CFDictionaryRef SMJobCopyDictionary(CFStringRef domain, CFStringRef label) { return NULL; }

@@ -26,7 +26,9 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/sysmacros.h>
+#include <sys/time.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -103,6 +105,18 @@ static int mac_fchown(int fd, uid_t owner, gid_t group)
     return r;
 }
 
+/* O_NOFOLLOW_ANY (freemac 1.224, Ferry 0.48.0) follows no symbolic link
+ * anywhere in the path, as Linux's openat2 does with RESOLVE_NO_SYMLINKS. */
+#define MAC_O_NOFOLLOW_ANY 0x20000000
+struct linux_open_how { uint64_t flags, mode, resolve; };
+#define LINUX_RESOLVE_NO_SYMLINKS 0x04
+static int nofollow_any_open(int fd, const char *path, int flags, mode_t mode)
+{
+    struct linux_open_how how = {(uint64_t)open_to_linux(flags & ~MAC_O_NOFOLLOW_ANY),
+                                 (flags & 0x200) ? (uint64_t)mode : 0, LINUX_RESOLVE_NO_SYMLINKS};
+    return (int)syscall(SYS_openat2, fd, path, &how, sizeof how);
+}
+
 static int mac_open(const char *path, int flags, ...)
 {
     mode_t mode = 0;
@@ -118,6 +132,8 @@ static int mac_open(const char *path, int flags, ...)
         return evtonly_open(AT_FDCWD, path, flags);
     if (flags & MAC_O_SYMLINK)
         return symlink_open(AT_FDCWD, path, flags, mode);
+    if (flags & MAC_O_NOFOLLOW_ANY)
+        return nofollow_any_open(AT_FDCWD, path, flags, mode);
     return open(path, open_to_linux(flags), mode);
 }
 
@@ -136,7 +152,90 @@ static int mac_openat(int fd, const char *path, int flags, ...)
         return evtonly_open(at_fd(fd), path, flags);
     if (flags & MAC_O_SYMLINK)
         return symlink_open(at_fd(fd), path, flags, mode);
+    if (flags & MAC_O_NOFOLLOW_ANY)
+        return nofollow_any_open(at_fd(fd), path, flags, mode);
     return openat(at_fd(fd), path, open_to_linux(flags), mode);
+}
+
+/* renamex_np and renameatx_np (freemac 1.224, Ferry 0.48.0): RENAME_SWAP
+ * exchanges the two items and RENAME_EXCL keeps an existing destination, as
+ * Linux's renameat2 does with RENAME_EXCHANGE and RENAME_NOREPLACE;
+ * RENAME_NOFOLLOW_ANY refuses (ELOOP) a path whose folders hold a symbolic
+ * link, which is checked by opening each item's folder that way. */
+#define MAC_RENAME_SWAP 0x2
+#define MAC_RENAME_EXCL 0x4
+#define MAC_RENAME_NOFOLLOW_ANY 0x10
+#define LINUX_RENAME_NOREPLACE 1
+#define LINUX_RENAME_EXCHANGE 2
+static int no_link_in_folders(int fd, const char *path)
+{
+    char folder[PATH_MAX];
+    const char *slash = strrchr(path, '/');
+    if (!slash)
+        return 0;
+    size_t n = slash == path ? 1 : (size_t)(slash - path);
+    if (n >= sizeof folder) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    memcpy(folder, path, n);
+    folder[n] = 0;
+    struct linux_open_how how = {O_PATH | O_DIRECTORY, 0, LINUX_RESOLVE_NO_SYMLINKS};
+    int d = (int)syscall(SYS_openat2, fd, folder, &how, sizeof how);
+    if (d < 0)
+        return -1;
+    close(d);
+    return 0;
+}
+static int mac_renameatx_np(int fromfd, const char *from, int tofd, const char *to, unsigned flags)
+{
+    if (flags & ~(unsigned)(MAC_RENAME_SWAP | MAC_RENAME_EXCL | MAC_RENAME_NOFOLLOW_ANY)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if ((flags & MAC_RENAME_NOFOLLOW_ANY) &&
+        (no_link_in_folders(at_fd(fromfd), from) < 0 || no_link_in_folders(at_fd(tofd), to) < 0))
+        return -1;
+    unsigned lf = ((flags & MAC_RENAME_SWAP) ? LINUX_RENAME_EXCHANGE : 0) |
+                  ((flags & MAC_RENAME_EXCL) ? LINUX_RENAME_NOREPLACE : 0);
+    return (int)syscall(SYS_renameat2, at_fd(fromfd), from, at_fd(tofd), to, lf);
+}
+/* utimes, futimes and lutimes (freemac 1.224, Ferry 0.48.0): a Mac's
+ * struct timeval keeps its microseconds in 32 bits, followed by padding,
+ * where Linux's keeps them in a long. */
+struct mac_timeval { int64_t tv_sec; int32_t tv_usec; int32_t pad; };
+static const struct timeval *linux_times(const struct mac_timeval *m, struct timeval out[2])
+{
+    if (!m)
+        return NULL;
+    for (int i = 0; i < 2; i++) {
+        out[i].tv_sec = (time_t)m[i].tv_sec;
+        out[i].tv_usec = m[i].tv_usec;
+    }
+    return out;
+}
+static int mac_utimes(const char *path, const struct mac_timeval *m)
+{
+    struct timeval t[2];
+    return utimes(path, linux_times(m, t));
+}
+static int mac_futimes(int fd, const struct mac_timeval *m)
+{
+    struct timeval t[2];
+    return futimes(fd, linux_times(m, t));
+}
+static int mac_lutimes(const char *path, const struct mac_timeval *m)
+{
+    struct timeval t[2];
+    return lutimes(path, linux_times(m, t));
+}
+static int mac_renameat(int fromfd, const char *from, int tofd, const char *to)
+{
+    return renameat(at_fd(fromfd), from, at_fd(tofd), to);
+}
+static int mac_renamex_np(const char *from, const char *to, unsigned flags)
+{
+    return mac_renameatx_np(MAC_AT_FDCWD, from, MAC_AT_FDCWD, to, flags);
 }
 
 static int mac_creat(const char *path, mode_t mode) { return creat(path, mode); }
@@ -965,6 +1064,12 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"OSAtomicCompareAndSwapLongBarrier", mac_OSAtomicCompareAndSwap64},
     {"open", mac_open},
     {"openat", mac_openat},
+    {"renamex_np", mac_renamex_np},
+    {"renameat", mac_renameat},
+    {"utimes", mac_utimes},
+    {"futimes", mac_futimes},
+    {"lutimes", mac_lutimes},
+    {"renameatx_np", mac_renameatx_np},
     {"creat", mac_creat},
     {"fchown", mac_fchown},
     {"access", mac_access},

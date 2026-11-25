@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+/* as a Mac's Foundation brings them in, which Sparkle's sources count on */
+#include <sys/stat.h>
+#include <sys/time.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
 #include <objc/NSObject.h>
@@ -407,6 +410,10 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 @property (readonly, copy) NSString *uppercaseString;
 @property (readonly, copy) NSString *lowercaseString;
 @property (readonly, copy) NSString *capitalizedString;
+/* in the user's locale, which changes no letter here (freemac 1.224) */
+@property (readonly, copy) NSString *localizedUppercaseString;
+@property (readonly, copy) NSString *localizedLowercaseString;
+@property (readonly, copy) NSString *localizedCapitalizedString;
 @property (readonly) int intValue;
 @property (readonly) NSInteger integerValue;
 @property (readonly) long long longLongValue;
@@ -614,6 +621,10 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 + (instancetype)arrayWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
 + (instancetype)arrayWithArray:(NSArray<ObjectType> *)array;
 + (NSArray<ObjectType> *)arrayWithContentsOfFile:(NSString *)path;
+/* freemac 1.224: a property list read from a file URL; the error says why one wasn't */
++ (NSArray<ObjectType> *)arrayWithContentsOfURL:(NSURL *)url;
++ (NSArray<ObjectType> *)arrayWithContentsOfURL:(NSURL *)url error:(NSError **)error;
+- (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error;
 - (instancetype)initWithContentsOfFile:(NSString *)path;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (instancetype)init;
@@ -651,6 +662,9 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (NSEnumerator<ObjectType> *)objectEnumerator;
 - (NSEnumerator<ObjectType> *)reverseObjectEnumerator;
 - (BOOL)writeToFile:(NSString *)path atomically:(BOOL)atomically;
+/* as an XML property list, as writeToFile: writes (freemac 1.224) */
+- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically;
+- (BOOL)writeToURL:(NSURL *)url error:(NSError **)error;
 @end
 
 @interface NSMutableArray<ObjectType> : NSArray<ObjectType>
@@ -687,6 +701,10 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 + (instancetype)dictionaryWithDictionary:(NSDictionary<KeyType, ObjectType> *)dict;
 + (instancetype)dictionaryWithObjects:(NSArray<ObjectType> *)objects forKeys:(NSArray<KeyType> *)keys;
 + (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfFile:(NSString *)path;
+/* freemac 1.224: a property list read from a file URL; the error says why one wasn't */
++ (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfURL:(NSURL *)url;
++ (NSDictionary<KeyType, ObjectType> *)dictionaryWithContentsOfURL:(NSURL *)url error:(NSError **)error;
+- (instancetype)initWithContentsOfURL:(NSURL *)url error:(NSError **)error;
 - (instancetype)initWithContentsOfFile:(NSString *)path;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (instancetype)init;
@@ -705,6 +723,9 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 - (void)enumerateKeysAndObjectsUsingBlock:(void (^)(KeyType key, ObjectType obj, BOOL *stop))block;
 - (NSEnumerator<ObjectType> *)objectEnumerator;
 - (BOOL)writeToFile:(NSString *)path atomically:(BOOL)atomically;
+/* as an XML property list, as writeToFile: writes (freemac 1.224) */
+- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically;
+- (BOOL)writeToURL:(NSURL *)url error:(NSError **)error;
 @end
 
 @interface NSMutableDictionary<KeyType, ObjectType> : NSDictionary<KeyType, ObjectType>
@@ -729,6 +750,9 @@ typedef NS_OPTIONS(NSUInteger, NSStringEnumerationOptions) {
 + (instancetype)setWithArray:(NSArray<ObjectType> *)array;
 + (instancetype)setWithSet:(NSSet<ObjectType> *)set;
 - (instancetype)initWithObjects:(const ObjectType[])objects count:(NSUInteger)count;
+- (instancetype)initWithObjects:(ObjectType)first, ... NS_REQUIRES_NIL_TERMINATION;
+- (instancetype)initWithArray:(NSArray<ObjectType> *)array;
+- (instancetype)initWithSet:(NSSet<ObjectType> *)set;
 - (instancetype)initWithSet:(NSSet<ObjectType> *)set copyItems:(BOOL)flag;
 - (BOOL)containsObject:(ObjectType)obj;
 - (ObjectType)member:(ObjectType)obj;
@@ -1008,6 +1032,8 @@ enum {
 
 /* ---- NSData ------------------------------------------------------------------------- */
 
+/* searching data from its end, or only at the start (or the end) of the range (freemac 1.224) */
+typedef NS_OPTIONS(NSUInteger, NSDataSearchOptions) { NSDataSearchBackwards = 1UL << 0, NSDataSearchAnchored = 1UL << 1 };
 typedef NS_OPTIONS(NSUInteger, NSDataWritingOptions) { NSDataWritingAtomic = 1, NSDataWritingWithoutOverwriting = 2 };
 /* How to read a file (mapping is only a hint, and Ferry reads the file in),
  * with the older names (freemac 1.221, Ferry 0.45.0). */
@@ -1050,7 +1076,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 - (void)getBytes:(void *)buffer length:(NSUInteger)length;
 - (void)getBytes:(void *)buffer range:(NSRange)range;
 - (NSData *)subdataWithRange:(NSRange)range;
-- (NSRange)rangeOfData:(NSData *)data options:(NSUInteger)opts range:(NSRange)range;
+- (NSRange)rangeOfData:(NSData *)data options:(NSDataSearchOptions)opts range:(NSRange)range;
 - (NSString *)base64EncodedStringWithOptions:(NSUInteger)opts;
 - (instancetype)initWithBase64EncodedString:(NSString *)string options:(NSUInteger)opts;
 - (instancetype)initWithBase64EncodedData:(NSData *)data options:(NSUInteger)opts;
@@ -1692,6 +1718,9 @@ FOUNDATION_EXPORT NSErrorDomain const NSOSStatusErrorDomain;
 FOUNDATION_EXPORT NSString *const NSLocalizedDescriptionKey;
 FOUNDATION_EXPORT NSString *const NSFilePathErrorKey;
 FOUNDATION_EXPORT NSString *const NSUnderlyingErrorKey;
+/* freemac 1.224: the type of the keys, and the key for several underlying errors */
+typedef NSString *NSErrorUserInfoKey;
+FOUNDATION_EXPORT NSErrorUserInfoKey const NSMultipleUnderlyingErrorsKey;
 
 FOUNDATION_EXPORT NSString *const NSLocalizedFailureReasonErrorKey;
 FOUNDATION_EXPORT NSString *const NSLocalizedRecoverySuggestionErrorKey;
@@ -1892,10 +1921,24 @@ typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
 - (NSString *)localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)tableName;
 + (NSBundle *)bundleWithURL:(NSURL *)url;
 + (NSBundle *)bundleWithIdentifier:(NSString *)identifier;
+/* the loaded frameworks, and the main bundle with the loaded bundles
+ * (freemac 1.224) */
++ (NSArray<NSBundle *> *)allFrameworks;
++ (NSArray<NSBundle *> *)allBundles;
 - (instancetype)initWithURL:(NSURL *)url;
 @property (readonly, copy) NSURL *executableURL;
 @property (readonly, copy) NSString *builtInPlugInsPath;
 @property (readonly, copy) NSURL *builtInPlugInsURL;
+/* freemac 1.224: the bundle's Frameworks, SharedFrameworks and SharedSupport
+ * folders, and another program in its MacOS folder (whether there or not) */
+@property (readonly, copy) NSString *privateFrameworksPath;
+@property (readonly, copy) NSURL *privateFrameworksURL;
+@property (readonly, copy) NSString *sharedFrameworksPath;
+@property (readonly, copy) NSURL *sharedFrameworksURL;
+@property (readonly, copy) NSString *sharedSupportPath;
+@property (readonly, copy) NSURL *sharedSupportURL;
+- (NSString *)pathForAuxiliaryExecutable:(NSString *)executableName;
+- (NSURL *)URLForAuxiliaryExecutable:(NSString *)executableName;
 - (BOOL)loadAndReturnError:(NSError **)error;
 - (BOOL)preflightAndReturnError:(NSError **)error;
 - (BOOL)unload;
@@ -1929,6 +1972,10 @@ FOUNDATION_EXPORT NSString *const NSRegistrationDomain;
 + (NSUserDefaults *)standardUserDefaults;
 + (void)resetStandardUserDefaults;
 - (instancetype)initWithSuiteName:(NSString *)name;
+/* another app's or suite's saved defaults, read after this app's own and
+ * before the registered ones (freemac 1.224) */
+- (void)addSuiteNamed:(NSString *)suiteName;
+- (void)removeSuiteNamed:(NSString *)suiteName;
 - (id)objectForKey:(NSString *)key;
 - (void)setObject:(id)value forKey:(NSString *)key;
 - (void)removeObjectForKey:(NSString *)key;
@@ -2125,6 +2172,8 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
     NSURLCreationDateKey, NSURLContentModificationDateKey, NSURLContentAccessDateKey,
     NSURLAttributeModificationDateKey, NSURLParentDirectoryURLKey, NSURLTypeIdentifierKey,
     NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
+/* freemac 1.224: the volume an item is on (its device number) */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
 FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFileResourceTypeCharacterSpecial,
     *const NSURLFileResourceTypeDirectory, *const NSURLFileResourceTypeBlockSpecial,
     *const NSURLFileResourceTypeRegular, *const NSURLFileResourceTypeSymbolicLink,
@@ -2133,6 +2182,10 @@ FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFi
 @interface NSURL (FerryFileAccess)
 + (NSURL *)fileURLWithPathComponents:(NSArray<NSString *> *)components;
 + (NSURL *)fileURLWithFileSystemRepresentation:(const char *)path isDirectory:(BOOL)isDir relativeToURL:(NSURL *)baseURL;
+/* freemac 1.224 */
+- (instancetype)initFileURLWithFileSystemRepresentation:(const char *)path isDirectory:(BOOL)isDir
+                                          relativeToURL:(NSURL *)baseURL;
+- (BOOL)getFileSystemRepresentation:(char *)buffer maxLength:(NSUInteger)maxLength;
 @property (readonly) BOOL isFileReferenceURL; /* NO: file reference URLs are path URLs here */
 - (NSURL *)fileReferenceURL;
 @property (readonly, copy) NSURL *filePathURL;
@@ -2141,6 +2194,32 @@ FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFi
 - (NSDictionary<NSURLResourceKey, id> *)resourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys error:(NSError **)error;
 - (BOOL)setResourceValue:(id)value forKey:(NSURLResourceKey)key error:(NSError **)error;
 - (BOOL)setResourceValues:(NSDictionary<NSURLResourceKey, id> *)keyedValues error:(NSError **)error;
+@end
+/* Bookmarks (freemac 1.224): a bookmark here holds the item's path, so it
+ * finds the item where it was, not where it has since moved; the options
+ * are taken and change nothing. */
+typedef NS_OPTIONS(NSUInteger, NSURLBookmarkCreationOptions) {
+    NSURLBookmarkCreationMinimalBookmark = 1UL << 9, NSURLBookmarkCreationSuitableForBookmarkFile = 1UL << 10,
+    NSURLBookmarkCreationWithSecurityScope = 1UL << 11, NSURLBookmarkCreationSecurityScopeAllowOnlyReadAccess = 1UL << 12,
+    NSURLBookmarkCreationWithoutImplicitSecurityScope = 1UL << 29,
+};
+typedef NS_OPTIONS(NSUInteger, NSURLBookmarkResolutionOptions) {
+    NSURLBookmarkResolutionWithoutUI = 1UL << 8, NSURLBookmarkResolutionWithoutMounting = 1UL << 9,
+    NSURLBookmarkResolutionWithSecurityScope = 1UL << 10, NSURLBookmarkResolutionWithoutImplicitStartAccessing = 1UL << 15,
+};
+@interface NSURL (FerryBookmarks)
+- (NSData *)bookmarkDataWithOptions:(NSURLBookmarkCreationOptions)options
+     includingResourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys
+                      relativeToURL:(NSURL *)relativeURL
+                              error:(NSError **)error;
++ (instancetype)URLByResolvingBookmarkData:(NSData *)bookmarkData options:(NSURLBookmarkResolutionOptions)options
+                             relativeToURL:(NSURL *)relativeURL bookmarkDataIsStale:(BOOL *)isStale
+                                     error:(NSError **)error;
+- (instancetype)initByResolvingBookmarkData:(NSData *)bookmarkData options:(NSURLBookmarkResolutionOptions)options
+                              relativeToURL:(NSURL *)relativeURL bookmarkDataIsStale:(BOOL *)isStale
+                                      error:(NSError **)error;
+- (BOOL)startAccessingSecurityScopedResource;
+- (void)stopAccessingSecurityScopedResource;
 @end
 
 /* the older base64 names, without options (freemac 1.223, Ferry 0.47.0) */
@@ -2527,6 +2606,91 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringEnumerationOptions) {
 - (void)endEditing;
 @end
 
+/* ---- Markdown (freemac 1.224, Ferry 0.48.0) ----------------------------------------
+ * The types of an attributed string read from Markdown, which this
+ * Foundation doesn't read yet: initWithMarkdownString: and the like answer
+ * nil with NSFeatureUnsupportedError, so a program shows the text as it is
+ * (as Sparkle does with release notes when a Mac can't read them). A
+ * presentation intent can still be made and read. */
+typedef NS_ENUM(NSInteger, NSPresentationIntentKind) {
+    NSPresentationIntentKindParagraph, NSPresentationIntentKindHeader, NSPresentationIntentKindOrderedList,
+    NSPresentationIntentKindUnorderedList, NSPresentationIntentKindListItem, NSPresentationIntentKindCodeBlock,
+    NSPresentationIntentKindBlockQuote, NSPresentationIntentKindThematicBreak, NSPresentationIntentKindTable,
+    NSPresentationIntentKindTableHeaderRow, NSPresentationIntentKindTableRow, NSPresentationIntentKindTableCell,
+};
+typedef NS_ENUM(NSInteger, NSPresentationIntentTableColumnAlignment) {
+    NSPresentationIntentTableColumnAlignmentLeft, NSPresentationIntentTableColumnAlignmentCenter,
+    NSPresentationIntentTableColumnAlignmentRight,
+};
+@interface NSPresentationIntent : NSObject <NSCopying, NSSecureCoding>
+@property (readonly) NSPresentationIntentKind intentKind;
+@property (readonly, retain) NSPresentationIntent *parentIntent;
+@property (readonly) NSInteger identity;
+@property (readonly) NSInteger ordinal;
+@property (readonly) NSInteger headerLevel;
+@property (readonly) NSInteger indentationLevel;
+@property (readonly) NSInteger column;
+@property (readonly) NSInteger row;
+@property (readonly, copy) NSString *languageHint;
+@property (readonly, copy) NSArray<NSNumber *> *columnAlignments;
+@property (readonly) NSInteger columnCount;
++ (NSPresentationIntent *)paragraphIntentWithIdentity:(NSInteger)identity nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)headerIntentWithIdentity:(NSInteger)identity level:(NSInteger)level
+                                nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)codeBlockIntentWithIdentity:(NSInteger)identity languageHint:(NSString *)languageHint
+                                   nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)thematicBreakIntentWithIdentity:(NSInteger)identity
+                                       nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)orderedListIntentWithIdentity:(NSInteger)identity
+                                     nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)unorderedListIntentWithIdentity:(NSInteger)identity
+                                       nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)listItemIntentWithIdentity:(NSInteger)identity ordinal:(NSInteger)ordinal
+                                  nestedInsideIntent:(NSPresentationIntent *)parent;
++ (NSPresentationIntent *)blockQuoteIntentWithIdentity:(NSInteger)identity
+                                    nestedInsideIntent:(NSPresentationIntent *)parent;
+- (BOOL)isEquivalentToPresentationIntent:(NSPresentationIntent *)other;
+@end
+typedef NS_OPTIONS(NSUInteger, NSInlinePresentationIntent) {
+    NSInlinePresentationIntentEmphasized = 1 << 0, NSInlinePresentationIntentStronglyEmphasized = 1 << 1,
+    NSInlinePresentationIntentCode = 1 << 2, NSInlinePresentationIntentStrikethrough = 1 << 5,
+    NSInlinePresentationIntentSoftBreak = 1 << 6, NSInlinePresentationIntentLineBreak = 1 << 7,
+    NSInlinePresentationIntentInlineHTML = 1 << 8, NSInlinePresentationIntentBlockHTML = 1 << 9,
+};
+FOUNDATION_EXPORT NSString *const NSPresentationIntentAttributeName;
+FOUNDATION_EXPORT NSString *const NSInlinePresentationIntentAttributeName;
+FOUNDATION_EXPORT NSString *const NSAlternateDescriptionAttributeName;
+FOUNDATION_EXPORT NSString *const NSImageURLAttributeName;
+FOUNDATION_EXPORT NSString *const NSLanguageIdentifierAttributeName;
+typedef NS_ENUM(NSInteger, NSAttributedStringMarkdownParsingFailurePolicy) {
+    NSAttributedStringMarkdownParsingFailureReturnError = 0,
+    NSAttributedStringMarkdownParsingFailureReturnPartiallyParsedIfPossible = 1,
+};
+typedef NS_ENUM(NSInteger, NSAttributedStringMarkdownInterpretedSyntax) {
+    NSAttributedStringMarkdownInterpretedSyntaxFull = 0, NSAttributedStringMarkdownInterpretedSyntaxInlineOnly = 1,
+    NSAttributedStringMarkdownInterpretedSyntaxInlineOnlyPreservingWhitespace = 2,
+};
+@interface NSAttributedStringMarkdownParsingOptions : NSObject <NSCopying>
+@property BOOL allowsExtendedAttributes;
+@property NSAttributedStringMarkdownInterpretedSyntax interpretedSyntax;
+@property NSAttributedStringMarkdownParsingFailurePolicy failurePolicy;
+@property (copy) NSString *languageCode;
+@end
+@interface NSAttributedString (FerryMarkdown)
+- (instancetype)initWithMarkdownString:(NSString *)markdownString
+                               options:(NSAttributedStringMarkdownParsingOptions *)options
+                               baseURL:(NSURL *)baseURL
+                                 error:(NSError **)error;
+- (instancetype)initWithMarkdown:(NSData *)markdown
+                         options:(NSAttributedStringMarkdownParsingOptions *)options
+                         baseURL:(NSURL *)baseURL
+                           error:(NSError **)error;
+- (instancetype)initWithContentsOfMarkdownFileAtURL:(NSURL *)markdownFile
+                                            options:(NSAttributedStringMarkdownParsingOptions *)options
+                                            baseURL:(NSURL *)baseURL
+                                              error:(NSError **)error;
+@end
+
 /* ---- functions ------------------------------------------------------------------- */
 
 #ifdef __cplusplus
@@ -2549,6 +2713,8 @@ NSPoint NSPointFromString(NSString *s);
 NSSize NSSizeFromString(NSString *s);
 NSRect NSRectFromString(NSString *s);
 NSString *NSHomeDirectory(void);
+/* the home folder of the user of that name, nil when there is none (freemac 1.224) */
+NSString *NSHomeDirectoryForUser(NSString *userName);
 NSString *NSTemporaryDirectory(void);
 NSString *NSUserName(void);
 NSString *NSFullUserName(void);
@@ -2772,6 +2938,8 @@ enum { NSFormattingError = 2048 };
 /* Ordered sets and UUIDs, which Core Data's ordered relationships and UUID attributes hold. */
 #include <Foundation/NSOrderedSet.h>
 #include <Foundation/NSUUID.h>
+/* NSXPCConnection, for programs that look for an XPC service (freemac 1.224) */
+#include <Foundation/NSXPCConnection.h>
 /* Decimal numbers, expressions and comparison predicates (freemac 1.211, Ferry 0.37.0). */
 #include <Foundation/NSDecimal.h>
 #include <Foundation/NSDecimalNumber.h>

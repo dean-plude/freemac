@@ -1,0 +1,23 @@
+policy accessory 1
+active after launching 0
+this app active 0
+at launch: frontmost org.example.Editor, name Editor, pid 4242, active 1, is this app 0
+own window focused: frontmost org.freemac.ferry.agentapp, name AgentApp, pid this one's, active 0, is this app 1
+browser focused: frontmost org.example.Browser, name Browser, pid 5151, active 1, is this app 0
+install 0
+register on the dispatcher target 0
+press: sent 1
+  application target: pressed, id 7
+  application target: released, id 7
+presses 1
+recorder cell RecorderCell, its control 1, code 47
+chooser cell class before NSActionCell
+chooser cell class RecorderCell, cell RecorderCell
+control cell class NSActionCell
+button title OK
+sets 2 2 3 1
+wayfire: focus-view 30
+wayfire: focus-view 12
+wayfire: register 1 key 105 command+option
+wayfire: unregister 1
+exit=0

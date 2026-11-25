@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <dlfcn.h>
+#include <mach-o/dyld.h>
 #include <objc/runtime.h>
 
 int *_NSGetArgc(void);
@@ -255,6 +256,23 @@ static NSMutableDictionary *bundles_by_path;
  * from, when that image is a bundle's program and the bundle has an
  * Info.plist. Classes of the program itself, and of libraries and of Ferry's
  * own frameworks (which have no Info.plist), give the main bundle. */
+/* The bundle whose program is this image: its nearest folder with an
+ * extension, when that folder is a bundle with an Info.plist naming the
+ * image as its program; nil for any other image. */
+static NSBundle *bundle_of_image(const char *image)
+{
+    NSString *exe = FResolvedPath([NSString stringWithUTF8String:image]);
+    for (NSString *dir = [exe stringByDeletingLastPathComponent]; [dir length] > 1;
+         dir = [dir stringByDeletingLastPathComponent]) {
+        if (![[dir pathExtension] length])
+            continue;
+        NSBundle *b = [NSBundle bundleWithPath:dir];
+        if (b && b->_info && [exe isEqualToString:FResolvedPath(b->_executable)])
+            return b;
+        break;
+    }
+    return nil;
+}
 + (NSBundle *)bundleForClass:(Class)cls
 {
     NSBundle *main = [self mainBundle];
@@ -264,17 +282,27 @@ static NSMutableDictionary *bundles_by_path;
     NSString *exe = FResolvedPath([NSString stringWithUTF8String:image]);
     if ([exe isEqualToString:FResolvedPath([main executablePath])])
         return main;
-    for (NSString *dir = [exe stringByDeletingLastPathComponent]; [dir length] > 1;
-         dir = [dir stringByDeletingLastPathComponent]) {
-        if (![[dir pathExtension] length])
-            continue;
-        NSBundle *b = [self bundleWithPath:dir];
-        if (b && b->_info && [exe isEqualToString:FResolvedPath(b->_executable)])
-            return b;
-        break;
-    }
-    return main;
+    return bundle_of_image(image) ?: main;
 }
+/* The bundles of the loaded images: the frameworks' and the loaded
+ * bundles' (freemac 1.224). */
+static NSArray *loaded_bundles(BOOL frameworks)
+{
+    NSMutableArray *out = [NSMutableArray array];
+    uint32_t n = _dyld_image_count();
+    for (uint32_t i = 0; i < n; i++) {
+        const char *image = _dyld_get_image_name(i);
+        NSBundle *b = image ? bundle_of_image(image) : nil;
+        if (b && b != [NSBundle mainBundle] && ![out containsObject:b] &&
+            [[[b bundlePath] pathExtension] isEqualToString:@"framework"] == frameworks)
+            [out addObject:b];
+    }
+    return out;
+}
++ (NSArray *)allFrameworks { return loaded_bundles(YES); }
++ (NSArray *)allBundles { return [@[[self mainBundle]] arrayByAddingObjectsFromArray:loaded_bundles(NO)]; }
+/* A bundle made already, or the bundle of a loaded framework or bundle, as
+ * a Mac knows those by their identifiers. */
 + (NSBundle *)bundleWithIdentifier:(NSString *)identifier
 {
     if (!identifier)
@@ -286,6 +314,9 @@ static NSMutableDictionary *bundles_by_path;
             if ([identifier isEqualToString:[b bundleIdentifier]])
                 return b;
     }
+    for (NSBundle *b in [loaded_bundles(YES) arrayByAddingObjectsFromArray:loaded_bundles(NO)])
+        if ([identifier isEqualToString:[b bundleIdentifier]])
+            return b;
     return nil;
 }
 - (instancetype)initWithURL:(NSURL *)url
@@ -357,6 +388,28 @@ static NSMutableDictionary *bundles_by_path;
 - (NSString *)builtInPlugInsPath { return _plugins; }
 - (NSURL *)builtInPlugInsURL { return _plugins ? [NSURL fileURLWithPath:_plugins isDirectory:YES] : nil; }
 - (NSURL *)executableURL { return _executable ? [NSURL fileURLWithPath:_executable] : nil; }
+/* the folders beside PlugIns, and another program beside the bundle's own (freemac 1.224) */
+- (NSString *)ferryFolder:(NSString *)name
+{
+    return [[_plugins stringByDeletingLastPathComponent] stringByAppendingPathComponent:name];
+}
+- (NSString *)privateFrameworksPath { return [self ferryFolder:@"Frameworks"]; }
+- (NSURL *)privateFrameworksURL { return [NSURL fileURLWithPath:[self privateFrameworksPath] isDirectory:YES]; }
+- (NSString *)sharedFrameworksPath { return [self ferryFolder:@"SharedFrameworks"]; }
+- (NSURL *)sharedFrameworksURL { return [NSURL fileURLWithPath:[self sharedFrameworksPath] isDirectory:YES]; }
+- (NSString *)sharedSupportPath { return [self ferryFolder:@"SharedSupport"]; }
+- (NSURL *)sharedSupportURL { return [NSURL fileURLWithPath:[self sharedSupportPath] isDirectory:YES]; }
+- (NSString *)pathForAuxiliaryExecutable:(NSString *)name
+{
+    NSString *dir = _executable ? [_executable stringByDeletingLastPathComponent] : [self ferryFolder:@"MacOS"];
+    NSString *path = [dir stringByAppendingPathComponent:name];
+    return [[NSFileManager defaultManager] fileExistsAtPath:path] ? path : nil;
+}
+- (NSURL *)URLForAuxiliaryExecutable:(NSString *)name
+{
+    NSString *path = [self pathForAuxiliaryExecutable:name];
+    return path ? [NSURL fileURLWithPath:path] : nil;
+}
 /* Loading a bundle's program is dlopen's (src/dyld.c): its classes join
  * the runtime and its initializers run. A program, once loaded, stays. */
 - (BOOL)loadAndReturnError:(NSError **)error
@@ -562,9 +615,48 @@ static NSUserDefaults *standard_defaults;
     else
         [self removeObjectForKey:key];
 }
+static char suites_key;
+/* The suites added, each read from its file when asked, as another program
+ * may write it (freemac 1.224). */
+- (void)addSuiteNamed:(NSString *)name
+{
+    if (![name length] || [name isEqualToString:_domain])
+        return;
+    @synchronized(self) {
+        NSMutableArray *suites = objc_getAssociatedObject(self, &suites_key);
+        if (!suites) {
+            suites = [NSMutableArray array];
+            objc_setAssociatedObject(self, &suites_key, suites, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (![suites containsObject:name])
+            [suites addObject:name];
+    }
+}
+- (void)removeSuiteNamed:(NSString *)name
+{
+    @synchronized(self) {
+        [objc_getAssociatedObject(self, &suites_key) removeObject:name];
+    }
+}
+static id suite_value(NSUserDefaults *d, NSString *file, NSString *key)
+{
+    NSArray *suites;
+    @synchronized(d) {
+        suites = [[objc_getAssociatedObject(d, &suites_key) copy] autorelease];
+    }
+    NSString *dir = [file stringByDeletingLastPathComponent];
+    for (NSString *s in suites) {
+        NSString *path = [dir stringByAppendingPathComponent:[s stringByAppendingPathExtension:@"plist"]];
+        id v = [[NSDictionary dictionaryWithContentsOfFile:path] objectForKey:key];
+        if (v)
+            return v;
+    }
+    return nil;
+}
 - (id)objectForKey:(NSString *)key
 {
-    return [_arguments objectForKey:key] ?: [_values objectForKey:key] ?: [_registered objectForKey:key];
+    return [_arguments objectForKey:key] ?: [_values objectForKey:key] ?: suite_value(self, _file, key)
+                                                                           ?: [_registered objectForKey:key];
 }
 - (BOOL)save
 {

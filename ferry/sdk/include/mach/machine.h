@@ -31,5 +31,21 @@ typedef int cpu_subtype_t;
 #define CPU_SUBTYPE_ARM64_ALL ((cpu_subtype_t)0)
 #define CPU_SUBTYPE_ARM64E ((cpu_subtype_t)2)
 #endif
+/* the PowerPC subtypes, which programs that name them all list (freemac 1.224) */
+#ifndef CPU_SUBTYPE_POWERPC_ALL
+#define CPU_SUBTYPE_POWERPC_ALL ((cpu_subtype_t)0)
+#define CPU_SUBTYPE_POWERPC_601 ((cpu_subtype_t)1)
+#define CPU_SUBTYPE_POWERPC_602 ((cpu_subtype_t)2)
+#define CPU_SUBTYPE_POWERPC_603 ((cpu_subtype_t)3)
+#define CPU_SUBTYPE_POWERPC_603e ((cpu_subtype_t)4)
+#define CPU_SUBTYPE_POWERPC_603ev ((cpu_subtype_t)5)
+#define CPU_SUBTYPE_POWERPC_604 ((cpu_subtype_t)6)
+#define CPU_SUBTYPE_POWERPC_604e ((cpu_subtype_t)7)
+#define CPU_SUBTYPE_POWERPC_620 ((cpu_subtype_t)8)
+#define CPU_SUBTYPE_POWERPC_750 ((cpu_subtype_t)9)
+#define CPU_SUBTYPE_POWERPC_7400 ((cpu_subtype_t)10)
+#define CPU_SUBTYPE_POWERPC_7450 ((cpu_subtype_t)11)
+#define CPU_SUBTYPE_POWERPC_970 ((cpu_subtype_t)100)
+#endif
 __FERRY_END
 #endif

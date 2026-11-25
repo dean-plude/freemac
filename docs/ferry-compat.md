@@ -1455,6 +1455,137 @@ The apps' own frameworks, compiled the same way from their public source:
 None of them was linked yet, and Sequel Pro's MySQL framework wasn't
 reached: it needs the MySQL client library built for Ferry.
 
+### Shortcuts, asset catalogues and KeyCastr (freemac 1.224, Ferry 0.48.0)
+
+The same 627 files as in 1.223 were compiled again with `ferry-cc
+-fsyntax-only`, before and after this work, by one survey script. The
+script now finds a header that a source names in another case
+(`SUlog.h`, `MPDOcument.h`, `<HexFiend/HFFUnctions.h>`), as a Mac's disk
+does. That is why the "before" column is a little higher than 1.223's
+"now".
+
+| App | Source files | Compiled before | Compile now |
+| --- | --- | --- | --- |
+| Flycut | 23 | 23 | 23 |
+| ShiftIt | 23 | 21 | 21 |
+| Spectacle | 31 | 31 | 31 |
+| Gas Mask | 43 | 39 | 39 |
+| MacPass | 159 | 64 | 64 |
+| MacDown | 36 | 16 | 20 |
+| Sequel Pro | 190 | 148 | 149 |
+| KeyCastr | 17 | 12 | 17 |
+| Hex Fiend | 105 | 81 | 81 |
+| All nine | 627 | 435 | 445 |
+
+With hoedown, LibYAML and GBCli built as frameworks, 21 of MacDown's files
+compile.
+
+Global shortcuts were pressed through the stand-in for Wayfire's IPC
+that the tests use, with the app started with no display. Every
+combination an app registered with Strata was pressed once:
+
+| App | When its shortcuts are pressed |
+| --- | --- |
+| Spectacle | Registers its 18 shortcuts. Each press resizes or moves the focused window: centre, full screen, the halves, the corners, the next and previous thirds, larger and smaller. Its status item shows its picture from the asset catalogue |
+| Flycut | Registers its shortcut. A press runs its handler, which opens the bezel on the main screen (not drawn with no display) |
+| KeyCastr | Registers none until the user records one; shows its status item with its icon |
+
+KeyCastr was linked into a bundle as the other three were:
+
+- ShortcutRecorder and Sparkle 2 (with its ed25519 code) were built from
+  their source as frameworks.
+- KCVisualizer was built as a framework, and the Default, Minimal and
+  Svelte visualizers as plug-ins.
+- Its xibs were compiled with `ferry-ibtool`.
+
+Under X it shows Sparkle's "Check for updates automatically?" window and
+its status item. Its About window's Quartz Composer animation doesn't
+run, and it shows no keystrokes. Its event tap is `NULL`, since Wayland
+lets no app read another app's keys, and KeyCastr says nothing about
+that. On freemac's desktop it puts its status item in the menu bar.
+Sparkle 2's XPC services never connect: every call to them fails, as on
+a Mac without the services.
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `RegisterEventHotKey` presses on the dispatcher target, `LSUIElement` and `LSBackgroundOnly`, `frontmostApplication` from Wayfire's focused window, `TransformProcessType`, a control class's own cell | Spectacle, Flycut, KeyCastr | done |
+| `ferry-actool`; `imageNamed:`, `colorNamed:`, `NSDataAsset`, the app icon from an `.icns` file's largest PNG | Spectacle, KeyCastr's ShortcutRecorder | done; `Assets.car` isn't read, image stacks and symbol sets aren't compiled |
+| `CFNotificationCenter` (local, distributed, Darwin), `CFMachPort` | KeyCastr | done; there are no Mach ports, so `CFMachPortCreate` gives `NULL` |
+| `os_trace`, `os_activity`, `audit_token_t`, the PowerPC CPU subtypes | Sparkle 2, ShortcutRecorder | done |
+| `NSXPCConnection`, `NSXPCInterface`, `NSXPCListener` | Sparkle 2 | done; a connection never connects, and its proxies fail with `NSXPCConnectionInvalid` |
+| `SMJobBless`, `SMJobSubmit`, `SMJobRemove`, `SMJobCopyDictionary`, `AuthorizationRightGet` and `Set` | Sparkle 2 | done; there's no launchd, so each is refused |
+| bookmarks and security scopes, `NSURLVolumeIdentifierKey`, a bundle's other folders, auxiliary executables, `bundleWithIdentifier:` for loaded frameworks, `allFrameworks`, `allBundles` | Sparkle 2, ShortcutRecorder | done; a bookmark holds the path only |
+| `renamex_np`, `renameatx_np`, `renameat`, `O_NOFOLLOW_ANY`, `utimes`, `futimes`, `lutimes` | Sparkle 2 | done, on `renameat2`, `openat2` and the Mac's `struct timeval` |
+| `rangeOfData:` backwards and anchored, plists from URLs, `writeToURL:atomically:`, localized case changes, `NSHomeDirectoryForUser`, `addSuiteNamed:` | Sparkle 2, MacDown | done |
+| JSON with a comma before `]` or `}` | ShortcutRecorder | done |
+| Markdown in attributed strings, `NSPresentationIntent` | Sparkle 2 | the intents are there; Markdown isn't read and the initializers fail |
+| `WKContentRuleListStore` | Sparkle 2 | done; nothing is compiled, so nothing is blocked |
+| window frames by name, tool-tip rects, `relativeCurveToPoint:`, layout direction, control tint, `NSTextTab` and tab stops, `colorWithCatalogName:colorName:`, `parentItem`, `NSStringDrawingContext`, `NSDrawThreePartImage`, `NSDrawNinePartImage`, the function keys up to F35 | KeyCastr, ShortcutRecorder, Sequel Pro | done; nine-part middles are stretched, not tiled |
+| `hasMarkedText`, `NSCursorAttributeName`, the text view's `is...Enabled` names | MacDown | done; there's no input method, so there's never marked text |
+| the current input source as one object | ShortcutRecorder | done |
+| `<qcView>` in `ferry-ibtool` | KeyCastr | done; made as a `QCView`, which can't run a composition |
+
+What still stops each app's files (the first error in each file):
+
+- **Flycut (0)**, **Spectacle (0)**, **KeyCastr (0)**: all compile, and
+  they link and run.
+- **ShiftIt (2)**: `X11/Xlib.h`, its X11 driver, left out of the NoX11
+  target that was linked.
+- **Gas Mask (4)**: its Swift bridging header; `SMAppService`;
+  `kSCNetworkFlagsReachable`; `alloca` without `alloca.h`.
+- **MacPass (95)**: KeePassKit (60 files) and HNHUi (16), plus
+  TransformerKit and Sparkle. Then:
+  - `windowNumbersWithOptions:` and `kSecAttrApplicationTag`;
+  - `NSTitlebarAccessoryViewController`;
+  - single calls: `getValue:size:`,
+    `popUpMenuPositioningItem:atLocation:inView:`,
+    `openURLs:withApplicationAtURL:options:configuration:error:`,
+    `eventWithEventRef:`, `mutableString`, `menuForEvent:`;
+  - a `CGSize` in a boxed expression, and Core Image's `CIImage` (2).
+- **MacDown (16)**: its libraries' headers, from its Pods:
+  MASPreferences, PAPreferences, JJPluralForm, M13OrderedDictionary,
+  handlebars-objc, and `yaml.h` named bare. Then `version.h`, made by its
+  build.
+- **Sequel Pro (41)**:
+  - `NSConnection`, `NSTokenFieldCellDelegate`,
+    `NSPrintPanelAccessorizing`, `complex.h` and `alloca` without
+    `alloca.h` (3 each);
+  - `NSCalendarDate`, `SecTrustedApplicationRef`, and
+    `NSAppleEventManager`;
+  - `NSPICTImageRep`, `NSColorSpace`, `NSColorList` and `WebHistoryItem`;
+  - `bzlib.h`, `CFXMLCreateStringByEscapingEntities`, `getlogin`,
+    `Block_copy`, `object_getInstanceVariable` and
+    `NSFileTypeForHFSTypeCode`;
+  - older names (`unimpErr`, `Nanoseconds`, `NSThickSquareBezelStyle`,
+    `NSTexturedBackgroundWindowMask`,
+    `NSExcludedElementsDocumentAttribute`);
+  - a few calls that return `id` where a value is wanted.
+- **Hex Fiend (24)**:
+  - its Swift bridging header (2);
+  - `OSMemoryBarrier` and `OSQueueHead`;
+  - `DiskArbitration`, `sys/disk.h` and `servers/bootstrap.h`;
+  - `PAGE_SIZE`;
+  - the remaining Mac text encodings;
+  - `NSClickGestureRecognizer`, `CTFontCopyCharacterSet`,
+    `CGContextShowGlyphsAtPositions` and
+    `NSFrameRectWithWidthUsingOperation`;
+  - `setRefusesFirstResponder:`, `orderedDocuments`,
+    `ancestorSharedWithView:`, `enclosingMenuItem`, and
+    `makeObjectsPerformSelector:` on a set;
+  - `uint64` in its templates (3), and a parse error inside its data
+    inspector's fetch macros.
+
+MacDown's libraries, built from their public source into frameworks:
+
+| Library | Files | Built | What it does under Ferry |
+| --- | --- | --- | --- |
+| hoedown | 9 | all | turns Markdown into HTML |
+| LibYAML | 8 | all | parses YAML |
+| GBCli | 4 | all | reads command-line options into settings |
+| handlebars-objc | 38 | 35 | not usable: its lexer is a flex file, and flex wasn't available to build it. One file subscripts an `id<NSFastEnumeration>`, and two need the framework's headers laid out as its build lays them |
+
 ## What the apps need most
 
 Counted over the nine apps:
@@ -1465,7 +1596,7 @@ Counted over the nine apps:
    `NSToolbar`, `NSSegmentedControl`, `NSSearchField` and `NSStackView` in
    1.164. Split view and tab view controllers, which MacPass builds
    its windows on, came in 1.210 with `NSGradient` and `NSShadow`, the
-   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first; 383 of 608 files compiled after 1.222. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run: each shows its status item, its menu and its windows, from nibs that `ferry-ibtool` compiled where the app has xibs. Counted again over fresh clones, 428 of 627 files now compile (395 before), and the table under "Linking and running the apps" lists what stops the rest. Next is building the frameworks the other apps bring with them (KeePassKit, KissXML and HNHUi for MacPass, MacDown's libraries, Sequel Pro's MySQL framework), and global shortcuts.
+   drawing classes six of the apps use. Collection views and rulers, which MacPass and Sequel Pro use, came in 1.212. Tracking areas and cursors, which four of the apps use, came in 1.213, with shadows drawn and `NSAnimation`. In 1.219 a search of the apps' source added the calls they make next (child windows, login items, file calls, encodings). In 1.221 and 1.222 each app's source was compiled against Ferry's SDK and what it stopped at was added, most-used first. In 1.223 Flycut, Spectacle and ShiftIt were linked into bundles with Ferry's SDK and run, each showing its status item, its menu and its windows. In 1.224 their global shortcuts were pressed through freemac's desktop, and Spectacle's and Flycut's did what they do on a Mac; asset catalogues were compiled, so Spectacle's status item shows its picture; and KeyCastr became the fourth app to link and run. Counted over the same clones, 445 of 627 files now compile (435 before, counted the same way), and the table under "Shortcuts, asset catalogues and KeyCastr" lists what stops the rest. Next is building the frameworks the other apps bring with them (KeePassKit, KissXML and HNHUi for MacPass, the rest of MacDown's libraries, Sequel Pro's MySQL framework), which the apps' own sources now mostly wait on. Gas Mask and Hex Fiend also have Swift in them, which Ferry can't build, so neither can be linked.
 2. **`NSStatusBar`/`NSStatusItem`**: four of the apps live in the menu bar
    (Flycut, ShiftIt, Spectacle, Gas Mask). Done in 1.157, as items in
    freemac's menu bar.

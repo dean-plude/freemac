@@ -561,7 +561,26 @@ static ATISInputSource *make_source(NSString *name)
     return src;
 }
 
-static ATISInputSource *current_source(void) { return make_source(selected_layout_name()); }
+/* A Mac keeps one object for each input source, so a program may hold the
+ * current one without retaining it (ShortcutRecorder does): each source is
+ * made once and kept, and handed out retained (freemac 1.224). */
+static ATISInputSource *source_named(NSString *name)
+{
+    static NSMutableDictionary *made;
+    @synchronized([ATISInputSource class]) {
+        if (!made)
+            made = [[NSMutableDictionary alloc] init];
+        ATISInputSource *src = made[name];
+        if (!src) {
+            src = make_source(name);
+            made[name] = src;
+            [src release];
+        }
+        return [src retain];
+    }
+}
+
+static ATISInputSource *current_source(void) { return source_named(selected_layout_name()); }
 
 TISInputSourceRef TISCopyCurrentKeyboardInputSource(void) { return (TISInputSourceRef)current_source(); }
 TISInputSourceRef TISCopyCurrentKeyboardLayoutInputSource(void) { return (TISInputSourceRef)current_source(); }
@@ -576,7 +595,7 @@ TISInputSourceRef TISCopyInputSourceForLanguage(CFStringRef language)
 {
     NSString *l = (NSString *)language;
     if ([l isEqual:@"en"] || [l hasPrefix:@"en-"] || [l hasPrefix:@"en_"])
-        return (TISInputSourceRef)make_source(@"English (US)");
+        return (TISInputSourceRef)source_named(@"English (US)");
     return NULL;
 }
 
@@ -589,7 +608,7 @@ static NSArray *all_sources(void)
         names = @[ @"English (US)" ];
     for (id n in names)
         if ([n isKindOfClass:[NSString class]])
-            [list addObject:[make_source(n) autorelease]];
+            [list addObject:[source_named(n) autorelease]];
     return list;
 }
 
@@ -844,7 +863,21 @@ OSStatus CopyProcessName(const ProcessSerialNumber *psn, CFStringRef *name)
     *name = (CFStringRef)[process_name() copy];
     return noErr;
 }
-OSStatus TransformProcessType(const ProcessSerialNumber *psn, UInt32 type) { return noErr; }
+/* The app's activation policy, as a Mac changes it (freemac 1.224, Ferry
+ * 0.48.0). */
+OSStatus TransformProcessType(const ProcessSerialNumber *psn, UInt32 type)
+{
+    if (!is_self(psn))
+        return procNotFound;
+    [NSApplication sharedApplication];
+    if (type == kProcessTransformToForegroundApplication)
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    else if (type == kProcessTransformToUIElementApplication)
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    else if (type == kProcessTransformToBackgroundApplication)
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+    return noErr;
+}
 OSErr SetFrontProcess(const ProcessSerialNumber *psn) { return is_self(psn) ? noErr : procNotFound; }
 OSErr SetFrontProcessWithOptions(const ProcessSerialNumber *psn, OptionBits options) { return SetFrontProcess(psn); }
 OSErr ShowHideProcess(const ProcessSerialNumber *psn, Boolean visible)

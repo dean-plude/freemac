@@ -370,7 +370,7 @@ static NSArray *image_extensions(void)
     NSImage *im = named_images[name];
     if (im)
         return im;
-    im = [[NSBundle mainBundle] imageForResource:name];
+    im = [[NSBundle mainBundle] imageForResource:name];   /* its asset catalogue first */
     if (!im)
         im = standard_image(name);
     if (!im)
@@ -911,6 +911,10 @@ static CGFloat file_scale(NSString *path)
 /* With "name@2x" beside "name", both are kept, for drawing at either scale. */
 - (NSImage *)imageForResource:(NSImageName)name
 {
+    /* the bundle's asset catalogue first, as on a Mac (NSAssets.m) */
+    NSImage *asset = AAssetImage(self, name);
+    if (asset)
+        return asset;
     NSString *path = [self pathForImageResource:name];
     NSImage *im = path ? [[[NSImage alloc] initWithContentsOfFile:path] autorelease] : nil;
     if (!im)

@@ -11,6 +11,7 @@ module AppKit [system] {
     header "AppKit/NSAnimation.h"
     header "AppKit/NSBezierPath.h"
     header "AppKit/NSCollectionView.h"
+    header "AppKit/NSDataAsset.h"
     header "AppKit/NSDockTile.h"
     header "AppKit/NSEventMonitors.h"
     header "AppKit/NSFontDescriptor.h"
@@ -77,6 +78,7 @@ module CoreFoundation [system] {
     header "CoreFoundation/CFError.h"
     header "CoreFoundation/CFLocale.h"
     header "CoreFoundation/CFMore.h"
+    header "CoreFoundation/CFNotificationCenter.h"
     header "CoreFoundation/CFNumber.h"
     header "CoreFoundation/CFPreferences.h"
     header "CoreFoundation/CFRunLoop.h"
@@ -211,6 +213,7 @@ module Foundation [system] {
     header "Foundation/NSXMLNode.h"
     header "Foundation/NSXMLNodeOptions.h"
     header "Foundation/NSXMLParser.h"
+    header "Foundation/NSXPCConnection.h"
     header "Foundation/NSZone.h"
     export *
     link framework "Foundation"

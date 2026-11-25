@@ -50,12 +50,13 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
-        foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents|foundation_apps_more)
+        foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents|foundation_apps_more|\
+        foundation_keycastr_calls)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
-        appkit_document_presenter|appkit_quicklook|appkit_apps_more)
+        appkit_document_presenter|appkit_quicklook|appkit_apps_more|appkit_keycastr)
             # its files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -262,7 +263,7 @@ run_one libsystem_available "$here/libsystem_available.m" "$here/libsystem_avail
 plugins="$build/plugin_bundles"
 rm -rf "$plugins" "$build/plugin_bundles.cc.log"; mkdir -p "$plugins"
 plugins_ok=1
-for b in Greeter Plain Broken; do
+for b in Greeter Plain Broken Quiet; do
     mkdir -p "$plugins/$b.bundle/Contents/MacOS"
     principal=; [ $b = Greeter ] && principal='<key>NSPrincipalClass</key><string>Greeter</string>'
     exe=$b; [ $b = Broken ] && exe=Missing
@@ -278,6 +279,9 @@ for b in Greeter Plain; do
     "$top/sdk/ferry-cc" -O1 -bundle -o "$plugins/$b.bundle/Contents/MacOS/$b" "$src" -framework Foundation \
         2>> "$build/plugin_bundles.cc.log" || plugins_ok=0
 done
+# Quiet is opened with dlopen, and then found by its identifier
+"$top/sdk/ferry-cc" -O1 -bundle -o "$plugins/Quiet.bundle/Contents/MacOS/Quiet" "$here/dlfcn/quiet.c" \
+    2>> "$build/plugin_bundles.cc.log" || plugins_ok=0
 if [ $plugins_ok = 1 ]; then
     run_one libsystem_plugin "$here/libsystem_plugin.m" "$here/libsystem_plugin.out" -framework Foundation \
         -framework CoreFoundation
@@ -739,6 +743,30 @@ if command -v dbus-run-session > /dev/null && command -v gdbus > /dev/null; then
 else
     echo "skip appkit_statusbar (needs dbus-run-session and gdbus)"
 fi
+# An app's asset catalogue (freemac 1.224, Ferry 0.48.0): make_assets.py
+# makes one and compiles it with ferry-actool into AssetApp.app, which
+# reads back its images, colours, data and app icon; ferry-actool says on
+# stderr which kinds it left out
+app="$build/AssetApp.app"
+rm -rf "$app"; cp -r "$here/appkit/AssetApp.app" "$app"; mkdir -p "$app/Contents/MacOS"
+if ! python3 -I "$here/appkit/make_assets.py" "$top/sdk/ferry-actool" "$build/assets_src" "$app" \
+        2> "$build/appkit_assets.actool.log" || ! grep -q "Gear.symbolset: symbolset isn't compiled" "$build/appkit_assets.actool.log"; then
+    echo "FAIL appkit_assets (ferry-actool)"; sed 's/^/    /' "$build/appkit_assets.actool.log"; fail=$((fail + 1))
+elif "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/AssetApp" "$here/appkit/assets.m" -framework Cocoa \
+        2> "$build/appkit_assets.cc.log"; then
+    env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$app/Contents/MacOS/AssetApp" \
+        > "$build/appkit_assets.got" 2> "$build/appkit_assets.err"
+    echo "exit=$?" >> "$build/appkit_assets.got"
+    if diff -u "$here/appkit/assets.out" "$build/appkit_assets.got" > "$build/appkit_assets.diff"; then
+        echo "ok   appkit_assets"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_assets"; sed 's/^/    /' "$build/appkit_assets.diff"; sed 's/^/    stderr: /' "$build/appkit_assets.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_assets (did not compile)"; sed 's/^/    /' "$build/appkit_assets.cc.log"
+    fail=$((fail + 1))
+fi
 # An app started from its main nib (M5), with no display. The nibs come
 # from make_nibs.py; what Ferry says about the parts it can't use goes to
 # stderr and is checked too.
@@ -1187,6 +1215,15 @@ run_one foundation_apps_more "$here/foundation/apps_more.m" "$here/foundation/ap
 # Foundation calls KeePassKit and the apps' other frameworks make (1.223).
 run_one foundation_framework_calls "$here/foundation/framework_calls.m" "$here/foundation/framework_calls.out" \
     -fobjc-arc -fblocks -framework Foundation
+# What KeyCastr, its Sparkle and ShortcutRecorder, and MacDown's frameworks
+# call (freemac 1.224, Ferry 0.48.0): CoreFoundation's notification
+# centers, os_trace, an XPC connection that never connects, data searches,
+# bookmarks, plists at URLs, Markdown (not read), launchd's calls (refused),
+# the console user, renamex_np, O_NOFOLLOW_ANY and futimes; in a home of
+# the test's own.
+run_one foundation_keycastr_calls "$here/foundation/keycastr_calls.m" "$here/foundation/keycastr_calls.out" \
+    -fobjc-arc -fblocks -framework Foundation -framework ServiceManagement -framework Security \
+    -framework SystemConfiguration
 run_one foundation_fsevents "$here/foundation/fsevents.m" "$here/foundation/fsevents.out" -fobjc-arc -fblocks \
     -framework Foundation -framework CoreServices
 run_one foundation_asserts "$here/foundation/asserts.m" "$here/foundation/asserts.out" -fobjc-arc -fblocks \
@@ -1200,6 +1237,12 @@ fi
 run_one appkit_childwindows "$here/appkit/childwindows.m" "$here/appkit/childwindows.out" -fobjc-arc -fblocks \
     -framework Cocoa
 run_one appkit_affine "$here/appkit/affine.m" "$here/appkit/affine.out" -fobjc-arc -fblocks -framework Cocoa
+# What KeyCastr and its ShortcutRecorder and Sparkle call in AppKit and
+# Carbon (freemac 1.224, Ferry 0.48.0): window frames by name, tab stops, a
+# catalogue colour, tool-tip rects, three- and nine-part images, the
+# process type and the input source kept as one object; in a home of its own.
+run_one appkit_keycastr "$here/appkit/keycastr_appkit.m" "$here/appkit/keycastr_appkit.out" -fobjc-arc -fblocks \
+    -framework Cocoa -framework Carbon
 # WebKit: WKWebView and the older WebView, shown by this system's WebKitGTK
 # (freemac 1.214, Ferry 0.40.0). First what needs neither WebKitGTK nor a
 # display: the classes, web views that stay empty with no display, and the
@@ -1322,8 +1365,22 @@ if command -v python3 > /dev/null 2>&1; then
         echo "FAIL appkit_cgservices (did not compile)"; sed 's/^/    /' "$build/appkit_cgservices.cc.log"
         fail=$((fail + 1))
     fi
+    # An agent app's shortcuts (freemac 1.224, Ferry 0.48.0): AgentApp.app
+    # says LSUIElement, so it isn't made active by starting and the
+    # frontmost app is the one Wayfire has focused, as Spectacle checks; a
+    # hotkey on the dispatcher target; a control's own cell class, as
+    # Flycut's ShortcutRecorder needs
+    app="$build/AgentApp.app"
+    rm -rf "$app"; cp -r "$here/appkit/AgentApp.app" "$app"; mkdir -p "$app/Contents/MacOS"
+    if "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$app/Contents/MacOS/AgentApp" "$here/appkit/agent_app.m" \
+            -framework Cocoa -framework Carbon 2> "$build/appkit_agent_app.cc.log"; then
+        wayfire_test appkit_agent_app "$app/Contents/MacOS/AgentApp" "$here/appkit/agent_app.out"
+    else
+        echo "FAIL appkit_agent_app (did not compile)"; sed 's/^/    /' "$build/appkit_agent_app.cc.log"
+        fail=$((fail + 1))
+    fi
 else
-    echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility, appkit_cgservices (they need python3)"
+    echo "skip appkit_hotkeys, appkit_hotkeys_plain, appkit_accessibility, appkit_cgservices, appkit_agent_app (they need python3)"
 fi
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -52,6 +52,7 @@ K(kSecCodeInfoTimestamp, "kSecCodeInfoTimestamp")
 K(kSecCodeInfoTrust, "kSecCodeInfoTrust")
 K(kSecCodeInfoUnique, "kSecCodeInfoUnique")
 K(kSecGuestAttributePid, "kSecGuestAttributePid")
+K(kSecGuestAttributeAudit, "kSecGuestAttributeAudit")
 #undef K
 
 static NSString *canonical(NSString *path)
