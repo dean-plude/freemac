@@ -6,7 +6,9 @@
  * rows, built in code and from a nib ferry-ibtool compiled
  * (predicate_editor.xib), a few older cell and field calls, the application's will-become and
  * will-resign notifications, Core Audio's objects through AudioToolbox with
- * no sound server, and a few newer Foundation names. */
+ * no sound server, and a few newer Foundation names; and (freemac 1.236)
+ * a grid view leaving hidden a view the app hid, as Itsycal's agenda hides
+ * its video button, while hiding and showing the views of a row it hides. */
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 #import <AudioToolbox/AudioToolbox.h>
@@ -226,6 +228,28 @@ static void foundation(void)
     printf("cornerCurve: %s\n", l.cornerCurve.UTF8String);
 }
 
+/* Itsycal's agenda cell: a grid of a label and a button the app hides
+ * when the event has no meeting link */
+static void grid_hidden(void)
+{
+    NSTextField *label = [NSTextField labelWithString:@"9:30 AM - 10 AM"];
+    NSButton *video = [NSButton buttonWithTitle:@"V" target:nil action:NULL];
+    NSGridView *grid = [NSGridView gridViewWithViews:@[ @[ label, video ] ]];
+    video.hidden = YES;
+    [grid setFrame:NSMakeRect(0, 0, 200, 30)];
+    [grid layoutSubtreeIfNeeded];
+    printf("a grid's button the app hid: hidden %d\n", video.hidden);
+    [grid rowAtIndex:0].hidden = YES;
+    [grid layoutSubtreeIfNeeded];
+    printf("  its row hidden: label hidden %d, button hidden %d\n", label.hidden, video.hidden);
+    [grid rowAtIndex:0].hidden = NO;
+    [grid layoutSubtreeIfNeeded];
+    printf("  its row shown again: label hidden %d, button hidden %d\n", label.hidden, video.hidden);
+    video.hidden = NO;
+    [grid layoutSubtreeIfNeeded];
+    printf("  shown by the app: button hidden %d\n", video.hidden);
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -236,6 +260,7 @@ int main(void)
         older_calls();
         core_audio();
         foundation();
+        grid_hidden();
     }
     return 0;
 }

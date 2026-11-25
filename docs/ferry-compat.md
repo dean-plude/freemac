@@ -1939,7 +1939,7 @@ were looked at as later candidates.
 | Itsycal | It wouldn't link: no EventKit, and newer AppKit, Foundation and Core Animation names missing | Ferry had no EventKit, and the app is written for recent macOS | It links and runs, and its status item shows its window |
 | Itsycal | The window was 16 to 78 points wide, its month cut off | The month title hugs its text at priority 1; the solver held its width at zero while any weaker wish broke, and the window took the width | The window is the width of its month, at the top right of the screen under the menu bar |
 | Itsycal | Clicking the status item raised an exception | It reads an event's `participationStatus` by key, which Ferry's EventKit didn't answer | The status is the user's own among the event's attendees |
-| Itsycal | The agenda never showed | `preferredContentSize` changed nothing, and `viewDidLayout`, where the agenda asks for its height, was never sent | The agenda shows under the month, with each day's events and reminders. It appears a few seconds after the click: the window's constraints, with the agenda's rows in them, take over a second to solve, two or three times |
+| Itsycal | The agenda never showed | `preferredContentSize` changed nothing, and `viewDidLayout`, where the agenda asks for its height, was never sent | The agenda shows under the month, with each day's events and reminders. It appears a few seconds after the click: the window's constraints, with the agenda's rows in them, are solved 22 times, 3.9 seconds in all (see "The apps rebuilt by recipes") |
 | Gas Mask | It doesn't compile | Its Growl framework, built from source, uses `CFPropertyListFormat`, `kCFAllocatorMalloc` and `AliasHandle`, which Ferry's headers lack, and declares a type its own way that the SDK declares another | Not done |
 
 What was added:
@@ -1953,10 +1953,49 @@ What was added:
 | Core Audio's default devices, their names, volume and mute, through AudioToolbox's header | the surveyed apps | done, through pactl or wpctl |
 | safe areas, display links, window occlusion, symbol configurations, menu section headers, system fill colours, scroll phases, `refusesFirstResponder`, the application's will-become and will-resign notifications, older cell and field calls, a layer's corner curve, `NSDateIntervalFormatter`, `localizedStandardCompare:`, the tags key, reachability flags | Itsycal, Gas Mask | done |
 
-The seven earlier apps weren't rebuilt or run again this round: the
-build scripts and builds they were run from were lost with the round's
-scratch space. The layout pass and the solver changes reach them too, so
-they should be run again in the next round.
+### The apps rebuilt by recipes (freemac 1.236, Ferry 0.60.0)
+
+Each app that has run under Ferry is built by a script in `ferry/apps/`,
+which fetches it and what it uses at pinned commits and builds them with
+Ferry's SDK (see `ferry/apps/README.md`). The Objective-C apps are built
+from their Xcode projects by `ferry/apps/xcode.py`, Ferry's own reader of
+the project file. Each app was built that way and run under X with no
+window manager on a 1280 by 800 screen, with freemac's Topline as the menu
+bar, given input with XTest.
+
+| App | Built from | What it shows | Changed this round |
+| --- | --- | --- | --- |
+| Flycut | its source, with MJCloudKitUserDefaultsSync | the accessibility alert; its status menu (Search, Clear All, Merge All, Preferences, About, Quit); its preferences with their toolbar | nothing |
+| Spectacle | its source, with Sparkle 1.22.0 | with the accessibility grant, its status menu of moves; its preferences with the shortcut recorders | nothing |
+| ShiftIt | its "ShiftIt NoX11" target, Sparkle 1.22.0 and the ShortcutRecorder its repository carries | "Start ShiftIt automatically?", then its status menu of positions | nothing |
+| KeyCastr | its source, with ShortcutRecorder, Sparkle 2 (its submodules) and its three visualizer plug-ins | Sparkle's "Check for updates automatically?" at 437 by 171, and its status item. Its key display, a clear window, is a light bar across the foot of the screen: with no compositor, X can't show it through | nothing |
+| MacPass | its source, with KeePassKit, KissXML, TransformerKit, HNHUi, DDHotKey and Sparkle 2.6.4 | its plug-in update question; its welcome window with the icon, "Welcome to MacPass", Open Database and Create Database, and its recent documents; Create Database opens the document window with its groups, entries and inspector | the welcome window had only its icon, too big: a stack view sized the 128-point image view to its picture, and its title, cut off, was wider in Ferry's font than the stack. Now as on a Mac |
+| MacDown | its source, with hoedown, LibYAML, handlebars-objc (its parser made with bison and flex), MASPreferences, PAPreferences, JJPluralForm, M13OrderedDictionary, Prism and Sparkle 1.22.0 | its contributing guide, highlighted in the editor and rendered in the preview, with its toolbar | nothing |
+| Itsycal | its 0.29.0 source, with MASShortcut 2.4.0 and Sparkle 1.27.1 | the month with today ringed and the agenda of the coming days | the video-call button showed on every agenda row: Itsycal hides it in a grid view's cell, and the grid view unhid every view of a row it showed. It shows now only for an event with a meeting link |
+| TomatoBar | its source and its three Swift packages | its popover with Start, the intervals and the menu | nothing |
+| Sequel Pro | no recipe yet | not run | |
+
+Sequel Pro's recipe needs MariaDB Connector/C built for Ferry, with its
+hashes over CommonCrypto, and its preference defaults written again with
+Ferry's archiver, as freemac 1.226's build did; that build's scripts were
+lost with its scratch space.
+
+Itsycal's window still appears seconds after the click. Opening it solves
+the window's constraints 22 times, 3.9 seconds in all. The large solves
+are of 1064 rows over 450 variables, and each takes 80 rounds that hold
+one broken inequality at a time, then a pass that tries letting go of
+each: about 160 eliminations of some 2 milliseconds, 300 to 420
+milliseconds a solve. Starting from the inequalities held in the window's
+last solve, or holding all the broken ones of a priority at once, would
+cut the rounds; solving the window fewer times as the agenda's rows come
+in would cut the rest.
+
+What was added:
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| a stack view's views held to their own width and height constraints; its width across from the widest view with a width of its own | MacPass | done |
+| a grid view hiding and showing only the views of the rows and columns it hides | Itsycal | done |
 
 ### FFmpeg's libraries and tools (freemac 1.233, Ferry 0.57.0)
 

@@ -593,7 +593,7 @@ static void drain_wake(int fd)
     return next < 1e15 ? [NSDate dateWithTimeIntervalSinceReferenceDate:next] : [NSDate distantFuture];
 }
 
-/* Set by CFRunLoopRun (CoreFoundation.m) while it runs (freemac 1.NEXT, VLC). */
+/* Set by CFRunLoopRun (CoreFoundation.m) while it runs (freemac 1.235, VLC). */
 __thread BOOL _FerryRunLoopRunForever;
 
 /* For CFRunLoopRunInMode. */

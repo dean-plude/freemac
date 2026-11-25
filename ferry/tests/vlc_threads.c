@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry test (freemac 1.NEXT): what VLC's core needs of threads and the main
+ * Ferry test (freemac 1.235): what VLC's core needs of threads and the main
  * run loop. Waiting on a condition is a cancellation point, as POSIX says, so
  * pthread_cancel ends a thread waiting there (VLC stops its decoder threads
  * that way), with the mutex held again for the cleanup handlers. On the main
