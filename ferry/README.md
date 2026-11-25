@@ -462,6 +462,8 @@ in `appkit/AppKitNewer.m`. The tests are `appkit_newer_apps` and
 
 From Ferry 0.57.0 (freemac 1.233), FFmpeg's libraries and its `ffmpeg` and `ffprobe` tools build as Mac programs with `apps/ffmpeg.sh` (8.0.1 or 6.1.1) and decode, encode and filter under Ferry as they do on Linux, and programs can start others with `posix_spawn` and match file names with `glob` and `fnmatch`.
 
+From Ferry 0.58.0 (freemac 1.234), `coreaudio/` holds Core Audio, which also serves AudioToolbox and AudioUnit, in place of 1.232's `coreaudio/CoreAudio.c`: the HAL on the sound server through libpulse (`CABackend.m`, `CAHardware.m`), audio units (`CAAudioUnit.m`), audio queues (`CAAudioQueue.m`), converters (`CAConverter.m`) and formats (`CAFormat.m`). With no sound server, or `FERRY_AUDIO=null`, a null device plays into `FERRY_AUDIO_OUTPUT_FILE` and records from `FERRY_AUDIO_INPUT_FILE`; the tests are the `coreaudio_` ones.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

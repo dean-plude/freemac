@@ -150,6 +150,19 @@ run_one() {
             FERRY_JAVASCRIPTCORE="$build/none/libjavascriptcoregtk-4.1.so.0" \
                 timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         javascriptcore_*) timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Core Audio (freemac 1.234, Ferry 0.58.0): the null device, with
+        # the samples it plays and records in files; as if libpulse weren't
+        # installed; and run.sh's own PulseAudio
+        coreaudio_missing)
+            env -u FERRY_AUDIO FERRY_PULSE_LIBRARY="$build/none/libpulse.so.0" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_auhal)
+            FERRY_AUDIO=null FERRY_AUDIO_OUTPUT_FILE="$build/$name.played" FERRY_AUDIO_INPUT_FILE="$build/$name.heard" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_pulse)
+            env -u FERRY_AUDIO PULSE_SERVER="unix:$pulse_dir/native" HOME="$pulse_dir/home" XDG_RUNTIME_DIR="$pulse_dir" \
+                FERRY_TEST_PACTL="$pulse_pactl" timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_*) FERRY_AUDIO=null timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         # WebKit (freemac 1.214, Ferry 0.40.0): two tests with no display
         # (one as if WebKitGTK weren't installed), and the others on the X
         # display of run.sh's own Xvfb; each in a home of its own
@@ -1588,6 +1601,47 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 # the empty capture devices, address book and I/O Kit registry.
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
     -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices
+
+# Core Audio, Audio Units, Audio Queues and converters (freemac 1.234,
+# Ferry 0.58.0), on no sound hardware: the devices and their formats, set
+# and heard by listeners, an IO proc and PCM converters; the same with no
+# libpulse at all; a HALOutput and a DefaultOutput unit playing sines into
+# the null device's file, and a HALOutput unit recording one from it, as
+# VLC and OBS do; audio queues playing to and recording from the null
+# device's loopback; and, where PulseAudio is installed, a server of the
+# test's own with null sinks, played to and recorded from
+ca_frameworks="-framework AudioToolbox -framework AudioUnit -framework CoreAudio -framework CoreFoundation"
+run_one coreaudio_devices "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fblocks $ca_frameworks
+run_one coreaudio_missing "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fblocks $ca_frameworks
+run_one coreaudio_auhal "$here/coreaudio/auhal.c" "$here/coreaudio/auhal.out" -fblocks $ca_frameworks
+run_one coreaudio_queue "$here/coreaudio/queue.c" "$here/coreaudio/queue.out" -fblocks $ca_frameworks
+pulse_bin=${FERRY_TEST_PULSEAUDIO:-$(command -v pulseaudio || true)}
+pulse_pactl=${FERRY_TEST_PACTL:-$(command -v pactl || true)}
+if [ -n "$pulse_bin" ] && [ -n "$pulse_pactl" ]; then
+    pulse_dir="$build/pulse"
+    rm -rf "$pulse_dir"; mkdir -p "$pulse_dir/home"; chmod 700 "$pulse_dir"
+    HOME="$pulse_dir/home" XDG_RUNTIME_DIR="$pulse_dir" XDG_CONFIG_HOME= "$pulse_bin" -n --daemonize=no \
+        --exit-idle-time=-1 --use-pid-file=no --disable-shm=yes \
+        -L "module-native-protocol-unix socket=$pulse_dir/native auth-anonymous=1" \
+        -L "module-null-sink sink_name=ferry_test_sink" -L "module-null-sink sink_name=ferry_other_sink" \
+        > "$pulse_dir/log" 2>&1 &
+    pulse_pid=$!
+    pulse_up=
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        if PULSE_SERVER="unix:$pulse_dir/native" HOME="$pulse_dir/home" "$pulse_pactl" info > /dev/null 2>&1; then
+            pulse_up=1; break
+        fi
+        sleep 0.5
+    done
+    if [ -n "$pulse_up" ]; then
+        run_one coreaudio_pulse "$here/coreaudio/pulse.c" "$here/coreaudio/pulse.out" -fblocks $ca_frameworks
+    else
+        echo "skip coreaudio_pulse (PulseAudio didn't start; see $pulse_dir/log)"
+    fi
+    kill "$pulse_pid" 2> /dev/null; wait "$pulse_pid" 2> /dev/null
+else
+    echo "skip coreaudio_pulse (it needs PulseAudio's pulseaudio and pactl)"
+fi
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

@@ -263,6 +263,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_webkit_symbol", ferry_webkit_symbol},
     /* Ferry's own: this system's JavaScriptCore, for Ferry's JavaScriptCore (host.c) */
     {"ferry_jsc_symbol", ferry_jsc_symbol},
+    /* Ferry's own: this system's libpulse, for Ferry's Core Audio (host.c, 1.234) */
+    {"ferry_sound_symbol", ferry_sound_symbol},
     {NULL, NULL},
 };
 
