@@ -1316,7 +1316,12 @@ class Compiler:
             if col.tag != "tableColumn":
                 continue
             cuid = self.uid_for(col.get("id")) if col.get("id") else a.reserve()
-            keys = dict(NSIdentifier=a.string(col.get("identifier", "")), NSWidth=float(col.get("width", "100")),
+            # A column left without an identifier gets the one Interface
+            # Builder gives it, "AutomaticTableColumnIdentifier.N" by its
+            # place, so that each column finds its own cell view prototype
+            # (VLC's Messages window, freemac 1.NEXT).
+            col_ident = col.get("identifier") or "AutomaticTableColumnIdentifier.%d" % len(columns)
+            keys = dict(NSIdentifier=a.string(col_ident), NSWidth=float(col.get("width", "100")),
                         NSMinWidth=float(col.get("minWidth", "10")), NSMaxWidth=float(col.get("maxWidth", "3.4e38")),
                         NSIsEditable=yes(col, "editable", True), NSIsHidden=yes(col, "hidden"), NSTableView=uid)
             hc = child(col, "tableHeaderCell", "headerCell")
@@ -1338,7 +1343,7 @@ class Compiler:
             self.connections_of(col, cuid)
             pv = child(col, "prototypeCellViews")
             for cell_view in (pv if pv is not None else []):
-                ident = cell_view.get("identifier") or col.get("identifier") or ""
+                ident = cell_view.get("identifier") or col_ident
                 prototypes.append((ident, self.prototype(cell_view)))
             columns.append(cuid)
         f = 0
