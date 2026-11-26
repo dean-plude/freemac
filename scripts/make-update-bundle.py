@@ -7,8 +7,8 @@ Dials > Software Update (see build/overlay/usr/libexec/freemac-update-helper).
 
 build-iso.sh runs it on the finished image, so the bundle holds exactly the
 freemac files the ISO has: the shell, the apps' launchers and icons, the
-helpers, themes, wallpapers, sounds, Strata's plugins, freemac's own files in
-/etc, and /etc/os-release with the new version. It writes
+helpers, themes, wallpapers, sounds, Strata's plugins, Ferry (freemac's runner
+for Mac apps, when the image has it), freemac's own files in /etc, and /etc/os-release with the new version. It writes
 freemac-update-VERSION-BASE-amd64.tar.xz and its .sha256 into OUTDIR.
 Original freemac code.
 """
@@ -36,6 +36,9 @@ FOLDERS = (
     "usr/share/backgrounds/freemac",
     "usr/share/sounds/freemac",
     "usr/share/plymouth/themes/freemac",
+    # Ferry, freemac's runner for Mac apps: its frameworks, Installer and SDK.
+    "usr/lib/ferry",
+    "usr/share/ferry",
 )
 # Other freemac files in the image, as patterns.
 PATTERNS = (
@@ -49,6 +52,10 @@ PATTERNS = (
     "usr/libexec/freemac-*",
     "usr/share/polkit-1/actions/org.freemac.*",
     "etc/os-release",
+    "usr/bin/ferry",
+    "usr/bin/ferry-*",
+    "usr/lib/binfmt.d/ferry.conf",
+    "usr/share/applications/ferry-installer.desktop",
 )
 
 

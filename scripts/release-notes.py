@@ -24,9 +24,8 @@ items = "\n".join("- " + item for item in whats_new.items(version)) or "- Fixes 
 text = text.replace("@WHATSNEW@", items)
 ferry_line = ""
 if ferry:
-    ferry_line = ("- **%s** (optional, not on the ISO): Ferry, freemac's own layer for running simple Intel Mac "
-                  "programs. Double-click it in freemac to install it with Slipway. Larger Mac apps start but "
-                  "don't run all the way yet, and App Store apps never will.\n" % ferry)
+    ferry_line = ("- **%s**: Ferry, freemac's own runner for Intel Mac apps, on its own. The ISO already has "
+                  "it; this package is for other Ubuntu computers. App Store apps don't run.\n" % ferry)
 text = text.replace("@FERRY@\n", ferry_line)
 text = text.replace("@VERSION@", version).replace("@SIZE@", size).replace("@SHA256@", checksum)
 sys.stdout.write(text)
