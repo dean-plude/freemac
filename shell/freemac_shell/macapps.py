@@ -16,7 +16,7 @@ generic app icon instead.
 
     freemac-mac-app install Foo.app [--system]   copy it to Applications and add it to the app grid
     freemac-mac-app remove Foo.app               the opposite
-    freemac-mac-app open Foo.app                 run it with Ferry, if it can be
+    freemac-mac-app open Foo.app [FILE...]       run it with Ferry, if it can be, and open the files in it
     freemac-mac-app icon Foo.app out.png         write its icon as a PNG
     freemac-mac-app scan                         add apps found in Applications to the app grid
 
@@ -30,6 +30,7 @@ import os
 import plistlib
 import re
 import shutil
+import socket
 import struct
 import subprocess
 import sys
@@ -37,7 +38,7 @@ import sys
 import gi
 
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import GdkPixbuf, GLib  # noqa: E402
+from gi.repository import GdkPixbuf, Gio, GLib  # noqa: E402
 
 GENERIC_ICON = "freemac-mac-app"
 ICON_PREFIX = "ferry-"     # icon and .desktop names; the icon tiler leaves these alone
@@ -247,6 +248,93 @@ def cached_icon(path, size):
     return pixbuf
 
 
+# ---- the documents an app opens -------------------------------------------
+# A Mac app lists the kinds of file it opens in CFBundleDocumentTypes: by MIME
+# type, by file extension, or by Uniform Type Identifier. freemac's app list
+# (and so Drawer's Open With, its Get Info and the Dock) knows kinds of file
+# by MIME type, so each is turned into one. Extensions are looked up in the
+# system's own list of file types (shared-mime-info); identifiers by this
+# table of Apple's published public ones and common third-party ones.
+UTI_MIME = {
+    "public.plain-text": "text/plain", "public.utf8-plain-text": "text/plain", "public.html": "text/html",
+    "public.xml": "application/xml", "public.json": "application/json", "public.rtf": "text/rtf",
+    "public.comma-separated-values-text": "text/csv", "public.markdown": "text/markdown",
+    "net.daringfireball.markdown": "text/markdown", "com.adobe.pdf": "application/pdf",
+    "public.jpeg": "image/jpeg", "public.png": "image/png", "com.compuserve.gif": "image/gif",
+    "public.tiff": "image/tiff", "com.microsoft.bmp": "image/bmp", "public.heic": "image/heic",
+    "org.webmproject.webp": "image/webp", "public.svg-image": "image/svg+xml",
+    "com.microsoft.ico": "image/vnd.microsoft.icon",
+    "public.mp3": "audio/mpeg", "public.mpeg-4-audio": "audio/mp4", "com.apple.m4a-audio": "audio/mp4",
+    "public.aac-audio": "audio/aac", "public.aiff-audio": "audio/x-aiff", "public.aifc-audio": "audio/x-aifc",
+    "com.microsoft.waveform-audio": "audio/x-wav", "public.midi-audio": "audio/midi",
+    "org.xiph.flac": "audio/flac", "org.xiph.opus": "audio/x-opus+ogg", "org.xiph.ogg-audio": "audio/ogg",
+    "org.xiph.ogg-video": "video/ogg", "public.ac3-audio": "audio/ac3",
+    "org.3gpp.adaptive-multi-rate-audio": "audio/AMR", "com.microsoft.windows-media-wma": "audio/x-ms-wma",
+    "com.microsoft.windows-media-wmv": "video/x-ms-wmv", "com.microsoft.windows-media-wm": "video/x-ms-asf",
+    "com.microsoft.advanced-systems-format": "video/x-ms-asf",
+    "com.microsoft.advanced-stream-redirector": "audio/x-ms-asx",
+    "com.real.realmedia": "application/vnd.rn-realmedia", "com.real.realmedia-vbr": "application/vnd.rn-realmedia",
+    "com.real.realaudio": "audio/vnd.rn-realaudio", "public.mpeg-4": "video/mp4",
+    "com.apple.m4v-video": "video/x-m4v", "com.apple.quicktime-movie": "video/quicktime",
+    "public.avi": "video/x-msvideo", "public.mpeg": "video/mpeg", "public.mpeg-2-video": "video/mpeg",
+    "public.mpeg-2-transport-stream": "video/mp2t", "public.3gpp": "video/3gpp", "public.3gpp2": "video/3gpp2",
+    "public.dv-movie": "video/dv", "com.adobe.flash.video": "video/x-flv", "org.matroska.mkv": "video/x-matroska",
+    "org.matroska.mka": "audio/x-matroska", "org.webmproject.webm": "video/webm",
+    "public.m3u-playlist": "audio/x-mpegurl", "public.pls-playlist": "audio/x-scpls",
+    "public.iso-image": "application/x-cd-image", "com.rarlab.rar-archive": "application/vnd.rar",
+    "public.zip-archive": "application/zip", "org.gnu.gnu-zip-archive": "application/gzip",
+    "public.tar-archive": "application/x-tar",
+}
+# Kinds of file no app takes over just by listing them: anything at all, and
+# folders and disks, which Drawer opens itself.
+NOT_CLAIMED = {"application/octet-stream", "inode/directory", "inode/mount-point"}
+
+
+def known_mime(mime):
+    """The system's own name for a MIME type (aliases resolved), or None when
+    the system doesn't know the type."""
+    if not isinstance(mime, str) or "/" not in mime:
+        return None
+    canonical = Gio.content_type_from_mime_type(mime.strip())
+    if not canonical or canonical not in _registered():
+        return None
+    return Gio.content_type_get_mime_type(canonical) or canonical
+
+
+_REGISTERED = None
+
+
+def _registered():
+    global _REGISTERED
+    if _REGISTERED is None:
+        _REGISTERED = set(Gio.content_types_get_registered())
+    return _REGISTERED
+
+
+def document_types(plist):
+    """The MIME types of the documents the app says it opens, sorted."""
+    found = set()
+    kinds = plist.get("CFBundleDocumentTypes")
+    for kind in kinds if isinstance(kinds, list) else []:
+        if not isinstance(kind, dict) or kind.get("CFBundleTypeRole") == "None":
+            continue
+        names = []
+        for mime in kind.get("CFBundleTypeMIMETypes") or []:
+            names.append(mime)
+        for uti in kind.get("LSItemContentTypes") or []:
+            names.append(UTI_MIME.get(uti) if isinstance(uti, str) else None)
+        for ext in kind.get("CFBundleTypeExtensions") or []:
+            if isinstance(ext, str) and ext.strip(". ") and ext not in ("*", "****"):
+                guess, uncertain = Gio.content_type_guess("file." + ext.strip(". ").lower(), None)
+                if not uncertain:
+                    names.append(Gio.content_type_get_mime_type(guess) or guess)
+        for name in names:
+            mime = known_mime(name)
+            if mime and mime not in NOT_CLAIMED:
+                found.add(mime)
+    return sorted(found)
+
+
 # ---- installing ----------------------------------------------------------
 def places(system):
     if system:
@@ -296,11 +384,16 @@ def install(source, system=False, copy=True):
         "Type=Application",
         f"Name={desktop_escape(name)}",
         "Comment=" + desktop_escape(f"Mac app{' ' + version if isinstance(version, str) else ''}"),
-        "Exec=freemac-mac-app open " + exec_quote(target),
+        "Exec=freemac-mac-app open " + exec_quote(target) + " %F",
         f"Icon={icon_name if pixbuf is not None else GENERIC_ICON}",
         "Categories=Utility;",
         "X-freemac-MacApp=" + desktop_escape(target),
     ]
+    # The documents it opens, so Drawer offers it for them (Open With, a
+    # file dropped on its Dock icon), as a Mac's Finder does.
+    mimes = document_types(plist)
+    if mimes:
+        lines.insert(-1, "MimeType=" + "".join(m + ";" for m in mimes))
     with open(os.path.join(apps, icon_name + ".desktop"), "w") as f:
         f.write("\n".join(lines) + "\n")
     refresh(data)
@@ -384,9 +477,40 @@ def notify(title, body):
         print(f"{title}: {body}", file=sys.stderr)
 
 
-def open_app(path):
-    name = display_name(path)
-    program = executable(path)
+def open_socket(path, plist=None):
+    """Where the app, once running under Ferry, listens for files to open
+    (Ferry's AppKit makes it): $XDG_RUNTIME_DIR/ferry/<bundle id>.open."""
+    plist = info(path) if plist is None else plist
+    ident = plist.get("CFBundleIdentifier")
+    if not isinstance(ident, str) or not ident:
+        return None
+    return os.path.join(GLib.get_user_runtime_dir(), "ferry", re.sub(r"[^A-Za-z0-9._-]", "-", ident) + ".open")
+
+
+def hand_to_running(path, files, plist=None):
+    """Give the files to the copy of the app that's already running, as a Mac
+    does (with none, it comes to the front). True when one took them."""
+    where = open_socket(path, plist)
+    if not where or not os.path.exists(where):
+        return False
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+            conn.settimeout(3)
+            conn.connect(where)
+            conn.sendall("".join(f + "\n" for f in files).encode("utf-8", "surrogateescape"))
+            conn.shutdown(socket.SHUT_WR)
+            return conn.recv(16).startswith(b"ok")
+    except OSError:
+        return False
+
+
+def open_app(path, files=()):
+    files = [os.path.abspath(f) for f in files if "\n" not in f]
+    plist = info(path)
+    if hand_to_running(path, files, plist):
+        return 0
+    name = display_name(path, plist)
+    program = executable(path, plist)
     if program is None:
         notify(f"“{name}” can't be opened", "It has no program inside it.")
         return 1
@@ -401,7 +525,7 @@ def open_app(path):
     # running and keeps writing would otherwise fill the pipe and freeze.
     log = log_path(name)
     with open(log, "wb") as sink:
-        child = subprocess.Popen(["ferry", program], stdout=sink, stderr=subprocess.STDOUT,
+        child = subprocess.Popen(["ferry", program] + files, stdout=sink, stderr=subprocess.STDOUT,
                                  start_new_session=True, cwd=os.path.dirname(program))
     try:
         status = child.wait(timeout=3)
@@ -454,7 +578,7 @@ def main(argv=None):
         elif action == "remove":
             remove(path, system)
         elif action == "open":
-            return open_app(path)
+            return open_app(path, args[2:])
         elif action == "icon":
             pixbuf = bundle_pixbuf(path, int(args[3]) if len(args) > 3 else 512)
             if pixbuf is None:

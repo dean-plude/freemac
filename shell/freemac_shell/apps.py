@@ -27,7 +27,25 @@ def app_info(app_id):
             if wm_class and wm_class.lower() == app_id.lower():
                 info = other
                 break
+    info = _mac_app_entry(info)
     _cache[app_id] = info
+    return info
+
+
+def _mac_app_entry(info):
+    """A Mac app's windows carry its bundle identifier, which finds the entry
+    Ferry writes for them (X-Ferry-Bundle names the app). When the app is in
+    the app grid, its entry there (X-freemac-MacApp) stands for it instead:
+    the one pinned to the Dock, and the one that knows the app's documents
+    and gives them to the copy that's running."""
+    if not isinstance(info, Gio.DesktopAppInfo) or not info.has_key("X-Ferry-Bundle"):
+        return info
+    import os
+    bundle = os.path.realpath(info.get_string("X-Ferry-Bundle") or "")
+    for other in Gio.AppInfo.get_all():
+        if isinstance(other, Gio.DesktopAppInfo) and other.has_key("X-freemac-MacApp"):
+            if os.path.realpath(other.get_string("X-freemac-MacApp") or "") == bundle:
+                return other
     return info
 
 

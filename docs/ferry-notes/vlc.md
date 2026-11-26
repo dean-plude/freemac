@@ -221,6 +221,36 @@ it as the C layout. FFmpeg is now built in plain C (nasm's Mach-O objects
 use a relocation ld64.lld refuses), and a build from the earlier recipe is
 redone. Nothing in Ferry was wrong here.
 
+## Opening videos from the desktop (freemac 1.NEXT)
+
+A video double-clicked in Drawer, picked from Open With, or dropped on
+VLC's Dock icon now opens in VLC, and in the copy that's already open when
+there is one, as on a Mac.
+
+- An app's entry in the app grid lists the kinds of file its Info.plist
+  says it opens (`CFBundleDocumentTypes`: MIME types, extensions looked up
+  in the system's file types, and Uniform Type Identifiers from a table of
+  the public ones), and its command takes the files (`%F`), so Drawer,
+  Get Info's Open with and the Dock offer it for them
+  (`shell/freemac_shell/macapps.py`). VLC lists 57 kinds here. Folders, disks
+  and "anything" aren't claimed, and nothing is made the default: Open
+  With, or Get Info's Change All…, does that.
+- `freemac-mac-app open VLC.app FILE...` hands the files to Ferry, which
+  gives them to the app's delegate (`application:openFiles:` for VLC).
+- Ferry's AppKit has each app with a bundle identifier listen on
+  `$XDG_RUNTIME_DIR/ferry/<identifier>.open`, and `freemac-mac-app` tries
+  it first: the running copy gets the files (or, with none, a "reopen"
+  and comes forward), so a second VLC doesn't start. A copy started by
+  hand from Terminal while another listens leaves it be, as on a Mac
+  (`appkit/NSApplication.m`).
+- The Dock finds a running Mac app's entry in the app grid rather than the
+  hidden one Ferry writes for its windows, so VLC pinned to the Dock is the
+  same icon when it runs, and a file dropped on it opens
+  (`shell/freemac_shell/apps.py`).
+
+Tests: `tests/appkit/open_running.m` (OpenApp.app asks its own socket from
+another thread) and `shell/tests/test_macapps_open.py`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
