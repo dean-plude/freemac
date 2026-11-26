@@ -1,0 +1,6 @@
+regular: push 32 high, round rect 19 high, a title and a margin wide; pop-up 25 high
+small: push 28 high, round rect 17 high, a title and a margin wide; pop-up 22 high
+  push a title and a margin wide
+mini: push 16 high, round rect 17 high, a title and a margin wide; pop-up 15 high
+  push a title and a margin wide
+exit=0

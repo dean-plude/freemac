@@ -15,6 +15,7 @@ check: "Show the thing" state 0 (the defaults say no)
 check after the default changed: state 1
 pop-up: 3 items, selected "Medium" tag 2, pulls down no, bezel drawn yes
 box: "Details" holds 2 views
+box resized: content at 3,3, 454 wide
 stepper: 10 in 0..50 by 5, in the box yes
 browser, an element the tool does not know: NSView
 table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes (line border yes), header yes

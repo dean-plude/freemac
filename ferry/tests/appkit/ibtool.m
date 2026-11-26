@@ -148,6 +148,11 @@ int main(void)
                yesno([pop isBordered]));
         printf("box: \"%s\" holds %lu views\n", [[owner.box title] UTF8String],
                (unsigned long)[[[owner.box contentView] subviews] count]);
+        /* the content view keeps the margins the document gives it, 3 points
+         * here, when the box is resized */
+        [owner.box setFrameSize:NSMakeSize(460, 64)];
+        NSRect inside = [[owner.box contentView] frame];
+        printf("box resized: content at %.0f,%.0f, %.0f wide\n", inside.origin.x, inside.origin.y, inside.size.width);
         NSStepper *st = owner.stepper;
         printf("stepper: %.0f in %.0f..%.0f by %.0f, in the box %s\n", [st doubleValue], [st minValue], [st maxValue],
                [st increment], yesno([st isDescendantOf:owner.box]));

@@ -320,6 +320,24 @@ frame is now taken as asked (`appkit/NSWindow.m`).
 
 Test: `tests/appkit/set_frame.m`.
 
+## Small buttons, pop-ups and boxes in the effects panels (freemac 1.NEXT)
+
+VLC's Video Effects, Audio Effects and Track Synchronization panels use
+mini "Reset" buttons and small pop-ups. Ferry sized every push button and
+pop-up as a regular one, 60 by 32 and 25 high, so each mini Reset button
+sat below the panel it belongs to and was cut off, and the small profile
+pop-up took room from the panel above it. A small push button is now 28
+high and a mini one 16, a round rect button 19, or 17 when small or mini,
+and a pop-up 22 when small and 15 when mini, each as wide as its title and
+a margin, as Interface Builder sizes them (`appkit/NSControl.m`,
+`appkit/NSPopUpButton.m`). ferry-ibtool now also reads Interface Builder's
+name for a round rect button's bezel ("roundedRect"), and gives a box's
+content view the margins its xib places it at, 1 point for VLC's line
+boxes rather than 5, which had shrunk the Image Adjust sliders.
+
+Tests: `tests/appkit/control_sizes.m`, and the box's margins in
+`tests/appkit/ibtool.m`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
@@ -331,3 +349,8 @@ Test: `tests/appkit/set_frame.m`.
   so where a xib spaces push buttons by their bezels (the File tab of
   VLC's Open dialog), the space comes out too small and the File tab is
   squashed; a box whose title is a check box (Capture's Video) is cut off.
+  The same makes the Video Effects boxes 6 points shorter than on a Mac
+  (the logo's Transparency slider sits on its box's bottom edge).
+- The equalizer's first band label shows "6" for "60": where two labels of
+  the same priority share too little room, a Mac shares it out between
+  them and Ferry's solver gives it all to one.

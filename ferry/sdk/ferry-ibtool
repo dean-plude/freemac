@@ -201,7 +201,7 @@ LINE_BREAK = {"wordWrapping": 0, "charWrapping": 1, "clipping": 2, "truncatingHe
 CONTROL_SIZE = {"regular": 0, "small": 1, "mini": 2, "large": 0}
 BEZEL = {"rounded": 1, "regularSquare": 2, "thick": 3, "thicker": 4, "disclosure": 5, "shadowlessSquare": 6,
          "circular": 7, "texturedSquare": 8, "helpButton": 9, "smallSquare": 10, "texturedRounded": 11,
-         "roundRect": 12, "recessed": 13, "roundedDisclosure": 14, "inline": 15}
+         "roundRect": 12, "roundedRect": 12, "recessed": 13, "roundedDisclosure": 14, "inline": 15}
 META_FONTS = {"system": (".AppleSystemUIFont", 13), "systemBold": (".AppleSystemUIFont-Bold", 13),
               "smallSystem": (".AppleSystemUIFont", 11), "smallSystemBold": (".AppleSystemUIFont-Bold", 11),
               "miniSystem": (".AppleSystemUIFont", 9), "miniSystemBold": (".AppleSystemUIFont-Bold", 9),
@@ -1146,6 +1146,12 @@ class Compiler:
                                      "atBottom": 5, "belowBottom": 6}.get(e.get("titlePosition"), 2),
                     NSTitleCell=title_cell, NSTransparent=yes(e, "transparent"), NSOffsets="{5, 5}")
         cv = child(e, "view", "contentView")
+        # the content view's margins are where the document puts it: a
+        # line box's content sits 1 point in, not 5 (freemac 1.NEXT: VLC's
+        # Video Effects boxes)
+        cr = child(cv, "rect", "frame") if cv is not None else None
+        if cr is not None:
+            keys["NSOffsets"] = "{%g, %g}" % (float(cr.get("x", 0)), float(cr.get("y", 0)))
         if cv is not None:
             cuid = self.uid_for(cv.get("id")) if cv.get("id") else a.reserve()
             self.view(cv, cuid, uid)
