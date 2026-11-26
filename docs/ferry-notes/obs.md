@@ -78,5 +78,10 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
   seen drawing.)
 - The camera source isn't built: Ferry's `AVCaptureDevice` lists no cameras
   yet.
-- Frame rate: with screen capture under llvmpipe about a quarter of the
-  frames are late (21 to 22 of 30 per second). This hasn't been profiled.
+- Frame rate on a machine without a GPU driver: with screen capture under
+  Mesa's software renderer (llvmpipe, 4 cores) about a quarter to a third of
+  the frames are late. A profile while recording put about three quarters of
+  OBS's CPU time in llvmpipe's drawing threads; the screen copy into OBS
+  (about 2 %) and the encoder side (about 5 %) are small. So it's software
+  OpenGL, and a PC whose GPU has a Mesa driver shouldn't see it. Not yet
+  measured on such a PC.
