@@ -1,0 +1,194 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7ae5611..76f3960 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -25,7 +25,7 @@ if(OS_WINDOWS)
+   add_subdirectory(libobs-winrt)
+ endif()
+ add_subdirectory(libobs-opengl)
+-if(OS_MACOS)
++if(OS_MACOS AND NOT OBS_FERRY)
+   add_subdirectory(libobs-metal)
+ endif()
+ add_subdirectory(plugins)
+diff --git a/cmake/common/helpers_common.cmake b/cmake/common/helpers_common.cmake
+index b2694fa..6a07f3d 100644
+--- a/cmake/common/helpers_common.cmake
++++ b/cmake/common/helpers_common.cmake
+@@ -463,6 +463,11 @@ function(add_core_module target)
+   set(multiValueArgs PLATFORMS ARCHITECTURES)
+   cmake_parse_arguments(PARSE_ARGV 0 _AOP "${options}" "${oneValueArgs}" "${multiValueArgs}")
+ 
++  # modules a Ferry build leaves out (hardware cards, Syphon, the browser and so on)
++  if(target IN_LIST OBS_FERRY_SKIP_MODULES)
++    return()
++  endif()
++
+   if(NOT TARGET libobs)
+     message(FATAL_ERROR "Cannot add libobs core module without existing 'libobs' target")
+   endif()
+diff --git a/cmake/common/osconfig.cmake b/cmake/common/osconfig.cmake
+index 4c30147..3f4ab4e 100644
+--- a/cmake/common/osconfig.cmake
++++ b/cmake/common/osconfig.cmake
+@@ -7,7 +7,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+   set(CMAKE_CXX_EXTENSIONS FALSE)
+   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows")
+   set(OS_WINDOWS TRUE)
+-elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
++elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" OR OBS_FERRY)
+   set(CMAKE_C_EXTENSIONS FALSE)
+   set(CMAKE_CXX_EXTENSIONS FALSE)
+   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos")
+diff --git a/cmake/macos/buildspec.cmake b/cmake/macos/buildspec.cmake
+index f54608e..4ee6d77 100644
+--- a/cmake/macos/buildspec.cmake
++++ b/cmake/macos/buildspec.cmake
+@@ -27,4 +27,7 @@ function(_check_dependencies_macos)
+   )
+ endfunction()
+ 
+-_check_dependencies_macos()
++# Ferry brings its own builds of the dependencies, on CMAKE_PREFIX_PATH.
++if(NOT OBS_FERRY)
++  _check_dependencies_macos()
++endif()
+diff --git a/cmake/macos/compilerconfig.cmake b/cmake/macos/compilerconfig.cmake
+index 7478e3d..d87b8aa 100644
+--- a/cmake/macos/compilerconfig.cmake
++++ b/cmake/macos/compilerconfig.cmake
+@@ -5,11 +5,15 @@ include_guard(GLOBAL)
+ option(ENABLE_COMPILER_TRACE "Enable clang time-trace" OFF)
+ mark_as_advanced(ENABLE_COMPILER_TRACE)
+ 
+-if(NOT XCODE)
+-  message(FATAL_ERROR "Building OBS Studio on macOS requires Xcode generator.")
+-endif()
++# Ferry (freemac's Mac app layer) builds OBS with Ninja and clang against its
++# own SDK: no Xcode, no Swift, no Apple SDK to check.
++if(NOT OBS_FERRY)
++  if(NOT XCODE)
++    message(FATAL_ERROR "Building OBS Studio on macOS requires Xcode generator.")
++  endif()
+ 
+-enable_language(Swift)
++  enable_language(Swift)
++endif()
+ 
+ include(compiler_common)
+ 
+@@ -61,13 +65,17 @@ function(check_sdk_requirements)
+   endif()
+ endfunction()
+ 
+-check_sdk_requirements()
++if(NOT OBS_FERRY)
++  check_sdk_requirements()
++endif()
+ 
+ # Enable dSYM generator for release builds
++if(NOT OBS_FERRY)
+ string(APPEND CMAKE_C_FLAGS_RELEASE " -g")
+ string(APPEND CMAKE_CXX_FLAGS_RELEASE " -g")
+ string(APPEND CMAKE_OBJC_FLAGS_RELEASE " -g")
+ string(APPEND CMAKE_OBJCXX_FLAGS_RELEASE " -g")
++endif()
+ 
+ # Default ObjC compiler options used by Xcode:
+ #
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index 397b703..ab7d495 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -84,7 +84,9 @@ add_core_module(mac-videotoolbox PLATFORMS MACOS)
+ add_core_module(mac-virtualcam PLATFORMS MACOS)
+ add_core_module(nv-filters PLATFORMS WINDOWS)
+ 
+-check_obs_browser()
++if(NOT "obs-browser" IN_LIST OBS_FERRY_SKIP_MODULES)
++  check_obs_browser()
++endif()
+ 
+ add_core_module(obs-ffmpeg)
+ add_core_module(obs-filters)
+@@ -105,7 +107,9 @@ add_core_module(
+ )
+ add_core_module(obs-webrtc)
+ 
+-check_obs_websocket()
++if(NOT "obs-websocket" IN_LIST OBS_FERRY_SKIP_MODULES)
++  check_obs_websocket()
++endif()
+ 
+ add_core_module(obs-x264)
+ add_core_module(oss-audio PLATFORMS FREEBSD OPENBSD)
+diff --git a/plugins/mac-capture/audio-device-enum.c b/plugins/mac-capture/audio-device-enum.c
+index 8c6ce31..a449502 100644
+--- a/plugins/mac-capture/audio-device-enum.c
++++ b/plugins/mac-capture/audio-device-enum.c
+@@ -12,7 +12,9 @@ static inline bool device_is_input(char *device)
+ 	return astrstri(device, "soundflower") == NULL && astrstri(device, "wavtap") == NULL &&
+ 	       astrstri(device, "soundsiphon") == NULL && astrstri(device, "ishowu") == NULL &&
+ 	       astrstri(device, "blackhole") == NULL && astrstri(device, "loopback") == NULL &&
+-	       astrstri(device, "groundcontrol") == NULL && astrstri(device, "vbcable") == NULL;
++	       astrstri(device, "groundcontrol") == NULL && astrstri(device, "vbcable") == NULL &&
++	       /* Ferry: a sound server's monitor of an output ("<sink>.monitor") */
++	       astrstri(device, ".monitor") == NULL;
+ }
+ 
+ static inline bool enum_success(OSStatus stat, const char *msg)
+diff --git a/plugins/mac-capture/mac-audio.c b/plugins/mac-capture/mac-audio.c
+index 9e6111a..9d74e9f 100644
+--- a/plugins/mac-capture/mac-audio.c
++++ b/plugins/mac-capture/mac-audio.c
+@@ -2,6 +2,7 @@
+ #include <CoreFoundation/CFString.h>
+ #include <CoreAudio/CoreAudio.h>
+ #include <unistd.h>
++#include <inttypes.h> /* Ferry: PRIu32 */
+ #include <errno.h>
+ 
+ #include <obs-module.h>
+@@ -69,8 +70,31 @@ static bool get_default_output_device(struct coreaudio_data *ca)
+ 	if (!list.items.num)
+ 		return false;
+ 
++	/* Ferry: the monitor of the default output, where there is one */
++	const char *chosen = list.items.array[0].value.array;
++	AudioObjectPropertyAddress addr = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
++					   kAudioObjectPropertyElementMain};
++	AudioDeviceID out = 0;
++	UInt32 size = sizeof(out);
++	CFStringRef cf_out = NULL;
++	struct dstr want = {0};
++	if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &out) == noErr && out) {
++		addr.mSelector = kAudioDevicePropertyDeviceUID;
++		size = sizeof(cf_out);
++		if (AudioObjectGetPropertyData(out, &addr, 0, NULL, &size, &cf_out) == noErr && cf_out &&
++		    cfstr_copy_dstr(cf_out, kCFStringEncodingUTF8, &want)) {
++			dstr_cat(&want, ".monitor");
++			for (size_t i = 0; i < list.items.num; i++)
++				if (strcmp(list.items.array[i].value.array, want.array) == 0)
++					chosen = list.items.array[i].value.array;
++		}
++		if (cf_out)
++			CFRelease(cf_out);
++	}
++
+ 	bfree(ca->device_uid);
+-	ca->device_uid = bstrdup(list.items.array[0].value.array);
++	ca->device_uid = bstrdup(chosen);
++	dstr_free(&want);
+ 
+ 	device_list_free(&list);
+ 	return true;
+diff --git a/plugins/mac-capture/plugin-main.c b/plugins/mac-capture/plugin-main.c
+index e82e034..43fc38b 100644
+--- a/plugins/mac-capture/plugin-main.c
++++ b/plugins/mac-capture/plugin-main.c
+@@ -1,4 +1,5 @@
+ #include <obs-module.h>
++#include <AvailabilityMacros.h> /* Ferry: WEAK_IMPORT_ATTRIBUTE */
+ 
+ OBS_DECLARE_MODULE()
+ OBS_MODULE_USE_DEFAULT_LOCALE("mac-capture", "en-US")

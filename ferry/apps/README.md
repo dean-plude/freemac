@@ -25,6 +25,7 @@ many files compile at once (2 by default).
 | `itsycal.sh` | Itsycal, a menu bar calendar | MASShortcut 2.4.0, Sparkle 1.27.1 | freemac 1.232 |
 | `tomatobar.sh` | TomatoBar, a SwiftUI menu bar timer | its three Swift packages | freemac 1.230 |
 | `vlc.sh` | VLC, the media player: playing in its window with sound and subtitles, its playlist, Open and Preferences | VLC 3.0.24, FFmpeg and FreeType, from release tarballs checked by checksum | freemac 1.237 |
+| `obs.sh` | OBS Studio 33, the screen recorder: its main window and preview, Settings, screen capture, and recording with desktop sound and a microphone; also packed as `OBS-33.0.3.zip` | Qt 6.11.1, FFmpeg 8.0.1 (`ffmpeg.sh`), x264, mbedtls, jansson, FreeType; two small patches in `obs/` | freemac 1.239 (recipe: 1.NEXT) |
 
 Sequel Pro (freemac 1.226) has no recipe yet: it needs MariaDB
 Connector/C built for Ferry, with its hashes over CommonCrypto.
