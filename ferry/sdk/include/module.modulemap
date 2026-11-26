@@ -9,6 +9,12 @@ module Accelerate [system] {
     link framework "Accelerate"
 }
 
+module AddressBook [system] {
+    header "AddressBook/AddressBook.h"
+    export *
+    link framework "AddressBook"
+}
+
 module AppKit [system] {
     header "AppKit/AppKit.h"
     header "AppKit/AppKitApps.h"
@@ -125,6 +131,7 @@ module AudioUnit [system] {
 module AVFoundation [system] {
     header "AVFoundation/AVFoundation.h"
     header "AVFoundation/AVCaptureDevice.h"
+    header "AVFoundation/AVCaptureSession.h"
     export *
     link framework "AVFoundation"
 }
@@ -261,6 +268,25 @@ module CoreServices [system] {
     link framework "CoreServices"
 }
 
+module CoreMedia [system] {
+    header "CoreMedia/CoreMedia.h"
+    header "CoreMedia/CMAttachment.h"
+    header "CoreMedia/CMBlockBuffer.h"
+    header "CoreMedia/CMFormatDescription.h"
+    header "CoreMedia/CMSampleBuffer.h"
+    header "CoreMedia/CMSync.h"
+    header "CoreMedia/CMTime.h"
+    export *
+    link framework "CoreMedia"
+}
+
+module CoreMediaIO [system] {
+    header "CoreMediaIO/CoreMediaIO.h"
+    header "CoreMediaIO/CMIOHardware.h"
+    export *
+    link framework "CoreMediaIO"
+}
+
 module CoreText [system] {
     header "CoreText/CoreText.h"
     header "CoreText/CTFont.h"
@@ -271,6 +297,24 @@ module CoreText [system] {
     header "CoreText/CTStringAttributes.h"
     export *
     link framework "CoreText"
+}
+
+module CoreVideo [system] {
+    header "CoreVideo/CoreVideo.h"
+    header "CoreVideo/CVBase.h"
+    header "CoreVideo/CVBuffer.h"
+    header "CoreVideo/CVDisplayLink.h"
+    header "CoreVideo/CVHostTime.h"
+    header "CoreVideo/CVImageBuffer.h"
+    header "CoreVideo/CVOpenGLTexture.h"
+    header "CoreVideo/CVOpenGLTextureCache.h"
+    header "CoreVideo/CVPixelBuffer.h"
+    header "CoreVideo/CVPixelBufferIOSurface.h"
+    header "CoreVideo/CVPixelBufferPool.h"
+    header "CoreVideo/CVPixelFormatDescription.h"
+    header "CoreVideo/CVReturn.h"
+    export *
+    link framework "CoreVideo"
 }
 
 module DiskArbitration [system] {
@@ -422,6 +466,12 @@ module JavaScriptCore [system] {
     link framework "JavaScriptCore"
 }
 
+module MediaPlayer [system] {
+    header "MediaPlayer/MediaPlayer.h"
+    export *
+    link framework "MediaPlayer"
+}
+
 module Metal [system] {
     header "Metal/Metal.h"
     export *
@@ -438,6 +488,22 @@ module Network [system] {
     header "Network/Network.h"
     export *
     link framework "Network"
+}
+
+module OpenGL [system] {
+    header "OpenGL/OpenGL.h"
+    header "OpenGL/CGLCurrent.h"
+    header "OpenGL/CGLDevice.h"
+    header "OpenGL/CGLIOSurface.h"
+    header "OpenGL/CGLRenderers.h"
+    header "OpenGL/CGLTypes.h"
+    header "OpenGL/gl.h"
+    header "OpenGL/gl3.h"
+    header "OpenGL/gl3ext.h"
+    header "OpenGL/glext.h"
+    header "OpenGL/gltypes.h"
+    export *
+    link framework "OpenGL"
 }
 
 module Quartz [system] {
@@ -471,6 +537,16 @@ module QuickLook [system] {
     header "QuickLook/QuickLook.h"
     export *
     link framework "QuickLook"
+}
+
+module ScreenCaptureKit [system] {
+    header "ScreenCaptureKit/ScreenCaptureKit.h"
+    header "ScreenCaptureKit/SCError.h"
+    header "ScreenCaptureKit/SCScreenshotManager.h"
+    header "ScreenCaptureKit/SCShareableContent.h"
+    header "ScreenCaptureKit/SCStream.h"
+    export *
+    link framework "ScreenCaptureKit"
 }
 
 module ScriptingBridge [system] {

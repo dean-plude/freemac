@@ -1,0 +1,29 @@
+screen capture devices allowed: set 0, read 0, now 1, settable 1; CoreMediaIO devices: 0; another object: 1
+camera: Ferry Test Camera (ferry-test-camera), model Ferry Test Camera, by freemac, connected 1, video 1, sound 0, AVCaptureDeviceTypeExternal
+found again by its ID: 1; no microphones here: 1
+discovered: 1; as muxed: 0
+format: vide yuvs 640x480 at 30 (1/30), 15 (1/15), ITU_R_601_4
+format: vide yuvs 320x240 at 30 (1/30), ITU_R_601_4
+format: vide 2vuy 640x480 at 30 (1/30), ITU_R_601_4
+format: vide 420v 1280x720 at 30 (1/30), ITU_R_601_4
+format: vide 420v 640x480 at 30 (1/30), ITU_R_601_4
+active at first: 420v 1280x720, every 1/30 s
+preset AVCaptureSessionPresetHigh; input 1, added 1
+a second input: 0; output: 1
+the camera's own: 420v; offered: 5; connection 1
+own format: 420v 1280x720, IOSurface 1, described as 420v, every 1/30 s; left Y 82 Cb 90 Cr 240, right Y 41 Cb 240 Cr 110
+running after stop: 0; times go forward: 1
+32BGRA: BGRA 1280x720, IOSurface 1, described as BGRA, every 1/30 s; left red, right blue
+preset 640x480: yuvs 640x480
+640x480 in 32BGRA: BGRA 640x480, IOSurface 1, described as BGRA, every 1/30 s; left red, right blue
+640x480 in 420v: 420v 640x480, IOSurface 1, described as 420v, every 1/30 s; left Y 82 Cb 90 Cr 240, right Y 41 Cb 240 Cr 110
+three planes as they are: 420v 640x480, IOSurface 1, described as 420v, every 1/30 s; left Y 82 Cb 90 Cr 240, right Y 41 Cb 240 Cr 110
+three planes in 32BGRA: BGRA 640x480, IOSurface 1, described as BGRA, every 1/30 s; left red, right blue
+the device's own format: preset AVCaptureSessionPresetInputPriority
+2vuy camera in yuvs: yuvs 640x480, IOSurface 1, described as yuvs, every 1/30 s; left 82 90 82 240, right 41 240 41 110
+2vuy camera as it is: 2vuy 640x480, IOSurface 1, described as 2vuy, every 1/30 s; left 90 82 240 82, right 240 41 110 41
+15 a second: BGRA 640x480, IOSurface 1, described as BGRA, every 1/15 s; left red, right blue
+about 15 a second: 1
+1280x720 offered: 1, 3840x2160: 0
+turned down: running 0, error -11852
+exit=0

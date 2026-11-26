@@ -94,6 +94,11 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 FERRY_ACCESS_ASKER="$here/appkit/fake_asker.sh" "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
+        appkit_avcapture_camera)
+            # Ferry's test camera, with a home of its own whose camera answer is set by the test
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
+                FERRY_CAMERA_TEST=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_bindings|appkit_archiver)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
@@ -873,6 +878,8 @@ run_one appkit_avaudioplayer "$here/appkit/avaudioplayer.m" "$here/appkit/avaudi
 # Microphone and camera access (freemac 1.241): the user's say, as OBS asks for it.
 run_one appkit_avcapture_access "$here/appkit/avcapture_access.m" "$here/appkit/avcapture_access.out" -fobjc-arc \
     -framework Foundation -framework AVFoundation
+# Cameras (freemac 1.257): Ferry's test camera read the way OBS's camera source reads one.
+run_one appkit_avcapture_camera "$here/appkit/avcapture_camera.m" "$here/appkit/avcapture_camera.out" -fobjc-arc
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 # What Flycut calls as it starts: the Process Manager for itself, remote
