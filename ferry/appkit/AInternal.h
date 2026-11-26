@@ -61,6 +61,11 @@ void AViewDecodeConstraints(NSView *view, NSCoder *coder);
  * display (no WAYLAND_DISPLAY or DISPLAY, or GTK can't open it). Windows
  * still work without one, drawn off screen. */
 BOOL ADisplayAvailable(void);
+/* YES for a view in a HUD panel, which a Mac draws dark (its controls light
+ * on dark, as in its dark appearance); NSWindow.m. And the colour a light
+ * control's text takes there: the usual label colours turn white. */
+BOOL AViewIsDark(NSView *view);
+NSColor *ADarkText(NSColor *color);
 NSRect AScreenFrame(BOOL visibleOnly);
 CGFloat AScreenScale(void);
 /* Where a nib's window starts (NSWindow.m, 1.229): its rect, laid out on

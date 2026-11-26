@@ -351,7 +351,34 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 }
 - (BOOL)isReleasedWhenClosed { return _released; }
 - (void)setReleasedWhenClosed:(BOOL)flag { _released = flag; }
-- (NSColor *)backgroundColor { return _background ?: [NSColor windowBackgroundColor]; }
+BOOL AViewIsDark(NSView *view)
+{
+    NSWindow *w = [view window];
+    return w && ([w styleMask] & NSWindowStyleMaskHUDWindow) != 0;
+}
+
+NSColor *ADarkText(NSColor *c)
+{
+    if (!c || [c isEqual:[NSColor labelColor]] || [c isEqual:[NSColor textColor]] ||
+        [c isEqual:[NSColor controlTextColor]] || [c isEqual:[NSColor blackColor]])
+        return [NSColor colorWithWhite:1 alpha:0.9];
+    if ([c isEqual:[NSColor secondaryLabelColor]] || [c isEqual:[NSColor disabledControlTextColor]])
+        return [NSColor colorWithWhite:1 alpha:0.55];
+    if ([c isEqual:[NSColor tertiaryLabelColor]] || [c isEqual:[NSColor placeholderTextColor]])
+        return [NSColor colorWithWhite:1 alpha:0.35];
+    return c;
+}
+
+/* A HUD panel (VLC's Media Information and effects, a Mac's Inspector
+ * panels) is dark and a little see-through, its text white. */
+- (NSColor *)backgroundColor
+{
+    if (_background)
+        return _background;
+    if (_style & NSWindowStyleMaskHUDWindow)
+        return [NSColor colorWithCalibratedWhite:0.12 alpha:0.94];
+    return [NSColor windowBackgroundColor];
+}
 - (void)setBackgroundColor:(NSColor *)color
 {
     [_background release];

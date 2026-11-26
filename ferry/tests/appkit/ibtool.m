@@ -105,6 +105,14 @@ int main(void)
         NSPanel *p = owner.panel;
         printf("panel: %s \"%s\" utility %s visible %s\n", [[p className] UTF8String], [[p title] UTF8String],
                yesno(([p styleMask] & NSWindowStyleMaskUtilityWindow) != 0), yesno([p isVisible]));
+        /* a HUD panel (as xibs write it, HUD="YES") is dark; a slider taller
+         * than wide is vertical, and keeps its control size and range */
+        CGFloat white = 1, alpha = 0;
+        [[[p backgroundColor] colorUsingColorSpace:[NSColorSpace genericGrayColorSpace]] getWhite:&white alpha:&alpha];
+        NSSlider *band = [[[p contentView] subviews] firstObject];
+        printf("panel HUD %s, dark %s; slider vertical %s, small %s, %g to %g\n",
+               yesno(([p styleMask] & NSWindowStyleMaskHUDWindow) != 0), yesno(white < 0.5), yesno([band isVertical]),
+               yesno([band controlSize] == NSControlSizeSmall), [band minValue], [band maxValue]);
         printf("content subviews: %lu\n", (unsigned long)[[[w contentView] subviews] count]);
 
         NSTextField *name = owner.nameField;

@@ -736,7 +736,7 @@ class Compiler:
                               (16, "utility"), (128, "nonactivatingPanel"), (256, "texturedBackground"),
                               (1 << 13, "hud"), (1 << 14, "fullScreen"), (1 << 15, "fullSizeContentView"),
                               (1 << 12, "unifiedTitleAndToolbar"), (64, "docModal")):
-                if yes(sm, name):
+                if yes(sm, name) or yes(sm, name.upper()):  # xibs write the HUD style as HUD
                     style |= bit
         content = child(e, "view", "contentView")
         cuid = None
@@ -1171,13 +1171,20 @@ class Compiler:
         c = child(e, "sliderCell", "cell")
         cell = None
         if c is not None:
+            # a xib names a vertical slider only by its frame (taller than
+            # wide), as VLC's equalizer bands are
+            vertical = yes(c, "vertical")
+            frame = child(e, "rect", "frame")
+            if c.get("vertical") is None and frame is not None:
+                vertical = float(frame.get("height", "0")) > float(frame.get("width", "0"))
             cell = self.uid_for(c.get("id")) if c.get("id") else a.reserve()
             a.fill(cell, a.obj(*custom_cell(c, "NSSliderCell"), NSCellFlags=self.cell_flags(c),
-                               NSCellFlags2=0, NSMinValue=float(c.get("minValue", "0")),
+                               NSCellFlags2=self.cell_flags2(c, 0),   # (its control size)
+                               NSMinValue=float(c.get("minValue", "0")),
                                NSMaxValue=float(c.get("maxValue", "1")), NSValue=float(c.get("doubleValue", "0")),
                                NSNumberOfTickMarks=int(c.get("numberOfTickMarks", "0")),
                                NSAllowsTickMarkValuesOnly=yes(c, "allowsTickMarkValuesOnly"),
-                               NSVertical=yes(c, "vertical")))
+                               NSVertical=vertical))
             self.cell_common(c, cell)
         return "NSSlider", self.control_keys(e, cell)
 

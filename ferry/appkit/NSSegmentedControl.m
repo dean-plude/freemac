@@ -760,7 +760,9 @@ enum { SEG_PAD = 10, SEG_HEIGHT = 22 };
     NSRect track = NSMakeRect(NSMinX(r[0]), r[0].origin.y, NSMaxX(r[n - 1]) - NSMinX(r[0]), r[0].size.height);
     NSSegmentSwitchTracking mode = [cell trackingMode];
     BOOL one = mode == NSSegmentSwitchTrackingSelectOne;
-    AFillRoundedRect(track, 6, [NSColor colorWithWhite:0 alpha:0.055 * dim], [NSColor colorWithWhite:0 alpha:0.08 * dim]);
+    BOOL dark = AViewIsDark(self);   /* in a HUD panel: a see-through track, light text */
+    AFillRoundedRect(track, 6, [NSColor colorWithWhite:dark ? 1 : 0 alpha:(dark ? 0.1 : 0.055) * dim],
+                     [NSColor colorWithWhite:dark ? 1 : 0 alpha:0.08 * dim]);
 
     CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
     /* the selected segments: a raised knob when one is chosen at a time,
@@ -774,10 +776,10 @@ enum { SEG_PAD = 10, SEG_HEIGHT = 22 };
             CGColorRef shadow = CGColorCreateGenericRGB(0, 0, 0, 0.18 * dim);
             CGContextSetShadowWithColor(cg, CGSizeMake(0, -0.5), 1.5, shadow);
             CGColorRelease(shadow);
-            NSColor *fill = _selectedBezel ?: [NSColor whiteColor];
+            NSColor *fill = _selectedBezel ?: dark ? [NSColor colorWithWhite:1 alpha:0.28] : [NSColor whiteColor];
             if (pressed)
                 fill = [fill shadowWithLevel:0.08];
-            AFillRoundedRect(k, 4.5, [fill colorWithAlphaComponent:dim], nil);
+            AFillRoundedRect(k, 4.5, [fill colorWithAlphaComponent:[fill alphaComponent] * dim], nil);
             CGContextRestoreGState(cg);
         } else if (sel) {
             NSColor *fill = _selectedBezel ?: [NSColor colorWithWhite:0 alpha:pressed ? 0.24 : 0.16];
@@ -798,8 +800,8 @@ enum { SEG_PAD = 10, SEG_HEIGHT = 22 };
         NSSegmentItem *s = [cell _segment:i];
         BOOL on = s->enabled && enabled;
         BOOL light = s->selected && _selectedBezel;
-        NSColor *text = light ? [NSColor colorWithWhite:1 alpha:on ? 1 : 0.5]
-                              : [NSColor colorWithWhite:0 alpha:on ? 0.85 : 0.3];
+        NSColor *text = light || dark ? [NSColor colorWithWhite:1 alpha:on ? (dark ? 0.9 : 1) : 0.5]
+                                      : [NSColor colorWithWhite:0 alpha:on ? 0.85 : 0.3];
         NSRect c = NSInsetRect(r[i], SEG_PAD / 2.0, 0);
         CGFloat iw = 0, ih = 0;
         if (s->image) {
