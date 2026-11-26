@@ -9,12 +9,16 @@
  * its attributes; one that names a font answers what it doesn't hold (its
  * file's URL, its traits) from the installed face it names. A collection
  * matches descriptors by family, display name or PostScript name, ignoring
- * case, as a Mac's does. A Mac family that isn't installed matches nothing
- * (CTFontCreateWithName still gives its stand-in). CTFontCreateForString
+ * case, as a Mac's does. A Mac family that isn't installed (Helvetica
+ * Neue, Monaco...) matches the faces of the family that stands for it, as
+ * CTFontCreateWithName gives, and those faces then show the Mac family as
+ * their display name; any other family that isn't installed matches
+ * nothing. CTFontCreateForString
  * finds the font that has a string's first character as Pango would. */
 #import "GInternal.h"
 
 GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size);
+NSString *GFontMacFamily(NSString *name);
 
 const CFStringRef kCTFontNameAttribute = (CFStringRef)@"NSFontNameAttribute";
 const CFStringRef kCTFontDisplayNameAttribute = (CFStringRef)@"NSFontVisibleNameAttribute";
@@ -33,6 +37,7 @@ const CFStringRef kCTFontSlantTrait = (CFStringRef)@"NSCTFontSlantTrait";
 @interface GFace : NSObject {
 @public
     NSString *path, *family, *style, *full, *postscript, *ferryName;
+    NSString *standsFor;   /* the Mac family it was given for, if any */
     unsigned index;
     float weight;   /* 100 to 900 */
     BOOL italic;
@@ -42,7 +47,7 @@ const CFStringRef kCTFontSlantTrait = (CFStringRef)@"NSCTFontSlantTrait";
 - (void)dealloc
 {
     [path release]; [family release]; [style release]; [full release]; [postscript release];
-    [ferryName release];
+    [ferryName release]; [standsFor release];
     [super dealloc];
 }
 @end
@@ -181,11 +186,23 @@ static CTFontDescriptorRef descriptor(NSDictionary *attributes)
     return (CTFontDescriptorRef)d;
 }
 
+/* A face given for a Mac family that isn't installed shows that family as
+ * its display name, as the Mac's own faces do ("Helvetica Neue", "Helvetica
+ * Neue Bold"), so that an app that looks for the family in the file's faces
+ * finds it; its family and PostScript names stay its own. */
+static NSString *display_name(GFace *f)
+{
+    if (!f->standsFor)
+        return f->full;
+    BOOL regular = [f->style caseInsensitiveCompare:@"Regular"] == NSOrderedSame || ![f->style length];
+    return regular ? f->standsFor : [NSString stringWithFormat:@"%@ %@", f->standsFor, f->style];
+}
+
 static NSDictionary *face_attributes(GFace *f)
 {
     return @{
         (id)kCTFontNameAttribute : f->postscript,
-        (id)kCTFontDisplayNameAttribute : f->full,
+        (id)kCTFontDisplayNameAttribute : display_name(f),
         (id)kCTFontFamilyNameAttribute : f->family,
         (id)kCTFontStyleNameAttribute : f->style,
         (id)kCTFontURLAttribute : [NSURL fileURLWithPath:f->path],
@@ -269,7 +286,7 @@ static BOOL face_matches(GFace *f, NSDictionary *query)
     if (!family && !name && !display)
         return NO;
     return (!family || same(f->family, family)) && (!name || same(f->postscript, name)) &&
-           (!display || same(f->full, display));
+           (!display || same(f->full, display) || same(display_name(f), display));
 }
 
 CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef collection)
@@ -284,6 +301,29 @@ CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef col
                 CFRelease(d);
                 break;
             }
+    if (![out count]) {
+        /* A Mac family that isn't here: the installed family standing for it */
+        for (id q in queries) {
+            if (![q isKindOfClass:[GFontDescriptor class]])
+                continue;
+            NSDictionary *a = ((GFontDescriptor *)q)->attributes;
+            id mac = a[(id)kCTFontFamilyNameAttribute] ?: a[(id)kCTFontDisplayNameAttribute];
+            NSString *standin = [mac isKindOfClass:[NSString class]] ? GFontMacFamily(mac) : nil;
+            GFont *font = standin ? GFontCreate(standin, 400, 0, 12) : nil;
+            NSString *family = font ? [[font->family copy] autorelease] : nil;
+            [font release];
+            if (!family)
+                continue;
+            for (GFace *f in installed_faces())
+                if (same(f->family, family)) {
+                    if (!f->standsFor)
+                        f->standsFor = [mac copy];
+                    CTFontDescriptorRef d = descriptor(face_attributes(f));
+                    [out addObject:(id)d];
+                    CFRelease(d);
+                }
+        }
+    }
     if (![out count]) {
         [out release];
         return NULL;

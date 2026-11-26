@@ -37,6 +37,7 @@ int ferry_library_supported(const char *name)
     return !strcmp(name, "/usr/lib/libSystem.B.dylib")
         || !strncmp(name, "/usr/lib/system/", 16)
         || !strcmp(name, "/usr/lib/libobjc.A.dylib")
+        || !strcmp(name, "/usr/lib/libiconv.2.dylib") /* libc_vlc.c */
         || !strcmp(name, FERRY_HOST_LIBRARY)
         || ferry_twin_library(name)
         || ferry_cxx_library(name);

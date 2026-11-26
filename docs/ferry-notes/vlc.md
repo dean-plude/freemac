@@ -188,13 +188,35 @@ class for it (`appkit/NSApplication.m`).
 Tests: `tests/setjmp.c`, `tests/graphics/fonts.c`, `tests/byteorder.c`,
 `tests/appkit/viewer_launch.m`.
 
+## Subtitles, the playlist and seeking (freemac 1.NEXT, Ferry 0.NEXT)
+
+VLC now shows subtitles over the video in its window, in its default font,
+and its Open dialog, the playlist after stopping and seeking all work.
+Ferry gained:
+
+- iconv: `iconv_open`, `iconv` and `iconv_close`, and GNU libiconv's own
+  names for them, as a Mac's `/usr/lib/libiconv.2.dylib` has them, served
+  by this system's C library (`src/libc_vlc.c`, `iconv.h`, `-liconv`).
+  VLC's subtitle decoder converts text files from Windows-1252, its
+  default, and stopped with "cannot convert" before.
+- A Mac font family that isn't installed (VLC asks for Helvetica Neue)
+  matches the fonts that stand in for it, which then answer to its name, so
+  VLC's FreeType module finds a file to draw with (`graphics/CoreTextFonts.m`).
+- A number formatter in the old, Mac OS X 10.0 style (as VLC's Preferences
+  nib has, `0%`) shows % as it is, as a Mac does, so the opacity and volume
+  fields read 100% and not 10000% (`foundation/NSNumberFormatter.m`).
+
+`apps/vlc.sh` reconfigures a build made without iconv, and its C++ compiler
+now links libc++ by itself as a Mac's clang++ does, so VLC's C++ modules
+(blend, spatializer, adaptive streaming) build.
+
+Tests: `tests/iconv.c`, `tests/graphics/fonts.c`, `tests/foundation/numbers.m`.
+
 ## Still to do
 
-- The playlist after stopping, Open and the other windows are still to be
-  tried. The Preferences window opens with its title bar above the top of
-  the screen, and its percentage fields show 10000%.
+- Subtitles burned into a transcoded video (`soverlay`) come out striped
+  and tinted; on screen they're right.
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
-- The C++ plugins (adaptive streaming among them) need libc++ linked.
 - VideoToolbox decoding, the keychain, speech, the CD module and
   SecureTransport don't build yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test

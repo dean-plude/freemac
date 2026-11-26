@@ -18,7 +18,7 @@ SRC += src/libc_vlc.c
 # posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
 SRC += src/libc_apps.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
-TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd
+TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd sdk/lib/libiconv.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
            sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd
@@ -187,6 +187,9 @@ src/objc/%.o: src/objc/%.S
 sdk/lib/libSystem.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libSystem > $@
+sdk/lib/libiconv.tbd: ferry sdk/gen-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-tbd.sh ./ferry libiconv > $@
 
 sdk/lib/libz.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib

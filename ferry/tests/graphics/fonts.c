@@ -5,7 +5,8 @@
  * faces, each with its file's URL and its traits; the file's own faces
  * include it; a descriptor made from just a PostScript name answers its file
  * and traits from the face it names; a Mac family that isn't installed
- * matches nothing; CTFontCreateForString keeps a font that has the
+ * (Helvetica Neue) matches the faces standing for it, any other family
+ * nothing; CTFontCreateForString keeps a font that has the
  * character. */
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreText/CoreText.h>
@@ -96,6 +97,25 @@ int main(void)
     printf("a regular face and a bold one: %d %d\n", regular, bold);
     printf("a PostScript name finds the same file and traits: %d\n", byname);
 
+    CFArrayRef neue = matching(kCTFontFamilyNameAttribute, CFSTR("Helvetica Neue"));
+    printf("Helvetica Neue finds the faces standing for it: %d\n", neue && CFArrayGetCount(neue) > 0);
+    int listed = 0;
+    for (CFIndex n = 0; neue && n < CFArrayGetCount(neue) && !listed; n++) {
+        CFURLRef u = CTFontDescriptorCopyAttribute(CFArrayGetValueAtIndex(neue, n), kCTFontURLAttribute);
+        CFArrayRef inFile = u ? CTFontManagerCreateFontDescriptorsFromURL(u) : NULL;
+        for (CFIndex i = 0; inFile && i < CFArrayGetCount(inFile); i++) {
+            CFStringRef shown = CTFontDescriptorCopyAttribute(CFArrayGetValueAtIndex(inFile, i), kCTFontDisplayNameAttribute);
+            if (shown && CFStringCompare(shown, CFSTR("helvetica neue"), kCFCompareCaseInsensitive) == kCFCompareEqualTo)
+                listed = 1;
+            if (shown)
+                CFRelease(shown);
+        }
+        if (inFile)
+            CFRelease(inFile);
+        if (u)
+            CFRelease(u);
+    }
+    printf("and one of their files shows a face as Helvetica Neue: %d\n", listed);
     CFArrayRef none = matching(kCTFontFamilyNameAttribute, CFSTR("No Such Family Here"));
     printf("a family that isn't installed matches nothing: %d\n", none == NULL);
 
