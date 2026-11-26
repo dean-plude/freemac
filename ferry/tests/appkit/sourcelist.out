@@ -1,0 +1,10 @@
+rows 4
+  LIBRARY: grey
+  Playlist: its own colour
+  Media Library: its own colour
+  MY COMPUTER: grey
+Show button at the heading's right: yes; on a row that isn't a heading: none
+after Show: rows 6, MY COMPUTER open yes
+after Hide on LIBRARY: rows 4, selected -1
+a click on a heading's words: rows 4
+exit=0

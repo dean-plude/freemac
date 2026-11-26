@@ -759,6 +759,9 @@ run_one appkit_scrolling "$here/appkit/scrolling.m" "$here/appkit/scrolling.out"
 # Split views and tab views, built in code and from a nib (after M7).
 run_one appkit_panes "$here/appkit/panes.m" "$here/appkit/panes.out" -fobjc-arc -framework Cocoa
 run_one appkit_tables "$here/appkit/tables.m" "$here/appkit/tables.out" -fobjc-arc -framework Cocoa
+# a source list, as VLC's sidebar is: grey headings that open and close
+# with Show and Hide (freemac 1.NEXT)
+run_one appkit_sourcelist "$here/appkit/sourcelist.m" "$here/appkit/sourcelist.out" -fobjc-arc -framework Cocoa
 # Dragging table rows and outline items within the app, and drops on them
 # (freemac 1.220, Ferry 0.44.0).
 run_one appkit_table_dragging "$here/appkit/table_dragging.m" "$here/appkit/table_dragging.out" -fobjc-arc \
