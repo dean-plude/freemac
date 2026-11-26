@@ -862,15 +862,19 @@ static CGAffineTransform to_root(CALayer *l)
 
 - (BOOL)needsDisplay { return _needsDisplay; }
 
-- (void)setNeedsDisplay
+/* As on a Mac, setNeedsDisplayInRect: is the one that marks, and
+ * setNeedsDisplay asks it for the bounds: a subclass that overrides both,
+ * one calling the other (Qt's container layer), doesn't loop. */
+- (void)setNeedsDisplay { [self setNeedsDisplayInRect:[self bounds]]; }
+
+- (void)setNeedsDisplayInRect:(CGRect)r
 {
+    (void)r;
     if (_presentation)
         return;
     _needsDisplay = YES;
     [self _ferryChanged];
 }
-
-- (void)setNeedsDisplayInRect:(CGRect)r { [self setNeedsDisplay]; }
 
 /* for a layer kind whose display draws without CALayer's (CAOpenGLLayer, 1.235) */
 - (void)_ferryClearNeedsDisplay { _needsDisplay = NO; }

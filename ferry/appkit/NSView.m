@@ -341,8 +341,8 @@ void AViewDecode(NSView *v, NSCoder *c)
     if (flag == _wantsLayer)
         return;
     _wantsLayer = flag;
-    if (flag && !_layer)
-        [self _adoptLayer:[self makeBackingLayer] hosting:NO];
+    if (flag && !_layer)   /* through setLayer:, as on a Mac, for views that override it (Qt's) */
+        [self setLayer:[self makeBackingLayer]];
     else if (!flag && _layer && !_hostsLayer)
         [self _dropLayer];
     [self setNeedsDisplay:YES];
@@ -774,6 +774,10 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     _needsDisplay = flag;
     if (flag)
         [_window _noteNeedsDisplay];
+    /* A backing layer whose delegate displays it (displayLayer:, as Qt's
+     * view does) is displayed when the view is: the layer is marked too. */
+    if (flag && _layer && !_hostsLayer && [[_layer delegate] respondsToSelector:@selector(displayLayer:)])
+        [_layer setNeedsDisplay];
 }
 - (void)setNeedsDisplayInRect:(NSRect)rect { [self setNeedsDisplay:YES]; }
 - (void)setKeyboardFocusRingNeedsDisplayInRect:(NSRect)rect { [self setNeedsDisplay:YES]; }
