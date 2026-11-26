@@ -1724,6 +1724,8 @@ fi
 # and container layer, displayLayer:, and an IOSurface as the contents.
 run_one appkit_qt_layers "$here/appkit/qt_layers.m" "$here/appkit/qt_layers.out" -fobjc-arc -framework Cocoa \
     -framework QuartzCore -framework IOSurface
+# Buttons drawn through their cells, as Qt 6's Mac style draws them (OBS).
+run_one appkit_qt_cells "$here/appkit/qt_cells.m" "$here/appkit/qt_cells.out" -fobjc-arc -fblocks -framework Cocoa
 run_one corevideo_pixelbuffer "$here/corevideo/pixelbuffer.m" "$here/corevideo/pixelbuffer.out" \
     -framework Foundation -framework CoreVideo -framework IOSurface
 run_one corevideo_displaylink "$here/corevideo/displaylink.m" "$here/corevideo/displaylink.out" -fblocks \

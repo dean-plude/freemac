@@ -1,0 +1,10 @@
+a button made in code has a cell: yes
+the same cell each time: yes
+the cell's view is the button: yes
+radio button on: centre white, ring coloured
+radio button off: centre white, edge grey
+the cell keeps the button's state: yes
+check box on: corner coloured
+the cell keeps the button's enabled: yes
+push button bezel: middle white
+exit=0
