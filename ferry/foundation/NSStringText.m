@@ -397,17 +397,22 @@ static NSString *normalized(NSString *self, int form)
  * upper-cases, 1 lower-cases, 2 capitalizes: as on a Mac, the first
  * character of each word (a run between white space) in its title case and
  * the rest in lower case. nil without ICU, for NSString's own table. */
-static NSString *icu_case(const unichar *c, int32_t n, int kind)
+static NSString *icu_case(const unichar *c, int32_t n, int kind, const char *locale)
 {
     int32_t cap = n * 3 + 16;
     unichar *out = malloc((size_t)cap * sizeof(unichar));
     UErrorCode err = 0;
-    int32_t got = (kind == 0 ? icu.toUpper : icu.toLower)(out, cap, c, n, "", &err);
+    int32_t got = (kind == 0 ? icu.toUpper : icu.toLower)(out, cap, c, n, locale ? locale : "", &err);
     NSString *r = U_FAILURE(err) || got > cap ? nil : FStringFromChars(out, (NSUInteger)got);
     free(out);
     return r;
 }
-NSString *FStringCaseMapped(NSString *self, int kind)
+/* In a locale's own rules: Turkish and Azeri dot their capital I, Lithuanian
+ * keeps a dot over i with an accent (uppercaseStringWithLocale: and the
+ * others, Ferry 0.66; OBS asks for them). An empty locale is the root's. */
+NSString *FStringCaseMappedInLocale(NSString *self, int kind, const char *locale);
+NSString *FStringCaseMapped(NSString *self, int kind) { return FStringCaseMappedInLocale(self, kind, ""); }
+NSString *FStringCaseMappedInLocale(NSString *self, int kind, const char *locale)
 {
     if (!load_icu() || !icu.toUpper || !icu.toLower || !icu.toTitleChar)
         return nil;
@@ -415,7 +420,7 @@ NSString *FStringCaseMapped(NSString *self, int kind)
     unichar *c = copy_chars(self, &n);
     NSString *r;
     if (kind != 2) {
-        r = icu_case(c, (int32_t)n, kind);
+        r = icu_case(c, (int32_t)n, kind, locale);
     } else {
         NSMutableString *m = [NSMutableString stringWithCapacity:n];
         NSCharacterSet *ws = [NSCharacterSet whitespaceAndNewlineCharacterSet];
@@ -439,7 +444,7 @@ NSString *FStringCaseMapped(NSString *self, int kind)
                                          (unichar)(0xdc00 + ((cp - 0x10000) & 0x3ff))];
             else
                 [m appendFormat:@"%C", (unichar)cp];
-            NSString *rest = icu_case(c + start + first, (int32_t)(i - start - first), 1);
+            NSString *rest = icu_case(c + start + first, (int32_t)(i - start - first), 1, locale);
             [m appendString:rest ?: FStringFromChars(c + start + first, i - start - first)];
         }
         r = m;
