@@ -192,3 +192,23 @@ index e82e034..43fc38b 100644
  
  OBS_DECLARE_MODULE()
  OBS_MODULE_USE_DEFAULT_LOCALE("mac-capture", "en-US")
+diff --git a/plugins/text-freetype2/text-freetype2.c b/plugins/text-freetype2/text-freetype2.c
+index 0e92bf0..d71e231 100644
+--- a/plugins/text-freetype2/text-freetype2.c
++++ b/plugins/text-freetype2/text-freetype2.c
+@@ -320,6 +320,15 @@ static bool init_font(struct ft2_source *srcdata)
+ 	FT_Long index;
+ 	const char *path =
+ 		get_font_path(srcdata->font_name, srcdata->font_size, srcdata->font_style, srcdata->font_flags, &index);
++#ifdef __APPLE__
++	/* Ferry: a system without Apple's fonts has no Helvetica, the default
++	 * face, so a new Text source would draw nothing. Use a sans-serif face
++	 * that is there instead, as a Mac substitutes a missing font. */
++	static const char *const fallbacks[] = {"Inter", "Liberation Sans", "DejaVu Sans", "FreeSans", NULL};
++	for (size_t i = 0; !path && fallbacks[i]; i++)
++		path = get_font_path(fallbacks[i], srcdata->font_size, srcdata->font_style, srcdata->font_flags,
++				     &index);
++#endif
+ 	if (!path)
+ 		return false;
+ 
