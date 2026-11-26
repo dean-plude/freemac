@@ -213,6 +213,7 @@ static NSArray *all_windows(void)
         if (is_app_window(w))
             [own addObject:w];
     BOOL others = AXIsProcessTrusted();
+    BOOL recordingSay = ACaptureAllowed();    /* other apps' windows with either say (freemac 1.240) */
     pid_t me = getpid();
     NSString *myName = own_name();
     NSMutableSet *matched = [NSMutableSet set];
@@ -249,7 +250,7 @@ static NSArray *all_windows(void)
                 if (!mine)
                     continue;   /* a surface of the app's that isn't one of its windows */
                 [matched addObject:mine];
-            } else if (!others) {
+            } else if (!others && !recordingSay) {
                 continue;
             }
             NSRect r = json_rect(v[@"geometry"]);

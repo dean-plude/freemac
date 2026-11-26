@@ -51,6 +51,8 @@ static NSString *app_key(void)
     return [exe length] ? [exe stringByStandardizingPath] : [[NSProcessInfo processInfo] processName];
 }
 
+NSString *ACaptureAppKey(void) { return app_key(); }
+
 static NSString *app_name(void)
 {
     NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
@@ -141,10 +143,10 @@ static const ACaptureBackend *backend(void)
             chosen = &ACapturePortalBackend;
         else if (forced && !strcmp(forced, "none"))
             chosen = NULL;
-        else if (wl && *wl)
-            chosen = &ACapturePortalBackend;
+        else if (wl && *wl && (ACapturePortalReachable() || !(xd && *xd)))
+            chosen = &ACapturePortalBackend;    /* a portal that doesn't answer says why */
         else if (xd && *xd)
-            chosen = &ACaptureX11Backend;
+            chosen = &ACaptureX11Backend;       /* X11, or Xwayland where the portal doesn't answer */
     });
     return chosen;
 }
@@ -305,6 +307,16 @@ static CGImageRef image_from(const ACaptureImage *im, CGRect part)
     return image;
 }
 
+/* a grabber for a stream's source, or for a single picture */
+static void *open_for(ACaptureSourceKind kind, CGDirectDisplayID display, uint64_t window, BOOL cursor, BOOL once)
+{
+    const ACaptureBackend *b = backend();
+    if (!b->openTarget)
+        return b->open();
+    ACaptureTarget t = {kind, display, window, cursor, once};
+    return b->openTarget(&t);
+}
+
 CGImageRef ACaptureCreateScreenImage(CGRect points)
 {
     if (!ACaptureAvailable())
@@ -320,7 +332,7 @@ CGImageRef ACaptureCreateScreenImage(CGRect points)
     px = CGRectIntersection(px, main->pixelFrame);
     if (CGRectIsEmpty(px))
         return NULL;
-    void *g = backend()->open();
+    void *g = open_for(ACaptureSourceDisplay, main->number, 0, NO, YES);
     if (!g)
         return NULL;
     ACaptureImage im;
@@ -336,7 +348,7 @@ CGImageRef ACaptureCreateWindowImage(CGWindowID number)
     ACaptureWindow *w = ACaptureWindowNumbered(number);
     if (!w)
         return NULL;
-    void *g = backend()->open();
+    void *g = open_for(ACaptureSourceWindow, 0, w->handle, NO, YES);
     if (!g)
         return NULL;
     ACaptureImage im;
@@ -607,7 +619,7 @@ static void store(CVPixelBufferRef pb, const uint32_t *argb, size_t w, size_t h,
         ok = [self _prepare:_config error:&why];
         [why retain];
         if (ok)
-            _grabber = backend()->open();
+            _grabber = open_for(_config->kind, _config->display, _handle, _config->showsCursor, NO);
         if (ok && !_grabber) {
             ok = NO;
             why = [ACaptureError(-3802, @"The display server can't be read.") retain];
@@ -740,6 +752,12 @@ static void store(CVPixelBufferRef pb, const uint32_t *argb, size_t w, size_t h,
     @autoreleasepool {
         ACaptureConfig *c = [[_config retain] autorelease];
         const ACaptureBackend *be = backend();
+        NSError *failed = be->failure ? be->failure(_grabber) : nil;
+        if (failed) {
+            /* the portal's user said no, or its session ended */
+            [self stopWithError:failed];
+            return;
+        }
         ACaptureImage im;
         CGRect origin = CGRectZero;     /* where the grabbed pixels are, in the back end's pixels */
         CGFloat scale = 1;

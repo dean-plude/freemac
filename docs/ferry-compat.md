@@ -2129,6 +2129,19 @@ The user is asked once whether an app may record the screen, with freemac's own 
 
 OBS Studio 33 starts and opens its main window (freemac 1.239, Ferry 0.63.0): it had stopped at once because libobs asks for the computer's own Application Support folder (`NSLocalDomainMask`), and Ferry answered only the user's. The local domain is now `/Applications`, `/usr/local/share` and `/var/cache`, and the system domain `/usr/share`.
 
+### Screen capture on Wayland: the ScreenCast portal and PipeWire (freemac 1.240, Ferry 0.64.0)
+
+ScreenCaptureKit, CGDisplayStream and the window list's pictures now work on Wayland too, through the xdg-desktop-portal ScreenCast portal and PipeWire, as OBS Studio's mac-capture plugin needs on freemac's Wayfire desktop.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `SCShareableContent`, `SCDisplay`, `SCWindow`, `SCRunningApplication` | OBS | done on Wayland: under Wayfire the displays are its outputs and the windows its views, with their apps and process ids; elsewhere the displays come from wl_output and the window list has one entry for the window the user picks in the portal's dialog |
+| `SCStream`, `SCScreenshotManager`, `CGDisplayStream`, `CGWindowListCreateImage` of the screen and of other apps' windows | OBS, screenshot tools | done on Wayland: each stream starts a portal session, so the portal's dialog shows as it starts (and is skipped where the portal takes the restore token kept from last time); the user saying no there stops the stream with `SCStreamErrorUserDeclined`; the pointer comes as metadata and is drawn as `showsCursor` says, or is drawn in by the compositor where the portal can't send it apart; a portal that records only displays still gives a window, cut from its display |
+| `CGWindowListCopyWindowInfo` | OBS | other apps' Wayfire windows are now listed to an app allowed to record the screen, as under X11 |
+| DMA-BUF streams | | not yet: a portal that offers only DMA-BUF buffers is said once, and nothing comes |
+
+On Wayland the user is asked twice the first time: freemac's own screen-recording question, then the portal's dialog, which is the compositor's. `FERRY_CAPTURE=x11` still reads Xwayland instead.
+
 ## What the apps need most
 
 Counted over the nine apps:
