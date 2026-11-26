@@ -13,6 +13,10 @@
 #define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "../../usr/include/GL/glcorearb.h"
+#elif defined(__building_module) && __building_module(OpenGL)
+/* building the OpenGL module, which CoreVideo's and AppKit's import, where
+ * Ferry was built without this system's OpenGL headers: the module has
+ * CGL's calls and types but no GL calls (freemac 1.258) */
 #else
 #error "Ferry's SDK has no OpenGL headers: this system's OpenGL headers (libgl-dev) weren't installed when Ferry was built"
 #endif

@@ -27,6 +27,17 @@ enum {
     kCMVideoCodecType_422YpCbCr8 = '2vuy', kCMVideoCodecType_JPEG = 'jpeg', kCMVideoCodecType_H264 = 'avc1',
     kCMVideoCodecType_HEVC = 'hvc1', kCMVideoCodecType_MPEG4Video = 'mp4v', kCMVideoCodecType_AppleProRes422 = 'apcn',
     kCMVideoCodecType_JPEG_OpenDML = 'dmb1',
+    kCMVideoCodecType_Animation = 'rle ', kCMVideoCodecType_Cinepak = 'cvid',
+    kCMVideoCodecType_SorensonVideo = 'SVQ1', kCMVideoCodecType_SorensonVideo3 = 'SVQ3',
+    kCMVideoCodecType_H263 = 'h263', kCMVideoCodecType_MPEG1Video = 'mp1v', kCMVideoCodecType_MPEG2Video = 'mp2v',
+    kCMVideoCodecType_DVCNTSC = 'dvc ', kCMVideoCodecType_DVCPAL = 'dvcp', kCMVideoCodecType_DVCProPAL = 'dvpp',
+    kCMVideoCodecType_DVCPro50NTSC = 'dv5n', kCMVideoCodecType_DVCPro50PAL = 'dv5p',
+    kCMVideoCodecType_DVCPROHD720p60 = 'dvhp', kCMVideoCodecType_DVCPROHD720p50 = 'dvhq',
+    kCMVideoCodecType_DVCPROHD1080i60 = 'dvh6', kCMVideoCodecType_DVCPROHD1080i50 = 'dvh5',
+    kCMVideoCodecType_DVCPROHD1080p30 = 'dvh3', kCMVideoCodecType_DVCPROHD1080p25 = 'dvh2',
+    kCMVideoCodecType_AppleProRes4444XQ = 'ap4x', kCMVideoCodecType_AppleProRes4444 = 'ap4h',
+    kCMVideoCodecType_AppleProRes422HQ = 'apch', kCMVideoCodecType_AppleProRes422LT = 'apcs',
+    kCMVideoCodecType_AppleProRes422Proxy = 'apco', kCMVideoCodecType_VP9 = 'vp09', kCMVideoCodecType_AV1 = 'av01',
 };
 typedef FourCharCode CMAudioCodecType;
 typedef struct {

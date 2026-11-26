@@ -110,6 +110,10 @@ int main(void)
         [key appendString:@"ated"];
         printf("keys are copied: %s %d\n", [md[@"mut"] UTF8String], md[@"mutated"] == nil);
         show("sorted by value", [@{@"b": @2, @"a": @3, @"c": @1} keysSortedByValueUsingSelector:@selector(compare:)]);
+        show("sorted by value, largest first",
+             [@{@"b": @2, @"a": @3, @"c": @1, @"d": @4} keysSortedByValueUsingComparator:^NSComparisonResult(id x, id y) {
+                 return [y compare:x];
+             }]);
 
         /* sets */
         NSSet *set = [NSSet setWithObjects:@"x", @"y", @"x", @"z", nil];

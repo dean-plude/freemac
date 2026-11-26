@@ -778,6 +778,8 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @property (readonly, copy) NSArray<ObjectType> *allValues;
 - (NSArray<KeyType> *)allKeysForObject:(ObjectType)obj;
 - (NSArray<KeyType> *)keysSortedByValueUsingSelector:(SEL)comparator;
+- (NSArray<KeyType> *)keysSortedByValueUsingComparator:(NSComparator)cmptr;
+- (NSArray<KeyType> *)keysSortedByValueWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr;
 - (BOOL)isEqualToDictionary:(NSDictionary<KeyType, ObjectType> *)other;
 - (void)enumerateKeysAndObjectsUsingBlock:(void (^)(KeyType key, ObjectType obj, BOOL *stop))block;
 - (NSEnumerator<ObjectType> *)objectEnumerator;

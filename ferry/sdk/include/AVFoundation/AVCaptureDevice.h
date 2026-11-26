@@ -76,6 +76,19 @@ FOUNDATION_EXPORT NSNotificationName const AVCaptureDeviceWasDisconnectedNotific
 @property (readonly) AVCaptureDeviceType deviceType;
 @property (readonly, getter=isSuspended) BOOL suspended;
 @property (readonly, getter=isInUseByAnotherApplication) BOOL inUseByAnotherApplication;
+/* video effects (Portrait, Center Stage, Studio Light, reactions,
+ * background replacement): none are on under Ferry */
+@property (readonly, getter=isPortraitEffectActive) BOOL portraitEffectActive;
+@property (readonly, getter=isCenterStageActive) BOOL centerStageActive;
+@property (readonly, getter=isStudioLightActive) BOOL studioLightActive;
+@property (readonly) BOOL canPerformReactionEffects;
+@property (readonly, getter=isBackgroundReplacementActive) BOOL backgroundReplacementActive;
+@property (class, readonly) BOOL reactionEffectGesturesEnabled;
+@property (class, readonly) BOOL reactionEffectsEnabled;
+@property (class, readonly, getter=isPortraitEffectEnabled) BOOL portraitEffectEnabled;
+@property (class, readonly, getter=isCenterStageEnabled) BOOL centerStageEnabled;
+@property (class, readonly, getter=isStudioLightEnabled) BOOL studioLightEnabled;
+@property (class, readonly, getter=isBackgroundReplacementEnabled) BOOL backgroundReplacementEnabled;
 @property (readonly) NSArray<AVCaptureDeviceFormat *> *formats;
 /* set inside lockForConfiguration: and unlockForConfiguration */
 @property (retain) AVCaptureDeviceFormat *activeFormat;
