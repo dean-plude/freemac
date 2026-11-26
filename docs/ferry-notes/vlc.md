@@ -308,6 +308,18 @@ vertical scroller got a bezel and every one without got none.
 Tests: `tests/appkit/hud_table.m`, and the table's line border in
 `tests/appkit/ibtool.xib`.
 
+## Fitting the window to a small video (freemac 1.NEXT)
+
+VLC fits its window to a video that starts playing, keeping the window's
+top where it was. Ferry's `setFrame:display:` asked the window's delegate
+`windowWillResize:toSize:` first, which a Mac does only while the user
+resizes a window; VLC's delegate keeps the video's shape, so the window
+came out taller than VLC had worked out, its top far above the screen,
+and a 320x240 video left VLC's window off the top of the screen. The
+frame is now taken as asked (`appkit/NSWindow.m`).
+
+Test: `tests/appkit/set_frame.m`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.

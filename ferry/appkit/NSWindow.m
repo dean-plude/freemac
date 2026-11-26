@@ -756,10 +756,12 @@ static BOOL places_own_windows(void)
         [self setFrameOrigin:NSMakePoint(_frame.origin.x, NSMaxY(vis) - _frame.size.height)];
 }
 
+/* The frame is taken as asked: a Mac asks the delegate's
+ * windowWillResize:toSize: only when the user resizes the window, so an
+ * app that works out a frame itself (VLC fitting its window to a video)
+ * gets that frame, its top where the app put it. */
 - (void)setFrame:(NSRect)frame display:(BOOL)display
 {
-    if ([_delegate respondsToSelector:@selector(windowWillResize:toSize:)] && !NSEqualSizes(frame.size, _frame.size))
-        frame.size = [_delegate windowWillResize:self toSize:frame.size];
     frame.size.width = fmax(frame.size.width, 1);
     frame.size.height = fmax(frame.size.height, 1);
     BOOL moved = !NSEqualPoints(frame.origin, _frame.origin);
