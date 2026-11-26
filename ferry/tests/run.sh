@@ -425,6 +425,8 @@ run_one foundation_sysversion "$here/foundation/sysversion.m" "$here/foundation/
     -framework Foundation -framework CoreServices
 run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foundation/sysversion.out" \
     -framework Foundation -framework Carbon
+# A Mac's Fonts folders: this system's fonts, flat, by name (fonts.c).
+run_one foundation_mac_fonts "$here/foundation/mac_fonts.m" "$here/foundation/mac_fonts.out" -framework Foundation
 # Security: keychain items in a home of the test's own, kept between two
 # runs, and the code-signing answers (said once with FERRY_VERBOSE).
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
