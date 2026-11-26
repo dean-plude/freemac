@@ -1183,6 +1183,45 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.250 "Buttons line up as on a Mac" (done)
+
+Ferry 0.73.0: Auto Layout now lines up what a Mac lines up, a view's alignment rect, not its frame. A push button is drawn as a 22-point bezel inside a 32-point frame, and a Mac app's window spaces its buttons by their bezels; Ferry spaced them by their frames, 10 points too tall each, so a tightly laid-out window squeezed its buttons (VLC's Open dialog drew its Browse button 3 pixels tall). Buttons now sit where the window's design puts them, with their frames the size a nib gives them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The solver works in alignment rects: a view's place, its size and its intrinsic size are its frame less its alignmentRectInsets, and the frame it sets is the one round the rect it solved, for a view with no subviews of its own | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A regular rounded push button's alignment rect is its bezel: 5 points in at the top and bottom and 6 at the sides of its frame; Ferry's own controls' intrinsic sizes, given as frames, are taken less their insets, an app's own as they are | Ferry AppKit (NSControl.m) | done |
+| 3 | A test of a label and two buttons spaced by their bezels and an app's own view with insets | tests/appkit/alignment_rects.m | done |
+
+## 1.249 "Ported programs link as on a Mac" (done)
+
+Ferry 0.72.0: a program built with Ferry's SDK can ask for the maths, dynamic-loading, threads and C libraries by name (-lm, -ldl, -lpthread, -lc), as builds ported from other systems do, and gets libSystem for each, as a Mac's SDK gives it. Before, each of those stopped the build at the link.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | libm.tbd, libdl.tbd, libpthread.tbd and libc.tbd in the SDK, each libSystem, made and installed with it | Ferry SDK (Makefile) | done |
+| 2 | A test program built with all four links and runs | tests/run.sh (sdk_std_libs) | done |
+
+## 1.248 "Fonts for Mac apps" (done)
+
+Ferry 0.71.0: a Mac app that looks for fonts in a Mac's Fonts folders now finds this computer's fonts there. OBS Studio's Text source lists them, so a font picked in its Select font window shows the text in the preview and the recording, where before it found no fonts and drew nothing.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Fonts folder of each Library folder Ferry gives (the user's, the computer's and the system's), and the Mac's own ~/Library/Fonts, /Library/Fonts and /System/Library/Fonts, list every font file in this system's matching fonts folder and the folders in it, flat and by name | Ferry libSystem (fonts.c) | done |
+| 2 | Opening, stat, lstat, access and listing a font there all reach the font itself, through a folder of links Ferry keeps in the user's cache and makes again when fonts are added or removed; a real Fonts folder is left as it is | Ferry libSystem (fonts.c, posix.c, stdio.c) | done |
+| 3 | Checked with OBS opened in a fresh account: a Text (FreeType 2) source with FreeSans picked shows its text in the preview | Acceptance, tests/foundation/mac_fonts.m | done |
+
+## 1.247 "Mac apps open on screen" (done)
+
+Ferry 0.70.0: a Mac app's window that asks to be taller than the screen, as OBS Studio's does the first time it opens (960 points on a 900-point screen), now fits the screen with its title bar showing, instead of opening with its top and title bar above the screen where you can't reach them. A window placed above the top of the screen comes down, as a Mac puts it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A titled window put on screen keeps its title bar on screen: one whose top is above the screen's visible top comes down, and a resizable one taller than the screen is made to fit it; a fixed-size one keeps its size | Ferry AppKit (NSWindow.m) | done |
+| 2 | The fit happens when the window is ordered front, with or without a display, so it is tested headless | Ferry AppKit (NSWindow.m), tests/appkit/qt_popups.m | done |
+| 3 | Checked with OBS opened for the first time in a fresh account: its main window is 1280x900 at the top of the screen | Acceptance | done |
+
 ## 1.246 "OBS records the screen from its download" (done)
 
 Ferry 0.69.0: OBS Studio, downloaded from its own site and opened in a fresh account, now gets all the way to a recording. Its drop-down lists open, so you can pick the display in a macOS Screen Capture source's Properties, and the preview shows the screen at once; Start Recording then saves a movie of it with sound. Its right-click and + menus stay open until you choose, instead of closing the moment they appear, and those pop-up menus no longer take the keyboard or show up in the Dock.

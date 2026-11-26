@@ -7,7 +7,7 @@ PREFIX ?= /usr
 DESTDIR ?=
 
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/pthread.c src/passthrough.c src/host.c \
-      src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
+      src/commoncrypto.c src/sysversion.c src/fonts.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/socket.c src/kqueue.c src/libc_more.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/dispatch_io.c src/objc/exception.c \
       src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c \
@@ -20,6 +20,8 @@ SRC += src/libc_vlc.c
 SRC += src/libc_apps.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd sdk/lib/libiconv.tbd
+# -lm, -ldl, -lpthread and -lc link libSystem, as with a Mac's SDK (freemac 1.249)
+TBD_ALIASES = sdk/lib/libm.tbd sdk/lib/libdl.tbd sdk/lib/libpthread.tbd sdk/lib/libc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
            sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd sdk/lib/libcurl.tbd
@@ -164,7 +166,7 @@ QUARTZCORE_HEADERS += $(GPU_HEADERS)
 SDK_GL = sdk/usr/include/GL
 GPU = $(SDK_GL) $(IOSURFACE) $(OPENGL) $(COREVIDEO)
 
-all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(SCK)
+all: ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(SCK)
 
 include media/media.mk
 
@@ -200,6 +202,8 @@ src/objc/%.o: src/objc/%.S
 sdk/lib/libSystem.tbd: ferry sdk/gen-tbd.sh
 	mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libSystem > $@
+$(TBD_ALIASES): sdk/lib/libSystem.tbd
+	ln -sf libSystem.tbd $@
 sdk/lib/libiconv.tbd: ferry sdk/gen-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libiconv > $@
@@ -441,7 +445,7 @@ $(SCK): $(SCK_OBJ) $(APPKIT) $(COREAUDIO)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA) $(SCK)
+install: ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA) $(SCK)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -478,7 +482,7 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRA
 	install -Dm755 $(SCK) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/ScreenCaptureKit.framework/ScreenCaptureKit
 
 clean:
-	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
+	rm -f ferry $(OBJ) $(TBD) $(TBD_ALIASES) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
 	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build eventkit/build coreaudio/build \

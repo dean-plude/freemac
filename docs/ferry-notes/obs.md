@@ -33,8 +33,8 @@ Two patches, in `ferry/apps/obs/`, are applied to the checkouts:
   prebuilt dependency bundle. It doesn't build libobs-metal. It skips the
   modules named in `OBS_FERRY_SKIP_MODULES`. It also adds two includes
   (`inttypes.h`, `AvailabilityMacros.h`) that a Mac's SDK headers bring in
-  by themselves. And "Desktop Audio" lists a sound server's monitors (see
-  Known gaps).
+  by themselves. "Desktop Audio" lists a sound server's monitors, and the
+  Text source falls back to a font that is there (see Known gaps).
 
 Left out: the browser source and docks (CEF), obs-websocket, VST, scripting,
 the virtual camera, Syphon, AJA and Decklink cards, and the camera source
@@ -70,11 +70,12 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
   default output. That is written but not yet tried on a real sound server
   (the test machine has only Ferry's null device); "macOS Audio Capture"
   works for desktop sound meanwhile.
-- The text source (`text-freetype2`) looks for fonts in the folders that
-  `NSSearchPathForDirectoriesInDomains(NSLibraryDirectory)` names, plus
-  `Fonts`. Ferry maps those to `~/.local/share`, `/usr/local/share` and
-  `/usr/share`, where the folder is `fonts`, in lower case. So it finds no
-  fonts yet.
+- The text source (`text-freetype2`) asks for Helvetica by default, which a
+  system without Apple's fonts lacks. Ferry 0.71.0 lists this system's fonts
+  in the Mac Fonts folders, and the patch makes the source fall back to Inter,
+  Liberation Sans, DejaVu Sans or FreeSans when the face it asks for is
+  missing, so a new Text source draws straight away. (Fallback built, not yet
+  seen drawing.)
 - The camera source isn't built: Ferry's `AVCaptureDevice` lists no cameras
   yet.
 - Frame rate: with screen capture under llvmpipe about a quarter of the

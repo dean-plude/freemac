@@ -425,6 +425,8 @@ run_one foundation_sysversion "$here/foundation/sysversion.m" "$here/foundation/
     -framework Foundation -framework CoreServices
 run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foundation/sysversion.out" \
     -framework Foundation -framework Carbon
+# A Mac's Fonts folders: this system's fonts, flat, by name (fonts.c).
+run_one foundation_mac_fonts "$here/foundation/mac_fonts.m" "$here/foundation/mac_fonts.out" -framework Foundation
 # Security: keychain items in a home of the test's own, kept between two
 # runs, and the code-signing answers (said once with FERRY_VERBOSE).
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
@@ -890,6 +892,7 @@ run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.o
 run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out" -fobjc-arc -framework Cocoa
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
+run_one appkit_alignment_rects "$here/appkit/alignment_rects.m" "$here/appkit/alignment_rects.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
 # a layout manager laying text out with no text view, as VLC wraps text
 run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
@@ -1720,6 +1723,8 @@ run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -fram
 run_one setjmp "$here/setjmp.c" "$here/setjmp.out"
 # OSByteOrder.h, which a Mac's CoreFoundation brings in (VLC's fonts).
 run_one byteorder "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation
+# -lm, -ldl, -lpthread and -lc, as a ported program's build asks for them, link libSystem.
+run_one sdk_std_libs "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation -lm -ldl -lpthread -lc
 # GNU libiconv's calls, linked as on a Mac (freemac 1.238, VLC's subtitles)
 run_one iconv "$here/iconv.c" "$here/iconv.out" -liconv
 # Cells of the app's own classes in a nib (freemac 1.237): VLC's sliders,

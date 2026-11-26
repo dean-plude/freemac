@@ -3115,3 +3115,66 @@ macOS Screen Capture source, picking the display and recording.
 and one closed, a keyless window never becoming key, and a number's
 pointer value.
 
+A titled window, as it is first put on screen, is kept with its title
+bar on screen, as a Mac constrains it (freemac 1.247, Ferry 0.70.0): one
+whose top is above the screen's visible top comes down, and a resizable
+one taller than the screen's visible part is made that tall (no less
+than its minimum size); a fixed-size window keeps its size. Sheets,
+child windows and full-screen windows are left where they are. OBS
+asks for a 960-point main window the first time it opens on a
+900-point screen. The same test checks a tall resizable window and a
+fixed-size one.
+
+## A Mac's Fonts folders (freemac 1.248, Ferry 0.71.0)
+
+A Mac keeps fonts flat in the Fonts folder of each Library, and programs
+list such a folder and open each file in it with FreeType: OBS Studio's
+Text (FreeType 2) source does, with the Library folders
+`NSSearchPathForDirectoriesInDomains` gives. This system keeps fonts in
+folders of their own under `~/.local/share/fonts` (and `~/.fonts`),
+`/usr/local/share/fonts` and `/usr/share/fonts`.
+
+- Each domain's Fonts folder, `<Library>/Fonts` for the Library folder
+  Ferry gives (`~/.local/share`, `/usr/local/share`, `/usr/share`) and
+  the Mac's own `~/Library/Fonts`, `/Library/Fonts` and
+  `/System/Library/Fonts`, is a folder of links to every font file in that
+  domain's fonts folder and the folders in it, named as the file is
+  (`.ttf`, `.otf`, `.ttc`, `.otc`, `.pfb`, `.pfa`, `.dfont`, `.woff`,
+  `.woff2`); of two files with one name, the first in name order.
+- Ferry keeps the links in `~/.cache/freemac/ferry/Fonts`, made aside and
+  moved in whole the first time a program looks in a Fonts folder, and
+  made again when the fonts there changed. `open`, `openat`, `fopen`,
+  `stat`, `lstat`, `fstatat`, `access` and `opendir` take a path into a
+  Fonts folder there; `lstat` follows the link, so a font is a file to the
+  program, as on a Mac. A real Fonts folder is left as it is.
+- OBS's default Text font is Helvetica, which isn't here; a font picked
+  with its Select font window is used.
+
+`tests/foundation/mac_fonts.m` lists, opens, stats and reads fonts in a
+test's own fonts folder through the Library's Fonts folder and
+`~/Library/Fonts`.
+
+## Alignment rects in Auto Layout (freemac 1.250, Ferry 0.73.0)
+
+A Mac's Auto Layout places a view's alignment rect, its frame less its
+`alignmentRectInsets`, and a nib's constraints are written against them:
+Interface Builder spaces push buttons by their bezels, not by the taller
+frames they are drawn in.
+
+- The solver's unknowns for a view are its alignment rect. Where a view
+  is now, its intrinsic size and the frame it is given all go through its
+  insets: the frame set is the one round the alignment rect solved for.
+  Only a view with no subviews of its own is taken by its alignment rect,
+  so that what is inside a view is placed against its frame.
+- A regular rounded push button (bordered, not image-only, not a check box
+  or radio button) has insets of 5 points at the top and bottom and 6 at
+  the sides, its 22-point bezel inside a 32-point frame, as Ferry draws
+  it. Other controls have none yet.
+- `intrinsicContentSize` is the alignment rect's size, as on a Mac, for an
+  app's own class. Ferry's own `NSButton` gives the frame it wants (as
+  `sizeToFit`, stack views, grid views and alerts use it), so the solver
+  takes off its insets.
+
+`tests/appkit/alignment_rects.m` checks a button spaced 8 points below a
+label and two buttons 12 points apart by their bezels, with 32-point
+frames, and an app's own view with insets.

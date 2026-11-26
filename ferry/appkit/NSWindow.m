@@ -746,14 +746,24 @@ static BOOL places_own_windows(void)
         [self saveFrameUsingName:_autosaveName];
 }
 /* A titled window put on screen keeps its title bar there: one whose top
- * is above the screen's visible top comes down (as a Mac constrains it). */
+ * is above the screen's visible top comes down, and a resizable one taller
+ * than the screen's visible part is made to fit it, as a Mac constrains
+ * it (OBS asks for 960 points on a 900-point screen) (freemac 1.247). */
 - (void)_constrainToScreen
 {
-    if (!(_style & NSWindowStyleMaskTitled) || _sheetParent || _parent)
+    if (!(_style & NSWindowStyleMaskTitled) || _sheetParent || _parent || (_style & NSWindowStyleMaskFullScreen))
         return;
-    NSRect vis = AScreenFrame(YES);
-    if (NSMaxY(_frame) > NSMaxY(vis))
-        [self setFrameOrigin:NSMakePoint(_frame.origin.x, NSMaxY(vis) - _frame.size.height)];
+    NSRect vis = AScreenFrame(YES), r = _frame;
+    if ((_style & NSWindowStyleMaskResizable) && r.size.height > vis.size.height)
+        r.size.height = fmax(vis.size.height, [self minSize].height);
+    if (r.size.height != _frame.size.height && NSMinY(r) < NSMinY(vis))
+        r.origin.y = NSMinY(vis);
+    if (NSMaxY(r) > NSMaxY(vis))
+        r.origin.y = NSMaxY(vis) - r.size.height;
+    if (r.size.height != _frame.size.height)
+        [self setFrame:r display:NO];
+    else if (r.origin.y != _frame.origin.y)
+        [self setFrameOrigin:r.origin];
 }
 
 /* The frame is taken as asked: a Mac asks the delegate's
@@ -1088,6 +1098,8 @@ static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget
     if (_closing)
         return;
     BOOL was = _visible;
+    if (!was && !_gtk)
+        [self _constrainToScreen];   /* as a Mac puts it on screen, display or not */
     _visible = YES;
     if (!was) {
         if (!_first && _initialFirst)

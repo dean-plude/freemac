@@ -1,0 +1,7 @@
+Library/Fonts: there 1, folder 1
+lists: Bold.otf Plain.ttf Set.ttc
+Bold.otf reads "bold"; Plain.ttf is a file 1; README.txt there 0
+~/Library/Fonts/Set.ttc reads "set", readable 1
+missing font: 0
+other Library folders as they were: 1
+exit=0
