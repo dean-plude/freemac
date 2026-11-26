@@ -9,6 +9,9 @@
 #ifndef FERRY_CGDIRECTDISPLAY_H
 #define FERRY_CGDIRECTDISPLAY_H
 #include <CoreGraphics/CGEvent.h>
+/* the display calls answer colour spaces and images, as on a Mac */
+#include <CoreGraphics/CGColorSpace.h>
+#include <CoreGraphics/CGImage.h>
 #include <mach/boolean.h>
 /* as on a Mac, the display calls bring IOKit's registry types (freemac 1.232) */
 #include <IOKit/IOKitLib.h>

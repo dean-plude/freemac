@@ -408,6 +408,42 @@ static NSImage *drawable(id image) { return [image isKindOfClass:[NSImage class]
 
 + (Class)cellClass { return [NSButtonCell class]; }
 
+/* A button made in code has no cell, as Ferry's controls keep their state
+ * themselves. A program that draws a button through its cell (Qt's style
+ * draws its check boxes, radio buttons and push buttons with
+ * [button.cell drawInteriorWithFrame:inView:] and drawBezelWithFrame:)
+ * gets one made the first time it asks, given the button's settings each
+ * time it asks, so the cell draws what the button shows. */
+static char made_cell_key;
+- (NSCell *)cell
+{
+    NSCell *c = [super cell];
+    if (!c && [[self class] cellClass] == [NSButtonCell class]) {
+        c = [[[NSButtonCell alloc] init] autorelease];
+        [self setCell:c];
+        objc_setAssociatedObject(self, &made_cell_key, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (c && objc_getAssociatedObject(self, &made_cell_key)) {
+        NSButtonCell *b = (NSButtonCell *)c;
+        [b setButtonType:_type];
+        [b setAllowsMixedState:_mixed];
+        [b setState:_state];
+        [b setEnabled:[self isEnabled]];
+        [b setHighlighted:[self isHighlighted]];
+        [b setTitle:_title ?: @""];
+        [b setAlternateTitle:_alternateTitle ?: @""];
+        [b setKeyEquivalent:_key ?: @""];
+        [b setBordered:_bordered];
+        [b setTransparent:_transparent];
+        [b setBezelStyle:_bezel];
+        [b setAlignment:[self alignment]];
+        [b setControlSize:[self controlSize]];
+        [b setFont:[self font]];
+        [b setImage:drawable(_image)];
+    }
+    return c;
+}
+
 - (void)_takeFromCell:(NSCell *)cell
 {
     [super _takeFromCell:cell];
