@@ -3125,3 +3125,31 @@ asks for a 960-point main window the first time it opens on a
 900-point screen. The same test checks a tall resizable window and a
 fixed-size one.
 
+## A Mac's Fonts folders (freemac 1.248, Ferry 0.71.0)
+
+A Mac keeps fonts flat in the Fonts folder of each Library, and programs
+list such a folder and open each file in it with FreeType: OBS Studio's
+Text (FreeType 2) source does, with the Library folders
+`NSSearchPathForDirectoriesInDomains` gives. This system keeps fonts in
+folders of their own under `~/.local/share/fonts` (and `~/.fonts`),
+`/usr/local/share/fonts` and `/usr/share/fonts`.
+
+- Each domain's Fonts folder, `<Library>/Fonts` for the Library folder
+  Ferry gives (`~/.local/share`, `/usr/local/share`, `/usr/share`) and
+  the Mac's own `~/Library/Fonts`, `/Library/Fonts` and
+  `/System/Library/Fonts`, is a folder of links to every font file in that
+  domain's fonts folder and the folders in it, named as the file is
+  (`.ttf`, `.otf`, `.ttc`, `.otc`, `.pfb`, `.pfa`, `.dfont`, `.woff`,
+  `.woff2`); of two files with one name, the first in name order.
+- Ferry keeps the links in `~/.cache/freemac/ferry/Fonts`, made aside and
+  moved in whole the first time a program looks in a Fonts folder, and
+  made again when the fonts there changed. `open`, `openat`, `fopen`,
+  `stat`, `lstat`, `fstatat`, `access` and `opendir` take a path into a
+  Fonts folder there; `lstat` follows the link, so a font is a file to the
+  program, as on a Mac. A real Fonts folder is left as it is.
+- OBS's default Text font is Helvetica, which isn't here; a font picked
+  with its Select font window is used.
+
+`tests/foundation/mac_fonts.m` lists, opens, stats and reads fonts in a
+test's own fonts folder through the Library's Fonts folder and
+`~/Library/Fonts`.

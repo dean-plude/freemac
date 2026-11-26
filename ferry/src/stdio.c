@@ -7,6 +7,7 @@
  * system's own FILE in its _cookie field. Every stdio call goes through here.
  */
 #define _GNU_SOURCE
+#include <limits.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -121,7 +122,8 @@ static struct mac_FILE *mac_fopen(const char *path, const char *mode)
             close(fd);
         return wrap(f);
     }
-    return wrap(fopen(path, mode));
+    char font[PATH_MAX];
+    return wrap(fopen(ferry_font_path(path, font, sizeof font), mode));
 }
 static struct mac_FILE *mac_fdopen(int fd, const char *mode) { return wrap(fdopen(fd, mode)); }
 static struct mac_FILE *mac_tmpfile(void) { return wrap(tmpfile()); }

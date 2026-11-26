@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.248 "Fonts for Mac apps" (done)
+
+Ferry 0.71.0: a Mac app that looks for fonts in a Mac's Fonts folders now finds this computer's fonts there. OBS Studio's Text source lists them, so a font picked in its Select font window shows the text in the preview and the recording, where before it found no fonts and drew nothing.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Fonts folder of each Library folder Ferry gives (the user's, the computer's and the system's), and the Mac's own ~/Library/Fonts, /Library/Fonts and /System/Library/Fonts, list every font file in this system's matching fonts folder and the folders in it, flat and by name | Ferry libSystem (fonts.c) | done |
+| 2 | Opening, stat, lstat, access and listing a font there all reach the font itself, through a folder of links Ferry keeps in the user's cache and makes again when fonts are added or removed; a real Fonts folder is left as it is | Ferry libSystem (fonts.c, posix.c, stdio.c) | done |
+| 3 | Checked with OBS opened in a fresh account: a Text (FreeType 2) source with FreeSans picked shows its text in the preview | Acceptance, tests/foundation/mac_fonts.m | done |
+
 ## 1.247 "Mac apps open on screen" (done)
 
 Ferry 0.70.0: a Mac app's window that asks to be taller than the screen, as OBS Studio's does the first time it opens (960 points on a 900-point screen), now fits the screen with its title bar showing, instead of opening with its top and title bar above the screen where you can't reach them. A window placed above the top of the screen comes down, as a Mac puts it.

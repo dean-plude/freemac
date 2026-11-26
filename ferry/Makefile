@@ -7,7 +7,7 @@ PREFIX ?= /usr
 DESTDIR ?=
 
 SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c src/pthread.c src/passthrough.c src/host.c \
-      src/commoncrypto.c src/sysversion.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
+      src/commoncrypto.c src/sysversion.c src/fonts.c src/servercerts.c src/sysctl.c src/attrlist.c src/dyld.c \
       src/socket.c src/kqueue.c src/libc_more.c \
       src/objc/runtime.c src/objc/nsobject.c src/objc/blocks.c src/objc/dispatch.c src/objc/dispatch_io.c src/objc/exception.c \
       src/objc/symbols.c src/objc/oslog.c src/cxx.c src/cxx_unwind.c src/cxx_threads.c src/wchar.c src/tlv.c \
