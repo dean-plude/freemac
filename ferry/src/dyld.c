@@ -252,8 +252,17 @@ static void *open_path(const char *path, int mode, struct image *caller)
         found = ferry_image_resolve(caller, path, full, sizeof full) && is_file(full);
     else if (ferry_find_system_framework(path, full, sizeof full))
         found = 1;
-    else if (!strchr(path, '/'))
+    else if (!strchr(path, '/')) {
         found = search_leaf(path, full, sizeof full);
+        /* As dyld does, a bare name also goes through the caller's and the
+         * app's run paths, as @rpath/name (OBS loads libobs-opengl.dylib so). */
+        char rp[PATH_MAX], at[PATH_MAX];
+        snprintf(at, sizeof at, "@rpath/%s", path);
+        if (!found && caller && ferry_image_resolve(caller, at, rp, sizeof rp) && is_file(rp)) {
+            snprintf(full, sizeof full, "%s", rp);
+            found = 1;
+        }
+    }
     else {
         snprintf(full, sizeof full, "%s", path);
         found = is_file(full);

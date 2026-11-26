@@ -1718,6 +1718,10 @@ fi
 # textures, an NSOpenGLView's triangle and a core context drawing from a
 # thread of its own, a CAOpenGLLayer; and OpenGL as if it weren't installed.
 # FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
+# A view drawn as Qt 6's Cocoa plugin draws one (OBS): its own setLayer:
+# and container layer, displayLayer:, and an IOSurface as the contents.
+run_one appkit_qt_layers "$here/appkit/qt_layers.m" "$here/appkit/qt_layers.out" -fobjc-arc -framework Cocoa \
+    -framework QuartzCore -framework IOSurface
 run_one corevideo_pixelbuffer "$here/corevideo/pixelbuffer.m" "$here/corevideo/pixelbuffer.out" \
     -framework Foundation -framework CoreVideo -framework IOSurface
 run_one corevideo_displaylink "$here/corevideo/displaylink.m" "$here/corevideo/displaylink.out" -fblocks \

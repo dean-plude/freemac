@@ -22,5 +22,6 @@ the core ran 4 threads
   gamma: 7000
 alpha's pthread_once ran once: yes
 alpha opened again gives the same handle: yes
+a bare name opens through the run path: yes
 every handle closed: yes
 exit=0

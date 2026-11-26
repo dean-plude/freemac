@@ -112,6 +112,13 @@ int main(int argc, char **argv)
     void *h2 = dlopen(again, RTLD_NOW | RTLD_LOCAL);
     printf("alpha opened again gives the same handle: %s\n", yes(h2 == handles[0]));
     int closed = dlclose(h2) == 0;
+
+    /* a bare name, as OBS opens libobs-opengl.dylib: found, as dyld finds
+     * it, through the program's run path (the core's own folder) */
+    void *bare = dlopen("libplugcore.dylib", RTLD_NOW);
+    printf("a bare name opens through the run path: %s\n", yes(bare && dlsym(bare, "core_count") == (void *)core_count));
+    if (bare)
+        closed &= dlclose(bare) == 0;
     for (int i = 0; i < loaded; i++)
         closed &= dlclose(handles[i]) == 0;
     printf("every handle closed: %s\n", yes(closed));
