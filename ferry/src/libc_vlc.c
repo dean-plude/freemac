@@ -13,6 +13,7 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <iconv.h>
 #include <math.h>
 #include <pwd.h>
 #include <signal.h>
@@ -600,7 +601,46 @@ static void mac_backtrace_symbols_fd(void *const *addrs, int n, int fd)
     }
 }
 
+
+/* ---- iconv (freemac 1.NEXT; VLC's subtitle decoder) ----------------------------
+ * A Mac's /usr/lib/libiconv.2.dylib is GNU libiconv. glibc has the same three
+ * calls, with the same iconv_t (a pointer, -1 on failure), the same
+ * character set names for everything VLC asks for (UTF-8, CP1252, UTF-16LE,
+ * WCHAR_T, ISO-8859-x...) and a 4-byte wchar_t, as a Mac has. errno comes
+ * back in the Mac's numbers (EILSEQ, E2BIG, EINVAL) as for any other call.
+ * GNU libiconv's own names (libiconv_open and so on) are the same calls. */
+static iconv_t mac_iconv_open(const char *to, const char *from) { return iconv_open(to, from); }
+static size_t mac_iconv(iconv_t cd, char **in, size_t *inleft, char **out, size_t *outleft)
+{
+    return iconv(cd, in, inleft, out, outleft);
+}
+static int mac_iconv_close(iconv_t cd) { return iconv_close(cd); }
+/* iconvctl: only "is this conversion trivial" has an answer here; the other
+ * requests (transliteration and discarding on the fly) aren't offered. */
+static int mac_iconvctl(iconv_t cd, int request, void *arg)
+{
+    (void)cd;
+    if (request == 0 && arg) { /* ICONV_TRIVIALP */
+        *(int *)arg = 0;
+        return 0;
+    }
+    ferry_set_mac_errno(22); /* EINVAL */
+    return -1;
+}
+static const char *mac_locale_charset(void) { return "UTF-8"; }
+static const int mac_libiconv_version = 0x010b; /* 1.11, as a Mac's */
+
 const struct ferry_symbol ferry_libc_vlc_symbols[] = {
+    {"iconv_open", mac_iconv_open},
+    {"iconv", mac_iconv},
+    {"iconv_close", mac_iconv_close},
+    {"iconvctl", mac_iconvctl},
+    {"libiconv_open", mac_iconv_open},
+    {"libiconv", mac_iconv},
+    {"libiconv_close", mac_iconv_close},
+    {"libiconvctl", mac_iconvctl},
+    {"locale_charset", mac_locale_charset},
+    {"_libiconv_version", (void *)&mac_libiconv_version},
     {"backtrace", mac_backtrace},
     {"backtrace_symbols", mac_backtrace_symbols},
     {"backtrace_symbols_fd", mac_backtrace_symbols_fd},

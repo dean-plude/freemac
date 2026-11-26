@@ -186,6 +186,8 @@ reading
     "25%" -> 0.25 (double)
     "12.5%" -> 0.125 (double)
     "25" -> (nil)
+  10.0 style percent: 100%
+    "40%" -> 40 (integer)
   accounting
     "($5.00)" -> -5 (integer)
   integers from 0 to 100

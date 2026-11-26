@@ -57,9 +57,14 @@ fetch "$ft_tar" "$ft_url" "$ft_sha"
 
 # The tools a Mac build expects, by their Mac names.
 b=$work/bin
-for t in gcc g++; do
-    printf '#!/bin/sh\nexec %s "$@"\n' "$ferry/sdk/ferry-cc" > "$b/x86_64-apple-darwin-$t"
-done
+printf '#!/bin/sh\nexec %s "$@"\n' "$ferry/sdk/ferry-cc" > "$b/x86_64-apple-darwin-gcc"
+# The C++ compiler links libc++ by itself, as a Mac's clang++ does: VLC's
+# C++ modules (blend, spatializer, adaptive) are linked with it.
+cat > "$b/x86_64-apple-darwin-g++" <<EOF
+#!/bin/sh
+for a; do case \$a in -c|-E|-S|-M|-MM) exec "$ferry/sdk/ferry-cc" "\$@";; esac; done
+exec "$ferry/sdk/ferry-cc" "\$@" -lc++
+EOF
 for t in ar ranlib nm strip objdump; do ln -sf "$(command -v llvm-$t)" "$b/x86_64-apple-darwin-$t"; done
 for t in otool lipo install-name-tool; do
     p=$(command -v llvm-$t || ls /usr/bin/llvm-$t-* 2>/dev/null | tail -n 1)
@@ -119,8 +124,10 @@ fi
 # display link); ld64.lld looks only in the ones named, so every module
 # names both, and drops whichever it doesn't call.
 cd "$work/vlcbuild"
-# (a build configured by an earlier recipe, without Core Video or FreeType, is redone)
-[ ! -f config.status ] || { grep -q CoreVideo config.status && grep -q freetype2 config.status; } ||
+# (a build configured by an earlier recipe, without Core Video, FreeType or
+# iconv, is redone)
+[ ! -f config.status ] || { grep -q CoreVideo config.status && grep -q freetype2 config.status &&
+    grep -q '"HAVE_ICONV"' config.status; } ||
     rm -f config.status
 if [ ! -f config.status ]; then
     "$top/src/vlc-$vlc_ver/configure" --host=x86_64-apple-darwin --prefix="$work/vlcprefix" \

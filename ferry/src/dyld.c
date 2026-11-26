@@ -176,7 +176,9 @@ static int is_libsystem(const char *path)
     static const char *const names[] = {
         "/usr/lib/libSystem.B.dylib", "/usr/lib/libSystem.dylib", "/usr/lib/libc.dylib", "/usr/lib/libm.dylib",
         "/usr/lib/libdl.dylib", "/usr/lib/libpthread.dylib", "/usr/lib/libinfo.dylib", "/usr/lib/libdyld.dylib",
-        "/usr/lib/libobjc.A.dylib", "/usr/lib/libobjc.dylib", "/usr/lib/libdispatch.dylib", NULL,
+        "/usr/lib/libobjc.A.dylib", "/usr/lib/libobjc.dylib", "/usr/lib/libdispatch.dylib",
+        /* GNU libiconv, served from Ferry's own calls (libc_vlc.c) */
+        "/usr/lib/libiconv.2.dylib", "/usr/lib/libiconv.dylib", NULL,
     };
     if (!strncmp(path, "/usr/lib/system/", 16))
         return 1;

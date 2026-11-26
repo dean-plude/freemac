@@ -639,7 +639,11 @@ static void split_pattern(NSString *pat, NSString **prefix, NSString **number, N
     _maxInt = sci ? hashes + zeros : 2000000000;
     _sciAll = sci && !_minInt && !_maxFrac;
     NSString *affixes = [prefix stringByAppendingString:suffix];
-    if ([affixes rangeOfString:@"%"].location != NSNotFound) {
+    /* A Mac OS X 10.0 style formatter (as an old nib has, VLC's "0%")
+     * shows % as it is, without scaling the number by 100. */
+    if (_behavior == NSNumberFormatterBehavior10_0)
+        ;
+    else if ([affixes rangeOfString:@"%"].location != NSNotFound) {
         [_multiplier release];
         _multiplier = [[NSNumber numberWithInt:100] retain];
     } else if ([affixes rangeOfString:@"‰"].location != NSNotFound) {
