@@ -77,8 +77,9 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
   system without Apple's fonts lacks. Ferry 0.71.0 lists this system's fonts
   in the Mac Fonts folders, and the patch makes the source fall back to Inter,
   Liberation Sans, DejaVu Sans or FreeSans when the face it asks for is
-  missing, so a new Text source draws straight away. (Fallback built, not yet
-  seen drawing.)
+  missing, so a new Text source draws straight away. Seen on run 9: a Text
+  source asking for Helvetica drew in a stand-in face, with its outline and
+  drop shadow, in both the preview and the recording.
 - The camera sources ("Video Capture Device" and its Legacy one) build
   against Ferry 0.81.0, which lists this system's cameras. Headless, they
   load, list Ferry's test camera (`FERRY_CAMERA_TEST=1`), offer its presets
