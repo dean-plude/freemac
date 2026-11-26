@@ -3115,3 +3115,13 @@ macOS Screen Capture source, picking the display and recording.
 and one closed, a keyless window never becoming key, and a number's
 pointer value.
 
+A titled window, as it is first put on screen, is kept with its title
+bar on screen, as a Mac constrains it (freemac 1.247, Ferry 0.70.0): one
+whose top is above the screen's visible top comes down, and a resizable
+one taller than the screen's visible part is made that tall (no less
+than its minimum size); a fixed-size window keeps its size. Sheets,
+child windows and full-screen windows are left where they are. OBS
+asks for a 960-point main window the first time it opens on a
+900-point screen. The same test checks a tall resizable window and a
+fixed-size one.
+

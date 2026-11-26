@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.247 "Mac apps open on screen" (done)
+
+Ferry 0.70.0: a Mac app's window that asks to be taller than the screen, as OBS Studio's does the first time it opens (960 points on a 900-point screen), now fits the screen with its title bar showing, instead of opening with its top and title bar above the screen where you can't reach them. A window placed above the top of the screen comes down, as a Mac puts it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A titled window put on screen keeps its title bar on screen: one whose top is above the screen's visible top comes down, and a resizable one taller than the screen is made to fit it; a fixed-size one keeps its size | Ferry AppKit (NSWindow.m) | done |
+| 2 | The fit happens when the window is ordered front, with or without a display, so it is tested headless | Ferry AppKit (NSWindow.m), tests/appkit/qt_popups.m | done |
+| 3 | Checked with OBS opened for the first time in a fresh account: its main window is 1280x900 at the top of the screen | Acceptance | done |
+
 ## 1.246 "OBS records the screen from its download" (done)
 
 Ferry 0.69.0: OBS Studio, downloaded from its own site and opened in a fresh account, now gets all the way to a recording. Its drop-down lists open, so you can pick the display in a macOS Screen Capture source's Properties, and the preview shows the screen at once; Start Recording then saves a movie of it with sound. Its right-click and + menus stay open until you choose, instead of closing the moment they appear, and those pop-up menus no longer take the keyboard or show up in the Dock.

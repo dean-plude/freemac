@@ -4,7 +4,8 @@
  * performClickWithFrame:inView: tracks its menu until it closes before
  * it returns, the choice made or not, as on a Mac; a window that can't
  * become key (a pop-up menu) is never made key; and a number read as a
- * pointer gives its value, as OBS reads a screen's number. */
+ * pointer gives its value, as OBS reads a screen's number. A resizable
+ * window taller than the screen is made to fit it (1.247). */
 #import <Cocoa/Cocoa.h>
 
 @interface NSWindow (FerryPeek)
@@ -79,6 +80,23 @@ int main(void)
         [menu makeKeyWindow];
         printf("keyless window: shown %d, key %d, the window still key %d\n", menu.isVisible, menu.isKeyWindow,
                w.isKeyWindow);
+
+        /* a resizable window taller than the screen is made to fit it, as
+         * OBS's first window is; one that can't be resized only comes down */
+        NSRect vis = [[NSScreen mainScreen] visibleFrame];
+        NSWindow *tall = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, -60, 800, vis.size.height + 60)
+                                                     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable
+                                                       backing:NSBackingStoreBuffered defer:NO];
+        [tall orderFront:nil];
+        NSWindow *fixed = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 400, 300)
+                                                      styleMask:NSWindowStyleMaskTitled
+                                                        backing:NSBackingStoreBuffered defer:NO];
+        [fixed setFrame:NSMakeRect(0, NSMaxY(vis) - 200, 400, 300) display:NO];
+        [fixed orderFront:nil];
+        printf("tall window: fits %d, top at the screen's %d; fixed window: same height %d, top at the screen's %d\n",
+               NSHeight(tall.frame) <= NSHeight(vis) && NSMinY(tall.frame) >= NSMinY(vis),
+               NSMaxY(tall.frame) == NSMaxY(vis), NSHeight(fixed.frame) == 300,
+               NSMaxY(fixed.frame) == NSMaxY(vis));
 
         NSNumber *screenNumber = @(1);
         printf("number as pointer: %lu, zero %p\n", (unsigned long)(uintptr_t)screenNumber.pointerValue,
