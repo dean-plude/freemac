@@ -907,7 +907,8 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (id)viewAtColumn:(NSInteger)column
 {
     NSArray *cols = [[self _table] tableColumns];
-    if (column < 0 || column >= (NSInteger)[cols count])
+    /* a group row's one view, across the row, is its first column's */
+    if (column < 0 || column >= (NSInteger)[cols count] || (_group && column == 0))
         return [_views objectForKey:[NSNull null]];
     return [_views objectForKey:[NSValue valueWithNonretainedObject:[cols objectAtIndex:(NSUInteger)column]]];
 }
@@ -1248,6 +1249,9 @@ enum {
         _autoresizing = (NSTableViewColumnAutoresizingStyle)[coder decodeIntegerForKey:@"NSColumnAutoresizingStyle"];
     _grid = [decoded(coder, @"NSGridColor", [NSColor class]) copy];
     _background = [decoded(coder, @"NSBackgroundColor", [NSColor class]) copy];
+    if ([coder containsValueForKey:@"NSTableViewSelectionHighlightStyle"])
+        [self setSelectionHighlightStyle:(NSTableViewSelectionHighlightStyle)[coder
+                                             decodeIntegerForKey:@"NSTableViewSelectionHighlightStyle"]];
     if ([coder containsValueForKey:@"NSDraggingSourceMaskForLocal"])
         _draggingMaskLocal = [coder decodeIntegerForKey:@"NSDraggingSourceMaskForLocal"];
     if ([coder containsValueForKey:@"NSDraggingSourceMaskForNonLocal"])
@@ -3296,6 +3300,14 @@ enum {
                 [v setFrame:NSMakeRect(0, floor(_spacing.height / 2), rr.size.width, rr.size.height - _spacing.height)];
                 [rv->_views setObject:v forKey:[NSNull null]];
                 [rv addSubview:v];
+                /* a source list's heading, in Interface Builder's colour for
+                 * it, is drawn as a Mac draws it, in grey */
+                if (_highlight == NSTableViewSelectionHighlightStyleSourceList &&
+                    [v respondsToSelector:@selector(textField)]) {
+                    NSTextField *tf = [(NSTableCellView *)v textField];
+                    if ([[tf textColor] isEqual:[NSColor headerColor]])
+                        [tf setTextColor:[NSColor secondaryLabelColor]];
+                }
             }
         }
     } else {

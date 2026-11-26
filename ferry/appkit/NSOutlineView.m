@@ -87,6 +87,8 @@ static const CGFloat disclosure_width = 16;
     BOOL _reloadTree;
     id _dropItem;                    /* the drop proposed (freemac 1.220), retained */
     NSInteger _dropChildIndex;
+    NSTrackingArea *_hoverArea;      /* a source list's headings under the mouse, retained */
+    NSInteger _hoverRow;             /* the heading under it, plus one (0: none) */
 }
 
 - (void)_setUpOutline
@@ -125,6 +127,7 @@ static const CGFloat disclosure_width = 16;
     [_root release];
     [_rowNodes release];
     [_dropItem release];
+    [_hoverArea release];
     [super dealloc];
 }
 
@@ -565,6 +568,77 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
         return 0;
     return disclosure_width + n->level * _indent;
 }
+/* A source list's headings open and close with a Show or Hide button at
+ * their right, there while the mouse is over the heading, as on a Mac. */
+static NSDictionary *hide_button_attributes(void)
+{
+    return @{ NSFontAttributeName : [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+              NSForegroundColorAttributeName : [NSColor secondaryLabelColor] };
+}
+static CGFloat hide_button_width(void)
+{
+    NSDictionary *a = hide_button_attributes();
+    return ceil(fmax([@"Show" sizeWithAttributes:a].width, [@"Hide" sizeWithAttributes:a].width)) + 4;
+}
+- (BOOL)_showsHideButtonAtRow:(NSInteger)row
+{
+    return [self selectionHighlightStyle] == NSTableViewSelectionHighlightStyleSourceList && [self _isGroupRow:row];
+}
+- (void)updateTrackingAreas
+{
+    [super updateTrackingAreas];
+    if (_hoverArea || [self selectionHighlightStyle] != NSTableViewSelectionHighlightStyleSourceList)
+        return;
+    _hoverArea = [[NSTrackingArea alloc]
+        initWithRect:NSZeroRect
+             options:NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited | NSTrackingActiveInActiveApp |
+                     NSTrackingInVisibleRect
+               owner:self
+            userInfo:nil];
+    [self addTrackingArea:_hoverArea];
+}
+- (void)_setHoverRow:(NSInteger)row
+{
+    if (row + 1 == _hoverRow)
+        return;
+    NSInteger old = _hoverRow - 1;
+    _hoverRow = row + 1;
+    for (NSInteger r = 0; r < 2; r++) {
+        NSInteger at = r ? row : old;
+        if (at < 0 || at >= [self numberOfRows])
+            continue;
+        NSTableRowView *rv = [self rowViewAtRow:at makeIfNecessary:NO];
+        if (rv)
+            [rv setNeedsDisplay:YES];
+        else
+            [self setNeedsDisplayInRect:[self rectOfRow:at]];
+    }
+}
+- (void)mouseMoved:(NSEvent *)e
+{
+    if (_hoverArea) {
+        NSInteger row = [self rowAtPoint:[self convertPoint:[e locationInWindow] fromView:nil]];
+        [self _setHoverRow:[self _showsHideButtonAtRow:row] ? row : -1];
+    }
+    [super mouseMoved:e];
+}
+- (void)mouseExited:(NSEvent *)e
+{
+    if (_hoverArea)
+        [self _setHoverRow:-1];
+    [super mouseExited:e];
+}
+- (void)_drawHideButtonIn:(NSRect)r row:(NSInteger)row
+{
+    if (_hoverRow != row + 1)
+        return;
+    AOutlineNode *n = [self _nodeAtRow:row];
+    NSDictionary *a = hide_button_attributes();
+    NSString *title = n->expanded ? @"Hide" : @"Show";
+    NSSize s = [title sizeWithAttributes:a];
+    [title drawAtPoint:NSMakePoint(NSMaxX(r) - s.width - 2, NSMidY(r) - s.height / 2) withAttributes:a];
+}
+
 - (NSRect)frameOfOutlineCellAtRow:(NSInteger)row
 {
     AOutlineNode *n = [self _nodeAtRow:row];
@@ -575,6 +649,12 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
     if ([d respondsToSelector:@selector(outlineView:shouldShowOutlineCellForItem:)] &&
         ![d outlineView:self shouldShowOutlineCellForItem:n->item])
         return NSZeroRect;
+    if ([self _showsHideButtonAtRow:row]) {
+        /* a source list's heading: Show or Hide at its right */
+        NSRect rr = [self rectOfRow:row];
+        CGFloat w = hide_button_width();
+        return NSMakeRect(NSMaxX(rr) - w - 6, rr.origin.y, w, rr.size.height);
+    }
     NSRect cell = [self frameOfCellAtColumn:column row:row];
     CGFloat x = cell.origin.x - disclosure_width;
     return NSMakeRect(x, cell.origin.y, disclosure_width, cell.size.height);
@@ -786,6 +866,10 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
     if (NSIsEmptyRect(r))
         return;
     AOutlineNode *n = [self _nodeAtRow:row];
+    if ([self _showsHideButtonAtRow:row]) {
+        [self _drawHideButtonIn:r row:row];
+        return;
+    }
     ATableDrawChevron(r, n->expanded, [self _chevronColorForRow:row], YES);
 }
 - (void)_drawDecorationsInRowView:(NSTableRowView *)view
@@ -796,6 +880,10 @@ static BOOL same_item(id a, id b) { return a == b || (a && b && [a isEqual:b]); 
         return;
     r.origin.y -= [self rectOfRow:row].origin.y;
     AOutlineNode *n = [self _nodeAtRow:row];
+    if ([self _showsHideButtonAtRow:row]) {
+        [self _drawHideButtonIn:r row:row];
+        return;
+    }
     ATableDrawChevron(r, n->expanded, [self _chevronColorForRow:row], [view isFlipped]);
 }
 /* A click on a chevron opens or closes its item (with option, everything

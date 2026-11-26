@@ -146,8 +146,9 @@ int main(void)
         for (NSTableColumn *c in [t tableColumns])
             printf("  column %s \"%s\" width %.0f editable %s\n", [[c identifier] UTF8String],
                    [[[c headerCell] stringValue] UTF8String], [c width], yesno([c isEditable]));
-        printf("  multiple selection %s, alternating rows %s\n", yesno([t allowsMultipleSelection]),
-               yesno([t usesAlternatingRowBackgroundColors]));
+        printf("  multiple selection %s, alternating rows %s, source list %s\n", yesno([t allowsMultipleSelection]),
+               yesno([t usesAlternatingRowBackgroundColors]),
+               yesno([t selectionHighlightStyle] == NSTableViewSelectionHighlightStyleSourceList));
         [t reloadData];
         printf("  rows %ld\n", (long)[t numberOfRows]);
 

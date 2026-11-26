@@ -298,6 +298,39 @@ int main(void)
                [NSStringFromClass([e.centerYAnchor class]) UTF8String],
                [NSStringFromClass([described.firstAnchor class]) UTF8String]);
 
+        /* an aspect ratio: a width against a height, the height set by the
+         * superview (an icon in a sidebar's row, as VLC's), and a height
+         * against a width */
+        NSView *row = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 200, 24)];
+        NSView *icon = [[NSView alloc] init], *label = [[NSView alloc] init], *wide = [[NSView alloc] init];
+        for (NSView *v in @[ icon, label, wide ]) {
+            v.translatesAutoresizingMaskIntoConstraints = NO;
+            [row addSubview:v];
+        }
+        [NSLayoutConstraint activateConstraints:@[
+            [NSLayoutConstraint constraintWithItem:icon attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual
+                                            toItem:icon attribute:NSLayoutAttributeHeight multiplier:14.0 / 15 constant:0],
+            [icon.topAnchor constraintEqualToAnchor:row.topAnchor constant:2],
+            [row.bottomAnchor constraintEqualToAnchor:icon.bottomAnchor constant:2],
+            [icon.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:3],
+            [label.leadingAnchor constraintEqualToAnchor:icon.trailingAnchor constant:7],
+            [label.topAnchor constraintEqualToAnchor:row.topAnchor], [label.heightAnchor constraintEqualToConstant:16],
+            [label.widthAnchor constraintEqualToConstant:50],
+            [wide.widthAnchor constraintEqualToConstant:32], [wide.leadingAnchor constraintEqualToAnchor:row.leadingAnchor],
+            [wide.topAnchor constraintEqualToAnchor:row.topAnchor],
+            [wide.heightAnchor constraintEqualToAnchor:wide.widthAnchor multiplier:0.5 constant:1],
+        ]];
+        [row layoutSubtreeIfNeeded];
+        printf("aspect: icon %s, label at %g, wide %s\n", [NSStringFromRect(icon.frame) UTF8String], label.frame.origin.x,
+               [NSStringFromSize(wide.frame.size) UTF8String]);
+        @try {
+            [NSLayoutConstraint constraintWithItem:icon attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual
+                                            toItem:row attribute:NSLayoutAttributeTop multiplier:1 constant:0];
+            printf("width against top: made\n");
+        } @catch (NSException *x) {
+            printf("width against top: %s\n", [x.name UTF8String]);
+        }
+
         /* the visual format's mistakes */
         for (NSString *bad in @[ @"H:|-[missing]-|", @"H:|-[left", @"V:[left]-(>=x)-[right]" ]) {
             @try {
