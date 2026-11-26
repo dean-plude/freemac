@@ -745,8 +745,19 @@ static BOOL keeps_state(NSButtonType t)
         return NSMakeSize(fmax(ceil(t.width) + 12, 18), fmax(ceil(t.height) + 2, 16));
     if (_bezel == NSBezelStyleHelpButton)
         return NSMakeSize(25, 25);
+    /* a small or mini button is the size Interface Builder gives it, so a
+     * row laid out around one keeps its height (freemac 1.NEXT: VLC's mini
+     * Reset buttons, 39 by 17, had a regular button's 60 by 32 and slipped
+     * out of the panel they sit in) */
+    NSControlSize size = [self controlSize];
+    if (_bezel == NSBezelStyleRoundRect)
+        return NSMakeSize(ceil(t.width) + 16, size == NSControlSizeSmall || size == NSControlSizeMini ? 17 : 19);
     if (pos == NSImageOnly)
         return NSMakeSize(fmax(ceil(t.width) + 16, 32), fmax(32, ceil(t.height) + 10));
+    if (_bezel == NSBezelStyleRounded && size == NSControlSizeSmall)
+        return NSMakeSize(ceil(t.width) + 25, 28);
+    if (_bezel == NSBezelStyleRounded && size == NSControlSizeMini)
+        return NSMakeSize(ceil(t.width) + 20, 16);
     return NSMakeSize(fmax(ceil(t.width) + 28, 60), fmax(32, ceil(t.height) + 10));
 }
 

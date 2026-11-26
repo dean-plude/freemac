@@ -894,6 +894,7 @@ run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_a
 run_one appkit_disclosure "$here/appkit/disclosure.m" "$here/appkit/disclosure.out" -fobjc-arc -framework Cocoa
 run_one appkit_hud_table "$here/appkit/hud_table.m" "$here/appkit/hud_table.out" -fobjc-arc -framework Cocoa
 run_one appkit_set_frame "$here/appkit/set_frame.m" "$here/appkit/set_frame.out" -fobjc-arc -framework Cocoa
+run_one appkit_control_sizes "$here/appkit/control_sizes.m" "$here/appkit/control_sizes.out" -fobjc-arc -framework Cocoa
 # NSAccessibility: the names, the protocol's methods and the older API
 run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
     -framework Cocoa -framework ApplicationServices

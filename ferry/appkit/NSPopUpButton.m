@@ -1025,6 +1025,13 @@ static BOOL choosable(NSMenuItem *item)
     }
     if (![self usesItemFromMenu])
         w = fmax(w, ALineSize(AAttributed([self title], font, nil), NULL, NULL).width);
+    /* a small or mini pop-up is shorter, as Interface Builder sizes it
+     * (freemac 1.NEXT: VLC's small profile pop-ups) */
+    NSControlSize size = [self controlSize];
+    if (size == NSControlSizeSmall)
+        return NSMakeSize(fmax(ceil(w) + 36, 44), 22);
+    if (size == NSControlSizeMini)
+        return NSMakeSize(fmax(ceil(w) + 30, 38), 15);
     return NSMakeSize(fmax(ceil(w) + 8 + 4 + 16 + 2 + 6 + 6, 50), 25);
 }
 
