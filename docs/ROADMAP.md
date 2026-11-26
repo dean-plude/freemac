@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.243 "Mac apps from a .zip, and Applications that keeps up" (done)
+
+Mac apps often come as a .zip, and their frameworks hold symbolic links (Versions/Current and the links beside it) that the app can't start without. Drawer now keeps links when it expands a .zip, as long as they point inside the new folder, as it already did for tar archives, and Compress stores links as links. A Mac app that comes out of a .zip is selected, and Drawer says it's ready to open. The app grid now follows the Applications folders while you're logged in: an app dragged or copied into Applications shows up in the app grid, the Dock's app list and search with its own icon within seconds, once it has finished copying; one moved out or to the Trash goes. Before, that waited for the next login.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Expanding a .zip keeps its symbolic links that point inside it; Compress keeps links as links | Drawer (drawer_archive) | done |
+| 2 | A Mac app that came out of a .zip is selected, with a line saying it's ready to open | Drawer | done |
+| 3 | `freemac-mac-app watch`, started with the session: apps added to or taken out of Applications reach the app grid within seconds, a copy only once it's complete | Mac apps (macapps.py), session | done |
+
 ## 1.242 "OBS opens again" (done)
 
 Ferry 0.66.0: NSString changes letter case in a given locale (`uppercaseStringWithLocale:`, `lowercaseStringWithLocale:` and `capitalizedStringWithLocale:`), with ICU's rules for that locale, so Turkish gets its dotted capital I. OBS Studio 33 calls one of these at startup, and without it OBS quit before its window opened. In Ferry's test setup OBS now goes through its whole tour (the main window, every Settings page, a source's properties and filters) and quits cleanly, and records a microphone tone at its own pitch and level.
