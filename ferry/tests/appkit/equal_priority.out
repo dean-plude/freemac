@@ -1,0 +1,5 @@
+at least 50, then at least 100: 100 wide
+at least 100, then at least 50: 100 wide
+at least 50, at least 100, at most 90: 100 wide, from 90 to 100: 1
+three sliders as tall as the first, at least 40, 120, 80: 120 tall
+exit=0

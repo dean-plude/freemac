@@ -893,6 +893,7 @@ run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out"
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
 run_one appkit_alignment_rects "$here/appkit/alignment_rects.m" "$here/appkit/alignment_rects.out" -fobjc-arc -framework Cocoa
+run_one appkit_equal_priority "$here/appkit/equal_priority.m" "$here/appkit/equal_priority.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
 # a layout manager laying text out with no text view, as VLC wraps text
 run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
