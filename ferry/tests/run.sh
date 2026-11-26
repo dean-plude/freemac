@@ -881,6 +881,10 @@ run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.o
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
+# a layout manager laying text out with no text view, as VLC wraps text
+run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
+# disclosure triangles and rounded disclosure buttons
+run_one appkit_disclosure "$here/appkit/disclosure.m" "$here/appkit/disclosure.out" -fobjc-arc -framework Cocoa
 # NSAccessibility: the names, the protocol's methods and the older API
 run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
     -framework Cocoa -framework ApplicationServices

@@ -113,6 +113,11 @@ int main(void)
         printf("panel HUD %s, dark %s; slider vertical %s, small %s, %g to %g\n",
                yesno(([p styleMask] & NSWindowStyleMaskHUDWindow) != 0), yesno(white < 0.5), yesno([band isVertical]),
                yesno([band controlSize] == NSControlSizeSmall), [band minValue], [band maxValue]);
+        /* a disclosure triangle opens and closes, as a button that stays on */
+        NSButton *tri = [[[p contentView] subviews] lastObject];
+        [tri performClick:nil];
+        printf("disclosure triangle: bezel %ld, open after a click %s\n", (long)[tri bezelStyle],
+               yesno([tri state] == NSControlStateValueOn));
         printf("content subviews: %lu\n", (unsigned long)[[[w contentView] subviews] count]);
 
         NSTextField *name = owner.nameField;

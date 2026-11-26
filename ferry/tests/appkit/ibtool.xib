@@ -244,6 +244,13 @@ DQ
                         <rect key="frame" x="10" y="5" width="18" height="90"/>
                         <sliderCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="-20" maxValue="20" numberOfTickMarks="9" sliderType="linear" id="pnlslidercell"/>
                     </slider>
+                    <button id="pnldisclose">
+                        <rect key="frame" x="40" y="5" width="13" height="13"/>
+                        <buttonCell key="cell" type="disclosureTriangle" bezelStyle="disclosure" imagePosition="above" alignment="center" borderStyle="border" inset="2" id="pnldisclosecell">
+                            <behavior key="behavior" pushIn="YES" changeBackground="YES" changeGray="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                    </button>
                 </subviews>
             </view>
         </window>

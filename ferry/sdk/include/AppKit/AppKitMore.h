@@ -191,6 +191,7 @@ APPKIT_EXTERN NSNotificationName const NSTextStorageDidProcessEditingNotificatio
 - (NSUInteger)characterIndexForGlyphAtIndex:(NSUInteger)index;
 - (NSUInteger)glyphIndexForPoint:(NSPoint)point inTextContainer:(NSTextContainer *)container;
 - (NSRect)lineFragmentRectForGlyphAtIndex:(NSUInteger)index effectiveRange:(NSRangePointer)range;
+- (NSRect)lineFragmentUsedRectForGlyphAtIndex:(NSUInteger)index effectiveRange:(NSRangePointer)range;
 @end
 
 /* ---- cells: the button cell's highlight and state masks, a cell's menu,
