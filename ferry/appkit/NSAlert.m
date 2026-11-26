@@ -367,9 +367,16 @@ static NSTextField *label(NSString *s, NSFont *font, CGFloat x, CGFloat y, CGFlo
     NSWindow *w = [self window];
     /* centred a third of the way down the main window, or the screen, and
      * kept on the screen: a tall alert (ShiftIt's, with its picture) moves
-     * down rather than losing its top (1.229) */
+     * down rather than losing its top (1.229); a main window that is
+     * hidden, off the screen or smaller than the alert counts for nothing,
+     * and the alert goes on the screen (VLC asks its first-run question over
+     * its 84-point-high window, freemac 1.NEXT) */
     NSWindow *over = [NSApp mainWindow];
-    NSRect f = [w frame], screen = [[NSScreen mainScreen] visibleFrame], base = over ? [over frame] : screen;
+    NSRect f = [w frame], screen = [[NSScreen mainScreen] visibleFrame];
+    if (![over isVisible] || !NSContainsRect(NSInsetRect(screen, -1, -1), [over frame]) ||
+        NSWidth([over frame]) < f.size.width || NSHeight([over frame]) < f.size.height)
+        over = nil;
+    NSRect base = over ? [over frame] : screen;
     NSPoint at = NSMakePoint(floor(NSMidX(base) - f.size.width / 2),
                              floor(NSMaxY(base) - (NSMaxY(base) - NSMinY(base)) / 3 - f.size.height / 2));
     at.x = fmax(NSMinX(screen), fmin(at.x, NSMaxX(screen) - f.size.width));

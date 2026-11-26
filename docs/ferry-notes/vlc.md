@@ -338,13 +338,39 @@ boxes rather than 5, which had shrunk the Image Adjust sliders.
 Tests: `tests/appkit/control_sizes.m`, and the box's margins in
 `tests/appkit/ibtool.m`.
 
+## Opening VLC as a user would, and its Dock menu (freemac 1.NEXT)
+
+VLC.app copied to a fresh `~/Applications` and opened with
+`freemac-mac-app open VLC.app video.mp4`, with no Ferry test variables
+set (only HOME, DISPLAY, PATH, XDG_RUNTIME_DIR and LANG), starts, asks its
+first-run question and then plays the video in its window. Two things
+were wrong on the way:
+
+- The first-run question ("Check for album art and metadata?", an
+  NSAlert run with runModal) opened at the bottom of the screen. An alert
+  is placed a third of the way down the main window, and VLC asks while
+  its main window is 84 points high, so the 320-point alert was pushed
+  down to the screen's edge. An alert now goes on the screen when the main
+  window is hidden, off the screen or smaller than the alert
+  (`appkit/NSAlert.m`).
+- VLC's Dock menu (Play, Stop, Next, Previous, Mute) comes from its nib,
+  which connects the application's dockMenu outlet, and Ferry had no such
+  outlet. The application now takes it, and freemac's Dock shows that menu
+  when the delegate gives none of its own (`appkit/NSDockTile.m`).
+
+VideoLAN's own disk image couldn't be fetched or opened where this was
+tested (VideoLAN's server out of reach, no 7-Zip), so installing from it
+is still to try.
+
+Test: `tests/appkit/notify_dock_outlet.m`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
 - VideoToolbox decoding, the keychain, speech, the CD module and
   SecureTransport don't build yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test
-  setup only.
+  setup only. Installing from VideoLAN's own disk image is untried.
 - Auto Layout places views by their frames, not their alignment rectangles,
   so where a xib spaces push buttons by their bezels (the File tab of
   VLC's Open dialog), the space comes out too small and the File tab is
