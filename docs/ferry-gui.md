@@ -1877,7 +1877,8 @@ The new or extended ones:
     writes it.
 
 - **Core Animation, not done yet** (freemac 1.198, Ferry 0.25.0).
-  - Shadows (`shadowOpacity` and the rest) are kept but not drawn.
+  - Shadows are drawn from freemac 1.253 (Ferry 0.76.0); see "Layer
+    shadows" below.
   - Masks (`mask`) and filters (`filters`, `backgroundFilters`,
     `compositingFilter`) are kept but not drawn.
   - CATransition keeps its type, subtype and timing, but nothing is drawn
@@ -2590,7 +2591,7 @@ The new or extended ones:
   - Areas are checked by geometry against every view shown in the window, so an area under another view is still entered. Only an area with the visible rect option is cut to the part of its view that shows; any other area counts in full, even where a scroll view's clip hides it.
   - `NSCursor` sets GTK's named cursors, which the desktop's cursor theme draws, so the arrow, I-beam and hands look like this system's and not a Mac's. With no display, cursors are only kept.
   - Shadows are drawn in bitmap and window contexts but not in PDF contexts, so a printed page has none. The blur is three box blurs, close to a Gaussian but not the same.
-  - Layer shadows (`CALayer`'s `shadowOpacity` and the rest) are still kept but not drawn.
+  - Layer shadows (`CALayer`'s `shadowOpacity` and the rest) are drawn from freemac 1.253.
   - `NSAnimationNonblockingThreaded` runs like the non-blocking mode, on the run loop of the thread that started it, and not on a thread of its own.
   - The animator proxy and `NSAnimationContext` set values at the end of the group, with no frames between, as before. `NSViewAnimation` fades windows and views by their alpha values.
   - `NSDistributedNotificationCenter` reaches only Ferry programs, over the D-Bus session bus. The notifications a Mac's system posts (such as the change between light and dark appearance) never come. User info that isn't a property list is dropped, as Apple says it must be one. `NSDistributedNotificationPostToAllSessions` posts on this session's bus only.
@@ -3211,3 +3212,20 @@ type allowed when the panel opened gets the new type's in its place. Other
 controls in an accessory view (text fields, radio groups, sliders) aren't
 offered. With no display, `FERRY_PANEL_CHOICES` gives the choices, one
 `Label=Option` line each, a check box by `true` or `false`.
+
+## Layer shadows (freemac 1.253, Ferry 0.76.0)
+
+A layer with a `shadowOpacity` above 0 casts a shadow in its
+`shadowColor` at that opacity, moved by `shadowOffset` (in the space it is
+placed in, so a negative height moves it down on a Mac's unflipped layers)
+and blurred by `shadowRadius`, taken as a Gaussian's radius (Core
+Graphics's blur of twice that), all scaled as the layer is drawn.
+
+- With no `shadowPath`, the layer is drawn as one, its background,
+  contents, sublayers and border, and that casts the shadow: a layer with
+  nothing of its own casts its sublayers' shapes.
+- With a `shadowPath`, the path's shadow is drawn under the layer, all of
+  it, and the layer is drawn over it with no shadow of its own.
+- The layer's `opacity` fades its shadow with it.
+
+`tests/quartzcore/layer_shadows.m` checks each of these pixel by pixel.

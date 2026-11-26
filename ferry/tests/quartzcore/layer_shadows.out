@@ -1,0 +1,8 @@
+no shadow: below 255
+shadow 6 down: below 0, square 255, above 255, beside 255
+at half opacity, below is grey: 1
+blurred by 4: just outside grey 1, far out 255
+a larger shadow path: 2 left of the square 0, square 255
+sublayer's shadow: under the dot 0, under the empty box 255
+layer at half opacity, shadow grey: 1
+exit=0

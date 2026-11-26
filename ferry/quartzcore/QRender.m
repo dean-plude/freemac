@@ -7,8 +7,10 @@
  * transform and geometryFlipped), then the border on top; all inside the
  * rounded bounds when masksToBounds is set, and composited as one at the
  * layer's opacity. A layer's transform is drawn as its 2D part. Images
- * are always drawn the right way up on the page. Shadows, masks and
- * filters aren't drawn yet. */
+ * are always drawn the right way up on the page. A layer casts its shadow
+ * (freemac 1.253): from its shadowPath when it has one, else from all it
+ * draws (background, contents, sublayers and border) taken as one, as Apple
+ * documents. Masks and filters aren't drawn yet. */
 #import "QInternal.h"
 
 /* From a layer's bounds space to the space its superlayer puts sublayers
@@ -217,6 +219,27 @@ static void draw_contents(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL fl
     CGContextRestoreGState(ctx);
 }
 
+/* Sets the layer's shadow in the context, if it casts one: its colour at
+ * shadowOpacity, its offset (in the layer's superlayer's space, as the
+ * layer is placed) and its radius taken to the base space Core Graphics
+ * keeps shadows in. A layer's shadowRadius is a Gaussian's, Core Graphics's
+ * blur twice that. */
+static BOOL set_shadow(NSDictionary *v, CGContextRef ctx)
+{
+    double opacity = QNum(v, @"shadowOpacity");
+    CGColorRef color = QColor(v, @"shadowColor");
+    if (opacity <= 0 || !color || CGColorGetAlpha(color) <= 0)
+        return NO;
+    CGAffineTransform m = CGContextGetCTM(ctx);
+    m.tx = m.ty = 0;
+    CGSize off = CGSizeApplyAffineTransform(QSize(v, @"shadowOffset"), m);
+    double scale = sqrt(fabs(m.a * m.d - m.b * m.c));
+    CGColorRef c = CGColorCreateCopyWithAlpha(color, CGColorGetAlpha(color) * fmin(opacity, 1));
+    CGContextSetShadowWithColor(ctx, off, 2 * fmax(QNum(v, @"shadowRadius"), 0) * scale, c);
+    CGColorRelease(c);
+    return YES;
+}
+
 static NSDictionary *values_of(CALayer *l, BOOL pres)
 {
     return pres ? [l _ferryPresentationValues] : [l _ferryValues];
@@ -235,13 +258,25 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         return;
     CGRect b = QRect(v, @"bounds");
     CGContextSaveGState(ctx);
-    BOOL group = opacity < 1;
+    BOOL shadowed = set_shadow(v, ctx), fromPath = shadowed && v[@"shadowPath"];
+    if (fromPath) {
+        /* the path's shadow under the layer, the layer itself unshadowed */
+        CGContextSaveGState(ctx);
+        CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
+        GContextSetDrawsShadowsOnly(ctx, YES);
+        CGContextSetRGBFillColor(ctx, 0, 0, 0, 1);
+        CGContextBeginPath(ctx);
+        CGContextAddPath(ctx, (CGPathRef)v[@"shadowPath"]);
+        CGContextFillPath(ctx);
+        GContextSetDrawsShadowsOnly(ctx, NO);
+        CGContextRestoreGState(ctx);
+        CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
+    }
+    BOOL group = opacity < 1 || (shadowed && !fromPath);
     if (group) {
         CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
         CGContextBeginTransparencyLayer(ctx, NULL);
     }
-    if (QNum(v, @"shadowOpacity") > 0)
-        QWarnOnce("layer shadows");
     if ([l mask])
         QWarnOnce("layer masks");
     if ([v[@"filters"] count] || [v[@"backgroundFilters"] count] || v[@"compositingFilter"])

@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.253 "Layers cast their shadows" (done)
+
+Ferry 0.76.0: a Mac app's Core Animation layers now draw their shadows. Cards, popovers, buttons and panels that an app gives a soft shadow with `shadowOpacity`, `shadowRadius` and `shadowOffset` showed flat before; now they cast the shadow a Mac draws, from the layer's own shape, or from its `shadowPath`.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer casts its shadow from all it draws taken as one, in its colour at its opacity, moved and blurred as on a Mac, faded with the layer's opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shadow path's whole shadow is drawn under the layer instead | Ferry QuartzCore, Core Graphics | done |
+| 3 | New test `quartzcore_layer_shadows`, checked pixel by pixel | Ferry | done |
+
 ## 1.252 "An app's own options in the file chooser" (done)
 
 Ferry 0.75.0: a Mac app can add its own controls under an Open or Save panel, most often a Format menu in a Save panel. The file chooser freemac shows is the system's own, which can't hold an app's view, so these were left out. Now the accessory view's pop-up menus and check boxes show in the chooser as its own choices, named by the label beside each menu ("Format") or the check box's title. What is chosen goes back to the app as if its own controls were clicked, before the file is taken, so a Format menu that changes the file type gives the saved file its new extension (picture.png saved as JPEG is picture.jpg), as on a Mac.
