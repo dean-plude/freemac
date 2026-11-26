@@ -511,6 +511,7 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
  * right (or down); a selection, rounded and inset unless the style is full
  * width or plain, joined to the rows above and below if they are selected. */
 void ATableDrawTextLine(NSAttributedString *string, NSRect frame, NSTextAlignment align, BOOL flipped);
+void ATableDrawTextLines(NSAttributedString *string, NSRect frame, NSTextAlignment align, BOOL flipped);
 void ATableDrawChevron(NSRect rect, BOOL down, NSColor *color, BOOL flipped);
 void ATableDrawSelection(NSRect rect, NSTableViewStyle style, NSTableViewSelectionHighlightStyle highlight,
                          BOOL emphasized, BOOL joinsAbove, BOOL joinsBelow);

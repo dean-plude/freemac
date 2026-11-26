@@ -380,6 +380,24 @@ total, as on a Mac.
 Tests: the unnamed column in `tests/appkit/ibtool.xib`, and the eye in
 `tests/appkit/image.m`.
 
+## The Errors and Warnings window (freemac 1.NEXT)
+
+When VLC can't open something, its Errors and Warnings window lists the
+error with a stop sign and its title in bold over the message. Ferry
+showed a blank document icon and ran the title and message together on one
+line. Now `iconForFileType:` gives the alert icons for the HFS codes
+`'stop'`, `'caut'` and `'note'` (Ferry's own red stop sign, caution
+triangle and info circle). A text cell in a cell-based table that isn't in
+single-line mode draws each line of its text on its own line, so the
+title and the message sit on two lines in VLC's 45-point rows. Test:
+`tests/appkit/error_rows.m`.
+
+Rechecked on Ferry 0.69.0: VLC's pop-ups, its first-run alert, its
+Preferences and effects panels, and full screen all work as before.
+All 32 windows in VLC's nibs have a title bar. VLC makes only three
+borderless windows itself (full screen, the blackout window, and the
+video window with decorations off), and those stay undecorated.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
