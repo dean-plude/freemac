@@ -134,6 +134,10 @@ static NSBezierPath *corner_path(NSRect r, CGFloat r0, CGFloat r1)
 /* A selection over rows r (in a flipped view): rounded and inset unless
  * the table is full width or plain. top and bottom say whether a
  * neighbouring selected row joins on. */
+/* YES while a table in a HUD panel draws its selection and cells: they draw
+ * light on dark */
+static BOOL drawing_dark;
+
 void ATableDrawSelection(NSRect r, NSTableViewStyle style, NSTableViewSelectionHighlightStyle highlight,
                            BOOL emphasized, BOOL joinsAbove, BOOL joinsBelow)
 {
@@ -141,9 +145,11 @@ void ATableDrawSelection(NSRect r, NSTableViewStyle style, NSTableViewSelectionH
         return;
     NSColor *fill = emphasized ? [NSColor selectedContentBackgroundColor]
                                : [NSColor unemphasizedSelectedContentBackgroundColor];
+    if (drawing_dark && !emphasized)
+        fill = [NSColor colorWithCalibratedWhite:1 alpha:0.18];
     if (style == NSTableViewStyleFullWidth || style == NSTableViewStylePlain) {
         [fill setFill];
-        NSRectFill(r);
+        NSRectFillUsingOperation(r, NSCompositingOperationSourceOver);
         return;
     }
     r = NSInsetRect(r, selection_inset, 0);
@@ -214,13 +220,21 @@ void ATableDrawChevron(NSRect r, BOOL down, NSColor *color, BOOL flipped)
 
 /* ---- cells drawing themselves --------------------------------------------------------- */
 
+/* the usual light backgrounds a cell or table is given, which a HUD panel's
+ * table leaves see-through */
+static BOOL light_background(NSColor *c)
+{
+    return [c isEqual:[NSColor controlBackgroundColor]] || [c isEqual:[NSColor textBackgroundColor]] ||
+           [c isEqual:[NSColor whiteColor]];
+}
+
 static NSColor *cell_text_color(NSCell *cell, NSColor *own)
 {
     if (![cell isEnabled])
-        return [NSColor disabledControlTextColor];
+        return drawing_dark ? ADarkText([NSColor disabledControlTextColor]) : [NSColor disabledControlTextColor];
     if ([cell backgroundStyle] == NSBackgroundStyleEmphasized)
         return [NSColor alternateSelectedControlTextColor];
-    return own ?: [NSColor controlTextColor];
+    return drawing_dark ? ADarkText(own) : own ?: [NSColor controlTextColor];
 }
 
 @implementation NSCell (NSCellDrawing)
@@ -272,7 +286,8 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
 - (NSColor *)_drawingTextColor { return cell_text_color(self, [self textColor]); }
 - (void)drawWithFrame:(NSRect)frame inView:(NSView *)view
 {
-    if ([self drawsBackground] && [self backgroundColor] && [self backgroundStyle] != NSBackgroundStyleEmphasized) {
+    if ([self drawsBackground] && [self backgroundColor] && [self backgroundStyle] != NSBackgroundStyleEmphasized &&
+        !(drawing_dark && light_background([self backgroundColor]))) {
         [[self backgroundColor] setFill];
         NSRectFill(frame);
     }
@@ -3435,18 +3450,23 @@ enum {
 
 - (void)drawBackgroundInClipRect:(NSRect)clip
 {
+    /* in a HUD panel the table is see-through, its stripes faintly light */
+    BOOL dark = AViewIsDark(self);
     NSColor *bg = [self backgroundColor];
-    [bg setFill];
-    NSRectFillUsingOperation(clip, NSCompositingOperationSourceOver);
+    if (!(dark && light_background(bg))) {
+        [bg setFill];
+        NSRectFillUsingOperation(clip, NSCompositingOperationSourceOver);
+    }
     if (!_alternating)
         return;
-    NSArray *colors = [NSColor alternatingContentBackgroundColors];
+    NSArray *colors = dark ? @[ [NSColor clearColor], [NSColor colorWithWhite:1 alpha:0.05] ]
+                           : [NSColor alternatingContentBackgroundColors];
     NSInteger n = [self numberOfRows];
     CGFloat stride = _rowHeight + _spacing.height;
     NSRange rows = [self rowsInRect:clip];
     for (NSUInteger r = rows.location; r < NSMaxRange(rows); r++) {
         [[colors objectAtIndex:r % [colors count]] setFill];
-        NSRectFill(NSIntersectionRect([self rectOfRow:(NSInteger)r], clip));
+        NSRectFillUsingOperation(NSIntersectionRect([self rectOfRow:(NSInteger)r], clip), NSCompositingOperationSourceOver);
     }
     /* stripes carry on below the last row */
     CGFloat y = [self _rowsHeight];
@@ -3454,7 +3474,7 @@ enum {
         if (y + stride < NSMinY(clip))
             continue;
         [[colors objectAtIndex:(NSUInteger)r % [colors count]] setFill];
-        NSRectFill(NSIntersectionRect(NSMakeRect(NSMinX(clip), y, clip.size.width, stride), clip));
+        NSRectFillUsingOperation(NSIntersectionRect(NSMakeRect(NSMinX(clip), y, clip.size.width, stride), clip), NSCompositingOperationSourceOver);
     }
 }
 - (void)drawGridInClipRect:(NSRect)clip
@@ -3562,10 +3582,13 @@ enum {
         [self _updateVisibleViews];
         return;
     }
+    BOOL was = drawing_dark;
+    drawing_dark = AViewIsDark(self);
     [self highlightSelectionInClipRect:dirty];
     NSRange rows = [self rowsInRect:dirty];
     for (NSUInteger r = rows.location; r < NSMaxRange(rows); r++)
         [self drawRow:(NSInteger)r clipRect:dirty];
+    drawing_dark = was;
 }
 - (void)viewDidMoveToWindow
 {

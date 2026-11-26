@@ -95,7 +95,10 @@ static double coder_double(NSCoder *c, NSString *key, double fallback)
 
 /* ---- NSSlider ------------------------------------------------------------------------ */
 
-static const CGFloat knob_size = 20, track_width = 4;
+static const CGFloat track_width = 4;
+/* the knob, as big as the control's size: a small slider (VLC's equalizer
+ * bands, 18 points wide with their ticks) has a smaller one */
+#define knob_size [self _knobSize]
 
 @implementation NSSlider {
     double _min, _max, _alt;
@@ -241,6 +244,11 @@ static const CGFloat knob_size = 20, track_width = 4;
     [_trackFill release];
     _trackFill = [c retain];
     [self setNeedsDisplay:YES];
+}
+- (CGFloat)_knobSize
+{
+    NSControlSize size = [self controlSize];
+    return size == NSControlSizeMini ? 10 : size == NSControlSizeSmall ? 13 : 20;
 }
 - (double)knobThickness { return knob_size; }
 
@@ -408,7 +416,7 @@ static const CGFloat knob_size = 20, track_width = 4;
 
 - (NSSize)intrinsicContentSize
 {
-    CGFloat extra = _ticks > 0 ? 6 : 0;
+    CGFloat extra = _ticks > 0 ? ([self controlSize] == NSControlSizeRegular ? 6 : 4) : 0;
     return [self isVertical] ? NSMakeSize(knob_size + 1 + extra, -1) : NSMakeSize(-1, knob_size + 1 + extra);
 }
 
@@ -421,13 +429,14 @@ static const CGFloat knob_size = 20, track_width = 4;
     BOOL vertical = [self isVertical];
     NSRect track = vertical ? NSMakeRect(a.x - track_width / 2, fmin(a.y, z.y), track_width, fabs(z.y - a.y))
                             : NSMakeRect(a.x, a.y - track_width / 2, z.x - a.x, track_width);
-    AFillRoundedRect(track, track_width / 2, [NSColor colorWithWhite:0 alpha:0.12 * dim], nil);
+    BOOL dark = AViewIsDark(self);   /* in a HUD panel the empty track is light */
+    AFillRoundedRect(track, track_width / 2, [NSColor colorWithWhite:dark ? 1 : 0 alpha:(dark ? 0.22 : 0.12) * dim], nil);
     NSRect filled = vertical ? NSMakeRect(track.origin.x, fmin(a.y, k.y), track_width, fabs(k.y - a.y))
                              : NSMakeRect(a.x, track.origin.y, k.x - a.x, track_width);
     NSColor *fill = _trackFill ?: [NSColor controlAccentColor];
     if (filled.size.width > 0 && filled.size.height > 0)
         AFillRoundedRect(filled, track_width / 2, [fill colorWithAlphaComponent:dim], nil);
-    [[NSColor colorWithWhite:0 alpha:0.35 * dim] setFill];
+    [[NSColor colorWithWhite:dark ? 1 : 0 alpha:0.35 * dim] setFill];
     for (NSInteger i = 0; i < _ticks; i++)
         NSRectFill([self rectOfTickMarkAtIndex:i]);
     NSRect knob = NSMakeRect(k.x - knob_size / 2 + 0.5, k.y - knob_size / 2 + 0.5, knob_size - 1, knob_size - 1);

@@ -2245,7 +2245,14 @@ class DrawerWindow(Gtk.ApplicationWindow):
                 self.notify(f"Couldn't expand “{os.path.basename(path)}”: {error}")
             else:
                 self.refresh()
-                self.notify(f"Expanded into “{os.path.basename(folder)}”.")
+                if os.path.dirname(folder) == os.path.realpath(self.path):
+                    self.select_paths([os.path.join(self.path, os.path.basename(folder))])
+                if macapps.is_bundle(folder):
+                    # a Mac app that came as a .zip (freemac 1.243): it opens from here
+                    self.notify(f"“{macapps.display_name(folder)}” is ready. Open it, or drag it "
+                                "to Applications to keep it in the app grid.")
+                else:
+                    self.notify(f"Expanded into “{os.path.basename(folder)}”.")
 
         self._in_background(lambda: drawer_archive.extract(path), done,
                             f"Expanding “{os.path.basename(path)}”…")

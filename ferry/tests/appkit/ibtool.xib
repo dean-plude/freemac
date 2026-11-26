@@ -234,11 +234,17 @@ DQ
             <point key="canvasLocation" x="100" y="100"/>
         </window>
         <window title="Hidden Panel" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" visibleAtLaunch="NO" animationBehavior="default" id="pnl" customClass="NSPanel">
-            <windowStyleMask key="styleMask" titled="YES" utility="YES"/>
+            <windowStyleMask key="styleMask" titled="YES" utility="YES" HUD="YES"/>
             <rect key="contentRect" x="100" y="100" width="200" height="100"/>
             <view key="contentView" id="pnlcontent">
                 <rect key="frame" x="0.0" y="0.0" width="200" height="100"/>
                 <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <slider id="pnlslider">
+                        <rect key="frame" x="10" y="5" width="18" height="90"/>
+                        <sliderCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="-20" maxValue="20" numberOfTickMarks="9" sliderType="linear" id="pnlslidercell"/>
+                    </slider>
+                </subviews>
             </view>
         </window>
     </objects>

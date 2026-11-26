@@ -858,7 +858,7 @@ static CGFloat hide_button_width(void)
 {
     return [self isRowSelected:row] && [self _isEmphasized] && [self selectionHighlightStyle] != NSTableViewSelectionHighlightStyleNone
                ? [NSColor alternateSelectedControlTextColor]
-               : [NSColor secondaryLabelColor];
+               : AViewIsDark(self) ? ADarkText([NSColor secondaryLabelColor]) : [NSColor secondaryLabelColor];
 }
 - (void)_drawDecorationsForRow:(NSInteger)row
 {
