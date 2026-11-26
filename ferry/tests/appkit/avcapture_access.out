@@ -1,0 +1,11 @@
+at first: microphone 0, camera 0
+camera turned down: microphone 0, camera 2
+microphone: answered, granted 1, on the main thread 0
+after asking: microphone 3, camera 2
+microphone again: answered, granted 1, on the main thread 0
+camera: answered, granted 0, on the main thread 0
+camera with sound: answered, granted 0, on the main thread 0
+text: answered, granted 0, on the main thread 0
+asked:
+asked --kind microphone --app-id APP --name appkit_avcapture_access
+exit=0

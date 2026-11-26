@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 static const CGWindowID other_bit = 0x40000000;    /* as CGServices.m numbers other apps' windows */
 
@@ -62,17 +64,19 @@ static NSString *app_name(void)
     return [[NSProcessInfo processInfo] processName];
 }
 
-static NSString *grants_path(void)
+/* ~/.config/freemac/KIND.json: screen-recording, microphone or camera
+ * (freemac 1.241: AVCaptureDevice asks the last two, in files of their own) */
+static NSString *grants_path(NSString *kind)
 {
     const char *config = getenv("XDG_CONFIG_HOME");
     NSString *base = config && *config ? @(config) : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
-    return [base stringByAppendingPathComponent:@"freemac/screen-recording.json"];
+    return [base stringByAppendingPathComponent:[NSString stringWithFormat:@"freemac/%@.json", kind]];
 }
 
-int ACaptureStoredAnswer(void)
+int ACaptureStoredAnswerOfKind(NSString *kind)
 {
     @autoreleasepool {
-        NSData *d = [NSData dataWithContentsOfFile:grants_path()];
+        NSData *d = [NSData dataWithContentsOfFile:grants_path(kind)];
         id j = d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:NULL] : nil;
         id apps = [j isKindOfClass:[NSDictionary class]] ? j[@"apps"] : nil;
         id entry = [apps isKindOfClass:[NSDictionary class]] ? apps[app_key()] : nil;
@@ -83,41 +87,69 @@ int ACaptureStoredAnswer(void)
     }
 }
 
+int ACaptureStoredAnswer(void) { return ACaptureStoredAnswerOfKind(@"screen-recording"); }
 BOOL ACaptureAllowed(void) { return ACaptureStoredAnswer() == 1; }
 
-void ACaptureAsk(void)
+static const char *asking_for(NSString *kind)
 {
+    if ([kind isEqualToString:@"microphone"])
+        return "use the microphone";
+    if ([kind isEqualToString:@"camera"])
+        return "use the camera";
+    return "record the screen";
+}
+
+void ACaptureAskKind(NSString *kind, BOOL wait)
+{
+    /* one question at a time, each kind once in the program's life: a
+     * second caller waits for the first one's answer and finds it kept */
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    static BOOL asked;
+    static NSMutableSet *asked;
     pthread_mutex_lock(&lock);
-    BOOL again = asked;
-    asked = YES;
-    pthread_mutex_unlock(&lock);
-    if (again || ACaptureStoredAnswer() >= 0)
+    if (!asked)
+        asked = [[NSMutableSet alloc] init];
+    BOOL again = [asked containsObject:kind];
+    [asked addObject:kind];
+    if (again || ACaptureStoredAnswerOfKind(kind) >= 0) {
+        pthread_mutex_unlock(&lock);
         return;
+    }
     @autoreleasepool {
         const char *forced = getenv("FERRY_ACCESS_ASKER");
         const char *wl = getenv("WAYLAND_DISPLAY"), *xd = getenv("DISPLAY");
-        if (!(forced && *forced) && !(wl && *wl) && !(xd && *xd))
-            return;    /* no display to ask on */
-        char *found = forced && *forced ? NULL : g_find_program_in_path("freemac-allow-control");
-        NSString *asker = forced && *forced ? @(forced) : found ? @(found) : nil;
-        if (found)
-            g_free(found);
-        if (!asker) {
-            fflush(stdout);
-            fprintf(stderr, "AppKit (Ferry): can't ask whether %s may record the screen "
-                            "(freemac-allow-control isn't installed)\n", [app_name() UTF8String]);
-            return;
+        char *found = NULL;
+        NSString *asker = nil;
+        if ((forced && *forced) || (wl && *wl) || (xd && *xd)) {    /* else no display to ask on */
+            found = forced && *forced ? NULL : g_find_program_in_path("freemac-allow-control");
+            asker = forced && *forced ? @(forced) : found ? @(found) : nil;
+            if (found)
+                g_free(found);
+            if (!asker) {
+                fflush(stdout);
+                fprintf(stderr, "AppKit (Ferry): can't ask whether %s may %s "
+                                "(freemac-allow-control isn't installed)\n", [app_name() UTF8String], asking_for(kind));
+            }
         }
-        char *argv[] = {(char *)[asker fileSystemRepresentation], "--kind", "screen-recording", "--app-id",
-                        (char *)[app_key() UTF8String], "--name", (char *)[app_name() UTF8String], NULL};
-        GError *error = NULL;
-        g_spawn_async(NULL, argv, NULL, G_SPAWN_STDOUT_TO_DEV_NULL, NULL, NULL, NULL, &error);
-        if (error)
-            g_error_free(error);
+        if (asker) {
+            char *argv[] = {(char *)[asker fileSystemRepresentation], "--kind", (char *)[kind UTF8String], "--app-id",
+                            (char *)[app_key() UTF8String], "--name", (char *)[app_name() UTF8String], NULL};
+            GError *error = NULL;
+            int pid = 0;
+            BOOL ok = g_spawn_async(NULL, argv, NULL, G_SPAWN_STDOUT_TO_DEV_NULL | (wait ? G_SPAWN_DO_NOT_REAP_CHILD : 0),
+                                    NULL, NULL, wait ? &pid : NULL, &error) != 0;
+            if (error)
+                g_error_free(error);
+            if (ok && wait && pid > 0) {
+                int status;
+                while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
+                    ;
+            }
+        }
     }
+    pthread_mutex_unlock(&lock);
 }
+
+void ACaptureAsk(void) { ACaptureAskKind(@"screen-recording", NO); }
 
 bool CGPreflightScreenCaptureAccess(void) { return ACaptureAllowed(); }
 bool CGRequestScreenCaptureAccess(void)

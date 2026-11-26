@@ -88,6 +88,12 @@ run_one() {
         appkit_window*)
             XDG_RUNTIME_DIR="$xdg" WAYLAND_DISPLAY=ferry-test DISPLAY= \
                 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_avcapture_access)
+            # a home of its own, asking with freemac's own freemac-allow-control (answering Allow)
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
+                FERRY_ACCESS_ASKER="$here/appkit/fake_asker.sh" "$top/ferry" "$exe" > "$build/$name.got" \
+                2> "$build/$name.err" ;;
         appkit_bindings|appkit_archiver)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
@@ -844,6 +850,9 @@ run_one appkit_more_controls "$here/appkit/more_controls.m" "$here/appkit/more_c
     -framework Cocoa
 run_one appkit_avaudioplayer "$here/appkit/avaudioplayer.m" "$here/appkit/avaudioplayer.out" -fobjc-arc \
     -framework Cocoa -framework AVFoundation
+# Microphone and camera access (freemac 1.241): the user's say, as OBS asks for it.
+run_one appkit_avcapture_access "$here/appkit/avcapture_access.m" "$here/appkit/avcapture_access.out" -fobjc-arc \
+    -framework Foundation -framework AVFoundation
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 # What Flycut calls as it starts: the Process Manager for itself, remote
