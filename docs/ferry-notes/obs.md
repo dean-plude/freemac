@@ -82,8 +82,12 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
 - The camera sources ("Video Capture Device" and its Legacy one) build
   against Ferry 0.81.0, which lists this system's cameras. Headless, they
   load, list Ferry's test camera (`FERRY_CAMERA_TEST=1`), offer its presets
-  and open it. Not yet seen in OBS's preview. Ferry gives cameras no sound
-  yet, so a camera's own microphone isn't captured.
+  and open it. In OBS itself, "Video Capture Device" shows the test camera
+  in the preview at 1280x720 and records it: a 31 s recording came out as
+  1280x720 H.264 at 30 fps with AAC sound, 8 of 965 frames late (software
+  GL), saved in ~/Videos. The Legacy source hasn't been tried in OBS yet, and
+  no real webcam has. Ferry gives cameras no sound yet, so a camera's own
+  microphone isn't captured.
 - Frame rate on a machine without a GPU driver: with screen capture under
   Mesa's software renderer (llvmpipe, 4 cores) about a quarter to a third of
   the frames are late. A profile while recording put about three quarters of
