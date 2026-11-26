@@ -143,8 +143,9 @@ int main(void)
         printf("check after the default changed: state %ld\n", (long)[check state]);
 
         NSPopUpButton *pop = owner.sizePopUp;
-        printf("pop-up: %ld items, selected \"%s\" tag %ld, pulls down %s\n", (long)[pop numberOfItems],
-               [[pop titleOfSelectedItem] UTF8String], (long)[[pop selectedItem] tag], yesno([pop pullsDown]));
+        printf("pop-up: %ld items, selected \"%s\" tag %ld, pulls down %s, bezel drawn %s\n", (long)[pop numberOfItems],
+               [[pop titleOfSelectedItem] UTF8String], (long)[[pop selectedItem] tag], yesno([pop pullsDown]),
+               yesno([pop isBordered]));
         printf("box: \"%s\" holds %lu views\n", [[owner.box title] UTF8String],
                (unsigned long)[[[owner.box contentView] subviews] count]);
         NSStepper *st = owner.stepper;
