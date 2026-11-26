@@ -2127,6 +2127,8 @@ OBS Studio's mac-capture plugin records displays, windows and apps with ScreenCa
 
 The user is asked once whether an app may record the screen, with freemac's own question (`freemac-allow-control --kind screen-recording`); the answers are kept in `~/.config/freemac/screen-recording.json`. Until then ScreenCaptureKit answers `SCStreamErrorUserDeclined`, the screen's and other apps' pictures are `NULL`, and the window list shows other apps' windows only to an app allowed to control them.
 
+OBS Studio 33 starts and opens its main window (freemac 1.239, Ferry 0.63.0): it had stopped at once because libobs asks for the computer's own Application Support folder (`NSLocalDomainMask`), and Ferry answered only the user's. The local domain is now `/Applications`, `/usr/local/share` and `/var/cache`, and the system domain `/usr/share`.
+
 ## What the apps need most
 
 Counted over the nine apps:

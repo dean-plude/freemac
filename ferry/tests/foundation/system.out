@@ -70,6 +70,9 @@ dict read: {
 documents ~/Documents
 app support ~/.local/share
 caches ~/.cache
+local app support /usr/local/share
+all app support ~/.local/share /usr/local/share /usr/share
+local applications /Applications, system documents 0
 registered 7 light
 set 11 1 recent2 1.5
 stored: {

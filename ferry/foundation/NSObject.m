@@ -1405,8 +1405,7 @@ NSString *NSFullUserName(void)
     return NSUserName();
 }
 
-/* Where a Mac app's folders are on freemac. Only the user domain has folders;
- * the Mac's /Library and /System/Library have no counterpart here. */
+/* Where a Mac app's own folders are on freemac, in the user domain. */
 NSString *FUserFolder(NSSearchPathDirectory dir)
 {
     switch (dir) {
@@ -1425,12 +1424,39 @@ NSString *FUserFolder(NSSearchPathDirectory dir)
     }
 }
 
+/* The computer's own folders, a Mac's local and system domains. freemac puts
+ * apps for everyone in /Applications and their files in /usr/local/share, as
+ * the shell's installer does; the system's own data is /usr/share. A Mac
+ * answers with a folder whether or not it exists (freemac 1.239). */
+static NSString *local_folder(NSSearchPathDirectory dir)
+{
+    switch (dir) {
+    case NSApplicationDirectory: return @"/Applications";
+    case NSLibraryDirectory:
+    case NSApplicationSupportDirectory: return @"/usr/local/share";
+    case NSCachesDirectory: return @"/var/cache";
+    default: return nil;
+    }
+}
+static NSString *system_folder(NSSearchPathDirectory dir)
+{
+    switch (dir) {
+    case NSLibraryDirectory:
+    case NSApplicationSupportDirectory: return @"/usr/share";
+    default: return nil;
+    }
+}
+
 NSArray *NSSearchPathForDirectoriesInDomains(NSSearchPathDirectory dir, NSSearchPathDomainMask mask, BOOL expandTilde)
 {
+    /* in a Mac's order: user, local, network (none here), system */
+    NSMutableArray *a = [NSMutableArray array];
     NSString *p = (mask & NSUserDomainMask) ? FUserFolder(dir) : nil;
-    if (!p)
-        return [NSArray array];
-    if (!expandTilde)
-        p = [p stringByAbbreviatingWithTildeInPath];
-    return [NSArray arrayWithObject:p];
+    if (p)
+        [a addObject:expandTilde ? p : [p stringByAbbreviatingWithTildeInPath]];
+    if ((mask & NSLocalDomainMask) && (p = local_folder(dir)) && ![a containsObject:p])
+        [a addObject:p];
+    if ((mask & NSSystemDomainMask) && (p = system_folder(dir)) && ![a containsObject:p])
+        [a addObject:p];
+    return a;
 }
