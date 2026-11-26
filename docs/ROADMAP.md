@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.254 "Layers keep to their masks" (done)
+
+Ferry 0.77.0: a Mac app's Core Animation layer masks are now drawn. A round profile picture, a faded list edge or a shape cut out with a mask layer showed whole before; now the layer shows only where its mask is opaque, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer, its sublayers and border show only where the mask layer, placed by its frame, is opaque, and as far as it is | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shape layer masks by its path, and the shadow is cast by what the mask leaves | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_masks`, checked pixel by pixel | Ferry | done |
+
 ## 1.253 "Layers cast their shadows" (done)
 
 Ferry 0.76.0: a Mac app's Core Animation layers now draw their shadows. Cards, popovers, buttons and panels that an app gives a soft shadow with `shadowOpacity`, `shadowRadius` and `shadowOffset` showed flat before; now they cast the shadow a Mac draws, from the layer's own shape, or from its `shadowPath`.

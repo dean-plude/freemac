@@ -1,0 +1,6 @@
+masked to its middle: middle red, edge white
+half-opaque mask: pink
+a circle: middle red, corner white
+sublayer and border masked: blue kept blue, blue cut white, border cut white, border kept black
+masked shadow: under the middle black, under the cut-away part white
+exit=0

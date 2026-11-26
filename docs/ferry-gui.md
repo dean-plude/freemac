@@ -1879,8 +1879,9 @@ The new or extended ones:
 - **Core Animation, not done yet** (freemac 1.198, Ferry 0.25.0).
   - Shadows are drawn from freemac 1.253 (Ferry 0.76.0); see "Layer
     shadows" below.
-  - Masks (`mask`) and filters (`filters`, `backgroundFilters`,
-    `compositingFilter`) are kept but not drawn.
+  - Masks are drawn from freemac 1.254 (Ferry 0.77.0); see "Layer masks"
+    below. Filters (`filters`, `backgroundFilters`, `compositingFilter`)
+    are kept but not drawn.
   - CATransition keeps its type, subtype and timing, but nothing is drawn
     for it: the change shows at once.
   - `contentsRect`, `contentsCenter` and `contentsScale` are stored but not
@@ -3229,3 +3230,15 @@ Graphics's blur of twice that), all scaled as the layer is drawn.
 - The layer's `opacity` fades its shadow with it.
 
 `tests/quartzcore/layer_shadows.m` checks each of these pixel by pixel.
+
+## Layer masks (freemac 1.254, Ferry 0.77.0)
+
+A layer with a `mask` now shows only where its mask layer is opaque, and as
+far as it is: a mask that is half opaque shows the layer at half strength, and
+the mask's colours don't count. The mask is placed in the layer's own space by
+its frame and drawn as any layer is, so a shape layer masks by its path (a
+round avatar, a faded edge) and a mask's sublayers count too. Everything the
+layer draws is masked together: its background, contents, sublayers and
+border. The layer's shadow is cast by what the mask leaves, as on a Mac. The
+test `quartzcore_layer_masks` checks this pixel by pixel.
+
