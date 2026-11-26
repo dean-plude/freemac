@@ -128,24 +128,39 @@ typedef struct CGImage *CGImageRef;
 typedef struct CGGradient *CGGradientRef;
 typedef void (*CGDataProviderReleaseDataCallback)(void *info, const void *data, size_t size);
 
-typedef enum {
+typedef CF_ENUM(uint32_t, CGImageAlphaInfo) {
     kCGImageAlphaNone, kCGImageAlphaPremultipliedLast, kCGImageAlphaPremultipliedFirst, kCGImageAlphaLast,
     kCGImageAlphaFirst, kCGImageAlphaNoneSkipLast, kCGImageAlphaNoneSkipFirst, kCGImageAlphaOnly,
-} CGImageAlphaInfo;
-typedef enum {
+};
+typedef CF_ENUM(uint32_t, CGImageByteOrderInfo) {
+    kCGImageByteOrderMask = 0x7000,
+    kCGImageByteOrderDefault = (0 << 12),
+    kCGImageByteOrder16Little = (1 << 12),
+    kCGImageByteOrder32Little = (2 << 12),
+    kCGImageByteOrder16Big = (3 << 12),
+    kCGImageByteOrder32Big = (4 << 12),
+};
+typedef CF_ENUM(uint32_t, CGImagePixelFormatInfo) {
+    kCGImagePixelFormatMask = 0xF0000,
+    kCGImagePixelFormatPacked = (0 << 16),
+    kCGImagePixelFormatRGB555 = (1 << 16),
+    kCGImagePixelFormatRGB565 = (2 << 16),
+    kCGImagePixelFormatRGB101010 = (3 << 16),
+    kCGImagePixelFormatRGBCIF10 = (4 << 16),
+};
+typedef CF_OPTIONS(uint32_t, CGBitmapInfo) {
     kCGBitmapAlphaInfoMask = 0x1F,
     kCGBitmapFloatInfoMask = 0xF00,
     kCGBitmapFloatComponents = (1 << 8),
-    kCGBitmapByteOrderMask = 0x7000,
-    kCGBitmapByteOrderDefault = (0 << 12),
-    kCGBitmapByteOrder16Little = (1 << 12),
-    kCGBitmapByteOrder32Little = (2 << 12),
-    kCGBitmapByteOrder16Big = (3 << 12),
-    kCGBitmapByteOrder32Big = (4 << 12),
-} CGBitmapInfo;
+    kCGBitmapByteOrderMask = kCGImageByteOrderMask,
+    kCGBitmapByteOrderDefault = kCGImageByteOrderDefault,
+    kCGBitmapByteOrder16Little = kCGImageByteOrder16Little,
+    kCGBitmapByteOrder32Little = kCGImageByteOrder32Little,
+    kCGBitmapByteOrder16Big = kCGImageByteOrder16Big,
+    kCGBitmapByteOrder32Big = kCGImageByteOrder32Big,
+};
 #define kCGBitmapByteOrder32Host kCGBitmapByteOrder32Little
 #define kCGBitmapByteOrder16Host kCGBitmapByteOrder16Little
-typedef uint32_t CGImageByteOrderInfo;
 
 CGDataProviderRef CGDataProviderCreateWithData(void *info, const void *data, size_t size,
                                                CGDataProviderReleaseDataCallback releaseData);
@@ -155,6 +170,30 @@ CGDataProviderRef CGDataProviderCreateWithURL(CFURLRef url);
 CGDataProviderRef CGDataProviderRetain(CGDataProviderRef provider);
 void CGDataProviderRelease(CGDataProviderRef provider);
 CFDataRef CGDataProviderCopyData(CGDataProviderRef provider);
+/* An ICC profile's space: Ferry draws RGB data in sRGB (grey and CMYK in its
+ * own spaces), and a space has no profile to give back. */
+CGColorSpaceRef CGColorSpaceCreateWithICCData(CFTypeRef data);
+CGColorSpaceRef CGColorSpaceCreateICCBased(size_t nComponents, const CGFloat *range, CGDataProviderRef profile,
+                                           CGColorSpaceRef alternate);
+CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef space);
+/* A space as a property list, to keep or send: its name when it has one,
+ * otherwise its ICC profile; and back again. */
+CFPropertyListRef CGColorSpaceCopyPropertyList(CGColorSpaceRef space);
+CGColorSpaceRef CGColorSpaceCreateWithPropertyList(CFPropertyListRef plist);
+
+/* ---- fonts as Core Graphics sees them (a font file's data, or a Core Text font's) ---- */
+
+typedef struct CGFont *CGFontRef;
+CGFontRef CGFontCreateWithDataProvider(CGDataProviderRef provider);
+CGFontRef CGFontCreateWithFontName(CFStringRef name);
+CGFontRef CGFontRetain(CGFontRef font);
+void CGFontRelease(CGFontRef font);
+CFStringRef CGFontCopyFullName(CGFontRef font);
+CFStringRef CGFontCopyPostScriptName(CGFontRef font);
+int CGFontGetUnitsPerEm(CGFontRef font);
+size_t CGFontGetNumberOfGlyphs(CGFontRef font);
+CFDataRef CGFontCopyTableForTag(CGFontRef font, uint32_t tag);
+CFTypeID CGFontGetTypeID(void);
 
 CGImageRef CGImageCreate(size_t width, size_t height, size_t bitsPerComponent, size_t bitsPerPixel,
                          size_t bytesPerRow, CGColorSpaceRef space, CGBitmapInfo bitmapInfo,
@@ -166,6 +205,7 @@ CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGF
                                              CGColorRenderingIntent intent);
 CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect);
 CGImageRef CGImageCreateCopy(CGImageRef image);
+CGImageRef CGImageCreateCopyWithColorSpace(CGImageRef image, CGColorSpaceRef space);
 CGImageRef CGImageRetain(CGImageRef image);
 void CGImageRelease(CGImageRef image);
 size_t CGImageGetWidth(CGImageRef image);

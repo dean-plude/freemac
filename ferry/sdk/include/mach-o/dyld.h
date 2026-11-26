@@ -4,6 +4,7 @@
 #ifndef _MACH_O_DYLD_H_
 #define _MACH_O_DYLD_H_
 #include <_ferry.h>
+#include <mach-o/loader.h> /* as on a Mac: the images dyld names begin with these */
 __FERRY_BEGIN
 struct mach_header;
 uint32_t _dyld_image_count(void);

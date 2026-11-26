@@ -22,8 +22,10 @@ cat << 'EOF'
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 EOF
-for dir in AVFoundation AppKit ApplicationServices AudioToolbox AudioUnit CFNetwork Carbon Cocoa CommonCrypto CoreData CoreFoundation \
-           CoreGraphics CoreImage CloudKit CoreAudio CoreAudioTypes CoreServices CoreText EventKit Foundation HIServices IOKit ImageIO JavaScriptCore Quartz QuartzCore QuickLook \
+for dir in Accelerate AppKit ApplicationServices AudioToolbox AudioUnit AVFoundation Carbon CFNetwork CloudKit \
+           Cocoa CommonCrypto CoreAudio CoreAudioTypes CoreData CoreFoundation CoreGraphics CoreImage CoreServices \
+           CoreText DiskArbitration EventKit Foundation HIServices ImageIO IOKit IOSurface JavaScriptCore Metal \
+           MetalKit Network Quartz QuartzCore QuickLook \
            ScriptingBridge Security \
            ServiceManagement SystemConfiguration UniformTypeIdentifiers UserNotifications WebKit; do
     [ -d "$inc/$dir" ] || continue
@@ -31,6 +33,7 @@ for dir in AVFoundation AppKit ApplicationServices AudioToolbox AudioUnit CFNetw
         HIServices) link=ApplicationServices ;;
         AudioToolbox|AudioUnit|CoreAudioTypes) link=CoreAudio ;;
         CommonCrypto) link= ;;
+        MetalKit) link=Metal ;;
         *) link=$dir ;;
     esac
     echo

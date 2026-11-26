@@ -1,0 +1,7 @@
+uuid v4, upper 1, lower 1, different 1
+parse back 1, bad text -1, copy 1, cleared null 1, null 0
+thread times 0 (4), basic 0 (10, 40 bytes), cpu time used 1, resident 1
+page 4096 (mask fff, shift 12), vm info 0, free memory 1
+simd markers 1
+C locale: point ".", separator "", frac digits 127, int signs 127 127
+exit=0

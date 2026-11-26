@@ -42,13 +42,17 @@ const char *const ferry_passthrough[] = {
     "setgid", "seteuid", "setegid", "getpgrp", "setpgid", "setsid", "getsid", "getlogin",
     "fork", "execv", "execvp", "execve", "execl", "execlp", "alarm", "pause", "sleep",
     "usleep", "nanosleep", "getgroups", "umask", "nice",
+    /* freemac 1.232, Ferry 0.56.0: priorities, and the group database, whose record
+     * is laid out the same on both */
+    "getpriority", "shmget", "shmat", "shmdt", "semget", "semop", "ftok", "backtrace", "backtrace_symbols", "backtrace_symbols_fd", "setpriority", "getgrgid", "getgrnam", "getgrgid_r", "getgrnam_r",
+    "getgrent", "setgrent", "endgrent", "getgrouplist", "initgroups",
     /* files */
     "read", "write", "pread", "pwrite", "readv", "writev", "close", "lseek", "dup", "dup2",
     "pipe", "fsync", "fdatasync", "ftruncate", "truncate", "unlink", "rmdir", "mkdir",
     "chdir", "fchdir", "getcwd", "chmod", "fchmod", "chown", "lchown",
     "link", "symlink", "readlink", "isatty", "ttyname", "mkstemp", "mkstemps", "mkdtemp",
     "mktemp", "select", "poll", "gethostname", "getpagesize",
-    "getdtablesize", "flock",
+    "getdtablesize", "flock", "times",
     /* folders' changes, for FSEvents (foundation/FSEvents.m) */
     "inotify_init1", "inotify_add_watch", "inotify_rm_watch",
     /* memory maps (mmap itself is converted) */

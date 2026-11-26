@@ -21,6 +21,7 @@
 /src/jsc_names.h
 /sdk/usr/
 /swift/build/
+/media/build/
 /eventkit/build/
 /coreaudio/build/
 /iosurface/build/

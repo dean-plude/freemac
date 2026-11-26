@@ -28,6 +28,14 @@
 /* Calls whose Intel symbol carries the 64-bit-inode variant suffix. */
 #define __FERRY_INODE64(name) __asm("_" #name "$INODE64")
 typedef uint32_t __uint32_t;
+/* the rest of a Mac's <sys/_types.h> fixed-width names (freemac 1.232) */
+typedef int8_t __int8_t;
+typedef uint8_t __uint8_t;
+typedef int16_t __int16_t;
+typedef uint16_t __uint16_t;
+typedef int32_t __int32_t;
+typedef int64_t __int64_t;
+typedef uint64_t __uint64_t;
 typedef long ssize_t;
 typedef int64_t off_t;
 typedef uint16_t mode_t;

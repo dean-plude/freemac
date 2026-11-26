@@ -64,7 +64,7 @@ enum { kFSEventStreamEventIdSinceNow = 0xFFFFFFFFFFFFFFFFULL };
 typedef struct __FSEventStream *FSEventStreamRef;
 typedef const struct __FSEventStream *ConstFSEventStreamRef;
 
-typedef struct {
+typedef struct FSEventStreamContext {
     CFIndex version;
     void *info;
     const void *(*retain)(const void *info);

@@ -5,6 +5,17 @@
 #ifndef _FERRY_MACTYPES_H_
 #define _FERRY_MACTYPES_H_
 #include <stdint.h>
+/* nil, as a Mac's MacTypes.h gives it to C and C++ too: the same null as
+ * <objc/objc.h>'s (freemac 1.232) */
+#ifndef nil
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define nil nullptr
+#elif defined(__cplusplus)
+#define nil __null
+#else
+#define nil ((void *)0)
+#endif
+#endif
 typedef uint8_t UInt8;
 typedef int8_t SInt8;
 typedef uint16_t UInt16;
@@ -24,7 +35,10 @@ typedef uint32_t FourCharCode;
 typedef uint32_t OSType;
 typedef uint32_t ResType;
 /* no error, as every Carbon-era call and Core Audio answers (freemac 1.234) */
+#ifndef _FERRY_NOERR_
+#define _FERRY_NOERR_
 enum { noErr = 0 };
+#endif
 typedef uint16_t UniChar;
 typedef uint8_t UTF8Char;
 typedef uint16_t UTF16Char;

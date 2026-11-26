@@ -16,17 +16,10 @@
 
 GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size);
 
-const CFStringRef kCTFontNameAttribute = (CFStringRef)@"NSFontNameAttribute";
-const CFStringRef kCTFontDisplayNameAttribute = (CFStringRef)@"NSFontVisibleNameAttribute";
-const CFStringRef kCTFontFamilyNameAttribute = (CFStringRef)@"NSFontFamilyAttribute";
-const CFStringRef kCTFontStyleNameAttribute = (CFStringRef)@"NSFontFaceAttribute";
-const CFStringRef kCTFontSizeAttribute = (CFStringRef)@"NSFontSizeAttribute";
-const CFStringRef kCTFontTraitsAttribute = (CFStringRef)@"NSCTFontTraitsAttribute";
-const CFStringRef kCTFontURLAttribute = (CFStringRef)@"NSCTFontFileURLAttribute";
-const CFStringRef kCTFontSymbolicTrait = (CFStringRef)@"NSCTFontSymbolicTrait";
-const CFStringRef kCTFontWeightTrait = (CFStringRef)@"NSCTFontWeightTrait";
-const CFStringRef kCTFontWidthTrait = (CFStringRef)@"NSCTFontProportionTrait";
-const CFStringRef kCTFontSlantTrait = (CFStringRef)@"NSCTFontSlantTrait";
+/* The attribute keys, the descriptor class and the calls that make and read
+ * descriptors are in CTFontDescriptor.m; these two come from there. */
+CTFontDescriptorRef GFontDescriptorMake(NSDictionary *attributes);
+NSDictionary *GFontDescriptorAttributes(CTFontDescriptorRef descriptor);
 
 /* ---- the installed faces ------------------------------------------------------------ */
 
@@ -155,31 +148,7 @@ static GFace *face_named(NSString *name)
 
 /* ---- descriptors --------------------------------------------------------------------- */
 
-@interface GFontDescriptor : NSObject {
-@public
-    NSDictionary *attributes;
-}
-@end
-@implementation GFontDescriptor
-- (void)dealloc
-{
-    [attributes release];
-    [super dealloc];
-}
-- (BOOL)isEqual:(id)other
-{
-    return other == self || ([other isKindOfClass:[GFontDescriptor class]] &&
-                             [attributes isEqual:((GFontDescriptor *)other)->attributes]);
-}
-- (NSUInteger)hash { return [attributes hash]; }
-@end
-
-static CTFontDescriptorRef descriptor(NSDictionary *attributes)
-{
-    GFontDescriptor *d = [[GFontDescriptor alloc] init];
-    d->attributes = [attributes copy] ?: [[NSDictionary alloc] init];
-    return (CTFontDescriptorRef)d;
-}
+static CTFontDescriptorRef descriptor(NSDictionary *attributes) { return GFontDescriptorMake(attributes); }
 
 static NSDictionary *face_attributes(GFace *f)
 {
@@ -198,33 +167,13 @@ static NSDictionary *face_attributes(GFace *f)
     };
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateWithAttributes(CFDictionaryRef attributes)
+/* What a descriptor that names an installed font answers for an attribute it
+ * doesn't hold (its file's URL, its traits...): CTFontDescriptorCopyAttribute
+ * asks this. */
+id GFontInstalledFaceAttribute(NSDictionary *attributes, NSString *attribute)
 {
-    return descriptor((NSDictionary *)attributes);
-}
-
-CTFontDescriptorRef CTFontDescriptorCreateWithNameAndSize(CFStringRef name, CGFloat size)
-{
-    NSMutableDictionary *d = [NSMutableDictionary dictionaryWithObject:(id)name forKey:(id)kCTFontNameAttribute];
-    if (size > 0)
-        d[(id)kCTFontSizeAttribute] = @(size);
-    return descriptor(d);
-}
-
-CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef desc)
-{
-    return (CFDictionaryRef)[((GFontDescriptor *)desc)->attributes copy];
-}
-
-CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef desc, CFStringRef attribute)
-{
-    NSDictionary *a = ((GFontDescriptor *)desc)->attributes;
-    id value = a[(id)attribute];
-    if (!value) {
-        GFace *f = face_named(a[(id)kCTFontNameAttribute]);
-        value = f ? face_attributes(f)[(id)attribute] : nil;
-    }
-    return (CFTypeRef)[value retain];
+    GFace *f = face_named(attributes[(id)kCTFontNameAttribute]);
+    return f ? face_attributes(f)[attribute] : nil;
 }
 
 /* ---- collections --------------------------------------------------------------------- */
@@ -278,7 +227,8 @@ CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef col
     NSMutableArray *out = [[NSMutableArray alloc] init];
     for (GFace *f in installed_faces())
         for (id q in queries)
-            if ([q isKindOfClass:[GFontDescriptor class]] && face_matches(f, ((GFontDescriptor *)q)->attributes)) {
+            if (GFontDescriptorAttributes((CTFontDescriptorRef)q) &&
+                face_matches(f, GFontDescriptorAttributes((CTFontDescriptorRef)q))) {
                 CTFontDescriptorRef d = descriptor(face_attributes(f));
                 [out addObject:(id)d];
                 CFRelease(d);

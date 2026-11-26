@@ -674,6 +674,66 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
     return YES;
 }
 
+/* Ferry has no table of zones' names in each language, so it names them as
+ * Unicode's rules do when a language has no name of its own: the short
+ * styles give the zone's abbreviation, the long standard and daylight
+ * styles its offset ("GMT+01:00"), and the generic style its place ("Paris
+ * Time"). The locale doesn't change these. */
+@implementation NSTimeZone (NSTimeZoneNames)
+
+/* a moment in standard time (dst NO) or daylight saving time (YES), near now */
+- (NSDate *)_ferryDateInDaylight:(BOOL)dst
+{
+    NSDate *d = [NSDate date];
+    for (int i = 0; i < 3; i++) {
+        if ([self isDaylightSavingTimeForDate:d] == dst)
+            return d;
+        NSDate *next = [self nextDaylightSavingTimeTransitionAfterDate:d];
+        if (!next)
+            break;
+        d = [next dateByAddingTimeInterval:3600];
+    }
+    return nil;
+}
+
+static NSString *gmt_offset(NSInteger secs)
+{
+    if (secs == 0)
+        return @"GMT";
+    NSInteger a = secs < 0 ? -secs : secs;
+    return [NSString stringWithFormat:@"GMT%c%02ld:%02ld", secs < 0 ? '-' : '+', (long)(a / 3600), (long)(a / 60 % 60)];
+}
+
+- (NSString *)localizedName:(NSTimeZoneNameStyle)style locale:(NSLocale *)locale
+{
+    (void)locale;
+    BOOL daylight = style == NSTimeZoneNameStyleDaylightSaving || style == NSTimeZoneNameStyleShortDaylightSaving;
+    NSDate *at = style == NSTimeZoneNameStyleGeneric || style == NSTimeZoneNameStyleShortGeneric
+                     ? [NSDate date]
+                     : [self _ferryDateInDaylight:daylight];
+    if (!at)
+        return daylight ? nil : [self localizedName:NSTimeZoneNameStyleShortGeneric locale:locale];
+    switch (style) {
+    case NSTimeZoneNameStyleShortStandard:
+    case NSTimeZoneNameStyleShortDaylightSaving:
+    case NSTimeZoneNameStyleShortGeneric: return [self abbreviationForDate:at];
+    case NSTimeZoneNameStyleStandard:
+    case NSTimeZoneNameStyleDaylightSaving: return gmt_offset([self secondsFromGMTForDate:at]);
+    case NSTimeZoneNameStyleGeneric: {
+        NSString *name = self.name;
+        NSRange slash = [name rangeOfString:@"/" options:NSBackwardsSearch];
+        if (slash.location == NSNotFound)
+            return gmt_offset([self secondsFromGMTForDate:at]);
+        NSString *place = [[name substringFromIndex:slash.location + 1] stringByReplacingOccurrencesOfString:@"_"
+                                                                                                   withString:@" "];
+        return [place stringByAppendingString:@" Time"];
+    }
+    }
+    return nil;
+}
+
+@end
+
 @implementation NSLocale {
     NSString *_id;
     NSDictionary *_parts;
@@ -801,6 +861,17 @@ static BOOL all_in(NSString *s, BOOL upper, NSUInteger min, NSUInteger max)
         return [self currencyCode];
     if ([key isEqualToString:NSLocaleCurrencySymbol])
         return [self currencySymbol];
+    /* freemac 1.232, Ferry 0.56.0: what Qt's QLocale asks of a Mac's locale */
+    if ([key isEqualToString:@"locale:quotation begin"])
+        return @"\u201C";
+    if ([key isEqualToString:@"locale:quotation end"])
+        return @"\u201D";
+    if ([key isEqualToString:@"locale:alternate quotation begin"])
+        return @"\u2018";
+    if ([key isEqualToString:@"locale:alternate quotation end"])
+        return @"\u2019";
+    if ([key isEqualToString:@"locale:measurement system"])
+        return [self usesMetricSystem] ? @"Metric" : @"U.S.";
     if ([key isEqualToString:NSLocaleCalendar]) {
         NSCalendar *c = [NSCalendar calendarWithIdentifier:[self calendarIdentifier]];
         [c setLocale:self];

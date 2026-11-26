@@ -105,7 +105,42 @@ static locale_t mac_uselocale(locale_t loc)
 static int mac_mb_cur_max(void) { return (int)MB_CUR_MAX; }
 static int mac_mb_cur_max_l(locale_t loc) { UNDER(loc, (int)MB_CUR_MAX); }
 
-static struct lconv *mac_localeconv_l(locale_t loc) { UNDER(loc, localeconv()); }
+/* A Mac's struct lconv: the same as this system's but for the order of
+ * the last four international money fields, kept per thread as
+ * localeconv's answer is. */
+struct mac_lconv {
+    char *strings[10];
+    char int_frac_digits, frac_digits, p_cs_precedes, p_sep_by_space, n_cs_precedes, n_sep_by_space, p_sign_posn,
+        n_sign_posn, int_p_cs_precedes, int_n_cs_precedes, int_p_sep_by_space, int_n_sep_by_space, int_p_sign_posn,
+        int_n_sign_posn;
+};
+static __thread struct mac_lconv mac_lconv_answer;
+
+static struct mac_lconv *mac_lconv_of(const struct lconv *l)
+{
+    struct mac_lconv *m = &mac_lconv_answer;
+    char *strings[10] = {l->decimal_point,     l->thousands_sep,     l->grouping,     l->int_curr_symbol,
+                         l->currency_symbol,   l->mon_decimal_point, l->mon_thousands_sep, l->mon_grouping,
+                         l->positive_sign,     l->negative_sign};
+    memcpy(m->strings, strings, sizeof strings);
+    m->int_frac_digits = l->int_frac_digits;
+    m->frac_digits = l->frac_digits;
+    m->p_cs_precedes = l->p_cs_precedes;
+    m->p_sep_by_space = l->p_sep_by_space;
+    m->n_cs_precedes = l->n_cs_precedes;
+    m->n_sep_by_space = l->n_sep_by_space;
+    m->p_sign_posn = l->p_sign_posn;
+    m->n_sign_posn = l->n_sign_posn;
+    m->int_p_cs_precedes = l->int_p_cs_precedes;
+    m->int_n_cs_precedes = l->int_n_cs_precedes;
+    m->int_p_sep_by_space = l->int_p_sep_by_space;
+    m->int_n_sep_by_space = l->int_n_sep_by_space;
+    m->int_p_sign_posn = l->int_p_sign_posn;
+    m->int_n_sign_posn = l->int_n_sign_posn;
+    return m;
+}
+static struct mac_lconv *mac_localeconv(void) { return mac_lconv_of(localeconv()); }
+static struct mac_lconv *mac_localeconv_l(locale_t loc) { UNDER(loc, mac_lconv_of(localeconv())); }
 
 static const char *mac_querylocale(int mask, locale_t loc)
 {
@@ -288,7 +323,61 @@ extern void __cxa_finalize(void *dso);
 #define SAME(name) {#name, (void *)name}
 #define MAC(name) {#name, (void *)mac_##name}
 
+
+/* ---- nl_langinfo: a Mac's item numbers ------------------------------------------- */
+
+static nl_item langinfo_to_linux(int mac)
+{
+    static const nl_item first[] = {CODESET, D_T_FMT, D_FMT, T_FMT, T_FMT_AMPM, AM_STR, PM_STR};
+    if (mac >= 0 && mac <= 6)
+        return first[mac];
+    if (mac >= 7 && mac <= 13)
+        return DAY_1 + (mac - 7);
+    if (mac >= 14 && mac <= 20)
+        return ABDAY_1 + (mac - 14);
+    if (mac >= 21 && mac <= 32)
+        return MON_1 + (mac - 21);
+    if (mac >= 33 && mac <= 44)
+        return ABMON_1 + (mac - 33);
+    static const nl_item rest[] = {ERA,     ERA_D_FMT, ERA_D_T_FMT, ERA_T_FMT, ALT_DIGITS, RADIXCHAR,
+                                   THOUSEP, YESEXPR,   NOEXPR,      YESSTR,    NOSTR,      CRNCYSTR};
+    if (mac >= 45 && mac <= 56)
+        return rest[mac - 45];
+    return -1;
+}
+
+/* D_MD_ORDER, a Mac's own: "md" where the day follows the month in D_FMT. */
+static char *item_under(nl_item n, locale_t l)
+{
+    return l == LC_GLOBAL_LOCALE ? nl_langinfo(n) : nl_langinfo_l(n, l);
+}
+
+static char *md_order(locale_t l)
+{
+    const char *f = item_under(D_FMT, l);
+    const char *m = strpbrk(f, "mbB"), *d = strpbrk(f, "de");
+    return (char *)(d && m && d < m ? "dm" : "md");
+}
+
+static char *mac_nl_langinfo_l(int item, locale_t loc)
+{
+    /* the thread's own locale, which may be the global one */
+    locale_t l = loc == LC_GLOBAL_LOCALE ? uselocale((locale_t)0) : to_linux(loc);
+    if (item == 57)
+        return md_order(l);
+    nl_item n = langinfo_to_linux(item);
+    if (n == -1)
+        return (char *)"";
+    char *v = item_under(n, l);
+    /* a Mac names plain ASCII "US-ASCII" */
+    return n == CODESET && !strcmp(v, "ANSI_X3.4-1968") ? (char *)"US-ASCII" : v;
+}
+
+static char *mac_nl_langinfo(int item) { return mac_nl_langinfo_l(item, LC_GLOBAL_LOCALE); }
+
 const struct ferry_symbol ferry_wchar_symbols[] = {
+    {"nl_langinfo", mac_nl_langinfo},
+    {"nl_langinfo_l", mac_nl_langinfo_l},
     /* wide strings: the same calls */
     SAME(wcslen), SAME(wcsnlen), SAME(wcscpy), SAME(wcsncpy), SAME(wcscat), SAME(wcsncat), SAME(wcscmp),
     SAME(wcsncmp), SAME(wcscoll), SAME(wcsxfrm), SAME(wcschr), SAME(wcsrchr), SAME(wcsstr), SAME(wcsspn),
@@ -307,7 +396,7 @@ const struct ferry_symbol ferry_wchar_symbols[] = {
     SAME(towlower), SAME(towupper), MAC(wctype), MAC(iswctype), MAC(wctrans), MAC(towctrans),
     /* locales */
     MAC(newlocale), MAC(duplocale), MAC(freelocale), MAC(uselocale), MAC(querylocale), MAC(localeconv_l),
-    SAME(localeconv), {"___mb_cur_max", (void *)mac_mb_cur_max}, {"___mb_cur_max_l", (void *)mac_mb_cur_max_l},
+    MAC(localeconv), {"___mb_cur_max", (void *)mac_mb_cur_max}, {"___mb_cur_max_l", (void *)mac_mb_cur_max_l},
     MAC(isalnum_l), MAC(isalpha_l), MAC(isblank_l), MAC(iscntrl_l), MAC(isdigit_l), MAC(isgraph_l),
     MAC(islower_l), MAC(isprint_l), MAC(ispunct_l), MAC(isspace_l), MAC(isupper_l), MAC(isxdigit_l),
     MAC(tolower_l), MAC(toupper_l),

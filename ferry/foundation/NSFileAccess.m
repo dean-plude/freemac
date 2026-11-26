@@ -13,6 +13,7 @@
  * calling thread: only the presenters of this program are told of a change,
  * since nothing else here coordinates. */
 #import "FInternal.h"
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <pwd.h>
@@ -63,6 +64,11 @@ NSString *const NSURLLocalizedTypeDescriptionKey = @"NSURLLocalizedTypeDescripti
 NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
 NSString *const NSURLVolumeIdentifierKey = @"NSURLVolumeIdentifierKey";
+NSString *const NSURLVolumeTotalCapacityKey = @"NSURLVolumeTotalCapacityKey";
+NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacityKey";
+NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
+NSString *const NSURLVolumeAvailableCapacityForOpportunisticUsageKey =
+    @"NSURLVolumeAvailableCapacityForOpportunisticUsageKey";
 NSString *const NSURLFileResourceTypeKey = @"NSURLFileResourceTypeKey";
 NSString *const NSURLFileResourceTypeNamedPipe = @"NSURLFileResourceTypeNamedPipe";
 NSString *const NSURLFileResourceTypeCharacterSpecial = @"NSURLFileResourceTypeCharacterSpecial";
@@ -561,6 +567,19 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
         v = [NSNumber numberWithUnsignedLong:(unsigned long)st.st_nlink];
     else if (IS(NSURLVolumeIdentifierKey))
         v = [NSNumber numberWithUnsignedLongLong:(unsigned long long)st.st_dev];
+    else if (IS(NSURLVolumeTotalCapacityKey) || IS(NSURLVolumeAvailableCapacityKey) ||
+             IS(NSURLVolumeAvailableCapacityForImportantUsageKey) ||
+             IS(NSURLVolumeAvailableCapacityForOpportunisticUsageKey)) {
+        struct statfs fs;
+        if (statfs([path fileSystemRepresentation], &fs) == 0) {
+            unsigned long long block = fs.f_bsize ? fs.f_bsize : 512;
+            unsigned long long n = IS(NSURLVolumeTotalCapacityKey) ? fs.f_blocks : fs.f_bavail;
+            /* the important- and opportunistic-use figures are signed on a Mac */
+            v = IS(NSURLVolumeTotalCapacityKey) || IS(NSURLVolumeAvailableCapacityKey)
+                    ? [NSNumber numberWithUnsignedLongLong:n * block]
+                    : [NSNumber numberWithLongLong:(long long)(n * block)];
+        }
+    }
     else if (IS(NSURLFileResourceIdentifierKey))
         v = [NSString stringWithFormat:@"%llu:%llu", (unsigned long long)st.st_dev, (unsigned long long)st.st_ino];
     else if (IS(NSURLFileResourceTypeKey))

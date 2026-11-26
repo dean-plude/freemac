@@ -20,6 +20,16 @@
 #include <objc/NSObjCRuntime.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CGGeometry.h>
+/* In C++ every Foundation call has C linkage, as a Mac's FOUNDATION_EXPORT
+ * gives it; the C headers the parts below bring in come first, outside it. */
+#ifdef __cplusplus
+#include <inttypes.h>
+#include <limits.h>
+#include <sys/types.h>
+#include <uuid/uuid.h>
+#include <mach/message.h>
+#endif
+__FERRY_BEGIN
 
 #ifndef NS_FORMAT_FUNCTION
 #define NS_FORMAT_FUNCTION(F, A) __attribute__((format(__NSString__, F, A)))
@@ -29,8 +39,12 @@
  * as a Swift enum and NS_OPTIONS as an option set (freemac 1.227). */
 #define NS_ENUM(type, name) enum __attribute__((enum_extensibility(open))) name : type name; \
     enum __attribute__((enum_extensibility(open))) name : type
+#ifdef __cplusplus /* the plain number type in C++, as on a Mac */
+#define NS_OPTIONS(type, name) type name; enum __attribute__((flag_enum, enum_extensibility(open))) : name
+#else
 #define NS_OPTIONS(type, name) enum __attribute__((flag_enum, enum_extensibility(open))) name : type name; \
     enum __attribute__((flag_enum, enum_extensibility(open))) name : type
+#endif
 #define NS_ASSUME_NONNULL_BEGIN _Pragma("clang assume_nonnull begin")
 #define NS_ASSUME_NONNULL_END _Pragma("clang assume_nonnull end")
 #define NS_SWIFT_NAME(x)
@@ -1230,6 +1244,19 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 - (NSDate *)nextDaylightSavingTimeTransitionAfterDate:(NSDate *)date;
 - (BOOL)isEqualToTimeZone:(NSTimeZone *)other;
 @end
+/* a zone's name for people (freemac 1.232, Ferry 0.56.0) */
+typedef NS_ENUM(NSInteger, NSTimeZoneNameStyle) {
+    NSTimeZoneNameStyleStandard,
+    NSTimeZoneNameStyleShortStandard,
+    NSTimeZoneNameStyleDaylightSaving,
+    NSTimeZoneNameStyleShortDaylightSaving,
+    NSTimeZoneNameStyleGeneric,
+    NSTimeZoneNameStyleShortGeneric,
+};
+@class NSLocale;
+@interface NSTimeZone (NSTimeZoneNames)
+- (NSString *)localizedName:(NSTimeZoneNameStyle)style locale:(NSLocale *)locale;
+@end
 FOUNDATION_EXPORT NSString *const NSSystemTimeZoneDidChangeNotification;
 
 typedef NSString *NSLocaleKey;
@@ -2252,6 +2279,10 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
     NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
 /* freemac 1.224: the volume an item is on (its device number) */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
+/* a volume's size and free space, in bytes (freemac OBS work); the free
+ * space is the same for important and opportunistic use */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,
+    NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeAvailableCapacityForOpportunisticUsageKey;
 FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFileResourceTypeCharacterSpecial,
     *const NSURLFileResourceTypeDirectory, *const NSURLFileResourceTypeBlockSpecial,
     *const NSURLFileResourceTypeRegular, *const NSURLFileResourceTypeSymbolicLink,
@@ -3052,5 +3083,8 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/NSDateIntervalFormatter.h>
 /* What VLC's Mac interface calls besides (freemac 1.233, Ferry 0.57.0). */
 #include <Foundation/FoundationVLC.h>
+/* Handoff's user activities, which Qt's Mac plugin answers to. */
+#include <Foundation/NSUserActivity.h>
 
+__FERRY_END
 #endif

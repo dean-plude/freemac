@@ -58,5 +58,10 @@ int main(void)
     });
     printf("nested %d\n", nested(4));
     Block_release(nested);
+
+    /* atexit_b: blocks run at exit, the last added first */
+    __block int order = 0;
+    for (int i = 1; i <= 2; i++)
+        atexit_b(^{ printf("exit block %d ran %s\n", i, order++ == 2 - i ? "in order" : "out of order"); });
     return 0;
 }

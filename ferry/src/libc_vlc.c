@@ -18,6 +18,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/statvfs.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -168,8 +169,20 @@ static int pc_to_linux(int name)
     return -1;
 }
 
+/* A Mac's _PC_CASE_SENSITIVE and _PC_CASE_PRESERVING (Qt's file dialog
+ * asks): this system's file systems keep names as written and tell cases
+ * apart. */
+enum { MAC_PC_CASE_SENSITIVE = 11, MAC_PC_CASE_PRESERVING = 12 };
+
 static long mac_pathconf(const char *path, int name)
 {
+    if (name == MAC_PC_CASE_SENSITIVE || name == MAC_PC_CASE_PRESERVING) {
+        if (access(path, F_OK) < 0) {
+            ferry_sync_errno();
+            return -1;
+        }
+        return 1;
+    }
     int n = pc_to_linux(name);
     if (n < 0) {
         ferry_sync_errno();
@@ -183,6 +196,13 @@ static long mac_pathconf(const char *path, int name)
 
 static long mac_fpathconf(int fd, int name)
 {
+    if (name == MAC_PC_CASE_SENSITIVE || name == MAC_PC_CASE_PRESERVING) {
+        if (fcntl(fd, F_GETFD) < 0) {
+            ferry_sync_errno();
+            return -1;
+        }
+        return 1;
+    }
     int n = pc_to_linux(name);
     if (n < 0) {
         ferry_sync_errno();

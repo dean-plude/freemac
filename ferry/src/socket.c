@@ -35,6 +35,7 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
+#include <resolv.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
@@ -1248,6 +1249,7 @@ const struct ferry_symbol ferry_socket_symbols[] = {
     {"inet_pton", mac_inet_pton},
     {"inet_ntop", mac_inet_ntop},
     {"inet_addr", inet_addr},
+    {"res_init", res_init},
     {"inet_aton", inet_aton},
     {"inet_ntoa", inet_ntoa},
     {"inet_network", inet_network},

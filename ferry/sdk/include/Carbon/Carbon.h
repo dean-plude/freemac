@@ -69,6 +69,28 @@ enum {
     alphaLock = 1 << 10,
     optionKey = 1 << 11,
     controlKey = 1 << 12,
+    /* the window-active and mouse button bits (freemac OBS work) */
+    activeFlag = 1 << 0,
+    btnState = 1 << 7,
+};
+/* the parts of a key event's message: its character and key codes
+ * (Events.h; freemac OBS work, whose hotkey table is keyCodeMask >> 8 long) */
+enum {
+    charCodeMask = 0x000000FF,
+    keyCodeMask = 0x0000FF00,
+    adbAddrMask = 0x00FF0000,
+    osEvtMessageMask = (int)0xFF000000,
+};
+
+/* the character codes of the special keys (Events.h) */
+enum {
+    kNullCharCode = 0, kHomeCharCode = 1, kEnterCharCode = 3, kEndCharCode = 4, kHelpCharCode = 5,
+    kBellCharCode = 7, kBackspaceCharCode = 8, kTabCharCode = 9, kLineFeedCharCode = 10,
+    kVerticalTabCharCode = 11, kPageUpCharCode = 11, kFormFeedCharCode = 12, kPageDownCharCode = 12,
+    kReturnCharCode = 13, kFunctionKeyCharCode = 16, kCommandCharCode = 17, kCheckCharCode = 18,
+    kDiamondCharCode = 19, kAppleLogoCharCode = 20, kEscapeCharCode = 27, kClearCharCode = 27,
+    kLeftArrowCharCode = 28, kRightArrowCharCode = 29, kUpArrowCharCode = 30, kDownArrowCharCode = 31,
+    kSpaceCharCode = 32, kDeleteCharCode = 127, kBulletCharCode = 165, kNonBreakingSpaceCharCode = 202
 };
 
 /* the virtual key codes (Events.h); complete from freemac 1.221, Ferry 0.45.0 */
@@ -203,6 +225,14 @@ CFArrayRef TISCreateInputSourceList(CFDictionaryRef properties, Boolean includeA
 CFArrayRef TISCreateASCIICapableInputSourceList(void);
 void *TISGetInputSourceProperty(TISInputSourceRef source, CFStringRef key);
 OSStatus TISSelectInputSource(TISInputSourceRef source);
+/* An input method's own keyboard layout: freemac's input methods have none
+ * of their own, so this gives NULL and the current layout serves. */
+TISInputSourceRef TISCopyInputMethodKeyboardLayoutOverride(void);
+
+/* Which kind of layout data a keyboard layout has (Keyboards.h): Ferry's
+ * layouts hold only 'uchr' data. */
+typedef SInt32 KeyboardLayoutKind;
+enum { kKLKCHRuchrKind = 0, kKLKCHRKind = 1, kKLuchrKind = 2 };
 
 /* UCKeyTranslate and LMGetKbdType: CoreServices/UnicodeUtilities.h */
 

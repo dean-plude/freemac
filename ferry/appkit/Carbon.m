@@ -707,6 +707,44 @@ OSStatus UCKeyTranslate(const UCKeyboardLayout *layoutPtr, UInt16 key, UInt16 ac
     return noErr;
 }
 
+/* freemac's input methods bring no keyboard layout of their own. */
+TISInputSourceRef TISCopyInputMethodKeyboardLayoutOverride(void) { return NULL; }
+
+/* What a key event's key types with other modifiers held: the current
+ * layout's characters for its key code, as UCKeyTranslate gives them. */
+@implementation NSEvent (FerryApplyingModifiers)
+- (NSString *)charactersByApplyingModifiers:(NSEventModifierFlags)flags
+{
+    if ([self type] != NSEventTypeKeyDown && [self type] != NSEventTypeKeyUp)
+        [NSException raise:NSInternalInconsistencyException format:@"not a key event"];
+    TISInputSourceRef src = TISCopyCurrentKeyboardLayoutInputSource();
+    CFDataRef data = src ? TISGetInputSourceProperty(src, kTISPropertyUnicodeKeyLayoutData) : NULL;
+    if (!data) {
+        if (src)
+            CFRelease(src);
+        return [self charactersIgnoringModifiers];
+    }
+    UInt32 mods = 0;
+    if (flags & NSEventModifierFlagShift)
+        mods |= shiftKey >> 8;
+    if (flags & NSEventModifierFlagCapsLock)
+        mods |= alphaLock >> 8;
+    if (flags & NSEventModifierFlagControl)
+        mods |= controlKey >> 8;
+    if (flags & NSEventModifierFlagOption)
+        mods |= optionKey >> 8;
+    if (flags & NSEventModifierFlagCommand)
+        mods |= cmdKey >> 8;
+    UInt32 dead = 0;
+    UniChar chars[8];
+    UniCharCount n = 0;
+    UCKeyTranslate((const UCKeyboardLayout *)CFDataGetBytePtr(data), [self keyCode], kUCKeyActionDown, mods,
+                   LMGetKbdType(), kUCKeyTranslateNoDeadKeysMask, &dead, 8, &n, chars);
+    CFRelease(src);
+    return [NSString stringWithCharacters:chars length:n];
+}
+@end
+
 /* An ANSI keyboard (40 among the keyboard type numbers). */
 uint8_t LMGetKbdType(void) { return 40; }
 

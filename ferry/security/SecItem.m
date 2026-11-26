@@ -78,6 +78,9 @@ K(kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly, "kSecAttrAccessibleAfterFirs
 K(kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, "kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly")
 /* the protocols and authentication types are the older calls' four-letter codes */
 K(kSecAttrProtocolFTP, "ftp ")
+K(kSecAttrProtocolFTPAccount, "ftpa")
+K(kSecAttrProtocolFTPS, "ftps")
+K(kSecAttrProtocolFTPProxy, "ftpx")
 K(kSecAttrProtocolHTTP, "http")
 K(kSecAttrProtocolHTTPS, "htps")
 K(kSecAttrProtocolHTTPProxy, "htpx")

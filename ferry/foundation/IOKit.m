@@ -207,3 +207,11 @@ IOReturn IOPMCopyAssertionsStatus(CFDictionaryRef *status)
     *status = (CFDictionaryRef)[s copy];
     return kIOReturnSuccess;
 }
+
+/* freemac's displays aren't IOKit services, so there is nothing to tell. */
+CFDictionaryRef IODisplayCreateInfoDictionary(io_service_t framebuffer, IOOptionBits options)
+{
+    (void)framebuffer;
+    (void)options;
+    return NULL;
+}

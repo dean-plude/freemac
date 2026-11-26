@@ -1,0 +1,12 @@
+setjmp came back 42, local 8
+_longjmp with 0 gives 1
+siglongjmp put the mask back 1
+waitid 0 pid 1 code exited 1 status 3
+wait4 1 exited 1 code 3
+killed child code 1 signal SIGTERM 1
+group found 1 same id 1
+apple<Banana 1, Banana<cherry 1
+file2<file10 as numbers 1, as text 1
+case: a<A 1, same when ignored 1
+key too small 1, then fits 1
+exit=0

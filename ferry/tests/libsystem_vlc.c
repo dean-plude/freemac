@@ -53,6 +53,8 @@ int main(void)
     printf("name max %ld, path max %ld\n", pathconf("/", _PC_NAME_MAX), pathconf("/", _PC_PATH_MAX));
     errno = 0;
     printf("bad name %ld %d\n", pathconf("/", 99), errno == EINVAL);
+    printf("case sensitive %ld, preserving %ld, missing path %ld\n", pathconf("/", _PC_CASE_SENSITIVE),
+           pathconf("/", _PC_CASE_PRESERVING), pathconf("/no/such/path", _PC_CASE_SENSITIVE));
 
     /* getpwuid_r */
     struct passwd pw, *found = NULL;

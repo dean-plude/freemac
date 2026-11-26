@@ -193,6 +193,14 @@ void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path)
 }
 @end
 
+/* A font of a family as installed (or Pango's nearest), with a Pango weight
+ * and style; and a font's style name ("Bold Italic" as "BoldItalic"). */
+__attribute__((visibility("hidden"))) GFont *GFontLoad(NSString *family, int weight, int style, CGFloat size,
+                                                       const CGAffineTransform *matrix);
+__attribute__((visibility("hidden"))) NSString *GFontStyleName(GFont *f);
+/* the family that stands for a Mac family (Helvetica, Menlo...), or nil */
+NSString *GFontMacFamily(NSString *name);
+
 @interface GParagraphStyle : NSObject <NSCopying> {
 @public
     uint8_t alignment, lineBreakMode, writingDirection;

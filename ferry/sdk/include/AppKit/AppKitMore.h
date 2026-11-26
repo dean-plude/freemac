@@ -242,6 +242,8 @@ typedef NS_OPTIONS(NSUInteger, NSCellHitResult) {
 APPKIT_EXTERN NSNotificationName const NSMenuDidBeginTrackingNotification;
 APPKIT_EXTERN NSNotificationName const NSMenuDidEndTrackingNotification;
 APPKIT_EXTERN NSNotificationName const NSSystemColorsDidChangeNotification;
+/* posted when the fonts installed change; freemac doesn't watch, so never */
+APPKIT_EXTERN NSNotificationName const NSFontSetChangedNotification;
 /* A menu item's action is sent between these two, with the item's menu and
  * the item as "MenuItem" in the user info. */
 APPKIT_EXTERN NSNotificationName const NSMenuWillSendActionNotification;
@@ -452,6 +454,12 @@ APPKIT_EXTERN NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDid
  * so any other gives nil, as an unknown colour does. */
 @interface NSColor (FerryCatalog)
 + (NSColor *)colorWithCatalogName:(NSString *)listName colorName:(NSString *)colorName;
+/* A catalog colour's list and name. Ferry's colours are all component
+ * based (type is never NSColorTypeCatalog), so both give nil. */
+@property (readonly, copy) NSString *catalogNameComponent;
+@property (readonly, copy) NSString *colorNameComponent;
+@property (readonly, copy) NSString *localizedCatalogNameComponent;
+@property (readonly, copy) NSString *localizedColorNameComponent;
 @end
 /* the item whose submenu holds this item's menu */
 @interface NSMenuItem (FerryParentItem)

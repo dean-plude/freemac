@@ -17,7 +17,11 @@
  * protectionSpace.serverTrust) is a trust here too: the first time it is
  * asked about, Ferry connects to the server itself, directly and never
  * through a proxy, and reads the certificates it presents
- * (ferry_server_certificates, in src/servercerts.c). */
+ * (ferry_server_certificates, in src/servercerts.c).
+ *
+ * SecTrustCopyAnchorCertificates gives this system's certificate
+ * authorities, read from its CA bundle (the PEM file OpenSSL and every
+ * program here read), so no OpenSSL is needed for it. */
 #include "SInternal.h"
 #include <string.h>
 #include <time.h>
@@ -624,4 +628,52 @@ S_EXPORT CFArrayRef SecTrustCopyCertificateChain(SecTrustRef trust)
 {
     NSArray *chain = chain_of(trust);
     return chain ? (CFArrayRef)[chain copy] : NULL;
+}
+
+/* ---- the system's anchors ---------------------------------------------------------- */
+
+/* Where Linux distributions keep the bundle of trusted authorities, as PEM. */
+static const char *const ca_bundles[] = {
+    "/etc/ssl/certs/ca-certificates.crt", /* Debian, Ubuntu (freemac) */
+    "/etc/pki/tls/certs/ca-bundle.crt",   /* Fedora */
+    "/etc/ssl/ca-bundle.pem",             /* openSUSE */
+    "/etc/ssl/cert.pem",                  /* Alpine, Arch */
+    NULL,
+};
+
+S_EXPORT OSStatus SecTrustCopyAnchorCertificates(CFArrayRef *anchors)
+{
+    if (!anchors)
+        return errSecParam;
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSMutableArray *out = [[NSMutableArray alloc] init];
+    for (int i = 0; ca_bundles[i] && ![out count]; i++) {
+        NSString *text = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:ca_bundles[i]]
+                                                   encoding:NSUTF8StringEncoding
+                                                      error:NULL];
+        NSString *begin = @"-----BEGIN CERTIFICATE-----", *end = @"-----END CERTIFICATE-----";
+        NSUInteger at = 0, length = [text length];
+        while (text && at < length) {
+            NSRange b = [text rangeOfString:begin options:0 range:NSMakeRange(at, length - at)];
+            if (b.location == NSNotFound)
+                break;
+            NSUInteger body = NSMaxRange(b);
+            NSRange e = [text rangeOfString:end options:0 range:NSMakeRange(body, length - body)];
+            if (e.location == NSNotFound)
+                break;
+            NSString *base64 = [text substringWithRange:NSMakeRange(body, e.location - body)];
+            NSData *der = [[NSData alloc] initWithBase64EncodedString:base64
+                                                              options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if ([der length]) {
+                SCertificate *c = new_certificate(der);
+                [out addObject:c];
+                [c release];
+            }
+            [der release];
+            at = NSMaxRange(e);
+        }
+    }
+    *anchors = (CFArrayRef)out;
+    [pool release];
+    return errSecSuccess;
 }

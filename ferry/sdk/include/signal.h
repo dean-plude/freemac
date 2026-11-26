@@ -55,6 +55,13 @@ typedef struct {
     long si_band;
     unsigned long __pad[7];
 } siginfo_t;
+/* how a child changed, in si_code for SIGCHLD and waitid (freemac 1.232) */
+#define CLD_EXITED 1
+#define CLD_KILLED 2
+#define CLD_DUMPED 3
+#define CLD_TRAPPED 4
+#define CLD_STOPPED 5
+#define CLD_CONTINUED 6
 struct sigaction {
     union { void (*__sa_handler)(int); void (*__sa_sigaction)(int, siginfo_t *, void *); } __sigaction_u;
     sigset_t sa_mask;

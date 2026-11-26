@@ -22,14 +22,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/ipc.h>
 #include <sys/resource.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
+#include <spawn.h>
+#include <dirent.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -53,6 +59,9 @@ static int open_to_linux(int mac)
             out |= open_bits[i].lnx;
     return out;
 }
+
+/* for dispatch I/O's paths (src/objc/dispatch_io.c) */
+int ferry_open_flags_from_mac(int mac) { return open_to_linux(mac); }
 
 static int open_to_mac(int lnx)
 {
@@ -790,6 +799,48 @@ static pid_t mac_waitpid(pid_t pid, int *status, int options)
 
 static pid_t mac_wait(int *status) { return mac_waitpid(-1, status, 0); }
 
+/* freemac 1.232, Ferry 0.56.0: what Qt's process launcher waits with. The
+ * use figures (struct rusage) are laid out the same on both systems. */
+static pid_t mac_wait4(pid_t pid, int *status, int options, struct rusage *ru)
+{
+    int st = 0;
+    pid_t rc = wait4(pid, &st, options & 3, ru);
+    if (rc > 0 && status)
+        *status = status_to_mac(st);
+    return rc;
+}
+
+static pid_t mac_wait3(int *status, int options, struct rusage *ru) { return mac_wait4(-1, status, options, ru); }
+
+#define MAC_WEXITED    0x04
+#define MAC_WSTOPPED   0x08
+#define MAC_WCONTINUED 0x10
+#define MAC_WNOWAIT    0x20
+
+/* P_ALL, P_PID and P_PGID are 0, 1 and 2 on both, and so are the CLD_
+ * codes; the wait flags and the record differ. */
+static int mac_waitid(int idtype, id_t id, struct mac_siginfo *info, int options)
+{
+    int o = (options & 1 ? WNOHANG : 0) | (options & MAC_WEXITED ? WEXITED : 0)
+          | (options & MAC_WSTOPPED ? WSTOPPED : 0) | (options & MAC_WCONTINUED ? WCONTINUED : 0)
+          | (options & MAC_WNOWAIT ? WNOWAIT : 0);
+    siginfo_t li;
+    memset(&li, 0, sizeof li);
+    int rc = waitid((idtype_t)idtype, id, &li, o);
+    if (rc == 0 && info) {
+        memset(info, 0, sizeof *info);
+        if (li.si_pid) {
+            info->signo = ferry_signal_to_mac(li.si_signo);
+            info->code = li.si_code;
+            info->pid = li.si_pid;
+            info->uid = li.si_uid;
+            /* an exit code, or the number of the signal that ended or stopped the child */
+            info->status = li.si_code == CLD_EXITED ? li.si_status : ferry_signal_to_mac(li.si_status);
+        }
+    }
+    return rc;
+}
+
 /* ---- system information --------------------------------------------------------------- */
 
 static long mac_sysconf(int name)
@@ -856,6 +907,7 @@ static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(
 #define MAC_TIOCGWINSZ 0x40087468ul
 #define MAC_FIONREAD   0x4004667ful
 #define MAC_FIONBIO    0x8004667eul
+#define MAC_SIOCGIFMTU 0xc0206933ul /* a Mac's struct ifreq is 32 bytes, Linux's 40 */
 
 static int mac_ioctl(int fd, unsigned long req, ...)
 {
@@ -869,6 +921,16 @@ static int mac_ioctl(int fd, unsigned long req, ...)
         return ioctl(fd, FIONREAD, arg);
     if (req == MAC_FIONBIO) /* an int, nonzero for non-blocking */
         return ioctl(fd, FIONBIO, arg);
+    if (req == MAC_SIOCGIFMTU && arg) { /* both put the name first and the MTU after it */
+        struct ifreq lr;
+        memset(&lr, 0, sizeof lr);
+        memcpy(lr.ifr_name, arg, IFNAMSIZ);
+        lr.ifr_name[IFNAMSIZ - 1] = 0;
+        if (ioctl(fd, SIOCGIFMTU, &lr) < 0)
+            return -1;
+        memcpy((char *)arg + IFNAMSIZ, &lr.ifr_mtu, sizeof(int));
+        return 0;
+    }
     errno = ENOTTY;
     return -1;
 }
@@ -1040,7 +1102,155 @@ static bool mac_OSAtomicTestAndClear(uint32_t n, volatile void *addr)
     return (__atomic_fetch_and(b, (uint8_t)~mask, __ATOMIC_SEQ_CST) & mask) != 0;
 }
 
+/* ---- System V shared memory and semaphores (freemac 1.232) ---------------------------
+ * shmget, shmat, shmdt, semget, semop and ftok take the same arguments on
+ * both systems and pass through. A segment's or set's description has a
+ * Mac's layout, and semctl's commands a Mac's numbers, so those two are
+ * translated. */
+struct mac_ipc_perm {
+    uint32_t uid, gid, cuid, cgid;
+    uint16_t mode, seq;
+    int32_t key;
+};
+#pragma pack(push, 4)
+struct mac_shmid_ds {
+    struct mac_ipc_perm perm;
+    uint64_t segsz;
+    int32_t lpid, cpid;
+    uint16_t nattch;
+    int64_t atime, dtime, ctime;
+    void *internal;
+};
+struct mac_semid_ds {
+    struct mac_ipc_perm perm;
+    int32_t base;
+    uint16_t nsems;
+    int64_t otime;
+    int32_t pad1;
+    int64_t ctime;
+    int32_t pad2, pad3[4];
+};
+#pragma pack(pop)
+_Static_assert(sizeof(struct mac_ipc_perm) == 24, "Mac struct ipc_perm is 24 bytes");
+_Static_assert(sizeof(struct mac_shmid_ds) == 76, "Mac struct shmid_ds is 76 bytes");
+
+static void perm_to_mac(const struct ipc_perm *l, struct mac_ipc_perm *m)
+{
+    m->uid = l->uid;
+    m->gid = l->gid;
+    m->cuid = l->cuid;
+    m->cgid = l->cgid;
+    m->mode = (uint16_t)(l->mode & 07777);
+    m->seq = (uint16_t)l->__seq;
+    m->key = l->__key;
+}
+
+static int mac_shmctl(int id, int cmd, struct mac_shmid_ds *buf)
+{
+    struct shmid_ds l;
+    memset(&l, 0, sizeof l);
+    switch (cmd) {
+    case 0: /* IPC_RMID */
+        return shmctl(id, IPC_RMID, NULL);
+    case 1: /* IPC_SET */
+        if (!buf || shmctl(id, IPC_STAT, &l))
+            return buf ? -1 : (errno = EFAULT, -1);
+        l.shm_perm.uid = buf->perm.uid;
+        l.shm_perm.gid = buf->perm.gid;
+        l.shm_perm.mode = buf->perm.mode & 0777;
+        return shmctl(id, IPC_SET, &l);
+    case 2: /* IPC_STAT */
+        if (!buf)
+            return errno = EFAULT, -1;
+        if (shmctl(id, IPC_STAT, &l))
+            return -1;
+        memset(buf, 0, sizeof *buf);
+        perm_to_mac(&l.shm_perm, &buf->perm);
+        buf->segsz = l.shm_segsz;
+        buf->lpid = l.shm_lpid;
+        buf->cpid = l.shm_cpid;
+        buf->nattch = (uint16_t)l.shm_nattch;
+        buf->atime = l.shm_atime;
+        buf->dtime = l.shm_dtime;
+        buf->ctime = l.shm_ctime;
+        return 0;
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+union linux_semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+};
+
+/* The fourth argument is a union semun, passed as one 8-byte word. */
+static int mac_semctl(int id, int num, int cmd, ...)
+{
+    va_list ap;
+    va_start(ap, cmd);
+    union {
+        int val;
+        void *ptr;
+    } arg;
+    arg.ptr = va_arg(ap, void *);
+    va_end(ap);
+    union linux_semun u;
+    struct semid_ds l;
+    switch (cmd) {
+    case 0: return semctl(id, num, IPC_RMID);
+    case 1: { /* IPC_SET */
+        struct mac_semid_ds *m = arg.ptr;
+        memset(&l, 0, sizeof l);
+        u.buf = &l;
+        if (!m || semctl(id, 0, IPC_STAT, u))
+            return m ? -1 : (errno = EFAULT, -1);
+        l.sem_perm.uid = m->perm.uid;
+        l.sem_perm.gid = m->perm.gid;
+        l.sem_perm.mode = m->perm.mode & 0777;
+        return semctl(id, 0, IPC_SET, u);
+    }
+    case 2: { /* IPC_STAT */
+        struct mac_semid_ds *m = arg.ptr;
+        if (!m)
+            return errno = EFAULT, -1;
+        memset(&l, 0, sizeof l);
+        u.buf = &l;
+        if (semctl(id, 0, IPC_STAT, u))
+            return -1;
+        memset(m, 0, sizeof *m);
+        perm_to_mac(&l.sem_perm, &m->perm);
+        m->nsems = (uint16_t)l.sem_nsems;
+        m->otime = l.sem_otime;
+        m->ctime = l.sem_ctime;
+        return 0;
+    }
+    case 3: return semctl(id, num, GETNCNT);
+    case 4: return semctl(id, num, GETPID);
+    case 5: return semctl(id, num, GETVAL);
+    case 7: return semctl(id, num, GETZCNT);
+    case 6: /* GETALL */
+        u.array = arg.ptr;
+        return semctl(id, num, GETALL, u);
+    case 8: /* SETVAL */
+        u.val = arg.val;
+        return semctl(id, num, SETVAL, u);
+    case 9: /* SETALL */
+        u.array = arg.ptr;
+        return semctl(id, num, SETALL, u);
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+
+/* vfork as fork: a vfork child may only exec or _exit, and fork serves that too
+ * without the parent's stack being shared through a call of Ferry's. */
+static pid_t mac_vfork(void) { return fork(); }
+
 const struct ferry_symbol ferry_posix_symbols[] = {
+    {"vfork", mac_vfork},
     {"OSMemoryBarrier", mac_OSMemoryBarrier},
     {"OSAtomicAdd32", mac_OSAtomicAdd32},
     {"OSAtomicAdd32Barrier", mac_OSAtomicAdd32},
@@ -1127,11 +1337,19 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"strsignal", mac_strsignal},
     {"waitpid", mac_waitpid},
     {"wait", mac_wait},
+    {"wait3", mac_wait3},
+    {"wait4", mac_wait4},
+    {"shmctl", mac_shmctl},
+    {"semctl", mac_semctl},
+    {"waitid", mac_waitid},
     {"sysconf", mac_sysconf},
     {"uname", mac_uname},
     {"getpwuid", mac_getpwuid},
     {"getpwnam", mac_getpwnam},
     {"ioctl", mac_ioctl},
+    {"tzname", tzname},
+    {"timezone", &timezone},
+    {"daylight", &daylight},
     {"getrlimit", mac_getrlimit},
     {"setrlimit", mac_setrlimit},
     {"getrusage", mac_getrusage},

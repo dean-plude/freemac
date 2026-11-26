@@ -8,4 +8,6 @@ count 3
 total 28
 outer 4
 nested 50
+exit block 2 ran in order
+exit block 1 ran in order
 exit=0

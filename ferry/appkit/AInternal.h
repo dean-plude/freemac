@@ -287,6 +287,9 @@ NSUInteger ABeepCount(void);
  * takes the window's mouse and keys until an item is chosen or it is
  * dismissed. Wayland doesn't let a program place a window of its own over
  * another, so the menu stays inside its window. */
+/* the standard key binding command for a key press, or NULL (NSEvent.m) */
+SEL AKeyBindingCommand(unichar c, NSEventModifierFlags f);
+
 @class AMenuView;
 @protocol AMenuOwner <NSObject>
 /* item is nil when the menu was dismissed */

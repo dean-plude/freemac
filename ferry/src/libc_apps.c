@@ -20,6 +20,9 @@
  *   a Mac's struct termios and BSD's flag, control character and speed
  *   numbers converted to this system's, and posix_openpt for a
  *   pseudo-terminal.
+ * - uuid(3): new random UUIDs (version 4, from getrandom), and UUIDs
+ *   written as and read from their 36-character form (freemac OBS work).
+ *   uuid_generate_time gives a random one too, as a Mac does by default.
  */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -37,6 +40,7 @@
 #include <string.h>
 #include <termios.h>
 #include <time.h>
+#include <sys/random.h>
 #include <unistd.h>
 
 #include "ferry.h"
@@ -671,7 +675,93 @@ static int mac_tcflow(int fd, int action)
 /* a pseudo-terminal's controlling side, opened with the Mac's O_ flags */
 static int mac_posix_openpt(int flags) { return posix_openpt(ferry_open_flags_to_linux(flags)); }
 
+/* ---- uuid(3) ---------------------------------------------------------------- */
+static void mac_uuid_clear(unsigned char *uu) { memset(uu, 0, 16); }
+static int mac_uuid_compare(const unsigned char *a, const unsigned char *b) { return memcmp(a, b, 16); }
+static void mac_uuid_copy(unsigned char *dst, const unsigned char *src) { memmove(dst, src, 16); }
+static int mac_uuid_is_null(const unsigned char *uu)
+{
+    for (int i = 0; i < 16; i++)
+        if (uu[i])
+            return 0;
+    return 1;
+}
+static void mac_uuid_generate_random(unsigned char *out)
+{
+    size_t got = 0;
+    while (got < 16) {
+        ssize_t n = getrandom(out + got, 16 - got, 0);
+        if (n > 0)
+            got += (size_t)n;
+        else if (errno != EINTR)
+            break;
+    }
+    if (got < 16) { /* no random source: still a distinct value */
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        uint64_t x = ((uint64_t)ts.tv_sec * 1000000000u + (uint64_t)ts.tv_nsec) ^ ((uint64_t)getpid() << 32);
+        for (size_t i = got; i < 16; i++) {
+            x = x * 6364136223846793005u + 1442695040888963407u;
+            out[i] = (unsigned char)(x >> 56);
+        }
+    }
+    out[6] = (unsigned char)((out[6] & 0x0f) | 0x40); /* version 4 */
+    out[8] = (unsigned char)((out[8] & 0x3f) | 0x80); /* RFC 4122 variant */
+}
+static void unparse(const unsigned char *uu, char *out, const char *digits)
+{
+    char *p = out;
+    for (int i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10)
+            *p++ = '-';
+        *p++ = digits[uu[i] >> 4];
+        *p++ = digits[uu[i] & 15];
+    }
+    *p = 0;
+}
+/* uuid_unparse writes capitals on a Mac */
+static void mac_uuid_unparse_upper(const unsigned char *uu, char *out) { unparse(uu, out, "0123456789ABCDEF"); }
+static void mac_uuid_unparse_lower(const unsigned char *uu, char *out) { unparse(uu, out, "0123456789abcdef"); }
+static int hex_digit(char c)
+{
+    return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+}
+/* 0 when the text is a UUID in its 36-character form, -1 otherwise */
+static int mac_uuid_parse(const char *in, unsigned char *uu)
+{
+    unsigned char b[16];
+    if (!in || strlen(in) < 36)
+        return -1;
+    for (int i = 0, k = 0; i < 36;) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (in[i++] != '-')
+                return -1;
+            continue;
+        }
+        int hi = hex_digit(in[i]), lo = hex_digit(in[i + 1]);
+        if (hi < 0 || lo < 0)
+            return -1;
+        b[k++] = (unsigned char)(hi << 4 | lo);
+        i += 2;
+    }
+    if (in[36] && in[36] != ' ' && in[36] != '\n')
+        return -1;
+    memcpy(uu, b, 16);
+    return 0;
+}
+
 const struct ferry_symbol ferry_libc_apps_symbols[] = {
+    {"uuid_clear", mac_uuid_clear},
+    {"uuid_compare", mac_uuid_compare},
+    {"uuid_copy", mac_uuid_copy},
+    {"uuid_is_null", mac_uuid_is_null},
+    {"uuid_generate", mac_uuid_generate_random},
+    {"uuid_generate_random", mac_uuid_generate_random},
+    {"uuid_generate_time", mac_uuid_generate_random},
+    {"uuid_parse", mac_uuid_parse},
+    {"uuid_unparse", mac_uuid_unparse_upper},
+    {"uuid_unparse_upper", mac_uuid_unparse_upper},
+    {"uuid_unparse_lower", mac_uuid_unparse_lower},
     {"posix_openpt", mac_posix_openpt},
     /* the same on both systems */
     {"grantpt", grantpt},

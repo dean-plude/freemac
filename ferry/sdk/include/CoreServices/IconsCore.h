@@ -22,6 +22,25 @@ typedef unsigned long UniCharCount;
 OSErr GetIconRefFromFileInfo(const FSRef *inRef, UniCharCount inFileNameLength, const UniChar *inFileName,
                              FSCatalogInfoBitmap inWhichInfo, const FSCatalogInfo *inCatalogInfo,
                              IconServicesUsageFlags inUsageFlags, IconRef *outIconRef, SInt16 *outLabel);
+/* The system's own icons, by their four-letter types. GetIconRef answers a
+ * reference naming the type, which PlotIconRefInContext draws with the
+ * desktop's icon for it. */
+enum { kOnSystemDisk = -32768, kOnAppropriateDisk = -32767 };
+/* (the generic document, folder, disk and alert types are in CoreServices.h) */
+enum {
+    kSystemIconsCreator = 'macs',
+    kGenericFloppyIcon = 'flpy',
+    kGenericCDROMIcon = 'cddr',
+    kGenericRemovableMediaIcon = 'rmov',
+    kGenericURLIcon = 'gurl',
+    kComputerIcon = 'root',
+    kDesktopIcon = 'desk',
+    kFullTrashIcon = 'ftrh',
+    kQuestionMarkIcon = 'ques',
+    kToolbarHomeIcon = 'tbhm',
+    kToolbarDesktopFolderIcon = 'tbds'
+};
+OSErr GetIconRef(SInt16 vRefNum, OSType creator, OSType iconType, IconRef *theIconRef);
 OSErr AcquireIconRef(IconRef theIconRef);
 OSErr ReleaseIconRef(IconRef theIconRef);
 
