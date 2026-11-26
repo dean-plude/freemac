@@ -1026,9 +1026,23 @@ static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget
     }
     if (_level > NSNormalWindowLevel)
         gtk_window_set_keep_above(_gtk, 1);
+    if (![self canBecomeKeyWindow]) {
+        /* A pop-up menu, a tooltip, a floating badge: on a Mac it shows
+         * without taking the keys from the window that has them, and the
+         * app's menus stay open over it. Qt's pop-up menus close as soon as
+         * their window loses key, so one that took the focus would close
+         * the moment it opened. */
+        gtk_window_set_accept_focus(_gtk, 0);
+        gtk_window_set_focus_on_map(_gtk, 0);
+        gtk_window_set_skip_taskbar_hint(_gtk, 1);
+        gtk_window_set_skip_pager_hint(_gtk, 1);
+        if (_level >= NSPopUpMenuWindowLevel)
+            gtk_window_set_type_hint(_gtk, GDK_WINDOW_TYPE_HINT_POPUP_MENU);
+    }
     gtk_window_set_default_size(_gtk, (int)_frame.size.width, (int)_frame.size.height);
     gtk_window_set_resizable(_gtk, (_style & NSWindowStyleMaskResizable) != 0);
-    gtk_window_set_decorated(_gtk, _style != NSWindowStyleMaskBorderless);
+    /* no title bar unless the window asks for one, as on a Mac */
+    gtk_window_set_decorated(_gtk, (_style & NSWindowStyleMaskTitled) != 0);
     gtk_window_set_deletable(_gtk, (_style & NSWindowStyleMaskClosable) != 0);
     _area = gtk_drawing_area_new();
     if (_style & NSWindowStyleMaskResizable)
@@ -2000,13 +2014,37 @@ static int on_focus_in(GtkWidget *w, GdkEvent *e, void *data)
     return 0;
 }
 
-static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
+/* Whether the keyboard focus is now in one of the app's own windows that
+ * can't become key: a pop-up menu or tooltip that a window manager focused
+ * anyway. The key window keeps its keys then, as on a Mac. */
+static BOOL focus_in_keyless_window(void)
+{
+    for (NSWindow *w in all_windows)
+        if (w->_gtk && w->_visible && ![w canBecomeKeyWindow] && gtk_window_has_toplevel_focus(w->_gtk))
+            return YES;
+    return NO;
+}
+
+/* The focus moves out first and into its new window after, so whether the
+ * key window really lost its keys is asked once both have happened. */
+static int resign_if_focus_left(void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
-        if (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet))
+        BOOL still = win->_gtk && gtk_window_has_toplevel_focus(win->_gtk);
+        if (!still && !focus_in_keyless_window() &&
+            (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet)))
             A_REPORTING([key_window resignKeyWindow];)
+        [win release];
     }
+    return 0;
+}
+
+static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
+{
+    NSWindow *win = data;
+    if (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet))
+        g_timeout_add(0, (GSourceFunc)resign_if_focus_left, [win retain]);
     return 0;
 }
 @end

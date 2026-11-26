@@ -3084,3 +3084,34 @@ bridge in the `ferry` binary.
 - 2026-11-26: Ferry 0.66.0 (freemac 1.242): NSString upper, lower and capitalized case in a given locale, through ICU (OBS Studio 33 asks at startup); OBS finishes its tour and records the microphone in Ferry's test setup.
 - 2026-11-26: Ferry 0.67.0 (freemac 1.244): a Mac app's main menu is in freemac's menu bar, published as GTK menus on the session bus, validated while the app is in front; its Window and Help items join Topline's own.
 - 2026-11-26: Ferry 0.68.0 (freemac 1.245): Mac apps follow freemac's light and dark mode, live; the system colours have dark values and are drawn in the appearance drawing is in; `make check` 340/340.
+
+## Qt's pop-up menus and lists (freemac 1.246, Ferry 0.69.0)
+
+What OBS Studio 33's Qt asks of a Mac for its menus and drop-down lists,
+checked by opening OBS from its download in a fresh account, adding a
+macOS Screen Capture source, picking the display and recording.
+
+- A window whose `canBecomeKeyWindow` is NO (Qt's pop-up menus and
+  tooltips are such panels) is made with GTK's accept-focus and
+  focus-on-map off and skip-taskbar and skip-pager on, and with the
+  pop-up-menu type hint at `NSPopUpMenuWindowLevel` and above. Qt closes
+  every pop-up when its key window resigns, so the key window resigns a
+  turn after GTK's focus-out, and not at all when focus is in one of the
+  app's keyless windows or came back.
+- A window has a title bar only when its style mask has
+  `NSWindowStyleMaskTitled`; a borderless panel or a pop-up has none.
+- `-[NSPopUpButtonCell performClickWithFrame:inView:]` opens the menu and
+  returns only once it has closed, the chosen item selected and its action
+  sent, as on a Mac. Qt's non-editable `QComboBox` opens its native list
+  with a cell of its own this way and reads the choice straight after.
+  `attachPopUpWithFrame:inView:` and a pop-up button's own click still
+  open the menu without waiting.
+- `-[NSNumber pointerValue]` gives the number's value, as a Mac's does;
+  OBS reads `NSScreenNumber` this way.
+- The waits for a pop-up menu wake every tenth of a second, so a menu
+  closed by a timer or a notification ends them without another event.
+
+`tests/appkit/qt_popups.m` checks the cell's wait with a menu chosen from
+and one closed, a keyless window never becoming key, and a number's
+pointer value.
+

@@ -246,6 +246,15 @@ enum { GTK_ICON_LOOKUP_FORCE_SIZE = 1 << 4 };
 enum { G_SPAWN_SEARCH_PATH = 1 << 2, G_SPAWN_STDOUT_TO_DEV_NULL = 1 << 3, G_SPAWN_STDERR_TO_DEV_NULL = 1 << 4 };
 void gtk_window_set_transient_for(GtkWidget *window, GtkWidget *parent);
 void gtk_window_set_keep_above(GtkWidget *window, gboolean setting);
+/* a window that can't become key (a pop-up menu, a tooltip) takes no
+ * keyboard focus and stays off the Dock's list, as on a Mac (freemac 1.246) */
+void gtk_window_set_accept_focus(GtkWidget *window, gboolean setting);
+void gtk_window_set_focus_on_map(GtkWidget *window, gboolean setting);
+void gtk_window_set_skip_taskbar_hint(GtkWidget *window, gboolean setting);
+void gtk_window_set_skip_pager_hint(GtkWidget *window, gboolean setting);
+void gtk_window_set_type_hint(GtkWidget *window, int hint);
+gboolean gtk_window_has_toplevel_focus(GtkWidget *window);
+enum { GDK_WINDOW_TYPE_HINT_POPUP_MENU = 3, GDK_WINDOW_TYPE_HINT_TOOLTIP = 10 };
 void gtk_window_set_modal(GtkWidget *window, gboolean modal);
 GtkIconTheme *gtk_icon_theme_get_default(void);
 GtkIconTheme *gtk_icon_theme_new(void);
