@@ -69,6 +69,17 @@ enum {
     alphaLock = 1 << 10,
     optionKey = 1 << 11,
     controlKey = 1 << 12,
+    /* the window-active and mouse button bits (freemac OBS work) */
+    activeFlag = 1 << 0,
+    btnState = 1 << 7,
+};
+/* the parts of a key event's message: its character and key codes
+ * (Events.h; freemac OBS work, whose hotkey table is keyCodeMask >> 8 long) */
+enum {
+    charCodeMask = 0x000000FF,
+    keyCodeMask = 0x0000FF00,
+    adbAddrMask = 0x00FF0000,
+    osEvtMessageMask = (int)0xFF000000,
 };
 
 /* the character codes of the special keys (Events.h) */

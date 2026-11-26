@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * What OBS's libobs asks of libSystem (freemac OBS work): uuid(3), the
  * older task_info flavors its CPU meter adds up, vm_page_size and
- * HOST_VM_INFO through a vm_statistics_t, and simd/base.h's markers. */
+ * HOST_VM_INFO through a vm_statistics_t, simd/base.h's markers, and
+ * localeconv in a Mac's struct lconv. */
+#include <locale.h>
 #include <mach/mach.h>
 #include <simd/base.h>
 #include <stdio.h>
@@ -58,5 +60,8 @@ int main(void)
     printf("page %lu (mask %lx, shift %d), vm info %d, free memory %d\n", (unsigned long)vm_page_size,
            (unsigned long)vm_page_mask, vm_page_shift, k3, vm.free_count * vm_page_size > 0);
     printf("simd markers %d\n", SIMD_COMPILER_HAS_REQUIRED_FEATURES);
+    struct lconv *lc = localeconv();
+    printf("C locale: point \"%s\", separator \"%s\", frac digits %d, int signs %d %d\n", lc->decimal_point,
+           lc->thousands_sep, lc->frac_digits, lc->int_p_sign_posn, lc->int_n_sign_posn);
     return 0;
 }

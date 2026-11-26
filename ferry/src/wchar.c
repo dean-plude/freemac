@@ -105,7 +105,42 @@ static locale_t mac_uselocale(locale_t loc)
 static int mac_mb_cur_max(void) { return (int)MB_CUR_MAX; }
 static int mac_mb_cur_max_l(locale_t loc) { UNDER(loc, (int)MB_CUR_MAX); }
 
-static struct lconv *mac_localeconv_l(locale_t loc) { UNDER(loc, localeconv()); }
+/* A Mac's struct lconv: the same as this system's but for the order of
+ * the last four international money fields, kept per thread as
+ * localeconv's answer is. */
+struct mac_lconv {
+    char *strings[10];
+    char int_frac_digits, frac_digits, p_cs_precedes, p_sep_by_space, n_cs_precedes, n_sep_by_space, p_sign_posn,
+        n_sign_posn, int_p_cs_precedes, int_n_cs_precedes, int_p_sep_by_space, int_n_sep_by_space, int_p_sign_posn,
+        int_n_sign_posn;
+};
+static __thread struct mac_lconv mac_lconv_answer;
+
+static struct mac_lconv *mac_lconv_of(const struct lconv *l)
+{
+    struct mac_lconv *m = &mac_lconv_answer;
+    char *strings[10] = {l->decimal_point,     l->thousands_sep,     l->grouping,     l->int_curr_symbol,
+                         l->currency_symbol,   l->mon_decimal_point, l->mon_thousands_sep, l->mon_grouping,
+                         l->positive_sign,     l->negative_sign};
+    memcpy(m->strings, strings, sizeof strings);
+    m->int_frac_digits = l->int_frac_digits;
+    m->frac_digits = l->frac_digits;
+    m->p_cs_precedes = l->p_cs_precedes;
+    m->p_sep_by_space = l->p_sep_by_space;
+    m->n_cs_precedes = l->n_cs_precedes;
+    m->n_sep_by_space = l->n_sep_by_space;
+    m->p_sign_posn = l->p_sign_posn;
+    m->n_sign_posn = l->n_sign_posn;
+    m->int_p_cs_precedes = l->int_p_cs_precedes;
+    m->int_n_cs_precedes = l->int_n_cs_precedes;
+    m->int_p_sep_by_space = l->int_p_sep_by_space;
+    m->int_n_sep_by_space = l->int_n_sep_by_space;
+    m->int_p_sign_posn = l->int_p_sign_posn;
+    m->int_n_sign_posn = l->int_n_sign_posn;
+    return m;
+}
+static struct mac_lconv *mac_localeconv(void) { return mac_lconv_of(localeconv()); }
+static struct mac_lconv *mac_localeconv_l(locale_t loc) { UNDER(loc, mac_lconv_of(localeconv())); }
 
 static const char *mac_querylocale(int mask, locale_t loc)
 {
@@ -361,7 +396,7 @@ const struct ferry_symbol ferry_wchar_symbols[] = {
     SAME(towlower), SAME(towupper), MAC(wctype), MAC(iswctype), MAC(wctrans), MAC(towctrans),
     /* locales */
     MAC(newlocale), MAC(duplocale), MAC(freelocale), MAC(uselocale), MAC(querylocale), MAC(localeconv_l),
-    SAME(localeconv), {"___mb_cur_max", (void *)mac_mb_cur_max}, {"___mb_cur_max_l", (void *)mac_mb_cur_max_l},
+    MAC(localeconv), {"___mb_cur_max", (void *)mac_mb_cur_max}, {"___mb_cur_max_l", (void *)mac_mb_cur_max_l},
     MAC(isalnum_l), MAC(isalpha_l), MAC(isblank_l), MAC(iscntrl_l), MAC(isdigit_l), MAC(isgraph_l),
     MAC(islower_l), MAC(isprint_l), MAC(ispunct_l), MAC(isspace_l), MAC(isupper_l), MAC(isxdigit_l),
     MAC(tolower_l), MAC(toupper_l),
