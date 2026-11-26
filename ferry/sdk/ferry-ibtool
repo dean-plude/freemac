@@ -1264,7 +1264,9 @@ class Compiler:
     def b_scrollView(self, e, uid):
         a = self.a
         subs = []
-        keys = dict(NSsFlags=0x20032 if yes(e, "hasVerticalScroller", True) else 0x20030,
+        # the low two bits are the border: a xib writes borderType only when it isn't a bezel
+        border = {"none": 0, "line": 1, "bezel": 2, "groove": 3}.get(e.get("borderType"), 2)
+        keys = dict(NSsFlags=0x20030 | border,
                     NSAutohidesScrollers=yes(e, "autohidesScrollers"))
         cv = child(e, "clipView", "contentView")
         if cv is not None:

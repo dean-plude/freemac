@@ -154,9 +154,10 @@ int main(void)
         printf("browser, an element the tool does not know: %s\n", [[owner.level className] UTF8String]);
 
         NSTableView *t = owner.table;
-        printf("table: %lu columns, row height %.0f, data source is the owner %s, in a scroll view %s, header %s\n",
+        printf("table: %lu columns, row height %.0f, data source is the owner %s, in a scroll view %s (line border %s), header %s\n",
                (unsigned long)[[t tableColumns] count], [t rowHeight], yesno([t dataSource] == (id)owner),
-               yesno([t enclosingScrollView] != nil), yesno([t headerView] != nil));
+               yesno([t enclosingScrollView] != nil), yesno([[t enclosingScrollView] borderType] == NSLineBorder),
+               yesno([t headerView] != nil));
         for (NSTableColumn *c in [t tableColumns])
             printf("  column %s \"%s\" width %.0f editable %s\n", [[c identifier] UTF8String],
                    [[[c headerCell] stringValue] UTF8String], [c width], yesno([c isEditable]));
