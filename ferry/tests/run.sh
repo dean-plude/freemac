@@ -1241,6 +1241,7 @@ if [ -n "$notify_python" ] && command -v dbus-run-session > /dev/null; then
     notify_test notify_ns --act "Build finished=action" --reply "Ping=Pong" --act "Choices=more:share" \
         --act "Not now=other" --act "Click me=default"
     notify_test notify_dock --dock --menu-click "New Window"
+    notify_test notify_dock_outlet --dock --menu-click "Play"
     # No notification server on the bus: nothing is shown, and Ferry says so once.
     notify_vars=FERRY_VERBOSE=1
     if notify_test notify_none --no-server; then
@@ -1252,7 +1253,7 @@ if [ -n "$notify_python" ] && command -v dbus-run-session > /dev/null; then
         fi
     fi
 else
-    echo "skip appkit_notify_un, appkit_notify_ns, appkit_notify_dock and appkit_notify_none" \
+    echo "skip appkit_notify_un, appkit_notify_ns, appkit_notify_dock, appkit_notify_dock_outlet and appkit_notify_none" \
         "(they need dbus-run-session and a Python with the gi bindings)"
 fi
 # No session bus at all: the same program carries on, and says so once.
