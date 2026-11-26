@@ -130,7 +130,8 @@ static const CGFloat TAB_HEIGHT = 24, TAB_PAD = 22, TAB_MIN = 44;
 - (NSDictionary *)_labelAttributes
 {
     NSFont *font = [_tabView font] ?: [NSFont systemFontOfSize:13];
-    return @{NSFontAttributeName : font, NSForegroundColorAttributeName : [NSColor labelColor]};
+    NSColor *c = AViewIsDark(_tabView) ? ADarkText(nil) : [NSColor labelColor];
+    return @{NSFontAttributeName : font, NSForegroundColorAttributeName : c};
 }
 - (NSSize)sizeOfLabel:(BOOL)shouldTruncate
 {
@@ -648,19 +649,22 @@ static const CGFloat TAB_HEIGHT = 24, TAB_PAD = 22, TAB_MIN = 44;
     NSUInteger n = [_items count];
     NSRect row = NSUnionRect([self _tabRect:0], [self _tabRect:n - 1]);
     /* the track: a rounded bar the tabs sit in */
-    AFillRoundedRect(NSInsetRect(row, 0.5, 0.5), 6, [NSColor colorWithCalibratedWhite:0.89 alpha:1],
-                     [NSColor colorWithCalibratedWhite:0 alpha:0.10]);
+    BOOL dark = AViewIsDark(self);   /* in a HUD panel the track is see-through, the line between tabs light */
+    AFillRoundedRect(NSInsetRect(row, 0.5, 0.5), 6,
+                     dark ? [NSColor colorWithCalibratedWhite:1 alpha:0.1] : [NSColor colorWithCalibratedWhite:0.89 alpha:1],
+                     [NSColor colorWithCalibratedWhite:dark ? 1 : 0 alpha:0.10]);
     NSInteger sel = _selected ? (NSInteger)[_items indexOfObjectIdenticalTo:_selected] : -1;
     for (NSUInteger i = 0; i < n; i++) {
         NSRect r = [self _tabRect:i];
         if ((NSInteger)i == sel) {
-            AFillRoundedRect(NSInsetRect(r, 2.5, 2.5), 4, [NSColor whiteColor],
+            AFillRoundedRect(NSInsetRect(r, 2.5, 2.5), 4,
+                             dark ? [NSColor colorWithCalibratedWhite:1 alpha:0.28] : [NSColor whiteColor],
                              [NSColor colorWithCalibratedWhite:0 alpha:0.16]);
         } else if ((NSInteger)i == _pressed) {
             AFillRoundedRect(NSInsetRect(r, 2.5, 2.5), 4, [NSColor colorWithCalibratedWhite:0 alpha:0.08], nil);
         } else if (i + 1 < n && (NSInteger)i + 1 != sel) {
             /* a thin line between two tabs that aren't selected */
-            [[NSColor colorWithCalibratedWhite:0 alpha:0.14] setFill];
+            [[NSColor colorWithCalibratedWhite:dark ? 1 : 0 alpha:0.14] setFill];
             NSRectFill([self _sideways] ? NSMakeRect(NSMinX(r) + 8, NSMaxY(r) - 0.5, r.size.width - 16, 1)
                                         : NSMakeRect(NSMaxX(r) - 0.5, NSMinY(r) + 6, 1, r.size.height - 12));
         }

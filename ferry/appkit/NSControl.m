@@ -825,16 +825,18 @@ static BOOL keeps_state(NSButtonType t)
     NSRect b = [self bounds];
     BOOL focused = [[self window] firstResponder] == self && [[self window] isKeyWindow];
     CGFloat dim = _enabled ? 1 : 0.45;
-    NSColor *text = [[NSColor controlTextColor] colorWithAlphaComponent:0.88 * dim];
+    BOOL dark = AViewIsDark(self);   /* in a HUD panel: light on dark */
+    NSColor *text = [(dark ? ADarkText(nil) : [NSColor controlTextColor]) colorWithAlphaComponent:0.88 * dim];
 
     if (_type == NSButtonTypeSwitch || _type == NSButtonTypeRadio) {
         CGFloat size = 14;
         NSRect box = NSMakeRect(b.origin.x + 1, floor(NSMidY(b) - size / 2), size, size);
         BOOL on = _state != NSControlStateValueOff;
         NSColor *fill = on ? (_highlighted ? [accent() shadowWithLevel:0.2] : accent())
-                           : (_highlighted ? [NSColor colorWithWhite:0.88 alpha:1] : [NSColor whiteColor]);
-        fill = [fill colorWithAlphaComponent:dim];
-        NSColor *edge = on ? nil : [NSColor colorWithWhite:0 alpha:0.3 * dim];
+                      : dark ? [NSColor colorWithWhite:1 alpha:_highlighted ? 0.3 : 0.15]
+                             : (_highlighted ? [NSColor colorWithWhite:0.88 alpha:1] : [NSColor whiteColor]);
+        fill = [fill colorWithAlphaComponent:[fill alphaComponent] * dim];
+        NSColor *edge = on ? nil : [NSColor colorWithWhite:dark ? 1 : 0 alpha:0.3 * dim];
         CGFloat radius = _type == NSButtonTypeRadio ? size / 2 : 3.5;
         AFillRoundedRect(box, radius, fill, edge);
         if (on) {
@@ -909,6 +911,10 @@ static BOOL keeps_state(NSButtonType t)
         fill = _highlighted ? [accent() shadowWithLevel:0.2] : accent();
         edge = nil;
         text = [NSColor colorWithWhite:1 alpha:dim];
+    } else if (AViewIsDark(self)) {   /* a HUD panel's button: light on dark */
+        fill = [NSColor colorWithWhite:1 alpha:_highlighted ? 0.32 : 0.18];
+        edge = [NSColor colorWithWhite:1 alpha:0.12];
+        text = ADarkText(text);
     } else {
         fill = _highlighted ? [NSColor colorWithWhite:0.85 alpha:1] : [NSColor whiteColor];
         edge = [NSColor colorWithWhite:0 alpha:0.22];
@@ -1708,11 +1714,17 @@ static BOOL keeps_state(NSButtonType t)
 - (BOOL)_isEditing { return _editing; }
 - (void)_drawBezelInRect:(NSRect)b focused:(BOOL)focused
 {
+    /* in a HUD panel a field is a see-through dark box with a light edge */
+    BOOL dark = AViewIsDark(self);
     if (_drawsBackground) {
-        [[self backgroundColor] setFill];
+        NSColor *bg = [self backgroundColor];
+        if (dark && (!_background || [_background isEqual:[NSColor textBackgroundColor]] ||
+                     [_background isEqual:[NSColor controlBackgroundColor]] || [_background isEqual:[NSColor whiteColor]]))
+            bg = [NSColor colorWithWhite:1 alpha:0.08];
+        [bg setFill];
         NSRectFill(b);
     }
-    [[NSColor colorWithWhite:0 alpha:_bezeled ? 0.25 : 0.5] setFill];
+    [[NSColor colorWithWhite:(dark ? 1 : 0) alpha:(dark ? 0.22 : _bezeled ? 0.25 : 0.5)] setFill];
     NSFrameRect(b);
     if (focused) {
         [[NSColor keyboardFocusIndicatorColor] setStroke];
@@ -1726,7 +1738,9 @@ static BOOL keeps_state(NSButtonType t)
 {
     if (_placeholderAttributed)
         return _placeholderAttributed;
-    return _placeholder ? AAttributed(_placeholder, [self font], [NSColor placeholderTextColor]) : nil;
+    return _placeholder ? AAttributed(_placeholder, [self font], AViewIsDark(self) ? ADarkText([NSColor placeholderTextColor])
+                                                                                  : [NSColor placeholderTextColor])
+                        : nil;
 }
 
 - (void)drawRect:(NSRect)dirty
@@ -1743,6 +1757,8 @@ static BOOL keeps_state(NSButtonType t)
     NSRect tr = [self _textRect];
     NSFont *font = [self font];
     NSColor *color = _enabled ? [self textColor] : [NSColor disabledControlTextColor];
+    if (AViewIsDark(self))
+        color = ADarkText(color);
     /* on a selected table row (its cell's background is emphasized) the
      * usual label colours turn white, as on a Mac */
     if (_enabled && !_editing && [_cell backgroundStyle] == NSBackgroundStyleEmphasized) {

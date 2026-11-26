@@ -1038,18 +1038,20 @@ static BOOL choosable(NSMenuItem *item)
     BOOL focused = [[self window] firstResponder] == self && [[self window] isKeyWindow];
     NSRect bezel = [self _bezelRect];
     BOOL up = ![self isFlipped];       /* "up" on the screen */
-    NSColor *text = [NSColor colorWithWhite:0 alpha:0.85 * dim];
+    BOOL dark = AViewIsDark(self);   /* in a HUD panel: light on dark */
+    NSColor *text = [NSColor colorWithWhite:dark ? 1 : 0 alpha:(dark ? 0.9 : 0.85) * dim];
     NSRect arrows;
     if ([self isBordered]) {
-        NSColor *fill = pressed ? [NSColor colorWithWhite:0.86 alpha:1] : [NSColor whiteColor];
+        NSColor *fill = dark ? [NSColor colorWithWhite:1 alpha:pressed ? 0.3 : 0.18]
+                      : pressed ? [NSColor colorWithWhite:0.86 alpha:1] : [NSColor whiteColor];
         CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
         CGContextSaveGState(cg);
         CGColorRef shadow = CGColorCreateGenericRGB(0, 0, 0, 0.12 * dim);
         CGContextSetShadowWithColor(cg, CGSizeMake(0, -0.5), 1, shadow);
         CGColorRelease(shadow);
-        AFillRoundedRect(bezel, 5, [fill colorWithAlphaComponent:dim], nil);
+        AFillRoundedRect(bezel, 5, [fill colorWithAlphaComponent:[fill alphaComponent] * dim], nil);
         CGContextRestoreGState(cg);
-        AFillRoundedRect(bezel, 5, nil, [NSColor colorWithWhite:0 alpha:0.16 * dim]);
+        AFillRoundedRect(bezel, 5, nil, [NSColor colorWithWhite:dark ? 1 : 0 alpha:(dark ? 0.12 : 0.16) * dim]);
         if (focused)
             AFillRoundedRect(NSInsetRect(bezel, -2.5, -2.5), 7.5, nil, [NSColor keyboardFocusIndicatorColor]);
         /* the arrow box at the right end */
@@ -1068,7 +1070,7 @@ static BOOL choosable(NSMenuItem *item)
         }
     } else {
         arrows = NSMakeRect(NSMaxX(bezel) - 12, bezel.origin.y, 10, bezel.size.height);
-        NSColor *gray = [NSColor colorWithWhite:0 alpha:(pressed ? 0.8 : 0.5) * dim];
+        NSColor *gray = [NSColor colorWithWhite:dark ? 1 : 0 alpha:(pressed ? 0.8 : dark ? 0.6 : 0.5) * dim];
         if ([cell arrowPosition] != NSPopUpNoArrow) {
             if (pulls) {
                 chevron(NSMakeRect(NSMidX(arrows) - 3, NSMidY(arrows) - 2, 6, 3), !up, gray, 1.4);
@@ -1078,7 +1080,7 @@ static BOOL choosable(NSMenuItem *item)
             }
         }
         if (pressed)
-            text = [NSColor colorWithWhite:0 alpha:dim];
+            text = [NSColor colorWithWhite:dark ? 1 : 0 alpha:dim];
     }
     /* the title, and the item's image before it */
     CGFloat x = bezel.origin.x + 8, right = arrows.origin.x - 4;
