@@ -293,7 +293,7 @@ static const struct ferry_symbol *const tables[] = {
     ferry_dispatch_symbols, ferry_dispatch_io_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
     ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
     ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols, ferry_libc_more_symbols, ferry_oslog_symbols,
-    ferry_swift_symbols, ferry_setjmp_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
+    ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
     ferry_libc_apps_symbols,
 };
 

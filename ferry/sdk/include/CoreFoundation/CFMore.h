@@ -340,6 +340,7 @@ CF_IMPLICIT_BRIDGING_DISABLED
 __FERRY_END
 
 /* ---- byte order (CFByteOrder) ---------------------------------------------------------- */
+#include <libkern/OSByteOrder.h>  /* a Mac's CFByteOrder.h brings it in */
 enum { CFByteOrderUnknown = 0, CFByteOrderLittleEndian = 1, CFByteOrderBigEndian = 2 };
 typedef CFIndex CFByteOrder;
 static inline CFByteOrder CFByteOrderGetCurrent(void) { return CFByteOrderLittleEndian; }

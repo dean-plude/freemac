@@ -157,7 +157,6 @@ extern const struct ferry_symbol ferry_kqueue_symbols[];
 extern const struct ferry_symbol ferry_libc_more_symbols[]; /* libc_more.c: malloc zones, basename, xattrs,
                                                              * fts, statfs, asl */
 extern const struct ferry_symbol ferry_oslog_symbols[]; /* objc/oslog.c: os_log */
-extern const struct ferry_symbol ferry_setjmp_symbols[]; /* setjmp.c: setjmp and longjmp */
 extern const struct ferry_symbol ferry_copyfile_symbols[]; /* copyfile.c: copyfile and fcopyfile */
 /* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
 extern const struct ferry_symbol ferry_swift_symbols[];

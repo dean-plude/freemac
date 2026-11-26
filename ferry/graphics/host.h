@@ -234,6 +234,11 @@ void pango_cairo_context_set_font_options(PangoContext *context, const cairo_fon
 void pango_cairo_show_layout_line(cairo_t *cr, PangoLayoutLine *line);
 void pango_cairo_layout_line_path(cairo_t *cr, PangoLayoutLine *line);
 cairo_scaled_font_t *pango_cairo_font_get_scaled_font(PangoFont *font);
+/* (freemac 1.NEXT) the font a fontset gives for a character, for CTFontCreateForString */
+typedef struct _PangoFontset PangoFontset;
+PangoFontset *pango_context_load_fontset(PangoContext *context, const PangoFontDescription *desc, void *language);
+PangoFont *pango_fontset_get_font(PangoFontset *fontset, unsigned wc);
+PangoFontMap *pango_font_get_font_map(PangoFont *font);
 
 /* ---- HarfBuzz ---------------------------------------------------------------- */
 
@@ -276,6 +281,10 @@ hb_language_t hb_language_from_string(const char *str, int len);
 hb_bool_t hb_font_get_glyph_name(hb_font_t *font, hb_codepoint_t glyph, char *name, unsigned size);
 hb_bool_t hb_font_get_glyph_from_name(hb_font_t *font, const char *name, int len, hb_codepoint_t *glyph);
 enum { HB_MEMORY_MODE_DUPLICATE = 0, HB_MEMORY_MODE_READONLY = 1 };
+/* (freemac 1.NEXT) reading the names and style of a font file's faces, for
+ * Core Text's font descriptors (the calls above, and these) */
+hb_blob_t *hb_blob_create_from_file(const char *file_name);
+float hb_style_get_value(hb_font_t *font, uint32_t style_tag);
 
 /* ---- GdkPixbuf (decoding image files) and Poppler (PDF) ------------------------- */
 

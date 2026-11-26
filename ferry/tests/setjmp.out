@@ -1,0 +1,8 @@
+jmp_buf is 148 bytes, sigjmp_buf 152
+setjmp came back with 7 after 2 rounds, kept 42
+longjmp with 0 gives 1
+setjmp puts the mask back: 1
+_setjmp leaves it: 1
+sigsetjmp(1) puts it back: 1
+sigsetjmp(0) leaves it: 1
+exit=0

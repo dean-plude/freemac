@@ -164,7 +164,12 @@ static NSString *full_name(NSString *family, NSString *style)
 - (NSString *)description { return [NSString stringWithFormat:@"<CTFontDescriptor %p> %@", self, attrs]; }
 @end
 
-static CTFontDescriptorRef make_descriptor(NSDictionary *attrs)
+CTFontDescriptorRef GFontDescriptorMake(NSDictionary *attrs);
+NSDictionary *GFontDescriptorAttributes(CTFontDescriptorRef descriptor);
+id GFontInstalledFaceAttribute(NSDictionary *attributes, NSString *attribute); /* CoreTextFonts.m */
+
+static CTFontDescriptorRef make_descriptor(NSDictionary *attrs) { return GFontDescriptorMake(attrs); }
+CTFontDescriptorRef GFontDescriptorMake(NSDictionary *attrs)
 {
     GFontDescriptor *d = [[GFontDescriptor alloc] init];
     d->attrs = [attrs copy] ?: [[NSDictionary alloc] init];
@@ -172,7 +177,8 @@ static CTFontDescriptorRef make_descriptor(NSDictionary *attrs)
 }
 
 /* A descriptor's attributes; AppKit's NSFontDescriptor passed as one answers too. */
-static NSDictionary *attrs_of(CTFontDescriptorRef descriptor)
+static NSDictionary *attrs_of(CTFontDescriptorRef descriptor) { return GFontDescriptorAttributes(descriptor); }
+NSDictionary *GFontDescriptorAttributes(CTFontDescriptorRef descriptor)
 {
     id d = (id)descriptor;
     if ([d isKindOfClass:[GFontDescriptor class]])
@@ -242,7 +248,10 @@ CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef descriptor)
 
 CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute)
 {
-    id v = attribute ? [attrs_of(descriptor) objectForKey:(id)attribute] : nil;
+    NSDictionary *a = attrs_of(descriptor);
+    id v = attribute ? [a objectForKey:(id)attribute] : nil;
+    if (!v && attribute)   /* one that names an installed font answers for it */
+        v = GFontInstalledFaceAttribute(a, (NSString *)attribute);
     return (CFTypeRef)[v retain];
 }
 
@@ -742,13 +751,6 @@ static NSArray *descriptors_from_data(NSData *data, NSURL *url)
     }
     hb_blob_destroy(blob);
     return out.count ? out : nil;
-}
-
-CFArrayRef CTFontManagerCreateFontDescriptorsFromURL(CFURLRef fileURL)
-{
-    NSURL *url = (NSURL *)fileURL;
-    NSData *data = url.isFileURL ? [NSData dataWithContentsOfURL:url] : nil;
-    return (CFArrayRef)[descriptors_from_data(data, url) copy];
 }
 
 CFArrayRef CTFontManagerCreateFontDescriptorsFromData(CFDataRef data)

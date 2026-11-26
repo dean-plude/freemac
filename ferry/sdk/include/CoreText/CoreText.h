@@ -50,6 +50,21 @@ CTFontRef CTFontCreateCopyWithSymbolicTraits(CTFontRef font, CGFloat size, const
                                              CTFontSymbolicTraits value, CTFontSymbolicTraits mask);
 CTFontRef CTFontCreateCopyWithFamily(CTFontRef font, CGFloat size, const CGAffineTransform *matrix,
                                      CFStringRef family);
+CTFontRef CTFontCreateForString(CTFontRef current, CFStringRef string, CFRange range);
+
+/* descriptors, collections and the font manager (freemac 1.NEXT) */
+typedef const struct __CTFontCollection *CTFontCollectionRef;
+extern const CFStringRef kCTFontNameAttribute, kCTFontDisplayNameAttribute, kCTFontFamilyNameAttribute,
+    kCTFontStyleNameAttribute, kCTFontSizeAttribute, kCTFontTraitsAttribute, kCTFontURLAttribute;
+extern const CFStringRef kCTFontSymbolicTrait, kCTFontWeightTrait, kCTFontWidthTrait, kCTFontSlantTrait;
+CTFontDescriptorRef CTFontDescriptorCreateWithAttributes(CFDictionaryRef attributes);
+CTFontDescriptorRef CTFontDescriptorCreateWithNameAndSize(CFStringRef name, CGFloat size);
+CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef descriptor);
+CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute);
+CTFontCollectionRef CTFontCollectionCreateWithFontDescriptors(CFArrayRef descriptors, CFDictionaryRef options);
+CTFontCollectionRef CTFontCollectionCreateFromAvailableFonts(CFDictionaryRef options);
+CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef collection);
+CFArrayRef CTFontManagerCreateFontDescriptorsFromURL(CFURLRef url);
 CFStringRef CTFontCopyPostScriptName(CTFontRef font);
 CFStringRef CTFontCopyFamilyName(CTFontRef font);
 CFStringRef CTFontCopyFullName(CTFontRef font);
