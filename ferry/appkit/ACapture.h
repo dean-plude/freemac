@@ -40,6 +40,11 @@ int ACaptureStoredAnswer(void);
 BOOL ACaptureAllowed(void);
 /* asks the user, once in the program's life, without waiting */
 void ACaptureAsk(void);
+/* the same for another kind of access, kept in ~/.config/freemac/KIND.json:
+ * "screen-recording", "microphone" or "camera" (freemac 1.241). With wait,
+ * returns once the user has answered (freemac-allow-control has exited). */
+int ACaptureStoredAnswerOfKind(NSString *kind);
+void ACaptureAskKind(NSString *kind, BOOL wait);
 
 /* ---- displays and windows --------------------------------------------------------------- */
 

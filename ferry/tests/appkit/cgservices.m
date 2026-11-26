@@ -254,6 +254,18 @@ int main(void)
         NSString *app = [store[@"apps"] allKeys].firstObject;
         store[@"apps"][app][@"allowed"] = @NO;
         [[NSJSONSerialization dataWithJSONObject:store options:0 error:NULL] writeToFile:path atomically:YES];
+        /* and recording the screen too: CGRequestScreenCaptureAccess above
+         * asked without waiting, so wait for that answer before turning it off
+         * (else it could land after this, and the list show other windows) */
+        NSString *recPath = [NSHomeDirectory() stringByAppendingPathComponent:@".config/freemac/screen-recording.json"];
+        for (int i = 0; i < 100 && ![[NSFileManager defaultManager] fileExistsAtPath:recPath]; i++)
+            usleep(50000);
+        NSMutableDictionary *rec = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:recPath]
+                                                                   options:NSJSONReadingMutableContainers error:NULL];
+        for (NSString *k in [rec[@"apps"] allKeys])
+            rec[@"apps"][k][@"allowed"] = @NO;
+        if (rec)
+            [[NSJSONSerialization dataWithJSONObject:rec options:0 error:NULL] writeToFile:recPath atomically:YES];
         printf("turned off: preflight %d\n", CGPreflightPostEventAccess());
         show_list("on screen, turned off",
                   CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID));
