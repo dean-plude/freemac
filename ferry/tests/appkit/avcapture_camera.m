@@ -30,6 +30,19 @@ static NSString *fcc(FourCharCode c)
 @property (atomic) double firstTime, lastTime;
 @end
 
+/* counts every picture, for a session let go of while running */
+@interface Counter : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
+@property (atomic) int count;
+@end
+@implementation Counter
+- (void)captureOutput:(AVCaptureOutput *)output
+    didOutputSampleBuffer:(CMSampleBufferRef)sample
+           fromConnection:(AVCaptureConnection *)connection
+{
+    self.count++;
+}
+@end
+
 @implementation Catcher
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputSampleBuffer:(CMSampleBufferRef)sample
@@ -251,6 +264,26 @@ int main(void)
 
         printf("1280x720 offered: %d, 3840x2160: %d\n", [session canSetSessionPreset:AVCaptureSessionPreset1280x720],
                [session canSetSessionPreset:AVCaptureSessionPreset3840x2160]);
+
+        /* a running session the app lets go of stops, as OBS's legacy camera
+         * source counts on, and pictures queued before the stop aren't handed
+         * over */
+        Counter *counter = [Counter new];
+        dispatch_queue_t q = dispatch_queue_create("counter", NULL);
+        @autoreleasepool {
+            AVCaptureSession *s2 = [AVCaptureSession new];
+            AVCaptureVideoDataOutput *o2 = [AVCaptureVideoDataOutput new];
+            [s2 addInput:[AVCaptureDeviceInput deviceInputWithDevice:cam error:NULL]];
+            [s2 addOutput:o2];
+            [o2 setSampleBufferDelegate:counter queue:q];
+            [s2 startRunning];
+            for (int i = 0; i < 100 && counter.count < 3; i++)
+                usleep(20000);
+        }
+        int at_release = counter.count;
+        usleep(300000);
+        dispatch_sync(q, ^{});
+        printf("let go of while running: had pictures %d, more after %d\n", at_release >= 3, counter.count - at_release);
 
         /* the user said no */
         allow(NO);

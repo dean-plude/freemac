@@ -26,5 +26,6 @@ the device's own format: preset AVCaptureSessionPresetInputPriority
 15 a second: BGRA 640x480, IOSurface 1, described as BGRA, every 1/15 s; left red, right blue
 about 15 a second: 1
 1280x720 offered: 1, 3840x2160: 0
+let go of while running: had pictures 1, more after 0
 turned down: running 0, error -11852
 exit=0

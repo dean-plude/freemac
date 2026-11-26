@@ -3321,3 +3321,15 @@ DVCPRO HD, ProRes, Cinepak, Sorenson, MPEG-1 and 2 and the rest), and
 was built without this system's OpenGL headers, the OpenGL module still
 builds, with CGL's calls but no GL calls, so `@import CoreVideo;` and
 `@import AppKit;` work there too.
+
+## Letting go of a camera session (freemac 1.259, Ferry 0.82.0)
+
+A running `AVCaptureSession` that its app lets go of stops, as on a Mac:
+its capture thread doesn't keep it, and pictures already queued for an
+output's delegate are dropped once the session has stopped, so an app that
+frees its delegate's state along with the session (OBS's Legacy camera
+source does) isn't handed a picture afterwards. `NSNotificationCenter` lets
+go of a notification as soon as it has been posted rather than leaving it to
+the posting thread's autorelease pool, so posting doesn't keep the object a
+notification is about alive. `NSNotification` has
+`initWithName:object:userInfo:`.

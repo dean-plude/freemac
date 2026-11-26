@@ -2590,6 +2590,7 @@ typedef NSString *NSNotificationName;
 @interface NSNotification : NSObject <NSCopying>
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object;
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info;
+- (instancetype)initWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)userInfo;
 @property (readonly, copy) NSNotificationName FERRY_SWIFT_NONNULL name;
 @property (readonly, retain) id object;
 @property (readonly, copy) NSDictionary *userInfo;
