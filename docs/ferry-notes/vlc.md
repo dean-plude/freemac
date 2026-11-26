@@ -251,6 +251,42 @@ there is one, as on a Mac.
 Tests: `tests/appkit/open_running.m` (OpenApp.app asks its own socket from
 another thread) and `shell/tests/test_macapps_open.py`.
 
+## The sidebar and the dark panels (freemac 1.NEXT)
+
+VLC's library sidebar now looks like a Mac source list: grey group rows
+with Show and Hide on hover, and its playlist and media library icons kept
+square. Media Information, Video Effects and Audio Effects open as dark,
+see-through HUD panels with light text, as on a Mac, and the equalizer's
+bands stand upright at their small size.
+
+- ferry-ibtool writes a xib's `HUD` window style and works out a slider's
+  direction from its frame when the xib doesn't say, and its control size.
+- Windows with the HUD style draw dark, and the controls in them (text
+  fields, buttons, check boxes, tabs, segmented controls, pop-ups, tables,
+  outlines and sliders) draw light on dark (`appkit/NSWindow.m`,
+  `AViewIsDark`).
+- Auto Layout keeps a view's aspect ratio (a multiplier between its own
+  width and height).
+
+## The full Preferences (freemac 1.NEXT)
+
+Show All in VLC's Preferences opens the full list of VLC's settings, with
+every module's options, instead of freezing VLC. VLC wraps each setting's
+help text with a layout manager and a text container and no text view;
+Ferry's layout manager now lays text out by itself in that case, line by
+line in the container's width, each line running to the next as on a Mac
+(`appkit/NSTextView.m`). Before, every line came back empty and VLC's
+wrapping never ended.
+
+VLC's Open dialog shows its "Media Resource Locator (MRL)" field with a
+disclosure triangle: Ferry's buttons now draw disclosure triangles and
+rounded disclosure buttons, and ferry-ibtool makes a xib's disclosure
+buttons stay on when clicked, so the triangle opens the field and turns
+down, as on a Mac (`appkit/NSControl.m`).
+
+Tests: `tests/appkit/layout_alone.m`, `tests/appkit/disclosure.m`, and the
+disclosure triangle in `tests/appkit/ibtool.xib`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
@@ -258,3 +294,7 @@ another thread) and `shell/tests/test_macapps_open.py`.
   SecureTransport don't build yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test
   setup only.
+- Auto Layout places views by their frames, not their alignment rectangles,
+  so where a xib spaces push buttons by their bezels (the File tab of
+  VLC's Open dialog), the space comes out too small and the File tab is
+  squashed; a box whose title is a check box (Capture's Video) is cut off.

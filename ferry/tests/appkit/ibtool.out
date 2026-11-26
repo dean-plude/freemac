@@ -4,6 +4,7 @@ top level: IBHelper, IBWindow, NSMenu, NSPanel, NSUserDefaultsController
 window: IBWindow "Settings" style 0x3 content 480x360 autosave "IBToolWindow" min 300x200 visible yes
 panel: NSPanel "Hidden Panel" utility yes visible no
 panel HUD yes, dark yes; slider vertical yes, small yes, -20 to 20
+disclosure triangle: bezel 5, open after a click yes
 content subviews: 9
 name: "Ada" placeholder "Name" editable yes bezeled yes alignment 2 bold yes tip "Your name" mask 10 in window yes
 name bound to NSUserDefaultsController, keyPath values.IBToolName

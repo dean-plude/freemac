@@ -1021,6 +1021,8 @@ class Compiler:
             aux = 3
         elif btype == "radio":
             aux = 4
+        elif btype in ("disclosureTriangle", "disclosure"):   # they open and close: on and off
+            aux = 1
         elif "changeContents" in behaviour or "lightByContents" in behaviour:
             aux = 2 if "changeContents" in behaviour else 5
         elif "changeBackground" in behaviour or "changeGray" in behaviour:

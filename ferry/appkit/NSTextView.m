@@ -5,7 +5,8 @@
  * as its text container and keeps the lines, which drawing, the caret,
  * selection and hit-testing all use. NSLayoutManager and NSTextContainer
  * exist for the code that asks for them, and for nibs, but the layout is the
- * view's. The view is flipped, as on a Mac. */
+ * view's; a layout manager lays text out itself only when no view shows it.
+ * The view is flipped, as on a Mac. */
 #import "AInternal.h"
 
 NSNotificationName const NSTextDidBeginEditingNotification = @"NSTextDidBeginEditingNotification";
@@ -19,6 +20,9 @@ NSNotificationName const NSTextViewDidChangeSelectionNotification = @"NSTextView
 - (NSRect)_rectForRange:(NSRange)range;
 - (NSRange)_rangeForRect:(NSRect)rect;
 - (NSRect)_lineRectForIndex:(NSUInteger)index range:(NSRangePointer)range;
+@end
+@interface NSLayoutManager (FerryLayout)
+- (void)_textStorageChanged;
 @end
 
 /* ---- NSTextStorage: an attributed string that tells its layout managers when it changes ---- */
@@ -107,7 +111,7 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
     _mask = 0;
     _change = 0;
     for (NSLayoutManager *lm in [[_managers copy] autorelease])
-        [[lm firstTextView] _textStorageChanged];
+        [lm _textStorageChanged];
 }
 - (void)beginEditing { _editing++; }
 - (void)endEditing
@@ -207,10 +211,23 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
 - (void)setLineBreakMode:(NSLineBreakMode)m { _lineBreak = m; }
 @end
 
+/* A line laid out by a layout manager that has no text view (below). */
+typedef struct {
+    CTLineRef line;
+    NSRange range;
+    NSRect rect;   /* the line fragment, in the container */
+    CGFloat x, width;
+} LMLine;
+
 @implementation NSLayoutManager {
     NSTextStorage *_storage;   /* not retained: the storage holds us */
     NSMutableArray *_containers;
     BOOL _nonContiguous, _fontLeading, _invisibles, _controls, _noBackgroundLayout;
+    LMLine *_own;   /* its own layout, when no text view shows the text */
+    NSUInteger _ownCount;
+    BOOL _ownValid;
+    CGFloat _ownWidth;
+    NSRect _ownUsed;
 }
 - (instancetype)init
 {
@@ -233,13 +250,105 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
     return self;
 }
 - (void)encodeWithCoder:(NSCoder *)coder {}
+- (void)_freeOwnLayout
+{
+    for (NSUInteger i = 0; i < _ownCount; i++)
+        CFRelease(_own[i].line);
+    free(_own);
+    _own = NULL;
+    _ownCount = 0;
+    _ownValid = NO;
+}
 - (void)dealloc
 {
+    [self _freeOwnLayout];
     [_containers release];
     [super dealloc];
 }
+/* Text measured with a layout manager and a text container and no text
+ * view, as apps do to wrap or size text (VLC wraps its preferences' help
+ * this way): the manager lays the text out itself, in the first
+ * container's width less its padding, one glyph to a character (freemac
+ * 1.NEXT). Laid out again when the text or the width changes. */
+- (BOOL)_ownLayout
+{
+    if ([self firstTextView] || !_storage)
+        return NO;
+    NSTextContainer *c = [_containers firstObject];
+    CGFloat pad = c ? [c lineFragmentPadding] : 0;
+    CGFloat width = fmax((c ? [c size].width : 1e7) - 2 * pad, 1);
+    if (_ownValid && width == _ownWidth)
+        return YES;
+    [self _freeOwnLayout];
+    NSMutableAttributedString *text = [[_storage mutableCopy] autorelease];
+    NSUInteger n = [text length], i = 0;
+    while (i < n) {
+        NSRange r;
+        if (![text attribute:NSFontAttributeName atIndex:i effectiveRange:&r])
+            [text addAttribute:NSFontAttributeName value:ADefaultFont() range:r];
+        i = NSMaxRange(r);
+    }
+    CGFloat bottom = 0, widest = 0;
+    if (n) {
+        const CGFloat tall = 1e6;
+        CTFramesetterRef fs = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)text);
+        CGMutablePathRef path = CGPathCreateMutable();
+        CGPathAddRect(path, NULL, CGRectMake(0, 0, width, tall));
+        CTFrameRef frame = CTFramesetterCreateFrame(fs, CFRangeMake(0, 0), path, NULL);
+        CFArrayRef lines = CTFrameGetLines(frame);
+        CFIndex count = CFArrayGetCount(lines);
+        _own = calloc((size_t)count + 1, sizeof *_own);
+        CGPoint *origins = calloc((size_t)count + 1, sizeof *origins);
+        CTFrameGetLineOrigins(frame, CFRangeMake(0, 0), origins);
+        for (CFIndex k = 0; k < count; k++) {
+            CTLineRef line = CFArrayGetValueAtIndex(lines, k);
+            CGFloat a, d, l;
+            double w = CTLineGetTypographicBounds(line, &a, &d, &l);
+            CFRange r = CTLineGetStringRange(line);
+            LMLine *t = &_own[_ownCount++];
+            t->line = CFRetain(line);
+            t->range = NSMakeRange((NSUInteger)r.location, (NSUInteger)r.length);
+            t->x = origins[k].x + pad;
+            t->width = w - CTLineGetTrailingWhitespaceWidth(line);
+            t->rect = NSMakeRect(0, tall - origins[k].y - a, width + 2 * pad, a + d + l);
+            bottom = NSMaxY(t->rect);
+            widest = fmax(widest, t->x + t->width + pad);
+        }
+        free(origins);
+        CFRelease(frame);
+        CGPathRelease(path);
+        CFRelease(fs);
+        /* each line runs to the next, as on a Mac: its paragraph's newline
+         * is its own last character */
+        for (NSUInteger k = 0; k < _ownCount; k++) {
+            NSUInteger end = k + 1 < _ownCount ? _own[k + 1].range.location : n;
+            if (end > _own[k].range.location)
+                _own[k].range.length = end - _own[k].range.location;
+        }
+    }
+    _ownUsed = NSMakeRect(0, 0, ceil(widest), ceil(bottom));
+    _ownWidth = width;
+    _ownValid = YES;
+    return YES;
+}
+- (void)_textStorageChanged
+{
+    _ownValid = NO;
+    [[self firstTextView] _textStorageChanged];
+}
+- (NSUInteger)_ownLineFor:(NSUInteger)i
+{
+    NSUInteger k = 0;
+    while (k + 1 < _ownCount && i >= NSMaxRange(_own[k].range))
+        k++;
+    return k;
+}
 - (NSTextStorage *)textStorage { return _storage; }
-- (void)setTextStorage:(NSTextStorage *)s { _storage = s; }
+- (void)setTextStorage:(NSTextStorage *)s
+{
+    _storage = s;
+    _ownValid = NO;
+}
 - (void)replaceTextStorage:(NSTextStorage *)s
 {
     [_storage removeLayoutManager:self];
@@ -251,6 +360,7 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
     if (![_containers containsObject:c]) {
         [_containers addObject:c];
         [c setLayoutManager:self];
+        _ownValid = NO;
     }
 }
 - (NSTextView *)firstTextView
@@ -263,15 +373,43 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
 - (NSRect)usedRectForTextContainer:(NSTextContainer *)c
 {
     NSTextView *tv = [c textView];
-    return tv ? [tv _usedRect] : NSZeroRect;
+    if (tv)
+        return [tv _usedRect];
+    return [self _ownLayout] ? _ownUsed : NSZeroRect;
 }
-- (NSRange)glyphRangeForTextContainer:(NSTextContainer *)c { return NSMakeRange(0, [_storage length]); }
+- (NSRange)glyphRangeForTextContainer:(NSTextContainer *)c
+{
+    /* laid out by itself: the lines that fit in the container's height */
+    if (![c textView] && [self _ownLayout] && _ownCount) {
+        CGFloat h = [c size].height;
+        NSUInteger end = 0;
+        for (NSUInteger k = 0; k < _ownCount && (k == 0 || NSMaxY(_own[k].rect) <= h); k++)
+            end = NSMaxRange(_own[k].range);
+        return NSMakeRange(0, end);
+    }
+    return NSMakeRange(0, [_storage length]);
+}
 /* One glyph for each character (freemac 1.221, Ferry 0.45.0): the text
  * view that shows the container answers for the rectangles. */
 - (NSRect)boundingRectForGlyphRange:(NSRange)range inTextContainer:(NSTextContainer *)c
 {
     NSTextView *tv = [c textView] ?: [self firstTextView];
-    return tv ? [tv _rectForRange:range] : NSZeroRect;
+    if (tv)
+        return [tv _rectForRange:range];
+    if (![self _ownLayout] || !_ownCount)
+        return NSZeroRect;
+    NSRect r = NSZeroRect;
+    for (NSUInteger k = 0; k < _ownCount; k++) {
+        LMLine *t = &_own[k];
+        NSUInteger s = MAX(range.location, t->range.location), e = MIN(NSMaxRange(range), NSMaxRange(t->range));
+        if (s > e || (s == e && range.length))
+            continue;
+        CGFloat x0 = t->x + CTLineGetOffsetForStringIndex(t->line, (CFIndex)s, NULL);
+        CGFloat x1 = t->x + CTLineGetOffsetForStringIndex(t->line, (CFIndex)e, NULL);
+        NSRect lr = NSMakeRect(x0, NSMinY(t->rect), fmax(x1 - x0, 0), NSHeight(t->rect));
+        r = NSIsEmptyRect(r) && NSWidth(r) == 0 && NSHeight(r) == 0 ? lr : NSUnionRect(r, lr);
+    }
+    return r;
 }
 - (NSRange)glyphRangeForCharacterRange:(NSRange)range actualCharacterRange:(NSRangePointer)actual
 {
@@ -301,9 +439,33 @@ NSNotificationName const NSTextStorageDidProcessEditingNotification = @"NSTextSt
 - (NSRect)lineFragmentRectForGlyphAtIndex:(NSUInteger)i effectiveRange:(NSRangePointer)range
 {
     NSTextView *tv = [self firstTextView];
-    return tv ? [tv _lineRectForIndex:i range:range] : NSZeroRect;
+    if (tv)
+        return [tv _lineRectForIndex:i range:range];
+    if (![self _ownLayout] || !_ownCount) {
+        if (range)
+            *range = NSMakeRange(0, 0);
+        return NSZeroRect;
+    }
+    LMLine *t = &_own[[self _ownLineFor:i]];
+    if (range)
+        *range = t->range;
+    return t->rect;
 }
-- (void)ensureLayoutForTextContainer:(NSTextContainer *)c { [[c textView] _usedRect]; }
+- (NSRect)lineFragmentUsedRectForGlyphAtIndex:(NSUInteger)i effectiveRange:(NSRangePointer)range
+{
+    NSRect r = [self lineFragmentRectForGlyphAtIndex:i effectiveRange:range];
+    if ([self firstTextView] || !_ownCount)
+        return r;
+    LMLine *t = &_own[[self _ownLineFor:i]];
+    return NSMakeRect(0, NSMinY(r), ceil(t->x + t->width + [[_containers firstObject] lineFragmentPadding]), NSHeight(r));
+}
+- (void)ensureLayoutForTextContainer:(NSTextContainer *)c
+{
+    if ([c textView])
+        [[c textView] _usedRect];
+    else
+        [self _ownLayout];
+}
 - (NSUInteger)numberOfGlyphs { return [_storage length]; }
 - (CGFloat)defaultLineHeightForFont:(NSFont *)f
 {

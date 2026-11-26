@@ -1,0 +1,9 @@
+  used is as tall as the lines, bounds within the width
+  after a change: 5 chars on the first line
+wrapped to 200: 5 lines, a newline at each break, text unchanged
+  used is as tall as the lines, bounds within the width
+  after a change: 5 chars on the first line
+two paragraphs at 500: 2 lines, no newline added
+  after a change: 5 chars on the first line
+empty text: 0 lines, empty
+exit=0
