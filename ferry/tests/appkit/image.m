@@ -177,6 +177,8 @@ int main(void)
         size("add template", [plus size]);
         printf("app icon: %d, caution: %d\n", [NSImage imageNamed:NSImageNameApplicationIcon] != nil,
                [NSImage imageNamed:NSImageNameCaution] != nil);
+        NSImage *look = [NSImage imageNamed:@"NSQuickLookTemplate"];
+        printf("quick look: template %d, %.0fx%.0f\n", [look isTemplate], [look size].width, [look size].height);
         NSImageView *iv = [NSImageView imageViewWithImage:plus];
         [iv setFrame:NSMakeRect(0, 0, 14, 14)];
         [iv setContentTintColor:[NSColor colorWithRed:1 green:0 blue:0 alpha:1]];

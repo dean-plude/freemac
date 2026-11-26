@@ -20,7 +20,7 @@ stepper: 10 in 0..50 by 5, in the box yes
 browser, an element the tool does not know: NSView
 table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes (line border yes), header yes
   column name "Name" width 150 editable yes
-  column size "Size" width 120 editable no
+  column AutomaticTableColumnIdentifier.1 "Size" width 120 editable no
   multiple selection no, alternating rows yes, source list yes
   rows 2
 stack: NSStackView orientation 1, 2 views: "First" (1) "Second" (0)

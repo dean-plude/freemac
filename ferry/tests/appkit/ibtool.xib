@@ -173,7 +173,7 @@ DQ
                                             </textFieldCell>
                                             <tableColumnResizingMask key="resizingMask" resizeWithTable="YES" userResizable="YES"/>
                                         </tableColumn>
-                                        <tableColumn identifier="size" editable="NO" width="120" minWidth="40" maxWidth="1000" id="col2">
+                                        <tableColumn identifier="" editable="NO" width="120" minWidth="40" maxWidth="1000" id="col2">
                                             <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" title="Size">
                                                 <font key="font" metaFont="smallSystem"/>
                                             </tableHeaderCell>

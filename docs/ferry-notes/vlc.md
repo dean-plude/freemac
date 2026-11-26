@@ -364,6 +364,22 @@ is still to try.
 
 Test: `tests/appkit/notify_dock_outlet.m`.
 
+## The Messages window (freemac 1.NEXT)
+
+VLC's Messages window (Window > Messages) showed each message's text in
+all three columns, and its Details button was a blank blue square. Its
+table's columns have no identifiers in the xib; Interface Builder then
+names them "AutomaticTableColumnIdentifier.0", ".1" and so on, and each
+column's cell view goes by its column's name. ferry-ibtool gave them all
+the empty name, so the last column's cell view was used for every column.
+It now names them as Interface Builder does. The Details button's picture,
+NSQuickLookTemplate, is now drawn by Ferry (an eye). The playlist with
+several videos (Window > Playlist) shows each with its duration and the
+total, as on a Mac.
+
+Tests: the unnamed column in `tests/appkit/ibtool.xib`, and the eye in
+`tests/appkit/image.m`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
