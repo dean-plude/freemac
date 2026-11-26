@@ -287,6 +287,17 @@ down, as on a Mac (`appkit/NSControl.m`).
 Tests: `tests/appkit/layout_alone.m`, `tests/appkit/disclosure.m`, and the
 disclosure triangle in `tests/appkit/ibtool.xib`.
 
+## Pop-up menus and the other windows (freemac 1.NEXT)
+
+VLC's pop-up menus (the Convert / Save profile, every choice in
+Preferences) draw their white rounded button and blue arrow box as on a
+Mac. Interface Builder writes a pop-up button's cell with the border style
+"borderAndBezel", which ferry-ibtool had read as no border at all; it now
+sets both (`sdk/ferry-ibtool`). Convert / Save (Shift-Command-S) and
+Bookmarks (Command-B) open with their controls in place.
+
+Test: the pop-up line in `tests/appkit/ibtool.m`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.

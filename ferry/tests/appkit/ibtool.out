@@ -13,7 +13,7 @@ ok: "OK" key Return tag 12 bezel 1 target IBOwner action confirm:
 confirm: from NSButton "OK"
 check: "Show the thing" state 0 (the defaults say no)
 check after the default changed: state 1
-pop-up: 3 items, selected "Medium" tag 2, pulls down no
+pop-up: 3 items, selected "Medium" tag 2, pulls down no, bezel drawn yes
 box: "Details" holds 2 views
 stepper: 10 in 0..50 by 5, in the box yes
 browser, an element the tool does not know: NSView

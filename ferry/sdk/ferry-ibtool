@@ -486,9 +486,10 @@ class Compiler:
             f |= 0x10000000
         if yes(cell, "selectable"):
             f |= 0x00200000
-        if cell.get("borderStyle") == "bezel" or yes(cell, "bezeled"):
+        # a pop-up button's cell is written with borderStyle "borderAndBezel": both bits
+        if cell.get("borderStyle") in ("bezel", "borderAndBezel") or yes(cell, "bezeled"):
             f |= 0x00400000
-        if cell.get("borderStyle") == "border" or yes(cell, "bordered"):
+        if cell.get("borderStyle") in ("border", "borderAndBezel") or yes(cell, "bordered"):
             f |= 0x00800000
         if yes(cell, "scrollable"):
             f |= 0x00100000
@@ -1032,7 +1033,7 @@ class Compiler:
         else:
             aux = 0
         bezel = BEZEL.get(c.get("bezelStyle"), 1 if btype == "push" else 2)
-        bordered = c.get("borderStyle") == "border" or yes(c, "bordered")
+        bordered = c.get("borderStyle") in ("border", "borderAndBezel") or yes(c, "bordered")
         flags = (0x00800000 if bordered else 0) | (0x8000 if yes(c, "transparent") else 0) | 0x04000000
         mask = 0
         m = child(c, "modifierMask", "keyEquivalentModifierMask")
