@@ -560,6 +560,26 @@ NSString *FStringCaseMapped(NSString *s, int kind);
 - (NSString *)localizedUppercaseString { return [self uppercaseString]; }
 - (NSString *)localizedLowercaseString { return [self lowercaseString]; }
 - (NSString *)localizedCapitalizedString { return [self capitalizedString]; }
+/* Ferry 0.66: in the given locale's rules, as ICU has them (Turkish's dotted
+ * capital I, for one); nil is no locale's, the same as uppercaseString. */
+NSString *FStringCaseMappedInLocale(NSString *s, int kind, const char *locale);
+static const char *case_locale(id locale)
+{
+    NSString *ident = [locale respondsToSelector:@selector(localeIdentifier)] ? [locale localeIdentifier] : nil;
+    return ident ? [ident UTF8String] : "";
+}
+- (NSString *)uppercaseStringWithLocale:(NSLocale *)locale
+{
+    return FStringCaseMappedInLocale(self, 0, case_locale(locale)) ?: [self mapChars:to_upper];
+}
+- (NSString *)lowercaseStringWithLocale:(NSLocale *)locale
+{
+    return FStringCaseMappedInLocale(self, 1, case_locale(locale)) ?: [self mapChars:to_lower];
+}
+- (NSString *)capitalizedStringWithLocale:(NSLocale *)locale
+{
+    return FStringCaseMappedInLocale(self, 2, case_locale(locale)) ?: [self mapChars:to_cap];
+}
 
 /* numbers */
 - (int)intValue { return (int)[self longLongValue]; }

@@ -446,6 +446,10 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 @property (readonly, copy) NSString *localizedUppercaseString;
 @property (readonly, copy) NSString *localizedLowercaseString;
 @property (readonly, copy) NSString *localizedCapitalizedString;
+/* in that locale's rules (Turkish's dotted capital I); nil is no locale's (Ferry 0.66) */
+- (NSString *)uppercaseStringWithLocale:(NSLocale *)locale;
+- (NSString *)lowercaseStringWithLocale:(NSLocale *)locale;
+- (NSString *)capitalizedStringWithLocale:(NSLocale *)locale;
 @property (readonly) int intValue;
 @property (readonly) NSInteger integerValue;
 @property (readonly) long long longLongValue;
