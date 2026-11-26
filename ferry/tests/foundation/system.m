@@ -73,6 +73,14 @@ int main(int argc, char **argv)
         printf("app support %s\n", tilde([[[fm URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask]
                                               firstObject] path]));
         printf("caches %s\n", [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, NO) firstObject] UTF8String]);
+        /* the computer's own folders, as OBS's libobs asks for its program data (freemac 1.239) */
+        printf("local app support %s\n", [[NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                              NSLocalDomainMask, YES) componentsJoinedByString:@" "] UTF8String]);
+        printf("all app support %s\n", tilde([NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                              NSAllDomainsMask, YES) componentsJoinedByString:@" "]));
+        printf("local applications %s, system documents %lu\n",
+               [[[[fm URLsForDirectory:NSApplicationDirectory inDomains:NSLocalDomainMask] firstObject] path] UTF8String],
+               (unsigned long)[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSSystemDomainMask, YES) count]);
 
         /* user defaults: written through to ~/.config/ferry/preferences */
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
