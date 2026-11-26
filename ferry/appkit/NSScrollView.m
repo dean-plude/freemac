@@ -907,8 +907,12 @@ static Class ruler_class;
         NSRectFill(NSMakeRect(b.origin.x, b.origin.y, vRuler, hRuler));
     }
     if (_border != NSNoBorder) {
-        [[NSColor colorWithCalibratedWhite:_border == NSLineBorder ? 0.3 : 0.72 alpha:1] setFill];
-        NSFrameRect([self bounds]);
+        /* in a HUD panel the border is a faint light line, not a light frame on the dark */
+        if (AViewIsDark(self))
+            [[NSColor colorWithCalibratedWhite:1 alpha:0.2] setFill];
+        else
+            [[NSColor colorWithCalibratedWhite:_border == NSLineBorder ? 0.3 : 0.72 alpha:1] setFill];
+        NSFrameRectWithWidthUsingOperation([self bounds], 1, NSCompositingOperationSourceOver);
     }
 }
 @end

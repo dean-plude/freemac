@@ -885,6 +885,7 @@ run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_b
 run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
 # disclosure triangles and rounded disclosure buttons
 run_one appkit_disclosure "$here/appkit/disclosure.m" "$here/appkit/disclosure.out" -fobjc-arc -framework Cocoa
+run_one appkit_hud_table "$here/appkit/hud_table.m" "$here/appkit/hud_table.out" -fobjc-arc -framework Cocoa
 # NSAccessibility: the names, the protocol's methods and the older API
 run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
     -framework Cocoa -framework ApplicationServices

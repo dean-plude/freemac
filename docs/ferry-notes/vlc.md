@@ -298,6 +298,16 @@ Bookmarks (Command-B) open with their controls in place.
 
 Test: the pop-up line in `tests/appkit/ibtool.m`.
 
+Bookmarks' list matches its dark panel: a table's header in a HUD panel
+is a faint band with light titles, and a scroll view's border there is a
+faint line, not a light frame (`appkit/NSTableView.m`,
+`appkit/NSScrollView.m`). ferry-ibtool also gives a scroll view the border
+its xib names (none, line, bezel or groove); before, every one with a
+vertical scroller got a bezel and every one without got none.
+
+Tests: `tests/appkit/hud_table.m`, and the table's line border in
+`tests/appkit/ibtool.xib`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.

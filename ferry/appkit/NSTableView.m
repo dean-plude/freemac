@@ -432,6 +432,8 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
 - (void)drawInteriorWithFrame:(NSRect)frame inView:(NSView *)view
 {
     NSColor *color = [self textColor] ?: [NSColor headerTextColor];
+    if (AViewIsDark(view))   /* a table in a HUD panel: its header is dark, the titles light */
+        color = ADarkText(color);
     ATableDrawTextLine(AAttributed([self stringValue], [self font] ?: [NSFont systemFontOfSize:11], color),
                    NSInsetRect(frame, 6, 0), [self alignment] == NSTextAlignmentNatural ? NSTextAlignmentLeft : [self alignment],
                    [view isFlipped]);
@@ -737,8 +739,16 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (void)drawRect:(NSRect)dirty
 {
     NSRect b = [self bounds];
-    [[NSColor controlBackgroundColor] setFill];
-    NSRectFill(dirty);
+    /* in a HUD panel the header is a faint light band on the dark panel, as on a Mac */
+    BOOL dark = AViewIsDark(self);
+    NSColor *line = dark ? [NSColor colorWithWhite:1 alpha:0.15] : [NSColor separatorColor];
+    if (dark) {
+        [[NSColor colorWithWhite:1 alpha:0.06] setFill];
+        NSRectFillUsingOperation(dirty, NSCompositingOperationSourceOver);
+    } else {
+        [[NSColor controlBackgroundColor] setFill];
+        NSRectFill(dirty);
+    }
     NSArray *cols = [_tableView tableColumns];
     NSArray *sorts = [_tableView sortDescriptors];
     NSSortDescriptor *first = [sorts firstObject];
@@ -750,8 +760,8 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
         if (!NSIntersectsRect(r, dirty))
             continue;
         if ((NSInteger)i == _pressed && _resized < 0) {
-            [[NSColor colorWithCalibratedWhite:0 alpha:0.05] setFill];
-            NSRectFill(r);
+            [[NSColor colorWithCalibratedWhite:dark ? 1 : 0 alpha:dark ? 0.1 : 0.05] setFill];
+            NSRectFillUsingOperation(r, NSCompositingOperationSourceOver);
         }
         NSTableHeaderCell *cell = [c headerCell];
         NSSortDescriptor *proto = [c sortDescriptorPrototype];
@@ -763,11 +773,13 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
         if (sorted)
             [cell drawSortIndicatorWithFrame:r inView:self ascending:[first ascending] priority:0];
         /* a thin divider, short of the top and bottom */
-        [[NSColor separatorColor] setFill];
-        NSRectFill(NSMakeRect(NSMaxX(r) - 1, b.origin.y + 6, 1, b.size.height - 12));
+        [line setFill];
+        NSRectFillUsingOperation(NSMakeRect(NSMaxX(r) - 1, b.origin.y + 6, 1, b.size.height - 12),
+                                 NSCompositingOperationSourceOver);
     }
-    [[NSColor separatorColor] setFill];
-    NSRectFill(NSMakeRect(dirty.origin.x, NSMaxY(b) - 1, dirty.size.width, 1));
+    [line setFill];
+    NSRectFillUsingOperation(NSMakeRect(dirty.origin.x, NSMaxY(b) - 1, dirty.size.width, 1),
+                             NSCompositingOperationSourceOver);
 }
 - (void)mouseDown:(NSEvent *)e
 {
@@ -823,10 +835,16 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (void)drawRect:(NSRect)dirty
 {
     NSRect b = [self bounds];
-    [[NSColor controlBackgroundColor] setFill];
-    NSRectFill(dirty);
-    [[NSColor separatorColor] setFill];
-    NSRectFill(NSMakeRect(b.origin.x, NSMaxY(b) - 1, b.size.width, 1));
+    BOOL dark = AViewIsDark(self);
+    if (dark) {
+        [[NSColor colorWithWhite:1 alpha:0.06] setFill];
+        NSRectFillUsingOperation(dirty, NSCompositingOperationSourceOver);
+    } else {
+        [[NSColor controlBackgroundColor] setFill];
+        NSRectFill(dirty);
+    }
+    [dark ? [NSColor colorWithWhite:1 alpha:0.15] : [NSColor separatorColor] setFill];
+    NSRectFillUsingOperation(NSMakeRect(b.origin.x, NSMaxY(b) - 1, b.size.width, 1), NSCompositingOperationSourceOver);
 }
 @end
 
