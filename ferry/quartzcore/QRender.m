@@ -10,7 +10,8 @@
  * are always drawn the right way up on the page. A layer casts its shadow
  * (freemac 1.253): from its shadowPath when it has one, else from all it
  * draws (background, contents, sublayers and border) taken as one, as Apple
- * documents. Masks and filters aren't drawn yet. */
+ * documents. A mask keeps the layer only where the mask layer is opaque
+ * (freemac 1.254). Filters aren't drawn yet. */
 #import "QInternal.h"
 
 /* From a layer's bounds space to the space its superlayer puts sublayers
@@ -245,6 +246,8 @@ static NSDictionary *values_of(CALayer *l, BOOL pres)
     return pres ? [l _ferryPresentationValues] : [l _ferryValues];
 }
 
+static void apply_mask(CALayer *mask, CGContextRef ctx, BOOL pres, BOOL flipped);
+
 static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pres, BOOL flipped,
                          void (^content)(CGContextRef))
 {
@@ -272,13 +275,12 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         CGContextRestoreGState(ctx);
         CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
     }
-    BOOL group = opacity < 1 || (shadowed && !fromPath);
+    CALayer *mask = [l mask];
+    BOOL group = opacity < 1 || (shadowed && !fromPath) || mask;
     if (group) {
         CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
         CGContextBeginTransparencyLayer(ctx, NULL);
     }
-    if ([l mask])
-        QWarnOnce("layer masks");
     if ([v[@"filters"] count] || [v[@"backgroundFilters"] count] || v[@"compositingFilter"])
         QWarnOnce("layer filters");
     double radius = QNum(v, @"cornerRadius");
@@ -361,8 +363,31 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         CGPathRelease(edge);
     }
     CGPathRelease(shape);
+    if (mask)
+        apply_mask(mask, ctx, pres, flipped);
     if (group)
         CGContextEndTransparencyLayer(ctx);
+    CGContextRestoreGState(ctx);
+}
+
+/* A mask: what the layer drew so far (in its transparency layer) is kept
+ * only as far as the mask layer, drawn in the layer's own space as placed
+ * by its frame, is opaque; its colours don't count (freemac 1.254). */
+static void apply_mask(CALayer *mask, CGContextRef ctx, BOOL pres, BOOL flipped)
+{
+    NSDictionary *mv = values_of(mask, pres);
+    CGAffineTransform m = placement(mv);
+    CGContextSaveGState(ctx);
+    CGContextSetAlpha(ctx, 1);
+    CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
+    /* the transparency layer goes onto what is there in the blend mode in
+     * force when it began, the mask drawn in it as usual */
+    CGContextSetBlendMode(ctx, kCGBlendModeDestinationIn);
+    CGContextBeginTransparencyLayer(ctx, NULL);
+    CGContextSetBlendMode(ctx, kCGBlendModeNormal);
+    CGContextConcatCTM(ctx, m);
+    render_layer(mask, mv, ctx, pres, flipped ^ reverses(m), nil);
+    CGContextEndTransparencyLayer(ctx);
     CGContextRestoreGState(ctx);
 }
 
