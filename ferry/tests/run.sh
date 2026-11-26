@@ -615,6 +615,8 @@ run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/draw
 # the test clock.
 run_one quartzcore_layers "$here/quartzcore/layers.m" "$here/quartzcore/layers.out" -fobjc-arc \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_shadows "$here/quartzcore/layer_shadows.m" "$here/quartzcore/layer_shadows.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
 run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/animations.out" -fobjc-arc -fblocks \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
 # AppKit (M4). First with no display, where windows are drawn off screen,
