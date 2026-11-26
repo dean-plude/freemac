@@ -28,8 +28,8 @@ const char *const ferry_host_names[] = {
  * which AppKit uses for windows, GdkPixbuf, Poppler and OpenJPEG, which
  * read image, PDF and JPEG 2000 files, and GIO, whose D-Bus calls, menu
  * models and actions put menu bar items and an app's own menus in the
- * desktop's menu bar and whose content types name
- * the icon for a kind of file. Each is opened the first time one of its calls is looked up. */
+ * desktop's menu bar, whose content types name the icon for a kind of
+ * file and whose settings say whether the desktop is light or dark. Each is opened the first time one of its calls is looked up. */
 struct group {
     const char *what;
     const char *const *libraries;
@@ -79,7 +79,7 @@ void *ferry_host_lookup(const char *name)
                       : !strncmp(name, "g_bus_", 6) || !strncmp(name, "g_dbus_", 7) ||
                               !strncmp(name, "g_content_type_", 15) || !strncmp(name, "g_themed_icon_", 14) ||
                               !strncmp(name, "g_menu_", 7) || !strncmp(name, "g_simple_action", 15) ||
-                              !strncmp(name, "g_action_map_", 13)
+                              !strncmp(name, "g_action_map_", 13) || !strncmp(name, "g_settings_", 11)
                           ? &gio
                       : !strncmp(name, "gtk_", 4) || !strncmp(name, "gdk_", 4) ? &windows
                                                                          : &drawing;

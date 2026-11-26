@@ -455,8 +455,8 @@ APPKIT_EXTERN NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDid
  * so any other gives nil, as an unknown colour does. */
 @interface NSColor (FerryCatalog)
 + (NSColor *)colorWithCatalogName:(NSString *)listName colorName:(NSString *)colorName;
-/* A catalog colour's list and name. Ferry's colours are all component
- * based (type is never NSColorTypeCatalog), so both give nil. */
+/* A catalog colour's list and name: a system colour, which changes with
+ * the appearance, is in the System list; other colours give nil. */
 @property (readonly, copy) NSString *catalogNameComponent;
 @property (readonly, copy) NSString *colorNameComponent;
 @property (readonly, copy) NSString *localizedCatalogNameComponent;
