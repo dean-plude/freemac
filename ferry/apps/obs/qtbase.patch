@@ -1,0 +1,83 @@
+diff --git a/src/plugins/platforms/cocoa/qcocoawindow.mm b/src/plugins/platforms/cocoa/qcocoawindow.mm
+index 63f8b08d..bb72c39a 100644
+--- a/src/plugins/platforms/cocoa/qcocoawindow.mm
++++ b/src/plugins/platforms/cocoa/qcocoawindow.mm
+@@ -25,7 +25,9 @@
+ #include <qpa/qplatformscreen.h>
+ #include <QtGui/private/qcoregraphics_p.h>
+ #include <QtGui/private/qhighdpiscaling_p.h>
++#if QT_CONFIG(metal)
+ #include <QtGui/private/qmetallayer_p.h>
++#endif
+ 
+ #include <QDebug>
+ 
+@@ -1736,6 +1738,7 @@ void QCocoaWindow::deliverUpdateRequest()
+     qCDebug(lcQpaDrawing) << "Delivering update request to" << window();
+     QScopedValueRollback<bool> blocker(m_deliveringUpdateRequest, true);
+ 
++#if QT_CONFIG(metal)
+     if (auto *qtMetalLayer = qt_objc_cast<QMetalLayer*>(contentLayer())) {
+         // We attempt a read lock here, so that the animation/render thread is
+         // prioritized lower than the main thread's displayLayer processing.
+@@ -1751,6 +1754,7 @@ void QCocoaWindow::deliverUpdateRequest()
+         // back into setNeedsDisplay, which would deadlock.
+         qtMetalLayer.displayLock.unlock();
+     }
++#endif
+ 
+     QPlatformWindow::deliverUpdateRequest();
+ }
+diff --git a/src/plugins/platforms/cocoa/qnsview.mm b/src/plugins/platforms/cocoa/qnsview.mm
+index 0d7f5055..ab6794e7 100644
+--- a/src/plugins/platforms/cocoa/qnsview.mm
++++ b/src/plugins/platforms/cocoa/qnsview.mm
+@@ -36,7 +36,9 @@
+ #endif
+ #include "qcocoaintegration.h"
+ #include <QtGui/private/qmacmimeregistry_p.h>
++#if QT_CONFIG(metal)
+ #include <QtGui/private/qmetallayer_p.h>
++#endif
+ 
+ #include <QuartzCore/CATransaction.h>
+ 
+diff --git a/src/plugins/platforms/cocoa/qnsview_drawing.mm b/src/plugins/platforms/cocoa/qnsview_drawing.mm
+index 877169f2..89e2ed40 100644
+--- a/src/plugins/platforms/cocoa/qnsview_drawing.mm
++++ b/src/plugins/platforms/cocoa/qnsview_drawing.mm
+@@ -103,6 +103,7 @@
+ */
+ - (CALayer *)makeBackingLayer
+ {
++#if QT_CONFIG(metal)
+     if ([self shouldUseMetalLayer]) {
+         // Check if Metal is supported. If it isn't then it's most likely
+         // too late at this point and the QWindow will be non-functional,
+@@ -117,6 +118,7 @@
+                 << "Metal is not supported by any of the GPUs in this system.";
+         }
+     }
++#endif
+ 
+     // We handle drawing via displayLayer instead of drawRect or updateLayer,
+     // as the latter two do not work for CAMetalLayer. And we handle content
+@@ -300,6 +302,7 @@
+         m_platformWindow->handleExposeEvent(bounds);
+     };
+ 
++#if QT_CONFIG(metal)
+     if (auto *qtMetalLayer = qt_objc_cast<QMetalLayer*>(layer)) {
+         const bool presentedWithTransaction = qtMetalLayer.presentsWithTransaction;
+         qtMetalLayer.presentsWithTransaction = YES;
+@@ -335,7 +338,9 @@
+             qCDebug(lcMetalLayer) << "Unlocking" << qtMetalLayer << "after finishing display-cycle";
+             qtMetalLayer.displayLock.unlock();
+         }, Qt::QueuedConnection);
+-    } else {
++    } else
++#endif
++    {
+         handleExposeEvent();
+     }
+ }

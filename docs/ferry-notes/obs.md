@@ -1,0 +1,81 @@
+# OBS Studio under Ferry
+
+Notes from getting OBS Studio 33.0.3's Mac app running under Ferry, for the
+release notes when the recipe lands (freemac 1.NEXT, Ferry 0.NEXT).
+
+## How it's built
+
+`ferry/apps/obs.sh [WORK]` fetches OBS Studio at its 33.0.3 commit and what
+it uses from their own repositories (Qt 6.11.1's qtbase and qtsvg, x264,
+mbedtls 3.6.2, jansson, nlohmann/json, SIMDe, uthash; FFmpeg 8.0.1 through
+`apps/ffmpeg.sh`; FreeType from qtbase's own copy) and builds them all with
+clang aimed at `x86_64-apple-macos12`, Ferry's headers and ld64.lld. Nothing
+of theirs is kept in freemac's repository. The app lands at
+`WORK/build/obs/OBS.app`, laid out as OBS's own Xcode build and macdeployqt
+lay it out, and runs with `./ferry WORK/build/obs/OBS.app`. Qt's plugins sit
+inside the bundle (`Contents/PlugIns`, found through `Resources/qt.conf`), so
+nothing needs `QT_PLUGIN_PATH`. Where `zip` is installed the recipe also packs
+the app, links kept, as `WORK/build/obs/OBS-33.0.3.zip`, which freemac opens
+like any other Mac app's download.
+
+Qt is built twice: once for this system, for its build tools (moc, rcc,
+uic), and once for Ferry as frameworks with `@rpath` install names. OBS's
+CMake wants Xcode on a Mac; with Ferry it is built by Ninja instead.
+
+Two patches, in `ferry/apps/obs/`, are applied to the checkouts:
+
+- `qtbase.patch`: Qt's Cocoa plugin includes and uses its Metal layer
+  whatever `FEATURE_metal` says. The patch puts those parts under
+  `QT_CONFIG(metal)`, so the plugin builds without Metal. Ferry draws Qt's
+  windows through Core Animation layers.
+- `obs-studio.patch`: an `OBS_FERRY` option. It takes the macOS CMake path
+  without asking for Xcode, Swift or an Apple SDK, and doesn't check OBS's
+  prebuilt dependency bundle. It doesn't build libobs-metal. It skips the
+  modules named in `OBS_FERRY_SKIP_MODULES`. It also adds two includes
+  (`inttypes.h`, `AvailabilityMacros.h`) that a Mac's SDK headers bring in
+  by themselves. And "Desktop Audio" lists a sound server's monitors (see
+  Known gaps).
+
+Left out: the browser source and docks (CEF), obs-websocket, VST, scripting,
+the virtual camera, Syphon, AJA and Decklink cards, and the camera source
+(mac-avcapture), which waits for Ferry's AVCaptureDevice to list cameras.
+VideoToolbox and Core Audio's AAC encoder are left out too: Ferry has
+neither, and FFmpeg's AAC encoder and x264 serve instead.
+
+## What works (on the test machine, with Mesa's llvmpipe)
+
+- The main window, the preview, scenes and sources, the mixer, the docks.
+- Screen capture (`screen_capture`, over Ferry's ScreenCaptureKit), once the
+  app is allowed to record the screen (`~/.config/freemac/screen-recording.json`,
+  set by freemac-allow-control).
+- Recording to Matroska with x264 and FFmpeg's AAC, through `obs-ffmpeg-mux`.
+  A SIGTERM quits OBS cleanly and the file is finished. (OBS asks before
+  quitting while it records unless `ConfirmOnExit=false` in `user.ini`.)
+- Sound in recordings, from "macOS Audio Capture" (`sck_audio_capture`,
+  desktop sound through ScreenCaptureKit). A 440 Hz tone fed through Ferry's
+  null sound device came out at 440 Hz and the same level.
+- Recording from a microphone ("Mic/Aux", Core Audio input). OBS asks for
+  microphone access once, freemac asks the user, and the answer is kept in
+  `~/.config/freemac/microphone.json` (freemac #290). A 440 Hz tone fed to
+  Ferry's null device as the input came out at the same pitch.
+- Settings (every page), a source's Properties and Filters, and Add Source.
+- `--startrecording` and `--collection NAME` on the command line.
+
+## Known gaps
+
+- "Desktop Audio" as OBS sets it up by default (`coreaudio_output_capture`)
+  lists only input devices whose UID names a loopback driver (BlackHole,
+  Loopback, Soundflower). The patch adds a sound server's monitors of the
+  outputs (UIDs ending in `.monitor`) and makes "Default" the monitor of the
+  default output. That is written but not yet tried on a real sound server
+  (the test machine has only Ferry's null device); "macOS Audio Capture"
+  works for desktop sound meanwhile.
+- The text source (`text-freetype2`) looks for fonts in the folders that
+  `NSSearchPathForDirectoriesInDomains(NSLibraryDirectory)` names, plus
+  `Fonts`. Ferry maps those to `~/.local/share`, `/usr/local/share` and
+  `/usr/share`, where the folder is `fonts`, in lower case. So it finds no
+  fonts yet.
+- The camera source isn't built: Ferry's `AVCaptureDevice` lists no cameras
+  yet.
+- Frame rate: with screen capture under llvmpipe about a quarter of the
+  frames are late (21 to 22 of 30 per second). This hasn't been profiled.
