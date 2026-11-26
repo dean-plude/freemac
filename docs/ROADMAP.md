@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.249 "Ported programs link as on a Mac" (done)
+
+Ferry 0.72.0: a program built with Ferry's SDK can ask for the maths, dynamic-loading, threads and C libraries by name (-lm, -ldl, -lpthread, -lc), as builds ported from other systems do, and gets libSystem for each, as a Mac's SDK gives it. Before, each of those stopped the build at the link.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | libm.tbd, libdl.tbd, libpthread.tbd and libc.tbd in the SDK, each libSystem, made and installed with it | Ferry SDK (Makefile) | done |
+| 2 | A test program built with all four links and runs | tests/run.sh (sdk_std_libs) | done |
+
 ## 1.248 "Fonts for Mac apps" (done)
 
 Ferry 0.71.0: a Mac app that looks for fonts in a Mac's Fonts folders now finds this computer's fonts there. OBS Studio's Text source lists them, so a font picked in its Select font window shows the text in the preview and the recording, where before it found no fonts and drew nothing.

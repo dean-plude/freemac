@@ -1546,7 +1546,8 @@ Software Update carries to installed computers.
   naming the call; Ferry never guesses.
 - The Ferry SDK (`ferry-cc`) builds Mac programs on freemac with clang and
   lld, against our own headers and our own description of libSystem, so tests
-  never need a Mac.
+  never need a Mac. `-lm`, `-ldl`, `-lpthread` and `-lc` link libSystem, as
+  on a Mac (freemac 1.249).
 
 **Sources.** Only public documentation and open specifications: the Mach-O
 file format as documented publicly and in LLVM's open-source tools (Apache-2.0
