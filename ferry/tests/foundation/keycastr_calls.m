@@ -199,6 +199,12 @@ static void strings_and_errors(void)
     NSString *s = @"caf\u00e9 \u00e0 la carte";
     printf("  %s / %s / %s\n", [[s localizedUppercaseString] UTF8String], [[@"FERRY Boat" localizedLowercaseString] UTF8String],
            [[@"the ferry boat" localizedCapitalizedString] UTF8String]);
+    /* Ferry 0.66: OBS lowercases its names with lowercaseStringWithLocale: */
+    NSLocale *en = [NSLocale localeWithLocaleIdentifier:@"en_US"];
+    printf("  with a locale: %s / %s / %s; nil: %s\n", [[@"Video Capture Device" lowercaseStringWithLocale:en] UTF8String],
+           [[@"mac capture" uppercaseStringWithLocale:en] UTF8String],
+           [[@"screen capture" capitalizedStringWithLocale:en] UTF8String],
+           [[@"OBS Studio" lowercaseStringWithLocale:nil] UTF8String]);
     printf("  NSMultipleUnderlyingErrorsKey: %s\n", [NSMultipleUnderlyingErrorsKey UTF8String]);
     printf("  NSHomeDirectoryForUser(me) is the home: %s, for no one: %s\n",
            [NSHomeDirectoryForUser(NSUserName()) isEqualToString:NSHomeDirectory()] ? "yes" : "no",
