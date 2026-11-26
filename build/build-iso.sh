@@ -15,6 +15,9 @@
 #   VERSION   image version string (default: contents of VERSION file)
 #   WORKDIR   scratch directory (default: ./work)
 #   OUTDIR    output directory (default: ./out)
+#   FERRY_DEB path to Ferry's package (freemac-ferry_*.deb, from
+#             ferry/packaging/build-deb.sh) to put on the image; without it
+#             the image has no Ferry, and Mac apps don't open
 #   SOURCE_DATE_EPOCH  timestamp used for every file in the image (default: last
 #             git commit time, or the VERSION file's mtime)
 
@@ -146,6 +149,19 @@ in_chroot apt-get install -y --no-install-recommends $KERNEL $PACKAGES
 # A second update, now that AppStream is installed, downloads the app
 # catalogue (DEP-11) for Harbor and builds its cache.
 in_chroot apt-get update || log "Warning: couldn't download the app catalogue; Harbor will fetch it later"
+
+# Ferry, freemac's runner for Mac apps, from the package the release built
+# just before (FERRY_DEB). Without it the image is the same desktop, and
+# opening a Mac app says that Ferry isn't on this computer.
+if [ -n "${FERRY_DEB:-}" ] && [ -f "$FERRY_DEB" ]; then
+  log "Adding Ferry ($(basename "$FERRY_DEB"))"
+  cp "$FERRY_DEB" "$ROOTFS/tmp/freemac-ferry.deb"
+  FERRY_LIBS=$(grep -v '^[[:space:]]*#' "$REPO/build/packages/ferry.list" | tr -s ' \n' ' ')
+  # shellcheck disable=SC2086
+  in_chroot apt-get install -y --no-install-recommends /tmp/freemac-ferry.deb $FERRY_LIBS \
+    || log "Warning: couldn't add Ferry; Mac apps won't open on this image"
+  rm -f "$ROOTFS/tmp/freemac-ferry.deb"
+fi
 
 log "Applying freemac overlay"
 # Root owns everything the overlay adds. cp -a alone would keep the owner of

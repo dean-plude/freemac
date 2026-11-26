@@ -96,6 +96,17 @@ class Store(unittest.TestCase):
             self.assertEqual(window_control.main(["--app-id", "com.example.Flycut", "--name", "Flycut"]), 1)
             ask.assert_called_once_with("com.example.Flycut", "Flycut")
 
+    def test_microphone_and_camera_are_questions_of_their_own(self):
+        # freemac 1.241: AVCaptureDevice asks with --kind microphone or camera
+        for kind, words in (("microphone", "use the microphone"), ("camera", "use the camera")):
+            self.assertEqual(window_control.path(kind), os.path.join(self.dir.name, "freemac", kind + ".json"))
+            self.assertEqual(window_control.question("OBS", kind), f"Allow “OBS” to {words}?")
+            self.assertEqual(window_control.main(["--app-id", "com.obsproject.obs-studio", "--name", "OBS",
+                                                  "--kind", kind, "--answer", "deny"]), 1)
+            self.assertFalse(window_control.answer("com.obsproject.obs-studio", kind))
+        self.assertIsNone(window_control.answer("com.obsproject.obs-studio", "screen-recording"))
+        self.assertIsNone(window_control.answer("com.obsproject.obs-studio"))
+
     def test_recording_the_screen_is_its_own_question_and_file(self):
         # freemac 1.238: Ferry's screen capture asks with --kind screen-recording
         self.assertEqual(window_control.path("screen-recording"),
@@ -205,6 +216,26 @@ class Dials(unittest.TestCase):
         self.assertIsNone(window_control.answer("com.example.Flycut"))
         self.assertEqual([r.title for r in self.rows(listbox)], ["Spectacle"])
 
+
+    def test_recording_microphone_and_camera_show_once_an_app_has_asked(self):
+        from freemac_shell import dials_security
+
+        window_control.set_allowed("com.obsproject.obs-studio", True, "OBS", "screen-recording")
+        window_control.set_allowed("com.obsproject.obs-studio", False, "OBS", "microphone")
+        widgets = dials_security.control_section(self.window())
+        headings = [w.get_text() for w in widgets[0::3]]
+        self.assertEqual(headings, ["Control Other Windows", "Screen Recording", "Microphone"])
+        recording = self.rows(widgets[4])
+        self.assertEqual([r.title for r in recording], ["OBS"])
+        switch = self.find(recording[0], self.Gtk.Switch)[0]
+        self.assertTrue(switch.get_active())
+        switch.set_active(False)
+        self.assertFalse(window_control.answer("com.obsproject.obs-studio", "screen-recording"))
+        self.assertFalse(window_control.answer("com.obsproject.obs-studio", "microphone"))
+        forget = [b for b in self.find(self.rows(widgets[7])[0], self.Gtk.Button) if b.get_label() == "Forget"][0]
+        forget.clicked()
+        self.assertIsNone(window_control.answer("com.obsproject.obs-studio", "microphone"))
+        self.assertFalse(window_control.answer("com.obsproject.obs-studio", "screen-recording"))
 
 if __name__ == "__main__":
     unittest.main()

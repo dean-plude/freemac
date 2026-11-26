@@ -6,10 +6,10 @@ top, a dock along the bottom, calm window chrome, a fast search launcher and
 trackpad gestures that just work.
 
 It is a small Linux distribution (Debian base) with its own Wayland desktop
-shell. It is **not** macOS and it contains nothing from Apple. An optional
-add-on, [Ferry](ferry/README.md), runs some simple command-line programs built
-for Intel Macs; Mac apps in general, and App Store apps in particular, do not
-run.
+shell. It is **not** macOS and it contains nothing from Apple. It comes with
+[Ferry](ferry/README.md), our own runner for apps built for Intel Macs: open a
+Mac app and it runs on the freemac desktop. Many apps run (VLC and OBS Studio
+among them), many don't yet, and App Store apps never will.
 
 ## Screenshots
 
@@ -302,26 +302,27 @@ From 0.5 on, work is planned in batches of features; the current list is in
 ## Running Mac apps
 
 freemac is not macOS and does not include it. Mac program support comes from
-Ferry, our own optional, experimental compatibility layer (milestone 6), and
+Ferry, our own compatibility layer (milestone 6), which comes with freemac, and
 its limits are real:
 
 - **App Store apps are not supported.** They are encrypted and tied to Apple's
   DRM and Apple ID, and freemac will not try to work around that.
 - Only apps built for Intel (x86-64), or universal apps, can run on a PC. Apps
   built only for Apple silicon cannot.
-- Ferry runs simple command-line programs, and simple windowed ones built
-  with AppKit. Real Mac apps start and load their windows but none runs all
-  the way yet; most everyday Mac apps will not work for a long time, if ever.
+- Ferry runs command-line programs and windowed apps built with AppKit,
+  SwiftUI and Qt: VLC plays videos, OBS Studio records the screen with its
+  sound, and smaller apps such as TomatoBar, Itsycal and Sequel Pro run. Many
+  everyday Mac apps still need things Ferry doesn't have yet.
   See [ferry/README.md](ferry/README.md) and
   [docs/ferry-compat.md](docs/ferry-compat.md).
-- Ferry isn't on the ISO. Each release has its package beside the ISO
-  (`freemac-ferry_*_amd64.deb`); double-click it in freemac to install it.
+- Ferry is on the ISO from 1.241, and Software Update brings it to computers
+  installed earlier. Each release also has its package beside the ISO
+  (`freemac-ferry_*_amd64.deb`) for other Ubuntu computers.
 
 Mac apps still look like themselves on freemac: put a `.app` in the
 Applications folder (or use Add to Applications in Drawer) and it appears in
 the app grid, dock and search with its own icon, read from the app itself.
-Opening one runs it through Ferry when Ferry is installed and the program is
-simple enough; otherwise freemac says plainly that it can't run yet.
+Opening one runs it through Ferry when Ferry can run it; otherwise freemac says plainly that it can't run yet.
 A Mac program's menu bar items (the icons and words at the right of a Mac's
 menu bar) appear in freemac's menu bar, with their menus.
 Their lists, tables and outlines (the kind with a column header you click

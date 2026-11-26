@@ -1,6 +1,6 @@
 freemac @VERSION@: a live ISO you can start in a virtual machine (or on a PC from a USB stick) without building anything.
 
-freemac is an original, free desktop for x86-64 PCs that works like a classic Mac-style desktop: a menu bar along the top, a dock along the bottom, Command-key shortcuts and its own apps. It is Linux underneath and contains nothing from Apple. It is not macOS and doesn't run Mac apps.
+freemac is an original, free desktop for x86-64 PCs that works like a classic Mac-style desktop: a menu bar along the top, a dock along the bottom, Command-key shortcuts and its own apps. It is Linux underneath and contains nothing from Apple. It is not macOS, but it comes with Ferry, its own runner for Intel Mac apps: open a Mac app (a .app, or a .dmg or .pkg to install one) and it runs on the freemac desktop. Many apps run; some don't yet, and App Store apps never will.
 
 ## What's new in @VERSION@
 

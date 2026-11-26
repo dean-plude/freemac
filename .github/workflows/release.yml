@@ -54,9 +54,9 @@ jobs:
             sudo udevadm trigger --name-match=kvm
           fi
 
-      - name: Build Ferry, the optional Mac layer
-        # A package of its own, published beside the ISO. It isn't on the
-        # ISO, and a failure here doesn't stop the release.
+      - name: Build Ferry, freemac's runner for Mac apps
+        # Its package goes on the ISO and is also published beside it. A
+        # failure here doesn't stop the release: that ISO just has no Ferry.
         continue-on-error: true
         timeout-minutes: 20
         run: |
@@ -68,9 +68,11 @@ jobs:
         # A build takes about 20 minutes; one that stalls stops here.
         timeout-minutes: 70
         run: |
-          # Ferry, the optional Mac layer, isn't part of the desktop image.
+          # Ferry goes on the image from the package the step above built;
+          # its sources aren't needed for the rest of the build.
+          FERRY_DEB=$(ls "$PWD"/out-ferry/freemac-ferry_*_amd64.deb 2>/dev/null | head -1 || true)
           rm -rf ferry
-          sudo env BASE=ubuntu WORKDIR=/mnt/fm-work OUTDIR="$PWD/out" ./build/build-iso.sh
+          sudo env BASE=ubuntu WORKDIR=/mnt/fm-work OUTDIR="$PWD/out" FERRY_DEB="$FERRY_DEB" ./build/build-iso.sh
           sudo rm -rf /mnt/fm-work
           sudo chown -R "$USER" out
           ls -la out

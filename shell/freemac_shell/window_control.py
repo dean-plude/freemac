@@ -34,6 +34,11 @@ form: whether an app may record the screen and other apps' windows
 Studio does. Ferry runs it with --kind screen-recording when an app first
 asks (CGRequestScreenCaptureAccess, or SCShareableContent).
 
+From freemac 1.241 it asks two more, each in a file of its own beside the
+others: --kind microphone (microphone.json) and --kind camera (camera.json),
+for AVCaptureDevice's requestAccessForMediaType:, as OBS Studio's microphone
+and camera sources ask.
+
 The answer is a choice the user makes, not a wall: every program of the
 user's can reach Wayfire's IPC socket. Original freemac code.
 """
@@ -44,7 +49,8 @@ import sys
 
 FILE = "window-control.json"
 # the questions this program asks, and the file each answer is kept in
-KINDS = {"control": FILE, "screen-recording": "screen-recording.json"}
+KINDS = {"control": FILE, "screen-recording": "screen-recording.json",
+         "microphone": "microphone.json", "camera": "camera.json"}
 
 
 def path(kind="control"):
@@ -114,6 +120,10 @@ def display_name(app_id):
 def question(name, kind="control"):
     if kind == "screen-recording":
         return f"Allow “{name}” to record this computer's screen?"
+    if kind == "microphone":
+        return f"Allow “{name}” to use the microphone?"
+    if kind == "camera":
+        return f"Allow “{name}” to use the camera?"
     return f"Allow “{name}” to control other windows?"
 
 
@@ -121,6 +131,14 @@ DETAIL = ("It wants to move and resize the windows of other apps, list them and 
           "and press keys in them. You can change this in Dials > Privacy & Security.")
 RECORDING_DETAIL = ("It wants to see everything on the screen and in other apps' windows, "
                     "and record it. You can change this in Dials > Privacy & Security.")
+MICROPHONE_DETAIL = ("It wants to hear and record what the microphone picks up. "
+                     "You can change this in Dials > Privacy & Security.")
+CAMERA_DETAIL = ("It wants to see and record what the camera shows. "
+                 "You can change this in Dials > Privacy & Security.")
+DETAILS = {"control": (DETAIL, "preferences-desktop-accessibility"),
+           "screen-recording": (RECORDING_DETAIL, "camera-video"),
+           "microphone": (MICROPHONE_DETAIL, "audio-input-microphone"),
+           "camera": (CAMERA_DETAIL, "camera-web")}
 
 
 def ask(app_id, name, kind="control"):
@@ -133,11 +151,10 @@ def ask(app_id, name, kind="control"):
     from . import alert, style
 
     style.apply()
-    recording = kind == "screen-recording"
-    response = alert.ask(None, question(name, kind), RECORDING_DETAIL if recording else DETAIL,
+    detail, icon = DETAILS[kind]
+    response = alert.ask(None, question(name, kind), detail,
                          [("Don't Allow", Gtk.ResponseType.CANCEL), ("Allow", Gtk.ResponseType.OK)],
-                         default=Gtk.ResponseType.CANCEL,
-                         icon="camera-video" if recording else "preferences-desktop-accessibility")
+                         default=Gtk.ResponseType.CANCEL, icon=icon)
     allowed = response == Gtk.ResponseType.OK
     set_allowed(app_id, allowed, name, kind)
     return allowed
@@ -151,7 +168,8 @@ def main(argv=None):
     parser.add_argument("--answer", choices=("allow", "deny"),
                         help="keep this answer without asking (for scripts and tests)")
     parser.add_argument("--kind", choices=sorted(KINDS), default="control",
-                        help="what is asked: controlling other windows (the default) or recording the screen")
+                        help="what is asked: controlling other windows (the default), recording the screen, "
+                             "or using the microphone or camera")
     args = parser.parse_args(argv)
     name = args.name or display_name(args.app_id)
     known = answer(args.app_id, args.kind)

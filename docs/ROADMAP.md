@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.241 "Ferry comes with freemac" (done)
+
+Ferry 0.65.0 is on the ISO: a new freemac has Ferry from the start, so a Mac app opens from Drawer, the dock or the app grid with its own icon, and a .dmg or .pkg opens in Ferry's Installer, with nothing to add first. Software Update brings Ferry to computers installed earlier. Its libraries come too: libc++ for apps written in C++, 7-Zip for disk images and libcurl for networking. Its package is still published beside the ISO for other Ubuntu computers. In Ferry's test setup, OBS Studio now records the screen with its sound: the Screen source captures the display at half size over a colour, and quitting OBS stops the recording and finishes the file (19 seconds of H.264 and AAC, a 440 Hz test tone recorded at its own pitch and level). Buttons that apps make in code now draw through their cells, as Qt 6's Mac style draws OBS's buttons.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Ferry on the ISO: the release builds its package first and the image installs it with its libraries (`build/packages/ferry.list`); an image whose Ferry didn't build is the same desktop without it | Build (build-iso.sh, release workflow) | done |
+| 2 | Software Update carries Ferry (its program, frameworks, Installer, SDK and binfmt registration) to installed computers | Software Update (make-update-bundle.py) | done |
+| 3 | The release notes, README and Drawer's message no longer call Ferry an add-on | Docs, Drawer | done |
+| 4 | In Ferry's test setup, OBS Studio records the screen and its sound, and stops cleanly when asked to quit | Ferry (OBS task) | done |
+| 5 | Buttons made in code draw through their cells; `CGDirectDisplay.h` brings CGImage and CGColorSpace, as on a Mac | Ferry AppKit, SDK | done |
+| 6 | Dials > Privacy & Security lists every question Mac apps ask through Ferry: Screen Recording, Microphone and Camera join Control Other Windows once an app has asked, each app with its switch and Forget; freemac-allow-control asks about the microphone and the camera | Dials, Ferry | done |
+
 ## 1.240 "Ferry: screen capture on Wayland" (done)
 
 Ferry 0.64.0: Mac apps record the screen on Wayland, freemac's own Wayfire desktop included. Capture now speaks the xdg-desktop-portal ScreenCast portal (a session for each stream, the portal's own dialog where the user picks a display or a window, the pointer as metadata or drawn in, and a restore token kept for each app so the dialog can be skipped the next time) and reads the PipeWire stream it hands back in shared memory, into the same IOSurface frames as under X11, so ScreenCaptureKit, CGDisplayStream and the screen's pictures work the same way. Displays and windows are listed from Wayfire's IPC, as NSScreen and the window list already number them; on other compositors the displays come from wl_output and the window is the one the user picks. Capture chooses the portal where Wayland's portal answers, X11 otherwise, and `FERRY_CAPTURE` still forces one. freemac's own screen-recording question is asked first, as before; the portal's dialog comes after it. It has been tested against a stand-in portal with a real PipeWire, not yet in a real Wayfire session, and DMA-BUF streams aren't read yet.

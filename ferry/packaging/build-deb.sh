@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Builds freemac-ferry_VERSION_amd64.deb, an optional add-on that is not part
-# of the freemac ISO. Install it with: sudo apt install ./freemac-ferry_*.deb
+# Builds freemac-ferry_VERSION_amd64.deb. The freemac ISO installs it (see
+# FERRY_DEB in build/build-iso.sh); on another computer: sudo apt install ./freemac-ferry_*.deb
 set -eu
 top=$(cd "$(dirname "$0")/.." && pwd)
 out=${OUTDIR:-$top/packaging/out}

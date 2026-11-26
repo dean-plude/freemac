@@ -2,7 +2,8 @@
 
 Ferry runs simple command-line programs and simple windowed programs built for Intel Macs on freemac (and
 other x86-64 Linux systems). It is our own code, written from public
-documentation, and an optional add-on: it isn't on the freemac ISO.
+documentation, and it comes with freemac: the ISO has it from freemac 1.241, and Software Update brings it to
+computers installed earlier.
 
 ```
 ferry ./program [arguments]
