@@ -158,6 +158,11 @@ gboolean gtk_file_chooser_set_current_folder(void *chooser, const char *filename
 void gtk_file_chooser_set_current_name(void *chooser, const char *name);
 GSList *gtk_file_chooser_get_filenames(void *chooser);
 void gtk_file_chooser_add_filter(void *chooser, GtkFileFilter *filter);
+/* a choice under the chooser (GTK 3.22): options NULL for a check box */
+void gtk_file_chooser_add_choice(void *chooser, const char *id, const char *label, const char **options,
+                                 const char **option_labels);
+void gtk_file_chooser_set_choice(void *chooser, const char *id, const char *option);
+const char *gtk_file_chooser_get_choice(void *chooser, const char *id);
 GtkFileFilter *gtk_file_filter_new(void);
 void gtk_file_filter_set_name(GtkFileFilter *filter, const char *name);
 void gtk_file_filter_add_pattern(GtkFileFilter *filter, const char *pattern);
