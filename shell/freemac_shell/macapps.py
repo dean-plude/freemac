@@ -19,6 +19,7 @@ generic app icon instead.
     freemac-mac-app open Foo.app [FILE...]       run it with Ferry, if it can be, and open the files in it
     freemac-mac-app icon Foo.app out.png         write its icon as a PNG
     freemac-mac-app scan                         add apps found in Applications to the app grid
+    freemac-mac-app watch                        keep doing so while the session lasts
 
 Ferry runs Mac apps built only on the frameworks it has so far; when it can't
 run one, opening it says so plainly instead of failing silently. What Ferry
@@ -463,6 +464,93 @@ def scan():
     return added
 
 
+# ---- watching ------------------------------------------------------------
+# freemac 1.243: an app dragged into Applications (or unzipped there) shows
+# up in the app grid, the Dock's app list and search within seconds, and one
+# moved to the Trash goes, as on a Mac, rather than at the next login. The
+# Applications folders are looked at every few seconds (a folder's listing
+# is cheap to read, and ~/Applications may not exist yet to be watched); a
+# new app is added once it has stopped growing, so one still being copied
+# isn't added half-copied, without its icon.
+def signature(path):
+    """(files, bytes, newest change) of everything in path: equal twice in a
+    row means nothing is being copied into it any more."""
+    files = size = newest = 0
+    for root, dirs, names in os.walk(path):
+        for name in names + dirs:
+            try:
+                st = os.lstat(os.path.join(root, name))
+            except OSError:
+                continue
+            files += 1
+            size += st.st_size
+            newest = max(newest, st.st_mtime_ns)
+    return files, size, newest
+
+
+class Watcher:
+    """What's in the Applications folders, and which new apps are still
+    being copied. poll() is one look; it runs scan() when an app went, or a
+    new one is complete."""
+
+    def __init__(self, folders=None, scan=None):
+        self.folders = folders or [places(False)[0], places(True)[0]]
+        self.scan = scan or globals()["scan"]
+        self.seen = self.listing()
+        self.waiting = {}          # new folder -> its signature at the last look
+        self.plain = set()         # new folders that settled without being apps (yet)
+
+    def listing(self):
+        found = set()
+        for folder in self.folders:
+            try:
+                found |= {os.path.join(folder, n) for n in os.listdir(folder) if not n.startswith(".")}
+            except OSError:
+                pass
+        return found
+
+    def poll(self):
+        """One look. True when scan() ran."""
+        now = self.listing()
+        gone = bool(self.seen - now)
+        for path in now - self.seen:
+            self.waiting[path] = None
+        self.seen = now
+        self.plain &= now
+        for path in [p for p in self.plain if is_bundle(p)]:   # its Info.plist came last
+            self.plain.discard(path)
+            self.waiting[path] = None
+        added = False
+        for path in list(self.waiting):
+            if path not in now or not os.path.isdir(path):
+                del self.waiting[path]
+                continue
+            sig = signature(path)
+            if sig != self.waiting[path]:
+                self.waiting[path] = sig
+                continue
+            del self.waiting[path]
+            if is_bundle(path):
+                added = True
+            else:
+                self.plain.add(path)
+        if gone or added:
+            try:
+                self.scan()
+            except (OSError, ValueError):
+                pass
+            return True
+        return False
+
+
+def watch(every=3.0):
+    import time
+    watcher = Watcher()
+    while True:
+        time.sleep(every)
+        watcher.poll()
+
+
 def in_applications(path):
     folder = os.path.dirname(os.path.realpath(path))
     return folder in {os.path.realpath(places(s)[0]) for s in (False, True)}
@@ -567,6 +655,12 @@ def main(argv=None):
     args = [a for a in argv if not a.startswith("--")]
     if args[:1] == ["scan"]:
         scan()
+        return 0
+    if args[:1] == ["watch"]:
+        try:
+            watch()
+        except KeyboardInterrupt:
+            pass
         return 0
     if len(args) < 2 or args[0] not in ("install", "remove", "open", "icon"):
         print(__doc__.split("\n\n")[3], file=sys.stderr)
