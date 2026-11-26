@@ -1183,6 +1183,18 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.239 "Ferry: OBS Studio's main window opens" (done)
+
+Ferry 0.63.0: OBS Studio 33 (its Mac build, with Qt 6.11) starts under Ferry and opens its main window: scenes, sources, the audio mixer, transitions and controls, with its OpenGL preview running at 30 frames a second on Mesa. The last thing in the way was libobs asking for the computer's own Application Support folder, a Mac's local domain, which Ferry didn't answer, so OBS stopped at once. Mac apps now get the computer's folders as a Mac gives them: `/Applications`, `/usr/local/share` (Library and Application Support, where freemac's installer puts apps' files for everyone) and `/var/cache` for the local domain, `/usr/share` for the system domain, after the user's own, in a Mac's order. OBS doesn't record yet, and the download doesn't include Ferry's OBS build; this is Ferry's test setup.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSSearchPathForDirectoriesInDomains` and `-[NSFileManager URLsForDirectory:inDomains:]` answer the local and system domains, as OBS's libobs asks for its program data | Ferry (foundation/) | done |
+| 2 | OBS 33 runs to its main window, its modules (x264, FFmpeg, outputs, filters, transitions, image source, RTMP services) loaded and its preview drawing | Ferry (OBS task) | done |
+| 3 | OBS records, and captures the screen with mac-capture | Ferry (OBS task) | next |
+| 4 | Tests: `foundation_system` checks the local and system domains. `make check` 330 of 330, three times | Ferry | done |
+| 5 | The README shows OBS under Ferry | Docs | done |
+
 ## 1.238 "Ferry: screen capture for OBS, VLC's Preferences and subtitles, and Qt 6 windows on screen" (done)
 
 Ferry 0.62.0: Mac apps record the screen. ScreenCaptureKit lists the displays, the windows and the apps that own them, and streams a display, part of one, a single window, or a display showing only some apps' windows (or all but some) as Core Media sample buffers whose pixels are IOSurface-backed Core Video buffers in 'BGRA', 'l10r', '420v' or '420f', with the frame-info attachments OBS reads, at the configured size and frame interval, with or without the pointer. The older calls OBS also uses are here too: CGDisplayStream, display modes, and the window list with its pictures of other apps' windows and of the screen. Under X11 the pixels come from the X server, through MIT-SHM where it can share memory and XGetImage where it can't, a window's own through XComposite, and the pointer through XFixes; with `capturesAudio` the stream also records what the computer plays from the sound server's monitor. Recording asks the user once, as freemac's own question with its own file of answers. Wayland (Wayfire) would need the ScreenCast portal and PipeWire, which aren't spoken yet: there capture says so and finds nothing, unless `FERRY_CAPTURE=x11` points it at an X server.

@@ -1124,8 +1124,10 @@ static BOOL delegate_allows(NSFileManager *fm, SEL pathSel, SEL urlSel, NSString
 }
 - (NSArray *)URLsForDirectory:(NSSearchPathDirectory)directory inDomains:(NSSearchPathDomainMask)mask
 {
-    NSString *p = (mask & NSUserDomainMask) ? FUserFolder(directory) : nil;
-    return p ? [NSArray arrayWithObject:[NSURL fileURLWithPath:p isDirectory:YES]] : [NSArray array];
+    NSMutableArray *a = [NSMutableArray array];
+    for (NSString *p in NSSearchPathForDirectoriesInDomains(directory, mask, YES))
+        [a addObject:[NSURL fileURLWithPath:p isDirectory:YES]];
+    return a;
 }
 - (NSURL *)URLForDirectory:(NSSearchPathDirectory)directory inDomain:(NSSearchPathDomainMask)domain
          appropriateForURL:(NSURL *)url create:(BOOL)create error:(NSError **)error
