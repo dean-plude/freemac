@@ -212,10 +212,17 @@ now links libc++ by itself as a Mac's clang++ does, so VLC's C++ modules
 
 Tests: `tests/iconv.c`, `tests/graphics/fonts.c`, `tests/foundation/numbers.m`.
 
+Subtitles burned into a converted video (`--sout '#transcode{...,soverlay}'`)
+now come out as on screen. They were striped and tinted whenever VLC scaled
+them to fit the picture: `apps/vlc.sh` built FFmpeg without its nasm files
+but with its inline assembly, and swscale's inline MMXEXT code then hands
+its vertical filter, in the MMX layout, to the plain C scaler, which reads
+it as the C layout. FFmpeg is now built in plain C (nasm's Mach-O objects
+use a relocation ld64.lld refuses), and a build from the earlier recipe is
+redone. Nothing in Ferry was wrong here.
+
 ## Still to do
 
-- Subtitles burned into a transcoded video (`soverlay`) come out striped
-  and tinted; on screen they're right.
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
 - VideoToolbox decoding, the keychain, speech, the CD module and
   SecureTransport don't build yet.
