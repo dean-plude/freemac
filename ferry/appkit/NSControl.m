@@ -761,6 +761,30 @@ static BOOL keeps_state(NSButtonType t)
     return NSMakeSize(fmax(ceil(t.width) + 28, 60), fmax(32, ceil(t.height) + 10));
 }
 
+/* A regular rounded push button is drawn as a 22-point bezel in the middle
+ * of its frame, 6 points in from each side (below); Auto Layout lines up
+ * the bezel, as a Mac lines up its push buttons' alignment rects (freemac
+ * 1.250). Its intrinsic size above is the frame it wants. */
+- (BOOL)_isRegularPushButton
+{
+    return _bordered && _bezel == NSBezelStyleRounded && _type != NSButtonTypeSwitch && _type != NSButtonTypeRadio &&
+           [self imagePosition] != NSImageOnly && [self controlSize] == NSControlSizeRegular &&
+           !(drawable(_image) && [drawable(_image) size].height > 16);
+}
+- (NSEdgeInsets)alignmentRectInsets
+{
+    if (![self _isRegularPushButton])
+        return [super alignmentRectInsets];
+    return NSEdgeInsetsMake(5, 6, 5, 6);   /* a 32-point frame round a 22-point bezel */
+}
+- (BOOL)_intrinsicSizeIsFrameSize
+{
+    static IMP mine;
+    if (!mine)
+        mine = class_getMethodImplementation([NSButton class], @selector(intrinsicContentSize));
+    return class_getMethodImplementation(object_getClass(self), @selector(intrinsicContentSize)) == mine;
+}
+
 /* ---- drawing ---------------------------------------------------------------------- */
 
 - (BOOL)_isDefault { return [_key isEqualToString:@"\r"] && _bordered; }

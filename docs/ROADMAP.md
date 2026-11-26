@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.250 "Buttons line up as on a Mac" (done)
+
+Ferry 0.73.0: Auto Layout now lines up what a Mac lines up, a view's alignment rect, not its frame. A push button is drawn as a 22-point bezel inside a 32-point frame, and a Mac app's window spaces its buttons by their bezels; Ferry spaced them by their frames, 10 points too tall each, so a tightly laid-out window squeezed its buttons (VLC's Open dialog drew its Browse button 3 pixels tall). Buttons now sit where the window's design puts them, with their frames the size a nib gives them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The solver works in alignment rects: a view's place, its size and its intrinsic size are its frame less its alignmentRectInsets, and the frame it sets is the one round the rect it solved, for a view with no subviews of its own | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A regular rounded push button's alignment rect is its bezel: 5 points in at the top and bottom and 6 at the sides of its frame; Ferry's own controls' intrinsic sizes, given as frames, are taken less their insets, an app's own as they are | Ferry AppKit (NSControl.m) | done |
+| 3 | A test of a label and two buttons spaced by their bezels and an app's own view with insets | tests/appkit/alignment_rects.m | done |
+
 ## 1.249 "Ported programs link as on a Mac" (done)
 
 Ferry 0.72.0: a program built with Ferry's SDK can ask for the maths, dynamic-loading, threads and C libraries by name (-lm, -ldl, -lpthread, -lc), as builds ported from other systems do, and gets libSystem for each, as a Mac's SDK gives it. Before, each of those stopped the build at the link.

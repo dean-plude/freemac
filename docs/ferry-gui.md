@@ -3153,3 +3153,28 @@ folders of their own under `~/.local/share/fonts` (and `~/.fonts`),
 `tests/foundation/mac_fonts.m` lists, opens, stats and reads fonts in a
 test's own fonts folder through the Library's Fonts folder and
 `~/Library/Fonts`.
+
+## Alignment rects in Auto Layout (freemac 1.250, Ferry 0.73.0)
+
+A Mac's Auto Layout places a view's alignment rect, its frame less its
+`alignmentRectInsets`, and a nib's constraints are written against them:
+Interface Builder spaces push buttons by their bezels, not by the taller
+frames they are drawn in.
+
+- The solver's unknowns for a view are its alignment rect. Where a view
+  is now, its intrinsic size and the frame it is given all go through its
+  insets: the frame set is the one round the alignment rect solved for.
+  Only a view with no subviews of its own is taken by its alignment rect,
+  so that what is inside a view is placed against its frame.
+- A regular rounded push button (bordered, not image-only, not a check box
+  or radio button) has insets of 5 points at the top and bottom and 6 at
+  the sides, its 22-point bezel inside a 32-point frame, as Ferry draws
+  it. Other controls have none yet.
+- `intrinsicContentSize` is the alignment rect's size, as on a Mac, for an
+  app's own class. Ferry's own `NSButton` gives the frame it wants (as
+  `sizeToFit`, stack views, grid views and alerts use it), so the solver
+  takes off its insets.
+
+`tests/appkit/alignment_rects.m` checks a button spaced 8 points below a
+label and two buttons 12 points apart by their bezels, with 32-point
+frames, and an app's own view with insets.

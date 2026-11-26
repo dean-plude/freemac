@@ -1,0 +1,8 @@
+push button insets: top 5 left 6 bottom 5 right 6
+label: frame 20,20 100x17; alignment 20,20 100x17
+first button: frame 14,40 86x32; alignment 20,45 74x22
+second button: frame 14,74 86x32; alignment 20,79 74x22
+own view: frame 17,109 48x26; alignment 20,113 40x20
+first button's bezel 8 below the label: 1; buttons' bezels 12 apart: 1
+frames as a nib has them: 1
+exit=0
