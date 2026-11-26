@@ -1,0 +1,6 @@
+listening: yes
+reopen, visible windows: no
+open 2: Second.txt First.txt
+answers: ok, ok
+socket left behind: no
+exit=0
