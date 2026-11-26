@@ -31,8 +31,7 @@
 # Left out: the browser source and docks (CEF), obs-websocket, VST,
 # scripting, virtual camera, Syphon, AJA and Decklink cards, VideoToolbox
 # and Core Audio's AAC encoder (Ferry has neither; FFmpeg's AAC encoder
-# serves), and the camera source (mac-avcapture, until Ferry's
-# AVCaptureDevice lists cameras). docs/ferry-notes/obs.md has the details.
+# serves). docs/ferry-notes/obs.md has the details.
 #
 # The app lands at WORK/build/obs/OBS.app, with its Qt frameworks and
 # plugins inside it. Run it with
@@ -324,7 +323,7 @@ fi
 # OBS Studio
 skip="aja;aja-output-ui;decklink;decklink-captions;decklink-output-ui;mac-syphon;mac-virtualcam"
 skip="$skip;mac-videotoolbox;coreaudio-encoder;obs-browser;obs-libfdk;obs-vst;obs-webrtc;obs-websocket"
-skip="$skip;vlc-video;mac-avcapture"
+skip="$skip;vlc-video"
 obs_key="$obs_commit $(cksum < "$patches/obs-studio.patch") $skip $qt_key"
 if step obs-configure "$obs_key" || [ ! -f "$build/obs.obj/build.ninja" ]; then
     say "configuring OBS Studio $obs_version"

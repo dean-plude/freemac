@@ -34,11 +34,14 @@ Two patches, in `ferry/apps/obs/`, are applied to the checkouts:
   modules named in `OBS_FERRY_SKIP_MODULES`. It also adds two includes
   (`inttypes.h`, `AvailabilityMacros.h`) that a Mac's SDK headers bring in
   by themselves. "Desktop Audio" lists a sound server's monitors, and the
-  Text source falls back to a font that is there (see Known gaps).
+  Text source falls back to a font that is there (see Known gaps). The two
+  camera sources (mac-avcapture and its Legacy one) get ARC, which Xcode's
+  settings ask for and Ninja doesn't read, and the new one's `@import` lines
+  become plain `#import`s, with the frameworks those would link named in its
+  CMake, so it builds without clang modules.
 
 Left out: the browser source and docks (CEF), obs-websocket, VST, scripting,
-the virtual camera, Syphon, AJA and Decklink cards, and the camera source
-(mac-avcapture), which waits for Ferry's AVCaptureDevice to list cameras.
+the virtual camera, Syphon, AJA and Decklink cards.
 VideoToolbox and Core Audio's AAC encoder are left out too: Ferry has
 neither, and FFmpeg's AAC encoder and x264 serve instead.
 
@@ -76,8 +79,11 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
   Liberation Sans, DejaVu Sans or FreeSans when the face it asks for is
   missing, so a new Text source draws straight away. (Fallback built, not yet
   seen drawing.)
-- The camera source isn't built: Ferry's `AVCaptureDevice` lists no cameras
-  yet.
+- The camera sources ("Video Capture Device" and its Legacy one) build
+  against Ferry 0.81.0, which lists this system's cameras. Headless, they
+  load, list Ferry's test camera (`FERRY_CAMERA_TEST=1`), offer its presets
+  and open it. Not yet seen in OBS's preview. Ferry gives cameras no sound
+  yet, so a camera's own microphone isn't captured.
 - Frame rate on a machine without a GPU driver: with screen capture under
   Mesa's software renderer (llvmpipe, 4 cores) about a quarter to a third of
   the frames are late. A profile while recording put about three quarters of
