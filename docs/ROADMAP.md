@@ -1183,6 +1183,29 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.257 "Mac apps see your camera" (done)
+
+Ferry 0.80.0: a Mac app now sees the PC's webcams through AVFoundation, as on a Mac. AVCaptureDevice lists each camera with its formats and frame rates, and a capture session hands its pictures to the app in the pixel format the app asks for (the camera's own, 32BGRA, 420v or yuvs), at the size its preset or chosen format sets. Cameras plugged in or taken out are noticed while the app runs. Camera access goes by what the user said in Dials, Privacy & Security, Camera. This is what OBS Studio's camera source needs, and the last piece before its "Video Capture Device" works.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The PC's cameras (V4L2): list, formats, rates, start, frames, Motion JPEG through libturbojpeg; a test camera with FERRY_CAMERA_TEST=1 | Ferry (camera.c) | done |
+| 2 | AVCaptureDevice formats, frame rates, device types, discovery sessions, plug-in and unplug notifications | Ferry AVFoundation (AVCaptureDevice.m) | done |
+| 3 | AVCaptureSession, AVCaptureDeviceInput and AVCaptureVideoDataOutput with presets and pixel format conversion into IOSurface-backed pixel buffers | Ferry AVFoundation (AVCaptureSession.m) | done |
+| 4 | CoreMediaIO's system object, which OBS's camera plugin sets as it starts | Ferry CoreMediaIO | done |
+| 5 | `@import` for CoreMedia, CoreMediaIO, CoreVideo, MediaPlayer, OpenGL, ScreenCaptureKit and AddressBook | Ferry SDK | done |
+| 6 | New test `appkit_avcapture_camera` | Ferry | done |
+
+## 1.256 "Layers blend as the app asks" (done)
+
+Ferry 0.79.0: a Mac app's Core Animation layer with a blend mode as its compositing filter (multiply, screen, overlay, plus lighter and the rest) is now blended with what is under it, as on a Mac. Tinted overlays, glows and darkened artwork drew as plain opaque layers before. AppKit's notes on stderr that are whole sentences no longer get "isn't supported yet" stuck on the end.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `compositingFilter` blend modes by Core Animation's and Core Image's names, the layer blended as one at its opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | Whole-sentence notes said as they are (menus with no session bus, a status item's menu) | Ferry AppKit | done |
+| 3 | New test `quartzcore_layer_blend_modes` | Ferry | done |
+
 ## 1.255 "Sprites and stretchable pictures in layers" (done)
 
 Ferry 0.78.0: a Mac app's Core Animation layers now draw only the part of their image the app asks for, and stretch a picture in nine parts. Sprite sheets and film strips showed the whole sheet before, and buttons, bubbles and panels built from one small picture had their rounded corners stretched out of shape; now they draw as on a Mac.

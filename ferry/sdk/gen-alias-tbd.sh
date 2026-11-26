@@ -4,7 +4,7 @@
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
 # SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
 # UniformTypeIdentifiers in Foundation's,
-# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia and
+# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia, CoreMediaIO and
 # AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's): the calls the
 # files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
@@ -35,9 +35,10 @@ case $framework in
     IOKit) pattern='^_(IO[A-Z]|kIO)' ;;
     Cocoa) pattern='.' ;;
     Carbon) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)|^_(Gestalt$|UC(CreateCollator|DisposeCollator|CompareText|GetCollationKey|CompareCollationKeys)$|LocaleRefFromLocaleString$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
-    AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType|AVMediaType)|^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType)' ;;
+    AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType|AVMediaType|AVCapture(Device|Session)[A-Za-z0-9]*(Notification|Key|Type[A-Za-z]*|Preset[A-Za-z0-9]*)$|AVFoundationErrorDomain$)' ;;
     MediaPlayer) pattern='^_(OBJC_(METACLASS|CLASS)_\$_MP|MP)' ;;
     CoreMedia) pattern='^_(CM|kCM)' ;;
+    CoreMediaIO) pattern='^_CMIO' ;;
     AddressBook) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AB|kAB)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;
