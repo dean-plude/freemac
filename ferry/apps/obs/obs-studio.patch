@@ -122,6 +122,92 @@ index 397b703..ab7d495 100644
  
  add_core_module(obs-x264)
  add_core_module(oss-audio PLATFORMS FREEBSD OPENBSD)
+diff --git a/plugins/mac-avcapture/CMakeLists.txt b/plugins/mac-avcapture/CMakeLists.txt
+index 73d7c02..35aa828 100644
+--- a/plugins/mac-avcapture/CMakeLists.txt
++++ b/plugins/mac-avcapture/CMakeLists.txt
+@@ -26,6 +26,11 @@ set_target_properties_obs(
+              XCODE_ATTRIBUTE_CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION YES
+              XCODE_ATTRIBUTE_GCC_WARN_SHADOW YES
+ )
++if(OBS_FERRY)
++  # Ninja doesn't read the Xcode settings above, so ARC is asked for here.
++  target_compile_options(mac-avcapture-legacy PRIVATE -fobjc-arc)
++endif()
++
+ target_enable(mac-avcapture-legacy)
+ 
+ add_library(mac-avcapture MODULE)
+@@ -48,6 +53,24 @@ target_sources(
+ 
+ target_link_libraries(mac-avcapture PRIVATE OBS::libobs)
+ 
++if(OBS_FERRY)
++  # Ninja doesn't read the Xcode settings below either: ARC is asked for here, and
++  # the frameworks that clang modules would link for its @import lines (which
++  # Ferry's patch makes plain #imports) are named.
++  target_compile_options(mac-avcapture PRIVATE -fobjc-arc)
++  target_link_libraries(
++    mac-avcapture
++    PRIVATE
++      "$<LINK_LIBRARY:FRAMEWORK,Foundation.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,AVFoundation.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,CoreGraphics.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,CoreMedia.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,CoreMediaIO.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,CoreVideo.framework>"
++      "$<LINK_LIBRARY:FRAMEWORK,IOSurface.framework>"
++  )
++endif()
++
+ set_target_properties_obs(
+   mac-avcapture
+   PROPERTIES FOLDER plugins
+diff --git a/plugins/mac-avcapture/OBSAVCapture.h b/plugins/mac-avcapture/OBSAVCapture.h
+index a414557..769ff16 100644
+--- a/plugins/mac-avcapture/OBSAVCapture.h
++++ b/plugins/mac-avcapture/OBSAVCapture.h
+@@ -5,9 +5,9 @@
+ //  Created by Patrick Heyer on 2023-03-07.
+ //
+ 
+-@import Foundation;
+-@import AVFoundation;
+-@import CoreMediaIO;
++#import <Foundation/Foundation.h>
++#import <AVFoundation/AVFoundation.h>
++#import <CoreMediaIO/CoreMediaIO.h>
+ 
+ #import "OBSAVCapturePresetInfo.h"
+ 
+diff --git a/plugins/mac-avcapture/OBSAVCapturePresetInfo.h b/plugins/mac-avcapture/OBSAVCapturePresetInfo.h
+index 7ccbdd0..88eb9d8 100644
+--- a/plugins/mac-avcapture/OBSAVCapturePresetInfo.h
++++ b/plugins/mac-avcapture/OBSAVCapturePresetInfo.h
+@@ -5,8 +5,8 @@
+ //  Created by Patrick Heyer on 2023-03-07.
+ //
+ 
+-@import Foundation;
+-@import AVFoundation;
++#import <Foundation/Foundation.h>
++#import <AVFoundation/AVFoundation.h>
+ 
+ /// Stores format and framerate of a [AVCaptureSessionPreset](https://developer.apple.com/documentation/avfoundation/avcapturesessionpreset?language=objc).
+ ///
+diff --git a/plugins/mac-avcapture/plugin-properties.h b/plugins/mac-avcapture/plugin-properties.h
+index 3abebda..a26c038 100644
+--- a/plugins/mac-avcapture/plugin-properties.h
++++ b/plugins/mac-avcapture/plugin-properties.h
+@@ -5,7 +5,7 @@
+ //  Created by Patrick Heyer on 2023-03-07.
+ //
+ 
+-@import Foundation;
++#import <Foundation/Foundation.h>
+ 
+ #import <obs-properties.h>
+ 
 diff --git a/plugins/mac-capture/audio-device-enum.c b/plugins/mac-capture/audio-device-enum.c
 index 8c6ce31..a449502 100644
 --- a/plugins/mac-capture/audio-device-enum.c
