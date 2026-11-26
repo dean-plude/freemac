@@ -3306,3 +3306,18 @@ With `FERRY_CAMERA_TEST=1`, Ferry adds a test camera that sends red on its
 left and blue on its right, with a white square moving across. The test
 `appkit_avcapture_camera` reads it the way OBS Studio's camera source does.
 Microphones, still photos, movie file outputs and preview layers aren't here.
+
+## Camera details for OBS (freemac 1.258, Ferry 0.81.0)
+
+A camera's video effects (`portraitEffectActive`, `centerStageActive`,
+`studioLightActive`, `canPerformReactionEffects`,
+`backgroundReplacementActive` and the class switches such as
+`reactionEffectGesturesEnabled`) are all off. `CMTimeConvertScale` converts
+exactly and rounds by the method given (half away from zero by default,
+toward or away from zero, or toward either infinity), marking a rounded time
+as rounded. Core Media names the older and professional codec types (DV,
+DVCPRO HD, ProRes, Cinepak, Sorenson, MPEG-1 and 2 and the rest), and
+`NSDictionary` sorts its keys by value with a comparator block. Where Ferry
+was built without this system's OpenGL headers, the OpenGL module still
+builds, with CGL's calls but no GL calls, so `@import CoreVideo;` and
+`@import AppKit;` work there too.

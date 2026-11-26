@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.258 "OBS's camera source builds" (done)
+
+Ferry 0.81.0: the last calls OBS Studio's camera plugin uses that Ferry didn't have: a camera's video effects (Portrait, Center Stage, Studio Light, reactions and background replacement, all off), Core Media's rounding methods for converting a time to another scale, the names of older and professional video codecs, and sorting a dictionary's keys by value with a block. The OpenGL module (and the CoreVideo and AppKit modules that bring it in) now builds on a system whose OpenGL headers weren't installed when Ferry was built.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | AVCaptureDevice video-effect properties, instance and class | Ferry AVFoundation | done |
+| 2 | `CMTimeRoundingMethod` and exact rounding in `CMTimeConvertScale` | Ferry CoreMedia | done |
+| 3 | Codec types: Animation, Cinepak, Sorenson, H.263, MPEG-1 and 2, DV and DVCPRO HD, ProRes 4444 and 422 HQ/LT/Proxy, VP9, AV1 | Ferry CoreMedia | done |
+| 4 | `keysSortedByValueUsingComparator:` and `keysSortedByValueWithOptions:usingComparator:` | Ferry Foundation | done |
+| 5 | OpenGL module without the system's OpenGL headers | Ferry SDK | done |
+| 6 | Tests: `appkit_avcapture_camera`, `screencapture_coremedia`, `foundation_collections` | Ferry | done |
+
 ## 1.257 "Mac apps see your camera" (done)
 
 Ferry 0.80.0: a Mac app now sees the PC's webcams through AVFoundation, as on a Mac. AVCaptureDevice lists each camera with its formats and frame rates, and a capture session hands its pictures to the app in the pixel format the app asks for (the camera's own, 32BGRA, 420v or yuvs), at the size its preset or chosen format sets. Cameras plugged in or taken out are noticed while the app runs. Camera access goes by what the user said in Dials, Privacy & Security, Camera. This is what OBS Studio's camera source needs, and the last piece before its "Video Capture Device" works.

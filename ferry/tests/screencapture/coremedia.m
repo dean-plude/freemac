@@ -27,6 +27,25 @@ static void time_text(const char *what, CMTime t)
         printf("%s: %lld/%d\n", what, (long long)t.value, t.timescale);
 }
 
+/* CMTimeConvertScale's rounding methods (freemac 1.258), as OBS's camera
+ * source converts frame durations */
+static void rounding(void)
+{
+    CMTime t = CMTimeMake(1001, 30000), n = CMTimeMake(-25, 10);
+    time_text("1001/30000 at 1000, default", CMTimeConvertScale(t, 1000, kCMTimeRoundingMethod_Default));
+    time_text("toward zero", CMTimeConvertScale(t, 1000, kCMTimeRoundingMethod_RoundTowardZero));
+    time_text("away from zero", CMTimeConvertScale(t, 1000, kCMTimeRoundingMethod_RoundAwayFromZero));
+    time_text("-25/10 at 1, half away", CMTimeConvertScale(n, 1, kCMTimeRoundingMethod_RoundHalfAwayFromZero));
+    time_text("toward +infinity", CMTimeConvertScale(n, 1, kCMTimeRoundingMethod_RoundTowardPositiveInfinity));
+    time_text("toward -infinity", CMTimeConvertScale(n, 1, kCMTimeRoundingMethod_RoundTowardNegativeInfinity));
+    CMTime exact = CMTimeConvertScale(CMTimeMake(3, 10), 1000, kCMTimeRoundingMethod_Default);
+    printf("exact: %lld/%d, rounded %d; rounded one marked %d\n", (long long)exact.value, exact.timescale,
+           (exact.flags & kCMTimeFlags_HasBeenRounded) != 0,
+           (CMTimeConvertScale(t, 1000, kCMTimeRoundingMethod_Default).flags & kCMTimeFlags_HasBeenRounded) != 0);
+    printf("codec types: %s %s %s\n", [four(kCMVideoCodecType_AppleProRes4444) UTF8String],
+           [four(kCMVideoCodecType_DVCPROHD1080i60) UTF8String], [four(kCMVideoCodecType_Animation) UTF8String]);
+}
+
 static void video(void)
 {
     CVPixelBufferRef pb = NULL;
@@ -233,6 +252,7 @@ int main(void)
         blocks();
         audio();
         no_display();
+        rounding();
         [[NSFileManager defaultManager] removeItemAtPath:@(dir) error:NULL];
     }
     return 0;
