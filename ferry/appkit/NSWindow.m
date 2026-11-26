@@ -997,6 +997,9 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     g_signal_connect_data(w, signal, (GCallback)handler, window, NULL, 0);
 }
 
+/* once GTK has the window: where the app's menus are, for the menu bar */
+static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget_get_window(w)); }
+
 - (void)_makeGtk
 {
     if (_gtk || _hostedSheet || !ADisplayAvailable())
@@ -1040,6 +1043,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "delete-event", on_delete, self);
     connect(_gtk, "focus-in-event", on_focus_in, self);
     connect(_gtk, "focus-out-event", on_focus_out, self);
+    connect(_gtk, "realize", on_realize, self);
     if (places_own_windows()) {
         connect(_gtk, "configure-event", on_configure, self);
         [self _placeGtk];

@@ -742,6 +742,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     [menu retain];
     [_mainMenu release];
     _mainMenu = menu;
+    AMainMenuBarChanged();
 }
 - (NSMenu *)windowsMenu { return _windowsMenu; }
 - (void)setWindowsMenu:(NSMenu *)m { _windowsMenu = m; }

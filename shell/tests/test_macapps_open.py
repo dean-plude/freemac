@@ -104,6 +104,28 @@ class Installing(unittest.TestCase):
         entry = self.entry({"CFBundleIdentifier": "org.example.plain", "CFBundleExecutable": "Player"})
         self.assertNotIn("MimeType", entry)
 
+    def test_windows_find_the_entry_by_bundle_identifier(self):
+        # freemac 1.244: Ferry names the windows after the bundle identifier
+        self.assertEqual(self.entry(PLAYER)["StartupWMClass"], "org.example.player")
+        shutil.rmtree(os.path.join(self.dir, "Player.app"))
+        self.assertNotIn("StartupWMClass", self.entry({"CFBundleName": "Plain", "CFBundleExecutable": "Player"}))
+
+    def test_scan_gives_older_entries_the_window_name(self):
+        apps_folder = os.path.join(self.dir, "Applications")
+        os.makedirs(apps_folder)
+        app = make_app(apps_folder, PLAYER)
+        macapps.install(app, copy=False)
+        path = os.path.join(self.data, "applications", macapps.item_name(app) + ".desktop")
+        with open(path) as f:
+            older = [line for line in f.read().splitlines() if not line.startswith("StartupWMClass=")]
+        with open(path, "w") as f:
+            f.write("\n".join(older) + "\n")
+        with mock.patch.object(macapps, "places", lambda system: (apps_folder, self.data) if not system
+                               else (os.path.join(self.dir, "none"), os.path.join(self.dir, "nodata"))):
+            macapps.scan()
+        with open(path) as f:
+            self.assertIn("StartupWMClass=org.example.player\n", f.read())
+
 
 class Opening(unittest.TestCase):
     def setUp(self):

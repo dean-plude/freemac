@@ -92,9 +92,13 @@ class HelpPanel(Gtk.Window):
     (title, menu) for every menu in the bar, as it is now; closed() is
     called when the panel goes away."""
 
-    def __init__(self, sources, closed):
+    def __init__(self, sources, closed, extras=None):
         super().__init__(title="Help")
         self.sources, self.closed, self.found, self.closed_at = sources, closed, [], 0.0
+        # The front app's own Help items, shown under the field before
+        # anything is typed, as a Mac shows an app's Help menu:
+        # (label, shortcut, run or None, tick) for each.
+        self.extras = extras or (lambda: [])
         self.picks = []   # what each row of the list does: a menu item, a Guide topic, or None
         style.make_transparent(self)
         GtkLayerShell.init_for_window(self)
@@ -135,7 +139,8 @@ class HelpPanel(Gtk.Window):
         self.entry.set_text("")
         self._fill()
         self.show_all()
-        self.list.hide()
+        if not any(self.picks):
+            self.list.hide()
         self.entry.grab_focus()
 
     def close_panel(self):
@@ -173,12 +178,21 @@ class HelpPanel(Gtk.Window):
             line.pack_start(Gtk.Image.new_from_icon_name("freemac-guide", Gtk.IconSize.MENU), False, False, 0)
             line.pack_start(Gtk.Label(label=guide_topics.TOPICS[name][0], xalign=0), True, True, 0)
             self._add(line, ("topic", name))
+        if not query:
+            for label, shortcut, run, _tick in self.extras():
+                line = Gtk.Box(spacing=24)
+                line.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+                keys = Gtk.Label(label=shortcut, xalign=1)
+                keys.get_style_context().add_class("dim-label")
+                line.pack_end(keys, False, False, 0)
+                line.set_sensitive(run is not None)
+                self._add(line, ("call", run) if run else None)
         if query and not self.found and not topics:
             none = Gtk.Label(label="No menu items or topics match", xalign=0)
             none.get_style_context().add_class("dim-label")
             self._add(none, None)
         self.list.show_all()
-        self.list.set_visible(bool(query))
+        self.list.set_visible(bool(query) or any(self.picks))
         first = next((i for i, pick in enumerate(self.picks) if pick), None)
         if first is not None:
             self.list.select_row(self.list.get_row_at_index(first))
@@ -220,6 +234,9 @@ class HelpPanel(Gtk.Window):
             return
         kind, what = self.picks[row.get_index()]
         self.close_panel()
+        if kind == "call":
+            GLib.timeout_add(120, lambda: what() and False)
+            return
         if kind == "topic":
             try:
                 GLib.spawn_async(["freemac-guide", "--topic", what], flags=GLib.SpawnFlags.SEARCH_PATH)

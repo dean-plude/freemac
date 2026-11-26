@@ -127,6 +127,10 @@ void AWindowsDisplayIfNeeded(void);
 void AWindowsNeedUpdate(void);
 void AWindowsUpdate(void);
 void AGlibAttach(void);
+/* the app's main menu in the desktop's menu bar (AMainMenuBar.m) */
+void AMainMenuBarAttach(GdkWindow *window);
+void AMainMenuBarChanged(void);
+NSString *AMenuAccelerator(NSString *key, NSEventModifierFlags mask);
 NSWindow *AKeyWindow(void);
 NSWindow *AMainWindow(void);
 NSArray *AAllWindows(void);

@@ -389,4 +389,40 @@ GdkCursor *gdk_cursor_new_from_name(GdkDisplay *display, const char *name);
 GdkCursor *gdk_cursor_new_from_surface(GdkDisplay *display, cairo_surface_t *surface, double x, double y);
 void gdk_window_set_cursor(GdkWindow *window, GdkCursor *cursor);
 GtkWidget *gtk_window_get_focus(GtkWidget *window);
+/* The app's main menu in the desktop's menu bar (AMainMenuBar.m): GIO's
+ * menu models and actions, exported on the session bus as org.gtk.Menus and
+ * org.gtk.Actions, and the window's note to the compositor (GTK's
+ * gtk_shell1, which GDK sends) of where they are. */
+typedef struct _GMenu GMenu;
+typedef struct _GMenuItem GMenuItem;
+typedef struct _GSimpleAction GSimpleAction;
+typedef struct _GSimpleActionGroup GSimpleActionGroup;
+GMenu *g_menu_new(void);
+GMenuItem *g_menu_item_new(const char *label, const char *detailed_action);
+void g_menu_item_set_attribute_value(GMenuItem *item, const char *attribute, GVariant *value);
+void g_menu_item_set_submenu(GMenuItem *item, void *submenu);
+void g_menu_item_set_section(GMenuItem *item, void *section);
+void g_menu_append_item(GMenu *menu, GMenuItem *item);
+void g_menu_remove_all(GMenu *menu);
+int g_menu_model_get_n_items(void *model);
+GSimpleActionGroup *g_simple_action_group_new(void);
+GSimpleAction *g_simple_action_new(const char *name, const char *parameter_type);
+GSimpleAction *g_simple_action_new_stateful(const char *name, const char *parameter_type, GVariant *state);
+void g_simple_action_set_enabled(GSimpleAction *action, gboolean enabled);
+void g_simple_action_set_state(GSimpleAction *action, GVariant *value);
+void g_action_map_add_action(void *map, void *action);
+void g_action_map_remove_action(void *map, const char *name);
+void *g_action_map_lookup_action(void *map, const char *name);
+unsigned g_dbus_connection_export_menu_model(GDBusConnection *connection, const char *path, void *menu,
+                                             GError **error);
+unsigned g_dbus_connection_export_action_group(GDBusConnection *connection, const char *path, void *group,
+                                               GError **error);
+const char *g_dbus_connection_get_unique_name(GDBusConnection *connection);
+gboolean g_type_check_instance_is_a(void *instance, size_t type);
+size_t gdk_wayland_window_get_type(void);
+void gdk_wayland_window_set_dbus_properties_libgtk_only(GdkWindow *window, const char *application_id,
+                                                        const char *app_menu_path, const char *menubar_path,
+                                                        const char *window_object_path,
+                                                        const char *application_object_path,
+                                                        const char *unique_bus_name);
 #endif
