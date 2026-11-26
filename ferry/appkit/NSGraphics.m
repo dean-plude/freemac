@@ -143,6 +143,16 @@ NSString *const NSDeviceWhiteColorSpace = @"NSDeviceWhiteColorSpace";
     CGFloat _c[4];      /* sRGB, not premultiplied */
     BOOL _gray;
     CGColorRef _cg;
+    /* A colour that changes with the appearance (freemac 1.245, Ferry
+     * 0.68.0): a system colour has its components in the dark appearance
+     * too; one an app makes with colorWithName:dynamicProvider: asks its
+     * provider, once for light and once for dark. */
+    BOOL _dynamic;
+    CGFloat _d[4];
+    CGColorRef _cg_dark;
+    NSString *_name;
+    NSColor * (^_provider)(NSAppearance *);
+    NSColor *_made[2];
 }
 
 static CGFloat clamp01(CGFloat v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
@@ -156,6 +166,51 @@ static NSColor *make_color(CGFloat r, CGFloat g, CGFloat b, CGFloat a, BOOL gray
     c->_c[3] = clamp01(a);
     c->_gray = gray;
     return [c autorelease];
+}
+
+static NSColor *make_dynamic(NSString *name, const CGFloat light[4], const CGFloat dark[4])
+{
+    NSColor *c = make_color(light[0], light[1], light[2], light[3], NO);
+    c->_dynamic = YES;
+    for (int i = 0; i < 4; i++)
+        c->_d[i] = clamp01(dark[i]);
+    c->_name = [name copy];
+    return c;
+}
+
+/* the colour a provider gives in the light or dark appearance */
+static NSColor *provided(NSColor *c, BOOL dark)
+{
+    if (!c->_made[dark]) {
+        NSAppearance *a = [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+        NSColor *made = c->_provider(a);
+        c->_made[dark] = [made == c ? nil : made retain];
+    }
+    return c->_made[dark];
+}
+
+/* the components drawing uses now */
+static const CGFloat *comps(NSColor *c)
+{
+    for (int depth = 0; c && c->_dynamic && depth < 8; depth++) {
+        BOOL dark = ADrawsDark();
+        if (!c->_provider)
+            return dark ? c->_d : c->_c;
+        NSColor *made = provided(c, dark);
+        if (!made)
+            break;
+        c = made;
+    }
+    return c->_c;
+}
+
+/* this colour as it is drawn now, a colour that stays the same */
+static NSColor *resolved(NSColor *c)
+{
+    if (!c->_dynamic)
+        return c;
+    const CGFloat *v = comps(c);
+    return make_color(v[0], v[1], v[2], v[3], NO);
 }
 
 static void hsb_to_rgb(CGFloat h, CGFloat s, CGFloat v, CGFloat *r, CGFloat *g, CGFloat *b)
@@ -245,14 +300,25 @@ static char pattern_key;
     return make_color(g->rgba[0], g->rgba[1], g->rgba[2], g->rgba[3], NO);
 }
 
-/* The catalogue colours: Ferry's own light palette, chosen to sit well with
- * freemac's theme. */
+/* The catalogue colours: Ferry's own palette, chosen to sit well with
+ * freemac's theme, light and, for the system colours, dark too. */
 #define NAMED(name, r, g, b, a)                                                                                  \
     +(NSColor *)name                                                                                             \
     {                                                                                                            \
         static NSColor *c;                                                                                       \
         if (!c)                                                                                                  \
             c = [make_color(r, g, b, a, NO) retain];                                                             \
+        return c;                                                                                                \
+    }
+/* a system colour with its components in the light and the dark appearance */
+#define NAMED2(name, r, g, b, a, dr, dg, db, da)                                                                 \
+    +(NSColor *)name                                                                                             \
+    {                                                                                                            \
+        static NSColor *c;                                                                                       \
+        if (!c) {                                                                                                \
+            const CGFloat light[4] = {r, g, b, a}, dark[4] = {dr, dg, db, da};                                   \
+            c = [make_dynamic(@ #name, light, dark) retain];                                                     \
+        }                                                                                                        \
         return c;                                                                                                \
     }
 NAMED(blackColor, 0, 0, 0, 1)
@@ -270,62 +336,62 @@ NAMED(orangeColor, 1, 0.5, 0, 1)
 NAMED(purpleColor, 0.5, 0, 0.5, 1)
 NAMED(brownColor, 0.6, 0.4, 0.2, 1)
 NAMED(clearColor, 0, 0, 0, 0)
-NAMED(systemRedColor, 0.93, 0.26, 0.24, 1)
-NAMED(systemGreenColor, 0.23, 0.70, 0.33, 1)
-NAMED(systemBlueColor, 0.10, 0.45, 0.91, 1)
-NAMED(systemOrangeColor, 0.96, 0.55, 0.14, 1)
-NAMED(systemYellowColor, 0.98, 0.78, 0.15, 1)
-NAMED(systemPurpleColor, 0.62, 0.36, 0.84, 1)
-NAMED(systemGrayColor, 0.56, 0.56, 0.58, 1)
-NAMED(systemPinkColor, 0.95, 0.29, 0.48, 1)
-NAMED(systemBrownColor, 0.64, 0.52, 0.37, 1)
-NAMED(systemTealColor, 0.35, 0.68, 0.78, 1)
-NAMED(systemMintColor, 0.0, 0.78, 0.75, 1)
-NAMED(systemCyanColor, 0.38, 0.73, 0.95, 1)
-NAMED(systemIndigoColor, 0.37, 0.36, 0.85, 1)
-NAMED(labelColor, 0, 0, 0, 0.88)
-NAMED(secondaryLabelColor, 0, 0, 0, 0.55)
-NAMED(tertiaryLabelColor, 0, 0, 0, 0.3)
-NAMED(textColor, 0, 0, 0, 1)
-NAMED(textBackgroundColor, 1, 1, 1, 1)
-NAMED(selectedTextColor, 0, 0, 0, 1)
-NAMED(selectedTextBackgroundColor, 0.70, 0.83, 1.0, 1)
-NAMED(placeholderTextColor, 0, 0, 0, 0.3)
-NAMED(controlColor, 1, 1, 1, 1)
-NAMED(controlBackgroundColor, 1, 1, 1, 1)
-NAMED(controlTextColor, 0, 0, 0, 0.88)
-NAMED(disabledControlTextColor, 0, 0, 0, 0.3)
-NAMED(selectedControlColor, 0.70, 0.83, 1.0, 1)
-NAMED(windowBackgroundColor, 0.93, 0.93, 0.93, 1)
-NAMED(underPageBackgroundColor, 0.59, 0.59, 0.59, 1)
-NAMED(gridColor, 0.88, 0.88, 0.88, 1)
-NAMED(separatorColor, 0, 0, 0, 0.1)
-NAMED(controlAccentColor, 0.10, 0.45, 0.91, 1)
-NAMED(keyboardFocusIndicatorColor, 0.10, 0.45, 0.91, 0.5)
-NAMED(alternateSelectedControlColor, 0.10, 0.45, 0.91, 1)
-NAMED(headerTextColor, 0, 0, 0, 0.88)
+NAMED2(systemRedColor, 0.93, 0.26, 0.24, 1, 1.0, 0.33, 0.30, 1)
+NAMED2(systemGreenColor, 0.23, 0.70, 0.33, 1, 0.27, 0.80, 0.38, 1)
+NAMED2(systemBlueColor, 0.10, 0.45, 0.91, 1, 0.16, 0.52, 1.0, 1)
+NAMED2(systemOrangeColor, 0.96, 0.55, 0.14, 1, 1.0, 0.62, 0.15, 1)
+NAMED2(systemYellowColor, 0.98, 0.78, 0.15, 1, 1.0, 0.84, 0.16, 1)
+NAMED2(systemPurpleColor, 0.62, 0.36, 0.84, 1, 0.72, 0.44, 0.94, 1)
+NAMED2(systemGrayColor, 0.56, 0.56, 0.58, 1, 0.58, 0.58, 0.60, 1)
+NAMED2(systemPinkColor, 0.95, 0.29, 0.48, 1, 1.0, 0.33, 0.53, 1)
+NAMED2(systemBrownColor, 0.64, 0.52, 0.37, 1, 0.68, 0.56, 0.41, 1)
+NAMED2(systemTealColor, 0.35, 0.68, 0.78, 1, 0.39, 0.76, 0.86, 1)
+NAMED2(systemMintColor, 0.0, 0.78, 0.75, 1, 0.39, 0.89, 0.85, 1)
+NAMED2(systemCyanColor, 0.38, 0.73, 0.95, 1, 0.40, 0.80, 1.0, 1)
+NAMED2(systemIndigoColor, 0.37, 0.36, 0.85, 1, 0.42, 0.41, 0.95, 1)
+NAMED2(labelColor, 0, 0, 0, 0.88, 1, 1, 1, 0.86)
+NAMED2(secondaryLabelColor, 0, 0, 0, 0.55, 1, 1, 1, 0.55)
+NAMED2(tertiaryLabelColor, 0, 0, 0, 0.3, 1, 1, 1, 0.26)
+NAMED2(textColor, 0, 0, 0, 1, 1, 1, 1, 1)
+NAMED2(textBackgroundColor, 1, 1, 1, 1, 0.12, 0.12, 0.13, 1)
+NAMED2(selectedTextColor, 0, 0, 0, 1, 1, 1, 1, 1)
+NAMED2(selectedTextBackgroundColor, 0.70, 0.83, 1.0, 1, 0.25, 0.38, 0.58, 1)
+NAMED2(placeholderTextColor, 0, 0, 0, 0.3, 1, 1, 1, 0.26)
+NAMED2(controlColor, 1, 1, 1, 1, 0.36, 0.36, 0.38, 1)
+NAMED2(controlBackgroundColor, 1, 1, 1, 1, 0.12, 0.12, 0.13, 1)
+NAMED2(controlTextColor, 0, 0, 0, 0.88, 1, 1, 1, 0.86)
+NAMED2(disabledControlTextColor, 0, 0, 0, 0.3, 1, 1, 1, 0.26)
+NAMED2(selectedControlColor, 0.70, 0.83, 1.0, 1, 0.25, 0.38, 0.58, 1)
+NAMED2(windowBackgroundColor, 0.93, 0.93, 0.93, 1, 0.19, 0.19, 0.20, 1)
+NAMED2(underPageBackgroundColor, 0.59, 0.59, 0.59, 1, 0.14, 0.14, 0.15, 1)
+NAMED2(gridColor, 0.88, 0.88, 0.88, 1, 0.28, 0.28, 0.29, 1)
+NAMED2(separatorColor, 0, 0, 0, 0.1, 1, 1, 1, 0.1)
+NAMED2(controlAccentColor, 0.10, 0.45, 0.91, 1, 0.16, 0.52, 1.0, 1)
+NAMED2(keyboardFocusIndicatorColor, 0.10, 0.45, 0.91, 0.5, 0.16, 0.52, 1.0, 0.5)
+NAMED2(alternateSelectedControlColor, 0.10, 0.45, 0.91, 1, 0.16, 0.52, 1.0, 1)
+NAMED2(headerTextColor, 0, 0, 0, 0.88, 1, 1, 1, 0.86)
 /* a table header's text since 10.14, and Interface Builder's colour for a source
  * list's headings and many labels (VLC's "Drop media here") */
-NAMED(headerColor, 0, 0, 0, 0.85)
+NAMED2(headerColor, 0, 0, 0, 0.85, 1, 1, 1, 0.85)
 /* Interface Builder's colour for a source list's background: a sidebar's grey */
-NAMED(_sourceListBackgroundColor, 0.94, 0.94, 0.94, 1)
-NAMED(linkColor, 0.0, 0.40, 0.85, 1)
+NAMED2(_sourceListBackgroundColor, 0.94, 0.94, 0.94, 1, 0.16, 0.16, 0.17, 1)
+NAMED2(linkColor, 0.0, 0.40, 0.85, 1, 0.25, 0.60, 1.0, 1)
 /* the older system colours (freemac 1.221, Ferry 0.45.0) */
-NAMED(windowFrameColor, 0.80, 0.80, 0.80, 1)
-NAMED(windowFrameTextColor, 0, 0, 0, 0.88)
-NAMED(scrollBarColor, 0.90, 0.90, 0.90, 1)
-NAMED(knobColor, 0, 0, 0, 0.45)
-NAMED(selectedKnobColor, 0, 0, 0, 0.6)
-NAMED(highlightColor, 1, 1, 1, 1)
+NAMED2(windowFrameColor, 0.80, 0.80, 0.80, 1, 0.30, 0.30, 0.31, 1)
+NAMED2(windowFrameTextColor, 0, 0, 0, 0.88, 1, 1, 1, 0.86)
+NAMED2(scrollBarColor, 0.90, 0.90, 0.90, 1, 0.22, 0.22, 0.23, 1)
+NAMED2(knobColor, 0, 0, 0, 0.45, 1, 1, 1, 0.45)
+NAMED2(selectedKnobColor, 0, 0, 0, 0.6, 1, 1, 1, 0.6)
+NAMED2(highlightColor, 1, 1, 1, 1, 0.70, 0.70, 0.72, 1)
 NAMED(shadowColor, 0, 0, 0, 1)
-NAMED(controlHighlightColor, 0.85, 0.85, 0.85, 1)
-NAMED(controlLightHighlightColor, 1, 1, 1, 1)
-NAMED(controlShadowColor, 0.5, 0.5, 0.5, 1)
-NAMED(controlDarkShadowColor, 0.25, 0.25, 0.25, 1)
-NAMED(selectedMenuItemColor, 0.10, 0.45, 0.91, 1)
+NAMED2(controlHighlightColor, 0.85, 0.85, 0.85, 1, 0.32, 0.32, 0.33, 1)
+NAMED2(controlLightHighlightColor, 1, 1, 1, 1, 0.40, 0.40, 0.41, 1)
+NAMED2(controlShadowColor, 0.5, 0.5, 0.5, 1, 0.10, 0.10, 0.11, 1)
+NAMED2(controlDarkShadowColor, 0.25, 0.25, 0.25, 1, 0.05, 0.05, 0.06, 1)
+NAMED2(selectedMenuItemColor, 0.10, 0.45, 0.91, 1, 0.16, 0.52, 1.0, 1)
 NAMED(selectedMenuItemTextColor, 1, 1, 1, 1)
-NAMED(quaternaryLabelColor, 0, 0, 0, 0.1)
-NAMED(unemphasizedSelectedTextBackgroundColor, 0.86, 0.86, 0.86, 1)
+NAMED2(quaternaryLabelColor, 0, 0, 0, 0.1, 1, 1, 1, 0.1)
+NAMED2(unemphasizedSelectedTextBackgroundColor, 0.86, 0.86, 0.86, 1, 0.27, 0.27, 0.28, 1)
 NAMED(findHighlightColor, 1, 0.9, 0, 1)
 /* An app's named colours are in the asset catalogue ferry-actool compiled
  * into its bundle (NSAssets.m, freemac 1.224, Ferry 0.48.0); nil, as on a
@@ -339,52 +405,71 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
 - (void)dealloc
 {
     CGColorRelease(_cg);
+    CGColorRelease(_cg_dark);
+    [_name release];
+    [_provider release];
+    [_made[0] release];
+    [_made[1] release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 - (BOOL)isEqual:(id)other
 {
+    if (other == self)
+        return YES;
     if (![other isKindOfClass:[NSColor class]])
         return NO;
     NSColor *o = other;
+    if (_dynamic || o->_dynamic)
+        return _dynamic && o->_dynamic && !_provider && !o->_provider && !memcmp(_c, o->_c, sizeof _c) &&
+               !memcmp(_d, o->_d, sizeof _d);
     return !memcmp(_c, o->_c, sizeof _c);
 }
 - (NSUInteger)hash { return (NSUInteger)(_c[0] * 255) << 24 | (NSUInteger)(_c[1] * 255) << 16 | (NSUInteger)(_c[2] * 255) << 8 | (NSUInteger)(_c[3] * 255); }
 - (NSString *)description
 {
+    if (_dynamic)
+        return [NSString stringWithFormat:@"Catalog color: System %@", _name ?: @"dynamic"];
     if (_gray)
         return [NSString stringWithFormat:@"NSCalibratedWhiteColorSpace %g %g", _c[0], _c[3]];
     return [NSString stringWithFormat:@"sRGB IEC61966-2.1 colorspace %g %g %g %g", _c[0], _c[1], _c[2], _c[3]];
 }
+- (NSString *)_ferryDynamicName { return _dynamic ? _name : nil; }
 
-- (CGFloat)redComponent { return _c[0]; }
-- (CGFloat)greenComponent { return _c[1]; }
-- (CGFloat)blueComponent { return _c[2]; }
-- (CGFloat)alphaComponent { return _c[3]; }
-- (CGFloat)whiteComponent { return _gray ? _c[0] : 0.299 * _c[0] + 0.587 * _c[1] + 0.114 * _c[2]; }
+- (CGFloat)redComponent { return comps(self)[0]; }
+- (CGFloat)greenComponent { return comps(self)[1]; }
+- (CGFloat)blueComponent { return comps(self)[2]; }
+- (CGFloat)alphaComponent { return comps(self)[3]; }
+- (CGFloat)whiteComponent
+{
+    const CGFloat *c = comps(self);
+    return _gray ? c[0] : 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+}
 - (NSInteger)numberOfComponents { return _gray ? 2 : 4; }
 - (void)getRed:(CGFloat *)r green:(CGFloat *)g blue:(CGFloat *)b alpha:(CGFloat *)a
 {
-    if (r) *r = _c[0];
-    if (g) *g = _c[1];
-    if (b) *b = _c[2];
-    if (a) *a = _c[3];
+    const CGFloat *c = comps(self);
+    if (r) *r = c[0];
+    if (g) *g = c[1];
+    if (b) *b = c[2];
+    if (a) *a = c[3];
 }
 - (void)getWhite:(CGFloat *)w alpha:(CGFloat *)a
 {
     if (w) *w = [self whiteComponent];
-    if (a) *a = _c[3];
+    if (a) *a = comps(self)[3];
 }
 - (void)getHue:(CGFloat *)h saturation:(CGFloat *)s brightness:(CGFloat *)v alpha:(CGFloat *)a
 {
-    CGFloat mx = fmax(_c[0], fmax(_c[1], _c[2])), mn = fmin(_c[0], fmin(_c[1], _c[2])), d = mx - mn, hue = 0;
+    const CGFloat *c = comps(self);
+    CGFloat mx = fmax(c[0], fmax(c[1], c[2])), mn = fmin(c[0], fmin(c[1], c[2])), d = mx - mn, hue = 0;
     if (d > 0) {
-        if (mx == _c[0])
-            hue = fmod((_c[1] - _c[2]) / d, 6);
-        else if (mx == _c[1])
-            hue = (_c[2] - _c[0]) / d + 2;
+        if (mx == c[0])
+            hue = fmod((c[1] - c[2]) / d, 6);
+        else if (mx == c[1])
+            hue = (c[2] - c[0]) / d + 2;
         else
-            hue = (_c[0] - _c[1]) / d + 4;
+            hue = (c[0] - c[1]) / d + 4;
         hue /= 6;
         if (hue < 0)
             hue += 1;
@@ -392,40 +477,78 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
     if (h) *h = hue;
     if (s) *s = mx > 0 ? d / mx : 0;
     if (v) *v = mx;
-    if (a) *a = _c[3];
+    if (a) *a = c[3];
 }
 - (CGFloat)hueComponent { CGFloat h; [self getHue:&h saturation:NULL brightness:NULL alpha:NULL]; return h; }
 - (CGFloat)saturationComponent { CGFloat s; [self getHue:NULL saturation:&s brightness:NULL alpha:NULL]; return s; }
 - (CGFloat)brightnessComponent { CGFloat v; [self getHue:NULL saturation:NULL brightness:&v alpha:NULL]; return v; }
 
+/* A dynamic colour's CGColor is the one for the appearance drawing is in
+ * when it's asked for, as on a Mac. */
 - (CGColorRef)CGColor
 {
+    if (_dynamic && _provider) {
+        NSColor *made = provided(self, ADrawsDark());
+        return made ? [made CGColor] : CGColorGetConstantColor(kCGColorClear);
+    }
+    if (_dynamic && ADrawsDark()) {
+        if (!_cg_dark)
+            _cg_dark = CGColorCreateSRGB(_d[0], _d[1], _d[2], _d[3]);
+        return _cg_dark;
+    }
     if (!_cg)
         _cg = CGColorCreateSRGB(_c[0], _c[1], _c[2], _c[3]);
     return _cg;
 }
-- (NSColor *)colorWithAlphaComponent:(CGFloat)alpha { return make_color(_c[0], _c[1], _c[2], alpha, _gray); }
+/* a system colour with less alpha changes with the appearance too */
+- (NSColor *)colorWithAlphaComponent:(CGFloat)alpha
+{
+    if (_dynamic) {
+        CGFloat light[4], dark[4];
+        if (_provider) {
+            NSColor *l = provided(self, NO), *d = provided(self, YES);
+            memcpy(light, l ? l->_c : _c, sizeof light);
+            memcpy(dark, d ? d->_c : _c, sizeof dark);
+            if (l && l->_dynamic)
+                memcpy(light, l->_c, sizeof light);
+            if (d && d->_dynamic)
+                memcpy(dark, d->_d, sizeof dark);
+        } else {
+            memcpy(light, _c, sizeof light);
+            memcpy(dark, _d, sizeof dark);
+        }
+        light[3] = dark[3] = alpha;
+        return make_dynamic(_name, light, dark);
+    }
+    return make_color(_c[0], _c[1], _c[2], alpha, _gray);
+}
 - (NSColor *)blendedColorWithFraction:(CGFloat)f ofColor:(NSColor *)o
 {
     if (!o)
         return nil;
     f = clamp01(f);
-    return make_color(_c[0] + (o->_c[0] - _c[0]) * f, _c[1] + (o->_c[1] - _c[1]) * f,
-                      _c[2] + (o->_c[2] - _c[2]) * f, _c[3] + (o->_c[3] - _c[3]) * f, NO);
+    const CGFloat *c = comps(self), *oc = comps(o);
+    return make_color(c[0] + (oc[0] - c[0]) * f, c[1] + (oc[1] - c[1]) * f, c[2] + (oc[2] - c[2]) * f,
+                      c[3] + (oc[3] - c[3]) * f, NO);
 }
 - (NSColor *)highlightWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor whiteColor]]; }
 - (NSColor *)shadowWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor blackColor]]; }
-- (NSColor *)colorUsingColorSpaceName:(NSString *)name { return self; }
-- (NSColor *)colorUsingColorSpace:(id)space { return self; }
-/* Ferry's colours are all kept as components; one made from a pattern
- * image is a pattern too. None is a catalog colour. */
+/* a system colour in a colour space is the colour it is now */
+- (NSColor *)colorUsingColorSpaceName:(NSString *)name { return resolved(self); }
+- (NSColor *)colorUsingColorSpace:(id)space { return resolved(self); }
+/* Ferry's colours are kept as components, a system colour as two sets of
+ * them, which makes it a catalog colour; one made from a pattern image is
+ * a pattern. */
 - (NSColorType)type
 {
+    if (_dynamic)
+        return NSColorTypeCatalog;
     return [self patternImage] ? NSColorTypePattern : NSColorTypeComponentBased;
 }
 - (NSColor *)colorUsingType:(NSColorType)type
 {
-    if (type == NSColorTypeComponentBased) return self;
+    if (type == NSColorTypeComponentBased) return resolved(self);
+    if (type == NSColorTypeCatalog) return _dynamic ? self : nil;
     if (type == NSColorTypePattern) return [self patternImage] ? self : nil;
     return nil;
 }
@@ -436,15 +559,33 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
 }
 - (void)setFill
 {
+    const CGFloat *c = comps(self);
     if (current_cg())
-        CGContextSetRGBFillColor(current_cg(), _c[0], _c[1], _c[2], _c[3]);
+        CGContextSetRGBFillColor(current_cg(), c[0], c[1], c[2], c[3]);
 }
 - (void)setStroke
 {
+    const CGFloat *c = comps(self);
     if (current_cg())
-        CGContextSetRGBStrokeColor(current_cg(), _c[0], _c[1], _c[2], _c[3]);
+        CGContextSetRGBStrokeColor(current_cg(), c[0], c[1], c[2], c[3]);
+}
+
+NSColor *ADynamicColor(NSString *name, const CGFloat light[4], const CGFloat dark[4])
+{
+    return make_dynamic(name, light, dark);
+}
+
+/* a colour an app makes that changes with the appearance (macOS 10.15) */
+NSColor *AColorWithProvider(NSString *name, NSColor * (^provider)(NSAppearance *))
+{
+    NSColor *c = make_color(0, 0, 0, 0, NO);
+    c->_dynamic = YES;
+    c->_name = [name copy];
+    c->_provider = [provider copy];
+    return c;
 }
 @end
+
 
 void AColorRGBA(NSColor *color, CGFloat rgba[4])
 {

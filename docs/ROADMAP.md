@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.245 "Mac apps in light and dark" (done)
+
+Ferry 0.68.0: Mac apps follow freemac's appearance, as on a Mac. When Dials > Appearance is Dark, or Auto after sunset, a Mac app that knows dark mode opens dark: its windows, text, lists, sidebars and controls take dark colours, and Qt apps such as OBS and VLC read the same. Switch the appearance while the app is open and it changes with everything else, at once. An app that says it needs the light look, or was built before macOS had dark mode, stays light as it would on a Mac, and one that picks its own appearance keeps it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Mac app's appearance is freemac's, read from the desktop's colour scheme and followed while it runs; apps that need the light look (NSRequiresAquaSystemAppearance, or built with an SDK before 10.14) stay light | Ferry AppKit (AppKitMore.m) | done |
+| 2 | The system colours (labelColor, windowBackgroundColor, textBackgroundColor, controlColor, the sidebar and table colours and the rest) have dark values and are drawn in the appearance of the view, its window or the app; colorWithName:dynamicProvider: asks its provider for each appearance | Ferry AppKit (NSGraphics.m) | done |
+| 3 | A change tells the app as a Mac does: effectiveAppearance's observers, viewDidChangeEffectiveAppearance, NSSystemColorsDidChangeNotification, AppleInterfaceThemeChangedNotification and the AppleInterfaceStyle default | Ferry AppKit, Foundation | done |
+
 ## 1.244 "Mac apps' own menus in the menu bar" (done)
 
 Ferry 0.67.0: a Mac app's own menus are in freemac's menu bar, as on a Mac. Its File, Edit, View and other menus are there beside the app's name, with their shortcuts shown the Mac way, a tick by what's on and greyed out what can't be chosen right now, checked again every half second while the app is in front. Its application menu (About, Settings, Check for Updates) joins the menu under the app's name, and Quit there asks the app itself to quit, so it can ask to save first. The app's own Window items join freemac's Window menu and its Help items show under Help's search field, so the bar keeps one of each, and Help's search finds the app's menu items. Windows of a Mac app in the app grid now find its entry by the app's bundle identifier, so the Dock and ⌘Tab show the right icon and name for them even before the app has said where its icon is.

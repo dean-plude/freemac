@@ -335,10 +335,12 @@ NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDidChangeNotifica
     id color = ((id (*)(id, SEL))objc_msgSend)([NSColor class], sel);
     return [color isKindOfClass:[NSColor class]] ? color : nil;
 }
-- (NSString *)catalogNameComponent { return nil; }
-- (NSString *)colorNameComponent { return nil; }
-- (NSString *)localizedCatalogNameComponent { return nil; }
-- (NSString *)localizedColorNameComponent { return nil; }
+/* A system colour (one that changes with the appearance, freemac 1.245) is
+ * in the System list under its name; other colours are in none. */
+- (NSString *)catalogNameComponent { return [self _ferryDynamicName] ? @"System" : nil; }
+- (NSString *)colorNameComponent { return [self _ferryDynamicName]; }
+- (NSString *)localizedCatalogNameComponent { return [self catalogNameComponent]; }
+- (NSString *)localizedColorNameComponent { return [self colorNameComponent]; }
 @end
 
 @implementation NSMenuItem (FerryParentItem)

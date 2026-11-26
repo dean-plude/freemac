@@ -730,6 +730,8 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
             _policy = NSApplicationActivationPolicyAccessory;
         else
             _policy = NSApplicationActivationPolicyRegular;
+        /* light or dark, as freemac is (AppKitMore.m, freemac 1.245) */
+        AAppearanceFollow();
     }
     return self;
 }

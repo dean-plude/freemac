@@ -108,6 +108,13 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
                 TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_appearance)
+            # dark, then light, as Dials > Appearance would have it, in a home of its own
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            { echo "== dark"; HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_APPEARANCE=dark \
+                  env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" &&
+              echo "== light" && HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_APPEARANCE=light \
+                  env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe"; } > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_keychain)
             # twice in one home: what the first run keeps, the second finds
@@ -1468,6 +1475,12 @@ run_one appkit_affine "$here/appkit/affine.m" "$here/appkit/affine.out" -fobjc-a
 # process type and the input source kept as one object; in a home of its own.
 run_one appkit_keycastr "$here/appkit/keycastr_appkit.m" "$here/appkit/keycastr_appkit.out" -fobjc-arc -fblocks \
     -framework Cocoa -framework Carbon
+# Light and dark (freemac 1.245, Ferry 0.68.0): the app is in freemac's
+# appearance, system colours are drawn in the one drawing is in, a colour's
+# provider is asked once for each, and an appearance the app sets tells its
+# observers, views, defaults and the theme notification's observers.
+run_one appkit_appearance "$here/appkit/appearance.m" "$here/appkit/appearance.out" -fobjc-arc -fblocks \
+    -framework Cocoa
 # WebKit: WKWebView and the older WebView, shown by this system's WebKitGTK
 # (freemac 1.214, Ferry 0.40.0). First what needs neither WebKitGTK nor a
 # display: the classes, web views that stay empty with no display, and the

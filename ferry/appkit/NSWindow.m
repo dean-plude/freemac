@@ -862,6 +862,13 @@ static BOOL places_own_windows(void)
  * shown in the window, an open menu. */
 - (void)_drawWindowInContext:(CGContextRef)ctx screen:(BOOL)screen
 {
+    /* in the window's own appearance, if it has one (freemac 1.245) */
+    NSAppearance *appearance = ABeginDrawingAppearance(self);
+    [self _drawWindowContentInContext:ctx screen:screen];
+    AEndDrawingAppearance(appearance);
+}
+- (void)_drawWindowContentInContext:(CGContextRef)ctx screen:(BOOL)screen
+{
     NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
     CGContextSaveGState(ctx);
     CGContextSetBlendMode(ctx, kCGBlendModeCopy);
