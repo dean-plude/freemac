@@ -405,6 +405,9 @@ static NSString *format_double(double d, BOOL single)
         return "c";
     return types[strchr(letters, _type) - letters];
 }
+/* a number read as a pointer gives its value, as on a Mac: apps read an
+ * NSScreenNumber this way (OBS's screen capture does) (freemac 1.246) */
+- (void *)pointerValue { return (void *)(uintptr_t)[self unsignedLongLongValue]; }
 - (void)getValue:(void *)value
 {
     switch (_type) {

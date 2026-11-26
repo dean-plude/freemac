@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.246 "OBS records the screen from its download" (done)
+
+Ferry 0.69.0: OBS Studio, downloaded from its own site and opened in a fresh account, now gets all the way to a recording. Its drop-down lists open, so you can pick the display in a macOS Screen Capture source's Properties, and the preview shows the screen at once; Start Recording then saves a movie of it with sound. Its right-click and + menus stay open until you choose, instead of closing the moment they appear, and those pop-up menus no longer take the keyboard or show up in the Dock.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A window that can't become key (a Qt pop-up menu, a tooltip) takes no focus and stays off the Dock's list; the key window waits a turn before resigning, and doesn't when focus went to one of the app's pop-ups, so Qt's menus no longer close as they open | Ferry AppKit (NSWindow.m, gtk.h) | done |
+| 2 | NSPopUpButtonCell's performClickWithFrame:inView: tracks its menu until it closes, the choice made, before it returns, as on a Mac: Qt's lists open their menus this way | Ferry AppKit (NSPopUpButton.m) | done |
+| 3 | A number read as a pointer gives its value, as OBS reads a screen's number; menu waits wake now and then, so a menu closed by a timer ends them | Ferry Foundation (NSValue.m), AppKit | done |
+| 4 | README screenshot of OBS capturing and recording the screen | Docs | done |
+
 ## 1.245 "Mac apps in light and dark" (done)
 
 Ferry 0.68.0: Mac apps follow freemac's appearance, as on a Mac. When Dials > Appearance is Dark, or Auto after sunset, a Mac app that knows dark mode opens dark: its windows, text, lists, sidebars and controls take dark colours, and Qt apps such as OBS and VLC read the same. Switch the appearance while the app is open and it changes with everything else, at once. An app that says it needs the light look, or was built before macOS had dark mode, stays light as it would on a Mac, and one that picks its own appearance keeps it.

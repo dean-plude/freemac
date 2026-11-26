@@ -812,7 +812,27 @@ static BOOL choosable(NSMenuItem *item)
         [(NSControl *)view setHighlighted:YES];
 }
 - (void)attachPopUpWithFrame:(NSRect)frame inView:(NSView *)view { [self _openForView:view frame:frame]; }
-- (void)performClickWithFrame:(NSRect)frame inView:(NSView *)view { [self _openForView:view frame:frame]; }
+/* As on a Mac, a click made this way tracks the menu until it closes,
+ * the choice made, before it returns: Qt's lists (OBS's) open their menu
+ * with a cell of their own and read the choice back straight after
+ * (freemac 1.246). A pop-up button's own click opens it without waiting. */
+- (void)performClickWithFrame:(NSRect)frame inView:(NSView *)view
+{
+    [self _openForView:view frame:frame];
+    AMenuView *open = [_open retain];
+    [self retain];
+    while (open && _open == open && [open window]) {
+        @autoreleasepool {
+            /* waking now and then, so a menu closed by a timer ends the wait */
+            NSEvent *e = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]
+                                               inMode:NSEventTrackingRunLoopMode dequeue:YES];
+            if (e)
+                [NSApp sendEvent:e];
+        }
+    }
+    [open release];
+    [self release];
+}
 - (void)dismissPopUp { [_open dismiss]; }
 
 /* The menu closed: a chosen item becomes the selection (a pull-down list
