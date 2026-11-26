@@ -1,0 +1,9 @@
+none: 128,128,128 (outside 255,0,0)
+multiply: 128,0,0 (outside 255,0,0)
+screen: 128,128,255 (outside 0,0,255)
+plus lighter: 255,0,255 (outside 255,0,0)
+Core Image difference: 0,255,255 (outside 255,0,0)
+Core Image addition: 255,0,255 (outside 255,0,0)
+multiply at half opacity: 127,0,0 (outside 255,0,0)
+an unknown filter is drawn normally: 128,128,128 (outside 255,0,0)
+exit=0

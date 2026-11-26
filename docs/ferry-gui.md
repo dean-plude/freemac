@@ -1880,8 +1880,10 @@ The new or extended ones:
   - Shadows are drawn from freemac 1.253 (Ferry 0.76.0); see "Layer
     shadows" below.
   - Masks are drawn from freemac 1.254 (Ferry 0.77.0); see "Layer masks"
-    below. Filters (`filters`, `backgroundFilters`, `compositingFilter`)
-    are kept but not drawn.
+    below. A `compositingFilter` that is a blend mode is drawn from freemac
+    1.256 (Ferry 0.79.0); see "Layer blend modes" below. Other filters
+    (`filters`, `backgroundFilters`, a compositing filter that isn't a
+    blend mode) are kept but not drawn.
   - CATransition keeps its type, subtype and timing, but nothing is drawn
     for it: the change shows at once.
   - `contentsRect`, `contentsCenter` and `contentsScale` are drawn from
@@ -3254,4 +3256,19 @@ top when the layer is drawn flipped. `contentsScale` sets how many pixels of
 the image make a point, for the corners and for the gravities that keep the
 image's size. The test `quartzcore_layer_contents_parts` checks this pixel by
 pixel.
+
+## Layer blend modes (freemac 1.256, Ferry 0.79.0)
+
+A layer whose `compositingFilter` is a blend mode is now put down over what is
+under it with that mode, as on a Mac: Core Animation's own names
+(`multiplyBlendMode`, `screenBlendMode`, `plusL`, `plusD` and the rest) or a
+Core Image filter's (`CIMultiplyBlendMode`, `CIAdditionCompositing`,
+`CISourceAtopCompositing` and the rest), given as the name or as the filter.
+Everything the layer draws is blended as one, at the layer's opacity. A
+compositing filter that isn't a blend mode is drawn normally, with a note
+once on stderr. The test `quartzcore_layer_blend_modes` checks this.
+
+AppKit's notes on stderr that are whole sentences (no session bus for the
+app's menus or menu bar items, a status item's menu opening on the next click)
+are now said as they are, without "isn't supported yet" added after them.
 

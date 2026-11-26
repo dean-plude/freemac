@@ -267,7 +267,7 @@ static BOOL connect_bus(void)
     bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
     if (!bus) {
         if (error) {
-            AWarnOnce("menu bar items: no session bus, so they aren't shown");
+            ANoteOnce("there is no session bus, so the app's menu bar items aren't shown");
             g_error_free(error);
         }
         return NO;
@@ -846,7 +846,7 @@ static void menu_will_open(NSMenu *menu)
 {
     /* The desktop's menu bar opens menus itself; this one is kept, so the
      * next click on the item opens it. */
-    AWarnOnce("popUpStatusItemMenu: the menu opens on the next click on the item instead");
+    ANoteOnce("popUpStatusItemMenu: can't open the menu by itself here, so it opens on the next click on the item");
     if (!_menu)
         [self setMenu:menu];
 }

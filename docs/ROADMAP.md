@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.256 "Layers blend as the app asks" (done)
+
+Ferry 0.79.0: a Mac app's Core Animation layer with a blend mode as its compositing filter (multiply, screen, overlay, plus lighter and the rest) is now blended with what is under it, as on a Mac. Tinted overlays, glows and darkened artwork drew as plain opaque layers before. AppKit's notes on stderr that are whole sentences no longer get "isn't supported yet" stuck on the end.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `compositingFilter` blend modes by Core Animation's and Core Image's names, the layer blended as one at its opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | Whole-sentence notes said as they are (menus with no session bus, a status item's menu) | Ferry AppKit | done |
+| 3 | New test `quartzcore_layer_blend_modes` | Ferry | done |
+
 ## 1.255 "Sprites and stretchable pictures in layers" (done)
 
 Ferry 0.78.0: a Mac app's Core Animation layers now draw only the part of their image the app asks for, and stretch a picture in nine parts. Sprite sheets and film strips showed the whole sheet before, and buttons, bubbles and panels built from one small picture had their rounded corners stretched out of shape; now they draw as on a Mac.
