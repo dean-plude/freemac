@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.251 "Auto Layout keeps the rule broken furthest" (done)
+
+Ferry 0.74.0: when a window's layout breaks several rules of one priority, Auto Layout now holds the one broken furthest first, as a Mac's solver in effect does by keeping the total error down. Holding whichever came first could leave a much bigger one broken for good: a view with a minimum width of 50, a minimum of 100 and a maximum of 90 at one priority came out 50 wide, 50 points short, where a Mac makes it 90 to 100 wide, 10 short.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The next inequality held is the one broken furthest at the highest priority any broken one has, the first in order on a tie | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A test of minimums and a maximum at one priority, in either order, and of sliders as tall as the tallest minimum | tests/appkit/equal_priority.m | done |
+
 ## 1.250 "Buttons line up as on a Mac" (done)
 
 Ferry 0.73.0: Auto Layout now lines up what a Mac lines up, a view's alignment rect, not its frame. A push button is drawn as a 22-point bezel inside a 32-point frame, and a Mac app's window spaces its buttons by their bezels; Ferry spaced them by their frames, 10 points too tall each, so a tightly laid-out window squeezed its buttons (VLC's Open dialog drew its Browse button 3 pixels tall). Buttons now sit where the window's design puts them, with their frames the size a nib gives them.

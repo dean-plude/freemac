@@ -3178,3 +3178,14 @@ frames they are drawn in.
 `tests/appkit/alignment_rects.m` checks a button spaced 8 points below a
 label and two buttons 12 points apart by their bezels, with 32-point
 frames, and an app's own view with insets.
+
+## Rules of one priority (freemac 1.251, Ferry 0.74.0)
+
+Ferry's solver holds inequalities one at a time while the answer breaks
+them. Among the broken ones at the highest priority any has, it now takes
+the one broken furthest, the first in order on a tie, rather than simply
+the first. A Mac's solver keeps the total error down, so a rule broken far
+is the one it keeps; taking the first could leave a big one broken that the
+rounds which let rules go cannot get back. `tests/appkit/equal_priority.m`
+checks minimum widths of 50 and 100 in either order, the same with a
+maximum of 90, and sliders each as tall as the first.
