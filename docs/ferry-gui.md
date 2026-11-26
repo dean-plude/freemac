@@ -1877,13 +1877,15 @@ The new or extended ones:
     writes it.
 
 - **Core Animation, not done yet** (freemac 1.198, Ferry 0.25.0).
-  - Shadows (`shadowOpacity` and the rest) are kept but not drawn.
-  - Masks (`mask`) and filters (`filters`, `backgroundFilters`,
-    `compositingFilter`) are kept but not drawn.
+  - Shadows are drawn from freemac 1.253 (Ferry 0.76.0); see "Layer
+    shadows" below.
+  - Masks are drawn from freemac 1.254 (Ferry 0.77.0); see "Layer masks"
+    below. Filters (`filters`, `backgroundFilters`, `compositingFilter`)
+    are kept but not drawn.
   - CATransition keeps its type, subtype and timing, but nothing is drawn
     for it: the change shows at once.
-  - `contentsRect`, `contentsCenter` and `contentsScale` are stored but not
-    used when the contents are drawn.
+  - `contentsRect`, `contentsCenter` and `contentsScale` are drawn from
+    freemac 1.255 (Ferry 0.78.0); see "Parts of a layer's image" below.
   - Only the 2D part of a layer's transform is drawn. Perspective and
     rotations about x or y are kept and animate, but the drawing is flat.
   - A keyframe animation's `rotationMode` is ignored.
@@ -2590,7 +2592,7 @@ The new or extended ones:
   - Areas are checked by geometry against every view shown in the window, so an area under another view is still entered. Only an area with the visible rect option is cut to the part of its view that shows; any other area counts in full, even where a scroll view's clip hides it.
   - `NSCursor` sets GTK's named cursors, which the desktop's cursor theme draws, so the arrow, I-beam and hands look like this system's and not a Mac's. With no display, cursors are only kept.
   - Shadows are drawn in bitmap and window contexts but not in PDF contexts, so a printed page has none. The blur is three box blurs, close to a Gaussian but not the same.
-  - Layer shadows (`CALayer`'s `shadowOpacity` and the rest) are still kept but not drawn.
+  - Layer shadows (`CALayer`'s `shadowOpacity` and the rest) are drawn from freemac 1.253.
   - `NSAnimationNonblockingThreaded` runs like the non-blocking mode, on the run loop of the thread that started it, and not on a thread of its own.
   - The animator proxy and `NSAnimationContext` set values at the end of the group, with no frames between, as before. `NSViewAnimation` fades windows and views by their alpha values.
   - `NSDistributedNotificationCenter` reaches only Ferry programs, over the D-Bus session bus. The notifications a Mac's system posts (such as the change between light and dark appearance) never come. User info that isn't a property list is dropped, as Apple says it must be one. `NSDistributedNotificationPostToAllSessions` posts on this session's bus only.
@@ -3153,3 +3155,103 @@ folders of their own under `~/.local/share/fonts` (and `~/.fonts`),
 `tests/foundation/mac_fonts.m` lists, opens, stats and reads fonts in a
 test's own fonts folder through the Library's Fonts folder and
 `~/Library/Fonts`.
+
+## Alignment rects in Auto Layout (freemac 1.250, Ferry 0.73.0)
+
+A Mac's Auto Layout places a view's alignment rect, its frame less its
+`alignmentRectInsets`, and a nib's constraints are written against them:
+Interface Builder spaces push buttons by their bezels, not by the taller
+frames they are drawn in.
+
+- The solver's unknowns for a view are its alignment rect. Where a view
+  is now, its intrinsic size and the frame it is given all go through its
+  insets: the frame set is the one round the alignment rect solved for.
+  Only a view with no subviews of its own is taken by its alignment rect,
+  so that what is inside a view is placed against its frame.
+- A regular rounded push button (bordered, not image-only, not a check box
+  or radio button) has insets of 5 points at the top and bottom and 6 at
+  the sides, its 22-point bezel inside a 32-point frame, as Ferry draws
+  it. Other controls have none yet.
+- `intrinsicContentSize` is the alignment rect's size, as on a Mac, for an
+  app's own class. Ferry's own `NSButton` gives the frame it wants (as
+  `sizeToFit`, stack views, grid views and alerts use it), so the solver
+  takes off its insets.
+
+`tests/appkit/alignment_rects.m` checks a button spaced 8 points below a
+label and two buttons 12 points apart by their bezels, with 32-point
+frames, and an app's own view with insets.
+
+## Rules of one priority (freemac 1.251, Ferry 0.74.0)
+
+Ferry's solver holds inequalities one at a time while the answer breaks
+them. Among the broken ones at the highest priority any has, it now takes
+the one broken furthest, the first in order on a tie, rather than simply
+the first. A Mac's solver keeps the total error down, so a rule broken far
+is the one it keeps; taking the first could leave a big one broken that the
+rounds which let rules go cannot get back. `tests/appkit/equal_priority.m`
+checks minimum widths of 50 and 100 in either order, the same with a
+maximum of 90, and sliders each as tall as the first.
+
+## An accessory view in Open and Save panels (freemac 1.252, Ferry 0.75.0)
+
+Ferry's Open and Save panels are the system's file chooser, GTK's or the
+desktop's own through its portal, which can't hold an app's view. So an
+accessory view is offered as the chooser's choices instead:
+
+- each enabled, visible pop-up menu that isn't a pull-down list, with the
+  items that can be chosen (no separators, disabled or hidden items),
+  named by the label on its left on the same line, its colon dropped, or
+  "Format" when there is no label and only one menu;
+- each enabled, visible check box, named by its title.
+
+When the chooser closes with a file, every choice that changed goes back
+into its control as a click would: the item is chosen or the box ticked,
+the control's bindings are told and its action is sent. Only then is the
+file checked and taken, so a Format menu's action that sets
+`allowedFileTypes` decides the extension: a name with an extension of a
+type allowed when the panel opened gets the new type's in its place. Other
+controls in an accessory view (text fields, radio groups, sliders) aren't
+offered. With no display, `FERRY_PANEL_CHOICES` gives the choices, one
+`Label=Option` line each, a check box by `true` or `false`.
+
+## Layer shadows (freemac 1.253, Ferry 0.76.0)
+
+A layer with a `shadowOpacity` above 0 casts a shadow in its
+`shadowColor` at that opacity, moved by `shadowOffset` (in the space it is
+placed in, so a negative height moves it down on a Mac's unflipped layers)
+and blurred by `shadowRadius`, taken as a Gaussian's radius (Core
+Graphics's blur of twice that), all scaled as the layer is drawn.
+
+- With no `shadowPath`, the layer is drawn as one, its background,
+  contents, sublayers and border, and that casts the shadow: a layer with
+  nothing of its own casts its sublayers' shapes.
+- With a `shadowPath`, the path's shadow is drawn under the layer, all of
+  it, and the layer is drawn over it with no shadow of its own.
+- The layer's `opacity` fades its shadow with it.
+
+`tests/quartzcore/layer_shadows.m` checks each of these pixel by pixel.
+
+## Layer masks (freemac 1.254, Ferry 0.77.0)
+
+A layer with a `mask` now shows only where its mask layer is opaque, and as
+far as it is: a mask that is half opaque shows the layer at half strength, and
+the mask's colours don't count. The mask is placed in the layer's own space by
+its frame and drawn as any layer is, so a shape layer masks by its path (a
+round avatar, a faded edge) and a mask's sublayers count too. Everything the
+layer draws is masked together: its background, contents, sublayers and
+border. The layer's shadow is cast by what the mask leaves, as on a Mac. The
+test `quartzcore_layer_masks` checks this pixel by pixel.
+
+## Parts of a layer's image (freemac 1.255, Ferry 0.78.0)
+
+A layer's `contentsRect` now picks the part of its image that is drawn, as
+sprite sheets and film strips use it, and `contentsCenter` stretches the image
+in nine parts, as buttons, bubbles and panels drawn from one small picture
+use it: the corners outside the centre keep their size (shrunk alike when the
+layer is too small for them), the edges stretch one way and the centre both.
+Both are in the layer's unit space, where y = 0 is the image's bottom, or its
+top when the layer is drawn flipped. `contentsScale` sets how many pixels of
+the image make a point, for the corners and for the gravities that keep the
+image's size. The test `quartzcore_layer_contents_parts` checks this pixel by
+pixel.
+

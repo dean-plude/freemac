@@ -1337,7 +1337,45 @@ static void add_attr(problem *p, pending *r, id item, NSLayoutAttribute a, doubl
     }
 }
 
-/* Where an item is now, in the root's top-down points. */
+/* What Auto Layout lines up for a view: its alignment rect, the frame less
+ * its alignmentRectInsets, as on a Mac (freemac 1.250). A rounded push
+ * button's is its bezel, inside the taller frame it is drawn in, so a nib's
+ * spacing between buttons is between their bezels. Only a view with no
+ * subviews of its own is taken by its alignment rect, so that what is
+ * placed inside a view is placed against its frame. Insets in the root's
+ * top-down terms: left, top, right, bottom. */
+static NSEdgeInsets insets_of(id item)
+{
+    if (![item isKindOfClass:[NSView class]] || [[(NSView *)item subviews] count])
+        return NSEdgeInsetsMake(0, 0, 0, 0);
+    NSEdgeInsets e = [(NSView *)item alignmentRectInsets];
+    if (!isfinite(e.top) || !isfinite(e.left) || !isfinite(e.bottom) || !isfinite(e.right))
+        return NSEdgeInsetsMake(0, 0, 0, 0);
+    return e;   /* top is the view's visual top, flipped or not */
+}
+
+@interface NSView (FerryIntrinsicFrame)
+- (BOOL)_intrinsicSizeIsFrameSize;   /* NSControl.m: Ferry's own push buttons */
+@end
+
+/* A view's intrinsic size in alignment-rect terms. Ferry's own controls
+ * give theirs as the frame they want; one the app's own class gives is
+ * taken as it is, as a Mac takes it. */
+static NSSize alignment_intrinsic(NSView *v)
+{
+    NSSize s = [v intrinsicContentSize];
+    if ([v respondsToSelector:@selector(_intrinsicSizeIsFrameSize)] && [v _intrinsicSizeIsFrameSize]) {
+        NSEdgeInsets e = insets_of(v);
+        if (s.width >= 0)
+            s.width = fmax(0, s.width - e.left - e.right);
+        if (s.height >= 0)
+            s.height = fmax(0, s.height - e.top - e.bottom);
+    }
+    return s;
+}
+
+/* Where an item is now, in the root's top-down points: a view's alignment
+ * rect. */
 static NSRect current_rect(id item, NSView *root)
 {
     NSView *v = view_of(item);
@@ -1350,6 +1388,11 @@ static NSRect current_rect(id item, NSView *root)
     inRoot.origin.x -= [root bounds].origin.x;
     if ([root isFlipped])
         inRoot.origin.y -= [root bounds].origin.y;
+    if (item != root) {
+        NSEdgeInsets e = insets_of(item);
+        inRoot = NSMakeRect(inRoot.origin.x + e.left, inRoot.origin.y + e.top,
+                            fmax(0, inRoot.size.width - e.left - e.right), fmax(0, inRoot.size.height - e.top - e.bottom));
+    }
     return inRoot;
 }
 
@@ -1485,17 +1528,37 @@ static BOOL breaks(pending *r, double *x)
     return (r->relation < 0 && v > r->rhs + 1e-6) || (r->relation > 0 && v < r->rhs - 1e-6);
 }
 
-/* The first inequality, in priority order, that x breaks and that isn't held. */
+/* How far x is past an inequality, 0 if it keeps it. */
+static double broken_by(pending *r, double *x)
+{
+    double v = evaluate(r, x);
+    if (r->relation < 0)
+        return v > r->rhs + 1e-6 ? v - r->rhs : 0;
+    return v < r->rhs - 1e-6 ? r->rhs - v : 0;
+}
+
+/* The inequality to hold next: of those x breaks that aren't held, the one
+ * broken furthest at the highest priority any of them has, the first of
+ * those in order if two are broken as far. A Mac's solver keeps the total
+ * error down; holding whichever broken rule came first could leave a far
+ * bigger one broken (at least 50, at least 100 and at most 90 at one
+ * priority came out 50, 50 short of 100, where 90 to 100 is 10 short of
+ * one), as the rounds that let rules go can't undo it (freemac 1.251). */
 static int first_broken(problem *p, char *active, double *x)
 {
+    int best = -1;
+    double most = 0;
     for (int k = 0; k < p->nrows; k++) {
         pending *r = &p->rows[k];
+        if (best >= 0 && r->priority != p->rows[best].priority)
+            break;
         if (r->relation == NSLayoutRelationEqual || active[k])
             continue;
-        if (breaks(r, x))
-            return k;
+        double d = broken_by(r, x);
+        if (d > most + 1e-9)
+            best = k, most = d;
     }
-    return -1;
+    return best;
 }
 
 static int stat_calls, stat_solves;   /* for FERRY_LAYOUT_STATS */
@@ -1714,7 +1777,7 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
         }
         /* a view placed by constraints: its intrinsic size, then where it was */
         if ([item isKindOfClass:[NSView class]]) {
-            NSSize is = [(NSView *)item intrinsicContentSize];
+            NSSize is = alignment_intrinsic(item);
             double want = vertical ? is.height : is.width;
             if (want >= 0) {
                 NSLayoutConstraintOrientation o = vertical ? NSLayoutConstraintOrientationVertical
@@ -1973,8 +2036,10 @@ static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
                 int pi = item_index(&p, parent_of(item));
                 double px = pi >= 0 ? hx[2 * pi] : 0, py = pi >= 0 ? vx[2 * pi] : 0;
                 double ph = pi >= 0 ? vx[2 * pi + 1] : [parent_of(item) bounds].size.height;
-                double w = fmax(0, hx[2 * k + 1]), h = fmax(0, vx[2 * k + 1]);
-                NSRect f = frame_from(item, hx[2 * k], w, vx[2 * k], h, px, py, ph);
+                /* the frame around the alignment rect solved for */
+                NSEdgeInsets e = insets_of(item);
+                double w = fmax(0, hx[2 * k + 1]) + e.left + e.right, h = fmax(0, vx[2 * k + 1]) + e.top + e.bottom;
+                NSRect f = frame_from(item, hx[2 * k] - e.left, w, vx[2 * k] - e.top, h, px, py, ph);
                 f = NSMakeRect(round(f.origin.x * 2) / 2, round(f.origin.y * 2) / 2, round(w * 2) / 2,
                                round(h * 2) / 2);
                 if ([item isKindOfClass:[NSView class]]) {
@@ -1988,7 +2053,9 @@ static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
                 id item = p.items[k];
                 if (!placed_by_superview(item))
                     continue;
+                NSEdgeInsets e = insets_of(item);
                 NSSize now = [(NSView *)item frame].size;
+                now.width -= e.left + e.right, now.height -= e.top + e.bottom;
                 if (fabs(now.width - hx[2 * k + 1]) >= 0.5 || fabs(now.height - vx[2 * k + 1]) >= 0.5)
                     *again = YES;
             }

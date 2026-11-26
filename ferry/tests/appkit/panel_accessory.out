@@ -1,0 +1,7 @@
+choice Format: PNG JPEG TIFF
+choice Alpha: (check box)
+nothing changed: OK, picture.png, format actions 0
+check box action: on
+JPEG with alpha: OK, picture.jpg, format JPEG, format actions 1, alpha bound 1
+TIFF, no extension typed: notes.tiff, format TIFF (GIF can't be chosen)
+exit=0

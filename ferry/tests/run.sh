@@ -615,6 +615,12 @@ run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/draw
 # the test clock.
 run_one quartzcore_layers "$here/quartzcore/layers.m" "$here/quartzcore/layers.out" -fobjc-arc \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_shadows "$here/quartzcore/layer_shadows.m" "$here/quartzcore/layer_shadows.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_masks "$here/quartzcore/layer_masks.m" "$here/quartzcore/layer_masks.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_contents_parts "$here/quartzcore/layer_contents_parts.m" "$here/quartzcore/layer_contents_parts.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
 run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/animations.out" -fobjc-arc -fblocks \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
 # AppKit (M4). First with no display, where windows are drawn off screen,
@@ -892,6 +898,8 @@ run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.o
 run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out" -fobjc-arc -framework Cocoa
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
+run_one appkit_alignment_rects "$here/appkit/alignment_rects.m" "$here/appkit/alignment_rects.out" -fobjc-arc -framework Cocoa
+run_one appkit_equal_priority "$here/appkit/equal_priority.m" "$here/appkit/equal_priority.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
 # a layout manager laying text out with no text view, as VLC wraps text
 run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
@@ -920,6 +928,7 @@ run_one appkit_layers "$here/appkit/layers.m" "$here/appkit/layers.out" -fobjc-a
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
 # Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).
 run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
+run_one appkit_panel_accessory "$here/appkit/panel_accessory.m" "$here/appkit/panel_accessory.out" -fobjc-arc -framework Cocoa
 # Drag and drop into a window: the steps GTK's drop signals take (M7).
 run_one appkit_dragging "$here/appkit/dragging.m" "$here/appkit/dragging.out" -fobjc-arc -framework Cocoa
 # Menu bar items (after M7): read, opened and clicked over D-Bus as the
@@ -1722,6 +1731,8 @@ run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -fram
 run_one setjmp "$here/setjmp.c" "$here/setjmp.out"
 # OSByteOrder.h, which a Mac's CoreFoundation brings in (VLC's fonts).
 run_one byteorder "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation
+# -lm, -ldl, -lpthread and -lc, as a ported program's build asks for them, link libSystem.
+run_one sdk_std_libs "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation -lm -ldl -lpthread -lc
 # GNU libiconv's calls, linked as on a Mac (freemac 1.238, VLC's subtitles)
 run_one iconv "$here/iconv.c" "$here/iconv.out" -liconv
 # Cells of the app's own classes in a nib (freemac 1.237): VLC's sliders,

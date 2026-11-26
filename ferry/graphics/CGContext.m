@@ -538,6 +538,7 @@ static void paint_with_shadow(GContext *c, cairo_pattern_t *shape, const struct 
 }
 
 void GContextSetShadowOnly(CGContextRef c, BOOL only) { GSTATE(CTX)->shadowOnly = only; }
+void GContextSetDrawsShadowsOnly(CGContextRef c, BOOL only) { CTX->shadowOnly = only; }
 
 BOOL GContextBeginShadow(GContext *c)
 {

@@ -1183,6 +1183,75 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.255 "Sprites and stretchable pictures in layers" (done)
+
+Ferry 0.78.0: a Mac app's Core Animation layers now draw only the part of their image the app asks for, and stretch a picture in nine parts. Sprite sheets and film strips showed the whole sheet before, and buttons, bubbles and panels built from one small picture had their rounded corners stretched out of shape; now they draw as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `contentsRect` picks the part of a layer's image that is drawn, in the layer's own unit space | Ferry QuartzCore (QRender.m) | done |
+| 2 | `contentsCenter` stretches the image in nine parts, keeping its corners' size, at the image's `contentsScale` | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_contents_parts`, checked pixel by pixel | Ferry | done |
+
+## 1.254 "Layers keep to their masks" (done)
+
+Ferry 0.77.0: a Mac app's Core Animation layer masks are now drawn. A round profile picture, a faded list edge or a shape cut out with a mask layer showed whole before; now the layer shows only where its mask is opaque, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer, its sublayers and border show only where the mask layer, placed by its frame, is opaque, and as far as it is | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shape layer masks by its path, and the shadow is cast by what the mask leaves | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_masks`, checked pixel by pixel | Ferry | done |
+
+## 1.253 "Layers cast their shadows" (done)
+
+Ferry 0.76.0: a Mac app's Core Animation layers now draw their shadows. Cards, popovers, buttons and panels that an app gives a soft shadow with `shadowOpacity`, `shadowRadius` and `shadowOffset` showed flat before; now they cast the shadow a Mac draws, from the layer's own shape, or from its `shadowPath`.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer casts its shadow from all it draws taken as one, in its colour at its opacity, moved and blurred as on a Mac, faded with the layer's opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shadow path's whole shadow is drawn under the layer instead | Ferry QuartzCore, Core Graphics | done |
+| 3 | New test `quartzcore_layer_shadows`, checked pixel by pixel | Ferry | done |
+
+## 1.252 "An app's own options in the file chooser" (done)
+
+Ferry 0.75.0: a Mac app can add its own controls under an Open or Save panel, most often a Format menu in a Save panel. The file chooser freemac shows is the system's own, which can't hold an app's view, so these were left out. Now the accessory view's pop-up menus and check boxes show in the chooser as its own choices, named by the label beside each menu ("Format") or the check box's title. What is chosen goes back to the app as if its own controls were clicked, before the file is taken, so a Format menu that changes the file type gives the saved file its new extension (picture.png saved as JPEG is picture.jpg), as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An accessory view's enabled pop-up menus (their items that can be chosen) and check boxes become the chooser's choices, a menu named by the label on its left | Ferry AppKit (NSSavePanel.m) | done |
+| 2 | Each changed choice goes back into its control as a click would: the selection, the control's bindings and its action, before the chosen file is checked and taken | Ferry AppKit | done |
+| 3 | A Save panel's name keeps no extension of a type allowed before the format changed: it is replaced by the new type's | Ferry AppKit | done |
+| 4 | With no display, FERRY_PANEL_CHOICES answers the choices; new test `appkit_panel_accessory` | Ferry | done |
+
+## 1.251 "Auto Layout keeps the rule broken furthest" (done)
+
+Ferry 0.74.0: when a window's layout breaks several rules of one priority, Auto Layout now holds the one broken furthest first, as a Mac's solver in effect does by keeping the total error down. Holding whichever came first could leave a much bigger one broken for good: a view with a minimum width of 50, a minimum of 100 and a maximum of 90 at one priority came out 50 wide, 50 points short, where a Mac makes it 90 to 100 wide, 10 short.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The next inequality held is the one broken furthest at the highest priority any broken one has, the first in order on a tie | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A test of minimums and a maximum at one priority, in either order, and of sliders as tall as the tallest minimum | tests/appkit/equal_priority.m | done |
+
+## 1.250 "Buttons line up as on a Mac" (done)
+
+Ferry 0.73.0: Auto Layout now lines up what a Mac lines up, a view's alignment rect, not its frame. A push button is drawn as a 22-point bezel inside a 32-point frame, and a Mac app's window spaces its buttons by their bezels; Ferry spaced them by their frames, 10 points too tall each, so a tightly laid-out window squeezed its buttons (VLC's Open dialog drew its Browse button 3 pixels tall). Buttons now sit where the window's design puts them, with their frames the size a nib gives them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The solver works in alignment rects: a view's place, its size and its intrinsic size are its frame less its alignmentRectInsets, and the frame it sets is the one round the rect it solved, for a view with no subviews of its own | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A regular rounded push button's alignment rect is its bezel: 5 points in at the top and bottom and 6 at the sides of its frame; Ferry's own controls' intrinsic sizes, given as frames, are taken less their insets, an app's own as they are | Ferry AppKit (NSControl.m) | done |
+| 3 | A test of a label and two buttons spaced by their bezels and an app's own view with insets | tests/appkit/alignment_rects.m | done |
+
+## 1.249 "Ported programs link as on a Mac" (done)
+
+Ferry 0.72.0: a program built with Ferry's SDK can ask for the maths, dynamic-loading, threads and C libraries by name (-lm, -ldl, -lpthread, -lc), as builds ported from other systems do, and gets libSystem for each, as a Mac's SDK gives it. Before, each of those stopped the build at the link.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | libm.tbd, libdl.tbd, libpthread.tbd and libc.tbd in the SDK, each libSystem, made and installed with it | Ferry SDK (Makefile) | done |
+| 2 | A test program built with all four links and runs | tests/run.sh (sdk_std_libs) | done |
+
 ## 1.248 "Fonts for Mac apps" (done)
 
 Ferry 0.71.0: a Mac app that looks for fonts in a Mac's Fonts folders now finds this computer's fonts there. OBS Studio's Text source lists them, so a font picked in its Select font window shows the text in the preview and the recording, where before it found no fonts and drew nothing.

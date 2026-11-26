@@ -7,8 +7,12 @@
  * transform and geometryFlipped), then the border on top; all inside the
  * rounded bounds when masksToBounds is set, and composited as one at the
  * layer's opacity. A layer's transform is drawn as its 2D part. Images
- * are always drawn the right way up on the page. Shadows, masks and
- * filters aren't drawn yet. */
+ * are always drawn the right way up on the page. A layer casts its shadow
+ * (freemac 1.253): from its shadowPath when it has one, else from all it
+ * draws (background, contents, sublayers and border) taken as one, as Apple
+ * documents. A mask keeps the layer only where the mask layer is opaque
+ * (freemac 1.254). contentsRect picks a part of the image and contentsCenter
+ * stretches it in nine parts (freemac 1.255). Filters aren't drawn yet. */
 #import "QInternal.h"
 
 /* From a layer's bounds space to the space its superlayer puts sublayers
@@ -171,6 +175,50 @@ static void draw_upright(CGContextRef ctx, CGRect r, CGImageRef img, BOOL flippe
     CGContextRestoreGState(ctx);
 }
 
+/* A rectangle in the unit space of the layer's contents (contentsRect,
+ * contentsCenter) as whole pixels of the image, counted from its top row.
+ * The unit space is the layer's own: y = 0 is the edge at its minimum y,
+ * which is the image's bottom unless the space is drawn flipped. Only the
+ * part inside the image is kept. */
+static CGRect unit_to_pixels(CGRect u, CGImageRef img, BOOL flipped)
+{
+    double w = CGImageGetWidth(img), h = CGImageGetHeight(img);
+    double y = flipped ? u.origin.y : 1 - u.origin.y - u.size.height;
+    CGRect px = CGRectMake(round(u.origin.x * w), round(y * h), 0, 0);
+    px.size.width = round((u.origin.x + u.size.width) * w) - px.origin.x;
+    px.size.height = round((y + u.size.height) * h) - px.origin.y;
+    return CGRectIntersection(CGRectStandardize(px), CGRectMake(0, 0, w, h));
+}
+
+/* The image drawn into r in nine parts, as contentsCenter asks: the corners
+ * outside the centre keep their size (shrunk alike when r is too small for
+ * them), the edges stretch one way and the centre both. */
+static void draw_stretched(CGContextRef ctx, CGRect r, CGImageRef img, CGRect c, double scale, BOOL flipped)
+{
+    double w = CGImageGetWidth(img), h = CGImageGetHeight(img);
+    if (CGRectIsNull(c)) /* a centre outside the image: the middle of it */
+        c = CGRectMake(floor(w / 2), floor(h / 2), 0, 0);
+    double sx[4] = {0, c.origin.x, CGRectGetMaxX(c), w}, sy[4] = {0, c.origin.y, CGRectGetMaxY(c), h};
+    double left = sx[1] / scale, right = (w - sx[2]) / scale, top = sy[1] / scale, bottom = (h - sy[2]) / scale;
+    double fx = left + right > r.size.width ? r.size.width / (left + right) : 1;
+    double fy = top + bottom > r.size.height ? r.size.height / (top + bottom) : 1;
+    double dx[4] = {0, left * fx, r.size.width - right * fx, r.size.width};
+    double dy[4] = {0, top * fy, r.size.height - bottom * fy, r.size.height}; /* from the top down */
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            CGRect src = CGRectMake(sx[j], sy[i], sx[j + 1] - sx[j], sy[i + 1] - sy[i]);
+            double dw = dx[j + 1] - dx[j], dh = dy[i + 1] - dy[i];
+            if (src.size.width < 1 || src.size.height < 1 || dw <= 0 || dh <= 0)
+                continue;
+            CGImageRef piece = CGImageCreateWithImageInRect(img, src);
+            if (!piece)
+                continue;
+            double y = flipped ? r.origin.y + dy[i] : CGRectGetMaxY(r) - dy[i + 1];
+            draw_upright(ctx, CGRectMake(r.origin.x + dx[j], y, dw, dh), piece, flipped);
+            CGImageRelease(piece);
+        }
+}
+
 /* whether a property the layer's class redraws for is animating */
 static BOOL redraws_while_animating(CALayer *l)
 {
@@ -204,23 +252,59 @@ static void draw_contents(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL fl
     double scale = QNum(v, @"contentsScale");
     if (scale <= 0)
         scale = 1;
+    CGImageRef part = NULL;
+    CGRect cr = QRect(v, @"contentsRect");
+    if (!CGRectEqualToRect(cr, CGRectMake(0, 0, 1, 1))) {
+        CGRect px = unit_to_pixels(cr, img, flipped);
+        if (px.size.width < 1 || px.size.height < 1)
+            return;
+        part = CGImageCreateWithImageInRect(img, px);
+        if (!part)
+            return;
+        img = part;
+    }
     CGSize size = CGSizeMake(CGImageGetWidth(img) / scale, CGImageGetHeight(img) / scale);
-    if (!CGRectEqualToRect(QRect(v, @"contentsRect"), CGRectMake(0, 0, 1, 1)))
-        QWarnOnce("contentsRect");
-    if (!CGRectEqualToRect(QRect(v, @"contentsCenter"), CGRectMake(0, 0, 1, 1)))
-        QWarnOnce("contentsCenter");
     CGRect r = gravity_rect(v[@"contentsGravity"], b, size);
     CGContextSaveGState(ctx);
     if ([v[@"magnificationFilter"] isEqual:kCAFilterNearest])
         CGContextSetInterpolationQuality(ctx, kCGInterpolationNone);
-    draw_upright(ctx, r, img, flipped);
+    CGRect center = QRect(v, @"contentsCenter");
+    if (CGRectEqualToRect(center, CGRectMake(0, 0, 1, 1)))
+        draw_upright(ctx, r, img, flipped);
+    else
+        draw_stretched(ctx, r, img, unit_to_pixels(center, img, flipped), scale, flipped);
     CGContextRestoreGState(ctx);
+    if (part)
+        CGImageRelease(part);
+}
+
+/* Sets the layer's shadow in the context, if it casts one: its colour at
+ * shadowOpacity, its offset (in the layer's superlayer's space, as the
+ * layer is placed) and its radius taken to the base space Core Graphics
+ * keeps shadows in. A layer's shadowRadius is a Gaussian's, Core Graphics's
+ * blur twice that. */
+static BOOL set_shadow(NSDictionary *v, CGContextRef ctx)
+{
+    double opacity = QNum(v, @"shadowOpacity");
+    CGColorRef color = QColor(v, @"shadowColor");
+    if (opacity <= 0 || !color || CGColorGetAlpha(color) <= 0)
+        return NO;
+    CGAffineTransform m = CGContextGetCTM(ctx);
+    m.tx = m.ty = 0;
+    CGSize off = CGSizeApplyAffineTransform(QSize(v, @"shadowOffset"), m);
+    double scale = sqrt(fabs(m.a * m.d - m.b * m.c));
+    CGColorRef c = CGColorCreateCopyWithAlpha(color, CGColorGetAlpha(color) * fmin(opacity, 1));
+    CGContextSetShadowWithColor(ctx, off, 2 * fmax(QNum(v, @"shadowRadius"), 0) * scale, c);
+    CGColorRelease(c);
+    return YES;
 }
 
 static NSDictionary *values_of(CALayer *l, BOOL pres)
 {
     return pres ? [l _ferryPresentationValues] : [l _ferryValues];
 }
+
+static void apply_mask(CALayer *mask, CGContextRef ctx, BOOL pres, BOOL flipped);
 
 static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pres, BOOL flipped,
                          void (^content)(CGContextRef))
@@ -235,15 +319,26 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         return;
     CGRect b = QRect(v, @"bounds");
     CGContextSaveGState(ctx);
-    BOOL group = opacity < 1;
+    BOOL shadowed = set_shadow(v, ctx), fromPath = shadowed && v[@"shadowPath"];
+    if (fromPath) {
+        /* the path's shadow under the layer, the layer itself unshadowed */
+        CGContextSaveGState(ctx);
+        CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
+        GContextSetDrawsShadowsOnly(ctx, YES);
+        CGContextSetRGBFillColor(ctx, 0, 0, 0, 1);
+        CGContextBeginPath(ctx);
+        CGContextAddPath(ctx, (CGPathRef)v[@"shadowPath"]);
+        CGContextFillPath(ctx);
+        GContextSetDrawsShadowsOnly(ctx, NO);
+        CGContextRestoreGState(ctx);
+        CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
+    }
+    CALayer *mask = [l mask];
+    BOOL group = opacity < 1 || (shadowed && !fromPath) || mask;
     if (group) {
         CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
         CGContextBeginTransparencyLayer(ctx, NULL);
     }
-    if (QNum(v, @"shadowOpacity") > 0)
-        QWarnOnce("layer shadows");
-    if ([l mask])
-        QWarnOnce("layer masks");
     if ([v[@"filters"] count] || [v[@"backgroundFilters"] count] || v[@"compositingFilter"])
         QWarnOnce("layer filters");
     double radius = QNum(v, @"cornerRadius");
@@ -326,8 +421,31 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         CGPathRelease(edge);
     }
     CGPathRelease(shape);
+    if (mask)
+        apply_mask(mask, ctx, pres, flipped);
     if (group)
         CGContextEndTransparencyLayer(ctx);
+    CGContextRestoreGState(ctx);
+}
+
+/* A mask: what the layer drew so far (in its transparency layer) is kept
+ * only as far as the mask layer, drawn in the layer's own space as placed
+ * by its frame, is opaque; its colours don't count (freemac 1.254). */
+static void apply_mask(CALayer *mask, CGContextRef ctx, BOOL pres, BOOL flipped)
+{
+    NSDictionary *mv = values_of(mask, pres);
+    CGAffineTransform m = placement(mv);
+    CGContextSaveGState(ctx);
+    CGContextSetAlpha(ctx, 1);
+    CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
+    /* the transparency layer goes onto what is there in the blend mode in
+     * force when it began, the mask drawn in it as usual */
+    CGContextSetBlendMode(ctx, kCGBlendModeDestinationIn);
+    CGContextBeginTransparencyLayer(ctx, NULL);
+    CGContextSetBlendMode(ctx, kCGBlendModeNormal);
+    CGContextConcatCTM(ctx, m);
+    render_layer(mask, mv, ctx, pres, flipped ^ reverses(m), nil);
+    CGContextEndTransparencyLayer(ctx);
     CGContextRestoreGState(ctx);
 }
 
