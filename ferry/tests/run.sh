@@ -922,6 +922,7 @@ run_one appkit_layers "$here/appkit/layers.m" "$here/appkit/layers.out" -fobjc-a
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
 # Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).
 run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
+run_one appkit_panel_accessory "$here/appkit/panel_accessory.m" "$here/appkit/panel_accessory.out" -fobjc-arc -framework Cocoa
 # Drag and drop into a window: the steps GTK's drop signals take (M7).
 run_one appkit_dragging "$here/appkit/dragging.m" "$here/appkit/dragging.out" -fobjc-arc -framework Cocoa
 # Menu bar items (after M7): read, opened and clicked over D-Bus as the

@@ -3189,3 +3189,25 @@ is the one it keeps; taking the first could leave a big one broken that the
 rounds which let rules go cannot get back. `tests/appkit/equal_priority.m`
 checks minimum widths of 50 and 100 in either order, the same with a
 maximum of 90, and sliders each as tall as the first.
+
+## An accessory view in Open and Save panels (freemac 1.252, Ferry 0.75.0)
+
+Ferry's Open and Save panels are the system's file chooser, GTK's or the
+desktop's own through its portal, which can't hold an app's view. So an
+accessory view is offered as the chooser's choices instead:
+
+- each enabled, visible pop-up menu that isn't a pull-down list, with the
+  items that can be chosen (no separators, disabled or hidden items),
+  named by the label on its left on the same line, its colon dropped, or
+  "Format" when there is no label and only one menu;
+- each enabled, visible check box, named by its title.
+
+When the chooser closes with a file, every choice that changed goes back
+into its control as a click would: the item is chosen or the box ticked,
+the control's bindings are told and its action is sent. Only then is the
+file checked and taken, so a Format menu's action that sets
+`allowedFileTypes` decides the extension: a name with an extension of a
+type allowed when the panel opened gets the new type's in its place. Other
+controls in an accessory view (text fields, radio groups, sliders) aren't
+offered. With no display, `FERRY_PANEL_CHOICES` gives the choices, one
+`Label=Option` line each, a check box by `true` or `false`.

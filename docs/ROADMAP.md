@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.252 "An app's own options in the file chooser" (done)
+
+Ferry 0.75.0: a Mac app can add its own controls under an Open or Save panel, most often a Format menu in a Save panel. The file chooser freemac shows is the system's own, which can't hold an app's view, so these were left out. Now the accessory view's pop-up menus and check boxes show in the chooser as its own choices, named by the label beside each menu ("Format") or the check box's title. What is chosen goes back to the app as if its own controls were clicked, before the file is taken, so a Format menu that changes the file type gives the saved file its new extension (picture.png saved as JPEG is picture.jpg), as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An accessory view's enabled pop-up menus (their items that can be chosen) and check boxes become the chooser's choices, a menu named by the label on its left | Ferry AppKit (NSSavePanel.m) | done |
+| 2 | Each changed choice goes back into its control as a click would: the selection, the control's bindings and its action, before the chosen file is checked and taken | Ferry AppKit | done |
+| 3 | A Save panel's name keeps no extension of a type allowed before the format changed: it is replaced by the new type's | Ferry AppKit | done |
+| 4 | With no display, FERRY_PANEL_CHOICES answers the choices; new test `appkit_panel_accessory` | Ferry | done |
+
 ## 1.251 "Auto Layout keeps the rule broken furthest" (done)
 
 Ferry 0.74.0: when a window's layout breaks several rules of one priority, Auto Layout now holds the one broken furthest first, as a Mac's solver in effect does by keeping the total error down. Holding whichever came first could leave a much bigger one broken for good: a view with a minimum width of 50, a minimum of 100 and a maximum of 90 at one priority came out 50 wide, 50 points short, where a Mac makes it 90 to 100 wide, 10 short.
