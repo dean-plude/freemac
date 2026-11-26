@@ -470,6 +470,8 @@ From Ferry 0.59.0 (freemac 1.235), `opengl/` is OpenGL.framework, CGL on this sy
 
 Mac apps with big windows open without a wait: Ferry's Auto Layout solver now goes again only over what a change reaches, so a window of hundreds of views lays out in a tenth of a second instead of several seconds, with every view in the same place.
 
+From Ferry 0.62.0 (freemac 1.238), Mac apps record the screen, as OBS Studio's mac-capture plugin does: `screencapturekit/` is ScreenCaptureKit.framework, and AppKit's file holds the capture core it shares with CGDisplayStream and the window list's pictures (`appkit/ACapture.m`, `ACaptureX11.m`, `CGDisplayStream.m`), with Core Media's sample buffers beside it (`appkit/CMSampleBuffer.m`). Under X11 the X server's screen and windows are read through MIT-SHM, XComposite and XFixes; under Wayland the ScreenCast portal isn't spoken yet (`appkit/ACapturePortal.m` says so), and `FERRY_CAPTURE=x11|portal|none` chooses. Recording asks the user once (`freemac-allow-control --kind screen-recording`). The tests are `screencapture_coremedia` and `screencapture_x11`, `screencapture_x11_noshm` on an Xvfb of their own.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

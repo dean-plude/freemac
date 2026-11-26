@@ -1,0 +1,70 @@
+before asking: content 0, error com.apple.ScreenCaptureKit.SCStreamErrorDomain -3801
+after the user's answer: allowed 1
+asked: asked --kind screen-recording --app-id APP --name screencapture
+content: error 0, 1 displays
+  display 1: 320x240 at 0,0 320x240, the main display 1
+  my window: id is its number 1, at 40,60 160x120, on screen 1, layer 0, mine 1, app "screencapture" ()
+  the other app's window: listed 1, at 220,160 80x60, on screen 1, its pid 1, numbered as another app's 1
+  applications: both listed 1
+display filter: style 2, scale 1.0, rect 0,0 320x240
+outputs added: screen 1, audio 1
+synchronised with the host clock 1
+started: done
+started again: error -3807
+the screen, 'BGRA':
+  320x240 BGRA, on an IOSurface 1, valid 1 ready 1 samples 1
+  format: vide BGRA 320x240, matches 1
+  time: on the host clock 1, not after now 1
+  info: status 0, content 0,0 320x240, scale factor 1.0, content scale 1.00, screen 0,0 320x240, shown before now 1
+  at the top left: black
+  at my window's top left quarter: red
+  at its top right: green
+  at its bottom left: blue
+  at its bottom right: yellow
+  at the other app's window: cyan
+pointer shown: done
+the pointer drawn in: 1
+configured: done
+the screen, 'l10r' at half size:
+  160x120 l10r, on an IOSurface 1, valid 1 ready 1 samples 1
+  format: vide l10r 160x120, matches 1
+  time: on the host clock 1, not after now 1
+  info: status 0, content 0,0 160x120, scale factor 1.0, content scale 0.50, screen 0,0 320x240, shown before now 1
+  at my window's top left quarter: red
+  at its bottom right: yellow
+window filter: style 1, scale 1.0, rect 0,0 160x120
+configured: done
+filtered: done
+the window alone:
+  160x120 BGRA, on an IOSurface 1, valid 1 ready 1 samples 1
+  format: vide BGRA 160x120, matches 1
+  time: on the host clock 1, not after now 1
+  info: status 0, content 0,0 160x120, scale factor 1.0, content scale 1.00, screen 40,60 160x120, shown before now 1
+  at the top left of its content: red
+  at its bottom right: yellow
+configured: done
+filtered: done
+only the other app (style 3):
+  at my window: black
+  at the other app's: cyan
+filtered: done
+all but my app:
+  at my window: black
+  at the other app's: cyan
+audio before asking for it: 0
+audio asked for: done
+audio: came 1, heard what was played 1
+  soun, 48000 Hz, 2 channels, float 1, not interleaved 1, 1024 frames, on the host clock 1
+stopped: done
+after stopping: frames came 0, audio came 0, the delegate told of errors 0
+stopped again: error -3808
+a picture: 160x120, at my window red
+a display stream: made 1, started 1
+  a frame: 160x120, 1 rect 0,0 160x120, top left red, bottom right yellow
+  stopped: told 1
+display mode: 320x240, 320x240 pixels, usable 1; display 320x240
+the window list: mine numbered 1, its pid 1, layer 0, on screen 1, at 40,60 160x120
+  the other app's: listed 1, its pid 1, at 220,160 80x60, the same number as ScreenCaptureKit's 1
+  the screen's picture: 320x240, at my window red, at the other's cyan
+  the other app's picture: 80x60, cyan
+exit=0

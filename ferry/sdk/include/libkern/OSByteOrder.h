@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* Byte order (freemac 1.NEXT, for VLC's Core Text fonts). Ferry runs on
+/* Byte order (freemac 1.238, for VLC's Core Text fonts). Ferry runs on
  * x86-64, which is little-endian, as Apple's documentation for these calls
  * describes. */
 #ifndef _FERRY_LIBKERN_OSBYTEORDER_H_

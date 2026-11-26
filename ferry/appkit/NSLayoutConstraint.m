@@ -22,8 +22,8 @@
  * are made equalities, highest priority first, only while the answer breaks
  * them.
  *
- * The elimination is sparse and only ever goes forward (freemac 1.NEXT,
- * Ferry 0.NEXT): a row in it never changes once in, so when an inequality
+ * The elimination is sparse and only ever goes forward (freemac 1.238,
+ * Ferry 0.62.0): a row in it never changes once in, so when an inequality
  * is made active or let go only the rows after it are gone through again,
  * and of those only the ones that meet an unknown whose settling row
  * changed. The answer is the same as working it all out anew each time.
@@ -874,7 +874,7 @@ ANCHOR(heightAnchor, NSLayoutDimension, NSLayoutAttributeHeight)
 
 #define EPS 1e-7
 
-/* The elimination (freemac 1.NEXT, Ferry 0.NEXT). Rows go in one at a
+/* The elimination (freemac 1.238, Ferry 0.62.0). Rows go in one at a
  * time, in priority order, each reduced by the rows already in and kept
  * when it says something new; one that contradicts them is left out. Rows
  * are sparse, as constraints are (a few unknowns each), and reduced only
@@ -1815,8 +1815,8 @@ static void add_item(problem *p, id item, NSView *root)
     [p->items addObject:item];
 }
 
-/* Fitting sizes asked for while a window's rows are made (freemac 1.NEXT,
- * Ferry 0.NEXT). A stack view asks how big each of its views wants to be
+/* Fitting sizes asked for while a window's rows are made (freemac 1.238,
+ * Ferry 0.62.0). A stack view asks how big each of its views wants to be
  * and how firmly, for its own size and hugging, again and again, and
  * nothing moves until the window's rows are solved: each is worked out
  * once. */

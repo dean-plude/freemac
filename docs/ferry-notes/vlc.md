@@ -157,7 +157,7 @@ other than root (see above):
 
     ferry WORK/build/vlc/VLC.app video.mp4
 
-## Preferences and the subtitle fonts (freemac 1.NEXT, Ferry 0.NEXT)
+## Preferences and the subtitle fonts (freemac 1.238, Ferry 0.62)
 
 VLC's menus now answer their Command-key equivalents, and its Preferences
 window opens, with every pane (Interface, Audio, Video, Subtitles / OSD,
@@ -188,7 +188,7 @@ class for it (`appkit/NSApplication.m`).
 Tests: `tests/setjmp.c`, `tests/graphics/fonts.c`, `tests/byteorder.c`,
 `tests/appkit/viewer_launch.m`.
 
-## Subtitles, the playlist and seeking (freemac 1.NEXT, Ferry 0.NEXT)
+## Subtitles, the playlist and seeking (freemac 1.238, Ferry 0.62)
 
 VLC now shows subtitles over the video in its window, in its default font,
 and its Open dialog, the playlist after stopping and seeking all work.

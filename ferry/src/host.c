@@ -491,3 +491,48 @@ void *ferry_gl_symbol(const char *name)
         p = gl_get_proc(name);
     return p;
 }
+
+/* ---- screen capture (freemac 1.238, Ferry 0.62.0) ---------------------------------
+ * Ferry's screen capture (ScreenCaptureKit, CGDisplayStream and pictures of
+ * the screen, appkit/ACaptureX11.m) reads an X11 screen through this
+ * system's Xlib (libX11.so.6) and its MIT-SHM, XFIXES and Composite
+ * extensions (libXext.so.6, libXfixes.so.3, libXcomposite.so.1), whose
+ * calls and structures are the same on both systems. They are opened the
+ * first time a program asks what is on the screen, so a program that never
+ * does doesn't load them, and Ferry runs on a system without them (capture
+ * then finds no screen). Only X calls are served, and the C library's
+ * System V shared memory calls, which MIT-SHM needs (a Mac program's own
+ * would take the Mac's numbers). FERRY_XLIB names another library to open
+ * in libX11's place (the tests use it to stand for a system without it). */
+static void *x_handle, *xext_handle, *xfixes_handle, *xcomposite_handle;
+static void open_capture(void)
+{
+    const char *other = getenv("FERRY_XLIB");
+    x_handle = dlopen(other && *other ? other : "libX11.so.6", RTLD_NOW | RTLD_LOCAL);
+    if (!x_handle)
+        return;
+    xext_handle = dlopen("libXext.so.6", RTLD_NOW | RTLD_LOCAL);
+    xfixes_handle = dlopen("libXfixes.so.3", RTLD_NOW | RTLD_LOCAL);
+    xcomposite_handle = dlopen("libXcomposite.so.1", RTLD_NOW | RTLD_LOCAL);
+}
+
+void *ferry_capture_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name)
+        return NULL;
+    if (!strcmp(name, "shmget") || !strcmp(name, "shmat") || !strcmp(name, "shmdt") || !strcmp(name, "shmctl"))
+        return dlsym(RTLD_DEFAULT, name);
+    if (name[0] != 'X')
+        return NULL;
+    pthread_once(&once, open_capture);
+    if (!x_handle)
+        return NULL;
+    void *const handles[] = {x_handle, xext_handle, xfixes_handle, xcomposite_handle};
+    for (size_t i = 0; i < sizeof handles / sizeof handles[0]; i++) {
+        void *p = handles[i] ? dlsym(handles[i], name) : NULL;
+        if (p)
+            return p;
+    }
+    return NULL;
+}

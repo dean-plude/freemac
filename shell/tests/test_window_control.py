@@ -96,6 +96,31 @@ class Store(unittest.TestCase):
             self.assertEqual(window_control.main(["--app-id", "com.example.Flycut", "--name", "Flycut"]), 1)
             ask.assert_called_once_with("com.example.Flycut", "Flycut")
 
+    def test_recording_the_screen_is_its_own_question_and_file(self):
+        # freemac 1.238: Ferry's screen capture asks with --kind screen-recording
+        self.assertEqual(window_control.path("screen-recording"),
+                         os.path.join(self.dir.name, "freemac", "screen-recording.json"))
+        self.assertEqual(window_control.question("OBS", "screen-recording"),
+                         "Allow “OBS” to record this computer's screen?")
+        with mock.patch.object(window_control, "ask") as ask:
+            self.assertEqual(window_control.main(["--app-id", "com.obsproject.obs-studio", "--name", "OBS",
+                                                  "--kind", "screen-recording", "--answer", "allow"]), 0)
+            ask.assert_not_called()
+        self.assertTrue(window_control.answer("com.obsproject.obs-studio", "screen-recording"))
+        # the other question is still unasked, and its file untouched
+        self.assertIsNone(window_control.answer("com.obsproject.obs-studio"))
+        self.assertFalse(os.path.exists(window_control.path()))
+        with open(window_control.path("screen-recording")) as f:
+            self.assertEqual(json.load(f), {"apps": {"com.obsproject.obs-studio": {"name": "OBS", "allowed": True}}})
+
+        def the_user_allows(app_id, name, kind):
+            window_control.set_allowed(app_id, True, name, kind)
+            return True
+
+        with mock.patch.object(window_control, "ask", side_effect=the_user_allows) as ask:
+            self.assertEqual(window_control.main(["--app-id", "org.example.Rec", "--kind", "screen-recording"]), 0)
+            ask.assert_called_once_with("org.example.Rec", "Rec", "screen-recording")
+
 
 def gtk():
     if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
