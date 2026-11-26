@@ -1014,6 +1014,33 @@ else
     echo "FAIL appkit_documents (did not compile)"; sed 's/^/    /' "$build/appkit_documents.cc.log"
     fail=$((fail + 1))
 fi
+# Opening files in the copy that's already running (freemac 1.NEXT):
+# OpenApp.app asks its own socket from another thread, as the desktop's
+# freemac-mac-app would, and the socket is gone once it has quit.
+app="$build/OpenApp.app"
+home="$build/home_open_running"
+rm -rf "$app" "$home"; cp -r "$here/appkit/OpenApp.app" "$app"; mkdir -p "$app/Contents/MacOS" "$home/work" "$home/run"
+chmod 700 "$home/run"
+for f in First Second Relative; do printf '%s' "$f" > "$home/work/$f.txt"; done
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/OpenApp" "$here/appkit/open_running.m" -framework Cocoa \
+        2> "$build/appkit_open_running.cc.log"; then
+    (cd "$home/work" && env -u WAYLAND_DISPLAY -u DISPLAY HOME="$home" XDG_RUNTIME_DIR="$home/run" \
+        "$top/ferry" "$app/Contents/MacOS/OpenApp") > "$build/appkit_open_running.got" \
+        2> "$build/appkit_open_running.err"
+    status=$?
+    left=no; [ -e "$home/run/ferry/org.freemac.ferry.openapp.open" ] && left=yes
+    printf 'socket left behind: %s\nexit=%s\n' "$left" "$status" >> "$build/appkit_open_running.got"
+    if diff -u "$here/appkit/open_running.out" "$build/appkit_open_running.got" > "$build/appkit_open_running.diff"; then
+        echo "ok   appkit_open_running"; pass=$((pass + 1))
+    else
+        echo "FAIL appkit_open_running"; sed 's/^/    /' "$build/appkit_open_running.diff"
+        sed 's/^/    stderr: /' "$build/appkit_open_running.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL appkit_open_running (did not compile)"; sed 's/^/    /' "$build/appkit_open_running.cc.log"
+    fail=$((fail + 1))
+fi
 # Images (M7), in an app bundle the test writes its image files into: it
 # runs from there, so imageNamed: finds them. No image files are kept here.
 app="$build/ImageApp.app"

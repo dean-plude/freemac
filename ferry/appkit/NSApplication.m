@@ -8,6 +8,13 @@
 #import "AInternal.h"
 #import "ANotify.h"
 #import "AWayfire.h"
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+void FerryRunLoopAddDescriptor(int fd, void (*callback)(int, void *), void *ctx);
 
 NSApplication *NSApp;
 NSNotificationName const NSApplicationWillFinishLaunchingNotification = @"NSApplicationWillFinishLaunchingNotification";
@@ -677,6 +684,12 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 - (BOOL)isFlipped { return YES; }
 @end
 
+@interface NSApplication (AOpenRequests)
+- (BOOL)_openFiles:(NSArray *)files;
+- (void)_openUntitledIfWanted;
+- (void)_openRequested:(NSArray *)files;
+@end
+
 @implementation NSApplication {
     id _delegate;
     NSMenu *_mainMenu;
@@ -990,6 +1003,107 @@ static void register_app_icon(void)
                      [entry dataUsingEncoding:NSUTF8StringEncoding]);
 }
 
+/* ---- opening files in the copy that's already running ------------------------------- */
+
+/* On a Mac, opening a document (a double-click in the Finder, a file dropped
+ * on the app's Dock icon) when its app is already open gives the document to
+ * that copy of the app, and opening the app again only brings it to the
+ * front. Here the desktop opens a Mac app through freemac-mac-app, which
+ * first asks the running copy (freemac 1.NEXT): each app with a bundle
+ * identifier listens on $XDG_RUNTIME_DIR/ferry/<identifier>.open, a Unix
+ * socket, for the absolute paths of the files to open, one to a line, and
+ * answers "ok". No paths means "come to the front". A copy started by hand
+ * while another one is listening leaves that one be, as a second copy
+ * started from a Mac's Terminal would. */
+
+static char open_socket[sizeof(((struct sockaddr_un *)0)->sun_path)];
+static pid_t open_socket_owner;
+
+static void forget_open_socket(void)
+{
+    if (open_socket[0] && getpid() == open_socket_owner)
+        unlink(open_socket);
+}
+
+static void open_request(int listener, void *ctx)
+{
+    int fd = accept(listener, NULL, NULL);
+    if (fd < 0)
+        return;
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof on);
+    struct timeval wait = {2, 0};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof wait);
+    NSMutableData *got = [NSMutableData data];
+    char buf[4096];
+    ssize_t n;
+    while ([got length] < 1 << 20 && (n = read(fd, buf, sizeof buf)) > 0)
+        [got appendBytes:buf length:n];
+    (void)!write(fd, "ok\n", 3);
+    close(fd);
+    NSString *text = [[[NSString alloc] initWithData:got encoding:NSUTF8StringEncoding] autorelease];
+    NSMutableArray *files = [NSMutableArray array];
+    for (NSString *line in [text componentsSeparatedByString:@"\n"]) {
+        NSString *path = [line stringByStandardizingPath];
+        if ([path isAbsolutePath] && [[NSFileManager defaultManager] fileExistsAtPath:path])
+            [files addObject:path];
+    }
+    @autoreleasepool {
+        @try {
+            [NSApp _openRequested:files];
+        } @catch (NSException *x) {
+            [NSApp reportException:x];
+        }
+    }
+}
+
+static void listen_for_open_requests(void)
+{
+    NSString *ident = [[NSBundle mainBundle] bundleIdentifier];
+    const char *runtime = getenv("XDG_RUNTIME_DIR");
+    if (![ident length] || !runtime || *runtime != '/')
+        return;
+    NSMutableString *name = [NSMutableString string];
+    for (NSUInteger i = 0; i < [ident length]; i++) {
+        unichar c = [ident characterAtIndex:i];
+        BOOL plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' ||
+                     c == '_' || c == '-';
+        unichar out = plain ? c : (unichar)'-';
+        [name appendFormat:@"%C", out];
+    }
+    char dir[sizeof open_socket];
+    if (snprintf(dir, sizeof dir, "%s/ferry", runtime) >= (int)sizeof dir)
+        return;
+    mkdir(dir, 0700);
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof addr);
+    addr.sun_len = sizeof addr;
+    addr.sun_family = AF_UNIX;
+    if (snprintf(addr.sun_path, sizeof addr.sun_path, "%s/%s.open", dir, [name UTF8String]) >=
+        (int)sizeof addr.sun_path)
+        return;
+    int probe = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (probe < 0)
+        return;
+    BOOL taken = connect(probe, (struct sockaddr *)&addr, sizeof addr) == 0;   /* another copy listens */
+    close(probe);
+    if (taken)
+        return;
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0)
+        return;
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    unlink(addr.sun_path);
+    if (bind(fd, (struct sockaddr *)&addr, sizeof addr) != 0 || listen(fd, 8) != 0) {
+        close(fd);
+        return;
+    }
+    memcpy(open_socket, addr.sun_path, sizeof open_socket);
+    open_socket_owner = getpid();
+    atexit(forget_open_socket);
+    FerryRunLoopAddDescriptor(fd, open_request, NULL);
+}
+
 - (void)finishLaunching
 {
     if (_launched)
@@ -1008,6 +1122,8 @@ static void register_app_icon(void)
     if (_policy == NSApplicationActivationPolicyRegular)
         [self activateIgnoringOtherApps:YES];
     [self _openLaunchFiles];
+    if (_policy == NSApplicationActivationPolicyRegular)
+        listen_for_open_requests();
     /* No windows are restored, so restoring them is done at once
      * (freemac 1.225, Ferry 0.49.0): MacPass waits for this and for the
      * launch before it shows its welcome window. */
@@ -1038,6 +1154,16 @@ static void register_app_icon(void)
         if ([[NSFileManager defaultManager] fileExistsAtPath:path])
             [files addObject:[path stringByStandardizingPath]];
     }
+    if ([self _openFiles:files])
+        return;
+    [self _openUntitledIfWanted];
+}
+
+/* Files the app is asked to open, given to its delegate as a Mac's AppKit
+ * gives them (as URLs, as paths, one by one), else to its document
+ * controller. NO when nothing took them. */
+- (BOOL)_openFiles:(NSArray *)files
+{
     NSDocumentController *documents = [NSDocumentController _existingSharedController];
     BOOL opened = NO;
     if ([files count]) {
@@ -1063,8 +1189,12 @@ static void register_app_icon(void)
             opened = NO;
         }
     }
-    if (opened)
-        return;
+    return opened;
+}
+
+- (void)_openUntitledIfWanted
+{
+    NSDocumentController *documents = [NSDocumentController _existingSharedController];
     /* Only a document-based app, one with a type it edits and a document
      * class for it, opens an untitled document by itself. An app that
      * keeps the shared controller only for its recent documents, as
@@ -1081,6 +1211,40 @@ static void register_app_icon(void)
         if (![documents openUntitledDocumentAndDisplay:YES error:&error] && error)
             [documents presentError:error];
     }
+}
+
+/* What the desktop asked of the running copy (see open_request): files to
+ * open, or, with none, to come back to the front, which a Mac gives the
+ * delegate as a "reopen" (it may say no); then a hidden or minimized app
+ * shows its windows again, and one with no windows at all may open an
+ * untitled document. */
+- (void)_openRequested:(NSArray *)files
+{
+    BOOL visible = NO;
+    for (NSWindow *w in AAllWindows())
+        if ([w isVisible] && ![w isMiniaturized])
+            visible = YES;
+    if ([files count]) {
+        [self _openFiles:files];
+    } else {
+        BOOL reopen = YES;
+        if ([_delegate respondsToSelector:@selector(applicationShouldHandleReopen:hasVisibleWindows:)])
+            reopen = [_delegate applicationShouldHandleReopen:self hasVisibleWindows:visible];
+        if (reopen && !visible) {
+            BOOL any = NO;
+            for (NSWindow *w in [[AAllWindows() copy] autorelease])
+                if ([w isMiniaturized]) {
+                    [w deminiaturize:nil];
+                    any = YES;
+                }
+            if (!any)
+                [self _openUntitledIfWanted];
+        }
+    }
+    [self activateIgnoringOtherApps:YES];
+    NSWindow *front = [self keyWindow] ?: [self mainWindow];
+    if ([front isVisible])
+        [front makeKeyAndOrderFront:nil];
 }
 
 - (void)run

@@ -1517,7 +1517,11 @@ menu that opens late is refused by the compositor.
   grid, both named `ferry-<bundle id>`. Apps found in `~/Applications` are
   added at login; Drawer shows `.app` folders as single apps with their own
   icon. Apps whose icon only exists in a compiled asset catalogue get
-  freemac's generic Mac app icon.
+  freemac's generic Mac app icon. The entry also lists the kinds of file
+  the app opens (`CFBundleDocumentTypes`, as MIME types), so Drawer and the
+  Dock offer it for them; `freemac-mac-app open` gives files to the copy
+  already running, through the socket Ferry's AppKit listens on
+  (`$XDG_RUNTIME_DIR/ferry/<bundle id>.open`), before starting a new one.
 
 ## Mac app compatibility (optional layer)
 
