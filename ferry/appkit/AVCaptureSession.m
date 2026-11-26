@@ -346,6 +346,7 @@ static NSArray<NSNumber *> *offered_formats(void)
     dispatch_queue_t _queue;
     BOOL _discardLate;
     atomic_int _inFlight;
+    atomic_int _generation; /* moved on when the session stops: pictures queued before it aren't handed over */
     CVPixelBufferPoolRef _pool;
     OSType _poolFormat;
     int _poolW, _poolH;
@@ -501,10 +502,11 @@ static NSArray<NSNumber *> *offered_formats(void)
     atomic_fetch_add(&_inFlight, 1);
     [self retain];
     AVCaptureConnection *connection = _connection;
+    int generation = atomic_load(&_generation);
     dispatch_async(queue, ^{
         @autoreleasepool {
             id d = self->_delegate;
-            if (d)
+            if (d && atomic_load(&self->_generation) == generation)
                 [d captureOutput:self didOutputSampleBuffer:sample fromConnection:connection];
         }
         CFRelease(sample);
@@ -788,6 +790,10 @@ static NSArray<NSNumber *> *offered_formats(void)
 
 - (void)_postError:(NSError *)error
 {
+    /* the capture thread says nothing once the session is stopping, perhaps
+     * because the app let it go */
+    if (atomic_load(&_stop) && pthread_equal(pthread_self(), _thread))
+        return;
     [self retain];
     dispatch_async(dispatch_get_main_queue(), ^{
         [[NSNotificationCenter defaultCenter] postNotificationName:AVCaptureSessionRuntimeErrorNotification
@@ -822,12 +828,13 @@ static void *capture_main(void *arg);
     atomic_store(&_restart, 0);
     for (AVCaptureOutput *o in _outputs)
         o->_connection->_active = YES;
-    [self retain]; /* the thread's, let go when it ends */
+    /* the thread doesn't keep the session: as on a Mac, a running session
+     * that its app lets go of stops (dealloc joins the thread), so an app
+     * that frees its delegate's state with the session, as OBS's legacy
+     * camera source does, isn't handed pictures after (freemac 1.259) */
     _haveThread = pthread_create(&_thread, NULL, capture_main, self) == 0;
-    if (!_haveThread) {
+    if (!_haveThread)
         _running = NO;
-        [self release];
-    }
     BOOL started = _haveThread;
     pthread_mutex_unlock(&_lock);
     if (started)
@@ -852,6 +859,12 @@ static void *capture_main(void *arg);
         pthread_detach(t);
     else
         pthread_join(t, NULL);
+    /* pictures already on their way to a delegate's queue aren't handed over */
+    pthread_mutex_lock(&_lock);
+    for (AVCaptureOutput *o in _outputs)
+        if ([o isKindOfClass:[AVCaptureVideoDataOutput class]])
+            atomic_fetch_add(&((AVCaptureVideoDataOutput *)o)->_generation, 1);
+    pthread_mutex_unlock(&_lock);
     [[NSNotificationCenter defaultCenter] postNotificationName:AVCaptureSessionDidStopRunningNotification
                                                         object:self];
 }
@@ -966,7 +979,6 @@ static void *capture_main(void *arg)
     AVCaptureSession *s = arg;
     pthread_setname_np("com.apple.avfoundation.capture");
     [s _captureLoop];
-    [s release];
     return NULL;
 }
 @end

@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.259 "OBS quits cleanly with a camera" (done)
+
+Ferry 0.82.0: OBS Studio's Legacy camera source no longer crashes OBS when it quits. Posting a notification kept the object it was about until the posting thread's autorelease pool drained, and OBS loads its scenes in a pool it never drains, so a capture session that OBS let go of kept running and handed pictures to a source OBS had already freed. A notification is now let go of as soon as it has been posted, as on a Mac. A capture session that its app lets go of while it runs stops, and pictures already on their way to a delegate aren't handed over once it has stopped.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Posted notifications released at once, not autoreleased; `-[NSNotification initWithName:object:userInfo:]` | Ferry Foundation | done |
+| 2 | A running capture session stops when its app lets go of it; pictures queued for a delegate dropped after stop | Ferry AVFoundation | done |
+| 3 | OBS's Legacy camera source previews, records at 30 fps and quits cleanly on the test camera | Ferry / OBS | done |
+| 4 | Tests: `foundation_runloop`, `appkit_avcapture_camera` | Ferry | done |
+
 ## 1.258 "OBS's camera source builds" (done)
 
 Ferry 0.81.0: the last calls OBS Studio's camera plugin uses that Ferry didn't have: a camera's video effects (Portrait, Center Stage, Studio Light, reactions and background replacement, all off), Core Media's rounding methods for converting a time to another scale, the names of older and professional video codecs, and sorting a dictionary's keys by value with a block. The OpenGL module (and the CoreVideo and AppKit modules that bring it in) now builds on a system whose OpenGL headers weren't installed when Ferry was built.
