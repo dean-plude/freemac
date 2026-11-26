@@ -390,6 +390,12 @@ def install(source, system=False, copy=True):
         "Categories=Utility;",
         "X-freemac-MacApp=" + desktop_escape(target),
     ]
+    # Ferry names the app's windows after its bundle identifier (freemac
+    # 1.244): this lets the Dock put them on this icon, even for an app with
+    # no icon of its own for Ferry to register.
+    ident = plist.get("CFBundleIdentifier")
+    if isinstance(ident, str) and ident and "\n" not in ident:
+        lines.insert(-1, "StartupWMClass=" + desktop_escape(ident))
     # The documents it opens, so Drawer offers it for them (Open With, a
     # file dropped on its Dock icon), as a Mac's Finder does.
     mimes = document_types(plist)
@@ -437,16 +443,23 @@ def scan():
             for name in os.listdir(listed):
                 if not (name.startswith(ICON_PREFIX) and name.endswith(".desktop")):
                     continue
-                target = None
+                target, has_class = None, False
                 try:
                     with open(os.path.join(listed, name)) as f:
                         for line in f:
                             if line.startswith("X-freemac-MacApp="):
                                 target = line.split("=", 1)[1].strip()
+                            has_class = has_class or line.startswith("StartupWMClass=")
                 except OSError:
                     continue
                 if target and is_bundle(target):
                     known.add(os.path.realpath(target))
+                    # an entry made before 1.244 learns the name of the app's windows
+                    if not has_class and isinstance(info(target).get("CFBundleIdentifier"), str):
+                        try:
+                            install(target, system, copy=False)
+                        except (OSError, ValueError):
+                            pass
                 elif target:
                     os.remove(os.path.join(listed, name))
                     stale_icon = os.path.join(data, "icons", "hicolor", "512x512", "apps", name[:-8] + ".png")

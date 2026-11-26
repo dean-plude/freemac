@@ -138,6 +138,7 @@ class Topline(Gtk.Window):
         self._menubar = None
         self._app_model = None
         self._groups = {}
+        self._merged = {}    # the app's own Window and Help menus (see MERGED)
         self._bus = None
         # The app menus' shortcuts, watched for while a held app has no window.
         self._key_models, self._keys_sent, self._keys_queued = [], None, False
@@ -173,7 +174,8 @@ class Topline(Gtk.Window):
         # Its button opens a panel of its own, which takes the keyboard.
         self.help_button = helpsearch.HelpButton()
         self.help = helpsearch.HelpPanel(self._searchable_menus,
-                                         lambda: self.help_button.set_active(False))
+                                         lambda: self.help_button.set_active(False),
+                                         extras=lambda: self._help_extras())
         self.help_button.connect("toggled", self._help_toggled)
         bar.pack_start(self.help_button, False, False, 0)
         self._slide(self.help_button)
@@ -729,6 +731,12 @@ class Topline(Gtk.Window):
         for button in self.menus_box.get_children():
             yield (button.get_label() or "").replace("_", ""), button.get_popup()
         yield "Window", self.window_menu
+        help_model = self._merged.get("Help")
+        if help_model is not None:
+            menu = Gtk.Menu.new_from_model(help_model)
+            for prefix, group in self._groups.items():
+                menu.insert_action_group(prefix, group)
+            yield "Help", menu
 
     def _menu_open(self):
         return any(menu is not None and menu.get_visible() for menu in self._menus())
@@ -937,6 +945,12 @@ class Topline(Gtk.Window):
         # Asking for the items is also what makes the model load them; it
         # calls back (items-changed) once they've arrived.
         menus = list(self._top_level(self._menubar)) if self._menubar is not None else []
+        merged = {}
+        for label, submenu in menus:
+            if label.replace("_", "") in self.MERGED:
+                merged[label.replace("_", "")] = submenu
+        menus = [(label, submenu) for label, submenu in menus if label.replace("_", "") not in self.MERGED]
+        self._use_merged(merged)
         for label, submenu in menus:
             button = Gtk.MenuButton(label=label, use_underline=True)
             menu = self._menu_from_model(submenu)
@@ -948,6 +962,89 @@ class Topline(Gtk.Window):
             button.show_all()
         self.menus_box.set_visible(bool(menus))
         self._queue_keys()
+
+    # The bar has one Window menu and one Help, as on a Mac: an app's own
+    # (a Mac app's always has both) join Topline's. Its Window items go in
+    # Window after Bring All to Front, its Help items under Help's search
+    # field.
+    MERGED = ("Window", "Help")
+
+    def _use_merged(self, merged):
+        if merged.keys() == self._merged.keys() and all(merged[k] is self._merged[k] for k in merged):
+            return
+        self._merged = merged
+        for model in merged.values():
+            # asking for the items is what loads them; they call back
+            model.get_n_items()
+            model.connect("items-changed", lambda *_: GLib.idle_add(self._refill_merged))
+        self._refill_merged()
+
+    def _refill_merged(self):
+        if not self.window_menu.get_visible():
+            self._fill_window_menu(self.focused)
+        return False
+
+    @staticmethod
+    def _plain_label(label):
+        """A GTK label as shown: "__" is an underscore, "_" marks a key."""
+        return label.replace("__", "\0").replace("_", "").replace("\0", "_")
+
+    def _model_rows(self, model):
+        """(label, shortcut, action, target) for each item of a menu model
+        that does something, with None between sections; submenus are left
+        out."""
+        string = GLib.VariantType.new("s")
+        for i in range(model.get_n_items()):
+            section = model.get_item_link(i, Gio.MENU_LINK_SECTION)
+            if section is not None:
+                yield None
+                yield from self._model_rows(section)
+                continue
+            label = model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_LABEL, string)
+            action = model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_ACTION, string)
+            if label is None or action is None:
+                continue
+            accel = model.get_item_attribute_value(i, "accel", string)
+            shortcut = ""
+            if accel is not None:
+                keyval, mods = Gtk.accelerator_parse(accel.get_string())
+                shortcut = mac_accel.text(keyval, mods, mac_accel.command_key_on())
+            yield (self._plain_label(label.get_string()), shortcut, action.get_string(),
+                   model.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_TARGET, None))
+
+    def _action_of(self, action):
+        """(group, name) for an app's "app.x" or "win.x", if it has it."""
+        prefix, _, name = action.partition(".")
+        group = self._groups.get(prefix)
+        return (group, name) if group is not None and name and group.has_action(name) else None
+
+    def _merged_rows(self, which):
+        """(label, shortcut, run or None, tick) for the app's own items in its
+        Window or Help menu, None between sections, none at either end."""
+        model = self._merged.get(which)
+        rows = []
+        for row in (self._model_rows(model) if model is not None else ()):
+            if row is None:
+                if rows and rows[-1] is not None:
+                    rows.append(None)
+                continue
+            label, shortcut, action, target = row
+            found = self._action_of(action)
+            run = None
+            tick = None
+            if found and found[0].get_action_enabled(found[1]):
+                run = (lambda g=found[0], n=found[1], t=target: g.activate_action(n, t))
+            if found:
+                state = found[0].get_action_state(found[1])
+                if state is not None and state.is_of_type(GLib.VariantType.new("b")):
+                    tick = state.get_boolean()
+            rows.append((label, shortcut, run, tick))
+        while rows and rows[-1] is None:
+            rows.pop()
+        return rows
+
+    def _help_extras(self):
+        return [row for row in self._merged_rows("Help") if row is not None]
 
     def _add_emoji_item(self, menu):
         """Every app's Edit menu ends with Emoji & Symbols, as on a Mac. It
@@ -1093,7 +1190,9 @@ class Topline(Gtk.Window):
                 hiding.append_item(item)
             combined.append_section(None, hiding)
             quitting = Gio.Menu()
-            item = Gio.MenuItem.new(f"Quit {name}", "topline.quit")
+            # A Mac app quits itself (it may ask to save first); others are
+            # asked to close their windows.
+            item = Gio.MenuItem.new(f"Quit {name}", "app.quit" if self._action_of("app.quit") else "topline.quit")
             item.set_attribute_value("accel", GLib.Variant.new_string("<Super>q"))
             quitting.append_item(item)
             combined.append_section(None, quitting)
@@ -1132,7 +1231,9 @@ class Topline(Gtk.Window):
             self._item(menu, "Hide Others", lambda: self._hide_others(view), shortcut="\u2325\u2318H")
             self._item(menu, "Show All", self._show_all)
             menu.append(Gtk.SeparatorMenuItem())
-            self._item(menu, f"Quit {name}", lambda: self._quit(view), shortcut="\u2318Q")
+            quit_own = self._action_of("app.quit")
+            self._item(menu, f"Quit {name}", (lambda: quit_own[0].activate_action("quit", None)) if quit_own
+                       else (lambda: self._quit(view)), shortcut="\u2318Q")
         menu.show_all()
 
     def _services_item(self):
@@ -1196,6 +1297,15 @@ class Topline(Gtk.Window):
         menu.append(self._move_resize_item(view))
         menu.append(Gtk.SeparatorMenuItem())
         self._item(menu, "Bring All to Front", (lambda: self._bring_all(view)) if view else None)
+        own = self._merged_rows("Window") if view else []
+        if own:
+            menu.append(Gtk.SeparatorMenuItem())
+        for row in own:
+            if row is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            label, shortcut, run_it, tick = row
+            self._item(menu, label, run_it, shortcut=shortcut, check=tick)
         if view and self.wf:
             windows = self._views_of(view.get("app-id") or "")
             if windows:
