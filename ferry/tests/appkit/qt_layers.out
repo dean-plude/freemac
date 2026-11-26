@@ -1,0 +1,7 @@
+setLayer: called for the backing layer: yes (1)
+the view's layer is the container: yes
+container marked through setNeedsDisplayInRect: once: yes
+the view's setNeedsDisplay: marks the content layer: yes
+displayLayer: asked when drawn: yes
+IOSurface contents drawn: top blue, bottom red
+exit=0

@@ -588,7 +588,7 @@ run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
 # database uses them on a Mac (for OBS).
 run_one graphics_fontdesc "$here/graphics/fontdesc.m" "$here/graphics/fontdesc.out" -fobjc-arc \
     -framework CoreText -framework CoreGraphics -framework Foundation
-# (1.NEXT) font descriptors, collections and font files, as VLC's subtitle text finds fonts
+# (1.238) font descriptors, collections and font files, as VLC's subtitle text finds fonts
 run_one graphics_fonts "$here/graphics/fonts.c" "$here/graphics/fonts.out" \
     -framework CoreText -framework CoreFoundation -framework CoreGraphics
 # The same, linked under ApplicationServices' Mac name, which CoreGraphics' file also serves.
@@ -606,7 +606,7 @@ run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/
 # linked through Cocoa and through AppKit itself.
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
 run_one appkit_hidden_redraw "$here/appkit/hidden_redraw.m" "$here/appkit/hidden_redraw.out" -framework Cocoa
-# (1.NEXT) no untitled document, and no error, at the launch of an app with
+# (1.238) no untitled document, and no error, at the launch of an app with
 # no document class that uses the document controller for recents (VLC)
 run_one appkit_viewer_launch "$here/appkit/viewer_launch.m" "$here/appkit/viewer_launch.out" -framework Cocoa
 run_one appkit_views_appkit "$here/appkit/views.m" "$here/appkit/views.out" -fblocks \
@@ -1612,7 +1612,11 @@ run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework 
 # What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
 # DiskArbitration (no disks) and Network's path monitor, and a Mac's
 # __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)
-run_one libcurl "$here/libcurl.c" "$here/libcurl.out" -lcurl
+if [ -f "$top/sdk/usr/include/curl/curl.h" ]; then
+    run_one libcurl "$here/libcurl.c" "$here/libcurl.out" -lcurl
+else
+    echo "skip libcurl (needs libcurl's headers: libcurl4-openssl-dev or another libcurl -dev)"
+fi
 # setjmp, wait4 and waitid, the group database and UCCompareText, for Qt's core
 run_one libc_qt "$here/libc_qt.c" "$here/libc_qt.out" -framework CoreServices
 run_one libc_qt_more "$here/libc_qt_more.c" "$here/libc_qt_more.out"
@@ -1648,11 +1652,11 @@ run_one appkit_qt_calls "$here/appkit/qt_calls.m" "$here/appkit/qt_calls.out" -f
 # what VLC's core needs (freemac 1.235): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation
-# (1.NEXT) setjmp and longjmp in a Mac's jmp_buf, which FreeType uses
+# (1.238) setjmp and longjmp in a Mac's jmp_buf, which FreeType uses
 run_one setjmp "$here/setjmp.c" "$here/setjmp.out"
 # OSByteOrder.h, which a Mac's CoreFoundation brings in (VLC's fonts).
 run_one byteorder "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation
-# GNU libiconv's calls, linked as on a Mac (freemac 1.NEXT, VLC's subtitles)
+# GNU libiconv's calls, linked as on a Mac (freemac 1.238, VLC's subtitles)
 run_one iconv "$here/iconv.c" "$here/iconv.out" -liconv
 # Cells of the app's own classes in a nib (freemac 1.237): VLC's sliders,
 # steppers and segmented controls keep theirs through ferry-ibtool
@@ -1720,6 +1724,12 @@ fi
 # textures, an NSOpenGLView's triangle and a core context drawing from a
 # thread of its own, a CAOpenGLLayer; and OpenGL as if it weren't installed.
 # FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
+# A view drawn as Qt 6's Cocoa plugin draws one (OBS): its own setLayer:
+# and container layer, displayLayer:, and an IOSurface as the contents.
+run_one appkit_qt_layers "$here/appkit/qt_layers.m" "$here/appkit/qt_layers.out" -fobjc-arc -framework Cocoa \
+    -framework QuartzCore -framework IOSurface
+# Buttons drawn through their cells, as Qt 6's Mac style draws them (OBS).
+run_one appkit_qt_cells "$here/appkit/qt_cells.m" "$here/appkit/qt_cells.out" -fobjc-arc -fblocks -framework Cocoa
 run_one corevideo_pixelbuffer "$here/corevideo/pixelbuffer.m" "$here/corevideo/pixelbuffer.out" \
     -framework Foundation -framework CoreVideo -framework IOSurface
 run_one corevideo_displaylink "$here/corevideo/displaylink.m" "$here/corevideo/displaylink.out" -fblocks \
@@ -1745,6 +1755,72 @@ fi
 run_one opengl_missing "$here/opengl/missing.m" "$here/opengl/missing.out" -framework Cocoa -framework QuartzCore \
     -framework CoreVideo -framework OpenGL
 webkit_message opengl_missing "^ferry: this program draws with OpenGL, and this system's OpenGL (libEGL.so.1, Mesa) isn't installed$"
+# Screen capture (freemac 1.238, Ferry 0.62.0), as OBS Studio's
+# mac-capture plugin uses it: Core Media's sample buffers and
+# ScreenCaptureKit with no display, then ScreenCaptureKit, CGDisplayStream
+# and the window list's pictures on an X display of the test's own
+# (screencapture/capture_test.sh), read through XShm and without it, with
+# the sound the null audio device plays
+run_one screencapture_coremedia "$here/screencapture/coremedia.m" "$here/screencapture/coremedia.out" -fobjc-arc \
+    -fblocks -framework Foundation -framework ScreenCaptureKit -framework CoreMedia -framework CoreVideo \
+    -framework ApplicationServices
+if ! command -v Xvfb > /dev/null 2>&1; then
+    echo "skip screencapture_x11, screencapture_x11_noshm (need Xvfb)"
+elif ! "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/screencapture" "$here/screencapture/capture.m" \
+        -framework Cocoa -framework ScreenCaptureKit -framework CoreMedia -framework CoreVideo -framework IOSurface \
+        -framework AudioToolbox \
+        2> "$build/screencapture.cc.log"; then
+    echo "FAIL screencapture (did not compile)"; sed 's/^/    /' "$build/screencapture.cc.log"; fail=$((fail + 1))
+else
+    for name in screencapture_x11 screencapture_x11_noshm; do
+        mode=; [ "$name" = screencapture_x11_noshm ] && mode=no-shm
+        sh "$here/screencapture/capture_test.sh" "$top/ferry" "$build/screencapture" "$build/home_$name" $mode \
+            > "$build/$name.got" 2> "$build/$name.err"
+        echo "exit=$?" >> "$build/$name.got"
+        if diff -u "$here/screencapture/capture.out" "$build/$name.got" > "$build/$name.diff"; then
+            echo "ok   $name"; pass=$((pass + 1))
+        else
+            echo "FAIL $name"; sed 's/^/    /' "$build/$name.diff"; sed 's/^/    stderr: /' "$build/$name.err"
+            fail=$((fail + 1))
+        fi
+    done
+fi
+# Screen capture on Wayland (freemac 1.240, Ferry 0.64.0): the ScreenCast
+# portal (a fake one on a private session bus) and PipeWire (a private
+# daemon, with test producers in the compositor's place), with no X display
+# (screencapture/portal_test.sh)
+portal_python=
+for p in python3 python3.13 python3.12 python3.11; do
+    if command -v "$p" > /dev/null 2>&1 && "$p" -c 'from gi.repository import Gio' > /dev/null 2>&1; then
+        portal_python=$p; break
+    fi
+done
+portal_need=
+for t in pipewire wireplumber dbus-daemon cc pkg-config; do
+    command -v "$t" > /dev/null 2>&1 || portal_need="$portal_need $t"
+done
+[ -z "$portal_need" ] && ! pkg-config --exists libpipewire-0.3 && portal_need=" libpipewire-0.3's headers"
+[ -z "$portal_python" ] && portal_need="$portal_need Python's gi"
+if [ -n "$portal_need" ]; then
+    echo "skip screencapture_portal (need$portal_need)"
+elif ! cc -o "$build/pw_producer" "$here/screencapture/pw_producer.c" $(pkg-config --cflags --libs libpipewire-0.3) \
+        2> "$build/pw_producer.cc.log" ||
+     ! "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/screencapture_portal" "$here/screencapture/portal.m" \
+        -framework Foundation -framework ScreenCaptureKit -framework CoreMedia -framework CoreVideo \
+        -framework ApplicationServices 2>> "$build/pw_producer.cc.log"; then
+    echo "FAIL screencapture_portal (did not compile)"; sed 's/^/    /' "$build/pw_producer.cc.log"; fail=$((fail + 1))
+else
+    name=screencapture_portal
+    sh "$here/screencapture/portal_test.sh" "$top/ferry" "$build/screencapture_portal" "$build/pw_producer" \
+        "$build/home_$name" "$portal_python" > "$build/$name.got" 2> "$build/$name.err"
+    echo "exit=$?" >> "$build/$name.got"
+    if diff -u "$here/screencapture/portal.out" "$build/$name.got" > "$build/$name.diff"; then
+        echo "ok   $name"; pass=$((pass + 1))
+    else
+        echo "FAIL $name"; sed 's/^/    /' "$build/$name.diff"; sed 's/^/    stderr: /' "$build/$name.err"
+        fail=$((fail + 1))
+    fi
+fi
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"

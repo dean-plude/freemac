@@ -1,0 +1,58 @@
+before asking: content 0, error -3801
+after the user's answer: allowed 1
+content: error 0, 1 displays
+  display 1: 320x200 at 0,0 320x200, the main display 1
+  the other app's window: listed 1, at 100,50 100x50, on screen 1, app "Viewer" (org.example.Viewer) pid 4343, numbered as another app's 1
+  the window list: the other app's window listed 1, the same number as ScreenCaptureKit's 1
+display stream started: done
+the display, the pointer left out:
+  320x200, on an IOSurface 1
+  at the top left quarter: red
+  at the top right: green
+  at the bottom left: blue
+  at the bottom right: yellow
+  at the pointer's place: red
+  portal: CreateSession
+  portal: SelectSources types=1 multiple=False cursor_mode=4 persist_mode=2 restore_token=none
+  portal: Start (the user picked)
+  portal: OpenPipeWireRemote
+  the display now: 320x200 at 0,0 320x200
+  a filter of it: scale 2.0, rect 0,0 320x200
+pointer shown: done
+the display, the pointer drawn in:
+  320x200, on an IOSurface 1
+  at the pointer's place: white
+  at beside it: red
+configured: done
+filtered: done
+the window alone:
+  200x100, on an IOSurface 1
+  at its middle: cyan
+  at near its corner: cyan
+stopped: done
+  the delegate told of an error 0
+  portal: CreateSession
+  portal: SelectSources types=2 multiple=False cursor_mode=4 persist_mode=2 restore_token=none
+  portal: Start (the user picked)
+  portal: OpenPipeWireRemote
+the display again: done
+  a frame came 1, at the bottom right yellow
+stopped: done
+  portal: CreateSession
+  portal: SelectSources types=1 multiple=False cursor_mode=4 persist_mode=2 restore_token=token-1
+  portal: Start (the user picked)
+  portal: OpenPipeWireRemote
+the window, refused: done
+  stopped 1, with error -3801, frames 0
+  portal: CreateSession
+  portal: SelectSources types=2 multiple=False cursor_mode=4 persist_mode=2 restore_token=token-2
+  portal: Start (the user said no)
+the screen's picture: 640x400, top left red, bottom right yellow
+  portal: CreateSession
+  portal: SelectSources types=1 multiple=False cursor_mode=4 persist_mode=2 restore_token=token-3
+  portal: Start (the user picked)
+  portal: OpenPipeWireRemote
+sessions: 5, every one closed 1
+AppKit (Ferry): screen capture under Wayland needs PipeWire's library (libpipewire-0.3.so.0), which isn't installed
+without PipeWire: content 0, 0 displays, error -3814
+exit=0

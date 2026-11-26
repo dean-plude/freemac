@@ -491,3 +491,86 @@ void *ferry_gl_symbol(const char *name)
         p = gl_get_proc(name);
     return p;
 }
+
+/* ---- screen capture (freemac 1.238, Ferry 0.62.0) ---------------------------------
+ * Ferry's screen capture (ScreenCaptureKit, CGDisplayStream and pictures of
+ * the screen, appkit/ACaptureX11.m) reads an X11 screen through this
+ * system's Xlib (libX11.so.6) and its MIT-SHM, XFIXES and Composite
+ * extensions (libXext.so.6, libXfixes.so.3, libXcomposite.so.1), whose
+ * calls and structures are the same on both systems. They are opened the
+ * first time a program asks what is on the screen, so a program that never
+ * does doesn't load them, and Ferry runs on a system without them (capture
+ * then finds no screen). Only X calls are served, and the C library's
+ * System V shared memory calls, which MIT-SHM needs (a Mac program's own
+ * would take the Mac's numbers). FERRY_XLIB names another library to open
+ * in libX11's place (the tests use it to stand for a system without it). */
+static void *x_handle, *xext_handle, *xfixes_handle, *xcomposite_handle;
+static void open_capture(void)
+{
+    const char *other = getenv("FERRY_XLIB");
+    x_handle = dlopen(other && *other ? other : "libX11.so.6", RTLD_NOW | RTLD_LOCAL);
+    if (!x_handle)
+        return;
+    xext_handle = dlopen("libXext.so.6", RTLD_NOW | RTLD_LOCAL);
+    xfixes_handle = dlopen("libXfixes.so.3", RTLD_NOW | RTLD_LOCAL);
+    xcomposite_handle = dlopen("libXcomposite.so.1", RTLD_NOW | RTLD_LOCAL);
+}
+
+/* Under Wayland (freemac 1.240, appkit/ACapturePortal.m) the screen comes
+ * through the ScreenCast portal as a PipeWire stream, read with this
+ * system's libpipewire-0.3 (pw_ calls), with the displays from
+ * libwayland-client where Wayfire can't list them (wl_ calls and its two
+ * interface descriptions), and the two GIO calls the portal's file
+ * descriptor needs beyond the bus calls ferry_bus_symbol serves. Each is
+ * opened the first time it's asked for; FERRY_PIPEWIRE names another
+ * library to open in libpipewire's place (the tests use it to stand for a
+ * system without PipeWire). */
+static void *pw_handle, *wl_handle, *capture_gio_handle;
+static void open_pipewire(void)
+{
+    const char *other = getenv("FERRY_PIPEWIRE");
+    pw_handle = dlopen(other && *other ? other : "libpipewire-0.3.so.0", RTLD_NOW | RTLD_LOCAL);
+}
+static void open_wayland_client(void) { wl_handle = dlopen("libwayland-client.so.0", RTLD_NOW | RTLD_LOCAL); }
+static void open_capture_gio(void) { capture_gio_handle = dlopen("libgio-2.0.so.0", RTLD_NOW | RTLD_LOCAL); }
+
+static void *wayland_capture_symbol(const char *name)
+{
+    static pthread_once_t pw_once = PTHREAD_ONCE_INIT, wl_once = PTHREAD_ONCE_INIT, gio_once = PTHREAD_ONCE_INIT;
+    if (!strncmp(name, "pw_", 3)) {
+        pthread_once(&pw_once, open_pipewire);
+        return pw_handle ? dlsym(pw_handle, name) : NULL;
+    }
+    if (!strncmp(name, "wl_", 3)) {
+        pthread_once(&wl_once, open_wayland_client);
+        return wl_handle ? dlsym(wl_handle, name) : NULL;
+    }
+    if (!strcmp(name, "g_unix_fd_list_get") || !strcmp(name, "g_object_unref")) {
+        pthread_once(&gio_once, open_capture_gio);
+        return capture_gio_handle ? dlsym(capture_gio_handle, name) : NULL;
+    }
+    return NULL;
+}
+
+void *ferry_capture_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name)
+        return NULL;
+    if (name[0] != 'X' && strncmp(name, "shm", 3))
+        return wayland_capture_symbol(name);
+    if (!strcmp(name, "shmget") || !strcmp(name, "shmat") || !strcmp(name, "shmdt") || !strcmp(name, "shmctl"))
+        return dlsym(RTLD_DEFAULT, name);
+    if (name[0] != 'X')
+        return NULL;
+    pthread_once(&once, open_capture);
+    if (!x_handle)
+        return NULL;
+    void *const handles[] = {x_handle, xext_handle, xfixes_handle, xcomposite_handle};
+    for (size_t i = 0; i < sizeof handles / sizeof handles[0]; i++) {
+        void *p = handles[i] ? dlsym(handles[i], name) : NULL;
+        if (p)
+            return p;
+    }
+    return NULL;
+}

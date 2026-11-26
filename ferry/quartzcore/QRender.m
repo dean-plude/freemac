@@ -86,13 +86,47 @@ static CGPathRef rounded(CGRect r, double radius, NSUInteger corners)
     return p;
 }
 
-/* contents as an image: a CGImage, or anything that gives one (NSImage) */
+static void surface_done(void *info, const void *data, size_t size)
+{
+    (void)data;
+    (void)size;
+    [(id)info release];
+}
+
+/* An IOSurface as layer contents (Qt's backing store gives one): its BGRA
+ * pixels, read in place, while the image keeps the surface. Asked through
+ * the IOSurface class's own methods, so Core Animation needn't link it. */
+static CGImageRef surface_image(id s)
+{
+    if (((OSType(*)(id, SEL))objc_msgSend)(s, @selector(pixelFormat)) != 'BGRA') {
+        QWarnOnce("IOSurface contents other than BGRA");
+        return NULL;
+    }
+    size_t w = (size_t)((NSInteger(*)(id, SEL))objc_msgSend)(s, @selector(width));
+    size_t h = (size_t)((NSInteger(*)(id, SEL))objc_msgSend)(s, @selector(height));
+    size_t row = (size_t)((NSInteger(*)(id, SEL))objc_msgSend)(s, @selector(bytesPerRow));
+    void *base = ((void *(*)(id, SEL))objc_msgSend)(s, @selector(baseAddress));
+    if (!w || !h || !base || row < w * 4)
+        return NULL;
+    CGDataProviderRef p = CGDataProviderCreateWithData([s retain], base, row * h, surface_done);
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGImageRef img = CGImageCreate(w, h, 8, 32, row, cs, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little,
+                                   p, NULL, false, kCGRenderingIntentDefault);
+    CGColorSpaceRelease(cs);
+    CGDataProviderRelease(p);
+    return img ? (CGImageRef)[(id)img autorelease] : NULL;
+}
+
+/* contents as an image: a CGImage, anything that gives one (NSImage), or an IOSurface */
 static CGImageRef image_of(id contents)
 {
     if (!contents)
         return NULL;
     if ([contents isKindOfClass:[GImage class]])
         return (CGImageRef)contents;
+    Class surface = objc_getClass("IOSurface");
+    if (surface && [contents isKindOfClass:surface])
+        return surface_image(contents);
     SEL s = @selector(CGImageForProposedRect:context:hints:);
     if ([contents respondsToSelector:s])
         return ((CGImageRef(*)(id, SEL, CGRect *, id, id))objc_msgSend)(contents, s, NULL, nil, nil);

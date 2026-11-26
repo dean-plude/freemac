@@ -27,6 +27,13 @@ other apps' windows (CGWindowListCopyWindowInfo) and press keys in them
 clipboard managers such as Flycut do to paste; CGRequestPostEventAccess
 asks this same question.
 
+From freemac 1.238 (Ferry 0.62.0) the same program asks a second
+question, kept apart in ~/.config/freemac/screen-recording.json in the same
+form: whether an app may record the screen and other apps' windows
+(ScreenCaptureKit, CGDisplayStream, CGWindowListCreateImage), as OBS
+Studio does. Ferry runs it with --kind screen-recording when an app first
+asks (CGRequestScreenCaptureAccess, or SCShareableContent).
+
 The answer is a choice the user makes, not a wall: every program of the
 user's can reach Wayfire's IPC socket. Original freemac code.
 """
@@ -36,17 +43,19 @@ import os
 import sys
 
 FILE = "window-control.json"
+# the questions this program asks, and the file each answer is kept in
+KINDS = {"control": FILE, "screen-recording": "screen-recording.json"}
 
 
-def path():
+def path(kind="control"):
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return os.path.join(base, "freemac", FILE)
+    return os.path.join(base, "freemac", KINDS[kind])
 
 
-def load():
+def load(kind="control"):
     """{app id: {"name": str, "allowed": bool}}."""
     try:
-        with open(path()) as f:
+        with open(path(kind)) as f:
             data = json.load(f)
     except (OSError, ValueError):
         return {}
@@ -57,8 +66,8 @@ def load():
             if isinstance(k, str) and isinstance(v, dict) and isinstance(v.get("allowed"), bool)}
 
 
-def _save(entries):
-    target = path()
+def _save(entries, kind="control"):
+    target = path(kind)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     temp = target + ".new"
     with open(temp, "w") as f:
@@ -67,30 +76,30 @@ def _save(entries):
     os.replace(temp, target)
 
 
-def answer(app_id):
+def answer(app_id, kind="control"):
     """True or False once the user has answered for the app, None before."""
-    entry = load().get(app_id)
+    entry = load(kind).get(app_id)
     return entry["allowed"] if entry else None
 
 
-def set_allowed(app_id, allowed, name=None):
-    entries = load()
+def set_allowed(app_id, allowed, name=None, kind="control"):
+    entries = load(kind)
     entry = dict(entries.get(app_id) or {})
     entry["allowed"] = bool(allowed)
     entry["name"] = name or entry.get("name") or display_name(app_id)
     entries[app_id] = entry
-    _save(entries)
+    _save(entries, kind)
 
 
-def forget(app_id):
-    entries = load()
+def forget(app_id, kind="control"):
+    entries = load(kind)
     if entries.pop(app_id, None) is not None:
-        _save(entries)
+        _save(entries, kind)
 
 
-def apps():
+def apps(kind="control"):
     """[(app id, name, allowed)] sorted by name, for Dials."""
-    rows = [(k, v.get("name") or display_name(k), v["allowed"]) for k, v in load().items()]
+    rows = [(k, v.get("name") or display_name(k), v["allowed"]) for k, v in load(kind).items()]
     return sorted(rows, key=lambda r: r[1].lower())
 
 
@@ -102,15 +111,19 @@ def display_name(app_id):
     return base or app_id
 
 
-def question(name):
+def question(name, kind="control"):
+    if kind == "screen-recording":
+        return f"Allow “{name}” to record this computer's screen?"
     return f"Allow “{name}” to control other windows?"
 
 
 DETAIL = ("It wants to move and resize the windows of other apps, list them and read their titles, "
           "and press keys in them. You can change this in Dials > Privacy & Security.")
+RECORDING_DETAIL = ("It wants to see everything on the screen and in other apps' windows, "
+                    "and record it. You can change this in Dials > Privacy & Security.")
 
 
-def ask(app_id, name):
+def ask(app_id, name, kind="control"):
     """Show the question and keep the answer. Returns it (True or False)."""
     import gi
 
@@ -120,11 +133,13 @@ def ask(app_id, name):
     from . import alert, style
 
     style.apply()
-    response = alert.ask(None, question(name), DETAIL,
+    recording = kind == "screen-recording"
+    response = alert.ask(None, question(name, kind), RECORDING_DETAIL if recording else DETAIL,
                          [("Don't Allow", Gtk.ResponseType.CANCEL), ("Allow", Gtk.ResponseType.OK)],
-                         default=Gtk.ResponseType.CANCEL, icon="preferences-desktop-accessibility")
+                         default=Gtk.ResponseType.CANCEL,
+                         icon="camera-video" if recording else "preferences-desktop-accessibility")
     allowed = response == Gtk.ResponseType.OK
-    set_allowed(app_id, allowed, name)
+    set_allowed(app_id, allowed, name, kind)
     return allowed
 
 
@@ -135,16 +150,18 @@ def main(argv=None):
     parser.add_argument("--name", help="the app's name, as the question shows it")
     parser.add_argument("--answer", choices=("allow", "deny"),
                         help="keep this answer without asking (for scripts and tests)")
+    parser.add_argument("--kind", choices=sorted(KINDS), default="control",
+                        help="what is asked: controlling other windows (the default) or recording the screen")
     args = parser.parse_args(argv)
     name = args.name or display_name(args.app_id)
-    known = answer(args.app_id)
+    known = answer(args.app_id, args.kind)
     if known is not None:          # asked once already: Dials changes it
         return 0 if known else 1
     if args.answer:
         allowed = args.answer == "allow"
-        set_allowed(args.app_id, allowed, name)
+        set_allowed(args.app_id, allowed, name, args.kind)
     else:
-        allowed = ask(args.app_id, name)
+        allowed = ask(args.app_id, name) if args.kind == "control" else ask(args.app_id, name, args.kind)
     return 0 if allowed else 1
 
 

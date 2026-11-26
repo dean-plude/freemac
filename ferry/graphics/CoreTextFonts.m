@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Core Text's font descriptors, collections and font manager (freemac
- * 1.NEXT, for VLC's subtitle text, which finds font files this way and draws
+ * 1.238, for VLC's subtitle text, which finds font files this way and draws
  * them with FreeType). Written from Apple's public API documentation.
  *
  * The installed faces are read once, from the font folders this system's
