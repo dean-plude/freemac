@@ -2928,6 +2928,44 @@ and `appkit_binding_validation`; `NSGradient`, `NSShadow`,
 are committed (editors registered with a controller), other calendars,
 locales' own number and date data, and document versions.
 
+## The app's own menus in the menu bar (freemac 1.244, Ferry 0.67.0)
+
+A Mac app's main menu (`NSApp.mainMenu`) is shown in freemac's menu bar,
+Topline, the way GTK apps' menus are: `appkit/AMainMenuBar.m` publishes it
+on the session bus as GIO menu models (`org.gtk.Menus` at
+`/org/ferry/menus/appmenu` and `/org/ferry/menus/menubar`, with the actions
+as `org.gtk.Actions` at `/org/ferry`), and each window, once GTK has it,
+tells the compositor where they are through GDK's gtk_shell1 note, which
+Strata keeps and Topline asks for.
+
+- The first menu is the application menu. Services, Hide, Hide Others,
+  Show All and Quit are left out, because Topline adds them to every app;
+  Topline's Quit activates `app.quit`, which sends `terminate:`.
+- Every other menu follows, with separators as sections. Items Topline's own
+  menus already have are left out: Minimize, Zoom, Bring All to Front, the
+  window list and the tab items in Window, Emoji & Symbols and Start
+  Dictation in Edit. A menu with nothing left isn't shown. Topline puts the
+  app's remaining Window items in its own Window menu and its Help items
+  under Help's search field.
+- Each item is the action `app.N`; its key equivalent is shown with it
+  (Command as Control, which Strata turns ⌘ into, so Topline draws ⌘),
+  while the keys themselves still reach the app's windows as before.
+  Shortcuts with Control aren't shown.
+- Mac menus are validated as they open, which Topline does itself, so the
+  menus are validated every half second while the app is in front, and the
+  delegates' `menuNeedsUpdate:` is asked when it comes to the front and
+  after an item is chosen. A change in enabled state is sent as that; a
+  change in the items (added, renamed, hidden, a tick coming or going)
+  sends the menus again.
+- Choosing an item validates it again and sends its action through
+  `ASendMenuItemAction`, with the notifications a Mac posts.
+- Nothing is published for an accessory or background app, outside a
+  Wayland session, without a session bus, or with `FERRY_NO_MENU_BAR` set.
+
+Checked by hand in a headless Wayland session with a private bus: the
+menus, shortcuts, ticks and dimmed items read as Topline reads them, an item
+chosen over the bus runs its action, and `app.quit` ends the app.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -3012,3 +3050,4 @@ bridge in the `ferry` binary.
 - 2026-11-26: Ferry 0.64.0 (freemac 1.240): screen capture on Wayland, freemac's Wayfire desktop included: the xdg-desktop-portal ScreenCast portal (a session per stream, the portal's dialog, monitors and windows, the pointer as metadata or drawn in, restore tokens kept per app) and the PipeWire stream it opens, read in shared memory in BGRx, BGRA, RGBx or RGBA into the same IOSurface frames as under X11; displays and windows from Wayfire's IPC, or wl_output elsewhere; the portal chosen when Wayland's portal answers, X11 otherwise; one new test with a private PipeWire and a fake portal.
 - 2026-11-26: Ferry 0.65.0 (freemac 1.241): Ferry is on the freemac ISO and in Software Update, with libc++, 7-Zip and libcurl; buttons made in code draw through their cells (OBS's Qt 6 Mac style); OBS records the screen and its sound in Ferry's test setup.
 - 2026-11-26: Ferry 0.66.0 (freemac 1.242): NSString upper, lower and capitalized case in a given locale, through ICU (OBS Studio 33 asks at startup); OBS finishes its tour and records the microphone in Ferry's test setup.
+- 2026-11-26: Ferry 0.67.0 (freemac 1.244): a Mac app's main menu is in freemac's menu bar, published as GTK menus on the session bus, validated while the app is in front; its Window and Help items join Topline's own.

@@ -26,8 +26,9 @@ const char *const ferry_host_names[] = {
 
 /* Six groups: the drawing libraries Core Graphics and Core Text use, GTK,
  * which AppKit uses for windows, GdkPixbuf, Poppler and OpenJPEG, which
- * read image, PDF and JPEG 2000 files, and GIO, whose D-Bus calls put
- * menu bar items in the desktop's menu bar and whose content types name
+ * read image, PDF and JPEG 2000 files, and GIO, whose D-Bus calls, menu
+ * models and actions put menu bar items and an app's own menus in the
+ * desktop's menu bar and whose content types name
  * the icon for a kind of file. Each is opened the first time one of its calls is looked up. */
 struct group {
     const char *what;
@@ -76,7 +77,9 @@ void *ferry_host_lookup(const char *name)
                       : !strncmp(name, "poppler_", 8)                   ? &pdf
                       : !strncmp(name, "opj_", 4)                       ? &jpeg2000
                       : !strncmp(name, "g_bus_", 6) || !strncmp(name, "g_dbus_", 7) ||
-                              !strncmp(name, "g_content_type_", 15) || !strncmp(name, "g_themed_icon_", 14)
+                              !strncmp(name, "g_content_type_", 15) || !strncmp(name, "g_themed_icon_", 14) ||
+                              !strncmp(name, "g_menu_", 7) || !strncmp(name, "g_simple_action", 15) ||
+                              !strncmp(name, "g_action_map_", 13)
                           ? &gio
                       : !strncmp(name, "gtk_", 4) || !strncmp(name, "gdk_", 4) ? &windows
                                                                          : &drawing;

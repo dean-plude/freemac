@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.244 "Mac apps' own menus in the menu bar" (done)
+
+Ferry 0.67.0: a Mac app's own menus are in freemac's menu bar, as on a Mac. Its File, Edit, View and other menus are there beside the app's name, with their shortcuts shown the Mac way, a tick by what's on and greyed out what can't be chosen right now, checked again every half second while the app is in front. Its application menu (About, Settings, Check for Updates) joins the menu under the app's name, and Quit there asks the app itself to quit, so it can ask to save first. The app's own Window items join freemac's Window menu and its Help items show under Help's search field, so the bar keeps one of each, and Help's search finds the app's menu items. Windows of a Mac app in the app grid now find its entry by the app's bundle identifier, so the Dock and ⌘Tab show the right icon and name for them even before the app has said where its icon is.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Mac app's main menu is published on the session bus as GTK menus, and each of its windows tells the compositor where (as a GTK app's do): the application menu without the items freemac adds itself, then the other menus, separators as sections, shortcuts, ticks and dimmed items | Ferry AppKit (AMainMenuBar.m) | done |
+| 2 | Choosing an item checks it again and sends its action, as on a Mac; Quit in the app menu ends the app through its own Quit | Ferry AppKit, Topline | done |
+| 3 | An app's own Window and Help menus join Topline's: its Window items after Bring All to Front, its Help items under Help's search field, which also finds them | Topline, Help (helpsearch.py) | done |
+| 4 | A Mac app's app grid entry names its windows by the bundle identifier (StartupWMClass), and entries made before get it at the next scan | Mac apps (macapps.py) | done |
+
 ## 1.243 "Mac apps from a .zip, and Applications that keeps up" (done)
 
 Mac apps often come as a .zip, and their frameworks hold symbolic links (Versions/Current and the links beside it) that the app can't start without. Drawer now keeps links when it expands a .zip, as long as they point inside the new folder, as it already did for tar archives, and Compress stores links as links. A Mac app that comes out of a .zip is selected, and Drawer says it's ready to open. The app grid now follows the Applications folders while you're logged in: an app dragged or copied into Applications shows up in the app grid, the Dock's app list and search with its own icon within seconds, once it has finished copying; one moved out or to the Trash goes. Before, that waited for the next login.
