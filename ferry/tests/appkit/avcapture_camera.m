@@ -152,6 +152,9 @@ int main(void)
         printf("camera: %s (%s), model %s, by %s, connected %d, video %d, sound %d, %s\n", [cam.localizedName UTF8String],
                [cam.uniqueID UTF8String], [cam.modelID UTF8String], [cam.manufacturer UTF8String], cam.connected,
                [cam hasMediaType:AVMediaTypeVideo], [cam hasMediaType:AVMediaTypeAudio], [cam.deviceType UTF8String]);
+        printf("effects: portrait %d, Center Stage %d, Studio Light %d, reactions %d, background %d, gestures %d\n",
+               cam.portraitEffectActive, cam.centerStageActive, cam.studioLightActive, cam.canPerformReactionEffects,
+               cam.backgroundReplacementActive, AVCaptureDevice.reactionEffectGesturesEnabled);
         printf("found again by its ID: %d; no microphones here: %d\n",
                [AVCaptureDevice deviceWithUniqueID:cam.uniqueID] == cam,
                [[AVCaptureDevice devicesWithMediaType:AVMediaTypeAudio] count] == 0);

@@ -67,12 +67,36 @@ static CMTime combine(CMTime a, CMTime b, int sign)
 }
 CMTime CMTimeAdd(CMTime a, CMTime b) { return combine(a, b, 1); }
 CMTime CMTimeSubtract(CMTime a, CMTime b) { return combine(a, b, -1); }
-CMTime CMTimeConvertScale(CMTime t, int32_t scale, uint32_t method)
+/* value * scale / timescale, exactly, rounded as the method says (freemac
+ * 1.258); the QuickTime method rounds as the default does */
+CMTime CMTimeConvertScale(CMTime t, int32_t scale, CMTimeRoundingMethod method)
 {
     if (!CMTIME_IS_NUMERIC(t) || scale <= 0)
         return t;
-    CMTime r = CMTimeMakeWithSeconds(CMTimeGetSeconds(t), scale);
-    if ((int64_t)r.value * t.timescale != t.value * (int64_t)scale)
+    if (scale == t.timescale)
+        return t;
+    __int128 num = (__int128)t.value * scale, den = t.timescale;
+    __int128 q = num / den, rem = num % den; /* q rounds toward zero */
+    if (rem) {
+        int neg = (num < 0) != (den < 0);
+        __int128 twice = rem < 0 ? -2 * rem : 2 * rem, d = den < 0 ? -den : den;
+        int away = 0;
+        switch (method) {
+        case kCMTimeRoundingMethod_RoundTowardZero: away = 0; break;
+        case kCMTimeRoundingMethod_RoundAwayFromZero: away = 1; break;
+        case kCMTimeRoundingMethod_RoundTowardPositiveInfinity: away = !neg; break;
+        case kCMTimeRoundingMethod_RoundTowardNegativeInfinity: away = neg; break;
+        default: away = twice >= d; break; /* half away from zero */
+        }
+        if (away)
+            q += neg ? -1 : 1;
+    }
+    if (q > INT64_MAX || q < INT64_MIN)
+        return (CMTime){0, 0, kCMTimeFlags_Valid | (q > 0 ? kCMTimeFlags_PositiveInfinity
+                                                          : kCMTimeFlags_NegativeInfinity), 0};
+    CMTime r = CMTimeMake((int64_t)q, scale);
+    r.epoch = t.epoch;
+    if (rem)
         r.flags |= kCMTimeFlags_HasBeenRounded;
     return r;
 }

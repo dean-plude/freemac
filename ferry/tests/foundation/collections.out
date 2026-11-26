@@ -82,6 +82,12 @@ sorted by value: (
     b,
     a
 )
+sorted by value, largest first: (
+    d,
+    a,
+    b,
+    c
+)
 set 3 contains y 1, mutable 2 contains 1 0, subset 1
 set sorted: (
     x,

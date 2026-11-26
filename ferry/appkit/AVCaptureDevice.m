@@ -424,6 +424,17 @@ static AVAuthorizationStatus status_of(int answer)
     return _builtin ? AVCaptureDeviceTypeBuiltInWideAngleCamera : AVCaptureDeviceTypeExternal;
 }
 - (BOOL)isSuspended { return NO; }
+- (BOOL)isPortraitEffectActive { return NO; }
+- (BOOL)isCenterStageActive { return NO; }
+- (BOOL)isStudioLightActive { return NO; }
+- (BOOL)canPerformReactionEffects { return NO; }
+- (BOOL)isBackgroundReplacementActive { return NO; }
++ (BOOL)reactionEffectGesturesEnabled { return NO; }
++ (BOOL)reactionEffectsEnabled { return NO; }
++ (BOOL)isPortraitEffectEnabled { return NO; }
++ (BOOL)isCenterStageEnabled { return NO; }
++ (BOOL)isStudioLightEnabled { return NO; }
++ (BOOL)isBackgroundReplacementEnabled { return NO; }
 - (BOOL)isInUseByAnotherApplication { return NO; }
 - (BOOL)transportControlsSupported { return NO; }
 - (int32_t)transportType { return _builtin ? 'bltn' : 'usb '; }
