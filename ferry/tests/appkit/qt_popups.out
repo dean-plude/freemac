@@ -1,0 +1,5 @@
+cell click (choose): returned after the menu closed, open meanwhile 1, closed now 1, selected Display 2
+cell click (close): returned after the menu closed, open meanwhile 1, closed now 1, selected Display 1
+keyless window: shown 1, key 0, the window still key 1
+number as pointer: 1, zero (nil)
+exit=0

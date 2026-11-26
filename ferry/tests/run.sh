@@ -885,6 +885,9 @@ run_one appkit_archiver "$here/appkit/archiver.m" "$here/appkit/archiver.out" -f
 # rings, text storage edits, cell masks, field editors, menus, appearances
 # (freemac 1.221, Ferry 0.45.0).
 run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.out" -fobjc-arc -framework Cocoa
+# Qt's lists: a cell's click tracks its menu until it closes, keyless pop-up
+# windows, a number read as a pointer (freemac 1.246, Ferry 0.69.0).
+run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out" -fobjc-arc -framework Cocoa
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
