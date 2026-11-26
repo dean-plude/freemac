@@ -6,6 +6,10 @@
  * (freemac 1.226, Ferry 0.50.0; MariaDB Connector/C). */
 #include <sys/select.h>
 __FERRY_BEGIN
+/* the POSIX edition a Mac's libc follows, as its <sys/unistd.h> says */
+#define _POSIX_VERSION 200112L
+#define _POSIX2_VERSION 200112L
+#define _POSIX_THREADS 200112L
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -86,6 +90,8 @@ long sysconf(int);
 #define _PC_CHOWN_RESTRICTED 7
 #define _PC_NO_TRUNC 8
 #define _PC_VDISABLE 9
+#define _PC_CASE_SENSITIVE 11 /* 1 on this system's file systems */
+#define _PC_CASE_PRESERVING 12
 long pathconf(const char *, int);
 long fpathconf(int, int);
 void swab(const void *, void *, ssize_t);
@@ -97,5 +103,24 @@ int lchown(const char *, uid_t, gid_t);
 extern char *optarg;
 extern int optind, opterr, optopt, optreset;
 int getopt(int, char *const[], const char *);
+/* who a process runs as, its group and session, and a little more
+ * (freemac 1.232, Ferry 0.56.0); vfork is served as fork */
+int setuid(uid_t);
+int setgid(gid_t);
+int seteuid(uid_t);
+int setegid(gid_t);
+pid_t getpgrp(void);
+int setpgid(pid_t, pid_t);
+pid_t setsid(void);
+pid_t getsid(pid_t);
+int getgroups(int, gid_t[]);
+int nice(int);
+int fchdir(int);
+int fdatasync(int);
+int getdtablesize(void);
+pid_t vfork(void);
+int unlinkat(int, const char *, int);
+int execl(const char *, const char *, ...);
+int execlp(const char *, const char *, ...);
 __FERRY_END
 #endif

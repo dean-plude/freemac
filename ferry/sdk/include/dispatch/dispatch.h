@@ -26,6 +26,8 @@ typedef void *dispatch_queue_attr_t;   /* not an object here */
 typedef NSObject *dispatch_group_t;
 typedef NSObject *dispatch_semaphore_t;
 typedef NSObject *dispatch_source_t;
+typedef NSObject *dispatch_data_t;
+typedef NSObject *dispatch_io_t;
 #define DISPATCH_RETURNS_RETAINED __attribute__((ns_returns_retained))
 #elif defined(__OBJC__)
 /* As a Mac's os/object.h does: dispatch objects are NSObjects, so anything
@@ -44,6 +46,8 @@ typedef id dispatch_queue_attr_t;
 typedef id dispatch_group_t;
 typedef id dispatch_semaphore_t;
 typedef id dispatch_source_t;
+typedef id dispatch_data_t;
+typedef id dispatch_io_t;
 #define DISPATCH_RETURNS_RETAINED __attribute__((ns_returns_retained))
 #else
 typedef struct dispatch_queue_s *dispatch_queue_t;
@@ -55,6 +59,8 @@ typedef struct dispatch_queue_attr_s *dispatch_queue_attr_t;
 typedef struct dispatch_group_s *dispatch_group_t;
 typedef struct dispatch_semaphore_s *dispatch_semaphore_t;
 typedef struct dispatch_source_s *dispatch_source_t;
+typedef struct dispatch_data_s *dispatch_data_t;
+typedef struct dispatch_io_s *dispatch_io_t;
 #ifdef __cplusplus
 /* In C++ (freemac 1.230), as on a Mac, each kind of object is a kind of
  * dispatch_object_s, so that any of them is a dispatch_object_t. */
@@ -64,6 +70,8 @@ struct dispatch_queue_attr_s : public dispatch_object_s {};
 struct dispatch_group_s : public dispatch_object_s {};
 struct dispatch_semaphore_s : public dispatch_object_s {};
 struct dispatch_source_s : public dispatch_object_s {};
+struct dispatch_data_s : public dispatch_object_s {};
+struct dispatch_io_s : public dispatch_object_s {};
 typedef struct dispatch_object_s *dispatch_object_t;
 #else
 /* Any dispatch object, as C's transparent union lets it be passed. */
@@ -74,6 +82,8 @@ typedef union {
     struct dispatch_group_s *_dg;
     struct dispatch_semaphore_s *_dsema;
     struct dispatch_source_s *_ds;
+    struct dispatch_data_s *_ddata;
+    struct dispatch_io_s *_dchannel;
 } dispatch_object_t __attribute__((transparent_union));
 #endif
 #define DISPATCH_RETURNS_RETAINED
@@ -255,4 +265,7 @@ void dispatch_retain(dispatch_object_t object);
 void dispatch_release(dispatch_object_t object);
 #endif
 __FERRY_END
+/* data objects and I/O channels (freemac 1.232), as a Mac's dispatch.h brings them */
+#include <dispatch/data.h>
+#include <dispatch/io.h>
 #endif

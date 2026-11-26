@@ -217,6 +217,8 @@ run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 # Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
 # what VLC's core asks of libSystem (1.232).
 run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
+# uuid(3), the older task_info flavors and vm_page_size, for OBS's libobs
+run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 # mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
 # backtrace three calls deep in Mac code (freemac 1.233).
@@ -238,6 +240,8 @@ run_one pthreads "$here/pthreads.c" "$here/pthreads.out"
 run_one dispatch_concurrent "$here/dispatch_concurrent.c" "$here/dispatch_concurrent.out" -fblocks
 # read, write, signal and process sources on real descriptors, signals and a child
 run_one dispatch_sources "$here/dispatch_sources.c" "$here/dispatch_sources.out" -fblocks
+# dispatch data and dispatch I/O: channels on a file and dispatch_read on a pipe (QRandomAccessAsyncFile)
+run_one dispatch_io "$here/dispatch_io.c" "$here/dispatch_io.out" -fblocks
 run_one objc_basic "$here/objc_basic.m" "$here/objc_basic.out" -lobjc
 run_one objc_arc "$here/objc_arc.m" "$here/objc_arc.out" -fobjc-arc -lobjc
 run_one objc_unknown "$here/objc_unknown.m" "$here/objc_unknown.out" -lobjc
@@ -417,6 +421,9 @@ run_one security_code "$here/security/code.m" "$here/security/code.out" -framewo
 # items from attribute lists, searches and access lists, in a home of its
 # own.
 run_one security_older "$here/security/older.m" "$here/security/older.out" -framework Foundation -framework Security
+# the system's certificate authorities and a volume's free space, for OBS
+run_one security_obs_calls "$here/security/obs_calls.m" "$here/security/obs_calls.out" -fobjc-arc \
+    -framework Foundation -framework Security
 # NSThread, cross-thread performs and run loops, and the locks and the
 # runtime under real threads.
 run_one foundation_threads "$here/foundation/threads.m" "$here/foundation/threads.out" -framework Foundation
@@ -472,6 +479,8 @@ if [ -s "$top/sdk/lib/libc++.tbd" ] &&
     run_one cxx_thread_local "$here/cxx/thread_local.cpp" "$here/cxx/thread_local.out" -std=c++17 -lc++
     run_one objcxx_mixed "$here/cxx/objcxx_mixed.mm" "$here/cxx/objcxx_mixed.out" -std=c++17 -fobjc-arc \
         -framework Foundation -lc++
+    run_one objcxx_cocoa "$here/cxx/objcxx_cocoa.mm" "$here/cxx/objcxx_cocoa.out" -std=c++17 \
+        -framework Cocoa -lc++
     # Without this system's libc++, a C++ program stops and says what to install.
     FERRY_LIBCXX=/nonexistent/libc++.so.1 "$top/ferry" "$build/cxx_basics" > /dev/null 2> "$build/cxx_missing.err"
     status=$?
@@ -574,6 +583,10 @@ run_one graphics_geometry "$here/graphics/geometry.c" "$here/graphics/geometry.o
     -framework CoreGraphics -framework CoreFoundation
 run_one graphics_drawing "$here/graphics/drawing.c" "$here/graphics/drawing.out" -framework CoreGraphics
 run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
+    -framework CoreText -framework CoreGraphics -framework Foundation
+# Font descriptors, traits, names, tables and the family list, as Qt's font
+# database uses them on a Mac (for OBS).
+run_one graphics_fontdesc "$here/graphics/fontdesc.m" "$here/graphics/fontdesc.out" -fobjc-arc \
     -framework CoreText -framework CoreGraphics -framework Foundation
 # (1.NEXT) font descriptors, collections and font files, as VLC's subtitle text finds fonts
 run_one graphics_fonts "$here/graphics/fonts.c" "$here/graphics/fonts.out" \
@@ -1596,6 +1609,17 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
+# DiskArbitration (no disks) and Network's path monitor, and a Mac's
+# __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)
+run_one libcurl "$here/libcurl.c" "$here/libcurl.out" -lcurl
+# setjmp, wait4 and waitid, the group database and UCCompareText, for Qt's core
+run_one libc_qt "$here/libc_qt.c" "$here/libc_qt.out" -framework CoreServices
+run_one libc_qt_more "$here/libc_qt_more.c" "$here/libc_qt_more.out"
+run_one mac_thread_block "$here/mac_thread_block.c" "$here/mac_thread_block.out" -fblocks
+run_one media_frameworks "$here/media/frameworks.m" "$here/media/frameworks.out" -fobjc-arc -fblocks \
+    -framework Foundation -framework IOSurface -framework Accelerate -framework Metal -framework DiskArbitration \
+    -framework Network
 # what Itsycal and Gas Mask need (freemac 1.232): layout, the predicate
 # editor, in code and from a nib the tool compiled (it says nothing of it),
 # older cell calls, Core Audio through AudioToolbox, newer names
@@ -1616,6 +1640,11 @@ run_one eventkit "$here/eventkit.m" "$here/eventkit.out" -fobjc-arc -fblocks -fr
 run_one appkit_vlc "$here/appkit/vlc.m" "$here/appkit/vlc.out" -framework Cocoa -framework MediaPlayer \
     -framework CoreMedia -framework AddressBook -framework AVFoundation -framework IOKit -framework CoreServices \
     -framework QuartzCore
+# What Qt's Mac platform plugin calls besides, for OBS Studio: the Carbon
+# pasteboard with promises, Icon Services drawing, text input contexts,
+# screen depths and ICC profiles, key repeat, the window list, Handoff.
+run_one appkit_qt_calls "$here/appkit/qt_calls.m" "$here/appkit/qt_calls.out" -fblocks -framework Cocoa \
+    -framework ApplicationServices
 # what VLC's core needs (freemac 1.235): condition waits as cancellation
 # points, and CFRunLoopRun on the main thread waiting until it is stopped
 run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -framework CoreFoundation

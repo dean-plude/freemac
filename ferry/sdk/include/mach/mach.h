@@ -33,6 +33,10 @@ typedef integer_t cpu_type_t, cpu_subtype_t, cpu_threadtype_t;
 #define KERN_SUCCESS 0
 #define KERN_INVALID_ARGUMENT 4
 #define KERN_FAILURE 5
+#define KERN_NO_SPACE 3
+#define KERN_RESOURCE_SHORTAGE 6
+#define KERN_ABORTED 14
+#define KERN_OPERATION_TIMED_OUT 49
 
 extern mach_port_t mach_task_self_;
 #define mach_task_self() mach_task_self_
@@ -77,6 +81,7 @@ struct vm_statistics {
         pageouts, faults, cow_faults, lookups, hits, purgeable_count, purges, speculative_count;
 };
 typedef struct vm_statistics vm_statistics_data_t;
+typedef struct vm_statistics *vm_statistics_t;
 #define HOST_VM_INFO_COUNT ((mach_msg_type_number_t)(sizeof(vm_statistics_data_t) / sizeof(integer_t)))
 
 struct vm_statistics64 {
@@ -88,6 +93,7 @@ struct vm_statistics64 {
     uint64_t total_uncompressed_pages_in_compressor;
 } __attribute__((aligned(8)));
 typedef struct vm_statistics64 vm_statistics64_data_t;
+typedef struct vm_statistics64 *vm_statistics64_t;
 #define HOST_VM_INFO64_COUNT ((mach_msg_type_number_t)(sizeof(vm_statistics64_data_t) / sizeof(integer_t)))
 
 kern_return_t host_info(host_t host, host_flavor_t flavor, host_info_t info, mach_msg_type_number_t *count);
@@ -108,6 +114,42 @@ struct mach_task_basic_info {
 } __attribute__((packed, aligned(4)));
 typedef struct mach_task_basic_info mach_task_basic_info_data_t;
 #define MACH_TASK_BASIC_INFO_COUNT ((mach_msg_type_number_t)(sizeof(mach_task_basic_info_data_t) / sizeof(natural_t)))
+/* The older flavors (freemac OBS work): the task's size and the processor
+ * time of its threads that have ended (TASK_BASIC_INFO_64, which is
+ * TASK_BASIC_INFO in a 64-bit program), and that of its running threads
+ * (TASK_THREAD_TIMES_INFO). OBS adds the two up for its CPU meter. */
+#define TASK_THREAD_TIMES_INFO 3
+#define TASK_BASIC_INFO_64 5
+#define TASK_BASIC_INFO TASK_BASIC_INFO_64
+typedef integer_t policy_t;
+struct task_basic_info_64 {
+    integer_t suspend_count;
+    mach_vm_size_t virtual_size;
+    mach_vm_size_t resident_size;
+    time_value_t user_time;
+    time_value_t system_time;
+    policy_t policy;
+} __attribute__((packed, aligned(4)));
+typedef struct task_basic_info_64 task_basic_info_64_data_t;
+typedef struct task_basic_info_64 *task_basic_info_64_t;
+typedef struct task_basic_info_64 task_basic_info_data_t;
+typedef struct task_basic_info_64 *task_basic_info_t;
+#define TASK_BASIC_INFO_64_COUNT ((mach_msg_type_number_t)(sizeof(task_basic_info_64_data_t) / sizeof(natural_t)))
+#define TASK_BASIC_INFO_COUNT TASK_BASIC_INFO_64_COUNT
+struct task_thread_times_info {
+    time_value_t user_time;
+    time_value_t system_time;
+};
+typedef struct task_thread_times_info task_thread_times_info_data_t;
+typedef struct task_thread_times_info *task_thread_times_info_t;
+#define TASK_THREAD_TIMES_INFO_COUNT                                                                              \
+    ((mach_msg_type_number_t)(sizeof(task_thread_times_info_data_t) / sizeof(natural_t)))
 kern_return_t task_info(task_t task, task_flavor_t flavor, task_info_t info, mach_msg_type_number_t *count);
+/* the size of a page of memory, 4096 bytes on an Intel Mac (freemac OBS work) */
+extern vm_size_t vm_page_size;
+extern vm_size_t vm_page_mask;
+extern int vm_page_shift;
 __FERRY_END
+#include <mach/semaphore.h>
+#include <mach/vm_map.h>
 #endif

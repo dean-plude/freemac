@@ -1,0 +1,5 @@
+main thread's slot is itself 1
+another thread's slot is itself 1
+a dispatch worker's slot is itself 1
+commpage "commpage 64-bit", 64-bit 1, SSE2 1, processors 1
+exit=0

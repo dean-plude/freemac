@@ -16,4 +16,7 @@ int utimes(const char *, const struct timeval[2]);
 int futimes(int, const struct timeval[2]);
 int lutimes(const char *, const struct timeval[2]);
 __FERRY_END
+/* fd_set and select(), which a Mac's <sys/time.h> gives too (libcurl's
+   headers count on it) */
+#include <sys/select.h>
 #endif

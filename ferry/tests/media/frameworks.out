@@ -1,0 +1,15 @@
+surface 641x480 bpe 4 row 2576 aligned 1 format 42475241
+alloc >= rows 1 planes 0
+seed went up once 1, unlock with no lock fails 1
+lookup finds it 1 byte 7f
+value hello
+in use 1
+gone after release 1
+planes 2, 64x32 and 32x16, second after first 1
+vImage copy 0 rows 1
+exp10 1000 0.1 sinpi 1 cospi -1
+metal device none, devices 0
+disk session 1, disk 1
+path status known 1
+updated 1 cancelled 1
+exit=0

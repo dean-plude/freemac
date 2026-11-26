@@ -21,12 +21,17 @@
 #define _GNU_SOURCE
 #include <cpuid.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
+#include <linux/futex.h>
+#include <sys/syscall.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -865,6 +870,9 @@ typedef uint32_t mac_port_t;
 #define MACH_TASK_BASIC_INFO 20
 
 static mac_port_t mach_task_self_ = MAC_TASK_PORT;
+/* an Intel Mac's page size, which programs read as vm_page_size */
+static uintptr_t mac_vm_page_size = 4096, mac_vm_page_mask = 4095;
+static int mac_vm_page_shift = 12;
 
 static mac_port_t mac_mach_host_self(void) { return MAC_HOST_PORT; }
 static mac_port_t mac_mach_task_self(void) { return MAC_TASK_PORT; }
@@ -1052,9 +1060,94 @@ struct mac_task_basic_info {
 } __attribute__((packed, aligned(4)));
 _Static_assert(sizeof(struct mac_task_basic_info) == 48, "mach_task_basic_info");
 
+/* TASK_BASIC_INFO_64: the same figures in the older order, its processor
+ * time only that of threads that have ended; TASK_THREAD_TIMES_INFO: that
+ * of the running threads. A Mac program adds the two to get the total. */
+#define MAC_TASK_THREAD_TIMES_INFO 3
+#define MAC_TASK_BASIC_INFO_64 5
+struct mac_task_basic_info_64 {
+    int32_t suspend_count;
+    uint64_t virtual_size, resident_size;
+    int32_t user_seconds, user_microseconds, system_seconds, system_microseconds;
+    int32_t policy;
+} __attribute__((packed, aligned(4)));
+_Static_assert(sizeof(struct mac_task_basic_info_64) == 40, "task_basic_info_64");
+
+/* The processor time of the threads running now, from each one's
+ * /proc/self/task/N/stat, in microseconds. */
+static void running_threads_time(long long *user_us, long long *system_us)
+{
+    *user_us = *system_us = 0;
+    long tick = sysconf(_SC_CLK_TCK);
+    if (tick <= 0)
+        tick = 100;
+    DIR *d = opendir("/proc/self/task");
+    for (struct dirent *e; d && (e = readdir(d));) {
+        if (e->d_name[0] == '.')
+            continue;
+        char path[64], text[1024];
+        snprintf(path, sizeof path, "/proc/self/task/%.20s/stat", e->d_name);
+        if (read_text(path, text, sizeof text) <= 0)
+            continue;
+        char *p = strrchr(text, ')'); /* the name may hold spaces */
+        unsigned long long ut = 0, st = 0;
+        /* after the name: state, then fields 4 to 13, then utime and stime */
+        if (p && sscanf(p + 1, " %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu", &ut, &st) == 2) {
+            *user_us += (long long)(ut * 1000000ull / (unsigned long long)tick);
+            *system_us += (long long)(st * 1000000ull / (unsigned long long)tick);
+        }
+    }
+    if (d)
+        closedir(d);
+}
+
 static int mac_task_info(mac_port_t task, int flavor, int32_t *info, uint32_t *count)
 {
-    if (task != MAC_TASK_PORT || !info || !count || flavor != MACH_TASK_BASIC_INFO)
+    if (task != MAC_TASK_PORT || !info || !count)
+        return KERN_INVALID_ARGUMENT;
+    if (flavor == MAC_TASK_THREAD_TIMES_INFO || flavor == MAC_TASK_BASIC_INFO_64) {
+        long long ru = 0, rs = 0, lu, ls;
+        struct rusage r;
+        if (getrusage(RUSAGE_SELF, &r) == 0) {
+            ru = (long long)r.ru_utime.tv_sec * 1000000 + r.ru_utime.tv_usec;
+            rs = (long long)r.ru_stime.tv_sec * 1000000 + r.ru_stime.tv_usec;
+        }
+        running_threads_time(&lu, &ls);
+        if (lu > ru)
+            lu = ru;
+        if (ls > rs)
+            ls = rs;
+        if (flavor == MAC_TASK_THREAD_TIMES_INFO) {
+            if (*count < 4)
+                return KERN_FAILURE;
+            int32_t t[4] = {(int32_t)(lu / 1000000), (int32_t)(lu % 1000000), (int32_t)(ls / 1000000),
+                            (int32_t)(ls % 1000000)};
+            memcpy(info, t, sizeof t);
+            *count = 4;
+            return KERN_SUCCESS;
+        }
+        uint32_t need = sizeof(struct mac_task_basic_info_64) / 4;
+        if (*count < need)
+            return KERN_FAILURE;
+        struct mac_task_basic_info_64 b;
+        memset(&b, 0, sizeof b);
+        char text[256];
+        unsigned long long pages = 0, resident = 0;
+        if (read_text("/proc/self/statm", text, sizeof text) > 0)
+            sscanf(text, "%llu %llu", &pages, &resident);
+        long page = sysconf(_SC_PAGESIZE);
+        b.virtual_size = pages * (unsigned long long)page;
+        b.resident_size = resident * (unsigned long long)page;
+        long long du = ru - lu, ds = rs - ls; /* the threads that have ended */
+        b.user_seconds = (int32_t)(du / 1000000);
+        b.user_microseconds = (int32_t)(du % 1000000);
+        b.system_seconds = (int32_t)(ds / 1000000);
+        b.system_microseconds = (int32_t)(ds % 1000000);
+        memcpy(info, &b, sizeof b);
+        *count = need;
+        return KERN_SUCCESS;
+    }
+    if (flavor != MACH_TASK_BASIC_INFO)
         return KERN_INVALID_ARGUMENT;
     uint32_t need = sizeof(struct mac_task_basic_info) / 4;
     if (*count < need)
@@ -1083,7 +1176,258 @@ static int mac_task_info(mac_port_t task, int flavor, int32_t *info, uint32_t *c
     return KERN_SUCCESS;
 }
 
+
+/* ---- the task's own memory: vm_allocate, vm_deallocate, vm_remap ----------------- */
+#define MAC_KERN_NO_SPACE 3
+#define MAC_KERN_INVALID_ARGUMENT 4
+#define MAC_VM_PROT_READ 1
+#define MAC_VM_PROT_WRITE 2
+#define MAC_VM_PROT_EXECUTE 4
+#define MAC_VM_FLAGS_ANYWHERE 1
+
+static int mac_vm_allocate(mac_port_t task, uintptr_t *addr, uintptr_t size, int flags)
+{
+    if (task != MAC_TASK_PORT || !addr)
+        return MAC_KERN_INVALID_ARGUMENT;
+    void *want = (flags & MAC_VM_FLAGS_ANYWHERE) ? NULL : (void *)*addr;
+    void *p = mmap(want, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | (want ? MAP_FIXED_NOREPLACE : 0),
+                   -1, 0);
+    if (p == MAP_FAILED)
+        return MAC_KERN_NO_SPACE;
+    *addr = (uintptr_t)p;
+    return 0;
+}
+
+static int mac_vm_deallocate(mac_port_t task, uintptr_t addr, uintptr_t size)
+{
+    if (task != MAC_TASK_PORT)
+        return MAC_KERN_INVALID_ARGUMENT;
+    if (size)
+        munmap((void *)(addr & ~(uintptr_t)(getpagesize() - 1)), size + (addr & (uintptr_t)(getpagesize() - 1)));
+    return 0;
+}
+
+/* Only a copy, into fresh memory anywhere: the new pages hold what the old
+ * ones held and may be read and written. */
+static int mac_vm_remap(mac_port_t task, uintptr_t *addr, uintptr_t size, uintptr_t mask, int flags,
+                        mac_port_t src_task, uintptr_t src, unsigned int copy, int *cur, int *max,
+                        unsigned int inherit)
+{
+    (void)mask;
+    (void)inherit;
+    if (task != MAC_TASK_PORT || src_task != MAC_TASK_PORT || !addr || !copy || !(flags & MAC_VM_FLAGS_ANYWHERE))
+        return MAC_KERN_INVALID_ARGUMENT;
+    uintptr_t page = (uintptr_t)getpagesize();
+    uintptr_t start = src & ~(page - 1), len = ((src + size + page - 1) & ~(page - 1)) - start;
+    void *p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (p == MAP_FAILED)
+        return MAC_KERN_NO_SPACE;
+    memcpy(p, (void *)start, len);
+    *addr = (uintptr_t)p + (src - start);
+    if (cur)
+        *cur = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE;
+    if (max)
+        *max = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE | MAC_VM_PROT_EXECUTE;
+    return 0;
+}
+
+/* ---- waiting on an address: __ulock_wait, __ulock_wait2, __ulock_wake ---------- */
+/* The Darwin kernel's address waits, as its published sys/ulock.h (part of
+ * the open-source xnu) describes them: Qt's QMutex and QSemaphore wait this
+ * way on a Mac. A wait sleeps while the 32- or 64-bit word at addr still
+ * holds value; a wake rouses one waiter, or all with ULF_WAKE_ALL. Here
+ * each is a Linux futex on the word (for a 64-bit word, on its low half,
+ * after checking the whole word, which callers loop around anyway). With
+ * ULF_NO_ERRNO an error comes back as minus a Mac errno, otherwise as -1
+ * with errno set. Only waits within one process are served. */
+#define MAC_UL_COMPARE_AND_WAIT 1
+#define MAC_UL_UNFAIR_LOCK 2
+#define MAC_UL_COMPARE_AND_WAIT_SHARED 3
+#define MAC_UL_COMPARE_AND_WAIT64 5
+#define MAC_UL_COMPARE_AND_WAIT64_SHARED 6
+#define MAC_ULF_WAKE_ALL 0x100
+#define MAC_ULF_NO_ERRNO 0x01000000
+
+static int ulock_fail(uint32_t op, int err)
+{
+    if (op & MAC_ULF_NO_ERRNO)
+        return -ferry_errno_to_mac(err);
+    errno = err;
+    return -1;
+}
+
+static int ulock_is_64(uint32_t op)
+{
+    uint32_t kind = op & 0xff;
+    return kind == MAC_UL_COMPARE_AND_WAIT64 || kind == MAC_UL_COMPARE_AND_WAIT64_SHARED;
+}
+
+static int mac_ulock_wait2(uint32_t op, void *addr, uint64_t value, uint64_t timeout_ns, uint64_t value2)
+{
+    (void)value2;
+    uint32_t kind = op & 0xff;
+    if (!addr || ((uintptr_t)addr & 3) || kind == 0 || kind > MAC_UL_COMPARE_AND_WAIT64_SHARED)
+        return ulock_fail(op, EINVAL);
+    uint32_t low = (uint32_t)value;
+    if (ulock_is_64(op)) {
+        if (__atomic_load_n((uint64_t *)addr, __ATOMIC_SEQ_CST) != value)
+            return 0;
+    } else if (__atomic_load_n((uint32_t *)addr, __ATOMIC_SEQ_CST) != low)
+        return 0;
+    struct timespec ts, *tp = NULL;
+    if (timeout_ns) {
+        ts.tv_sec = (time_t)(timeout_ns / 1000000000u);
+        ts.tv_nsec = (long)(timeout_ns % 1000000000u);
+        tp = &ts;
+    }
+    long r = syscall(SYS_futex, (uint32_t *)addr, FUTEX_WAIT_PRIVATE, low, tp, NULL, 0);
+    if (r == 0 || errno == EAGAIN)
+        return 0;
+    return ulock_fail(op, errno);
+}
+
+static int mac_ulock_wait(uint32_t op, void *addr, uint64_t value, uint32_t timeout_us)
+{
+    return mac_ulock_wait2(op, addr, value, (uint64_t)timeout_us * 1000u, 0);
+}
+
+static int mac_ulock_wake(uint32_t op, void *addr, uint64_t wake_value)
+{
+    (void)wake_value;
+    if (!addr || ((uintptr_t)addr & 3))
+        return ulock_fail(op, EINVAL);
+    int n = (op & MAC_ULF_WAKE_ALL) ? INT_MAX : 1;
+    long r = syscall(SYS_futex, (uint32_t *)addr, FUTEX_WAKE_PRIVATE, n, NULL, NULL, 0);
+    if (r < 0)
+        return ulock_fail(op, errno);
+    /* no one was waiting: the kernel's answer is ENOENT */
+    return r == 0 ? ulock_fail(op, ENOENT) : 0;
+}
+
+/* System Integrity Protection's settings: none are on under Ferry. */
+static int mac_csr_get_active_config(uint32_t *config)
+{
+    if (config)
+        *config = 0;
+    return 0;
+}
+
+static int mac_csr_check(uint32_t mask)
+{
+    (void)mask;
+    return 0;
+}
+
+/* ---- the commpage --------------------------------------------------------------- */
+/* An Intel Mac maps a read-only page at 0x7fffffe00000 into every program,
+ * laid out as xnu's published osfmk/i386/cpu_capabilities.h describes.
+ * Programs read the processor's features from it directly: Qt reads the
+ * 64-bit capability word at +0x10 to see whether AVX-512 is usable. Ferry
+ * maps the same page, with its signature, version, capabilities, processor
+ * count and cache line size filled in from this machine. If something
+ * already sits at that address the page is left out. */
+#define COMMPAGE_ADDR 0x00007fffffe00000ull
+#define CAP_MMX 0x1ull
+#define CAP_SSE 0x2ull
+#define CAP_SSE2 0x4ull
+#define CAP_SSE3 0x8ull
+#define CAP_CACHE64 0x20ull
+#define CAP_FAST_TLS 0x80ull
+#define CAP_SSSE3 0x100ull
+#define CAP_64BIT 0x200ull
+#define CAP_SSE4_1 0x400ull
+#define CAP_SSE4_2 0x800ull
+#define CAP_AES 0x1000ull
+#define CAP_AVX1 0x01000000ull
+#define CAP_RDRAND 0x02000000ull
+#define CAP_F16C 0x04000000ull
+#define CAP_ENFSTRG 0x08000000ull
+#define CAP_FMA 0x10000000ull
+#define CAP_AVX2 0x20000000ull
+#define CAP_BMI1 0x40000000ull
+#define CAP_BMI2 0x80000000ull
+#define CAP_RTM 0x100000000ull
+#define CAP_HLE 0x200000000ull
+#define CAP_ADX 0x400000000ull
+#define CAP_RDSEED 0x800000000ull
+#define CAP_AVX512F 0x4000000000ull
+
+static uint64_t commpage_capabilities(long ncpus)
+{
+    unsigned a, b, c, d;
+    uint64_t caps = CAP_64BIT | CAP_CACHE64 | CAP_FAST_TLS;
+    if (__get_cpuid(1, &a, &b, &c, &d)) {
+        if (d & (1u << 23)) caps |= CAP_MMX;
+        if (d & (1u << 25)) caps |= CAP_SSE;
+        if (d & (1u << 26)) caps |= CAP_SSE2;
+        if (c & (1u << 0)) caps |= CAP_SSE3;
+        if (c & (1u << 9)) caps |= CAP_SSSE3;
+        if (c & (1u << 19)) caps |= CAP_SSE4_1;
+        if (c & (1u << 20)) caps |= CAP_SSE4_2;
+        if (c & (1u << 25)) caps |= CAP_AES;
+        if (c & (1u << 12)) caps |= CAP_FMA;
+        if (c & (1u << 29)) caps |= CAP_F16C;
+        if (c & (1u << 30)) caps |= CAP_RDRAND;
+        /* AVX counts only when the system saves its registers (OSXSAVE and XCR0) */
+        if ((c & (1u << 27)) && (c & (1u << 28))) {
+            unsigned lo, hi;
+            __asm__("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
+            if ((lo & 6) == 6) {
+                caps |= CAP_AVX1;
+                if (__get_cpuid_count(7, 0, &a, &b, &c, &d)) {
+                    if (b & (1u << 5)) caps |= CAP_AVX2;
+                    if ((b & (1u << 16)) && (lo & 0xe0) == 0xe0) caps |= CAP_AVX512F;
+                }
+            }
+        }
+        if (__get_cpuid_count(7, 0, &a, &b, &c, &d)) {
+            if (b & (1u << 3)) caps |= CAP_BMI1;
+            if (b & (1u << 4)) caps |= CAP_HLE;
+            if (b & (1u << 8)) caps |= CAP_BMI2;
+            if (b & (1u << 9)) caps |= CAP_ENFSTRG;
+            if (b & (1u << 11)) caps |= CAP_RTM;
+            if (b & (1u << 18)) caps |= CAP_RDSEED;
+            if (b & (1u << 19)) caps |= CAP_ADX;
+        }
+    }
+    caps |= (uint64_t)((ncpus > 255 ? 255 : ncpus) & 0xff) << 16;
+    return caps;
+}
+
+void ferry_commpage_init(void)
+{
+    void *p = mmap((void *)COMMPAGE_ADDR, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                   -1, 0);
+    if (p == MAP_FAILED)
+        return;
+    if (p != (void *)COMMPAGE_ADDR) {
+        munmap(p, 4096);
+        return;
+    }
+    unsigned char *page = p;
+    long ncpus = logical_configured();
+    uint64_t caps = commpage_capabilities(ncpus);
+    memcpy(page, "commpage 64-bit", 16);          /* +0x000 signature */
+    memcpy(page + 0x010, &caps, 8);               /* +0x010 capabilities, 64 bits */
+    uint16_t version = 14;
+    memcpy(page + 0x01e, &version, 2);            /* +0x01e version */
+    uint32_t caps32 = (uint32_t)caps;
+    memcpy(page + 0x020, &caps32, 4);             /* +0x020 capabilities, 32 bits */
+    page[0x022] = (unsigned char)(ncpus > 255 ? 255 : ncpus); /* +0x022 processors */
+    uint16_t line = 64;
+    memcpy(page + 0x026, &line, 2);               /* +0x026 cache line size */
+    mprotect(p, 4096, PROT_READ);
+}
+
 const struct ferry_symbol ferry_sysctl_symbols[] = {
+    {"__ulock_wait", mac_ulock_wait},
+    {"__ulock_wait2", mac_ulock_wait2},
+    {"__ulock_wake", mac_ulock_wake},
+    {"csr_get_active_config", mac_csr_get_active_config},
+    {"csr_check", mac_csr_check},
+    {"vm_allocate", mac_vm_allocate},
+    {"vm_deallocate", mac_vm_deallocate},
+    {"vm_remap", mac_vm_remap},
     {"sysctl", mac_sysctl},
     {"sysctlbyname", mac_sysctlbyname},
     {"sysctlnametomib", mac_sysctlnametomib},
@@ -1092,6 +1436,9 @@ const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"mach_host_self", mac_mach_host_self},
     {"mach_task_self", mac_mach_task_self},
     {"mach_task_self_", &mach_task_self_},
+    {"vm_page_size", &mac_vm_page_size},
+    {"vm_page_mask", &mac_vm_page_mask},
+    {"vm_page_shift", &mac_vm_page_shift},
     {"mach_port_deallocate", mac_mach_port_deallocate},
     {"host_page_size", mac_host_page_size},
     {"host_statistics", mac_host_statistics},

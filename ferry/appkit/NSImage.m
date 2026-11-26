@@ -13,6 +13,7 @@
 NSString *const NSImageCompressionFactor = @"NSImageCompressionFactor";
 NSString *const NSImageHintCTM = @"ctm";
 NSString *const NSImageHintInterpolation = @"interpolation";
+NSString *const NSImageHintUserInterfaceLayoutDirection = @"userInterfaceLayoutDirection";
 
 NSImageName const NSImageNameAddTemplate = @"NSAddTemplate";
 NSImageName const NSImageNameRemoveTemplate = @"NSRemoveTemplate";

@@ -6,6 +6,7 @@ timedwait on 1: 0
 destroy 0, again 1
 name max 255, path max 4096
 bad name -1 1
+case sensitive 1, preserving 1, missing path -1
 root 0 root uid 0 dir /root
 nobody 0 1
 pending usr1 1 usr2 0

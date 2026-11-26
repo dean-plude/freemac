@@ -105,6 +105,16 @@ int main(void)
         GetKeys(keys);
         printf("modifiers %u, keys held %s\n", (unsigned)GetCurrentKeyModifiers(),
                keys[0].bigEndianValue || keys[3].bigEndianValue ? "some" : "none");
+
+        /* what Qt's key mapper asks: an input method's own layout (none
+         * here) and what a key types with other modifiers */
+        NSEvent *e = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:0 timestamp:0
+                                  windowNumber:0 context:nil characters:@"a" charactersIgnoringModifiers:@"a"
+                                     isARepeat:NO keyCode:kVK_ANSI_1];
+        printf("input method layout %s, 1 with shift %s, without %s, layout kind %d\n",
+               TISCopyInputMethodKeyboardLayoutOverride() ? "set" : "NULL",
+               [[e charactersByApplyingModifiers:NSEventModifierFlagShift] UTF8String],
+               [[e charactersByApplyingModifiers:0] UTF8String], (int)(KeyboardLayoutKind)kKLuchrKind);
     }
     return 0;
 }

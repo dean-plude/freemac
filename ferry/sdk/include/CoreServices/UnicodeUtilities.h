@@ -47,6 +47,39 @@ OSStatus UCKeyTranslate(const UCKeyboardLayout *keyLayoutPtr, UInt16 virtualKeyC
                         UniChar unicodeString[]);
 UInt8 LMGetKbdType(void);
 
+/* Comparing text in a locale's order (freemac 1.232, Ferry 0.56.0), which
+ * Qt's QCollator uses on a Mac. Ferry's collator is served from
+ * Foundation's file (foundation/UCCollation.m): it orders by letter before
+ * case and, when asked, reads digits as numbers; it knows no locale's own
+ * rules. */
+typedef struct OpaqueCollatorRef *CollatorRef;
+typedef struct OpaqueLocaleRef *LocaleRef;
+typedef UInt32 LocaleOperationVariant;
+typedef UInt32 UCCollateOptions;
+typedef UInt32 UCCollationValue;
+enum {
+    kUCCollateComposeInsensitiveMask = 1 << 1,
+    kUCCollateWidthInsensitiveMask = 1 << 2,
+    kUCCollateCaseInsensitiveMask = 1 << 3,
+    kUCCollateDiacritInsensitiveMask = 1 << 4,
+    kUCCollatePunctuationSignificantMask = 1 << 15,
+    kUCCollateDigitsOverrideMask = 1 << 16,
+    kUCCollateDigitsAsNumberMask = 1 << 17,
+};
+enum { kUCCollateStandardOptions = kUCCollateComposeInsensitiveMask | kUCCollateWidthInsensitiveMask };
+enum { kUCOutputBufferTooSmall = -25340 };
+OSStatus LocaleRefFromLocaleString(const char *localeString, LocaleRef *localeRef);
+OSStatus UCCreateCollator(LocaleRef locale, LocaleOperationVariant opVariant, UCCollateOptions options,
+                          CollatorRef *collatorRef);
+OSStatus UCDisposeCollator(CollatorRef *collatorRef);
+OSStatus UCCompareText(CollatorRef collatorRef, const UniChar *text1Ptr, UniCharCount text1Length,
+                       const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent, SInt32 *order);
+OSStatus UCGetCollationKey(CollatorRef collatorRef, const UniChar *textPtr, UniCharCount textLength,
+                           ItemCount maxKeySize, ItemCount *actualKeySize, UCCollationValue collationKey[]);
+OSStatus UCCompareCollationKeys(const UCCollationValue *key1Ptr, ItemCount key1Length,
+                                const UCCollationValue *key2Ptr, ItemCount key2Length, Boolean *equivalent,
+                                SInt32 *order);
+
 #ifdef __cplusplus
 }
 #endif

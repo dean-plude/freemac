@@ -150,6 +150,8 @@ typedef struct _PangoFontMap PangoFontMap;
 typedef struct _PangoContext PangoContext;
 typedef struct _PangoFont PangoFont;
 typedef struct _PangoFontDescription PangoFontDescription;
+typedef struct _PangoFontFamily PangoFontFamily;
+typedef struct _PangoFontFace PangoFontFace;
 typedef struct _PangoFontMetrics PangoFontMetrics;
 typedef struct _PangoLayout PangoLayout;
 typedef struct _PangoLayoutIter PangoLayoutIter;
@@ -183,6 +185,15 @@ PangoFontDescription *pango_font_describe(PangoFont *font);
 void *pango_font_get_hb_font(PangoFont *font);
 
 PangoContext *pango_font_map_create_context(PangoFontMap *fontmap);
+/* the installed families and their faces (Core Text's font descriptors, AppKit's font manager) */
+void pango_font_map_list_families(PangoFontMap *fontmap, PangoFontFamily ***families, int *count);
+const char *pango_font_family_get_name(PangoFontFamily *family);
+int pango_font_family_is_monospace(PangoFontFamily *family);
+void pango_font_family_list_faces(PangoFontFamily *family, PangoFontFace ***faces, int *count);
+const char *pango_font_face_get_face_name(PangoFontFace *face);
+PangoFontDescription *pango_font_face_describe(PangoFontFace *face);
+int pango_font_face_is_synthesized(PangoFontFace *face);
+int pango_font_description_get_stretch(const PangoFontDescription *desc);
 PangoFont *pango_context_load_font(PangoContext *context, const PangoFontDescription *desc);
 void pango_context_set_round_glyph_positions(PangoContext *context, int round_positions);
 
@@ -250,16 +261,29 @@ hb_position_t hb_font_get_glyph_h_advance(hb_font_t *font, hb_codepoint_t glyph)
 hb_bool_t hb_font_get_glyph_extents(hb_font_t *font, hb_codepoint_t glyph, hb_glyph_extents_t *extents);
 hb_bool_t hb_font_get_h_extents(hb_font_t *font, hb_font_extents_t *extents);
 hb_bool_t hb_ot_metrics_get_position(hb_font_t *font, uint32_t tag, hb_position_t *position);
-/* (freemac 1.NEXT) reading the names and style of a font file's faces, for
- * Core Text's font descriptors */
+/* a font's tables, names and glyph names (Core Text's CTFontCopyTable, CTFontCopyName...) */
 typedef struct hb_blob_t hb_blob_t;
-hb_blob_t *hb_blob_create_from_file(const char *file_name);
+typedef struct hb_language_impl_t *hb_language_t;
+hb_blob_t *hb_face_reference_table(const hb_face_t *face, uint32_t tag);
+const char *hb_blob_get_data(hb_blob_t *blob, unsigned *length);
+unsigned hb_blob_get_length(hb_blob_t *blob);
+hb_blob_t *hb_blob_create(const char *data, unsigned length, int mode, void *user_data, void (*destroy)(void *));
 void hb_blob_destroy(hb_blob_t *blob);
-unsigned hb_face_count(hb_blob_t *blob);
 hb_face_t *hb_face_create(hb_blob_t *blob, unsigned index);
+hb_face_t *hb_face_reference(hb_face_t *face);
 void hb_face_destroy(hb_face_t *face);
-unsigned hb_ot_name_get_utf8(hb_face_t *face, unsigned name_id, const void *language, unsigned *text_size,
+unsigned hb_face_count(hb_blob_t *blob);
+unsigned hb_face_get_table_tags(const hb_face_t *face, unsigned start_offset, unsigned *table_count,
+                                uint32_t *table_tags);
+unsigned hb_ot_name_get_utf8(hb_face_t *face, unsigned name_id, hb_language_t language, unsigned *text_size,
                              char *text);
+hb_language_t hb_language_from_string(const char *str, int len);
+hb_bool_t hb_font_get_glyph_name(hb_font_t *font, hb_codepoint_t glyph, char *name, unsigned size);
+hb_bool_t hb_font_get_glyph_from_name(hb_font_t *font, const char *name, int len, hb_codepoint_t *glyph);
+enum { HB_MEMORY_MODE_DUPLICATE = 0, HB_MEMORY_MODE_READONLY = 1 };
+/* (freemac 1.NEXT) reading the names and style of a font file's faces, for
+ * Core Text's font descriptors (the calls above, and these) */
+hb_blob_t *hb_blob_create_from_file(const char *file_name);
 float hb_style_get_value(hb_font_t *font, uint32_t style_tag);
 
 /* ---- GdkPixbuf (decoding image files) and Poppler (PDF) ------------------------- */

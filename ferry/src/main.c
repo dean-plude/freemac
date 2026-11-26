@@ -158,13 +158,13 @@ int main(int argc, char **argv, char **envp)
              * description of libSystem is generated from this. */
             const struct ferry_symbol *tables[] = {ferry_core_symbols, ferry_stdio_symbols, ferry_posix_symbols,
                                                    ferry_pthread_symbols, ferry_blocks_symbols,
-                                                   ferry_dispatch_symbols, ferry_commoncrypto_symbols,
+                                                   ferry_dispatch_symbols, ferry_dispatch_io_symbols, ferry_commoncrypto_symbols,
                                                    ferry_sysversion_symbols, ferry_sysctl_symbols,
                                                    ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
                                                    ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols,
                                                    ferry_libc_more_symbols, ferry_oslog_symbols,
-                                                   ferry_swift_symbols, ferry_libc_vlc_symbols,
-                                                   ferry_libc_apps_symbols};
+                                                   ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
+                                                    ferry_libc_apps_symbols};
             for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);
@@ -227,5 +227,7 @@ int main(int argc, char **argv, char **envp)
         exit(ferry_run(program, argc - i + 1, args, envp));
     }
     /* The program sees itself as argv[0], as it would on a Mac. */
+    ferry_commpage_init();
+    ferry_thread_tsd_init();
     exit(ferry_run(argv[i], argc - i, argv + i, envp));
 }

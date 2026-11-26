@@ -3,11 +3,10 @@
 // Foundation;" and the like (freemac 1.222, Ferry 0.46.0). Written by
 // sdk/gen-modulemap.sh; run it again after adding a header.
 
-module AVFoundation [system] {
-    header "AVFoundation/AVFoundation.h"
-    header "AVFoundation/AVCaptureDevice.h"
+module Accelerate [system] {
+    header "Accelerate/Accelerate.h"
     export *
-    link framework "AVFoundation"
+    link framework "Accelerate"
 }
 
 module AppKit [system] {
@@ -17,18 +16,44 @@ module AppKit [system] {
     header "AppKit/AppKitMore.h"
     header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"
+    header "AppKit/AppKitQt.h"
     header "AppKit/AppKitVLC.h"
     header "AppKit/NSAccessibility.h"
+    module NSAccessibilityElement {
+        header "AppKit/NSAccessibilityElement.h"
+        export *
+    }
     header "AppKit/NSAlert.h"
     header "AppKit/NSAnimation.h"
+    module NSApplication {
+        header "AppKit/NSApplication.h"
+        export *
+    }
     header "AppKit/NSBezierPath.h"
+    module NSButton {
+        header "AppKit/NSButton.h"
+        export *
+    }
     header "AppKit/NSCollectionView.h"
+    header "AppKit/NSColorSampler.h"
     header "AppKit/NSDataAsset.h"
     header "AppKit/NSDockTile.h"
+    module NSDragging {
+        header "AppKit/NSDragging.h"
+        export *
+    }
+    module NSEvent {
+        header "AppKit/NSEvent.h"
+        export *
+    }
     header "AppKit/NSEventMonitors.h"
     header "AppKit/NSFontDescriptor.h"
     header "AppKit/NSGraphics.h"
     header "AppKit/NSGridView.h"
+    module NSImage {
+        header "AppKit/NSImage.h"
+        export *
+    }
     header "AppKit/NSLayoutConstraint.h"
     module NSMenu {
         header "AppKit/NSMenu.h"
@@ -36,13 +61,29 @@ module AppKit [system] {
     }
     header "AppKit/NSOpenGL.h"
     header "AppKit/NSOpenGLView.h"
+    module NSPanel {
+        header "AppKit/NSPanel.h"
+        export *
+    }
     header "AppKit/NSPredicateEditor.h"
     header "AppKit/NSRuleEditor.h"
     header "AppKit/NSRulerView.h"
     header "AppKit/NSRunningApplication.h"
+    module NSScreen {
+        header "AppKit/NSScreen.h"
+        export *
+    }
     header "AppKit/NSTextAttachment.h"
     header "AppKit/NSTouchBar.h"
     header "AppKit/NSTrackingArea.h"
+    module NSView {
+        header "AppKit/NSView.h"
+        export *
+    }
+    module NSWindow {
+        header "AppKit/NSWindow.h"
+        export *
+    }
     header "AppKit/NSWorkspace.h"
     export *
     link framework "AppKit"
@@ -81,11 +122,11 @@ module AudioUnit [system] {
     link framework "CoreAudio"
 }
 
-module CFNetwork [system] {
-    header "CFNetwork/CFNetwork.h"
-    header "CFNetwork/CFProxySupport.h"
+module AVFoundation [system] {
+    header "AVFoundation/AVFoundation.h"
+    header "AVFoundation/AVCaptureDevice.h"
     export *
-    link framework "CFNetwork"
+    link framework "AVFoundation"
 }
 
 module Carbon [system] {
@@ -95,6 +136,19 @@ module Carbon [system] {
     }
     export *
     link framework "Carbon"
+}
+
+module CFNetwork [system] {
+    header "CFNetwork/CFNetwork.h"
+    header "CFNetwork/CFProxySupport.h"
+    export *
+    link framework "CFNetwork"
+}
+
+module CloudKit [system] {
+    header "CloudKit/CloudKit.h"
+    export *
+    link framework "CloudKit"
 }
 
 module Cocoa [system] {
@@ -112,6 +166,22 @@ module CommonCrypto [system] {
     header "CommonCrypto/CommonKeyDerivation.h"
     header "CommonCrypto/CommonRandom.h"
     export *
+}
+
+module CoreAudio [system] {
+    header "CoreAudio/CoreAudio.h"
+    header "CoreAudio/AudioHardware.h"
+    header "CoreAudio/AudioHardwareBase.h"
+    header "CoreAudio/CoreAudioTypes.h"
+    header "CoreAudio/HostTime.h"
+    export *
+    link framework "CoreAudio"
+}
+
+module CoreAudioTypes [system] {
+    header "CoreAudioTypes/CoreAudioTypes.h"
+    export *
+    link framework "CoreAudio"
 }
 
 module CoreData [system] {
@@ -135,12 +205,14 @@ module CoreFoundation [system] {
     header "CoreFoundation/CFNumber.h"
     header "CoreFoundation/CFPlugInCOM.h"
     header "CoreFoundation/CFPreferences.h"
+    header "CoreFoundation/CFPropertyList.h"
     header "CoreFoundation/CFRunLoop.h"
     header "CoreFoundation/CFSet.h"
     header "CoreFoundation/CFSocket.h"
     header "CoreFoundation/CFStream.h"
     header "CoreFoundation/CFString.h"
     header "CoreFoundation/CFURL.h"
+    header "CoreFoundation/CFURLEnumerator.h"
     header "CoreFoundation/CFUUID.h"
     export *
     link framework "CoreFoundation"
@@ -172,28 +244,6 @@ module CoreImage [system] {
     link framework "CoreImage"
 }
 
-module CloudKit [system] {
-    header "CloudKit/CloudKit.h"
-    export *
-    link framework "CloudKit"
-}
-
-module CoreAudio [system] {
-    header "CoreAudio/CoreAudio.h"
-    header "CoreAudio/AudioHardware.h"
-    header "CoreAudio/AudioHardwareBase.h"
-    header "CoreAudio/CoreAudioTypes.h"
-    header "CoreAudio/HostTime.h"
-    export *
-    link framework "CoreAudio"
-}
-
-module CoreAudioTypes [system] {
-    header "CoreAudioTypes/CoreAudioTypes.h"
-    export *
-    link framework "CoreAudio"
-}
-
 module CoreServices [system] {
     header "CoreServices/CoreServices.h"
     header "CoreServices/AppleEvents.h"
@@ -220,6 +270,12 @@ module CoreText [system] {
     header "CoreText/CTStringAttributes.h"
     export *
     link framework "CoreText"
+}
+
+module DiskArbitration [system] {
+    header "DiskArbitration/DiskArbitration.h"
+    export *
+    link framework "DiskArbitration"
 }
 
 module EventKit [system] {
@@ -279,6 +335,7 @@ module Foundation [system] {
     header "Foundation/NSString.h"
     header "Foundation/NSTask.h"
     header "Foundation/NSThread.h"
+    header "Foundation/NSTimeZone.h"
     header "Foundation/NSTimer.h"
     header "Foundation/NSURL.h"
     header "Foundation/NSURLAuthenticationChallenge.h"
@@ -293,6 +350,7 @@ module Foundation [system] {
     header "Foundation/NSURLResponse.h"
     header "Foundation/NSURLSession.h"
     header "Foundation/NSUUID.h"
+    header "Foundation/NSUserActivity.h"
     header "Foundation/NSUserDefaults.h"
     header "Foundation/NSUserNotification.h"
     header "Foundation/NSValue.h"
@@ -311,9 +369,17 @@ module Foundation [system] {
 
 module HIServices [system] {
     header "HIServices/Accessibility.h"
+    header "HIServices/Icons.h"
+    header "HIServices/Pasteboard.h"
     header "HIServices/Processes.h"
     export *
     link framework "ApplicationServices"
+}
+
+module ImageIO [system] {
+    header "ImageIO/ImageIO.h"
+    export *
+    link framework "ImageIO"
 }
 
 module IOKit [system] {
@@ -325,10 +391,15 @@ module IOKit [system] {
     link framework "IOKit"
 }
 
-module ImageIO [system] {
-    header "ImageIO/ImageIO.h"
+module IOSurface [system] {
+    header "IOSurface/IOSurface.h"
+    header "IOSurface/IOSurfaceAPI.h"
+    header "IOSurface/IOSurfaceBase.h"
+    header "IOSurface/IOSurfaceObjC.h"
+    header "IOSurface/IOSurfaceRef.h"
+    header "IOSurface/IOSurfaceTypes.h"
     export *
-    link framework "ImageIO"
+    link framework "IOSurface"
 }
 
 module JavaScriptCore [system] {
@@ -350,6 +421,24 @@ module JavaScriptCore [system] {
     link framework "JavaScriptCore"
 }
 
+module Metal [system] {
+    header "Metal/Metal.h"
+    export *
+    link framework "Metal"
+}
+
+module MetalKit [system] {
+    header "MetalKit/MetalKit.h"
+    export *
+    link framework "Metal"
+}
+
+module Network [system] {
+    header "Network/Network.h"
+    export *
+    link framework "Network"
+}
+
 module Quartz [system] {
     header "Quartz/Quartz.h"
     header "Quartz/QCView.h"
@@ -366,6 +455,7 @@ module QuartzCore [system] {
     header "QuartzCore/CALayer.h"
     header "QuartzCore/CAMediaTiming.h"
     header "QuartzCore/CAMediaTimingFunction.h"
+    header "QuartzCore/CAMetalLayer.h"
     header "QuartzCore/CAOpenGLLayer.h"
     header "QuartzCore/CAShapeLayer.h"
     header "QuartzCore/CATextLayer.h"
@@ -430,6 +520,14 @@ module SystemConfiguration [system] {
 
 module UniformTypeIdentifiers [system] {
     header "UniformTypeIdentifiers/UniformTypeIdentifiers.h"
+    module UTCoreTypes {
+        header "UniformTypeIdentifiers/UTCoreTypes.h"
+        export *
+    }
+    module UTType {
+        header "UniformTypeIdentifiers/UTType.h"
+        export *
+    }
     export *
     link framework "UniformTypeIdentifiers"
 }

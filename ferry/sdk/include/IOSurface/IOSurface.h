@@ -25,6 +25,9 @@ typedef struct __IOSurface *IOSurfaceRef;
 
 typedef uint32_t IOSurfaceID;
 
+/* what IOSurfaceLock and the like return when they succeed */
+enum { kIOSurfaceSuccess = 0 };
+
 typedef CF_OPTIONS(uint32_t, IOSurfaceLockOptions) {
     kIOSurfaceLockReadOnly = 0x00000001,
     kIOSurfaceLockAvoidSync = 0x00000002,

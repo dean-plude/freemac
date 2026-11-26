@@ -37,5 +37,9 @@ int timespec_get(struct timespec *, int);
 int clock_getres(clockid_t, struct timespec *);
 uint64_t clock_gettime_nsec_np(clockid_t);
 void tzset(void);
+/* what tzset sets (freemac 1.232, Ferry 0.56.0) */
+extern char *tzname[2];
+extern long timezone;
+extern int daylight;
 __FERRY_END
 #endif

@@ -89,6 +89,10 @@ long double copysignl(long double, long double); long double nanl(const char *);
 long double roundl(long double); long double truncl(long double); long double fminl(long double, long double);
 long double fmaxl(long double, long double); long double log10l(long double); long double log2l(long double);
 long double exp2l(long double);
+/* a Mac's own: 10^x and sin, cos, tan of pi*x */
+double __exp10(double); float __exp10f(float);
+double __sinpi(double); float __sinpif(float); double __cospi(double); float __cospif(float);
+double __tanpi(double); float __tanpif(float);
 /* the rest of C99's float and long double maths (freemac 1.227, for Swift) */
 long double acosl(long double);
 long double asinl(long double);

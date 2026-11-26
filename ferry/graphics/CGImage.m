@@ -571,6 +571,19 @@ CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect)
 }
 
 CGImageRef CGImageCreateCopy(CGImageRef image) { return (CGImageRef)[OBJ(image) retain]; }
+/* the same pixels read in another colour space with as many components;
+ * NULL for a mask, or a space of another size */
+CGImageRef CGImageCreateCopyWithColorSpace(CGImageRef image, CGColorSpaceRef space)
+{
+    GImage *src = (GImage *)image;
+    if (!src || !space || src->mask ||
+        CGColorSpaceGetNumberOfComponents(space) != CGColorSpaceGetNumberOfComponents((CGColorSpaceRef)src->space))
+        return NULL;
+    GImage *im = make_image(src->width, src->height, src->bpc, src->bpp, src->bpr, (GColorSpace *)space, src->info,
+                            src->provider);
+    im->interpolate = src->interpolate;
+    return (CGImageRef)im;
+}
 CGImageRef CGImageRetain(CGImageRef image) { return (CGImageRef)[OBJ(image) retain]; }
 void CGImageRelease(CGImageRef image) { [OBJ(image) release]; }
 size_t CGImageGetWidth(CGImageRef image) { return image ? ((GImage *)image)->width : 0; }

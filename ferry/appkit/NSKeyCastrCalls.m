@@ -335,6 +335,10 @@ NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDidChangeNotifica
     id color = ((id (*)(id, SEL))objc_msgSend)([NSColor class], sel);
     return [color isKindOfClass:[NSColor class]] ? color : nil;
 }
+- (NSString *)catalogNameComponent { return nil; }
+- (NSString *)colorNameComponent { return nil; }
+- (NSString *)localizedCatalogNameComponent { return nil; }
+- (NSString *)localizedColorNameComponent { return nil; }
 @end
 
 @implementation NSMenuItem (FerryParentItem)

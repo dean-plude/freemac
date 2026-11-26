@@ -16,12 +16,18 @@
 #include <ApplicationServices/ApplicationServices.h>
 #import <QuartzCore/QuartzCore.h>
 
+/* In C++ every AppKit call has C linkage, as on a Mac. */
+#ifdef __cplusplus
+#include <sys/types.h>
+#endif
 #define APPKIT_EXTERN extern
+__FERRY_BEGIN
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
 @class NSApplication, NSWindow, NSView, NSEvent, NSColor, NSFont, NSMenu, NSMenuItem, NSScreen;
 @class NSGraphicsContext, NSBitmapImageRep, NSParagraphStyle, NSBezierPath, NSCursor, NSImage;
 @class NSWindowController, NSViewController, NSStoryboard;
+@protocol NSUserActivityRestoring;
 
 /* ---- events ----------------------------------------------------------------------- */
 
@@ -33,6 +39,12 @@ typedef NS_ENUM(NSUInteger, NSEventType) {
     NSEventTypeAppKitDefined = 13, NSEventTypeSystemDefined = 14, NSEventTypeApplicationDefined = 15,
     NSEventTypePeriodic = 16, NSEventTypeCursorUpdate = 17, NSEventTypeScrollWheel = 22,
     NSEventTypeOtherMouseDown = 25, NSEventTypeOtherMouseUp = 26, NSEventTypeOtherMouseDragged = 27,
+    /* tablets, gestures and touches, which Ferry's PCs don't send yet; Qt's
+     * Mac plugin names them */
+    NSEventTypeRotate = 18, NSEventTypeBeginGesture = 19, NSEventTypeEndGesture = 20,
+    NSEventTypeTabletPoint = 23, NSEventTypeTabletProximity = 24, NSEventTypeGesture = 29,
+    NSEventTypeMagnify = 30, NSEventTypeSwipe = 31, NSEventTypeSmartMagnify = 32, NSEventTypeQuickLook = 33,
+    NSEventTypePressure = 34, NSEventTypeDirectTouch = 37, NSEventTypeChangeMode = 38,
 };
 typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskLeftMouseDown = 1ULL << 1, NSEventMaskLeftMouseUp = 1ULL << 2,
@@ -43,9 +55,14 @@ typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskFlagsChanged = 1ULL << 12, NSEventMaskApplicationDefined = 1ULL << 15,
     NSEventMaskScrollWheel = 1ULL << 22, NSEventMaskOtherMouseDown = 1ULL << 25,
     NSEventMaskOtherMouseUp = 1ULL << 26, NSEventMaskOtherMouseDragged = 1ULL << 27,
+    NSEventMaskRotate = 1ULL << 18, NSEventMaskBeginGesture = 1ULL << 19, NSEventMaskEndGesture = 1ULL << 20,
+    NSEventMaskTabletPoint = 1ULL << 23, NSEventMaskTabletProximity = 1ULL << 24,
+    NSEventMaskGesture = 1ULL << 29, NSEventMaskMagnify = 1ULL << 30, NSEventMaskSwipe = 1ULL << 31,
+    NSEventMaskSmartMagnify = 1ULL << 32, NSEventMaskPressure = 1ULL << 34,
+    NSEventMaskDirectTouch = 1ULL << 37, NSEventMaskChangeMode = 1ULL << 38,
     NSEventMaskAny = ~0ULL,
 };
-static inline NSEventMask NSEventMaskFromType(NSEventType type) { return 1ULL << type; }
+static inline NSEventMask NSEventMaskFromType(NSEventType type) { return (NSEventMask)(1ULL << type); }
 typedef NS_OPTIONS(NSUInteger, NSEventModifierFlags) {
     NSEventModifierFlagCapsLock = 1 << 16, NSEventModifierFlagShift = 1 << 17,
     NSEventModifierFlagControl = 1 << 18, NSEventModifierFlagOption = 1 << 19,
@@ -126,6 +143,10 @@ enum {
 /* Quartz events (freemac 1.220, Ferry 0.44.0, appkit/CGServices.m): an
  * event made from one, and one made from an event, which the caller
  * doesn't release (the NSEvent keeps it). */
+/* what a key event's key types with these modifiers held instead */
+@interface NSEvent (FerryApplyingModifiers)
+- (NSString *)charactersByApplyingModifiers:(NSEventModifierFlags)modifiers;
+@end
 @interface NSEvent (NSEventCGEvent)
 + (NSEvent *)eventWithCGEvent:(CGEventRef)cgEvent;
 @property (readonly) CGEventRef CGEvent;
@@ -558,7 +579,7 @@ typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
     NSImageCacheDefault, NSImageCacheAlways, NSImageCacheBySize, NSImageCacheNever,
 };
 typedef NSString *NSImageHintKey;
-APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation;
+APPKIT_EXTERN NSImageHintKey const NSImageHintCTM, NSImageHintInterpolation, NSImageHintUserInterfaceLayoutDirection;
 APPKIT_EXTERN NSString *const NSImageCompressionFactor;
 
 /* Images: read from PNG, JPEG, GIF, TIFF, BMP, ICO and ICNS files (by this
@@ -583,7 +604,13 @@ APPKIT_EXTERN NSString *const NSImageCompressionFactor;
 - (BOOL)setName:(NSImageName)name;
 - (NSImageName)name;
 @property NSSize size;
+#ifdef __cplusplus
+/* "template" is a keyword in Objective-C++, so it is spelt as its methods there */
+- (BOOL)isTemplate;
+- (void)setTemplate:(BOOL)isTemplate;
+#else
 @property (getter=isTemplate) BOOL template;
+#endif
 @property (readonly, getter=isValid) BOOL valid;
 @property (copy) NSString *accessibilityDescription;
 @property (copy) NSColor *backgroundColor;
@@ -1062,11 +1089,19 @@ typedef NS_ENUM(NSUInteger, NSBackingStoreType) {
 };
 typedef NS_ENUM(NSInteger, NSWindowOrderingMode) { NSWindowAbove = 1, NSWindowBelow = -1, NSWindowOut = 0 };
 typedef NSInteger NSWindowLevel;
+#ifdef __cplusplus
+/* NSWindowLevel constants in C++, as a Mac's, so std::max(level,
+ * NSPopUpMenuWindowLevel) and the like take them as NSIntegers */
+static const NSWindowLevel NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSSubmenuWindowLevel = 3,
+    NSTornOffMenuWindowLevel = 3, NSModalPanelWindowLevel = 8, NSDockWindowLevel = 20, NSMainMenuWindowLevel = 24,
+    NSStatusWindowLevel = 25, NSPopUpMenuWindowLevel = 101, NSScreenSaverWindowLevel = 1000;
+#else
 enum {
     NSNormalWindowLevel = 0, NSFloatingWindowLevel = 3, NSSubmenuWindowLevel = 3, NSTornOffMenuWindowLevel = 3,
     NSModalPanelWindowLevel = 8, NSDockWindowLevel = 20, NSMainMenuWindowLevel = 24, NSStatusWindowLevel = 25,
     NSPopUpMenuWindowLevel = 101, NSScreenSaverWindowLevel = 1000,
 };
+#endif
 typedef NS_OPTIONS(NSUInteger, NSWindowCollectionBehavior) {
     NSWindowCollectionBehaviorDefault = 0,
     NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0,
@@ -1367,6 +1402,15 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 - (BOOL)applicationOpenUntitledFile:(NSApplication *)sender;
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag;
 - (NSError *)application:(NSApplication *)application willPresentError:(NSError *)error;
+/* Handoff and secure restorable state (AppKitQt.h) */
+- (BOOL)application:(NSApplication *)application willContinueUserActivityWithType:(NSString *)userActivityType;
+- (BOOL)application:(NSApplication *)application
+    continueUserActivity:(NSUserActivity *)userActivity
+      restorationHandler:(void (^)(NSArray<id<NSUserActivityRestoring>> *restorableObjects))restorationHandler;
+- (void)application:(NSApplication *)application
+    didFailToContinueUserActivityWithType:(NSString *)userActivityType error:(NSError *)error;
+- (void)application:(NSApplication *)application didUpdateUserActivity:(NSUserActivity *)userActivity;
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app;
 @end
 
 @interface NSApplication : NSResponder
@@ -4625,6 +4669,8 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
  * (freemac 1.226, Ferry 0.50.0) */
 
 #import <AppKit/AppKitOlder.h>
+/* picking a colour off the screen (NSColorSampler.m) (freemac 1.232, Ferry 0.56.0) */
+#import <AppKit/NSColorSampler.h>
 
 /* ---- newer names: safe areas, display links, occlusion, symbol configurations,
  * section headers (AppKitNewer.m) (freemac 1.232, Ferry 0.56.0) */
@@ -4640,4 +4686,9 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 #import <AppKit/NSOpenGL.h>
 #import <AppKit/NSOpenGLView.h>
 
+/* ---- what Qt's Mac platform plugin calls besides (AppKitQt.m), for OBS */
+
+#import <AppKit/AppKitQt.h>
+
+__FERRY_END
 #endif

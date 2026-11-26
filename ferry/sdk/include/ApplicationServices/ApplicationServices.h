@@ -11,3 +11,6 @@
 #include <HIServices/Accessibility.h>
 /* The Process Manager (HIServices); served from AppKit's file. */
 #include <HIServices/Processes.h>
+/* The Pasteboard Manager and drawing Icon Services icons; served from AppKit's file. */
+#include <HIServices/Pasteboard.h>
+#include <HIServices/Icons.h>
