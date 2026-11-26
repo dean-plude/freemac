@@ -210,6 +210,47 @@ void ATableDrawTextLine(NSAttributedString *s, NSRect frame, NSTextAlignment ali
     CFRelease(line);
 }
 
+/* Text with line breaks in it, a line for each paragraph, the block centred
+ * in frame and each line cut short with an ellipsis, as a cell that isn't in
+ * single-line mode draws "Title\nmessage". */
+void ATableDrawTextLines(NSAttributedString *s, NSRect frame, NSTextAlignment align, BOOL flipped)
+{
+    NSString *text = [s string];
+    if ([text rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]].location == NSNotFound) {
+        ATableDrawTextLine(s, frame, align, flipped);
+        return;
+    }
+    NSMutableArray *lines = [NSMutableArray array];
+    NSMutableArray *heights = [NSMutableArray array];
+    CGFloat total = 0;
+    NSUInteger start = 0, length = [text length];
+    while (start <= length) {
+        NSUInteger end = start, next = start;
+        [text getParagraphStart:NULL end:&next contentsEnd:&end forRange:NSMakeRange(start, 0)];
+        NSAttributedString *line = [s attributedSubstringFromRange:NSMakeRange(start, end - start)];
+        NSFont *font = [line length] ? [line attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL] : nil;
+        if (!font && start < length)
+            font = [s attribute:NSFontAttributeName atIndex:start effectiveRange:NULL];
+        font = font ?: ADefaultFont();
+        CGFloat h = ceil([font ascender] - [font descender] + 1);
+        if (total > 0 && total + h > frame.size.height)
+            break;   /* the lines that fit */
+        [lines addObject:line];
+        [heights addObject:@(h)];
+        total += h;
+        if (next >= length)
+            break;
+        start = next;
+    }
+    CGFloat y = flipped ? NSMidY(frame) - total / 2 : NSMidY(frame) + total / 2;
+    for (NSUInteger i = 0; i < [lines count]; i++) {
+        CGFloat h = [heights[i] doubleValue];
+        NSRect r = NSMakeRect(frame.origin.x, flipped ? y : y - h, frame.size.width, h);
+        ATableDrawTextLine(lines[i], r, align, flipped);
+        y += flipped ? h : -h;
+    }
+}
+
 /* A chevron pointing right, or down when open, centred in r. */
 void ATableDrawChevron(NSRect r, BOOL down, NSColor *color, BOOL flipped)
 {
@@ -291,7 +332,10 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
         s = value;
     else
         s = AAttributed([self stringValue], font, color);
-    ATableDrawTextLine(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
+    if ([self usesSingleLineMode])
+        ATableDrawTextLine(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
+    else
+        ATableDrawTextLines(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
 }
 - (void)drawWithFrame:(NSRect)frame inView:(NSView *)view { [self drawInteriorWithFrame:frame inView:view]; }
 @end
