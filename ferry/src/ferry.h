@@ -92,6 +92,7 @@ void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry
 void *ferry_sound_symbol(const char *name);         /* libpulse, for Ferry's Core Audio (coreaudio/) */
 void *ferry_gl_symbol(const char *name);            /* EGL and OpenGL, for Ferry's OpenGL (opengl/) */
 void *ferry_capture_symbol(const char *name);       /* Xlib and its extensions, for screen capture (1.238) */
+void *ferry_camera_symbol(const char *name);        /* cameras, for AVFoundation's capture (camera.c, 1.257) */
 
 /* servercerts.c: the certificates an https server presents, for Security */
 int ferry_server_certificates(const char *host, int port, int timeout_ms,

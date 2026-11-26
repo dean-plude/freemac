@@ -3272,3 +3272,37 @@ AppKit's notes on stderr that are whole sentences (no session bus for the
 app's menus or menu bar items, a status item's menu opening on the next click)
 are now said as they are, without "isn't supported yet" added after them.
 
+
+## Cameras (freemac 1.257, Ferry 0.80.0)
+
+A Mac app sees the PC's webcams through AVFoundation. Ferry finds each camera
+(V4L2 video capture devices under /dev/video*) and lists it as an
+AVCaptureDevice of type External with its name, maker, model and a unique ID
+that stays the same between runs. Its formats list each size the camera sends
+in each pixel format (YUYV, UYVY, NV12, I420 and Motion JPEG) with the frame
+rates it offers, and `activeFormat` and `activeVideoMinFrameDuration` choose
+what it sends. `AVCaptureDeviceDiscoverySession` finds cameras by device type,
+and cameras plugged in or taken out while the app runs post
+`AVCaptureDeviceWasConnectedNotification` and
+`AVCaptureDeviceWasDisconnectedNotification`.
+
+An `AVCaptureSession` with an `AVCaptureDeviceInput` and an
+`AVCaptureVideoDataOutput` hands the app a sample buffer for each picture on
+the app's queue, with the camera's own time stamps. The picture comes in the
+pixel format the output's `videoSettings` ask for (`420v`, `420f`, `yuvs`,
+`2vuy` or `32BGRA`), or the camera's own when they ask for none, in an
+IOSurface-backed pixel buffer that carries its colour attachments. Session
+presets (`High`, `640x480`, `1280x720` and the rest) pick the nearest format.
+Motion JPEG is decoded with libturbojpeg, and handed over as 32BGRA.
+
+A session starts only when the user allowed the camera for the app in Dials,
+Privacy & Security, Camera (asking once if they haven't said); otherwise it
+posts a runtime error with `AVErrorApplicationIsNotAuthorizedToUseDevice`. A
+camera another app is using makes the session try again each second.
+CoreMediaIO's system object keeps the "allow screen capture devices" switch
+that OBS's camera plugin sets as it starts; it lists no devices of its own.
+
+With `FERRY_CAMERA_TEST=1`, Ferry adds a test camera that sends red on its
+left and blue on its right, with a white square moving across. The test
+`appkit_avcapture_camera` reads it the way OBS Studio's camera source does.
+Microphones, still photos, movie file outputs and preview layers aren't here.

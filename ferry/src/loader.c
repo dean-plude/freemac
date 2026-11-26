@@ -941,6 +941,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"AudioUnit", "CoreAudio"},
     {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.233) */
     {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.233) */
+    {"CoreMediaIO", "AppKit"},       /* the system object, appkit/CoreMediaIO.m (1.257) */
     {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.233) */
     {NULL, NULL},
 };

@@ -26,6 +26,7 @@ typedef FourCharCode CMVideoCodecType;
 enum {
     kCMVideoCodecType_422YpCbCr8 = '2vuy', kCMVideoCodecType_JPEG = 'jpeg', kCMVideoCodecType_H264 = 'avc1',
     kCMVideoCodecType_HEVC = 'hvc1', kCMVideoCodecType_MPEG4Video = 'mp4v', kCMVideoCodecType_AppleProRes422 = 'apcn',
+    kCMVideoCodecType_JPEG_OpenDML = 'dmb1',
 };
 typedef FourCharCode CMAudioCodecType;
 typedef struct {
