@@ -12,7 +12,9 @@
  * draws (background, contents, sublayers and border) taken as one, as Apple
  * documents. A mask keeps the layer only where the mask layer is opaque
  * (freemac 1.254). contentsRect picks a part of the image and contentsCenter
- * stretches it in nine parts (freemac 1.255). Filters aren't drawn yet. */
+ * stretches it in nine parts (freemac 1.255). A compositingFilter that is a
+ * blend mode puts the layer down with that mode (freemac 1.256); the other
+ * filters aren't drawn yet. */
 #import "QInternal.h"
 
 /* From a layer's bounds space to the space its superlayer puts sublayers
@@ -278,6 +280,48 @@ static void draw_contents(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL fl
         CGImageRelease(part);
 }
 
+/* The blend mode a layer's compositingFilter asks for, or -1: Core
+ * Animation's own names ("multiplyBlendMode") or a Core Image filter's
+ * ("CIMultiplyBlendMode", "CIAdditionCompositing"), as a name or as the
+ * filter. */
+static int blend_mode_of(id filter)
+{
+    if (!filter)
+        return -1;
+    NSString *name = [filter isKindOfClass:[NSString class]] ? filter
+                     : [filter respondsToSelector:@selector(name)] ? [filter name] : nil;
+    if (![name isKindOfClass:[NSString class]] || ![name length]) {
+        QWarnOnce("a compositingFilter other than a blend mode");
+        return -1;
+    }
+    if ([name hasPrefix:@"CI"] && [name length] > 2)
+        name = [[[name substringWithRange:NSMakeRange(2, 1)] lowercaseString] stringByAppendingString:[name substringFromIndex:3]];
+    static const struct { const char *name; CGBlendMode mode; } modes[] = {
+        {"normalBlendMode", kCGBlendModeNormal}, {"multiplyBlendMode", kCGBlendModeMultiply},
+        {"screenBlendMode", kCGBlendModeScreen}, {"overlayBlendMode", kCGBlendModeOverlay},
+        {"darkenBlendMode", kCGBlendModeDarken}, {"lightenBlendMode", kCGBlendModeLighten},
+        {"colorDodgeBlendMode", kCGBlendModeColorDodge}, {"colorBurnBlendMode", kCGBlendModeColorBurn},
+        {"softLightBlendMode", kCGBlendModeSoftLight}, {"hardLightBlendMode", kCGBlendModeHardLight},
+        {"differenceBlendMode", kCGBlendModeDifference}, {"exclusionBlendMode", kCGBlendModeExclusion},
+        {"hueBlendMode", kCGBlendModeHue}, {"saturationBlendMode", kCGBlendModeSaturation},
+        {"colorBlendMode", kCGBlendModeColor}, {"luminosityBlendMode", kCGBlendModeLuminosity},
+        {"additionCompositing", kCGBlendModePlusLighter}, {"plusL", kCGBlendModePlusLighter},
+        {"plusD", kCGBlendModePlusDarker}, {"sourceOverCompositing", kCGBlendModeNormal},
+        {"sourceAtopCompositing", kCGBlendModeSourceAtop}, {"sourceInCompositing", kCGBlendModeSourceIn},
+        {"sourceOutCompositing", kCGBlendModeSourceOut}, {"sourceAtop", kCGBlendModeSourceAtop},
+        {"sourceIn", kCGBlendModeSourceIn}, {"sourceOut", kCGBlendModeSourceOut},
+        {"destOver", kCGBlendModeDestinationOver}, {"destIn", kCGBlendModeDestinationIn},
+        {"destOut", kCGBlendModeDestinationOut}, {"destAtop", kCGBlendModeDestinationAtop},
+        {"xor", kCGBlendModeXOR}, {"clear", kCGBlendModeClear}, {"copy", kCGBlendModeCopy},
+    };
+    const char *n = [name UTF8String];
+    for (size_t i = 0; i < sizeof modes / sizeof *modes; i++)
+        if (!strcmp(n, modes[i].name))
+            return modes[i].mode;
+    QWarnOnce("a compositingFilter other than a blend mode");
+    return -1;
+}
+
 /* Sets the layer's shadow in the context, if it casts one: its colour at
  * shadowOpacity, its offset (in the layer's superlayer's space, as the
  * layer is placed) and its radius taken to the base space Core Graphics
@@ -334,12 +378,17 @@ static void render_layer(CALayer *l, NSDictionary *v, CGContextRef ctx, BOOL pre
         CGContextSetShadowWithColor(ctx, CGSizeZero, 0, NULL);
     }
     CALayer *mask = [l mask];
-    BOOL group = opacity < 1 || (shadowed && !fromPath) || mask;
+    int blend = blend_mode_of(v[@"compositingFilter"]);
+    BOOL group = opacity < 1 || (shadowed && !fromPath) || mask || blend >= 0;
     if (group) {
         CGContextSetAlpha(ctx, GSTATE((GContext *)ctx)->alpha * opacity);
+        if (blend >= 0) /* the group is put down with the mode set when it began */
+            CGContextSetBlendMode(ctx, (CGBlendMode)blend);
         CGContextBeginTransparencyLayer(ctx, NULL);
+        if (blend >= 0)
+            CGContextSetBlendMode(ctx, kCGBlendModeNormal);
     }
-    if ([v[@"filters"] count] || [v[@"backgroundFilters"] count] || v[@"compositingFilter"])
+    if ([v[@"filters"] count] || [v[@"backgroundFilters"] count])
         QWarnOnce("layer filters");
     double radius = QNum(v, @"cornerRadius");
     NSUInteger corners = [v[@"maskedCorners"] unsignedIntegerValue];

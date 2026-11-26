@@ -350,7 +350,7 @@ static BOOL export_menus(void)
     if (!bus) {
         if (error)
             g_error_free(error);
-        AWarnOnce("the app's menus: no session bus, so they aren't in the menu bar");
+        ANoteOnce("there is no session bus, so the app's menus aren't in the menu bar");
         return NO;
     }
     app_menu = g_menu_new();
@@ -367,7 +367,7 @@ static BOOL export_menus(void)
         !g_dbus_connection_export_menu_model(bus, BAR_PATH, bar_menu, &error)) {
         if (error)
             g_error_free(error);
-        AWarnOnce("the app's menus: they couldn't be offered on the session bus");
+        ANoteOnce("the app's menus couldn't be offered on the session bus, so they aren't in the menu bar");
         return NO;
     }
     AGlibAttach();
