@@ -472,6 +472,8 @@ Mac apps with big windows open without a wait: Ferry's Auto Layout solver now go
 
 From Ferry 0.62.0 (freemac 1.238), Mac apps record the screen, as OBS Studio's mac-capture plugin does: `screencapturekit/` is ScreenCaptureKit.framework, and AppKit's file holds the capture core it shares with CGDisplayStream and the window list's pictures (`appkit/ACapture.m`, `ACaptureX11.m`, `CGDisplayStream.m`), with Core Media's sample buffers beside it (`appkit/CMSampleBuffer.m`). Under X11 the X server's screen and windows are read through MIT-SHM, XComposite and XFixes; under Wayland the ScreenCast portal isn't spoken yet (`appkit/ACapturePortal.m` says so), and `FERRY_CAPTURE=x11|portal|none` chooses. Recording asks the user once (`freemac-allow-control --kind screen-recording`). The tests are `screencapture_coremedia` and `screencapture_x11`, `screencapture_x11_noshm` on an Xvfb of their own.
 
+From Ferry 0.64.0 (freemac 1.240), screen capture works on Wayland as well as X11: `appkit/ACapturePortal.m` speaks the xdg-desktop-portal ScreenCast portal over D-Bus and reads the PipeWire stream it opens (libpipewire-0.3 and libwayland-client are loaded only when needed), with displays and windows from Wayfire's IPC, or from wl_output elsewhere. Capture picks the portal under Wayland when it answers and X11 otherwise; `FERRY_CAPTURE=x11|portal|none` chooses, and restore tokens are kept per app in `~/.config/freemac/screencast-restore.json`. The test is `screencapture_portal`, with a private PipeWire, a fake portal on a private session bus and test producers.
+
 For drawing there are Ferry's own Core Graphics and Core Text
 (`CoreGraphics.framework`, which also serves `CoreText` and
 `ApplicationServices`), drawn by this system's Cairo, Pango and HarfBuzz:

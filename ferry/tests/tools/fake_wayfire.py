@@ -4,7 +4,7 @@
 Ferry's hotkey, Accessibility and Quartz services tests (freemac 1.215,
 Ferry 0.41.0; window list and posted keys freemac 1.220, Ferry 0.44.0).
 
-    fake_wayfire.py SOCKET LOG [--no-strata] [--layout NAME]
+    fake_wayfire.py SOCKET LOG [--no-strata] [--layout NAME] [--scene FILE]
 
 It listens on SOCKET and answers as Wayfire does (a 4-byte little-endian
 length, then JSON {"method": ..., "data": ...}), from two displays and a
@@ -27,6 +27,11 @@ and two calls for the test itself:
   fake/layout {"name": NAME}                     the keyboard's layout is now NAME
   fake/add-view {"id", "app-id", "title", "pid", "output", "geometry", "focus"}
                                                  one more window, of process pid
+
+With --scene, the displays and windows are FILE's instead (screen capture
+on Wayland, freemac 1.240): JSON {"outputs": [as list-outputs answers],
+"views": [{"id", "app-id", "title", "output", "geometry", "focus"}],
+"pids": {"view id": pid}}.
 
 Each call that changes something is also written to LOG, one line each.
 With --no-strata, Strata's calls answer "No such method found!", as a
@@ -261,9 +266,21 @@ def serve(conn, fake):
             conn.sendall(struct.pack("<I", len(out)) + out)
 
 
+def load_scene(path):
+    global OUTPUTS, VIEWS, PIDS
+    with open(path) as f:
+        scene = json.load(f)
+    OUTPUTS = scene.get("outputs", OUTPUTS)
+    VIEWS = [view(v["id"], v.get("app-id", ""), v.get("title", ""), v.get("output", 1), v["geometry"],
+                  v.get("focus", 0)) for v in scene.get("views", [])]
+    PIDS = {int(k): v for k, v in scene.get("pids", {}).items()}
+
+
 def main():
     path, log_path = sys.argv[1], sys.argv[2]
     args = sys.argv[3:]
+    if "--scene" in args[:-1]:
+        load_scene(args[args.index("--scene") + 1])
     layout = args[args.index("--layout") + 1] if "--layout" in args[:-1] else "English (US)"
     fake = Fake(log_path, "--no-strata" not in args, layout)
     open(log_path, "w").close()

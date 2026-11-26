@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.240 "Ferry: screen capture on Wayland" (done)
+
+Ferry 0.64.0: Mac apps record the screen on Wayland, freemac's own Wayfire desktop included. Capture now speaks the xdg-desktop-portal ScreenCast portal (a session for each stream, the portal's own dialog where the user picks a display or a window, the pointer as metadata or drawn in, and a restore token kept for each app so the dialog can be skipped the next time) and reads the PipeWire stream it hands back in shared memory, into the same IOSurface frames as under X11, so ScreenCaptureKit, CGDisplayStream and the screen's pictures work the same way. Displays and windows are listed from Wayfire's IPC, as NSScreen and the window list already number them; on other compositors the displays come from wl_output and the window is the one the user picks. Capture chooses the portal where Wayland's portal answers, X11 otherwise, and `FERRY_CAPTURE` still forces one. freemac's own screen-recording question is asked first, as before; the portal's dialog comes after it. It has been tested against a stand-in portal with a real PipeWire, not yet in a real Wayfire session, and DMA-BUF streams aren't read yet.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The ScreenCast portal over D-Bus: CreateSession, SelectSources (monitor or window, cursor mode, persist mode, restore token), Start, OpenPipeWireRemote, the Request and Response signals, Session.Close; declined and failed answers as ScreenCaptureKit's errors | Ferry (appkit/ACapturePortal.m) | done |
+| 2 | PipeWire: the stream from the portal's node, BGRx, BGRA, RGBx and RGBA in shared memory, header, crop and cursor metadata, into the capture core's IOSurface ring | Ferry (appkit/ACapturePortal.m) | done |
+| 3 | DMA-BUF buffers | Ferry | not started (said once where a portal offers only those) |
+| 4 | Restore tokens kept per app and source in `~/.config/freemac/screencast-restore.json` | Ferry (appkit/ACapturePortal.m) | done |
+| 5 | Displays and windows from Wayfire's IPC (outputs, views, Strata's view pids), the scale learned from the stream; wl_output and the portal-picked window elsewhere | Ferry (appkit/ACapturePortal.m, CGServices.m) | done |
+| 6 | Choosing the back end at run time (portal, X11, `FERRY_CAPTURE`), libpipewire and libwayland-client loaded when needed | Ferry (appkit/ACapture.m, src/host.c) | done |
+| 8 | Tests: `screencapture_portal`; `make check` 331 of 331, three times. A test with a private PipeWire, a fake portal on a private session bus and test producers, with no X display | Ferry (tests/screencapture/) | done |
+
 ## 1.239 "Ferry: OBS Studio's main window opens" (done)
 
 Ferry 0.63.0: OBS Studio 33 (its Mac build, with Qt 6.11) starts under Ferry and opens its main window: scenes, sources, the audio mixer, transitions and controls, with its OpenGL preview running at 30 frames a second on Mesa. The last thing in the way was libobs asking for the computer's own Application Support folder, a Mac's local domain, which Ferry didn't answer, so OBS stopped at once. Mac apps now get the computer's folders as a Mac gives them: `/Applications`, `/usr/local/share` (Library and Application Support, where freemac's installer puts apps' files for everyone) and `/var/cache` for the local domain, `/usr/share` for the system domain, after the user's own, in a Mac's order. OBS doesn't record yet, and the download doesn't include Ferry's OBS build; this is Ferry's test setup.
@@ -1207,7 +1221,7 @@ Ferry 0.62.0: Mac apps record the screen. ScreenCaptureKit lists the displays, t
 | 4 | The window list: other apps' X windows in `CGWindowListCopyWindowInfo`, and `CGWindowListCreateImage` of the screen and of other apps' windows, behind the user's say | Ferry (appkit/CGServices.m) | done |
 | 5 | The capture core: an X11 back end (MIT-SHM or XGetImage, XComposite, XFixes, `_NET_CLIENT_LIST`, `_NET_WM_NAME`, `_NET_WM_PID`), frames on a ring of IOSurfaces at the frame interval, scaling, the pointer, the user's say in `screen-recording.json` | Ferry (appkit/ACapture*.m), Shell (window_control.py) | done |
 | 6 | The computer's sound as ScreenCaptureKit's audio output, from the sound server's monitor of the default output | Ferry (screencapturekit/, coreaudio/) | done |
-| 7 | Wayland: the xdg-desktop-portal ScreenCast portal and PipeWire streams behind the same back-end interface | Ferry (appkit/ACapturePortal.m) | not started (a stub that says so) |
+| 7 | Wayland: the xdg-desktop-portal ScreenCast portal and PipeWire streams behind the same back-end interface | Ferry (appkit/ACapturePortal.m) | done in 1.240 |
 | 8 | Tests on an Xvfb of their own with another app's window beside the test's, and with no display | Ferry, Shell | done |
 | 9 | VLC's menus answer their Command-key equivalents and its Preferences window opens with every pane, its subtitle renderer built against FreeType; `setjmp` and `sigsetjmp` in a Mac's `jmp_buf`, Core Text font descriptors and fallbacks from the installed fonts (VLC task, see `docs/ferry-notes/vlc.md`) | Ferry | done |
 | 10 | Qt 6.11 builds against Ferry's SDK and a Qt Widgets window runs with its Cocoa platform and macOS style; C linkage for Foundation's and AppKit's C calls in C++, `nil` as `nullptr` in C++, named colour spaces kept, ICC profiles, and what OBS's libobs asks of libSystem, Foundation, Security, IOKit HID and Carbon (OBS task) | Ferry | done |

@@ -1785,6 +1785,42 @@ else
         fi
     done
 fi
+# Screen capture on Wayland (freemac 1.240, Ferry 0.64.0): the ScreenCast
+# portal (a fake one on a private session bus) and PipeWire (a private
+# daemon, with test producers in the compositor's place), with no X display
+# (screencapture/portal_test.sh)
+portal_python=
+for p in python3 python3.13 python3.12 python3.11; do
+    if command -v "$p" > /dev/null 2>&1 && "$p" -c 'from gi.repository import Gio' > /dev/null 2>&1; then
+        portal_python=$p; break
+    fi
+done
+portal_need=
+for t in pipewire wireplumber dbus-daemon cc pkg-config; do
+    command -v "$t" > /dev/null 2>&1 || portal_need="$portal_need $t"
+done
+[ -z "$portal_need" ] && ! pkg-config --exists libpipewire-0.3 && portal_need=" libpipewire-0.3's headers"
+[ -z "$portal_python" ] && portal_need="$portal_need Python's gi"
+if [ -n "$portal_need" ]; then
+    echo "skip screencapture_portal (need$portal_need)"
+elif ! cc -o "$build/pw_producer" "$here/screencapture/pw_producer.c" $(pkg-config --cflags --libs libpipewire-0.3) \
+        2> "$build/pw_producer.cc.log" ||
+     ! "$top/sdk/ferry-cc" -O1 -fobjc-arc -fblocks -o "$build/screencapture_portal" "$here/screencapture/portal.m" \
+        -framework Foundation -framework ScreenCaptureKit -framework CoreMedia -framework CoreVideo \
+        -framework ApplicationServices 2>> "$build/pw_producer.cc.log"; then
+    echo "FAIL screencapture_portal (did not compile)"; sed 's/^/    /' "$build/pw_producer.cc.log"; fail=$((fail + 1))
+else
+    name=screencapture_portal
+    sh "$here/screencapture/portal_test.sh" "$top/ferry" "$build/screencapture_portal" "$build/pw_producer" \
+        "$build/home_$name" "$portal_python" > "$build/$name.got" 2> "$build/$name.err"
+    echo "exit=$?" >> "$build/$name.got"
+    if diff -u "$here/screencapture/portal.out" "$build/$name.got" > "$build/$name.diff"; then
+        echo "ok   $name"; pass=$((pass + 1))
+    else
+        echo "FAIL $name"; sed 's/^/    /' "$build/$name.diff"; sed 's/^/    stderr: /' "$build/$name.err"
+        fail=$((fail + 1))
+    fi
+fi
 # Swift programs, and Ferry's SwiftUI (freemac 1.227); skipped without a
 # Swift toolchain or Swift's runtime built for Ferry
 . "$here/swift/run.sh"
