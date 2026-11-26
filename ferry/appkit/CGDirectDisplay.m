@@ -116,54 +116,7 @@ uint32_t CGDisplayModelNumber(CGDirectDisplayID d) { return 0xFFFFFFFF; }
 uint32_t CGDisplaySerialNumber(CGDirectDisplayID d) { return 0; }
 CGColorSpaceRef CGDisplayCopyColorSpace(CGDirectDisplayID d) { return CGColorSpaceCreateWithName(kCGColorSpaceSRGB); }
 
-/* ---- display modes ---- */
-
-@interface FDisplayMode : NSObject {
-@public
-    size_t width, height, pixelWidth, pixelHeight;
-}
-@end
-@implementation FDisplayMode
-@end
-
-static Class mode_class(void) { return [FDisplayMode class]; }
-CFTypeID CGDisplayModeGetTypeID(void) { return (CFTypeID)(uintptr_t)mode_class(); }
-
-CGDisplayModeRef CGDisplayCopyDisplayMode(CGDirectDisplayID d)
-{
-    NSScreen *s = screen_for(d);
-    if (!s)
-        return NULL;
-    FDisplayMode *m = [[FDisplayMode alloc] init];
-    NSSize size = [s frame].size;
-    CGFloat scale = [s backingScaleFactor];
-    m->width = (size_t)size.width;
-    m->height = (size_t)size.height;
-    m->pixelWidth = (size_t)(size.width * scale);
-    m->pixelHeight = (size_t)(size.height * scale);
-    return (__bridge CGDisplayModeRef)m;
-}
-CFArrayRef CGDisplayCopyAllDisplayModes(CGDirectDisplayID d, CFDictionaryRef options)
-{
-    CGDisplayModeRef m = CGDisplayCopyDisplayMode(d);
-    if (!m)
-        return NULL;
-    NSArray *a = [[NSArray alloc] initWithObjects:(__bridge id)m, nil];
-    CGDisplayModeRelease(m);
-    return (__bridge CFArrayRef)a;
-}
-CGError CGDisplaySetDisplayMode(CGDirectDisplayID d, CGDisplayModeRef mode, CFDictionaryRef options) { return kCGErrorFailure; }
-#define M(ref) ((__bridge FDisplayMode *)(ref))
-size_t CGDisplayModeGetWidth(CGDisplayModeRef m) { return m ? M(m)->width : 0; }
-size_t CGDisplayModeGetHeight(CGDisplayModeRef m) { return m ? M(m)->height : 0; }
-size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef m) { return m ? M(m)->pixelWidth : 0; }
-size_t CGDisplayModeGetPixelHeight(CGDisplayModeRef m) { return m ? M(m)->pixelHeight : 0; }
-double CGDisplayModeGetRefreshRate(CGDisplayModeRef m) { return m ? 60.0 : 0; }
-uint32_t CGDisplayModeGetIOFlags(CGDisplayModeRef m) { return m ? 0x3 : 0; } /* valid, safe */
-int32_t CGDisplayModeGetIODisplayModeID(CGDisplayModeRef m) { return m ? 1 : 0; }
-bool CGDisplayModeIsUsableForDesktopGUI(CGDisplayModeRef m) { return m != NULL; }
-CGDisplayModeRef CGDisplayModeRetain(CGDisplayModeRef m) { if (m) [M(m) retain]; return m; }
-void CGDisplayModeRelease(CGDisplayModeRef m) { if (m) [M(m) release]; }
+/* ---- display modes: in CGDisplayStream.m, with the capture back end's answer (freemac 1.238) ---- */
 
 /* ---- reconfiguration, capture, the cursor ---- */
 

@@ -262,7 +262,7 @@ int main(void)
         reads(pct, @"12.5%");
         reads(pct, @"25");
         /* An old (Mac OS X 10.0 style) formatter keeps % as it is: VLC's
-         * opacity field shows 100 as "100%" (freemac 1.NEXT) */
+         * opacity field shows 100 as "100%" (freemac 1.238) */
         NSNumberFormatter *old = [[NSNumberFormatter alloc] init];
         [old setFormatterBehavior:NSNumberFormatterBehavior10_0];
         [old setPositiveFormat:@"0%"];

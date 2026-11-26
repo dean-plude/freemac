@@ -228,6 +228,7 @@ module CoreGraphics [system] {
     header "CoreGraphics/CGContext.h"
     header "CoreGraphics/CGDataProvider.h"
     header "CoreGraphics/CGDirectDisplay.h"
+    header "CoreGraphics/CGDisplayStream.h"
     header "CoreGraphics/CGEvent.h"
     header "CoreGraphics/CGGeometry.h"
     header "CoreGraphics/CGGradient.h"

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* GNU libiconv's calls, as a Mac's /usr/lib/libiconv.2.dylib has them
- * (freemac 1.NEXT; VLC's subtitle decoder converts Windows-1252 text). */
+ * (freemac 1.238; VLC's subtitle decoder converts Windows-1252 text). */
 #include <errno.h>
 #include <iconv.h>
 #include <stdio.h>

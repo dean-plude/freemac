@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
-/* Non-local jumps (freemac 1.NEXT, for FreeType). A Mac's jmp_buf is 37
+/* Non-local jumps (freemac 1.238, for FreeType). A Mac's jmp_buf is 37
  * ints on x86-64, its sigjmp_buf one more. */
 #ifndef _FERRY_SETJMP_H_
 #define _FERRY_SETJMP_H_

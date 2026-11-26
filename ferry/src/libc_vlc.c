@@ -6,7 +6,7 @@
  * few C library calls whose Mac data or numbers differ from this system's
  * (pathconf, getpwuid_r, sigwait, statvfs, sys_errlist), from the Mac's
  * man pages; and backtrace(3), which follows Mac code's frame pointers.
- * And setjmp and longjmp (freemac 1.NEXT), which FreeType uses.
+ * And setjmp and longjmp (freemac 1.238), which FreeType uses.
  *
  * A semaphore is a number standing for a POSIX semaphore of this system;
  * the numbers start well above Ferry's task and host ports.
@@ -311,7 +311,7 @@ static int mac_sigsuspend(const uint32_t *set)
     return r;
 }
 
-/* ---- setjmp and longjmp, in a Mac's jmp_buf (freemac 1.NEXT) -------------------------
+/* ---- setjmp and longjmp, in a Mac's jmp_buf (freemac 1.238) -------------------------
  *
  * A Mac's jmp_buf is 37 ints (148 bytes) and its sigjmp_buf 38, smaller than
  * this system's, so Mac code can't use glibc's. What's inside is libSystem's
@@ -602,7 +602,7 @@ static void mac_backtrace_symbols_fd(void *const *addrs, int n, int fd)
 }
 
 
-/* ---- iconv (freemac 1.NEXT; VLC's subtitle decoder) ----------------------------
+/* ---- iconv (freemac 1.238; VLC's subtitle decoder) ----------------------------
  * A Mac's /usr/lib/libiconv.2.dylib is GNU libiconv. glibc has the same three
  * calls, with the same iconv_t (a pointer, -1 on failure), the same
  * character set names for everything VLC asks for (UTF-8, CP1252, UTF-16LE,

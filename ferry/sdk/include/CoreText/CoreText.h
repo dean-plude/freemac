@@ -52,7 +52,7 @@ CTFontRef CTFontCreateCopyWithFamily(CTFontRef font, CGFloat size, const CGAffin
                                      CFStringRef family);
 CTFontRef CTFontCreateForString(CTFontRef current, CFStringRef string, CFRange range);
 
-/* descriptors, collections and the font manager (freemac 1.NEXT) */
+/* descriptors, collections and the font manager (freemac 1.238) */
 typedef const struct __CTFontCollection *CTFontCollectionRef;
 extern const CFStringRef kCTFontNameAttribute, kCTFontDisplayNameAttribute, kCTFontFamilyNameAttribute,
     kCTFontStyleNameAttribute, kCTFontSizeAttribute, kCTFontTraitsAttribute, kCTFontURLAttribute;

@@ -91,6 +91,7 @@ void *ferry_webkit_symbol(const char *name);        /* WebKitGTK, for Ferry's We
 void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry's (javascriptcore/) */
 void *ferry_sound_symbol(const char *name);         /* libpulse, for Ferry's Core Audio (coreaudio/) */
 void *ferry_gl_symbol(const char *name);            /* EGL and OpenGL, for Ferry's OpenGL (opengl/) */
+void *ferry_capture_symbol(const char *name);       /* Xlib and its extensions, for screen capture (1.238) */
 
 /* servercerts.c: the certificates an https server presents, for Security */
 int ferry_server_certificates(const char *host, int port, int timeout_ms,

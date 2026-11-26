@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry test (freemac 1.NEXT): setjmp and longjmp in a Mac's jmp_buf, which
+ * Ferry test (freemac 1.238): setjmp and longjmp in a Mac's jmp_buf, which
  * FreeType uses to leave a rasteriser that runs out of room (VLC draws its
  * subtitles with FreeType). longjmp comes back from setjmp a second time with
  * the value given (1 for 0), with local variables kept in registers back as

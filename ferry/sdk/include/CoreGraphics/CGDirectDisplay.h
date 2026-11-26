@@ -113,6 +113,37 @@ CFUUIDRef CGDisplayCreateUUIDFromDisplayID(CGDirectDisplayID displayID);
 CGDirectDisplayID CGDisplayGetDisplayIDFromUUID(CFUUIDRef uuid);
 
 
+/* Display modes (freemac 1.238, Ferry 0.62.0): a display has the one mode
+ * it runs in, its size in points and in pixels; it can't be changed. */
+typedef struct CGDisplayMode *CGDisplayModeRef;
+enum { kDisplayModeValidFlag = 0x00000001, kDisplayModeSafeFlag = 0x00000002, kDisplayModeDefaultFlag = 0x00000004,
+       kDisplayModeNativeFlag = 0x02000000 };
+extern const CFStringRef kCGDisplayShowDuplicateLowResolutionModes;
+CFTypeID CGDisplayModeGetTypeID(void);
+CGDisplayModeRef CGDisplayCopyDisplayMode(CGDirectDisplayID display);
+CFArrayRef CGDisplayCopyAllDisplayModes(CGDirectDisplayID display, CFDictionaryRef options);
+CGError CGDisplaySetDisplayMode(CGDirectDisplayID display, CGDisplayModeRef mode, CFDictionaryRef options);
+CGDisplayModeRef CGDisplayModeRetain(CGDisplayModeRef mode);
+void CGDisplayModeRelease(CGDisplayModeRef mode);
+size_t CGDisplayModeGetWidth(CGDisplayModeRef mode);
+size_t CGDisplayModeGetHeight(CGDisplayModeRef mode);
+size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode);
+size_t CGDisplayModeGetPixelHeight(CGDisplayModeRef mode);
+double CGDisplayModeGetRefreshRate(CGDisplayModeRef mode);
+uint32_t CGDisplayModeGetIOFlags(CGDisplayModeRef mode);
+int32_t CGDisplayModeGetIODisplayModeID(CGDisplayModeRef mode);
+bool CGDisplayModeIsUsableForDesktopGUI(CGDisplayModeRef mode);
+/* the display's size in millimetres, and its rotation in degrees */
+CGSize CGDisplayScreenSize(CGDirectDisplayID display);
+double CGDisplayRotation(CGDirectDisplayID display);
+uint32_t CGDisplayModelNumber(CGDirectDisplayID display);
+uint32_t CGDisplayVendorNumber(CGDirectDisplayID display);
+uint32_t CGDisplaySerialNumber(CGDirectDisplayID display);
+/* A display's UUID, the same for the same display each time, and back (on
+ * a Mac from ColorSync, through ApplicationServices). */
+CFUUIDRef CGDisplayCreateUUIDFromDisplayID(uint32_t displayID);
+uint32_t CGDisplayGetDisplayIDFromUUID(CFUUIDRef uuid);
+
 /* fades */
 typedef uint32_t CGDisplayFadeReservationToken;
 typedef float CGDisplayFadeInterval;
