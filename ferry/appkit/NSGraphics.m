@@ -304,6 +304,11 @@ NAMED(controlAccentColor, 0.10, 0.45, 0.91, 1)
 NAMED(keyboardFocusIndicatorColor, 0.10, 0.45, 0.91, 0.5)
 NAMED(alternateSelectedControlColor, 0.10, 0.45, 0.91, 1)
 NAMED(headerTextColor, 0, 0, 0, 0.88)
+/* a table header's text since 10.14, and Interface Builder's colour for a source
+ * list's headings and many labels (VLC's "Drop media here") */
+NAMED(headerColor, 0, 0, 0, 0.85)
+/* Interface Builder's colour for a source list's background: a sidebar's grey */
+NAMED(_sourceListBackgroundColor, 0.94, 0.94, 0.94, 1)
 NAMED(linkColor, 0.0, 0.40, 0.85, 1)
 /* the older system colours (freemac 1.221, Ferry 0.45.0) */
 NAMED(windowFrameColor, 0.80, 0.80, 0.80, 1)

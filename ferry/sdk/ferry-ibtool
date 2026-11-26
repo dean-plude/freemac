@@ -1350,6 +1350,9 @@ class Compiler:
                                                    e.get("columnAutoresizingStyle"), 1),
                     NSBackgroundColor=self.color(child(e, "color", "backgroundColor")),
                     NSGridColor=self.color(child(e, "color", "gridColor")))
+        if e.get("selectionHighlightStyle") in ("none", "regular", "sourceList"):
+            keys["NSTableViewSelectionHighlightStyle"] = {"none": -1, "regular": 0, "sourceList": 1}[
+                e.get("selectionHighlightStyle")]
         if e.get("headerView"):
             keys["NSHeaderView"] = self.uid_for(e.get("headerView"))
         if prototypes:

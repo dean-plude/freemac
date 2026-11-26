@@ -342,7 +342,9 @@ NSDictionary *_NSDictionaryOfVariableBindings(NSString *keys, id first, ...)
     if (!view1 || attr1 == NSLayoutAttributeNotAnAttribute)
         [NSException raise:NSInvalidArgumentException
                     format:@"NSLayoutConstraint needs a first item and attribute"];
-    if (view2 && attr2 != NSLayoutAttributeNotAnAttribute && horizontal(attr1) != horizontal(attr2))
+    /* (a width against a height, an aspect ratio, is the one pairing across the axes) */
+    if (view2 && attr2 != NSLayoutAttributeNotAnAttribute && horizontal(attr1) != horizontal(attr2) &&
+        !(is_size(attr1) && is_size(attr2)))
         [NSException raise:NSInvalidArgumentException
                     format:@"NSLayoutConstraint: a constraint can't relate %@ to %@", attribute_name(attr1),
                            attribute_name(attr2)];
@@ -1221,6 +1223,8 @@ typedef struct {
     pending *rows;
     int nrows, cap;
     int nvars;                    /* 2 per item on the axis being solved */
+    const double *other;          /* the other axis as solved, for aspect ratios (NULL: as things are) */
+    BOOL across[2];               /* aspect ratios were met solving across (horizontal, vertical) */
 } problem;
 
 static int item_index(problem *p, id item)
@@ -1600,6 +1604,18 @@ static void solve_axis(problem *p, NSArray *constraints, NSView *root, BOOL vert
             continue;
         if (!i2 && !is_size(a1) && !i1b)
             continue;   /* a position against nothing means nothing */
+        if (i2 && is_size(a1) && is_size(a2) && a1 != a2 && !i1b && !i2b) {
+            /* an aspect ratio, a width against a height: the other size is
+             * the other axis's, as solved there (or as it is, the first time) */
+            int i = item_index(p, i2);
+            double other = p->other && i >= 0 ? p->other[2 * i + 1]
+                         : vertical ? current_rect(i2, root).size.width : current_rect(i2, root).size.height;
+            pending *r = new_row(p, [c priority], [c relation], c);
+            add_attr(p, r, i1, a1, 1, rtl);
+            r->rhs += [c multiplier] * other + [c constant];
+            p->across[vertical ? 1 : 0] = YES;
+            continue;
+        }
         pending *r = new_row(p, [c priority], [c relation], c);
         add_attr(p, r, i1, a1, 1, rtl);
         if (i1b)
@@ -1923,7 +1939,17 @@ static NSSize solve_once(NSView *root, BOOL fitting, BOOL *again)
         if (!fitting)
             fit_memo_on = YES;
         solve_axis(&p, usable, root, NO, fitting, hx);
+        p.other = hx;
         solve_axis(&p, usable, root, YES, fitting, vx);
+        if (p.across[0]) {
+            /* a width that follows a height: again, with the heights solved */
+            p.other = vx;
+            solve_axis(&p, usable, root, NO, fitting, hx);
+            if (p.across[1]) {
+                p.other = hx;
+                solve_axis(&p, usable, root, YES, fitting, vx);
+            }
+        }
         if (!fitting)
             forget_fitted();
         if (!fitting) {

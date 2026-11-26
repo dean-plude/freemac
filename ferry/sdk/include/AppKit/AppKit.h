@@ -251,7 +251,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL disabledControlTextColor, * FERRY_SWIFT_NONNULL selectedControlColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL windowBackgroundColor, * FERRY_SWIFT_NONNULL underPageBackgroundColor, * FERRY_SWIFT_NONNULL gridColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL separatorColor, * FERRY_SWIFT_NONNULL controlAccentColor, * FERRY_SWIFT_NONNULL keyboardFocusIndicatorColor;
-@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL alternateSelectedControlColor, * FERRY_SWIFT_NONNULL headerTextColor, * FERRY_SWIFT_NONNULL linkColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL alternateSelectedControlColor, * FERRY_SWIFT_NONNULL headerTextColor, * FERRY_SWIFT_NONNULL headerColor, * FERRY_SWIFT_NONNULL linkColor;
 @property (readonly) CGFloat redComponent, greenComponent, blueComponent, alphaComponent, whiteComponent;
 @property (readonly) CGFloat hueComponent, saturationComponent, brightnessComponent;
 @property (readonly) NSInteger numberOfComponents;
