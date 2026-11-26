@@ -2111,6 +2111,22 @@ arithmetic no longer shows in a frame.
 Every frame in Ferry's tests, and every fitting size asked for in them, is
 the same as before.
 
+### Screen capture: ScreenCaptureKit, CGDisplayStream and the window list (freemac 1.238, Ferry 0.62.0)
+
+OBS Studio's mac-capture plugin records displays, windows and apps with ScreenCaptureKit on macOS 12.3 and later, and with CGDisplayStream and the window list before that. Ferry now has both, reading the X server's screen and windows.
+
+| Calls | Apps | Now |
+| --- | --- | --- |
+| `SCShareableContent` (`getShareableContentWithCompletionHandler:`, `…ExcludingDesktopWindows:onScreenWindowsOnly:`, `…OnScreenWindowsOnlyBelowWindow:`, `…AboveWindow:`, `getCurrentProcessShareableContentWithCompletionHandler:`, `infoForFilter:`), `SCDisplay`, `SCWindow`, `SCRunningApplication` | OBS | done under X11: the X screen is display 1; windows come front to back from `_NET_CLIENT_LIST_STACKING` or `_NET_CLIENT_LIST`, or the root's children with no window manager, with `_NET_WM_NAME`, `_NET_WM_PID` and `WM_CLASS`; the app's own keep their window numbers |
+| `SCContentFilter` (a desktop-independent window; a display excluding windows, including windows, including or excluding applications with exceptions), `SCStreamConfiguration` (size, `minimumFrameInterval`, `pixelFormat` 'BGRA', 'l10r', '420v', '420f', `queueDepth`, `showsCursor`, `scalesToFit`, `preservesAspectRatio`, `sourceRect`, `destinationRect`, `backgroundColor`, `colorMatrix`, `capturesAudio`, `sampleRate`, `channelCount`) | OBS | done; windows left out are painted with the background colour, since what's under them can't be read |
+| `SCStream`: `addStreamOutput:type:sampleHandlerQueue:error:`, `removeStreamOutput:type:error:`, `startCaptureWithCompletionHandler:`, `stopCaptureWithCompletionHandler:`, `updateConfiguration:`, `updateContentFilter:`, `synchronizationClock`, `SCStreamDelegate`'s `stream:didStopWithError:`; `SCScreenshotManager` | OBS | done: each frame a `CMSampleBuffer` on the host clock with an IOSurface-backed `CVPixelBuffer`, and `SCStreamFrameInfo` Status, DisplayTime, ScaleFactor, ContentScale, ContentRect and ScreenRect; audio as non-interleaved float from the sound server's monitor, the app's own sound included (`excludesCurrentProcessAudio` can't be honoured); no microphone output |
+| Core Media: `CMSampleBuffer` (create from block buffers or image buffers, copies, timing, sizes, readiness, invalidation, attachments, the sample attachments array, audio buffer lists), `CMFormatDescription` (video from an image buffer, audio from an ASBD), `CMBlockBuffer`, `CMClockGetHostTimeClock` | OBS | done |
+| `CGDisplayStreamCreateWithDispatchQueue`, `CGDisplayStreamStart`, `CGDisplayStreamStop`, the handler's frame status and IOSurface, `CGDisplayStreamUpdateGetRects`, `CGDisplayStreamUpdateGetDropCount`, `kCGDisplayStreamSourceRect`, `…ShowCursor`, `…MinimumFrameTime`, `…QueueDepth`; `CGDisplayCopyDisplayMode` and the display mode calls | OBS (older macOS) | done |
+| `CGWindowListCopyWindowInfo` and `CGWindowListCreateImage` for other apps' windows and the screen; `CGPreflightScreenCaptureAccess`, `CGRequestScreenCaptureAccess` | OBS, screenshot tools | done under X11, once the user has said yes; other apps' windows are numbered from 0x40000000 |
+| Wayland | | not yet: capture needs the ScreenCast portal and PipeWire there, and says so; `FERRY_CAPTURE=x11` reads Xwayland or another X server instead |
+
+The user is asked once whether an app may record the screen, with freemac's own question (`freemac-allow-control --kind screen-recording`); the answers are kept in `~/.config/freemac/screen-recording.json`. Until then ScreenCaptureKit answers `SCStreamErrorUserDeclined`, the screen's and other apps' pictures are `NULL`, and the window list shows other apps' windows only to an app allowed to control them.
+
 ## What the apps need most
 
 Counted over the nine apps:

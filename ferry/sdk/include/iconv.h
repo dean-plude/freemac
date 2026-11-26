@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later  (Ferry SDK) */
 /* Character set conversion, as a Mac's libiconv (GNU libiconv 1.11) has it
- * (freemac 1.NEXT, VLC). Link with -liconv. */
+ * (freemac 1.238, VLC). Link with -liconv. */
 #ifndef _FERRY_ICONV_H_
 #define _FERRY_ICONV_H_
 #include <_ferry.h>

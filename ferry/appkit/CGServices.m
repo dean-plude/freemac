@@ -36,6 +36,7 @@
  * app itself, with no say needed. */
 #import "AInternal.h"
 #import "AWayfire.h"
+#import "ACapture.h"
 #include <Carbon/Carbon.h>
 #include <HIServices/Accessibility.h>
 #include <stdarg.h>
@@ -280,6 +281,42 @@ static NSArray *all_windows(void)
             }
             [out addObject:e];
         }
+    } else if (!strcmp(ACaptureBackendName(), "x11") && ACaptureAvailable()) {
+        /* freemac 1.238: under X11, the X server's windows, front to back,
+         * other apps' with either say (controlling windows, or recording
+         * the screen), numbered with other_bit on their X window ids */
+        BOOL recording = ACaptureAllowed();
+        for (ACaptureWindow *w in ACaptureWindows()) {
+            NSWindow *mine = nil;
+            if (w->own) {
+                for (NSWindow *o in own)
+                    if ((CGWindowID)[o windowNumber] == w->number)
+                        mine = o;
+                if (!mine || [matched containsObject:mine])
+                    continue;
+                [matched addObject:mine];
+            } else if (!others && !recording) {
+                continue;
+            }
+            ACGWindowEntry *e = [[[ACGWindowEntry alloc] init] autorelease];
+            e->number = w->number;
+            e->pid = w->pid;
+            e->title = [w->title copy];
+            e->owner = [w->owner copy];
+            e->bounds = NSRectFromCGRect(w->frame);
+            e->onscreen = w->onscreen;
+            e->layer = 0;
+            e->alpha = 1;
+            if (mine) {
+                e->window = mine;
+                [e->owner release];
+                e->owner = [myName copy];
+                e->layer = [mine level];
+                e->alpha = [mine alphaValue];
+                e->onscreen = e->onscreen && [mine isVisible] && ![mine isMiniaturized];
+            }
+            [out addObject:e];
+        }
     }
     for (NSWindow *w in own) {
         if ([matched containsObject:w])
@@ -379,7 +416,9 @@ CFArrayRef CGWindowListCreateDescriptionFromArray(CFArrayRef windowArray)
 
 static CGImageRef picture_of(CGWindowID number)
 {
-    if (!number || (number & other_bit))
+    if (number && (number & other_bit))
+        return ACaptureAllowed() ? ACaptureCreateWindowImage(number) : NULL;   /* freemac 1.238 */
+    if (!number)
         return NULL;
     NSWindow *w = [NSApp windowWithWindowNumber:(NSInteger)number];
     NSView *v = w ? [w contentView] : nil;
@@ -400,7 +439,11 @@ CGImageRef CGWindowListCreateImage(CGRect screenBounds, CGWindowListOption listO
     @autoreleasepool {
         if (listOption == kCGWindowListOptionIncludingWindow)
             return picture_of(windowID);
-        return NULL;    /* the screen, or other apps' windows: never */
+        /* the screen (freemac 1.238): with the say, everything on it in
+         * screenBounds; the windows above or below one aren't picked out */
+        if (listOption == kCGWindowListOptionOnScreenOnly && windowID == kCGNullWindowID && ACaptureAllowed())
+            return ACaptureCreateScreenImage(screenBounds);
+        return NULL;
     }
 }
 
@@ -413,8 +456,8 @@ CGImageRef CGWindowListCreateImageFromArray(CGRect screenBounds, CFArrayRef wind
     }
 }
 
-bool CGPreflightScreenCaptureAccess(void) { return false; }
-bool CGRequestScreenCaptureAccess(void) { return false; }
+/* CGPreflightScreenCaptureAccess and CGRequestScreenCaptureAccess are in
+ * ACapture.m, with the say to record the screen (freemac 1.238). */
 
 /* ---- events ---------------------------------------------------------------------------- */
 

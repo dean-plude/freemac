@@ -436,5 +436,6 @@ __FERRY_END
 #include <CoreGraphics/CGEvent.h>
 #include <CoreGraphics/CGWindow.h>
 #include <CoreGraphics/CGDirectDisplay.h>
+#include <CoreGraphics/CGDisplayStream.h> /* freemac 1.238 */
 
 #endif

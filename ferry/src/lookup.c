@@ -286,6 +286,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_sound_symbol", ferry_sound_symbol},
     /* Ferry's own: this system's EGL and OpenGL, for Ferry's OpenGL (host.c) */
     {"ferry_gl_symbol", ferry_gl_symbol},
+    /* Ferry's own: this system's Xlib, for screen capture (host.c, freemac 1.238) */
+    {"ferry_capture_symbol", ferry_capture_symbol},
     {NULL, NULL},
 };
 

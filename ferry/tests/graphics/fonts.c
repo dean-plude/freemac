@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ferry test (freemac 1.NEXT): Core Text's font descriptors, collections and
+ * Ferry test (freemac 1.238): Core Text's font descriptors, collections and
  * font manager, as VLC's subtitle text uses them to find font files for
  * FreeType: a collection matched by family finds the family's installed
  * faces, each with its file's URL and its traits; the file's own faces

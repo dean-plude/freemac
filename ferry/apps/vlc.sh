@@ -96,13 +96,25 @@ export CC=x86_64-apple-darwin-gcc CXX=x86_64-apple-darwin-g++
 export OBJC=$CC OBJCXX=$CXX
 
 # FFmpeg's codecs and demuxers, as static libraries for VLC's avcodec,
-# avformat and swscale modules.
+# avformat and swscale modules. Built in plain C: nasm's Mach-O objects use a
+# relocation ld64.lld refuses, and the inline assembly can't go alone, since
+# swscale's inline MMXEXT code expects the vertical scaler from the nasm
+# files and without it scales planar YUV pictures wrongly (VLC's subtitles,
+# when it scaled them to burn them into a video, came out striped).
+# (a build from an earlier recipe, with the inline assembly, is redone, and
+# VLC's modules that link it are linked again)
+if [ -f "$work/ffbuild/config.h" ] && grep -q 'HAVE_INLINE_ASM 1' "$work/ffbuild/config.h"; then
+    rm -rf "$work/ffbuild" "$work/prefix/lib/libav"* "$work/prefix/lib/libsw"* "$work/prefix/lib/libpostproc"*
+    rm -f "$work/vlcbuild/modules/"lib*avcodec_plugin.la "$work/vlcbuild/modules/"lib*avformat_plugin.la \
+        "$work/vlcbuild/modules/"libswscale_plugin.la "$work/vlcbuild/modules/"libpacketizer_avparser_plugin.la
+    mkdir -p "$work/ffbuild"
+fi
 if [ ! -f "$work/prefix/lib/libavcodec.a" ]; then
     (cd "$work/ffbuild" && "$top/src/ffmpeg-$ff_ver/configure" --prefix="$work/prefix" \
         --enable-cross-compile --target-os=darwin --arch=x86_64 \
         --cc="$CC" --cxx="$CXX" --ar=llvm-ar --ranlib=llvm-ranlib --nm=llvm-nm --strip=llvm-strip \
         --disable-programs --disable-doc --enable-static --disable-shared --enable-pic \
-        --disable-autodetect --disable-devices --disable-x86asm --disable-network \
+        --disable-autodetect --disable-devices --disable-x86asm --disable-inline-asm --disable-network \
         --enable-gpl --disable-debug &&
         make -j"$jobs" && make install)
 fi

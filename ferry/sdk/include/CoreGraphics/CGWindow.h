@@ -8,8 +8,12 @@
  * belongs to) and are listed only once the user has allowed the app to
  * control other windows (Dials > Privacy & Security). A window's number is
  * then Wayfire's view number with bit 30 set, so it never meets one of the
- * app's own window numbers. Pictures are taken of the app's own windows
- * only: freemac doesn't let apps record the screen. */
+ * app's own window numbers. Pictures are taken of the app's own windows,
+ * and (freemac 1.238, Ferry 0.62.0) of the screen and of other apps'
+ * windows once the user has allowed the app to record the screen
+ * (CGRequestScreenCaptureAccess). Under X11, other apps' windows are the X
+ * server's, numbered with the same bit set on their X window id, and are
+ * listed with either say. */
 #ifndef _FERRY_CGWINDOW_H_
 #define _FERRY_CGWINDOW_H_
 #include <CoreFoundation/CoreFoundation.h>
@@ -91,13 +95,17 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 CFArrayRef CGWindowListCreate(CGWindowListOption option, CGWindowID relativeToWindow);
 CFArrayRef CGWindowListCreateDescriptionFromArray(CFArrayRef windowArray);
 /* A picture of this app's own window (kCGWindowListOptionIncludingWindow
- * with its number); NULL for anything else. */
+ * with its number); with the say to record the screen, of the screen in
+ * screenBounds (CGRectInfinite for all of it) or of another app's window;
+ * NULL otherwise. */
 struct CGImage;
 struct CGImage *CGWindowListCreateImage(CGRect screenBounds, CGWindowListOption listOption, CGWindowID windowID,
                                         CGWindowImageOption imageOption);
 struct CGImage *CGWindowListCreateImageFromArray(CGRect screenBounds, CFArrayRef windowArray,
                                                  CGWindowImageOption imageOption);
-/* Screen recording is never allowed. */
+/* Whether the user has let the app record the screen (kept in
+ * ~/.config/freemac/screen-recording.json), and asking them: the request
+ * answers at once with what was already said, and asks only once. */
 bool CGPreflightScreenCaptureAccess(void);
 bool CGRequestScreenCaptureAccess(void);
 

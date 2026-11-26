@@ -1299,6 +1299,11 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @property (readonly, copy) NSString *localizedName;
 @property (readonly, copy) NSDictionary *deviceDescription;
 @end
+/* to and from the screen's pixels (freemac 1.238, Ferry 0.62.0; appkit/ACapture.m) */
+@interface NSScreen (FerryBacking)
+- (NSRect)convertRectToBacking:(NSRect)rect;
+- (NSRect)convertRectFromBacking:(NSRect)rect;
+@end
 
 /* ---- menus ------------------------------------------------------------------------ */
 

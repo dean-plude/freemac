@@ -79,7 +79,8 @@ APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(Q
                  sdk/include/AppKit/NSCollectionView.h sdk/include/AppKit/NSRulerView.h \
                  appkit/AWayfire.h sdk/include/AppKit/NSEventMonitors.h sdk/include/HIServices/Accessibility.h \
                  sdk/include/Carbon/Carbon.h sdk/include/ScriptingBridge/ScriptingBridge.h \
-                 $(wildcard sdk/include/AppKit/*.h)
+                 $(wildcard sdk/include/AppKit/*.h) $(wildcard sdk/include/CoreMedia/*.h) \
+                 sdk/include/CoreGraphics/CGDisplayStream.h appkit/ACapture.h
 
 # CloudKit: records, zones and subscriptions as plain objects, with no
 # iCloud account behind them (cloudkit/CloudKit.m).
@@ -106,6 +107,14 @@ COREAUDIO = frameworks/CoreAudio.framework/CoreAudio
 COREAUDIO_HEADERS = coreaudio/CAInternal.h coreaudio/CAPulse.h $(wildcard sdk/include/CoreAudio/*.h) \
                     $(wildcard sdk/include/CoreAudioTypes/*.h) $(wildcard sdk/include/AudioToolbox/*.h) \
                     $(wildcard sdk/include/AudioUnit/*.h) $(FOUNDATION_HEADERS)
+
+# ScreenCaptureKit (freemac 1.238, Ferry 0.62.0): the shareable content,
+# filters and streams over AppKit's capture core (appkit/ACapture.h), which
+# reads the X server (or, not yet, the Wayland ScreenCast portal).
+SCK_SRC = $(wildcard screencapturekit/*.m)
+SCK_OBJ = $(SCK_SRC:screencapturekit/%.m=screencapturekit/build/%.o)
+SCK = frameworks/ScreenCaptureKit.framework/ScreenCaptureKit
+SCK_HEADERS = $(wildcard sdk/include/ScreenCaptureKit/*.h) $(APPKIT_HEADERS) $(COREAUDIO_HEADERS)
 
 # Ferry's own Installer (installer/), a Mac app built against the frameworks above.
 INSTALLER_SRC = installer/Installer.m installer/IPackage.m
@@ -155,7 +164,7 @@ QUARTZCORE_HEADERS += $(GPU_HEADERS)
 SDK_GL = sdk/usr/include/GL
 GPU = $(SDK_GL) $(IOSURFACE) $(OPENGL) $(COREVIDEO)
 
-all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO)
+all: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(SCK)
 
 include media/media.mk
 
@@ -331,10 +340,11 @@ appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
 	@mkdir -p appkit/build
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
-$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(OPENGL) $(HOST_TBD)
+$(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(OPENGL) $(COREVIDEO) $(IOSURFACE) $(HOST_TBD)
 	@mkdir -p frameworks/AppKit.framework frameworks/Cocoa.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
-	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore -framework OpenGL $(HOST_TBD)
+	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore -framework OpenGL \
+	    -framework CoreVideo -framework IOSurface $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 	@mkdir -p frameworks/Carbon.framework
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd
@@ -418,10 +428,20 @@ $(COREAUDIO): $(COREAUDIO_OBJ) $(FOUNDATION)
 	sdk/gen-alias-tbd.sh AudioToolbox $@ > frameworks/AudioToolbox.framework/AudioToolbox.tbd
 	sdk/gen-alias-tbd.sh AudioUnit $@ > frameworks/AudioUnit.framework/AudioUnit.tbd
 
+screencapturekit/build/%.o: screencapturekit/%.m $(SCK_HEADERS) sdk/ferry-cc
+	@mkdir -p screencapturekit/build
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
+
+$(SCK): $(SCK_OBJ) $(APPKIT) $(COREAUDIO)
+	@mkdir -p frameworks/ScreenCaptureKit.framework
+	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/ScreenCaptureKit.framework/Versions/A/ScreenCaptureKit \
+	    -o $@ $(SCK_OBJ) -framework Foundation -framework CoreGraphics -framework CoreVideo -framework IOSurface \
+	    -framework AppKit -framework CoreAudio
+
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA)
+install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA) $(SCK)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -455,12 +475,13 @@ install: ferry $(TBD) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRA
 	install -Dm755 $(IOSURFACE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/IOSurface.framework/IOSurface
 	install -Dm755 $(OPENGL) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/OpenGL.framework/OpenGL
 	install -Dm755 $(COREVIDEO) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreVideo.framework/CoreVideo
+	install -Dm755 $(SCK) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/ScreenCaptureKit.framework/ScreenCaptureKit
 
 clean:
 	rm -f ferry $(OBJ) $(TBD) src/host_names.h src/webkit_names.h src/jsc_names.h
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
 	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build eventkit/build coreaudio/build \
-	    iosurface/build opengl/build corevideo/build media/build
+	    iosurface/build opengl/build corevideo/build media/build screencapturekit/build
 
 .PHONY: all check install clean
