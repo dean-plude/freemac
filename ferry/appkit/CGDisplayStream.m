@@ -4,7 +4,7 @@
  * CGDisplayMode: see CoreGraphics/CGDisplayStream.h. A display stream is
  * one of Ferry's capture streams (ACapture.h) handing its frames'
  * IOSurfaces to the app's block; OBS Studio's older display capture reads
- * the screen this way. A display has one mode, the one it runs in. */
+ * the screen this way. */
 #import "AInternal.h"
 #import "ACapture.h"
 #include <IOSurface/IOSurface.h>

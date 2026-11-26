@@ -12,10 +12,12 @@
  *
  * Back ends: what lists the displays and windows and grabs their pixels.
  * X11 (ACaptureX11.m) reads the X server's screen and windows; the
- * Wayland one (ACapturePortal.m) would go through the xdg-desktop-portal's
- * ScreenCast portal and PipeWire, and is not written yet. FERRY_CAPTURE
- * (x11, portal or none) chooses one; otherwise a Wayland session gets the
- * portal and an X11 session X11.
+ * Wayland one (ACapturePortal.m, freemac 1.240) goes through the
+ * xdg-desktop-portal's ScreenCast portal over D-Bus and reads the PipeWire
+ * stream it hands back, listing the displays and windows from Wayfire's
+ * IPC (or the displays from wl_output). FERRY_CAPTURE (x11, portal or
+ * none) chooses one; otherwise a Wayland session whose portal answers gets
+ * the portal, and any other session with an X server X11.
  *
  * Streams: a frame each interval on a capture queue of the stream's own,
  * grabbed, scaled into a ring of IOSurface-backed Core Video pixel buffers
@@ -140,6 +142,17 @@ typedef void (^ACaptureFrameHandler)(const ACaptureFrame *frame);
 
 /* ---- the back ends' interface (ACaptureX11.m, ACapturePortal.m) --------------------- */
 
+/* What a grabber is opened for (freemac 1.240), for a back end that has
+ * to ask for one source before it has any pixels (the portal): a display
+ * or a window, whether the pointer is to be shown, and whether this is a
+ * single picture, whose first grab may wait for the user to choose. */
+typedef struct {
+    ACaptureSourceKind kind;    /* ACaptureSourceWindows grabs the display */
+    CGDirectDisplayID display;
+    uint64_t window;            /* the back end's handle */
+    BOOL showsCursor, once;
+} ACaptureTarget;
+
 typedef struct {
     uint8_t *data;              /* B, G, R, X bytes for each pixel, top row first; writable */
     size_t width, height, bytesPerRow;
@@ -163,11 +176,20 @@ typedef struct ACaptureBackend {
     BOOL (*grabScreen)(void *grabber, CGRect pixels, ACaptureImage *out);
     BOOL (*grabWindow)(void *grabber, uint64_t handle, ACaptureImage *out, CGRect *pixelFrame);
     BOOL (*cursor)(void *grabber, ACaptureCursor *out);
+    /* optional (NULL for X11): open for a target; and why a grabber can
+     * never give pixels (the user said no in the portal's dialog), or nil */
+    void *(*openTarget)(const ACaptureTarget *target);
+    NSError *(*failure)(void *grabber);
 } ACaptureBackend;
 extern const ACaptureBackend ACaptureX11Backend;
 extern const ACaptureBackend ACapturePortalBackend;
 /* says once on stderr why a back end can't be used */
 void ACaptureSayOnce(const char *what);
+/* the key the app's answers are kept under: its bundle id, or its path */
+NSString *ACaptureAppKey(void);
+/* whether the ScreenCast portal answers on the session bus and PipeWire's
+ * library is there (asked once; ACapturePortal.m) */
+BOOL ACapturePortalReachable(void);
 
 /* the error ScreenCaptureKit reports (SCStreamErrorDomain) */
 NSError *ACaptureError(NSInteger code, NSString *description);
