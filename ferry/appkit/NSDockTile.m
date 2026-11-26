@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Ferry's AppKit: the app's tile in the Dock (NSDockTile, NSApp's dockTile,
- * requestUserAttention: and cancelUserAttentionRequest:, and the
- * delegate's applicationDockMenu:), written from Apple's public
- * documentation.
+ * requestUserAttention: and cancelUserAttentionRequest:, the delegate's
+ * applicationDockMenu: and the application's dockMenu outlet, which a nib
+ * connects), written from Apple's public documentation.
  *
  * A Mac draws the Dock itself. Here the app tells the desktop's dock what to
  * show with the com.canonical.Unity.LauncherEntry Update signal, which
@@ -37,6 +37,7 @@ static BOOL urgent, have_menu, sent, watching;
 static BOOL label_sent;                 /* the dock was last sent a text label */
 static NSInteger attention;             /* the standing attention request, 0 for none */
 static id menu_server;                  /* the Dock menu, served over dbusmenu (NSStatusBar.m) */
+static NSMenu *nib_menu;                /* the application's dockMenu outlet, set by a nib */
 
 @interface NSDockTile (FerryPrivate)
 - (instancetype)_initWithOwner:(id)owner;
@@ -111,22 +112,42 @@ void ADockSetBadge(NSString *label)
     [the_app_tile() setBadgeLabel:label];
 }
 
-/* The app finished launching: a delegate with a Dock menu gets it served,
- * and asked for again each time the dock opens it. */
+static BOOL launched;
+
+/* The app finished launching: a Dock menu, the delegate's or the one a nib
+ * connected to the application's dockMenu outlet (VLC's Play, Stop, Next,
+ * Previous and Mute, freemac 1.NEXT), is served, and the delegate is asked
+ * for its menu again each time the dock opens it; when the delegate gives
+ * none, the nib's menu is shown. */
 void ADockLaunched(void)
 {
+    launched = YES;
     id delegate = [NSApp delegate];
-    if (have_menu || ![delegate respondsToSelector:@selector(applicationDockMenu:)] || !ANotifyBus())
+    if (have_menu || (!nib_menu && ![delegate respondsToSelector:@selector(applicationDockMenu:)]) || !ANotifyBus())
         return;
     have_menu = YES;
     menu_server = [AMenuServe(DOCK_MENU_PATH, ^NSMenu *(void) {
         id d = [NSApp delegate];
-        if (![d respondsToSelector:@selector(applicationDockMenu:)])
-            return nil;
-        return ((NSMenu * (*)(id, SEL, id)) objc_msgSend)(d, @selector(applicationDockMenu:), NSApp);
+        NSMenu *menu = nil;
+        if ([d respondsToSelector:@selector(applicationDockMenu:)])
+            menu = ((NSMenu * (*)(id, SEL, id)) objc_msgSend)(d, @selector(applicationDockMenu:), NSApp);
+        return menu ? menu : nib_menu;
     }) retain];
     send_update();
 }
+
+@implementation NSApplication (ADockMenuOutlet)
+- (NSMenu *)dockMenu { return nib_menu; }
+- (void)setDockMenu:(NSMenu *)menu
+{
+    if (menu == nib_menu)
+        return;
+    [nib_menu release];
+    nib_menu = [menu retain];
+    if (launched)
+        ADockLaunched();
+}
+@end
 
 static void set_urgent(BOOL on)
 {

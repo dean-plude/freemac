@@ -1183,6 +1183,58 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.248 "Fonts for Mac apps" (done)
+
+Ferry 0.71.0: a Mac app that looks for fonts in a Mac's Fonts folders now finds this computer's fonts there. OBS Studio's Text source lists them, so a font picked in its Select font window shows the text in the preview and the recording, where before it found no fonts and drew nothing.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The Fonts folder of each Library folder Ferry gives (the user's, the computer's and the system's), and the Mac's own ~/Library/Fonts, /Library/Fonts and /System/Library/Fonts, list every font file in this system's matching fonts folder and the folders in it, flat and by name | Ferry libSystem (fonts.c) | done |
+| 2 | Opening, stat, lstat, access and listing a font there all reach the font itself, through a folder of links Ferry keeps in the user's cache and makes again when fonts are added or removed; a real Fonts folder is left as it is | Ferry libSystem (fonts.c, posix.c, stdio.c) | done |
+| 3 | Checked with OBS opened in a fresh account: a Text (FreeType 2) source with FreeSans picked shows its text in the preview | Acceptance, tests/foundation/mac_fonts.m | done |
+
+## 1.247 "Mac apps open on screen" (done)
+
+Ferry 0.70.0: a Mac app's window that asks to be taller than the screen, as OBS Studio's does the first time it opens (960 points on a 900-point screen), now fits the screen with its title bar showing, instead of opening with its top and title bar above the screen where you can't reach them. A window placed above the top of the screen comes down, as a Mac puts it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A titled window put on screen keeps its title bar on screen: one whose top is above the screen's visible top comes down, and a resizable one taller than the screen is made to fit it; a fixed-size one keeps its size | Ferry AppKit (NSWindow.m) | done |
+| 2 | The fit happens when the window is ordered front, with or without a display, so it is tested headless | Ferry AppKit (NSWindow.m), tests/appkit/qt_popups.m | done |
+| 3 | Checked with OBS opened for the first time in a fresh account: its main window is 1280x900 at the top of the screen | Acceptance | done |
+
+## 1.246 "OBS records the screen from its download" (done)
+
+Ferry 0.69.0: OBS Studio, downloaded from its own site and opened in a fresh account, now gets all the way to a recording. Its drop-down lists open, so you can pick the display in a macOS Screen Capture source's Properties, and the preview shows the screen at once; Start Recording then saves a movie of it with sound. Its right-click and + menus stay open until you choose, instead of closing the moment they appear, and those pop-up menus no longer take the keyboard or show up in the Dock.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A window that can't become key (a Qt pop-up menu, a tooltip) takes no focus and stays off the Dock's list; the key window waits a turn before resigning, and doesn't when focus went to one of the app's pop-ups, so Qt's menus no longer close as they open | Ferry AppKit (NSWindow.m, gtk.h) | done |
+| 2 | NSPopUpButtonCell's performClickWithFrame:inView: tracks its menu until it closes, the choice made, before it returns, as on a Mac: Qt's lists open their menus this way | Ferry AppKit (NSPopUpButton.m) | done |
+| 3 | A number read as a pointer gives its value, as OBS reads a screen's number; menu waits wake now and then, so a menu closed by a timer ends them | Ferry Foundation (NSValue.m), AppKit | done |
+| 4 | README screenshot of OBS capturing and recording the screen | Docs | done |
+
+## 1.245 "Mac apps in light and dark" (done)
+
+Ferry 0.68.0: Mac apps follow freemac's appearance, as on a Mac. When Dials > Appearance is Dark, or Auto after sunset, a Mac app that knows dark mode opens dark: its windows, text, lists, sidebars and controls take dark colours, and Qt apps such as OBS and VLC read the same. Switch the appearance while the app is open and it changes with everything else, at once. An app that says it needs the light look, or was built before macOS had dark mode, stays light as it would on a Mac, and one that picks its own appearance keeps it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Mac app's appearance is freemac's, read from the desktop's colour scheme and followed while it runs; apps that need the light look (NSRequiresAquaSystemAppearance, or built with an SDK before 10.14) stay light | Ferry AppKit (AppKitMore.m) | done |
+| 2 | The system colours (labelColor, windowBackgroundColor, textBackgroundColor, controlColor, the sidebar and table colours and the rest) have dark values and are drawn in the appearance of the view, its window or the app; colorWithName:dynamicProvider: asks its provider for each appearance | Ferry AppKit (NSGraphics.m) | done |
+| 3 | A change tells the app as a Mac does: effectiveAppearance's observers, viewDidChangeEffectiveAppearance, NSSystemColorsDidChangeNotification, AppleInterfaceThemeChangedNotification and the AppleInterfaceStyle default | Ferry AppKit, Foundation | done |
+
+## 1.244 "Mac apps' own menus in the menu bar" (done)
+
+Ferry 0.67.0: a Mac app's own menus are in freemac's menu bar, as on a Mac. Its File, Edit, View and other menus are there beside the app's name, with their shortcuts shown the Mac way, a tick by what's on and greyed out what can't be chosen right now, checked again every half second while the app is in front. Its application menu (About, Settings, Check for Updates) joins the menu under the app's name, and Quit there asks the app itself to quit, so it can ask to save first. The app's own Window items join freemac's Window menu and its Help items show under Help's search field, so the bar keeps one of each, and Help's search finds the app's menu items. Windows of a Mac app in the app grid now find its entry by the app's bundle identifier, so the Dock and ⌘Tab show the right icon and name for them even before the app has said where its icon is.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A Mac app's main menu is published on the session bus as GTK menus, and each of its windows tells the compositor where (as a GTK app's do): the application menu without the items freemac adds itself, then the other menus, separators as sections, shortcuts, ticks and dimmed items | Ferry AppKit (AMainMenuBar.m) | done |
+| 2 | Choosing an item checks it again and sends its action, as on a Mac; Quit in the app menu ends the app through its own Quit | Ferry AppKit, Topline | done |
+| 3 | An app's own Window and Help menus join Topline's: its Window items after Bring All to Front, its Help items under Help's search field, which also finds them | Topline, Help (helpsearch.py) | done |
+| 4 | A Mac app's app grid entry names its windows by the bundle identifier (StartupWMClass), and entries made before get it at the next scan | Mac apps (macapps.py) | done |
+
 ## 1.243 "Mac apps from a .zip, and Applications that keeps up" (done)
 
 Mac apps often come as a .zip, and their frameworks hold symbolic links (Versions/Current and the links beside it) that the app can't start without. Drawer now keeps links when it expands a .zip, as long as they point inside the new folder, as it already did for tar archives, and Compress stores links as links. A Mac app that comes out of a .zip is selected, and Drawer says it's ready to open. The app grid now follows the Applications folders while you're logged in: an app dragged or copied into Applications shows up in the app grid, the Dock's app list and search with its own icon within seconds, once it has finished copying; one moved out or to the Trash goes. Before, that waited for the next login.

@@ -201,7 +201,7 @@ LINE_BREAK = {"wordWrapping": 0, "charWrapping": 1, "clipping": 2, "truncatingHe
 CONTROL_SIZE = {"regular": 0, "small": 1, "mini": 2, "large": 0}
 BEZEL = {"rounded": 1, "regularSquare": 2, "thick": 3, "thicker": 4, "disclosure": 5, "shadowlessSquare": 6,
          "circular": 7, "texturedSquare": 8, "helpButton": 9, "smallSquare": 10, "texturedRounded": 11,
-         "roundRect": 12, "recessed": 13, "roundedDisclosure": 14, "inline": 15}
+         "roundRect": 12, "roundedRect": 12, "recessed": 13, "roundedDisclosure": 14, "inline": 15}
 META_FONTS = {"system": (".AppleSystemUIFont", 13), "systemBold": (".AppleSystemUIFont-Bold", 13),
               "smallSystem": (".AppleSystemUIFont", 11), "smallSystemBold": (".AppleSystemUIFont-Bold", 11),
               "miniSystem": (".AppleSystemUIFont", 9), "miniSystemBold": (".AppleSystemUIFont-Bold", 9),
@@ -486,9 +486,10 @@ class Compiler:
             f |= 0x10000000
         if yes(cell, "selectable"):
             f |= 0x00200000
-        if cell.get("borderStyle") == "bezel" or yes(cell, "bezeled"):
+        # a pop-up button's cell is written with borderStyle "borderAndBezel": both bits
+        if cell.get("borderStyle") in ("bezel", "borderAndBezel") or yes(cell, "bezeled"):
             f |= 0x00400000
-        if cell.get("borderStyle") == "border" or yes(cell, "bordered"):
+        if cell.get("borderStyle") in ("border", "borderAndBezel") or yes(cell, "bordered"):
             f |= 0x00800000
         if yes(cell, "scrollable"):
             f |= 0x00100000
@@ -1021,6 +1022,8 @@ class Compiler:
             aux = 3
         elif btype == "radio":
             aux = 4
+        elif btype in ("disclosureTriangle", "disclosure"):   # they open and close: on and off
+            aux = 1
         elif "changeContents" in behaviour or "lightByContents" in behaviour:
             aux = 2 if "changeContents" in behaviour else 5
         elif "changeBackground" in behaviour or "changeGray" in behaviour:
@@ -1030,7 +1033,7 @@ class Compiler:
         else:
             aux = 0
         bezel = BEZEL.get(c.get("bezelStyle"), 1 if btype == "push" else 2)
-        bordered = c.get("borderStyle") == "border" or yes(c, "bordered")
+        bordered = c.get("borderStyle") in ("border", "borderAndBezel") or yes(c, "bordered")
         flags = (0x00800000 if bordered else 0) | (0x8000 if yes(c, "transparent") else 0) | 0x04000000
         mask = 0
         m = child(c, "modifierMask", "keyEquivalentModifierMask")
@@ -1143,6 +1146,12 @@ class Compiler:
                                      "atBottom": 5, "belowBottom": 6}.get(e.get("titlePosition"), 2),
                     NSTitleCell=title_cell, NSTransparent=yes(e, "transparent"), NSOffsets="{5, 5}")
         cv = child(e, "view", "contentView")
+        # the content view's margins are where the document puts it: a
+        # line box's content sits 1 point in, not 5 (freemac 1.NEXT: VLC's
+        # Video Effects boxes)
+        cr = child(cv, "rect", "frame") if cv is not None else None
+        if cr is not None:
+            keys["NSOffsets"] = "{%g, %g}" % (float(cr.get("x", 0)), float(cr.get("y", 0)))
         if cv is not None:
             cuid = self.uid_for(cv.get("id")) if cv.get("id") else a.reserve()
             self.view(cv, cuid, uid)
@@ -1261,7 +1270,9 @@ class Compiler:
     def b_scrollView(self, e, uid):
         a = self.a
         subs = []
-        keys = dict(NSsFlags=0x20032 if yes(e, "hasVerticalScroller", True) else 0x20030,
+        # the low two bits are the border: a xib writes borderType only when it isn't a bezel
+        border = {"none": 0, "line": 1, "bezel": 2, "groove": 3}.get(e.get("borderType"), 2)
+        keys = dict(NSsFlags=0x20030 | border,
                     NSAutohidesScrollers=yes(e, "autohidesScrollers"))
         cv = child(e, "clipView", "contentView")
         if cv is not None:
@@ -1305,7 +1316,12 @@ class Compiler:
             if col.tag != "tableColumn":
                 continue
             cuid = self.uid_for(col.get("id")) if col.get("id") else a.reserve()
-            keys = dict(NSIdentifier=a.string(col.get("identifier", "")), NSWidth=float(col.get("width", "100")),
+            # A column left without an identifier gets the one Interface
+            # Builder gives it, "AutomaticTableColumnIdentifier.N" by its
+            # place, so that each column finds its own cell view prototype
+            # (VLC's Messages window, freemac 1.NEXT).
+            col_ident = col.get("identifier") or "AutomaticTableColumnIdentifier.%d" % len(columns)
+            keys = dict(NSIdentifier=a.string(col_ident), NSWidth=float(col.get("width", "100")),
                         NSMinWidth=float(col.get("minWidth", "10")), NSMaxWidth=float(col.get("maxWidth", "3.4e38")),
                         NSIsEditable=yes(col, "editable", True), NSIsHidden=yes(col, "hidden"), NSTableView=uid)
             hc = child(col, "tableHeaderCell", "headerCell")
@@ -1327,7 +1343,7 @@ class Compiler:
             self.connections_of(col, cuid)
             pv = child(col, "prototypeCellViews")
             for cell_view in (pv if pv is not None else []):
-                ident = cell_view.get("identifier") or col.get("identifier") or ""
+                ident = cell_view.get("identifier") or col_ident
                 prototypes.append((ident, self.prototype(cell_view)))
             columns.append(cuid)
         f = 0

@@ -128,6 +128,8 @@ static int nofollow_any_open(int fd, const char *path, int flags, mode_t mode)
 
 static int mac_open(const char *path, int flags, ...)
 {
+    char font[PATH_MAX];
+    path = ferry_font_path(path, font, sizeof font);
     mode_t mode = 0;
     if (flags & 0x200) {
         va_list ap;
@@ -148,6 +150,8 @@ static int mac_open(const char *path, int flags, ...)
 
 static int mac_openat(int fd, const char *path, int flags, ...)
 {
+    char font[PATH_MAX];
+    path = ferry_font_path(path, font, sizeof font);
     mode_t mode = 0;
     if (flags & 0x200) {
         va_list ap;
@@ -367,11 +371,20 @@ void ferry_to_mac_stat(const struct stat *s, void *out) { to_mac_stat(s, out); }
 
 /* The Mac's version file is one Ferry makes (sysversion.c). */
 #define VIRTUAL_OR(path, call) (ferry_virtual_stat(path, &s) ? 0 : (call))
-STAT_WRAPPER(mac_stat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, stat(path, &s)))
-STAT_WRAPPER(mac_lstat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, lstat(path, &s)))
+/* A font in a Mac Fonts folder is a link in Ferry's (fonts.c), and a file to
+ * the program, as on a Mac: lstat follows it. */
+static int font_stat(const char *path, struct stat *s, int follow)
+{
+    char font[PATH_MAX];
+    const char *p = ferry_font_path(path, font, sizeof font);
+    return p != path ? stat(p, s) : follow ? stat(path, s) : lstat(path, s);
+}
+STAT_WRAPPER(mac_stat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, font_stat(path, &s, 1)))
+STAT_WRAPPER(mac_lstat64(const char *path, struct mac_stat *out), VIRTUAL_OR(path, font_stat(path, &s, 0)))
 STAT_WRAPPER(mac_fstat64(int fd, struct mac_stat *out), fstat(fd, &s))
 STAT_WRAPPER(mac_fstatat64(int fd, const char *path, struct mac_stat *out, int flags),
-             VIRTUAL_OR(path, fstatat(at_fd(fd), path, &s, (flags & MAC_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0)))
+             VIRTUAL_OR(path, path && path[0] == '/' ? font_stat(path, &s, !(flags & MAC_AT_SYMLINK_NOFOLLOW))
+                                  : fstatat(at_fd(fd), path, &s, (flags & MAC_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0)))
 
 /* access's mode bits are the same on both systems (R_OK 4, W_OK 2, X_OK 1). */
 static int mac_access(const char *path, int mode)
@@ -383,7 +396,8 @@ static int mac_access(const char *path, int mode)
         }
         return 0;
     }
-    return access(path, mode);
+    char font[PATH_MAX];
+    return access(ferry_font_path(path, font, sizeof font), mode);
 }
 
 /* ---- directories ------------------------------------------------------------------- */
@@ -416,7 +430,11 @@ static struct mac_DIR *wrap_dir(DIR *d)
     return m;
 }
 
-static struct mac_DIR *mac_opendir(const char *path) { return wrap_dir(opendir(path)); }
+static struct mac_DIR *mac_opendir(const char *path)
+{
+    char font[PATH_MAX];
+    return wrap_dir(opendir(ferry_font_path(path, font, sizeof font)));
+}
 static struct mac_DIR *mac_fdopendir(int fd) { return wrap_dir(fdopendir(fd)); }
 
 static struct mac_dirent *mac_readdir(struct mac_DIR *m)

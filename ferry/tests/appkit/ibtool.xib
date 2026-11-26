@@ -150,7 +150,7 @@ DQ
                             </subviews>
                         </view>
                     </box>
-                    <scrollView autohidesScrollers="YES" horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" usesPredominantAxisScrolling="NO" id="scr">
+                    <scrollView borderType="line" autohidesScrollers="YES" horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" usesPredominantAxisScrolling="NO" id="scr">
                         <rect key="frame" x="20" y="60" width="300" height="130"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" id="clip">
@@ -173,7 +173,7 @@ DQ
                                             </textFieldCell>
                                             <tableColumnResizingMask key="resizingMask" resizeWithTable="YES" userResizable="YES"/>
                                         </tableColumn>
-                                        <tableColumn identifier="size" editable="NO" width="120" minWidth="40" maxWidth="1000" id="col2">
+                                        <tableColumn identifier="" editable="NO" width="120" minWidth="40" maxWidth="1000" id="col2">
                                             <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" title="Size">
                                                 <font key="font" metaFont="smallSystem"/>
                                             </tableHeaderCell>
@@ -244,6 +244,13 @@ DQ
                         <rect key="frame" x="10" y="5" width="18" height="90"/>
                         <sliderCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="-20" maxValue="20" numberOfTickMarks="9" sliderType="linear" id="pnlslidercell"/>
                     </slider>
+                    <button id="pnldisclose">
+                        <rect key="frame" x="40" y="5" width="13" height="13"/>
+                        <buttonCell key="cell" type="disclosureTriangle" bezelStyle="disclosure" imagePosition="above" alignment="center" borderStyle="border" inset="2" id="pnldisclosecell">
+                            <behavior key="behavior" pushIn="YES" changeBackground="YES" changeGray="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                    </button>
                 </subviews>
             </view>
         </window>

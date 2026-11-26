@@ -127,6 +127,27 @@ void AWindowsDisplayIfNeeded(void);
 void AWindowsNeedUpdate(void);
 void AWindowsUpdate(void);
 void AGlibAttach(void);
+/* the app's main menu in the desktop's menu bar (AMainMenuBar.m) */
+void AMainMenuBarAttach(GdkWindow *window);
+void AMainMenuBarChanged(void);
+/* freemac's light or dark appearance (AppKitMore.m, freemac 1.245): whether
+ * the desktop is dark, whether drawing is in a dark appearance now, the
+ * appearance an object set for itself, and following the desktop's changes */
+BOOL ADesktopDark(void);
+BOOL ADrawsDark(void);
+NSAppearance *AOwnAppearance(id object);
+NSAppearance *ABeginDrawingAppearance(id object);
+void AEndDrawingAppearance(NSAppearance *saved);
+void AAppearanceFollow(void);
+@interface NSColor (FerryDynamic)
+- (NSString *)_ferryDynamicName; /* a system colour's name, nil for others */
+@end
+NSColor *AColorWithProvider(NSString *name, NSColor * (^provider)(NSAppearance *));
+NSColor *ADynamicColor(NSString *name, const CGFloat light[4], const CGFloat dark[4]);
+@interface NSUserDefaults (FerryGlobalDomain)
++ (void)_ferrySetGlobalValue:(id)value forKey:(NSString *)key;
+@end
+NSString *AMenuAccelerator(NSString *key, NSEventModifierFlags mask);
 NSWindow *AKeyWindow(void);
 NSWindow *AMainWindow(void);
 NSArray *AAllWindows(void);
@@ -490,6 +511,7 @@ void ANibNoteNamedMenu(NSMenu *menu, NSString *name);
  * right (or down); a selection, rounded and inset unless the style is full
  * width or plain, joined to the rows above and below if they are selected. */
 void ATableDrawTextLine(NSAttributedString *string, NSRect frame, NSTextAlignment align, BOOL flipped);
+void ATableDrawTextLines(NSAttributedString *string, NSRect frame, NSTextAlignment align, BOOL flipped);
 void ATableDrawChevron(NSRect rect, BOOL down, NSColor *color, BOOL flipped);
 void ATableDrawSelection(NSRect rect, NSTableViewStyle style, NSTableViewSelectionHighlightStyle highlight,
                          BOOL emphasized, BOOL joinsAbove, BOOL joinsBelow);

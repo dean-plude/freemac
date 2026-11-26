@@ -746,20 +746,32 @@ static BOOL places_own_windows(void)
         [self saveFrameUsingName:_autosaveName];
 }
 /* A titled window put on screen keeps its title bar there: one whose top
- * is above the screen's visible top comes down (as a Mac constrains it). */
+ * is above the screen's visible top comes down, and a resizable one taller
+ * than the screen's visible part is made to fit it, as a Mac constrains
+ * it (OBS asks for 960 points on a 900-point screen) (freemac 1.247). */
 - (void)_constrainToScreen
 {
-    if (!(_style & NSWindowStyleMaskTitled) || _sheetParent || _parent)
+    if (!(_style & NSWindowStyleMaskTitled) || _sheetParent || _parent || (_style & NSWindowStyleMaskFullScreen))
         return;
-    NSRect vis = AScreenFrame(YES);
-    if (NSMaxY(_frame) > NSMaxY(vis))
-        [self setFrameOrigin:NSMakePoint(_frame.origin.x, NSMaxY(vis) - _frame.size.height)];
+    NSRect vis = AScreenFrame(YES), r = _frame;
+    if ((_style & NSWindowStyleMaskResizable) && r.size.height > vis.size.height)
+        r.size.height = fmax(vis.size.height, [self minSize].height);
+    if (r.size.height != _frame.size.height && NSMinY(r) < NSMinY(vis))
+        r.origin.y = NSMinY(vis);
+    if (NSMaxY(r) > NSMaxY(vis))
+        r.origin.y = NSMaxY(vis) - r.size.height;
+    if (r.size.height != _frame.size.height)
+        [self setFrame:r display:NO];
+    else if (r.origin.y != _frame.origin.y)
+        [self setFrameOrigin:r.origin];
 }
 
+/* The frame is taken as asked: a Mac asks the delegate's
+ * windowWillResize:toSize: only when the user resizes the window, so an
+ * app that works out a frame itself (VLC fitting its window to a video)
+ * gets that frame, its top where the app put it. */
 - (void)setFrame:(NSRect)frame display:(BOOL)display
 {
-    if ([_delegate respondsToSelector:@selector(windowWillResize:toSize:)] && !NSEqualSizes(frame.size, _frame.size))
-        frame.size = [_delegate windowWillResize:self toSize:frame.size];
     frame.size.width = fmax(frame.size.width, 1);
     frame.size.height = fmax(frame.size.height, 1);
     BOOL moved = !NSEqualPoints(frame.origin, _frame.origin);
@@ -859,6 +871,13 @@ static BOOL places_own_windows(void)
 /* The background, then the root views: content, toolbar strip, a sheet
  * shown in the window, an open menu. */
 - (void)_drawWindowInContext:(CGContextRef)ctx screen:(BOOL)screen
+{
+    /* in the window's own appearance, if it has one (freemac 1.245) */
+    NSAppearance *appearance = ABeginDrawingAppearance(self);
+    [self _drawWindowContentInContext:ctx screen:screen];
+    AEndDrawingAppearance(appearance);
+}
+- (void)_drawWindowContentInContext:(CGContextRef)ctx screen:(BOOL)screen
 {
     NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
     CGContextSaveGState(ctx);
@@ -997,6 +1016,9 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     g_signal_connect_data(w, signal, (GCallback)handler, window, NULL, 0);
 }
 
+/* once GTK has the window: where the app's menus are, for the menu bar */
+static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget_get_window(w)); }
+
 - (void)_makeGtk
 {
     if (_gtk || _hostedSheet || !ADisplayAvailable())
@@ -1014,9 +1036,23 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     }
     if (_level > NSNormalWindowLevel)
         gtk_window_set_keep_above(_gtk, 1);
+    if (![self canBecomeKeyWindow]) {
+        /* A pop-up menu, a tooltip, a floating badge: on a Mac it shows
+         * without taking the keys from the window that has them, and the
+         * app's menus stay open over it. Qt's pop-up menus close as soon as
+         * their window loses key, so one that took the focus would close
+         * the moment it opened. */
+        gtk_window_set_accept_focus(_gtk, 0);
+        gtk_window_set_focus_on_map(_gtk, 0);
+        gtk_window_set_skip_taskbar_hint(_gtk, 1);
+        gtk_window_set_skip_pager_hint(_gtk, 1);
+        if (_level >= NSPopUpMenuWindowLevel)
+            gtk_window_set_type_hint(_gtk, GDK_WINDOW_TYPE_HINT_POPUP_MENU);
+    }
     gtk_window_set_default_size(_gtk, (int)_frame.size.width, (int)_frame.size.height);
     gtk_window_set_resizable(_gtk, (_style & NSWindowStyleMaskResizable) != 0);
-    gtk_window_set_decorated(_gtk, _style != NSWindowStyleMaskBorderless);
+    /* no title bar unless the window asks for one, as on a Mac */
+    gtk_window_set_decorated(_gtk, (_style & NSWindowStyleMaskTitled) != 0);
     gtk_window_set_deletable(_gtk, (_style & NSWindowStyleMaskClosable) != 0);
     _area = gtk_drawing_area_new();
     if (_style & NSWindowStyleMaskResizable)
@@ -1040,6 +1076,7 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     connect(_gtk, "delete-event", on_delete, self);
     connect(_gtk, "focus-in-event", on_focus_in, self);
     connect(_gtk, "focus-out-event", on_focus_out, self);
+    connect(_gtk, "realize", on_realize, self);
     if (places_own_windows()) {
         connect(_gtk, "configure-event", on_configure, self);
         [self _placeGtk];
@@ -1061,6 +1098,8 @@ static void connect(GtkWidget *w, const char *signal, void *handler, NSWindow *w
     if (_closing)
         return;
     BOOL was = _visible;
+    if (!was && !_gtk)
+        [self _constrainToScreen];   /* as a Mac puts it on screen, display or not */
     _visible = YES;
     if (!was) {
         if (!_first && _initialFirst)
@@ -1987,13 +2026,37 @@ static int on_focus_in(GtkWidget *w, GdkEvent *e, void *data)
     return 0;
 }
 
-static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
+/* Whether the keyboard focus is now in one of the app's own windows that
+ * can't become key: a pop-up menu or tooltip that a window manager focused
+ * anyway. The key window keeps its keys then, as on a Mac. */
+static BOOL focus_in_keyless_window(void)
+{
+    for (NSWindow *w in all_windows)
+        if (w->_gtk && w->_visible && ![w canBecomeKeyWindow] && gtk_window_has_toplevel_focus(w->_gtk))
+            return YES;
+    return NO;
+}
+
+/* The focus moves out first and into its new window after, so whether the
+ * key window really lost its keys is asked once both have happened. */
+static int resign_if_focus_left(void *data)
 {
     @autoreleasepool {
         NSWindow *win = data;
-        if (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet))
+        BOOL still = win->_gtk && gtk_window_has_toplevel_focus(win->_gtk);
+        if (!still && !focus_in_keyless_window() &&
+            (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet)))
             A_REPORTING([key_window resignKeyWindow];)
+        [win release];
     }
+    return 0;
+}
+
+static int on_focus_out(GtkWidget *w, GdkEvent *e, void *data)
+{
+    NSWindow *win = data;
+    if (key_window == win || (key_window && key_window == win->_sheet && win->_sheet->_hostedSheet))
+        g_timeout_add(0, (GSourceFunc)resign_if_focus_left, [win retain]);
     return 0;
 }
 @end

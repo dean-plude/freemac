@@ -70,7 +70,8 @@ static BOOL run_menu(NSMenu *menu, NSView *view, NSRect rect, NSInteger aligned,
     [open retain];
     while (!owner->done && [open window]) {
         @autoreleasepool {
-            NSEvent *e = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantFuture]
+            /* waking now and then, so a menu closed by a timer ends the wait */
+            NSEvent *e = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]
                                                inMode:NSEventTrackingRunLoopMode dequeue:YES];
             if (e)
                 [NSApp sendEvent:e];

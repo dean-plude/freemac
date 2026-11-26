@@ -108,6 +108,13 @@ run_one() {
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= \
                 TZ=Europe/Paris TZDIR= LANG=en_US.UTF-8 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        appkit_appearance)
+            # dark, then light, as Dials > Appearance would have it, in a home of its own
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            { echo "== dark"; HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_APPEARANCE=dark \
+                  env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" &&
+              echo "== light" && HOME="$build/home_$name" XDG_CONFIG_HOME= FERRY_APPEARANCE=light \
+                  env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe"; } > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_*) env -u WAYLAND_DISPLAY -u DISPLAY "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_keychain)
             # twice in one home: what the first run keeps, the second finds
@@ -418,6 +425,8 @@ run_one foundation_sysversion "$here/foundation/sysversion.m" "$here/foundation/
     -framework Foundation -framework CoreServices
 run_one foundation_sysversion_carbon "$here/foundation/sysversion.m" "$here/foundation/sysversion.out" \
     -framework Foundation -framework Carbon
+# A Mac's Fonts folders: this system's fonts, flat, by name (fonts.c).
+run_one foundation_mac_fonts "$here/foundation/mac_fonts.m" "$here/foundation/mac_fonts.out" -framework Foundation
 # Security: keychain items in a home of the test's own, kept between two
 # runs, and the code-signing answers (said once with FERRY_VERBOSE).
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
@@ -878,9 +887,20 @@ run_one appkit_archiver "$here/appkit/archiver.m" "$here/appkit/archiver.out" -f
 # rings, text storage edits, cell masks, field editors, menus, appearances
 # (freemac 1.221, Ferry 0.45.0).
 run_one appkit_more_names "$here/appkit/more_names.m" "$here/appkit/more_names.out" -fobjc-arc -framework Cocoa
+# Qt's lists: a cell's click tracks its menu until it closes, keyless pop-up
+# windows, a number read as a pointer (freemac 1.246, Ferry 0.69.0).
+run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out" -fobjc-arc -framework Cocoa
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
+# a layout manager laying text out with no text view, as VLC wraps text
+run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
+# disclosure triangles and rounded disclosure buttons
+run_one appkit_disclosure "$here/appkit/disclosure.m" "$here/appkit/disclosure.out" -fobjc-arc -framework Cocoa
+run_one appkit_hud_table "$here/appkit/hud_table.m" "$here/appkit/hud_table.out" -fobjc-arc -framework Cocoa
+run_one appkit_error_rows "$here/appkit/error_rows.m" "$here/appkit/error_rows.out" -fobjc-arc -framework Cocoa
+run_one appkit_set_frame "$here/appkit/set_frame.m" "$here/appkit/set_frame.out" -fobjc-arc -framework Cocoa
+run_one appkit_control_sizes "$here/appkit/control_sizes.m" "$here/appkit/control_sizes.out" -fobjc-arc -framework Cocoa
 # NSAccessibility: the names, the protocol's methods and the older API
 run_one appkit_nsaccessibility "$here/appkit/nsaccessibility.m" "$here/appkit/nsaccessibility.out" -fobjc-arc \
     -framework Cocoa -framework ApplicationServices
@@ -1227,6 +1247,7 @@ if [ -n "$notify_python" ] && command -v dbus-run-session > /dev/null; then
     notify_test notify_ns --act "Build finished=action" --reply "Ping=Pong" --act "Choices=more:share" \
         --act "Not now=other" --act "Click me=default"
     notify_test notify_dock --dock --menu-click "New Window"
+    notify_test notify_dock_outlet --dock --menu-click "Play"
     # No notification server on the bus: nothing is shown, and Ferry says so once.
     notify_vars=FERRY_VERBOSE=1
     if notify_test notify_none --no-server; then
@@ -1238,7 +1259,7 @@ if [ -n "$notify_python" ] && command -v dbus-run-session > /dev/null; then
         fi
     fi
 else
-    echo "skip appkit_notify_un, appkit_notify_ns, appkit_notify_dock and appkit_notify_none" \
+    echo "skip appkit_notify_un, appkit_notify_ns, appkit_notify_dock, appkit_notify_dock_outlet and appkit_notify_none" \
         "(they need dbus-run-session and a Python with the gi bindings)"
 fi
 # No session bus at all: the same program carries on, and says so once.
@@ -1460,6 +1481,12 @@ run_one appkit_affine "$here/appkit/affine.m" "$here/appkit/affine.out" -fobjc-a
 # process type and the input source kept as one object; in a home of its own.
 run_one appkit_keycastr "$here/appkit/keycastr_appkit.m" "$here/appkit/keycastr_appkit.out" -fobjc-arc -fblocks \
     -framework Cocoa -framework Carbon
+# Light and dark (freemac 1.245, Ferry 0.68.0): the app is in freemac's
+# appearance, system colours are drawn in the one drawing is in, a colour's
+# provider is asked once for each, and an appearance the app sets tells its
+# observers, views, defaults and the theme notification's observers.
+run_one appkit_appearance "$here/appkit/appearance.m" "$here/appkit/appearance.out" -fobjc-arc -fblocks \
+    -framework Cocoa
 # WebKit: WKWebView and the older WebView, shown by this system's WebKitGTK
 # (freemac 1.214, Ferry 0.40.0). First what needs neither WebKitGTK nor a
 # display: the classes, web views that stay empty with no display, and the

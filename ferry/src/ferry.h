@@ -130,6 +130,9 @@ void *ferry_tlv_address(void *descriptor); /* the calling thread's copy of a var
 int ferry_is_virtual(const char *path);                    /* /System/Library/CoreServices/SystemVersion.plist */
 int ferry_virtual_open(const char *path, int linux_flags); /* -1 and errno if it can't be */
 int ferry_virtual_stat(const char *path, struct stat *s);  /* 1 if it was one of Ferry's files */
+/* fonts.c: a path into a Mac Fonts folder, taken to Ferry's folder of links
+ * to this system's fonts (in buf), or the path itself */
+const char *ferry_font_path(const char *path, char *buf, size_t size);
 
 /* errno.c */
 int ferry_errno_to_mac(int linux_errno);

@@ -735,14 +735,29 @@ static BOOL keeps_state(NSButtonType t)
         t = NSMakeSize(fmax(t.width, im.width), t.height + im.height + 2);
     else if (im.width > 0)
         t = NSMakeSize(t.width + im.width + 4, fmax(t.height, im.height));
+    if (_bezel == NSBezelStyleDisclosure)   /* a triangle, and the title beside it */
+        return [[self title] length] ? NSMakeSize(13 + 4 + ceil(t.width), fmax(13, ceil(t.height))) : NSMakeSize(13, 13);
+    if (_bezel == NSBezelStyleRoundedDisclosure)
+        return NSMakeSize(21, 21);
     if (!_bordered)
         return NSMakeSize(ceil(t.width) + 4, ceil(t.height) + 2);
     if (_bezel == NSBezelStyleInline)   /* a small badge, as in a source list */
         return NSMakeSize(fmax(ceil(t.width) + 12, 18), fmax(ceil(t.height) + 2, 16));
     if (_bezel == NSBezelStyleHelpButton)
         return NSMakeSize(25, 25);
+    /* a small or mini button is the size Interface Builder gives it, so a
+     * row laid out around one keeps its height (freemac 1.NEXT: VLC's mini
+     * Reset buttons, 39 by 17, had a regular button's 60 by 32 and slipped
+     * out of the panel they sit in) */
+    NSControlSize size = [self controlSize];
+    if (_bezel == NSBezelStyleRoundRect)
+        return NSMakeSize(ceil(t.width) + 16, size == NSControlSizeSmall || size == NSControlSizeMini ? 17 : 19);
     if (pos == NSImageOnly)
         return NSMakeSize(fmax(ceil(t.width) + 16, 32), fmax(32, ceil(t.height) + 10));
+    if (_bezel == NSBezelStyleRounded && size == NSControlSizeSmall)
+        return NSMakeSize(ceil(t.width) + 25, 28);
+    if (_bezel == NSBezelStyleRounded && size == NSControlSizeMini)
+        return NSMakeSize(ceil(t.width) + 20, 16);
     return NSMakeSize(fmax(ceil(t.width) + 28, 60), fmax(32, ceil(t.height) + 10));
 }
 
@@ -864,6 +879,36 @@ static BOOL keeps_state(NSButtonType t)
             AFillRoundedRect(NSInsetRect(box, -2, -2), radius + 2, nil, [NSColor keyboardFocusIndicatorColor]);
         [self _drawTitleIn:NSMakeRect(NSMaxX(box) + 6, b.origin.y, NSMaxX(b) - NSMaxX(box) - 6, b.size.height)
                      color:text];
+        return;
+    }
+
+    /* a disclosure triangle (freemac 1.NEXT): a grey chevron, pointing at
+     * its title when closed and down when open, as an outline's are */
+    if (_bezel == NSBezelStyleDisclosure) {
+        NSColor *c = dark ? ADarkText([NSColor secondaryLabelColor]) : [NSColor secondaryLabelColor];
+        c = [c colorWithAlphaComponent:[c alphaComponent] * dim * (_highlighted ? 0.6 : 1)];
+        CGFloat side = fmin(13, fmin(b.size.width, b.size.height));
+        NSRect r = NSMakeRect(b.origin.x, floor(NSMidY(b) - side / 2), side, side);
+        ATableDrawChevron(r, _state == NSControlStateValueOn, c, [self isFlipped]);
+        if ([[self title] length])
+            [self _drawTitleIn:NSMakeRect(NSMaxX(r) + 4, b.origin.y, NSMaxX(b) - NSMaxX(r) - 4, b.size.height)
+                         color:text];
+        return;
+    }
+    /* a rounded button with a chevron that points down to open and up to
+     * close */
+    if (_bezel == NSBezelStyleRoundedDisclosure) {
+        CGFloat side = fmin(fmin(b.size.width, b.size.height) - 2, 21);
+        NSRect box = NSMakeRect(round(NSMidX(b) - side / 2), round(NSMidY(b) - side / 2), side, side);
+        NSColor *fill = dark ? [NSColor colorWithWhite:1 alpha:_highlighted ? 0.32 : 0.18]
+                             : (_highlighted ? [NSColor colorWithWhite:0.85 alpha:1] : [NSColor whiteColor]);
+        AFillRoundedRect(box, 5, [fill colorWithAlphaComponent:[fill alphaComponent] * dim],
+                         [NSColor colorWithWhite:dark ? 1 : 0 alpha:(dark ? 0.12 : 0.22) * dim]);
+        if (focused)
+            AFillRoundedRect(NSInsetRect(box, -2.5, -2.5), 7.5, nil, [NSColor keyboardFocusIndicatorColor]);
+        BOOL open = _state == NSControlStateValueOn;
+        /* drawn pointing down, or up by drawing it as the other way up */
+        ATableDrawChevron(box, YES, text, open ? ![self isFlipped] : [self isFlipped]);
         return;
     }
 

@@ -1,0 +1,5 @@
+stop icon: 32x32, red 1, white bar 1
+caution icon: 1, note icon: 1
+text cell: 2 lines
+single-line mode: 1 line
+exit=0

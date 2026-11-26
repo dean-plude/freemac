@@ -4,6 +4,7 @@ top level: IBHelper, IBWindow, NSMenu, NSPanel, NSUserDefaultsController
 window: IBWindow "Settings" style 0x3 content 480x360 autosave "IBToolWindow" min 300x200 visible yes
 panel: NSPanel "Hidden Panel" utility yes visible no
 panel HUD yes, dark yes; slider vertical yes, small yes, -20 to 20
+disclosure triangle: bezel 5, open after a click yes
 content subviews: 9
 name: "Ada" placeholder "Name" editable yes bezeled yes alignment 2 bold yes tip "Your name" mask 10 in window yes
 name bound to NSUserDefaultsController, keyPath values.IBToolName
@@ -12,13 +13,14 @@ ok: "OK" key Return tag 12 bezel 1 target IBOwner action confirm:
 confirm: from NSButton "OK"
 check: "Show the thing" state 0 (the defaults say no)
 check after the default changed: state 1
-pop-up: 3 items, selected "Medium" tag 2, pulls down no
+pop-up: 3 items, selected "Medium" tag 2, pulls down no, bezel drawn yes
 box: "Details" holds 2 views
+box resized: content at 3,3, 454 wide
 stepper: 10 in 0..50 by 5, in the box yes
 browser, an element the tool does not know: NSView
-table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes, header yes
+table: 2 columns, row height 19, data source is the owner yes, in a scroll view yes (line border yes), header yes
   column name "Name" width 150 editable yes
-  column size "Size" width 120 editable no
+  column AutomaticTableColumnIdentifier.1 "Size" width 120 editable no
   multiple selection no, alternating rows yes, source list yes
   rows 2
 stack: NSStackView orientation 1, 2 views: "First" (1) "Second" (0)

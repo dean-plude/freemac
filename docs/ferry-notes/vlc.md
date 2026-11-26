@@ -251,10 +251,166 @@ there is one, as on a Mac.
 Tests: `tests/appkit/open_running.m` (OpenApp.app asks its own socket from
 another thread) and `shell/tests/test_macapps_open.py`.
 
+## The sidebar and the dark panels (freemac 1.NEXT)
+
+VLC's library sidebar now looks like a Mac source list: grey group rows
+with Show and Hide on hover, and its playlist and media library icons kept
+square. Media Information, Video Effects and Audio Effects open as dark,
+see-through HUD panels with light text, as on a Mac, and the equalizer's
+bands stand upright at their small size.
+
+- ferry-ibtool writes a xib's `HUD` window style and works out a slider's
+  direction from its frame when the xib doesn't say, and its control size.
+- Windows with the HUD style draw dark, and the controls in them (text
+  fields, buttons, check boxes, tabs, segmented controls, pop-ups, tables,
+  outlines and sliders) draw light on dark (`appkit/NSWindow.m`,
+  `AViewIsDark`).
+- Auto Layout keeps a view's aspect ratio (a multiplier between its own
+  width and height).
+
+## The full Preferences (freemac 1.NEXT)
+
+Show All in VLC's Preferences opens the full list of VLC's settings, with
+every module's options, instead of freezing VLC. VLC wraps each setting's
+help text with a layout manager and a text container and no text view;
+Ferry's layout manager now lays text out by itself in that case, line by
+line in the container's width, each line running to the next as on a Mac
+(`appkit/NSTextView.m`). Before, every line came back empty and VLC's
+wrapping never ended.
+
+VLC's Open dialog shows its "Media Resource Locator (MRL)" field with a
+disclosure triangle: Ferry's buttons now draw disclosure triangles and
+rounded disclosure buttons, and ferry-ibtool makes a xib's disclosure
+buttons stay on when clicked, so the triangle opens the field and turns
+down, as on a Mac (`appkit/NSControl.m`).
+
+Tests: `tests/appkit/layout_alone.m`, `tests/appkit/disclosure.m`, and the
+disclosure triangle in `tests/appkit/ibtool.xib`.
+
+## Pop-up menus and the other windows (freemac 1.NEXT)
+
+VLC's pop-up menus (the Convert / Save profile, every choice in
+Preferences) draw their white rounded button and blue arrow box as on a
+Mac. Interface Builder writes a pop-up button's cell with the border style
+"borderAndBezel", which ferry-ibtool had read as no border at all; it now
+sets both (`sdk/ferry-ibtool`). Convert / Save (Shift-Command-S) and
+Bookmarks (Command-B) open with their controls in place.
+
+Test: the pop-up line in `tests/appkit/ibtool.m`.
+
+Bookmarks' list matches its dark panel: a table's header in a HUD panel
+is a faint band with light titles, and a scroll view's border there is a
+faint line, not a light frame (`appkit/NSTableView.m`,
+`appkit/NSScrollView.m`). ferry-ibtool also gives a scroll view the border
+its xib names (none, line, bezel or groove); before, every one with a
+vertical scroller got a bezel and every one without got none.
+
+Tests: `tests/appkit/hud_table.m`, and the table's line border in
+`tests/appkit/ibtool.xib`.
+
+## Fitting the window to a small video (freemac 1.NEXT)
+
+VLC fits its window to a video that starts playing, keeping the window's
+top where it was. Ferry's `setFrame:display:` asked the window's delegate
+`windowWillResize:toSize:` first, which a Mac does only while the user
+resizes a window; VLC's delegate keeps the video's shape, so the window
+came out taller than VLC had worked out, its top far above the screen,
+and a 320x240 video left VLC's window off the top of the screen. The
+frame is now taken as asked (`appkit/NSWindow.m`).
+
+Test: `tests/appkit/set_frame.m`.
+
+## Small buttons, pop-ups and boxes in the effects panels (freemac 1.NEXT)
+
+VLC's Video Effects, Audio Effects and Track Synchronization panels use
+mini "Reset" buttons and small pop-ups. Ferry sized every push button and
+pop-up as a regular one, 60 by 32 and 25 high, so each mini Reset button
+sat below the panel it belongs to and was cut off, and the small profile
+pop-up took room from the panel above it. A small push button is now 28
+high and a mini one 16, a round rect button 19, or 17 when small or mini,
+and a pop-up 22 when small and 15 when mini, each as wide as its title and
+a margin, as Interface Builder sizes them (`appkit/NSControl.m`,
+`appkit/NSPopUpButton.m`). ferry-ibtool now also reads Interface Builder's
+name for a round rect button's bezel ("roundedRect"), and gives a box's
+content view the margins its xib places it at, 1 point for VLC's line
+boxes rather than 5, which had shrunk the Image Adjust sliders.
+
+Tests: `tests/appkit/control_sizes.m`, and the box's margins in
+`tests/appkit/ibtool.m`.
+
+## Opening VLC as a user would, and its Dock menu (freemac 1.NEXT)
+
+VLC.app copied to a fresh `~/Applications` and opened with
+`freemac-mac-app open VLC.app video.mp4`, with no Ferry test variables
+set (only HOME, DISPLAY, PATH, XDG_RUNTIME_DIR and LANG), starts, asks its
+first-run question and then plays the video in its window. Two things
+were wrong on the way:
+
+- The first-run question ("Check for album art and metadata?", an
+  NSAlert run with runModal) opened at the bottom of the screen. An alert
+  is placed a third of the way down the main window, and VLC asks while
+  its main window is 84 points high, so the 320-point alert was pushed
+  down to the screen's edge. An alert now goes on the screen when the main
+  window is hidden, off the screen or smaller than the alert
+  (`appkit/NSAlert.m`).
+- VLC's Dock menu (Play, Stop, Next, Previous, Mute) comes from its nib,
+  which connects the application's dockMenu outlet, and Ferry had no such
+  outlet. The application now takes it, and freemac's Dock shows that menu
+  when the delegate gives none of its own (`appkit/NSDockTile.m`).
+
+VideoLAN's own disk image couldn't be fetched or opened where this was
+tested (VideoLAN's server out of reach, no 7-Zip), so installing from it
+is still to try.
+
+Test: `tests/appkit/notify_dock_outlet.m`.
+
+## The Messages window (freemac 1.NEXT)
+
+VLC's Messages window (Window > Messages) showed each message's text in
+all three columns, and its Details button was a blank blue square. Its
+table's columns have no identifiers in the xib; Interface Builder then
+names them "AutomaticTableColumnIdentifier.0", ".1" and so on, and each
+column's cell view goes by its column's name. ferry-ibtool gave them all
+the empty name, so the last column's cell view was used for every column.
+It now names them as Interface Builder does. The Details button's picture,
+NSQuickLookTemplate, is now drawn by Ferry (an eye). The playlist with
+several videos (Window > Playlist) shows each with its duration and the
+total, as on a Mac.
+
+Tests: the unnamed column in `tests/appkit/ibtool.xib`, and the eye in
+`tests/appkit/image.m`.
+
+## The Errors and Warnings window (freemac 1.NEXT)
+
+When VLC can't open something, its Errors and Warnings window lists the
+error with a stop sign and its title in bold over the message. Ferry
+showed a blank document icon and ran the title and message together on one
+line. Now `iconForFileType:` gives the alert icons for the HFS codes
+`'stop'`, `'caut'` and `'note'` (Ferry's own red stop sign, caution
+triangle and info circle). A text cell in a cell-based table that isn't in
+single-line mode draws each line of its text on its own line, so the
+title and the message sit on two lines in VLC's 45-point rows. Test:
+`tests/appkit/error_rows.m`.
+
+Rechecked on Ferry 0.69.0: VLC's pop-ups, its first-run alert, its
+Preferences and effects panels, and full screen all work as before.
+All 32 windows in VLC's nibs have a title bar. VLC makes only three
+borderless windows itself (full screen, the blackout window, and the
+video window with decorations off), and those stay undecorated.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
 - VideoToolbox decoding, the keychain, speech, the CD module and
   SecureTransport don't build yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test
-  setup only.
+  setup only. Installing from VideoLAN's own disk image is untried.
+- Auto Layout places views by their frames, not their alignment rectangles,
+  so where a xib spaces push buttons by their bezels (the File tab of
+  VLC's Open dialog), the space comes out too small and the File tab is
+  squashed; a box whose title is a check box (Capture's Video) is cut off.
+  The same makes the Video Effects boxes 6 points shorter than on a Mac
+  (the logo's Transparency slider sits on its box's bottom edge).
+- The equalizer's first band label shows "6" for "60": where two labels of
+  the same priority share too little room, a Mac shares it out between
+  them and Ferry's solver gives it all to one.

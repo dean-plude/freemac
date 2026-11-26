@@ -884,7 +884,10 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
         CGContextConcatCTM(ctx, shown);
         local = CGRectApplyAffineTransform(local, CGAffineTransformInvert(shown));
     }
+    /* in the view's own appearance, if it has one (freemac 1.245) */
+    NSAppearance *appearance = ABeginDrawingAppearance(self);
     [self _drawContentInContext:ctx dirty:local screen:screen];
+    AEndDrawingAppearance(appearance);
     CGContextRestoreGState(ctx);
 }
 

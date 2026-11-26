@@ -1,0 +1,15 @@
+Update application://appkit_notify_dock_outlet.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+(the Dock starts again)
+Update application://appkit_notify_dock_outlet.desktop {count: 0, count-visible: false, quicklist: '/com/canonical/unity/launcherentry/ferry/menu', urgent: false}
+Dock menu:
+    menu Play
+    menu Stop
+    menu -
+    menu Mute
+(clicks Play in the Dock menu)
+----
+outlet kept: yes
+Dock menu: Play chosen
+done
+app exit=0
+exit=0

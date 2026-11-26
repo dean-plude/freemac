@@ -730,6 +730,8 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
             _policy = NSApplicationActivationPolicyAccessory;
         else
             _policy = NSApplicationActivationPolicyRegular;
+        /* light or dark, as freemac is (AppKitMore.m, freemac 1.245) */
+        AAppearanceFollow();
     }
     return self;
 }
@@ -742,6 +744,7 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
     [menu retain];
     [_mainMenu release];
     _mainMenu = menu;
+    AMainMenuBarChanged();
 }
 - (NSMenu *)windowsMenu { return _windowsMenu; }
 - (void)setWindowsMenu:(NSMenu *)m { _windowsMenu = m; }

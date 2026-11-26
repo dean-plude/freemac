@@ -26,6 +26,7 @@ pdf as CGImage: 20x10
 add template: template 1, name NSAddTemplate
 add template: 14x14
 app icon: 1, caution: 1
+quick look: template 1, 19x12
 tinted plus centre (7,7): 1.0 0.0 0.0 1.0
 tinted plus corner (0,0): 0.0 0.0 0.0 0.0
 image view left (2,2): 1.0 0.0 0.0 1.0

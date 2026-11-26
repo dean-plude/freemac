@@ -399,9 +399,46 @@ static NSString *uti_for_extension(NSString *ext)
     return icon_for(@"files", NO);
 }
 
+/* The alert icons that the HFS codes 'stop', 'caut' and 'note' name: a red
+ * stop sign with a white bar, the caution triangle and the info circle. */
+static NSImage *alert_icon(NSString *type)
+{
+    if ([type isEqualToString:@"'caut'"])
+        return [NSImage imageNamed:NSImageNameCaution];
+    if ([type isEqualToString:@"'note'"])
+        return [NSImage imageNamed:NSImageNameInfo];
+    if (![type isEqualToString:@"'stop'"])
+        return nil;
+    static NSImage *stop;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        stop = [[NSImage imageWithSize:NSMakeSize(32, 32) flipped:NO drawingHandler:^BOOL(NSRect r) {
+            NSBezierPath *p = [NSBezierPath bezierPath];
+            for (int i = 0; i < 8; i++) {
+                CGFloat a = M_PI / 8 + i * M_PI / 4;
+                NSPoint pt = NSMakePoint(16 + 14.5 * cos(a), 16 + 14.5 * sin(a));
+                if (i)
+                    [p lineToPoint:pt];
+                else
+                    [p moveToPoint:pt];
+            }
+            [p closePath];
+            [[NSColor colorWithRed:0.86 green:0.16 blue:0.14 alpha:1] setFill];
+            [p fill];
+            [[NSColor whiteColor] setFill];
+            [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(7, 13.5, 18, 5) xRadius:1.5 yRadius:1.5] fill];
+            return YES;
+        }] retain];
+    });
+    return stop;
+}
+
 /* A filename extension, a uniform type identifier, or an HFS type code. */
 - (NSImage *)iconForFileType:(NSString *)type
 {
+    NSImage *alert = alert_icon(type);
+    if (alert)
+        return alert;
     if ([type isEqualToString:@"public.folder"] || [type isEqualToString:@"public.directory"] ||
         [type isEqualToString:@"'fldr'"] || [type isEqualToString:NSFileTypeDirectory])
         return icon_for(@"folder", YES);

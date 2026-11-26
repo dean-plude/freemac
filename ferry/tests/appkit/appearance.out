@@ -1,0 +1,51 @@
+== dark
+app NSAppearanceNameDarkAqua, current NSAppearanceNameDarkAqua
+AppleInterfaceStyle Dark
+labelColor 1.00 1.00 1.00 0.86
+windowBackgroundColor 0.19 0.19 0.20 1.00
+type catalog 1, list System, name labelColor
+in sRGB 1.00 1.00 1.00 0.86
+with alpha 0.5 1.00 1.00 1.00 0.50
+in Aqua: labelColor 0.00 0.00 0.00 0.88
+in Aqua: textBackgroundColor 1.00 1.00 1.00 1.00
+in DarkAqua: labelColor 1.00 1.00 1.00 0.86
+in DarkAqua: textBackgroundColor 0.12 0.12 0.13 1.00
+in DarkAqua: with alpha 0.5 1.00 1.00 1.00 0.50
+current again NSAppearanceNameDarkAqua
+mine in Aqua 0.90 0.80 0.70 1.00
+mine in Aqua again 0.90 0.80 0.70 1.00
+mine in DarkAqua 0.10 0.20 0.30 1.00
+asked 2
+equal to itself 1, labelColor to textColor 0, plain colours 1
+inner view NSAppearanceNameAqua
+inner view after NSAppearanceNameDarkAqua
+after setAppearance: app NSAppearanceNameAqua, window NSAppearanceNameAqua, told 1, observed 1, theme 1
+labelColor now 0.00 0.00 0.00 0.88
+AppleInterfaceStyle now Dark
+back: app NSAppearanceNameDarkAqua, told 2, observed 2, theme 2
+== light
+app NSAppearanceNameAqua, current NSAppearanceNameAqua
+AppleInterfaceStyle (none)
+labelColor 0.00 0.00 0.00 0.88
+windowBackgroundColor 0.93 0.93 0.93 1.00
+type catalog 1, list System, name labelColor
+in sRGB 0.00 0.00 0.00 0.88
+with alpha 0.5 0.00 0.00 0.00 0.50
+in Aqua: labelColor 0.00 0.00 0.00 0.88
+in Aqua: textBackgroundColor 1.00 1.00 1.00 1.00
+in DarkAqua: labelColor 1.00 1.00 1.00 0.86
+in DarkAqua: textBackgroundColor 0.12 0.12 0.13 1.00
+in DarkAqua: with alpha 0.5 1.00 1.00 1.00 0.50
+current again NSAppearanceNameAqua
+mine in Aqua 0.90 0.80 0.70 1.00
+mine in Aqua again 0.90 0.80 0.70 1.00
+mine in DarkAqua 0.10 0.20 0.30 1.00
+asked 2
+equal to itself 1, labelColor to textColor 0, plain colours 1
+inner view NSAppearanceNameAqua
+inner view after NSAppearanceNameAqua
+after setAppearance: app NSAppearanceNameDarkAqua, window NSAppearanceNameDarkAqua, told 1, observed 1, theme 1
+labelColor now 1.00 1.00 1.00 0.86
+AppleInterfaceStyle now (none)
+back: app NSAppearanceNameAqua, told 2, observed 2, theme 2
+exit=0

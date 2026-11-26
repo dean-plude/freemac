@@ -86,14 +86,28 @@ static const CGFloat selection_inset = 5, selection_radius = 5;
 + (NSArray *)alternatingContentBackgroundColors
 {
     static NSArray *colors;
-    if (!colors)
-        colors = [@[ [NSColor colorWithCalibratedWhite:1 alpha:1], [NSColor colorWithCalibratedWhite:0.957 alpha:1] ]
-            retain];
+    if (!colors) {
+        /* light or dark, with the appearance (freemac 1.245) */
+        const CGFloat light0[4] = {1, 1, 1, 1}, dark0[4] = {0.12, 0.12, 0.13, 1};
+        const CGFloat light1[4] = {0.957, 0.957, 0.957, 1}, dark1[4] = {0.16, 0.16, 0.17, 1};
+        colors = [@[
+            ADynamicColor(@"alternatingContentBackgroundColor0", light0, dark0),
+            ADynamicColor(@"alternatingContentBackgroundColor1", light1, dark1)
+        ] retain];
+    }
     return colors;
 }
 + (NSArray *)controlAlternatingRowBackgroundColors { return [self alternatingContentBackgroundColors]; }
 + (NSColor *)selectedContentBackgroundColor { return [NSColor controlAccentColor]; }
-+ (NSColor *)unemphasizedSelectedContentBackgroundColor { return [NSColor colorWithCalibratedWhite:0.863 alpha:1]; }
++ (NSColor *)unemphasizedSelectedContentBackgroundColor
+{
+    static NSColor *c;
+    if (!c) {
+        const CGFloat light[4] = {0.863, 0.863, 0.863, 1}, dark[4] = {0.27, 0.27, 0.28, 1};
+        c = [ADynamicColor(@"unemphasizedSelectedContentBackgroundColor", light, dark) retain];
+    }
+    return c;
+}
 + (NSColor *)alternateSelectedControlTextColor { return [NSColor whiteColor]; }
 + (NSColor *)unemphasizedSelectedTextColor { return [NSColor labelColor]; }
 + (NSColor *)selectedControlTextColor { return [NSColor controlTextColor]; }
@@ -196,6 +210,47 @@ void ATableDrawTextLine(NSAttributedString *s, NSRect frame, NSTextAlignment ali
     CFRelease(line);
 }
 
+/* Text with line breaks in it, a line for each paragraph, the block centred
+ * in frame and each line cut short with an ellipsis, as a cell that isn't in
+ * single-line mode draws "Title\nmessage". */
+void ATableDrawTextLines(NSAttributedString *s, NSRect frame, NSTextAlignment align, BOOL flipped)
+{
+    NSString *text = [s string];
+    if ([text rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]].location == NSNotFound) {
+        ATableDrawTextLine(s, frame, align, flipped);
+        return;
+    }
+    NSMutableArray *lines = [NSMutableArray array];
+    NSMutableArray *heights = [NSMutableArray array];
+    CGFloat total = 0;
+    NSUInteger start = 0, length = [text length];
+    while (start <= length) {
+        NSUInteger end = start, next = start;
+        [text getParagraphStart:NULL end:&next contentsEnd:&end forRange:NSMakeRange(start, 0)];
+        NSAttributedString *line = [s attributedSubstringFromRange:NSMakeRange(start, end - start)];
+        NSFont *font = [line length] ? [line attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL] : nil;
+        if (!font && start < length)
+            font = [s attribute:NSFontAttributeName atIndex:start effectiveRange:NULL];
+        font = font ?: ADefaultFont();
+        CGFloat h = ceil([font ascender] - [font descender] + 1);
+        if (total > 0 && total + h > frame.size.height)
+            break;   /* the lines that fit */
+        [lines addObject:line];
+        [heights addObject:@(h)];
+        total += h;
+        if (next >= length)
+            break;
+        start = next;
+    }
+    CGFloat y = flipped ? NSMidY(frame) - total / 2 : NSMidY(frame) + total / 2;
+    for (NSUInteger i = 0; i < [lines count]; i++) {
+        CGFloat h = [heights[i] doubleValue];
+        NSRect r = NSMakeRect(frame.origin.x, flipped ? y : y - h, frame.size.width, h);
+        ATableDrawTextLine(lines[i], r, align, flipped);
+        y += flipped ? h : -h;
+    }
+}
+
 /* A chevron pointing right, or down when open, centred in r. */
 void ATableDrawChevron(NSRect r, BOOL down, NSColor *color, BOOL flipped)
 {
@@ -277,7 +332,10 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
         s = value;
     else
         s = AAttributed([self stringValue], font, color);
-    ATableDrawTextLine(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
+    if ([self usesSingleLineMode])
+        ATableDrawTextLine(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
+    else
+        ATableDrawTextLines(s, [self titleRectForBounds:frame], [self alignment], [view isFlipped]);
 }
 - (void)drawWithFrame:(NSRect)frame inView:(NSView *)view { [self drawInteriorWithFrame:frame inView:view]; }
 @end
@@ -432,6 +490,8 @@ static NSColor *cell_text_color(NSCell *cell, NSColor *own)
 - (void)drawInteriorWithFrame:(NSRect)frame inView:(NSView *)view
 {
     NSColor *color = [self textColor] ?: [NSColor headerTextColor];
+    if (AViewIsDark(view))   /* a table in a HUD panel: its header is dark, the titles light */
+        color = ADarkText(color);
     ATableDrawTextLine(AAttributed([self stringValue], [self font] ?: [NSFont systemFontOfSize:11], color),
                    NSInsetRect(frame, 6, 0), [self alignment] == NSTextAlignmentNatural ? NSTextAlignmentLeft : [self alignment],
                    [view isFlipped]);
@@ -737,8 +797,16 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (void)drawRect:(NSRect)dirty
 {
     NSRect b = [self bounds];
-    [[NSColor controlBackgroundColor] setFill];
-    NSRectFill(dirty);
+    /* in a HUD panel the header is a faint light band on the dark panel, as on a Mac */
+    BOOL dark = AViewIsDark(self);
+    NSColor *line = dark ? [NSColor colorWithWhite:1 alpha:0.15] : [NSColor separatorColor];
+    if (dark) {
+        [[NSColor colorWithWhite:1 alpha:0.06] setFill];
+        NSRectFillUsingOperation(dirty, NSCompositingOperationSourceOver);
+    } else {
+        [[NSColor controlBackgroundColor] setFill];
+        NSRectFill(dirty);
+    }
     NSArray *cols = [_tableView tableColumns];
     NSArray *sorts = [_tableView sortDescriptors];
     NSSortDescriptor *first = [sorts firstObject];
@@ -750,8 +818,8 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
         if (!NSIntersectsRect(r, dirty))
             continue;
         if ((NSInteger)i == _pressed && _resized < 0) {
-            [[NSColor colorWithCalibratedWhite:0 alpha:0.05] setFill];
-            NSRectFill(r);
+            [[NSColor colorWithCalibratedWhite:dark ? 1 : 0 alpha:dark ? 0.1 : 0.05] setFill];
+            NSRectFillUsingOperation(r, NSCompositingOperationSourceOver);
         }
         NSTableHeaderCell *cell = [c headerCell];
         NSSortDescriptor *proto = [c sortDescriptorPrototype];
@@ -763,11 +831,13 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
         if (sorted)
             [cell drawSortIndicatorWithFrame:r inView:self ascending:[first ascending] priority:0];
         /* a thin divider, short of the top and bottom */
-        [[NSColor separatorColor] setFill];
-        NSRectFill(NSMakeRect(NSMaxX(r) - 1, b.origin.y + 6, 1, b.size.height - 12));
+        [line setFill];
+        NSRectFillUsingOperation(NSMakeRect(NSMaxX(r) - 1, b.origin.y + 6, 1, b.size.height - 12),
+                                 NSCompositingOperationSourceOver);
     }
-    [[NSColor separatorColor] setFill];
-    NSRectFill(NSMakeRect(dirty.origin.x, NSMaxY(b) - 1, dirty.size.width, 1));
+    [line setFill];
+    NSRectFillUsingOperation(NSMakeRect(dirty.origin.x, NSMaxY(b) - 1, dirty.size.width, 1),
+                             NSCompositingOperationSourceOver);
 }
 - (void)mouseDown:(NSEvent *)e
 {
@@ -823,10 +893,16 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (void)drawRect:(NSRect)dirty
 {
     NSRect b = [self bounds];
-    [[NSColor controlBackgroundColor] setFill];
-    NSRectFill(dirty);
-    [[NSColor separatorColor] setFill];
-    NSRectFill(NSMakeRect(b.origin.x, NSMaxY(b) - 1, b.size.width, 1));
+    BOOL dark = AViewIsDark(self);
+    if (dark) {
+        [[NSColor colorWithWhite:1 alpha:0.06] setFill];
+        NSRectFillUsingOperation(dirty, NSCompositingOperationSourceOver);
+    } else {
+        [[NSColor controlBackgroundColor] setFill];
+        NSRectFill(dirty);
+    }
+    [dark ? [NSColor colorWithWhite:1 alpha:0.15] : [NSColor separatorColor] setFill];
+    NSRectFillUsingOperation(NSMakeRect(b.origin.x, NSMaxY(b) - 1, b.size.width, 1), NSCompositingOperationSourceOver);
 }
 @end
 

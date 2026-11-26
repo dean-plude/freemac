@@ -272,8 +272,20 @@ static NSImage *standard_image(NSString *name)
         return standard_image(NSImageNameFolder);
     if ([name isEqualToString:NSImageNameTouchBarDeleteTemplate])
         return standard_image(NSImageNameStopProgressTemplate);
-    if ([name isEqualToString:NSImageNameTouchBarQuickLookTemplate] ||
-        [name isEqualToString:NSImageNameTouchBarShareTemplate] ||
+    /* an eye, Quick Look's sign (VLC's Messages window shows details with
+     * it, freemac 1.NEXT) */
+    if ([name isEqualToString:@"NSQuickLookTemplate"] || [name isEqualToString:NSImageNameTouchBarQuickLookTemplate])
+        return drawn(NSMakeSize(19, 12), YES, ^(NSRect r) {
+            [[NSColor blackColor] set];
+            NSBezierPath *eye = stroked(1.4);
+            [eye moveToPoint:NSMakePoint(1.5, 6)];
+            [eye curveToPoint:NSMakePoint(17.5, 6) controlPoint1:NSMakePoint(5, 12) controlPoint2:NSMakePoint(14, 12)];
+            [eye curveToPoint:NSMakePoint(1.5, 6) controlPoint1:NSMakePoint(14, 0) controlPoint2:NSMakePoint(5, 0)];
+            [eye closePath];
+            [eye stroke];
+            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(7, 3.5, 5, 5)] fill];
+        });
+    if ([name isEqualToString:NSImageNameTouchBarShareTemplate] ||
         [name isEqualToString:NSImageNameTouchBarHistoryTemplate] ||
         [name isEqualToString:NSImageNameTouchBarComposeTemplate])
         return standard_image(NSImageNameActionTemplate);

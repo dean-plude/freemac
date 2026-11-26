@@ -659,9 +659,37 @@ static id suite_value(NSUserDefaults *d, NSString *file, NSString *key)
     }
     return nil;
 }
+/* The global domain: what the system says to every program, after the
+ * program's own defaults and before the registered ones, as on a Mac.
+ * AppKit keeps AppleInterfaceStyle there (freemac 1.245, Ferry 0.68.0). */
+static NSMutableDictionary *global_values;
++ (void)_ferrySetGlobalValue:(id)value forKey:(NSString *)key
+{
+    @synchronized([NSUserDefaults class]) {
+        if (!global_values)
+            global_values = [[NSMutableDictionary alloc] init];
+        if (value)
+            [global_values setObject:value forKey:key];
+        else
+            [global_values removeObjectForKey:key];
+    }
+}
+static id global_value(NSString *key)
+{
+    @synchronized([NSUserDefaults class]) {
+        return [[[global_values objectForKey:key] retain] autorelease];
+    }
+}
+static NSDictionary *global_domain(void)
+{
+    @synchronized([NSUserDefaults class]) {
+        return global_values ? [NSDictionary dictionaryWithDictionary:global_values] : [NSDictionary dictionary];
+    }
+}
 - (id)objectForKey:(NSString *)key
 {
     return [_arguments objectForKey:key] ?: [_values objectForKey:key] ?: suite_value(self, _file, key)
+                                                                           ?: global_value(key)
                                                                            ?: [_registered objectForKey:key];
 }
 - (BOOL)save
@@ -768,12 +796,15 @@ static id suite_value(NSUserDefaults *d, NSString *file, NSString *key)
 - (NSDictionary *)dictionaryRepresentation
 {
     NSMutableDictionary *d = [NSMutableDictionary dictionaryWithDictionary:_registered];
+    [d addEntriesFromDictionary:global_domain()];
     [d addEntriesFromDictionary:_values];
     [d addEntriesFromDictionary:_arguments];
     return d;
 }
 - (NSDictionary *)persistentDomainForName:(NSString *)name
 {
+    if ([name isEqualToString:NSGlobalDomain])
+        return global_domain();
     return [name isEqualToString:_domain] ? [NSDictionary dictionaryWithDictionary:_values] : nil;
 }
 - (void)removePersistentDomainForName:(NSString *)name

@@ -113,6 +113,11 @@ int main(void)
         printf("panel HUD %s, dark %s; slider vertical %s, small %s, %g to %g\n",
                yesno(([p styleMask] & NSWindowStyleMaskHUDWindow) != 0), yesno(white < 0.5), yesno([band isVertical]),
                yesno([band controlSize] == NSControlSizeSmall), [band minValue], [band maxValue]);
+        /* a disclosure triangle opens and closes, as a button that stays on */
+        NSButton *tri = [[[p contentView] subviews] lastObject];
+        [tri performClick:nil];
+        printf("disclosure triangle: bezel %ld, open after a click %s\n", (long)[tri bezelStyle],
+               yesno([tri state] == NSControlStateValueOn));
         printf("content subviews: %lu\n", (unsigned long)[[[w contentView] subviews] count]);
 
         NSTextField *name = owner.nameField;
@@ -138,19 +143,26 @@ int main(void)
         printf("check after the default changed: state %ld\n", (long)[check state]);
 
         NSPopUpButton *pop = owner.sizePopUp;
-        printf("pop-up: %ld items, selected \"%s\" tag %ld, pulls down %s\n", (long)[pop numberOfItems],
-               [[pop titleOfSelectedItem] UTF8String], (long)[[pop selectedItem] tag], yesno([pop pullsDown]));
+        printf("pop-up: %ld items, selected \"%s\" tag %ld, pulls down %s, bezel drawn %s\n", (long)[pop numberOfItems],
+               [[pop titleOfSelectedItem] UTF8String], (long)[[pop selectedItem] tag], yesno([pop pullsDown]),
+               yesno([pop isBordered]));
         printf("box: \"%s\" holds %lu views\n", [[owner.box title] UTF8String],
                (unsigned long)[[[owner.box contentView] subviews] count]);
+        /* the content view keeps the margins the document gives it, 3 points
+         * here, when the box is resized */
+        [owner.box setFrameSize:NSMakeSize(460, 64)];
+        NSRect inside = [[owner.box contentView] frame];
+        printf("box resized: content at %.0f,%.0f, %.0f wide\n", inside.origin.x, inside.origin.y, inside.size.width);
         NSStepper *st = owner.stepper;
         printf("stepper: %.0f in %.0f..%.0f by %.0f, in the box %s\n", [st doubleValue], [st minValue], [st maxValue],
                [st increment], yesno([st isDescendantOf:owner.box]));
         printf("browser, an element the tool does not know: %s\n", [[owner.level className] UTF8String]);
 
         NSTableView *t = owner.table;
-        printf("table: %lu columns, row height %.0f, data source is the owner %s, in a scroll view %s, header %s\n",
+        printf("table: %lu columns, row height %.0f, data source is the owner %s, in a scroll view %s (line border %s), header %s\n",
                (unsigned long)[[t tableColumns] count], [t rowHeight], yesno([t dataSource] == (id)owner),
-               yesno([t enclosingScrollView] != nil), yesno([t headerView] != nil));
+               yesno([t enclosingScrollView] != nil), yesno([[t enclosingScrollView] borderType] == NSLineBorder),
+               yesno([t headerView] != nil));
         for (NSTableColumn *c in [t tableColumns])
             printf("  column %s \"%s\" width %.0f editable %s\n", [[c identifier] UTF8String],
                    [[[c headerCell] stringValue] UTF8String], [c width], yesno([c isEditable]));
