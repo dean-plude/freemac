@@ -1652,6 +1652,8 @@ run_one vlc_threads "$here/vlc_threads.c" "$here/vlc_threads.out" -fblocks -fram
 run_one setjmp "$here/setjmp.c" "$here/setjmp.out"
 # OSByteOrder.h, which a Mac's CoreFoundation brings in (VLC's fonts).
 run_one byteorder "$here/byteorder.c" "$here/byteorder.out" -framework CoreFoundation
+# GNU libiconv's calls, linked as on a Mac (freemac 1.NEXT, VLC's subtitles)
+run_one iconv "$here/iconv.c" "$here/iconv.out" -liconv
 # Cells of the app's own classes in a nib (freemac 1.237): VLC's sliders,
 # steppers and segmented controls keep theirs through ferry-ibtool
 if python3 -I "$top/sdk/ferry-ibtool" --compile "$build/VLCCells.nib" "$here/appkit/vlc_cells.xib" \

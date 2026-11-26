@@ -2,6 +2,8 @@ the sans-serif family has faces: 1
 each face's file is there: 1, and holds it: 1
 a regular face and a bold one: 1 1
 a PostScript name finds the same file and traits: 1
+Helvetica Neue finds the faces standing for it: 1
+and one of their files shows a face as Helvetica Neue: 1
 a family that isn't installed matches nothing: 1
 a font with the character is kept: 1
 exit=0

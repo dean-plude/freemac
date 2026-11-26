@@ -1,0 +1,10 @@
+opened: 1
+converted: 0, left 0
+utf-8: 63 61 66 c3 a9 20 e2 82 ac
+small: 1, E2BIG 1, wrote 3
+closed: 0
+bad: 1, EILSEQ 1 (92), stopped at 1
+utf-16le: 61 00
+trivial: 0 0
+unknown set: 1, EINVAL 1
+exit=0

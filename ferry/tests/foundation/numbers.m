@@ -261,6 +261,13 @@ int main(void)
         reads(pct, @"25%");
         reads(pct, @"12.5%");
         reads(pct, @"25");
+        /* An old (Mac OS X 10.0 style) formatter keeps % as it is: VLC's
+         * opacity field shows 100 as "100%" (freemac 1.NEXT) */
+        NSNumberFormatter *old = [[NSNumberFormatter alloc] init];
+        [old setFormatterBehavior:NSNumberFormatterBehavior10_0];
+        [old setPositiveFormat:@"0%"];
+        printf("  10.0 style percent: %s\n", [[old stringFromNumber:[NSNumber numberWithInt:100]] UTF8String]);
+        reads(old, @"40%");
         NSNumberFormatter *acc = styled(NSNumberFormatterCurrencyAccountingStyle);
         printf("  accounting\n");
         reads(acc, @"($5.00)");
