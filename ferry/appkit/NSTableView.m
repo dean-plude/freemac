@@ -86,14 +86,28 @@ static const CGFloat selection_inset = 5, selection_radius = 5;
 + (NSArray *)alternatingContentBackgroundColors
 {
     static NSArray *colors;
-    if (!colors)
-        colors = [@[ [NSColor colorWithCalibratedWhite:1 alpha:1], [NSColor colorWithCalibratedWhite:0.957 alpha:1] ]
-            retain];
+    if (!colors) {
+        /* light or dark, with the appearance (freemac 1.245) */
+        const CGFloat light0[4] = {1, 1, 1, 1}, dark0[4] = {0.12, 0.12, 0.13, 1};
+        const CGFloat light1[4] = {0.957, 0.957, 0.957, 1}, dark1[4] = {0.16, 0.16, 0.17, 1};
+        colors = [@[
+            ADynamicColor(@"alternatingContentBackgroundColor0", light0, dark0),
+            ADynamicColor(@"alternatingContentBackgroundColor1", light1, dark1)
+        ] retain];
+    }
     return colors;
 }
 + (NSArray *)controlAlternatingRowBackgroundColors { return [self alternatingContentBackgroundColors]; }
 + (NSColor *)selectedContentBackgroundColor { return [NSColor controlAccentColor]; }
-+ (NSColor *)unemphasizedSelectedContentBackgroundColor { return [NSColor colorWithCalibratedWhite:0.863 alpha:1]; }
++ (NSColor *)unemphasizedSelectedContentBackgroundColor
+{
+    static NSColor *c;
+    if (!c) {
+        const CGFloat light[4] = {0.863, 0.863, 0.863, 1}, dark[4] = {0.27, 0.27, 0.28, 1};
+        c = [ADynamicColor(@"unemphasizedSelectedContentBackgroundColor", light, dark) retain];
+    }
+    return c;
+}
 + (NSColor *)alternateSelectedControlTextColor { return [NSColor whiteColor]; }
 + (NSColor *)unemphasizedSelectedTextColor { return [NSColor labelColor]; }
 + (NSColor *)selectedControlTextColor { return [NSColor controlTextColor]; }

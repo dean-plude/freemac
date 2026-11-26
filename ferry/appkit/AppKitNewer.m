@@ -457,8 +457,10 @@ static char header_key, visibility_key, attributed_key;
     +(NSColor *)name                                                                                                   \
     {                                                                                                                  \
         static NSColor *c;                                                                                             \
-        if (!c)                                                                                                        \
-            c = [[NSColor colorWithSRGBRed:0 green:0 blue:0 alpha:opacity] retain];                                     \
+        if (!c) {                                                                                                      \
+            const CGFloat light[4] = {0, 0, 0, opacity}, dark[4] = {1, 1, 1, opacity * 1.6};                           \
+            c = [ADynamicColor(@ #name, light, dark) retain];                                                          \
+        }                                                                                                              \
         return c;                                                                                                      \
     }
 @implementation NSColor (FerrySystemFills)
@@ -467,11 +469,11 @@ FILL(secondarySystemFillColor, 0.08)
 FILL(tertiarySystemFillColor, 0.05)
 FILL(quaternarySystemFillColor, 0.03)
 FILL(quinarySystemFillColor, 0.02)
+/* a colour that asks the provider for itself in the appearance it's drawn
+ * in (freemac 1.245) */
 + (NSColor *)colorWithName:(NSColorName)name dynamicProvider:(NSColor * (^)(NSAppearance *))provider
 {
-    NSAppearance *a = [NSAppearance currentDrawingAppearance] ?: [NSAppearance appearanceNamed:NSAppearanceNameAqua];
-    NSColor *c = provider ? provider(a) : nil;
-    return c ?: [NSColor clearColor];
+    return provider ? AColorWithProvider(name, provider) : [NSColor clearColor];
 }
 @end
 #undef FILL

@@ -2966,6 +2966,38 @@ Checked by hand in a headless Wayland session with a private bus: the
 menus, shortcuts, ticks and dimmed items read as Topline reads them, an item
 chosen over the bus runs its action, and `app.quit` ends the app.
 
+## Light and dark (freemac 1.245, Ferry 0.68.0)
+
+A Mac app is in freemac's appearance: `NSApp.effectiveAppearance` is
+DarkAqua while `org.gnome.desktop.interface`'s `color-scheme` is
+`prefer-dark` (Dials > Appearance > Dark, or Auto after sunset) and Aqua
+otherwise. `appkit/AppKitMore.m` reads the key through GSettings when the
+app starts and watches it from GLib's main context, which the run loop
+turns. `FERRY_APPEARANCE=dark` or `light` sets it instead.
+
+- An app stays light, as on a Mac, when its Info.plist has
+  `NSRequiresAquaSystemAppearance` or its program was linked against an SDK
+  before 10.14's (its `LC_BUILD_VERSION` or `LC_VERSION_MIN_MACOSX`). An
+  appearance the app, a window or a view sets is used for it.
+- `NSAppearance.currentAppearance` is the app's unless something set it;
+  drawing a view or window with an appearance of its own sets it for that
+  drawing.
+- The system colours (`NSGraphics.m`) are catalog colours in the System
+  list with a light and a dark set of components, read in the appearance
+  drawing is in when a component, `CGColor`, `set` or a colour space is
+  asked for. `colorWithName:dynamicProvider:` asks the provider once for
+  light and once for dark. `colorWithAlphaComponent:` on one keeps both.
+- When it changes: KVO on `effectiveAppearance` (the app and its windows),
+  `viewDidChangeEffectiveAppearance` and a redraw for every view,
+  `NSSystemColorsDidChangeNotification`,
+  `AppleInterfaceThemeChangedNotification` to the app's own observers of
+  the distributed centre, and `AppleInterfaceStyle` (Dark, or not there) in
+  the defaults' new global domain, which follows the desktop whatever the
+  app chose.
+
+Checked by `appkit_appearance`, and by hand with a private session bus and
+dconf: a running app hears both changes and its colours follow.
+
 ## Known limits (for every milestone)
 
 - **Apple silicon (arm64)-only apps** would need a CPU translator. Ferry runs
@@ -3051,3 +3083,4 @@ bridge in the `ferry` binary.
 - 2026-11-26: Ferry 0.65.0 (freemac 1.241): Ferry is on the freemac ISO and in Software Update, with libc++, 7-Zip and libcurl; buttons made in code draw through their cells (OBS's Qt 6 Mac style); OBS records the screen and its sound in Ferry's test setup.
 - 2026-11-26: Ferry 0.66.0 (freemac 1.242): NSString upper, lower and capitalized case in a given locale, through ICU (OBS Studio 33 asks at startup); OBS finishes its tour and records the microphone in Ferry's test setup.
 - 2026-11-26: Ferry 0.67.0 (freemac 1.244): a Mac app's main menu is in freemac's menu bar, published as GTK menus on the session bus, validated while the app is in front; its Window and Help items join Topline's own.
+- 2026-11-26: Ferry 0.68.0 (freemac 1.245): Mac apps follow freemac's light and dark mode, live; the system colours have dark values and are drawn in the appearance drawing is in; `make check` 340/340.

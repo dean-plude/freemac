@@ -425,4 +425,16 @@ void gdk_wayland_window_set_dbus_properties_libgtk_only(GdkWindow *window, const
                                                         const char *window_object_path,
                                                         const char *application_object_path,
                                                         const char *unique_bus_name);
+/* freemac's light or dark appearance, from its interface settings
+ * (AppKitMore.m, freemac 1.245, Ferry 0.68.0) */
+typedef struct _GSettings GSettings;
+typedef struct _GSettingsSchema GSettingsSchema;
+typedef struct _GSettingsSchemaSource GSettingsSchemaSource;
+GSettingsSchemaSource *g_settings_schema_source_get_default(void);
+GSettingsSchema *g_settings_schema_source_lookup(GSettingsSchemaSource *source, const char *schema_id,
+                                                 gboolean recursive);
+gboolean g_settings_schema_has_key(GSettingsSchema *schema, const char *name);
+void g_settings_schema_unref(GSettingsSchema *schema);
+GSettings *g_settings_new_full(GSettingsSchema *schema, void *backend, const char *path);
+char *g_settings_get_string(GSettings *settings, const char *key);
 #endif
