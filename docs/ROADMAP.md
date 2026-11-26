@@ -1183,6 +1183,16 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.255 "Sprites and stretchable pictures in layers" (done)
+
+Ferry 0.78.0: a Mac app's Core Animation layers now draw only the part of their image the app asks for, and stretch a picture in nine parts. Sprite sheets and film strips showed the whole sheet before, and buttons, bubbles and panels built from one small picture had their rounded corners stretched out of shape; now they draw as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `contentsRect` picks the part of a layer's image that is drawn, in the layer's own unit space | Ferry QuartzCore (QRender.m) | done |
+| 2 | `contentsCenter` stretches the image in nine parts, keeping its corners' size, at the image's `contentsScale` | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_contents_parts`, checked pixel by pixel | Ferry | done |
+
 ## 1.254 "Layers keep to their masks" (done)
 
 Ferry 0.77.0: a Mac app's Core Animation layer masks are now drawn. A round profile picture, a faded list edge or a shape cut out with a mask layer showed whole before; now the layer shows only where its mask is opaque, as on a Mac.

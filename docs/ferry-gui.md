@@ -1884,8 +1884,8 @@ The new or extended ones:
     are kept but not drawn.
   - CATransition keeps its type, subtype and timing, but nothing is drawn
     for it: the change shows at once.
-  - `contentsRect`, `contentsCenter` and `contentsScale` are stored but not
-    used when the contents are drawn.
+  - `contentsRect`, `contentsCenter` and `contentsScale` are drawn from
+    freemac 1.255 (Ferry 0.78.0); see "Parts of a layer's image" below.
   - Only the 2D part of a layer's transform is drawn. Perspective and
     rotations about x or y are kept and animate, but the drawing is flat.
   - A keyframe animation's `rotationMode` is ignored.
@@ -3241,4 +3241,17 @@ round avatar, a faded edge) and a mask's sublayers count too. Everything the
 layer draws is masked together: its background, contents, sublayers and
 border. The layer's shadow is cast by what the mask leaves, as on a Mac. The
 test `quartzcore_layer_masks` checks this pixel by pixel.
+
+## Parts of a layer's image (freemac 1.255, Ferry 0.78.0)
+
+A layer's `contentsRect` now picks the part of its image that is drawn, as
+sprite sheets and film strips use it, and `contentsCenter` stretches the image
+in nine parts, as buttons, bubbles and panels drawn from one small picture
+use it: the corners outside the centre keep their size (shrunk alike when the
+layer is too small for them), the edges stretch one way and the centre both.
+Both are in the layer's unit space, where y = 0 is the image's bottom, or its
+top when the layer is drawn flipped. `contentsScale` sets how many pixels of
+the image make a point, for the corners and for the gravities that keep the
+image's size. The test `quartzcore_layer_contents_parts` checks this pixel by
+pixel.
 
