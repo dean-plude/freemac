@@ -392,8 +392,8 @@ def open_app(path):
         return 1
     if not shutil.which("ferry"):
         notify(f"“{name}” is a Mac app",
-               "Mac apps open with Ferry, an optional add-on that isn't installed on this "
-               "computer.")
+               "Mac apps open with Ferry, freemac's runner for Mac apps, which isn't on this "
+               "computer. Software Update adds it.")
         return 1
     # Ferry stops at once, with a message naming the reason, when a program
     # needs something it doesn't have yet (a Mac framework such as AppKit).
