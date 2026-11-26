@@ -1183,6 +1183,15 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.242 "OBS opens again" (done)
+
+Ferry 0.66.0: NSString changes letter case in a given locale (`uppercaseStringWithLocale:`, `lowercaseStringWithLocale:` and `capitalizedStringWithLocale:`), with ICU's rules for that locale, so Turkish gets its dotted capital I. OBS Studio 33 calls one of these at startup, and without it OBS quit before its window opened. In Ferry's test setup OBS now goes through its whole tour (the main window, every Settings page, a source's properties and filters) and quits cleanly, and records a microphone tone at its own pitch and level.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Letter case in a given locale: upper case, lower case and capitalized, as ICU maps them for that locale; nil is no locale's | Ferry Foundation, SDK | done |
+| 2 | OBS Studio opens again and finishes its tour in Ferry's test setup, then records the microphone | Ferry (OBS task) | done |
+
 ## 1.241 "Ferry comes with freemac" (done)
 
 Ferry 0.65.0 is on the ISO: a new freemac has Ferry from the start, so a Mac app opens from Drawer, the dock or the app grid with its own icon, and a .dmg or .pkg opens in Ferry's Installer, with nothing to add first. Software Update brings Ferry to computers installed earlier. Its libraries come too: libc++ for apps written in C++, 7-Zip for disk images and libcurl for networking. Its package is still published beside the ISO for other Ubuntu computers. In Ferry's test setup, OBS Studio now records the screen with its sound: the Screen source captures the display at half size over a colour, and quitting OBS stops the recording and finishes the file (19 seconds of H.264 and AAC, a 440 Hz test tone recorded at its own pitch and level). Buttons that apps make in code now draw through their cells, as Qt 6's Mac style draws OBS's buttons.
