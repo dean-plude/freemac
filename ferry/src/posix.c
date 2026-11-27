@@ -748,8 +748,20 @@ static void trampoline_info(int s, siginfo_t *info, void *ctx)
     ((void (*)(int, struct mac_siginfo *, void *))mac_handler[s])(mi.signo, &mi, NULL);
 }
 
+/* SIGEMT and SIGINFO have no Linux signal, so nothing ever raises them; a
+ * program may still set and read their handlers (Node.js resets every
+ * signal at start), so those are kept here. */
+static struct mac_sigaction unraised[32];
+
 static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_sigaction *old)
 {
+    if (mac > 0 && mac < 32 && !mac_to_linux_sig[mac]) {
+        if (old)
+            *old = unraised[mac];
+        if (act)
+            unraised[mac] = *act;
+        return 0;
+    }
     int s = sig_or_fail(mac);
     if (s <= 0)
         return s == 0 ? (errno = EINVAL, -1) : -1;

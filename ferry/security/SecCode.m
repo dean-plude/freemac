@@ -334,6 +334,35 @@ S_EXPORT OSStatus SecRequirementCopyString(SecRequirementRef requirement, SecCSF
     return errSecSuccess;
 }
 
+/* A requirement as data (freemac 1.265, for Chromium): Ferry's requirements
+ * are their text, so the data is the text in UTF-8, and data made that way
+ * reads back. Apple's compiled requirement blobs (which start with the
+ * magic 0xfade0c00) aren't read: Ferry checks no signatures. */
+S_EXPORT OSStatus SecRequirementCopyData(SecRequirementRef requirement, SecCSFlags flags, CFDataRef *data)
+{
+    SRequirement *r = (SRequirement *)requirement;
+    if (!data || !r)
+        return errSecCSObjectRequired;
+    if (![r isKindOfClass:[SRequirement class]])
+        return errSecCSInvalidObjectRef;
+    *data = (CFDataRef)[[r->text dataUsingEncoding:NSUTF8StringEncoding] copy];
+    return errSecSuccess;
+}
+
+S_EXPORT OSStatus SecRequirementCreateWithData(CFDataRef data, SecCSFlags flags, SecRequirementRef *requirement)
+{
+    NSData *d = (NSData *)data;
+    if (!d || !requirement)
+        return errSecCSObjectRequired;
+    const unsigned char *b = d.bytes;
+    if (d.length >= 4 && b[0] == 0xfa && b[1] == 0xde && b[2] == 0x0c)
+        return errSecCSReqUnsupported;
+    NSString *text = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
+    if (!text)
+        return errSecCSReqInvalid;
+    return SecRequirementCreateWithString((CFStringRef)text, flags, requirement);
+}
+
 /* ---- tasks (SecTask.h) ----------------------------------------------------------------
  * The running program as a task. It has no entitlements and no signing
  * identifier, since Ferry reads no signature (see the top of this file). */

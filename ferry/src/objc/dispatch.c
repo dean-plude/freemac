@@ -90,6 +90,7 @@ struct dobj {
     unsigned long mask;
     uint64_t kid;
     int kregistered, kpending, kdone;
+    int mach_fd; /* a mach_send source: readable once the port is dead */
     struct dobj *next_k;
 };
 
@@ -1389,7 +1390,8 @@ long dispatch_semaphore_wait(struct dobj *s, uint64_t timeout)
 /* ---- sources ---------------------------------------------------------------- */
 
 /* DISPATCH_SOURCE_TYPE_TIMER and the others are addresses of variables. */
-enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_READ, S_WRITE, S_SIGNAL, S_PROC, S_VNODE, S_OTHER };
+enum { S_TIMER, S_DATA_ADD, S_DATA_OR, S_DATA_REPLACE, S_READ, S_WRITE, S_SIGNAL, S_PROC, S_VNODE, S_MACH_RECV, S_MACH_SEND,
+       S_OTHER };
 char ferry_dispatch_source_type_timer[16], ferry_dispatch_source_type_data_add[16],
     ferry_dispatch_source_type_data_or[16], ferry_dispatch_source_type_data_replace[16],
     ferry_dispatch_source_type_read[16], ferry_dispatch_source_type_write[16],
@@ -1411,8 +1413,8 @@ static const struct {
     {"signal", ferry_dispatch_source_type_signal, S_SIGNAL},
     {"proc", ferry_dispatch_source_type_proc, S_PROC},
     {"vnode", ferry_dispatch_source_type_vnode, S_VNODE},
-    {"mach_recv", ferry_dispatch_source_type_mach_recv, S_OTHER},
-    {"mach_send", ferry_dispatch_source_type_mach_send, S_OTHER},
+    {"mach_recv", ferry_dispatch_source_type_mach_recv, S_MACH_RECV},
+    {"mach_send", ferry_dispatch_source_type_mach_send, S_MACH_SEND},
     {"memorypressure", ferry_dispatch_source_type_memorypressure, S_OTHER},
 };
 
@@ -1430,12 +1432,13 @@ struct dobj *dispatch_source_create(const void *type, uintptr_t handle, unsigned
         }
     /* what a Mac refuses: a signal that isn't one, a descriptor that can't be */
     if ((t == S_SIGNAL && (handle == 0 || handle >= 32)) || ((t == S_READ || t == S_WRITE || t == S_VNODE) && handle > INT32_MAX) ||
-        (t == S_PROC && (handle == 0 || handle > INT32_MAX)))
+        (t == S_PROC && (handle == 0 || handle > INT32_MAX)) || ((t == S_MACH_RECV || t == S_MACH_SEND) && handle > UINT32_MAX))
         return NULL;
     struct dobj *s = new_object(K_SOURCE);
     s->source_type = t;
     s->handle = handle;
     s->mask = mask;
+    s->mach_fd = -1;
     s->target = dispatch_queue_create_with_target("source", NULL, q ? q : DEFAULT_Q);
     s->suspended = 1; /* a new source starts suspended */
     return s;
@@ -1558,8 +1561,10 @@ void dispatch_source_set_cancel_handler(struct dobj *s, void *block)
         _Block_release(old);
 }
 
-/* Read, write, signal and process sources wait on one kqueue (src/kqueue.c)
- * in a thread of their own. When it reports one, the source's data is
+/* Read, write, signal, process and Mach port sources wait on one kqueue
+ * (src/kqueue.c) in a thread of their own. A mach_recv source watches its
+ * port with EVFILT_MACHPORT and fires while messages wait, as a read source
+ * does; a mach_send source watches for its port's death (src/mach.c). When it reports one, the source's data is
  * merged (bytes ready, signals counted, process events or'ed) and its
  * handler queued on its target queue, as for a data source. A read or
  * write source is registered EV_DISPATCH and enabled again once its
@@ -1570,12 +1575,22 @@ static int kfd = -1;
 static struct dobj *ksources;
 static uint64_t next_kid;
 
+/* A source the kqueue re-enables after its handler: it fires again while
+ * its descriptor stays ready, or while messages wait on its port. */
+static int level_source(const struct dobj *s)
+{
+    return s->source_type == S_READ || s->source_type == S_WRITE || s->source_type == S_MACH_RECV;
+}
+
 static int ksource_change(struct dobj *s, int flags)
 {
     int16_t filter = s->source_type == S_READ ? FERRY_EVFILT_READ : s->source_type == S_WRITE ? FERRY_EVFILT_WRITE
                    : s->source_type == S_SIGNAL ? FERRY_EVFILT_SIGNAL
-                   : s->source_type == S_VNODE ? FERRY_EVFILT_VNODE : FERRY_EVFILT_PROC;
-    struct kevent64_s k = {.ident = s->handle, .filter = filter, .flags = (uint16_t)flags, .udata = s->kid};
+                   : s->source_type == S_VNODE ? FERRY_EVFILT_VNODE
+                   : s->source_type == S_MACH_RECV ? FERRY_EVFILT_MACHPORT
+                   : s->source_type == S_MACH_SEND ? FERRY_EVFILT_READ : FERRY_EVFILT_PROC;
+    uint64_t ident = s->source_type == S_MACH_SEND ? (uint64_t)s->mach_fd : s->handle;
+    struct kevent64_s k = {.ident = ident, .filter = filter, .flags = (uint16_t)flags, .udata = s->kid};
     if (s->source_type == S_PROC)
         k.fflags = (uint32_t)(s->mask | FERRY_NOTE_EXIT);
     if (s->source_type == S_VNODE) {
@@ -1601,9 +1616,9 @@ static void fire_ksource(void *ctx)
     s->data = 0;
     s->kpending = 0;
     pthread_mutex_unlock(&dq);
-    if (pending && (data || s->source_type == S_READ || s->source_type == S_WRITE))
+    if (pending && (data || level_source(s)))
         call_handler(s, data);
-    if (s->source_type == S_READ || s->source_type == S_WRITE) {
+    if (level_source(s)) {
         pthread_mutex_lock(&dq);
         if (!s->cancelled && s->kregistered == 1) /* under the lock, so a cancel can't come between */
             ksource_change(s, FERRY_EV_ENABLE);
@@ -1633,6 +1648,14 @@ static void *ksource_main(void *unused)
             case S_WRITE: s->data = ev[i].data > 0 ? (unsigned long)ev[i].data : 0; break;
             case S_SIGNAL: s->data += (unsigned long)ev[i].data; break;
             case S_VNODE: s->data |= ev[i].fflags & s->mask; break;
+            case S_MACH_RECV: break;
+            case S_MACH_SEND:
+                s->data |= 0x1 & s->mask; /* DISPATCH_MACH_SEND_DEAD */
+                if (!s->kdone) {
+                    s->kdone = 1;
+                    live_ksources--;
+                }
+                break;
             case S_PROC:
                 s->data |= ev[i].fflags & s->mask;
                 if ((ev[i].flags & FERRY_EV_EOF) && !s->kdone) {
@@ -1670,12 +1693,16 @@ static void ksource_start_locked(struct dobj *s)
         pthread_attr_destroy(&a);
     }
     s->kid = ++next_kid;
-    int flags = FERRY_EV_ADD | (s->source_type == S_READ || s->source_type == S_WRITE ? FERRY_EV_DISPATCH : 0);
+    if (s->source_type == S_MACH_SEND && s->mach_fd < 0)
+        s->mach_fd = ferry_mach_port_fd((uint32_t)s->handle, 1);
+    int flags = FERRY_EV_ADD | (level_source(s) ? FERRY_EV_DISPATCH : 0) |
+                (s->source_type == S_MACH_SEND ? FERRY_EV_ONESHOT : 0);
     if (ksource_change(s, flags) < 0) {
         int e = errno;
         fprintf(stderr, "ferry: a dispatch %s source for %lu can't be watched (%s); it won't fire\n",
                 s->source_type == S_READ ? "read" : s->source_type == S_WRITE ? "write"
-                : s->source_type == S_SIGNAL ? "signal" : s->source_type == S_VNODE ? "vnode" : "process",
+                : s->source_type == S_SIGNAL ? "signal" : s->source_type == S_VNODE ? "vnode"
+                : s->source_type == S_MACH_RECV ? "mach_recv" : s->source_type == S_MACH_SEND ? "mach_send" : "process",
                 (unsigned long)s->handle, strerror(e));
         s->kregistered = -1;
         return;
@@ -1691,7 +1718,8 @@ static void ksource_start_locked(struct dobj *s)
 static void ksource_resumed_locked(struct dobj *s)
 {
     if (s->source_type != S_READ && s->source_type != S_WRITE && s->source_type != S_SIGNAL &&
-        s->source_type != S_PROC && s->source_type != S_VNODE)
+        s->source_type != S_PROC && s->source_type != S_VNODE && s->source_type != S_MACH_RECV &&
+        s->source_type != S_MACH_SEND)
         return;
     if (s->cancelled)
         return;
@@ -1723,6 +1751,10 @@ static int ksource_forget_locked(struct dobj *s)
 static void ksource_unwatch(struct dobj *s)
 {
     ksource_change(s, FERRY_EV_DELETE); /* fails when the descriptor was closed first, which is fine */
+    if (s->mach_fd >= 0) {
+        close(s->mach_fd);
+        s->mach_fd = -1;
+    }
     objc_release((id)s);
 }
 

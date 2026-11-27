@@ -509,6 +509,22 @@ CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float prefer
 @property CAFrameRateRange preferredFrameRateRange;
 @end
 
+/* What Chromium calls besides (freemac 1.265, quartzcore/CAElectron.m): a
+ * handler for around the transaction's commit (run once, after it, at the
+ * main thread's next pass, whatever the phase); a layer's contents changed
+ * in place; high dynamic range metadata, kept (freemac's screens show
+ * standard range). */
+typedef NS_ENUM(NSInteger, CATransactionPhase) {
+    kCATransactionPhasePreLayout = 0, kCATransactionPhasePreCommit = 1, kCATransactionPhasePostCommit = 2
+};
+@interface CATransaction (FerryElectron)
++ (void)addCommitHandler:(void (^)(void))block forPhase:(CATransactionPhase)phase;
+@end
+@interface CALayer (FerryElectron)
+- (void)setContentsChanged;
+@property (strong) id EDRMetadata;
+@end
+
 /* OpenGL layers (freemac 1.235) */
 #import <QuartzCore/CAOpenGLLayer.h>
 

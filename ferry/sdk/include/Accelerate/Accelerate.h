@@ -73,4 +73,38 @@ CGImageRef vImageCreateCGImageFromBuffer(const vImage_Buffer *buf, const vImage_
                                          vImage_Flags flags, vImage_Error *error);
 vImage_Error vImageCopyBuffer(const vImage_Buffer *src, const vImage_Buffer *dest, size_t pixelSize, vImage_Flags flags);
 
+
+/* ---- vDSP (freemac 1.265, Ferry 0.88.0): the calls in media/Accelerate.m ---------- */
+typedef unsigned long vDSP_Length;
+typedef long vDSP_Stride;
+typedef struct DSPComplex { float real, imag; } DSPComplex;
+typedef struct DSPSplitComplex { float *realp, *imagp; } DSPSplitComplex;
+typedef struct OpaqueFFTSetup *FFTSetup;
+typedef int FFTDirection;
+typedef int FFTRadix;
+enum { kFFTDirection_Forward = +1, kFFTDirection_Inverse = -1 };
+enum { kFFTRadix2 = 0, kFFTRadix3 = 1, kFFTRadix5 = 2 };
+enum { FFT_FORWARD = kFFTDirection_Forward, FFT_INVERSE = kFFTDirection_Inverse, FFT_RADIX2 = kFFTRadix2 };
+void vDSP_vadd(const float *A, vDSP_Stride IA, const float *B, vDSP_Stride IB, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_vsub(const float *B, vDSP_Stride IB, const float *A, vDSP_Stride IA, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_vmul(const float *A, vDSP_Stride IA, const float *B, vDSP_Stride IB, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_vsmul(const float *A, vDSP_Stride IA, const float *B, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_vsadd(const float *A, vDSP_Stride IA, const float *B, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_vsma(const float *A, vDSP_Stride IA, const float *B, const float *C, vDSP_Stride IC, float *D,
+               vDSP_Stride ID, vDSP_Length N);
+void vDSP_vclip(const float *A, vDSP_Stride IA, const float *B, const float *C, float *D, vDSP_Stride ID, vDSP_Length N);
+void vDSP_maxmgv(const float *A, vDSP_Stride IA, float *C, vDSP_Length N);
+void vDSP_svesq(const float *A, vDSP_Stride IA, float *C, vDSP_Length N);
+void vDSP_conv(const float *A, vDSP_Stride IA, const float *F, vDSP_Stride IF, float *C, vDSP_Stride IC,
+               vDSP_Length N, vDSP_Length P);
+void vDSP_deq22(const float *A, vDSP_Stride IA, const float *B, float *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_deq22D(const double *A, vDSP_Stride IA, const double *B, double *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_ctoz(const DSPComplex *C, vDSP_Stride IC, const DSPSplitComplex *Z, vDSP_Stride IZ, vDSP_Length N);
+void vDSP_ztoc(const DSPSplitComplex *Z, vDSP_Stride IZ, DSPComplex *C, vDSP_Stride IC, vDSP_Length N);
+void vDSP_zvmul(const DSPSplitComplex *A, vDSP_Stride IA, const DSPSplitComplex *B, vDSP_Stride IB,
+                const DSPSplitComplex *C, vDSP_Stride IC, vDSP_Length N, int Conjugate);
+FFTSetup vDSP_create_fftsetup(vDSP_Length Log2n, FFTRadix Radix);
+void vDSP_destroy_fftsetup(FFTSetup setup);
+void vDSP_fft_zrip(FFTSetup Setup, const DSPSplitComplex *C, vDSP_Stride IC, vDSP_Length Log2N, FFTDirection Direction);
+
 #endif

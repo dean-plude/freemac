@@ -1,0 +1,11 @@
+first is the default zone: yes, zones 1
+a new zone is listed: zones 2
+unregistered: zones 1
+after the swap the first is mine: yes, zones 2
+its name: MyZone
+still works
+back to the default: yes
+stack: 0, holds it yes, read-write yes, count 9
+the lowest region: 0, above zero yes
+past the end: KERN_INVALID_ADDRESS
+exit=0

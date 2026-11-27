@@ -90,6 +90,7 @@ _Static_assert(sizeof(struct mac_attr) == 64, "Mac thread attribute is 64 bytes"
 #define MAC_SCOPE_SYSTEM 1
 #define MAC_INHERIT_SCHED 1
 #define MAC_STACK_MIN 8192
+#define FERRY_STACK_FLOOR ((size_t)256 * 1024)
 #define MAC_QOS_DEFAULT 0x15
 
 static int err(int linux_errno) { return ferry_errno_to_mac(linux_errno); }
@@ -203,7 +204,7 @@ static void run_cleanup_handlers(void)
 
 /* A Mac thread's own block (freemac 1.232, Ferry 0.56.0). On an Intel Mac
  * the gs register points at the running thread's block of thread-specific
- * slots, as xnu's published libsyscall/os/tsd.h lays out: slot 0 holds the
+ * slots, as code built for a Mac expects to find it: slot 0 holds the
  * thread itself, and pthread keys and the system's direct keys follow. Code
  * built for a Mac reads it directly, as Qt's QThread::currentThreadId does
  * ("mov %gs:0"). Linux leaves gs unused on x86-64 (its threads use fs), so
@@ -321,6 +322,23 @@ static unsigned mac_pthread_mach_thread_np(pthread_t t)
 }
 
 static unsigned mac_mach_thread_self(void) { return (unsigned)gettid_now(); }
+
+/* The thread a Mach thread port (here its thread id) names, among those
+ * Ferry knows of; 0 for any other. */
+static pthread_t mac_pthread_from_mach_thread_np(unsigned port)
+{
+    if ((pid_t)port == getpid())
+        return main_thread;
+    pthread_t found = 0;
+    pthread_mutex_lock(&known_lock);
+    for (struct known *k = known_threads; k; k = k->next)
+        if ((unsigned)k->tid == port) {
+            found = k->t;
+            break;
+        }
+    pthread_mutex_unlock(&known_lock);
+    return found;
+}
 
 /* A Mac thread names itself; this system keeps 15 characters of it. */
 static int mac_pthread_setname_np(const char *name)
@@ -501,8 +519,12 @@ static int mac_pthread_attr_setstacksize(struct mac_attr *a, size_t size)
 {
     if (size < MAC_STACK_MIN)
         return err(EINVAL);
-    if (size < (size_t)PTHREAD_STACK_MIN)
-        size = (size_t)PTHREAD_STACK_MIN;
+    /* A Mac thread may ask for as little as 8 KB, but this system's thread
+     * start (its guard page and thread-local storage come out of the same
+     * stack) and Ferry's own calls need more, so a small stack is made
+     * 256 KB. The pages are only used as the thread touches them. */
+    if (size < FERRY_STACK_FLOOR)
+        size = FERRY_STACK_FLOOR;
     return err(pthread_attr_setstacksize(&a->a, size));
 }
 
@@ -896,21 +918,63 @@ static int mac_pthread_rwlock_unlock(struct mac_rwlock *l) { return err(pthread_
 
 /* ---- thread-specific data ------------------------------------------------------------- */
 
-/* A Mac key is an unsigned long, this system's an unsigned int. */
+/* A Mac key is an unsigned long, this system's an unsigned int. A Mac
+ * program's keys are slots of its thread's block, from 256 on (freemac
+ * 1.265): code built for a Mac may read a key's value straight from
+ * %gs:key*8, as Chromium's thread-local storage does, so the value lives
+ * in the block. This system's key, 256 below, keeps the same value too,
+ * so the key's destructor runs at the thread's exit. Keys past the block's
+ * end keep their value in this system's key alone. */
+#define MAC_KEY_BASE 256
+
 static int mac_pthread_key_create(unsigned long *key, void (*destructor)(void *))
 {
     pthread_key_t k;
     int rc = pthread_key_create(&k, destructor);
     if (!rc)
-        *key = k;
+        *key = (unsigned long)k + MAC_KEY_BASE;
     return err(rc);
 }
 
-static int mac_pthread_key_delete(unsigned long key) { return err(pthread_key_delete((pthread_key_t)key)); }
-static void *mac_pthread_getspecific(unsigned long key) { return pthread_getspecific((pthread_key_t)key); }
+static int linux_key(unsigned long key, pthread_key_t *k)
+{
+    if (key < MAC_KEY_BASE || key - MAC_KEY_BASE > 0xffffffffu)
+        return 0;
+    *k = (pthread_key_t)(key - MAC_KEY_BASE);
+    return 1;
+}
+
+static int mac_pthread_key_delete(unsigned long key)
+{
+    pthread_key_t k;
+    if (!linux_key(key, &k))
+        return 22; /* EINVAL */
+    return err(pthread_key_delete(k));
+}
+
+static void *mac_pthread_getspecific(unsigned long key)
+{
+    if (key < MAC_TSD_SLOTS) {
+        if (!mac_tsd[0])
+            ferry_thread_tsd_init();
+        return mac_tsd[key];
+    }
+    pthread_key_t k;
+    return linux_key(key, &k) ? pthread_getspecific(k) : NULL;
+}
+
 static int mac_pthread_setspecific(unsigned long key, const void *value)
 {
-    return err(pthread_setspecific((pthread_key_t)key, value));
+    pthread_key_t k;
+    if (!linux_key(key, &k))
+        return 22;
+    int rc = pthread_setspecific(k, value);
+    if (!rc && key < MAC_TSD_SLOTS) {
+        if (!mac_tsd[0])
+            ferry_thread_tsd_init();
+        mac_tsd[key] = (void *)value;
+    }
+    return err(rc);
 }
 
 /* ---- os_unfair_lock and OSSpinLock ----------------------------------------------------
@@ -979,7 +1043,7 @@ static int mac_sched_yield(void) { return sched_yield(); }
 #define F(name) {#name, (void *)mac_##name}
 const struct ferry_symbol ferry_pthread_symbols[] = {
     F(pthread_create), F(pthread_join), F(pthread_detach), F(pthread_self), F(pthread_equal), F(pthread_exit),
-    F(pthread_main_np), F(pthread_is_threaded_np), F(pthread_threadid_np), F(pthread_mach_thread_np),
+    F(pthread_main_np), F(pthread_is_threaded_np), F(pthread_threadid_np), F(pthread_mach_thread_np), F(pthread_from_mach_thread_np),
     F(mach_thread_self), F(pthread_setname_np), F(pthread_getname_np), F(pthread_get_stacksize_np),
     F(pthread_get_stackaddr_np), F(pthread_once), F(pthread_getschedparam), F(pthread_setschedparam),
     F(sched_get_priority_max), F(sched_get_priority_min), F(sched_yield), F(pthread_setcancelstate),

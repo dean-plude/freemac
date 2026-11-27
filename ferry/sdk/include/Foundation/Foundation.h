@@ -484,6 +484,7 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 @property (readonly, copy) NSString *stringByExpandingTildeInPath;
 @property (readonly, copy) NSString *stringByAbbreviatingWithTildeInPath;
 @property (readonly, copy) NSString *stringByStandardizingPath;
+@property (readonly, copy) NSString *stringByResolvingSymlinksInPath;
 @property (readonly) BOOL isAbsolutePath;
 @property (readonly) const char *fileSystemRepresentation NS_RETURNS_INNER_POINTER;
 - (NSString *)stringByAppendingPathComponent:(NSString *)component;
@@ -2073,6 +2074,17 @@ typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
 + (NSArray<NSString *> *)preferredLocalizationsFromArray:(NSArray<NSString *> *)localizations;
 + (NSArray<NSString *> *)preferredLocalizationsFromArray:(NSArray<NSString *> *)localizations
                                           forPreferences:(NSArray<NSString *> *)preferences;
+- (NSString *)pathForResource:(NSString *)name
+                       ofType:(NSString *)ext
+                  inDirectory:(NSString *)subpath
+              forLocalization:(NSString *)localization;
+- (NSArray<NSString *> *)pathsForResourcesOfType:(NSString *)ext
+                                     inDirectory:(NSString *)subpath
+                                 forLocalization:(NSString *)localization;
+- (NSURL *)URLForResource:(NSString *)name
+            withExtension:(NSString *)ext
+             subdirectory:(NSString *)subpath
+             localization:(NSString *)localization;
 @end
 #define NSLocalizedString(key, comment) [[NSBundle mainBundle] localizedStringForKey:(key) value:@"" table:nil]
 #define NSLocalizedStringFromTable(key, tbl, comment) \

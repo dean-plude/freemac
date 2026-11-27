@@ -64,11 +64,6 @@ static NSMutableArray *search_handlers;
 }
 @end
 
-@implementation NSScreen (FerryGodot)
-/* The most frames a second the screen shows: Ferry draws at 60 */
-- (NSInteger)maximumFramesPerSecond { return 60; }
-@end
-
 @implementation NSWorkspace (FerryGodot)
 /* Each URL is opened as openURL: opens it, as with the older form; the
  * desktop picks the program, so there is no Mac application to answer. */

@@ -93,6 +93,10 @@ boolean_t CGDisplayIsActive(CGDirectDisplayID d) { return screen_numbered(d) != 
 boolean_t CGDisplayIsOnline(CGDirectDisplayID d) { return CGDisplayIsActive(d); }
 boolean_t CGDisplayIsBuiltin(CGDirectDisplayID d) { return CGDisplayIsMain(d); }
 boolean_t CGDisplayUsesOpenGLAcceleration(CGDirectDisplayID d) { return CGDisplayIsActive(d); }
+/* Grayscale and inverted colours are accessibility display settings that
+ * Ferry's displays never turn on. */
+boolean_t CGDisplayUsesForceToGray(void) { return 0; }
+boolean_t CGDisplayUsesInvertedPolarity(void) { return 0; }
 
 /* ---- fades: a borderless window over every screen, its alpha the blend ----------------- */
 
