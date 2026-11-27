@@ -84,8 +84,9 @@ static id through_function(CAValueFunction *f, id v)
 - (NSString *)keyPath { return _keyPath; }
 - (void)setKeyPath:(NSString *)path
 {
-    [_keyPath release];
+    id wasKeyPath = _keyPath;
     _keyPath = [path copy];
+    [wasKeyPath release];
 }
 - (BOOL)isAdditive { return _additive; }
 - (void)setAdditive:(BOOL)flag { _additive = flag; }

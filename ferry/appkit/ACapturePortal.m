@@ -845,8 +845,9 @@ static NSArray *wl_output_displays(void)
         }
         WL.display_disconnect(display);
     }
-    [kept release];
+    id wasKept = kept;
     kept = [out copy];
+    [wasKept release];
     keptAt = now_ns();
     pthread_mutex_unlock(&lock);
     return out;

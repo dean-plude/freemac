@@ -94,8 +94,9 @@ static NSIndexPath *IP(NSInteger section, NSInteger item) { return [NSIndexPath 
 {
     if (identifier == _identifier)
         return;
-    [_identifier release];
+    id wasIdentifier = _identifier;
     _identifier = [identifier copy];
+    [wasIdentifier release];
 }
 - (NSArray *)draggingImageComponents { return [NSArray array]; }
 - (void)prepareForReuse {}
@@ -686,8 +687,9 @@ GRID_PROP(NSSize, maximumItemSize, setMaximumItemSize, _max)
 {
     if (colors == _colors)
         return;
-    [_colors release];
+    id wasColors = _colors;
     _colors = [colors copy];
+    [wasColors release];
     [[self collectionView] setNeedsDisplay:YES];
 }
 
@@ -2380,8 +2382,9 @@ static NSComparisonResult (^by_place)(id, id) = ^NSComparisonResult(id a, id b) 
 {
     if (content == _content)
         return;
-    [_content release];
+    id wasContent = _content;
     _content = [content copy];
+    [wasContent release];
     [self _reloadLegacy];
 }
 - (NSCollectionViewItem *)itemPrototype { return _prototype; }

@@ -102,8 +102,9 @@ static NSColorPanelMode picker_mode = NSColorPanelModeWheel;
 {
     if (!color)
         return;
-    [_color release];
+    id wasColor = _color;
     _color = [color copy];
+    [wasColor release];
     if (_chooser) {
         CGFloat c[4];
         AColorRGBA(_color, c);
@@ -126,8 +127,9 @@ static NSColorPanelMode picker_mode = NSColorPanelModeWheel;
 - (NSView *)accessoryView { return _accessory; }
 - (void)setAccessoryView:(NSView *)v
 {
-    [_accessory release];
+    id wasAccessory = _accessory;
     _accessory = [v retain];
+    [wasAccessory release];
 }
 - (void)setTarget:(id)target { _target = target; }
 - (void)setAction:(SEL)action { _action = action; }
@@ -258,8 +260,9 @@ static int on_delete(GtkWidget *dialog, GdkEvent *event, void *data)
 {
     if (!color)
         return;
-    [_color release];
+    id wasColor = _color;
     _color = [color copy];
+    [wasColor release];
     [self setNeedsDisplay:YES];
 }
 - (id)objectValue { return _color; }

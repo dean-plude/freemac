@@ -955,8 +955,9 @@ static NSMutableDictionary *global_class_names(void)
 - (void)_ferrySetFacade:(NSCoder *)facade name:(NSString *)name
 {
     _facade = facade;
-    [_archiverName release];
+    id wasArchiverName = _archiverName;
     _archiverName = [name copy];
+    [wasArchiverName release];
 }
 @end
 

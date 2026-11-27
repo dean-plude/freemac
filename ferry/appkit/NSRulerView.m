@@ -227,8 +227,9 @@ static void ensure_units(void)
     ensure_units();
     if (![units objectForKey:name])
         [NSException raise:NSInvalidArgumentException format:@"NSRulerView: unknown measurement units %@", name];
-    [_units release];
+    id wasUnits = _units;
     _units = [name copy];
+    [wasUnits release];
     [self invalidateHashMarks];
 }
 - (CGFloat)originOffset { return _originOffset; }

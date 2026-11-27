@@ -241,8 +241,9 @@ static const CGFloat track_width = 4;
 - (NSColor *)trackFillColor { return _trackFill; }
 - (void)setTrackFillColor:(NSColor *)c
 {
-    [_trackFill release];
+    id wasTrackFill = _trackFill;
     _trackFill = [c retain];
+    [wasTrackFill release];
     [self setNeedsDisplay:YES];
 }
 - (CGFloat)_knobSize

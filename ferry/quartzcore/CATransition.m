@@ -51,14 +51,16 @@ CATransitionSubtype const kCATransitionFromBottom = @"fromBottom";
 - (NSString *)type { return _type; }
 - (void)setType:(NSString *)type
 {
-    [_type release];
+    id wasType = _type;
     _type = [type copy];
+    [wasType release];
 }
 - (NSString *)subtype { return _subtype; }
 - (void)setSubtype:(NSString *)subtype
 {
-    [_subtype release];
+    id wasSubtype = _subtype;
     _subtype = [subtype copy];
+    [wasSubtype release];
 }
 - (float)startProgress { return _startProgress; }
 - (void)setStartProgress:(float)p { _startProgress = fmax(0, fmin(1, p)); }

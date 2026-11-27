@@ -268,6 +268,9 @@ run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 # Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
 # what VLC's core asks of libSystem (1.232).
 run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
+# shm_open, the va_list _l printing calls and condition waits that don't
+# wake early, for darktable (freemac darktable work)
+run_one libsystem_darktable "$here/libsystem_darktable.c" "$here/libsystem_darktable.out"
 # uuid(3), the older task_info flavors and vm_page_size, for OBS's libobs
 run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
@@ -1911,6 +1914,10 @@ fi
 # FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
 # A view drawn as Qt 6's Cocoa plugin draws one (OBS): its own setLayer:
 # and container layer, displayLayer:, and an IOSurface as the contents.
+# GTK 3's window view (darktable): a layer for a view that overrides
+# wantsLayer, drawn in updateLayer from a CVPixelBuffer; collation without a collator
+run_one appkit_darktable_calls "$here/appkit/darktable_calls.m" "$here/appkit/darktable_calls.out" -fobjc-arc \
+    -framework Cocoa -framework CoreVideo -framework CoreServices
 run_one appkit_qt_layers "$here/appkit/qt_layers.m" "$here/appkit/qt_layers.out" -fobjc-arc -framework Cocoa \
     -framework QuartzCore -framework IOSurface
 # Buttons drawn through their cells, as Qt 6's Mac style draws them (OBS).

@@ -100,16 +100,18 @@ static NSAnimationContext *standing;
 - (CAMediaTimingFunction *)timingFunction { return _timing; }
 - (void)setTimingFunction:(CAMediaTimingFunction *)function
 {
-    [_timing release];
+    id wasTiming = _timing;
     _timing = [function retain];
+    [wasTiming release];
     if (_grouped)
         [CATransaction setAnimationTimingFunction:function];
 }
 - (void (^)(void))completionHandler { return _completion; }
 - (void)setCompletionHandler:(void (^)(void))handler
 {
-    [_completion release];
+    id wasCompletion = _completion;
     _completion = [handler copy];
+    [wasCompletion release];
     if (_grouped)
         [CATransaction setCompletionBlock:handler];
 }

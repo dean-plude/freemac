@@ -141,8 +141,9 @@ static void place(NSMutableArray *places, NSRunLoop *loop, NSString *mode, BOOL 
 - (NSData *)TXTRecordData { return _txt; }
 - (BOOL)setTXTRecordData:(NSData *)recordData
 {
-    [_txt release];
+    id wasTxt = _txt;
     _txt = [recordData copy];
+    [wasTxt release];
     return YES;
 }
 

@@ -264,8 +264,9 @@ static const CGFloat scroller_width = 15;
 - (NSColor *)backgroundColor { return _background ?: [NSColor controlBackgroundColor]; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c copy];
+    [wasBackground release];
     [self setNeedsDisplay:YES];
 }
 - (BOOL)copiesOnScroll { return _copiesOnScroll; }
@@ -505,8 +506,9 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
         return;
     if ([_clip superview] == self)
         [_clip removeFromSuperview];
-    [_clip release];
+    id wasClip = _clip;
     _clip = [clip retain];
+    [wasClip release];
     if ([clip superview] != self)
         [self addSubview:clip positioned:NSWindowBelow relativeTo:nil];
     [self tile];
@@ -545,8 +547,9 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 {
     if (_vertical != s) {
         [_vertical removeFromSuperview];
-        [_vertical release];
+        id wasVertical = _vertical;
         _vertical = [s retain];
+        [wasVertical release];
     }
     [self _adopt:s];
     [self tile];
@@ -564,8 +567,9 @@ static NSSize border_size(NSBorderType t) { return t == NSNoBorder ? NSZeroSize 
 {
     if (_horizontal != s) {
         [_horizontal removeFromSuperview];
-        [_horizontal release];
+        id wasHorizontal = _horizontal;
         _horizontal = [s retain];
+        [wasHorizontal release];
     }
     [self _adopt:s];
     [self tile];

@@ -611,8 +611,9 @@ WebView *WSWebViewOf(GtkWidget *web) { return web ? (WebView *)g_object_get_data
 - (void)_setFrame:(WebFrame *)frame { _frame = frame; }
 - (void)_setResponse:(NSURLResponse *)response
 {
-    [_response release];
+    id wasResponse = _response;
     _response = [response retain];
+    [wasResponse release];
 }
 - (void)_setLoading:(BOOL)loading { _loading = loading; }
 
@@ -728,8 +729,9 @@ static NSString *const frame_tree_script =
 {
     if ([name isEqualToString:_name])
         return;
-    [_name release];
+    id wasName = _name;
     _name = [name copy];
+    [wasName release];
 }
 
 - (GtkWidget *)_web { return [[_webView _wk] _gtkWebView]; }
@@ -891,8 +893,9 @@ static NSString *const frame_tree_script =
 /* the navigation this frame is about to ask about is its own */
 - (void)_announce:(NSString *)url
 {
-    [_announced release];
+    id wasAnnounced = _announced;
     _announced = [url copy];
+    [wasAnnounced release];
 }
 
 - (void)_inFrame:(NSString *)body
@@ -2164,8 +2167,9 @@ static WebHistoryItem *item_of(WKBackForwardListItem *wk)
 - (NSString *)applicationNameForUserAgent { return _applicationName; }
 - (void)setApplicationNameForUserAgent:(NSString *)name
 {
-    [_applicationName release];
+    id wasApplicationName = _applicationName;
     _applicationName = [name copy];
+    [wasApplicationName release];
     [_wk _setApplicationName:name];
 }
 - (NSString *)userAgentForURL:(NSURL *)URL
@@ -2288,8 +2292,9 @@ static WebHistoryItem *item_of(WKBackForwardListItem *wk)
 - (NSString *)groupName { return _groupName; }
 - (void)setGroupName:(NSString *)name
 {
-    [_groupName release];
+    id wasGroupName = _groupName;
     _groupName = [name copy];
+    [wasGroupName release];
 }
 
 - (WebScriptObject *)windowScriptObject { return _windowScriptObject; }

@@ -187,14 +187,16 @@ static void on_terminated(GtkWidget *web, int reason, void *data);
     BOOL back = WK(webkit_web_view_can_go_back)(_web), forward = WK(webkit_web_view_can_go_forward)(_web);
     if (title != _title && ![title isEqualToString:_title]) {
         [self willChangeValueForKey:@"title"];
-        [_title release];
+        id wasTitle = _title;
         _title = [title copy];
+        [wasTitle release];
         [self didChangeValueForKey:@"title"];
     }
     if (url != _URL && ![url isEqual:_URL]) {
         [self willChangeValueForKey:@"URL"];
-        [_URL release];
+        id wasURL = _URL;
         _URL = [url retain];
+        [wasURL release];
         [self didChangeValueForKey:@"URL"];
     }
     if (loading != _loading) {
@@ -240,8 +242,9 @@ static void on_list_changed(WebKitBackForwardList *list, void *item, void *remov
     if (!_web)
         return nil;
     WKNavigation *n = [[[WKNavigation alloc] init] autorelease];
-    [_pending release];
+    id wasPending = _pending;
     _pending = [n retain];
+    [wasPending release];
     return n;
 }
 

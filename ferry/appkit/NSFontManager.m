@@ -670,8 +670,9 @@ static NSFont *make_font(NSString *family, int weight, int style, CGFloat size)
         return;
     [self retain];
     [chosen retain];
-    [_chosen release];
+    id wasChosen = _chosen;
     _chosen = [chosen retain];
+    [wasChosen release];
     _sending = YES;
     if (_enabled)
         [[NSFontManager sharedFontManager] modifyFontViaPanel:self];

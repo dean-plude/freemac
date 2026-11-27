@@ -543,8 +543,9 @@ enum { SEG_PAD = 10, SEG_HEIGHT = 22 };
 - (NSColor *)selectedSegmentBezelColor { return _selectedBezel; }
 - (void)setSelectedSegmentBezelColor:(NSColor *)c
 {
-    [_selectedBezel release];
+    id wasSelectedBezel = _selectedBezel;
     _selectedBezel = [c copy];
+    [wasSelectedBezel release];
     [self setNeedsDisplay:YES];
 }
 - (BOOL)isSpringLoaded { return _springLoaded; }

@@ -320,8 +320,9 @@ static NSString *const objects_did_change = @"NSObjectsChangedInManagingContextN
     [self willChangeValueForKey:@"arrangedObjects"];
     [_arrangedProxy _contentWillChange];
     [_arranged setArray:arranged];
-    [_selectionIndexes release];
+    id wasSelectionIndexes = _selectionIndexes;
     _selectionIndexes = [sel copy];
+    [wasSelectionIndexes release];
     [_arrangedProxy _contentDidChange];
     [self didChangeValueForKey:@"arrangedObjects"];
     if (selectionChanges) {
@@ -341,8 +342,9 @@ static NSString *const objects_did_change = @"NSObjectsChangedInManagingContextN
     for (NSString *k in selection_keys())
         [self willChangeValueForKey:k];
     [_selectionProxy _sourceWillChange];
-    [_selectionIndexes release];
+    id wasSelectionIndexes = _selectionIndexes;
     _selectionIndexes = [sel copy];
+    [wasSelectionIndexes release];
     [_selectionProxy _sourceDidChange];
     for (NSString *k in [selection_keys() reverseObjectEnumerator])
         [self didChangeValueForKey:k];
@@ -378,8 +380,9 @@ static NSString *const objects_did_change = @"NSObjectsChangedInManagingContextN
 - (void)setSortDescriptors:(NSArray *)d
 {
     [self willChangeValueForKey:@"sortDescriptors"];
-    [_sortDescriptors release];
+    id wasSortDescriptors = _sortDescriptors;
     _sortDescriptors = [d copy];
+    [wasSortDescriptors release];
     [self didChangeValueForKey:@"sortDescriptors"];
     ABindingPush(self, NSSortDescriptorsBinding);
     [self rearrangeObjects];

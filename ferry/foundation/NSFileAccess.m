@@ -870,8 +870,9 @@ static void on_queue(id presenter, void (^block)(void))
 - (NSString *)purposeIdentifier { return _purpose; }
 - (void)setPurposeIdentifier:(NSString *)p
 {
-    [_purpose release];
+    id wasPurpose = _purpose;
     _purpose = [p copy];
+    [wasPurpose release];
 }
 - (void)cancel {}
 - (void)coordinateReadingItemAtURL:(NSURL *)url options:(NSFileCoordinatorReadingOptions)options

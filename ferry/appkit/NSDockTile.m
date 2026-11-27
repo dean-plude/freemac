@@ -142,8 +142,9 @@ void ADockLaunched(void)
 {
     if (menu == nib_menu)
         return;
-    [nib_menu release];
+    id wasNib_menu = nib_menu;
     nib_menu = [menu retain];
+    [wasNib_menu release];
     if (launched)
         ADockLaunched();
 }
@@ -301,8 +302,9 @@ NSInteger ADockRequestAttention(NSInteger type)
         if (!rep)
             return;
         [v cacheDisplayInRect:bounds toBitmapImageRep:rep];
-        [_picture release];
+        id wasPicture = _picture;
         _picture = [rep retain];
+        [wasPicture release];
         if (!getenv("WAYLAND_DISPLAY") && !getenv("DISPLAY"))
             return;
         if (!ADisplayAvailable())

@@ -17,6 +17,9 @@ __FERRY_BEGIN
 void *mmap(void *, size_t, int, int, int, off_t);
 int munmap(void *, size_t);
 int mprotect(void *, size_t, int);
+/* named shared memory (freemac darktable work); flags are a Mac's O_ flags */
+int shm_open(const char *, int, ...);
+int shm_unlink(const char *);
 /* freemac 1.232 (VLC): advice on how memory will be used */
 #define MADV_NORMAL 0
 #define MADV_RANDOM 1

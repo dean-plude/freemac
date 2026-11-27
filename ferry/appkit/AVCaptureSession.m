@@ -634,8 +634,9 @@ static NSArray<NSNumber *> *offered_formats(void)
 {
     pthread_mutex_lock(&_lock);
     if (![_preset isEqualToString:AVCaptureSessionPresetInputPriority]) {
-        [_preset release];
+        id wasPreset = _preset;
         _preset = [AVCaptureSessionPresetInputPriority copy];
+        [wasPreset release];
     }
     pthread_mutex_unlock(&_lock);
     [self _changed];
