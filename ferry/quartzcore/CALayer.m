@@ -1020,10 +1020,13 @@ static void resize_axis(double *origin, double *length, double delta, BOOL minFl
         return;
     CGSize now = QRect(_superlayer->_values, @"bounds").size;
     CGRect f = [self frame];
-    resize_axis(&f.origin.x, &f.size.width, now.width - size.width, mask & kCALayerMinXMargin,
-                mask & kCALayerWidthSizable, mask & kCALayerMaxXMargin);
-    resize_axis(&f.origin.y, &f.size.height, now.height - size.height, mask & kCALayerMinYMargin,
-                mask & kCALayerHeightSizable, mask & kCALayerMaxYMargin);
+    /* each flag counts once: the mask's bits aren't 1 (kCALayerHeightSizable
+     * is 16), and summed as they are a sizable layer grew by a sixteenth of
+     * its superlayer's growth (freemac 1.266) */
+    resize_axis(&f.origin.x, &f.size.width, now.width - size.width, !!(mask & kCALayerMinXMargin),
+                !!(mask & kCALayerWidthSizable), !!(mask & kCALayerMaxXMargin));
+    resize_axis(&f.origin.y, &f.size.height, now.height - size.height, !!(mask & kCALayerMinYMargin),
+                !!(mask & kCALayerHeightSizable), !!(mask & kCALayerMaxYMargin));
     [self setFrame:f];
 }
 

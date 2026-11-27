@@ -29,6 +29,7 @@ static void forget_pending(GContext *c);
         free(data);
     free(states);
     [space release];
+    [cgFont release];
     [super dealloc];
 }
 
@@ -446,9 +447,18 @@ void CGContextSetAllowsAntialiasing(CGContextRef c, bool allows)
 }
 
 void CGContextSetShouldSmoothFonts(CGContextRef c, bool should) {}
+
+/* Whether the user turned font smoothing off for the whole system: a
+ * private call that Chromium declares in its own open source and asks
+ * before it draws text (freemac 1.266, Obsidian). freemac smooths fonts. */
+bool CGFontRenderingGetFontSmoothingDisabled(void) { return false; }
 void CGContextSetAllowsFontSmoothing(CGContextRef c, bool allows) {}
 void CGContextSetShouldSubpixelPositionFonts(CGContextRef c, bool should) {}
 void CGContextSetAllowsFontSubpixelPositioning(CGContextRef c, bool allows) {}
+/* Whether glyphs are drawn at whole fractions of a pixel only; Cairo places
+ * them where they are asked to go (freemac 1.266, Obsidian). */
+void CGContextSetShouldSubpixelQuantizeFonts(CGContextRef c, bool should) {}
+void CGContextSetAllowsFontSubpixelQuantization(CGContextRef c, bool allows) {}
 
 void CGContextSetInterpolationQuality(CGContextRef c, CGInterpolationQuality q) { GSTATE(CTX)->interpolation = q; }
 CGInterpolationQuality CGContextGetInterpolationQuality(CGContextRef c) { return GSTATE(CTX)->interpolation; }
@@ -1037,6 +1047,16 @@ void CGContextClipToRects(CGContextRef c, const CGRect *rects, size_t count)
 
 void CGContextClipToRect(CGContextRef c, CGRect rect) { CGContextClipToRects(c, &rect, 1); }
 
+/* Clipping to a mask image: Cairo clips only to paths, so drawing is clipped
+ * to the mask's rectangle, and what the mask hides inside it still shows
+ * (freemac 1.266). */
+void CGContextClipToMask(CGContextRef c, CGRect rect, CGImageRef mask)
+{
+    if (mask)
+        GWarnOnce("clipping to a mask image (only to its rectangle)");
+    CGContextClipToRect(c, rect);
+}
+
 CGRect CGContextGetClipBoundingBox(CGContextRef c)
 {
     double x0, y0, x1, y1;
@@ -1193,6 +1213,50 @@ CGPoint CGContextGetTextPosition(CGContextRef c) { return CGPointMake(CTX->textM
 void CGContextSetTextDrawingMode(CGContextRef c, CGTextDrawingMode mode) { GSTATE(CTX)->textMode = mode; }
 void CGContextSetCharacterSpacing(CGContextRef c, CGFloat spacing) { GSTATE(CTX)->characterSpacing = spacing; }
 void CGContextSetFontSize(CGContextRef c, CGFloat size) { GSTATE(CTX)->fontSize = size; }
+
+/* The font CGContextShowGlyphsAtPositions draws with, at the font size set
+ * (Apple's CGContext documentation). It is kept by the context, not saved
+ * and restored with the graphics state (freemac 1.266). */
+void CGContextSetFont(CGContextRef c, CGFontRef font)
+{
+    if (!c)
+        return;
+    id old = CTX->cgFont;
+    CTX->cgFont = font ? [(id)font retain] : nil;
+    [old release];
+}
+
+void CGContextShowGlyphsAtPositions(CGContextRef c, const CGGlyph glyphs[], const CGPoint positions[], size_t count)
+{
+    if (!c || !CTX->cgFont || !count)
+        return;
+    CTFontRef f = CTFontCreateWithGraphicsFont((CGFontRef)CTX->cgFont, GSTATE(CTX)->fontSize, NULL, NULL);
+    if (!f)
+        return;
+    CTFontDrawGlyphs(f, glyphs, positions, count, c);
+    CFRelease(f);
+}
+
+/* ---- PDF contexts and pages ---------------------------------------------------------- */
+
+/* Ferry can't draw into a PDF yet, so it makes no PDF context; an app that
+ * asks for one prints nothing (Apple's CGPDFContext documentation says it
+ * returns NULL when it can't make one). A page begun on any other context
+ * is that context (freemac 1.266). */
+CGContextRef CGPDFContextCreate(CGDataConsumerRef consumer, const CGRect *mediaBox, CFDictionaryRef auxiliaryInfo)
+{
+    GWarnOnce("drawing into a PDF");
+    return NULL;
+}
+CGContextRef CGPDFContextCreateWithURL(CFURLRef url, const CGRect *mediaBox, CFDictionaryRef auxiliaryInfo)
+{
+    return CGPDFContextCreate(NULL, mediaBox, auxiliaryInfo);
+}
+void CGPDFContextClose(CGContextRef c) {}
+void CGPDFContextBeginPage(CGContextRef c, CFDictionaryRef pageInfo) {}
+void CGPDFContextEndPage(CGContextRef c) {}
+void CGContextBeginPage(CGContextRef c, const CGRect *mediaBox) {}
+void CGContextEndPage(CGContextRef c) {}
 
 void GContextDrawText(GContext *c, CGFloat x, CGFloat y, void (^body)(BOOL path))
 {

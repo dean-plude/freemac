@@ -75,6 +75,17 @@ static char key_hidden, key_on_image, key_off_image, key_mixed_image;
 static NSInteger spell_sequence;
 
 @implementation NSSpellChecker (FerryElectron)
+/* The system's typing settings (Keyboard > Text Input on a Mac), which an
+ * app asks before it fixes up what's typed. Ferry corrects nothing as you
+ * type, so each is off (freemac 1.266). */
++ (BOOL)isAutomaticTextReplacementEnabled { return NO; }
++ (BOOL)isAutomaticSpellingCorrectionEnabled { return NO; }
++ (BOOL)isAutomaticQuoteSubstitutionEnabled { return NO; }
++ (BOOL)isAutomaticDashSubstitutionEnabled { return NO; }
++ (BOOL)isAutomaticCapitalizationEnabled { return NO; }
++ (BOOL)isAutomaticPeriodSubstitutionEnabled { return NO; }
++ (BOOL)isAutomaticTextCompletionEnabled { return NO; }
++ (BOOL)isAutomaticInlinePredictionEnabled { return NO; }
 - (NSArray *)checkString:(NSString *)stringToCheck range:(NSRange)range types:(NSTextCheckingTypes)checkingTypes
                  options:(NSDictionary *)options inSpellDocumentWithTag:(NSInteger)tag
              orthography:(NSOrthography **)orthography wordCount:(NSInteger *)wordCount
@@ -132,3 +143,66 @@ static NSInteger spell_sequence;
     return nil;
 }
 @end
+
+/* ---- window server calls Chromium declares in its own source (freemac 1.266) ---------- */
+
+/* Chromium's helpers cut themselves off from the window server, and its
+ * windows set their alpha, transform, warp and which part of them screen
+ * capture leaves out through private calls that it declares itself. Ferry
+ * has one connection and draws windows its own way, so each is accepted
+ * and changes nothing (kCGErrorSuccess). A region is the rectangle it was
+ * made from, kept in a CF object the caller releases. */
+int32_t CGSSetDenyWindowServerConnections(bool deny) { return 0; }
+int32_t CGSSetWindowAlpha(int connection, int window, float alpha) { return 0; }
+int32_t CGSSetWindowTransform(int connection, int window, CGAffineTransform transform) { return 0; }
+int32_t CGSSetWindowWarp(int connection, int window, int width, int height, const void *mesh) { return 0; }
+int32_t CGSSetWindowCaptureExcludeShape(int connection, int window, CFTypeRef region) { return 0; }
+int _CGSDefaultConnection(void) { return 1; }
+CFTypeRef CGRegionCreateWithRect(CGRect rect) { return (CFTypeRef)[[NSValue valueWithRect:NSRectFromCGRect(rect)] retain]; }
+
+/* ---- services and events --------------------------------------------------------------- */
+
+/* Running a service from the Services menu: freemac has no services, so
+ * none runs (Apple's documentation: NO when the service couldn't be run). */
+BOOL NSPerformService(NSString *itemName, NSPasteboard *pboard) { return NO; }
+
+/* An event from data that CGEventCreateData made: Ferry's events aren't
+ * flattened to data, so there is none to make one from. */
+CGEventRef CGEventCreateFromData(CFAllocatorRef allocator, CFDataRef data) { return NULL; }
+
+/* ---- captions (MediaAccessibility) ----------------------------------------------------- */
+
+/* How the user wants captions on video drawn: freemac has no caption
+ * settings, so the Mac's defaults, white text on black, and the video's own
+ * style wherever it has one (kMACaptionAppearanceBehaviorUseContentIfAvailable). */
+static void caption_behavior(int *behavior)
+{
+    if (behavior)
+        *behavior = 1;
+}
+CGColorRef MACaptionAppearanceCopyForegroundColor(int domain, int *behavior)
+{
+    caption_behavior(behavior);
+    return CGColorCreateGenericRGB(1, 1, 1, 1);
+}
+CGColorRef MACaptionAppearanceCopyBackgroundColor(int domain, int *behavior)
+{
+    caption_behavior(behavior);
+    return CGColorCreateGenericRGB(0, 0, 0, 1);
+}
+CGColorRef MACaptionAppearanceCopyWindowColor(int domain, int *behavior)
+{
+    caption_behavior(behavior);
+    return CGColorCreateGenericRGB(0, 0, 0, 1);
+}
+CGFloat MACaptionAppearanceGetForegroundOpacity(int domain, int *behavior) { caption_behavior(behavior); return 1; }
+CGFloat MACaptionAppearanceGetBackgroundOpacity(int domain, int *behavior) { caption_behavior(behavior); return 0.8; }
+CGFloat MACaptionAppearanceGetWindowOpacity(int domain, int *behavior) { caption_behavior(behavior); return 0; }
+CGFloat MACaptionAppearanceGetWindowRoundedCornerRadius(int domain, int *behavior) { caption_behavior(behavior); return 0; }
+CGFloat MACaptionAppearanceGetRelativeCharacterSize(int domain, int *behavior) { caption_behavior(behavior); return 1; }
+int MACaptionAppearanceGetTextEdgeStyle(int domain, int *behavior) { caption_behavior(behavior); return 1; /* none */ }
+CTFontDescriptorRef MACaptionAppearanceCopyFontDescriptorForStyle(int domain, int *behavior, int style)
+{
+    caption_behavior(behavior);
+    return CTFontDescriptorCreateWithNameAndSize(CFSTR("Helvetica"), 0);
+}

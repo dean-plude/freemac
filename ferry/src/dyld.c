@@ -60,6 +60,10 @@ __attribute__((format(printf, 1, 2))) static void set_error(const char *fmt, ...
     vsnprintf(error_text, sizeof error_text, fmt, ap);
     va_end(ap);
     error_set = 1;
+    /* With -v, say why a dlopen or dlsym failed: a program often only
+     * reports that "it couldn't load" a library (freemac 1.266). */
+    if (ferry_verbose)
+        fprintf(stderr, "ferry: %s\n", error_text);
 }
 
 static char *mac_dlerror(void)

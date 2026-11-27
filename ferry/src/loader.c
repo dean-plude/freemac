@@ -458,7 +458,8 @@ static int looks_like_string_constant(const char *raw)
     size_t upper = 0;
     while (n[upper] >= 'A' && n[upper] <= 'Z')
         upper++;
-    if (upper < 3 || upper > 4 || n[upper] < 'a' || n[upper] > 'z')
+    /* NSURLIsExcludedFromBackupKey: a prefix, an acronym and a word (1.266) */
+    if (upper < 3 || upper > 7 || n[upper] < 'a' || n[upper] > 'z')
         return 0;
     size_t len = strlen(n);
     for (int i = 0; ends[i]; i++) {
@@ -933,6 +934,11 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"IOKit", "Foundation"},             /* the registry and power assertions, foundation/IOKit.m */
     {"ForceFeedback", "Foundation"},     /* no force feedback devices, foundation/IOKit.m (Godot) */
     {"UniformTypeIdentifiers", "Foundation"}, /* UTType, foundation/UTTypes.m (freemac 1.225) */
+    /* OpenGL.framework/Libraries/libGL.dylib and libGLU.dylib: the same GL
+     * calls as the framework, which ANGLE (Chromium, Electron) opens by
+     * that path (freemac 1.266) */
+    {"libGL.dylib", "OpenGL"},
+    {"libGLU.dylib", "OpenGL"},
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},
     {"ImageIO", "CoreGraphics"},

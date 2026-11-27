@@ -60,6 +60,11 @@ NSString *const NSURLContentAccessDateKey = @"NSURLContentAccessDateKey";
 NSString *const NSURLAttributeModificationDateKey = @"NSURLAttributeModificationDateKey";
 NSString *const NSURLParentDirectoryURLKey = @"NSURLParentDirectoryURLKey";
 NSString *const NSURLTypeIdentifierKey = @"NSURLTypeIdentifierKey";
+/* Time Machine's backup exclusion (Chromium asks it of its profile files,
+ * freemac 1.266): nothing is backed up here, so it reads NO and takes any
+ * value. The content type's UTType is left to UniformTypeIdentifiers. */
+NSString *const NSURLIsExcludedFromBackupKey = @"NSURLIsExcludedFromBackupKey";
+NSString *const NSURLContentTypeKey = @"NSURLContentTypeKey";
 NSString *const NSURLLocalizedTypeDescriptionKey = @"NSURLLocalizedTypeDescriptionKey";
 NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
@@ -669,6 +674,8 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
         else
             v = uti;
     }
+    else if (IS(NSURLIsExcludedFromBackupKey))
+        v = BOOLV(NO);
 #undef IS
 #undef BOOLV
     *value = v;

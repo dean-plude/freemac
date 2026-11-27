@@ -261,7 +261,62 @@ static void mac_malloc_destroy_zone(struct mac_zone *z)
     }
 }
 
-static struct mac_zone *mac_malloc_zone_from_ptr(const void *p) { return p ? zone_named(&default_zone) : NULL; }
+/* A block that a zone of the program's own gave out (Chromium's
+ * PartitionAlloc registers one in every Electron app) goes back to that
+ * zone: as malloc_zone_from_ptr(3) says, a Mac finds a block's zone by
+ * asking each registered zone for the block's size, and free, realloc and
+ * malloc_size use the zone that answers. Ferry's own zones all share this
+ * system's heap, so they are skipped (their size call reads that heap's
+ * block header, which a foreign block lacks); a block no other zone claims
+ * is this system's (freemac 1.266). */
+static struct mac_zone *foreign_zone(const void *p)
+{
+    if (!p || (registered_count < 2 && default_zone.size == zone_size))
+        return NULL;
+    unsigned n = registered_count;
+    for (unsigned i = 0; i < n && i < MAX_ZONES; i++) {
+        struct mac_zone *z = (struct mac_zone *)registered_zones[i];
+        if (z && z->size && z->size != zone_size && z->size(z, p))
+            return z;
+    }
+    return NULL;
+}
+
+static struct mac_zone *mac_malloc_zone_from_ptr(const void *p)
+{
+    struct mac_zone *z = foreign_zone(p);
+    return z ? z : p ? zone_named(&default_zone) : NULL;
+}
+
+static void mac_free(void *p)
+{
+    struct mac_zone *z = foreign_zone(p);
+    if (z)
+        z->free(z, p);
+    else
+        free(p);
+}
+
+static void *mac_realloc(void *p, size_t size)
+{
+    struct mac_zone *z = foreign_zone(p);
+    return z ? z->realloc(z, p, size) : realloc(p, size);
+}
+
+/* reallocf(3): realloc that frees the block when it can't be grown */
+static void *mac_reallocf(void *p, size_t size)
+{
+    void *q = mac_realloc(p, size);
+    if (!q && p && size)
+        mac_free(p);
+    return q;
+}
+
+static size_t mac_malloc_size(const void *p)
+{
+    struct mac_zone *z = foreign_zone(p);
+    return z ? z->size(z, p) : p ? malloc_usable_size((void *)p) : 0;
+}
 
 static void mac_malloc_set_zone_name(struct mac_zone *z, const char *name)
 {
@@ -1265,6 +1320,10 @@ const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"malloc_create_zone", mac_malloc_create_zone},
     {"malloc_destroy_zone", mac_malloc_destroy_zone},
     {"malloc_zone_from_ptr", mac_malloc_zone_from_ptr},
+    {"free", mac_free},
+    {"realloc", mac_realloc},
+    {"reallocf", mac_reallocf},
+    {"malloc_size", mac_malloc_size},
     {"malloc_zone_malloc", mac_malloc_zone_malloc},
     {"malloc_zone_calloc", mac_malloc_zone_calloc},
     {"malloc_zone_valloc", mac_malloc_zone_valloc},

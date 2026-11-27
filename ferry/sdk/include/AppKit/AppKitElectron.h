@@ -60,6 +60,17 @@ typedef NS_OPTIONS(NSUInteger, NSCursorFrameResizeDirections) {
 
 /* Ferry's spell checker has no dictionaries: it finds nothing to correct */
 @interface NSSpellChecker (FerryElectron)
+@property (class, readonly) BOOL automaticTextReplacementEnabled, automaticSpellingCorrectionEnabled,
+    automaticQuoteSubstitutionEnabled, automaticDashSubstitutionEnabled, automaticCapitalizationEnabled,
+    automaticPeriodSubstitutionEnabled, automaticTextCompletionEnabled, automaticInlinePredictionEnabled;
++ (BOOL)isAutomaticTextReplacementEnabled;
++ (BOOL)isAutomaticSpellingCorrectionEnabled;
++ (BOOL)isAutomaticQuoteSubstitutionEnabled;
++ (BOOL)isAutomaticDashSubstitutionEnabled;
++ (BOOL)isAutomaticCapitalizationEnabled;
++ (BOOL)isAutomaticPeriodSubstitutionEnabled;
++ (BOOL)isAutomaticTextCompletionEnabled;
++ (BOOL)isAutomaticInlinePredictionEnabled;
 - (NSArray *)checkString:(NSString *)stringToCheck range:(NSRange)range types:(NSTextCheckingTypes)checkingTypes
                  options:(NSDictionary *)options inSpellDocumentWithTag:(NSInteger)tag
              orthography:(NSOrthography **)orthography wordCount:(NSInteger *)wordCount;

@@ -257,6 +257,27 @@ CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef descriptor, CFString
 
 CFTypeID CTFontDescriptorGetTypeID(void) { return (CFTypeID)[GFontDescriptor class]; }
 
+/* An attribute in the user's language, and which language that was: Ferry's
+ * font names come in one language, so the attribute as it is, with no
+ * language named (Apple's CTFontDescriptor documentation; freemac 1.266). */
+CFTypeRef CTFontDescriptorCopyLocalizedAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute,
+                                                 CFStringRef *language)
+{
+    if (language)
+        *language = NULL;
+    return CTFontDescriptorCopyAttribute(descriptor, attribute);
+}
+
+/* Whether a descriptor names the system's interface font. Chromium declares
+ * this private call in its own source; the Mac's interface font names start
+ * with a full stop (".AppleSystemUIFont"), as Ferry's stand-in does. */
+bool CTFontDescriptorIsSystemUIFont(CTFontDescriptorRef descriptor)
+{
+    NSDictionary *a = attrs_of(descriptor);
+    id name = a[(id)kCTFontNameAttribute] ?: a[(id)kCTFontFamilyNameAttribute];
+    return [name isKindOfClass:[NSString class]] && [name hasPrefix:@"."];
+}
+
 /* ---- the installed families and their faces ---------------------------------------------- */
 
 /* Generic names fontconfig answers to, which aren't families of their own. */
@@ -620,6 +641,8 @@ CFArrayRef CTFontCopyVariationAxes(CTFontRef font)
     (void)font;
     return NULL;
 }
+/* The same, as Chromium asks for it in a private call it declares itself. */
+CFArrayRef CTFontCopyVariationAxesInternal(CTFontRef font) { return CTFontCopyVariationAxes(font); }
 
 CFDictionaryRef CTFontCopyVariation(CTFontRef font)
 {
@@ -634,6 +657,16 @@ CGGlyph CTFontGetGlyphWithName(CTFontRef font, CFStringRef glyphName)
     if (!font || !name || !hb_font_get_glyph_from_name(FONT->hb, name, -1, &g))
         return 0;
     return (CGGlyph)g;
+}
+
+/* A glyph by its name in the font (Apple's CGFont documentation). */
+CGGlyph CGFontGetGlyphWithGlyphName(CGFontRef cgfont, CFStringRef name)
+{
+    CTFontRef f = CTFontCreateWithGraphicsFont(cgfont, 12, NULL, NULL);
+    CGGlyph g = f ? CTFontGetGlyphWithName(f, name) : 0;
+    if (f)
+        CFRelease(f);
+    return g;
 }
 
 CFStringRef CTFontCopyNameForGlyph(CTFontRef font, CGGlyph glyph)

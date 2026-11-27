@@ -410,6 +410,20 @@ bool CTFontGetGlyphsForCharacters(CTFontRef font, const UniChar *chars, CGGlyph 
     return all;
 }
 
+/* The characters the font has glyphs for, from its character map
+ * (freemac 1.266; Chromium asks to decide which font draws a character). */
+CFCharacterSetRef CTFontCopyCharacterSet(CTFontRef font)
+{
+    NSMutableCharacterSet *set = [[NSMutableCharacterSet alloc] init];
+    hb_set_t *codes = hb_set_create();
+    hb_face_collect_unicodes(hb_font_get_face(FONT->hb), codes);
+    hb_codepoint_t first = (hb_codepoint_t)-1, last = 0;
+    while (hb_set_next_range(codes, &first, &last))
+        [set addCharactersInRange:NSMakeRange(first, (NSUInteger)last - first + 1)];
+    hb_set_destroy(codes);
+    return (CFCharacterSetRef)set;
+}
+
 double CTFontGetAdvancesForGlyphs(CTFontRef font, CTFontOrientation orientation, const CGGlyph *glyphs,
                                   CGSize *advances, CFIndex count)
 {

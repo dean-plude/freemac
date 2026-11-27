@@ -174,7 +174,6 @@ static float mac_cospif(float x) { return (float)mac_cospi(x); }
 static double mac_tanpi(double x) { return mac_sinpi(x) / mac_cospi(x); }
 static float mac_tanpif(float x) { return (float)mac_tanpi(x); }
 
-static size_t mac_malloc_size(const void *p) { return p ? malloc_usable_size((void *)p) : 0; }
 
 /* ---- character classes ----------------------------------------------------------
  * Mac headers test ASCII characters against a table in _DefaultRuneLocale and
@@ -284,7 +283,6 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"mach_absolute_time", mac_absolute_time},
     {"mach_continuous_time", mac_absolute_time},
     {"mach_timebase_info", mac_timebase_info},
-    {"malloc_size", mac_malloc_size},
     {"_DefaultRuneLocale", &default_rune},
     {"_CurrentRuneLocale", &current_rune},
     {"__maskrune", mac_maskrune},

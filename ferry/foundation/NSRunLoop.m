@@ -518,10 +518,29 @@ static void drain_wake(int fd)
             all += pcount[i];
         }
     }
-    if (ms > 0)
+    BOOL waiting = ms > 0;
+    if (waiting) {
         [self _tellObservers:kCFRunLoopBeforeWaiting];
+        /* An observer of BeforeWaiting may set a timer to fire sooner, or
+         * add a block, as Chromium's run loop pump does just before the
+         * loop sleeps; on a Mac the sleep ends for them, so it is
+         * shortened here too (freemac 1.266: Obsidian's compositor slept
+         * through the timer for its next frame). */
+        NSTimeInterval soon = [NSDate timeIntervalSinceReferenceDate];
+        os_unfair_lock_lock(&_lock);
+        NSTimeInterval first = limit;
+        for (NSTimer *timer in _timers)
+            if (timer->_fire < first)
+                first = timer->_fire;
+        BOOL blocks = [_blocks count] > 0;
+        os_unfair_lock_unlock(&_lock);
+        double w = first - soon;
+        int tms = blocks || w <= 0 ? 0 : w > 2e6 ? 2000000000 : (int)ceil(w * 1000);
+        if (tms < ms)
+            ms = tms;
+    }
     int ready = poll(fds, all, ms);
-    if (ms > 0)
+    if (waiting)   /* AfterWaiting always follows BeforeWaiting, as Chromium checks */
         [self _tellObservers:kCFRunLoopAfterWaiting];
     if (ready > 0 && fds[0].revents)
         drain_wake(_wake[0]);

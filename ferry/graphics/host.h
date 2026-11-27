@@ -252,6 +252,11 @@ typedef struct { hb_position_t ascender, descender, line_gap, reserved[9]; } hb_
 #define HB_TAG(a, b, c, d) ((uint32_t)(a) << 24 | (uint32_t)(b) << 16 | (uint32_t)(c) << 8 | (uint32_t)(d))
 
 hb_face_t *hb_font_get_face(hb_font_t *font);
+typedef struct hb_set_t hb_set_t;
+hb_set_t *hb_set_create(void);
+void hb_set_destroy(hb_set_t *set);
+hb_bool_t hb_set_next_range(const hb_set_t *set, hb_codepoint_t *first, hb_codepoint_t *last);
+void hb_face_collect_unicodes(hb_face_t *face, hb_set_t *out);
 unsigned hb_face_get_upem(const hb_face_t *face);
 unsigned hb_face_get_glyph_count(const hb_face_t *face);
 hb_font_t *hb_font_create(hb_face_t *face);

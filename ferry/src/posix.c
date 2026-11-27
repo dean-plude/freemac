@@ -7,6 +7,8 @@
  */
 #define _GNU_SOURCE
 #include <dirent.h>
+#include <dlfcn.h>
+#include <ucontext.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -753,6 +755,82 @@ static void trampoline_info(int s, siginfo_t *info, void *ctx)
  * signal at start), so those are kept here. */
 static struct mac_sigaction unraised[32];
 
+/* FERRY_CRASH_REPORT=1: a program that crashes says where, in which image
+ * and near which symbol, with the frames its frame pointers lead to, and
+ * the program's own handlers for crashes aren't installed, so that the
+ * report comes first (freemac 1.266, for finding why an app's helper
+ * process ends). */
+static int crash_report;
+
+static int crash_read(uintptr_t a, void *out, size_t n)
+{
+    struct iovec l = {out, n}, r = {(void *)a, n};
+    return syscall(SYS_process_vm_readv, getpid(), &l, 1, &r, 1, 0) == (long)n ? 0 : -1;
+}
+
+static void crash_where(uintptr_t a)
+{
+    struct image *im = ferry_image_containing((void *)a);
+    if (im) {
+        void *sa = NULL;
+        const char *sn = ferry_image_nearest(im, (void *)a, &sa);
+        const char *path = ferry_image_path(im), *base = strrchr(path, '/');
+        fprintf(stderr, "  %#lx %s+%#lx %s+%#lx\n", (unsigned long)a, base ? base + 1 : path,
+                (unsigned long)(a - (uintptr_t)ferry_image_header(im)), sn ? sn : "?",
+                (unsigned long)(sn ? a - (uintptr_t)sa : 0));
+        return;
+    }
+    Dl_info d;
+    if (dladdr((void *)a, &d) && d.dli_fname)
+        fprintf(stderr, "  %#lx ferry %s+%#lx\n", (unsigned long)a, d.dli_sname ? d.dli_sname : "?",
+                (unsigned long)(a - (uintptr_t)(d.dli_saddr ? d.dli_saddr : d.dli_fbase)));
+    else
+        fprintf(stderr, "  %#lx\n", (unsigned long)a);
+}
+
+static void crash_handler(int sig, siginfo_t *si, void *ctx)
+{
+    ucontext_t *uc = ctx;
+    uintptr_t ip = (uintptr_t)uc->uc_mcontext.gregs[REG_RIP], bp = (uintptr_t)uc->uc_mcontext.gregs[REG_RBP];
+    fprintf(stderr, "ferry: process %d thread %ld crashed: signal %d (code %d), address %p\n", getpid(),
+            (long)syscall(SYS_gettid), sig, si->si_code, si->si_addr);
+    char sel[64] = {0};
+    crash_read((uintptr_t)uc->uc_mcontext.gregs[REG_RSI], sel, sizeof sel - 1);
+    for (unsigned i = 0; i < sizeof sel; i++)
+        if (sel[i] && (sel[i] < 0x20 || sel[i] > 0x7e)) {
+            sel[i] = 0;
+            break;
+        }
+    fprintf(stderr, "  rdi %#llx rsi %#llx (\"%s\") rdx %#llx rsp %#llx\n",
+            (unsigned long long)uc->uc_mcontext.gregs[REG_RDI], (unsigned long long)uc->uc_mcontext.gregs[REG_RSI], sel,
+            (unsigned long long)uc->uc_mcontext.gregs[REG_RDX], (unsigned long long)uc->uc_mcontext.gregs[REG_RSP]);
+    crash_where(ip);
+    for (int i = 0; i < 24 && bp; i++) {
+        uintptr_t frame[2];
+        if (crash_read(bp, frame, sizeof frame) < 0 || !frame[1])
+            break;
+        crash_where(frame[1]);
+        if (frame[0] <= bp)
+            break;
+        bp = frame[0];
+    }
+    _exit(128 + sig);
+}
+
+void ferry_crash_report_init(void)
+{
+    const char *e = getenv("FERRY_CRASH_REPORT");
+    if (!e || !*e || *e == '0')
+        return;
+    crash_report = 1;
+    struct sigaction sa = {0};
+    sa.sa_sigaction = crash_handler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    int sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGTRAP, SIGFPE};
+    for (unsigned i = 0; i < sizeof sigs / sizeof sigs[0]; i++)
+        sigaction(sigs[i], &sa, NULL);
+}
+
 static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_sigaction *old)
 {
     if (mac > 0 && mac < 32 && !mac_to_linux_sig[mac]) {
@@ -765,6 +843,8 @@ static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_si
     int s = sig_or_fail(mac);
     if (s <= 0)
         return s == 0 ? (errno = EINVAL, -1) : -1;
+    if (crash_report && act && (s == SIGSEGV || s == SIGBUS || s == SIGILL || s == SIGTRAP || s == SIGFPE))
+        return 0; /* the crash report stays */
     struct sigaction in = {0}, out;
     if (act) {
         int f = act->flags;
