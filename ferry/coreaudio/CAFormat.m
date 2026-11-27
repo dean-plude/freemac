@@ -399,6 +399,23 @@ static OSStatus layout_property(AudioFormatPropertyID prop, UInt32 spec_size, co
     return err;
 }
 
+/* the frames in one packet of a compressed format the converters handle;
+ * 0 for one they don't (HE-AAC among them) */
+static UInt32 codec_frames_per_packet(UInt32 id)
+{
+    switch (id) {
+    case kAudioFormatMPEG4AAC: return 1024;
+    case kAudioFormatAppleLossless: return 4096;
+    case kAudioFormatFLAC: return 4096;
+    case kAudioFormatOpus: return 960;
+    case kAudioFormatMPEGLayer3:
+    case kAudioFormatMPEGLayer2: return 1152;
+    case kAudioFormatAC3:
+    case kAudioFormatEnhancedAC3: return 1536;
+    default: return 0;
+    }
+}
+
 static OSStatus format_property(AudioFormatPropertyID prop, UInt32 spec_size, const void *spec, UInt32 *size,
                                 void *out)
 {
@@ -466,8 +483,24 @@ static OSStatus format_property(AudioFormatPropertyID prop, UInt32 spec_size, co
         if (*size < sizeof(AudioStreamBasicDescription))
             return kAudioFormatBadPropertySizeError;
         AudioStreamBasicDescription *f = out;
-        if (f->mFormatID != kAudioFormatLinearPCM)
-            return kAudioFormatUnsupportedDataFormatError;
+        if (f->mFormatID != kAudioFormatLinearPCM) {
+            /* A compressed format the audio converters handle: its frames
+             * in a packet, and no fixed bytes per packet, as Apple's
+             * documentation of the property describes (freemac 1.266) */
+            UInt32 fpp = codec_frames_per_packet(f->mFormatID);
+            if (!fpp)
+                return kAudioFormatUnsupportedDataFormatError;
+            if (!f->mFramesPerPacket)
+                f->mFramesPerPacket = fpp;
+            if (!f->mChannelsPerFrame)
+                f->mChannelsPerFrame = 2;
+            f->mBytesPerFrame = 0;
+            if (f->mFormatID != kAudioFormatAC3)
+                f->mBytesPerPacket = 0;
+            f->mBitsPerChannel = 0;
+            *size = sizeof(AudioStreamBasicDescription);
+            return noErr;
+        }
         if (!f->mBitsPerChannel)
             f->mBitsPerChannel = (f->mFormatFlags & kAudioFormatFlagIsFloat) ? 32 : 16;
         if (!f->mFramesPerPacket)
@@ -512,13 +545,24 @@ static OSStatus format_property(AudioFormatPropertyID prop, UInt32 spec_size, co
     }
     case kAudioFormatProperty_EncodeFormatIDs:
     case kAudioFormatProperty_DecodeFormatIDs: {
-        /* only linear PCM is converted here */
+        /* linear PCM, and the formats the converters encode or decode
+         * through the system's FFmpeg */
+        static const UInt32 enc[] = {kAudioFormatLinearPCM, kAudioFormatMPEG4AAC, kAudioFormatAppleLossless,
+                                     kAudioFormatFLAC, kAudioFormatOpus};
+        static const UInt32 dec[] = {kAudioFormatLinearPCM, kAudioFormatMPEG4AAC, kAudioFormatAppleLossless,
+                                     kAudioFormatFLAC, kAudioFormatOpus, kAudioFormatMPEGLayer3,
+                                     kAudioFormatMPEGLayer2, kAudioFormatAC3, kAudioFormatEnhancedAC3};
+        const UInt32 *ids = prop == kAudioFormatProperty_EncodeFormatIDs ? enc : dec;
+        UInt32 n = prop == kAudioFormatProperty_EncodeFormatIDs ? 5 : 9;
         if (out) {
-            if (*size < sizeof(UInt32))
+            UInt32 fit = *size / sizeof(UInt32);
+            if (!fit)
                 return kAudioFormatBadPropertySizeError;
-            *(UInt32 *)out = kAudioFormatLinearPCM;
+            if (fit < n)
+                n = fit;
+            memcpy(out, ids, n * sizeof(UInt32));
         }
-        *size = sizeof(UInt32);
+        *size = n * sizeof(UInt32);
         return noErr;
     }
     default:
