@@ -1800,7 +1800,7 @@ How it fits together:
 
 | Part | Where | What it is |
 | --- | --- | --- |
-| Swift's runtime and standard library | `swift/build-runtime.sh` into `frameworks/swift` | the open-source Swift project's own, at swift-6.1.3-RELEASE, built unchanged for `x86_64-apple-macosx` with `ferry-cc` and a swift.org toolchain for Linux. It is the same kind of library as a Mac's `/usr/lib/swift/libswiftCore.dylib`, with Objective-C interoperability on |
+| Swift's runtime and standard library | `swift/build-runtime.sh` into `frameworks/swift`; the package carries it in /usr/lib/ferry/frameworks/swift (freemac 1.261) | the open-source Swift project's own, at swift-6.1.3-RELEASE, built unchanged for `x86_64-apple-macosx` with `ferry-cc` and a swift.org toolchain for Linux. It is the same kind of library as a Mac's `/usr/lib/swift/libswiftCore.dylib`, with Objective-C interoperability on |
 | Loading it | `src/swiftsupport.c` | `/usr/lib/swift/libswift*.dylib`, or `@rpath/libswift*.dylib` when the app carries no copy, is served from `frameworks/swift` |
 | What Swift's runtime asks of Objective-C | `src/objc/swift.c`, `src/objc/runtime.c` | classes made while the program runs are realized; class lookups go to Swift's hook first; generic classes get their names when asked. The older Swift-class bit is moved to the stable one |
 | The compiler driver | `sdk/ferry-swiftc` | the toolchain's `swift-frontend`, aimed at a Mac, reading the SDK's module map and API notes; `ferry-cc` links |

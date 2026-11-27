@@ -10,6 +10,13 @@ version=$("$top/ferry" --version | awk '{print $2}')
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 make -C "$top" -s install DESTDIR="$root" PREFIX=/usr
+# Swift's runtime and Ferry's Swift modules, when packaging/build-swift.sh
+# has built them: a Mac app written in Swift needs them, and Ferry looks for
+# them in /usr/lib/ferry/frameworks/swift (freemac 1.261).
+if ls "$top"/frameworks/swift/*.dylib >/dev/null 2>&1; then
+    install -d "$root/usr/lib/ferry/frameworks/swift"
+    install -m755 "$top"/frameworks/swift/*.dylib "$root/usr/lib/ferry/frameworks/swift/"
+fi
 install -Dm644 "$top/README.md" "$root/usr/share/doc/freemac-ferry/README.md"
 install -d "$root/DEBIAN"
 size=$(du -sk "$root/usr" | cut -f1)
