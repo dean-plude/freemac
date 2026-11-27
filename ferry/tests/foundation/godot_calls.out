@@ -1,0 +1,14 @@
+manager made, type matches 1
+open 1
+devices none, matched 0
+property pads
+close 1
+no device: value 0, elements (nil)
+force feedback 0, create 0, device (nil)
+entry id 0 0, parent 0, same 1
+id matching has 42
+__TEXT found, __nope no, __text section found
+pow 8 9 2 3
+colour spaces 3 3
+volume keys: case answered, immutable 0, volume holds home
+exit=0

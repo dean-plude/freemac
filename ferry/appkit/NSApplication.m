@@ -143,6 +143,13 @@ void NSBeep(void)
  * before. Wayfire's answer is kept for half a second. */
 void GContextSyncAll(void);   /* CoreGraphics */
 
+NSString *const NSDeviceResolution = @"NSDeviceResolution";
+NSString *const NSDeviceColorSpaceName = @"NSDeviceColorSpaceName";
+NSString *const NSDeviceBitsPerSample = @"NSDeviceBitsPerSample";
+NSString *const NSDeviceIsScreen = @"NSDeviceIsScreen";
+NSString *const NSDeviceIsPrinter = @"NSDeviceIsPrinter";
+NSString *const NSDeviceSize = @"NSDeviceSize";
+
 @implementation NSScreen {
     NSRect _frame, _visible;
     NSString *_name;
@@ -227,9 +234,14 @@ static NSArray *screens_from_wayfire(void)
 - (NSString *)localizedName { return _wayfire && [_name length] ? _name : @"Display"; }
 - (NSDictionary *)deviceDescription
 {
+    CGFloat dpi = 72 * [self backingScaleFactor];
     return @{
         @"NSScreenNumber" : @(_wayfire ? _number : 1),
-        @"NSDeviceSize" : [NSValue valueWithSize:[self frame].size]
+        NSDeviceSize : [NSValue valueWithSize:[self frame].size],
+        NSDeviceResolution : [NSValue valueWithSize:NSMakeSize(dpi, dpi)],
+        NSDeviceIsScreen : @"YES",
+        NSDeviceBitsPerSample : @8,
+        NSDeviceColorSpaceName : @"NSCalibratedRGBColorSpace",
     };
 }
 - (void)dealloc

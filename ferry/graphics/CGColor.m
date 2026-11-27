@@ -14,6 +14,13 @@ const CFStringRef kCGColorSpaceLinearSRGB = (CFStringRef)@"kCGColorSpaceLinearSR
 const CFStringRef kCGColorSpaceExtendedSRGB = (CFStringRef)@"kCGColorSpaceExtendedSRGB";
 const CFStringRef kCGColorSpaceDisplayP3 = (CFStringRef)@"kCGColorSpaceDisplayP3";
 const CFStringRef kCGColorSpaceGenericCMYK = (CFStringRef)@"kCGColorSpaceGenericCMYK";
+/* more RGB spaces by name (freemac Godot work), drawn as sRGB like the rest */
+const CFStringRef kCGColorSpaceExtendedLinearSRGB = (CFStringRef)@"kCGColorSpaceExtendedLinearSRGB";
+const CFStringRef kCGColorSpaceDCIP3 = (CFStringRef)@"kCGColorSpaceDCIP3";
+const CFStringRef kCGColorSpaceITUR_709 = (CFStringRef)@"kCGColorSpaceITUR_709";
+const CFStringRef kCGColorSpaceITUR_2020 = (CFStringRef)@"kCGColorSpaceITUR_2020";
+const CFStringRef kCGColorSpaceAdobeRGB1998 = (CFStringRef)@"kCGColorSpaceAdobeRGB1998";
+const CFStringRef kCGColorSpaceExtendedDisplayP3 = (CFStringRef)@"kCGColorSpaceExtendedDisplayP3";
 const CFStringRef kCGColorWhite = (CFStringRef)@"kCGColorWhite";
 const CFStringRef kCGColorBlack = (CFStringRef)@"kCGColorBlack";
 const CFStringRef kCGColorClear = (CFStringRef)@"kCGColorClear";
@@ -88,7 +95,10 @@ static GColorSpace *named_space(NSString *name)
         return make_space(kCGColorSpaceModelCMYK, 4, name);
     if ([name isEqual:(id)kCGColorSpaceSRGB] || [name isEqual:(id)kCGColorSpaceGenericRGB] ||
         [name isEqual:(id)kCGColorSpaceLinearSRGB] || [name isEqual:(id)kCGColorSpaceExtendedSRGB] ||
-        [name isEqual:(id)kCGColorSpaceDisplayP3])
+        [name isEqual:(id)kCGColorSpaceDisplayP3] || [name isEqual:(id)kCGColorSpaceExtendedLinearSRGB] ||
+        [name isEqual:(id)kCGColorSpaceDCIP3] || [name isEqual:(id)kCGColorSpaceITUR_709] ||
+        [name isEqual:(id)kCGColorSpaceITUR_2020] || [name isEqual:(id)kCGColorSpaceAdobeRGB1998] ||
+        [name isEqual:(id)kCGColorSpaceExtendedDisplayP3])
         return make_space(kCGColorSpaceModelRGB, 3, name);
     return nil;
 }

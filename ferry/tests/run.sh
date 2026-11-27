@@ -1496,6 +1496,11 @@ run_one foundation_framework_calls "$here/foundation/framework_calls.m" "$here/f
 run_one foundation_keycastr_calls "$here/foundation/keycastr_calls.m" "$here/foundation/keycastr_calls.out" \
     -fobjc-arc -fblocks -framework Foundation -framework ServiceManagement -framework Security \
     -framework SystemConfiguration
+# What the Godot engine's Mac build calls besides (freemac Godot work): a HID
+# manager and Force Feedback that find no devices, registry IDs, the
+# program's segments, whole-vector math, colour spaces and volume keys.
+run_one foundation_godot_calls "$here/foundation/godot_calls.m" "$here/foundation/godot_calls.out" \
+    -fobjc-arc -framework Foundation -framework IOKit -framework ForceFeedback -framework CoreGraphics
 # What MacPass, MacDown and their frameworks call (freemac 1.225, Ferry
 # 0.49.0): the Darwin and ObjectiveC modules, KVC through indexed and set
 # accessors, NSValue's bytes, URL components, binary search, an attributed

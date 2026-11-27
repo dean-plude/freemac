@@ -139,6 +139,8 @@ struct mtl_draw_state {
     const struct mtl_rpipe *p;
     const struct mtl_dsstate *ds;
     struct mtl_bindings vb, fb;
+    unsigned vstride[31];           /* strides of setVertexBuffer:...attributeStride: */
+    uint32_t vstride_set;           /* which of them are set (else the pipeline's own) */
     double vp[6];                   /* viewport 0 */
     double vpx[15][6];              /* viewports 1 to 15, of setViewports */
     unsigned nvp;                   /* how many viewports; 0 or 1 is only vp */

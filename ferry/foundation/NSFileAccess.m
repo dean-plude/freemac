@@ -65,6 +65,10 @@ NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
 NSString *const NSURLVolumeIdentifierKey = @"NSURLVolumeIdentifierKey";
 NSString *const NSURLVolumeIsLocalKey = @"NSURLVolumeIsLocalKey";
+NSString *const NSURLVolumeURLKey = @"NSURLVolumeURLKey";
+NSString *const NSURLVolumeSupportsCaseSensitiveNamesKey = @"NSURLVolumeSupportsCaseSensitiveNamesKey";
+NSString *const NSURLIsSystemImmutableKey = @"NSURLIsSystemImmutableKey";
+NSString *const NSURLIsUserImmutableKey = @"NSURLIsUserImmutableKey";
 NSString *const NSURLVolumeTotalCapacityKey = @"NSURLVolumeTotalCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
@@ -590,6 +594,33 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
                     ? [NSNumber numberWithUnsignedLongLong:n * block]
                     : [NSNumber numberWithLongLong:(long long)(n * block)];
         }
+    }
+    else if (IS(NSURLIsSystemImmutableKey) || IS(NSURLIsUserImmutableKey))
+        /* freemac Godot work: this system's immutable flag (chattr +i) is
+         * the system one; nothing here sets a user one */
+        v = BOOLV(IS(NSURLIsSystemImmutableKey) && (st.st_flags & 0x00020000 /* SF_IMMUTABLE */));
+    else if (IS(NSURLVolumeSupportsCaseSensitiveNamesKey)) {
+        /* FAT, exFAT, NTFS and a Mac's HFS+ and APFS disks fold case */
+        struct statfs fs;
+        if (statfs([path fileSystemRepresentation], &fs) == 0) {
+            unsigned long t = (unsigned long)fs.f_type;
+            BOOL folds = t == 0x4d44 /* FAT */ || t == 0x2011BAB0 /* exFAT */ || t == 0x5346544e /* NTFS */ ||
+                         t == 0x7366746e /* ntfs3 */ || t == 0x4244 /* HFS */ || t == 0x482b /* HFS+ */;
+            v = BOOLV(!folds);
+        }
+    }
+    else if (IS(NSURLVolumeURLKey)) {
+        /* the folder the volume is mounted on: the last one up the path on
+         * the same device */
+        NSString *top = dir ? path : [path stringByDeletingLastPathComponent];
+        struct stat up;
+        while (![top isEqualToString:@"/"]) {
+            NSString *parent = [top stringByDeletingLastPathComponent];
+            if (stat([parent fileSystemRepresentation], &up) != 0 || up.st_dev != st.st_dev)
+                break;
+            top = parent;
+        }
+        v = [NSURL fileURLWithPath:top isDirectory:YES];
     }
     else if (IS(NSURLFileResourceIdentifierKey))
         v = [NSString stringWithFormat:@"%llu:%llu", (unsigned long long)st.st_dev, (unsigned long long)st.st_ino];

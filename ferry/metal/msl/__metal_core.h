@@ -68,6 +68,9 @@ typedef int int32_t;
 typedef unsigned int uint32_t;
 typedef long int64_t;
 typedef unsigned long uint64_t;
+/* MSL has the C sizes too (MoltenVK's own shaders use size_t) */
+typedef __SIZE_TYPE__ size_t;
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
 typedef long intptr_t;
 typedef unsigned long uintptr_t;
 #define INFINITY __builtin_inff()

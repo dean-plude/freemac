@@ -39,4 +39,6 @@ f = {x['name']: x for x in json.load(open(sys.argv[1]))['functions']}
 assert [b['index'] for b in f['vs_main']['buffers']] == [3], f['vs_main']['buffers']
 assert [b['index'] for b in f['fs_main']['buffers']] == [2], f['fs_main']['buffers']
 " "$tmp/blender.json"
+# SPIRV-Cross-style shader code (MoltenVK, as Godot uses) builds
+"$here/../ferry-mslc" build "$here/spirv-cross-style.metal" -o "$tmp/spirv.dylib"
 echo "ferry-mslc: all tests passed"

@@ -418,6 +418,8 @@ APPKIT_EXTERN NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDid
 @property (readonly) BOOL accessibilityDisplayShouldReduceTransparency;
 @property (readonly) BOOL accessibilityDisplayShouldReduceMotion;
 @property (readonly) BOOL accessibilityDisplayShouldInvertColors;
+@property (readonly, getter=isVoiceOverEnabled) BOOL voiceOverEnabled;
+@property (readonly, getter=isSwitchControlEnabled) BOOL switchControlEnabled;
 @end
 /* A view: being reused (by a table), its appearance changed, whether a
  * rectangle is to be drawn (one that meets the visible rectangle), its
