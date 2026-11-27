@@ -1183,6 +1183,38 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.267 "FreeCAD opens" (done)
+
+Ferry 0.90.0: FreeCAD 1.0.2, the 3D CAD program, from its official download, opens its Start page, opens a Part Design model and draws it in its 3D view, which turns with the navigation cube. FreeCAD is a big Qt 5 app with Python, OpenCASCADE and Coin3D on OpenGL inside. The biggest fix helps every Qt app: Qt's redraws now reach the screen, where before a click did its work but the window never showed it.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Every library a program or a `dlopen` brings in is mapped before any is linked, as dyld does, so a call one library makes into another loaded later is found | Ferry | done |
+| 2 | Export tables with empty edges (conda-forge's zlib), `RTLD_NEXT` reaching libraries loaded before the caller (Qt finds OpenGL this way) | Ferry | done |
+| 3 | C library: printing with a locale (`vsprintf_l` and kin), `shm_open`, message catalogs, and `qsort_r` with the Mac's argument order | Ferry | done |
+| 4 | `NSColor` colour space names and pattern colours as Qt asks for them; `needsToDrawRect:` and `getRectsBeingDrawn:count:` for the rectangle being drawn; Image I/O's type list | Ferry AppKit / Image I/O | done |
+| 5 | An IOSurface a layer shows counts as in use, so Qt paints its next frame into another one and every redraw reaches the screen | Ferry Core Animation | done |
+| 6 | OpenGL drawn into a Qt window shows, without asking the window to draw again for each frame | Ferry AppKit | done |
+| 7 | FreeCAD opens, opens a part, draws it in 3D and turns it | Ferry / FreeCAD | done |
+| 8 | `FERRY_EVENT_TRACE=1` prints where each mouse click goes | Ferry AppKit | done |
+
+## 1.266 "Obsidian opens" (done)
+
+Ferry 0.89.0: Obsidian 1.8.10, from its official download, opens a working window. Its start page shows, Quick start makes a vault and opens the Welcome note beside the live graph view, and typing into a note edits and saves it. Chromium splits an app into several processes that pass messages and share memory over Mach ports, and Ferry's ports now reach between processes. Ferry starts an Electron app with drawing in software, since Ferry's OpenGL can't yet fill the shared surfaces Chromium composites into on the graphics card.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Mach ports between processes: rights carried in messages, forwarding, replies from a process that has gone, the bootstrap rendezvous Chromium uses; `FERRY_MACH_TRACE` shows failed and full sends | Ferry | done |
+| 2 | IOSurfaces shared between processes through Mach memory entries, which count as in use while another process holds one, so a compositor swaps buffers and every frame arrives | Ferry IOSurface | done |
+| 3 | A run loop tells its observers it woke after every sleep, and wakes for a timer an observer set just before it slept | Ferry Foundation | done |
+| 4 | A layer that resizes with its superlayer grows by the whole change, not a sixteenth of it | Ferry Core Animation | done |
+| 5 | Core Graphics fonts, mask clipping, PDF contexts and data consumers; Core Text character sets and family matches; caption appearance settings; display streams on a run loop | Ferry Core Graphics / Core Text / AppKit | done |
+| 6 | Text input: `-[NSString getCharacters:]` and the spell checker's typing settings | Ferry Foundation / AppKit | done |
+| 7 | Malloc zones another allocator made, OpenGL under its Linux library names, missing string constants filled in, clearer messages when a library won't load, a crash report with registers and a backtrace | Ferry | done |
+| 8 | Core Audio format information and encoder and decoder lists for the compressed formats | Ferry Core Audio | done |
+| 9 | Obsidian opens, makes a vault, shows its notes and graph, and edits a note | Ferry / Obsidian | done |
+| 10 | A synchronous XPC call returns only after its reply block has run | Ferry Foundation | done |
+
 ## 1.265 "Electron apps start" (done)
 
 Ferry 0.88.0: Obsidian 1.8.10, picked from the official download as the first Electron app (Chromium and Node.js inside), now gets through its whole start in the main process: Node.js loads the app's own code, its menus are built, and it starts its GPU, network and page helper processes. The helpers can't yet reach the main app, because Chromium passes messages between its processes over Mach ports and Ferry's ports work inside one process only; that is the next batch. Everything Electron needed on the way is in Ferry for other apps too.

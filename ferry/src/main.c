@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.88.0"
+#define FERRY_VERSION "0.90.0"
 
 static void usage(FILE *out)
 {
@@ -222,18 +222,35 @@ int main(int argc, char **argv, char **envp)
         snprintf(electron, sizeof electron, "%s/Contents/Frameworks/Electron Framework.framework", argv[i]);
         argv[i] = program;
         if (is_dir(electron)) {
-            int has = 0;
-            for (int k = i + 1; k < argc; k++)
-                has |= !strcmp(argv[k], "--no-sandbox");
-            if (!has) {
-                char **args = calloc((size_t)(argc + 2), sizeof *args);
+            int sandbox = 0, gpu = 0;
+            for (int k = i + 1; k < argc; k++) {
+                sandbox |= !strcmp(argv[k], "--no-sandbox");
+                gpu |= !strcmp(argv[k], "--disable-gpu");
+            }
+            /* Chromium composites a page on the graphics card into shared
+             * surfaces that Ferry's OpenGL can't fill in yet, so the window
+             * would stay empty; drawn in software instead, it shows (WebGL
+             * still runs, in software). FERRY_ELECTRON_GPU=1 keeps the
+             * card (freemac 1.266). */
+            const char *keep = getenv("FERRY_ELECTRON_GPU");
+            if (keep && *keep && strcmp(keep, "0"))
+                gpu = 1;
+            const char *add[2];
+            int n = 0;
+            if (!sandbox)
+                add[n++] = "--no-sandbox";
+            if (!gpu)
+                add[n++] = "--disable-gpu";
+            if (n) {
+                char **args = calloc((size_t)(argc + n + 1), sizeof *args);
                 memcpy(args, argv, (size_t)(i + 1) * sizeof *args);
-                args[i + 1] = "--no-sandbox";
-                memcpy(args + i + 2, argv + i + 1, (size_t)(argc - i - 1) * sizeof *args);
+                memcpy(args + i + 1, add, (size_t)n * sizeof *args);
+                memcpy(args + i + 1 + n, argv + i + 1, (size_t)(argc - i - 1) * sizeof *args);
                 argv = args;
-                argc++;
+                argc += n;
                 if (ferry_verbose)
-                    fprintf(stderr, "ferry: an Electron app; Ferry has no Mac app sandbox, so it runs without one\n");
+                    fprintf(stderr, "ferry: an Electron app; Ferry has no Mac app sandbox, so it runs without one%s\n",
+                            gpu ? "" : ", and draws it in software");
             }
         }
     } else if (is_installable(argv[i])) {
@@ -253,5 +270,6 @@ int main(int argc, char **argv, char **envp)
     /* The program sees itself as argv[0], as it would on a Mac. */
     ferry_commpage_init();
     ferry_thread_tsd_init();
+    ferry_crash_report_init();
     exit(ferry_run(argv[i], argc - i, argv + i, envp));
 }

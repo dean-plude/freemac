@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Mach ports and messages within one process (freemac 1.265), written from
+ * Mach ports and messages, within a process and between processes (freemac 1.265, 1.266), written from
  * Apple's public Mach documentation (the mach_port_* and mach_msg reference
  * pages, "Kernel Programming Guide: Mach Overview") and the Mach 3 kernel
  * interface and principles books.
@@ -29,7 +29,9 @@
  *    wait, so kqueue's EVFILT_MACHPORT and dispatch's mach_recv sources
  *    can wait on it with everything else.
  *  - The bootstrap server: a service a program checks in is looked up by
- *    the same program. Services in other processes aren't found yet.
+ *    it and by other programs.
+ *  - Messages go to ports in other processes too, with their rights and
+ *    memory (see "ports across processes" below).
  *
  * A sender waits while a queue holds as many messages as its limit, as on
  * a Mac (MACH_SEND_TIMEOUT gives up with MACH_SEND_TIMED_OUT); a send-once
@@ -183,6 +185,21 @@ struct port {
     int kfd;                          /* a memory entry: the shared memory it names, or -1 */
     uint64_t koff, ksize;
     int kprot;
+    /* across processes (freemac 1.266): a port another process can name has
+     * a key, the process it was made in and a number; rpid is the process
+     * its receive right is in when that isn't this one (a port standing for
+     * another process's, or one whose receive right went to another), and
+     * holders are the processes told of a port whose receive right is here */
+    int rpid, kpid;
+    uint32_t kid;
+    struct port *knext;
+    int *holders;
+    unsigned nholders, cholders;
+    /* a port whose receive right went to another process stays, holding a
+     * reference of its own, to pass on what is still sent to it by its old
+     * key (a message can be on its way when the right moves), until that
+     * process says the port died or the right comes back */
+    int forwarding;
 };
 
 struct right {
@@ -210,6 +227,7 @@ struct kmsg {
     unsigned char *body; /* what follows the header */
     unsigned ndesc;
     struct kdesc *desc;
+    int from_pid; /* the process that sent it, when another one */
 };
 
 struct entry {
@@ -300,10 +318,15 @@ static struct port *port_new(int is_set)
 
 static void port_ref(struct port *p) { p->refs++; }
 
+static void key_remove(struct port *p);
+
 static void port_unref(struct port *p)
 {
     if (--p->refs > 0)
         return;
+    if (p->kid)
+        key_remove(p);
+    free(p->holders);
     if (p->efd >= 0)
         close(p->efd);
     if (p->dead_efd >= 0)
@@ -430,6 +453,7 @@ static void no_senders_check(struct port *p)
 static void destroy_kmsg(struct kmsg *m);
 
 static void receive_destroyed(struct port *p);
+static void holders_told_dead(struct port *p);
 
 static void drop_send(struct port *p)
 {
@@ -471,6 +495,8 @@ static void receive_destroyed(struct port *p)
         return;
     p->dead = 1;
     p->in_space = 0;
+    if (!p->rpid && p->kid)
+        holders_told_dead(p);
     set_remove(p);
     while (p->head) {
         struct kmsg *m = p->head;
@@ -508,6 +534,10 @@ static void receive_destroyed(struct port *p)
         port_unref(p);
     }
     pthread_cond_broadcast(&mcond);
+    if (p->forwarding) {
+        p->forwarding = 0;
+        port_unref(p); /* the caller holds a reference of its own */
+    }
 }
 
 static void free_entry(struct entry *e)
@@ -524,12 +554,28 @@ static void free_entry(struct entry *e)
 
 /* Take a right out of the space, as a disposition says; the right comes
  * back holding a reference to its port. */
+/* The task's own port, as a right in a message (Chromium's helpers send
+ * theirs to the browser): a port of its own that nobody receives on, and
+ * that dies with the process, so a send right to it in another process
+ * becomes a dead name when this one ends (freemac 1.266). */
+static struct port *task_object;
+
 static kern_return_t copyin(mac_port_t name, int disp, struct right *out, int is_dest)
 {
     out->p = NULL;
     out->type = 0;
     if (name == MACH_PORT_NULL || name == MACH_PORT_DEAD)
         return KERN_SUCCESS;
+    if (name == TASK_PORT && !is_dest && (disp == MOVE_SEND || disp == COPY_SEND)) {
+        if (!task_object && (task_object = port_new(0)))
+            task_object->refs = 1; /* the task's own, for good */
+        if (!task_object)
+            return KERN_RESOURCE_SHORTAGE;
+        task_object->srights++;
+        port_ref(task_object);
+        *out = (struct right){task_object, MOVE_SEND};
+        return KERN_SUCCESS;
+    }
     struct entry *e = entry_of(name);
     if (!e)
         return KERN_INVALID_NAME;
@@ -681,8 +727,16 @@ static void destroy_kmsg(struct kmsg *m)
     free(m);
 }
 
+static void remote_send(struct port *p, struct kmsg *m);
+static int trace_level(void);
+
+/* A message for a port whose receive right is in another process goes there. */
 static void enqueue(struct port *p, struct kmsg *m)
 {
+    if (p->rpid) {
+        remote_send(p, m);
+        return;
+    }
     port_ref(p);
     m->next = NULL;
     if (p->tail)
@@ -752,8 +806,12 @@ static kern_return_t send_locked(struct mach_header_ *h, int option, unsigned se
         /* a send-once right always gets through, as on a Mac */
         if (!dp->qlimit || dp->count < dp->qlimit || rdisp == MOVE_SEND_ONCE || rdisp == MAKE_SEND_ONCE)
             break;
-        if ((option & MACH_SEND_TIMEOUT) && timeout == 0)
+        if ((option & MACH_SEND_TIMEOUT) && timeout == 0) {
+            if (trace_level() >= 1)
+                fprintf(stderr, "ferry-mach %d: queue full (id %#x to %#x): %u of %u, rpid %d, key %d/%u\n", getpid(), h->id, h->remote, dp->count,
+                        dp->qlimit, dp->rpid, dp->kpid, dp->kid);
             return MACH_SEND_TIMED_OUT;
+        }
         if (option & MACH_SEND_TIMEOUT) {
             if (pthread_cond_timedwait(&mcond, &mach_lock, &until) == ETIMEDOUT) {
                 struct entry *now = entry_of(h->remote);
@@ -826,6 +884,9 @@ static kern_return_t send_locked(struct mach_header_ *h, int option, unsigned se
                 mac_port_t name;
                 memcpy(&name, d + (kind == MACH_MSG_PORT_DESCRIPTOR ? 0 : 12), 4);
                 if (copyin(name, d[10], &k->r, 0) != KERN_SUCCESS) {
+                    if (getenv("FERRY_MACH_TRACE"))
+                        fprintf(stderr, "ferry-mach %d: message %#x: right %#x (disposition %d) isn't valid\n",
+                                getpid(), h->id, name, d[10]);
                     err = MACH_SEND_INVALID_RIGHT;
                     goto fail;
                 }
@@ -980,7 +1041,8 @@ static kern_return_t copyout_msg(struct port *from, struct kmsg *m, struct mach_
     memcpy(t + 4, &v, 4);
     v = from->seqno - 1;
     memcpy(t + 8, &v, 4);
-    uint32_t uid = (uint32_t)getuid(), gid = (uint32_t)getgid(), pid = (uint32_t)getpid();
+    uint32_t uid = (uint32_t)getuid(), gid = (uint32_t)getgid();
+    uint32_t pid = (uint32_t)(m->from_pid ? m->from_pid : getpid());
     memcpy(t + 12, &uid, 4); /* the sender's security token */
     memcpy(t + 16, &gid, 4);
     uint32_t audit[8] = {uid, uid, gid, uid, gid, pid, pid, 1};
@@ -1075,8 +1137,12 @@ static kern_return_t mac_mach_msg_overwrite(void *msg, int option, unsigned send
     (void)rcv_limit;
     kern_return_t r = KERN_SUCCESS;
     pthread_mutex_lock(&mach_lock);
-    if (option & MACH_SEND_MSG)
+    if (option & MACH_SEND_MSG) {
         r = send_locked(msg, option, send_size, timeout);
+        if (r != KERN_SUCCESS && trace_level() >= 1)
+            fprintf(stderr, "ferry-mach %d: a send to %#x failed: %#x\n", getpid(),
+                    ((struct mach_header_ *)msg)->remote, r);
+    }
     if (r == KERN_SUCCESS && (option & MACH_RCV_MSG))
         r = receive_locked(rcv_msg ? rcv_msg : msg, option, rcv_size, rcv_name, timeout);
     pthread_mutex_unlock(&mach_lock);
@@ -1364,6 +1430,8 @@ static kern_return_t mac_mach_port_deallocate(mac_port_t task, mac_port_t name)
     pthread_mutex_lock(&mach_lock);
     kern_return_t r = dealloc_locked(name);
     pthread_mutex_unlock(&mach_lock);
+    if (r && getenv("FERRY_MACH_TRACE"))
+        fprintf(stderr, "ferry-mach %d: deallocate %#x: %d\n", getpid(), name, r);
     return r;
 }
 
@@ -1823,6 +1891,1062 @@ static mac_port_t mac_thread_get_special_reply_port(void)
 
 /* ---- the bootstrap server ------------------------------------------------------------ */
 
+/* ---- ports across processes ------------------------------------------------------ */
+
+/* On a Mac the kernel carries a message to a port in any task, with its
+ * rights, memory and file ports, and a receive right can itself move to
+ * another task. Chromium needs this between its browser and helper
+ * processes: a helper finds the browser's rendezvous service with
+ * bootstrap_look_up, gets its first ports from it, and then talks over Mojo
+ * channels built on those ports (freemac 1.266).
+ *
+ * Here each process that names ports to others has a datagram socket of its
+ * own, in a folder only its user can open, named by its process id. A port
+ * another process can name has a key (the process it was made in, and a
+ * number). A process holding a send right to a port whose receive right is
+ * elsewhere has a port standing for it, with the process to send to, and a
+ * message to it is written out (its rights by key, its out-of-line memory
+ * copied, memory entries and file ports as file descriptors) and sent to
+ * that process, which takes it in as if it had been sent there. A receive
+ * right that moves leaves a port behind that passes messages on, and the
+ * messages already waiting follow it.
+ *
+ * When a receive right is destroyed, the processes told of the port hear
+ * so, and their send rights become dead names (with their dead-name
+ * notifications). When a process ends, every port whose receive right was
+ * in it dies the same way: each process watches the processes it sends to.
+ * The bootstrap server's services are files in the same folder, so a
+ * service checked in by one program is found by another. */
+
+#include <poll.h>
+#include <signal.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/un.h>
+
+#define W_MSG 0x48434d46u  /* 'FMCH' a message */
+#define W_BIG 0x47424d46u  /* 'FMBG' a large message, in a memory file */
+#define W_DEAD 0x44444d46u /* 'FMDD' a port's receive right was destroyed */
+#define W_HOLD 0x4c484d46u /* 'FMHL' a process holds a send right to a port */
+#define W_MAXFD 250
+#define W_INLINE (48u * 1024)
+
+enum { WK_NONE, WK_PORT, WK_FD, WK_DEAD };
+
+struct w_hdr {
+    uint32_t magic, len;
+    int32_t pid;
+    uint32_t nfds;
+    int32_t dkpid;
+    uint32_t dkid;
+    uint32_t complex, size;
+    int32_t id;
+    uint32_t dest_type, body_len, ndesc;
+};
+
+struct w_right {
+    int32_t kpid;
+    uint32_t kid;
+    int32_t route; /* where its receive right is */
+    uint8_t type, kind;
+    uint16_t pad;
+    int32_t fd;
+    uint64_t koff, ksize;
+    int32_t kprot;
+    uint32_t qlimit;
+    uint64_t context;
+    uint32_t nholders; /* a receive right: the processes told of it, which follow */
+    uint32_t pad2;
+};
+
+struct w_note {
+    uint32_t magic, len;
+    int32_t pid;
+    uint32_t nfds;
+    int32_t kpid;
+    uint32_t kid;
+    int32_t holder;
+    uint32_t pad;
+};
+
+static int net_state; /* 0 not yet, 1 up, -1 can't */
+static int net_sock = -1, net_epoll = -1;
+static char net_dir[96];
+static int my_pid;
+static uint32_t next_kid;
+
+/* the keys of ports other processes can name */
+#define KBUCKETS 512
+static struct port *kbucket[KBUCKETS];
+
+static unsigned khash(int pid, uint32_t kid) { return ((unsigned)pid * 2654435761u ^ kid * 40503u) % KBUCKETS; }
+
+static struct port *key_find(int pid, uint32_t kid)
+{
+    for (struct port *p = kbucket[khash(pid, kid)]; p; p = p->knext)
+        if (p->kpid == pid && p->kid == kid)
+            return p;
+    return NULL;
+}
+
+static void key_insert(struct port *p)
+{
+    unsigned h = khash(p->kpid, p->kid);
+    p->knext = kbucket[h];
+    kbucket[h] = p;
+}
+
+static void key_remove(struct port *p)
+{
+    for (struct port **q = &kbucket[khash(p->kpid, p->kid)]; *q; q = &(*q)->knext)
+        if (*q == p) {
+            *q = p->knext;
+            break;
+        }
+    p->kid = 0;
+    p->knext = NULL;
+}
+
+static void key_assign(struct port *p)
+{
+    if (p->kid)
+        return;
+    p->kpid = my_pid;
+    p->kid = ++next_kid;
+    key_insert(p);
+}
+
+static void holder_add(struct port *p, int pid)
+{
+    if (pid == my_pid || pid <= 0)
+        return;
+    for (unsigned i = 0; i < p->nholders; i++)
+        if (p->holders[i] == pid)
+            return;
+    if (p->nholders == p->cholders) {
+        unsigned c = p->cholders ? p->cholders * 2 : 4;
+        int *h = realloc(p->holders, c * sizeof *h);
+        if (!h)
+            return;
+        p->holders = h;
+        p->cholders = c;
+    }
+    p->holders[p->nholders++] = pid;
+}
+
+static int pid_alive(int pid) { return pid > 0 && (kill(pid, 0) == 0 || errno == EPERM); }
+
+/* ---- the folder, the socket and its two threads ---- */
+
+static int private_dir(const char *path)
+{
+    if (mkdir(path, 0700) < 0 && errno != EEXIST)
+        return -1;
+    struct stat st;
+    return lstat(path, &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid() && !(st.st_mode & 077) ? 0 : -1;
+}
+
+static int mach_folder(void)
+{
+    if (net_dir[0])
+        return 0;
+    char d[sizeof net_dir];
+    const char *x = getenv("XDG_RUNTIME_DIR");
+    struct stat st;
+    if (x && *x && strlen(x) < 48 && stat(x, &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid())
+        snprintf(d, sizeof d, "%s/ferry-mach", x);
+    else
+        snprintf(d, sizeof d, "/tmp/ferry-mach-%u", (unsigned)getuid());
+    if (private_dir(d) < 0)
+        return -1;
+    char svc[sizeof d + 8];
+    snprintf(svc, sizeof svc, "%s/svc", d);
+    if (private_dir(svc) < 0)
+        return -1;
+    memcpy(net_dir, d, sizeof d);
+    return 0;
+}
+
+static void sock_path(struct sockaddr_un *a, int pid)
+{
+    memset(a, 0, sizeof *a);
+    a->sun_family = AF_UNIX;
+    snprintf(a->sun_path, sizeof a->sun_path, "%s/%d.sock", net_dir, pid);
+}
+
+struct outmsg {
+    struct outmsg *next;
+    int to;
+    unsigned char *buf;
+    size_t len;
+    int fds[W_MAXFD];
+    unsigned nfds;
+};
+static pthread_mutex_t out_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t out_cond = PTHREAD_COND_INITIALIZER;
+static struct outmsg *out_head, *out_tail;
+
+static void out_push(struct outmsg *o)
+{
+    pthread_mutex_lock(&out_lock);
+    o->next = NULL;
+    if (out_tail)
+        out_tail->next = o;
+    else
+        out_head = o;
+    out_tail = o;
+    pthread_cond_signal(&out_cond);
+    pthread_mutex_unlock(&out_lock);
+}
+
+static void out_free(struct outmsg *o)
+{
+    for (unsigned i = 0; i < o->nfds; i++)
+        close(o->fds[i]);
+    free(o->buf);
+    free(o);
+}
+
+static int send_datagram(int to, const void *buf, size_t len, const int *fds, unsigned nfds)
+{
+    struct sockaddr_un a;
+    sock_path(&a, to);
+    struct iovec iov = {(void *)buf, len};
+    union {
+        char b[CMSG_SPACE(sizeof(int) * (W_MAXFD + 1))];
+        struct cmsghdr align;
+    } c;
+    struct msghdr mh = {.msg_name = &a, .msg_namelen = sizeof a, .msg_iov = &iov, .msg_iovlen = 1};
+    if (nfds) {
+        mh.msg_control = c.b;
+        mh.msg_controllen = CMSG_SPACE(sizeof(int) * nfds);
+        struct cmsghdr *cm = CMSG_FIRSTHDR(&mh);
+        cm->cmsg_level = SOL_SOCKET;
+        cm->cmsg_type = SCM_RIGHTS;
+        cm->cmsg_len = CMSG_LEN(sizeof(int) * nfds);
+        memcpy(CMSG_DATA(cm), fds, sizeof(int) * nfds);
+    }
+    for (;;) {
+        if (sendmsg(net_sock, &mh, MSG_NOSIGNAL) >= 0)
+            return 0;
+        if (errno != EINTR)
+            return -errno;
+    }
+}
+
+static void peer_died(int pid);
+
+static void *sender_main(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        pthread_mutex_lock(&out_lock);
+        while (!out_head)
+            pthread_cond_wait(&out_cond, &out_lock);
+        struct outmsg *o = out_head;
+        out_head = o->next;
+        if (!out_head)
+            out_tail = NULL;
+        pthread_mutex_unlock(&out_lock);
+        int r = o->len <= W_INLINE ? send_datagram(o->to, o->buf, o->len, o->fds, o->nfds) : -EMSGSIZE;
+        if (r == -EMSGSIZE || r == -ENOBUFS) {
+            /* a large message goes in a memory file, sent ahead of its own descriptors */
+            int mfd = memfd_create("ferry-mach-message", MFD_CLOEXEC);
+            r = -ENOMEM;
+            if (mfd >= 0 && write(mfd, o->buf, o->len) == (ssize_t)o->len) {
+                struct w_note n = {W_BIG, (uint32_t)o->len, my_pid, o->nfds + 1, 0, 0, 0, 0};
+                int fds[W_MAXFD + 1];
+                fds[0] = mfd;
+                memcpy(fds + 1, o->fds, o->nfds * sizeof(int));
+                r = send_datagram(o->to, &n, sizeof n, fds, o->nfds + 1);
+            }
+            if (mfd >= 0)
+                close(mfd);
+        }
+        if (r == -ENOENT || r == -ECONNREFUSED || r == -ENOTDIR) {
+            pthread_mutex_lock(&mach_lock);
+            peer_died(o->to);
+            pthread_mutex_unlock(&mach_lock);
+        } else if (r < 0 && ferry_verbose) {
+            fprintf(stderr, "ferry: a Mach message to process %d wasn't sent (%s)\n", o->to, strerror(-r));
+        }
+        out_free(o);
+    }
+    return NULL;
+}
+
+/* the processes watched: when one ends, the ports whose receive rights were in it die */
+struct watched {
+    int pid, fd;
+};
+static struct watched *watch;
+static unsigned nwatch, cwatch;
+
+static void watch_pid(int pid)
+{
+    if (pid == my_pid || pid <= 0 || net_epoll < 0)
+        return;
+    for (unsigned i = 0; i < nwatch; i++)
+        if (watch[i].pid == pid)
+            return;
+    int fd = (int)syscall(SYS_pidfd_open, pid, 0);
+    if (fd < 0)
+        return;
+    if (nwatch == cwatch) {
+        unsigned c = cwatch ? cwatch * 2 : 16;
+        struct watched *w = realloc(watch, c * sizeof *w);
+        if (!w) {
+            close(fd);
+            return;
+        }
+        watch = w;
+        cwatch = c;
+    }
+    watch[nwatch++] = (struct watched){pid, fd};
+    struct epoll_event ev = {.events = EPOLLIN, .data.u64 = (uint64_t)(unsigned)pid};
+    epoll_ctl(net_epoll, EPOLL_CTL_ADD, fd, &ev);
+}
+
+static void unwatch_pid(int pid)
+{
+    for (unsigned i = 0; i < nwatch; i++)
+        if (watch[i].pid == pid) {
+            epoll_ctl(net_epoll, EPOLL_CTL_DEL, watch[i].fd, NULL);
+            close(watch[i].fd);
+            watch[i] = watch[--nwatch];
+            return;
+        }
+}
+
+/* Every port whose receive right was in a process that ended dies. */
+static void peer_died(int pid)
+{
+    unwatch_pid(pid);
+    struct port **gone = NULL;
+    unsigned n = 0, cap = 0;
+    for (unsigned b = 0; b < KBUCKETS; b++)
+        for (struct port *p = kbucket[b]; p; p = p->knext)
+            if (p->rpid == pid && !p->dead) {
+                if (n == cap) {
+                    cap = cap ? cap * 2 : 16;
+                    struct port **g = realloc(gone, cap * sizeof *g);
+                    if (!g)
+                        break;
+                    gone = g;
+                }
+                port_ref(p);
+                gone[n++] = p;
+            }
+    for (unsigned i = 0; i < n; i++) {
+        receive_destroyed(gone[i]);
+        port_unref(gone[i]);
+    }
+    free(gone);
+}
+
+static void deliver_locked(const unsigned char *buf, size_t len, int *fds, unsigned nfds);
+
+static void *receiver_main(void *arg)
+{
+    (void)arg;
+    size_t cap = W_INLINE + 4096;
+    unsigned char *buf = malloc(cap);
+    for (;;) {
+        struct epoll_event ev[16];
+        int n = epoll_wait(net_epoll, ev, 16, -1);
+        for (int i = 0; i < n; i++) {
+            if (ev[i].data.u64 != 0) {
+                pthread_mutex_lock(&mach_lock);
+                peer_died((int)ev[i].data.u64);
+                pthread_mutex_unlock(&mach_lock);
+                continue;
+            }
+            for (;;) {
+                union {
+                    char b[CMSG_SPACE(sizeof(int) * (W_MAXFD + 1))];
+                    struct cmsghdr align;
+                } c;
+                struct iovec iov = {buf, cap};
+                struct msghdr mh = {.msg_iov = &iov, .msg_iovlen = 1, .msg_control = c.b, .msg_controllen = sizeof c.b};
+                ssize_t got = recvmsg(net_sock, &mh, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+                if (got < 0)
+                    break;
+                int fds[W_MAXFD + 1];
+                unsigned nfds = 0;
+                for (struct cmsghdr *cm = CMSG_FIRSTHDR(&mh); cm; cm = CMSG_NXTHDR(&mh, cm))
+                    if (cm->cmsg_level == SOL_SOCKET && cm->cmsg_type == SCM_RIGHTS) {
+                        unsigned k = (unsigned)((cm->cmsg_len - CMSG_LEN(0)) / sizeof(int));
+                        if (nfds + k > W_MAXFD + 1)
+                            k = W_MAXFD + 1 - nfds;
+                        memcpy(fds + nfds, CMSG_DATA(cm), k * sizeof(int));
+                        nfds += k;
+                    }
+                uint32_t magic = 0;
+                if (got >= 4)
+                    memcpy(&magic, buf, 4);
+                if (magic == W_BIG && got >= (ssize_t)sizeof(struct w_note) && nfds >= 1) {
+                    struct w_note note;
+                    memcpy(&note, buf, sizeof note);
+                    unsigned char *big = malloc(note.len ? note.len : 1);
+                    if (big && pread(fds[0], big, note.len, 0) == (ssize_t)note.len) {
+                        close(fds[0]);
+                        pthread_mutex_lock(&mach_lock);
+                        deliver_locked(big, note.len, fds + 1, nfds - 1);
+                        pthread_mutex_unlock(&mach_lock);
+                    } else {
+                        for (unsigned k = 0; k < nfds; k++)
+                            close(fds[k]);
+                    }
+                    free(big);
+                } else {
+                    pthread_mutex_lock(&mach_lock);
+                    deliver_locked(buf, (size_t)got, fds, nfds);
+                    pthread_mutex_unlock(&mach_lock);
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+static void net_down(void)
+{
+    if (net_state != 1)
+        return;
+    struct sockaddr_un a;
+    sock_path(&a, my_pid);
+    unlink(a.sun_path);
+}
+
+/* Brings this process's socket up, the first time another process may need
+ * to reach it. */
+static int net_up(void)
+{
+    if (net_state)
+        return net_state > 0 ? 0 : -1;
+    net_state = -1;
+    my_pid = getpid();
+    if (mach_folder() < 0)
+        return -1;
+    int s = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    if (s < 0)
+        return -1;
+    struct sockaddr_un a;
+    sock_path(&a, my_pid);
+    unlink(a.sun_path); /* left by an earlier process with this id */
+    if (bind(s, (struct sockaddr *)&a, sizeof a) < 0) {
+        close(s);
+        return -1;
+    }
+    int big = 4 << 20;
+    setsockopt(s, SOL_SOCKET, SO_SNDBUF, &big, sizeof big);
+    setsockopt(s, SOL_SOCKET, SO_RCVBUF, &big, sizeof big);
+    net_epoll = epoll_create1(EPOLL_CLOEXEC);
+    struct epoll_event ev = {.events = EPOLLIN, .data.u64 = 0};
+    if (net_epoll < 0 || epoll_ctl(net_epoll, EPOLL_CTL_ADD, s, &ev) < 0) {
+        close(s);
+        unlink(a.sun_path);
+        return -1;
+    }
+    net_sock = s;
+    /* the threads take no signals meant for the program */
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_SETMASK, &all, &old);
+    pthread_t t1, t2;
+    int ok = pthread_create(&t1, NULL, receiver_main, NULL) == 0 && pthread_create(&t2, NULL, sender_main, NULL) == 0;
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    if (!ok) {
+        close(s);
+        unlink(a.sun_path);
+        return -1;
+    }
+    pthread_detach(t1);
+    pthread_detach(t2);
+    net_state = 1;
+    atexit(net_down);
+    return 0;
+}
+
+static void note_send(uint32_t magic, int to, struct port *p, int holder)
+{
+    struct outmsg *o = calloc(1, sizeof *o);
+    struct w_note *n = calloc(1, sizeof *n);
+    if (!o || !n) {
+        free(o);
+        free(n);
+        return;
+    }
+    *n = (struct w_note){magic, sizeof *n, my_pid, 0, p->kpid, p->kid, holder, 0};
+    o->to = to;
+    o->buf = (unsigned char *)n;
+    o->len = sizeof *n;
+    out_push(o);
+}
+
+static void holders_told_dead(struct port *p)
+{
+    for (unsigned i = 0; i < p->nholders; i++)
+        note_send(W_DEAD, p->holders[i], p, 0);
+    p->nholders = 0;
+}
+
+/* ---- writing a message out ---- */
+
+struct wbuf {
+    unsigned char *b;
+    size_t len, cap;
+    int fds[W_MAXFD];
+    unsigned nfds;
+    int err;
+};
+
+static void wput(struct wbuf *w, const void *data, size_t n)
+{
+    if (w->err)
+        return;
+    if (w->len + n > w->cap) {
+        size_t c = w->cap ? w->cap : 512;
+        while (c < w->len + n)
+            c *= 2;
+        unsigned char *b = realloc(w->b, c);
+        if (!b) {
+            w->err = 1;
+            return;
+        }
+        w->b = b;
+        w->cap = c;
+    }
+    memcpy(w->b + w->len, data, n);
+    w->len += n;
+}
+
+/* ports whose receive rights just left, whose waiting messages follow */
+static struct port **moving;
+static unsigned nmoving, cmoving;
+
+/* A right in a message to process `to`; the right is used up. */
+static void put_right(struct wbuf *w, struct right r, int to)
+{
+    struct w_right wr;
+    memset(&wr, 0, sizeof wr);
+    wr.fd = -1;
+    struct port *p = r.p;
+    if (!p) {
+        wput(w, &wr, sizeof wr);
+        return;
+    }
+    wr.type = r.type;
+    if (p->kfd >= 0) {
+        int d = w->nfds < W_MAXFD ? fcntl(p->kfd, F_DUPFD_CLOEXEC, 0) : -1;
+        if (d < 0) {
+            w->err = 1;
+        } else {
+            wr.kind = WK_FD;
+            wr.fd = (int32_t)w->nfds;
+            w->fds[w->nfds++] = d;
+            wr.koff = p->koff;
+            wr.ksize = p->ksize;
+            wr.kprot = p->kprot;
+        }
+        destroy_right(r);
+        wput(w, &wr, sizeof wr);
+        return;
+    }
+    if (p->dead) {
+        wr.kind = WK_DEAD;
+        destroy_right(r);
+        wput(w, &wr, sizeof wr);
+        return;
+    }
+    wr.kind = WK_PORT;
+    if (p->rpid) {
+        /* a send right to a port elsewhere: it goes on by key */
+        wr.kpid = p->kpid;
+        wr.kid = p->kid;
+        wr.route = p->rpid;
+        if (r.type == MOVE_SEND)
+            drop_send(p);
+        else
+            p->sorights--;
+        port_unref(p);
+        wput(w, &wr, sizeof wr);
+        return;
+    }
+    key_assign(p);
+    wr.kpid = p->kpid;
+    wr.kid = p->kid;
+    wr.route = my_pid;
+    if (r.type == MOVE_RECEIVE) {
+        /* the receive right goes: this port passes messages on to it */
+        wr.qlimit = p->qlimit;
+        wr.context = p->context;
+        unsigned nh = 0;
+        for (unsigned i = 0; i < p->nholders; i++)
+            nh += p->holders[i] != to;
+        wr.nholders = nh + 1;
+        wput(w, &wr, sizeof wr);
+        int32_t self = my_pid;
+        wput(w, &self, 4);
+        for (unsigned i = 0; i < p->nholders; i++)
+            if (p->holders[i] != to) {
+                int32_t h = p->holders[i];
+                wput(w, &h, 4);
+            }
+        p->nholders = 0;
+        p->rpid = to;
+        if (!p->forwarding) {
+            p->forwarding = 1;
+            port_ref(p);
+        }
+        watch_pid(to);
+        if (nmoving == cmoving) {
+            unsigned c = cmoving ? cmoving * 2 : 8;
+            struct port **m = realloc(moving, c * sizeof *m);
+            if (m) {
+                moving = m;
+                cmoving = c;
+            }
+        }
+        if (nmoving < cmoving)
+            moving[nmoving++] = p; /* keeps the right's reference */
+        else
+            port_unref(p);
+        return;
+    }
+    /* a send or send-once right to a port here: the other process holds it now,
+     * and is told when the port dies */
+    holder_add(p, to);
+    port_unref(p);
+    wput(w, &wr, sizeof wr);
+}
+
+static int sending_out;
+
+/* FERRY_MACH_TRACE=2: every message between processes, sent and delivered */
+static int trace_level(void)
+{
+    static int level = -1;
+    if (level < 0) {
+        const char *t = getenv("FERRY_MACH_TRACE");
+        level = t ? atoi(t) : 0;
+    }
+    return level;
+}
+
+static void remote_send(struct port *p, struct kmsg *m)
+{
+    int to = p->rpid;
+    if (trace_level() >= 2)
+        fprintf(stderr, "ferry-mach %d: send to %d: id %#x, %u bytes, %u descriptors\n", getpid(), to, m->id, m->size,
+                m->ndesc);
+    if (net_up() < 0) {
+        destroy_kmsg(m);
+        return;
+    }
+    struct wbuf w;
+    memset(&w, 0, sizeof w);
+    struct w_hdr h = {W_MSG, 0, my_pid, 0, p->kpid, p->kid, m->complex, m->size, m->id, m->dest_type,
+                      m->size - (uint32_t)sizeof(struct mach_header_), m->ndesc};
+    wput(&w, &h, sizeof h);
+    put_right(&w, m->reply, to);
+    m->reply.p = NULL;
+    wput(&w, m->body, h.body_len);
+    for (unsigned i = 0; i < m->ndesc; i++) {
+        struct kdesc *k = &m->desc[i];
+        uint32_t hd[2] = {k->offset, (uint32_t)k->kind};
+        wput(&w, hd, sizeof hd);
+        if (k->kind == MACH_MSG_PORT_DESCRIPTOR || k->kind == MACH_MSG_GUARDED_PORT_DESCRIPTOR) {
+            put_right(&w, k->r, to);
+            k->r.p = NULL;
+        } else if (k->kind == MACH_MSG_OOL_DESCRIPTOR || k->kind == MACH_MSG_OOL_VOLATILE_DESCRIPTOR) {
+            uint64_t n = k->mem_size;
+            wput(&w, &n, 8);
+            if (n)
+                wput(&w, k->mem, n);
+        } else {
+            uint32_t n = k->nports;
+            wput(&w, &n, 4);
+            for (unsigned j = 0; j < k->nports; j++) {
+                put_right(&w, k->ports[j], to);
+                k->ports[j].p = NULL;
+            }
+        }
+    }
+    destroy_kmsg(m);
+    if (w.err) {
+        for (unsigned i = 0; i < w.nfds; i++)
+            close(w.fds[i]);
+        free(w.b);
+    } else {
+        struct outmsg *o = calloc(1, sizeof *o);
+        if (!o) {
+            for (unsigned i = 0; i < w.nfds; i++)
+                close(w.fds[i]);
+            free(w.b);
+        } else {
+            h.len = (uint32_t)w.len;
+            h.nfds = w.nfds;
+            memcpy(w.b, &h, sizeof h);
+            o->to = to;
+            o->buf = w.b;
+            o->len = w.len;
+            memcpy(o->fds, w.fds, w.nfds * sizeof(int));
+            o->nfds = w.nfds;
+            out_push(o);
+        }
+    }
+    /* the messages waiting on a port whose receive right left follow it, in order */
+    if (sending_out)
+        return;
+    sending_out = 1;
+    while (nmoving) {
+        struct port *q = moving[--nmoving];
+        while (q->head) {
+            struct kmsg *km = q->head;
+            q->head = km->next;
+            if (!q->head)
+                q->tail = NULL;
+            q->count--;
+            enqueue(q, km);
+            port_unref(q); /* the queue's reference */
+        }
+        efd_update(q);
+        pthread_cond_broadcast(&mcond);
+        port_unref(q);
+    }
+    sending_out = 0;
+}
+
+/* ---- taking a message in ---- */
+
+struct rbuf {
+    const unsigned char *b;
+    size_t len, off;
+    int *fds;
+    unsigned nfds;
+    int err;
+};
+
+static int rget(struct rbuf *r, void *out, size_t n)
+{
+    if (r->err || r->off + n > r->len) {
+        r->err = 1;
+        memset(out, 0, n);
+        return -1;
+    }
+    memcpy(out, r->b + r->off, n);
+    r->off += n;
+    return 0;
+}
+
+static struct right dead_right(uint8_t type)
+{
+    struct port *p = port_new(0);
+    if (!p)
+        return (struct right){NULL, 0};
+    p->dead = 1;
+    p->refs = 1;
+    if (type == MOVE_SEND_ONCE)
+        p->sorights = 1;
+    else
+        p->srights = 1;
+    return (struct right){p, type == MOVE_SEND_ONCE ? MOVE_SEND_ONCE : MOVE_SEND};
+}
+
+static struct right get_right(struct rbuf *rb, int from)
+{
+    struct w_right wr;
+    if (rget(rb, &wr, sizeof wr) < 0)
+        return (struct right){NULL, 0};
+    int holders[64];
+    unsigned nh = 0;
+    for (uint32_t i = 0; i < wr.nholders; i++) {
+        int32_t h;
+        if (rget(rb, &h, 4) < 0)
+            return (struct right){NULL, 0};
+        if (nh < 64)
+            holders[nh++] = h;
+    }
+    switch (wr.kind) {
+    case WK_FD: {
+        if (wr.fd < 0 || (unsigned)wr.fd >= rb->nfds || rb->fds[wr.fd] < 0)
+            return dead_right(wr.type);
+        struct port *p = port_new(0);
+        if (!p)
+            return (struct right){NULL, 0};
+        p->kfd = rb->fds[wr.fd];
+        rb->fds[wr.fd] = -1;
+        p->koff = wr.koff;
+        p->ksize = wr.ksize;
+        p->kprot = wr.kprot;
+        p->refs = 1;
+        p->srights = 1;
+        p->mscount = 1;
+        return (struct right){p, MOVE_SEND};
+    }
+    case WK_DEAD:
+        return dead_right(wr.type);
+    case WK_PORT:
+        break;
+    default:
+        return (struct right){NULL, 0};
+    }
+    struct port *p = key_find(wr.kpid, wr.kid);
+    if (wr.type == MOVE_RECEIVE) {
+        if (p && (p->dead || !p->rpid)) {
+            key_remove(p); /* a dead stand-in, whose names are dead names already */
+            p = NULL;
+        }
+        if (p) {
+            p->rpid = 0;
+            if (p->forwarding) {
+                p->forwarding = 0;
+                p->refs--; /* the right coming back holds it now (the caller's reference follows) */
+            }
+        } else {
+            p = port_new(0);
+            if (!p)
+                return (struct right){NULL, 0};
+            p->kpid = wr.kpid;
+            p->kid = wr.kid;
+            key_insert(p);
+        }
+        p->qlimit = wr.qlimit;
+        p->context = wr.context;
+        for (unsigned i = 0; i < nh; i++)
+            holder_add(p, holders[i]);
+        holder_add(p, from);
+        port_ref(p);
+        return (struct right){p, MOVE_RECEIVE};
+    }
+    if (!p) {
+        if (wr.route == my_pid || !pid_alive(wr.route))
+            return dead_right(wr.type);
+        p = port_new(0);
+        if (!p)
+            return (struct right){NULL, 0};
+        p->kpid = wr.kpid;
+        p->kid = wr.kid;
+        p->rpid = wr.route;
+        key_insert(p);
+        watch_pid(wr.route);
+        if (wr.route != from)
+            note_send(W_HOLD, wr.route, p, my_pid);
+    }
+    if (p->dead || p->rpid) {
+        if (wr.type == MOVE_SEND_ONCE)
+            p->sorights++;
+        else {
+            p->srights++;
+            p->mscount++;
+        }
+    }
+    port_ref(p);
+    return (struct right){p, wr.type == MOVE_SEND_ONCE ? MOVE_SEND_ONCE : MOVE_SEND};
+}
+
+static void deliver_locked(const unsigned char *buf, size_t len, int *fds, unsigned nfds)
+{
+    struct rbuf rb = {buf, len, 0, fds, nfds, 0};
+    uint32_t magic = 0;
+    if (len >= 4)
+        memcpy(&magic, buf, 4);
+    if (magic == W_DEAD || magic == W_HOLD) {
+        struct w_note n;
+        if (rget(&rb, &n, sizeof n) == 0) {
+            struct port *p = key_find(n.kpid, n.kid);
+            if (p && magic == W_DEAD && p->rpid) {
+                port_ref(p);
+                receive_destroyed(p);
+                port_unref(p);
+            } else if (p && magic == W_HOLD) {
+                if (p->rpid)
+                    note_send(W_HOLD, p->rpid, p, n.holder);
+                else if (!p->dead)
+                    holder_add(p, n.holder);
+                else
+                    note_send(W_DEAD, n.holder, p, 0);
+            }
+        }
+        goto done;
+    }
+    if (magic != W_MSG)
+        goto done;
+    struct w_hdr h;
+    rget(&rb, &h, sizeof h);
+    struct kmsg *m = calloc(1, sizeof *m);
+    if (!m)
+        goto done;
+    m->from_pid = h.pid;
+    m->complex = h.complex;
+    m->size = h.size;
+    m->id = h.id;
+    m->dest_type = (uint8_t)h.dest_type;
+    m->reply = get_right(&rb, h.pid);
+    m->body = malloc(h.body_len ? h.body_len : 1);
+    if (!m->body || h.body_len != h.size - sizeof(struct mach_header_)) {
+        destroy_kmsg(m);
+        goto done;
+    }
+    rget(&rb, m->body, h.body_len);
+    if (h.ndesc) {
+        m->desc = calloc(h.ndesc, sizeof *m->desc);
+        if (!m->desc || h.ndesc > h.body_len / 12) {
+            destroy_kmsg(m);
+            goto done;
+        }
+    }
+    for (uint32_t i = 0; i < h.ndesc && !rb.err; i++) {
+        struct kdesc *k = &m->desc[m->ndesc++];
+        uint32_t hd[2];
+        rget(&rb, hd, sizeof hd);
+        k->offset = hd[0];
+        k->kind = (int)hd[1];
+        if (k->offset + desc_size(k->kind) > h.body_len) {
+            rb.err = 1;
+            break;
+        }
+        if (k->kind == MACH_MSG_PORT_DESCRIPTOR || k->kind == MACH_MSG_GUARDED_PORT_DESCRIPTOR) {
+            k->r = get_right(&rb, h.pid);
+        } else if (k->kind == MACH_MSG_OOL_DESCRIPTOR || k->kind == MACH_MSG_OOL_VOLATILE_DESCRIPTOR) {
+            uint64_t n;
+            rget(&rb, &n, 8);
+            if (n > rb.len - rb.off) {
+                rb.err = 1;
+                break;
+            }
+            k->mem_size = (size_t)n;
+            if (n) {
+                k->mem = malloc((size_t)n);
+                if (!k->mem) {
+                    rb.err = 1;
+                    break;
+                }
+                rget(&rb, k->mem, (size_t)n);
+            }
+        } else {
+            uint32_t n;
+            rget(&rb, &n, 4);
+            if (n > (rb.len - rb.off) / sizeof(struct w_right)) {
+                rb.err = 1;
+                break;
+            }
+            k->ports = calloc(n ? n : 1, sizeof *k->ports);
+            if (!k->ports) {
+                rb.err = 1;
+                break;
+            }
+            for (uint32_t j = 0; j < n; j++)
+                k->ports[k->nports++] = get_right(&rb, h.pid);
+        }
+    }
+    struct port *dp = key_find(h.dkpid, h.dkid);
+    if (trace_level() >= 2)
+        fprintf(stderr, "ferry-mach %d: from %d: to %d/%u: id %#x, %u bytes%s\n", getpid(), h.pid, h.dkpid, h.dkid, h.id,
+                h.size, rb.err ? ", unreadable" : !dp ? ", no such port" : dp->dead ? ", port gone" : "");
+    if (rb.err || !dp || dp->dead) {
+        /* a port made here that is gone: the sender is told, so that its
+         * rights become dead names, as a send to a dead port fails on a Mac */
+        if (!rb.err && h.dkpid == my_pid && (!dp || !dp->rpid)) {
+            struct port gone;
+            memset(&gone, 0, sizeof gone);
+            gone.kpid = h.dkpid;
+            gone.kid = h.dkid;
+            note_send(W_DEAD, h.pid, &gone, 0);
+        }
+        destroy_kmsg(m);
+        goto done;
+    }
+    if (!dp->rpid && m->dest_type == MOVE_SEND_ONCE && dp->sorights)
+        dp->sorights--; /* the sender's send-once right is used up */
+    enqueue(dp, m);
+done:
+    for (unsigned i = 0; i < nfds; i++)
+        if (fds[i] >= 0)
+            close(fds[i]);
+}
+
+/* ---- the bootstrap server's services, as files ---- */
+
+static void service_file(char *out, size_t n, const char *name)
+{
+    int k = snprintf(out, n, "%s/svc/", net_dir);
+    for (const unsigned char *c = (const unsigned char *)name; *c && k + 4 < (int)n; c++) {
+        if (*c == '/' || *c == '%' || *c < 0x20)
+            k += snprintf(out + k, n - (size_t)k, "%%%02X", *c);
+        else
+            out[k++] = (char)*c;
+    }
+    out[k] = 0;
+}
+
+/* The service another process checked in, if it is still running: its key
+ * and where its receive right is. */
+static int service_read(const char *name, int *kpid, uint32_t *kid, int *route)
+{
+    if (mach_folder() < 0)
+        return -1;
+    char path[512];
+    service_file(path, sizeof path, name);
+    FILE *f = fopen(path, "re");
+    if (!f)
+        return -1;
+    int ok = fscanf(f, "%d %u %d", kpid, kid, route) == 3;
+    fclose(f);
+    if (!ok || !pid_alive(*route)) {
+        unlink(path);
+        return -1;
+    }
+    return 0;
+}
+
+static void service_written(const char *name, struct port *p)
+{
+    if (net_up() < 0)
+        return;
+    int route = my_pid;
+    if (p->rpid)
+        route = p->rpid;
+    else
+        key_assign(p);
+    char path[512], tmp[540];
+    service_file(path, sizeof path, name);
+    snprintf(tmp, sizeof tmp, "%s.%d", path, my_pid);
+    FILE *f = fopen(tmp, "we");
+    if (!f)
+        return;
+    fprintf(f, "%d %u %d\n", p->kpid, p->kid, route);
+    if (fclose(f) == 0)
+        rename(tmp, path);
+    else
+        unlink(tmp);
+}
+
+/* A send right to another process's service. */
+static struct port *service_import(int kpid, uint32_t kid, int route)
+{
+    if (net_up() < 0 || route == my_pid)
+        return NULL;
+    struct port *p = key_find(kpid, kid);
+    if (p && (p->dead || !p->rpid))
+        return p->dead ? NULL : p;
+    if (!p) {
+        p = port_new(0);
+        if (!p)
+            return NULL;
+        p->kpid = kpid;
+        p->kid = kid;
+        p->rpid = route;
+        key_insert(p);
+        watch_pid(route);
+        note_send(W_HOLD, route, p, my_pid);
+    }
+    return p;
+}
+
 struct service {
     struct service *next;
     char name[128];
@@ -1865,7 +2989,9 @@ static kern_return_t mac_bootstrap_check_in(mac_port_t bp, const char *name, mac
     pthread_mutex_lock(&mach_lock);
     services_sweep();
     kern_return_t r;
-    if (service_named(name)) {
+    int kpid, route;
+    uint32_t kid;
+    if (service_named(name) || (service_read(name, &kpid, &kid, &route) == 0 && route != getpid())) {
         r = BOOTSTRAP_SERVICE_ACTIVE;
     } else if ((r = allocate_locked(MACH_PORT_RIGHT_RECEIVE, sp)) == KERN_SUCCESS) {
         struct service *s = calloc(1, sizeof *s);
@@ -1875,6 +3001,7 @@ static kern_return_t mac_bootstrap_check_in(mac_port_t bp, const char *name, mac
             port_ref(s->p);
             s->next = services;
             services = s;
+            service_written(name, s->p); /* found by other programs too */
         }
     }
     pthread_mutex_unlock(&mach_lock);
@@ -1890,12 +3017,17 @@ static kern_return_t mac_bootstrap_look_up(mac_port_t bp, const char *name, mac_
     services_sweep();
     struct service *s = service_named(name);
     kern_return_t r = BOOTSTRAP_UNKNOWN_SERVICE;
-    if (s) {
-        s->p->srights++;
-        s->p->mscount++;
-        port_ref(s->p);
-        *sp = copyout((struct right){s->p, MOVE_SEND});
-        r = KERN_SUCCESS;
+    struct port *p = s ? s->p : NULL;
+    int kpid, route;
+    uint32_t kid;
+    if (!p && service_read(name, &kpid, &kid, &route) == 0)
+        p = service_import(kpid, kid, route); /* another program's */
+    if (p) {
+        p->srights++;
+        p->mscount++;
+        port_ref(p);
+        *sp = copyout((struct right){p, MOVE_SEND});
+        r = *sp ? KERN_SUCCESS : KERN_RESOURCE_SHORTAGE;
     }
     pthread_mutex_unlock(&mach_lock);
     return r;
@@ -1932,6 +3064,7 @@ static kern_return_t mac_bootstrap_register(mac_port_t bp, const char *name, mac
             port_ref(s->p);
             s->next = services;
             services = s;
+            service_written(name, s->p);
         }
     }
     pthread_mutex_unlock(&mach_lock);

@@ -254,6 +254,9 @@ run_one libsystem_electron "$here/libsystem_electron.c" "$here/libsystem_electro
 # Mach ports and messages in one process, with kevent's EVFILT_MACHPORT and
 # dispatch's mach sources, which Chromium carries its messages on (1.265)
 run_one mach_ports "$here/mach_ports.c" "$here/mach_ports.out"
+# Mach messages between two processes: rendezvous, a moved receive right,
+# a memory entry, a file port and a dead-name notification (1.266)
+run_one mach_ipc "$here/mach_ipc.c" "$here/mach_ipc.out"
 # Core Foundation heaps and tokenizers, the dynamic store, Security's
 # identities and trust settings, vDSP and symlink paths, which Electron's
 # Chromium calls at start (1.265)

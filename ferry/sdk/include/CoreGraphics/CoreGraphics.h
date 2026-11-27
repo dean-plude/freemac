@@ -441,6 +441,33 @@ void CGContextSetTextDrawingMode(CGContextRef c, CGTextDrawingMode mode);
 void CGContextSetCharacterSpacing(CGContextRef c, CGFloat spacing);
 void CGContextSetFontSize(CGContextRef c, CGFloat size);
 
+/* freemac 1.266: fonts, glyphs, masks, data consumers and PDF contexts */
+void CGContextSetFont(CGContextRef c, CGFontRef font);
+void CGContextShowGlyphsAtPositions(CGContextRef c, const CGGlyph glyphs[], const CGPoint positions[], size_t count);
+void CGContextClipToMask(CGContextRef c, CGRect rect, CGImageRef mask);
+void CGContextSetShouldSubpixelQuantizeFonts(CGContextRef c, bool should);
+void CGContextSetAllowsFontSubpixelQuantization(CGContextRef c, bool allows);
+typedef struct CGDataConsumer *CGDataConsumerRef;
+typedef size_t (*CGDataConsumerPutBytesCallback)(void *info, const void *buffer, size_t count);
+typedef void (*CGDataConsumerReleaseInfoCallback)(void *info);
+typedef struct CGDataConsumerCallbacks {
+    CGDataConsumerPutBytesCallback putBytes;
+    CGDataConsumerReleaseInfoCallback releaseConsumer;
+} CGDataConsumerCallbacks;
+CGDataConsumerRef CGDataConsumerCreate(void *info, const CGDataConsumerCallbacks *callbacks);
+CGDataConsumerRef CGDataConsumerCreateWithCFData(CFMutableDataRef data);
+CGDataConsumerRef CGDataConsumerCreateWithURL(CFURLRef url);
+CGDataConsumerRef CGDataConsumerRetain(CGDataConsumerRef consumer);
+void CGDataConsumerRelease(CGDataConsumerRef consumer);
+CFTypeID CGDataConsumerGetTypeID(void);
+CGContextRef CGPDFContextCreate(CGDataConsumerRef consumer, const CGRect *mediaBox, CFDictionaryRef auxiliaryInfo);
+CGContextRef CGPDFContextCreateWithURL(CFURLRef url, const CGRect *mediaBox, CFDictionaryRef auxiliaryInfo);
+void CGPDFContextClose(CGContextRef c);
+void CGPDFContextBeginPage(CGContextRef c, CFDictionaryRef pageInfo);
+void CGPDFContextEndPage(CGContextRef c);
+void CGContextBeginPage(CGContextRef c, const CGRect *mediaBox);
+void CGContextEndPage(CGContextRef c);
+
 __FERRY_END
 
 /* Quartz Event Services and Window Services (freemac 1.220, Ferry 0.44.0),

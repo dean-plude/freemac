@@ -272,36 +272,7 @@ static int mac_asprintf_l(char **s, locale_t loc, const char *f, ...)
     va_end(ap);
     return r;
 }
-/* The va_list forms, and sprintf's (darktable, through GLib's printf) */
-static int mac_vsnprintf_l(char *s, size_t n, locale_t loc, const char *f, va_list ap)
-{
-    locale_t old = uselocale(to_linux(loc));
-    int r = vsnprintf(s, n, f, ap);
-    uselocale(old);
-    return r;
-}
-static int mac_vasprintf_l(char **s, locale_t loc, const char *f, va_list ap)
-{
-    locale_t old = uselocale(to_linux(loc));
-    int r = vasprintf(s, f, ap);
-    uselocale(old);
-    return r;
-}
-static int mac_vsprintf_l(char *s, locale_t loc, const char *f, va_list ap)
-{
-    locale_t old = uselocale(to_linux(loc));
-    int r = vsprintf(s, f, ap);
-    uselocale(old);
-    return r;
-}
-static int mac_sprintf_l(char *s, locale_t loc, const char *f, ...)
-{
-    va_list ap;
-    va_start(ap, f);
-    int r = mac_vsprintf_l(s, loc, f, ap);
-    va_end(ap);
-    return r;
-}
+/* the va_list scanning form (darktable, through GLib) */
 static int mac_vsscanf_l(const char *s, locale_t loc, const char *f, va_list ap)
 {
     locale_t old = uselocale(to_linux(loc));
@@ -420,7 +391,31 @@ static unsigned long long mac_wcstoull_l(const wchar_t *s, wchar_t **e, int b, l
 static double mac_wcstod_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstod(s, e)); }
 static float mac_wcstof_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstof(s, e)); }
 
+/* Printing into a string under a locale (printf_l(3)): the plain call,
+ * with the locale in force on this thread while it runs (freemac 1.267). */
+static int mac_vsnprintf_l(char *buf, size_t n, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vsnprintf(buf, n, fmt, ap));
+}
+static int mac_vsprintf_l(char *buf, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vsprintf(buf, fmt, ap));
+}
+static int mac_vasprintf_l(char **out, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vasprintf(out, fmt, ap));
+}
+static int mac_sprintf_l(char *buf, locale_t loc, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int r = mac_vsprintf_l(buf, loc, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
 const struct ferry_symbol ferry_wchar_symbols[] = {
+    MAC(vsnprintf_l), MAC(vsprintf_l), MAC(vasprintf_l), MAC(sprintf_l),
     {"nl_langinfo", mac_nl_langinfo},
     {"nl_langinfo_l", mac_nl_langinfo_l},
     MAC(wcstol_l), MAC(wcstoul_l), MAC(wcstoll_l), MAC(wcstoull_l), MAC(wcstod_l), MAC(wcstof_l),
@@ -451,8 +446,7 @@ const struct ferry_symbol ferry_wchar_symbols[] = {
     MAC(towlower_l), MAC(towupper_l), MAC(iswctype_l), MAC(wctype_l),
     MAC(strtol_l), MAC(strtoul_l), MAC(strtoll_l), MAC(strtoull_l), MAC(strtod_l), MAC(strtof_l),
     MAC(strtold_l), MAC(strcoll_l), MAC(strxfrm_l), MAC(wcscoll_l), MAC(wcsxfrm_l), MAC(strftime_l), MAC(strptime_l),
-    MAC(snprintf_l), MAC(asprintf_l), MAC(sscanf_l), MAC(vsnprintf_l), MAC(vasprintf_l), MAC(vsprintf_l),
-    MAC(sprintf_l), MAC(vsscanf_l),
+    MAC(snprintf_l), MAC(asprintf_l), MAC(sscanf_l), MAC(vsscanf_l),
     MAC(btowc_l), MAC(wctob_l), MAC(mbrtowc_l), MAC(wcrtomb_l), MAC(mbrlen_l), MAC(mbtowc_l), MAC(wctomb_l),
     MAC(mbsrtowcs_l), MAC(wcsrtombs_l), MAC(mbsnrtowcs_l), MAC(wcsnrtombs_l), MAC(mbstowcs_l),
     MAC(wcstombs_l), MAC(mblen_l),

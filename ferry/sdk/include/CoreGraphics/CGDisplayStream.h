@@ -68,6 +68,10 @@ typedef void *CGDisplayStreamFrameAvailableHandler;
 CFTypeID CGDisplayStreamGetTypeID(void);
 CFTypeID CGDisplayStreamUpdateGetTypeID(void);
 /* outputPixelFormat is 'BGRA', 'l10r', '420v' or '420f' */
+CGDisplayStreamRef CGDisplayStreamCreate(CGDirectDisplayID display, size_t outputWidth, size_t outputHeight,
+                                         int32_t pixelFormat, CFDictionaryRef properties,
+                                         CGDisplayStreamFrameAvailableHandler handler);
+CFRunLoopSourceRef CGDisplayStreamGetRunLoopSource(CGDisplayStreamRef displayStream);
 CGDisplayStreamRef CGDisplayStreamCreateWithDispatchQueue(CGDirectDisplayID display, size_t outputWidth,
                                                           size_t outputHeight, int32_t pixelFormat,
                                                           CFDictionaryRef properties, dispatch_queue_t queue,

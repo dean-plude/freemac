@@ -57,6 +57,13 @@ kern_return_t IOObjectRelease(io_object_t object)
 kern_return_t IOObjectRetain(io_object_t object) { return IOObjectRelease(object); }
 io_registry_entry_t IORegistryEntryFromPath(mach_port_t mainPort, const io_string_t path) { return IO_OBJECT_NULL; }
 io_registry_entry_t IORegistryGetRootEntry(mach_port_t mainPort) { return IO_OBJECT_NULL; }
+/* The registry has no entries here, so none has a name (freemac 1.266). */
+kern_return_t IORegistryEntryGetName(io_registry_entry_t entry, io_name_t name)
+{
+    if (name)
+        name[0] = 0;
+    return kIOReturnBadArgument;
+}
 /* Walking the registry finds nothing: an empty iterator, and no parent. */
 kern_return_t IORegistryEntryCreateIterator(io_registry_entry_t entry, const char *plane, uint32_t options,
                                             io_iterator_t *iterator)
@@ -659,6 +666,8 @@ IOHIDElementCookie IOHIDElementGetCookie(IOHIDElementRef element) { return 0; }
 IOHIDElementType IOHIDElementGetType(IOHIDElementRef element) { return 0; }
 uint32_t IOHIDElementGetUsagePage(IOHIDElementRef element) { return 0; }
 uint32_t IOHIDElementGetUsage(IOHIDElementRef element) { return 0; }
+uint32_t IOHIDElementGetReportID(IOHIDElementRef element) { return 0; }
+uint32_t IOHIDElementGetReportSize(IOHIDElementRef element) { return 0; }
 CFIndex IOHIDElementGetLogicalMin(IOHIDElementRef element) { return 0; }
 CFIndex IOHIDElementGetLogicalMax(IOHIDElementRef element) { return 0; }
 CFIndex IOHIDElementGetPhysicalMin(IOHIDElementRef element) { return 0; }

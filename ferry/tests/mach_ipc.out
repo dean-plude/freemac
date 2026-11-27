@@ -1,0 +1,14 @@
+check in: 0
+spawn: 0
+request: 0 id mrzv, from the child 1, a send-once reply 1
+reply: 0
+child got: the waiting message 1, the memory entry 1, the file port 1, the memory 1, the sender 1
+memory entry now: from the child
+pipe: through the pipe
+request notification: 0
+late message: 0
+child exit: 0
+dead name: 0 id 72, the moved port 1
+now a dead name: 1
+send to it: 0x10000003
+exit=0

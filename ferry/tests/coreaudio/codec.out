@@ -20,4 +20,7 @@ lossless cookie: 24 bytes
 lossless encoded: yes, smaller: yes
 lossless decoded: 48000 frames, the same: yes
 QDesign: not supported
+AAC format info: 0, 1024 frames a packet
+HE-AAC format info: not supported
+encodes: lpcm aac  alac flac opus
 exit=0

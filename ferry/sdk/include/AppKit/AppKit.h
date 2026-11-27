@@ -253,6 +253,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL separatorColor, * FERRY_SWIFT_NONNULL controlAccentColor, * FERRY_SWIFT_NONNULL keyboardFocusIndicatorColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL alternateSelectedControlColor, * FERRY_SWIFT_NONNULL headerTextColor, * FERRY_SWIFT_NONNULL headerColor, * FERRY_SWIFT_NONNULL linkColor;
 @property (readonly) CGFloat redComponent, greenComponent, blueComponent, alphaComponent, whiteComponent;
+@property (readonly) NSString *colorSpaceName;
 @property (readonly) CGFloat hueComponent, saturationComponent, brightnessComponent;
 @property (readonly) NSInteger numberOfComponents;
 @property (readonly) CGColorRef CGColor;
@@ -272,6 +273,10 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 - (void)setStroke;
 @end
 APPKIT_EXTERN NSString *const NSCalibratedRGBColorSpace;
+APPKIT_EXTERN NSString *const NSDeviceCMYKColorSpace;
+APPKIT_EXTERN NSString *const NSNamedColorSpace;
+APPKIT_EXTERN NSString *const NSPatternColorSpace;
+APPKIT_EXTERN NSString *const NSCustomColorSpace;
 APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 APPKIT_EXTERN NSString *const NSCalibratedWhiteColorSpace;
 APPKIT_EXTERN NSString *const NSDeviceWhiteColorSpace;

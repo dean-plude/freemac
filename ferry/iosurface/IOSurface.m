@@ -5,15 +5,26 @@
  *
  * A surface is page-aligned memory of the program's own, laid out as its
  * properties ask (one plane, or several each with its own rows), with the
- * values a program sets on it and a use count. Its ID and its "Mach port"
- * find it again within the program; there is no kernel object behind
- * either, so a surface can't be passed to another program as on a Mac.
+ * values a program sets on it and a use count. Its ID finds it again within
+ * the program.
+ *
+ * Since freemac 1.266 its memory is a Mach memory entry (shared memory,
+ * src/mach.c), and IOSurfaceCreateMachPort gives a send right to it, which
+ * can go to another program in a Mach message as on a Mac: Chromium's GPU
+ * process draws a window's pixels into a surface and sends it to the app's
+ * own process this way. The page before the pixels describes the surface,
+ * so IOSurfaceLookupFromMachPort in the other program can lay it out the
+ * same; the values set on it stay with the program that set them.
  * Locking only counts the seed, as the memory is never moved. An
  * IOSurfaceRef is an object of the class IOSurface, so CFRetain and
  * CFRelease work on it. Built without ARC. */
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurface.h>
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -81,6 +92,11 @@ struct plane {
     size_t _allocSize, _planeCount;
     struct plane _planes[MAX_PLANES];
     unsigned char *_memory;
+    unsigned char *_map;    /* the shared mapping: the description page, then the memory */
+    size_t _mapSize;
+    mach_port_t _entry;     /* the memory entry behind it (0 for one another program made) */
+    pid_t _fromPid;         /* for a surface another program made: that program, */
+    IOSurfaceID _fromId;    /* and the surface's ID there */
     uint32_t _seed;
     int32_t _useCount;
     int32_t _locks;
@@ -89,6 +105,8 @@ struct plane {
     NSMutableDictionary *_values;
     pthread_mutex_t _mutex;
 }
+- (BOOL)ferryShare;
+- (instancetype)ferryInitWithMap:(unsigned char *)map size:(size_t)size;
 @end
 
 /* The surfaces alive now, by ID (not retained: a surface leaves when it goes). */
@@ -131,9 +149,25 @@ static void table_remove(IOSurfaceID sid)
         }
 }
 
-/* the "Mach port" of a surface: its ID with a mark, which only this
- * program's IOSurfaceLookupFromMachPort understands */
+/* the "Mach port" Ferry gave before 1.266, when no memory could be shared:
+ * the ID with a mark, still understood within the program */
 #define PORT_MARK 0x51000000u
+
+/* The page before a shared surface's memory: what another program needs to
+ * lay the surface out as its maker did. */
+#define SHARE_MAGIC 0x534f4946u /* "FIOS" */
+#define SHARE_PAGE 4096
+struct share_header {
+    uint32_t magic, version;
+    int32_t pid;
+    IOSurfaceID id;
+    uint64_t allocSize, width, height, bytesPerRow, bytesPerElement, elementWidth, elementHeight, offset, planeCount;
+    uint32_t format, castingAllowed;
+    struct plane planes[MAX_PLANES];
+    /* how many other programs hold the surface, so its maker sees it in use
+     * as on a Mac (IOSurfaceIsInUse) while one shows it (freemac 1.266) */
+    uint32_t users;
+};
 
 static size_t number(NSDictionary *d, id key, size_t otherwise)
 {
@@ -208,15 +242,97 @@ static size_t align_up(size_t v, size_t a) { return a ? (v + a - 1) / a * a : v;
         return nil;
     }
     _allocSize = align_up(_allocSize, 4096);
-    if (posix_memalign((void **)&_memory, 4096, _allocSize)) {
-        _memory = NULL;
-        [self release];
-        return nil;
+    if (![self ferryShare]) {
+        if (posix_memalign((void **)&_memory, 4096, _allocSize)) {
+            _memory = NULL;
+            [self release];
+            return nil;
+        }
+        memset(_memory, 0, _allocSize);
     }
-    memset(_memory, 0, _allocSize);
     id name = [p objectForKey:@"IOSurfaceName"];
     if (name)
         [_values setObject:name forKey:@"IOSurfaceName"];
+    pthread_mutex_lock(&table_mutex);
+    do
+        _id = ++last_id;
+    while (!_id || table_find(_id));
+    int added = table_add(_id, self);
+    pthread_mutex_unlock(&table_mutex);
+    if (!added) {
+        _id = 0;
+        [self release];
+        return nil;
+    }
+    if (_map)
+        ((struct share_header *)_map)->id = _id;
+    return self;
+}
+
+/* The memory as a Mach memory entry, mapped here, with its description in
+ * the first page (fresh memory is zeroed). */
+- (BOOL)ferryShare
+{
+    memory_object_size_t size = SHARE_PAGE + _allocSize;
+    mach_port_t entry = MACH_PORT_NULL;
+    if (mach_make_memory_entry_64(mach_task_self(), &size, 0, MAP_MEM_NAMED_CREATE | VM_PROT_READ | VM_PROT_WRITE,
+                                  &entry, MACH_PORT_NULL) != KERN_SUCCESS)
+        return NO;
+    mach_vm_address_t at = 0;
+    if (mach_vm_map(mach_task_self(), &at, size, 0, VM_FLAGS_ANYWHERE, entry, 0, FALSE, VM_PROT_READ | VM_PROT_WRITE,
+                    VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE) != KERN_SUCCESS) {
+        mach_port_deallocate(mach_task_self(), entry);
+        return NO;
+    }
+    _entry = entry;
+    _map = (unsigned char *)(uintptr_t)at;
+    _mapSize = (size_t)size;
+    _memory = _map + SHARE_PAGE;
+    struct share_header *h = (struct share_header *)_map;
+    h->magic = SHARE_MAGIC;
+    h->version = 1;
+    h->pid = getpid();
+    h->allocSize = _allocSize;
+    h->width = _width;
+    h->height = _height;
+    h->bytesPerRow = _bytesPerRow;
+    h->bytesPerElement = _bytesPerElement;
+    h->elementWidth = _elementWidth;
+    h->elementHeight = _elementHeight;
+    h->offset = _offset;
+    h->planeCount = _planeCount;
+    h->format = _format;
+    h->castingAllowed = _castingAllowed;
+    memcpy(h->planes, _planes, sizeof h->planes);
+    return YES;
+}
+
+/* A surface another program made, from its shared memory mapped here. */
+- (instancetype)ferryInitWithMap:(unsigned char *)map size:(size_t)size
+{
+    if (!(self = [super init]))
+        return nil;
+    pthread_mutex_init(&_mutex, NULL);
+    _values = [[NSMutableDictionary alloc] init];
+    const struct share_header *h = (const struct share_header *)map;
+    _map = map;
+    _mapSize = size;
+    _memory = map + SHARE_PAGE;
+    _fromPid = h->pid;
+    _fromId = h->id;
+    _allocSize = (size_t)h->allocSize;
+    _width = (size_t)h->width;
+    _height = (size_t)h->height;
+    _bytesPerRow = (size_t)h->bytesPerRow;
+    _bytesPerElement = (size_t)h->bytesPerElement;
+    _elementWidth = (size_t)h->elementWidth;
+    _elementHeight = (size_t)h->elementHeight;
+    _offset = (size_t)h->offset;
+    _planeCount = h->planeCount <= MAX_PLANES ? (size_t)h->planeCount : MAX_PLANES;
+    _format = h->format;
+    _castingAllowed = h->castingAllowed != 0;
+    memcpy(_planes, h->planes, sizeof _planes);
+    __atomic_add_fetch(&((struct share_header *)map)->users, 1, __ATOMIC_ACQ_REL);
     pthread_mutex_lock(&table_mutex);
     do
         _id = ++last_id;
@@ -246,7 +362,15 @@ static size_t align_up(size_t v, size_t a) { return a ? (v + a - 1) / a * a : v;
 
 - (void)dealloc
 {
-    free(_memory);
+    if (_map) {
+        if (_fromPid)
+            __atomic_sub_fetch(&((struct share_header *)_map)->users, 1, __ATOMIC_ACQ_REL);
+        mach_vm_deallocate(mach_task_self(), (mach_vm_address_t)(uintptr_t)_map, _mapSize);
+        if (_entry)
+            mach_port_deallocate(mach_task_self(), _entry);
+    } else {
+        free(_memory);
+    }
     [_values release];
     pthread_mutex_destroy(&_mutex);
     [super dealloc];
@@ -353,7 +477,14 @@ static size_t align_up(size_t v, size_t a) { return a ? (v + a - 1) / a * a : v;
     pthread_mutex_unlock(&_mutex);
 }
 
-- (BOOL)isInUse { return __atomic_load_n(&_useCount, __ATOMIC_ACQUIRE) > 0; }
+- (BOOL)isInUse
+{
+    if (__atomic_load_n(&_useCount, __ATOMIC_ACQUIRE) > 0)
+        return YES;
+    /* a surface this program made and shared is in use while another
+     * program still holds it, as Apple's IOSurfaceIsInUse describes */
+    return _map && !_fromPid && __atomic_load_n(&((struct share_header *)_map)->users, __ATOMIC_ACQUIRE) > 0;
+}
 - (void)incrementUseCount { __atomic_add_fetch(&_useCount, 1, __ATOMIC_ACQ_REL); }
 - (void)decrementUseCount { __atomic_sub_fetch(&_useCount, 1, __ATOMIC_ACQ_REL); }
 - (int32_t)localUseCount { return __atomic_load_n(&_useCount, __ATOMIC_ACQUIRE); }
@@ -550,10 +681,83 @@ void IOSurfaceRemoveAllValues(IOSurfaceRef b)
         [S(b) removeAllAttachments];
 }
 
-mach_port_t IOSurfaceCreateMachPort(IOSurfaceRef b) { return b && S(b)->_id < 0x01000000u ? PORT_MARK | S(b)->_id : 0; }
+/* A new send right to the surface's memory, which the caller lets go of
+ * with mach_port_deallocate, as on a Mac. A surface whose memory couldn't
+ * be shared, or that another program made, gives a fresh entry or the old
+ * marked number. */
+mach_port_t IOSurfaceCreateMachPort(IOSurfaceRef b)
+{
+    if (!b)
+        return MACH_PORT_NULL;
+    IOSurface *s = S(b);
+    if (getenv("FERRY_IOSURFACE_TRACE"))
+        fprintf(stderr, "iosurface %d: port for %u %zux%zu\n", getpid(), s->_id, s->_width, s->_height);
+    mach_port_t port = MACH_PORT_NULL;
+    if (s->_entry) {
+        kern_return_t kr = mach_port_mod_refs(mach_task_self(), s->_entry, MACH_PORT_RIGHT_SEND, 1);
+        if (getenv("FERRY_IOSURFACE_TRACE")) {
+            mach_port_urefs_t refs = 0;
+            mach_port_get_refs(mach_task_self(), s->_entry, MACH_PORT_RIGHT_SEND, &refs);
+            fprintf(stderr, "iosurface %d: entry %#x: %#x, %u send refs\n", getpid(), s->_entry, kr, refs);
+        }
+        if (kr == KERN_SUCCESS)
+            return s->_entry;
+    }
+    if (s->_map) {
+        memory_object_size_t size = s->_mapSize;
+        if (mach_make_memory_entry_64(mach_task_self(), &size, (memory_object_offset_t)(uintptr_t)s->_map,
+                                      VM_PROT_READ | VM_PROT_WRITE, &port, MACH_PORT_NULL) == KERN_SUCCESS)
+            return port;
+    }
+    return s->_id < 0x01000000u ? PORT_MARK | s->_id : MACH_PORT_NULL;
+}
+
+/* The surface behind a send right: this program's own, one already brought
+ * in from the program that made it, or one mapped now from its memory. */
 IOSurfaceRef IOSurfaceLookupFromMachPort(mach_port_t port)
 {
-    return (port & 0xff000000u) == PORT_MARK ? IOSurfaceLookup(port & 0x00ffffffu) : NULL;
+    if ((port & 0xff000000u) == PORT_MARK)
+        return IOSurfaceLookup(port & 0x00ffffffu);
+    if (!port)
+        return NULL;
+    mach_vm_address_t at = 0;
+    if (mach_vm_map(mach_task_self(), &at, SHARE_PAGE, 0, VM_FLAGS_ANYWHERE, port, 0, FALSE, VM_PROT_READ,
+                    VM_PROT_READ, VM_INHERIT_NONE) != KERN_SUCCESS)
+        return NULL;
+    struct share_header h = *(const struct share_header *)(uintptr_t)at;
+    mach_vm_deallocate(mach_task_self(), at, SHARE_PAGE);
+    if (getenv("FERRY_IOSURFACE_TRACE"))
+        fprintf(stderr, "iosurface %d: lookup %#x: pid %d id %u\n", getpid(), port, h.pid, h.id);
+    if (h.magic != SHARE_MAGIC || h.version != 1)
+        return NULL;
+    if (h.pid == getpid())
+        return IOSurfaceLookup(h.id);
+    IOSurface *found = nil;
+    pthread_mutex_lock(&table_mutex);
+    for (size_t i = 0; i < table_count && !found; i++)
+        if (table[i].surface->_fromPid == h.pid && table[i].surface->_fromId == h.id)
+            found = [table[i].surface retain];
+    pthread_mutex_unlock(&table_mutex);
+    if (found) {
+        if (getenv("FERRY_IOSURFACE_TRACE")) {
+            const uint32_t *px = (const uint32_t *)found->_memory;
+            fprintf(stderr, "iosurface %d: again; pixels %08x %08x %08x\n", getpid(), px[0],
+                    px[found->_bytesPerRow / 4 * (found->_height / 2) + found->_width / 2], px[found->_bytesPerRow / 4 * 40 + 40]);
+        }
+        return (IOSurfaceRef)found;
+    }
+    size_t size = SHARE_PAGE + (size_t)h.allocSize;
+    at = 0;
+    if (mach_vm_map(mach_task_self(), &at, size, 0, VM_FLAGS_ANYWHERE, port, 0, FALSE, VM_PROT_READ | VM_PROT_WRITE,
+                    VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE) != KERN_SUCCESS)
+        return NULL;
+    IOSurface *made = [[IOSurface alloc] ferryInitWithMap:(unsigned char *)(uintptr_t)at size:size];
+    if (made && getenv("FERRY_IOSURFACE_TRACE")) {
+        const uint32_t *px = (const uint32_t *)made->_memory;
+        fprintf(stderr, "iosurface %d: new; pixels %08x %08x %08x\n", getpid(), px[0],
+                px[made->_bytesPerRow / 4 * (made->_height / 2) + made->_width / 2], px[made->_bytesPerRow / 4 * 40 + 40]);
+    }
+    return (IOSurfaceRef)made;
 }
 
 size_t IOSurfaceGetPropertyMaximum(CFStringRef property)

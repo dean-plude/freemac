@@ -3396,6 +3396,77 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## FreeCAD opens (freemac 1.267, Ferry 0.90.0)
+
+FreeCAD 1.0.2, from its official download, opens its Start page, opens the
+Part Design example, draws it in its 3D view and turns it with the
+navigation cube. FreeCAD is a Qt 5 app carrying Python, OpenCASCADE and
+Coin3D, and it took these:
+
+- **Loading as dyld does.** Every library a program or a `dlopen` brings in
+  is mapped first and linked after, so a library built to find its calls
+  wherever they are loaded (FreeCAD's Python modules) finds ones in
+  libraries loaded after it. Export tables with empty edges, as
+  conda-forge's zlib has, are read, and `RTLD_NEXT` falls back to the
+  libraries loaded before the caller, which is how Qt finds OpenGL.
+- **The C library.** Printing with a locale (`vsprintf_l` and kin),
+  `shm_open`, message catalogs (`catopen`), and `qsort_r`, which on a Mac
+  passes its context first.
+- **Qt's redraws reach the screen.** Qt paints a window into an IOSurface
+  and hands it to the window's layer. It paints the next frame into a
+  surface that isn't in use, and skips handing over a surface the layer
+  already shows. A surface a layer shows now counts as in use, as it does
+  on a Mac once Core Animation has it, so Qt swaps surfaces and every
+  redraw shows. Before, a click worked but nothing on screen changed.
+- **OpenGL in a Qt window.** When a window holds a 3D view, Qt composes the
+  whole window with OpenGL. Each frame now shows without the window being
+  asked to draw again, which Qt answered with another frame, round and round.
+- **AppKit bits Qt asks for.** Colour space names and pattern colours,
+  `needsToDrawRect:` and `getRectsBeingDrawn:count:`, and Image I/O's list
+  of image types.
+
+`FERRY_EVENT_TRACE=1` prints where each mouse click goes, which shows
+whether a click that seems lost reached the app.
+
+## Obsidian opens (freemac 1.266, Ferry 0.89.0)
+
+Obsidian 1.8.10, from its official download, now opens a working window:
+its start page, a new vault from Quick start, the Welcome note and the
+graph view, and a note that takes typing and saves it. Chromium runs a page
+in one process, draws it in another and shows it in a third, so most of
+the work was between processes:
+
+- **Mach ports between processes.** A right sent in a message now reaches
+  the other process, messages are forwarded through the port's owner, and
+  a reply to a process that has quit fails as it would on a Mac.
+  `FERRY_MACH_TRACE=1` prints sends that fail or find a full queue, and
+  `FERRY_MACH_TRACE=2` every send between processes.
+- **Shared IOSurfaces.** A surface's memory is a Mach memory entry with a
+  page describing it, so another process maps the same pixels. A surface
+  counts as in use while another process holds it, as Apple's
+  `IOSurfaceIsInUse` describes; Chromium's compositor then draws the next
+  frame into a free buffer, and the window sees each one.
+  `FERRY_IOSURFACE_TRACE=1` follows surfaces between processes.
+- **Run loops.** An observer told the run loop is about to sleep may set a
+  timer; the run loop now wakes for it, and it always says it woke after it
+  slept, which Chromium checks.
+- **Core Animation.** A layer that resizes with its superlayer
+  (`kCALayerWidthSizable`, `kCALayerHeightSizable`) grows by the whole
+  change. It grew by a sixteenth, which put Obsidian's page almost entirely
+  below its window.
+- **Drawing and text.** Core Graphics fonts and glyphs, mask clipping (to
+  its rectangle for now), PDF contexts (not drawn yet), data consumers,
+  Core Text character sets, `-[NSString getCharacters:]` and the spell
+  checker's typing settings (all off: Ferry corrects nothing as you type).
+- **Software drawing.** Ferry starts an Electron app with Chromium's own
+  `--disable-gpu`, because Ferry's OpenGL can't yet fill the shared surfaces
+  Chromium composites into on the graphics card. WebGL still runs, in
+  software. `FERRY_ELECTRON_GPU=1` keeps the graphics card.
+
+Two debugging switches help with apps like this: `FERRY_VIEW_TREE=1` prints
+a window's views and layers as it draws them, and `FERRY_KEY_TRACE=1`
+prints each key and where it goes.
+
 ## Electron apps and what they needed (freemac 1.265, Ferry 0.88.0)
 
 Electron apps carry Chromium and Node.js inside, and many popular Mac apps

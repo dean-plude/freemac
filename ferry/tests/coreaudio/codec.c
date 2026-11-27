@@ -242,5 +242,27 @@ int main(void)
     printf("QDesign: %s\n", AudioConverterNew(&fl, &other, &enc) == kAudioConverterErr_FormatNotSupported
                                 ? "not supported"
                                 : "wrong");
+
+    /* Audio Format Services fills in a compressed format, as OBS asks
+     * before it offers Core Audio's AAC encoder (1.266) */
+    AudioStreamBasicDescription info = {48000, kAudioFormatMPEG4AAC, 0, 0, 0, 0, 2, 0, 0};
+    UInt32 isize = sizeof info;
+    err = AudioFormatGetProperty(kAudioFormatProperty_FormatInfo, 0, NULL, &isize, &info);
+    printf("AAC format info: %d, %u frames a packet\n", (int)err, (unsigned)info.mFramesPerPacket);
+    AudioStreamBasicDescription he = {48000, kAudioFormatMPEG4AAC_HE, 0, 0, 0, 0, 2, 0, 0};
+    isize = sizeof he;
+    printf("HE-AAC format info: %s\n",
+           AudioFormatGetProperty(kAudioFormatProperty_FormatInfo, 0, NULL, &isize, &he) ==
+                   kAudioFormatUnsupportedDataFormatError
+               ? "not supported"
+               : "wrong");
+    UInt32 ids[16];
+    isize = sizeof ids;
+    AudioFormatGetProperty(kAudioFormatProperty_EncodeFormatIDs, 0, NULL, &isize, ids);
+    printf("encodes:");
+    for (UInt32 i = 0; i < isize / sizeof(UInt32); i++)
+        printf(" %c%c%c%c", (int)(ids[i] >> 24), (int)(ids[i] >> 16 & 255), (int)(ids[i] >> 8 & 255),
+               (int)(ids[i] & 255));
+    printf("\n");
     return 0;
 }
