@@ -616,6 +616,25 @@ static const void *mac_getsectbynamefromheader_64(const void *mh, const char *se
     return mac_find_section(mh, segname, sectname, &slide);
 }
 
+/* The main program's segment of that name, as its unslid load command
+ * (freemac Godot work). */
+static const void *mac_getsegbyname(const char *segname)
+{
+    const struct mac_seg64 *segs[64];
+    intptr_t slide;
+    int n = mac_segments(mac_dyld_get_image_header(0), segs, 64, &slide);
+    for (int i = 0; i < n; i++)
+        if (!strncmp(segs[i]->segname, segname, 16))
+            return segs[i];
+    return NULL;
+}
+
+/* The main program's section of that name, as its unslid record. */
+static const void *mac_getsectbyname(const char *segname, const char *sectname)
+{
+    return mac_getsectbynamefromheader_64(mac_dyld_get_image_header(0), segname, sectname);
+}
+
 /* Ferry's own, for Foundation's NSBundle: the first class a loaded bundle
  * defines (its principal class when Info.plist names none). */
 static void *ferry_dl_first_class(void *h)
@@ -641,6 +660,8 @@ const struct ferry_symbol ferry_dyld_symbols[] = {
     {"getsectiondata", mac_getsectiondata},
     {"getsegmentdata", mac_getsegmentdata},
     {"getsectbynamefromheader_64", mac_getsectbynamefromheader_64},
+    {"getsegbyname", mac_getsegbyname},
+    {"getsectbyname", mac_getsectbyname},
     {"ferry_dl_first_class", ferry_dl_first_class},
     {NULL, NULL},
 };

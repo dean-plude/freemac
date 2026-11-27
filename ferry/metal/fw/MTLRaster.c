@@ -937,7 +937,16 @@ void mtl_execute_draw(const struct mtl_target *rt, const struct mtl_draw_state *
     (void)strip;
     float *vout = malloc(sizeof(float) * (size_t)nshade * (size_t)S.vsize);
     if (!vout || !vids) { free(vout); free(vids); free(slot); return; }
-    struct vshade V = {st, {&p->vd, st->vb.buffers, d->base_instance}, vids, nshade, 0, vout, S.vsize};
+    /* buffer strides set when binding (Metal 3's attributeStride:) over the pipeline's */
+    struct mtl_vdesc vd_dyn;
+    const struct mtl_vdesc *vd = &p->vd;
+    if (st->vstride_set) {
+        vd_dyn = p->vd;
+        for (int b = 0; b < 31; b++)
+            if (st->vstride_set & (1u << b)) vd_dyn.layout[b].stride = st->vstride[b];
+        vd = &vd_dyn;
+    }
+    struct vshade V = {st, {vd, st->vb.buffers, d->base_instance}, vids, nshade, 0, vout, S.vsize};
     size_t nchunks = (nshade + VCHUNK - 1) / VCHUNK;
     int fill_lines = st->fill == 1;
     for (unsigned inst = 0; inst < d->instances; inst++) {

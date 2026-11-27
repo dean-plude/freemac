@@ -133,6 +133,38 @@ static struct mac_sincos mac_sincos_stret(double x) { return (struct mac_sincos)
 static struct mac_sincosf mac_sincosf_stret(float x) { return (struct mac_sincosf){sinf(x), cosf(x)}; }
 /* A Mac's math library also has 10^x and sin, cos and tan of pi times x
    under these names (its <math.h> declares them for FFmpeg and others). */
+/* <simd/math.h> calls a Mac's math library for whole vectors under these
+   names (freemac Godot work: _simd_pow_f4); a vector goes in and comes
+   back in xmm registers on both systems, one lane at a time here. */
+typedef float mac_f2 __attribute__((vector_size(8)));
+typedef float mac_f4 __attribute__((vector_size(16)));
+typedef double mac_d2 __attribute__((vector_size(16)));
+#define MAC_SIMD1(name, f, d)                                                                        \
+    static mac_f2 mac_simd_##name##_f2(mac_f2 x) { return (mac_f2){f(x[0]), f(x[1])}; }              \
+    static mac_f4 mac_simd_##name##_f4(mac_f4 x) { return (mac_f4){f(x[0]), f(x[1]), f(x[2]), f(x[3])}; } \
+    static mac_d2 mac_simd_##name##_d2(mac_d2 x) { return (mac_d2){d(x[0]), d(x[1])}; }
+#define MAC_SIMD2(name, f, d)                                                                        \
+    static mac_f2 mac_simd_##name##_f2(mac_f2 x, mac_f2 y) { return (mac_f2){f(x[0], y[0]), f(x[1], y[1])}; } \
+    static mac_f4 mac_simd_##name##_f4(mac_f4 x, mac_f4 y)                                           \
+    {                                                                                                \
+        return (mac_f4){f(x[0], y[0]), f(x[1], y[1]), f(x[2], y[2]), f(x[3], y[3])};                 \
+    }                                                                                                \
+    static mac_d2 mac_simd_##name##_d2(mac_d2 x, mac_d2 y) { return (mac_d2){d(x[0], y[0]), d(x[1], y[1])}; }
+MAC_SIMD2(pow, powf, pow)
+MAC_SIMD2(atan2, atan2f, atan2)
+MAC_SIMD2(fmod, fmodf, fmod)
+MAC_SIMD1(exp, expf, exp)
+MAC_SIMD1(exp2, exp2f, exp2)
+MAC_SIMD1(log, logf, log)
+MAC_SIMD1(log2, log2f, log2)
+MAC_SIMD1(log10, log10f, log10)
+MAC_SIMD1(sin, sinf, sin)
+MAC_SIMD1(cos, cosf, cos)
+MAC_SIMD1(tan, tanf, tan)
+MAC_SIMD1(asin, asinf, asin)
+MAC_SIMD1(acos, acosf, acos)
+MAC_SIMD1(atan, atanf, atan)
+MAC_SIMD1(cbrt, cbrtf, cbrt)
 static double mac_exp10(double x) { return pow(10.0, x); }
 static float mac_exp10f(float x) { return powf(10.0f, x); }
 static double mac_sinpi(double x) { double r = fmod(x, 2.0); return (r == 0.0 || r == 1.0 || r == -1.0) ? copysign(0.0, x) : sin(M_PI * r); }
@@ -262,6 +294,51 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"__sincosf_stret", mac_sincosf_stret},
     {"__exp10", mac_exp10},
     {"__exp10f", mac_exp10f},
+    {"_simd_pow_f2", mac_simd_pow_f2},
+    {"_simd_pow_f4", mac_simd_pow_f4},
+    {"_simd_pow_d2", mac_simd_pow_d2},
+    {"_simd_atan2_f2", mac_simd_atan2_f2},
+    {"_simd_atan2_f4", mac_simd_atan2_f4},
+    {"_simd_atan2_d2", mac_simd_atan2_d2},
+    {"_simd_fmod_f2", mac_simd_fmod_f2},
+    {"_simd_fmod_f4", mac_simd_fmod_f4},
+    {"_simd_fmod_d2", mac_simd_fmod_d2},
+    {"_simd_exp_f2", mac_simd_exp_f2},
+    {"_simd_exp_f4", mac_simd_exp_f4},
+    {"_simd_exp_d2", mac_simd_exp_d2},
+    {"_simd_exp2_f2", mac_simd_exp2_f2},
+    {"_simd_exp2_f4", mac_simd_exp2_f4},
+    {"_simd_exp2_d2", mac_simd_exp2_d2},
+    {"_simd_log_f2", mac_simd_log_f2},
+    {"_simd_log_f4", mac_simd_log_f4},
+    {"_simd_log_d2", mac_simd_log_d2},
+    {"_simd_log2_f2", mac_simd_log2_f2},
+    {"_simd_log2_f4", mac_simd_log2_f4},
+    {"_simd_log2_d2", mac_simd_log2_d2},
+    {"_simd_log10_f2", mac_simd_log10_f2},
+    {"_simd_log10_f4", mac_simd_log10_f4},
+    {"_simd_log10_d2", mac_simd_log10_d2},
+    {"_simd_sin_f2", mac_simd_sin_f2},
+    {"_simd_sin_f4", mac_simd_sin_f4},
+    {"_simd_sin_d2", mac_simd_sin_d2},
+    {"_simd_cos_f2", mac_simd_cos_f2},
+    {"_simd_cos_f4", mac_simd_cos_f4},
+    {"_simd_cos_d2", mac_simd_cos_d2},
+    {"_simd_tan_f2", mac_simd_tan_f2},
+    {"_simd_tan_f4", mac_simd_tan_f4},
+    {"_simd_tan_d2", mac_simd_tan_d2},
+    {"_simd_asin_f2", mac_simd_asin_f2},
+    {"_simd_asin_f4", mac_simd_asin_f4},
+    {"_simd_asin_d2", mac_simd_asin_d2},
+    {"_simd_acos_f2", mac_simd_acos_f2},
+    {"_simd_acos_f4", mac_simd_acos_f4},
+    {"_simd_acos_d2", mac_simd_acos_d2},
+    {"_simd_atan_f2", mac_simd_atan_f2},
+    {"_simd_atan_f4", mac_simd_atan_f4},
+    {"_simd_atan_d2", mac_simd_atan_d2},
+    {"_simd_cbrt_f2", mac_simd_cbrt_f2},
+    {"_simd_cbrt_f4", mac_simd_cbrt_f4},
+    {"_simd_cbrt_d2", mac_simd_cbrt_d2},
     {"__sinpi", mac_sinpi},
     {"__sinpif", mac_sinpif},
     {"__cospi", mac_cospi},

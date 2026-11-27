@@ -64,6 +64,7 @@ template<class T> T simd_prefix_exclusive_sum(T v) { return T(0); }
 template<class T> T simd_prefix_inclusive_product(T v) { return v; }
 template<class T> T simd_prefix_exclusive_product(T) { return T(1); }
 struct simd_vote {
+    typedef ulong vote_t;
     ulong v;
     explicit simd_vote(ulong x = 0) : v(x) {}
     bool all() const { return v != 0; }
@@ -561,6 +562,20 @@ template<class T> constexpr bool is_signed_v = is_signed<T>::value;
 template<class T> constexpr bool is_unsigned_v = is_unsigned<T>::value;
 template<class T> constexpr int vec_elements_v = vec_elements<T>::value;
 } // namespace metal
+
+/* The argument layouts of indirect draws and dispatches and of tessellation
+ * factors (MSL "tessellation and indirect" structures), which a kernel
+ * writes for the GPU to read (MoltenVK's own kernels do; freemac Godot work). */
+struct MTLDrawPrimitivesIndirectArguments { uint vertexCount, instanceCount, vertexStart, baseInstance; };
+struct MTLDrawIndexedPrimitivesIndirectArguments {
+    uint indexCount, instanceCount, indexStart;
+    int baseVertex;
+    uint baseInstance;
+};
+struct MTLDrawPatchIndirectArguments { uint patchCount, instanceCount, patchStart, baseInstance; };
+struct MTLDispatchThreadgroupsIndirectArguments { uint threadgroupsPerGrid[3]; };
+struct MTLQuadTessellationFactorsHalf { half edgeTessellationFactor[4], insideTessellationFactor[2]; };
+struct MTLTriangleTessellationFactorsHalf { half edgeTessellationFactor[3], insideTessellationFactor; };
 
 #endif
 

@@ -919,7 +919,7 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
  * directory named by $FERRY_FRAMEWORKS, next to the ferry program
  * (frameworks/), or in /usr/lib/ferry/frameworks. A few Apple libraries are
  * served by one of Ferry's: CoreFoundation, SystemConfiguration and
- * CoreServices (Gestalt and login items), ServiceManagement, IOKit (foundation/IOKit.m) and
+ * CoreServices (Gestalt and login items), ServiceManagement, IOKit and ForceFeedback (foundation/IOKit.m) and
  * UniformTypeIdentifiers live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
  * (the few calls Cocoa apps still make, appkit/Carbon.m) inside AppKit, and
  * AudioToolbox and AudioUnit inside CoreAudio. */
@@ -931,6 +931,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreServices", "Foundation"}, /* Gestalt, next to NSProcessInfo, and login items (LoginItems.m) */
     {"ServiceManagement", "Foundation"}, /* SMLoginItemSetEnabled, foundation/LoginItems.m */
     {"IOKit", "Foundation"},             /* the registry and power assertions, foundation/IOKit.m */
+    {"ForceFeedback", "Foundation"},     /* no force feedback devices, foundation/IOKit.m (Godot) */
     {"UniformTypeIdentifiers", "Foundation"}, /* UTType, foundation/UTTypes.m (freemac 1.225) */
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},

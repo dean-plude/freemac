@@ -498,6 +498,16 @@ id<MTLComputePipelineState> FerryMTLNewComputePipeline(id<MTLFunction> f, MTLCom
     handler(p, r, err);
     [p release];
 }
+/* freemac Godot work: MoltenVK makes its pipelines this way */
+- (void)newComputePipelineStateWithDescriptor:(MTLComputePipelineDescriptor *)d options:(MTLPipelineOption)o
+                            completionHandler:(MTLNewComputePipelineStateWithReflectionCompletionHandler)handler
+{
+    NSError *err = nil;
+    MTLComputePipelineReflection *r = nil;
+    id<MTLComputePipelineState> p = FerryMTLNewComputePipeline(d.computeFunction, d, o, &r, &err);
+    handler(p, r, err);
+    [p release];
+}
 - (id<MTLFence>)newFence { return [[NSClassFromString(@"FerryMTLFence") alloc] init]; }
 - (id<MTLEvent>)newEvent { return [[NSClassFromString(@"FerryMTLSharedEvent") alloc] init]; }
 - (id<MTLSharedEvent>)newSharedEvent { return [[NSClassFromString(@"FerryMTLSharedEvent") alloc] init]; }

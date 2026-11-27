@@ -281,6 +281,7 @@ class Source:
                 self.edit(t.start, toks[j].end, " ")
         k = 0
         brace_stack = []   # kinds of the open braces: 'ns', 'struct', 'func', 'other'
+        seen_stack = [set()]  # member function headings met in each open brace
         stmt_start = 0
         while k < n:
             t = toks[k]
@@ -300,11 +301,25 @@ class Source:
                     kind = "func"
                     if t.user and all(b in ("ns",) for b in brace_stack):
                         self.maybe_entry(prev, k)
+                    # device and constant are both __global here, so a struct's
+                    # "const device" and "const constant" overloads (as in
+                    # SPIRV-Cross's spvUnsafeArray) become the same member: the
+                    # second one goes
+                    if t.user and prev and brace_stack and brace_stack[-1] == "struct":
+                        head = " ".join(p.text for p in prev)
+                        norm = re.sub(r"\b(device|constant)\b", "__global", head)
+                        if norm in seen_stack[-1]:
+                            j = match_close(toks, k)
+                            self.edit(prev[0].start, toks[j].end, " ")
+                        else:
+                            seen_stack[-1].add(norm)
                 brace_stack.append(kind)
+                seen_stack.append(set())
                 stmt_start = k + 1
             elif x == "}":
                 if brace_stack:
                     brace_stack.pop()
+                    seen_stack.pop()
                 stmt_start = k + 1
             elif x == ";":
                 if t.user:

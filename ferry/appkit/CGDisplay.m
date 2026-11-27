@@ -181,3 +181,18 @@ CGError CGReleaseDisplayFadeReservation(CGDisplayFadeReservationToken token)
     return kCGErrorSuccess;
 }
 boolean_t CGDisplayFadeOperationInProgress(void) { return fading; }
+
+/* The Metal device that drives a display, retained, as the reference says
+ * (freemac Godot work): Ferry's one software device, from the program's own
+ * Metal framework, or nil when the program doesn't have Metal loaded. */
+#include <dlfcn.h>
+id<MTLDevice> CGDirectDisplayCopyCurrentMetalDevice(CGDirectDisplayID display)
+{
+    id (*create)(void) = (id (*)(void))dlsym(RTLD_DEFAULT, "MTLCreateSystemDefaultDevice");
+    return create ? create() : nil;
+}
+
+/* The window server connection of a program's own windows: a private
+ * call (Godot sets window properties through it), so there is one
+ * connection, numbered 1, and nothing is sent on it. */
+int CGSMainConnectionID(void) { return 1; }
