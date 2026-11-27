@@ -353,3 +353,20 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         *outputStructCnt = 0;
     return kIOReturnUnsupported;
 }
+
+/* the old names of the main port call and a whole entry's properties (freemac
+ * 1.263, Audacity): there is no registry entry, so no properties */
+kern_return_t IOMasterPort(mach_port_t bootstrapPort, mach_port_t *mainPort)
+{
+    if (mainPort)
+        *mainPort = 0;
+    return kIOReturnSuccess;
+}
+kern_return_t IOMainPort(mach_port_t bootstrapPort, mach_port_t *mainPort) { return IOMasterPort(bootstrapPort, mainPort); }
+kern_return_t IORegistryEntryCreateCFProperties(io_registry_entry_t entry, CFMutableDictionaryRef *properties,
+                                                CFAllocatorRef allocator, IOOptionBits options)
+{
+    if (properties)
+        *properties = NULL;
+    return kIOReturnBadArgument;
+}

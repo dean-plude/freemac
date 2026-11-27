@@ -105,10 +105,12 @@ void GFromCairo(const struct gfmt *f, const uint32_t *src, uint8_t *dst, size_t 
     GColorSpace *space;
     GDataProvider *provider;
     BOOL interpolate, mask;
+    BOOL invert;                /* a mask whose decode array swaps 0 and 1 */
     cairo_surface_t *surface;   /* made the first time the image is drawn */
 }
 @end
-cairo_surface_t *GImageSurface(GImage *image);
+cairo_surface_t *GImageSurface(GImage *image); /* an image mask's is its coverage, in A8 */
+cairo_surface_t *GMaskSurface(GImage *mask);
 GImage *GImageDecode(NSData *data, NSString **type);   /* retained; nil if unreadable */
 
 @interface GGradient : NSObject {
@@ -149,6 +151,8 @@ struct gstate {
     void *data;
     BOOL ownsData, shadow;
     BOOL shadowLoaded;   /* the shadow surface holds the pixels: between GContextWillDraw and DidDraw */
+    BOOL shadowDirty;    /* ...and has drawing the caller's pixels don't have yet (GContextSync) */
+    BOOL pending;        /* listed for GContextSyncAll */
     size_t width, height, bpc, bpp, bpr;
     uint32_t info;
     GColorSpace *space;
@@ -159,7 +163,15 @@ struct gstate {
 
 #define GSTATE(c) (&(c)->states[(c)->depth])
 void GContextWillDraw(GContext *c);    /* brings outside changes to the pixels in */
-void GContextDidDraw(GContext *c);     /* writes the drawing out to the caller's pixels */
+void GContextDidDraw(GContext *c);     /* writes the drawing out to the caller's pixels, or notes it to (below) */
+/* A bitmap context of the main thread that holds its own memory, in a layout
+ * Cairo doesn't draw in, converts its pixels once for a run of drawing calls
+ * rather than for each one: they are written out when they're asked for
+ * (CGBitmapContextGetData, CGBitmapContextCreateImage, CGContextFlush, an
+ * image made on that memory being drawn) and when the event loop turns. */
+void GContextSync(GContext *c);
+void GContextSyncAll(void) __attribute__((visibility("default")));
+void GContextSyncBytes(const void *bytes, size_t length);
 void GContextSetSource(GContext *c, const double rgba[4]);
 /* Around one drawing call: with a shadow set, what the call draws goes into
  * a group, and GContextEndShadow paints its shadow and then the drawing. */

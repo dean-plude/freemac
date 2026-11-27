@@ -945,6 +945,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"ScriptingBridge", "AppKit"},   /* apps that can't be scripted here, appkit/ScriptingBridge.m */
     {"AudioToolbox", "CoreAudio"},   /* audio units and queues beside the HAL, coreaudio/ (1.232, 1.234) */
     {"AudioUnit", "CoreAudio"},
+    {"CoreMIDI", "CoreAudio"},      /* a system with no MIDI devices, coreaudio/CoreMIDI.m (1.263) */
     {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.233) */
     {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.233) */
     {"CoreMediaIO", "AppKit"},       /* the system object, appkit/CoreMediaIO.m (1.257) */

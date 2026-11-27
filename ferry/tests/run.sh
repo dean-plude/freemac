@@ -209,6 +209,10 @@ run_one() {
             rm -rf "$build/cache_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY XDG_CACHE_HOME="$build/cache_$name" \
                 timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        cxx_libstdcxx_loaded)
+            # GNU libstdc++ already in the process, as this system's OpenGL brings it
+            LD_PRELOAD="$(ldconfig -p | sed -n 's|.* => \(/.*libstdc++\.so\.6\)$|\1|p' | head -n 1)" \
+                "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -245,6 +249,7 @@ run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
 # uuid(3), the older task_info flavors and vm_page_size, for OBS's libobs
 run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
+run_one chkstk "$here/chkstk.c" "$here/chkstk.out"
 # mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
 # backtrace three calls deep in Mac code (freemac 1.233).
 run_one libsystem_media "$here/libsystem_media.c" "$here/libsystem_media.out"
@@ -429,6 +434,7 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
     -framework CoreFoundation
 # Run loop sources and CFSockets on 127.0.0.1, from plain C.
 run_one corefoundation_socket "$here/foundation/cfsocket.c" "$here/foundation/cfsocket.out" -framework CoreFoundation
+run_one foundation_constant_literals "$here/foundation/constant_literals.m" "$here/foundation/constant_literals.out" -framework Foundation
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
 # The macOS version, the same in the Mac's version file, uname, NSProcessInfo
@@ -503,6 +509,7 @@ if [ -s "$top/sdk/lib/libc++.tbd" ] &&
         fail=$((fail + 1))
     fi
     run_one cxx_threads "$here/cxx/threads.cpp" "$here/cxx/threads.out" -std=c++17 -lc++
+    run_one cxx_libstdcxx_loaded "$here/cxx/libstdcxx_loaded.cpp" "$here/cxx/libstdcxx_loaded.out" -std=c++17 -lc++
     run_one cxx_thread_local "$here/cxx/thread_local.cpp" "$here/cxx/thread_local.out" -std=c++17 -lc++
     run_one objcxx_mixed "$here/cxx/objcxx_mixed.mm" "$here/cxx/objcxx_mixed.out" -std=c++17 -fobjc-arc \
         -framework Foundation -lc++
@@ -641,6 +648,7 @@ run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/
 # linked through Cocoa and through AppKit itself.
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
 run_one appkit_hidden_redraw "$here/appkit/hidden_redraw.m" "$here/appkit/hidden_redraw.out" -framework Cocoa
+run_one appkit_partial_redraw "$here/appkit/partial_redraw.m" "$here/appkit/partial_redraw.out" -framework Cocoa
 # (1.238) no untitled document, and no error, at the launch of an app with
 # no document class that uses the document controller for recents (VLC)
 run_one appkit_viewer_launch "$here/appkit/viewer_launch.m" "$here/appkit/viewer_launch.out" -framework Cocoa

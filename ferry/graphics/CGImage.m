@@ -561,6 +561,7 @@ CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect)
     size_t px = src->bpp / 8, x0 = (size_t)r.origin.x, y0 = (size_t)r.origin.y;
     size_t w = (size_t)r.size.width, h = (size_t)r.size.height, bpr = w * px;
     NSMutableData *copy = [NSMutableData dataWithLength:bpr * h];
+    GContextSyncBytes(src->provider->data.bytes, src->provider->data.length);
     const uint8_t *bytes = src->provider->data.bytes;
     for (size_t y = 0; y < h; y++)
         memcpy((uint8_t *)copy.mutableBytes + y * bpr, bytes + (y0 + y) * src->bpr + x0 * px, bpr);
@@ -568,6 +569,130 @@ CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect)
     GImage *im = make_image(w, h, src->bpc, src->bpp, bpr, src->space, src->info, p);
     [p release];
     return (CGImageRef)im;
+}
+
+/* ---- masks (freemac 1.263) ------------------------------------------------------------
+ * An image mask (CGImageMaskCreate) paints the fill colour where its
+ * samples are 0 and nothing where they are 1. A greyscale image used as a
+ * mask reads the same way: black lets the image through, white hides it. */
+
+CGImageRef CGImageMaskCreate(size_t width, size_t height, size_t bitsPerComponent, size_t bitsPerPixel,
+                             size_t bytesPerRow, CGDataProviderRef provider, const CGFloat *decode,
+                             bool shouldInterpolate)
+{
+    if (!provider || !width || !height || !bitsPerComponent || bitsPerPixel < bitsPerComponent ||
+        bytesPerRow < (width * bitsPerPixel + 7) / 8)
+        return NULL;
+    GDataProvider *p = (GDataProvider *)provider;
+    if (p->data.length < bytesPerRow * (height - 1) + (width * bitsPerPixel + 7) / 8)
+        return NULL;
+    GImage *im = make_image(width, height, bitsPerComponent, bitsPerPixel, bytesPerRow, GSpaceGray(), 0, p);
+    im->mask = YES;
+    im->interpolate = shouldInterpolate;
+    /* a decode of [1 0] swaps what paints */
+    im->invert = decode && decode[0] > decode[1];
+    return (CGImageRef)im;
+}
+
+/* one sample of a grey or mask image, 0...255 */
+static unsigned grey_sample(GImage *m, size_t x, size_t y)
+{
+    const uint8_t *row = (const uint8_t *)m->provider->data.bytes + y * m->bpr;
+    size_t bit = x * m->bpp;
+    switch (m->bpc) {
+    case 8: return row[bit / 8];
+    case 16: return row[bit / 8 + ((m->info & kCGBitmapByteOrderMask) == kCGBitmapByteOrder16Little ? 1 : 0)];
+    case 1: case 2: case 4: {
+        unsigned v = (row[bit / 8] >> (8 - m->bpc - bit % 8)) & ((1u << m->bpc) - 1);
+        return v * 255 / ((1u << m->bpc) - 1);
+    }
+    default: return 0;
+    }
+}
+
+/* how much of each pixel of a w x h image the mask lets through, 0...255,
+ * the mask stretched to the image; NULL for a mask Ferry can't read */
+static uint8_t *mask_coverage(GImage *m, size_t w, size_t h)
+{
+    GContextSyncBytes(m->provider->data.bytes, m->provider->data.length);
+    uint8_t *cov = malloc(w * h ? w * h : 1);
+    if (!cov)
+        return NULL;
+    BOOL raw = (m->mask || m->space->model == kCGColorSpaceModelMonochrome) &&
+               (m->bpc == 1 || m->bpc == 2 || m->bpc == 4 || m->bpc == 8 || m->bpc == 16) &&
+               (m->mask || (m->info & kCGBitmapAlphaInfoMask) == kCGImageAlphaNone);
+    cairo_surface_t *s = raw ? NULL : GImageSurface(m);
+    if (!raw && !s) {
+        free(cov);
+        return NULL;
+    }
+    const uint8_t *sd = s ? cairo_image_surface_get_data(s) : NULL;
+    int stride = s ? cairo_image_surface_get_stride(s) : 0;
+    for (size_t y = 0; y < h; y++) {
+        size_t my = y * m->height / h;
+        for (size_t x = 0; x < w; x++) {
+            size_t mx = x * m->width / w;
+            unsigned v;
+            if (raw) {
+                v = grey_sample(m, mx, my);
+            } else {
+                uint32_t px = ((const uint32_t *)(sd + my * stride))[mx];
+                unsigned a = px >> 24, g = (px >> 8) & 0xff;
+                v = a ? (g * 255 / a) : 255; /* clear counts as white */
+                if (v > 255) v = 255;
+            }
+            cov[y * w + x] = (uint8_t)(m->invert ? v : 255 - v);
+        }
+    }
+    return cov;
+}
+
+CGImageRef CGImageCreateWithMask(CGImageRef image, CGImageRef mask)
+{
+    GImage *src = (GImage *)image, *m = (GImage *)mask;
+    if (!src || !m || src->mask)
+        return NULL;
+    cairo_surface_t *s = GImageSurface(src);
+    uint8_t *cov = s ? mask_coverage(m, src->width, src->height) : NULL;
+    if (!cov)
+        return NULL;
+    cairo_surface_t *out = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)src->width, (int)src->height);
+    cairo_surface_flush(out);
+    const uint8_t *sd = cairo_image_surface_get_data(s);
+    uint8_t *od = cairo_image_surface_get_data(out);
+    int ss = cairo_image_surface_get_stride(s), os = cairo_image_surface_get_stride(out);
+    for (size_t y = 0; y < src->height; y++) {
+        const uint8_t *a = sd + y * ss;
+        uint8_t *b = od + y * os;
+        for (size_t x = 0; x < src->width * 4; x++)
+            b[x] = (uint8_t)((a[x] * cov[y * src->width + x / 4] + 127) / 255);
+    }
+    free(cov);
+    cairo_surface_mark_dirty(out);
+    GImage *im = image_from_surface(out);
+    cairo_surface_destroy(out);
+    im->interpolate = src->interpolate;
+    return (CGImageRef)im;
+}
+
+/* an image mask's coverage as Cairo's alpha, for drawing the fill colour through it */
+cairo_surface_t *GMaskSurface(GImage *m)
+{
+    if (m->surface)
+        return m->surface;
+    uint8_t *cov = mask_coverage(m, m->width, m->height);
+    if (!cov)
+        return NULL;
+    cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_A8, (int)m->width, (int)m->height);
+    cairo_surface_flush(s);
+    uint8_t *d = cairo_image_surface_get_data(s);
+    int stride = cairo_image_surface_get_stride(s);
+    for (size_t y = 0; y < m->height; y++)
+        memcpy(d + y * stride, cov + y * m->width, m->width);
+    free(cov);
+    cairo_surface_mark_dirty(s);
+    m->surface = s;
+    return s;
 }
 
 CGImageRef CGImageCreateCopy(CGImageRef image) { return (CGImageRef)[OBJ(image) retain]; }
@@ -606,6 +731,8 @@ CFTypeID CGImageGetTypeID(void) { return (CFTypeID)[GImage class]; }
 
 cairo_surface_t *GImageSurface(GImage *im)
 {
+    if (im->mask)
+        return GMaskSurface(im);
     if (im->surface)
         return im->surface;
     struct gfmt f;
@@ -621,6 +748,7 @@ cairo_surface_t *GImageSurface(GImage *im)
     cairo_surface_flush(s);
     uint8_t *dst = cairo_image_surface_get_data(s);
     int stride = cairo_image_surface_get_stride(s);
+    GContextSyncBytes(im->provider->data.bytes, im->provider->data.length);
     const uint8_t *src = im->provider->data.bytes;
     for (size_t y = 0; y < im->height; y++)
         GToCairo(&f, src + y * im->bpr, (uint32_t *)(dst + y * stride), im->width);

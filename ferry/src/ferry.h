@@ -148,6 +148,7 @@ int ferry_open_flags_to_linux(int mac_flags); /* open(2)'s O_ flags (freemac 1.2
 
 /* libc_apps.c: posix_spawn, glob, fnmatch, termios and mach_wait_until (freemac 1.233) */
 extern const struct ferry_symbol ferry_libc_apps_symbols[];
+extern const struct ferry_symbol ferry_libc_audacity_symbols[]; /* libc_audacity.c (freemac 1.263) */
 
 /* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
 extern const struct ferry_symbol ferry_socket_symbols[];

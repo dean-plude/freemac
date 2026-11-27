@@ -535,15 +535,26 @@ APPKIT_EXTERN NSString *const NSDeviceRGBColorSpace;
 @end
 
 /* Bitmaps of 8-bit RGB or RGBA (premultiplied, alpha last), as a view's
- * cacheDisplayInRect:toBitmapImageRep: makes them. */
+ * cacheDisplayInRect:toBitmapImageRep: makes them, and (freemac 1.263) any
+ * other layout of 1 to 16 bits a sample: white, black, RGB or CMYK, planar
+ * or meshed, alpha first or last, premultiplied or not. */
 @interface NSBitmapImageRep : NSImageRep
 - (instancetype FERRY_SWIFT_NONNULL)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
                               pixelsHigh:(NSInteger)height bitsPerSample:(NSInteger)bps
                          samplesPerPixel:(NSInteger)spp hasAlpha:(BOOL)alpha isPlanar:(BOOL)planar
                           colorSpaceName:(NSString *)space bytesPerRow:(NSInteger)bpr
                             bitsPerPixel:(NSInteger)bpp;
+- (instancetype FERRY_SWIFT_NONNULL)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
+                              pixelsHigh:(NSInteger)height bitsPerSample:(NSInteger)bps
+                         samplesPerPixel:(NSInteger)spp hasAlpha:(BOOL)alpha isPlanar:(BOOL)planar
+                          colorSpaceName:(NSString *)space bitmapFormat:(NSBitmapFormat)format
+                             bytesPerRow:(NSInteger)bpr bitsPerPixel:(NSInteger)bpp;
 - (instancetype)initWithCGImage:(CGImageRef)image;
 @property (readonly) unsigned char *bitmapData;
+- (void)getBitmapDataPlanes:(unsigned char **)data;
+@property (readonly, getter=isPlanar) BOOL planar;
+@property (readonly) NSInteger numberOfPlanes, bytesPerPlane;
+@property (readonly) NSString *colorSpaceName;
 @property (readonly) NSInteger bytesPerRow, samplesPerPixel, bitsPerPixel;
 @property (readonly) NSBitmapFormat bitmapFormat;
 @property (readonly) CGImageRef CGImage;
@@ -699,6 +710,7 @@ typedef NS_ENUM(NSInteger, NSViewLayerContentsRedrawPolicy) {
 - (void)setBoundsSize:(NSSize)size;
 @property (readonly, assign) NSView *superview;
 @property (copy) NSArray<NSView *> *subviews;
+- (void)sortSubviewsUsingFunction:(NSComparisonResult (*)(__kindof NSView *, __kindof NSView *, void *))compare context:(void *)context;
 @property (readonly, assign) NSWindow *window;
 @property (readonly, getter=isFlipped) BOOL flipped;
 @property (readonly, getter=isOpaque) BOOL opaque;
@@ -748,6 +760,8 @@ typedef NS_ENUM(NSInteger, NSViewLayerContentsRedrawPolicy) {
 - (void)displayRect:(NSRect)rect;
 - (void)lockFocus;
 - (void)unlockFocus;
+- (BOOL)lockFocusIfCanDraw;
++ (NSView *)focusView;
 - (NSView *)hitTest:(NSPoint)point;
 - (BOOL)mouse:(NSPoint)point inRect:(NSRect)rect;
 - (BOOL)acceptsFirstMouse:(NSEvent *)event;

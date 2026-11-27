@@ -3395,3 +3395,69 @@ uses that Ferry didn't have:
 Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
+
+## Audacity and what it needed (freemac 1.263, Ferry 0.86.0)
+
+Audacity 3.7.5, from its official download, opens a sound file, plays it
+and records. It's built on wxWidgets 3.1 (its Cocoa port) and PortAudio
+(its Core Audio host, through the default output audio unit). What it
+needed:
+
+- **Drawing only what changed.** A view's `setNeedsDisplay:` and
+  `setNeedsDisplayInRect:` now record the part to draw, and the window draws
+  again only those rectangles (up to eight, merged where they touch), each
+  clipped, from the window background up through every view under it. Until
+  now any mark drew the whole window, so Audacity's meters, asking for a
+  redraw thirty times a second, kept the main thread busy and its clock and
+  playhead never moved. The whole window is still drawn when the window
+  itself was marked (a resize, a new backing), when a sheet is shown, when
+  OpenGL draws in it, or when a view with a layer changed.
+- **lockFocus.** `lockFocus`, `lockFocusIfCanDraw`, `unlockFocus` and
+  `+focusView` draw straight into the window's backing, outside
+  `drawRect:`, as wxWidgets' client drawing does.
+- **Bitmap contexts.** A bitmap context's pixels stay in Ferry's drawing
+  surface between drawing calls and are copied back to the app's memory only
+  when something reads them (`CGBitmapContextGetData`, making an image from
+  it, an image that shares its memory) or the run loop goes round.
+- **Core Audio.** Reading an audio unit's property into a buffer smaller
+  than the value (PortAudio reads "is running" into one byte) gives what
+  fits, as on a Mac. Core MIDI is there with no devices; a system sound
+  plays through the desktop's sound player.
+- **Odds and ends.** Labels with their own line breaks measure as their
+  widest line by all their lines; `sortSubviewsUsingFunction:context:`;
+  a modal window stays in front when other windows come forward; image
+  masks and bitmaps in other pixel layouts; malloc zones; the Carbon calls
+  for standard folders.
+
+To try it without a sound card, `FERRY_AUDIO_INPUT_FILE` names a file of
+raw 32-bit float samples that Ferry's null audio device records from, and
+`FERRY_AUDIO_OUTPUT_FILE` one it plays into.
+
+Not there yet: Audacity's crash reporter has nowhere to send, and a
+selected row in its lists isn't highlighted.
+
+### OBS Studio's own download
+
+OBS Studio 33.0.3 for Intel Macs, as it comes from OBS's site, now opens
+past its permissions window to its main window with a scene, the audio
+mixer and its controls. Earlier work ran a build of OBS made here; the
+official download, built with a newer Xcode, needed four more things:
+
+- **C++ errors.** The system's OpenGL brings in the GNU C++ library, and
+  Ferry's libc++ then took its exception machinery, so OBS's own `catch`
+  never matched a C++ error and the program ended. Ferry now opens libc++
+  with its symbols kept apart (`RTLD_DEEPBIND`).
+- **`___chkstk_darwin`,** the stack probe before a large stack frame (Qt,
+  FFmpeg, x264), touching each page down from the stack pointer and keeping
+  every register.
+- **Literal objects.** Newer clang writes `@3` and `@[a, b]` into the
+  program as objects of the classes `NSConstantIntegerNumber` (the class,
+  the type letters, the value) and `NSConstantArray` (the class, the count,
+  a pointer to the objects), and refers to the empty array and the two
+  booleans by their storage (`__NSArray0__struct`, `__kCFBooleanTrue`).
+  Ferry has those classes, and its booleans live in that storage. The
+  layouts were read from the data in OBS's own files.
+- **Folders and encoders.** Application Support and the other standard
+  folders are made when first asked for, as they always exist on a Mac, and
+  `VTCopyVideoEncoderList` gives an empty list, there being no hardware
+  encoder, so OBS offers its own.

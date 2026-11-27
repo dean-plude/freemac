@@ -760,11 +760,51 @@ static void check_range(NSArray *a, NSRange r)
 }
 @end
 
-/* clang refers to these for the literals @[] (and NSDictionary.m's @{}). */
+/* ---- NSConstantArray: a literal array kept in the program ---------------------------
+ * Newer clang writes a literal such as @[@1, @2] into the program itself, as
+ * an object of the class NSConstantArray: the class, the count, then a
+ * pointer to the objects. Qt and Syphon in OBS's own download hold these
+ * (freemac 1.263). */
+@interface NSConstantArray : NSArray
+@end
+
+/* the fields sit right after the class pointer, where the program put
+ * them; Ferry's own objects keep more there, so they are read by hand */
+struct ferry_constant_array {
+    Class isa;
+    NSUInteger count;
+    const id *objects;
+};
+#define LITERAL(a) ((const struct ferry_constant_array *)(const void *)(a))
+
+@implementation NSConstantArray
+- (id)retain { return self; }
+- (oneway void)release {}
+- (id)autorelease { return self; }
+- (NSUInteger)retainCount { return NSUIntegerMax; }
+- (void)dealloc { /* kept in the program, never freed */ if (0) [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return self; }
+- (NSUInteger)count { return LITERAL(self)->count; }
+- (id)objectAtIndex:(NSUInteger)index
+{
+    range_check(self, _cmd, index, LITERAL(self)->count);
+    return LITERAL(self)->objects[index];
+}
+@end
+
+/* clang refers to these for the literals @[] (and NSDictionary.m's @{}):
+ * older clang reads the pointer __NSArray0__, newer clang uses
+ * __NSArray0__struct itself as the empty array. */
 F_EXPORT id __NSArray0__;
 id __NSArray0__;
+F_EXPORT struct ferry_constant_array __NSArray0__struct;
+struct ferry_constant_array __NSArray0__struct;
 
-__attribute__((constructor)) static void empty_array_init(void) { __NSArray0__ = [[NSArray alloc] init]; }
+__attribute__((constructor)) static void empty_array_init(void)
+{
+    __NSArray0__ = [[NSArray alloc] init];
+    __NSArray0__struct.isa = [NSConstantArray class];
+}
 
 /* ---- NSNull ------------------------------------------------------------------------ */
 

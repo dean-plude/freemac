@@ -11,11 +11,16 @@
  * layouts, such as RGBA (kCGImageAlphaPremultipliedLast) and 8-bit grey,
  * are drawn in a Cairo copy and converted after each drawing call. */
 #import "GInternal.h"
+#include <pthread.h>
+
+static void forget_pending(GContext *c);
 
 @implementation GContext
 
 - (void)dealloc
 {
+    if (pending)
+        forget_pending(self);   /* its memory goes with it: nothing to write out */
     if (cr)
         cairo_destroy(cr);
     if (surface)
@@ -123,22 +128,53 @@ CGContextRef CGBitmapContextCreate(void *data, size_t width, size_t height, size
     return (CGContextRef)c;
 }
 
+/* the contexts whose drawing waits to be written out: main thread only */
+static GContext **pending_list;
+static size_t pending_count, pending_cap;
+static __thread int on_main = -1;
+static BOOL main_thread(void)
+{
+    if (on_main < 0)
+        on_main = pthread_main_np() != 0;
+    return on_main;
+}
+
+static void load_shadow(GContext *c)
+{
+    uint8_t *dst = cairo_image_surface_get_data(c->surface);
+    int stride = cairo_image_surface_get_stride(c->surface);
+    for (size_t y = 0; y < c->height; y++) {
+        const uint8_t *src = (const uint8_t *)c->data + y * c->bpr;
+        if (c->fmt.alphaOnly)
+            memcpy(dst + y * stride, src, c->width);
+        else
+            GToCairo(&c->fmt, src, (uint32_t *)(dst + y * stride), c->width);
+    }
+}
+
+static void write_shadow(GContext *c)
+{
+    const uint8_t *src = cairo_image_surface_get_data(c->surface);
+    int stride = cairo_image_surface_get_stride(c->surface);
+    BOOL opaque = c->fmt.a < 0;
+    for (size_t y = 0; y < c->height; y++) {
+        uint8_t *dst = (uint8_t *)c->data + y * c->bpr;
+        if (c->fmt.alphaOnly)
+            memcpy(dst, src + y * stride, c->width);
+        else
+            GFromCairo(&c->fmt, (const uint32_t *)(src + y * stride), dst, c->width, opaque);
+    }
+}
+
 void GContextWillDraw(GContext *c)
 {
     if (!c->data)
         return;
+    if (c->shadow && c->shadowLoaded)
+        return;   /* already holds the pixels, with the drawing since */
     cairo_surface_flush(c->surface);
-    if (c->shadow) {
-        uint8_t *dst = cairo_image_surface_get_data(c->surface);
-        int stride = cairo_image_surface_get_stride(c->surface);
-        for (size_t y = 0; y < c->height; y++) {
-            const uint8_t *src = (const uint8_t *)c->data + y * c->bpr;
-            if (c->fmt.alphaOnly)
-                memcpy(dst + y * stride, src, c->width);
-            else
-                GToCairo(&c->fmt, src, (uint32_t *)(dst + y * stride), c->width);
-        }
-    }
+    if (c->shadow)
+        load_shadow(c);
     cairo_surface_mark_dirty(c->surface);
     c->shadowLoaded = YES;
 }
@@ -152,23 +188,81 @@ void GContextDidDraw(GContext *c)
     cairo_surface_flush(c->surface);
     if (!c->shadow || !c->shadowLoaded)
         return;
+    c->shadowDirty = YES;
+    if (c->ownsData && main_thread()) {
+        if (!c->pending) {
+            if (pending_count == pending_cap) {
+                pending_cap = pending_cap ? pending_cap * 2 : 16;
+                pending_list = realloc(pending_list, pending_cap * sizeof *pending_list);
+            }
+            pending_list[pending_count++] = c;
+            c->pending = YES;
+        }
+        return;
+    }
+    GContextSync(c);
+}
+
+void GContextSync(GContext *c)
+{
+    if (!c || !c->data || !c->shadow || !c->shadowLoaded)
+        return;
+    cairo_surface_flush(c->surface);
+    if (c->shadowDirty)
+        write_shadow(c);
+    c->shadowDirty = NO;
     c->shadowLoaded = NO;
-    const uint8_t *src = cairo_image_surface_get_data(c->surface);
-    int stride = cairo_image_surface_get_stride(c->surface);
-    BOOL opaque = c->fmt.a < 0;
-    for (size_t y = 0; y < c->height; y++) {
-        uint8_t *dst = (uint8_t *)c->data + y * c->bpr;
-        if (c->fmt.alphaOnly)
-            memcpy(dst, src + y * stride, c->width);
-        else
-            GFromCairo(&c->fmt, (const uint32_t *)(src + y * stride), dst, c->width, opaque);
+}
+
+void GContextSyncAll(void)
+{
+    if (!pending_count || !main_thread())
+        return;
+    for (size_t i = 0; i < pending_count; i++) {
+        GContextSync(pending_list[i]);
+        pending_list[i]->pending = NO;
+    }
+    pending_count = 0;
+}
+
+static void forget_pending(GContext *c)
+{
+    for (size_t i = 0; i < pending_count; i++)
+        if (pending_list[i] == c) {
+            pending_list[i] = pending_list[--pending_count];
+            break;
+        }
+    c->pending = NO;
+}
+
+/* Writes out the waiting drawing of each context whose memory overlaps
+ * bytes: an image made on that memory is about to be read. */
+void GContextSyncBytes(const void *bytes, size_t length)
+{
+    if (!pending_count || !bytes || !main_thread())
+        return;
+    for (size_t i = 0; i < pending_count;) {
+        GContext *c = pending_list[i];
+        const uint8_t *a = c->data, *b = bytes;
+        if (a < b + length && b < a + c->bpr * c->height) {
+            GContextSync(c);
+            forget_pending(c);
+        } else {
+            i++;
+        }
     }
 }
 
 #define CTX ((GContext *)c)
 #define CR (CTX->cr)
 
-void *CGBitmapContextGetData(CGContextRef c) { return c ? CTX->data : NULL; }
+void *CGBitmapContextGetData(CGContextRef c)
+{
+    if (!c)
+        return NULL;
+    GContextSync(CTX);   /* the caller is about to read or write the pixels */
+    return CTX->data;
+}
 size_t CGBitmapContextGetWidth(CGContextRef c) { return c ? CTX->width : 0; }
 size_t CGBitmapContextGetHeight(CGContextRef c) { return c ? CTX->height : 0; }
 size_t CGBitmapContextGetBitsPerComponent(CGContextRef c) { return c ? CTX->bpc : 0; }
@@ -185,7 +279,7 @@ CGImageRef CGBitmapContextCreateImage(CGContextRef c)
 {
     if (!c || !CTX->data)
         return NULL;
-    GContextDidDraw(CTX);
+    GContextSync(CTX);
     CFDataRef copy = (CFDataRef)[[NSData alloc] initWithBytes:CTX->data length:CTX->bpr * CTX->height];
     CGDataProviderRef p = CGDataProviderCreateWithCFData(copy);
     CFRelease(copy);
@@ -198,7 +292,7 @@ CGImageRef CGBitmapContextCreateImage(CGContextRef c)
 CGContextRef CGContextRetain(CGContextRef c) { return (CGContextRef)[OBJ(c) retain]; }
 void CGContextRelease(CGContextRef c) { [OBJ(c) release]; }
 CFTypeID CGContextGetTypeID(void) { return (CFTypeID)[GContext class]; }
-void CGContextFlush(CGContextRef c) { GContextDidDraw(CTX); }
+void CGContextFlush(CGContextRef c) { GContextSync(CTX); }
 void CGContextSynchronize(CGContextRef c) {}
 
 /* ---- graphics state ------------------------------------------------------------------ */
@@ -979,9 +1073,17 @@ void CGContextDrawImage(CGContextRef c, CGRect rect, CGImageRef image)
         cairo_pattern_t *p = cairo_pattern_create_for_surface(s);
         cairo_pattern_set_extend(p, CAIRO_EXTEND_PAD);
         cairo_pattern_set_filter(p, filter_for(CTX, im));
-        cairo_set_source(CR, p);
         cairo_rectangle(CR, 0, 0, im->width, im->height);
         cairo_clip(CR);
+        if (im->mask) {
+            /* an image mask paints the fill colour through it (1.263) */
+            cairo_push_group(CR);
+            GContextSetSource(CTX, GSTATE(CTX)->fill);
+            cairo_mask(CR, p);
+            cairo_pop_group_to_source(CR);
+        } else {
+            cairo_set_source(CR, p);
+        }
         cairo_paint_with_alpha(CR, GSTATE(CTX)->alpha);
         cairo_pattern_destroy(p);
         cairo_restore(CR);

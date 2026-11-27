@@ -6,8 +6,9 @@
  * - malloc_good_size(3) and the malloc zones of malloc_zone_malloc(3).
  *   There is one heap, this system's, so every block can be given back
  *   with free() as on a Mac, and malloc_zone_from_ptr answers the default
- *   zone. A zone the program makes is a name only; destroying it leaves
- *   its blocks allocated, since they may since have been freed one by one.
+ *   zone. Zones are laid out as the Mac's malloc_zone_t, with function
+ *   pointers a program can call (1.263); destroying one leaves its blocks
+ *   allocated, since they may since have been freed one by one.
  * - basename(3) and dirname(3), which on a Mac leave the path alone and
  *   answer in storage of their own (here one buffer per thread), and their
  *   _r forms.
@@ -66,21 +67,109 @@ static size_t mac_malloc_good_size(size_t size)
     return (size + 4095) & ~(size_t)4095;
 }
 
+/* A zone is laid out as malloc_zone_t in the Mac's <malloc/malloc.h>
+ * (freemac 1.263): programs such as SQLite call through its function
+ * pointers rather than the malloc_zone_ calls. Every one of them uses this
+ * system's one heap. */
+struct mac_zone;
 struct mac_zone {
-    char name[64];
+    void *reserved1, *reserved2;
+    size_t (*size)(struct mac_zone *, const void *);
+    void *(*malloc)(struct mac_zone *, size_t);
+    void *(*calloc)(struct mac_zone *, size_t, size_t);
+    void *(*valloc)(struct mac_zone *, size_t);
+    void (*free)(struct mac_zone *, void *);
+    void *(*realloc)(struct mac_zone *, void *, size_t);
+    void (*destroy)(struct mac_zone *);
+    const char *zone_name;
+    unsigned (*batch_malloc)(struct mac_zone *, size_t, void **, unsigned);
+    void (*batch_free)(struct mac_zone *, void **, unsigned);
+    void *introspect;
+    unsigned version;
+    void *(*memalign)(struct mac_zone *, size_t, size_t);
+    void (*free_definite_size)(struct mac_zone *, void *, size_t);
+    size_t (*pressure_relief)(struct mac_zone *, size_t);
+    int (*claimed_address)(struct mac_zone *, void *);
+    void (*try_free_default)(struct mac_zone *, void *);
+    char name[64]; /* Ferry's own, after the Mac's fields */
 };
 
-static struct mac_zone default_zone = {"DefaultMallocZone"};
-static struct mac_zone purgeable_zone = {"DefaultPurgeableMallocZone"};
+static size_t zone_size(struct mac_zone *z, const void *p) { (void)z; return p ? malloc_usable_size((void *)p) : 0; }
+static void *mac_malloc_zone_malloc(struct mac_zone *z, size_t size) { (void)z; return malloc(size); }
+static void *mac_malloc_zone_calloc(struct mac_zone *z, size_t n, size_t size) { (void)z; return calloc(n, size); }
+static void *mac_malloc_zone_valloc(struct mac_zone *z, size_t size) { (void)z; return valloc(size); }
+static void *mac_malloc_zone_realloc(struct mac_zone *z, void *p, size_t size) { (void)z; return realloc(p, size); }
+static void mac_malloc_zone_free(struct mac_zone *z, void *p) { (void)z; free(p); }
+static size_t mac_malloc_zone_pressure_relief(struct mac_zone *z, size_t goal) { (void)z; (void)goal; return 0; }
+static void zone_free_definite(struct mac_zone *z, void *p, size_t size) { (void)z; (void)size; free(p); }
+static int zone_claimed(struct mac_zone *z, void *p) { (void)z; (void)p; return 1; }
 
-static struct mac_zone *mac_malloc_default_zone(void) { return &default_zone; }
-static struct mac_zone *mac_malloc_default_purgeable_zone(void) { return &purgeable_zone; }
+static void *mac_malloc_zone_memalign(struct mac_zone *z, size_t align, size_t size)
+{
+    (void)z;
+    void *p = NULL;
+    return posix_memalign(&p, align < sizeof(void *) ? sizeof(void *) : align, size) ? NULL : p;
+}
+
+static unsigned zone_batch_malloc(struct mac_zone *z, size_t size, void **out, unsigned n)
+{
+    (void)z;
+    unsigned i = 0;
+    for (; i < n && (out[i] = malloc(size)); i++)
+        ;
+    return i;
+}
+
+static void zone_batch_free(struct mac_zone *z, void **p, unsigned n)
+{
+    (void)z;
+    for (unsigned i = 0; i < n; i++)
+        free(p[i]);
+}
+
+static void mac_malloc_destroy_zone(struct mac_zone *z);
+
+/* the introspection table's calls (enumerator, good_size, check, print,
+ * log, force_lock, force_unlock, statistics, zone_locked and the rest):
+ * nothing to report about one shared heap */
+static uintptr_t zone_nothing(void) { return 0; }
+static size_t zone_good_size(struct mac_zone *z, size_t size) { (void)z; return mac_malloc_good_size(size); }
+static void *zone_introspect[] = {
+    (void *)zone_nothing, (void *)zone_good_size, (void *)zone_nothing, (void *)zone_nothing,
+    (void *)zone_nothing, (void *)zone_nothing,   (void *)zone_nothing, (void *)zone_nothing,
+    (void *)zone_nothing, (void *)zone_nothing,   (void *)zone_nothing, (void *)zone_nothing,
+    (void *)zone_nothing, (void *)zone_nothing,   (void *)zone_nothing, (void *)zone_nothing,
+};
+
+#define ZONE_INIT(n)                                                                                       \
+    {                                                                                                      \
+        NULL, NULL, zone_size, mac_malloc_zone_malloc, mac_malloc_zone_calloc, mac_malloc_zone_valloc,     \
+            mac_malloc_zone_free, mac_malloc_zone_realloc, mac_malloc_destroy_zone, NULL, zone_batch_malloc, \
+            zone_batch_free, zone_introspect, 13, mac_malloc_zone_memalign, zone_free_definite,              \
+            mac_malloc_zone_pressure_relief, zone_claimed, mac_malloc_zone_free, n                         \
+    }
+
+static struct mac_zone default_zone = ZONE_INIT("DefaultMallocZone");
+static struct mac_zone purgeable_zone = ZONE_INIT("DefaultPurgeableMallocZone");
+
+static struct mac_zone *zone_named(struct mac_zone *z)
+{
+    if (!z->zone_name)
+        z->zone_name = z->name;
+    return z;
+}
+
+static struct mac_zone *mac_malloc_default_zone(void) { return zone_named(&default_zone); }
+static struct mac_zone *mac_malloc_default_purgeable_zone(void) { return zone_named(&purgeable_zone); }
 
 static struct mac_zone *mac_malloc_create_zone(size_t start, unsigned flags)
 {
-    struct mac_zone *z = calloc(1, sizeof *z);
-    if (z)
-        strcpy(z->name, "Zone");
+    (void)start; (void)flags;
+    struct mac_zone *z = malloc(sizeof *z);
+    if (z) {
+        *z = (struct mac_zone)ZONE_INIT("Zone");
+        z->zone_name = z->name;
+    }
     return z;
 }
 
@@ -90,25 +179,14 @@ static void mac_malloc_destroy_zone(struct mac_zone *z)
         free(z);
 }
 
-static struct mac_zone *mac_malloc_zone_from_ptr(const void *p) { return p ? &default_zone : NULL; }
-static void *mac_malloc_zone_malloc(struct mac_zone *z, size_t size) { return malloc(size); }
-static void *mac_malloc_zone_calloc(struct mac_zone *z, size_t n, size_t size) { return calloc(n, size); }
-static void *mac_malloc_zone_valloc(struct mac_zone *z, size_t size) { return valloc(size); }
-static void *mac_malloc_zone_realloc(struct mac_zone *z, void *p, size_t size) { return realloc(p, size); }
-static void mac_malloc_zone_free(struct mac_zone *z, void *p) { free(p); }
-static size_t mac_malloc_zone_pressure_relief(struct mac_zone *z, size_t goal) { return 0; }
-
-static void *mac_malloc_zone_memalign(struct mac_zone *z, size_t align, size_t size)
-{
-    void *p = NULL;
-    return posix_memalign(&p, align < sizeof(void *) ? sizeof(void *) : align, size) ? NULL : p;
-}
+static struct mac_zone *mac_malloc_zone_from_ptr(const void *p) { return p ? zone_named(&default_zone) : NULL; }
 
 static void mac_malloc_set_zone_name(struct mac_zone *z, const char *name)
 {
     if (z && name) {
         strncpy(z->name, name, sizeof z->name - 1);
         z->name[sizeof z->name - 1] = 0;
+        z->zone_name = z->name;
     }
 }
 

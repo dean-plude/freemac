@@ -161,6 +161,7 @@ void AWindowDidClose(NSWindow *window);
 - (CGAffineTransform)_transformToSuperview;
 - (CGAffineTransform)_transformToWindow;
 - (void)_drawInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
+- (BOOL)_collectDirty:(NSRect *)rects count:(int *)n max:(int)max;
 - (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
 - (BOOL)_needsDisplayAnywhere;
 @end

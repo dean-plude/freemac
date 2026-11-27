@@ -50,7 +50,9 @@ case $framework in
     Quartz) pattern='^_(OBJC_(METACLASS|CLASS)_\$_(QL|QC)|QL|kQL|QC)' ;;
     # Core Audio's file serves AudioToolbox (with the audio objects' calls
     # its header brings in, 1.232) and AudioUnit (freemac 1.234)
-    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter)' ;;
+    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet)' ;;
+    # and Core MIDI, with no devices (freemac 1.263)
+    CoreMIDI) pattern='^_(MIDI|kMIDI)' ;;
     AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

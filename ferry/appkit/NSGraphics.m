@@ -1634,6 +1634,31 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
     BOOL _stale;   /* _image is out of date */
     NSInteger _bpr, _spp;
     CGImageRef _image;
+    /* Any other layout (freemac 1.263): 1, 2, 4, 8 or 16 bits a sample,
+     * planar or meshed, white, black, RGB or CMYK, alpha first or last,
+     * premultiplied or not. The pixels stay as the program lays them out,
+     * in _planes, and are turned into _data's 8-bit RGBA when drawn or read. */
+    BOOL _foreign, _rowns, _rplanar, _rdirty;
+    NSInteger _rbps, _rbpp, _rbpr, _rplaneCount;
+    NSBitmapFormat _rformat;
+    int _rspace;
+    unsigned char *_planes[5];
+    NSString *_space;
+}
+
+enum { RSPACE_WHITE, RSPACE_BLACK, RSPACE_RGB, RSPACE_CMYK };
+
+static int bitmap_space(NSString *space, NSInteger colours)
+{
+    if ([space isEqualToString:@"NSCalibratedBlackColorSpace"] || [space isEqualToString:@"NSDeviceBlackColorSpace"])
+        return RSPACE_BLACK;
+    if ([space isEqualToString:@"NSDeviceCMYKColorSpace"])
+        return RSPACE_CMYK;
+    if ([space isEqualToString:@"NSCalibratedWhiteColorSpace"] || [space isEqualToString:@"NSDeviceWhiteColorSpace"])
+        return RSPACE_WHITE;
+    if (space == nil || [space hasSuffix:@"RGBColorSpace"])
+        return colours == 1 ? RSPACE_WHITE : RSPACE_RGB;
+    return -1;
 }
 
 - (instancetype)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
@@ -1642,27 +1667,145 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
                           colorSpaceName:(NSString *)space bytesPerRow:(NSInteger)bpr
                             bitsPerPixel:(NSInteger)bpp
 {
+    return [self initWithBitmapDataPlanes:planes pixelsWide:width pixelsHigh:height bitsPerSample:bps
+                          samplesPerPixel:spp hasAlpha:alpha isPlanar:planar colorSpaceName:space
+                             bitmapFormat:0 bytesPerRow:bpr bitsPerPixel:bpp];
+}
+
+- (instancetype)initWithBitmapDataPlanes:(unsigned char **)planes pixelsWide:(NSInteger)width
+                              pixelsHigh:(NSInteger)height bitsPerSample:(NSInteger)bps
+                         samplesPerPixel:(NSInteger)spp hasAlpha:(BOOL)alpha isPlanar:(BOOL)planar
+                          colorSpaceName:(NSString *)space bitmapFormat:(NSBitmapFormat)format
+                             bytesPerRow:(NSInteger)bpr bitsPerPixel:(NSInteger)bpp
+{
     if (!(self = [super init]))
         return nil;
-    if (bps != 8 || planar || (spp != 4 && spp != 3) || (bpp && bpp != 32)) {
-        AWarnOnce("NSBitmapImageRep other than 8-bit RGB(A), meshed");
+    _wide = width;
+    _high = height;
+    _alpha = alpha;
+    _spp = spp;
+    _size = NSMakeSize(width, height);
+    _space = [(space ? space : NSDeviceRGBColorSpace) copy];
+    if (bps == 8 && !planar && (spp == 4 || spp == 3) && (!bpp || bpp == 32) && format == 0 &&
+        bitmap_space(space, 3) == RSPACE_RGB) {
+        _bps = 8;
+        _bpr = bpr ? bpr : width * 4;
+        if (planes && planes[0]) {
+            _data = planes[0];
+        } else {
+            _data = calloc((size_t)(_bpr * height), 1);
+            _owns = YES;
+        }
+        return self;
+    }
+    NSInteger colours = spp - (alpha ? 1 : 0);
+    int rspace = bitmap_space(space, colours);
+    BOOL fits = rspace >= 0 && width >= 0 && height >= 0 && spp >= 1 && spp <= 5 &&
+                (bps == 1 || bps == 2 || bps == 4 || bps == 8 || bps == 16) &&
+                colours == (rspace == RSPACE_CMYK ? 4 : rspace == RSPACE_RGB ? 3 : 1) &&
+                !(format & ~(NSUInteger)(NSBitmapFormatAlphaFirst | NSBitmapFormatAlphaNonpremultiplied));
+    if (!fits) {
+        AWarnOnce("an NSBitmapImageRep of this layout");
         [self release];
         return nil;
     }
-    _wide = width;
-    _high = height;
-    _bps = 8;
-    _alpha = alpha;
-    _spp = spp;
-    _bpr = bpr ? bpr : width * 4;
-    _size = NSMakeSize(width, height);
-    if (planes && planes[0]) {
-        _data = planes[0];
-    } else {
-        _data = calloc((size_t)(_bpr * height), 1);
-        _owns = YES;
+    _foreign = YES;
+    _bps = _rbps = bps;
+    _rspace = rspace;
+    _rplanar = planar && spp > 1;
+    _rformat = format;
+    _rplaneCount = _rplanar ? spp : 1;
+    _rbpp = _rplanar ? bps : (bpp ? bpp : bps * spp);
+    _rbpr = bpr ? bpr : (width * _rbpp + 7) / 8;
+    _bpr = width * 4;
+    _data = calloc((size_t)(_bpr * (height ? height : 1)), 1);
+    _owns = YES;
+    BOOL given = planes && planes[0];
+    for (NSInteger i = 0; i < _rplaneCount; i++) {
+        if (given && planes[i]) {
+            _planes[i] = planes[i];
+        } else {
+            _planes[i] = calloc((size_t)(_rbpr * (height ? height : 1)), 1);
+            _rowns = YES; /* all of them were allocated here, or none */
+        }
     }
+    _rdirty = YES;
     return self;
+}
+
+/* one sample of one pixel, scaled to 0...255 */
+static unsigned bitmap_sample(const unsigned char *row, NSInteger bit, NSInteger bps)
+{
+    switch (bps) {
+    case 16: {
+        const unsigned char *p = row + bit / 8;
+        return (unsigned)((p[0] << 8 | p[1]) >> 8); /* big-endian, as NSBitmapImageRep stores them */
+    }
+    case 8:
+        return row[bit / 8];
+    default: {
+        unsigned v = (row[bit / 8] >> (8 - bps - bit % 8)) & ((1u << bps) - 1);
+        return v * 255 / ((1u << bps) - 1);
+    }
+    }
+}
+
+/* turns the program's pixels into 8-bit RGBA, premultiplied */
+- (void)_syncForeign
+{
+    if (!_foreign)
+        return;
+    _rdirty = NO;
+    _stale = YES;
+    NSInteger colours = _spp - (_alpha ? 1 : 0);
+    BOOL first = _alpha && (_rformat & NSBitmapFormatAlphaFirst);
+    BOOL straight = _alpha && (_rformat & NSBitmapFormatAlphaNonpremultiplied);
+    for (NSInteger y = 0; y < _high; y++) {
+        unsigned char *out = _data + y * _bpr;
+        for (NSInteger x = 0; x < _wide; x++, out += 4) {
+            unsigned v[5];
+            for (NSInteger s = 0; s < _spp; s++) {
+                const unsigned char *row = _planes[_rplanar ? s : 0] + y * _rbpr;
+                NSInteger bit = _rplanar ? x * _rbps : x * _rbpp + s * _rbps;
+                v[s] = bitmap_sample(row, bit, _rbps);
+            }
+            unsigned a = 255;
+            const unsigned *c = v;
+            if (_alpha) {
+                if (first) {
+                    a = v[0];
+                    c = v + 1;
+                } else {
+                    a = v[colours];
+                }
+            }
+            unsigned r, g, b;
+            switch (_rspace) {
+            case RSPACE_WHITE: r = g = b = c[0]; break;
+            case RSPACE_BLACK: r = g = b = (straight || !_alpha ? 255 : a) - c[0]; break;
+            case RSPACE_RGB: r = c[0]; g = c[1]; b = c[2]; break;
+            default: { /* CMYK, the simple way */
+                unsigned k = c[3];
+                r = (255 - (c[0] > 255 - k ? 255 : c[0] + k));
+                g = (255 - (c[1] > 255 - k ? 255 : c[1] + k));
+                b = (255 - (c[2] > 255 - k ? 255 : c[2] + k));
+            }
+            }
+            if (straight) {
+                r = r * a / 255;
+                g = g * a / 255;
+                b = b * a / 255;
+            } else if (_alpha) {
+                if (r > a) r = a;
+                if (g > a) g = a;
+                if (b > a) b = a;
+            }
+            out[0] = (unsigned char)r;
+            out[1] = (unsigned char)g;
+            out[2] = (unsigned char)b;
+            out[3] = (unsigned char)a;
+        }
+    }
 }
 
 - (instancetype)initWithCGImage:(CGImageRef)image
@@ -1718,6 +1861,10 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
 {
     if (_owns)
         free(_data);
+    if (_rowns)
+        for (NSInteger i = 0; i < _rplaneCount; i++)
+            free(_planes[i]);
+    [_space release];
     CGImageRelease(_image);
     [super dealloc];
 }
@@ -1725,15 +1872,31 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
 - (unsigned char *)bitmapData
 {
     _exposed = YES;
-    return _data;
+    _rdirty = YES;
+    return _foreign ? _planes[0] : _data;
 }
-- (NSInteger)bytesPerRow { return _bpr; }
+- (void)getBitmapDataPlanes:(unsigned char **)data
+{
+    if (!data)
+        return;
+    _exposed = YES;
+    _rdirty = YES;
+    for (int i = 0; i < 5; i++)
+        data[i] = _foreign ? (i < _rplaneCount ? _planes[i] : NULL) : (i == 0 ? _data : NULL);
+}
+- (BOOL)isPlanar { return _foreign && _rplanar; }
+- (NSInteger)numberOfPlanes { return _foreign ? _rplaneCount : 1; }
+- (NSInteger)bytesPerPlane { return (_foreign ? _rbpr : _bpr) * _high; }
+- (NSInteger)bytesPerRow { return _foreign ? _rbpr : _bpr; }
 - (NSInteger)samplesPerPixel { return _spp; }
-- (NSInteger)bitsPerPixel { return 32; }
-- (NSBitmapFormat)bitmapFormat { return 0; }
+- (NSInteger)bitsPerPixel { return _foreign ? _rbpp : 32; }
+- (NSBitmapFormat)bitmapFormat { return _foreign ? _rformat : 0; }
+- (NSString *)colorSpaceName { return _space ? _space : NSDeviceRGBColorSpace; }
 
 - (CGImageRef)CGImage
 {
+    if (_foreign && (_exposed || _rdirty))
+        [self _syncForeign];
     if (_image && !_exposed && !_stale)
         return _image;
     _stale = NO;
@@ -1752,6 +1915,8 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
 {
     if (x < 0 || y < 0 || x >= _wide || y >= _high)
         return nil;
+    if (_rdirty)
+        [self _syncForeign];
     const unsigned char *p = _data + y * _bpr + x * 4;
     CGFloat a = _alpha ? p[3] / 255.0 : 1;
     if (a == 0)
@@ -1765,6 +1930,8 @@ void AFillRoundedRect(NSRect rect, CGFloat radius, NSColor *fill, NSColor *strok
         return;
     CGFloat c[4];
     AColorRGBA(color, c);
+    if (_rdirty)
+        [self _syncForeign];
     unsigned char *p = _data + y * _bpr + x * 4;
     CGFloat a = _alpha ? c[3] : 1;
     _stale = YES;
@@ -1823,6 +1990,8 @@ static cairo_status_t append_png(void *closure, const unsigned char *data, unsig
 
 - (NSData *)representationUsingType:(NSBitmapImageFileType)type properties:(NSDictionary *)properties
 {
+    if (_foreign && (_exposed || _rdirty))
+        [self _syncForeign];
     if (type == NSBitmapImageFileTypeTIFF)
         return [self _pixbufFileOfType:"tiff" quality:nil];
     if (type == NSBitmapImageFileTypeJPEG)

@@ -1183,6 +1183,25 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.263 "Audacity plays and records; OBS's own download opens" (done)
+
+Ferry 0.86.0: Audacity 3.7.5, the audio editor, runs from its official download. It opens a sound file and draws its waveform, plays it with the clock and playhead moving, and records, the waveform growing as it comes in. It was picked from the list of apps that looked likely not to work: it's built on wxWidgets and PortAudio, which use parts of AppKit and Core Audio no app had used before. The biggest change helps every app: a window now draws again only the part its views marked, as a Mac does, instead of the whole window, so an app that updates a meter or a clock many times a second stays quick. OBS Studio 33.0.3's official download, rather than a build made here, now opens to its main window too.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Windows draw again only what changed (`setNeedsDisplayInRect:`), a few rectangles at a time; a window's own change, a sheet, OpenGL or a layer still draws all of it | Ferry AppKit | done |
+| 2 | `lockFocus`, `lockFocusIfCanDraw` and `focusView`: drawing outside `drawRect:` lands in the window (wxWidgets' client drawing, a playhead over a waveform) | Ferry AppKit | done |
+| 3 | Bitmap contexts keep their pixels in Ferry's drawing surface until something reads them, so drawing into one bitmap many times is fast | Ferry Core Graphics | done |
+| 4 | Core Audio: an audio unit's property read into a short buffer gets what fits (PortAudio); render callbacks on any scope; Core MIDI and Core Audio's services (no MIDI devices) | Ferry Core Audio | done |
+| 5 | Labels with their own line breaks measure as all their lines; `sortSubviewsUsingFunction:context:`; a modal window stays in front of windows ordered front after it | Ferry AppKit | done |
+| 6 | Images: masks, bitmaps in other pixel layouts, field cells; malloc zones, Carbon folder and HIToolbox calls, more of the C library | Ferry | done |
+| 7 | Audacity 3.7.5 opens a WAV, plays it with the clock and playhead moving, and records | Ferry / Audacity | done |
+| 8 | A Mac program's C++ errors are caught by its own `catch` even when the system's GNU C++ library is loaded too (Ferry's libc++ is kept apart from it) | Ferry | done |
+| 9 | `___chkstk_darwin`, the stack probe Xcode's compilers call before a large stack frame; standard folders such as Application Support are made when first asked for | Ferry | done |
+| 10 | Literal numbers and arrays that newer Xcode writes into a program (`NSConstantIntegerNumber`, `NSConstantArray`, the empty array and the booleans by their storage) | Ferry Foundation | done |
+| 11 | VideoToolbox's encoder list (empty: no hardware encoders), so OBS offers its software encoders | Ferry | done |
+| 12 | OBS Studio 33.0.3's official download opens past its first-run windows to its main window | Ferry / OBS | done |
+
 ## 1.262 "IINA plays video" (done)
 
 Ferry 0.85.0: IINA 1.3.5, the video player written in Swift, runs from its official download and plays a video, picture and sound, in its own player window. It's the second app picked because it looked likely not to work: a large Swift app built on mpv and FFmpeg. Ferry gained what it was missing: more of the Swift additions a Mac's Foundation makes (`Data` and its protocols, `CharacterSet`, `IndexSet`, `URLRequest`, `CocoaError` and `URLError`, string methods), the Mac's shape of `DispatchQueue`, VideoToolbox (no hardware codecs, so FFmpeg decodes in software), picture in picture, ColorSync and power-source calls, window aspect ratios and drags, and gesture recognizers. A Swift object watched with key-value observing no longer crashes, and Swift's array storage is saved in archives as a plain array, as on a Mac.

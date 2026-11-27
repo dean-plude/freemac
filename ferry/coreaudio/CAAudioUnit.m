@@ -191,6 +191,7 @@ struct ComponentInstanceRecord {
     UInt32 layout_size[2];
     Float32 volume;
     UInt32 should_allocate, start_at_zero;
+    UInt32 render_quality; /* kept for the program; samples move unchanged */
     OSStatus last_error;
     unit_listener *listeners;
     render_notify *notifies;
@@ -311,6 +312,7 @@ OSStatus AudioComponentInstanceNew(AudioComponent c, AudioComponentInstance *out
     u->volume = 1.0f;
     u->should_allocate = 1;
     u->start_at_zero = 1;
+    u->render_quality = 0x7F; /* kRenderQuality_Max */
     if (has_device(u)) {
         for (int i = 0; i < 2; i++)
             AudioObjectAddPropertyListener(kAudioObjectSystemObject, &default_addresses[i], default_changed, u);
@@ -1035,6 +1037,10 @@ static OSStatus unit_get(AudioUnit u, AudioUnitPropertyID id, AudioUnitScope sco
         uput(v, &u->input, sizeof u->input);
         w = 1;
         break;
+    case kAudioUnitProperty_RenderQuality:
+        uput32(v, u->render_quality);
+        w = 1;
+        break;
     case kAudioOutputUnitProperty_StartTimestampsAtZero:
         uput32(v, u->start_at_zero);
         w = 1;
@@ -1098,10 +1104,12 @@ OSStatus AudioUnitGetProperty(AudioUnit u, AudioUnitPropertyID id, AudioUnitScop
     if (!err) {
         if (!data)
             *size = v.size;
-        else if (*size < v.size && id != kAudioOutputUnitProperty_ChannelMap)
-            err = kAudio_ParamError;
         else {
-            UInt32 n = *size < v.size ? *size / 4 * 4 : v.size;
+            /* a short buffer gets what fits, as a Mac's units copy it:
+             * PortAudio reads IsRunning into a 1-byte Boolean */
+            UInt32 n = *size >= v.size                            ? v.size
+                       : id == kAudioOutputUnitProperty_ChannelMap ? *size / 4 * 4
+                                                                   : *size;
             memcpy(data, ubytes(&v), n);
             *size = n;
         }
@@ -1185,10 +1193,8 @@ OSStatus AudioUnitSetProperty(AudioUnit u, AudioUnitPropertyID id, AudioUnitScop
             u->max_frames = *(const UInt32 *)data;
         break;
     case kAudioUnitProperty_SetRenderCallback:
-        if (scope == kAudioUnitScope_Output) {
-            err = kAudioUnitErr_InvalidScope;
-            break;
-        }
+        /* any scope: PortAudio, which Audacity plays through, sets it on
+         * the output scope, and a Mac's output units take it there too */
         if (!data || size == 0)
             memset(&u->render, 0, sizeof u->render);
         else if (!(err = need(size, sizeof u->render)))
@@ -1286,6 +1292,11 @@ OSStatus AudioUnitSetProperty(AudioUnit u, AudioUnitPropertyID id, AudioUnitScop
             memset(&u->input, 0, sizeof u->input);
         else if (!(err = need(size, sizeof u->input)))
             u->input = *(const AURenderCallbackStruct *)data;
+        break;
+    case kAudioUnitProperty_RenderQuality:
+        if (!data || (err = need(size, 4)))
+            break;
+        u->render_quality = *(const UInt32 *)data;
         break;
     case kAudioOutputUnitProperty_StartTimestampsAtZero:
         if (!data || (err = need(size, 4)))
